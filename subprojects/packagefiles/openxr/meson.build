@@ -4,7 +4,7 @@
 # the runtime-negotiation and manifest-discovery behaviour of the upstream CMake
 # build: XR_RUNTIME_JSON, the Windows ActiveRuntime registry value and the XDG
 # active_runtime.json search all work unchanged.
-project('openxr', ['c', 'cpp'], version: '1.1.63', license: 'Apache-2.0',
+project('openxr', ['c', 'cpp'], version: '1.1.65', license: 'Apache-2.0',
   meson_version: '>=1.6', default_options: ['cpp_std=c++17', 'warning_level=0'])
 
 cpp = meson.get_compiler('cpp')

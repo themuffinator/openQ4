@@ -38,7 +38,7 @@ def require(text: str, token: str, label: str) -> None:
 
 def check_build() -> None:
     wrap = read("subprojects/openxr.wrap")
-    require(wrap, "directory = OpenXR-SDK-release-1.1.63", "openxr.wrap pins the SDK release")
+    require(wrap, "directory = OpenXR-SDK-release-1.1.65", "openxr.wrap pins the SDK release")
     if not re.search(r"source_hash = [0-9a-f]{64}", wrap):
         raise AssertionError("openxr.wrap must pin the tarball hash")
     loader = read("subprojects/packagefiles/openxr/meson.build")

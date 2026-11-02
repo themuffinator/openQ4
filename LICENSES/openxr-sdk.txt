@@ -1,5 +1,5 @@
-OpenXR SDK (Khronos Group), release-1.1.63
-https://github.com/KhronosGroup/OpenXR-SDK/tree/release-1.1.63
+OpenXR SDK (Khronos Group), release-1.1.65
+https://github.com/KhronosGroup/OpenXR-SDK/tree/release-1.1.65
 
 openQ4 builds the OpenXR loader from this release statically into its client
 executable (subprojects/openxr.wrap, subprojects/packagefiles/openxr) and
