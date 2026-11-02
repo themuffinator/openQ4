@@ -332,6 +332,11 @@
 	"#str_41568"	"Frei"
 	"#str_41569"	"Inkompatibel"
 	"#str_41570"	"Unvollständig"
+	"#str_41571"	"Vorh. Marke"
+	"#str_41572"	"Nächste Marke"
+	"#str_41573"	"Auto-Folgen: Aus"
+	"#str_41574"	"Auto-Folgen: Killer"
+	"#str_41575"	"Auto-Folgen: Action"
 
 // Arena campaign
 	"#str_42000"	"EINZELSPIELER"

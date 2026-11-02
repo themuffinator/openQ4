@@ -6,7 +6,8 @@
 // A synthetic recording is written with the production writer, cut at every
 // byte, corrupted and given a stale index, and each staged .part is recovered.
 // The result is read back with the production reader and checked against the
-// clean-end rules the playback path enforces.
+// clean-end rules the playback path enforces. Format 1.3 marker and keyframe
+// records are rebuilt into their directories from the records that survived.
 
 #include <algorithm>
 #include <cassert>
@@ -20,6 +21,8 @@
 #include <string>
 #include <vector>
 
+#include "src/framework/async/MvdNavigation.h"
+
 #ifndef NULL
 #define NULL nullptr
 #endif
@@ -28,6 +31,8 @@ typedef unsigned char byte;
 
 static const int ASYNC_PROTOCOL_MAJOR = 2;
 static const int ASYNC_PROTOCOL_MINOR = 41;
+static const int MAX_ASYNC_CLIENTS = 32;
+static const int SERVER_MVD_MARKER_KIND_COUNT = 9;
 static const int FS_SEEK_SET = 0;
 
 template<class T> static T Min( T a, T b ) { return a < b ? a : b; }
@@ -259,6 +264,9 @@ public:
 	int lastSnapshotGameFrame = 0, lastSnapshotGameTime = 0, lastSnapshotFileOffset = 0;
 	int snapshotSequence = 0, snapshotCount = 0, reliableCount = 0, recordCount = 0;
 	idList<indexEntry_t> recordingIndex;
+	std::vector<openq4_mvd::Marker> markers;
+	std::vector<openq4_mvd::Keyframe> keyframes;
+	int markersDropped = 0;
 
 	void Clear() {
 		state = MVD_IDLE;
@@ -270,6 +278,9 @@ public:
 		lastSnapshotGameFrame = lastSnapshotGameTime = lastSnapshotFileOffset = 0;
 		snapshotSequence = snapshotCount = reliableCount = recordCount = 0;
 		recordingIndex.Clear();
+		markers.clear();
+		keyframes.clear();
+		markersDropped = 0;
 	}
 	bool WouldExceedLimits( int ) const { return false; }
 	bool WriteHeader();
@@ -277,6 +288,8 @@ public:
 	bool WriteRecord( unsigned short type, unsigned short version, unsigned short flags, const void *payload, int payloadLength, bool enforceLimits = true );
 	readResult_t ReadRecord( idFile *source, record_t &record );
 	bool WriteIndexRecord();
+	bool WriteNavigationRecords();
+	bool NoteNavigationRecord( const record_t &record, int fileOffset );
 	idStr BuildRecordingName( const idCmdArgs &args ) const;
 	bool Recover( const idCmdArgs &args );
 };
@@ -290,7 +303,35 @@ struct Layout {
 	std::vector<byte> bytes;
 	std::vector<int> recordEnds;		// file offset after each record
 	std::vector<int> recordTypes;
+	std::vector<int> recordStarts;
 };
+
+// A marker record as RecordMarker writes it.
+static std::vector<std::uint8_t> MarkerPayload( int frame, int time, int victim ) {
+	openq4_mvd::Marker marker;
+	marker.gameTime = time;
+	marker.kind = 5;
+	marker.client = 1;
+	marker.value0 = victim;
+	marker.value1 = 7;
+	std::vector<std::uint8_t> payload;
+	openq4_mvd::AppendU32( payload, static_cast<std::uint32_t>( frame ) );
+	openq4_mvd::AppendMarkerBody( payload, marker );
+	return payload;
+}
+
+// A keyframe record's grammar: counts, then three non-empty blocks.
+static std::vector<std::uint8_t> KeyframePayload( int frame, int time, int sequence, int reliables, int records ) {
+	std::vector<std::uint8_t> payload;
+	for ( int value : { frame, time, sequence, reliables, records } ) {
+		openq4_mvd::AppendU32( payload, static_cast<std::uint32_t>( value ) );
+	}
+	for ( int block = 0; block < 3; block++ ) {
+		openq4_mvd::AppendU32( payload, 3 );
+		payload.insert( payload.end(), { 7, 8, 9 } );
+	}
+	return payload;
+}
 
 // A recording as StartRecording and CaptureServerFrame write it: header,
 // metadata, map and network state, then reliable messages and snapshots every
@@ -313,12 +354,17 @@ static Layout WriteSource( bool withStaleIndex ) {
 	writer.header.contentChecksum = 0x1234u;
 	Layout layout;
 	assert( writer.WriteHeader() );
+	const auto note = [&]( int type, int start ) {
+		layout.recordStarts.push_back( start );
+		layout.recordEnds.push_back( writer.file->Tell() );
+		layout.recordTypes.push_back( type );
+	};
 	const byte init[16] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
 	const unsigned short initTypes[3] = { MVD_RECORD_METADATA, MVD_RECORD_MAP_STATE, MVD_RECORD_NETWORK_STATE };
 	for ( unsigned short type : initTypes ) {
+		const int start = writer.file->Tell();
 		assert( writer.WriteRecord( type, 1, type == MVD_RECORD_METADATA ? 0 : MVD_RECORD_FLAG_REQUIRED, init, sizeof( init ) ) );
-		layout.recordEnds.push_back( writer.file->Tell() );
-		layout.recordTypes.push_back( type );
+		note( type, start );
 	}
 	int sequence = 0;
 	for ( int step = 1; step <= 30; step++ ) {
@@ -330,25 +376,44 @@ static Layout WriteSource( bool withStaleIndex ) {
 			reliable.WriteInt( time );
 			reliable.WriteInt( step );
 			reliable.Write( init, 5 );
+			const int start = writer.file->Tell();
 			assert( writer.WriteRecord( MVD_RECORD_RELIABLE, 2, MVD_RECORD_FLAG_REQUIRED, reliable.GetDataPtr(), reliable.Length() ) );
-			layout.recordEnds.push_back( writer.file->Tell() );
-			layout.recordTypes.push_back( MVD_RECORD_RELIABLE );
+			note( MVD_RECORD_RELIABLE, start );
+			writer.reliableCount++;
+		}
+		if ( step % 10 == 5 ) {
+			const std::vector<std::uint8_t> marker = MarkerPayload( frame, time, step % 4 );
+			const int start = writer.file->Tell();
+			assert( writer.WriteRecord( MVD_RECORD_MARKER, 1, 0, marker.data(), static_cast<int>( marker.size() ) ) );
+			note( MVD_RECORD_MARKER, start );
 		}
 		idFile_Memory snapshot( "snapshot" );
 		snapshot.WriteInt( frame );
 		snapshot.WriteInt( time );
 		snapshot.WriteInt( ++sequence );
 		snapshot.Write( init, 9 + step % 7 );
+		int start = writer.file->Tell();
 		assert( writer.WriteRecord( MVD_RECORD_SNAPSHOT, 2, MVD_RECORD_FLAG_REQUIRED, snapshot.GetDataPtr(), snapshot.Length() ) );
-		layout.recordEnds.push_back( writer.file->Tell() );
-		layout.recordTypes.push_back( MVD_RECORD_SNAPSHOT );
+		note( MVD_RECORD_SNAPSHOT, start );
+		if ( step % 10 == 0 ) {
+			const std::vector<std::uint8_t> keyframe = KeyframePayload( frame, time, sequence, writer.reliableCount, writer.recordCount );
+			start = writer.file->Tell();
+			assert( writer.WriteRecord( MVD_RECORD_KEYFRAME, 1, 0, keyframe.data(), static_cast<int>( keyframe.size() ) ) );
+			note( MVD_RECORD_KEYFRAME, start );
+		}
 	}
 	if ( withStaleIndex ) {
-		// A finalize that wrote its index but died before the end record.
+		// A finalize that wrote its index and directories but died before the end record.
 		const byte stale[8] = {};
+		int start = writer.file->Tell();
 		assert( writer.WriteRecord( MVD_RECORD_INDEX, 1, 0, stale, sizeof( stale ), false ) );
-		layout.recordEnds.push_back( writer.file->Tell() );
-		layout.recordTypes.push_back( MVD_RECORD_INDEX );
+		note( MVD_RECORD_INDEX, start );
+		start = writer.file->Tell();
+		assert( writer.WriteRecord( MVD_RECORD_MARKER_TABLE, 1, 0, stale, 4, false ) );
+		note( MVD_RECORD_MARKER_TABLE, start );
+		start = writer.file->Tell();
+		assert( writer.WriteRecord( MVD_RECORD_KEYFRAME_TABLE, 1, 0, stale, 4, false ) );
+		note( MVD_RECORD_KEYFRAME_TABLE, start );
 	}
 	layout.bytes = fs.files["demos/source.mvd.part"];
 	return layout;
@@ -358,6 +423,11 @@ struct Verdict {
 	bool readable = false;
 	int snapshots = 0, reliables = 0, records = 0, endRecords = 0, indexRecords = 0;
 	bool endMatches = false, indexValid = false;
+	int markerTables = 0, keyframeTables = 0;
+	std::vector<openq4_mvd::Marker> markers;
+	std::vector<openq4_mvd::Keyframe> keyframes;
+	std::vector<int> keyframeRecordOffsets;
+	bool directoriesValid = true;
 };
 
 // Read a published demo back with the production reader and apply the clean-end
@@ -407,6 +477,18 @@ static Verdict ReadBack( const char *path ) {
 			verdict.indexRecords++;
 			indexOffset = offset;
 			indexRecord = record;
+		} else if ( record.type == MVD_RECORD_KEYFRAME ) {
+			verdict.keyframeRecordOffsets.push_back( offset );
+		} else if ( record.type == MVD_RECORD_MARKER_TABLE ) {
+			verdict.markerTables++;
+			verdict.directoriesValid = verdict.directoriesValid && openq4_mvd::ParseMarkerTable(
+				record.payload.Ptr(), record.payload.Num(), verdict.markers, SERVER_MVD_MARKER_KIND_COUNT,
+				MAX_ASYNC_CLIENTS, 8 );
+		} else if ( record.type == MVD_RECORD_KEYFRAME_TABLE ) {
+			verdict.keyframeTables++;
+			verdict.directoriesValid = verdict.directoriesValid && indexOffset >= 0 && openq4_mvd::ParseKeyframeTable(
+				record.payload.Ptr(), record.payload.Num(), static_cast<int>( MVD_HEADER_BYTES ), indexOffset,
+				verdict.keyframes );
 		}
 		if ( ( record.type == MVD_RECORD_SNAPSHOT || record.type == MVD_RECORD_RELIABLE ) && record.payload.Num() >= 8 ) {
 			lastFrame = Max( lastFrame, static_cast<int>( MVD_ReadLittleUInt( record.payload.Ptr() ) ) );
@@ -446,10 +528,13 @@ int main() {
 		fs.files.clear();
 		fs.files["demos/source.mvd.part"] = std::vector<byte>( layout.bytes.begin(), layout.bytes.begin() + cut );
 		int expectedSnapshots = 0, expectedReliables = 0, expectedRecords = 0;
+		int expectedMarkers = 0, expectedKeyframes = 0;
 		for ( size_t i = 0; i < layout.recordEnds.size() && layout.recordEnds[i] <= cut; i++ ) {
 			expectedRecords++;
 			expectedSnapshots += layout.recordTypes[i] == MVD_RECORD_SNAPSHOT;
 			expectedReliables += layout.recordTypes[i] == MVD_RECORD_RELIABLE;
+			expectedMarkers += layout.recordTypes[i] == MVD_RECORD_MARKER;
+			expectedKeyframes += layout.recordTypes[i] == MVD_RECORD_KEYFRAME;
 		}
 		const bool recovered = RunRecover( "source.mvd.part" );
 		const bool expectRecovered = cut >= headerBytes && expectedSnapshots > 0;
@@ -464,10 +549,20 @@ int main() {
 		CHECK( verdict.readable );
 		CHECK( verdict.snapshots == expectedSnapshots );
 		CHECK( verdict.reliables == expectedReliables );
-		// Every copied record plus the rebuilt index precedes the end record.
-		CHECK( verdict.records == expectedRecords + 1 );
+		// Every copied record plus the rebuilt index and directories precede the end record.
+		CHECK( verdict.records == expectedRecords + 1 + ( expectedMarkers > 0 ) + ( expectedKeyframes > 0 ) );
 		CHECK( verdict.endRecords == 1 && verdict.endMatches );
 		CHECK( verdict.indexRecords == 1 && verdict.indexValid );
+		// The directories list exactly the surviving markers and keyframes, and
+		// each keyframe entry names a keyframe record.
+		CHECK( verdict.directoriesValid );
+		CHECK( verdict.markerTables == ( expectedMarkers > 0 ) && static_cast<int>( verdict.markers.size() ) == expectedMarkers );
+		CHECK( verdict.keyframeTables == ( expectedKeyframes > 0 ) && static_cast<int>( verdict.keyframes.size() ) == expectedKeyframes );
+		CHECK( static_cast<int>( verdict.keyframeRecordOffsets.size() ) == expectedKeyframes );
+		for ( size_t i = 0; i < verdict.keyframes.size() && i < verdict.keyframeRecordOffsets.size(); i++ ) {
+			CHECK( verdict.keyframes[i].fileOffset == verdict.keyframeRecordOffsets[i] );
+			CHECK( verdict.keyframes[i].sequence == static_cast<int>( ( i + 1 ) * 10 ) );
+		}
 		CHECK( fs.files.count( "demos/source_recovered.mvd.part" ) == 0 );
 	}
 
@@ -488,6 +583,8 @@ int main() {
 		const Verdict verdict = ReadBack( "demos/source_recovered.mvd" );
 		CHECK( verdict.indexRecords == 1 && verdict.indexValid && verdict.endMatches );
 		CHECK( verdict.snapshots == 30 && verdict.reliables == 10 );
+		CHECK( verdict.directoriesValid && verdict.markerTables == 1 && verdict.keyframeTables == 1 );
+		CHECK( verdict.markers.size() == 3 && verdict.keyframes.size() == 3 );
 		CHECK( fs.files["demos/source.mvd.part"] == stale.bytes );
 	}
 

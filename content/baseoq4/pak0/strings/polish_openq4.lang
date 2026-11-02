@@ -344,6 +344,11 @@
 	"#str_41568"	"Swobodnie"
 	"#str_41569"	"Niezgodne"
 	"#str_41570"	"Niepełne"
+	"#str_41571"	"Poprz. znacznik"
+	"#str_41572"	"Nast. znacznik"
+	"#str_41573"	"Śledzenie: Wył."
+	"#str_41574"	"Śledzenie: Zabójca"
+	"#str_41575"	"Śledzenie: Akcja"
 
 // Arena campaign
 	"#str_42000"	"GRA JEDNOOSOBOWA"

@@ -1205,6 +1205,7 @@ void idGameLocal::ServerWriteServerDemoSnapshot( int sequence, idBitMsg &msg, in
 			}
 		}
 	}
+	serverDemoInstances = fullWorldInstances;
 	bool ret = ApplySnapshot( clientSnapshots[ MAX_CLIENTS ], clientEntityStates[ MAX_CLIENTS ], clientPVS[ MAX_CLIENTS ], sequence - 1 );
 	ret = ret;	// shut the warning
 	assert( ret || sequence == 1 );	// past the first snapshot of the server demo stream, there's always exactly one to clear
@@ -2341,6 +2342,251 @@ bool idGameLocal::ClientReadServerDemoSnapshot( int sequence, const int gameFram
 
 /*
 ===============
+idGameLocal::ServerWriteServerDemoBaseline
+
+openQ4: an MVD keyframe's delta baseline. Right after snapshot `sequence` is
+written it is the only one pending; once applied, its entity states replace the
+acknowledged ones. That merged table, stale entries included (a reused entity
+slot is delta-encoded against them), and the snapshot's entity PVS are what the
+next snapshot will be written against. The grammar is versioned on its own and
+validated by the engine before it is recorded or restored.
+===============
+*/
+static const int MVD_BASELINE_VERSION = 1;
+
+bool idGameLocal::ServerWriteServerDemoBaseline( int sequence, idFile *file ) {
+	if ( !IsServerDemoRecording() || file == NULL ) {
+		return false;
+	}
+	const snapshot_t *pending = clientSnapshots[ MAX_CLIENTS ];
+	if ( pending == NULL || pending->next != NULL || pending->sequence != sequence ) {
+		return false;
+	}
+
+	const entityState_t *baseline[ MAX_GENTITIES ];
+	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
+		baseline[ i ] = clientEntityStates[ MAX_CLIENTS ][ i ];
+	}
+	for ( const entityState_t *state = pending->firstEntityState; state != NULL; state = state->next ) {
+		if ( state->entityNumber < 0 || state->entityNumber >= MAX_GENTITIES ) {
+			return false;
+		}
+		baseline[ state->entityNumber ] = state;
+	}
+
+	int count = 0;
+	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
+		if ( baseline[ i ] != NULL ) {
+			count++;
+		}
+	}
+	file->WriteInt( MVD_BASELINE_VERSION );
+	file->WriteInt( sequence );
+	file->WriteUnsignedChar( serverDemoInstances ? 1 : 0 );
+	file->WriteInt( count );
+	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
+		if ( baseline[ i ] == NULL ) {
+			continue;
+		}
+		const int size = baseline[ i ]->state.GetSize();
+		if ( size <= 0 || size > MAX_ENTITY_STATE_SIZE ) {
+			return false;
+		}
+		file->WriteUnsignedShort( static_cast<unsigned short>( i ) );
+		file->WriteUnsignedShort( static_cast<unsigned short>( size ) );
+		file->Write( baseline[ i ]->state.GetData(), size );
+	}
+	for ( int i = 0; i < ENTITY_PVS_SIZE; i++ ) {
+		file->WriteInt( pending->pvs[ i ] );
+	}
+	return true;
+}
+
+/*
+===============
+idGameLocal::ClientReadServerDemoBaseline
+
+openQ4: restores an MVD keyframe after ReadNetworkInfo has spawned its players.
+The baseline becomes the acknowledged state of a pending snapshot numbered
+`sequence`, so the next recorded snapshot applies it and decodes against
+exactly the states the recorder used. Entities present at the keyframe are
+spawned or updated from their states as a snapshot would; those absent are
+staled the same way.
+===============
+*/
+bool idGameLocal::ClientReadServerDemoBaseline( int sequence, idFile *file ) {
+	if ( !IsServerDemoPlaying() || IsRepeaterDemoPlaying() || isServer || localClientNum != MAX_CLIENTS ||
+		 file == NULL ) {
+		return false;
+	}
+	int version = 0;
+	int recordedSequence = 0;
+	unsigned char instanceFlag = 0;
+	int count = 0;
+	if ( file->ReadInt( version ) != sizeof( version ) || version != MVD_BASELINE_VERSION ||
+		 file->ReadInt( recordedSequence ) != sizeof( recordedSequence ) || recordedSequence != sequence ||
+		 file->ReadUnsignedChar( instanceFlag ) != sizeof( instanceFlag ) || instanceFlag > 1 ||
+		 file->ReadInt( count ) != sizeof( count ) || count < 0 || count > MAX_GENTITIES ) {
+		common->Warning( "ClientReadServerDemoBaseline: invalid baseline header" );
+		return false;
+	}
+	const bool readEntityInstances = instanceFlag != 0;
+
+	// This baseline replaces whatever the reset left behind.
+	FreeSnapshotsOlderThanSequence( clientSnapshots[ MAX_CLIENTS ], idMath::INT_MAX );
+	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
+		if ( clientEntityStates[ MAX_CLIENTS ][ i ] != NULL ) {
+			entityStateAllocator.Free( clientEntityStates[ MAX_CLIENTS ][ i ] );
+			clientEntityStates[ MAX_CLIENTS ][ i ] = NULL;
+		}
+	}
+	int previous = -1;
+	for ( int n = 0; n < count; n++ ) {
+		unsigned short entityNumber = 0;
+		unsigned short size = 0;
+		if ( file->ReadUnsignedShort( entityNumber ) != sizeof( entityNumber ) ||
+			 file->ReadUnsignedShort( size ) != sizeof( size ) ||
+			 entityNumber <= previous || entityNumber >= MAX_GENTITIES ||
+			 size == 0 || size > MAX_ENTITY_STATE_SIZE ) {
+			common->Warning( "ClientReadServerDemoBaseline: invalid baseline entry %d", n );
+			return false;
+		}
+		entityState_t *state = entityStateAllocator.Alloc();
+		state->entityNumber = entityNumber;
+		state->next = NULL;
+		state->state.Init( state->stateBuf, sizeof( state->stateBuf ) );
+		state->state.SetSize( size );
+		clientEntityStates[ MAX_CLIENTS ][ entityNumber ] = state;
+		if ( file->Read( state->state.GetData(), size ) != size ) {
+			common->Warning( "ClientReadServerDemoBaseline: truncated baseline entry %d", n );
+			return false;
+		}
+		previous = entityNumber;
+	}
+	for ( int i = 0; i < ENTITY_PVS_SIZE; i++ ) {
+		if ( file->ReadInt( clientPVS[ MAX_CLIENTS ][ i ] ) != sizeof( int ) ) {
+			common->Warning( "ClientReadServerDemoBaseline: truncated entity PVS" );
+			return false;
+		}
+	}
+
+	// An empty pending snapshot: applying it before the next snapshot keeps
+	// these states and PVS as the acknowledged baseline.
+	snapshot_t *snapshot = snapshotAllocator.Alloc();
+	snapshot->sequence = sequence;
+	snapshot->firstEntityState = NULL;
+	snapshot->next = NULL;
+	memcpy( snapshot->pvs, clientPVS[ MAX_CLIENTS ], sizeof( snapshot->pvs ) );
+	clientSnapshots[ MAX_CLIENTS ] = snapshot;
+
+	snapshotEntities.Clear();
+	idEntity *nextSpawnedEnt;
+	for ( idEntity *ent = spawnedEntities.Next(); ent != NULL; ent = nextSpawnedEnt ) {
+		nextSpawnedEnt = ent->spawnNode.Next();
+		const int number = ent->entityNumber;
+		if ( number == ENTITYNUM_NONE || !ent->fl.networkSync || ent->fl.networkStale ||
+			 ( clientPVS[ MAX_CLIENTS ][ number >> 5 ] & ( 1 << ( number & 31 ) ) ) != 0 ) {
+			continue;
+		}
+		if ( ent->ClientStale() ) {
+			delete ent;
+		} else {
+			ent->fl.networkStale = true;
+		}
+	}
+
+	for ( int i = 0; i < ENTITYNUM_NONE; i++ ) {
+		entityState_t *base = clientEntityStates[ MAX_CLIENTS ][ i ];
+		if ( base == NULL || ( clientPVS[ MAX_CLIENTS ][ i >> 5 ] & ( 1 << ( i & 31 ) ) ) == 0 ) {
+			continue;
+		}
+		idBitMsgDelta deltaMsg;
+		base->state.BeginReading();
+		deltaMsg.InitReading( &base->state, NULL, NULL );
+		const int spawnId = deltaMsg.ReadBits( 32 - GENTITYNUM_BITS );
+		const int entityDefNumber = deltaMsg.ReadBits( entityDefBits );
+		const int entityInstance = readEntityInstances ? deltaMsg.ReadBits( ASYNC_PLAYER_INSTANCE_BITS ) : -1;
+		if ( spawnId < 0 || entityDefNumber < 0 ||
+			 entityDefNumber >= declManager->GetNumDecls( DECL_ENTITYDEF ) ||
+			 ( readEntityInstances && ( entityInstance < 0 || entityInstance >= MAX_INSTANCES ) ) ) {
+			common->Warning( "ClientReadServerDemoBaseline: invalid entity header %d/%d/%d", spawnId, entityDefNumber, entityInstance );
+			return false;
+		}
+
+		idEntity *ent = entities[ i ];
+		if ( ent == NULL || ent->entityDefNumber != entityDefNumber || spawnId != spawnIds[ i ] ) {
+			if ( i < MAX_CLIENTS && ent != NULL ) {
+				common->Warning( "ClientReadServerDemoBaseline: recycling client entity %d", i );
+			}
+			delete ent;
+			ent = NULL;
+			spawnCount = spawnId;
+
+			idDict args;
+			args.SetInt( "spawn_entnum", i );
+			args.Set( "name", va( "entity%d", i ) );
+			if ( readEntityInstances ) {
+				args.SetInt( "instance", entityInstance );
+			} else if ( GetLocalPlayer() != NULL ) {
+				args.SetInt( "instance", GetLocalPlayer()->GetInstance() );
+			}
+			const idDeclEntityDef *decl = static_cast< const idDeclEntityDef * >(
+				declManager->DeclByIndex( DECL_ENTITYDEF, entityDefNumber, false ) );
+			if ( decl == NULL || decl->GetType() != DECL_ENTITYDEF ) {
+				common->Warning( "ClientReadServerDemoBaseline: invalid entityDef %d", entityDefNumber );
+				return false;
+			}
+			args.Set( "classname", decl->GetName() );
+			if ( !SpawnEntityDef( args, &ent ) || entities[ i ] == NULL ) {
+				common->Warning( "ClientReadServerDemoBaseline: failed to spawn entity '%s'", decl->GetName() );
+				return false;
+			}
+			if ( i < MAX_CLIENTS && i >= numClients ) {
+				numClients = i + 1;
+			}
+		}
+
+		if ( readEntityInstances && ent->GetInstance() != entityInstance ) {
+			ent->SetInstance( entityInstance );
+		}
+		ent->snapshotNode.AddToEnd( snapshotEntities );
+		ent->snapshotSequence = sequence;
+		if ( ent->fl.networkStale ) {
+			ent->GetPhysics()->LinkClip();
+		}
+		ent->ReadFromSnapshot( deltaMsg );
+		if ( i < MAX_CLIENTS && !deltaMsg.IsReadOverflowed() && deltaMsg.ReadBits( 1 ) == 1 ) {
+			if ( !ent->IsType( idPlayer::GetClassType() ) ) {
+				common->Warning( "ClientReadServerDemoBaseline: non-player entity %d has player state", i );
+				return false;
+			}
+			static_cast< idPlayer * >( ent )->ReadPlayerStateFromSnapshot( deltaMsg );
+		}
+		if ( deltaMsg.IsReadOverflowed() ) {
+			common->Warning( "ClientReadServerDemoBaseline: truncated state for entity %d", i );
+			return false;
+		}
+		// As in ReadNetworkInfo: this resets presentation, so powerups appear.
+		ent->ClientUnstale();
+		ent->fl.networkStale = false;
+	}
+
+	entityState_t *gameStateBase = clientEntityStates[ MAX_CLIENTS ][ ENTITYNUM_NONE ];
+	if ( gameStateBase != NULL ) {
+		idBitMsgDelta deltaMsg;
+		gameStateBase->state.BeginReading();
+		deltaMsg.InitReading( &gameStateBase->state, NULL, NULL );
+		ReadGameStateFromSnapshot( deltaMsg );
+		if ( deltaMsg.IsReadOverflowed() ) {
+			common->Warning( "ClientReadServerDemoBaseline: truncated game state" );
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+===============
 idGameLocal::ClientReadRepeaterSnapshot
 ===============
 */
@@ -2990,6 +3236,9 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			idPlayer* victim = (victimEntityNumber != 255 ? static_cast<idPlayer*>(gameLocal.entities[ victimEntityNumber ]) : NULL);
 			int methodOfDeath = msg.ReadByte( );
 			bool quadKill = msg.ReadBits( 1 ) != 0;
+			if ( IsServerDemoPlaying() ) {
+				demoAutoTrack.NoteKill( attackerEntityNumber, victimEntityNumber, GetDemoFollowClient(), time );
+			}
 		
 			mpGame.ReceiveDeathMessage( attacker, attackerScore, victim, victimScore, methodOfDeath, quadKill );
 			break;
@@ -3294,6 +3543,9 @@ gameReturn_t idGameLocal::ClientPrediction( int clientNum, const usercmd_t *clie
 		if ( clientNum == MAX_CLIENTS && player && isNewFrame && !isRepeater) {
 			assert( player->IsFakeClient() );
 
+			if ( IsServerDemoPlaying() ) {
+				UpdateDemoAutoTrack( player, clientCmds[ clientNum ] );
+			}
 			player->ClientPredictionThink();
 			player->UpdateVisuals();
 
@@ -4825,12 +5077,66 @@ void idGameLocal::ReadNetworkInfo( int gameTime, idFile* file, int clientNum ) {
 
 /*
 ============
+idGameLocal::UpdateDemoAutoTrack
+
+openQ4: moves an auto-tracking playback camera. Attack and jump are the
+camera's own controls, so either one hands the camera back to the operator.
+============
+*/
+void idGameLocal::UpdateDemoAutoTrack( idPlayer *viewer, const usercmd_t &cmd ) {
+	const int mode = demo_autoTrack.GetInteger();
+	if ( mode == MP_AUTOTRACK_OFF || viewer == NULL || !viewer->IsFakeClient() ) {
+		return;
+	}
+	if ( ( cmd.buttons & BUTTON_ATTACK ) != 0 || cmd.upmove > 0 ) {
+		demo_autoTrack.SetInteger( MP_AUTOTRACK_OFF );
+		common->Printf( "MVD auto-tracking off\n" );
+		return;
+	}
+	const char *teamName = demo_autoTrackTeam.GetString();
+	const int teamFilter = !idStr::Icmp( teamName, "marine" ) ? TEAM_MARINE :
+		!idStr::Icmp( teamName, "strogg" ) ? TEAM_STROGG : -1;
+
+	mpAutoTrackPlayer players[ MP_AUTOTRACK_CLIENTS ];
+	static_assert( MP_AUTOTRACK_CLIENTS == MAX_CLIENTS, "auto-track covers every client slot" );
+	for ( int i = 0; i < MAX_CLIENTS; i++ ) {
+		if ( entities[ i ] == NULL || !entities[ i ]->IsType( idPlayer::GetClassType() ) ||
+			 !mpGame.CanSpectatorFollow( viewer->entityNumber, i ) ) {
+			continue;
+		}
+		const idPlayer *candidate = static_cast< const idPlayer * >( entities[ i ] );
+		mpAutoTrackPlayer &player = players[ i ];
+		player.eligible = true;
+		player.alive = !candidate->spectating && candidate->health > 0;
+		player.team = IsTeamGame() ? candidate->team : -1;
+		player.flag = candidate->PowerUpActive( POWERUP_CTF_MARINEFLAG ) ||
+			candidate->PowerUpActive( POWERUP_CTF_STROGGFLAG ) || candidate->PowerUpActive( POWERUP_CTF_ONEFLAG );
+		static const int timed[] = { POWERUP_QUADDAMAGE, POWERUP_HASTE, POWERUP_REGENERATION, POWERUP_INVISIBILITY,
+			POWERUP_ADRENALINE };
+		for ( int p = 0; p < static_cast<int>( sizeof( timed ) / sizeof( timed[ 0 ] ) ); p++ ) {
+			player.powerups += candidate->PowerUpActive( timed[ p ] ) ? 1 : 0;
+		}
+		player.score = mpGame.GetScore( i );
+	}
+
+	const int followed = GetDemoFollowClient();
+	const int target = demoAutoTrack.Choose( mode, IsTeamGame() ? teamFilter : -1, followed, players, time );
+	if ( target >= 0 && target != followed ) {
+		SetDemoFollowClient( target );
+	}
+}
+
+/*
+============
 idGameLocal::SetDemoState
 ============
 */
 void idGameLocal::SetDemoState( demoState_t state, bool _serverDemo, bool _timeDemo ) {
 	if ( demoState == DEMO_RECORDING && state == DEMO_NONE && serverDemo ) {
 		ServerClientDisconnect( MAX_CLIENTS );
+	}
+	if ( state == DEMO_PLAYING && demoState != DEMO_PLAYING ) {
+		demoAutoTrack.Reset();
 	}
 	demoState = state;
 	serverDemo = _serverDemo;

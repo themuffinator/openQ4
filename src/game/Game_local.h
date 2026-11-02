@@ -760,6 +760,9 @@ public:
 
 	virtual void			ServerWriteServerDemoSnapshot( int sequence, idBitMsg &msg, int lastSnapshotFrame, bool fullWorldInstances );
 	virtual bool			ClientReadServerDemoSnapshot( int sequence, const int gameFrame, const int gameTime, const idBitMsg &msg, bool fullWorldInstances );
+	// MVD keyframes are a multiplayer feature; this module records none.
+	virtual bool			ServerWriteServerDemoBaseline( int sequence, idFile *file ) { return false; }
+	virtual bool			ClientReadServerDemoBaseline( int sequence, idFile *file ) { return false; }
 
 	virtual void			RepeaterWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, const userOrigin_t &pvs_origin, int lastSnapshotFrame ) {assert(false);};
 	virtual void			RepeaterEndSnapshots( void ) {};

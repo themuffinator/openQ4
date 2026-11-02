@@ -19,9 +19,10 @@ static const char *DEMO_FILTER_RENDER = "render";
 static const char *DEMO_FILTER_LEGACY = "legacy";
 static const char *DEMO_FILTER_INCOMPLETE = "incomplete";
 
+// Not a cheat: MVD playback restores a cheat-free server's cvars.
 static idCVar demo_uiSeek(
 	"demo_uiSeek", "0",
-	CVAR_SYSTEM | CVAR_GUI | CVAR_FLOAT,
+	CVAR_SYSTEM | CVAR_GUI | CVAR_FLOAT | CVAR_NOCHEAT,
 	"normalized preview position used by the demo playback timeline",
 	0.0f, 1.0f );
 
@@ -402,6 +403,19 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 	}
 }
 
+// With no argument, cycle off, killer, action; the playback deck does the same.
+static void Session_CycleDemoAutoTrack() {
+	idCVar *autoTrack = cvarSystem->Find( "demo_autoTrack" );
+	if ( !idAsyncNetwork::multiViewDemo.IsPlaying() || autoTrack == NULL ) {
+		return;
+	}
+	idCmdArgs args;
+	args.AppendArg( "mvdAutoTrack" );
+	static const char * const modes[] = { "off", "killer", "action" };
+	args.AppendArg( modes[ ( idMath::ClampInt( 0, 2, autoTrack->GetInteger() ) + 1 ) % 3 ] );
+	idMultiViewDemo::AutoTrack_f( args );
+}
+
 #ifndef ID_DEDICATED
 static void Session_DemoMenu_f( const idCmdArgs &args ) {
 	sessLocal.OpenDemoMenu( !sessLocal.IsDemoPlaybackActive() );
@@ -454,6 +468,20 @@ static void Session_DemoFollow_f( const idCmdArgs &args ) {
 static void Session_DemoFreeRoam_f( const idCmdArgs &args ) {
 	if ( idAsyncNetwork::multiViewDemo.IsPlaying() ) {
 		idAsyncNetwork::multiViewDemo.FreeRoam();
+	}
+}
+
+static void Session_DemoMarker_f( const idCmdArgs &args ) {
+	if ( idAsyncNetwork::multiViewDemo.IsPlaying() ) {
+		idMultiViewDemo::Marker_f( args );
+	}
+}
+
+static void Session_DemoAutoTrack_f( const idCmdArgs &args ) {
+	if ( args.Argc() > 1 ) {
+		idMultiViewDemo::AutoTrack_f( args );
+	} else {
+		Session_CycleDemoAutoTrack();
 	}
 }
 
@@ -555,6 +583,8 @@ void idSessionLocal::InitDemoSystem() {
 	cmdSystem->AddCommand( "demoStep", Session_DemoStep_f, CMD_FL_SYSTEM, "steps a paused demo by one frame" );
 	cmdSystem->AddCommand( "demoFollow", Session_DemoFollow_f, CMD_FL_SYSTEM, "follows an MVD player: demoFollow [next|prev|free|<slot>|<name>]" );
 	cmdSystem->AddCommand( "demoFreeRoam", Session_DemoFreeRoam_f, CMD_FL_SYSTEM, "enters MVD free-roam mode" );
+	cmdSystem->AddCommand( "demoMarker", Session_DemoMarker_f, CMD_FL_SYSTEM, "seeks to an MVD marker: demoMarker next|prev [kind]" );
+	cmdSystem->AddCommand( "demoAutoTrack", Session_DemoAutoTrack_f, CMD_FL_SYSTEM, "sets or cycles MVD auto-tracking: demoAutoTrack [off|killer|action] [any|marine|strogg]" );
 	cmdSystem->AddCommand( "demoStop", Session_DemoStop_f, CMD_FL_SYSTEM, "stops unified demo playback" );
 #endif
 }
@@ -768,6 +798,7 @@ void idSessionLocal::UpdateDemoMenuGui() {
 		guiDemoMenu->SetStateBool( "demo_canStep", false );
 		guiDemoMenu->SetStateBool( "demo_canFreeRoam", false );
 		guiDemoMenu->SetStateBool( "demo_canFollow", false );
+		guiDemoMenu->SetStateBool( "demo_canMarker", false );
 	}
 
 	if ( seeking ) {
@@ -797,6 +828,12 @@ void idSessionLocal::UpdateDemoMenuGui() {
 		guiDemoMenu->SetStateBool( "demo_canStep", ( capabilities & DEMO_CAP_STEP ) != 0 );
 		guiDemoMenu->SetStateBool( "demo_canFreeRoam", ( capabilities & DEMO_CAP_FREE_ROAM ) != 0 );
 		guiDemoMenu->SetStateBool( "demo_canFollow", ( capabilities & DEMO_CAP_FOLLOW ) != 0 );
+		guiDemoMenu->SetStateBool( "demo_canMarker",
+			mvdPlaying && idAsyncNetwork::multiViewDemo.GetMarkerCount() > 0 );
+		const idCVar *autoTrack = cvarSystem->Find( "demo_autoTrack" );
+		static const char * const autoTrackLabels[] = { "#str_41573", "#str_41574", "#str_41575" };
+		guiDemoMenu->SetStateString( "demo_autoTrackLabel", DemoLocalized( autoTrackLabels[
+			autoTrack != NULL ? idMath::ClampInt( 0, 2, autoTrack->GetInteger() ) : 0 ] ) );
 	}
 
 	if ( demoBrowserMode && guiDemoList != NULL ) {
@@ -1429,6 +1466,18 @@ bool idSessionLocal::HandleDemoMenuCommand( const char *menuCommand ) {
 		if ( idAsyncNetwork::multiViewDemo.IsPlaying() ) {
 			idAsyncNetwork::multiViewDemo.FreeRoam();
 		}
+		return true;
+	}
+	if ( !idStr::Icmp( cmd, "demoMarkerNext" ) || !idStr::Icmp( cmd, "demoMarkerPrev" ) ) {
+		if ( idAsyncNetwork::multiViewDemo.IsPlaying() ) {
+			idAsyncNetwork::multiViewDemo.SeekToMarker( !idStr::Icmp( cmd, "demoMarkerNext" ) ? 1 : -1, 0 );
+			UpdateDemoMenuGui();
+		}
+		return true;
+	}
+	if ( !idStr::Icmp( cmd, "demoAutoTrack" ) ) {
+		Session_CycleDemoAutoTrack();
+		UpdateDemoMenuGui();
 		return true;
 	}
 	if ( !idStr::Icmp( cmd, "demoStop" ) ) {

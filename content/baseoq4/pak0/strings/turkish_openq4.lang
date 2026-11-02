@@ -332,6 +332,11 @@
 	"#str_41568"	"Serbest"
 	"#str_41569"	"Uyumsuz"
 	"#str_41570"	"Eksik"
+	"#str_41571"	"Önceki İşaret"
+	"#str_41572"	"Sonraki İşaret"
+	"#str_41573"	"Oto Takip: Kapalı"
+	"#str_41574"	"Oto Takip: Katil"
+	"#str_41575"	"Oto Takip: Aksiyon"
 
 // Arena campaign
 	"#str_42000"	"TEK OYUNCULU"

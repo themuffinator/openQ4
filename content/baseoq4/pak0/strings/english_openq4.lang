@@ -332,6 +332,11 @@
 	"#str_41568"	"Free"
 	"#str_41569"	"Incompatible"
 	"#str_41570"	"Incomplete"
+	"#str_41571"	"Prev Marker"
+	"#str_41572"	"Next Marker"
+	"#str_41573"	"Auto-Track: Off"
+	"#str_41574"	"Auto-Track: Killer"
+	"#str_41575"	"Auto-Track: Action"
 
 // Arena campaign
 	"#str_42000"	"SINGLE PLAYER"

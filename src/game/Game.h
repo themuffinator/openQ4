@@ -370,6 +370,13 @@ public:
 	// Read a snapshot from a server demo stream.
 	virtual bool				ClientReadServerDemoSnapshot( int sequence, const int gameFrame, const int gameTime, const idBitMsg &msg, bool fullWorldInstances ) = 0;
 
+	// MVD keyframes. Right after server demo snapshot `sequence` is written,
+	// write the delta baseline the next snapshot will be encoded against. During
+	// playback, after ReadNetworkInfo has restored a keyframe's players, install
+	// that baseline so the next recorded snapshot decodes as in continuous play.
+	virtual bool				ServerWriteServerDemoBaseline( int sequence, idFile *file ) = 0;
+	virtual bool				ClientReadServerDemoBaseline( int sequence, idFile *file ) = 0;
+
 	// Write a snapshot for repeater clients.
 	virtual void				RepeaterWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, const userOrigin_t &pvs_origin, int lastSnapshotFrame ) = 0;
 
@@ -728,7 +735,9 @@ extern rvGameLog *				gameLog;
 // 55: idUserInterfaceManager appends localized HUD text shaping for objective markers.
 // 56: checkpoint completion notification follows the durable commit.
 // 57: idDict carries a mutation observer; rebuild all modules sharing dictionaries.
-const int GAME_API_VERSION		= 57;
+// 58: idGame server-demo baselines for MVD keyframes; idNetworkSystem appends
+//     structured MVD markers.
+const int GAME_API_VERSION		= 58;
 
 struct gameImport_t {
 

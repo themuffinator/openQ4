@@ -332,6 +332,11 @@
 	"#str_41568"	"Libera"
 	"#str_41569"	"Incompatibile"
 	"#str_41570"	"Incompleta"
+	"#str_41571"	"Segnalino prec."
+	"#str_41572"	"Segnalino succ."
+	"#str_41573"	"Segui auto: No"
+	"#str_41574"	"Segui auto: Killer"
+	"#str_41575"	"Segui auto: Azione"
 
 // Campagna arena
 	"#str_42000"	"GIOCATORE SINGOLO"

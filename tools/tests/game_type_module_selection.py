@@ -673,7 +673,7 @@ def validate_two_phase_game_api_contract() -> None:
         return
 
     game_api = read(game_api_path)
-    require(game_api, "const int GAME_API_VERSION\t\t= 57;", "current game API version")
+    require(game_api, "const int GAME_API_VERSION\t\t= 58;", "current game API version")
     require(
         game_api,
         "virtual void\t\t\t\tShutdownAfterDecls( void ) = 0;",

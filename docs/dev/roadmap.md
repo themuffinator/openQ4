@@ -1596,7 +1596,7 @@ claim peer combinations that have not been tested.
   progress and best result through a disconnect and through a quit
   ([evidence](arena-campaign-ceremony.md#leaving-during-the-ceremony-24-october-2026)).
   Physical controls and endpoint loss/return remain.
-- [ ] **MP-05 — P1, investigation and implementation: demo reliability and
+- [x] **MP-05 — P1, investigation and implementation: demo reliability and
   operator workflow.** Reproduce the recorded Red Rover seek/debris distortion
   using the original recording. Define retention/quota/download/partial recovery
   and structured markers; complete named/previous follow, autotracking, independent
@@ -1656,6 +1656,25 @@ claim peer combinations that have not been tested.
   tests and staged GL refusal/cap/recovery/playback pass, with existing files
   unchanged. Downloads remain explicitly outside standard builds. Structured
   markers, autotracking, independent keyframes and export scope remain open.
+  Completed, 2 November: [MVD 1.3](multiview-demos.md#mvd-13-qualification-2-november-2026)
+  adds only optional records, so 1.2 readers still play it. The server records
+  structured markers (phase, round, pause, team score, kill, flag, powerup and
+  `mvdMark` operator notes) and every user-info broadcast, so players who join
+  mid-recording keep their names. Keyframes every `mvd_keyframeInterval` seconds
+  hold map state, network info and the recorder's full delta baseline;
+  backward and long forward seeks restore the nearest one and replay at most ten
+  seconds, with replay from the start as the fallback. `mvdMarker`/`demoMarker`
+  and the playback deck step through markers; killer and action auto-tracking
+  (`demoAutoTrack`, optional team filter) end when a camera is chosen by hand.
+  Runtime checks on listen and dedicated recordings match full replay at seven
+  keyframe-seek targets (state, players, entities, living poses), walk the
+  markers, follow a late joiner by name and auto-track kills. The dedicated run
+  found that a demo from a cheat-free server could never be paused or slowed
+  (`mvd_paused`, `mvd_scale` and `demo_uiSeek` counted as cheats); those
+  viewer-side cvars are now `CVAR_NOCHEAT`. Native fixtures carry 15 and 6
+  single-reversal controls. This closes the selected scope; reverse scrubbing,
+  timedemo, AVI export, thumbnails and a named player list stay deferred, and
+  Vulkan, Linux and macOS playback of 1.3 recordings were not run.
 - [ ] **MP-06 — P2, implementation and qualification: liquid extensions.** Verify
   splash/bubble/wade effects, underwater view/muffle, projectiles, buoyancy and bot
   behavior. The current AAS compiler already emits water/swim/waterjump data;
@@ -1689,6 +1708,17 @@ claim peer combinations that have not been tested.
   fixed compiler runtime preserves its hashes and writes outside `.install/`.
   This closes the compiler-output check; routing/movement consumers and wider
   liquid presentation remain open, and stock nonswimming AAS defaults stay intact.
+  Progress, 2 November: [replicated air and bot swimming](liquid-qualification.md#replicated-air-and-bot-swimming-2-november-2026)
+  are qualified on Windows/GL. `mp_liquid_air_smoke.py` passes: a remote
+  observer receives the host's air as it drains and recovers, the underwater
+  muffle switches, and paused demo seeks restore air on the followed HUD (100,
+  56, 100, 56). The harness called a nonexistent HUD probe and bound every
+  interface; it now uses `ui_hudTest` and loopback. A 90-second six-bot
+  liquid-lab audit simulates 82 s with 53 kills, no world deaths and one stuck
+  event. Multiplayer bots navigate by their runtime mesh and swimming monsters
+  are deferred, so no AAS swim consumer is in the selected scope. Remaining:
+  player-controlled swimming (real input only), projectiles crossing liquids,
+  and splash, bubble and wade presentation checked by eye.
 - [ ] **MP-07 — P1, implementation and qualification: coupled prediction and
   rewind.** In `src/mpgame/gamesys/SysCvar.cpp` both enhanced prediction and lag
   compensation default off. Preserve the coupled displayed-pose-age and rewind

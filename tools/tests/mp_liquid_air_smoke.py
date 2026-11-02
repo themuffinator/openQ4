@@ -44,7 +44,7 @@ def main() -> int:
             'addbot Sledge 2 exact', 'echo LIQUID_AIR_HOST_READY', 'waitMsec 8000',
             'recordMVD air_state', 'echo LIQUID_AIR_DRY', 'openq4_reportMPState', 'waitMsec 2000',
             'setviewpos -720 420 -200 0', 'waitMsec 3000', 'echo LIQUID_AIR_SUBMERGED',
-            'openq4_reportMPState', 'openq4_hudProbe guis/hud.gui get player_air',
+            'openq4_reportMPState', 'ui_hudTest guis/hud.gui get player_air',
             's_soundWorlds', 'screenshot screenshots/submerged.tga',
             'waitMsec 4000', 'echo LIQUID_AIR_DRAINED', 'openq4_reportMPState',
             'setviewpos 0 0 128 0', 'waitMsec 3000', 'echo LIQUID_AIR_SURFACED',
@@ -53,7 +53,7 @@ def main() -> int:
             'mvdFollow 0', 'mvdPause 1']
     for i, seconds in enumerate((1, 7, 1, 7)):
         host += [f'mvdSeek {seconds}', 'waitMsec 1500', f'echo LIQUID_AIR_SEEK {i}',
-                 'mvdStatus', 'openq4_reportMPState', 'openq4_hudProbe guis/hud.gui get player_air',
+                 'mvdStatus', 'openq4_reportMPState', 'ui_hudTest guis/hud.gui get player_air',
                  f'screenshot screenshots/seek_{i}.tga']
     host += ['stopMVD', 'echo LIQUID_AIR_HOST_COMPLETE', 'quit']
     observer = ['set g_autoExecAfterMapLoad ""', 'follow 0']
@@ -79,6 +79,8 @@ def main() -> int:
             'fs_savepath':str(game.parent), 'fs_devpath':str(game.parent),
             'logFile':'2', 'logFileName':'logs/openq4.log', 'developer':'1', 'net_allowCheats':'1',
             'net_serverDedicated':'0', 'net_LANServer':'1', 'net_port':str(args.port if role=='host' else args.port+1),
+            # Loopback only: no firewall prompt for an unregistered runtime path.
+            'net_ip':'127.0.0.1', 'net_enableIPv6':'0',
             'si_pure':'0', 'si_gameType':'DM', 'si_minPlayers':'1', 'si_maxPlayers':'4',
             'si_warmup':'0', 'si_useReady':'0', 'si_fragLimit':'999', 'si_timeLimit':'0', 'g_matchProfile':'casual',
             'bot_minPlayers':'0', 'bot_chat':'0', 'com_skipLoadingContinue':'1',

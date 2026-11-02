@@ -116,6 +116,8 @@ struct idMultiViewDemo {
     bool StopRecording(const char *reason, bool finalize,
                        serverMVDResultReason_t failureReason = SERVER_MVD_REASON_STREAM_WRITE_FAILED);
     bool WriteIndexRecord() { ++indexWrites; return indexOK; }
+    // The 1.3 directories follow the index; their writes are WriteRecord calls.
+    bool WriteNavigationRecords() { return true; }
     void Clear() {
         ++clears; state = MVD_IDLE; finalizing = false;
         fileName.clear(); tempFileName.clear(); lastError.clear();

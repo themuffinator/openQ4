@@ -9970,6 +9970,7 @@ void idMultiplayerGame::Clear() {
 	bCurrentMenuMsg = false;
 	nextMenu = 0;
 	pureReady = false;
+	mvdMarkersPrimed = false;
 	scoreBoard = NULL;
 	buyMenu = NULL;
 	isBuyingAllowedRightNow = false;
@@ -12177,9 +12178,91 @@ idPlayer* idMultiplayerGame::FragLeader( void ) {
 idMultiplayerGame::PlayerDeath
 ================
 */
+/*
+================
+idMultiplayerGame::PublishMVDMarkers
+
+openQ4: structured markers for an MVD being recorded. Changes made during the
+previous frame are published at the start of this one, from a state the first
+recorded frame primes without reporting it.
+================
+*/
+static_assert( MP_MVD_MARKER_PHASE == SERVER_MVD_MARKER_PHASE && MP_MVD_MARKER_ROUND == SERVER_MVD_MARKER_ROUND &&
+	MP_MVD_MARKER_PAUSE == SERVER_MVD_MARKER_PAUSE && MP_MVD_MARKER_SCORE == SERVER_MVD_MARKER_SCORE &&
+	MP_MVD_MARKER_KILL == SERVER_MVD_MARKER_KILL && MP_MVD_MARKER_FLAG == SERVER_MVD_MARKER_FLAG &&
+	MP_MVD_MARKER_POWERUP == SERVER_MVD_MARKER_POWERUP, "MVD marker kinds must match the engine ABI" );
+static_assert( MP_MVD_MARKER_CLIENTS == MAX_CLIENTS && MP_MVD_MARKER_FLAGS == MAX_CTF_FLAGS &&
+	TEAM_MARINE == 0 && TEAM_STROGG == 1 && POWERUP_MAX <= 32, "MVD marker state sizes" );
+
+void idMultiplayerGame::PublishMVDMarkers( void ) {
+	if ( !networkSystem->ServerIsMVDRecording() ) {
+		mvdMarkersPrimed = false;
+		return;
+	}
+
+	mpMVDMarkerState current;
+	current.phase = gameState->GetMPGameState();
+	current.round = matchSession.GetRoundState();
+	const mpMatchPauseView &pause = matchSession.GetPause();
+	current.pauseState = pause.state;
+	current.pauseKind = pause.kind;
+	current.pauseOwnerSide = pause.ownerSide;
+	current.teamScore[ TEAM_MARINE ] = teamScore[ TEAM_MARINE ];
+	current.teamScore[ TEAM_STROGG ] = teamScore[ TEAM_STROGG ];
+	current.flags = gameLocal.IsFlagGameType() && gameState->IsType( rvCTFGameState::GetClassType() );
+	if ( current.flags ) {
+		rvCTFGameState *ctf = static_cast< rvCTFGameState * >( gameState );
+		for ( int flag = 0; flag < MAX_CTF_FLAGS; flag++ ) {
+			current.flagState[ flag ] = ctf->GetFlagState( flag );
+			current.flagCarrier[ flag ] = ctf->GetFlagCarrier( flag );
+		}
+	}
+	for ( int i = 0; i < MAX_CLIENTS; i++ ) {
+		idEntity *entity = gameLocal.entities[ i ];
+		if ( entity != NULL && entity->IsType( idPlayer::GetClassType() ) ) {
+			current.present[ i ] = true;
+			current.powerups[ i ] = static_cast< std::uint32_t >( static_cast< idPlayer * >( entity )->inventory.powerups );
+		}
+	}
+
+	if ( mvdMarkersPrimed ) {
+		// Item powerups only; flag powerups are reported as flag events.
+		const std::uint32_t tracked =
+			( 1u << POWERUP_QUADDAMAGE ) | ( 1u << POWERUP_HASTE ) | ( 1u << POWERUP_REGENERATION ) |
+			( 1u << POWERUP_INVISIBILITY ) | ( 1u << POWERUP_AMMOREGEN ) | ( 1u << POWERUP_GUARD ) |
+			( 1u << POWERUP_DOUBLER ) | ( 1u << POWERUP_SCOUT ) | ( 1u << POWERUP_ADRENALINE ) |
+			( 1u << POWERUP_FC_ARMOR_REGEN );
+		mpMVDMarkerEvent events[ 64 ];
+		const int count = MPMVDMarkerDiff( mvdMarkerState, current, gameLocal.IsTeamGame(), tracked, events, 64 );
+		for ( int i = 0; i < count; i++ ) {
+			serverMVDMarker_t marker;
+			memset( &marker, 0, sizeof( marker ) );
+			marker.kind = events[ i ].kind;
+			marker.client = events[ i ].client;
+			marker.instance = -1;
+			marker.value0 = events[ i ].value0;
+			marker.value1 = events[ i ].value1;
+			networkSystem->ServerRecordMVDMarker( marker );
+		}
+	}
+	mvdMarkerState = current;
+	mvdMarkersPrimed = true;
+}
+
 void idMultiplayerGame::PlayerDeath( idPlayer *dead, idPlayer *killer, int methodOfDeath ) {
 	// don't do PrintMessageEvent
 	assert( !gameLocal.isClient );
+
+	if ( dead != NULL && networkSystem->ServerIsMVDRecording() ) {
+		serverMVDMarker_t marker;
+		memset( &marker, 0, sizeof( marker ) );
+		marker.kind = SERVER_MVD_MARKER_KILL;
+		marker.client = killer != NULL && killer != dead ? killer->entityNumber : -1;
+		marker.instance = dead->GetInstance();
+		marker.value0 = dead->entityNumber;
+		marker.value1 = methodOfDeath;
+		networkSystem->ServerRecordMVDMarker( marker );
+	}
 
 	if ( killer ) {
 		if ( gameLocal.IsTeamGame() ) {
@@ -16116,6 +16199,7 @@ void idMultiplayerGame::Run( void ) {
 	assert( gameLocal.isMultiplayer && gameLocal.isServer && gameState );
 
 	CommonRun();
+	PublishMVDMarkers();
 	if ( matchSession.GetPhase() == WARMUP || matchSession.GetPhase() == COUNTDOWN ) {
 		SynchronizeAllMatchParticipants();
 	}

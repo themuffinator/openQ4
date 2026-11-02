@@ -10,6 +10,9 @@ openQ4 multi-view demo recording and playback.
 #define __MULTIVIEWDEMO_H__
 
 #include "NetworkSystem.h"
+#include "MvdNavigation.h"
+
+#include <vector>
 
 class idFile;
 class idBitMsg;
@@ -30,6 +33,8 @@ struct mvdFileInfo_t {
 	int						snapshotCount;
 	int						reliableCount;
 	int						recordCount;
+	int						markerCount;
+	int						keyframeCount;
 	int						fileSize;
 	idStr					mapName;
 	idStr					gameType;
@@ -74,9 +79,13 @@ public:
 	bool					CopyFollowName( int clientNum, idStr &name ) const;
 	void					FreeRoam();
 	bool					QueryFileInfo( const char *name, mvdFileInfo_t &info );
+	int						GetMarkerCount() const;
+	bool					SeekToMarker( int direction, int kindFilter );
 
 	void					CaptureServerFrame( int gameFrame, int gameTime );
 	void					CaptureReliableMessage( const idBitMsg &msg, int routeType, int routeClient, int routeInstance = -1 );
+	void					CaptureUserInfo( int clientNum, const idDict &info );
+	bool					RecordMarker( const serverMVDMarker_t &marker );
 	void					RunPlaybackFrame();
 	void					OnServerMapChange();
 
@@ -96,6 +105,10 @@ public:
 	static void				FollowPrev_f( const idCmdArgs &args );
 	static void				Follow_f( const idCmdArgs &args );
 	static void				FreeRoam_f( const idCmdArgs &args );
+	static void				Mark_f( const idCmdArgs &args );
+	static void				Markers_f( const idCmdArgs &args );
+	static void				Marker_f( const idCmdArgs &args );
+	static void				AutoTrack_f( const idCmdArgs &args );
 
 private:
 	enum state_t {
@@ -181,6 +194,15 @@ private:
 	record_t				playbackMapState;
 	record_t				playbackNetworkState;
 	idList<indexEntry_t>	recordingIndex;
+	// Format 1.3 navigation. While recording these collect the directories
+	// written at finalization; during playback they hold what was read back.
+	std::vector<openq4_mvd::Marker>	markers;
+	std::vector<openq4_mvd::Keyframe> keyframes;
+	int						markersDropped;
+	int						lastKeyframeGameTime;
+	int						lastMarkerIndex;
+	int						nextPlaybackMarker;
+	bool					keyframeWritesDisabled;
 	serverMVDRecordingResult_t recordingResult;
 	bool					recordingResultValid;
 
@@ -206,8 +228,18 @@ private:
 	bool					WriteMapStateRecord();
 	bool					WriteNetworkStateRecord();
 	bool					WriteIndexRecord();
+	bool					WriteNavigationRecords();
+	bool					WriteKeyframeRecord( int gameFrame, int gameTime );
+	void					WriteMapStatePayload( idFile *payload ) const;
 	bool					ReadMapStateRecord( const record_t &record );
+	bool					ReadMapStatePayload( const byte *data, int length, idDict &serverInfo,
+								idDict &syncedCVars, idDict userInfo[MAX_ASYNC_CLIENTS] );
 	bool					ValidateNetworkStateRecord( const record_t &record, idStr &error ) const;
+	bool					ValidateNetworkStatePayload( const byte *bytes, int length, idStr &error ) const;
+	bool					NoteNavigationRecord( const record_t &record, int fileOffset );
+	bool					ParseNavigationTable( const record_t &record, int streamStart, int tableOffset );
+	bool					ApplyUserInfoRecord( const record_t &record );
+	bool					JumpToKeyframe( int index, bool &worldReset );
 	bool					ProcessPlaybackRecord( const record_t &record, bool &finished );
 	bool					RecordTimestamp( const record_t &record, int &gameTime ) const;
 	bool					LoadNextPlaybackRecord();

@@ -52,3 +52,39 @@ rather than these AAS files. On 28 October the user selected static liquids,
 player/bot swimming and replicated air readouts. Swimming monsters, new swim
 animations and moving volumes are deferred. Air-HUD replication and broader
 visual/audio/physics qualification remain in the selected MP-06 scope.
+
+## Replicated air and bot swimming, 2 November 2026
+
+Air readouts are replicated. The server publishes each player's air
+percentage as an entity event: a change at most every 100 ms, an unchanged
+value once a second (`mpAirPublishClock`). Clients and spectators show the
+replicated value (`mpAirReadoutState` refuses out-of-order and conflicting
+stamps), and a server demo's first snapshot bootstraps every player's readout.
+`player_air_readout_state.py` executes the ordering, reset and codec rules with
+reversal controls.
+
+`mp_liquid_air_smoke.py` now passes on Windows x64 with OpenGL and the retained
+HUD (`.tmp/wt-mp05-tools/air3/`). A listen host is placed under water in the
+liquid lab and recorded; a separate observer process follows it.
+
+- The observer received the host's air as it drained and recovered (81, 72,
+  64, 55, 47 and 43 per cent, then back up to 70) with advancing server stamps.
+- `s_soundWorlds` reported the underwater muffle on, then off after surfacing.
+- Paused demo seeks to 1, 7, 1 and 7 seconds restored 100, 56, 100 and 56 per
+  cent, and the followed player's HUD showed the same values.
+- The submerged engine capture shows the AIR gauge (74) and the underwater
+  view.
+
+The harness had called a HUD probe command that does not exist and bound every
+interface; it now uses `ui_hudTest guis/hud.gui get player_air` and binds to
+loopback, so it runs from any runtime path without a firewall prompt.
+
+A 90-second audit of six skill-4 bots in the liquid lab on the same build
+(`mp_bot_audit.py --map mp/liquid_lab --classify-impulses`,
+`.tmp/wt-mp05-tools/liquid-audit/`) simulated 82.0 seconds: 53 kills, no world
+deaths, one stuck event, no goal give-ups and 19 completed traversals.
+
+Still open: swimming under player control (it needs real input, which is never
+synthesised), projectiles entering and leaving liquids, and splash, bubble and
+wade presentation checked by eye. Swimming monsters, new swim animations and
+moving liquid volumes stay deferred.

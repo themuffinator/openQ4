@@ -1560,6 +1560,138 @@ windowDef Desktop
 			}
 		}
 
+		windowDef demo_marker_prev_disabled
+		{
+			rect		20,171,116,26
+			visible		( "gui::demo_active" != 1 || "gui::demo_canMarker" != 1 )
+			backcolor	0.07,0.07,0.06,0.9
+			bordercolor	0.18,0.18,0.15,1
+			bordersize	1
+			forecolor	0.36,0.36,0.32,1
+			text		"#str_41571"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_marker_prev
+		{
+			rect		20,171,116,26
+			visible		( "gui::demo_active" == 1 && "gui::demo_canMarker" == 1 )
+			backcolor	0.14,0.16,0.1,0.95
+			bordercolor	0.36,0.4,0.24,1
+			bordersize	1
+			forecolor	0.9,0.91,0.84,1
+			text		"#str_41571"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_marker_prev::backcolor" "$demo_marker_prev::backcolor" "0.32,0.19,0.06,1" "120" ;
+				transition "demo_marker_prev::bordercolor" "$demo_marker_prev::bordercolor" "0.95,0.49,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_marker_prev::backcolor" "$demo_marker_prev::backcolor" "0.14,0.16,0.1,0.95" "180" ;
+				transition "demo_marker_prev::bordercolor" "$demo_marker_prev::bordercolor" "0.36,0.4,0.24,1" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoMarkerPrev" ;
+			}
+		}
+
+		windowDef demo_marker_next_disabled
+		{
+			rect		140,171,116,26
+			visible		( "gui::demo_active" != 1 || "gui::demo_canMarker" != 1 )
+			backcolor	0.07,0.07,0.06,0.9
+			bordercolor	0.18,0.18,0.15,1
+			bordersize	1
+			forecolor	0.36,0.36,0.32,1
+			text		"#str_41572"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_marker_next
+		{
+			rect		140,171,116,26
+			visible		( "gui::demo_active" == 1 && "gui::demo_canMarker" == 1 )
+			backcolor	0.14,0.16,0.1,0.95
+			bordercolor	0.36,0.4,0.24,1
+			bordersize	1
+			forecolor	0.9,0.91,0.84,1
+			text		"#str_41572"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_marker_next::backcolor" "$demo_marker_next::backcolor" "0.32,0.19,0.06,1" "120" ;
+				transition "demo_marker_next::bordercolor" "$demo_marker_next::bordercolor" "0.95,0.49,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_marker_next::backcolor" "$demo_marker_next::backcolor" "0.14,0.16,0.1,0.95" "180" ;
+				transition "demo_marker_next::bordercolor" "$demo_marker_next::bordercolor" "0.36,0.4,0.24,1" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoMarkerNext" ;
+			}
+		}
+
+		windowDef demo_autotrack_disabled
+		{
+			rect		260,171,136,26
+			visible		( "gui::demo_active" != 1 || "gui::demo_canFollow" != 1 )
+			backcolor	0.07,0.07,0.06,0.9
+			bordercolor	0.18,0.18,0.15,1
+			bordersize	1
+			forecolor	0.36,0.36,0.32,1
+			text		"gui::demo_autoTrackLabel"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_autotrack
+		{
+			rect		260,171,136,26
+			visible		( "gui::demo_active" == 1 && "gui::demo_canFollow" == 1 )
+			backcolor	0.14,0.16,0.1,0.95
+			bordercolor	0.36,0.4,0.24,1
+			bordersize	1
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_autoTrackLabel"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_autotrack::backcolor" "$demo_autotrack::backcolor" "0.32,0.19,0.06,1" "120" ;
+				transition "demo_autotrack::bordercolor" "$demo_autotrack::bordercolor" "0.95,0.49,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_autotrack::backcolor" "$demo_autotrack::backcolor" "0.14,0.16,0.1,0.95" "180" ;
+				transition "demo_autotrack::bordercolor" "$demo_autotrack::bordercolor" "0.36,0.4,0.24,1" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoAutoTrack" ;
+			}
+		}
+
 		windowDef demo_speed_label
 		{
 			rect		20,137,50,18

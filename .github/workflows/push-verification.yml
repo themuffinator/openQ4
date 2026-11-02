@@ -350,6 +350,7 @@ jobs:
             tools/tests/mp_weapon_switch_contract.py \
             tools/tests/multiview_demo.py \
             tools/tests/mvd_server_api_contract.py \
+            tools/tests/mvd_navigation_contract.py \
             tools/tests/mvd_recording_failure_contract.py \
             tools/tests/mvd_recovery_contract.py \
             tools/tests/mvd_start_state_contract.py \
@@ -829,6 +830,7 @@ jobs:
           python tools/tests/mp_weapon_switch_contract.py
           python tools/tests/multiview_demo.py
           python tools/tests/mvd_server_api_contract.py
+          python tools/tests/mvd_navigation_contract.py
           python tools/tests/mvd_recording_failure_contract.py
           python tools/tests/mvd_recovery_contract.py
           python tools/tests/mvd_start_state_contract.py

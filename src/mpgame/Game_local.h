@@ -527,6 +527,7 @@ class rvGravityArea;
 
 //============================================================================
 // ddynerman: moved MultiplayerGame.h down here, so it can use more stuff in Game_local (idEntityPtr)
+#include "mp/DemoAutoTrack.h"
 #include "MultiplayerGame.h"
 // openQ4: gametype descriptor table; drives the IsTeamGame/IsFlagGameType family below
 #include "mp/GameTypes.h"
@@ -824,6 +825,8 @@ public:
 
 	virtual void			ServerWriteServerDemoSnapshot( int sequence, idBitMsg &msg, int lastSnapshotFrame, bool fullWorldInstances );
 	virtual bool			ClientReadServerDemoSnapshot( int sequence, const int gameFrame, const int gameTime, const idBitMsg &msg, bool fullWorldInstances );
+	virtual bool			ServerWriteServerDemoBaseline( int sequence, idFile *file );
+	virtual bool			ClientReadServerDemoBaseline( int sequence, idFile *file );
 
 	virtual void			RepeaterWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, const userOrigin_t &pvs_origin, int lastSnapshotFrame );
 	virtual void			RepeaterEndSnapshots( void );
@@ -1318,6 +1321,9 @@ private:
 	// demo interaction usercmds
 	usercmd_t				usercmd, oldUsercmd;
 	int						followPlayer;	// free fly or spectate follow through local interaction during server demo replays
+	bool					serverDemoInstances;	// the last server demo snapshot carried entity instances
+	mpDemoAutoTrack			demoAutoTrack;			// openQ4: playback camera auto-tracking
+	void					UpdateDemoAutoTrack( idPlayer *viewer, const usercmd_t &cmd );
 
 	int						demo_protocol;	// keep track of the protocol of the demo we're replaying
 

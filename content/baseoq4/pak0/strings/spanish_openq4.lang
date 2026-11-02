@@ -332,6 +332,11 @@
 	"#str_41568"	"Libre"
 	"#str_41569"	"Incompatible"
 	"#str_41570"	"Incompleta"
+	"#str_41571"	"Marcador anterior"
+	"#str_41572"	"Marcador siguiente"
+	"#str_41573"	"Seguir auto: No"
+	"#str_41574"	"Seguir auto: Asesino"
+	"#str_41575"	"Seguir auto: Acción"
 
 // Campaña de arena
 	"#str_42000"	"UN JUGADOR"

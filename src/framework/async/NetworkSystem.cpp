@@ -163,6 +163,16 @@ bool idNetworkSystem::ServerCopyMVDRecordingResult(
 
 /*
 ==================
+idNetworkSystem::ServerRecordMVDMarker
+==================
+*/
+bool idNetworkSystem::ServerRecordMVDMarker( const serverMVDMarker_t &marker ) {
+	return idAsyncNetwork::server.IsActive() &&
+		idAsyncNetwork::multiViewDemo.RecordMarker( marker );
+}
+
+/*
+==================
 idNetworkSystem::ServerDropClient
 ==================
 */

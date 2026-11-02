@@ -508,6 +508,8 @@ extern idCVar g_playerLean;
 
 extern idCVar net_clientPredictWeaponSwitch;
 
+extern idCVar demo_autoTrack;
+extern idCVar demo_autoTrackTeam;
 extern idCVar net_mpPredictMode;
 extern idCVar net_mpPredictMaxFrames;
 extern idCVar net_mpPredictDebug;

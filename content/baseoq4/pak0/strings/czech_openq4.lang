@@ -332,6 +332,11 @@
 	"#str_41568"	"Volná"
 	"#str_41569"	"Nekompatibilní"
 	"#str_41570"	"Neúplné"
+	"#str_41571"	"Předchozí značka"
+	"#str_41572"	"Další značka"
+	"#str_41573"	"Sledování: Vyp."
+	"#str_41574"	"Sledování: Vrah"
+	"#str_41575"	"Sledování: Akce"
 
 // Arena campaign
 	"#str_42000"	"JEDEN HRÁČ"

@@ -6,6 +6,50 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Multi-view demo markers, keyframes and auto-tracking, 2 November 2026
+
+- MVD recordings are format 1.3. The new records are optional, so builds that
+  read 1.2 still play them without the extras. The game schema is unchanged;
+  game API 58 adds the keyframe baseline calls and the marker entry point, so
+  engine and both game modules must be replaced together.
+- Structured markers: phase, round, timeout/pause, team score, kill, flag and
+  powerup events, plus `mvdMark <text>` operator notes over the console or rcon.
+  `mvdMarkers` lists them, `mvdMarker`/`demoMarker next|prev [kind]` and the
+  new Prev/Next Marker buttons jump to them, two seconds early by default
+  (`mvd_markerLeadMS`).
+- Keyframes every `mvd_keyframeInterval` seconds (default 10) let a rewind or
+  a long forward seek restore the nearest keyframe and replay at most ten
+  seconds instead of the whole match; replay from the start remains the
+  fallback. A keyframe carries map state, network info and the recorder's
+  complete delta baseline, so the next snapshot decodes exactly as in
+  continuous play.
+- User-info changes are recorded, so players who join or rename during a
+  recording keep their names and can be followed by name.
+- Auto-tracking: `demoAutoTrack killer` follows whoever killed the player being
+  watched; `action` follows flag carriers, powerups and recent kills, with a
+  dwell so the camera does not flicker; `marine`/`strogg` limits it to a team.
+  Choosing a camera by hand ends it. The playback deck has an Auto-Track button.
+- Fixed: demos recorded on servers without cheats could not be paused, slowed or
+  sped up, and the timeline did not follow the playback position. Playback
+  restores the server's `net_allowCheats 0`, and the playback cvars counted as
+  cheats.
+- Evidence: listen and dedicated recordings on Windows/GL match full replay at
+  seven keyframe-seek targets, walk markers, follow a late joiner by name and
+  auto-track kills ([MVD 1.3 qualification](multiview-demos.md#mvd-13-qualification-2-november-2026)).
+  `mvd_navigation_contract.py` (15 controls) and the extended
+  `mvd_recovery_contract.py` cover the parsers, stepping, marker diff,
+  auto-tracking and directory recovery. Not run: Vulkan, Linux and macOS
+  playback of 1.3 recordings, and runtime phase/score/flag markers.
+- Liquids (MP-06): `mp_liquid_air_smoke.py` now passes with the real HUD probe
+  command and loopback binding, and a liquid-lab bot audit records no world
+  deaths ([evidence](liquid-qualification.md#replicated-air-and-bot-swimming-2-november-2026)).
+
+Candidate release wording: Multi-view demos now mark the moments that matter.
+Jump between kills, flag captures, score changes, timeouts and your own notes,
+let the camera follow the killer or the action, and rewind long matches without
+waiting for a full replay. Players who join mid-match keep their names, and
+demos from ordinary servers can be paused and slowed again.
+
 ## Android NDK r30 and OpenAL Soft 1.25.2, 2 November 2026
 
 - The Android release workflow (`android-build.yml`) and the local build

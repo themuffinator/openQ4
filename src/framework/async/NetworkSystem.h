@@ -98,6 +98,33 @@ typedef struct {
 	char					partialQPath[ SERVER_MVD_RESULT_QPATH_BYTES + 1 ];
 } serverMVDRecordingResult_t;
 
+// Fixed-width, append-only game-module ABI for structured MVD markers. The
+// recorder stamps each marker with the server frame and time; text is display
+// data, limited to printable bytes, never an instruction for playback.
+static const int SERVER_MVD_MARKER_TEXT_BYTES = 120;
+
+typedef enum {
+	SERVER_MVD_MARKER_NONE = 0,
+	SERVER_MVD_MARKER_PHASE,		// value0 previous match phase, value1 new phase
+	SERVER_MVD_MARKER_ROUND,		// value0 previous round state, value1 new round state
+	SERVER_MVD_MARKER_PAUSE,		// value0 new pause state, value1 kind | ( owner side + 1 ) << 8
+	SERVER_MVD_MARKER_SCORE,		// value0 team, value1 new team score
+	SERVER_MVD_MARKER_KILL,			// client attacker (-1 world), value0 victim, value1 method of death
+	SERVER_MVD_MARKER_FLAG,			// client carrier (-1 none), value0 flag team, value1 new flag state
+	SERVER_MVD_MARKER_POWERUP,		// client holder, value0 powerup
+	SERVER_MVD_MARKER_NOTE,			// text from an operator
+	SERVER_MVD_MARKER_KIND_COUNT
+} serverMVDMarkerKind_t;
+
+typedef struct {
+	int						kind;
+	int						client;		// -1 when no player owns the event
+	int						instance;	// -1 for every instance
+	int						value0;
+	int						value1;
+	char					text[ SERVER_MVD_MARKER_TEXT_BYTES + 1 ];
+} serverMVDMarker_t;
+
 typedef enum {
 	SC_NONE = -1,
 	SC_FAVORITE,
@@ -209,6 +236,8 @@ public:
 	// False means dropped; true never promises delivery of disposable media.
 	virtual bool			ClientSendVoice( const idBitMsg &msg );
 	virtual bool			ServerSendVoice( int clientNum, const idBitMsg &msg );
+	// False when no recording is active or the marker is malformed.
+	virtual bool			ServerRecordMVDMarker( const serverMVDMarker_t &marker );
 };
 
 extern idNetworkSystem *	networkSystem;

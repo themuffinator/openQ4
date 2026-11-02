@@ -10,6 +10,15 @@ See [release status](../../user/release-status.md) and the
 
 ## Highlights
 
+- **Find the moments that matter in multi-view demos.** Recordings now mark
+  kills, flag captures, score and round changes, timeouts and powerups, and
+  server operators can add notes with `mvdMark`. Jump between them with the
+  new **Prev Marker** and **Next Marker** buttons or `demoMarker`, let
+  **Auto-Track** follow the killer or the action, and rewind long matches
+  quickly: a keyframe every ten seconds means a seek replays at most ten
+  seconds instead of the whole match. Players who join mid-recording keep their
+  names. See the [demos guide](../../user/multiview-demos.md).
+
 - **Choose your renderer and GPU in System settings.** The retained menu groups
   backend and device selection with quality presets and Auto-Detect, shows the
   active renderer, and offers a checked restart after applying a change. Choosing
@@ -295,6 +304,10 @@ See [release status](../../user/release-status.md) and the
 
 ## Upgrade Notes
 
+- Multi-view demos recorded by this build use MVD 1.3. Earlier openQ4 builds
+  that play 1.2 demos still play them, without markers, keyframes or late
+  joiners' names. Replace the engine and both game modules together (game API
+  58).
 - New campaign saves use format 4 to preserve frozen enemies, Retch buffs and
   animation speeds. Supported format 3 saves still load on the same platform;
   an enemy saved as solid ice gets a fresh four-second shatter countdown.
@@ -347,6 +360,9 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- Demos recorded on servers without cheats can be paused, slowed and sped up
+  again, and the playback timeline follows the position. Playback took over
+  the server's cheat setting, which locked those controls.
 - The bundled libraries are updated to their latest releases. SDL 3.4.18
   adds support for the Flydigi Apex 6 controller, stops the Keychron Q6
   System Control from appearing as a gamepad, and fixes a startup crash on

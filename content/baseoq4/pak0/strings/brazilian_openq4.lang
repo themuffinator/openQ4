@@ -332,6 +332,11 @@
 	"#str_41568"	"Livre"
 	"#str_41569"	"Incompatível"
 	"#str_41570"	"Incompleta"
+	"#str_41571"	"Marcador Anterior"
+	"#str_41572"	"Próximo Marcador"
+	"#str_41573"	"Seguir Auto: Não"
+	"#str_41574"	"Seguir Auto: Matador"
+	"#str_41575"	"Seguir Auto: Ação"
 
 // Arena campaign
 	"#str_42000"	"UM JOGADOR"

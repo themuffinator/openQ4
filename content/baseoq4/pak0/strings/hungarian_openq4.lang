@@ -332,6 +332,11 @@
 	"#str_41568"	"Szabad"
 	"#str_41569"	"Nem kompatibilis"
 	"#str_41570"	"Hiányos"
+	"#str_41571"	"Előző jelölő"
+	"#str_41572"	"Következő jelölő"
+	"#str_41573"	"Követés: Ki"
+	"#str_41574"	"Követés: Gyilkos"
+	"#str_41575"	"Követés: Akció"
 
 // Arena campaign
 	"#str_42000"	"EGYJÁTÉKOS"

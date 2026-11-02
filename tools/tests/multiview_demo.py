@@ -89,7 +89,9 @@ def validate_container() -> None:
     for needle in (
         "MVD_MAGIC[8]",
         "MVD_FORMAT_MAJOR = 1",
-        "MVD_FORMAT_MINOR = 2",
+        "MVD_FORMAT_MINOR = 3",
+        "MVD_OPTIONAL_KEYFRAMES",
+        "MVD_RECORD_KEYFRAME_TABLE",
         "MVD_FEATURE_RECORD_CRC",
         "MVD_FEATURE_LENGTH_DELIMITED",
         "MVD_FEATURE_SERVER_SNAPSHOTS",
@@ -222,10 +224,12 @@ def validate_container() -> None:
         "legacy MVDs recorded by game API 44 are rejected after the presentation-only API bump",
     )
 
+    # Map state from the stream start and from keyframes is parsed into
+    # temporaries, validated, and only then applied.
     require_order(
         source,
-        "MVD_ReadDict( &payload, sessLocal.mapSpawnData.syncedCVars, lastError )",
-        "MVD_ValidateSyncedCVars( sessLocal.mapSpawnData.syncedCVars, lastError )",
+        "MVD_ReadDict( &payload, syncedCVars, lastError )",
+        "MVD_ValidateSyncedCVars( syncedCVars, lastError )",
         "MVD network-cvar allowlist",
     )
     synced_cvars = between(
@@ -563,8 +567,9 @@ def validate_documented_compatibility() -> None:
     user = read(ROOT / "docs/user/multiview-demos.md")
 
     for needle in (
-        "format `1.2`",
-        "formats `1.0` and `1.1`",
+        "format `1.3`",
+        "formats `1.0` to `1.2`",
+        "### Keyframes, 1.3",
         "raw `GAME_API_VERSION`",
         "packed MVD game-schema",
         "`FULL_WORLD_INSTANCES`",
@@ -585,8 +590,8 @@ def validate_documented_compatibility() -> None:
         require(developer, needle, "developer MVD compatibility documentation")
 
     for needle in (
-        "MVD `.mvd` 1.0-1.2",
-        "MVD 1.2 is the current writer",
+        "MVD `.mvd` 1.3",
+        "MVD 1.3 is the current writer",
         "every active multiplayer instance",
         "version-1 decoder",
         "no index and a zero snapshot count",

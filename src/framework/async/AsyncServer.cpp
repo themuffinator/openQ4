@@ -1195,6 +1195,7 @@ void idAsyncServer::SendUserInfoBroadcast( int userInfoNum, const idDict &info, 
 	}
 
 	sessLocal.mapSpawnData.userInfo[userInfoNum] = *gameInfo;
+	idAsyncNetwork::multiViewDemo.CaptureUserInfo( userInfoNum, *gameInfo );
 }
 
 /*

@@ -101,7 +101,7 @@ def check_abi() -> None:
         require(render_world, field, "renderView_t keeps existing views symmetric")
 
     game = read("src/game/Game.h")
-    require(game, "const int GAME_API_VERSION\t\t= 57;", "game module ABI v57")
+    require(game, "const int GAME_API_VERSION\t\t= 58;", "game module ABI v58")
     import_block = game[game.index("struct gameImport_t {"):game.index("struct gameExport_t {")]
     # Append-only ABI: vrSystem (v50) keeps its slot; later members follow it.
     if not import_block.rstrip().rstrip("};").rstrip().endswith(

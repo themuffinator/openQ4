@@ -65,6 +65,7 @@ def build_fixture(mvd: str, game: str) -> str:
         mvd, re.M))
     helper = block(mvd, "static bool MVD_StartStateMatchesPlayers(")
     bodies = block(mvd, "bool idMultiViewDemo::ValidateNetworkStateRecord(") + "\n" + \
+        block(mvd, "bool idMultiViewDemo::ValidateNetworkStatePayload(") + "\n" + \
         block(game, "static int MP_StartStatePowerupBits(")
     harness = (ROOT / "tools/tests/native/MvdStartStateFixture.cpp").read_text(encoding="utf-8")
     return (harness.replace("// PRODUCTION_CONSTANTS", constants)

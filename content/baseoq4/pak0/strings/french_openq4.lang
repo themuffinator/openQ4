@@ -332,6 +332,11 @@
 	"#str_41568"	"Libre"
 	"#str_41569"	"Incompatible"
 	"#str_41570"	"Incomplète"
+	"#str_41571"	"Repère précédent"
+	"#str_41572"	"Repère suivant"
+	"#str_41573"	"Suivi auto : Non"
+	"#str_41574"	"Suivi auto : Tueur"
+	"#str_41575"	"Suivi auto : Action"
 
 // Campagne d'arène
 	"#str_42000"	"UN JOUEUR"

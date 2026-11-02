@@ -806,6 +806,8 @@ idCVar net_clientPredictWeaponSwitch(		"net_clientPredictWeaponSwitch",	"1",			C
 // locally, and a server must not be able to force per-frame cost onto a client.
 // (src/game/gamesys/SysCvar.cpp carries a copy of this cvar; the single-player fork never
 // runs multiplayer, so THIS is the live declaration.)
+idCVar demo_autoTrack(						"demo_autoTrack",					"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "multi-view demo camera auto-tracking (0=off, 1=follow the killer, 2=follow the action); choosing a camera by hand turns it off", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar demo_autoTrackTeam(					"demo_autoTrackTeam",				"any",			CVAR_GAME | CVAR_NOCHEAT, "team multi-view demo auto-tracking follows: any, marine or strogg" );
 idCVar net_mpPredictMode(					"net_mpPredictMode",				"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "multiplayer remote-client prediction mode (0=legacy limited, 1=enhanced per-frame)", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1> );
 // Ceiling on the extra replay tics one remote may be simulated for in a single chain.
 // net_clientMaxPrediction lets the engine hand over as many as 62 after a stall, for every

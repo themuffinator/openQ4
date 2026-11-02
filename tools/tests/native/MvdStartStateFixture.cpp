@@ -108,6 +108,7 @@ public:
 		idList<byte> payload;
 	};
 	bool ValidateNetworkStateRecord( const record_t &record, idStr &error ) const;
+	bool ValidateNetworkStatePayload( const byte *bytes, int length, idStr &error ) const;
 };
 
 // PRODUCTION_FUNCTIONS

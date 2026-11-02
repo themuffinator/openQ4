@@ -18,6 +18,7 @@
 #include "mp/Buying.h"
 #include "mp/HitFeedback.h"
 #include "mp/ObjectiveMarkers.h"
+#include "mp/MvdMarkers.h"
 #include "../game/gamesys/HudLines.h"
 #include "mp/match/MatchRules.h"
 #include "mp/match/MatchSeries.h"
@@ -1546,6 +1547,10 @@ private:
 
 	int				lastReadyToggleTime;
 	bool			pureReady;				// defaults to false, set to true once server game is running with pure checksums
+	// openQ4: match state last compared for MVD markers; primed while recording
+	mpMVDMarkerState mvdMarkerState;
+	bool			mvdMarkersPrimed;
+	void			PublishMVDMarkers( void );
 	bool			currentSoundOverride;
 	int				switchThrottle[ 3 ];
 	static void		SendReady( bool isReady );

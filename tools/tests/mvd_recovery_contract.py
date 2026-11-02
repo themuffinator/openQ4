@@ -40,6 +40,8 @@ FUNCTIONS = (
     "bool idMultiViewDemo::WriteRecord(",
     "idMultiViewDemo::readResult_t idMultiViewDemo::ReadRecord(",
     "bool idMultiViewDemo::WriteIndexRecord()",
+    "bool idMultiViewDemo::WriteNavigationRecords()",
+    "bool idMultiViewDemo::NoteNavigationRecord(",
     "idStr idMultiViewDemo::BuildRecordingName(",
     "bool idMultiViewDemo::Recover(",
 )
@@ -54,8 +56,8 @@ ENUMS = (
 MUTATIONS = (
     (
         "a stale index is copied instead of rebuilt",
-        "if ( record.type == MVD_RECORD_INDEX || record.type == MVD_RECORD_END ) {\n\t\t\t// A finalize",
-        "if ( false ) {\n\t\t\t// A finalize",
+        "if ( record.type == MVD_RECORD_INDEX || record.type == MVD_RECORD_END ||\n",
+        "if ( record.type == MVD_RECORD_END ||\n",
     ),
     (
         "the end record does not count the rebuilt index",
@@ -66,6 +68,16 @@ MUTATIONS = (
         "a recording with no complete snapshot is published",
         "if ( ok && snapshotCount == 0 ) {",
         "if ( false ) {",
+    ),
+    (
+        "stale marker and keyframe directories are copied instead of rebuilt",
+        "if ( record.type == MVD_RECORD_INDEX || record.type == MVD_RECORD_END ||\n\t\t\t record.type == MVD_RECORD_MARKER_TABLE || record.type == MVD_RECORD_KEYFRAME_TABLE ) {",
+        "if ( record.type == MVD_RECORD_INDEX || record.type == MVD_RECORD_END ) {",
+    ),
+    (
+        "recovered markers and keyframes are not collected for their directories",
+        "\t\t\tNoteNavigationRecord( record, outputOffset );\n",
+        "\n",
     ),
     (
         "a failed recovery leaves its staged output behind",
@@ -100,7 +112,7 @@ def compile_and_run(source: str, directory: Path, name: str, compiler: str) -> s
     cpp = directory / f"{name}.cpp"
     exe = directory / (f"{name}.exe" if os.name == "nt" else name)
     cpp.write_text(source, encoding="utf-8")
-    command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-sign-compare",
+    command = [compiler, "-std=c++17", f"-I{ROOT}", "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-sign-compare",
                "-Wno-unused-const-variable", "-Wno-unused-function", "-Wno-unused-variable",
                str(cpp), "-o", str(exe)]
     if os.environ.get("MP_MATCH_TEST_SANITIZERS") == "1":

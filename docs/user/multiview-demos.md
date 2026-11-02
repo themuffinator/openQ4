@@ -45,6 +45,20 @@ complete demo.
 snapshot count. It also shows whether the last recording was saved, or why it
 failed and where its partial file is.
 
+### Markers
+
+A recording marks the moments worth finding again: match phase and round
+changes, timeouts and pauses, team score changes, every kill, flag pickups,
+drops, returns and captures, and powerup pickups. Add your own note while
+recording, from the console or over rcon:
+
+```text
+mvdMark "Overtime starts"
+```
+
+Players who join or rename during a recording keep their names in playback, so
+you can follow them by name.
+
 ### Recover an interrupted recording
 
 Every record in an MVD carries its own length and checksum, so the complete
@@ -91,10 +105,41 @@ The controls include:
 - -30, -10, +10, and +30 second skips;
 - 0.25x, 0.5x, 1x, 2x, and 4x speed presets;
 - **Follow next** and **Free roam** for MVDs;
+- **Prev Marker** and **Next Marker**, when the demo has markers;
+- **Auto-Track**, which cycles Off, Killer and Action;
 - stop and close.
 
 While watching an MVD, attack also follows the next active player and jump
 leaves follow mode. Normal movement and look controls move the free camera.
+
+### Jump to markers
+
+`mvdMarkers` lists a demo's markers with their times. `demoMarker next` and
+`demoMarker prev` jump to the next or previous one, landing two seconds before
+it (`mvd_markerLeadMS` changes the lead-in). Add a kind to skip the rest:
+
+```text
+demoMarker next kill
+demoMarker prev note
+```
+
+The kinds are `phase`, `round`, `pause`, `score`, `kill`, `flag`, `powerup` and
+`note`.
+
+### Let the camera follow the action
+
+Auto-tracking picks the player to follow for you:
+
+- **Killer** moves to whoever killed the player you are watching, a moment after
+  the kill so you see it happen.
+- **Action** follows the most interesting player: a flag carrier first, then a
+  player with powerups, a recent run of kills or the lead. It holds each choice
+  for a few seconds, so the camera does not flick between players.
+
+Use the **Auto-Track** button, or `demoAutoTrack killer`, `demoAutoTrack
+action` or `demoAutoTrack off`. Add `marine` or `strogg` to watch one team only.
+Choosing a player yourself, or pressing attack or jump, hands the camera back to
+you.
 
 ### Playback console commands
 
@@ -110,6 +155,8 @@ format supports the action:
 | `demoStep` | Pause and advance one frame. |
 | `demoFollow [next\|prev\|free\|<slot>\|<name>]` | Follow the next or previous player, a client slot, or a player by name in an MVD. |
 | `demoFreeRoam` | Leave MVD follow mode for free flight. |
+| `demoMarker next\|prev [kind]` | Jump to the next or previous MVD marker. |
+| `demoAutoTrack [off\|killer\|action] [any\|marine\|strogg]` | Set auto-tracking, or cycle it with no arguments. |
 | `demoStop` | Stop the active demo. |
 
 A name matches whole names first, ignoring colors and case, then the one name
@@ -117,14 +164,16 @@ that contains what you typed; the console says when several names match. The
 overlay names the player you follow.
 
 MVD-only equivalents remain available: `mvdPause`, `mvdSpeed`, `mvdSeek`,
-`mvdSkip`, `mvdStep`, `mvdFollow`, `mvdFollowNext`, `mvdFollowPrev`, and
-`mvdFreeRoam`. Use `stopMVD` to stop MVD recording or playback.
+`mvdSkip`, `mvdStep`, `mvdFollow`, `mvdFollowNext`, `mvdFollowPrev`,
+`mvdFreeRoam`, `mvdMarker` and `mvdAutoTrack`. Use `stopMVD` to stop MVD
+recording or playback.
 
 ## What each format can do
 
 | Format | Playback | Seeking and speed | Camera |
 |---|---|---|---|
-| openQ4 MVD `.mvd` 1.0-1.2 | Supported, including compatible API-39, API-42, and API-44 1.0/1.1 recordings | Pause, speed, step, and replay-based seek | Full-world free roam and player follow |
+| openQ4 MVD `.mvd` 1.3 | Supported | Pause, speed, step, and seeking from the nearest keyframe | Full-world free roam, player follow, markers and auto-tracking |
+| openQ4 MVD `.mvd` 1.0-1.2 | Supported, including compatible API-39, API-42, and API-44 1.0/1.1 recordings | Pause, speed, step, and replay-based seek | Full-world free roam, player follow and auto-tracking |
 | openQ4 render `.demo` | Supported | Pause, speed, step, and replay-based seek | Fixed recorded camera |
 | Retail Quake 4 render `.demo` | Not supported yet | None | Not available |
 | Retail Quake 4 `.netdemo` | Not supported yet | None | Not available |
@@ -167,6 +216,7 @@ These archived settings make unattended server recording safer:
 | `mvd_maxDurationMinutes` | `360` | Maximum recording duration; `0` disables the limit. |
 | `mvd_enforceContent` | `1` | Refuse playback when declarations/content differ. |
 | `mvd_seekBudgetMS` | `12` | Maximum replay-seek work per displayed frame. |
+| `mvd_keyframeInterval` | `10` | Seconds between keyframes that let seeks skip most of the replay; `0` records none. |
 | `demo_renderSeekBudgetMS` | `10` | Cooperative render-demo replay budget checked between stream commands. |
 
 Lowering the snapshot delay increases temporal detail and file size. The
@@ -182,25 +232,30 @@ supported.
 MVD 1.0 contains the checked match stream without a timeline index. MVD 1.1
 adds an optional sparse timeline index containing the first snapshot,
 approximately one entry per second, and the final snapshot while leaving the
-required record layouts unchanged. MVD 1.2 is the current writer: it records
-networked entities from every active multiplayer instance and preserves
-instance-only reliable and positional effects. Its reliable and snapshot
-records have a new version, while the reader retains the version-1 decoder used
-by 1.0 and 1.1.
+required record layouts unchanged. MVD 1.2 records networked entities from every
+active multiplayer instance and preserves instance-only reliable and positional
+effects. Its reliable and snapshot records have a new version, while the reader
+retains the version-1 decoder used by 1.0 and 1.1.
+MVD 1.3 is the current writer: it adds markers, keyframes and name changes as
+optional records, so an older openQ4 that reads 1.2 still plays a 1.3 demo,
+without those extras.
 
-The current reader accepts all three versions and reconstructs a timeline by
+The current reader accepts all four versions and reconstructs a timeline by
 scanning checked snapshots when the index is absent. A valid 1.1 or 1.2 index
 also lets the browser obtain duration and count information without first
 scanning the whole match. A clean recording that ends before its first
 scheduled snapshot legitimately has no index and a zero snapshot count; it
 remains playable when its initialization and end marker are otherwise valid.
 
-The index does not turn delta snapshots into independent save points. Forward
-seeks replay records quickly from the current position. Rewinding resets the
-recorded map and initial state, then replays from the start in bounded chunks;
-the overlay shows **Seeking...** while that work is in progress. Long demos can
-therefore take longer to rewind, but the same safe fallback works for MVD 1.0
-through 1.2.
+Snapshots are stored as changes from the previous one, so a seek has to rebuild
+the world. An MVD 1.3 demo stores a keyframe every ten seconds: a complete copy
+of the match state the next snapshot builds on. Rewinding, or jumping well
+ahead, reloads the map, restores the nearest keyframe before the target and
+replays at most the last ten seconds, so a rewind late in a long match no
+longer replays everything before it. A
+keyframe that fails its checks is never used; openQ4 falls back to replaying
+from the start, which is also how MVD 1.0 to 1.2 demos seek. The overlay shows
+**Seeking...** while that work is in progress.
 
 Formats 1.0 and 1.1 keep their original exact game-API compatibility check.
 Format 1.2 uses a separately versioned MVD game schema, allowing future game

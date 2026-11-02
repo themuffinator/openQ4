@@ -491,6 +491,7 @@ void idGameLocal::Clear( void ) {
 	memset( &usercmd, 0, sizeof( usercmd ) );
 	memset( &oldUsercmd, 0, sizeof( oldUsercmd ) );
 	followPlayer = -1;	// start free flying
+	serverDemoInstances = false;
 
 	demo_protocol = 0;
 
