@@ -194,7 +194,7 @@ rvmBot::EntityIsDead
 bool rvmBot::EntityIsDead( idEntity* entity )
 {
 	{
-		idPlayer* player = entity->Cast<idPlayer>();
+		idPlayer* player = idCast<idPlayer>( entity );
 		if( player && player->health <= 0 )
 		{
 			return true;
@@ -223,7 +223,7 @@ float rvmBot::BotEntityVisibleTest( int viewer, idVec3 eye, idAngles viewangles,
 	//calculate middle of bounding box
 	//BotEntityInfo(ent, &entinfo);
 	entinfo = gameLocal.entities[ent];
-	viewEnt = gameLocal.entities[viewer]->Cast<idPlayer>();
+	viewEnt = idCast<idPlayer>( gameLocal.entities[viewer] );
 
 	//VectorAdd(entinfo->r.mins, entinfo->r.maxs, middle);
 	//VectorScale(middle, 0.5, middle);
@@ -537,7 +537,7 @@ int rvmBot::BotFindEnemy( bot_state_t* bs, int curenemy )
 	alertness = botCharacterStatsManager.Characteristic_BFloat( bs->character, CHARACTERISTIC_ALERTNESS, 0, 1 );
 	easyfragger = botCharacterStatsManager.Characteristic_BFloat( bs->character, CHARACTERISTIC_EASY_FRAGGER, 0, 1 );
 
-	clientEnt = gameLocal.entities[bs->client]->Cast<idPlayer>();
+	clientEnt = idCast<idPlayer>( gameLocal.entities[bs->client] );
 
 	//check if the health decreased
 	healthdecrease = bs->lasthealth > bs->inventory[INVENTORY_HEALTH];
@@ -548,7 +548,7 @@ int rvmBot::BotFindEnemy( bot_state_t* bs, int curenemy )
 	if( curenemy >= 0 )
 	{
 		//BotEntityInfo(curenemy, &curenemyinfo);
-		curenemyinfo = gameLocal.entities[curenemy]->Cast<idPlayer>();
+		curenemyinfo = idCast<idPlayer>( gameLocal.entities[curenemy] );
 		if( curenemyinfo == NULL || EntityIsDead( curenemyinfo ) )
 		{
 			curenemy = -1;
@@ -583,7 +583,7 @@ int rvmBot::BotFindEnemy( bot_state_t* bs, int curenemy )
 			continue;
 		}
 
-		entinfo = gameLocal.entities[i]->Cast<idPlayer>();
+		entinfo = idCast<idPlayer>( gameLocal.entities[i] );
 		if( !entinfo )
 		{
 			continue;
@@ -747,11 +747,11 @@ void rvmBot::BotAimAtEnemy( bot_state_t* bs )
 		return;
 	}
 
-	self = gameLocal.entities[bs->entitynum]->Cast<idPlayer>();
+	self = idCast<idPlayer>( gameLocal.entities[bs->entitynum] );
 
 	//get the enemy entity information
 	//BotEntityInfo(bs->enemy, &entinfo);
-	entinfo = gameLocal.entities[bs->enemy]->Cast<idPlayer>();
+	entinfo = idCast<idPlayer>( gameLocal.entities[bs->enemy] );
 
 	//if this is not a player (should be an obelisk)
 	if( bs->enemy >= MAX_CLIENTS )
@@ -839,7 +839,7 @@ void rvmBot::BotAimAtEnemy( bot_state_t* bs )
 	}
 	//get the enemy entity information
 	//BotEntityInfo(bs->enemy, &entinfo);
-	entinfo = gameLocal.entities[bs->enemy]->Cast<idPlayer>();
+	entinfo = idCast<idPlayer>( gameLocal.entities[bs->enemy] );
 
 	//if the enemy is invisible then shoot crappy most of the time
 	//if (entinfo->IsInvisible()) {
@@ -1226,7 +1226,7 @@ rvmBot::BotMoveInRandomDirection
 */
 int rvmBot::BotMoveInRandomDirection( bot_state_t* bs )
 {
-	rvmBot* ent = gameLocal.entities[bs->client]->Cast<rvmBot>();
+	rvmBot* ent = idCast<rvmBot>( gameLocal.entities[bs->client] );
 
 	//ent->ResetPathFinding();
 
@@ -1307,7 +1307,7 @@ void rvmBot::BotCheckAttack( bot_state_t* bs )
 	//BotEntityInfo(attackentity, &entinfo);
 	entinfo = gameLocal.entities[attackentity];
 
-	self = gameLocal.entities[bs->client]->Cast<idPlayer>();
+	self = idCast<idPlayer>( gameLocal.entities[bs->client] );
 
 	//
 	reactiontime = botCharacterStatsManager.Characteristic_BFloat( bs->character, CHARACTERISTIC_REACTIONTIME, 0, 1 );

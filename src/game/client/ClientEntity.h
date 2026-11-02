@@ -168,7 +168,7 @@ ID_INLINE bool rvClientEntityPtr<type>::IsValid( void ) const {
 template< class type >
 ID_INLINE type *rvClientEntityPtr<type>::GetEntity( void ) const {
 	int entityNum = spawnId & ( ( 1 << CENTITYNUM_BITS ) - 1 );
-	if ( ( gameLocal.clientSpawnIds[ entityNum ] == ( ( spawnId >> CENTITYNUM_BITS ) & ( 0xffffffff >> CENTITYNUM_BITS ) ) ) ) {
+	if ( gameLocal.clientSpawnIds[ entityNum ] == ( ( spawnId >> CENTITYNUM_BITS ) & ( 0xffffffff >> CENTITYNUM_BITS ) ) ) {
 		return static_cast<type *>( gameLocal.clientEntities[ entityNum ] );
 	}
 	return NULL;

@@ -33,14 +33,14 @@ stateResult_t rvmBot::state_Retreat(const stateParms_t& parms)
 	}
 
 	// Ensure the target is a player.
-	entinfo = gameLocal.entities[bs.enemy]->Cast<idPlayer>();
+	entinfo = idCast<idPlayer>( gameLocal.entities[bs.enemy] );
 	if( !entinfo )
 	{
 		stateThread.SetState("state_SeekLTG");
 		return SRESULT_DONE;
 	}
 
-	owner = gameLocal.entities[bs.entitynum]->Cast<rvmBot>();
+	owner = idCast<rvmBot>( gameLocal.entities[bs.entitynum] );
 
 	// If our enemy is dead, search for another LTG.
 	if( EntityIsDead( entinfo ) )

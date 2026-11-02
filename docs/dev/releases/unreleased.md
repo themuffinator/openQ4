@@ -337,6 +337,12 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- Multiplayer bots on Linux and macOS no longer risk a crash when a player
+  slot is empty. The bot code checked for a missing player in a way those
+  systems' compilers are allowed to skip.
+- For modders: the `printEntityDef` console command now prints the entity
+  definition's keys and values, not just where it was defined.
+
 - The menu pointer reaches every edge of the screen again. Moving the mouse
   while a menu screen was still opening, or out past the edge of the window,
   could leave the pointer stopping short of the far edges until you swept it

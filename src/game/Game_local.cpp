@@ -7492,7 +7492,7 @@ void idGameLocal::AlertBots(idPlayer* player, idVec3 alert_position)
 			continue;
 		}
 
-		bot = entities[i]->Cast<rvmBot>();
+		bot = idCast<rvmBot>( entities[i] );
 		if (bot == NULL)
 		{
 			continue;
@@ -7522,7 +7522,7 @@ void idGameLocal::AlertAI( idEntity *ent ) {
 		// Alert any bots near were we just exploded.
 		if (gameLocal.IsMultiplayer() && gameLocal.isServer)
 		{
-			idPlayer* player = ent->Cast<idPlayer>();
+			idPlayer* player = idCast<idPlayer>( ent );
 			if (player)
 			{
 				AlertBots(player, ent->GetOrigin());

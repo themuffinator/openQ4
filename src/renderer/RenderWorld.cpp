@@ -2516,7 +2516,7 @@ void idRenderWorldLocal::DebugSphere( const idVec4 &color, const idSphere &spher
 idRenderWorldLocal::DebugBounds
 ====================
 */
-void idRenderWorldLocal::DebugBounds( const idVec4 &color, const idBounds &bounds, const idVec3 &org, const int lifetime ) {
+void idRenderWorldLocal::DebugBounds( const idVec4 &color, const idBounds &bounds, const idVec3 &org, const int lifetime, bool depthTest ) {
 	int i;
 	idVec3 v[8];
 
@@ -2530,9 +2530,9 @@ void idRenderWorldLocal::DebugBounds( const idVec4 &color, const idBounds &bound
 		v[i][2] = org[2] + bounds[(i>>2)&1][2];
 	}
 	for ( i = 0; i < 4; i++ ) {
-		DebugLine( color, v[i], v[(i+1)&3], lifetime );
-		DebugLine( color, v[4+i], v[4+((i+1)&3)], lifetime );
-		DebugLine( color, v[i], v[4+i], lifetime );
+		DebugLine( color, v[i], v[(i+1)&3], lifetime, depthTest );
+		DebugLine( color, v[4+i], v[4+((i+1)&3)], lifetime, depthTest );
+		DebugLine( color, v[i], v[4+i], lifetime, depthTest );
 	}
 }
 

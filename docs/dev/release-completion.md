@@ -6,6 +6,49 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## General fixes round, 2 November 2026
+
+- Push Verification on main was red from the menus' safe-area change
+  (3ec10bc92) on. Four extracting harnesses compile slices of production
+  source that now call `SDL3_RefreshSafeArea` and read
+  `engineWindowState.safeArea*`, `Viewport::safe*` and `ui_retainedSafeArea`,
+  and `ui_system_number_fields` rendered SYSTEM without the generator's
+  `safe_frame` pass. The harnesses now carry those stand-ins and extract the
+  new function. `sdl3_strict_window` also checks that phone insets become
+  framebuffer pixels rounded outward at a 1.5x2 density and that a failed
+  query reports none. `ui_retained_resource_lifecycle` checks window insets
+  against the UI viewport's own margin, test insets, and malformed or
+  non-finite test values.
+- Bots: `idClass::Cast<T>()` returned NULL for a null `this`, and the bot code
+  called it on empty entity slots (`gameLocal.entities[i]->Cast<idPlayer>()`).
+  A member call through a null pointer is undefined, and GCC and clang may
+  fold the check to true (both warned), so optimized Linux and macOS game
+  modules could dereference null there. The member is replaced by a null-safe
+  `idCast<T>( object )`, used at all 23 call sites; a missed caller would now
+  fail to compile instead of crashing.
+- `idPolynomial::GetDerivative` and `GetAntiDerivative` fell off the end
+  without returning their result (undefined behaviour); BFG's idlib returns it.
+- `printEntityDef` now prints the def's key/value pairs. `idDeclEntityDef::Print`
+  and `rvDeclPlayerModel::Print` were not `const`, so they never overrode
+  `idDecl::Print() const` and the decl manager reached the empty base version.
+- `idRenderWorldLocal::DebugBounds` hid Raven's five-argument interface
+  method, so game debug draws went to the interface's fallback: it ignored
+  `depthTest` (four vehicle debug draws pass it) and drew a garbage box for
+  cleared bounds. It now overrides and passes `depthTest` to its lines. The
+  beam and sprite models' `IsLoaded() const` likewise hid `IsLoaded()`; they
+  now override it, with no behaviour change (`InitEmpty` models are never
+  purged).
+- CI build logs: clang reported about 50,000 lines of
+  `-Winconsistent-missing-override` because three methods in
+  `idRenderSystemLocal` were marked `override`; those markers are gone, so
+  the class is consistent again. Also gone: about 9,300 `-Wparentheses-equality`
+  lines from `idEntityPtr::GetEntity` (and `rvClientEntityPtr`), about 2,600
+  GCC `-Wclass-memaccess` lines from `idInterpolate`'s constructor, the
+  nameless `typedef enum` in `AASFile.h` and `BSE.h`, a `/*` inside a
+  comment in `snd_local.h`, and a discarded comma expression in
+  `idMatX::Eigen_Sort*`. `declEntityDef.h` and `DeclPlayerModel.h`, which
+  already marked `Parse` `override`, now mark every override.
+
 ## Menu pointer reach, 2 November 2026
 
 - The SDL3 backend drives a menu GUI's cursor with deltas between successive

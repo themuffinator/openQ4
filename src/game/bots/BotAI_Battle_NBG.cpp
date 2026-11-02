@@ -43,7 +43,7 @@ stateResult_t rvmBot::state_BattleNBG(const stateParms_t& parms)
 	}
 
 	//BotEntityInfo(bs.enemy, &entinfo);
-	entinfo = gameLocal.entities[bs.enemy]->Cast<idPlayer>();
+	entinfo = idCast<idPlayer>( gameLocal.entities[bs.enemy] );
 	if( entinfo->health <= 0 )
 	{
 		//AIEnter_Seek_NBG(bs, "battle nbg: enemy dead");

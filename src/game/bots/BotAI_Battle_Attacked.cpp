@@ -24,7 +24,7 @@ stateResult_t rvmBot::state_Attacked(const stateParms_t& parms) {
 	}
 
 	// Ensure the target is a player.
-	idPlayer *entinfo = gameLocal.entities[bs.enemy]->Cast<idPlayer>();
+	idPlayer *entinfo = idCast<idPlayer>( gameLocal.entities[bs.enemy] );
 	if (!entinfo)
 	{
 		stateThread.SetState("state_SeekLTG");

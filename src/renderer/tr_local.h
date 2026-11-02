@@ -861,9 +861,9 @@ public:
 #endif
 #endif
 	virtual bool			RegisterFont( const char *fontName, fontInfoEx_t &font );
-	bool GetRetainedFontMetrics(const char* face, int pixels, renderFontMetrics_t& out) override;
-	bool GetRetainedFontGlyph(const char* face, int pixels, unsigned int scalar, renderFontGlyph_t& out) override;
-	void ResetRetainedFontCache() override;
+	bool GetRetainedFontMetrics(const char* face, int pixels, renderFontMetrics_t& out);
+	bool GetRetainedFontGlyph(const char* face, int pixels, unsigned int scalar, renderFontGlyph_t& out);
+	void ResetRetainedFontCache();
 	virtual void			SetColor( const idVec4 &rgba );
 	virtual void			SetColor4( float r, float g, float b, float a );
 	virtual void			DrawStretchPic ( const idDrawVert *verts, const glIndex_t *indexes, int vertCount, int indexCount, const idMaterial *material,

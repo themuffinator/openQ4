@@ -83,7 +83,7 @@ struct rvMarker;
 
 #define MAX_AAS_BOUNDING_BOXES		4
 
-typedef enum {
+enum {
 
 	RE_WALK,
 	RE_WALKOFFLEDGE,

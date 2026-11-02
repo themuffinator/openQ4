@@ -28,15 +28,15 @@ public:
 	idStr					description;
 	idDict					sounds;
 
-	virtual size_t			Size( void ) const;
-	virtual const char *	DefaultDefinition() const;
+	virtual size_t			Size( void ) const override;
+	virtual const char *	DefaultDefinition() const override;
 	virtual bool			Parse( const char *text, const int textLength ) override;
 	virtual bool			Parse( const char *text, const int textLength, bool noCaching ) override;
-	virtual void			FreeData( void );
-	virtual void			Print( void );
+	virtual void			FreeData( void ) override;
+	virtual void			Print( void ) const override;
 
-	virtual	bool			RebuildTextSource( void ) { return( false ); }
-	virtual bool			Validate( const char *psText, int iTextLength, idStr &strReportTo ) const;
+	virtual	bool			RebuildTextSource( void ) override { return( false ); }
+	virtual bool			Validate( const char *psText, int iTextLength, idStr &strReportTo ) const override;
 };
 
 /*

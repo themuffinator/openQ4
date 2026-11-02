@@ -485,7 +485,7 @@ void idBotGoalManager::InitLevelItems( void )
 	//for (ent = AAS_NextBSPEntity(0); ent; ent = AAS_NextBSPEntity(ent))
 	for( int idx = 0; idx < gameLocal.num_entities; idx++ )
 	{
-		idItem* ent = gameLocal.entities[idx]->Cast<idItem>();
+		idItem* ent = idCast<idItem>( gameLocal.entities[idx] );
 
 		if( ent == nullptr )
 		{
@@ -947,7 +947,7 @@ void idBotGoalManager::BotFindEntityForLevelItem( levelitem_t* li )
 	}
 	for( int idx = 0; idx < gameLocal.num_entities; idx++ )
 	{
-		idItem* ent = gameLocal.entities[idx]->Cast<idItem>();
+		idItem* ent = idCast<idItem>( gameLocal.entities[idx] );
 
 		if( ent == NULL )
 		{
@@ -1028,7 +1028,7 @@ void idBotGoalManager::UpdateEntityItems( void )
 	//
 	for( int idx = 0; idx < gameLocal.num_entities; idx++ )
 	{
-		idItem* ent = gameLocal.entities[idx]->Cast<idItem>();
+		idItem* ent = idCast<idItem>( gameLocal.entities[idx] );
 
 		if( ent == nullptr )
 		{

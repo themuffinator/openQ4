@@ -506,7 +506,7 @@ public:
 ================================================
 idSoundReverb
 
-Retail Quake 4 environmental reverb (Quake4.exe 1.4.2): the efxs/*.efx preset
+Retail Quake 4 environmental reverb (Quake4.exe 1.4.2): the efxs/<name>.efx preset
 file, the map's maps/<map>.reverb area table, and the four reverb slots that
 follow the listener's area and the three areas nearest it through its portals.
 Slot planning and the EAX to EFX arithmetic live in SoundReverbCore.h.

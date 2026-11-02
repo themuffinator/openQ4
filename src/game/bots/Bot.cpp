@@ -237,7 +237,7 @@ void rvmBot::BotMoveToGoalOrigin(idVec3 goalOrigin)
 	idAngles desiredAngles = bs.botinput.dir.ToAngles();
 	if( bs.enemy >= 0 )
 	{
-		idPlayer* enemy = gameLocal.entities[bs.enemy]->Cast<idPlayer>();
+		idPlayer* enemy = idCast<idPlayer>( gameLocal.entities[bs.enemy] );
 		if( enemy )
 		{			
 			desiredAngles = (enemy->firstPersonViewOrigin - firstPersonViewOrigin).ToAngles();
@@ -407,7 +407,7 @@ void rvmBot::Damage( idEntity* inflictor, idEntity* attacker, const idVec3& dir,
 {
 	idPlayer::Damage( inflictor, attacker, dir, damageDefName, damageScale, location );
 
-	idPlayer* player = attacker ? attacker->Cast<idPlayer>() : NULL;
+	idPlayer* player = attacker ? idCast<idPlayer>( attacker ) : NULL;
 	if (health <= 0)
 	{		
 		if (player)
@@ -433,7 +433,7 @@ rvmBot::InflictedDamageEvent
 =======================
 */
 void rvmBot::InflictedDamageEvent(idEntity* target) {
-	idPlayer* player = target->Cast<idPlayer>();
+	idPlayer* player = idCast<idPlayer>( target );
 
 	// Don't flood the chat with death and insults.
 	if (!player->IsBot() && player->health <= 0)

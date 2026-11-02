@@ -795,7 +795,7 @@ private:
 class idRenderModelBeam : public idRenderModelStatic {
 public:
 	virtual dynamicModel_t		IsDynamicModel() const;
-	virtual bool				IsLoaded() const;
+	virtual bool				IsLoaded();
 	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
 	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
 };
@@ -826,7 +826,7 @@ public:
 								idRenderModelTrail();
 
 	virtual dynamicModel_t		IsDynamicModel() const;
-	virtual bool				IsLoaded() const;
+	virtual bool				IsLoaded();
 	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
 	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
 
@@ -846,7 +846,7 @@ public:
 class idRenderModelLightning : public idRenderModelStatic {
 public:
 	virtual dynamicModel_t		IsDynamicModel() const;
-	virtual bool				IsLoaded() const;
+	virtual bool				IsLoaded();
 	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
 	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
 };
@@ -861,7 +861,7 @@ public:
 class idRenderModelSprite : public idRenderModelStatic {
 public:
 	virtual	dynamicModel_t	IsDynamicModel() const;
-	virtual	bool			IsLoaded() const;
+	virtual	bool			IsLoaded();
 	virtual	idRenderModel *	InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
 	virtual	idBounds		Bounds( const struct renderEntity_s *ent ) const;
 };

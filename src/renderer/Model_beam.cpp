@@ -55,7 +55,7 @@ dynamicModel_t idRenderModelBeam::IsDynamicModel() const {
 idRenderModelBeam::IsLoaded
 ===============
 */
-bool idRenderModelBeam::IsLoaded() const {
+bool idRenderModelBeam::IsLoaded() {
 	return true;	// don't ever need to load
 }
 

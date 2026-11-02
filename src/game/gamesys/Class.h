@@ -389,18 +389,6 @@ public:
 // RAVEN END
 
 // jmarshall
-	template< typename T >
-	T* Cast(void)
-	{
-		return this ? (IsType(T::Type) ? static_cast<T*>(this) : NULL) : NULL;
-	}
-
-	template< typename T >
-	const T* Cast(void) const
-	{
-		return this ? (IsType(T::Type) ? static_cast<const T*>(this) : NULL) : NULL;
-	}
-
 	virtual void			StateThreadChanged(void) { };
 // jmarshall end
 
@@ -505,6 +493,19 @@ private:
 	CLASS_STATES_PROTOTYPE(idClass);
 // RAVEN END	
 };
+
+// The object as a T, or NULL when it is NULL or not a T. A free function
+// because a member call through a null pointer is undefined behaviour, and
+// GCC and clang fold a `this` null check to true.
+template< typename T >
+ID_INLINE T *idCast( idClass *object ) {
+	return ( object != NULL && object->IsType( T::Type ) ) ? static_cast<T *>( object ) : NULL;
+}
+
+template< typename T >
+ID_INLINE const T *idCast( const idClass *object ) {
+	return ( object != NULL && object->IsType( T::Type ) ) ? static_cast<const T *>( object ) : NULL;
+}
 
 /***********************************************************************
 

@@ -36,7 +36,7 @@ stateResult_t rvmBot::state_BattleFight(const stateParms_t& parms)
 	}
 
 	//BotEntityInfo(bs.enemy, &entinfo);
-	entinfo = gameLocal.entities[bs.enemy]->Cast<idPlayer>();// &g_entities[bs.enemy];
+	entinfo = idCast<idPlayer>( gameLocal.entities[bs.enemy] );// &g_entities[bs.enemy];
 
 	//if the enemy is dead
 	if( bs.enemydeath_time )

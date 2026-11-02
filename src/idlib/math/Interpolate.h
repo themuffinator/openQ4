@@ -57,7 +57,8 @@ template< class type >
 ID_INLINE idInterpolate<type>::idInterpolate() {
 	currentTime = startTime = duration = 0;
 	cacheValid = false;
-	memset( &currentValue, 0, sizeof( currentValue ) );
+	// Zero whatever the type; idVec/idQuat constructors leave members unset.
+	memset( static_cast<void *>( &currentValue ), 0, sizeof( currentValue ) );
 	startValue = endValue = currentValue;
 }
 

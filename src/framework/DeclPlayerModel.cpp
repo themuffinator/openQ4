@@ -175,7 +175,7 @@ void rvDeclPlayerModel::FreeData(void) {
 rvDeclPlayerModel::DefaultDefinition
 ===================
 */
-void rvDeclPlayerModel::Print(void) {
+void rvDeclPlayerModel::Print(void) const {
 	common->Printf("model = %s\n", model.c_str());
 	common->Printf("head = %s\n", head.c_str());
 	common->Printf("ui head = %s\n", uiHead.c_str());
