@@ -228,10 +228,12 @@ See [release status](../../user/release-status.md) and the
   shrinking. Mouse sensitivity, CPI, acceleration, gyro and touchpad
   sensitivity and the weapon's field of view and position also take a typed
   value, and a value outside the allowed range says what that range is.
-- **The menu cursor is back, in its original look.** The new interface's
-  pointer is again Quake 4's shaded arrow, turning into the pointing hand over
-  anything you can click, and it stays on screen whenever you use the mouse or
-  keyboard in a menu; it hides only while a controller is driving the menus.
+- **A sharp menu pointer, with a text cursor.** The new interface's pointer is
+  a smooth redraw of Quake 4's shaded arrow that stays crisp at any
+  resolution, and over a text or number field it becomes a matching I-beam.
+  It stays on screen whenever you use the mouse or keyboard in a menu and
+  hides only while a controller is driving the menus. The console uses the
+  same pointer, with the I-beam over its command line.
 - Player previews apply separate head skins and keep attachments aligned when
   their position changes.
 - **Clearer focus and cinematic transitions.** All three scopes keep the aim

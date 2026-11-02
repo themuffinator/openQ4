@@ -2586,6 +2586,41 @@ HUD keeps its own Safe Area Inset setting and reads no platform insets, the
 stock GUIs ignore them, swipe controls do not yet keep 24 dp from the edges,
 and no device has qualified it.
 
+## The pointer redrawn (2 November 2026)
+
+The 31 October cursor was ear-clipped polygons filled with `_white` and no
+edge coverage: its edges stair-stepped, its shadow was two hard offset
+copies, and its hand was the bitmap's pixel outline traced.
+`src/ui/PointerCursor.cpp` now draws the pointer for the retained menus and
+the console. It is vector art in the stock cursor's texel box, tessellated by
+the retained vector compiler with analytic edge coverage and drawn with
+`_retainedSolid` in one call: a black outline a texel wide, a mid-grey body
+darkening downwards, a bright facet and white ridge along the lit 45-degree
+edge, a dark tail, and a shadow cast 0.8 texel right and 1.2 down, sampled
+nine times over 0.7 texel so it blurs over about a texel and a half. The
+hand is gone: a control a press would reach keeps the arrow. Over a number or
+text field (`ControlRole::Number`), which a click would edit, the pointer is
+an I-beam in the same style, its chamfered serifs stepping into the stem at
+45 degrees. Each shape's mesh is built once per size about a hotspot on a
+pixel corner and placed at whole pixels, so its edge coverage stays exact.
+
+The pull-down console draws the same pointer in the UI viewport its mouse
+maps to, at its text's scale (a texel is 1/480 of the viewport height). Over
+the edit line, where a click places the caret, or during a selection begun
+there, it is the I-beam; the console no longer loads
+`gfx/guis/guicursor_arrow`. It keeps June's hotspot shift, drawing the pointer
+a text row above the mouse position its clicks use, although its rows now
+match their hit rectangles: with `conPointerTest` on the edit row the I-beam
+draws over the log line above. That shift needs a check with a real mouse.
+`conPointerTest <x> <y>` (cheat) opens the console with its mouse at a point
+of the 640x480 screen without a device. `screenshot` puts the console away,
+so the console's pointer was checked from window captures; the `cursor`
+capture scenario shows the menus' arrow over the emblem and over SINGLE
+PLAYER and the I-beam over CREATE SERVER's name field. Stock GUIs
+(`ui_retained 0`) keep the stock arrow and hand bitmaps. Not yet: the visual
+specification's pointer row still lists the hand, and changing it is a
+register revision.
+
 ## The menu cursor (31 October 2026)
 
 The retained menus drew a placeholder cursor, a flat triangle, and only after

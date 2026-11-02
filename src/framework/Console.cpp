@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Session_local.h"
 #include "ConsoleCompletion.h"
 #include "NativeInputPublications.h"
+#include "../ui/PointerCursor.h"
 
 void SCR_DrawTextLeftAlign( float &y, const char *text, ... ) id_attribute((format(printf,2,3)));
 void SCR_DrawTextRightAlign( float &y, const char *text, ... ) id_attribute((format(printf,2,3)));
@@ -56,7 +57,6 @@ void SCR_DrawTextRightAlign( float &y, const char *text, ... ) id_attribute((for
 #define CON_COMPLETION_MAX_FUZZY_MATCHES	oq4completion::MAX_FUZZY_MATCHES
 #define CON_COMPLETION_MAX_VISIBLE		8
 #define CON_TEXT_DRAG_THRESHOLD			4.0f
-#define CON_MOUSE_CURSOR_SIZE			32.0f
 #define CON_MOUSE_CURSOR_HOTSPOT_X		0.0f
 #define CON_MOUSE_CURSOR_HOTSPOT_Y		static_cast<float>( SMALLCHAR_HEIGHT )
 
@@ -91,6 +91,7 @@ public:
 	virtual void		SetProcFileOutOfDate( bool state );
 	virtual void		SetAASFileOutOfDate( bool state );
 	virtual	void		SetMousePosition( float x, float y );
+	void				OpenForInput( bool reduced );
 	virtual	void		Print( const char *text );
 	virtual	void		Draw( bool forceFullScreen );
 
@@ -336,7 +337,6 @@ private:
 
 	const idMaterial *	whiteShader;
 	const idMaterial *	consoleShader;
-	const idMaterial *	mouseCursorShader;
 };
 
 static idConsoleLocal localConsole;
@@ -1373,6 +1373,25 @@ static void Con_LatencyFlashTest_f( const idCmdArgs &args ) {
 
 /*
 ==============
+Con_PointerTest_f
+
+Opens the console and puts its pointer at a point of the 640x480 screen, as
+the mouse would, without device input, so captures can show the pointer.
+==============
+*/
+static void Con_PointerTest_f( const idCmdArgs &args ) {
+	if ( args.Argc() != 3 ) {
+		common->Printf( "usage: conPointerTest <x> <y>\n" );
+		return;
+	}
+	if ( !localConsole.Active() ) {
+		localConsole.OpenForInput( false );
+	}
+	localConsole.SetMousePosition( static_cast<float>( atof( args.Argv( 1 ) ) ), static_cast<float>( atof( args.Argv( 2 ) ) ) );
+}
+
+/*
+==============
 Con_Dump_f
 ==============
 */
@@ -1460,7 +1479,6 @@ void idConsoleLocal::Init( void ) {
 	completionFuzzyNeedle[0] = '\0';
 	whiteShader = NULL;
 	consoleShader = NULL;
-	mouseCursorShader = NULL;
 	nextHistoryLine = 0;
 	historyLine = 0;
 	commandHistoryLoaded = false;
@@ -1474,6 +1492,7 @@ void idConsoleLocal::Init( void ) {
 	cmdSystem->AddCommand( "clear", Con_Clear_f, CMD_FL_SYSTEM, "clears the console" );
 	cmdSystem->AddCommand( "conDump", Con_Dump_f, CMD_FL_SYSTEM, "dumps the console text to a file" );
 	cmdSystem->AddCommand( "latencyFlashTest", Con_LatencyFlashTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "arms com_latencyFlash as an attack press would, without device input" );
+	cmdSystem->AddCommand( "conPointerTest", Con_PointerTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "opens the console with its pointer at x y of the 640x480 screen, without device input" );
 }
 
 /*
@@ -1501,7 +1520,6 @@ void idConsoleLocal::LoadGraphics() {
 // jmarshall end
 	whiteShader = declManager->FindMaterial( "_white" );
 	consoleShader = declManager->FindMaterial( "console" );
-	mouseCursorShader = declManager->FindMaterial( "gfx/guis/guicursor_arrow" );
 	if ( charSetShader != NULL ) {
 		charSetShader->SetSort( SS_GUI );
 	}
@@ -1510,9 +1528,6 @@ void idConsoleLocal::LoadGraphics() {
 	}
 	if ( consoleShader != NULL ) {
 		consoleShader->SetSort( SS_GUI );
-	}
-	if ( mouseCursorShader != NULL ) {
-		mouseCursorShader->SetSort( SS_GUI );
 	}
 	UpdateLayoutMetrics( true );
 }
@@ -1592,6 +1607,30 @@ void idConsoleLocal::SetMousePosition( float x, float y ) {
 	mouseX = x;
 	mouseY = y;
 	mouseInitialized = true;
+}
+
+/*
+==============
+idConsoleLocal::OpenForInput
+
+Opens the console as its key does, taking the keyboard and the mouse.
+==============
+*/
+void idConsoleLocal::OpenForInput( bool reduced ) {
+	consoleField.Clear();
+	openq4::NativeInputBeforeInputBlockerChange();
+	keyCatching = true;
+	focus = CON_FOCUS_INPUT;
+	mouseInitialized = false;
+	scrollbarDragging = false;
+	completionScrollbarDragging = false;
+	ClearInputSelection();
+	ClearLogSelection();
+	ClearTextDragState();
+	InvalidateCompletionState();
+	SetDisplayFraction( GetOpenFraction( reduced ) );
+	cvarSystem->SetCVarBool( "ui_chat", true );
+	Sys_GrabMouseCursor( false );
 }
 
 /*
@@ -4462,21 +4501,8 @@ bool	idConsoleLocal::ProcessEvent( const sysEvent_t *event, bool forceAccept ) {
 			Sys_GrabMouseCursor( true );
 			cvarSystem->SetCVarBool( "ui_chat", false );
 		} else {
-			consoleField.Clear();
-			openq4::NativeInputBeforeInputBlockerChange();
-			keyCatching = true;
-			focus = CON_FOCUS_INPUT;
-			mouseInitialized = false;
-			scrollbarDragging = false;
-			completionScrollbarDragging = false;
-			ClearInputSelection();
-			ClearLogSelection();
-			ClearTextDragState();
-			InvalidateCompletionState();
 			// Holding Shift keeps the reduced-open behavior without exceeding the configured console height.
-			SetDisplayFraction( GetOpenFraction( idKeyInput::IsDown( K_SHIFT ) ) );
-			cvarSystem->SetCVarBool( "ui_chat", true );
-			Sys_GrabMouseCursor( false );
+			OpenForInput( idKeyInput::IsDown( K_SHIFT ) );
 		}
 		return true;
 	}
@@ -4779,23 +4805,26 @@ void idConsoleLocal::DrawMouseCursor( void ) {
 
 	EnsureMouseInitialized();
 
-	if ( mouseCursorShader != NULL ) {
-		const float cursorXScale = Con_GetConsoleXScale();
-		const float cursorWidth = CON_MOUSE_CURSOR_SIZE * cursorXScale;
-		const float cursorDrawX = mouseX - CON_MOUSE_CURSOR_HOTSPOT_X * cursorXScale;
-		const float cursorDrawY = mouseY - CON_MOUSE_CURSOR_HOTSPOT_Y;
-		renderSystem->SetColor( colorWhite );
-		renderSystem->DrawStretchPic( cursorDrawX, cursorDrawY, cursorWidth, CON_MOUSE_CURSOR_SIZE,
-			0.0f, 0.0f, 1.0f, 1.0f, mouseCursorShader );
-		return;
+	// The menus' pointer, in the UI viewport the console's mouse maps to and at
+	// the console text's scale. Over the edit line, where a click places the
+	// caret, or while a selection that started there is under way, it is the
+	// I-beam.
+	float inputX, inputY, inputW, inputH;
+	const bool overInput = inputSelecting || ( GetInputAreaRect( inputX, inputY, inputW, inputH ) &&
+		mouseY >= inputY && mouseY <= inputY + inputH && mouseX >= 0.0f && mouseX <= SCREEN_WIDTH );
+	float width = static_cast<float>( engineWindowState.uiViewportWidth );
+	float height = static_cast<float>( engineWindowState.uiViewportHeight );
+	if ( width <= 0.0f || height <= 0.0f ) {
+		width = static_cast<float>( renderSystem->GetScreenWidth() );
+		height = static_cast<float>( renderSystem->GetScreenHeight() );
 	}
-
-	const idVec4 &cursorColor = kConsoleBorderColor;
-	DrawSolidRect( mouseX, mouseY, 3.0f, 13.0f, cursorColor );
-	DrawSolidRect( mouseX, mouseY, 10.0f, 3.0f, cursorColor );
-	DrawSolidRect( mouseX + 3.0f, mouseY + 3.0f, 3.0f, 3.0f, cursorColor );
-	DrawSolidRect( mouseX + 6.0f, mouseY + 6.0f, 3.0f, 3.0f, cursorColor );
-	DrawSolidRect( mouseX + 3.0f, mouseY + 10.0f, 7.0f, 3.0f, cursorColor );
+	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
+	renderSystem->SetUseUIViewportFor2D( true );
+	UI_DrawPointerCursor( overInput ? POINTER_TEXT : POINTER_ARROW,
+		( mouseX - CON_MOUSE_CURSOR_HOTSPOT_X ) * width / SCREEN_WIDTH, ( mouseY - CON_MOUSE_CURSOR_HOTSPOT_Y ) * height / SCREEN_HEIGHT,
+		width, height, height / SCREEN_HEIGHT );
+	renderSystem->FlushGui();
+	renderSystem->SetUseUIViewportFor2D( oldViewport );
 }
 
 /*

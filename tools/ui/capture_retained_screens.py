@@ -1178,12 +1178,17 @@ SCENARIOS = {
         'openq4_system report', 'openq4_retainedGui report', 'ui_retainedStatus',
         'screenshot "screenshots/settings-system-returned.tga"',
     ]),
-    # The menu cursor (section 6): the stock arrow over the title's emblem and
-    # the stock hand over SINGLE PLAYER, a control a press would reach, placed
-    # without a device (openq4_retainedGui pointer, in the 640x480 screen).
+    # The menu cursor (section 6), placed without a device (openq4_retainedGui
+    # pointer, in the 640x480 screen): the arrow over the title's emblem, the
+    # arrow again over SINGLE PLAYER, a control a press would reach, and the
+    # I-beam over CREATE SERVER's server name field.
     'cursor': (None, [
         'waitMsec 9500', 'openq4_retainedGui pointer 470 150', 'waitMsec 300', 'screenshot "screenshots/cursor-arrow.tga"',
-        'openq4_retainedGui pointer 120 214', 'waitMsec 300', 'openq4_retainedGui report', 'screenshot "screenshots/cursor-hand.tga"',
+        'openq4_retainedGui pointer 120 214', 'waitMsec 300', 'openq4_retainedGui report', 'screenshot "screenshots/cursor-control.tga"',
+        'openq4_retainedGui focus nav_multiplayer', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 1200',
+        'openq4_retainedGui focus create', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 1400',
+        'openq4_retainedGui inspect "create-name"', 'openq4_retainedGui pointer 400 85', 'waitMsec 300', 'openq4_retainedGui report',
+        'screenshot "screenshots/cursor-text.tga"',
     ]),
     # LOAD DEFAULTS' YES restores the defaults: a changed sensitivity returns
     # to its default.

@@ -170,9 +170,10 @@ struct Renderer {
     bool GetUseUIViewportFor2D() const { return viewport; }
     void SetUseUIViewportFor2D(bool value) { viewport=value; }
     void SetColor4(float,float,float,float) {}
-    void DrawStretchTri(idVec2,idVec2,idVec2,idVec2,idVec2,idVec2,const void*) {}
     void FlushGui() {}
 } renderer,*renderSystem=&renderer;
+enum pointerCursor_t { POINTER_ARROW, POINTER_TEXT };
+void UI_DrawPointerCursor(pointerCursor_t,float,float,float,float,float) {}
 struct Decls { const void* FindMaterial(const char*) { return nullptr; } } decls,*declManager=&decls;
 '''
 
