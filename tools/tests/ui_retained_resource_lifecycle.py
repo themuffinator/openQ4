@@ -15,10 +15,12 @@ from filesystem_case_segments import function_body
 ROOT = Path(__file__).resolve().parents[2]
 
 SUPPORT = r'''
+#define _CRT_SECURE_NO_WARNINGS // the engine's sscanf, under the MSVC runtime
 #include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <limits>
 #include <map>
@@ -35,6 +37,7 @@ static double PresentationTime();
 static void Record(const char* kind,int id=0,double time=-1) { events.push_back({kind,id,time}); }
 namespace openq4::ui {
 struct Viewport { int width=0,height=0; float displayScale=1,userScale=1,pixelDensityX=1,pixelDensityY=1,originX=0,originY=0,textScale=1;
+    float safeLeft=0,safeTop=0,safeRight=0,safeBottom=0;
     int fits=0;float minimumWidth=0,minimumHeight=0;
     void FitToMinimum(float w,float h){++fits;minimumWidth=w;minimumHeight=h;}
 };
@@ -132,14 +135,19 @@ struct Common {
 } commonObject, *common=&commonObject;
 struct Commands { void RemoveCommand(const char*) {} } commands, *cmdSystem=&commands;
 struct WindowState {
-    int uiViewportWidth=1920,uiViewportHeight=1080,uiViewportX=80,uiViewportY=40;
+    int vidWidth=2080,vidHeight=1160,uiViewportWidth=1920,uiViewportHeight=1080,uiViewportX=80,uiViewportY=40;
     float displayScale=1.25f,pixelDensityX=2,pixelDensityY=2;
+    int safeAreaLeft=0,safeAreaTop=0,safeAreaRight=0,safeAreaBottom=0;
 } engineWindowState;
 struct CVar {
     float value;
     float GetFloat() const { return value; }
     bool GetBool() const { return value!=0; }
 } ui_retainedDensity{0},ui_retainedScale{1.5f},ui_retainedTextScale{1.75f},ui_retainedReducedMotion{0};
+struct StringCVar {
+    std::string value;
+    const char* GetString() const { return value.c_str(); }
+} ui_retainedSafeArea;
 static int codePageGeneration=1;
 static int LangDict_GetCodePageGeneration() { return codePageGeneration; }
 '''
@@ -252,6 +260,17 @@ int main() {
     assert(viewport.pixelDensityX==2);
     assert(viewport.textScale==1.75f);
     assert(viewport.fits==1 && viewport.minimumWidth==640 && viewport.minimumHeight==480);
+    assert(!viewport.safeLeft && !viewport.safeTop && !viewport.safeRight && !viewport.safeBottom);
+    // Window insets count only where they reach past the UI viewport's own
+    // margin; test insets apply where they reach further; a malformed or
+    // non-finite test value sets none.
+    engineWindowState.safeAreaLeft=100;engineWindowState.safeAreaTop=30;engineWindowState.safeAreaBottom=90;
+    ui_retainedSafeArea.value="0 0 50 nan";
+    assert(RetainedUI_DefaultViewport(viewport));
+    assert(viewport.safeLeft==20 && !viewport.safeTop && viewport.safeRight==50 && viewport.safeBottom==50);
+    ui_retainedSafeArea.value="1 2 3";
+    assert(RetainedUI_DefaultViewport(viewport) && viewport.safeLeft==20 && !viewport.safeRight);
+    engineWindowState.safeAreaLeft=engineWindowState.safeAreaTop=engineWindowState.safeAreaBottom=0;ui_retainedSafeArea.value.clear();
     ui_retainedDensity.value=2.5f;
     assert(RetainedUI_DefaultViewport(viewport) && viewport.displayScale==2.5f);
     host.viewportWidth=777; host.viewportHeight=333; host.viewportX=7; host.viewportY=3;

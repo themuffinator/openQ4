@@ -47,6 +47,7 @@ struct SDL_Window {
     SDL_WindowFlags flags=SDL_WINDOW_INPUT_FOCUS;
     unsigned display=101;
     int x=50,y=60,w=1280,h=720;
+    int safeLeft=0,safeTop=0,safeRight=0,safeBottom=0; // window-coordinate safe-area insets
     float densityX=1,densityY=1,scale=1;
     bool haveFullscreenMode=false;
     SDL_DisplayMode fullscreenMode;
@@ -102,6 +103,10 @@ static bool SDL_GetWindowSize(SDL_Window* value,int* width,int* height) {
 static bool SDL_GetWindowSizeInPixels(SDL_Window* value,int* width,int* height) {
     ++queries;if(failure=="pixel-query")return false;
     *width=static_cast<int>(value->w*value->densityX+.5f);*height=static_cast<int>(value->h*value->densityY+.5f);return true;
+}
+static bool SDL_GetWindowSafeArea(SDL_Window* value,SDL_Rect* rect) {
+    ++queries;if(failure=="safe-query")return false;
+    *rect={value->safeLeft,value->safeTop,value->w-value->safeLeft-value->safeRight,value->h-value->safeTop-value->safeBottom};return true;
 }
 static float SDL_GetWindowDisplayScale(SDL_Window* value) { ++queries;return value->scale; }
 static const SDL_DisplayMode* SDL_GetWindowFullscreenMode(SDL_Window* value) { ++queries;return value->haveFullscreenMode?&value->fullscreenMode:nullptr; }
@@ -181,6 +186,7 @@ static int SDL3_SaturateWindowCoordinate(int64_t value) {
 struct EngineState {
     int vidWidth=7,vidHeight=8,uiViewportX=9,uiViewportY=10,uiViewportWidth=11,uiViewportHeight=12;
     bool isFullscreen=false;float displayScale=3,pixelDensityX=4,pixelDensityY=5;
+    int safeAreaLeft=13,safeAreaTop=14,safeAreaRight=15,safeAreaBottom=16;
 } engineWindowState;
 struct Win32 { bool cdsFullscreen=false; } win32;
 struct Placement { bool valid=false;int x=0,y=0,width=640,height=480; } s_windowedPlacement;
@@ -231,6 +237,14 @@ static void Query() {
     assert(result.uiViewportX==150 && result.uiViewportWidth==1770 && result.uiViewportHeight==1440);
     assert(result.uiViewportX==engineWindowState.uiViewportX && result.uiViewportY==engineWindowState.uiViewportY &&
            result.uiViewportWidth==engineWindowState.uiViewportWidth && result.uiViewportHeight==engineWindowState.uiViewportHeight);
+    // A desktop window reports no inset; a phone's insets become framebuffer
+    // pixels rounded outward (16.5 -> 17), and a failed query reports none.
+    assert(!engineWindowState.safeAreaLeft && !engineWindowState.safeAreaTop && !engineWindowState.safeAreaRight && !engineWindowState.safeAreaBottom);
+    window.safeLeft=33;window.safeTop=47;window.safeRight=11;window.safeBottom=21;
+    SDL3_UpdateDisplayViewport(viewportDisplay,result.windowX,result.windowY,result.logicalWidth,result.logicalHeight,result.pixelWidth,result.pixelHeight);
+    assert(engineWindowState.safeAreaLeft==50 && engineWindowState.safeAreaTop==94 && engineWindowState.safeAreaRight==17 && engineWindowState.safeAreaBottom==42);
+    failure="safe-query";SDL3_UpdateDisplayViewport(viewportDisplay,result.windowX,result.windowY,result.logicalWidth,result.logicalHeight,result.pixelWidth,result.pixelHeight);
+    assert(!engineWindowState.safeAreaLeft && !engineWindowState.safeAreaTop && !engineWindowState.safeAreaRight && !engineWindowState.safeAreaBottom);
     Reset();window.flags|=SDL_WINDOW_FULLSCREEN;
     assert(SDL3_WindowServices_QueryWindowState(&result) && result.fullscreen && result.fullscreenDesktop);
     window.haveFullscreenMode=true;assert(SDL3_WindowServices_QueryWindowState(&result) && !result.fullscreenDesktop);
@@ -386,7 +400,7 @@ def main():
     table = source.split('static const renderWindowServices_t s_sdl3WindowServices = {', 1)[1].split('};', 1)[0]
     assert table.rstrip().endswith('SDL3_WindowServices_QueryWindowState,\n\tSDL3_WindowServices_ApplyScreenParmsStrict,\n\tSDL3_WindowServices_RetainVideoSystem,\n\tSDL3_WindowServices_ReleaseVideoSystem,')
     dependencies = '\n'.join(function_body(source, signature) for signature in (
-        'static int SDL3_ClampViewportPixel(', 'static void SDL3_SetUIViewport(',
+        'static int SDL3_ClampViewportPixel(', 'static void SDL3_RefreshSafeArea(', 'static void SDL3_SetUIViewport(',
         'static void SDL3_SetVidSize(', 'static void SDL3_SetFullscreenState(',
         'static void SDL3_UpdateDisplayViewport(', 'static void SDL3_RecordWindowedPlacement(',
     ))

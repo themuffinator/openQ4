@@ -148,7 +148,8 @@ class PairedNumbers(unittest.TestCase):
         cls.nodes=index_nodes(cls.page['root'])
 
     def test_generated_page_reproduces_source(self):
-        rendered=screens.render(system.system_document())
+        # The generator's last pass frames every document in the safe area.
+        rendered=screens.render(screens.safe_frame(system.system_document()))
         self.assertEqual(SOURCE.read_bytes().decode('utf-8').replace('\r\n','\n'),rendered.replace('\r\n','\n'))
 
     def test_complete_authored_slider_inventory(self):

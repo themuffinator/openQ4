@@ -103,7 +103,7 @@ def main():
     lease = '\n'.join(function_body(source, signature) for signature in signatures)
     assert '.ClearModified(' not in lease
     dependencies = '\n'.join(function_body(source, signature) for signature in (
-        'static int SDL3_ClampViewportPixel(', 'static void SDL3_SetUIViewport(', 'static void SDL3_SetVidSize(',
+        'static int SDL3_ClampViewportPixel(', 'static void SDL3_RefreshSafeArea(', 'static void SDL3_SetUIViewport(', 'static void SDL3_SetVidSize(',
         'static void SDL3_UpdateDisplayViewport(', 'static void SDL3_RecordWindowedPlacement('))
     code = ('#define USE_SDL3\n#include "src/sys/WindowSettings.h"\n' + support + dependencies + EXTRA + lease +
             function_body(source, 'static void SDL3_RefreshWindowPlacement(') + MAIN)
