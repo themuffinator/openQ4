@@ -155,7 +155,7 @@ def validate_shared_backend_contract() -> None:
                    "legacy exclusive selection uses the SYSTEM rule before SDL's closest mode")
     require(screen_parms, "if (!hasClosestMode && parms.displayHz > 0) {", "macOS exact-pixel search only for an explicit rate the shared rule lacks")
     require(screen_parms, "SDL_SetWindowFullscreen(s_sdlWindow, true)", "fullscreen transition")
-    require(screen_parms, "SDL_SetWindowBordered(s_sdlWindow, !useBorderlessWindow)", "borderless window transition")
+    require(screen_parms, "SDL3_SetWindowBorderedCompat(!useBorderlessWindow)", "borderless window transition")
     require(screen_parms, "SDL3_ConstrainWindowRectToBounds", "window restore bounds constraint")
     require(screen_parms, "SDL3_SyncWindowAfterScreenChange", "post-transition compositor sync")
     require(screen_parms, "reapplyDecoratedWindowPlacement", "post-composition decorated placement pass")

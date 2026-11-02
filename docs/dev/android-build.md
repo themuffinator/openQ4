@@ -42,7 +42,7 @@ The cross-file generator follows Android's
 it invokes Clang directly with the target/API instead of Windows `.cmd` wrappers.
 All native libraries must use the same NDK, ABI, API and shared C++ runtime.
 
-Obtain SDL3 3.4.16 sources (the repository's pinned subproject, including its
+Obtain SDL3 3.4.18 sources (the repository's pinned subproject, including its
 patches) and OpenAL Soft 1.24.3 sources separately. OpenAL 1.25.2 does not compile
 with NDK r27d's libc++ ranges support. SDL is zlib licensed; OpenAL Soft is LGPL licensed.
 These are the existing engine dependencies, built for the target. Preserve their
@@ -57,7 +57,7 @@ it neither replaces the engine's Meson build nor downloads sources implicitly.
 From the repository root on Windows, for example:
 
 ```powershell
-python tools/build/prepare_android_deps.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --sdl-source subprojects/SDL3-3.4.16 --openal-source E:/_SOURCE/_CODE/openal-soft-1.24.3 --prefix .tmp/android-build/deps --build-root .tmp/android-build/dependency-builds-1243
+python tools/build/prepare_android_deps.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --sdl-source subprojects/SDL3-3.4.18 --openal-source E:/_SOURCE/_CODE/openal-soft-1.24.3 --prefix .tmp/android-build/deps --build-root .tmp/android-build/dependency-builds-1243
 python tools/build/android_cross.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --api 24 --out .tmp/android-build/arm64.ini
 powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 setup builddir/android-arm64 --cross-file .tmp/android-build/arm64.ini -Dandroid_deps_root=E:/Repositories/openQ4/.tmp/android-build/deps -Dbuildtype=release
 powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir/android-arm64 -j 8
@@ -116,7 +116,7 @@ separate from the experimental ARM64 release. Keep its dependency prefix,
 native build and stage separate:
 
 ```powershell
-python tools/build/prepare_android_deps.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --abi x86_64 --api 24 --sdl-source subprojects/SDL3-3.4.16 --openal-source E:/_SOURCE/_CODE/openal-soft-1.24.3 --prefix .tmp/android-emulator/deps --build-root .tmp/android-emulator/dependency-builds
+python tools/build/prepare_android_deps.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --abi x86_64 --api 24 --sdl-source subprojects/SDL3-3.4.18 --openal-source E:/_SOURCE/_CODE/openal-soft-1.24.3 --prefix .tmp/android-emulator/deps --build-root .tmp/android-emulator/dependency-builds
 python tools/build/android_cross.py --ndk E:/_SOURCE/_CODE/android-ndk-r27d --abi x86_64 --api 24 --out .tmp/android-emulator/x64.ini
 $dependencyPrefix = (Resolve-Path .tmp/android-emulator/deps).Path
 & tools/build/meson_setup.ps1 setup builddir/android-x64 --cross-file .tmp/android-emulator/x64.ini "-Dandroid_deps_root=$dependencyPrefix" --buildtype=release

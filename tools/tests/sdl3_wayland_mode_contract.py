@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pin the SDL 3.4.16 behaviour the strict display path and the shared
+"""Pin the SDL 3.4.18 behaviour the strict display path and the shared
 exclusive mode rule rely on.
 
 SDL's Wayland driver emulates exclusive modes per window and never switches
@@ -89,7 +89,7 @@ def main() -> int:
     args = parser.parse_args()
     wrap = configparser.ConfigParser()
     wrap.read(WRAP, encoding="utf-8")
-    if wrap["wrap-file"]["directory"] != "SDL3-3.4.16":
+    if wrap["wrap-file"]["directory"] != "SDL3-3.4.18":
         raise RuntimeError("Review these SDL facts for the new SDL version, then update the pinned directory here")
     temporary = ROOT / ".tmp"
     temporary.mkdir(exist_ok=True)

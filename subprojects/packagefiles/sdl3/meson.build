@@ -1,7 +1,7 @@
 project(
   'sdl3',
   'c',
-  version: '3.4.16',
+  version: '3.4.18',
   license: 'zlib',
   meson_version: '>=1.6',
   default_options: ['c_std=none'],

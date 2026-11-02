@@ -21,7 +21,7 @@ def main():
  if a.sdl_include:sdl=a.sdl_include.resolve()
  else:
   config=configparser.ConfigParser();config.read(ROOT/'subprojects/sdl3.wrap',encoding='utf-8');specification=dict(config['wrap-file'])
-  assert specification['directory']=='SDL3-3.4.16','Review the SDL public header closure on update'
+  assert specification['directory']=='SDL3-3.4.18','Review the SDL public header closure on update'
   sdl_source.ROOT=ROOT;sdl_source.FILES=['include/SDL3/'+name for name in disposition_test.SDL_HEADERS]
   prepared,provision,_=sdl_source.provision_source(None,specification,out);sdl=prepared/'include'
  if not (sdl/'SDL3/SDL_events.h').is_file():raise RuntimeError('Explicit SDL public header tree is absent')

@@ -577,7 +577,7 @@ macOS Vulkan is experimental on a preview platform and has no accepted real-Appl
 
 ### Linux Packager Notes
 
-For downstream Linux packages, treat official openQ4 Linux archives as targeting an Ubuntu 24.04-class userspace unless broader distro coverage has been validated for the release. Meson 1.6.0 or newer is required. The SDL3 dependency floor is SDL3 `>=3.4.4`; the bundled fallback wrap currently tracks SDL3 3.4.16.
+For downstream Linux packages, treat official openQ4 Linux archives as targeting an Ubuntu 24.04-class userspace unless broader distro coverage has been validated for the release. Meson 1.6.0 or newer is required. The SDL3 dependency floor is SDL3 `>=3.4.4`; the bundled fallback wrap currently tracks SDL3 3.4.18.
 
 Package the default SDL3 backend with OpenGL plus Wayland/EGL support, and keep X11/GLX available where practical for fallback and diagnostics. The launcher or package notes should document both SDL spellings for explicit driver selection because users and SDL documentation may use either form:
 

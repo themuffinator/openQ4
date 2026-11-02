@@ -7,7 +7,7 @@ PACKAGE=ROOT/'subprojects/packagefiles/sdl3'
 SDL_FILES=['src/events/SDL_events.c','src/events/SDL_keyboard.c',
            'src/video/windows/SDL_windowskeyboard.c','src/video/windows/SDL_windowsevents.c',
            'src/video/windows/SDL_windowswindow.c','src/video/windows/SDL_windowsvideo.c']
-# Exact public include closure for SDL_events.h and SDL_init.h in pinned 3.4.16.
+# Exact public include closure for SDL_events.h and SDL_init.h in pinned 3.4.18.
 # The shared archive verifier extracts only these regular, bounded members.
 SDL_HEADERS=('SDL_atomic.h SDL_audio.h SDL_begin_code.h SDL_blendmode.h SDL_camera.h '
     'SDL_close_code.h SDL_endian.h SDL_error.h SDL_events.h SDL_gamepad.h SDL_guid.h '
@@ -43,7 +43,7 @@ def main():
     wrap_path=ROOT/'subprojects/sdl3.wrap'
     wrap=configparser.ConfigParser();wrap.read(wrap_path,encoding='utf-8')
     specification=dict(wrap['wrap-file'])
-    assert specification['directory']=='SDL3-3.4.16','Review SDL header whitelist before updating the pinned release'
+    assert specification['directory']=='SDL3-3.4.18','Review SDL header whitelist before updating the pinned release'
     assert all('sdl3/'+name in specification.get('diff_files','').split(', ') for name in PATCHES),'Required SDL patch stack is missing'
     sdl_source,provision,_=helper.provision_source(args.sdl_source,specification,out)
     engine=ROOT/'src/sys/sdl3/sdl3_backend.cpp'

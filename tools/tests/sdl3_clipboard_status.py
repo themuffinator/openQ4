@@ -139,7 +139,7 @@ def main() -> int:
         raise RuntimeError("A C++17 compiler is required")
     wrap = configparser.ConfigParser()
     wrap.read(WRAP, encoding="utf-8")
-    if wrap["wrap-file"]["directory"] != "SDL3-3.4.16" or "sdl3/clipboard-status.patch" not in wrap["wrap-file"].get("diff_files", "").split(", "):
+    if wrap["wrap-file"]["directory"] != "SDL3-3.4.18" or "sdl3/clipboard-status.patch" not in wrap["wrap-file"].get("diff_files", "").split(", "):
         raise RuntimeError("The tested pinned SDL clipboard patch must be registered")
     if b"\r" in PATCH.read_bytes():
         raise RuntimeError("Package patch must remain LF for archive application")

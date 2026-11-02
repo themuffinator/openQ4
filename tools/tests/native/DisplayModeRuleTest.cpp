@@ -1,6 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 // The shared exclusive fullscreen mode rule (src/sys/DisplayModeRule.h), and its
-// agreement with SDL 3.4.16's refresh-0 choice: SDL_GetClosestFullscreenDisplayMode
+// agreement with SDL 3.4.18's refresh-0 choice: SDL_GetClosestFullscreenDisplayMode
 // over a mode list sorted by SDL's cmpmodes, transcribed from SDL_video.c.
 #include "src/sys/DisplayModeRule.h"
 

@@ -47,7 +47,7 @@ def main():
     config = configparser.ConfigParser()
     config.read(ROOT/'subprojects/sdl3.wrap', encoding='utf-8')
     specification = dict(config['wrap-file'])
-    assert specification['directory'] == 'SDL3-3.4.16', 'Review SDL public header closure on dependency update'
+    assert specification['directory'] == 'SDL3-3.4.18', 'Review SDL public header closure on dependency update'
     sdl, provision, _ = helper.provision_source(args.sdl_source, specification, folder)
     names = ['src/sys/sdl3/NativeEventDisposition.h', 'src/sys/sdl3/NativeEventDisposition.cpp',
              'src/sys/sdl3/NativeQueueBatch.h', 'src/sys/sdl3/NativeQueueBatch.cpp',

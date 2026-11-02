@@ -150,7 +150,7 @@ int main() {
     helper.ROOT=ROOT
     helper.FILES=['include/SDL3/SDL_'+n+'.h' for n in ['atomic','audio','begin_code','blendmode','camera','close_code','endian','error','events','gamepad','guid','init','iostream','joystick','keyboard','keycode','mouse','mutex','pen','pixels','platform_defines','power','properties','rect','scancode','sensor','stdinc','surface','thread','touch','video']]
     wrap=configparser.ConfigParser();wrap.read(ROOT/'subprojects/sdl3.wrap',encoding='utf-8')
-    assert wrap['wrap-file']['directory']=='SDL3-3.4.16','Review SDL include closure for a new version'
+    assert wrap['wrap-file']['directory']=='SDL3-3.4.18','Review SDL include closure for a new version'
     sdl,provision,_=helper.provision_source(args.sdl_source,dict(wrap['wrap-file']),out)
     sdl_paths=[sdl/n for n in helper.FILES]+[sdl/'LICENSE.txt']
     sdl_before={str(p.relative_to(sdl)):sha(p) for p in sdl_paths}

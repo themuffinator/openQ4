@@ -4057,6 +4057,14 @@ static void SDL3_GetWindowPositionOnDisplay(SDL_DisplayID display, int width, in
 	}
 }
 
+// Since SDL 3.4.18, SDL_SetWindowBordered fails on video drivers without border
+// control (Android, KMSDRM, offscreen, dummy) even when nothing would change.
+// Ask SDL only for a real change, as earlier releases effectively did.
+static bool SDL3_SetWindowBorderedCompat(bool bordered) {
+	const bool borderless = (SDL_GetWindowFlags(s_sdlWindow) & SDL_WINDOW_BORDERLESS) != 0;
+	return bordered != borderless || SDL_SetWindowBordered(s_sdlWindow, bordered);
+}
+
 static bool SDL3_SetWindowPositionCompat(int frameX, int frameY, SDL_DisplayID display, bool centerOnWayland, const char *description) {
 	if (!s_sdlWindow) {
 		return false;
@@ -4757,7 +4765,7 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 	if (parms.fullScreen) {
 		SDL3_SnapshotCurrentWindowedPlacement();
 
-		if (!SDL_SetWindowBordered(s_sdlWindow, true)) {
+		if (!SDL3_SetWindowBorderedCompat(true)) {
 			common->Printf("SDL3: failed to restore window borders: %s\n", SDL_GetError());
 		}
 
@@ -4769,7 +4777,7 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 			if (!SDL_SetWindowFullscreen(s_sdlWindow, false)) {
 				common->Printf("SDL3: failed to leave fullscreen before spanned desktop mode: %s\n", SDL_GetError());
 			}
-			if (!SDL_SetWindowBordered(s_sdlWindow, false)) {
+			if (!SDL3_SetWindowBorderedCompat(false)) {
 				common->Printf("SDL3: failed to disable window borders for spanned desktop mode: %s\n", SDL_GetError());
 			}
 
@@ -4856,7 +4864,7 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 		}
 		(void)SDL_SetWindowFullscreenMode(s_sdlWindow, NULL);
 
-		if (!SDL_SetWindowBordered(s_sdlWindow, !useBorderlessWindow)) {
+		if (!SDL3_SetWindowBorderedCompat(!useBorderlessWindow)) {
 			common->Printf("SDL3: failed to set border mode: %s\n", SDL_GetError());
 		}
 
@@ -7532,7 +7540,7 @@ static bool SDL3_WindowServices_ApplyScreenParmsStrict(const renderWindowRequest
 	}
 	if (!SDL_SetWindowFullscreenMode(s_sdlWindow,exclusive ? &selectedMode : NULL))
 		return SDL3_StrictWindowFailure("Cannot select the requested fullscreen mode",error,errorSize,true);
-	if (!SDL_SetWindowBordered(s_sdlWindow,!borderless)) return SDL3_StrictWindowFailure("Cannot apply window borders",error,errorSize,true);
+	if (!SDL3_SetWindowBorderedCompat(!borderless)) return SDL3_StrictWindowFailure("Cannot apply window borders",error,errorSize,true);
 	int x = bounds.x, y = bounds.y;
 	if (!borderless && !parms.fullScreen) {
 		if (before.positionValid && before.displayId == display) { x = before.windowX; y = before.windowY; }

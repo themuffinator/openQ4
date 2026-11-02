@@ -1128,21 +1128,21 @@ jobs:
           if errorlevel 1 exit /b 1
           python tools\tests\windows_text_store.py
           if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --sdl-include subprojects/SDL3-3.4.16/include
+          python tools\tests\windows_text_collection_bridge.py --sdl-include subprojects/SDL3-3.4.18/include
           if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --compiler cl --msvc-debug --sdl-include subprojects/SDL3-3.4.16/include
+          python tools\tests\windows_text_collection_bridge.py --compiler cl --msvc-debug --sdl-include subprojects/SDL3-3.4.18/include
           if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --unsupported --sdl-include subprojects/SDL3-3.4.16/include
+          python tools\tests\windows_text_collection_bridge.py --unsupported --sdl-include subprojects/SDL3-3.4.18/include
           if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --sdl-include subprojects/SDL3-3.4.16/include
+          python tools\tests\windows_text_session.py --sdl-include subprojects/SDL3-3.4.18/include
           if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.16/include
+          python tools\tests\windows_text_session.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
           if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --route-facts --sdl-include subprojects/SDL3-3.4.16/include
+          python tools\tests\windows_text_session.py --route-facts --sdl-include subprojects/SDL3-3.4.18/include
           if errorlevel 1 exit /b 1
-          python tools\tests\native_input_facts.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.16/include
+          python tools\tests\native_input_facts.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
           if errorlevel 1 exit /b 1
-          python tools\tests\native_input_terminal.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.16/include
+          python tools\tests\native_input_terminal.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
 
   linux-arm64:
     name: Linux ARM64 Commit Validation

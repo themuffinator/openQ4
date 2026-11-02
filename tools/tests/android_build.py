@@ -53,7 +53,7 @@ def staged_package(stage: Path, variant: str) -> tuple[dict[str, bytes], dict[st
             archive.writestr(name, data)
     files.update({
         'android-build.json': json.dumps({'format': 1, 'variant': variant, 'abi': abi,
-                                          'androidApi': 24, 'sdlVersion': '3.4.16'}).encode(),
+                                          'androidApi': 24, 'sdlVersion': '3.4.18'}).encode(),
         'baseoq4/mod.json': b'{"version":"0.14.000","requiredopenQ4Version":"0.14.000"}',
         'baseoq4/pak0.pk4': pack.getvalue(), 'baseoq4/pak1.pk4': b'second pack',
         'LICENSE': b'engine license', 'LICENSING.md': b'component licenses', 'CONTRIBUTORS.md': b'credits',

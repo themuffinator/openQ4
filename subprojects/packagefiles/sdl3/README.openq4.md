@@ -1,6 +1,6 @@
 # openQ4 SDL3 package adjustments
 
-The Meson package builds [SDL 3.4.16](https://github.com/libsdl-org/SDL/tree/release-3.4.16),
+The Meson package builds [SDL 3.4.18](https://github.com/libsdl-org/SDL/tree/release-3.4.18),
 copyright Sam Lantinga and the SDL contributors, under its zlib license. That
 license permits the modifications below and is compatible with openQ4's GPLv3
 distribution. SDL's original license notice remains in the source distribution.
@@ -64,7 +64,7 @@ in existing native windows; callers must reconcile their own queues. Arbitrary
 filters that remove or mutate already queued markers/public events cannot be
 assumed lossless. Token exhaustion fails closed without pointer truncation.
 
-This is deliberately a partial IMM observation contract. SDL 3.4.16 has no active
+This is deliberately a partial IMM observation contract. SDL 3.4.18 has no active
 TSF text store or composition sink. A native Begin establishes an observed
 interval; preedit clearing and synchronous default-result character generation
 retain that interval. Unmarked `WM_CHAR` is identified as a native character

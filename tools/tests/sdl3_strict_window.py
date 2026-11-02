@@ -6,7 +6,7 @@ atomicity and explicit restore placement. This does not create a real window,
 drive input, qualify a compositor/monitor or prove renderer resource/present
 success. Legacy windowing source guards run separately.
 Video pin tests verify counted references, not SDL's real display-ID lifetime.
-Native Wayland's per-window mode emulation is modelled from SDL 3.4.16; no
+Native Wayland's per-window mode emulation is modelled from SDL 3.4.18; no
 compositor is qualified.
 The POD observes maximized geometry; it does not expose the compositor's hidden
 normal restore rectangle, so complete restore-rectangle fidelity is unqualified.
@@ -57,7 +57,7 @@ static float s_windowAspectSnapRatio=0;
 static unsigned viewportDisplay=101;
 static int allocations=0,mutations=0,queries=0;
 static bool noModes=false,noCurrentMode=false,noDesktopMode=false,silentSize=false,silentFullscreen=false,
-    silentBorder=false,silentMove=false,failQueryAfterMutation=false;
+    silentBorder=false,silentMove=false,failQueryAfterMutation=false,noBorders=false;
 static std::string failure,lastError;
 static std::vector<unsigned> displayIds={101,202};
 static std::map<unsigned,SDL_Rect> displayBounds={{101,{0,0,1920,1080}},{202,{1920,0,1920,1080}}};
@@ -149,6 +149,7 @@ static bool SDL_MaximizeWindow(SDL_Window* value) {
     if(!Mutate("maximize"))return false;value->flags|=SDL_WINDOW_MAXIMIZED;return true;
 }
 static bool SDL_SetWindowBordered(SDL_Window* value,bool enabled) {
+    if(noBorders)return SDL_SetError("That operation is not supported"); // SDL 3.4.18 drivers without border control
     if(!Mutate("border"))return false;
     if(!silentBorder) { if(enabled)value->flags&=~SDL_WINDOW_BORDERLESS;else value->flags|=SDL_WINDOW_BORDERLESS; }return true;
 }
@@ -200,7 +201,7 @@ static void Reset() {
     desktopModes={{101,{101,1920,1080,1,60}},{202,{202,1920,1080,1,144}}};currentModes=desktopModes;
     modes={{101,1280,720,1,60},{101,1920,1080,1,60},{101,1920,1080,2,59.94f},{101,1920,1080,2,144},{202,1920,1080,1,144}};
     mutations=queries=0;failure.clear();lastError.clear();viewportDisplay=101;
-    wayland=emulatedModes=noModes=noCurrentMode=noDesktopMode=silentSize=silentFullscreen=silentBorder=silentMove=failQueryAfterMutation=false;
+    wayland=emulatedModes=noModes=noCurrentMode=noDesktopMode=silentSize=silentFullscreen=silentBorder=silentMove=failQueryAfterMutation=noBorders=false;
     s_screenParmTransitionActive=s_windowAspectSnapActive=false;s_windowAspectSnapRatio=0;
 }
 static renderWindowRequest_t Request() {
@@ -330,6 +331,7 @@ static void Failures() {
         if(failure=="aspect")s_windowAspectSnapActive=true;
         if(failure=="leave")window.flags|=SDL_WINDOW_FULLSCREEN;
         if(failure=="restore")window.flags|=SDL_WINDOW_MINIMIZED;
+        if(failure=="border")window.flags|=SDL_WINDOW_BORDERLESS;
         if(failure=="hide")request.parms.hiddenWindow=true;
         if(failure=="enter") { request.parms.fullScreen=true;request.parms.width=1280;request.parms.height=720; }
         if(failure=="maximize")request.maximized=true;
@@ -337,6 +339,8 @@ static void Failures() {
     }
     Reset();silentSize=true;Failed(Request());
     Reset();silentBorder=true;auto request=Request();request.parms.borderless=true;Failed(request);
+    Reset();noBorders=true;Applied(Request());
+    Reset();noBorders=true;request=Request();request.parms.borderless=true;Failed(request);
     Reset();silentFullscreen=true;request=Request();request.parms.fullScreen=request.fullscreenDesktop=true;Failed(request);
     Reset();silentMove=true;request=Request();request.displayId=202;Failed(request);
     Reset();silentMove=true;request=Request();request.restorePlacement=true;request.windowX=250;request.windowY=180;Failed(request);
@@ -403,6 +407,7 @@ def main():
         'static int SDL3_ClampViewportPixel(', 'static void SDL3_RefreshSafeArea(', 'static void SDL3_SetUIViewport(',
         'static void SDL3_SetVidSize(', 'static void SDL3_SetFullscreenState(',
         'static void SDL3_UpdateDisplayViewport(', 'static void SDL3_RecordWindowedPlacement(',
+        'static bool SDL3_SetWindowBorderedCompat(',
     ))
     compiler = next((path for name in ('clang++', 'g++', 'c++') if (path := shutil.which(name))), None)
     if not compiler:

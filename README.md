@@ -196,7 +196,7 @@ Developers can also find advanced configuration and file layout in [TECHNICAL.md
 - **id Software** and **Raven Software** - Quake 4 and the underlying technology
 - **Raven Software** and **Ritual Entertainment** - Quake 4: The Awakening, the unreleased expansion whose single-player campaign openQ4 can run
 - **Chris Robinson and the [OpenAL Soft](https://openal-soft.org/) contributors** - cross-platform OpenAL runtime bundled in macOS packages
-- **Sam Lantinga and the [SDL contributors](https://github.com/libsdl-org/SDL/tree/release-3.4.16)** - cross-platform window, input and microphone support, including the dummy audio driver used in automated voice tests; SDL uses the zlib licence
+- **Sam Lantinga and the [SDL contributors](https://github.com/libsdl-org/SDL/tree/release-3.4.18)** - cross-platform window, input and microphone support, including the dummy audio driver used in automated voice tests; SDL uses the zlib licence
 - **Sean Barrett and the [stb_vorbis contributors](https://github.com/nothings/stb/blob/master/stb_vorbis.c)** - MIT/public-domain Vorbis decoding; openQ4 adds a virtual-filesystem callback path for bounded compressed streaming
 - **The Khronos Group and [glslang contributors](https://github.com/KhronosGroup/glslang/tree/15.1.0)** - GLSL-to-SPIR-V compiler used by the Vulkan renderer; its complete licence ships under `licenses/`
 - **[The Khronos Group, Valve Corporation and LunarG](https://github.com/KhronosGroup/OpenXR-SDK/tree/release-1.1.63)** - Apache-2.0 OpenXR loader and headers behind [VR mode](docs/user/vr.md); [licence notice](LICENSES/openxr-sdk.txt)

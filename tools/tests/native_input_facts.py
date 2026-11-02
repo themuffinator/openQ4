@@ -28,7 +28,7 @@ def main():
     else:
         config=configparser.ConfigParser();config.read(ROOT/'subprojects/sdl3.wrap',encoding='utf-8')
         specification=dict(config['wrap-file'])
-        assert specification['directory']=='SDL3-3.4.16','Review SDL public header closure on dependency update'
+        assert specification['directory']=='SDL3-3.4.18','Review SDL public header closure on dependency update'
         sdl_source.ROOT=ROOT
         sdl_source.FILES=['include/SDL3/'+name for name in disposition_test.SDL_HEADERS]
         prepared,provision,_=sdl_source.provision_source(None,specification,scratch)

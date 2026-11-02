@@ -27,12 +27,12 @@ must contain `lib/libquake4.so`, `lib/libSDL3.so`, the renderer/game modules and
 their shared dependencies, plus `baseoq4/pak0.pk4` and the remaining staged packs.
 
 Use Java 17 or 21, Gradle 8.12, and Android SDK platform 35. Supply the same SDL3
-source tree used for the native library (currently SDL 3.4.16):
+source tree used for the native library (currently SDL 3.4.18):
 
 ```sh
 gradle -p mobile/android \
   --project-cache-dir=/absolute/path/to/openQ4/.tmp/android-gradle-project \
-  -Psdl3SourceRoot=/path/to/SDL3-3.4.16 \
+  -Psdl3SourceRoot=/path/to/SDL3-3.4.18 \
   -Popenq4Stage=/path/to/openQ4/.install/android/arm64-v8a \
   assembleDebug
 ```
