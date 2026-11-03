@@ -7200,6 +7200,32 @@ void idSessionLocal::PublishCampaignChapters( idUserInterface *gui, int select )
 
 /*
 ===============
+idSessionLocal::CampaignSummaryShots
+
+The active campaign's levelshots for the retained Campaign page's summaries
+(section 13.7): its first level's, for NEW GAME, and the furthest reached
+one's, for CHAPTERS.
+===============
+*/
+void idSessionLocal::CampaignSummaryShots( idStr &first, idStr &furthest ) {
+#ifndef ID_DEDICATED
+	int count = 0;
+	const sessionChapter_t *chapters = Session_CampaignChapters( count );
+	idStrList saves;
+	const int reached = Session_CampaignChaptersReached( *this, saves );
+	int last = 0;
+	for ( int i = 0; i < count; i++ ) {
+		if ( reached & ( 1 << i ) ) {
+			last = i;
+		}
+	}
+	first = RetainedPauseShot( chapters[0].map, chapters[0].entityFilter );
+	furthest = RetainedPauseShot( chapters[last].map, chapters[last].entityFilter );
+#endif
+}
+
+/*
+===============
 idSessionLocal::StartCampaignChapter
 
 Starts a reached chapter of the active campaign: from its level's start

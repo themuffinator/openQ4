@@ -12,6 +12,7 @@
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
   "view.text": {"type": "number", "initial": 1, "view": "text"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "summary.section": {"type": "number", "initial": -1},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
   "from_controls": {"type": "boolean", "initial": false},
   "from_game": {"type": "boolean", "initial": false},
@@ -3287,7 +3288,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3315,7 +3316,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3343,7 +3344,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3371,7 +3372,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3399,7 +3400,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3427,7 +3428,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3455,7 +3456,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3483,7 +3484,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3511,7 +3512,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3539,7 +3540,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3567,7 +3568,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3595,7 +3596,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3605,6 +3606,36 @@
      {"op": "/", "args": [36.6, {"state": "view.text"}]}
     ]
    }
+  },
+  {
+   "id": "description.opacity",
+   "node": "description",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, -1]}, 1, 0]}
+  },
+  {
+   "id": "summary-controls.opacity",
+   "node": "summary-controls",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, 0]}, 1, 0]}
+  },
+  {
+   "id": "summary-game.opacity",
+   "node": "summary-game",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, 1]}, 1, 0]}
+  },
+  {
+   "id": "summary-display.opacity",
+   "node": "summary-display",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, 2]}, 1, 0]}
+  },
+  {
+   "id": "summary-audio.opacity",
+   "node": "summary-audio",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, 3]}, 1, 0]}
   },
   {
    "id": "text.details.top",
@@ -3641,7 +3672,7 @@
                    1.6,
                    {
                     "op": "/",
-                    "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+                    "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
                    }
                   ]
                  },
@@ -3659,8 +3690,8 @@
                         "op": "select",
                         "args": [
                          {"op": ">", "args": [{"state": "view.text"}, 1.5]},
-                         5,
-                         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 4, 3]}
+                         6,
+                         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 5, 3]}
                         ]
                        },
                        26
@@ -3688,7 +3719,7 @@
              1.6,
              {
               "op": "/",
-              "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+              "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
              }
             ]
            },
@@ -3706,7 +3737,7 @@
            1.6,
            {
             "op": "/",
-            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
            }
           ]
          },
@@ -3741,7 +3772,7 @@
                   "op": "select",
                   "args": [
                    {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                   6,
+                   8,
                    {
                     "op": "select",
                     "args": [
@@ -3766,17 +3797,17 @@
                             "op": "select",
                             "args": [
                              {"op": "==", "args": [{"state": "language"}, "hungarian"]},
-                             7,
+                             8,
                              {
                               "op": "select",
                               "args": [
                                {"op": "==", "args": [{"state": "language"}, "italian"]},
-                               5,
+                               8,
                                {
                                 "op": "select",
                                 "args": [
                                  {"op": "==", "args": [{"state": "language"}, "polish"]},
-                                 6,
+                                 7,
                                  {
                                   "op": "select",
                                   "args": [
@@ -3786,8 +3817,8 @@
                                     "op": "select",
                                     "args": [
                                      {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                     6,
-                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 6, 9]}
+                                     7,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 7, 9]}
                                     ]
                                    }
                                   ]
@@ -3812,7 +3843,7 @@
                   "op": "select",
                   "args": [
                    {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                   4,
+                   5,
                    {
                     "op": "select",
                     "args": [
@@ -3822,32 +3853,32 @@
                       "op": "select",
                       "args": [
                        {"op": "==", "args": [{"state": "language"}, "english"]},
-                       4,
+                       5,
                        {
                         "op": "select",
                         "args": [
                          {"op": "==", "args": [{"state": "language"}, "french"]},
-                         5,
+                         6,
                          {
                           "op": "select",
                           "args": [
                            {"op": "==", "args": [{"state": "language"}, "german"]},
-                           5,
+                           6,
                            {
                             "op": "select",
                             "args": [
-                             {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                             {"op": "==", "args": [{"state": "language"}, "italian"]},
                              5,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               {"op": "==", "args": [{"state": "language"}, "polish"]},
                                5,
                                {
                                 "op": "select",
                                 "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
-                                 4,
+                                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                 6,
                                  {
                                   "op": "select",
                                   "args": [
@@ -3858,7 +3889,7 @@
                                     "args": [
                                      {"op": "==", "args": [{"state": "language"}, "turkish"]},
                                      5,
-                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 6]}
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 7]}
                                     ]
                                    }
                                   ]
@@ -3919,7 +3950,7 @@
            1.6,
            {
             "op": "/",
-            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
            }
           ]
          }
@@ -3948,7 +3979,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -3962,8 +3993,8 @@
             "op": "select",
             "args": [
              {"op": ">", "args": [{"state": "view.text"}, 1.5]},
-             5,
-             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 4, 3]}
+             6,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 5, 3]}
             ]
            },
            26
@@ -4004,7 +4035,7 @@
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                     6,
+                     8,
                      {
                       "op": "select",
                       "args": [
@@ -4029,17 +4060,17 @@
                               "op": "select",
                               "args": [
                                {"op": "==", "args": [{"state": "language"}, "hungarian"]},
-                               7,
+                               8,
                                {
                                 "op": "select",
                                 "args": [
                                  {"op": "==", "args": [{"state": "language"}, "italian"]},
-                                 5,
+                                 8,
                                  {
                                   "op": "select",
                                   "args": [
                                    {"op": "==", "args": [{"state": "language"}, "polish"]},
-                                   6,
+                                   7,
                                    {
                                     "op": "select",
                                     "args": [
@@ -4049,8 +4080,8 @@
                                       "op": "select",
                                       "args": [
                                        {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                       6,
-                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 6, 9]}
+                                       7,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 7, 9]}
                                       ]
                                      }
                                     ]
@@ -4075,7 +4106,7 @@
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                     4,
+                     5,
                      {
                       "op": "select",
                       "args": [
@@ -4085,32 +4116,32 @@
                         "op": "select",
                         "args": [
                          {"op": "==", "args": [{"state": "language"}, "english"]},
-                         4,
+                         5,
                          {
                           "op": "select",
                           "args": [
                            {"op": "==", "args": [{"state": "language"}, "french"]},
-                           5,
+                           6,
                            {
                             "op": "select",
                             "args": [
                              {"op": "==", "args": [{"state": "language"}, "german"]},
-                             5,
+                             6,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
                                5,
                                {
                                 "op": "select",
                                 "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
                                  5,
                                  {
                                   "op": "select",
                                   "args": [
-                                   {"op": "==", "args": [{"state": "language"}, "polish"]},
-                                   4,
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   6,
                                    {
                                     "op": "select",
                                     "args": [
@@ -4121,7 +4152,7 @@
                                       "args": [
                                        {"op": "==", "args": [{"state": "language"}, "turkish"]},
                                        5,
-                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 6]}
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 7]}
                                       ]
                                      }
                                     ]
@@ -4184,7 +4215,7 @@
            1.6,
            {
             "op": "/",
-            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
            }
           ]
          }
@@ -4213,7 +4244,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -4227,8 +4258,8 @@
             "op": "select",
             "args": [
              {"op": ">", "args": [{"state": "view.text"}, 1.5]},
-             5,
-             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 4, 3]}
+             6,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 5, 3]}
             ]
            },
            26
@@ -4269,7 +4300,7 @@
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                     6,
+                     8,
                      {
                       "op": "select",
                       "args": [
@@ -4294,17 +4325,17 @@
                               "op": "select",
                               "args": [
                                {"op": "==", "args": [{"state": "language"}, "hungarian"]},
-                               7,
+                               8,
                                {
                                 "op": "select",
                                 "args": [
                                  {"op": "==", "args": [{"state": "language"}, "italian"]},
-                                 5,
+                                 8,
                                  {
                                   "op": "select",
                                   "args": [
                                    {"op": "==", "args": [{"state": "language"}, "polish"]},
-                                   6,
+                                   7,
                                    {
                                     "op": "select",
                                     "args": [
@@ -4314,8 +4345,8 @@
                                       "op": "select",
                                       "args": [
                                        {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                       6,
-                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 6, 9]}
+                                       7,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 7, 9]}
                                       ]
                                      }
                                     ]
@@ -4340,7 +4371,7 @@
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-                     4,
+                     5,
                      {
                       "op": "select",
                       "args": [
@@ -4350,32 +4381,32 @@
                         "op": "select",
                         "args": [
                          {"op": "==", "args": [{"state": "language"}, "english"]},
-                         4,
+                         5,
                          {
                           "op": "select",
                           "args": [
                            {"op": "==", "args": [{"state": "language"}, "french"]},
-                           5,
+                           6,
                            {
                             "op": "select",
                             "args": [
                              {"op": "==", "args": [{"state": "language"}, "german"]},
-                             5,
+                             6,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
                                5,
                                {
                                 "op": "select",
                                 "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
                                  5,
                                  {
                                   "op": "select",
                                   "args": [
-                                   {"op": "==", "args": [{"state": "language"}, "polish"]},
-                                   4,
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   6,
                                    {
                                     "op": "select",
                                     "args": [
@@ -4386,7 +4417,1067 @@
                                       "args": [
                                        {"op": "==", "args": [{"state": "language"}, "turkish"]},
                                        5,
-                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 6]}
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 7]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 26
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       210.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.summary-controls.width",
+   "node": "summary-controls",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "+",
+      "args": [
+       894.0,
+       {
+        "op": "*",
+        "args": [
+         -66.0,
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.summary-controls.height",
+   "node": "summary-controls",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             6,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 5, 3]}
+            ]
+           },
+           26
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "min",
+          "args": [
+           285.0,
+           {
+            "op": "-",
+            "args": [
+             630.0,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     8,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       5,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         6,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           8,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             7,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                               8,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                 8,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                   7,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     8,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       7,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 7, 9]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     5,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         5,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           6,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             6,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               5,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 5,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   6,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     5,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       5,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 7]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 26
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       210.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.summary-game.width",
+   "node": "summary-game",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "+",
+      "args": [
+       894.0,
+       {
+        "op": "*",
+        "args": [
+         -66.0,
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.summary-game.height",
+   "node": "summary-game",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             6,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 5, 3]}
+            ]
+           },
+           26
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "min",
+          "args": [
+           285.0,
+           {
+            "op": "-",
+            "args": [
+             630.0,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     8,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       5,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         6,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           8,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             7,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                               8,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                 8,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                   7,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     8,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       7,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 7, 9]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     5,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         5,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           6,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             6,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               5,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 5,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   6,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     5,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       5,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 7]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 26
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       210.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.summary-display.width",
+   "node": "summary-display",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "+",
+      "args": [
+       894.0,
+       {
+        "op": "*",
+        "args": [
+         -66.0,
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.summary-display.height",
+   "node": "summary-display",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             6,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 5, 3]}
+            ]
+           },
+           26
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "min",
+          "args": [
+           285.0,
+           {
+            "op": "-",
+            "args": [
+             630.0,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     8,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       5,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         6,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           8,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             7,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                               8,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                 8,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                   7,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     8,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       7,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 7, 9]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     5,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         5,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           6,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             6,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               5,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 5,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   6,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     5,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       5,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 7]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 26
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       210.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.summary-audio.width",
+   "node": "summary-audio",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "+",
+      "args": [
+       894.0,
+       {
+        "op": "*",
+        "args": [
+         -66.0,
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.summary-audio.height",
+   "node": "summary-audio",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             6,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 5, 3]}
+            ]
+           },
+           26
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "min",
+          "args": [
+           285.0,
+           {
+            "op": "-",
+            "args": [
+             630.0,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     8,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       5,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         6,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           8,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             7,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                               8,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                 8,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                   7,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     8,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       7,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 7, 9]}
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     5,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       4,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         5,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "french"]},
+                           6,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "german"]},
+                             6,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               5,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 5,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                                   6,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                     5,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                       5,
+                                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 5, 7]}
                                       ]
                                      }
                                     ]
@@ -4482,7 +5573,7 @@
                1.6,
                {
                 "op": "/",
-                "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+                "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
                }
               ]
              },
@@ -4500,8 +5591,8 @@
                     "op": "select",
                     "args": [
                      {"op": ">", "args": [{"state": "view.text"}, 1.5]},
-                     5,
-                     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 4, 3]}
+                     6,
+                     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 5, 3]}
                     ]
                    },
                    26
@@ -4541,7 +5632,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -4569,7 +5660,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -4597,7 +5688,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -4629,7 +5720,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -4658,7 +5749,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -4681,7 +5772,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -4698,7 +5789,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -4729,7 +5820,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -4758,7 +5849,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -4781,7 +5872,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -4798,7 +5889,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -4829,7 +5920,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -4858,7 +5949,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -4881,7 +5972,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -4898,7 +5989,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -4929,7 +6020,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -4958,7 +6049,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -4981,7 +6072,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -4998,7 +6089,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5025,7 +6116,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5053,7 +6144,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5081,7 +6172,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5109,7 +6200,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5137,7 +6228,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5165,7 +6256,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5193,7 +6284,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5225,7 +6316,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5254,7 +6345,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5277,7 +6368,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5294,7 +6385,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5325,7 +6416,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5354,7 +6445,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5377,7 +6468,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5394,7 +6485,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5425,7 +6516,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5454,7 +6545,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5477,7 +6568,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5494,7 +6585,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5525,7 +6616,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5554,7 +6645,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5577,7 +6668,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5594,7 +6685,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5621,7 +6712,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5649,7 +6740,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5677,7 +6768,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5705,7 +6796,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5733,7 +6824,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5761,7 +6852,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5789,7 +6880,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -5821,7 +6912,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5850,7 +6941,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5873,7 +6964,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5890,7 +6981,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5921,7 +7012,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5950,7 +7041,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -5973,7 +7064,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -5990,7 +7081,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6021,7 +7112,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6050,7 +7141,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6073,7 +7164,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6090,7 +7181,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6121,7 +7212,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6150,7 +7241,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6173,7 +7264,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6190,7 +7281,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6217,7 +7308,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6245,7 +7336,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6273,7 +7364,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6301,7 +7392,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6329,7 +7420,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6357,7 +7448,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6385,7 +7476,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6417,7 +7508,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6446,7 +7537,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6469,7 +7560,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6486,7 +7577,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6517,7 +7608,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6546,7 +7637,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6569,7 +7660,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6586,7 +7677,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6617,7 +7708,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6646,7 +7737,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6669,7 +7760,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6686,7 +7777,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6717,7 +7808,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6746,7 +7837,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -6769,7 +7860,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6786,7 +7877,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -6813,7 +7904,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6841,7 +7932,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6869,7 +7960,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6897,7 +7988,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6925,7 +8016,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6953,7 +8044,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -6981,7 +8072,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -7013,7 +8104,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7042,7 +8133,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7065,7 +8156,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7082,7 +8173,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7113,7 +8204,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7142,7 +8233,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7165,7 +8256,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7182,7 +8273,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7213,7 +8304,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7242,7 +8333,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7265,7 +8356,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7282,7 +8373,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7313,7 +8404,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7342,7 +8433,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7365,7 +8456,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7382,7 +8473,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7409,7 +8500,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -7437,7 +8528,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -7465,7 +8556,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -7493,7 +8584,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -7521,7 +8612,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -7549,7 +8640,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -7577,7 +8668,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -7609,7 +8700,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7638,7 +8729,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7661,7 +8752,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7678,7 +8769,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7709,7 +8800,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7738,7 +8829,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7761,7 +8852,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7778,7 +8869,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7809,7 +8900,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7838,7 +8929,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7861,7 +8952,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7878,7 +8969,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7909,7 +9000,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7938,7 +9029,7 @@
             1.6,
             {
              "op": "/",
-             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+             "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
             }
            ]
           },
@@ -7961,7 +9052,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -7978,7 +9069,7 @@
         1.6,
         {
          "op": "/",
-         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+         "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
         }
        ]
       },
@@ -8005,7 +9096,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -8033,7 +9124,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -8061,7 +9152,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -8089,7 +9180,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -8117,7 +9208,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -8146,7 +9237,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        }
@@ -8173,7 +9264,7 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -8201,7 +9292,231 @@
          1.6,
          {
           "op": "/",
-          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 554.0]
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       26
+      ]
+     },
+     26
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-controls.font-size",
+   "node": "summary-controls",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       18
+      ]
+     },
+     18
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-controls.line-height",
+   "node": "summary-controls",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       26
+      ]
+     },
+     26
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-game.font-size",
+   "node": "summary-game",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       18
+      ]
+     },
+     18
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-game.line-height",
+   "node": "summary-game",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       26
+      ]
+     },
+     26
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-display.font-size",
+   "node": "summary-display",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       18
+      ]
+     },
+     18
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-display.line-height",
+   "node": "summary-display",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       26
+      ]
+     },
+     26
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-audio.font-size",
+   "node": "summary-audio",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
+         }
+        ]
+       },
+       18
+      ]
+     },
+     18
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-audio.line-height",
+   "node": "summary-audio",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 606.0]
          }
         ]
        },
@@ -10446,6 +11761,7 @@
    "value": {"op": "-", "args": [0, {"state": "view.safeBottom"}]}
   }
  ],
+ "detail": {"state": "summary.section", "none": -1},
  "timelines": [
   {
    "id": "defaultsModal_yes.default",
@@ -17797,6 +19113,7 @@
           "disabled": "controls.disabled"
          },
          "action": "settingsControls",
+         "detail": 0,
          "navigation": {"up": "back", "down": "game"}
         }
        },
@@ -17997,6 +19314,7 @@
           "disabled": "game.disabled"
          },
          "action": "settingsGame",
+         "detail": 1,
          "navigation": {"up": "controls", "down": "display"}
         }
        },
@@ -18197,6 +19515,7 @@
           "disabled": "display.disabled"
          },
          "action": "settingsDisplay",
+         "detail": 2,
          "navigation": {"up": "game", "down": "audio"}
         }
        },
@@ -18397,6 +19716,7 @@
           "disabled": "audio.disabled"
          },
          "action": "settingsAudio",
+         "detail": 3,
          "navigation": {"up": "display", "down": "defaults"}
         }
        },
@@ -18827,7 +20147,76 @@
          "font-family": {"type": "font", "value": "lowpixel"},
          "font-size": {"type": "length", "value": 18, "unit": "dp"},
          "line-height": {"type": "length", "value": 26, "unit": "dp"},
-         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 1}
+        }
+       },
+       {
+        "id": "summary-controls",
+        "type": "text",
+        "properties": {
+         "text": {"type": "text", "value": "#str_231571"},
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 315.0, "unit": "dp"},
+         "height": {"type": "length", "value": 210.0, "unit": "dp"},
+         "font-family": {"type": "font", "value": "lowpixel"},
+         "font-size": {"type": "length", "value": 18, "unit": "dp"},
+         "line-height": {"type": "length", "value": 26, "unit": "dp"},
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 0}
+        }
+       },
+       {
+        "id": "summary-game",
+        "type": "text",
+        "properties": {
+         "text": {"type": "text", "value": "#str_231572"},
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 315.0, "unit": "dp"},
+         "height": {"type": "length", "value": 210.0, "unit": "dp"},
+         "font-family": {"type": "font", "value": "lowpixel"},
+         "font-size": {"type": "length", "value": 18, "unit": "dp"},
+         "line-height": {"type": "length", "value": 26, "unit": "dp"},
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 0}
+        }
+       },
+       {
+        "id": "summary-display",
+        "type": "text",
+        "properties": {
+         "text": {"type": "text", "value": "#str_231573"},
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 315.0, "unit": "dp"},
+         "height": {"type": "length", "value": 210.0, "unit": "dp"},
+         "font-family": {"type": "font", "value": "lowpixel"},
+         "font-size": {"type": "length", "value": 18, "unit": "dp"},
+         "line-height": {"type": "length", "value": 26, "unit": "dp"},
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 0}
+        }
+       },
+       {
+        "id": "summary-audio",
+        "type": "text",
+        "properties": {
+         "text": {"type": "text", "value": "#str_231574"},
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 315.0, "unit": "dp"},
+         "height": {"type": "length", "value": 210.0, "unit": "dp"},
+         "font-family": {"type": "font", "value": "lowpixel"},
+         "font-size": {"type": "length", "value": 18, "unit": "dp"},
+         "line-height": {"type": "length", "value": 26, "unit": "dp"},
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 0}
         }
        }
       ]

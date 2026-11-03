@@ -13,6 +13,9 @@
   "campaign.awakening": {"type": "boolean", "initial": false},
   "from_chapters": {"type": "boolean", "initial": false},
   "view.text": {"type": "number", "initial": 1, "view": "text"},
+  "summary.section": {"type": "number", "initial": -1},
+  "summary.newgame.shot": {"type": "string", "initial": ""},
+  "summary.chapters.shot": {"type": "string", "initial": ""},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
   "detail_title": {"type": "string", "initial": "#str_230039"},
@@ -911,6 +914,60 @@
    }
   },
   {
+   "id": "available.opacity",
+   "node": "available",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, -1]}, 1, 0]}
+  },
+  {
+   "id": "partial.opacity",
+   "node": "partial",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, -1]}, 1, 0]}
+  },
+  {
+   "id": "absent.opacity",
+   "node": "absent",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, -1]}, 1, 0]}
+  },
+  {
+   "id": "summary-newgame.opacity",
+   "node": "summary-newgame",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, 0]}, 1, 0]}
+  },
+  {
+   "id": "summary-newgame-shots.opacity",
+   "node": "summary-newgame-shots",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, 0]}, 1, 0]}
+  },
+  {
+   "id": "summary-newgame-shot.image",
+   "node": "summary-newgame-shot",
+   "property": "image",
+   "value": {"state": "summary.newgame.shot"}
+  },
+  {
+   "id": "summary-chapters.opacity",
+   "node": "summary-chapters",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, 1]}, 1, 0]}
+  },
+  {
+   "id": "summary-chapters-shots.opacity",
+   "node": "summary-chapters-shots",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "summary.section"}, 1]}, 1, 0]}
+  },
+  {
+   "id": "summary-chapters-shot.image",
+   "node": "summary-chapters-shot",
+   "property": "image",
+   "value": {"state": "summary.chapters.shot"}
+  },
+  {
    "id": "text.details.top",
    "node": "details",
    "property": "top",
@@ -1045,7 +1102,7 @@
                   "op": "select",
                   "args": [
                    {"op": "==", "args": [{"state": "language"}, "czech"]},
-                   7,
+                   8,
                    {
                     "op": "select",
                     "args": [
@@ -1064,21 +1121,14 @@
                          {
                           "op": "select",
                           "args": [
-                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           {"op": "==", "args": [{"state": "language"}, "spanish"]},
                            8,
                            {
                             "op": "select",
                             "args": [
-                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             {"op": "==", "args": [{"state": "language"}, "turkish"]},
                              8,
-                             {
-                              "op": "select",
-                              "args": [
-                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                               8,
-                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
-                              ]
-                             }
+                             {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
                             ]
                            }
                           ]
@@ -1131,14 +1181,7 @@
                                 "args": [
                                  {"op": "==", "args": [{"state": "language"}, "spanish"]},
                                  6,
-                                 {
-                                  "op": "select",
-                                  "args": [
-                                   {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                   6,
-                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 6, 7]}
-                                  ]
-                                 }
+                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
                                 ]
                                }
                               ]
@@ -1280,7 +1323,7 @@
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "czech"]},
-                     7,
+                     8,
                      {
                       "op": "select",
                       "args": [
@@ -1299,21 +1342,14 @@
                            {
                             "op": "select",
                             "args": [
-                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
                              8,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
                                8,
-                               {
-                                "op": "select",
-                                "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                 8,
-                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
-                                ]
-                               }
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
                               ]
                              }
                             ]
@@ -1366,14 +1402,7 @@
                                   "args": [
                                    {"op": "==", "args": [{"state": "language"}, "spanish"]},
                                    6,
-                                   {
-                                    "op": "select",
-                                    "args": [
-                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                     6,
-                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 6, 7]}
-                                    ]
-                                   }
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
                                   ]
                                  }
                                 ]
@@ -1517,7 +1546,7 @@
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "czech"]},
-                     7,
+                     8,
                      {
                       "op": "select",
                       "args": [
@@ -1536,21 +1565,14 @@
                            {
                             "op": "select",
                             "args": [
-                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
                              8,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
                                8,
-                               {
-                                "op": "select",
-                                "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                 8,
-                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
-                                ]
-                               }
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
                               ]
                              }
                             ]
@@ -1603,14 +1625,7 @@
                                   "args": [
                                    {"op": "==", "args": [{"state": "language"}, "spanish"]},
                                    6,
-                                   {
-                                    "op": "select",
-                                    "args": [
-                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                     6,
-                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 6, 7]}
-                                    ]
-                                   }
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
                                   ]
                                  }
                                 ]
@@ -1754,7 +1769,7 @@
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "czech"]},
-                     7,
+                     8,
                      {
                       "op": "select",
                       "args": [
@@ -1773,21 +1788,14 @@
                            {
                             "op": "select",
                             "args": [
-                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
                              8,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
                                8,
-                               {
-                                "op": "select",
-                                "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                 8,
-                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
-                                ]
-                               }
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
                               ]
                              }
                             ]
@@ -1840,14 +1848,7 @@
                                   "args": [
                                    {"op": "==", "args": [{"state": "language"}, "spanish"]},
                                    6,
-                                   {
-                                    "op": "select",
-                                    "args": [
-                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                     6,
-                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 6, 7]}
-                                    ]
-                                   }
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
                                   ]
                                  }
                                 ]
@@ -1991,7 +1992,7 @@
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "czech"]},
-                     7,
+                     8,
                      {
                       "op": "select",
                       "args": [
@@ -2010,21 +2011,14 @@
                            {
                             "op": "select",
                             "args": [
-                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
                              8,
                              {
                               "op": "select",
                               "args": [
-                               {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
                                8,
-                               {
-                                "op": "select",
-                                "args": [
-                                 {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                 8,
-                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
-                                ]
-                               }
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
                               ]
                              }
                             ]
@@ -2077,14 +2071,453 @@
                                   "args": [
                                    {"op": "==", "args": [{"state": "language"}, "spanish"]},
                                    6,
-                                   {
-                                    "op": "select",
-                                    "args": [
-                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                                     6,
-                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 6, 7]}
-                                    ]
-                                   }
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 26
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       210.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.summary-newgame.width",
+   "node": "summary-newgame",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "+",
+      "args": [
+       894.0,
+       {
+        "op": "*",
+        "args": [
+         -66.0,
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 561.0]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.summary-newgame.height",
+   "node": "summary-newgame",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 561.0]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             6,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 4, 3]}
+            ]
+           },
+           26
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "min",
+          "args": [
+           285.0,
+           {
+            "op": "-",
+            "args": [
+             630.0,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     8,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       8,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                         8,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           8,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             8,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               8,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     6,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       5,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         6,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
+                           6,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                             6,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               6,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 6,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   6,
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 26
+                ]
+               },
+               {"state": "view.text"}
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       210.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.summary-chapters.width",
+   "node": "summary-chapters",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "+",
+      "args": [
+       894.0,
+       {
+        "op": "*",
+        "args": [
+         -66.0,
+         {
+          "op": "min",
+          "args": [
+           1.6,
+           {
+            "op": "/",
+            "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 561.0]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 336.0, 315.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.summary-chapters.height",
+   "node": "summary-chapters",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 561.0]
+         }
+        ]
+       },
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             6,
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 4, 3]}
+            ]
+           },
+           26
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "-",
+        "args": [
+         630.0,
+         {
+          "op": "min",
+          "args": [
+           285.0,
+           {
+            "op": "-",
+            "args": [
+             630.0,
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "czech"]},
+                     8,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "english"]},
+                       8,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                         8,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           8,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                             8,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                               8,
+                               {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                     6,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "czech"]},
+                       5,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "english"]},
+                         6,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "german"]},
+                           6,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                             6,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "italian"]},
+                               6,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                 6,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   6,
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
                                   ]
                                  }
                                 ]
@@ -5735,6 +6168,468 @@
    }
   },
   {
+   "id": "tall.summary-newgame.font-size",
+   "node": "summary-newgame",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 561.0]
+         }
+        ]
+       },
+       18
+      ]
+     },
+     18
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-newgame.line-height",
+   "node": "summary-newgame",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 561.0]
+         }
+        ]
+       },
+       26
+      ]
+     },
+     26
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-chapters.font-size",
+   "node": "summary-chapters",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 561.0]
+         }
+        ]
+       },
+       18
+      ]
+     },
+     18
+    ]
+   }
+  },
+  {
+   "id": "tall.summary-chapters.line-height",
+   "node": "summary-chapters",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-210.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 561.0]
+         }
+        ]
+       },
+       26
+      ]
+     },
+     26
+    ]
+   }
+  },
+  {
+   "id": "summary-newgame-shots.display",
+   "node": "summary-newgame-shots",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "campaign.awakening"}, {"state": "awakening_chosen"}]},
+     {
+      "op": "select",
+      "args": [
+       {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+       "none",
+       {
+        "op": "select",
+        "args": [
+         {
+          "op": "&&",
+          "args": [
+           {"op": "!=", "args": [{"state": "summary.newgame.shot"}, ""]},
+           {
+            "op": ">=",
+            "args": [
+             {
+              "op": "select",
+              "args": [
+               {"op": ">", "args": [{"state": "view.text"}, 1]},
+               {
+                "op": "min",
+                "args": [
+                 285.0,
+                 {
+                  "op": "-",
+                  "args": [
+                   630.0,
+                   {
+                    "op": "*",
+                    "args": [
+                     {
+                      "op": "*",
+                      "args": [
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "czech"]},
+                           8,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "english"]},
+                             8,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                               8,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                 8,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   8,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     8,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         },
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                           6,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "czech"]},
+                             5,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "english"]},
+                               6,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "german"]},
+                                 6,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                                   6,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                     6,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                       6,
+                                       {
+                                        "op": "select",
+                                        "args": [
+                                         {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                         6,
+                                         {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
+                                        ]
+                                       }
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       },
+                       26
+                      ]
+                     },
+                     {"state": "view.text"}
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               285.0
+              ]
+             },
+             285.0
+            ]
+           }
+          ]
+         },
+         "block",
+         "none"
+        ]
+       }
+      ]
+     },
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "summary-chapters-shots.display",
+   "node": "summary-chapters-shots",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "campaign.awakening"}, {"state": "awakening_chosen"}]},
+     {
+      "op": "select",
+      "args": [
+       {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+       "none",
+       {
+        "op": "select",
+        "args": [
+         {
+          "op": "&&",
+          "args": [
+           {"op": "!=", "args": [{"state": "summary.chapters.shot"}, ""]},
+           {
+            "op": ">=",
+            "args": [
+             {
+              "op": "select",
+              "args": [
+               {"op": ">", "args": [{"state": "view.text"}, 1]},
+               {
+                "op": "min",
+                "args": [
+                 285.0,
+                 {
+                  "op": "-",
+                  "args": [
+                   630.0,
+                   {
+                    "op": "*",
+                    "args": [
+                     {
+                      "op": "*",
+                      "args": [
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "czech"]},
+                           8,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "english"]},
+                             8,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                               8,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                 8,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                   8,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                     8,
+                                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 8, 9]}
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         },
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+                           6,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "czech"]},
+                             5,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "english"]},
+                               6,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "german"]},
+                                 6,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                                   6,
+                                   {
+                                    "op": "select",
+                                    "args": [
+                                     {"op": "==", "args": [{"state": "language"}, "italian"]},
+                                     6,
+                                     {
+                                      "op": "select",
+                                      "args": [
+                                       {"op": "==", "args": [{"state": "language"}, "polish"]},
+                                       6,
+                                       {
+                                        "op": "select",
+                                        "args": [
+                                         {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                         6,
+                                         {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 6, 7]}
+                                        ]
+                                       }
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       },
+                       26
+                      ]
+                     },
+                     {"state": "view.text"}
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               285.0
+              ]
+             },
+             285.0
+            ]
+           }
+          ]
+         },
+         "block",
+         "none"
+        ]
+       }
+      ]
+     },
+     "none"
+    ]
+   }
+  },
+  {
    "id": "text.crumb.font-size",
    "node": "crumb",
    "property": "font-size",
@@ -6387,6 +7282,7 @@
    "value": {"op": "-", "args": [0, {"state": "view.safeBottom"}]}
   }
  ],
+ "detail": {"state": "summary.section", "none": -1},
  "timelines": [
   {
    "id": "quake4.default",
@@ -13302,6 +14198,7 @@
           "disabled": "newgame.disabled"
          },
          "action": "campaignNew",
+         "detail": 0,
          "navigation": {"up": "awakening", "down": "chapters"}
         }
        },
@@ -13502,6 +14399,7 @@
           "disabled": "chapters.disabled"
          },
          "action": "campaignChapters",
+         "detail": 1,
          "navigation": {"up": "newgame", "down": "back"}
         }
        },
@@ -13733,7 +14631,8 @@
          "font-family": {"type": "font", "value": "lowpixel"},
          "font-size": {"type": "length", "value": 18, "unit": "dp"},
          "line-height": {"type": "length", "value": 26, "unit": "dp"},
-         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 1}
         }
        },
        {
@@ -13750,7 +14649,8 @@
          "font-family": {"type": "font", "value": "lowpixel"},
          "font-size": {"type": "length", "value": 18, "unit": "dp"},
          "line-height": {"type": "length", "value": 26, "unit": "dp"},
-         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 1}
         }
        },
        {
@@ -13767,8 +14667,211 @@
          "font-family": {"type": "font", "value": "lowpixel"},
          "font-size": {"type": "length", "value": 18, "unit": "dp"},
          "line-height": {"type": "length", "value": 26, "unit": "dp"},
-         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 1}
         }
+       },
+       {
+        "id": "summary-newgame",
+        "type": "text",
+        "properties": {
+         "text": {"type": "text", "value": "#str_231575"},
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 315.0, "unit": "dp"},
+         "height": {"type": "length", "value": 210.0, "unit": "dp"},
+         "font-family": {"type": "font", "value": "lowpixel"},
+         "font-size": {"type": "length", "value": 18, "unit": "dp"},
+         "line-height": {"type": "length", "value": 26, "unit": "dp"},
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 0}
+        }
+       },
+       {
+        "id": "summary-chapters",
+        "type": "text",
+        "properties": {
+         "text": {"type": "text", "value": "#str_231576"},
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 315.0, "unit": "dp"},
+         "height": {"type": "length", "value": 210.0, "unit": "dp"},
+         "font-family": {"type": "font", "value": "lowpixel"},
+         "font-size": {"type": "length", "value": 18, "unit": "dp"},
+         "line-height": {"type": "length", "value": 26, "unit": "dp"},
+         "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]},
+         "opacity": {"type": "number", "value": 0}
+        }
+       }
+      ]
+     },
+     {
+      "id": "summary-newgame-shots",
+      "type": "group",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 960.0, "unit": "dp"},
+       "height": {"type": "length", "value": 720, "unit": "dp"},
+       "opacity": {"type": "number", "value": 0},
+       "pointer-events": {"type": "keyword", "value": "none"},
+       "display": {"type": "keyword", "value": "none"}
+      },
+      "children": [
+       {
+        "id": "summary-newgame-shot-back",
+        "type": "vector",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 592.5, "unit": "dp"},
+         "top": {"type": "length", "value": 115.5, "unit": "dp"},
+         "width": {"type": "length", "value": 210.0, "unit": "dp"},
+         "height": {"type": "length", "value": 157.5, "unit": "dp"}
+        },
+        "paths": [
+         {
+          "id": "back",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[0, 0]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.6]}}
+         }
+        ]
+       },
+       {
+        "id": "summary-newgame-shot",
+        "type": "image",
+        "properties": {
+         "image": {"type": "image", "value": ""},
+         "image-fit": {"type": "keyword", "value": "contain"},
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 594.0, "unit": "dp"},
+         "top": {"type": "length", "value": 117.0, "unit": "dp"},
+         "width": {"type": "length", "value": 207.0, "unit": "dp"},
+         "height": {"type": "length", "value": 154.5, "unit": "dp"}
+        }
+       },
+       {
+        "id": "summary-newgame-shot-border",
+        "type": "vector",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 592.5, "unit": "dp"},
+         "top": {"type": "length", "value": 115.5, "unit": "dp"},
+         "width": {"type": "length", "value": 210.0, "unit": "dp"},
+         "height": {"type": "length", "value": 157.5, "unit": "dp"},
+         "pointer-events": {"type": "keyword", "value": "none"}
+        },
+        "paths": [
+         {
+          "id": "border",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[0.75, 0.75]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, 0.75]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p3", "op": "line", "points": [[0.75, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "close", "op": "close"}
+          ],
+          "stroke": {
+           "paint": {"type": "solid", "color": {"type": "color", "value": [0.2549, 0.2745, 0.1412, 1.0]}},
+           "widthDp": 1.5,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "summary-chapters-shots",
+      "type": "group",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 960.0, "unit": "dp"},
+       "height": {"type": "length", "value": 720, "unit": "dp"},
+       "opacity": {"type": "number", "value": 0},
+       "pointer-events": {"type": "keyword", "value": "none"},
+       "display": {"type": "keyword", "value": "none"}
+      },
+      "children": [
+       {
+        "id": "summary-chapters-shot-back",
+        "type": "vector",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 592.5, "unit": "dp"},
+         "top": {"type": "length", "value": 115.5, "unit": "dp"},
+         "width": {"type": "length", "value": 210.0, "unit": "dp"},
+         "height": {"type": "length", "value": 157.5, "unit": "dp"}
+        },
+        "paths": [
+         {
+          "id": "back",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[0, 0]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.6]}}
+         }
+        ]
+       },
+       {
+        "id": "summary-chapters-shot",
+        "type": "image",
+        "properties": {
+         "image": {"type": "image", "value": ""},
+         "image-fit": {"type": "keyword", "value": "contain"},
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 594.0, "unit": "dp"},
+         "top": {"type": "length", "value": 117.0, "unit": "dp"},
+         "width": {"type": "length", "value": 207.0, "unit": "dp"},
+         "height": {"type": "length", "value": 154.5, "unit": "dp"}
+        }
+       },
+       {
+        "id": "summary-chapters-shot-border",
+        "type": "vector",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 592.5, "unit": "dp"},
+         "top": {"type": "length", "value": 115.5, "unit": "dp"},
+         "width": {"type": "length", "value": 210.0, "unit": "dp"},
+         "height": {"type": "length", "value": 157.5, "unit": "dp"},
+         "pointer-events": {"type": "keyword", "value": "none"}
+        },
+        "paths": [
+         {
+          "id": "border",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[0.75, 0.75]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, 0.75]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p3", "op": "line", "points": [[0.75, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "close", "op": "close"}
+          ],
+          "stroke": {
+           "paint": {"type": "solid", "color": {"type": "color", "value": [0.2549, 0.2745, 0.1412, 1.0]}},
+           "widthDp": 1.5,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         }
+        ]
        }
       ]
      }

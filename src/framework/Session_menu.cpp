@@ -6913,6 +6913,16 @@ static void Session_PublishSinglePlayerSummaries( idUserInterface *page, idSessi
 	Session_PublishSummaryShot( session, page, "summary.arena.shot", arenaCampaign.SelectedLevelshot() );
 }
 
+// Campaign's summaries: NEW GAME over the active campaign's first level,
+// CHAPTERS over the furthest it has reached. The page shows them while the
+// campaign chosen there is the active one; the other's are not mounted.
+static void Session_PublishCampaignSummaries( idUserInterface *page, idSessionLocal *session ) {
+	idStr first, furthest;
+	session->CampaignSummaryShots( first, furthest );
+	Session_PublishSummaryShot( session, page, "summary.newgame.shot", first );
+	Session_PublishSummaryShot( session, page, "summary.chapters.shot", furthest );
+}
+
 // Multiplayer's summaries: CREATE SERVER over the map it would host.
 static void Session_PublishMultiplayerSummaries( idUserInterface *page, idSessionLocal *session ) {
 	const char *map = cvarSystem->GetCVarString( "si_map" );
@@ -6983,6 +6993,7 @@ void idSessionLocal::OpenCampaignSelector( bool campaigns, bool fromArena, bool 
         if ( !stock ) {
             gui->SetStateBool( "campaign.awakening", awakening && info.ready );
             gui->SetStateBool( "from_chapters", fromChapters );
+            Session_PublishCampaignSummaries( gui, this );
         }
         gui->StateChanged( common->GetPresentationTime() );
     } else if ( gui != NULL ) {

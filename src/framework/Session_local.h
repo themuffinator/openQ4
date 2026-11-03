@@ -280,6 +280,8 @@ public:
 	// unlocked once the player reaches it (Session.cpp).
 	void RecordCampaignChapter();
 	void PublishCampaignChapters( idUserInterface *gui, int select = -1 );
+	// Its first level's levelshot and the furthest reached one's.
+	void CampaignSummaryShots( idStr &first, idStr &furthest );
 	bool StartCampaignChapter( int chapter );
 	bool HandleStockCampaignCommand( idUserInterface *gui, const char *menuCommand );
 	// The change between Campaign and a fourth-level child: its difficulty

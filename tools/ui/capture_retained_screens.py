@@ -1462,9 +1462,11 @@ SCENARIOS = {
     # the title, its bands coming home and SINGLE PLAYER still focused.
     # Each section summarizes itself in the content column while it is the
     # subject (section 13.7): Single Player's CAMPAIGN (no save in a fresh
-    # profile, so no picture) and ARENA over its chosen match's levelshot,
-    # then Multiplayer's JOIN GAME and CREATE SERVER over si_map's; BACK
-    # keeps the page's description.
+    # profile, so no picture) and ARENA over its chosen match's levelshot;
+    # Campaign's NEW GAME and CHAPTERS over the active campaign's first and
+    # furthest levels (the same in a fresh profile); Multiplayer's JOIN GAME
+    # and CREATE SERVER over si_map's; and SETTINGS' sections, text alone.
+    # BACK and LOAD DEFAULTS keep the page's description.
     'summaries': (None, [
         # A fresh build's first start can run past the usual wait; the title
         # refuses focus until it has arrived.
@@ -1473,6 +1475,11 @@ SCENARIOS = {
         'screenshot "screenshots/summaries-campaign.tga"',
         'openq4_retainedGui focus arena', 'waitMsec 300', 'openq4_retainedGui inspect "summary-arena-shot"',
         'screenshot "screenshots/summaries-arena.tga"',
+        'openq4_retainedGui focus campaign', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1200', 'openq4_retainedGui inspect "summary-newgame-shot"', 'screenshot "screenshots/summaries-newgame.tga"',
+        'openq4_retainedGui focus chapters', 'waitMsec 300', 'screenshot "screenshots/summaries-chapters.tga"',
+        'openq4_retainedGui focus quake4', 'waitMsec 300', 'screenshot "screenshots/summaries-quake4.tga"',
+        'openq4_retainedGui menu back 1', 'openq4_retainedGui menu back 0', 'waitMsec 1200',
         'openq4_retainedGui focus back', 'waitMsec 300', 'openq4_retainedGui inspect "description"',
         'screenshot "screenshots/summaries-back.tga"',
         'openq4_retainedGui menu back 1', 'openq4_retainedGui menu back 0', 'waitMsec 1500',
@@ -1481,6 +1488,11 @@ SCENARIOS = {
         'openq4_retainedGui focus create', 'waitMsec 300', 'openq4_retainedGui inspect "summary-create-shot"',
         'screenshot "screenshots/summaries-create.tga"',
         'openq4_retainedGui focus setup', 'waitMsec 300', 'screenshot "screenshots/summaries-setup.tga"',
+        'openq4_retainedGui focus back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 1500',
+        'openq4_retainedGui focus nav_settings', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 2500', 'openq4_retainedGui inspect "summary-controls"', 'screenshot "screenshots/summaries-controls.tga"',
+        'openq4_retainedGui focus display', 'waitMsec 300', 'screenshot "screenshots/summaries-display.tga"',
+        'openq4_retainedGui focus defaults', 'waitMsec 300', 'screenshot "screenshots/summaries-defaults.tga"',
     ]),
     'singleplayer-back': (None, [
         'waitMsec 4000', 'openq4_retainedGui focus nav_singleplayer', 'openq4_retainedGui menu accept 1',

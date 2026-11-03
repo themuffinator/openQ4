@@ -1200,12 +1200,13 @@ archived provenance; new scheduling belongs here.
   beside JOIN SERVER and the favorite toggle; a press of the left stick
   spectates and of the right one toggles the favorite, their glyphs on the
   plates since the prompt bar has no room for them (`FLOW-050`, `INP-011`).
-  The Single Player and Multiplayer pages' sections now
+  The menu levels' sections (Single Player, Campaign, Multiplayer and
+  SETTINGS) now
   [summarize themselves](ui/retained-screens.md#section-summaries-3-november-2026)
-  in the content column while they are the subject, CAMPAIGN, ARENA and
-  CREATE SERVER over a levelshot, through a cardless detail definition
-  (`FLOW-050`). Join Game's docked detail column for expanded layouts,
-  Campaign's and SETTINGS' summaries and the section layout remain.
+  in the content column while they are the subject, CAMPAIGN, ARENA, NEW
+  GAME, CHAPTERS and CREATE SERVER over a levelshot, through a cardless detail
+  definition (`FLOW-050`). Join Game's docked detail column for expanded
+  layouts and the section layout remain.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

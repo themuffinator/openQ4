@@ -27,7 +27,8 @@ from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE
                                     PAGE_TITLE_W, SUBPAGE_REVERSE_MS, SUBPAGE_SLOT, TITLE_SLOT, TOP_TO_PAGE, TOP_TO_SUBPAGE, U, absolute,
                                     by_language, colour, confirmation, crumb_fits, crumb_transform, fit_narrow, fixed_text, framing_bands,
                                     group, keyword, label, length, lit_field, navigation_plate, number, page_prompts, reflow_details, rgb, tall_dialog, tall_page,
-                                    track, transform, typeface, wrap_menu, Document)
+                                    track, transform, typeface, wrap_menu, section_summaries, summary_subject, SUMMARY_AUDIO,
+                                    SUMMARY_CONTROLS, SUMMARY_DISPLAY, SUMMARY_GAME, Document)
 from retained_difficulty import check_fits
 
 NAV_TOP = 181.0    # the Multiplayer page's first plate, on the same level
@@ -42,6 +43,11 @@ DEPART_MS = 300    # the stock screen's slide; it arrives at 500 ms
 # enter timeline. The session's BeginRetainedSubpage names the same events.
 DEEPER = (("controls", 0, "#str_200083", "subpageEnterControls"), ("game", 1, "#str_200084", "subpageEnterGame"),
           ("display", 2, "#str_229900", "subpageEnterDisplay"), ("audio", 3, "#str_229901", "subpageEnterAudio"))
+# The sections that go deeper summarize themselves in the content column
+# (section 13.7); LOAD DEFAULTS and BACK keep the page's description, which
+# names the defaults. No levelshot fits a settings page.
+SUMMARIES = [("controls", SUMMARY_CONTROLS, None), ("game", SUMMARY_GAME, None), ("display", SUMMARY_DISPLAY, None),
+             ("audio", SUMMARY_AUDIO, None)]
 DETAILS = (210.0, 140.0)    # the content column's box, u
 DETAIL_TEXT, DETAIL_LINE = 18, 26
 
@@ -53,7 +59,8 @@ def check_settings_fits() -> None:
     labels = [key for _, key, _ in SECTIONS] + ["#str_230045"]
     check_fits(tuple((key, "marine", 24, U * 314 / 1.03) for key in labels) +
                (("#str_200009", "marine", 18, U * PAGE_TITLE_W),),
-               (("#str_231546", "lowpixel", DETAIL_TEXT, U * DETAILS[0], int(U * DETAILS[1] // DETAIL_LINE)),))
+               tuple((key, "lowpixel", DETAIL_TEXT, U * DETAILS[0], int(U * DETAILS[1] // DETAIL_LINE))
+                     for key in ("#str_231546", *(key for _, key, _ in SUMMARIES))))
 
 
 def settings_page_document() -> dict:
@@ -99,7 +106,7 @@ def settings_page_document() -> dict:
             buttons.append(navigation_plate(doc, ident, key, event="defaultsModalShow"))
             continue
         doc.session(action, action)
-        buttons.append(navigation_plate(doc, ident, key, action=action))
+        buttons.append(navigation_plate(doc, ident, key, action=action, subject=summary_subject(ident, SUMMARIES)))
     buttons.append(navigation_plate(doc, "back", "#str_230045", action="back"))
     wrap_menu(buttons)
     description = label("description", "#str_231546", {**absolute(left=0, top=0, width=U * DETAILS[0], height=U * DETAILS[1]),
@@ -111,13 +118,14 @@ def settings_page_document() -> dict:
     canvas = {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)}
     details = group("details", {**absolute(left=U * 395, top=U * 190, width=U * DETAILS[0], height=U * DETAILS[1]), "opacity": number(0)},
                     [description])
-    # The description grows with the text above 100 % (section 2).
-    reflow_details(doc, details, ("#str_231546",))
+    summary_keys, _shots = section_summaries(doc, details, SUMMARIES)
+    # The description, and each summary, grows with the text above 100 % (section 2).
+    reflow_details(doc, details, ("#str_231546", *summary_keys))
     navigation = group("navigation", {**absolute(left=0, top=U * NAV_TOP, width=U * 357), "display": keyword("flex"),
                                       "flex-direction": keyword("column"), "opacity": number(1)}, buttons)
     content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [navigation, details])
     # A tall view stands the plates and the description in one column.
-    tall_page(doc, content, navigation, details, ("#str_231546",))
+    tall_page(doc, content, navigation, details, ("#str_231546", *summary_keys))
     tall_dialog(doc, defaults)
     # Going deeper, the section's label carries from its row into the slot at
     # the step's foot (title.carry, 300 ms).

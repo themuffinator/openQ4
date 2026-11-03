@@ -790,6 +790,8 @@ public:
     // The campaign page's chapters: the picks published and the starts.
     std::vector<int> chapterPublishes, chapterStarts;
     void PublishCampaignChapters(idUserInterface*, int select = -1) { chapterPublishes.push_back(select); }
+    // The active campaign's first and furthest reached levelshots.
+    void CampaignSummaryShots(idStr& first, idStr& furthest) { first = "gfx/guis/loadscreens/e3_load"; furthest = "gfx/guis/loadscreens/airdefense"; }
     bool StartCampaignChapter(int chapter) { chapterStarts.push_back(chapter); return chapter >= 0; }
     void UpdateRetainedHome(); bool RetainedHomeInputBlocked() const; void RetainedHomeFrameEvent();
     void HandleRetainedSessionRequest(idUserInterface*, const char*);
@@ -2372,6 +2374,11 @@ int main() {
         CHECK(s.guiActive && std::string(s.guiActive->Name()) == "guis/menu/singleplayer.q4ui" && arenaCampaign.selectors == 0);
         s.OpenCampaignSelector(true);
         CHECK(std::string(s.guiActive->Name()) == "guis/menu/campaigns.q4ui" && s.guiActive->state["awakening_ready"] == "1");
+        // NEW GAME and CHAPTERS summarize themselves (section 13.7) over the
+        // active campaign's first and furthest reached levels, read as precaches.
+        CHECK(s.guiActive->state["summary.newgame.shot"] == "gfx/guis/loadscreens/e3_load" &&
+              s.guiActive->state["summary.chapters.shot"] == "gfx/guis/loadscreens/airdefense" && latePrecaches == 0 &&
+              std::count(precached.begin(), precached.end(), std::string("gfx/guis/loadscreens/airdefense")) == 1);
         CHECK(!managerObject.flags[0].unique && managerObject.flags[0].shared);
         auto missing = Session(true);
         fileSystemObject.files.erase("guis/menu/singleplayer.q4ui"); fileSystemObject.files.erase("guis/menu/campaigns.q4ui");
@@ -5864,7 +5871,7 @@ def main() -> int:
         'static void Session_RetainedSaveLabel(', 'static idStr Session_RetainedSaveShot(', 'static void Session_RetainedSaveStamp(',
         'static void Session_RetainedSaveDetails(', 'static void Session_PublishRetainedTitleState(',
         'static void Session_PublishSummaryShot(', 'static void Session_PublishSinglePlayerSummaries(',
-        'static void Session_PublishMultiplayerSummaries(', 'idUserInterface *idSessionLocal::FindRetainedGui(',
+        'static void Session_PublishMultiplayerSummaries(', 'static void Session_PublishCampaignSummaries(', 'idUserInterface *idSessionLocal::FindRetainedGui(',
         'bool idSessionLocal::RetainedSystemAvailable(', 'bool idSessionLocal::ReturnSystemSettings(', 'void idSessionLocal::OpenCampaignSelector(',
         'bool idSessionLocal::OpenRetainedCampaignSkill(', 'bool idSessionLocal::OpenRetainedCampaignChapters(', 'void idSessionLocal::BeginRetainedCampaignSkill(',
         'bool idSessionLocal::RetainedHomeInputBlocked(',

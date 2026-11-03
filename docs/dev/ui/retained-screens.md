@@ -567,7 +567,12 @@ after editing the script; `--check` fails when an output is stale.
     instead. The picture stands 140x105 u at 395,77 u, over the column under
     the docked top band, and shows only while the session names one, while
     the column's text stays clear of it, and never in a tall view, where the
-    column stands under the plates.
+    column stands under the plates. On Campaign, NEW GAME stands over the
+    active campaign's first level and CHAPTERS over the furthest it has
+    reached (`summary.newgame.shot`, `summary.chapters.shot`). The pictures
+    show only while the campaign chosen there is the active one, since the
+    other's levels are not mounted. QUAKE 4, THE AWAKENING and BACK keep the
+    column's word on the campaigns.
   - **Sub-page state.** The top band stands one notch pitch (97 u) further
     toward the trailing edge while the bottom band stays docked. The parent
     title is the crumb in the band's thin span at 39,12 u and 0.40, cut at
@@ -1541,13 +1546,16 @@ continuity, page prompts and text-scale checks cover the new page. The
 ## Section summaries (3 November 2026)
 
 Section 13.7 says a section that leads deeper summarizes itself in the
-content column, with a levelshot where one fits, until Accept opens it. The
-Single Player and Multiplayer pages now do (FLOW-050): each section's
-sentence (`#str_231552` to `#str_231557`) takes the description's place
-while it is the subject, CAMPAIGN, ARENA and CREATE SERVER over a levelshot
-the session publishes as the page opens, and BACK keeps the description.
-[Single Player and Campaign](#screens) and the
-[Multiplayer page](#multiplayer-page) describe the pages.
+content column, with a levelshot where one fits, until Accept opens it.
+Single Player, Campaign, Multiplayer and SETTINGS now do (FLOW-050): each
+section's sentence (`#str_231552` to `#str_231557`, `#str_231571` to
+`#str_231576`) takes the description's place while it is the subject.
+CAMPAIGN, ARENA, NEW GAME, CHAPTERS and CREATE SERVER stand over a levelshot
+the session publishes as the page opens. BACK, Campaign's QUAKE 4 and THE
+AWAKENING, and SETTINGS' LOAD DEFAULTS keep the description.
+[Single Player and Campaign](#screens), the
+[Multiplayer page](#multiplayer-page) and the
+[SETTINGS page](#the-settings-page-26-october-2026) describe the pages.
 
 - **Why a detail state.** A control's feedback reaches only its own subtree,
   so a plate cannot light a node in the content column. The document format's
@@ -1563,12 +1571,15 @@ the session publishes as the page opens, and BACK keeps the description.
   session reads it as a precache and takes it out of the idle-frame queue
   (`Session_PublishSummaryShot`). ARENA's comes from
   `idArenaCampaign::SelectedLevelshot`, the match the Arena page would open
-  on.
+  on. NEW GAME's and CHAPTERS' come from `CampaignSummaryShots`: the active
+  campaign's first level and the furthest one reached. Only the active
+  campaign's levels are mounted, so they show only while the campaign chosen
+  on the page is the active one.
 
 `UiDocumentTest` accepts the cardless definition, `ui_retained_gate.py`
 checks the published pictures and their precaches, the menus, pages and
 mp-pages native groups walk the subjects and the column's text scale, and
-the `summaries` capture walks both pages at 16:9 and 9:16.
+the `summaries` capture walks the four pages at 16:9 and 9:16.
 
 ## Demos as a Multiplayer sub-page (2 November 2026)
 
@@ -2063,6 +2074,9 @@ presents. It is the stock settings screen's level of the menu: CONTROLS, GAME
 OPTIONS, DISPLAY, AUDIO and LOAD DEFAULTS on the home's navigation plates in
 the stock order and words, BACK under them, and one line in the content
 column saying what the page is for (`#str_231546`, in every language).
+CONTROLS, GAME OPTIONS, DISPLAY and AUDIO summarize themselves there while
+each is the subject ([section summaries](#section-summaries-3-november-2026));
+LOAD DEFAULTS and BACK keep that line, which names the defaults.
 
 | Button | Opens |
 | --- | --- |
@@ -3827,10 +3841,9 @@ what remains across every retained menu.
   The retained Join Game shows a server's players and rules in the stock
   tooltip's card rather than a docked detail column, and its SPECTATE and
   favorite toggle carry their stick presses on the plates, since the prompt
-  bar has no room for them. The Single Player and Multiplayer pages'
-  sections summarize themselves; Campaign's QUAKE 4, THE AWAKENING, NEW GAME
-  and CHAPTERS and SETTINGS' sections do not yet, and the summaries switch
-  without the plates' fade. The classic campaign page keeps CHAPTERS on it. The
+  bar has no room for them. The menu levels' sections summarize themselves,
+  but the summaries switch without the plates' fade. The classic campaign page
+  keeps CHAPTERS on it. The
   Single Player page keeps the home navigation plates and the
   BACK row instead of the section layout (navigation from 14 u, content from
   228 u) and the Back action in the bottom band; Classic is not built. A

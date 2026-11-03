@@ -356,6 +356,8 @@ SUMMARY_SHOT = (395.0, 77.0, 140.0, 105.0)   # u: left, top, width, height
 # The sections' sentences, in every shipped language.
 SUMMARY_CAMPAIGN, SUMMARY_ARENA = "#str_231552", "#str_231553"
 SUMMARY_JOIN, SUMMARY_CREATE, SUMMARY_DEMOS, SUMMARY_SETUP = "#str_231554", "#str_231555", "#str_231556", "#str_231557"
+SUMMARY_CONTROLS, SUMMARY_GAME, SUMMARY_DISPLAY, SUMMARY_AUDIO = "#str_231571", "#str_231572", "#str_231573", "#str_231574"
+SUMMARY_NEWGAME, SUMMARY_CHAPTERS = "#str_231575", "#str_231576"
 
 
 # The section the pointer is over, else the focused one, as the runtime writes
@@ -373,8 +375,9 @@ def section_summaries(doc: Document, details: dict, sections: list) -> tuple:
     description is, and where it has a levelshot a picture over the column.
     A control's feedback reaches only its own subtree, so the plates name
     their sections (`summary_subject`) and the runtime writes the subject's
-    to SUMMARY_STATE: its summary shows, and the description shows for BACK,
-    or with no subject. Returns the summary keys, for the column's fit and
+    to SUMMARY_STATE: its summary shows, and the description (each of the
+    column's labels, as many as the page has) shows for any other plate, or
+    with no subject. Returns the summary keys, for the column's fit and
     reflow, and the pictures' groups, which `reflowed` (reflow_details'
     result) and the tall view keep clear of the text."""
     from retained_saves import picture_frame
@@ -383,10 +386,12 @@ def section_summaries(doc: Document, details: dict, sections: list) -> tuple:
 
     def shown(index: int) -> dict:
         return {"op": "select", "args": [{"op": "==", "args": [{"state": SUMMARY_STATE}, index]}, 1, 0]}
-    description = next(child for child in details["children"] if child.get("type") == "text")
-    description["properties"]["opacity"] = number(1)
-    doc.bind(f"{description['id']}.opacity", description["id"], "opacity", shown(-1))
-    style = {key: value for key, value in description["properties"].items() if key != "text"}
+    descriptions = [child for child in details["children"] if child.get("type") == "text"]
+    for description in descriptions:
+        description["properties"]["opacity"] = number(1)
+        doc.bind(f"{description['id']}.opacity", description["id"], "opacity", shown(-1))
+    # Laid as the first is, shown whatever shows it.
+    style = {key: value for key, value in descriptions[0]["properties"].items() if key not in ("text", "display")}
     shots = []
     for index, (ident, key, shot_state) in enumerate(sections):
         details["children"].append(label(summary_id(ident), key, {**style, "opacity": number(0)}))
@@ -3046,10 +3051,13 @@ def campaign_document(campaigns: bool) -> dict:
         rows = [("newgame", "#str_200000", "campaignNew"), ("chapters", "#str_231280", "campaignChapters")]
     else:
         rows = [("campaign", "#str_230038", "campaigns"), ("arena", "#str_42002", "campaignArena")]
-    # Single Player's sections summarize themselves (section 13.7): CAMPAIGN
-    # over the newest save's levelshot, ARENA over its chosen match's.
-    summaries = [] if campaigns else [("campaign", SUMMARY_CAMPAIGN, "summary.campaign.shot"),
-                                      ("arena", SUMMARY_ARENA, "summary.arena.shot")]
+    # The sections that go deeper summarize themselves (section 13.7):
+    # Single Player's CAMPAIGN over the newest save's levelshot and ARENA over
+    # its chosen match's; Campaign's NEW GAME over the active campaign's first
+    # level and CHAPTERS over the furthest it has reached. QUAKE 4 and THE
+    # AWAKENING keep the column's word on the campaigns.
+    summaries = ([("newgame", SUMMARY_NEWGAME, "summary.newgame.shot"), ("chapters", SUMMARY_CHAPTERS, "summary.chapters.shot")]
+                 if campaigns else [("campaign", SUMMARY_CAMPAIGN, "summary.campaign.shot"), ("arena", SUMMARY_ARENA, "summary.arena.shot")])
     for ident, key, action in rows:
         doc.session(action, action)
         buttons.append(navigation_plate(doc, ident, key, action=action, subject=summary_subject(ident, summaries)))
@@ -3076,7 +3084,7 @@ def campaign_document(campaigns: bool) -> dict:
     nav_top = 190.0
     details_group = group("details", {**absolute(left=U * 395, top=U * 190, width=U * 210, height=U * 140), "opacity": number(0)}, details)
     keys = [node["properties"]["text"]["value"] for node in details]
-    summary_keys, shots = section_summaries(doc, details_group, summaries) if summaries else ([], [])
+    summary_keys, shots = section_summaries(doc, details_group, summaries)
     # The description, and each summary, grows with the text above 100 % (section 2).
     reflowed = reflow_details(doc, details_group, keys + summary_keys)
     navigation = group("navigation", {**absolute(left=0, top=U * nav_top, width=U * 357), "display": keyword("flex"),
@@ -3085,8 +3093,15 @@ def campaign_document(campaigns: bool) -> dict:
                                 "transform": transform(), "opacity": number(1)}, [navigation, details_group, *shots])
     # A tall view stands the plates and the description in one column.
     tall_page(doc, content, navigation, details_group, keys + summary_keys)
-    if summaries:
-        fit_summary_shots(doc, shots, summaries, reflowed)
+    fit_summary_shots(doc, shots, summaries, reflowed)
+    if campaigns:
+        # The session names the active campaign's levels: the other one's are
+        # not mounted until choosing it reloads the engine, so its pictures
+        # show only while the campaign chosen here is the active one.
+        active = {"op": "==", "args": [{"state": "campaign.awakening"}, {"state": "awakening_chosen"}]}
+        for shot in shots:
+            binding = next(b for b in doc.bindings if b["node"] == shot["id"] and b["property"] == "display")
+            binding["value"] = {"op": "select", "args": [active, binding["value"], "none"]}
     # The titles ride outside the sweeping content, in canvas coordinates.
     crumb_key = "#str_42000"
     if campaigns:

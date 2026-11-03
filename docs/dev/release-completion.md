@@ -27,6 +27,14 @@ See [player release status](../user/release-status.md).
   native tests and the `summaries` OpenGL capture (16:9 and 9:16) pass.
   Opening the Multiplayer page still late-loads Player Setup's preview model
   and crosshairs, as it did before this change.
+- Campaign's NEW GAME and CHAPTERS and SETTINGS' CONTROLS, GAME OPTIONS,
+  DISPLAY and AUDIO followed (`#str_231571` to `#str_231576`). NEW GAME
+  stands over the active campaign's first level and CHAPTERS over the
+  furthest it has reached (`CampaignSummaryShots`). The pictures show only
+  while the campaign chosen on the page is the active one, since the other's
+  levels are not mounted until choosing it reloads the engine. QUAKE 4, THE
+  AWAKENING, LOAD DEFAULTS and BACK keep their page's description. The gate,
+  the 170 UI native tests and the extended `summaries` capture pass.
 
 ## Network interoperability checks, 3 November 2026
 

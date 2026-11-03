@@ -4262,6 +4262,20 @@ static void CheckSettingsPage(ScreenHost& host, const char* path) {
 	Check(runtime.RunEvent("onActivate",0.1,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.4);
 	Check(runtime.FocusedControl() == "controls","from the home it starts on CONTROLS");
+	// The sections that go deeper summarize themselves in the column (section
+	// 13.7); LOAD DEFAULTS and BACK keep the description, which names them.
+	{
+		const auto lit = [&](const char* node) { const auto found = runtime.PresentedValue(node,"opacity"); return found ? static_cast<float>(found->data[0]) : -1.f; };
+		Check(Near(lit("summary-controls"),1,.001f) && Near(lit("description"),0,.001f) && text("summary-controls","text") == "#str_231571",
+			"CONTROLS summarizes itself");
+		Check(runtime.FocusControl("display",0.41),"focus DISPLAY");
+		runtime.Frame(viewport,0.42);
+		Check(Near(lit("summary-display"),1,.001f) && Near(lit("summary-controls"),0,.001f),"DISPLAY takes its place");
+		Check(runtime.FocusControl("defaults",0.43),"focus LOAD DEFAULTS");
+		runtime.Frame(viewport,0.44);
+		Check(Near(lit("description"),1,.001f) && Near(lit("summary-display"),0,.001f),"LOAD DEFAULTS keeps the description");
+		Check(runtime.FocusControl("controls",0.45),"back onto CONTROLS");
+	}
 	runtime.TakeActions();
 	press(MenuInput::Down,0.5); press(MenuInput::Accept,0.6);
 	{
@@ -5748,7 +5762,8 @@ int main(int argc, char** argv) {
  }
  if (argc == 3 && std::string(argv[1]) == "--settings") {
      ScreenHost host; CheckSettingsPage(host,argv[2]);
-     CheckColumnPageTextScale(host,argv[2],"guis/menu/settings.q4ui",{},{"defaultsModal"},{"description"});
+     CheckColumnPageTextScale(host,argv[2],"guis/menu/settings.q4ui",{},{"defaultsModal"},
+		{"description","summary-controls","summary-game","summary-display","summary-audio"});
      std::printf("retained SETTINGS page: %d checks passed\n",checks); return 0;
  }
  if (argc == 3 && std::string(argv[1]) == "--controls") {
@@ -5839,7 +5854,8 @@ int main(int argc, char** argv) {
 	if (runs("pause")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");
 	if (runs("strogg-pause")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.q4ui");
 	if (runs("menus")) CheckColumnPageTextScale(host,argv[5],"guis/menu/singleplayer.q4ui",{},{},{"description","summary-campaign","summary-arena"});
-	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.q4ui",{{"awakening_ready",true}},{},{"available"});
+	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.q4ui",{{"awakening_ready",true}},{},
+		{"available","summary-newgame","summary-chapters"});
 	// Title: canvas scaling, the lit field, the multiplied emblem and CONTINUE.
 	if (runs("menus")) {
 		const auto source = Read(argv[1]);
@@ -6889,6 +6905,28 @@ int main(int argc, char** argv) {
 			"the crumb is cut at the band's step");
 		Check(sub.GetBounds("title",subTitle) && Near(subTitle.x,160+136*1.5f,1) && Near(subTitle.y,19*1.5f,1),
 			"the sub-page title starts at the step's foot");
+		// NEW GAME and CHAPTERS summarize themselves (section 13.7) over the
+		// active campaign's levelshots while the campaign chosen is the active
+		// one; QUAKE 4, THE AWAKENING and BACK keep the column's word on the
+		// campaigns.
+		const auto lit = [&](const char* node) { const auto found = sub.PresentedValue(node,"opacity"); return found ? static_cast<float>(found->data[0]) : -1.f; };
+		const auto shown = [&](const char* node) { const auto found = sub.PresentedValue(node,"display"); return found ? found->text : std::string("?"); };
+		Check(sub.SetState({{"awakening_ready",true},{"summary.newgame.shot",std::string("gfx/guis/loadscreens/e3_load")},
+			{"summary.chapters.shot",std::string("gfx/guis/loadscreens/airdefense")}},error,1.55),"the session names the active campaign's levelshots");
+		sub.Frame(viewport,1.56);
+		Check(sub.FocusedControl() == "newgame" && Near(lit("summary-newgame"),1,.001f) && Near(lit("available"),0,.001f) &&
+			shown("summary-newgame-shots") == "block","NEW GAME summarizes itself over the first level's levelshot");
+		Check(sub.FocusControl("chapters",1.57),"focus CHAPTERS");
+		sub.Frame(viewport,1.58);
+		Check(Near(lit("summary-chapters"),1,.001f) && Near(lit("summary-newgame"),0,.001f) && shown("summary-chapters-shots") == "block",
+			"CHAPTERS summarizes itself over the furthest level's");
+		Check(sub.SetState({{"campaign.awakening",true}},error,1.59),"choose the campaign that is not active");
+		sub.Frame(viewport,1.6);
+		Check(shown("summary-chapters-shots") == "none","no levelshot shows for a campaign that is not mounted");
+		Check(sub.FocusControl("quake4",1.61),"focus QUAKE 4");
+		sub.Frame(viewport,1.62);
+		Check(Near(lit("available"),1,.001f) && Near(lit("summary-chapters"),0,.001f),"QUAKE 4 keeps the column's word on the campaigns");
+		Check(sub.SetState({{"campaign.awakening",false}},error,1.63) && sub.FocusControl("newgame",1.63),"back as it was");
 		// Going deeper: the plates fade over 150 ms while the page sweeps
 		// 640 u; the title becomes the crumb in 150 ms; from 50 ms the band
 		// steps and CAMPAIGN carries into the slot at the step's foot.
