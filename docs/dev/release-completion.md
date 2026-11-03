@@ -85,6 +85,24 @@ See [player release status](../user/release-status.md).
   AWAKENING, LOAD DEFAULTS and BACK keep their page's description. The gate,
   the 170 UI native tests and the extended `summaries` capture pass.
 
+## Multiplayer weapon and packet fixes, 3 November 2026
+
+- With optional lag compensation enabled, gauntlet and lightning impacts now
+  follow the target's current position. Lightning chain directions follow those
+  same positions, and penetrating rail shots retain their original trace line.
+  Prediction and lag compensation remain off by default.
+- Delayed packets from an older network message no longer discard a newer
+  message in progress. Fragments can also arrive in any order within one message,
+  reducing failed snapshot delivery on jittery links. Oversized fragments are
+  refused consistently over IPv4 and IPv6, without changing the protocol or the
+  supported peer combinations. The final build passes three pure joins over each
+  loopback family with simulated delay, jitter, loss and duplication.
+- Executable production-code tests cover the weapon geometry, fragment ordering
+  and competitive artifact writers' short-write/capacity/failure handling.
+  See [network qualification](mp-network-qualification.md#weapon-hit-geometry-and-fragment-ordering-3-november-2026)
+  and the [competitive audit](competitive-match-reference-audit.md#artifact-adapter-failure-boundaries-3-november-2026)
+  for their evidence scope and remaining live/physical checks.
+
 ## Network interoperability checks, 3 November 2026
 
 - **Retail Quake 4 peers are told why they cannot play.** An openQ4 client

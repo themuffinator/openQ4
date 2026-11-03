@@ -941,6 +941,25 @@ Mode-specific passing reports in that directory also include
 their named bracket, objective, round, rescue, isolation or voting scenarios;
 they do not establish every mode's readiness, roster and proposal edge.
 
+## Artifact adapter failure boundaries, 3 November 2026
+
+`mp_match_artifact_io_state.py` executes the production map-result, series-report
+and recovery filesystem writer methods against an `idFile`/`idFileSystem` fault
+injector. Each adapter passes successful chunked writes at one byte, 257 bytes
+and its maximum payload; every failure boundary from zero through 256 bytes with
+both zero and negative write errors; impossible write counts; failed sync/open,
+promotion and cleanup; and invalid lengths, null data/backends and path refusal.
+Successful writes preserve every byte and offset, sync once and close once.
+Partial writes never report completion, and failed sync cannot publish success.
+All twelve single-reversal controls fail. No production defect was found here.
+
+This closes executable coverage of the adapters' I/O failure handling. The
+canonical path grammar and serialization remain covered by the existing storage
+contracts; this fixture supplies a single accepted path capability. It does not
+simulate a process or power interruption, test a real full disk, or establish
+physical filesystem durability. Those live failure modes and the physical
+localized role workflows remain open. Evidence: `.tmp/mp-roadmap/artifact-io.log`.
+
 ## Remaining release closure order
 
 Runtime checks still uncover functional gaps as well as qualification work.

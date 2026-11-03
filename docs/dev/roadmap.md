@@ -2106,6 +2106,12 @@ claim peer combinations that have not been tested.
   ([evidence and limits](competitive-match-reference-audit.md#live-closure-scenarios-2026-11-03)).
   Physical keyboard/controller workflows, side ballots, the post-commit
   map-load limit and the rest of the release order remain open.
+  Follow-through, 3 November: the [artifact adapter fault-injection fixture](competitive-match-reference-audit.md#artifact-adapter-failure-boundaries-3-november-2026)
+  executes all three production writers at every short-write failure boundary
+  of a 257-byte payload, their capacity edges, failed sync/open/promotion/cleanup
+  and invalid input. Twelve reversal controls fail. This qualifies adapter
+  handling, not physical disk exhaustion, power loss or process interruption;
+  the live and physical-workflow gates remain open.
 - [ ] **MP-02 — P1, qualification and targeted fixes: bot traversal safety.** Rerun
   staged q4dm8/q4ctf3/q4ctf5/q4dz3 after the exact-state jump/unroutable-pad fixes,
   then the complete declared-map sweep including warmup (currently 33 variants).
@@ -2399,6 +2405,11 @@ claim peer combinations that have not been tested.
   at the boundary ([evidence](liquid-qualification.md#projectile-liquid-crossings-3-november-2026)).
   Remaining: player-controlled swimming (real input only), and splash, bubble
   and wade presentation checked by eye.
+  Follow-through, 3 November: the [current GL regression](liquid-qualification.md#current-mp-regression-run-3-november-2026)
+  passes remote air replication and four paused MVD seeks with matching air/HUD
+  values of 100, 56, 100 and 56. The engine capture shows the underwater view
+  and AIR gauge. This does not close physical swimming or the remaining effects
+  presentation checks.
 - [ ] **MP-07 — P1, implementation and qualification: coupled prediction and
   rewind.** In `src/mpgame/gamesys/SysCvar.cpp` both enhanced prediction and lag
   compensation default off. Preserve the coupled displayed-pose-age and rewind
@@ -2473,6 +2484,13 @@ claim peer combinations that have not been tested.
   prerequisite as the rewind path, so positive bias cannot report a fictitious
   rewind for a bot, listen host or unmeasured slot. The state and wiring checks
   pass; enhanced prediction and compensation remain off by default.
+  Progress, 3 November: [weapon geometry fixtures](mp-network-qualification.md#weapon-hit-geometry-and-fragment-ordering-3-november-2026)
+  found and fixed stale gauntlet/lightning effect endpoints and a penetrating
+  rail ray shifted by impact translation. Contacts and chain directions now
+  follow present targets, while rail continuation retains the historical ray.
+  The executable state fixture includes the production weapon resolution blocks
+  and rejects nine reversals. Remote weapon-play and same-fire-frame visual
+  qualification remain open, and defaults are unchanged.
 - [ ] **MP-08 — P1, qualification and decision: network and content interoperability.**
   Qualify real cross-platform/architecture peers over IPv4 and IPv6, fragmentation/
   MTU/rate limits, congestion, high player counts, discovery and reconnect. Preserve
@@ -2549,6 +2567,20 @@ claim peer combinations that have not been tested.
   cryptographic module verification or anti-cheat. Real WAN, cross-machine and
   other-architecture peers, real multi-record DNS and the retail client binary
   itself remain open; the user deferred the peer gates on 28 October.
+  Follow-through, 3 November: [fragment assembly qualification](mp-network-qualification.md#weapon-hit-geometry-and-fragment-ordering-3-november-2026)
+  fixes delayed older packets discarding a newer message prefix, refuses
+  fragments larger than the family's limit, and assembles aligned fragments in
+  any order with bounded storage. The impaired IPv6 run exposed a reliable-queue
+  overflow when same-message reordering discarded fragments; its failed report
+  is retained. Production send/reassembly fixtures
+  cover both families through 16 KiB, interleaving, missing/out-of-order packets,
+  duplicates, exact-multiple terminators and malformed headers, with eight failing
+  reversal controls. This does not qualify physical path MTUs or deferred peers.
+  The final staged Windows build passes three pure joins each on IPv4 and IPv6
+  loopback under seeded delay/jitter/loss/duplication (221 and 275 received client
+  fragments), with unchanged runtime hashes and clean exits. The 59 broader
+  match/network contracts pass. Real WAN, physical MTU and architecture gates
+  retain their previous scope and deferrals.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,

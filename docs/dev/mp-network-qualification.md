@@ -1,5 +1,80 @@
 # Multiplayer network qualification
 
+## Weapon hit geometry and fragment ordering, 3 November 2026
+
+The MP-07 weapon review found that the gauntlet and lightning restored player
+physics after tracing, but kept their effect endpoints at the historical hit.
+The gauntlet now translates its contact before effects. Lightning translates
+the primary and chain endpoints before restoring players, then rebuilds chain
+directions from those present positions. Selection still occurs in the rewound
+world, and all players are restored before these weapons apply damage/effects.
+Hitscan already translated its impact, but used that translated point to
+continue penetrating shots. It now retains the historical continuation point,
+so moving a rail impact onto its target cannot bend the remaining ray.
+
+`mp_lag_compensation_state.py` now executes the production gauntlet/lightning
+resolution blocks and the hitscan impact/penetration blocks, as well as the
+existing production history and estimator. It checks beam/contact geometry,
+chain directions, repeated target references, misses, full restoration and
+the separate rail continuation. Nine single-reversal controls fail, including
+the old weapon blocks and translated rail continuation. The wiring contract
+checks that target selection precedes translation and effects follow restoration.
+These are executable fixture results; they do not replace remote weapon-play
+or same-fire-frame visual qualification. Both enhanced defaults remain off.
+
+MP-08's production fragment assembler had further defects. Once a newer
+message began assembly, a delayed fragment from an older uncompleted sequence
+could reset the buffer and discard the newer prefix. Older fragments and delayed
+unfragmented messages now leave that prefix intact. A fragment larger than the address family's fixed size
+was also accepted as a final fragment; it is now refused before
+it can change assembly state. The wire format and family limits are unchanged.
+
+The first impaired IPv4 run passed all three pure joins, receiving 497
+fragments. The IPv6 run reached gameplay once, then lost its second join to a
+reliable-message overflow: fragments reordered within the same message were
+discarded rather than assembled. The failing report and original runtime hashes
+remain in `.tmp/mp-roadmap/lan-ipv6/`. Assembly now uses a bounded bitmap of aligned
+fragment offsets and a separately recorded final length. It accepts the final
+fragment first, waits for every missing byte, ignores duplicates without counting
+or overwriting them, and refuses misaligned, oversized or conflicting fragments.
+There is still only one bounded assembly buffer; a newer sequence supersedes an
+incomplete older sequence. This adds no retransmission or wire-format change.
+
+`network_fragment_state.py` executes production `SendNextFragment` and `Process`
+with deterministic datagrams. Both families cover one-byte, boundary, exact-
+multiple and 16 KiB payloads, empty terminators, interleaved sequences, duplicates,
+reverse-order delivery, missing fragments, truncated headers and oversized
+fragments. All eight reversal controls fail. The port, byte-message interface and decompression
+boundary are substitutes: this qualifies assembly, not compression or a real
+path MTU. No WAN or other-architecture qualification is claimed.
+
+The staged Windows x64 build of `47c78ed5e` passes `mp_lan_reconnect_smoke.py
+--impaired` with both families. Each peer has 30 ms fixed delay, 0-60 ms jitter,
+3% loss and 20% duplication, seeded with 40708. Every join reaches active
+gameplay on the pure dedicated server in slot 0, and both processes exit 0.
+IPv4 discovery passes; IPv6 loopback correctly has no multicast discovery.
+
+| Final run | Active joins | Received client fragments | Elapsed seconds |
+| --- | ---: | ---: | ---: |
+| `lan-ipv4-fixed/report.json` (before the delayed unfragmented guard) | 3/3 | 242 | 67.97 |
+| `lan-ipv6-fixed/report.json` (before the delayed unfragmented guard) | 3/3 | 320 | 88.00 |
+| `lan-ipv4-final/report.json` | 3/3 | 221 | 54.83 |
+| `lan-ipv6-final/report.json` | 3/3 | 275 | 71.39 |
+
+Reports retain installed-asset and runtime SHA-256 values and verify that the
+runtime did not change during the test. The final client hash starts
+`74bac939fd7bc997`, dedicated `c93b1ee10738e787`, and MP module
+`e6a7b200e18c7e0c`; full hashes are in the final reports. The build uses MSVC,
+`debugoptimized`, `b_ndebug=true`, and `build_game_sp=false` for this MP-only
+test stage. These are loopback gameplay checks, not cross-machine or WAN tests,
+and elapsed time on this shared host is not a performance qualification.
+
+The 59 broader match/network contracts and the three extended/new fixtures
+pass on Windows. The three fixtures also pass under Linux with Clang and
+ASan/UBSan, including all 29 reversal controls. This is native fixture evidence,
+not a Linux engine build or peer test. Native logs, the failing IPv6
+control, source diff and staged runtime reports are retained in `.tmp/mp-roadmap/`.
+
 Evidence for MP-07 (coupled prediction and rewind) and MP-08 (network
 interoperability) gathered on one machine, and the simulated network conditions
 that make that possible. Player-facing guidance is in the
