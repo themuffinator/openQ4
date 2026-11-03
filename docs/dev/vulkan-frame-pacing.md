@@ -1,6 +1,8 @@
 # Vulkan frame pacing investigation
 
-Status: unresolved. Vulkan remains experimental. This investigation separates
+Status: unresolved for the conditions described below. Windows x64 NVIDIA/Intel
+Vulkan support does not qualify every presentation/power configuration; Linux
+and macOS remain experimental. This investigation separates
 CPU work, GPU execution and synchronization waits; it does not establish a
 performance improvement or complete renderer qualification.
 
@@ -282,6 +284,53 @@ retained. The NVIDIA performance gate remains failed.
 Traces, decoded events, join audits, adapter mappings, engine captures, failed
 reports and exact runtime/source identities are retained under
 `.tmp/vulkan-gap-closure/fence-scheduling/`.
+
+## Visible-window diagnostics (3 November 2026)
+
+`renderer_vulkan_presentation.py` now retains actual presented-frame intervals,
+CPU/GPU timing identity, phase CSVs, camera endpoints, foreground observations,
+competing-client observations, power state and engine captures. It fails closed
+on missing presentation support, lost foreground ownership, contention or a
+missed 28 ms presented-p99 budget. Selecting a rendering GPU does not prove its
+display route; no new ETW route trace was taken.
+
+The clean `29e237378` build ran three windowed, 1280x720, 120 FPS capped Air
+Defense 1 intervals per adapter on AC, with mouse/controller input disabled.
+All six are **failed qualification**, retained in
+`.tmp/vk-roadmap/presentation-ac/`:
+
+| Rendering adapter | Presented p99, repeats 1 / 2 / 3 | Additional qualification failures |
+| --- | --- | --- |
+| NVIDIA RTX 4060 Laptop, 591.74 | 12.001 / 65.141 / 12.115 ms | No foreground ownership; another client overlapped repeat 3 |
+| Intel Iris Xe, 101.5590 | Unavailable in all three | Driver lacks `VK_KHR_present_wait`; no foreground ownership; another client overlapped repeat 1 |
+
+NVIDIA repeat 2 exceeds the unchanged budget without another observed openQ4
+client. Its last 256 CPU/GPU samples have p99 7.204/2.390 ms; these shorter
+windows are not a per-present causal trace. Foreground activation through the
+window-control helper failed, including its retry. The observer recorded zero
+focused samples. The earlier one-run diagnostic also records contention and
+lost focus in `.tmp/vk-roadmap/presentation-diagnostic/`.
+
+This first set additionally exposed a fixture issue: first-run hardware
+detection chose enhanced/modern on NVIDIA and balanced/baseline on Intel.
+The harness now pins balanced/baseline and retains the saved configuration;
+the old set is not a controlled cross-adapter comparison. Resource operation
+counts and deferred optimization decisions are recorded in
+[resource profiling](vulkan-resource-profiling.md).
+
+The corrected one-repeat-per-adapter set in
+`.tmp/vk-roadmap/presentation-balanced/` verifies balanced/baseline settings,
+unchanged runtime/harness hashes, camera endpoints, phase traces and valid
+engine captures. No competing openQ4 client was observed. NVIDIA presented p99
+is 11.983 ms (2,403 samples), with CPU/GPU p99 6.807/2.069 ms in the retained
+256-frame window. Intel CPU/GPU p99 is 9.445/8.394 ms, but presented timing is
+still unavailable. Both reports still fail foreground qualification (zero
+focused observations). These are corrected diagnostic fixtures, not a passing
+repeated foreground test.
+
+No driver, power-state or support-scope exception is approved by these results.
+Current foreground repeats, verified direct/hybrid routing, alternate power
+states and suitable presentation tracing on Intel remain open under VK-02.
 
 ## Next work
 

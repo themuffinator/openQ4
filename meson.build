@@ -272,6 +272,12 @@ if get_option('build_native_tests')
   test('openq4-objective-marker-layout', objective_marker_layout_test, timeout: 30)
   test('openq4-vulkan-material-sources', py,
     args: [files('tools/build/vulkan_material_sources.py'), '--check'], timeout: 30)
+  test('openq4-vulkan-qualification-report', py,
+    args: [files('tools/tests/renderer_vulkan_qualification.py'), 'self-test'], timeout: 30)
+  test('openq4-vulkan-presentation-report', py,
+    args: [files('tools/tests/renderer_vulkan_presentation.py'), '--self-test'], timeout: 30)
+  test('openq4-vulkan-material-cache', py,
+    args: [files('tools/tests/renderer_vulkan_material_cache.py')], timeout: 60)
   openq4_editor_document_test = executable(
     'openq4-editor-document-test',
     files(

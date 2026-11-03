@@ -130,23 +130,44 @@ void Release( Program &program ) {
     program.bytes = 0;
 }
 
-// The version index a new program takes: appended below capacity, otherwise
-// the least recently bound version that no current key names and that no
-// frame still in flight can reference (its slot's fence has been waited since
-// it was last bound). -1 when every version is current or in flight.
-int AcquireSlot() {
-    if ( programs.size() < MaxPrograms ) { return static_cast<int>( programs.size() ); }
+// Both the version and storage budgets must reclaim only stale, retired
+// versions. Reloading a large source can hit the byte budget well before the
+// version limit; keeping those stale sources used to poison every later edit.
+int EvictionCandidate() {
     int best = -1;
     for ( size_t i = 0; i < programs.size(); ++i ) {
+        if ( programs[i] == nullptr ) { continue; }
         const Program &candidate = *programs[i];
         if ( candidate.lastUseFrame + VK_FRAMES_IN_FLIGHT > frameSerial || IsCurrent( static_cast<int>( i ) ) ) { continue; }
         if ( best < 0 || candidate.lastUseFrame < programs[best]->lastUseFrame ) { best = static_cast<int>( i ); }
     }
-    if ( best >= 0 ) {
-        Release( *programs[best] );
-        ++evictions;
-    }
     return best;
+}
+
+void Evict( int slot ) {
+    Release( *programs[slot] );
+    programs[slot].reset();
+    ++evictions;
+}
+
+int AcquireSlot() {
+    for ( size_t i = 0; i < programs.size(); ++i ) {
+        if ( programs[i] == nullptr ) { return static_cast<int>( i ); }
+    }
+    if ( programs.size() < MaxPrograms ) { return static_cast<int>( programs.size() ); }
+    const int slot = EvictionCandidate();
+    if ( slot >= 0 ) { Evict( slot ); }
+    return slot;
+}
+
+bool ReserveCompilerStorage( size_t bytes ) {
+    if ( bytes > MaxCompilerBytes ) { return false; }
+    while ( compilerBytes > MaxCompilerBytes - bytes ) {
+        const int slot = EvictionCandidate();
+        if ( slot < 0 ) { return false; }
+        Evict( slot );
+    }
+    return true;
 }
 
 // A key the full table refused. Retried once the versions in flight have
@@ -171,12 +192,12 @@ void Reject( const std::string &key, const char *kind, const std::string &name )
 // Places a new version at slot and accounts its storage.
 Program *Install( std::unique_ptr<Program> program, int slot ) {
     program->identity = slot;
-    if ( program->bytes > MaxCompilerBytes - Min( compilerBytes, MaxCompilerBytes ) ) {
+    if ( !ReserveCompilerStorage( program->bytes ) ) {
         program->compiled = {};
         // clear() retains string capacity and would defeat the storage bound.
         std::string().swap( program->vertexSource );
         std::string().swap( program->fragmentSource );
-        program->arbParameters.clear();
+        std::vector<oq4material::ARBParameter>().swap( program->arbParameters );
         program->compiled.diagnostic = "material compiler storage exhausted";
         program->valid = false;
         program->bytes = 0;
@@ -240,6 +261,7 @@ Program *Find( const newShaderStage_t *stage ) {
     // Reuse precedes the capacity check: an unchanged reload must still work
     // when all version slots are occupied. Failed versions are reusable too.
     for ( size_t i = 0; i < programs.size(); ++i ) {
+        if ( programs[i] == nullptr ) { continue; }
         Program &old = *programs[i];
         if ( old.key == key && old.sourcePairFound == sourcePairFound
             && old.vertexSource == request.vertexSource && old.fragmentSource == request.fragmentSource ) {
@@ -261,7 +283,7 @@ Program *Find( const newShaderStage_t *stage ) {
             request.parameters.push_back( {stage->shaderParmNames[i], i, ParameterComponents( stage, i )} );
         }
         for ( int i = 0; i < stage->numShaderTextures; ++i ) { request.textures.push_back( {stage->shaderTextureNames[i], i} ); }
-        if ( compilerBytes + request.vertexSource.size() + request.fragmentSource.size() < MaxCompilerBytes ) {
+        if ( ReserveCompilerStorage( request.vertexSource.size() + request.fragmentSource.size() ) ) {
             program->valid = oq4material::CompileGLSL( request, program->compiled );
         } else { program->compiled.diagnostic = "material compiler storage exhausted"; }
     } else { program->compiled.diagnostic = "could not find a complete vertex/fragment source pair"; }
@@ -309,6 +331,7 @@ Program *FindARB( const char *vertexFile, const char *fragmentFile ) {
     const bool sourcesFound = vertexRead && fragmentRead;
     // Reuse precedes the capacity check, as for authored GLSL.
     for ( size_t i = 0; i < programs.size(); ++i ) {
+        if ( programs[i] == nullptr ) { continue; }
         Program &old = *programs[i];
         if ( old.key == key && old.sourcePairFound == sourcesFound
             && old.vertexSource == request.vertexSource && old.fragmentSource == request.fragmentSource ) {
@@ -331,7 +354,7 @@ Program *FindARB( const char *vertexFile, const char *fragmentFile ) {
     if ( !sourcesFound ) {
         program->compiled.diagnostic = !vertexRead ? "glprogs/" + vertexName + ": file not found"
             : "glprogs/" + fragmentName + ": file not found";
-    } else if ( compilerBytes + request.vertexSource.size() + request.fragmentSource.size() >= MaxCompilerBytes ) {
+    } else if ( !ReserveCompilerStorage( request.vertexSource.size() + request.fragmentSource.size() ) ) {
         program->compiled.diagnostic = "material compiler storage exhausted";
     } else {
         oq4material::ARBTranslation translation;
@@ -481,23 +504,28 @@ void VK_MaterialPrograms_Reload() {
     suppressedDiagnostics = 0;
     capacityRejections = 0;
     for ( auto &program : programs ) {
+        if ( program == nullptr ) { continue; }
         program->drawn = program->skipped = 0;
         program->lastSkip.clear();
     }
     common->Printf( "Vulkan: authored GLSL sources will be reloaded on use\n" );
 }
 
-void VK_MaterialPrograms_Report() {
-    int current = 0, invalid = 0;
+void VK_MaterialPrograms_Report( bool detailed ) {
+    int live = 0, current = 0, invalid = 0;
     for ( size_t i = 0; i < programs.size(); ++i ) {
+        if ( programs[i] == nullptr ) { continue; }
+        ++live;
         current += IsCurrent( static_cast<int>( i ) ) ? 1 : 0;
         invalid += programs[i]->valid ? 0 : 1;
     }
     common->Printf( "Vulkan authored GLSL/ARB programs: %d of %d versions (%d current, %d invalid, %d evicted), %zu of %zu compiler bytes\n",
-        static_cast<int>( programs.size() ), MaxPrograms, current, invalid, evictions, compilerBytes, MaxCompilerBytes );
+        live, MaxPrograms, current, invalid, evictions, compilerBytes, MaxCompilerBytes );
     common->Printf( "  since reload: %d capacity rejections, %d suppressed diagnostics; peak %d of %d authored draws per frame\n",
         capacityRejections, suppressedDiagnostics, peakDraws, MaxDrawsPerPool * MaxPoolsPerSlot );
+    if ( !detailed ) { return; }
     for ( size_t i = 0; i < programs.size(); ++i ) {
+        if ( programs[i] == nullptr ) { continue; }
         const Program &program = *programs[i];
         common->Printf( "  %s %s %s%s drawn=%d skipped=%d%s%s\n", program.valid ? "compiled" : "invalid", Kind( program ),
             program.name.c_str(), IsCurrent( static_cast<int>( i ) ) ? "" : " (stale)", program.drawn, program.skipped,
@@ -653,6 +681,7 @@ bool VK_MaterialPrograms_ARBTranslatable( unsigned int target, const char *file 
 
 void VK_MaterialPrograms_Shutdown() {
     for ( auto &program : programs ) {
+        if ( program == nullptr ) { continue; }
         if ( program->vertex != VK_NULL_HANDLE ) { vkDestroyShaderModule( vkCtx.device, program->vertex, NULL ); }
         if ( program->fragment != VK_NULL_HANDLE ) { vkDestroyShaderModule( vkCtx.device, program->fragment, NULL ); }
     }

@@ -1,8 +1,8 @@
 # Vulkan captures and diagnostic readbacks
 
 This page records how the Vulkan renderer reads pixels back for engine
-captures and debug tools, how each path labels its result, and what changed on
-23 October 2026 under roadmap item VK-07.
+captures and debug tools, how each path labels its result, and the changes
+under roadmap item VK-07.
 
 ## Paths
 
@@ -68,6 +68,37 @@ contracts pass.
 GL debug readbacks cover the whole window from (0,0); Vulkan intensity and depth
 views cover the view viewport, so a cropped `r_screenFraction` view differs.
 Vulkan's overdraw denominator is the active target's extent. `glReadPixels`
-always reads the frame image, not a bound render target as GL does. Cubemap,
-nested-target and MSAA readback comparisons against GL captures, and
-resize/restart drills during a capture, remain open under VK-07.
+always reads the frame image, not a bound render target as GL does. Arbitrary
+nested views and the remaining debug-view combinations still need GL-contract
+comparisons; the bounded capture sequence below does not qualify them.
+
+## Cubemap and write-failure qualification (3 November 2026)
+
+`TakeScreenshot` now checks the filesystem's written-byte count. A failed or
+short write marks the capture failed; `envshot` stops at that face and reports
+an incomplete cube, while `bakeReflectionProbes` does not reload or count that
+probe. The existing frame-data cleanup still runs before a failed bake exits.
+The Vulkan readback rectangle check also avoids signed addition overflow.
+
+`renderer_image_capture.py` compares seven captures for each of thirteen image
+cases, plus six cubemap faces at baseline, partial restart, full restart,
+resized window and restored window. It checks RGBA channels, orientation,
+repeated/interleaved reads, exact recovery within each backend, and the existing
+two-display-level GL/Vulkan limit. A directory at the first face's output path
+forces a write failure: both warnings must appear once, later faces must not
+be written, and the command must not report success.
+
+At both 4x and 8x MSAA on the RTX 4060 Laptop GPU, both backends passed all
+independent checks. Each set of 121 GL/Vulkan capture pairs differs by at most
+one display level.
+All thirty cubemap faces recover exactly within each backend. Vulkan validation
+reported no messages. Reports, harness snapshots, exact binary hashes and engine
+captures are retained under `.tmp/vk-roadmap/capture-gl4-rerun/`, `capture-vk4/`
+and `capture-comparison4/`, with the 8x repeats in `capture-gl8/`, `capture-vk8/`
+and `capture-comparison8/`. The first GL run had incorrectly unquoted hyphens
+in the new command arguments and is retained as a failed harness run in
+`capture-gl4/`; no image threshold changed for the corrected rerun.
+
+The screenshot, display-presentation and PBR material contracts also pass.
+These results qualify this fixture and its tested boundaries, not every
+portal/nested-view, stencil interpretation or capture failure combination.

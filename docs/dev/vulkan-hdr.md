@@ -1,7 +1,9 @@
 # Vulkan HDR scene and exposure
 
 Status: implemented with local Windows stock-map and GPU correctness evidence;
-visual/platform qualification remains open. Vulkan remains experimental. This describes internal scene range
+visual/platform qualification remains open. Vulkan is supported on qualified
+Windows x64 NVIDIA/Intel configurations; Linux and macOS remain experimental.
+This describes internal scene range
 and tone mapping, not HDR10/scRGB display output or full stock-material
 linearization.
 
@@ -15,7 +17,7 @@ linearization.
 | `r_hdrAutoExposureAsync` | `1` | Uses completed frame-slot readbacks. `0` deliberately submits and waits without presenting the partial frame, then resumes recording. |
 | `r_hdrExposure` | `1` | Multiplies the automatic exposure; remains the exposure control when automatic exposure is disabled. |
 
-Canonical game code in `openQ4-game` selects RGBA16F for the forward scene and
+Canonical in-tree game code selects RGBA16F for the forward scene and
 its MSAA resolve. Game post-AA targets remain LDR, because engine tone mapping
 runs before authored post effects, SMAA and HUD composition. The Vulkan-owned
 direct/scaled scene target follows the same HDR request. A live HDR request
@@ -769,6 +771,53 @@ Two survey suggestions were not taken. Admitting classic ambient blends other
 than replace or add would scale the PBR attachment too: a classic modulate decal
 over a PBR pixel writes zero into it under the same blend state. Admitting the
 cel world ink needs a linear-scene fixture first. Both stay declined.
+
+## HDR cubemap capture (3 November 2026, VK-05/VK-07)
+
+An engine cubemap face smaller than the window used to bypass Vulkan's scene
+target. Complete-view admission therefore rejected it as `scene-target` and
+used the display-referred fallback. In the linear laboratory with bloom, the
+specimen's centre was 172 instead of GL's 224; 2,406 pixels on the +Y face
+exceeded the unchanged two-level limit (maximum difference 81).
+
+Direct HDR captures whose view rectangle fits inside the frame now reuse the
+existing window-sized floating-point scene attachment. Their viewport and
+scissors keep the capture's original size; the existing spatial presenter
+copies the finished attachment one-to-one for readback. No additional scene
+cache or temporal history is created. Complete-view material/post admission
+still runs, and game-owned targets keep their existing ownership. Out-of-frame
+or tiled rectangles retain the previous path and remain outside this result.
+
+The extended `renderer_vulkan_hdr_post.py` passes 41 Vulkan and 36 OpenGL
+controls, including failure injection, exposure, bloom, reloads, resizing,
+restarts and exact main-view recovery after the cube capture. Its strict
+comparison passes all 42 pairs (36 views and six faces), with a maximum
+one-level difference at 0x MSAA on the RTX 4060 Laptop GPU. Vulkan validation
+reports no messages. The focused manual/bloom/automatic-exposure cube probe
+also produces the expected centre values, 207/224/224. Native capture-admission
+checks reject missing, empty, negative and out-of-frame rectangles.
+
+Retained evidence: `.tmp/vk-roadmap/hdr-post-{gl,vk}-fixed/` and
+`hdr-post-comparison-fixed.json`; the original failed reports and captures
+remain in `hdr-post-{gl,vk}/` and `hdr-post-comparison.json`. Reports include
+the exact development-binary and harness hashes. This qualifies in-frame HDR
+engine cube captures; it does not admit arbitrary portal/nested/material graphs
+or change production PBR's display-referred contract.
+
+After integration with the MP/save changes, the clean `29e237378` runtime also
+passes all 41 Vulkan post/capture controls at 4x MSAA with validation enabled.
+The report and engine captures are retained in
+`.tmp/vk-roadmap/hdr-post-vk4-integrated/`. This is an independent Vulkan
+lifecycle repeat; the 42 paired comparisons above use the recorded 0x set.
+
+The staged stock-gameplay lifecycle runner also passes SP Air Defense 1 and
+MP Q4DM1 at 0x and 4x MSAA: all four runs exit cleanly, keep the runtime
+unchanged and retain eight valid engine captures each. They exercise HDR
+toggles, exposure readback modes, temporal scaling, resize and both restart
+paths. Evidence is in `.tmp/vk-roadmap/hdr-gameplay-fixed/`. The earlier run
+in `hdr-gameplay/` exposed a fixture assumption: the first-run enhanced preset
+enabled bloom, so disabling tone mapping still ran the bloom/sky-preservation
+pass. The runner now explicitly pins bloom off for its disabled-HDR control.
 
 ## Remaining acceptance
 

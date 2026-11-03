@@ -1,6 +1,9 @@
 #ifndef __VK_EXECUTOR_HOOKS_H__
 #define __VK_EXECUTOR_HOOKS_H__
 
+// Opt-in executor-only operation counts and current bounded descriptor usage.
+void VK_Exec_PrintResourceInfo( bool reset = false );
+
 /*
 ===============================================================================
 
