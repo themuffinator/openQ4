@@ -2413,10 +2413,13 @@ leaves the screen.
   explanation grow under the picture, which gives them its room down to the
   docked bottom band (and gives way where too little is left), and START
   CHAPTER and BACK stand side by side under the levels instead.
-- **Objectives**: an objective's title keeps its two lines and runs on
-  across the plate with its description; the empty state's line and plate
-  grow; each completed objective's row grows, its title ending in an
-  ellipsis. The heading, COMPLETED and the serial keep their size.
+- **Objectives**: an objective's title takes the lines it needs to hold what
+  its two lines held at 100 %, and its description wraps on in its column,
+  so the plate grows; both stay over the back bar, which darkens no further
+  (text widened past it washed out over a bright view). The empty state's
+  line and plate grow; each completed objective's row grows, its title
+  ending in an ellipsis. The heading, COMPLETED and the serial keep their
+  size.
 - **MODS**: the mods' rows grow, and the selected mod's details stand on a
   pitch that grows from the same foot over the actions, the list scrolling
   through fewer rows; NAME, VERSION and the details' labels keep their size.
@@ -2426,7 +2429,8 @@ leaves the screen.
   before the 4:3 view's margin, whichever is less (from about 1.05 times on
   the fullest screens to 2.1 on the shortest).
 - **Join Game**: the scan's status grows upward from its place, the filter
-  row and the list's foot moving up with it; the empty state's sentence
+  row and the list's foot moving up with it, and runs on to CLEAR SORTING
+  while no player search's tag follows it; the empty state's sentence
   wraps onto the lines it needs, its action moving down; the details card
   grows as one with the text, its headings keeping their size. The sources,
   spinners, filter tags, headings and actions keep their size.

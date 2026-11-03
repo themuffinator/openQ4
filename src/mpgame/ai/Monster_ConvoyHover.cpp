@@ -121,9 +121,16 @@ void rvMonsterConvoyHover::Save ( idSaveGame *savefile ) const {
 	
 	savefile->WriteStaticObject ( physicsObj );
 
-	savefile->Write ( hoverDampening, sizeof ( idAngles ) * DAMPEN_ANGLE_SAMPLES );
+	for ( int i = 0; i < DAMPEN_ANGLE_SAMPLES; i++ ) {
+		savefile->WriteAngles( hoverDampening[ i ] );
+	}
 
-	savefile->Write( &myfl, sizeof(myfl) );	// cnicholson: Added unsaved var
+	// One bit per flag in declaration order: the bytes a raw copy of the struct wrote.
+	static_assert( sizeof( myfl ) == ( 3 + 7 ) / 8, "flag struct layout changed" );
+	const bool myflBits[] = {
+		myfl.pathing, myfl.faceEnemy, myfl.dead
+	};
+	SaveCodec_WriteFlagBytes( *savefile, myflBits );
 }
 
 /*
@@ -147,9 +154,15 @@ void rvMonsterConvoyHover::Restore ( idRestoreGame *savefile ) {
 	RestorePhysics ( &physicsObj );
 	physicsObj.EnableClip();
 
-	savefile->Read ( hoverDampening, sizeof ( idAngles ) * DAMPEN_ANGLE_SAMPLES );
+	for ( int i = 0; i < DAMPEN_ANGLE_SAMPLES; i++ ) {
+		savefile->ReadAngles( hoverDampening[ i ] );
+	}
 
-	savefile->Read( &myfl, sizeof(myfl) );	// cnicholson: Added unsaved var
+	bool myflBits[ 3 ];
+	SaveCodec_ReadFlagBytes( *savefile, myflBits );
+	myfl.pathing = myflBits[ 0 ];
+	myfl.faceEnemy = myflBits[ 1 ];
+	myfl.dead = myflBits[ 2 ];
 
 	InitSpawnArgsVariables();
 }

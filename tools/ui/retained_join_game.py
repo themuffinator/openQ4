@@ -941,6 +941,13 @@ def grow_status(doc: Document, result: dict) -> None:
     height = status["height"]["value"]
     growth = {"op": "*", "args": [height, {"op": "-", "args": [TEXT, 1]}]}
     doc.bind("text.join-status.height", "join-status", "height", text_times(height))
+    # Without a player search's tag after it, the status runs on to CLEAR
+    # SORTING.
+    searching = {"op": "!=", "args": [{"state": "join.search"}, ""]}
+    width = status["width"]["value"]
+    room = round(U * (CLEAR_SORT[0] - clear_sort_width() - STATUS[0] - 6), 4)
+    doc.bind("text.join-status.width", "join-status", "width",
+             {"op": "select", "args": [{"op": "&&", "args": [LARGER, {"op": "!", "args": [searching]}]}, room, width]})
     status["text-overflow"] = {"type": "keyword", "value": "clip"}
     doc.bind("text.join-status.text-overflow", "join-status", "text-overflow", {"op": "select", "args": [LARGER, "ellipsis", "clip"]})
     moved = ["servers-list", "servers_scroll", "join-gametype-value", "join_gametype_previous", "join_gametype_next"]

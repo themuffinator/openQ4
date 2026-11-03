@@ -8817,15 +8817,22 @@
                {
                 "op": "select",
                 "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 3,
                  {
-                  "op": "&&",
+                  "op": "select",
                   "args": [
-                   {"op": ">", "args": [{"state": "view.text"}, 1]},
-                   {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                   {
+                    "op": "&&",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1]},
+                     {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                    ]
+                   },
+                   2,
+                   1
                   ]
-                 },
-                 2,
-                 1
+                 }
                 ]
                },
                {"op": "*", "args": [13, {"state": "view.text"}]}
@@ -8861,15 +8868,22 @@
            {
             "op": "select",
             "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             3,
              {
-              "op": "&&",
+              "op": "select",
               "args": [
-               {"op": ">", "args": [{"state": "view.text"}, 1]},
-               {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+               {
+                "op": "&&",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1]},
+                 {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                ]
+               },
+               2,
+               1
               ]
-             },
-             2,
-             1
+             }
             ]
            },
            {"op": "*", "args": [13, {"state": "view.text"}]}
@@ -8960,15 +8974,22 @@
                {
                 "op": "select",
                 "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 3,
                  {
-                  "op": "&&",
+                  "op": "select",
                   "args": [
-                   {"op": ">", "args": [{"state": "view.text"}, 1]},
-                   {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                   {
+                    "op": "&&",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1]},
+                     {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                    ]
+                   },
+                   2,
+                   1
                   ]
-                 },
-                 2,
-                 1
+                 }
                 ]
                },
                {"op": "*", "args": [13, {"state": "view.text"}]}
@@ -9044,15 +9065,22 @@
                {
                 "op": "select",
                 "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 3,
                  {
-                  "op": "&&",
+                  "op": "select",
                   "args": [
-                   {"op": ">", "args": [{"state": "view.text"}, 1]},
-                   {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                   {
+                    "op": "&&",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1]},
+                     {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                    ]
+                   },
+                   2,
+                   1
                   ]
-                 },
-                 2,
-                 1
+                 }
                 ]
                },
                {"op": "*", "args": [13, {"state": "view.text"}]}
@@ -9128,15 +9156,22 @@
                {
                 "op": "select",
                 "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 3,
                  {
-                  "op": "&&",
+                  "op": "select",
                   "args": [
-                   {"op": ">", "args": [{"state": "view.text"}, 1]},
-                   {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                   {
+                    "op": "&&",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1]},
+                     {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                    ]
+                   },
+                   2,
+                   1
                   ]
-                 },
-                 2,
-                 1
+                 }
                 ]
                },
                {"op": "*", "args": [13, {"state": "view.text"}]}
@@ -9274,27 +9309,73 @@
           "args": [
            1.5,
            {
-            "op": "+",
+            "op": "select",
             "args": [
-             {"op": "+", "args": [313.0, {"op": "*", "args": [12, {"state": "view.text"}]}]},
+             {"state": "arena_campaignComplete"},
              {
-              "op": "*",
+              "op": "+",
               "args": [
+               {"op": "+", "args": [313.0, {"op": "*", "args": [12, {"state": "view.text"}]}]},
                {
-                "op": "select",
+                "op": "*",
                 "args": [
                  {
-                  "op": "&&",
+                  "op": "select",
                   "args": [
-                   {"op": ">", "args": [{"state": "view.text"}, 1]},
-                   {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {
+                      "op": "&&",
+                      "args": [
+                       {"op": ">", "args": [{"state": "view.text"}, 1]},
+                       {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                      ]
+                     },
+                     2,
+                     1
+                    ]
+                   }
                   ]
                  },
-                 2,
-                 1
+                 {"op": "*", "args": [13, {"state": "view.text"}]}
                 ]
-               },
-               {"op": "*", "args": [13, {"state": "view.text"}]}
+               }
+              ]
+             },
+             {
+              "op": "+",
+              "args": [
+               309.0,
+               {
+                "op": "*",
+                "args": [
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {
+                      "op": "&&",
+                      "args": [
+                       {"op": ">", "args": [{"state": "view.text"}, 1]},
+                       {"op": "!", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}]}
+                      ]
+                     },
+                     2,
+                     1
+                    ]
+                   }
+                  ]
+                 },
+                 {"op": "*", "args": [13, {"state": "view.text"}]}
+                ]
+               }
               ]
              }
             ]

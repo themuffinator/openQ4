@@ -78,7 +78,7 @@ void idBrittleFracture::Save( idSaveGame *savefile ) const {
 	int i, j;
 
 	savefile->WriteInt( health );
-	savefile->Write( &fl, sizeof( fl ) );
+	WriteFlagBytes( savefile );
 
 	// setttings
 	savefile->WriteMaterial( material );
@@ -148,7 +148,7 @@ void idBrittleFracture::Restore( idRestoreGame *savefile ) {
 	renderEntity.noDynamicInteractions = false;
 
 	savefile->ReadInt( health );
-	savefile->Read( &fl, sizeof( fl ) );
+	ReadFlagBytes( savefile );
 
 	// setttings
 	savefile->ReadMaterial( material );

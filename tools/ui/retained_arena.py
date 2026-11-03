@@ -999,14 +999,19 @@ def grow_arena(doc: Document, result: dict) -> None:
              {"op": "select", "args": [{"op": ">", "args": [text_sum(rule_top, times(36)), ARENA_FLOOR]}, "none", "block"]})
     # The progress under the ladder: its line wraps onto a second, so that
     # its count stays whole in the narrow column.
-    progress = {"op": "*", "args": [{"op": "select", "args": [LARGER, 2, 1]}, times(13)]}   # u
+    progress_lines = {"op": "select", "args": [{"op": ">", "args": [TEXT, 1.5]}, 3, {"op": "select", "args": [LARGER, 2, 1]}]}
+    progress = {"op": "*", "args": [progress_lines, times(13)]}   # u
     larger("arena-progress", "height", u(progress))
     larger("arena-progress", "white-space", "normal")
     lettered.append("arena-progress")
     for ident in ("arena-progress-track", "arena-progress-fill"):
         stand(ident, text_sum(PROGRESS_TOP + 2, progress))
     grow("arena-complete", 12, text_sum(PROGRESS_TOP + 9, progress))
-    stand("arena-reset-row", text_sum(PROGRESS_TOP + 15, times(12), progress))
+    # RESET PROGRESS stands under CAMPAIGN COMPLETE where that shows, else
+    # under the bar, clear of the bottom band.
+    complete = {"state": "arena_campaignComplete"}
+    stand("arena-reset-row", {"op": "select", "args": [complete, text_sum(PROGRESS_TOP + 15, times(12), progress),
+                                                       text_sum(PROGRESS_TOP + 11, progress)]})
     for ident in ("arena-tiers-head", "arena-matches-head", "arena-briefing-head", "arena-difficulty-label", "arena-best", "arena_easier",
                   "arena_harder", "arena_start", "arena_back", *(f"tier-{index}" for index in range(TIERS)),
                   *(f"match-{index}" for index in range(MATCHES))):

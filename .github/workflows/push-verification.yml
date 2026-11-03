@@ -528,6 +528,7 @@ jobs:
             tools/tests/ui_settings_service.py \
             tools/tests/durable_file.py \
             tools/tests/savegame_durability.py \
+            tools/tests/save_codec.py \
             tools/tests/settings_configuration_persistence.py \
             tools/tests/sdl3_settings_placement.py \
             tools/tests/ui_system_display.py \
@@ -975,6 +976,7 @@ jobs:
           python tools/tests/ui_settings_service.py
           python tools/tests/durable_file.py --mutations
           python tools/tests/savegame_durability.py
+          python tools/tests/save_codec.py
           python tools/tests/settings_configuration_persistence.py
           python tools/tests/sdl3_settings_placement.py
           python tools/tests/ui_system_display.py

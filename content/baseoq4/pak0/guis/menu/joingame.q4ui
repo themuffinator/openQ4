@@ -39336,6 +39336,51 @@
    }
   },
   {
+   "id": "text.join-status.width",
+   "node": "join-status",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "*",
+      "args": [
+       1.2,
+       {
+        "op": "select",
+        "args": [
+         {
+          "op": "&&",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1]},
+           {"op": "!", "args": [{"op": "!=", "args": [{"state": "join.search"}, ""]}]}
+          ]
+         },
+         540.0,
+         262.5
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {
+        "op": "&&",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1]},
+         {"op": "!", "args": [{"op": "!=", "args": [{"state": "join.search"}, ""]}]}
+        ]
+       },
+       540.0,
+       262.5
+      ]
+     }
+    ]
+   }
+  },
+  {
    "id": "text.join-status.text-overflow",
    "node": "join-status",
    "property": "text-overflow",
@@ -65306,12 +65351,6 @@
    "node": "join-status",
    "property": "bottom",
    "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 404.8, 259.5]}
-  },
-  {
-   "id": "tall.join-status.width",
-   "node": "join-status",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 315.0, 262.5]}
   },
   {
    "id": "tall.join-status.font-size",

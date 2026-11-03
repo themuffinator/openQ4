@@ -3221,3 +3221,24 @@ void Cmd_CheckSave_f( const idCmdArgs &args )
 	common->Printf( "checkSave: save/restore round trip completed\n" );
 }
 
+/*
+================
+Portable codec layouts (roadmap Q4-06)
+
+The portable save codecs name the fields of these production types. Building
+them here makes a renamed or retyped field a compile error before the codecs
+replace the raw blocks in the writer.
+================
+*/
+template void SaveCodec_WriteTraceModel( idSaveGame &, const idTraceModel & );
+template void SaveCodec_ReadTraceModel( idRestoreGame &, idTraceModel &, int, int, int, int, int );
+template void SaveCodec_WriteJointMod( idSaveGame &, const jointMod_t & );
+template void SaveCodec_ReadJointMod( idRestoreGame &, jointMod_t &, int );
+template void SaveCodec_WritePoseJointMod( idSaveGame &, const idAFPoseJointMod & );
+template void SaveCodec_ReadPoseJointMod( idRestoreGame &, idAFPoseJointMod &, int );
+template void SaveCodec_WriteJointQuat( idSaveGame &, const idJointQuat & );
+template void SaveCodec_ReadJointQuat( idRestoreGame &, idJointQuat & );
+template void SaveCodec_WriteJointMat( idSaveGame &, const idJointMat & );
+template void SaveCodec_ReadJointMat( idRestoreGame &, idJointMat & );
+template void SaveCodec_WriteValue( idSaveGame &, const idAngles & );
+template void SaveCodec_ReadValue( idRestoreGame &, idAngles & );

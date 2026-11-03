@@ -233,7 +233,13 @@ void idAFConstraint::Save( idSaveGame *saveFile ) const {
 	// TOSAVE: idVecX					lm;
 	saveFile->WriteInt ( firstIndex );  // cnicholson: Added unsaved var
 	
-	saveFile->Write( &fl, sizeof( fl ));// cnicholson: Added unsaved var
+	// One bit per flag in declaration order: the bytes a raw copy of the struct wrote.
+	static_assert( sizeof( fl ) == ( 6 + 7 ) / 8, "flag struct layout changed" );
+	const bool flBits[] = {
+		fl.allowPrimary, fl.frameConstraint, fl.noCollision, fl.isPrimary, fl.isZero,
+		fl.transient
+	};
+	SaveCodec_WriteFlagBytes( *saveFile, flBits );
 }
 
 /*
@@ -259,7 +265,14 @@ void idAFConstraint::Restore( idRestoreGame *saveFile ) {
 
 	saveFile->ReadInt ( firstIndex );	// cnicholson: Added unsaved var
 
-	saveFile->Read( &fl, sizeof( fl )); // cnicholson: Added unsaved var
+	bool flBits[ 6 ];
+	SaveCodec_ReadFlagBytes( *saveFile, flBits );
+	fl.allowPrimary = flBits[ 0 ];
+	fl.frameConstraint = flBits[ 1 ];
+	fl.noCollision = flBits[ 2 ];
+	fl.isPrimary = flBits[ 3 ];
+	fl.isZero = flBits[ 4 ];
+	fl.transient = flBits[ 5 ];
 }
 
 
@@ -4369,7 +4382,13 @@ void idAFBody::Save( idSaveGame *saveFile ) {
 	saveFile->WriteInt( maxAuxiliaryIndex );		// cnicholson: Added unsaved var
 	saveFile->WriteInt( maxSubTreeAuxiliaryIndex );	// cnicholson: Added unsaved var
 
-	saveFile->Write( &fl, sizeof( fl ) );			// cnicholson: Added unsaved var
+	// One bit per flag in declaration order: the bytes a raw copy of the struct wrote.
+	static_assert( sizeof( fl ) == ( 6 + 7 ) / 8, "flag struct layout changed" );
+	const bool flBits[] = {
+		fl.clipMaskSet, fl.selfCollision, fl.spatialInertiaSparse, fl.useFrictionDir,
+		fl.useContactMotorDir, fl.isZero
+	};
+	SaveCodec_WriteFlagBytes( *saveFile, flBits );
 }
 
 /*
@@ -4444,7 +4463,14 @@ void idAFBody::Restore( idRestoreGame *saveFile ) {
 	saveFile->ReadInt( maxAuxiliaryIndex );			// cnicholson: Added unrestored var
 	saveFile->ReadInt( maxSubTreeAuxiliaryIndex );	// cnicholson: Added unrestored var
 
-	saveFile->Read( &fl, sizeof( fl ) );			// cnicholson: Added unrestored var
+	bool flBits[ 6 ];
+	SaveCodec_ReadFlagBytes( *saveFile, flBits );
+	fl.clipMaskSet = flBits[ 0 ];
+	fl.selfCollision = flBits[ 1 ];
+	fl.spatialInertiaSparse = flBits[ 2 ];
+	fl.useFrictionDir = flBits[ 3 ];
+	fl.useContactMotorDir = flBits[ 4 ];
+	fl.isZero = flBits[ 5 ];
 }
 
 
