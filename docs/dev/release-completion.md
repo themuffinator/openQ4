@@ -6,6 +6,14 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Multiplayer bot knockback recovery, 3 November 2026
+
+- Bots better preserve a safe landing after a rocket or rail hit, including
+  hits that first slide them across the ground. Edge braking also settles
+  low-speed movement instead of repeatedly reversing it on a narrow rim.
+- Two recorded DM8 failures now survive isolated gameplay replays. The wider
+  traversal-safety gate remains open; see [qualification and limits](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026).
+
 ## Immediate resaves and interrupted loads, 3 November 2026
 
 - **Saving immediately after loading now produces a loadable save.** This also

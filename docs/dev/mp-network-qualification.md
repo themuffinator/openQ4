@@ -69,6 +69,13 @@ runtime did not change during the test. The final client hash starts
 test stage. These are loopback gameplay checks, not cross-machine or WAN tests,
 and elapsed time on this shared host is not a performance qualification.
 
+After integrating main's save/BSE changes, the clean tree `62ee95276` builds
+and stages successfully. Its impaired IPv6 regression also passes all three
+joins, with 355 received client fragments, both exits 0 and unchanged hashes
+(`lan-integrated/report.json`, 131.39 seconds). The integrated client hash starts
+`47322dfc491a57a3`, dedicated `63507833e186be86`, and MP module
+`ce7ca57fa935d2e9`. This is additional integration evidence, not a timing claim.
+
 The 59 broader match/network contracts and the three extended/new fixtures
 pass on Windows. The three fixtures also pass under Linux with Clang and
 ASan/UBSan, including all 29 reversal controls. This is native fixture evidence,

@@ -5,6 +5,97 @@ authoring or compile step. Bots arrive with a name, a way of playing and
 something to say about it. This describes their behaviour, validation and
 current limits.
 
+## Long-match recovery audit, 3 November 2026
+
+The renewed five-minute, six-bot, skill-4 DM8 audit records 284.128 simulated
+seconds, 106 combat kills and 152 completed traversals, with no stuck events,
+goal give-ups or traversal timeouts. Six world deaths remain subject to the
+strict causal policy. The match's runtime hashes stayed unchanged (client
+`241211745bb14c70`, MP module `f35a22ba1c45d83f`); its report and log are in
+`.tmp/mp-roadmap/bots-dm8/`.
+
+The first causality run was interrupted by the freshness check after a newer
+build was compiled. That report remains a failure, with no exclusions. The
+complete rerun uses independent copies of the original, hash-verified match
+binaries in `.tmp/runtime/baseline/`. Its deliberate freshness override applies
+only to causality for that recorded match. Each victim group has its own save
+directory and port; all batches retain hashes and clean-exit checks. The
+combined report in `.tmp/mp-roadmap/impulse-rerun/classification.json` historically
+classified four deaths as enemy impulses and two as navigation/control failures.
+Those exclusions are **not current qualification**: the follow-up below found
+that the replay checker accepted an earlier touchdown even if the bot was
+falling again at the end. All six remain counted until the stronger check is
+rerun against the recorded runtime with terminal-state instrumentation.
+
+Rhodes's rocket hit leaves five health. The hit-position controller survives,
+but the later recorded recovery pose near `(528.1, 686, 328.2)` reproduces a
+fatal five-point landing with both the later route target and a return target.
+Those poses come from rounded diagnostics, not a full match snapshot. Voss's
+later machinegun hit occurs after the fall was already lost; tracing back to
+the preceding rocket finds two surviving fixed inputs while the controller
+falls. Original controls and the route probe are retained alongside the audit.
+
+CTF3 and DZ3 also pass five-minute audits on the integrated `62ee95276` build:
+CTF3 records 284.192 simulated seconds, 40 kills and 116 traversals; DZ3 records
+284.320 seconds, 59 kills and 91 traversals. Neither has a world death, stuck
+event, give-up or traversal timeout. DZ3 records one refused pickup. These are
+in `.tmp/mp-roadmap/bots-ctf3/` and `bots-dz3/`.
+
+CTF5 records 284.256 simulated seconds, 79 kills, 211 traversals and two stuck
+events, with no give-ups or traversal timeouts. The older checker classified
+one death as an enemy impulse and two as recoverable failures (Kane and Sledge).
+That exclusion also needs the terminal-state requalification described above.
+The isolated controller survives both latter hit states; their later match
+departures still need isolation. The strict audit fails, as recorded in
+`.tmp/mp-roadmap/bots-ctf5/report.json`.
+
+All runs share the host with other work. DM8's observed 0.714 ms weighted mean
+and 3.25 ms worst-window p95 ceiling meet the selected reference budgets, but
+the competing-runtime/compiler check rejects controlled timing qualification.
+The strict broader safety and timing gates remain open.
+
+## Knockback slide and replay corrections, 3 November 2026
+
+The follow-up isolates two failures in real DM8 physics. A five-health bot
+survives a rocket if it coasts, but steering toward its southwest walking
+goal changes the slide before airborne recovery begins. A second rocket
+lands on a rim; full reverse commands at low speed then alternate direction
+until the bot walks off again.
+
+Recovery now preserves a proven coast through a grounded knockback interval,
+using the physics object's remaining knockback time. The new bounded proof
+follows flat-floor movement without friction, then requires a survivable fall
+or stopping reserve. Slopes, walls, steps and transport intersections remain
+unproven by this narrow check. Unplanned knocked flights take control early,
+zero input remains a valid held plan, and edge braking fades as speed falls.
+Air prediction also starts at the actual origin rather than one unit above it.
+
+`mp_bot_air_recovery_replay.py` passes all six expected outcomes in
+`.tmp/mp-roadmap/air-slide-proof/report.json`: southwest, northwest and south
+route targets finish grounded at five health; the second rocket's controller
+and fixed north input survive; the already-lost later pose still dies. The
+client hash is `47322dfc491a57a38d10240df99aa5b475f15b95370c9daf0c36cea39272e990`
+and the MP module is
+`70830d96d87b540324a0bcaa157d55b7550a3aa66ea44980d4e2c2c61175f1c3`;
+all runtime hashes stay unchanged through the replay. Failed intermediate
+replays remain beside it, including the air-only and first-contact-only fixes.
+
+The native decision and geometry fixtures pass on Windows and Linux x64
+(Clang ASan/UBSan on Linux), including eleven deliberate reversions across
+the two suites. The geometry controls cover a ground slide that crosses a
+pit after its ordinary stopping reserve, affordable landing versus void,
+false clearance from the lifted origin, and preservation of zero input.
+
+The audit itself now reports `MP_PHYSICS` immediately before each trial ends
+and requires a positive-health, grounded final state as well as a touchdown
+and no world death. Missing terminal state fails closed. Trial markers must
+match the entire name exactly once: `south` must not read `southwest`.
+Negative controls cover airborne/dead/missing final state and duplicate or
+prefix markers. Preserved old reports are not rewritten; separate
+`terminal-exact-marker-reassessment.json` files correct the intermediate
+interpretations. In particular, the original south route survived too; the
+southwest route was the reproduced failure.
+
 ## Why not AAS
 
 Quake 4's SDK routes AI over AAS, an offline navigation compile stored as a

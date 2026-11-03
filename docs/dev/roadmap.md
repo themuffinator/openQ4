@@ -2139,6 +2139,14 @@ claim peer combinations that have not been tested.
   navigation/control failures and retain strict world-death gates. Qualify route
   generation/think budgets, objectives and real combat; source tests do not close
   the previously failing runtime safety sweep.
+  Follow-through, 3 November: [knockback slide and replay corrections](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026)
+  fix two isolated DM8 failures: route steering spoiled a survivable ground
+  slide, and full reverse commands oscillated on a landing rim. Exact-origin
+  prediction, a bounded slide proof, retained coasting and scaled edge braking
+  pass six real-physics replay outcomes and Windows/Linux native controls.
+  The replay checker now requires alive/grounded terminal state and exact trial
+  markers; old first-touch impulse exclusions need requalification. The strict
+  long-match, catalog and controlled-timing gates remain open.
   Progress, 18 October: [four-map rerun](mp-bots.md#current-four-map-rerun-18-october-2026)
   passes CTF3/DZ3 but retains DM8/CTF5 world-death failures following logged combat
   impulses. The subsequent [33-map sweep](mp-bots.md#current-complete-catalog-sweep-18-october-2026)
