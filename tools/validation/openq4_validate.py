@@ -892,6 +892,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'vk_display_color_mapping_shader_pin.py', []),
         (root / "tools" / "tests" / 'vk_display_color_mapping_capture.py', ['--self-test']),
         (root / "tools" / "tests" / 'savegame_restore_matrix.py', ['--self-test']),
+        (root / "tools" / "tests" / 'savegame_cross_load.py', ['--self-test']),
     ]
     failures: list[str] = []
     checks: list[tuple[Path, list[str]]] = []

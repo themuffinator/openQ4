@@ -619,6 +619,7 @@ jobs:
             tools/tests/vk_display_color_mapping_shader_pin.py \
             tools/tests/vk_display_color_mapping_capture.py \
             tools/tests/savegame_restore_matrix.py \
+            tools/tests/savegame_cross_load.py \
             tools/tests/vk_temporal_resolve_shader_pin.py \
             tools/tests/vscode_fast_build.py
           bash -n tools/build/meson_setup.sh
@@ -1052,6 +1053,7 @@ jobs:
           python tools/tests/vk_display_color_mapping_shader_pin.py
           python tools/tests/vk_display_color_mapping_capture.py --self-test
           python tools/tests/savegame_restore_matrix.py --self-test
+          python tools/tests/savegame_cross_load.py --self-test
           python tools/tests/vk_temporal_resolve_shader_pin.py
           python tools/tests/vscode_fast_build.py
           OPENQ4_CHECKS

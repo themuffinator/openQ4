@@ -1774,6 +1774,36 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      Gate: every direction restores into gameplay without errors, its resave
      restores again on the source platform, and both platforms report the same
      object table.
+     Windows x64 and Linux x64 qualified, 3 November. `savegame_cross_load.py`
+     runs one platform's leg, at fixed tics. Its frozen save records the restore
+     before any time passes, and its resave, after 180 tics, travels back. Its
+     `--self-test` runs in CI. The Linux side is a WSL Ubuntu release build of
+     the same commit, using software GL under Xvfb.
+
+     The first runs found three platform dependences in typed fields, all fixed:
+     - The script program checksum covered source lines. Those number
+       differently in CRLF and LF checkouts of openQ4's script overrides, so
+       every cross-platform load quietly restarted the level. From v5 it covers
+       code only.
+     - GUI transitions named their target by a byte offset in the window
+       class. v5 names it by a field index.
+     - Retained GUI snapshots named their document by its source text, line
+       endings included. That comparison now ignores CRLF against LF.
+
+     Evidence:
+     - Seven stock maps (`airdefense1`, `convoy1`, `convoy2b`, `hangar1`,
+       `process1`, `storage1`, `walker`) and four Awakening maps
+       (`m01_stranarus_trench1`, `m03_airassault`, `m05_bio`, `m08_cryofac`)
+       pass in both directions, without errors.
+     - Each resave restores on the source platform.
+     - Both platforms' frozen saves of one input list the same object table,
+       568 to 3114 objects.
+     - The historical matrix still restores all 14 release saves and six v4
+       saves from builds 1769 to 1958.
+
+     Still open: macOS arm64 needs an Apple host, and this project has none.
+     ARM64 Linux or Android needs hardware, or an emulated GL stack that WSL
+     does not have. The stage stays open until one of each has run.
   5. **Release.** Player documentation on moving saves between platforms,
      release notes and the revised platform table. Gate: published with the
      evidence above.

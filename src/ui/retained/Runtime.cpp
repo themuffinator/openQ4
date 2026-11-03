@@ -3569,6 +3569,20 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		snapshot.swap(candidate); return true;
 	} catch (const std::exception& problem) { error = std::string("Cannot save instance snapshot: ")+problem.what(); return false; }
 }
+// A saved document source matches whatever line endings each checkout gave the
+// file: Windows checkouts write CRLF and the others LF, so a save made on one
+// platform names the same document differently on another (roadmap Q4-06).
+static bool SnapshotSourceMatches(const Json::Value& saved, const std::string& source) {
+	if (!saved.isString()) return false;
+	const std::string text = saved.asString();
+	std::size_t a = 0, b = 0;
+	for (;;) {
+		if (a < text.size() && text[a] == '\r' && a+1 < text.size() && text[a+1] == '\n') ++a;
+		if (b < source.size() && source[b] == '\r' && b+1 < source.size() && source[b+1] == '\n') ++b;
+		if (a == text.size() || b == source.size()) return a == text.size() && b == source.size();
+		if (text[a++] != source[b++]) return false;
+	}
+}
 bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, double seconds) {
     if(!Mutate())return false;
 
@@ -3595,7 +3609,8 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 			!SnapshotFields(root,{"format","version","document","application","presentation","interaction","widgets"})) return reject("Invalid instance snapshot fields");
 		const auto& identity = root["document"];
 		if (!SnapshotFields(identity,{"version","id","path","source"}) || !identity["version"].isUInt() || identity["version"].asUInt() != 1 ||
-			identity["id"] != impl->canonical->Model().id || identity["path"] != impl->sourcePath || identity["source"] != impl->canonical->Source())
+			identity["id"] != impl->canonical->Model().id || identity["path"] != impl->sourcePath ||
+			!SnapshotSourceMatches(identity["source"],impl->canonical->Source()))
 			return reject("Instance snapshot document/source identity mismatch");
 		ValueWidgetSnapshot widgets;
 		std::size_t numberEditors = 0, numberTextRemaining = ValueWidgetSnapshot::MaxNumberTextBytes;

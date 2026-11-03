@@ -1177,6 +1177,80 @@ Runtime evidence, 3 November 2026 (Windows x64, staged build 2015):
 The changed sources compile with MSVC, and with GCC and Clang on Linux. Linux
 and macOS runtime round trips belong to stage 4.
 
+### Cross-platform qualification (Q4-06 stage 4)
+
+`tools/tests/savegame_cross_load.py` runs one leg on the local platform:
+- a **write** leg starts a map fresh, plays 240 tics and saves;
+- a **load** leg restores an input save with game time stopped and saves it
+  before any time passes (the *frozen* save). It then plays 180 tics and saves
+  again; that resave travels back.
+
+Legs run with `com_fixedTic 1`, so frame counts are game time on any platform. A
+leg fails on any error, an unfinished after-load config, a save that is not v5
+`le64-portable1`, or an unresolved reference in a save that travels. A load
+leg also fails when its frozen save lists a different object table from its
+input. The frozen save runs before the first game frame after a load, so it
+records the restore but is never loaded (see
+[Saving before the first frame](#saving-before-the-first-frame-after-a-load)).
+`compare` reports whether two saves have the same object table and how many
+state bytes differ. `--self-test` runs in CI.
+
+Each direction runs four legs:
+1. write on the source;
+2. load on the source, which gives the baseline frozen save;
+3. load on the target;
+4. load the target's resave back on the source.
+
+It then compares the two frozen saves. The first runs, between Windows x64 and
+a WSL Ubuntu Linux x64 build of the same commit, found three platform
+dependences that the raw inventory could not see:
+
+- **Script checksum.** The program checksum covered each statement's source
+  line. After a block comment, `idLexer` steps one character past `*/`. In a
+  CRLF file that character is `\r`; in an LF file it is the newline, so the
+  file's later lines number one lower. openQ4's script overrides in
+  `content/baseoq4/pak1/scripts` are checked out CRLF on Windows and LF
+  elsewhere. Every map's program compiles every map script, so each
+  platform's build had its own checksum, and every cross-platform load quietly
+  restarted the level. Builds from checkouts with different `core.autocrlf`
+  settings disagree the same way. The local Windows copy of `convoy2b.script`
+  even mixes 1312 CRLF and 20 LF endings. From version 5 the checksum covers
+  only operations and operands, which are identical across checkouts. Older
+  payloads keep the old checksum, so they still restore where they were made.
+- **GUI transition targets.** A transition saved its target variable as a
+  byte offset in `idWindow` or `idSimpleWindow`, which follows the compiler's
+  class layout. On Linux, `airdefense1`'s HUD offset 376 named no variable,
+  and the restore failed after map teardown. Version 5 saves the index of the
+  variable in a fixed list (`idWindow::TransitionFieldOffset`).
+- **Retained GUI snapshots.** A retained document's saved state names the
+  document by its full source text, which carries the checkout's line endings.
+  A Windows save's `machinegun_scope.q4ui` (870 CRLF) did not match the Linux
+  copy, and the restore failed after teardown. The identity now compares
+  sources with CRLF and LF treated alike, for every payload version.
+
+Evidence with the fixes, 3 November 2026:
+- **Maps.** Every direction passes on seven stock maps (`airdefense1`,
+  `convoy1`, `convoy2b`, `hangar1`, `process1`, `storage1` and `walker`).
+  It also passes on four Awakening maps (`m01_stranarus_trench1`,
+  `m03_airassault`, `m05_bio` and `m08_cryofac`, `fs_game q4xbase`).
+- **Each map.** Each restore enters gameplay without errors, and each resave
+  restores on its source platform. The two platforms' frozen saves of the same
+  input list identical object tables, of 568 to 3114 objects.
+- **Created by the restore.** `m01_stranarus_trench1` restarts ten looping
+  client effects during every restore, on both platforms, after its saved
+  objects. The frozen-save check therefore requires the input's table as a
+  prefix and reports what follows it.
+- **State bytes.** The frozen saves' state bytes differ. A restore rebuilds
+  some values from the loading process's clock; pending `idSound` timers, for
+  example, become 7531 on one load and 9143 on another. Two loads on the same
+  platform differ the same way.
+- **Old saves.** The historical matrix still restores every release fixture and
+  six v4 saves from builds 1769 to 1958. `RetainedUiTest` restores a snapshot
+  into the same document with its line endings flipped.
+
+Not yet covered: macOS arm64 (no Apple host is available) and an ARM64 Linux or
+Android device.
+
 Consequences:
 
 - versions 3 and 4 require an exact OS ABI, compiler ABI, architecture, endian,

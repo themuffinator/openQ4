@@ -6,6 +6,29 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Saves tested between Windows and Linux, 3 November 2026
+
+- **New saves made on Windows restore on Linux, and the other way round.** The
+  tests covered seven campaign levels and four levels of The Awakening, in both
+  directions. Moving saves between platforms stays unsupported until macOS and
+  an ARM64 system have been tested too.
+- **A save no longer restarts its level when only a script's line endings or
+  comments changed.** A new save now checks the level scripts' code only. Before
+  this, a build whose script files had different line endings rejected the
+  save's scripts and quietly restarted the level.
+- **Fixed two cross-platform restore failures:** menu and HUD animations that
+  were in progress, and the new menus' saved state, no longer stop a save
+  loading on another platform.
+- **Upgrade note:** saves made in the new format by development builds from
+  earlier today restart their level when loaded. Earlier saves are unaffected.
+- Evidence: `savegame_cross_load.py` (new; its self-test runs in CI) on a
+  Windows x64 build and a Linux x64 build of the same commit. Every level
+  restored in both directions, and each resave restored again where it began.
+  Both platforms rebuilt identical object lists. `savegame_restore_matrix.py`
+  still restores every older save it did before, `RetainedUiTest` covers the
+  line-ending case, and the 51 meson save, restore and retained-UI tests pass.
+  See [savegame reliability](savegame-reliability.md#cross-platform-qualification-q4-06-stage-4).
+
 ## Save format ready for other platforms, 3 November 2026
 
 - **New saves use a platform-neutral format.** Saves now record every value

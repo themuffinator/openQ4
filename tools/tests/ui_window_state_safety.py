@@ -156,7 +156,7 @@ def validate_save_contract(window: str, header: str, winvar: str, simple: str) -
         "!focusReadSucceeded || !captureReadSucceeded || !overReadSucceeded",
         "invalid transition count",
         "ValidateRestoredTrackedWindowPointers",
-        "!FixupTransitions()",
+        "!FixupTransitions( OpenQ4_SaveGameRestoreIsPortable( savefile ) )",
     ):
         require(reader, token, "GUI window save reader")
     if reader.index("cmd = savedCmd;") < reader.index("savedName.Icmp( name ) != 0"):

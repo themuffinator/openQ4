@@ -334,7 +334,9 @@ public:
 	idWindow *		ReadSaveGameChildReference( idFile *savefile, const char *fieldName, bool allowDescendant,
 						bool *hadSerializedReference = NULL, bool *readSucceeded = NULL );
 	virtual void	ReadFromSaveGame( idFile *savefile );
-	bool			FixupTransitions();
+	bool			FixupTransitions( bool fieldIndexes );
+	static intptr_t	TransitionFieldOffset( bool simple, int index );
+	static int		TransitionFieldIndex( bool simple, intptr_t offset );
 	virtual void HasAction(){};
 	virtual void HasScripts(){};
 

@@ -4872,9 +4872,14 @@ bool idWindow::WriteSaveGameTransition( idTransitionData &trans, idFile *savefil
 			winName.c_str(), name.c_str(), gui->GetSourceFile() );
 		return false;
 	}
-	const int savedOffset = static_cast<int>( transitionOffset );
+	const int savedTarget = TransitionFieldIndex( dw.simp != NULL, transitionOffset );
+	if ( savedTarget < 0 ) {
+		common->Error( "idWindow::WriteSaveGameTransition: transition target '%s' for window '%s' in gui '%s' drives no saved field",
+			winName.c_str(), name.c_str(), gui->GetSourceFile() );
+		return false;
+	}
 	windowSaveGameFloats_t out = { savefile, true };
-	if ( !OpenQ4_WriteSaveGameInt( savefile, savedOffset, "idWindow::WriteSaveGameTransition", "target offset" ) ||
+	if ( !OpenQ4_WriteSaveGameInt( savefile, savedTarget, "idWindow::WriteSaveGameTransition", "target field" ) ||
 		 !WriteSaveGameString( winName, savefile ) ) {
 		return false;
 	}
@@ -4883,6 +4888,72 @@ bool idWindow::WriteSaveGameTransition( idTransitionData &trans, idFile *savefil
 }
 
 openQ4SaveGameRestore_t openQ4_saveGameRestore = { NULL, 0, 0 };
+
+/*
+===============
+idWindow::TransitionFieldOffset
+
+The window variables a transition can drive, in a fixed order. Payload version
+5 saves a transition's target variable as its index here. Earlier payloads saved
+the variable's byte offset in its window class, which follows the compiler's
+layout of that class, so it only resolved on the ABI that wrote it.
+===============
+*/
+intptr_t idWindow::TransitionFieldOffset( bool simple, int index ) {
+	if ( simple ) {
+		switch ( index ) {
+			case 0: return (intptr_t)&( ( idSimpleWindow * ) 0 )->rect;
+			case 1: return (intptr_t)&( ( idSimpleWindow * ) 0 )->backColor;
+			case 2: return (intptr_t)&( ( idSimpleWindow * ) 0 )->matColor;
+			case 3: return (intptr_t)&( ( idSimpleWindow * ) 0 )->foreColor;
+			case 4: return (intptr_t)&( ( idSimpleWindow * ) 0 )->borderColor;
+			case 5: return (intptr_t)&( ( idSimpleWindow * ) 0 )->textScale;
+			case 6: return (intptr_t)&( ( idSimpleWindow * ) 0 )->rotate;
+			default: return -1;
+		}
+	}
+	switch ( index ) {
+		case 0: return (intptr_t)&( ( idWindow * ) 0 )->rect;
+		case 1: return (intptr_t)&( ( idWindow * ) 0 )->backColor;
+		case 2: return (intptr_t)&( ( idWindow * ) 0 )->backColor_r;
+		case 3: return (intptr_t)&( ( idWindow * ) 0 )->backColor_g;
+		case 4: return (intptr_t)&( ( idWindow * ) 0 )->backColor_b;
+		case 5: return (intptr_t)&( ( idWindow * ) 0 )->backColor_w;
+		case 6: return (intptr_t)&( ( idWindow * ) 0 )->matColor;
+		case 7: return (intptr_t)&( ( idWindow * ) 0 )->matColor_r;
+		case 8: return (intptr_t)&( ( idWindow * ) 0 )->matColor_g;
+		case 9: return (intptr_t)&( ( idWindow * ) 0 )->matColor_b;
+		case 10: return (intptr_t)&( ( idWindow * ) 0 )->matColor_w;
+		case 11: return (intptr_t)&( ( idWindow * ) 0 )->foreColor;
+		case 12: return (intptr_t)&( ( idWindow * ) 0 )->foreColor_r;
+		case 13: return (intptr_t)&( ( idWindow * ) 0 )->foreColor_g;
+		case 14: return (intptr_t)&( ( idWindow * ) 0 )->foreColor_b;
+		case 15: return (intptr_t)&( ( idWindow * ) 0 )->foreColor_w;
+		case 16: return (intptr_t)&( ( idWindow * ) 0 )->hoverColor;
+		case 17: return (intptr_t)&( ( idWindow * ) 0 )->hoverColor_r;
+		case 18: return (intptr_t)&( ( idWindow * ) 0 )->hoverColor_g;
+		case 19: return (intptr_t)&( ( idWindow * ) 0 )->hoverColor_b;
+		case 20: return (intptr_t)&( ( idWindow * ) 0 )->hoverColor_w;
+		case 21: return (intptr_t)&( ( idWindow * ) 0 )->borderColor;
+		case 22: return (intptr_t)&( ( idWindow * ) 0 )->borderColor_r;
+		case 23: return (intptr_t)&( ( idWindow * ) 0 )->borderColor_g;
+		case 24: return (intptr_t)&( ( idWindow * ) 0 )->borderColor_b;
+		case 25: return (intptr_t)&( ( idWindow * ) 0 )->borderColor_w;
+		case 26: return (intptr_t)&( ( idWindow * ) 0 )->textScale;
+		case 27: return (intptr_t)&( ( idWindow * ) 0 )->rotate;
+		default: return -1;
+	}
+}
+
+// The index of the transition field at a byte offset, or -1.
+int idWindow::TransitionFieldIndex( bool simple, intptr_t offset ) {
+	for ( int index = 0; ; index++ ) {
+		const intptr_t field = TransitionFieldOffset( simple, index );
+		if ( field < 0 || field == offset ) {
+			return field < 0 ? -1 : index;
+		}
+	}
+}
 
 // A transition's interpolator is saved by its defining values from payload
 // version 5. Earlier payloads hold raw bytes, and one written before build
@@ -5760,7 +5831,7 @@ void idWindow::ReadFromSaveGame( idFile *savefile ) {
 		if ( !ValidateRestoredTrackedWindowPointers( hadSavedFocusReference, hadSavedCaptureReference ) ) {
 			return;
 		}
-		if ( !FixupTransitions() ) {
+		if ( !FixupTransitions( OpenQ4_SaveGameRestoreIsPortable( savefile ) ) ) {
 			return;
 		}
 	}
@@ -5783,9 +5854,12 @@ int idWindow::NumTransitions() {
 /*
 ===============
 idWindow::FixupTransitions
+
+Each saved target is a field index (TransitionFieldOffset) when fieldIndexes is
+set, and a byte offset from an earlier payload otherwise.
 ===============
 */
-bool idWindow::FixupTransitions() {
+bool idWindow::FixupTransitions( bool fieldIndexes ) {
 	if ( gui == NULL || gui->GetDesktop() == NULL ) {
 		common->Error( "idWindow::FixupTransitions: window '%s' has no gui desktop during savegame restore", name.c_str() );
 		return false;
@@ -5807,7 +5881,8 @@ bool idWindow::FixupTransitions() {
 			return false;
 		}
 		if ( dw && ( dw->win || dw->simp ) ){
-			const intptr_t transitionOffset = (intptr_t)transitions[i].offset;
+			const intptr_t transitionOffset = fieldIndexes ?
+				TransitionFieldOffset( dw->simp != NULL, transitions[i].offset ) : (intptr_t)transitions[i].offset;
 			if ( dw->win ) {
 				if ( transitionOffset == (intptr_t)&( ( idWindow * ) 0 )->rect ) {
 					transitions[i].data = &dw->win->rect;
@@ -5896,7 +5971,7 @@ bool idWindow::FixupTransitions() {
 				name.c_str(), gui->GetSourceFile(), c );
 			return false;
 		}
-		if ( !children[c]->FixupTransitions() ) {
+		if ( !children[c]->FixupTransitions( fieldIndexes ) ) {
 			return false;
 		}
 	}

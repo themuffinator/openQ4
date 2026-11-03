@@ -1939,6 +1939,21 @@ int main(int argc, char** argv) {
 		reject(replace(snapshot,"\"focus\":\"reference-controls\"","\"focus\":\"unknown\""));
 		host.cvars["ui_retainedScale"] = std::numeric_limits<double>::quiet_NaN(); reject(snapshot);
 		host.cvars["ui_retainedScale"] = 1.5;
+		{
+			// A Windows checkout writes CRLF and the others LF; a save names the
+			// same document on either (roadmap Q4-06).
+			const bool crlf = actionBindingSource.find("\r\n") != std::string::npos;
+			std::string otherEndings;
+			for (char c : actionBindingSource) {
+				if (crlf && c == '\r') continue;
+				if (!crlf && c == '\n') otherEndings += '\r';
+				otherEndings += c;
+			}
+			Runtime third(host);
+			Check(otherEndings != actionBindingSource && third.LoadDocument(otherEndings,"snapshot-bindings.q4ui",diagnostics),
+				"load the snapshot document with the other line endings");
+			Check(third.RestoreSnapshot(snapshot,error,30),"another checkout's line endings keep the snapshot's document identity");
+		}
 		Check(second.LoadDocument(bindingSource+"\n","snapshot-bindings.q4ui",diagnostics),"load source revision with unchanged IDs");
 		Check(!second.RestoreSnapshot(snapshot,error,30),"exact source changes require an explicit snapshot migration");
 		std::string replacementSnapshot;

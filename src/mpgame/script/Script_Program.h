@@ -592,8 +592,12 @@ public:
 	// save games
 	void										Save( idSaveGame *savefile ) const;
 	bool										Restore( idRestoreGame *savefile );
-	int											CalculateChecksum( void ) const;		// Used to insure program code has not
-																						//    changed between savegames
+	// Used to insure program code has not changed between savegames. Saves from
+	// payload version 5 leave out each statement's source line and file
+	// (sourcePositions false): they are debug data only, and idLexer numbers
+	// the lines after a block comment differently in LF and CRLF copies of a
+	// script, which made each platform's checkout compile its own checksum.
+	int											CalculateChecksum( bool sourcePositions ) const;
 
 	void										Startup( const char *defaultScript );
 	void										Restart( void );

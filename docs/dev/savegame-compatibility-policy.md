@@ -44,6 +44,18 @@ laid them out with explicit fields:
 - GUI transition interpolators, by their defining values. A non-finite value left
   by a GUI expression is saved as zero, as the GUI variables already are.
 
+Cross-loading between Windows and Linux (Q4-06 stage 4) found three values that
+followed the platform although they were written as typed fields. Version 5
+fixes them:
+
+- The script program checksum covers operations and operands only, not each
+  statement's source line. Lines numbered differently in CRLF and LF checkouts
+  of openQ4's script overrides.
+- A GUI transition names its target variable by an index into a fixed list,
+  not by its byte offset in the window class.
+- A retained GUI snapshot's document identity is compared with CRLF and LF
+  treated alike, for every payload version.
+
 Every other field already had an explicit width and byte order. Script storage
 is little-endian, and its 8-byte pointer slots hold zeroed temporaries or
 compile-time values (see [Portable revision](#portable-revision)). The payload
@@ -53,7 +65,7 @@ that family would stamp and accept only its own wire ABI. No supported target
 is outside it.
 
 Format eligibility is not yet transfer support. Until Q4-06 stage 4 has
-cross-loaded saves between platforms, the
+cross-loaded saves on every supported platform, the
 [platform policy](#platform-and-architecture-policy) still states what players
 may rely on. Versions 4 and 3 keep their decoders and the exact `raw1` match
 below. Builds from before version 5 cannot load a version 5 save.
@@ -374,8 +386,9 @@ is deliberately revised (stage 5). Players must not infer it from the stamp.
 ### Portable revision
 
 Decided on 3 November 2026 and scheduled as roadmap Q4-06 (P3). Stages 1 to 3
-have landed: payload version 5 implements the encoding and stamp below. Until
-stages 4 and 5 close, the platform rules above are what players may rely on.
+have landed: payload version 5 implements the encoding and stamp below. Stage 4
+has qualified Windows x64 and Linux x64 in both directions. Until stages 4 and 5
+close, the platform rules above are what players may rely on.
 The revision is defined as follows:
 
 - **Family.** 64-bit little-endian builds with IEEE-754 binary32 floats and
@@ -401,7 +414,10 @@ The revision is defined as follows:
   an existing save still loads only on the ABI that wrote it.
 - **Determinism.** The encoder writes the same bytes for the same state on
   every family member. Simulation after a load is not required to be
-  bit-identical across architectures.
+  bit-identical across architectures. A restore also rebuilds some values from
+  the loading process's clock, such as pending sound timers. So two loads of
+  one save, on one platform or two, need not re-encode identically; they
+  restore the same object table.
 - **Names.** Saves carry decl, model and sound names. Case-sensitive
   filesystems resolve them through the existing case handling, and
   qualification includes Linux.

@@ -2382,7 +2382,7 @@ void idProgram::Save( idSaveGame *savefile ) const {
 	const int checksum = GetSaveChecksum();
 	if ( verifyChecksum ) {
 		const double start = idLib::sys->GetClockTicks();
-		const int reference = CalculateChecksum();
+		const int reference = CalculateChecksum( false );
 		const double elapsed = ( idLib::sys->GetClockTicks() - start ) * 1000.0 / idLib::sys->ClockTicksPerSecond();
 		common->Printf( "Script save checksum: cached=%d matched=%d reference=%.3f ms statements=%d\n",
 			cacheHit ? 1 : 0, checksum == reference ? 1 : 0, elapsed, statements.Num() );
@@ -2459,7 +2459,7 @@ bool idProgram::Restore( idRestoreGame *savefile ) {
 	int saved_checksum, checksum;
 
 	savefile->ReadInt( saved_checksum );
-	checksum = CalculateChecksum();
+	checksum = CalculateChecksum( savefile->GetOpenQ4SaveGameCompatibilityVersion() < OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION );
 
 	if ( saved_checksum != checksum ) {
 		result = false;
@@ -2472,7 +2472,7 @@ bool idProgram::Restore( idRestoreGame *savefile ) {
 // the diagnostic save oracle. The compiler warms the cache before gameplay.
 int idProgram::GetSaveChecksum( void ) const {
 	if ( !saveChecksumValid ) {
-		saveChecksum = CalculateChecksum();
+		saveChecksum = CalculateChecksum( false );
 		saveChecksumValid = true;
 	}
 	return saveChecksum;
@@ -2525,7 +2525,7 @@ void idProgram::ZeroPointerLocals( byte *stack, int stackUsed, const function_t 
 idProgram::CalculateChecksum
 ================
 */
-int idProgram::CalculateChecksum( void ) const {
+int idProgram::CalculateChecksum( bool sourcePositions ) const {
 	int i, result;
 
 	typedef struct {
@@ -2561,8 +2561,11 @@ int idProgram::CalculateChecksum( void ) const {
 			statementList[i].c = -1;
 		}
 
-		statementList[i].linenumber = statements[i].linenumber;
-		statementList[i].file = statements[i].file;
+		// Source positions stay zero unless asked for (see the declaration).
+		if ( sourcePositions ) {
+			statementList[i].linenumber = statements[i].linenumber;
+			statementList[i].file = statements[i].file;
+		}
 	}
 
 	result = MD4_BlockChecksum( statementList, ( sizeof(statementBlock_t) * statements.Num() ) );
