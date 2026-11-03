@@ -6,6 +6,18 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Loading screen grid and top-right bracket, 3 November 2026
+
+- The Air Defense Bunker intro art (`e3_load`) has the `+` grid painted in, so
+  the stock `intro.gui` draws no grid over it. The retained loading screen
+  drew its own vector grid there too, and the two pitches clashed. The
+  vector grid now hides on the intro screen, as the brackets and identity
+  already did.
+- The top-trailing corner bracket is gone from the retained loading screen:
+  the level name and its detail line stand over it, and it showed through.
+- Checked on real Vulkan loads at 1600x900 (airdefense1 and airdefense2,
+  captured at the continue prompt) and with `ui_retained_gate.py`.
+
 ## Spectate on Join Game, 3 November 2026
 
 - Section 13.7's list pattern names Join, Spectate and Favorite. The prompt

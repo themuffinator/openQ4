@@ -4468,8 +4468,10 @@ def loading_document() -> dict:
         1, {"op": "*", "args": [0.03, {"op": "clamp", "args": [{"state": "map_loading"}, 0, 1]}]}]}]}
     doc.bind("load-shot.transform", "load-shot", "transform", [0, 0, drift, drift, 0])
 
+    # The top-trailing bracket is left out: the level name and its detail
+    # line stand where it would be, and it showed through beneath them.
     corners = []
-    for suffix, right, bottom in (("tl", False, False), ("tr", True, False), ("bl", False, True), ("br", True, True)):
+    for suffix, right, bottom in (("tl", False, False), ("bl", False, True), ("br", True, True)):
         node = corner_bracket(f"bracket-{suffix}", 0, 0, right, bottom)
         node["properties"] = absolute(**{"right" if right else "left": U * 8,
                                          "bottom" if bottom else "top": U * (54 if bottom else 28),
@@ -4729,6 +4731,10 @@ def loading_document() -> dict:
                                     track("tip-b", "color", [(0, shown), (250, hidden)])])
     doc.timelines.add("tipB", 250, [track("tip-b", "color", [(0, hidden), (250, shown)]),
                                     track("tip-a", "color", [(0, shown), (250, hidden)])])
+    # The intro art (e3_load) has the + grid painted in, so the stock intro
+    # screen draws none over it; a second grid at another pitch read as mess.
+    grid = vector("load-grid", {**FULL, "display": keyword("block")}, [grid_path()])
+    doc.bind("load-grid.display", "load-grid", "display", {"op": "select", "args": [{"state": "loading_intro"}, "none", "block"]})
     # A multiplayer join that ends at the Welcome card hands the screen over
     # (section 14.17): the session keeps drawing it, reading JOINING, until
     # the card presents, then plays handoff, the whole screen fading over
@@ -4741,7 +4747,7 @@ def loading_document() -> dict:
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 1]), "font-family": font("marine"),
                             "font-size": length(16), "color": colour([1, 1, 1, 0.8]), "opacity": number(1)}, [
         shot,
-        vector("load-grid", dict(FULL), [grid_path()]),
+        grid,
         top_band, bottom_band, brackets, dot_matrix, identity, objectives, server, arsenal, tips, progress,
     ])
     result = doc.build(root)
