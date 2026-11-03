@@ -197,6 +197,81 @@ def validate_oob_budgets() -> None:
     )
 
 
+def _validate_retail_protocol_refusal(server: str, client: str) -> None:
+    challenge = function_body(server, "void idAsyncServer::ProcessChallengeMessage(", "challenge handler")
+    require(server, "const int RETAIL_CHALLENGE_REQUEST_BYTES = 5;", "Quake 4 1.4.x challenge layout")
+    retail = challenge[challenge.index("msg.GetRemainingData() == RETAIL_CHALLENGE_REQUEST_BYTES"):] \
+        if "msg.GetRemainingData() == RETAIL_CHALLENGE_REQUEST_BYTES" in challenge else ""
+    require(retail, "return;", "retail challenge refusal")
+    retail = retail[:retail.index("return;")]
+    require_before(retail, "AllowConnectionlessResponse( from, false )", "PrintOOB( from, SERVER_PRINT_BADPROTOCOL,",
+                   "budgeted retail challenge refusal")
+    require_before(challenge, "msg.GetRemainingData() == RETAIL_CHALLENGE_REQUEST_BYTES", "msg.GetRemainingData() != 4",
+                   "retail challenge refused before the openQ4 layout is enforced")
+
+    setup = function_body(client, "void idAsyncClient::SetupConnection( void )", "connection setup")
+    require_before(setup, 'msg.WriteString( "getInfo" );', 'msg.WriteString( "challenge" );', "protocol query before challenge")
+    query = setup[setup.index("if ( !connectProtocolKnown ) {"):] if "if ( !connectProtocolKnown ) {" in setup else ""
+    require_before(query, 'msg.WriteString( "getInfo" );', "connectInfoRequests++;", "counted protocol query")
+    require(query, "msg.WriteLong( clientId );", "protocol query marked by the connection id")
+
+    info = function_body(client, "void idAsyncClient::ProcessInfoResponseMessage(", "info response handler")
+    require_before(info, "CheckConnectServerProtocol( from, serverInfo.challenge, protocol )",
+                   "if ( protocol != ASYNC_PROTOCOL_VERSION ) {", "connection protocol check before browser filtering")
+    check = function_body(client, "bool idAsyncClient::CheckConnectServerProtocol(", "connection protocol check")
+    for token in ("challenge != clientId", "AsyncClient_SameEndpoint( from, serverAddress )",
+                  "clientState != CS_CHALLENGING && clientState != CS_CONNECTING", '"#str_231570"', '"#str_41561"'):
+        require(check, token, "connection protocol check")
+    require_before(check, "protocol == ASYNC_PROTOCOL_VERSION", 'BufferCommandText( CMD_EXEC_NOW, "disconnect" )',
+                   "only a different protocol is refused")
+
+    response = function_body(client, "void idAsyncClient::ProcessChallengeResponseMessage(", "challenge response handler")
+    require_before(response,
+                   "otherGameDirectory && !connectProtocolKnown && connectInfoRequests < CONNECT_PROTOCOL_INFO_REQUESTS",
+                   "GetModInfo( serverGame, modInfo, &modReason )",
+                   "protocol known before a server's game directory is followed")
+
+
+def validate_retail_protocol_refusal() -> None:
+    """Quake 4 1.4.x peers are refused for their protocol, in both directions."""
+    server = read("src/framework/async/AsyncServer.cpp")
+    client = read("src/framework/async/AsyncClient.cpp")
+    _validate_retail_protocol_refusal(server, client)
+
+    for path in sorted((ROOT / "content/baseoq4/pak0/strings").glob("*_openq4.lang")):
+        text = path.read_text(encoding="utf-8")
+        line = next((entry for entry in text.splitlines() if '"#str_231570"' in entry), "")
+        value = line.split('"#str_231570"', 1)[1] if line else ""
+        if value.count("%s") != 1 or value.count("%d") != 4:
+            raise AssertionError(f"{path.name}: #str_231570 must take the address and both protocol versions")
+
+    for mutation, context in (
+        (server.replace("msg.GetRemainingData() == RETAIL_CHALLENGE_REQUEST_BYTES", "false", 1),
+         "a retail challenge is dropped without an answer"),
+        (server.replace("PrintOOB( from, SERVER_PRINT_BADPROTOCOL, va( \"server uses protocol %d.%d\\n\"", "( ( void )0, va( \"\"", 1),
+         "a retail challenge is answered without the protocol print"),
+    ):
+        try:
+            _validate_retail_protocol_refusal(mutation, client)
+        except AssertionError:
+            continue
+        raise AssertionError(f"retail refusal contract accepted mutation: {context}")
+    for mutation, context in (
+        (client.replace("CheckConnectServerProtocol( from, serverInfo.challenge, protocol )", "false", 1),
+         "the connection never checks the server's protocol"),
+        (client.replace("otherGameDirectory && !connectProtocolKnown && connectInfoRequests < CONNECT_PROTOCOL_INFO_REQUESTS",
+                        "false", 1),
+         "a server's game directory is followed before its protocol is known"),
+        (client.replace("if ( !connectProtocolKnown ) {", "if ( false ) {", 1),
+         "no protocol query goes with the challenge"),
+    ):
+        try:
+            _validate_retail_protocol_refusal(server, mutation)
+        except AssertionError:
+            continue
+        raise AssertionError(f"retail refusal contract accepted mutation: {context}")
+
+
 def validate_usercmd_packet_bounds() -> None:
     header = read("src/framework/async/AsyncNetwork.h")
     network = read("src/framework/async/AsyncNetwork.cpp")
@@ -930,6 +1005,7 @@ def main() -> None:
     validate_crypto_and_native_vectors()
     validate_secure_random_and_connection_challenges()
     validate_oob_budgets()
+    validate_retail_protocol_refusal()
     validate_usercmd_packet_bounds()
     validate_snapshot_decode_bounds()
     validate_rcon2_flow()

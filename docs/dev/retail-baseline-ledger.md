@@ -228,6 +228,33 @@ The end triggers skip everything between them: scripted sequences, AI, bosses,
 vehicles and terminals were not played, and saves made mid-sequence and other
 platforms were not covered.
 
+## Retail 2.85 peers refused, 3 November 2026
+
+MP-08 ran the installed retail dedicated server against openQ4 for the first
+time. `Quake4Ded.exe` (SHA-256
+`601406ac07ba40c39d6a9eeb2dbc4aa4968d545e808c3b37523fe2ea0f50ad4d`) reports
+`Quake4  V1.4.3 win-x86 Oct 20 2010` and protocol 2.85 under `fs_game q4mp`.
+It was bound to `127.0.0.1` with `fs_savepath` redirected into the run
+directory, and stopped with rcon `quit`; nothing in the installation changed.
+
+- Its `challengeResponse` has the same layout as openQ4's (challenge, server
+  id, `fs_game_base`, `fs_game`), and a 2.41 `connect` is answered with print
+  opcode 1, `server uses protocol 2.85`.
+- `Quake4.exe` (`a5a9a1f9c17a87cc1fd6b0b32d1e0f7a8c3a18ed3b49cd998474d5fc4b45ae80`)
+  follows the client id in its `challenge` with one byte (whether it is a
+  dedicated server), read from `idAsyncClient::SetupConnection` at
+  `0x1007f0e8`. openQ4 servers dropped any challenge that was not exactly four
+  bytes, so a retail client waited without an answer.
+- openQ4 clients followed the retail `q4mp` game directory before learning the
+  protocol and stopped with "requires mod 'q4mp' … missing mod.json".
+
+Both directions now refuse with the protocol, and the LAN scan already ignored
+the retail server for it. The controls, fixes and runtime identities are in
+[network qualification](mp-network-qualification.md#retail-285-refusal).
+The retail client binary was not run, because it opens a visible game window;
+its challenge was sent byte for byte instead. Joining retail servers remains a
+separate scope decision.
+
 ## File-by-file overlay disposition
 
 [retail-overlay-audit.csv](retail-overlay-audit.csv) lists every one of the 165

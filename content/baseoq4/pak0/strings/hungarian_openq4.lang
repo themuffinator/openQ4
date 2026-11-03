@@ -1433,6 +1433,7 @@
 	"#str_231550"	"Csatlakozz egy szerveren futó meccshez, indítsd a sajátodat, nézd meg a demóidat, vagy állítsd be a játékosodat."
 	"#str_231551"	"Ennek a pályának nincs automatikus mentése, ezért elölről indul a jelenlegi nehézségen, alap fegyverzettel."
 	"#str_231560"	"Adj meg egy számot %s és %s között."
+	"#str_231570"	"%s hálózati protokollja: %d.%d. Az openQ4 ezen verziójának protokollja: %d.%d, ezért nem tud csatlakozni. A Quake 4 1.4.2 szerverek protokollja: 2.85."
 	"#str_230141"	"Renderelési háttérrendszer"
 	"#str_230142"	"Renderelő eszköz"
 	"#str_230143"	"Automatikus;OpenGL;Vulkan;OpenGL ES"

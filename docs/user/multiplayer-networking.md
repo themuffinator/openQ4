@@ -19,6 +19,7 @@ This guide covers openQ4 multiplayer networking behavior and the cvars used to t
 - Server-side hitscan lag compensation is off by default (`net_mpLagCompensation 0`).
 - Remote-client prediction uses legacy mode by default (`net_mpPredictMode 0`).
 - Enhanced prediction and lag compensation are opt-in experiments. Each client tells the server how far ahead it draws other players, and the server rewinds only the rest, so the two settings no longer correct the same delay twice. Their combined behavior is still being measured on real connections.
+- Retail Quake 4 1.4.2 clients and servers use protocol 2.85 and cannot play with openQ4. Each side is refused with a message naming the protocol; see [Retail Quake 4 servers](#retail-quake-4-servers).
 - Use matching openQ4 releases and content on the server and clients. The voice-enabled candidate and release 0.13.0 refuse to join each other: pure servers report missing packages, while non-pure servers report data out of sync. Other release pairs need their own compatibility check. Voice packets are sent only to peers advertising the supported voice protocol.
 
 ## Find and join a server
@@ -66,6 +67,19 @@ available in ordinary discovery results.
 LAN discovery probes ports `28004` through `28011`. Use a direct connection
 for a server on another port. Internet results depend on the configured master
 service and reachable servers; direct connections remain available below.
+Over IPv6 the scan reaches servers on the same network link, including
+IPv6-only servers on Windows. A server that listens only on the IPv6 loopback
+address `::1` has no link to scan, so join it with `connect [::1]:<port>`.
+
+### Retail Quake 4 servers
+
+Retail Quake 4 1.4.2 servers use network protocol 2.85; openQ4 uses 2.41, so
+the two cannot play together. A LAN scan leaves retail servers out of the list
+(the console notes each one as `ignored - protocol 2.85`). Connecting to one
+directly shows **Network protocol mismatch** with both versions, before openQ4
+would switch to the retail server's `q4mp` folder. A retail player who tries an
+openQ4 server sees `server uses protocol 2.41`. See
+[server security](server-security.md#retail-quake-4-clients-and-servers).
 
 ## IPv4 Connections
 

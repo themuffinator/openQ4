@@ -1438,6 +1438,7 @@
 	"#str_231550"	"Rejoignez une partie sur un serveur, hébergez la vôtre, regardez vos démos ou configurez votre joueur."
 	"#str_231551"	"Ce niveau n'a pas de sauvegarde automatique de départ : il commence à zéro à votre difficulté actuelle, avec un arsenal standard."
 	"#str_231560"	"Saisissez un nombre de %s à %s."
+	"#str_231570"	"%s utilise le protocole réseau %d.%d. Cette version d'openQ4 utilise le protocole %d.%d et ne peut pas le rejoindre. Les serveurs Quake 4 1.4.2 utilisent le protocole 2.85."
 	"#str_230141"	"Moteur de rendu"
 	"#str_230142"	"Périphérique de rendu"
 	"#str_230143"	"Automatique;OpenGL;Vulkan;OpenGL ES"

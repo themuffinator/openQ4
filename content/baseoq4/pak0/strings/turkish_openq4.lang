@@ -1433,6 +1433,7 @@
 	"#str_231550"	"Bir sunucudaki maça katıl, kendi maçını aç, demolarını izle ya da oyuncunu ayarla."
 	"#str_231551"	"Bu seviyenin otomatik kaydı yok, bu yüzden mevcut zorlukta, standart bir cephanelikle sıfırdan başlar."
 	"#str_231560"	"%s ile %s arasında bir sayı gir."
+	"#str_231570"	"%s sunucusu %d.%d ağ protokolünü kullanıyor. openQ4'ün bu sürümü %d.%d protokolünü kullanıyor ve katılamaz. Quake 4 1.4.2 sunucuları 2.85 protokolünü kullanır."
 	"#str_230141"	"İşleme arka ucu"
 	"#str_230142"	"İşleme aygıtı"
 	"#str_230143"	"Otomatik;OpenGL;Vulkan;OpenGL ES"

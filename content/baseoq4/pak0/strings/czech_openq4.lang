@@ -1433,6 +1433,7 @@
 	"#str_231550"	"Připoj se k zápasu na serveru, založ vlastní, přehraj si svá dema nebo si nastav hráče."
 	"#str_231551"	"Tato úroveň nemá automatické uložení, takže začne znovu na vaší současné obtížnosti se standardním arzenálem."
 	"#str_231560"	"Zadej číslo od %s do %s."
+	"#str_231570"	"%s používá síťový protokol %d.%d. Tato verze openQ4 používá protokol %d.%d a nemůže se připojit. Servery Quake 4 1.4.2 používají protokol 2.85."
 	"#str_230141"	"Vykreslovací rozhraní"
 	"#str_230142"	"Vykreslovací zařízení"
 	"#str_230143"	"Automaticky;OpenGL;Vulkan;OpenGL ES"

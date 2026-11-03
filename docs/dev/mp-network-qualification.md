@@ -201,11 +201,143 @@ high-player-count runs, that is CPU starvation, not the network. The rates and
 drops above come from the quiet run; one other session's client was still
 running at 24% total CPU.
 
+## Discovery, reconnects, content and retail refusal (3 November 2026)
+
+MP-08 checks one Windows x64 machine can qualify. Every peer binds IPv4
+loopback, IPv6 loopback or this host's own scoped link-local IPv6 address
+(which Windows delivers internally), with hidden windows and no input. The
+final runtime is source `1e1f3e88a` plus this change; the control runtime is
+`1e1f3e88a` as committed. Both are debugoptimized builds with retail Steam
+assets. Reports are under `.tmp/mp08/final/` (control reports under
+`.tmp/mp08/final/*-control/` and `.tmp/mp08/lan-ipv6scoped-r1/`).
+
+| Runtime | Engine | Dedicated | `game-mp` | `pak0.pk4` |
+| --- | --- | --- | --- | --- |
+| Final | `87c8a999…acbf36` | `f9c231b1…6c22c0` | `005dfd4d…857d91` | `b5bf454b…d8a044` |
+| Control (`1e1f3e88a`) | `ccc6a010…e3b1d3` | `ef99e2e4…3bbd92` | `18b1191d…51da3f` | `1f4f336b…5275dc` |
+
+Full runtime hashes are in each report's `runtime_sha256`. The final runtime
+was built from `1e1f3e88a` plus the engine and content diff
+`.tmp/mp08/final/runtime-source.diff` (SHA-256 `c35e102ec29d`); `pak1.pk4` is
+`1a7c763f…6570a9` in both. The scoped IPv6 runs used a byte-identical copy at
+the firewall-registered `.tmp/mp-refinement/runtime/`.
+
+### LAN discovery and successive reconnects
+
+`tools/tests/mp_lan_reconnect_smoke.py` starts a pure dedicated server
+(`si_pure 1`, q4dm1) on the first free port of 28004-28011 and one client, both
+bound to the same address. The client runs `LANScan` and `listServers`, joins
+through the scan entry, disconnects, connects again by endpoint, then uses
+`reconnect`. Each join must reach active play (`openq4_reportMPState`), and the
+server must admit the client each time.
+
+| Family | Server | Scan | Joins (scan, endpoint, `reconnect`) | Result | Report SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| IPv4 loopback | `127.0.0.1:28004` | listed as `localhost:28004` (scan 1) | 3 in slot 0 (29.2, 5.9, 5.8 s) | pass | `b751e8c102f0` |
+| IPv6 loopback | `[::1]:28004` | empty, as expected (3 scans) | 3 in slot 0 (46.5, 5.5, 5.7 s) | pass | `57226bf4e011` |
+| IPv6 scoped link-local | `[fe80::93c2:3db5:5734:d3a3%22]:28004` | listed as `[fe80::93c2:3db5:5734:d3a3%22]:28004` (scan 1) | 3 in slot 0 (23.0, 5.3, 5.4 s) | pass | `0394692ae38b` |
+| IPv6 scoped, control | `[fe80::93c2:3db5:5734:d3a3%22]:28004` | not listed (3 scans) | none | fail | `866c0610548d` |
+
+- **Defect: Windows servers never heard IPv6 scans.** The scan reaches IPv6
+  servers by sending to `ff02::1` on every link. Windows delivers a multicast
+  group only to sockets that joined it, even the all-nodes group, while the
+  socket code skipped that join because Linux delivers `ff02::1` to every
+  socket. A Python probe on the same link-local address received the scan only
+  after `IPV6_JOIN_GROUP`, whether bound to the address or to `::`. The control
+  run (`lan-ipv6scoped-r1`: engine `b80688c7…f5ea06`, dedicated
+  `e168d49b…562c94`, a build identical except for the join) scanned three
+  times without the server logging one info response. `win_net.cpp` now
+  joins the discovery group on every link, `ff02::1` included, and the first
+  final scan listed the server. The POSIX layer is unchanged; Linux and macOS
+  IPv6 discovery were not run here.
+- IPv6 loopback has no link to scan: Windows rejects `::1` with a scope and
+  multicast through the loopback interface (`WSAENETUNREACH`), so that run
+  records an empty scan and joins by endpoint. IPv4 broadcast does reach a
+  socket bound to `127.0.0.1`.
+- The engine names loopback endpoints `localhost:<port>` in scan results.
+- `g_autoExecAfterMapLoad` is one-shot (it clears itself), so the harness arms
+  it before each join.
+
+### Pure content and local game modules
+
+`tools/tests/mp_mod_admission_smoke.py` (started by an earlier session and
+completed here) runs eight scenarios, each a fresh pure dedicated server and
+one client on IPv4 loopback. The server runs a test mod whose package is named
+`pak*`, so the pure list always carries it.
+
+| Scenario | Final | Control |
+| --- | --- | --- |
+| a matching client joins; its extra local package stays off the pure list | pass alone with a 300 s join timeout (`2afae01a99d5`); the full run timed out reloading under load | pass |
+| a client started without the mod switches to it and joins | pass | pass |
+| a client missing the package is refused | pass | pass |
+| a client with an altered package of the same name is refused | pass | pass |
+| a garbage `game-mp` in the save path and in the package is ignored | pass | pass |
+| an incomplete `mod.json` is ignored; the server runs openQ4 and a plain client joins | pass | fail (openq4_game_dir, openq4_strings_resolve, join_as_expected, clean_exits) |
+| a mod module in the trusted root is refused for pure startup | pass | pass |
+| the same module loads once `net_serverAllowServerMod 1` is set | pass | pass |
+| Report SHA-256 | `de046848d8a7` | `3e572a007f66` |
+
+- **Defect: an incomplete `mod.json` ran retail-only content.** The engine
+  ignored the mod but set `fs_game ""`, which also drops the openQ4 runtime
+  underlay. Logs went to `q4base/logs`, and openQ4 strings were unknown (about
+  8,000 warnings on a dedicated server). It now falls back to `baseoq4`;
+  `filesystem_mod_manifest.py` pins it, and the control fails exactly this
+  scenario.
+- In the full final run the matching-content client was still reloading after
+  its pure restart when the 120 s join limit ran out, with other sessions'
+  builds and clients loading the machine; its challenge had been answered at
+  once. Alone it joined in under a minute. An earlier session saw a client's
+  first challenges go unanswered under similar load; that did not recur here.
+
+The same-platform pure token (`0x68fb90b1`) is a compatibility check between
+openQ4 builds, not a cryptographic measurement of the loaded module or an
+anti-cheat system ([server security](../user/server-security.md#pure-multiplayer-and-local-game-modules)).
+Standard builds still download no assets or code.
+
+### Retail 2.85 refusal
+
+`tools/tests/mp_retail_protocol_smoke.py` runs the installed retail
+`Quake4Ded.exe` under `fs_game q4mp`, bound to `127.0.0.1` with its writable
+files in the run directory and stopped with rcon `quit`. An openQ4 client
+LAN-scans and then connects to it directly. Then an openQ4 dedicated server
+receives the challenge a 1.4.2 `Quake4.exe` sends: the client id and one byte
+(whether it is a dedicated server), read from the executable. The retail
+client itself is not run, because it opens a visible game window.
+
+| Check | Final | Control |
+| --- | --- | --- |
+| Retail server in the LAN scan | ignored (2.85) | ignored (2.85) |
+| openQ4 client's refusal reason | protocol 2.85 | missing `q4mp` mod |
+| Network protocol mismatch dialog | yes | no |
+| Followed into `q4mp` or sent `connect` | no | no |
+| 1.4.2 client challenge to an openQ4 server | print 1, `server uses protocol 2.41` | no answer |
+| openQ4 challenge to the same server | answered | answered |
+| Result | pass | fail |
+| Report SHA-256 | `fdafa262c713` | `8e8dc26635c6` |
+
+- **Defect: openQ4 clients misreported a retail server.** Retail answers the
+  challenge exactly as openQ4 does, naming its `q4mp` game directory, and
+  openQ4 followed that before learning the protocol. The client now sends
+  `getInfo` ahead of each challenge (the reply echoes the connection id) and
+  waits for the protocol before following a server into another game
+  directory. After three unanswered requests it proceeds as before. A
+  different protocol disconnects with **Network protocol mismatch**
+  (`#str_231570`, in all twelve openQ4 language tables).
+- **Defect: openQ4 servers ignored retail clients.** Any challenge that was not
+  exactly four bytes was dropped. The five-byte 1.4.x challenge is now
+  answered, within the challenge reply budget, with the protocol print a
+  retail client shows.
+- `network_security.py` pins both paths. Its mutation controls reject
+  dropping the retail answer, the missing protocol print, a missing protocol
+  check, following a game directory first, and a challenge without the query.
+
 ## Still open
 
 Real remote peers (WAN routes, NAT, other operating systems and architectures)
 and the defaults decision for enhanced prediction and lag compensation remain
-open under MP-07/MP-08. The server does not adapt its rate to a congested link
+open under MP-07/MP-08; the user deferred the peer gates on 28 October. So do
+LAN discovery across machines and on Linux and macOS, real multi-record DNS,
+and running the retail client binary (its challenge was reproduced instead). The server does not adapt its rate to a congested link
 on its own: a player whose connection is slower than the match needs has to
 lower `net_clientMaxRate`. Whether to adapt automatically is a design decision.
 Simulated conditions do not model route changes, cross-traffic sharing a

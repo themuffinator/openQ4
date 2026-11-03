@@ -1489,6 +1489,7 @@
 	"#str_231550"	"Dołącz do meczu na serwerze, załóż własny, obejrzyj swoje dema lub skonfiguruj swojego gracza."
 	"#str_231551"	"Ten poziom nie ma autozapisu startowego, więc zaczyna się od nowa na bieżącym poziomie trudności, ze standardowym arsenałem."
 	"#str_231560"	"Wpisz liczbę od %s do %s."
+	"#str_231570"	"%s używa protokołu sieciowego %d.%d. Ta wersja openQ4 używa protokołu %d.%d i nie może dołączyć. Serwery Quake 4 1.4.2 używają protokołu 2.85."
 	"#str_230141"	"Interfejs renderowania"
 	"#str_230142"	"Urządzenie renderujące"
 	"#str_230143"	"Automatycznie;OpenGL;Vulkan;OpenGL ES"

@@ -6,6 +6,30 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Network interoperability checks, 3 November 2026
+
+- **Retail Quake 4 peers are told why they cannot play.** An openQ4 client
+  now learns a server's protocol before following it into another game
+  folder. Connecting to a retail 1.4.2 server shows **Network protocol
+  mismatch** with both versions instead of a message about a missing `q4mp`
+  mod. A retail client's challenge to an openQ4 server is answered with
+  `server uses protocol 2.41` instead of silence.
+- **IPv6-only servers on Windows appear in LAN scans.** Windows delivers the
+  IPv6 discovery group only to sockets that join it, and the server sockets
+  now do.
+- **An incomplete `mod.json` falls back to openQ4, not retail-only content**,
+  so a server in that state still accepts players without the mod.
+- Evidence: `mp_lan_reconnect_smoke.py` (scan, then three successive joins in
+  one slot over IPv4 loopback, IPv6 loopback and scoped link-local IPv6),
+  `mp_mod_admission_smoke.py` (eight content and module scenarios) and
+  `mp_retail_protocol_smoke.py` (the installed retail `Quake4Ded.exe` on
+  loopback and a reproduced 1.4.2 challenge), each with a failing control on
+  `1e1f3e88a`; `network_security.py`, `network_ipv6_support.py` and
+  `filesystem_mod_manifest.py` pin the fixes. See
+  [network qualification](mp-network-qualification.md#discovery-reconnects-content-and-retail-refusal-3-november-2026)
+  and roadmap MP-08. WAN, cross-machine and other-architecture peers remain
+  open.
+
 ## Loading screen grid and top-right bracket, 3 November 2026
 
 - The Air Defense Bunker intro art (`e3_load`) has the `+` grid painted in, so

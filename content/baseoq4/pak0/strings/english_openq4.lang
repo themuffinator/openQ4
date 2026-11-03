@@ -1433,6 +1433,7 @@
 	"#str_231550"	"Join a match on a server, host your own, watch your demos or set up your player."
 	"#str_231551"	"This level has no start autosave, so it starts fresh at your current difficulty, with a standard arsenal."
 	"#str_231560"	"Enter a number from %s to %s."
+	"#str_231570"	"%s uses network protocol %d.%d. This version of openQ4 uses protocol %d.%d and cannot join it. Quake 4 1.4.2 servers use protocol 2.85."
 	"#str_230141"	"Rendering backend"
 	"#str_230142"	"Rendering device"
 	"#str_230143"	"Automatic;OpenGL;Vulkan;OpenGL ES"

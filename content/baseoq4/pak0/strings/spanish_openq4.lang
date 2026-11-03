@@ -1433,6 +1433,7 @@
 	"#str_231550"	"Únete a una partida en un servidor, crea la tuya, mira tus demos o configura tu jugador."
 	"#str_231551"	"Este nivel no tiene autoguardado inicial, así que empieza de cero con tu dificultad actual y un arsenal estándar."
 	"#str_231560"	"Introduce un número de %s a %s."
+	"#str_231570"	"%s usa el protocolo de red %d.%d. Esta versión de openQ4 usa el protocolo %d.%d y no puede unirse. Los servidores de Quake 4 1.4.2 usan el protocolo 2.85."
 	"#str_230141"	"API de renderizado"
 	"#str_230142"	"Dispositivo de renderizado"
 	"#str_230143"	"Automático;OpenGL;Vulkan;OpenGL ES"

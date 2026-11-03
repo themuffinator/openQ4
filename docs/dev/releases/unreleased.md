@@ -407,6 +407,17 @@ See [release status](../../user/release-status.md) and the
   systems' compilers are allowed to skip.
 - For modders: the `printEntityDef` console command now prints the entity
   definition's keys and values, not just where it was defined.
+- For modders and server hosts: a mod with an incomplete `mod.json` is now
+  ignored cleanly. The game runs normal openQ4 instead of falling back to
+  retail-only content with missing text and menus. A server in that state
+  also accepts players who don't have the mod.
+- Connecting to a retail Quake 4 1.4.2 server now says why it cannot work:
+  **Network protocol mismatch**, with both protocol versions. openQ4 used to
+  stop with a misleading message about a missing `q4mp` mod. Retail players
+  who try an openQ4 server are now told `server uses protocol 2.41` instead of
+  waiting for an answer that never came.
+- The LAN server list finds IPv6-only servers hosted on Windows. Those servers
+  never heard the IPv6 scan, so only IPv4 or a typed address could reach them.
 
 - The menu pointer reaches every edge of the screen again. Moving the mouse
   while a menu screen was still opening, or out past the edge of the window,

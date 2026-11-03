@@ -192,6 +192,9 @@ static void AsyncClient_CloseBackgroundDownloadFile( backgroundDownload_t &downl
 }
 
 const int SETUP_CONNECTION_RESEND_TIME	= 1000;
+// getInfo requests a challenge answer naming another game directory waits for
+// before it is followed without knowing the server's protocol.
+const int CONNECT_PROTOCOL_INFO_REQUESTS	= 3;
 const int EMPTY_RESEND_TIME				= 500;
 const int PREDICTION_FAST_ADJUST		= 4;
 
@@ -234,6 +237,9 @@ void idAsyncClient::Clear( void ) {
 	connectCandidateCount = 0;
 	connectCandidateIndex = 0;
 	connectChallengesSent = 0;
+	connectInfoRequests = 0;
+	connectProtocolKnown = false;
+	connectChallengeDeferred = false;
 	serverId = 0;
 	serverChallenge = 0;
 	serverMessageSequence = 0;
@@ -386,6 +392,9 @@ void idAsyncClient::ConnectToServer( const netadr_t adr ) {
 	connectCandidateCount = 1;
 	connectCandidateIndex = 0;
 	connectChallengesSent = 0;
+	connectInfoRequests = 0;
+	connectProtocolKnown = false;
+	connectChallengeDeferred = false;
 
 	// Keep the legacy 15-bit wire field but remove the predictable clock seed.
 	if ( !AsyncClient_SecureConnectionId( clientId ) ) {
@@ -1739,12 +1748,24 @@ void idAsyncClient::ProcessChallengeResponseMessage( const netadr_t from, const 
 	msg.ReadString( serverGameBase, MAX_STRING_CHARS );
 	msg.ReadString( serverGame, MAX_STRING_CHARS );
 
+	const bool otherGameDirectory = idStr::Icmp( cvarSystem->GetCVarString( "fs_game_base" ), serverGameBase ) ||
+		idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), serverGame );
+	// Do not follow a server into its game directory before its protocol is
+	// known. A Quake 4 1.4.x server names q4mp here, which would be refused as
+	// a missing mod and hide the real reason (CheckConnectServerProtocol). A
+	// server that never answers getInfo is followed after a few tries, as before.
+	if ( otherGameDirectory && !connectProtocolKnown && connectInfoRequests < CONNECT_PROTOCOL_INFO_REQUESTS ) {
+		common->DPrintf( "%s runs game directory '%s'; waiting for its protocol before following it\n",
+			Sys_NetAdrToString( from ), serverGame );
+		connectChallengeDeferred = true;
+		return;
+	}
+
 	// the server is running a different game... we need to reload in the correct fs_game
 	// even pure pak checks would fail if we didn't, as there are files we may not even see atm
 	// NOTE: we could read the pure list from the server at the same time and set it up for the restart
 	// ( if the client can restart directly with the right pak order, then we avoid an extra reloadEngine later.. )
-	if ( idStr::Icmp( cvarSystem->GetCVarString( "fs_game_base" ), serverGameBase ) ||
-		idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), serverGame ) ) {
+	if ( otherGameDirectory ) {
 		// bug #189 - if the server is running ROE and ROE is not locally installed, refuse to connect or we might crash
 		if ( !fileSystem->HasD3XP() && ( !idStr::Icmp( serverGameBase, "d3xp" ) || !idStr::Icmp( serverGame, "d3xp" ) ) ) {
 			common->Printf( "The server is running an expansion pack that is not installed on this client. Aborting the connection..\n" );
@@ -1930,6 +1951,9 @@ void idAsyncClient::ProcessInfoResponseMessage( const netadr_t from, const idBit
 	serverInfo.adr = from;
 	serverInfo.challenge = msg.ReadLong();			// challenge
 	protocol = msg.ReadLong();
+	if ( CheckConnectServerProtocol( from, serverInfo.challenge, protocol ) ) {
+		return;
+	}
 	if ( protocol != ASYNC_PROTOCOL_VERSION ) {
 		common->Printf( "server %s ignored - protocol %d.%d, expected %d.%d\n", Sys_NetAdrToString( serverInfo.adr ), protocol >> 16, protocol & 0xffff, ASYNC_PROTOCOL_MAJOR, ASYNC_PROTOCOL_MINOR );
 		return;
@@ -1961,6 +1985,40 @@ void idAsyncClient::ProcessInfoResponseMessage( const netadr_t from, const idBit
 	index = serverList.InfoResponse( serverInfo );
 
 	common->Printf( "%d: server %s - protocol %d.%d - %s\n", index, Sys_NetAdrToString( serverInfo.adr ), protocol >> 16, protocol & 0xffff, serverInfo.serverInfo.GetString( "si_name" ) );
+}
+
+/*
+==================
+idAsyncClient::CheckConnectServerProtocol
+
+Handles the answer to the getInfo SetupConnection sends with each challenge.
+A server speaking another protocol is refused here, with the reason, before the
+connection follows it anywhere. Returns true when the answer was that one.
+==================
+*/
+bool idAsyncClient::CheckConnectServerProtocol( const netadr_t from, int challenge, int protocol ) {
+	if ( !active || ( clientState != CS_CHALLENGING && clientState != CS_CONNECTING ) ||
+		challenge != clientId || !AsyncClient_SameEndpoint( from, serverAddress ) ) {
+		return false;
+	}
+	if ( protocol == ASYNC_PROTOCOL_VERSION ) {
+		connectProtocolKnown = true;
+		if ( connectChallengeDeferred ) {
+			// Ask again at once rather than at the next resend.
+			connectChallengeDeferred = false;
+			lastConnectTime = -9999;
+		}
+		return true;
+	}
+
+	common->Printf( "server %s uses protocol %d.%d, expected %d.%d - connection refused\n", Sys_NetAdrToString( from ),
+		protocol >> 16, protocol & 0xffff, ASYNC_PROTOCOL_MAJOR, ASYNC_PROTOCOL_MINOR );
+	const idStr reason = va( common->GetLanguageDict()->GetString( "#str_231570" ), Sys_NetAdrToString( from ),
+		protocol >> 16, protocol & 0xffff, ASYNC_PROTOCOL_MAJOR, ASYNC_PROTOCOL_MINOR );
+	ClearPendingPackets();
+	cmdSystem->BufferCommandText( CMD_EXEC_NOW, "disconnect" );
+	session->MessageBox( MSG_OK, reason.c_str(), common->GetLanguageDict()->GetString( "#str_41561" ), false );
+	return true;
 }
 
 /*
@@ -2499,9 +2557,24 @@ void idAsyncClient::SetupConnection( void ) {
 			if ( guiNetMenu != NULL ) {
 				guiNetMenu->SetStateString( "status", va( common->GetLanguageDict()->GetString( "#str_06749" ), Sys_NetAdrToString( serverAddress ) ) );
 			}
+			connectInfoRequests = 0;
+			connectProtocolKnown = false;
+			connectChallengeDeferred = false;
 		}
 		connectCandidateIndex = failover.index;
 		connectChallengesSent = failover.sent;
+
+		// Ask for the server's info ahead of the challenge, so its protocol is
+		// normally known by the time the challenge answer arrives. The reply
+		// echoes clientId, which marks it as this request's.
+		if ( !connectProtocolKnown ) {
+			msg.Init( msgBuf, sizeof( msgBuf ) );
+			msg.WriteShort( CONNECTIONLESS_MESSAGE_ID );
+			msg.WriteString( "getInfo" );
+			msg.WriteLong( clientId );
+			clientPort.SendPacket( serverAddress, msg.GetData(), msg.GetSize() );
+			connectInfoRequests++;
+		}
 
 		common->Printf( "sending challenge to %s\n", Sys_NetAdrToString( serverAddress ) );
 		msg.Init( msgBuf, sizeof( msgBuf ) );

@@ -1433,6 +1433,7 @@
 	"#str_231550"	"Tritt einem Spiel auf einem Server bei, starte dein eigenes, sieh dir deine Demos an oder richte deinen Spieler ein."
 	"#str_231551"	"Dieser Level hat keinen Autospeicherstand: Er beginnt neu mit Ihrem aktuellen Schwierigkeitsgrad und Standardausrüstung."
 	"#str_231560"	"Geben Sie eine Zahl von %s bis %s ein."
+	"#str_231570"	"%s verwendet das Netzwerkprotokoll %d.%d. Diese openQ4-Version verwendet Protokoll %d.%d und kann nicht beitreten. Server von Quake 4 1.4.2 verwenden Protokoll 2.85."
 	"#str_230141"	"Grafikschnittstelle"
 	"#str_230142"	"Grafikgerät"
 	"#str_230143"	"Automatisch;OpenGL;Vulkan;OpenGL ES"
