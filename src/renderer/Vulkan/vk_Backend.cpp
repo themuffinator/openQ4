@@ -530,6 +530,7 @@ void VK_Backend_PrepareThreadedFrame( void ) {
 }
 
 void VK_Backend_CompleteThreadedFrame( void ) {
+	VK_Device_CompleteThreadedRecovery();
 	// a device the render thread latched queues its recovery restart here
 	VK_Device_ServicePresentationRecovery();
 }
@@ -912,7 +913,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 				// back-buffer work for readback so it can be replaced by the real
 				// frame instead of presenting the crop by itself.
 				if ( !tr.takingScreenshot ) {
-					GLimp_SwapBuffers();
+					R_SwapBuffersWithInputTiming();
 				}
 				if ( timingEnabled ) { R_RendererMetrics_AddPresentMsec( Sys_Milliseconds() - presentBegin ); }
 				break;

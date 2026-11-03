@@ -1057,6 +1057,11 @@ public:
 	// counts into pc while that frame is still in flight
 	performanceCounters_t	renderThreadFrameCounters;
 	bool					renderThreadFrameCountersValid;
+	// Captured at EndFrame, stamped by the backend, consumed at retirement.
+	// These share the command chain's ownership (including inline captures).
+	double					frameLookSampleClock;
+	double					frameFlashPressClock;
+	double					frameSwapClock;
 
 	drawSurfsCommand_t		lockSurfacesCmd;	// use this when r_lockSurfaces = 1
 
@@ -1881,6 +1886,7 @@ void		GLimp_PreserveWindowOnShutdown( bool preserve );
 // same-process renderer restart.
 
 void		GLimp_SwapBuffers( void );
+void		R_SwapBuffersWithInputTiming( void );
 // Calls the system specific swapbuffers routine, and may also perform
 // other system specific cvar checks that happen every frame.
 // This will not be called if 'r_drawBuffer GL_FRONT'

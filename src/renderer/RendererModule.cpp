@@ -235,6 +235,9 @@ static void RM_Services_RendererDeviceEvent( int event ) {
 	R_RendererModule_RendererDeviceEvent( event );
 }
 
+void Usercmd_TakeFrameInputClocks( double &lookSampleClock, double &flashPressClock );
+void Common_RecordFrameInputToSwap( double lookSampleClock, double flashPressClock, double swapClock );
+
 static const renderModuleServices_t rm_services = {
 	RM_Services_Printf,
 	RM_Services_Warning,
@@ -254,6 +257,8 @@ static const renderModuleServices_t rm_services = {
 	RM_Services_GetLightGridLoadPolicy,
 	RM_Services_PublishLightGridLoadReceipt,
 	RM_Services_RendererDeviceEvent,
+	Usercmd_TakeFrameInputClocks,
+	Common_RecordFrameInputToSwap,
 };
 
 /*

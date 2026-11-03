@@ -1420,8 +1420,18 @@ bool VK_Device_SurfaceExtentChanged( void ) {
 VK_Device_RecreateSwapchain
 ====================
 */
+// The worker may discover out-of-date/surface-loss during acquire or present.
+// Window extent queries and surface creation belong to the main thread on
+// SDL/Wayland/macOS. The unfinished frame is skipped and recovery runs after
+// the main thread collects it, never by waiting back on that thread.
+static bool vkThreadedRecreatePending = false;
+
 bool VK_Device_RecreateSwapchain( void ) {
 	R_RenderThread_Sync( "device" );
+	if ( R_RenderThread_OnRenderThread() ) {
+		vkThreadedRecreatePending = true;
+		return false;
+	}
 	if ( !vkCtx.initialized || vkCtx.presentationBlocked ) {
 		return false;
 	}
@@ -1465,6 +1475,11 @@ presentation, which queues the full renderer restart.
 */
 bool VK_Device_RecoverSurface( void ) {
 	R_RenderThread_Sync( "device" );
+	if ( R_RenderThread_OnRenderThread() ) {
+		vkCtx.surfaceLost = true;
+		vkThreadedRecreatePending = true;
+		return false;
+	}
 	if ( !vkCtx.initialized || vkCtx.presentationBlocked ) return false;
 	if ( VK_GuiExecutor_FrameIsOpen() ) return false;
 	if ( vkWindowServices == NULL || vkWindowServices->CreateVulkanSurface == NULL ) {
@@ -1495,6 +1510,14 @@ bool VK_Device_RecoverSurface( void ) {
 	common->Printf( "Vulkan: surface recreated after surface loss\n" );
 	// A zero extent here is a minimized window; the next frame retries.
 	return VK_Device_CreateSwapchain();
+}
+
+void VK_Device_CompleteThreadedRecovery( void ) {
+	if ( !vkThreadedRecreatePending ) {
+		return;
+	}
+	vkThreadedRecreatePending = false;
+	(void)VK_Device_RecreateSwapchain();
 }
 
 /*
@@ -2070,6 +2093,7 @@ VK_Device_Shutdown
 ====================
 */
 void VK_Device_Shutdown( void ) {
+	vkThreadedRecreatePending = false;
 	R_DisplayPresentationShutdown();
 	// before the swapchain and device it waits on go away
 	VK_PresentTiming_Stop();

@@ -46,11 +46,15 @@ static bool							rt_quit = false;
 static bool							rt_failed = false;
 static char							rt_failure[1024];
 static int							rt_backEndMsec = 0;
-static std::atomic<bool>			rt_inFlight( false );	// readable without the mutex
+// A frame stays owned until the main thread retires it, even when the worker
+// has already finished. Clearing this on the worker loses the completion when
+// a short frame finishes before the next Sync (including its errors/def ops).
+static std::atomic<bool>			rt_inFlight( false );
 
 // counters for renderThreadStats; main thread only
 static int							rt_framesThreaded = 0;
 static int							rt_framesInline = 0;
+static int							rt_framesCompleted = 0;
 static int							rt_syncWaits = 0;
 static long long					rt_syncWaitUsec = 0;
 static idStrList					rt_syncReasons;
@@ -90,7 +94,6 @@ static void R_RenderThread_Main( void ) {
 			rt_busy = false;
 			rt_failed = rt_failed || failed;
 			rt_backEndMsec = elapsed;
-			rt_inFlight.store( false, std::memory_order_release );
 		}
 		rt_done.notify_all();
 	}
@@ -119,7 +122,8 @@ bool R_RenderThread_OnRenderThread( void ) {
 ==================
 R_RenderThread_InFlight
 
-True while a frame's backend may be running on the render thread.
+True until the main thread has collected the frame's backend result. Game-tic
+updates must keep queuing after recording ends, preserving their call order.
 ==================
 */
 bool R_RenderThread_InFlight( void ) {
@@ -145,6 +149,7 @@ bool R_RenderThread_Begin( const emptyCommand_t *cmds ) {
 	{
 		std::lock_guard<std::mutex> lock( rt_mutex );
 		assert( !rt_busy );
+		assert( !rt_inFlight.load( std::memory_order_relaxed ) );
 		rt_commands = cmds;
 		rt_busy = true;
 		rt_inFlight.store( true, std::memory_order_release );
@@ -186,13 +191,19 @@ void R_RenderThread_Sync( const char *reason ) {
 	int backEndMsec;
 	{
 		std::unique_lock<std::mutex> lock( rt_mutex );
+		if ( rt_busy ) {
+			rt_syncWaits++;
+		}
 		rt_done.wait( lock, [] { return !rt_busy; } );
 		failed = rt_failed;
 		rt_failed = false;
 		idStr::Copynz( failure, rt_failure, sizeof( failure ) );
 		backEndMsec = rt_backEndMsec;
 	}
-	rt_syncWaits++;
+	// Release ownership before completion: frame/cache retirement calls Sync,
+	// and applying queued world updates must take their immediate paths.
+	rt_inFlight.store( false, std::memory_order_release );
+	rt_framesCompleted++;
 	rt_syncWaitUsec += static_cast<long long>( R_RendererMetrics_CpuClock() - waitStart );	// microseconds
 	if ( idStr::Cmp( reason, "frame" ) != 0 ) {
 		R_RenderThread_CountReason( reason );
@@ -240,15 +251,19 @@ R_RenderThreadStats_f
 ==================
 */
 static void R_RenderThreadStats_f( const idCmdArgs &args ) {
+	// Report one closed interval, including a frame that finished before this
+	// command. Reset must not orphan its handoff in the next interval's count.
+	R_RenderThread_Sync( "stats" );
 	if ( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "reset" ) == 0 ) {
-		rt_framesThreaded = rt_framesInline = rt_syncWaits = rt_syncWaitUsec = 0;
+		rt_framesThreaded = rt_framesInline = rt_framesCompleted = rt_syncWaits = 0;
+		rt_syncWaitUsec = 0;
 		rt_syncReasons.Clear();
 		rt_syncReasonCounts.Clear();
 		return;
 	}
-	common->Printf( "Render thread: enabled=%d running=%d threaded=%d inline=%d waits=%d waitMs=%.2f\n",
+	common->Printf( "Render thread: enabled=%d running=%d threaded=%d inline=%d waits=%d waitMs=%.2f completed=%d\n",
 		r_vkRenderThread.GetBool() ? 1 : 0, rt_thread.joinable() ? 1 : 0, rt_framesThreaded, rt_framesInline,
-		rt_syncWaits, rt_syncWaitUsec * 0.001f );
+		rt_syncWaits, rt_syncWaitUsec * 0.001f, rt_framesCompleted );
 	for ( int i = 0; i < rt_syncReasons.Num(); i++ ) {
 		common->Printf( "Render thread early sync: %s=%d\n", rt_syncReasons[i].c_str(), rt_syncReasonCounts[i] );
 	}

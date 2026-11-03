@@ -319,6 +319,21 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   to 8.69 ms), p95 and p99 did not improve, and a GPU-bound run showed no
   gain. Overlapping the front end as well (stage 2) is what can lift the
   steady floor.
+  Further implementation, 3 November: frame ownership now lasts through
+  main-thread retirement, including when the worker finishes first. This fixes
+  skipped cleanup, lost worker errors and out-of-order queued world changes.
+  Map cleanup and restart drain the worker before erasing world resources.
+  Debug primitives synchronize only when their storage changes, and surface/
+  swapchain recovery is deferred to the main thread. Input-to-swap timing uses
+  the completed frame's successful swap receipt rather than the asynchronous
+  `EndFrame` return. The reference suite now fails on failed/missing reports
+  and missing refresh coverage, and records `--render-thread 0|1`. Executable
+  tests exercise fast/slow completion, errors, restart, delayed timing receipts
+  and acquire/present recovery. Windowed Vulkan SP/MP host/client and OpenGL SP
+  checks pass with five successful flash receipts per role and no gameplay in
+  sampled draws; see [lifetime evidence](presentation-owners.md#threaded-lifetime-validation-3-november-2026).
+  These are correctness prerequisites; stage 2,
+  the every-frame Quality floor and physical reference qualification remain open.
   Progress: targets, budgets and the measurement procedure are declared in the
   [presentation owners contract](presentation-owners.md), with
   `presentation_look_runtime.py` for engine-side latency and smoothness; its
@@ -388,6 +403,12 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   operator's checklist. Its `sensor` case is the click-to-photon session: the
   operator presses fire with a sensor on the flashed edge, and the snapshot
   gives the engine's press-to-swap time for the same presses.
+  Threaded-backend timing correction, 3 November: input clocks travel with the
+  drawn frame and are recorded on the main thread after its backend completes,
+  using the timestamp of its successful swap. Failed/withheld and hidden frames
+  do not count as latency samples; resetting statistics excludes older frames
+  that retire later. This corrects the engine-side instrument, not the still
+  pending click-to-photon measurement or by-eye review.
 
 ## Vulkan rendering
 
@@ -752,13 +773,22 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
 
       `renderThreadStats` counts threaded and inline frames, the main thread's
       waits, and every early sync by reason.
-    - **Stage 1 limits.** The tic appends debug lines, polygons and text that
-      the backend may be drawing (debug only). Swapchain recreation and surface
-      recovery after a present error still run on the render thread. That is
-      correct on Windows; before the cvar is used on Wayland or macOS, the
-      surface-extent query and `SDL_Vulkan_CreateSurface` must move to the main
-      thread. Lazy image loads on first bind run on the render thread and
-      invalidate the consumed-policy observation epoch, which costs cache
+    - **Stage 1 lifetime repairs, 3 November.** A completed worker keeps the
+      frame pending until the main thread collects it; clearing ownership on
+      the worker could skip retirement and its errors entirely. Queued world
+      operations now keep call order even when the backend completes between
+      two updates. The previous-frame timing read precedes handoff, avoiding a
+      race with the worker's counters. Debug-line, polygon and text mutations
+      synchronize; empty-list expiry does not serialize ordinary game tics.
+      Swapchain and lost-surface recovery queue from the worker and run on the
+      main thread after retirement, including window-extent queries and surface
+      creation. Native tests execute the actual handoff and recovery functions
+      against controlled workers/drivers. `renderThreadStats` drains the frame
+      before reporting/resetting, reports `completed`, and counts waits only
+      when the backend was still busy. The prototype remains opt-in; physical
+      Wayland/macOS testing and stage-2 overlap are still unqualified.
+    - **Remaining stage 1 limits.** Lazy image loads on first bind run on the
+      render thread and invalidate the consumed-policy observation epoch, which costs cache
       receipts, not correctness.
     - **Stage 1 evidence (3 November, native 2560 x 1440 fullscreen Quality
       `game/airdefense1` rotations on a shared machine).**

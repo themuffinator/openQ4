@@ -13,6 +13,7 @@ pins keep the existing ones from being dropped.
 from __future__ import annotations
 
 import sys
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -45,6 +46,10 @@ def check_thread() -> None:
                   "the main thread polls the window before the render thread presents")
     sync = function_body(thread, "void R_RenderThread_Sync(")
     require(sync, "R_RenderThread_OnRenderThread()", "the render thread never waits on itself")
+    require_order(sync, "rt_done.wait(", "rt_inFlight.store( false",
+                  "ownership ends only after collecting the worker result")
+    require_order(sync, "rt_inFlight.store( false", "tr.CompleteBackEndFrame();",
+                  "completion can reenter Sync without retiring the frame twice")
     require_order(sync, "tr.CompleteBackEndFrame();", 'common->Error( "render thread: %s", failure );',
                   "a backend error is re-raised on the main thread after the frame completes")
     require(function_body(thread, "static void R_RenderThread_Main("), "catch ( idException &ex )",
@@ -61,6 +66,11 @@ def check_frame() -> None:
     end = function_body(system, "void idRenderSystemLocal::EndFrame(")
     require(end, "R_IssueRenderCommandsOnRenderThread()", "EndFrame hand-off")
     require(end, "CompleteBackEndFrame();", "inline frames complete in EndFrame")
+    require_order(end, "const int previousBackEndMsec = backEnd.pc.msec;", "R_IssueRenderCommandsOnRenderThread()",
+                  "timing readback must not race the worker's counters")
+    debug = read(RENDERER / "tr_rendertools.cpp")
+    for name in ("ClearDebugText", "AddDebugText", "ClearDebugLines", "AddDebugLine", "ClearDebugPolygons", "AddDebugPolygon"):
+        require_sync(debug, "void RB_" + name + "(", "debug primitives shared with the backend")
     complete = function_body(system, "void idRenderSystemLocal::CompleteBackEndFrame(")
     require_order(complete, "R_ToggleSmpFrame();", "ApplyPendingDefOps();",
                   "queued render-world changes apply after the frame's memory is released")
@@ -88,6 +98,16 @@ def check_frame() -> None:
 
 
 def check_world() -> None:
+    for path, signature in (("RenderWorld_load.cpp", "void idRenderWorldLocal::FreeDefs("),
+                            ("tr_lightrun.cpp", "void R_FreeDerivedData("),
+                            ("ModelManager.cpp", "void idRenderModelManagerLocal::FreeModelVertexCaches("),
+                            ("RenderSystem_init.cpp", "void R_VidRestart_f("),
+                            ("RenderSystem_init.cpp", "static bool R_TryFullVidRestartInternal(")):
+        body = function_body(read(RENDERER / path), signature)
+        require_sync(read(RENDERER / path), signature, "bulk teardown retires before clearing live owners")
+        first = body[body.index("{") + 1:]
+        first = re.sub(r"//[^\n]*", "", first).strip()
+        assert first.startswith("R_RenderThread_Sync("), signature
     world = read(RENDERER / "RenderWorld.cpp")
     for signature, op in (("void idRenderWorldLocal::UpdateEntityDef(", "PENDING_UPDATE_ENTITY"),
                           ("void idRenderWorldLocal::FreeEntityDef(", "PENDING_FREE_ENTITY"),
@@ -115,6 +135,8 @@ def check_vulkan() -> None:
     swap = function_body(backend, "void GLimp_SwapBuffers(")
     require(swap, "R_RenderThread_OnRenderThread()", "SDL and recovery stay on the main thread")
     require(swap, "vkThreadedWindowInfo", "a threaded frame uses the hand-off's window poll")
+    require(function_body(backend, "void VK_Backend_CompleteThreadedFrame("), "VK_Device_CompleteThreadedRecovery();",
+            "window/surface recovery runs after collecting the worker")
     require_sync(backend, "bool GLimp_SetScreenParms(", "screen parameters")
     require_sync(backend, "bool idRenderTexture::Resize(", "render textures")
     image = read(RENDERER / "Vulkan" / "vk_Image.cpp")
@@ -122,6 +144,11 @@ def check_vulkan() -> None:
                       "void idImage::SetTexParameters(", "void idImage::Resize("):
         require_sync(image, signature, "images")
     device = read(RENDERER / "Vulkan" / "VulkanDevice.cpp")
+    for signature in ("bool VK_Device_RecreateSwapchain(", "bool VK_Device_RecoverSurface("):
+        recovery = function_body(device, signature)
+        require_order(recovery, "R_RenderThread_OnRenderThread()", "vkDeviceWaitIdle(",
+                      "the worker defers recovery without window calls or device teardown")
+        require(recovery, "vkThreadedRecreatePending = true;", "deferred recovery receipt")
     for signature in ("void VK_Device_WaitUploadBatch(", "void VK_Device_FlushUploadBatch(",
                       "bool VK_Device_BatchedUpload(", "void VK_Device_DeferDestroy(",
                       "void VK_Device_WaitIdleForTiming(", "bool VK_Device_RecreateSwapchain("):

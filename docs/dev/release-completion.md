@@ -6,6 +6,36 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## High-refresh render-thread reliability, 3 November 2026
+
+- **The experimental Vulkan render thread retires every completed frame.**
+  Fast frames can no longer skip cleanup, lose a backend error, or apply queued
+  world changes in the wrong order. Debug drawing now waits before changing
+  storage used by the worker. Map cleanup and renderer restart retire pending
+  frames before clearing live world resources. Swapchain and lost-surface
+  recovery run on the main thread, including window queries and surface creation.
+- **Input-latency diagnostics measure the frame's successful swap.** They no
+  longer mistake the asynchronous handoff for presentation. Hidden frames,
+  readbacks and failed presents are excluded, and resetting the statistics
+  excludes older frames still awaiting retirement.
+- **High-refresh qualification reports retain failures.** The reference suite
+  returns a failing status for failed or incomplete runs and records whether
+  Vulkan used its render thread. Passing automation does not claim physical
+  latency or visual qualification.
+- **Upgrade note:** build/install the engine and renderer modules together
+  (renderer API 30). Saves, network timestamps and the 60 Hz simulation are
+  unchanged. `r_vkRenderThread` and `in_presentationView` remain off by default.
+- Validation: executable production-function tests cover 1,006 worker handoffs,
+  fast/slow completion, backend errors, shutdown/restart, swap-time receipts,
+  reset boundaries and acquire/present recovery. Eight reference-suite tests
+  cover failure aggregation. All nine focused Meson tests and windowed Vulkan
+  SP/MP host/client plus OpenGL SP gameplay checks pass; every role records
+  five successful flash receipts and no gameplay during 128 sampled draws.
+  See [validation details](presentation-owners.md#threaded-lifetime-validation-3-november-2026).
+  The Quality frame-time floor, stage-2 renderer
+  overlap, physical latency and operator motion review remain open in HF-07,
+  HF-08 and REN-07; this entry makes no performance improvement claim.
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The

@@ -697,7 +697,7 @@ const void	RB_SwapBuffers( const void *data ) {
 	RB_QueueSavePreview();
 
 	if ( !r_frontBuffer.GetBool() && !tr.takingScreenshot ) {
-	    GLimp_SwapBuffers();
+	    R_SwapBuffersWithInputTiming();
 	}
 }
 

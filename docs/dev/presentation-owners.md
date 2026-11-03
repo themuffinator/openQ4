@@ -277,8 +277,14 @@ The engine's own share of that delay is measured too. `framePacingSnapshot`
 prints `Presentation latency …: lookSamples=… sampleToSwap … flashes=…
 pressToSwap …`: for every frame, the time from the draw's first late-look
 input sample, and from the press behind a drawn flash, to the return of the
-renderer's swap or present call (the renderer is synchronous, so the frame has
-been handed to the swap chain by then). A sensor reading minus `pressToSwap`
+renderer's successful swap or present call. Since 3 November, those clocks
+travel with the frame through the optional Vulkan render thread. The backend
+stamps the successful swap; the main thread records the receipt at retirement.
+Returning from `UpdateScreen` is not sufficient when the backend is asynchronous.
+Failed presents, hidden offscreen frames and readbacks do not produce latency
+samples, and a reset discards receipts whose input predates it. Renderer module
+API 30 carries the clock handoff/receipt; engine and renderer modules must be
+built together. A sensor reading minus `pressToSwap`
 is the GPU, compositor and display share. The harness reports both as
 `inputToSwapMs`. Its `sensor` case is the operator's session for this: the
 operator's own mouse works (no other case reads devices), late look and the
@@ -316,6 +322,12 @@ late look, entity poses, client debris). The pacing case adds the renderer's
 front-end, back-end and GPU summary, so a slow run shows where the frame went.
 The 240 cap is judged against the budget above. Other caps are reported only.
 `--fullscreen` uses the native desktop mode instead of a 960×540 window.
+For the optional Vulkan worker, add `--cvar r_vkRenderThread 1`; its default
+remains zero. The reference-suite wrapper accepts `--render-thread 0|1` and
+records that selection. It returns failure for a failed child, a missing or
+malformed report, or VRR coverage lost because no usable refresh was reported.
+Its `automatedPassed` result covers automation only: `physicalQualification`
+stays `pending` until sensor readings and the operator's review are recorded.
 For variable refresh, add a run with `--swap-interval 1 --fps <refresh − 3>`
 with VRR (G-Sync, FreeSync) on in the driver. With VRR the presented rate
 follows the cap; without it, vsync rounds it down to a divisor of the refresh.
@@ -687,3 +699,38 @@ logged an error. The variable-refresh cases ran at 237, from the reported
 240 Hz refresh. Vulkan reported presented intervals in every case it captured.
 Through every 100 ms stall the hitch cases never stepped the view backwards,
 and the review sessions completed.
+
+### Threaded lifetime validation, 3 November 2026
+
+The native tests now execute the production worker state machine, bulk world
+cleanup, debug-text expiry, swap receipt and latency collector. They force
+1,006 handoffs through both completion orders, errors, disable/restart and map
+teardown, including a worker that has finished before the main thread syncs.
+Delayed main-thread collection does not inflate the recorded swap time. The
+presentation test also executes deferred acquire/present recovery against
+controlled driver/window boundaries; no surface call runs on the worker.
+
+The live lifecycle probe uses the staged x64 runtime and installed stock assets,
+with a visible 960 x 540 window and device input disabled. It cycles caps
+30/60/120/144/165/240/360/uncapped, toggles VSync, exercises debug primitives,
+injects a Vulkan surface-loss result, restarts the renderer, toggles the worker,
+and arms five engine-only latency flashes. It uses the existing gameplay
+benchmark for SP `game/airdefense1` and MP `mp/q4dm1` listen-host/client, with an
+OpenGL SP control. Reports, binary hashes, engine logs and engine-rendered
+screenshots are retained under `.tmp/high-refresh/`; original failed runs are
+kept beside the repaired reruns. These are functional checks on a shared
+machine, not the native-resolution Quality budget or physical qualification.
+
+The final SP and MP Vulkan runs passed, with submitted/completed counts
+2,636/2,636 (SP), 2,542/2,542 (host) and 1,776/1,776 (client) at their last
+explicit stats checkpoint. The OpenGL control passed too. Each of the four
+roles recorded all five flash receipts and 128 presentation samples with zero
+gameplay executed during drawing. Engine screenshots show the expected worlds
+and HUDs after recovery/restart. The nine focused Meson tests pass, including
+the million-tick ownership test and the eight qualification-runner cases.
+
+A separate diagnostic issue remains: Vulkan `gfxInfo` can report the OpenGL
+bootstrap tier as `NullRenderer` after a restart even while native Vulkan
+rendering is active. The engine screenshots and successful presentation
+receipts verify that the world still renders; that tier label is not used as
+proof of renderer or pacing qualification.

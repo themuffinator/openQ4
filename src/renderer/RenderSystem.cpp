@@ -39,6 +39,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ScenePackets.h"
 #include "TemporalPresentation.h"
 #include "SavePreviewCapture.h"
+#include "DisplayPresentation.h"
 #include "../external/smaa/AreaTex.h"
 #include "../external/smaa/SearchTex.h"
 
@@ -1638,6 +1639,9 @@ EndFrame
 Returns the number of msec spent in the back end
 =============
 */
+void Usercmd_TakeFrameInputClocks( double &lookSampleClock, double &flashPressClock );
+void Common_RecordFrameInputToSwap( double lookSampleClock, double flashPressClock, double swapClock );
+
 void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	emptyCommand_t *cmd;
 
@@ -1665,8 +1669,17 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	}
 
 	// start the back end up again with the new command list
+	Usercmd_TakeFrameInputClocks( frameLookSampleClock, frameFlashPressClock );
+	if ( r_hiddenWindow.GetBool() ) {
+		// Hidden Vulkan frames complete in an offscreen image; its presentation
+		// receipt serves resource lifetime, not input-to-display measurement.
+		frameLookSampleClock = frameFlashPressClock = 0.0;
+	}
+	frameSwapClock = 0.0;
 	R_RendererMetrics_MarkFrameSubmitBegin();
 	const int frameFrontEndMsec = pc.frontEndMsec;
+	// The worker can overwrite backEnd.pc as soon as we hand it this frame.
+	const int previousBackEndMsec = backEnd.pc.msec;
 	if ( R_IssueRenderCommandsOnRenderThread() ) {
 		renderThreadFrameCounters = pc;
 		renderThreadFrameCountersValid = true;
@@ -1678,7 +1691,7 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 			*frontEndMsec = frameFrontEndMsec;
 		}
 		if ( backEndMsec ) {
-			*backEndMsec = backEnd.pc.msec;
+			*backEndMsec = previousBackEndMsec;
 		}
 	} else {
 		R_IssueRenderCommands();
@@ -1703,6 +1716,29 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 
 }
 
+// Keep the receipt on the frame until the main thread retires it. In the
+// threaded path EndFrame returns before this swap has even started.
+void R_SwapBuffersWithInputTiming( void ) {
+	const bool timeInput = tr.frameLookSampleClock > 0.0 || tr.frameFlashPressClock > 0.0;
+	renderDisplayPresentation_t beforeSwap = {};
+	if ( timeInput ) {
+		R_GetDisplayPresentation( &beforeSwap );
+	}
+	GLimp_SwapBuffers();
+	if ( timeInput ) {
+		const double swapClock = sys->GetClockTicks();
+		renderDisplayPresentation_t afterSwap;
+		R_GetDisplayPresentation( &afterSwap );
+		// Failed presents, readbacks and hidden offscreen frames must not
+		// masquerade as low input-to-display latency.
+		if ( afterSwap.available && afterSwap.generation == beforeSwap.generation
+				&& afterSwap.failureSequence == beforeSwap.failureSequence
+				&& afterSwap.presentedSequence > beforeSwap.presentedSequence ) {
+			tr.frameSwapClock = swapClock;
+		}
+	}
+}
+
 /*
 ===============
 idRenderSystemLocal::CompleteBackEndFrame
@@ -1713,6 +1749,10 @@ runs it in R_RenderThread_Sync once the thread has finished the frame.
 ===============
 */
 void idRenderSystemLocal::CompleteBackEndFrame( void ) {
+	if ( frameSwapClock > 0.0 ) {
+		Common_RecordFrameInputToSwap( frameLookSampleClock, frameFlashPressClock, frameSwapClock );
+	}
+	frameLookSampleClock = frameFlashPressClock = frameSwapClock = 0.0;
 	performanceCounters_t ticCounters;
 	const bool threadedFrame = renderThreadFrameCountersValid;
 	if ( threadedFrame ) {

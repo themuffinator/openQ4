@@ -95,6 +95,19 @@ idCVar r_windowHeight( "r_windowHeight", "720", CVAR_RENDERER | CVAR_ARCHIVE | C
 idCVar r_skipGuiShaders( "r_skipGuiShaders", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = skip all gui elements on surfaces, 2 = skip drawing but still handle events, 3 = draw but skip events", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 
 static const renderModuleServices_t *rgm_services = NULL;
+
+void Usercmd_TakeFrameInputClocks( double &look, double &flash ) {
+	look = flash = 0.0;
+	if ( rgm_services && rgm_services->TakeFrameInputClocks ) {
+		rgm_services->TakeFrameInputClocks( look, flash );
+	}
+}
+
+void Common_RecordFrameInputToSwap( double look, double flash, double swap ) {
+	if ( rgm_services && rgm_services->RecordFrameInputToSwap ) {
+		rgm_services->RecordFrameInputToSwap( look, flash, swap );
+	}
+}
 static const renderWindowServices_t *rgm_windowServices = NULL;
 static renderExport_t rgm_export;
 

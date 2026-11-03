@@ -89,7 +89,8 @@
 // 27 - idDict mutation-observer layout shared across engine/renderer boundaries.
 // 28 - glconfig_t appends active GPU class and dedicated-memory telemetry.
 // 29 - Owned read-only rendering-device inventory, callable on the live module.
-#define RENDER_API_VERSION			29
+// 30 - Main-thread input-clock handoff and completed-frame latency receipts.
+#define RENDER_API_VERSION			30
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -156,6 +157,10 @@ typedef struct renderModuleServices_s {
 	// the engine opens its XR session on the live context and closes it before
 	// the context goes away (vid_restart, recoverable restarts, shutdown) ---
 	void			( *RendererDeviceEvent )( int event );	// renderDeviceEvent_t
+	// --- version 30: called on the main thread at handoff/retirement. The
+	// backend supplies the successful swap's clock, never the handoff time. ---
+	void			( *TakeFrameInputClocks )( double &look, double &flash );
+	void			( *RecordFrameInputToSwap )( double look, double flash, double swap );
 } renderModuleServices_t;
 
 typedef enum {
