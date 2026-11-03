@@ -1964,6 +1964,10 @@
   "mp.admin.notice": {"type": "string", "initial": ""},
   "mp.admin.player.count": {"type": "number", "initial": 0},
   "mp.admin.player.selected": {"type": "number", "initial": -1},
+  "mp.admin.client": {"type": "number", "initial": -1},
+  "mp.admin.identity": {"type": "string", "initial": ""},
+  "card.admin_client": {"type": "number", "initial": -1},
+  "card.admin_identity": {"type": "string", "initial": ""},
   "ui.numberDraftsPending": {"type": "boolean", "initial": false},
   "mp.admin.console0": {"type": "string", "initial": ""},
   "mp.admin.console1": {"type": "string", "initial": ""},
@@ -1979,99 +1983,131 @@
   "mp.admin.console11": {"type": "string", "initial": ""},
   "mp.admin.player0.c0": {"type": "string", "initial": ""},
   "mp.admin.player0.c1": {"type": "string", "initial": ""},
+  "mp.admin.player0.identity": {"type": "string", "initial": ""},
   "mp.admin.player0.client": {"type": "number", "initial": -1},
   "mp.admin.player1.c0": {"type": "string", "initial": ""},
   "mp.admin.player1.c1": {"type": "string", "initial": ""},
+  "mp.admin.player1.identity": {"type": "string", "initial": ""},
   "mp.admin.player1.client": {"type": "number", "initial": -1},
   "mp.admin.player2.c0": {"type": "string", "initial": ""},
   "mp.admin.player2.c1": {"type": "string", "initial": ""},
+  "mp.admin.player2.identity": {"type": "string", "initial": ""},
   "mp.admin.player2.client": {"type": "number", "initial": -1},
   "mp.admin.player3.c0": {"type": "string", "initial": ""},
   "mp.admin.player3.c1": {"type": "string", "initial": ""},
+  "mp.admin.player3.identity": {"type": "string", "initial": ""},
   "mp.admin.player3.client": {"type": "number", "initial": -1},
   "mp.admin.player4.c0": {"type": "string", "initial": ""},
   "mp.admin.player4.c1": {"type": "string", "initial": ""},
+  "mp.admin.player4.identity": {"type": "string", "initial": ""},
   "mp.admin.player4.client": {"type": "number", "initial": -1},
   "mp.admin.player5.c0": {"type": "string", "initial": ""},
   "mp.admin.player5.c1": {"type": "string", "initial": ""},
+  "mp.admin.player5.identity": {"type": "string", "initial": ""},
   "mp.admin.player5.client": {"type": "number", "initial": -1},
   "mp.admin.player6.c0": {"type": "string", "initial": ""},
   "mp.admin.player6.c1": {"type": "string", "initial": ""},
+  "mp.admin.player6.identity": {"type": "string", "initial": ""},
   "mp.admin.player6.client": {"type": "number", "initial": -1},
   "mp.admin.player7.c0": {"type": "string", "initial": ""},
   "mp.admin.player7.c1": {"type": "string", "initial": ""},
+  "mp.admin.player7.identity": {"type": "string", "initial": ""},
   "mp.admin.player7.client": {"type": "number", "initial": -1},
   "mp.admin.player8.c0": {"type": "string", "initial": ""},
   "mp.admin.player8.c1": {"type": "string", "initial": ""},
+  "mp.admin.player8.identity": {"type": "string", "initial": ""},
   "mp.admin.player8.client": {"type": "number", "initial": -1},
   "mp.admin.player9.c0": {"type": "string", "initial": ""},
   "mp.admin.player9.c1": {"type": "string", "initial": ""},
+  "mp.admin.player9.identity": {"type": "string", "initial": ""},
   "mp.admin.player9.client": {"type": "number", "initial": -1},
   "mp.admin.player10.c0": {"type": "string", "initial": ""},
   "mp.admin.player10.c1": {"type": "string", "initial": ""},
+  "mp.admin.player10.identity": {"type": "string", "initial": ""},
   "mp.admin.player10.client": {"type": "number", "initial": -1},
   "mp.admin.player11.c0": {"type": "string", "initial": ""},
   "mp.admin.player11.c1": {"type": "string", "initial": ""},
+  "mp.admin.player11.identity": {"type": "string", "initial": ""},
   "mp.admin.player11.client": {"type": "number", "initial": -1},
   "mp.admin.player12.c0": {"type": "string", "initial": ""},
   "mp.admin.player12.c1": {"type": "string", "initial": ""},
+  "mp.admin.player12.identity": {"type": "string", "initial": ""},
   "mp.admin.player12.client": {"type": "number", "initial": -1},
   "mp.admin.player13.c0": {"type": "string", "initial": ""},
   "mp.admin.player13.c1": {"type": "string", "initial": ""},
+  "mp.admin.player13.identity": {"type": "string", "initial": ""},
   "mp.admin.player13.client": {"type": "number", "initial": -1},
   "mp.admin.player14.c0": {"type": "string", "initial": ""},
   "mp.admin.player14.c1": {"type": "string", "initial": ""},
+  "mp.admin.player14.identity": {"type": "string", "initial": ""},
   "mp.admin.player14.client": {"type": "number", "initial": -1},
   "mp.admin.player15.c0": {"type": "string", "initial": ""},
   "mp.admin.player15.c1": {"type": "string", "initial": ""},
+  "mp.admin.player15.identity": {"type": "string", "initial": ""},
   "mp.admin.player15.client": {"type": "number", "initial": -1},
   "mp.admin.player16.c0": {"type": "string", "initial": ""},
   "mp.admin.player16.c1": {"type": "string", "initial": ""},
+  "mp.admin.player16.identity": {"type": "string", "initial": ""},
   "mp.admin.player16.client": {"type": "number", "initial": -1},
   "mp.admin.player17.c0": {"type": "string", "initial": ""},
   "mp.admin.player17.c1": {"type": "string", "initial": ""},
+  "mp.admin.player17.identity": {"type": "string", "initial": ""},
   "mp.admin.player17.client": {"type": "number", "initial": -1},
   "mp.admin.player18.c0": {"type": "string", "initial": ""},
   "mp.admin.player18.c1": {"type": "string", "initial": ""},
+  "mp.admin.player18.identity": {"type": "string", "initial": ""},
   "mp.admin.player18.client": {"type": "number", "initial": -1},
   "mp.admin.player19.c0": {"type": "string", "initial": ""},
   "mp.admin.player19.c1": {"type": "string", "initial": ""},
+  "mp.admin.player19.identity": {"type": "string", "initial": ""},
   "mp.admin.player19.client": {"type": "number", "initial": -1},
   "mp.admin.player20.c0": {"type": "string", "initial": ""},
   "mp.admin.player20.c1": {"type": "string", "initial": ""},
+  "mp.admin.player20.identity": {"type": "string", "initial": ""},
   "mp.admin.player20.client": {"type": "number", "initial": -1},
   "mp.admin.player21.c0": {"type": "string", "initial": ""},
   "mp.admin.player21.c1": {"type": "string", "initial": ""},
+  "mp.admin.player21.identity": {"type": "string", "initial": ""},
   "mp.admin.player21.client": {"type": "number", "initial": -1},
   "mp.admin.player22.c0": {"type": "string", "initial": ""},
   "mp.admin.player22.c1": {"type": "string", "initial": ""},
+  "mp.admin.player22.identity": {"type": "string", "initial": ""},
   "mp.admin.player22.client": {"type": "number", "initial": -1},
   "mp.admin.player23.c0": {"type": "string", "initial": ""},
   "mp.admin.player23.c1": {"type": "string", "initial": ""},
+  "mp.admin.player23.identity": {"type": "string", "initial": ""},
   "mp.admin.player23.client": {"type": "number", "initial": -1},
   "mp.admin.player24.c0": {"type": "string", "initial": ""},
   "mp.admin.player24.c1": {"type": "string", "initial": ""},
+  "mp.admin.player24.identity": {"type": "string", "initial": ""},
   "mp.admin.player24.client": {"type": "number", "initial": -1},
   "mp.admin.player25.c0": {"type": "string", "initial": ""},
   "mp.admin.player25.c1": {"type": "string", "initial": ""},
+  "mp.admin.player25.identity": {"type": "string", "initial": ""},
   "mp.admin.player25.client": {"type": "number", "initial": -1},
   "mp.admin.player26.c0": {"type": "string", "initial": ""},
   "mp.admin.player26.c1": {"type": "string", "initial": ""},
+  "mp.admin.player26.identity": {"type": "string", "initial": ""},
   "mp.admin.player26.client": {"type": "number", "initial": -1},
   "mp.admin.player27.c0": {"type": "string", "initial": ""},
   "mp.admin.player27.c1": {"type": "string", "initial": ""},
+  "mp.admin.player27.identity": {"type": "string", "initial": ""},
   "mp.admin.player27.client": {"type": "number", "initial": -1},
   "mp.admin.player28.c0": {"type": "string", "initial": ""},
   "mp.admin.player28.c1": {"type": "string", "initial": ""},
+  "mp.admin.player28.identity": {"type": "string", "initial": ""},
   "mp.admin.player28.client": {"type": "number", "initial": -1},
   "mp.admin.player29.c0": {"type": "string", "initial": ""},
   "mp.admin.player29.c1": {"type": "string", "initial": ""},
+  "mp.admin.player29.identity": {"type": "string", "initial": ""},
   "mp.admin.player29.client": {"type": "number", "initial": -1},
   "mp.admin.player30.c0": {"type": "string", "initial": ""},
   "mp.admin.player30.c1": {"type": "string", "initial": ""},
+  "mp.admin.player30.identity": {"type": "string", "initial": ""},
   "mp.admin.player30.client": {"type": "number", "initial": -1},
   "mp.admin.player31.c0": {"type": "string", "initial": ""},
   "mp.admin.player31.c1": {"type": "string", "initial": ""},
+  "mp.admin.player31.identity": {"type": "string", "initial": ""},
   "mp.admin.player31.client": {"type": "number", "initial": -1},
   "mp.admin.kick.shown": {"type": "boolean", "initial": false},
   "mp.admin.kick.available": {"type": "boolean", "initial": false},
@@ -2605,13 +2641,33 @@
    "arguments": {"cvar": "s_voiceChatTest", "value": {"input": "value"}}
   },
   "mpAdminPass": {"operation": "session.menu", "arguments": {"command": "mpAdminPass"}},
-  "mpAdminSelect": {"operation": "session.menu", "arguments": {"command": "mpAdminSelect"}},
   "mpAdminBans": {"operation": "session.menu", "arguments": {"command": "mpAdminBans"}},
   "mpAdminConsole": {"operation": "session.menu", "arguments": {"command": "mpAdminConsole"}},
-  "mpAdminKick": {"operation": "session.menu", "arguments": {"command": "mpAdminKick"}},
-  "mpAdminBan": {"operation": "session.menu", "arguments": {"command": "mpAdminBan"}},
-  "mpAdminSwitch": {"operation": "session.menu", "arguments": {"command": "mpAdminSwitch"}},
   "mpAdminApply": {"operation": "session.menu", "arguments": {"command": "mpAdminApply"}},
+  "mpAdminSelect": {
+   "operation": "session.menu",
+   "arguments": {
+    "command": "mpAdminSelect",
+    "client": {"state": "card.admin_client"},
+    "identity": {"state": "card.admin_identity"}
+   }
+  },
+  "mpAdminKick": {
+   "operation": "session.menu",
+   "arguments": {"command": "mpAdminKick", "client": {"state": "mp.admin.client"}, "identity": {"state": "mp.admin.identity"}}
+  },
+  "mpAdminBan": {
+   "operation": "session.menu",
+   "arguments": {"command": "mpAdminBan", "client": {"state": "mp.admin.client"}, "identity": {"state": "mp.admin.identity"}}
+  },
+  "mpAdminSwitch": {
+   "operation": "session.menu",
+   "arguments": {
+    "command": "mpAdminSwitch",
+    "client": {"state": "mp.admin.client"},
+    "identity": {"state": "mp.admin.identity"}
+   }
+  },
   "adminEditField": {"operation": "ui.numberDrafts.focus", "arguments": {}},
   "enter.admin-password": {
    "input": "string",
@@ -4542,38 +4598,358 @@
   "admin_section_players": [{"op": "setState", "values": {"card.admin_section": 0}}, {"op": "focus", "control": "admin-tab-players"}],
   "admin_section_server": [{"op": "setState", "values": {"card.admin_section": 1}}, {"op": "focus", "control": "admin-tab-server"}],
   "admin_section_console": [{"op": "setState", "values": {"card.admin_section": 2}}, {"op": "focus", "control": "admin-tab-console"}],
-  "admin_player_0": [{"op": "setState", "values": {"card.admin_row": 0}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_1": [{"op": "setState", "values": {"card.admin_row": 1}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_2": [{"op": "setState", "values": {"card.admin_row": 2}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_3": [{"op": "setState", "values": {"card.admin_row": 3}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_4": [{"op": "setState", "values": {"card.admin_row": 4}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_5": [{"op": "setState", "values": {"card.admin_row": 5}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_6": [{"op": "setState", "values": {"card.admin_row": 6}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_7": [{"op": "setState", "values": {"card.admin_row": 7}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_8": [{"op": "setState", "values": {"card.admin_row": 8}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_9": [{"op": "setState", "values": {"card.admin_row": 9}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_10": [{"op": "setState", "values": {"card.admin_row": 10}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_11": [{"op": "setState", "values": {"card.admin_row": 11}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_12": [{"op": "setState", "values": {"card.admin_row": 12}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_13": [{"op": "setState", "values": {"card.admin_row": 13}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_14": [{"op": "setState", "values": {"card.admin_row": 14}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_15": [{"op": "setState", "values": {"card.admin_row": 15}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_16": [{"op": "setState", "values": {"card.admin_row": 16}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_17": [{"op": "setState", "values": {"card.admin_row": 17}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_18": [{"op": "setState", "values": {"card.admin_row": 18}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_19": [{"op": "setState", "values": {"card.admin_row": 19}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_20": [{"op": "setState", "values": {"card.admin_row": 20}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_21": [{"op": "setState", "values": {"card.admin_row": 21}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_22": [{"op": "setState", "values": {"card.admin_row": 22}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_23": [{"op": "setState", "values": {"card.admin_row": 23}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_24": [{"op": "setState", "values": {"card.admin_row": 24}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_25": [{"op": "setState", "values": {"card.admin_row": 25}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_26": [{"op": "setState", "values": {"card.admin_row": 26}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_27": [{"op": "setState", "values": {"card.admin_row": 27}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_28": [{"op": "setState", "values": {"card.admin_row": 28}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_29": [{"op": "setState", "values": {"card.admin_row": 29}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_30": [{"op": "setState", "values": {"card.admin_row": 30}}, {"op": "action", "action": "mpAdminSelect"}],
-  "admin_player_31": [{"op": "setState", "values": {"card.admin_row": 31}}, {"op": "action", "action": "mpAdminSelect"}],
+  "admin_player_0": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 0,
+     "card.admin_client": {"state": "mp.admin.player0.client"},
+     "card.admin_identity": {"state": "mp.admin.player0.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_1": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 1,
+     "card.admin_client": {"state": "mp.admin.player1.client"},
+     "card.admin_identity": {"state": "mp.admin.player1.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_2": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 2,
+     "card.admin_client": {"state": "mp.admin.player2.client"},
+     "card.admin_identity": {"state": "mp.admin.player2.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_3": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 3,
+     "card.admin_client": {"state": "mp.admin.player3.client"},
+     "card.admin_identity": {"state": "mp.admin.player3.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_4": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 4,
+     "card.admin_client": {"state": "mp.admin.player4.client"},
+     "card.admin_identity": {"state": "mp.admin.player4.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_5": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 5,
+     "card.admin_client": {"state": "mp.admin.player5.client"},
+     "card.admin_identity": {"state": "mp.admin.player5.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_6": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 6,
+     "card.admin_client": {"state": "mp.admin.player6.client"},
+     "card.admin_identity": {"state": "mp.admin.player6.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_7": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 7,
+     "card.admin_client": {"state": "mp.admin.player7.client"},
+     "card.admin_identity": {"state": "mp.admin.player7.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_8": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 8,
+     "card.admin_client": {"state": "mp.admin.player8.client"},
+     "card.admin_identity": {"state": "mp.admin.player8.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_9": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 9,
+     "card.admin_client": {"state": "mp.admin.player9.client"},
+     "card.admin_identity": {"state": "mp.admin.player9.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_10": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 10,
+     "card.admin_client": {"state": "mp.admin.player10.client"},
+     "card.admin_identity": {"state": "mp.admin.player10.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_11": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 11,
+     "card.admin_client": {"state": "mp.admin.player11.client"},
+     "card.admin_identity": {"state": "mp.admin.player11.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_12": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 12,
+     "card.admin_client": {"state": "mp.admin.player12.client"},
+     "card.admin_identity": {"state": "mp.admin.player12.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_13": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 13,
+     "card.admin_client": {"state": "mp.admin.player13.client"},
+     "card.admin_identity": {"state": "mp.admin.player13.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_14": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 14,
+     "card.admin_client": {"state": "mp.admin.player14.client"},
+     "card.admin_identity": {"state": "mp.admin.player14.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_15": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 15,
+     "card.admin_client": {"state": "mp.admin.player15.client"},
+     "card.admin_identity": {"state": "mp.admin.player15.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_16": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 16,
+     "card.admin_client": {"state": "mp.admin.player16.client"},
+     "card.admin_identity": {"state": "mp.admin.player16.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_17": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 17,
+     "card.admin_client": {"state": "mp.admin.player17.client"},
+     "card.admin_identity": {"state": "mp.admin.player17.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_18": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 18,
+     "card.admin_client": {"state": "mp.admin.player18.client"},
+     "card.admin_identity": {"state": "mp.admin.player18.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_19": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 19,
+     "card.admin_client": {"state": "mp.admin.player19.client"},
+     "card.admin_identity": {"state": "mp.admin.player19.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_20": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 20,
+     "card.admin_client": {"state": "mp.admin.player20.client"},
+     "card.admin_identity": {"state": "mp.admin.player20.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_21": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 21,
+     "card.admin_client": {"state": "mp.admin.player21.client"},
+     "card.admin_identity": {"state": "mp.admin.player21.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_22": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 22,
+     "card.admin_client": {"state": "mp.admin.player22.client"},
+     "card.admin_identity": {"state": "mp.admin.player22.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_23": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 23,
+     "card.admin_client": {"state": "mp.admin.player23.client"},
+     "card.admin_identity": {"state": "mp.admin.player23.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_24": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 24,
+     "card.admin_client": {"state": "mp.admin.player24.client"},
+     "card.admin_identity": {"state": "mp.admin.player24.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_25": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 25,
+     "card.admin_client": {"state": "mp.admin.player25.client"},
+     "card.admin_identity": {"state": "mp.admin.player25.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_26": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 26,
+     "card.admin_client": {"state": "mp.admin.player26.client"},
+     "card.admin_identity": {"state": "mp.admin.player26.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_27": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 27,
+     "card.admin_client": {"state": "mp.admin.player27.client"},
+     "card.admin_identity": {"state": "mp.admin.player27.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_28": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 28,
+     "card.admin_client": {"state": "mp.admin.player28.client"},
+     "card.admin_identity": {"state": "mp.admin.player28.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_29": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 29,
+     "card.admin_client": {"state": "mp.admin.player29.client"},
+     "card.admin_identity": {"state": "mp.admin.player29.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_30": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 30,
+     "card.admin_client": {"state": "mp.admin.player30.client"},
+     "card.admin_identity": {"state": "mp.admin.player30.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
+  "admin_player_31": [
+   {
+    "op": "setState",
+    "values": {
+     "card.admin_row": 31,
+     "card.admin_client": {"state": "mp.admin.player31.client"},
+     "card.admin_identity": {"state": "mp.admin.player31.identity"}
+    }
+   },
+   {"op": "action", "action": "mpAdminSelect"}
+  ],
   "admin_kick": [
    {
     "op": "if",
@@ -246562,7 +246938,8 @@
                   "focus": "admin-player-0.focus",
                   "pressed": "admin-player-0.pressed",
                   "disabled": "admin-player-0.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player0.identity"}
                 }
                },
                {
@@ -246691,7 +247068,8 @@
                   "focus": "admin-player-1.focus",
                   "pressed": "admin-player-1.pressed",
                   "disabled": "admin-player-1.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player1.identity"}
                 }
                },
                {
@@ -246820,7 +247198,8 @@
                   "focus": "admin-player-2.focus",
                   "pressed": "admin-player-2.pressed",
                   "disabled": "admin-player-2.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player2.identity"}
                 }
                },
                {
@@ -246949,7 +247328,8 @@
                   "focus": "admin-player-3.focus",
                   "pressed": "admin-player-3.pressed",
                   "disabled": "admin-player-3.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player3.identity"}
                 }
                },
                {
@@ -247078,7 +247458,8 @@
                   "focus": "admin-player-4.focus",
                   "pressed": "admin-player-4.pressed",
                   "disabled": "admin-player-4.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player4.identity"}
                 }
                },
                {
@@ -247207,7 +247588,8 @@
                   "focus": "admin-player-5.focus",
                   "pressed": "admin-player-5.pressed",
                   "disabled": "admin-player-5.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player5.identity"}
                 }
                },
                {
@@ -247336,7 +247718,8 @@
                   "focus": "admin-player-6.focus",
                   "pressed": "admin-player-6.pressed",
                   "disabled": "admin-player-6.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player6.identity"}
                 }
                },
                {
@@ -247465,7 +247848,8 @@
                   "focus": "admin-player-7.focus",
                   "pressed": "admin-player-7.pressed",
                   "disabled": "admin-player-7.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player7.identity"}
                 }
                },
                {
@@ -247594,7 +247978,8 @@
                   "focus": "admin-player-8.focus",
                   "pressed": "admin-player-8.pressed",
                   "disabled": "admin-player-8.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player8.identity"}
                 }
                },
                {
@@ -247723,7 +248108,8 @@
                   "focus": "admin-player-9.focus",
                   "pressed": "admin-player-9.pressed",
                   "disabled": "admin-player-9.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player9.identity"}
                 }
                },
                {
@@ -247852,7 +248238,8 @@
                   "focus": "admin-player-10.focus",
                   "pressed": "admin-player-10.pressed",
                   "disabled": "admin-player-10.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player10.identity"}
                 }
                },
                {
@@ -247981,7 +248368,8 @@
                   "focus": "admin-player-11.focus",
                   "pressed": "admin-player-11.pressed",
                   "disabled": "admin-player-11.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player11.identity"}
                 }
                },
                {
@@ -248110,7 +248498,8 @@
                   "focus": "admin-player-12.focus",
                   "pressed": "admin-player-12.pressed",
                   "disabled": "admin-player-12.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player12.identity"}
                 }
                },
                {
@@ -248239,7 +248628,8 @@
                   "focus": "admin-player-13.focus",
                   "pressed": "admin-player-13.pressed",
                   "disabled": "admin-player-13.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player13.identity"}
                 }
                },
                {
@@ -248368,7 +248758,8 @@
                   "focus": "admin-player-14.focus",
                   "pressed": "admin-player-14.pressed",
                   "disabled": "admin-player-14.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player14.identity"}
                 }
                },
                {
@@ -248497,7 +248888,8 @@
                   "focus": "admin-player-15.focus",
                   "pressed": "admin-player-15.pressed",
                   "disabled": "admin-player-15.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player15.identity"}
                 }
                },
                {
@@ -248626,7 +249018,8 @@
                   "focus": "admin-player-16.focus",
                   "pressed": "admin-player-16.pressed",
                   "disabled": "admin-player-16.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player16.identity"}
                 }
                },
                {
@@ -248755,7 +249148,8 @@
                   "focus": "admin-player-17.focus",
                   "pressed": "admin-player-17.pressed",
                   "disabled": "admin-player-17.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player17.identity"}
                 }
                },
                {
@@ -248884,7 +249278,8 @@
                   "focus": "admin-player-18.focus",
                   "pressed": "admin-player-18.pressed",
                   "disabled": "admin-player-18.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player18.identity"}
                 }
                },
                {
@@ -249013,7 +249408,8 @@
                   "focus": "admin-player-19.focus",
                   "pressed": "admin-player-19.pressed",
                   "disabled": "admin-player-19.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player19.identity"}
                 }
                },
                {
@@ -249142,7 +249538,8 @@
                   "focus": "admin-player-20.focus",
                   "pressed": "admin-player-20.pressed",
                   "disabled": "admin-player-20.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player20.identity"}
                 }
                },
                {
@@ -249271,7 +249668,8 @@
                   "focus": "admin-player-21.focus",
                   "pressed": "admin-player-21.pressed",
                   "disabled": "admin-player-21.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player21.identity"}
                 }
                },
                {
@@ -249400,7 +249798,8 @@
                   "focus": "admin-player-22.focus",
                   "pressed": "admin-player-22.pressed",
                   "disabled": "admin-player-22.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player22.identity"}
                 }
                },
                {
@@ -249529,7 +249928,8 @@
                   "focus": "admin-player-23.focus",
                   "pressed": "admin-player-23.pressed",
                   "disabled": "admin-player-23.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player23.identity"}
                 }
                },
                {
@@ -249658,7 +250058,8 @@
                   "focus": "admin-player-24.focus",
                   "pressed": "admin-player-24.pressed",
                   "disabled": "admin-player-24.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player24.identity"}
                 }
                },
                {
@@ -249787,7 +250188,8 @@
                   "focus": "admin-player-25.focus",
                   "pressed": "admin-player-25.pressed",
                   "disabled": "admin-player-25.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player25.identity"}
                 }
                },
                {
@@ -249916,7 +250318,8 @@
                   "focus": "admin-player-26.focus",
                   "pressed": "admin-player-26.pressed",
                   "disabled": "admin-player-26.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player26.identity"}
                 }
                },
                {
@@ -250045,7 +250448,8 @@
                   "focus": "admin-player-27.focus",
                   "pressed": "admin-player-27.pressed",
                   "disabled": "admin-player-27.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player27.identity"}
                 }
                },
                {
@@ -250174,7 +250578,8 @@
                   "focus": "admin-player-28.focus",
                   "pressed": "admin-player-28.pressed",
                   "disabled": "admin-player-28.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player28.identity"}
                 }
                },
                {
@@ -250303,7 +250708,8 @@
                   "focus": "admin-player-29.focus",
                   "pressed": "admin-player-29.pressed",
                   "disabled": "admin-player-29.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player29.identity"}
                 }
                },
                {
@@ -250432,7 +250838,8 @@
                   "focus": "admin-player-30.focus",
                   "pressed": "admin-player-30.pressed",
                   "disabled": "admin-player-30.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player30.identity"}
                 }
                },
                {
@@ -250561,7 +250968,8 @@
                   "focus": "admin-player-31.focus",
                   "pressed": "admin-player-31.pressed",
                   "disabled": "admin-player-31.disabled"
-                 }
+                 },
+                 "context": {"state": "mp.admin.player31.identity"}
                 }
                }
               ]
@@ -250830,7 +251238,8 @@
                     "pressed": "admin-kick.pressed",
                     "disabled": "admin-kick.disabled"
                    },
-                   "event": "admin_kick"
+                   "event": "admin_kick",
+                   "context": {"state": "mp.admin.identity"}
                   }
                  },
                  {
@@ -251127,7 +251536,8 @@
                     "pressed": "admin-ban.pressed",
                     "disabled": "admin-ban.disabled"
                    },
-                   "event": "admin_ban"
+                   "event": "admin_ban",
+                   "context": {"state": "mp.admin.identity"}
                   }
                  },
                  {
@@ -251424,7 +251834,8 @@
                     "pressed": "admin-switch.pressed",
                     "disabled": "admin-switch.disabled"
                    },
-                   "event": "admin_switch"
+                   "event": "admin_switch",
+                   "context": {"state": "mp.admin.identity"}
                   }
                  },
                  {

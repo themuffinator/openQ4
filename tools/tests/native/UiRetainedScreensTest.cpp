@@ -341,7 +341,8 @@ static void CheckSessionActions(const Document& document) {
 		const auto command = action.arguments.find("command");
 		Check(command != action.arguments.end(),"session operation names a command");
 		const auto& verb = std::get<std::string>(command->second.literal);
-		const bool player = verb == "mpSelectPlayer" || verb == "mpMute" || verb == "mpFriend";
+		const bool player = verb == "mpSelectPlayer" || verb == "mpMute" || verb == "mpFriend" ||
+			verb == "mpAdminSelect" || verb == "mpAdminKick" || verb == "mpAdminBan" || verb == "mpAdminSwitch";
 		const bool save = verb == "loadSelect" || verb == "saveSelect" || verb == "loadSave" || verb == "loadDelete";
 		Check(!save || (action.arguments.at("index").type == 0 && action.arguments.at("generation").type == 0),"save command carries catalog operands");
 		Check(action.arguments.size() == (player || save ? 3u : value ? 2u : 1u),"command carries exactly its typed operands");
@@ -866,6 +867,7 @@ static void CheckAdmin(ScreenHost& host, const char* path) {
 	StateValues admin = {{"mp.admin.valid",true},{"mp.admin.notice",std::string()},{"mp.admin.player.count",3.0},
 		{"mp.admin.player0.c0",std::string("Kane")},{"mp.admin.player0.c1",std::string("MARINES")},{"mp.admin.player0.client",0.0},
 		{"mp.admin.player1.c0",std::string("Anderson")},{"mp.admin.player1.c1",std::string("STROGG")},{"mp.admin.player1.client",4.0},
+		{"mp.admin.player1.identity",std::string("8196")},
 		{"mp.admin.player2.c0",std::string("Rhino")},{"mp.admin.player2.c1",std::string("MARINES")},{"mp.admin.player2.client",9.0},
 		{"mp.admin.player.selected",-1.0}};
 	for (const char* action : {"kick","ban","switch","apply"}) {
@@ -883,16 +885,37 @@ static void CheckAdmin(ScreenHost& host, const char* path) {
 	Check(kick.x >= list.x+list.width,"the actions stand beside the list");
 	Check(runtime.RunEvent("admin_player_1",2.4,effects,error) && asked("mpAdminSelect") &&
 		std::get<double>(runtime.GetState().at("card.admin_row")) == 1,"a row names itself to the session");
+	Check(std::get<double>(effects.actions[0].arguments.at("client")) == 4 &&
+		std::get<std::string>(effects.actions[0].arguments.at("identity")) == "8196","the row captures its connection");
 	Check(runtime.RunEvent("admin_kick",2.5,effects,error) && effects.actions.empty(),"an unavailable Kick asks nothing");
 	runtime.Frame(viewport,2.55);
 	Check(text("admin-kick-reason","display") == "block","and says why");
 	Check(runtime.SetState({{"mp.admin.player.selected",1.0},{"mp.admin.kick.available",true},{"mp.admin.ban.available",true},
-		{"mp.admin.switch.available",true}},error,2.6),"a player chosen");
+		{"mp.admin.switch.available",true},{"mp.admin.client",4.0},{"mp.admin.identity",std::string("8196")}},error,2.6),"a player chosen");
 	runtime.Frame(viewport,2.7);
 	Check(text("admin-player-1-chosen","display") == "block" && text("admin-player-0-chosen","display") == "none","the chosen row lights");
 	for (const auto& [event,verb] : std::vector<std::pair<const char*,const char*>>{{"admin_kick","mpAdminKick"},{"admin_ban","mpAdminBan"},
 		{"admin_switch","mpAdminSwitch"}}) {
 		Check(runtime.RunEvent(event,2.8,effects,error) && asked(verb),"an available player action asks the session");
+		Check(std::get<double>(effects.actions[0].arguments.at("client")) == 4 &&
+			std::get<std::string>(effects.actions[0].arguments.at("identity")) == "8196","admin actions capture the selected connection");
+	}
+	// Neither a row nor an armed player action follows a new occupant.
+	// A later fresh press remains usable; this checks the production document's
+	// contexts, not just the generic interaction implementation.
+	double targetTime = 2.81;
+	for (const char* control : {"admin-player-1","admin-kick","admin-ban","admin-switch"}) {
+		const char* context = std::string(control) == "admin-player-1" ? "mp.admin.player1.identity" : "mp.admin.identity";
+		Check(runtime.SetState({{context,std::string("8196")}},error,targetTime),"restore the original Admin target");
+		Check(runtime.FocusControl(control,targetTime),"focus the Admin target control");
+		runtime.TakeActions(); runtime.MenuAction(MenuInput::Accept,true,targetTime+.001);
+		Check(runtime.SetState({{context,std::string("12292")}},error,targetTime+.002),"replace the Admin target while held");
+		runtime.MenuAction(MenuInput::Accept,false,targetTime+.003);
+		Check(runtime.TakeActions().empty(),"target replacement cancels the held Admin control");
+		runtime.MenuAction(MenuInput::Accept,true,targetTime+.004);
+		runtime.MenuAction(MenuInput::Accept,false,targetTime+.005);
+		Check(runtime.TakeActions().size() == 1,"a fresh Admin activation still works");
+		targetTime += .03;
 	}
 	// View ban list asks for the server's list and opens PLAYER BAN LIST.
 	Check(runtime.RunEvent("admin_bans",3,effects,error) && effects.actions.size() == 1 &&

@@ -1636,9 +1636,17 @@ void idGameLocal::ServerProcessReliableMessage( int clientNum, const idBitMsg &m
 		}
 // shouchard:  voice chat
 		case GAME_RELIABLE_MESSAGE_VOICECHAT_MUTING: {
-			int clientDest = msg.ReadByte();
-			bool mute = ( 0 != msg.ReadByte() );
-			mpGame.ServerHandleVoiceMuting( clientNum, clientDest, mute );
+			// Slot, exact boolean, packed spawn identity. In particular, never
+			// interpret an older slot-only request against a replacement player.
+			if ( msg.GetRemainingReadBits() != 48 ) {
+				break;
+			}
+			const int clientDest = msg.ReadByte();
+			const int mute = msg.ReadByte();
+			const int identity = msg.ReadLong();
+			if ( mute == 0 || mute == 1 ) {
+				mpGame.ServerHandleVoiceMuting( clientNum, clientDest, identity, mute != 0 );
+			}
 			break;
 		}
 // shouchard:  server admin

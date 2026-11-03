@@ -1279,7 +1279,7 @@ static void CheckEventBridge() {
     const auto player=[](const char* command,StateValue client,StateValue identity) {
         return ActionInvocation{"player","session.menu",{{"command",std::string(command)},{"client",client},{"identity",identity}}};
     };
-    for (const auto* command : {"mpSelectPlayer","mpMute","mpFriend"}) {
+    for (const auto* command : {"mpSelectPlayer","mpMute","mpFriend","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch"}) {
         assert(ValidInvocation(player(command,0.0,std::string("8192")),error));
         assert(ValidInvocation(player(command,31.0,std::string("4294967295")),error));
         for (StateValue client : {StateValue(-1.0),StateValue(32.0),StateValue(2.5),StateValue(true),
@@ -1294,11 +1294,17 @@ static void CheckEventBridge() {
         idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
         eventPlans["players"]={{},{player("mpSelectPlayer",4.0,std::string("8196")),
                                   player("mpMute",31.0,std::string("4294967295")),
-                                  player("mpFriend",7.0,std::string("16391"))}};
+                                    player("mpFriend",7.0,std::string("16391")),
+                                    player("mpAdminSelect",4.0,std::string("8196")),
+                                    player("mpAdminKick",31.0,std::string("4294967295")),
+                                    player("mpAdminBan",7.0,std::string("16391")),
+                                    player("mpAdminSwitch",9.0,std::string("16393"))}};
         gui.HandleNamedEvent("players");
         gui.SetStateInt("card.client",19); gui.SetStateString("card.identity","99999");
+          gui.SetStateInt("mp.admin.client",19); gui.SetStateString("mp.admin.identity","99999");
         bool close=false; assert(gui.DispatchApplicationActions(gui.PendingApplicationCommand(),close) && !close);
-        for (const auto* expected : {"mpSelectPlayer 4 8196","mpMute 31 4294967295","mpFriend 7 16391"}) {
+        for (const auto* expected : {"mpSelectPlayer 4 8196","mpMute 31 4294967295","mpFriend 7 16391",
+                "mpAdminSelect 4 8196","mpAdminKick 31 4294967295","mpAdminBan 7 16391","mpAdminSwitch 9 16393"}) {
             idStr request; assert(gui.TakeSessionRequest(ActionMarker,request) && request==expected);
         }
         idStr none; assert(!gui.TakeSessionRequest(ActionMarker,none));

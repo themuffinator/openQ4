@@ -832,6 +832,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'ui_stock_level_load.py', []),
         (root / "tools" / "tests" / 'ui_retained_resource_lifecycle.py', []),
         (root / "tools" / "tests" / 'ui_retained_adapter.py', []),
+        (root / "tools" / "tests" / 'ui_player_identity.py', []),
+        (root / "tools" / "tests" / 'ui_player_targets.py', []),
         (root / "tools" / "tests" / 'ui_scrollbar_interaction.py', ['--mutations']),
         (root / "tools" / "tests" / 'ui_choice_scroll_interaction.py', ['--mutations']),
         (root / "tools" / "tests" / 'ui_document_edit.py', ['--mutations']),

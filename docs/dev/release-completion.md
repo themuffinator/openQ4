@@ -6,6 +6,18 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Multiplayer menu player targets, 3 November 2026
+
+- Mute and unmute requests and the Admin menu's player actions stay attached
+  to the player selected, even if someone else takes that connection slot
+  before the request arrives. Kick votes are cancelled if their target leaves
+  before execution.
+- Install the matching engine, multiplayer module and menu package together.
+  On older servers, muting remains local and remote menu player administration
+  requires an updated server; direct console administration is unchanged.
+- The remaining vote-request and Match Control identity work stays open under
+  UI-03. See [the implementation contract](ui/player-identity.md#mute-vote-and-admin-targets-3-november-2026).
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The

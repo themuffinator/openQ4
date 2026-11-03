@@ -1463,4 +1463,5 @@
 	"#str_230154"	"Unavailable device"
 	"#str_230155"	"Rendering"
 	"#str_230156"	"The requested renderer is unavailable. The active fallback is shown above."
+	"#str_231577"	"Server update required."
 }

@@ -1431,6 +1431,14 @@ archived provenance; new scheduling belongs here.
   Real-headset comfort/readability and the full device matrix remain open.
   Visual specification 1.28 and register revision 20 add the scope as pending
   `FLOW-067`; no evidence record is bound yet.
+  Progress, 3 November: [player-target guards](ui/player-identity.md#mute-vote-and-admin-targets-3-november-2026)
+  bind remote mute/unmute requests and retained Admin selections/actions to
+  the selected connection, including authenticated rcon delivery. Classic
+  menu player choices also retain their original identity. A kick vote
+  aborts when its target disappears or is replaced, including during the
+  passed-vote delay; a mixed vote applies none of its other changes.
+  Vote requests before server admission, retained kick-choice drafts,
+  Match Control rows and the wider device/platform matrix remain open.
 - [ ] **UI-04 — P1, implementation and qualification: full GUI corpus migration.**
   Finish all HUD, wrist/comms, scope, vehicle, cinematic, terminal/world and scripted
   surfaces with source-bound retained lowering. Preserve legacy grouping/remainder

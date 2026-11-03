@@ -3118,7 +3118,7 @@ int main() {
             chat = idUserInterface("guis/mpchat.gui"); chat.state["gameDraw"] = "1";
             gameObject.publish = [](idUserInterface* gui) {
                 if (gameObject.commands.back() == "retainedMultiplayerVariant") gui->SetStateBool("mp.welcome", welcomeAnswer);
-                if (gameObject.commands.back() == "retainedMultiplayerCover") { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", true); }
+                if (gameObject.commands.back() == "retainedMultiplayerCover") { gui->SetStateInt("mp.protocol", 3); gui->SetStateBool("mp.cover_allowed", true); }
                 if (gameObject.commands.back() != "retainedMultiplayerUncover") gui->SetStateInt("mp.revision", static_cast<int>(gameObject.commands.size()));
             };
             return s;
@@ -3163,7 +3163,7 @@ int main() {
         CHECK(s.guiRetainedReleasing == card && s.retainedReleaseUntil == commonObject.time + 250 && gameObject.commands.back() == "retainedMultiplayerUncover");
         s.UpdateRetainedMultiplayer(); CHECK(s.guiRetainedMultiplayer == nullptr && card->deactivations == 1);
         // Main Menu leaves for the main menu with the match running: no release.
-        s.guiActive = &mpMenu; gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", true); };
+        s.guiActive = &mpMenu; gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 3); gui->SetStateBool("mp.cover_allowed", true); };
         s.UpdateRetainedMultiplayer(); CHECK(s.guiRetainedMultiplayer == card && card->activations == 2 && card->named.back() == "open");
         gameObject.answer = [](const char*) -> const char* { return "main"; };
         s.HandleRetainedSessionRequest(card, "mpMainMenu");
@@ -3405,10 +3405,10 @@ int main() {
         card->state["card.admin.password"] = std::string(65, 'x'); s.HandleRetainedSessionRequest(card, "mpAdminPass");
         CHECK(gameObject.guiCommands.size() == checked && card->state["card.admin.password"].empty() &&
               cvarSystemObject.strings["net_clientRemoteConsolePassword"] == "correct horse battery");
-        card->state["card.admin_row"] = "2"; card->state["mp.admin.player2.client"] = "7"; s.HandleRetainedSessionRequest(card, "mpAdminSelect");
-        CHECK(gameObject.guiCommands.back() == "play main_menu_selection ; retained adminSelect 7" && s.guiRetainedMultiplayer == card);
+        card->state["card.admin_row"] = "2"; card->state["mp.admin.player2.client"] = "7"; s.HandleRetainedSessionRequest(card, "mpAdminSelect 7 8199");
+        CHECK(gameObject.guiCommands.back() == "play main_menu_selection ; retained adminSelect 7 8199" && s.guiRetainedMultiplayer == card);
         for (const auto& [verb, command] : std::vector<std::pair<const char*, const char*>>{
-                 {"mpAdminKick", "retained adminKick"}, {"mpAdminBan", "retained adminBan"}, {"mpAdminSwitch", "retained adminSwitch"},
+                 {"mpAdminKick 7 8199", "retained adminKick 7 8199"}, {"mpAdminBan 7 8199", "retained adminBan 7 8199"}, {"mpAdminSwitch 7 8199", "retained adminSwitch 7 8199"},
                  {"mpAdminBans", "retained adminBans"}, {"mpAdminUnban", "retained adminUnban"}, {"mpAdminApply", "retained adminApply"}}) {
             s.HandleRetainedSessionRequest(card, verb);
             CHECK(gameObject.guiCommands.back() == std::string("play main_menu_selection ; ") + command && s.guiRetainedMultiplayer == card);
@@ -3453,7 +3453,7 @@ int main() {
         // and Back is the summary's own close. The menu replacing the summary
         // retires the summary card and covers the menu with its own.
         static idUserInterface summary("guis/summary.gui"); summary = idUserInterface("guis/summary.gui"); summary.state["gameDraw"] = "1";
-        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", true); };
+        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 3); gui->SetStateBool("mp.cover_allowed", true); };
         s.guiRetainedSummary->state["card.tab"] = "2"; s.guiActive = &summary; s.UpdateRetainedMultiplayer();
         auto* sheet = s.guiRetainedMultiplayer;
         CHECK(sheet == s.guiRetainedSummary && s.retainedMultiplayerSummary && s.RetainedSummaryCovers() && sheet->named.back() == "open" &&
@@ -3477,7 +3477,7 @@ int main() {
         // questions) keep the menu up for the campaign; Resume closes it with
         // the release.
         static idUserInterface arenaMenu("guis/arena_pause.gui"); arenaMenu = idUserInterface("guis/arena_pause.gui"); arenaMenu.state["gameDraw"] = "1";
-        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", true); };
+        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 3); gui->SetStateBool("mp.cover_allowed", true); };
         const size_t arenaAsked = gameObject.commands.size();
         s.guiActive = &arenaMenu; s.UpdateRetainedMultiplayer();
         auto* arenaPause = s.guiRetainedMultiplayer;
@@ -3501,7 +3501,7 @@ int main() {
         // The game may refuse now (the join offer, an Arena Campaign match): the
         // stock menu keeps this opening, and the next asks again.
         auto refused = Mp(true, true);
-        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", false); };
+        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 3); gui->SetStateBool("mp.cover_allowed", false); };
         refused.UpdateRetainedMultiplayer(); refused.UpdateRetainedMultiplayer();
         CHECK(refused.guiRetainedMultiplayer == nullptr && refused.retainedMultiplayerUncovered && gameObject.commands.size() == 2 && refused.retainedStock.Num() == 0);
         refused.guiActive = nullptr; refused.UpdateRetainedMultiplayer(); refused.guiActive = &mpMenu; refused.UpdateRetainedMultiplayer();

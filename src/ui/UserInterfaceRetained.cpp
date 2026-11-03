@@ -247,7 +247,8 @@ bool SessionMenuCommand(const std::string& command) {
 }
 
 bool SessionMenuPlayerCommand(const std::string& command) {
-	return command == "mpSelectPlayer" || command == "mpMute" || command == "mpFriend";
+	return command == "mpSelectPlayer" || command == "mpMute" || command == "mpFriend" ||
+		command == "mpAdminSelect" || command == "mpAdminKick" || command == "mpAdminBan" || command == "mpAdminSwitch";
 }
 
 bool SessionMenuSaveCommand(const std::string& command) {

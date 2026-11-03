@@ -31,6 +31,12 @@ def observe(stage):
             *[f'openq4_retainedGui inspect "{node}"' for node in nodes], f'screenshot "screenshots/{stage}.tga"']
 
 
+def observe_admin(stage):
+    nodes = ('admin-player-1', 'admin-player-1-chosen', 'admin-player-1-c0', 'admin-kick-reason')
+    return [f'echo "PLAYER_IDENTITY_STAGE {stage}"', 'openq4_retainedGui report',
+            *[f'openq4_retainedGui inspect "{node}"' for node in nodes], f'screenshot "screenshots/{stage}.tga"']
+
+
 def steps():
     return ['waitMsec 5000', 'addbot IdentityOriginal', 'waitMsec 3000',
             'screenshot "screenshots/gameplay.tga"', 'openq4_assertMenuActivation 4000 game',
@@ -47,6 +53,17 @@ def steps():
             'openq4_retainedGui event players_a1', 'removebot IdentityReplacement', 'waitMsec 300',
             'addbot IdentityFinal', 'waitMsec 1500', *observe('queued-replaced'),
             *activate('players-a-1'), *observe('fresh-selection'),
+            # Admin buttons must also retire a held action and freeze its
+            # selected target before later session dispatch.
+            'openq4_retainedGui event tab_admin', 'waitMsec 500',
+            *activate('admin-player-1'), *observe_admin('admin-selected'),
+            'openq4_retainedGui focus "admin-kick"', 'openq4_retainedGui menu accept 1',
+            'removebot IdentityFinal', 'waitMsec 300', 'addbot AdminReplacement', 'waitMsec 1500',
+            'openq4_retainedGui menu accept 0', 'waitMsec 500', *observe_admin('admin-held-replaced'),
+            *activate('admin-player-1'), 'openq4_retainedGui event admin_kick',
+            'removebot AdminReplacement', 'waitMsec 300', 'addbot AdminFinal', 'waitMsec 1500',
+            *observe_admin('admin-queued-replaced'),
+            *activate('admin-player-1'), *activate('admin-kick'), 'waitMsec 1000', *observe_admin('admin-fresh-kick'),
             'openq4_retainedGui event onBack', 'waitMsec 500', 'screenshot "screenshots/gameplay-return.tga"']
 
 
@@ -65,6 +82,13 @@ def qualify(log):
             nodes.get('players-a-0-chosen', (-1, ''))[1] == ('none' if selected else 'block')
     slots = re.findall(r"addbot: 'Identity(?:Original|Replacement|Final)' joined as client (\d+)", log)
     checks['same-slot-reused'] = slots == ['1', '1', '1']
+    for stage in ('admin-selected', 'admin-held-replaced', 'admin-queued-replaced', 'admin-fresh-kick'):
+        section = sections.get(stage, '')
+        nodes = {node: display for node, display in re.findall(
+            r'^RETAINED_GUI_NODE id=(\S+) bounds=\S+ opacity=\S+ display=(\S+)', section, re.M)}
+        checks[stage] = nodes.get('admin-player-1') == ('none' if stage == 'admin-fresh-kick' else 'block') and \
+            nodes.get('admin-player-1-chosen') == ('block' if stage == 'admin-selected' else 'none')
+    checks['admin-slot-reused'] = re.findall(r"addbot: 'Admin(?:Replacement|Final)' joined as client (\d+)", log) == ['1', '1']
     checks['semantic-operations'] = not re.search(r'RETAINED_GUI_OPERATION .* failed|openq4_retainedGui: requires', log)
     return checks
 
@@ -87,6 +111,8 @@ def main():
     binaries = [p for p in binaries if p.is_file()]
     bindings = {str(p.relative_to(args.runtime)): capture.digest(p) for p in binaries}
     sources = ['src/mpgame/Player.cpp', 'src/mpgame/Player.h', 'src/mpgame/MultiplayerGame.cpp',
+               'src/mpgame/MultiplayerGame.h', 'src/mpgame/Game_network.cpp', 'src/mpgame/gamesys/SysCmds.cpp',
+               'tools/ui/retained_mp_admin.py',
                'src/ui/UserInterfaceRetained.cpp', 'src/framework/Session_menu.cpp',
                'src/ui/retained/Interaction.cpp', 'src/ui/retained/State.cpp', 'tools/ui/capture_player_identity.py',
                'content/baseoq4/pak0/guis/menu/mp_escape.q4ui']
@@ -102,7 +128,7 @@ def main():
     log = re.sub(r'\^[0-9]', '', (ROOT / result['log']).read_text(encoding='utf-8', errors='replace'))
     checks = qualify(log)
     checks.update(completed=result['complete'] and result['returncode'] == 0 and not result['errors'],
-                  renderer=active_renderer(log) == args.renderer, captures=len(result['screenshots']) == 7,
+                  renderer=active_renderer(log) == args.renderer, captures=len(result['screenshots']) == 11,
                   unchanged_binaries=bindings == {str(p.relative_to(args.runtime)): capture.digest(p) for p in binaries},
                   unchanged_sources=source_bindings == {p: capture.digest(ROOT / p) for p in sources})
     result.update(checks=checks, binaries=bindings, sources=source_bindings, log_sha256=capture.digest(ROOT / result['log']),
