@@ -365,6 +365,9 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- A long multiplayer chat message with an icon in it no longer repeats the
+  icon at the start of the next line when it wraps.
+
 - Demos recorded on servers without cheats can be paused, slowed and sped up
   again, and the playback timeline follows the position. Playback took over
   the server's cheat setting, which locked those controls.

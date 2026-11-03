@@ -179,6 +179,7 @@ jobs:
             tools/tests/dmap_vertex_sharing.py \
             tools/tests/dmap_tjunction_slivers.py \
             tools/tests/dmap_optimizer_zero_area.py \
+            tools/tests/idstr_last_color_code.py \
             tools/tests/renderer_silhouette_edges.py \
             tools/tests/fatal_error_startup_safety.py \
             tools/tests/android_build.py \
@@ -414,6 +415,7 @@ jobs:
             tools/tests/turbo_scripted_movers.py \
             tools/tests/savegame_pointer_width_safety.py \
             tools/tests/savegame_v3_contract.py \
+            tools/tests/savegame_raw_inventory.py \
             tools/tests/sdl3_input_parity.py \
             tools/tests/sys_event_queue_ownership.py \
             tools/tests/event_journal.py \
@@ -672,6 +674,7 @@ jobs:
           python tools/tests/dmap_vertex_sharing.py
           python tools/tests/dmap_tjunction_slivers.py
           python tools/tests/dmap_optimizer_zero_area.py
+          python tools/tests/idstr_last_color_code.py
           python tools/tests/renderer_silhouette_edges.py
           python tools/tests/fatal_error_startup_safety.py
           python tools/tests/android_build.py
@@ -891,6 +894,7 @@ jobs:
           python tools/tests/turbo_scripted_movers.py
           python tools/tests/savegame_pointer_width_safety.py
           python tools/tests/savegame_v3_contract.py
+          python tools/tests/savegame_raw_inventory.py
           python tools/tests/sdl3_input_parity.py
           python tools/tests/sys_event_queue_ownership.py
           python tools/tests/event_journal.py

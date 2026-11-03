@@ -2368,10 +2368,18 @@ idStr idStr::GetLastColorCode( void ) const {
 		int escapeType = 0;
 		int escapeLength = idStr::IsEscape( &data[i-1], &escapeType );
 
-		if ( escapeLength && ( escapeType == S_ESCAPE_COLORINDEX || S_ESCAPE_COLOR ) ) {
+		if ( escapeLength == 0 ) {
+			continue;
+		}
+		if ( escapeType == S_ESCAPE_COLORINDEX || escapeType == S_ESCAPE_COLOR ) {
 			idStr result = "";
 			result.Append( &data[i-1], escapeLength );
 			return result;
+		}
+		// ^r resets the color: the text after it is in the default color.
+		// Icons and other commands set no color, so look past them.
+		if ( data[i] == 'r' || data[i] == 'R' ) {
+			return "";
 		}
 	}
 
