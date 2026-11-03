@@ -446,6 +446,42 @@ def detail(doc: Document) -> list:
     return nodes
 
 
+LAUNCH_MOST = 1.25      # the entrance card at the largest the 4:3 canvas holds
+
+
+def grow_launch(doc: Document, card: dict) -> None:
+    """The entrance card above 100 % text: a card of lines over a picture,
+    shown for a moment, so it grows as one, its lines, letters and art, by
+    the text size up to the largest the 4:3 canvas holds, about its middle.
+    A tall view scales its stage instead (tall_arena_page), so there it
+    keeps its size. Every binding gives the authored value at 100 %
+    (check_text_bindings)."""
+    from build_retained_screens import TALL, TEXT, TEXT_LENGTHS, in_fractions, text_source, text_sum, walk_nodes
+    text_source(doc)
+    grown = {"op": "select", "args": [TALL, 1, {"op": "min", "args": [TEXT, LAUNCH_MOST]}]}
+    width, height = card["properties"]["width"]["value"], card["properties"]["height"]["value"]
+    # The page's narrow-view fit places the card by its offset from the
+    # canvas's middle (fit_narrow), as it places the page's other parts.
+    for key, place, extent in (("left", card["properties"]["left"]["value"], width),
+                               ("margin-top", card["properties"]["top"]["value"] - 360, height)):
+        doc.bind(f"text.launch-card.{key}", "launch-card", key,
+                 text_sum(place + extent / 2, {"op": "*", "args": [-extent / 2, grown]}))
+    for key, extent in (("width", width), ("height", height)):
+        doc.bind(f"text.launch-card.{key}", "launch-card", key, {"op": "*", "args": [extent, grown]})
+    for node in walk_nodes(card):
+        if node is card:
+            continue
+        props = node.get("properties", {})
+        if node.get("type") == "vector" and props.get("width", {}).get("unit") == "dp":
+            in_fractions(node, props["width"]["value"], props["height"]["value"])
+        for key, found in props.items():
+            if not isinstance(found, dict) or found.get("type") != "length" or found.get("unit") != "dp" or not found["value"]:
+                continue
+            # A font length grows by the card's own scale, not the text size.
+            value = {"op": "*", "args": [{"op": "/", "args": [found["value"], TEXT]} if key in TEXT_LENGTHS else found["value"], grown]}
+            doc.bind(f"text.{node['id']}.{key}", node["id"], key, value)
+
+
 def launch_layer(doc: Document) -> dict:
     """The entrance (the stock arena_launch_timeline): the screen darkens to
     0.72 over 320 ms as the card scales in from 94 % over 480 ms; from 760 ms
@@ -487,6 +523,7 @@ def launch_layer(doc: Document) -> dict:
         centred("launch-map", "", 153, 13, "lowpixel", 15, [0.63, 0.69, 0.52, 1], state="arena_selectedMap"),
         centred("launch-ready", "#str_42086", 188, 13, "lowpixel", 15, rgb(ORANGE)),
     ])
+    grow_launch(doc, card)
     stage = group("launch-stage", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)}, [card])
     layer = group("launch", {**FULL, "display": keyword("none"), "pointer-events": keyword("none")}, [
         group("launch-shade", {**FULL, "background-color": colour([0, 0, 0, 1]), "opacity": number(0)}), stage])
@@ -498,6 +535,51 @@ def launch_layer(doc: Document) -> dict:
     ])
     doc.events["arenaMatchLaunch"] = [{"op": "setState", "values": {"arena.launch": True}}, {"op": "playTimeline", "timeline": "launch"}]
     return layer
+
+
+def grow_ledger(doc: Document, phases: list):
+    """The result ledger above 100 % text: each line (the result, the match,
+    the message, the score, unlock and awards rows) is its 100 % height times
+    the text size, standing as far below its place as the lines above it
+    grew; the rows' labels and the NEW BEST tag keep their size, a label
+    centred in its grown line. Returns what the lines grew, which the dialog
+    grows by (confirmation's contents_grow)."""
+    from build_retained_screens import LARGER, TEXT, fixed_text, text_sum, text_source, walk_nodes
+    text_source(doc)
+    nodes = {node["id"]: node for phase in phases for node in walk_nodes(phase)}
+
+    def props(ident: str) -> dict:
+        return nodes[ident]["properties"]
+    # (the lines a row holds, by their tops) in order down the ledger.
+    lines = [("result-title",), ("result-match",), ("result-message",), ("result-score-label", "result-score"),
+             ("result-unlock-label", "result-unlock"), ("result-awards-label", "result-awards", "result-complete")]
+    above = 0
+    for line in lines:
+        grew = 0
+        for ident in line:
+            top, height = props(ident)["top"]["value"], props(ident)["height"]["value"]
+            if above:
+                doc.bind(f"text.{ident}.top", ident, "top",
+                         {"op": "select", "args": [LARGER, text_sum(top, {"op": "*", "args": [above, {"op": "-", "args": [TEXT, 1]}]}), top]})
+            doc.bind(f"text.{ident}.height", ident, "height", {"op": "*", "args": [height, TEXT]})
+            if ident.endswith("-label"):
+                doc.bind(f"text.{ident}.font-size", ident, "font-size", {"op": "/", "args": [props(ident)["font-size"]["value"], TEXT]})
+            elif props(ident).get("white-space", {}).get("value") == "nowrap":
+                props(ident)["text-overflow"] = keyword("clip")
+                doc.bind(f"text.{ident}.text-overflow", ident, "text-overflow", {"op": "select", "args": [LARGER, "ellipsis", "clip"]})
+            grew = max(grew, height)
+        if line == ("result-match",):
+            # The rule under the match moves with it.
+            top = props("result-rule")["top"]["value"]
+            doc.bind("text.result-rule.top", "result-rule", "top",
+                     {"op": "select", "args": [LARGER, text_sum(top, {"op": "*", "args": [above + grew, {"op": "-", "args": [TEXT, 1]}]}), top]})
+        if line[-1] == "result-score":
+            top = props("result-new-best")["top"]["value"]
+            doc.bind("text.result-new-best.top", "result-new-best", "top",
+                     {"op": "select", "args": [LARGER, text_sum(top, {"op": "*", "args": [above, {"op": "-", "args": [TEXT, 1]}]}), top]})
+            fixed_text(doc, nodes["result-new-best"])
+        above += grew
+    return {"op": "*", "args": [above, {"op": "-", "args": [TEXT, 1]}]}
 
 
 def result_modal(doc: Document) -> dict:
@@ -571,10 +653,11 @@ def result_modal(doc: Document) -> dict:
         row("awards", "#str_42154", 254, "arena_resultAwardLine", awards_shown, [0.95, 0.87, 0.6, 1], size=15, lines=2),
         champion])
     actions_u = RESULT_HEIGHT - 40
+    grown = grow_ledger(doc, [phase1, phase2, phase3])
     modal = confirmation(doc, "resultModal", "#str_42080", PLACEHOLDER, None, yes_event="resultRetry", no_event="resultDismiss",
                          height_u=RESULT_HEIGHT, top_u=RESULT_TOP, actions_u=actions_u, contents=[phase1, phase2, phase3],
                          yes_key="#str_42033", no_key="#str_42034", initial="resultModal_no", width_dp=RESULT_WIDTH,
-                         action_w=RESULT_ACTION_W, action_text=RESULT_ACTION_TEXT)
+                         action_w=RESULT_ACTION_W, action_text=RESULT_ACTION_TEXT, contents_grow=grown)
     # The actions wait for the reveal: RETRY after a defeat or an aborted
     # match, REPLAY after a win or a draw, where the match can be played
     # again; then NEXT after a win short of the last, RETURN, or CONTINUE
@@ -617,9 +700,19 @@ def reset_modal(doc: Document) -> dict:
     doc.session("resetCancel", "arenaResetCancel")
     body = label("resetModal-body", "#str_42073", {**absolute(left=33, top=71, width=RESET_W - 66, height=88),
                                                    **typeface("lowpixel", 17, 22, [1, 1, 1, 0.8])})
+    # Above 100 % text the question takes the lines the running language
+    # needs and the dialog grows with it, as a confirmation's body does.
+    from build_retained_screens import LARGER, per_language, text_buckets, text_source, text_sum, text_times, wrapped_lines
+    text_source(doc)
+    counts = wrapped_lines(("#str_42073",), "lowpixel", 17, RESET_W - 66)
+    lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+    needed = text_times({"op": "*", "args": [lines, 22]})
+    doc.bind("text.resetModal-body.height", "resetModal-body", "height",
+             {"op": "select", "args": [LARGER, {"op": "max", "args": [88, needed]}, 88]})
     modal = confirmation(doc, "resetModal", "#str_42011", PLACEHOLDER, None, yes_event="resetConfirmed", no_event="resetCancelled",
                          yes_key="#str_42075", no_key="#str_42074", action_w=RESET_ACTION_W, action_text=RESET_ACTION_TEXT,
-                         height_u=RESET_HEIGHT, top_u=RESET_TOP, actions_u=RESET_HEIGHT - 40, contents=[body])
+                         height_u=RESET_HEIGHT, top_u=RESET_TOP, actions_u=RESET_HEIGHT - 40, contents=[body],
+                         contents_grow={"op": "max", "args": [0, text_sum(-88, needed)]})
     doc.events["resetConfirmed"] = [{"op": "call", "event": "resetModalHide"}, {"op": "action", "action": "resetConfirm"}]
     doc.events["resetCancelled"] = [{"op": "call", "event": "resetModalHide"}, {"op": "action", "action": "resetCancel"}]
     doc.events["arenaResetReveal"] = [{"op": "call", "event": "resetModalShow"}]
@@ -789,7 +882,136 @@ def arena_document() -> dict:
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 1]), "font-family": font("marine"), "font-size": length(16),
                             "color": colour([1, 1, 1, 0.8])},
                  [*lit_field("field", 0.7), *bands, backing_node, content, titles, launch, result, reset, curtain])
-    return tall_arena_page(fit_narrow(doc.build(root), pages=True))
+    fitted = fit_narrow(doc.build(root), pages=True)
+    grow_arena(doc, fitted)
+    return tall_arena_page(fitted, doc.arena_lettered)
+
+
+# Section 2's text size on the Arena page. The plates, headings, the info's
+# labels, the steps, START MATCH, RESET PROGRESS and the best-result badge are
+# furniture; the briefing, the progress, the chosen match's name, description
+# and info and the difficulty's name are content.
+PICTURE_LEAST = 30.0     # u: a levelshot squeezed shorter than this gives its room to the lines
+ARENA_FLOOR = 420.0      # u: content stands over the docked bottom band's edge
+
+
+def grow_arena(doc: Document, result: dict) -> None:
+    """Above 100 % text the chosen match's lines grow under its levelshot,
+    which gives them its room (shrinking from its foot, and giving way where
+    too little is left), DIFFICULTY, its steps and START MATCH moving down
+    only as far as the lines still need; the briefing's lines grow down the
+    matches' column, its static rule giving way where it would cross the
+    bottom band (the path above it says the same); the progress grows under
+    the ladder. Each value ends in an ellipsis past its column. Every binding
+    gives the authored value at 100 % (check_text_bindings). Runs on the page
+    as the narrow-view fit left it, whose parts stand by their offset from
+    the canvas's middle. In a tall view, whose arrangement grows the page a
+    fixed amount, the content keeps that size at every text size, as the list
+    pages' details do."""
+    from build_retained_screens import LARGER as ANY_LARGER, TALL, TEXT, fixed_text, text_source, text_sum, walk_nodes
+    text_source(doc)
+    nodes = {node["id"]: node for node in walk_nodes(result["root"])}
+    LARGER = {"op": "&&", "args": [ANY_LARGER, {"op": "!", "args": [TALL]}]}
+    lettered = []
+
+    def u(value):
+        """`value` (u, or an expression in u) in dp."""
+        return round(U * value, 4) if isinstance(value, (int, float)) else {"op": "*", "args": [U, value]}
+
+    def times(value: float):
+        return {"op": "*", "args": [value, TEXT]}
+
+    def larger(ident: str, key: str, grown, authored=None) -> None:
+        if authored is None:
+            authored = nodes[ident]["properties"][key]["value"]
+        doc.bind(f"text.{ident}.{key}", ident, key, {"op": "select", "args": [LARGER, grown, authored]})
+
+    def stand(ident: str, top) -> None:
+        """`ident` stands at `top` (u on the canvas) above 100 %."""
+        props = nodes[ident]["properties"]
+        if props["top"].get("unit") == "dp":
+            larger(ident, "top", u(top))
+        else:
+            larger(ident, "margin-top", text_sum(-360, u(top)))
+
+    def grow(ident: str, height_u: float, top=None) -> None:
+        if top is not None:
+            stand(ident, top)
+        larger(ident, "height", u(times(height_u)))
+        props = nodes[ident]["properties"]
+        if props.get("white-space", {}).get("value") == "nowrap":
+            props["text-overflow"] = keyword("clip")
+            larger(ident, "text-overflow", "ellipsis", "clip")
+        lettered.append(ident)
+
+    # The chosen match: its levelshot, then its name, rule, description and
+    # info, then DIFFICULTY, the steps and START MATCH.
+    below = 6 + 6 + 4 + 4
+    lines = 14 + 36 + (INFO[-1][3] + 12 - INFO[0][3])
+    room = DIFFICULTY_TOP - SHOT_TOP
+    squeezed = text_sum(room - below, times(-lines))                   # u: the levelshot's height above 100 %
+    pictured = {"op": ">=", "args": [squeezed, PICTURE_LEAST]}
+    picture_h = {"op": "select", "args": [pictured, {"op": "min", "args": [SHOT_H, squeezed]}, 0]}
+    hidden = {"op": "&&", "args": [LARGER, {"op": "!", "args": [pictured]}]}
+    for ident in ("arena-shot-back", "arena-shot", "arena-shot-border"):
+        inset = SHOT_H - nodes[ident]["properties"]["height"]["value"] / U
+        larger(ident, "height", u({"op": "max", "args": [0, text_sum(-inset, picture_h)]}))
+        nodes[ident]["properties"]["display"] = keyword("block")
+        doc.bind(f"text.{ident}.display", ident, "display", {"op": "select", "args": [hidden, "none", "block"]})
+    # The best-result badge rides the levelshot's foot and goes with it.
+    nodes["arena-best"]["properties"]["opacity"] = number(1)
+    doc.bind("text.arena-best.opacity", "arena-best", "opacity",
+             {"op": "select", "args": [{"op": "&&", "args": [LARGER, {"op": "<", "args": [picture_h, BEST_H + 10]}]}, 0, 1]})
+    stand("arena-best", text_sum(SHOT_TOP - 1 - BEST_H, picture_h))
+    title = {"op": "select", "args": [pictured, text_sum(SHOT_TOP + 6, picture_h), SHOT_TOP]}
+    grow("arena-match-title", 14, title)
+    stand("arena-title-rule", text_sum(2, title, times(14)))
+    description = text_sum(6, title, times(14))
+    grow("arena-match-description", 36, description)
+    info = text_sum(4, description, times(36))
+    for ident, _key, _state, top, info_lines in INFO:
+        at = text_sum(info, times(top - INFO[0][3]))
+        grow(f"arena-{ident}", 12 * info_lines, at)
+        # The label keeps its size, centred in its grown line.
+        stand(f"arena-{ident}-label", text_sum(1, at))
+        larger(f"arena-{ident}-label", "height", u(times(11)))
+        label_props = nodes[f"arena-{ident}-label"]["properties"]
+        doc.bind(f"text.arena-{ident}-label.font-size", f"arena-{ident}-label", "font-size",
+                 {"op": "/", "args": [label_props["font-size"]["value"], TEXT]})
+    shift = {"op": "max", "args": [0, text_sum(4 - DIFFICULTY_TOP, info, times(INFO[-1][3] + 12 - INFO[0][3]))]}
+    steps_top = DIFFICULTY_TOP + 13
+    for ident, top in (("arena-difficulty-label", DIFFICULTY_TOP), ("arena_easier", steps_top), ("arena_harder", steps_top),
+                       ("arena_start", START_TOP)):
+        stand(ident, text_sum(top, shift))
+    # The difficulty's name stays centred between its steps.
+    grow("arena-difficulty", 14, text_sum(steps_top + 2 + 7, shift, times(-7)))
+    # The briefing down the matches' column.
+    name_top = BRIEFING_TOP + 12
+    grow("arena-tier-name", 15)
+    tier_description = text_sum(name_top + 2, times(15))
+    grow("arena-tier-description", 36, tier_description)
+    path_top = text_sum(3, tier_description, times(36))
+    grow("arena-tier-path", 22, path_top)
+    rule_top = text_sum(2, path_top, times(22))
+    grow("arena-tier-rule", 36, rule_top)
+    nodes["arena-tier-rule"]["properties"]["display"] = keyword("block")
+    doc.bind("text.arena-tier-rule.display", "arena-tier-rule", "display",
+             {"op": "select", "args": [{"op": ">", "args": [text_sum(rule_top, times(36)), ARENA_FLOOR]}, "none", "block"]})
+    # The progress under the ladder: its line wraps onto a second, so that
+    # its count stays whole in the narrow column.
+    progress = {"op": "*", "args": [{"op": "select", "args": [LARGER, 2, 1]}, times(13)]}   # u
+    larger("arena-progress", "height", u(progress))
+    larger("arena-progress", "white-space", "normal")
+    lettered.append("arena-progress")
+    for ident in ("arena-progress-track", "arena-progress-fill"):
+        stand(ident, text_sum(PROGRESS_TOP + 2, progress))
+    grow("arena-complete", 12, text_sum(PROGRESS_TOP + 9, progress))
+    stand("arena-reset-row", text_sum(PROGRESS_TOP + 15, times(12), progress))
+    for ident in ("arena-tiers-head", "arena-matches-head", "arena-briefing-head", "arena-difficulty-label", "arena-best", "arena_easier",
+                  "arena_harder", "arena_start", "arena_back", *(f"tier-{index}" for index in range(TIERS)),
+                  *(f"match-{index}" for index in range(MATCHES))):
+        fixed_text(doc, nodes[ident])
+    doc.arena_lettered = lettered
 
 
 # A tall view's Arena page (retained_tall): the three columns become two
@@ -811,7 +1033,7 @@ TALL_BESIDE = 24.0                             # dp: from a column of plates to 
 TALL_BLOCKS = 30.0                             # dp: between the tiers' block and the matches'
 
 
-def tall_arena_page(result: dict) -> dict:
+def tall_arena_page(result: dict, lettered: list = ()) -> dict:
     from build_retained_screens import TALL
     from retained_saves import BACKING_ALPHA
     from retained_tall import CONTENT_W, MARGIN, TallLayout
@@ -858,6 +1080,12 @@ def tall_arena_page(result: dict) -> dict:
     tall.block(detail_ids, (U * DETAIL_X, U * SHOT_TOP), (detail_x, top), detail, shift)
     tall.block(("arena-difficulty-label", "arena_easier", "arena-difficulty", "arena_harder", "arena_start"), (U * DETAIL_X, U * DIFFICULTY_TOP),
                (MARGIN, top + matches_h + TALL_BESIDE), steps, shift)
+    # The content that grows with the text in a landscape view (grow_arena)
+    # keeps its letters at the arrangement's size here.
+    for ident in lettered:
+        for key in ("font-size", "line-height"):
+            found = next(binding for binding in tall.bindings if binding["id"] == f"tall.{ident}.{key}")
+            found["value"]["args"][1] = {"op": "/", "args": [found["value"]["args"][1], {"state": "view.text"}]}
     tall.dialogs(TALL_DIALOGS)
     tall.scale("launch-stage", round(min(TALL_DIALOGS, CONTENT_W / tall.dp("launch-card", "width")), 4))
     tall.shade("arena-backing", BACKING_ALPHA)

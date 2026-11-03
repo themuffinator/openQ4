@@ -8,10 +8,11 @@
  "canvas": {"height": 720, "minWidth": 960},
  "state": {
   "restart.skill": {"type": "number", "initial": 1},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "prompt.glyphs": {"type": "number", "initial": 0},
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
-  "view.text": {"type": "number", "initial": 1, "view": "text"},
+  "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
   "notice.0.shown": {"type": "boolean", "initial": false},
   "notice.0.text": {"type": "string", "initial": ""},
@@ -199,6 +200,578 @@
        }
       ]
      }
+    ]
+   }
+  },
+  {
+   "id": "text.skill-0-label.font-size",
+   "node": "skill-0-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-0-label.line-height",
+   "node": "skill-0-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-0-label-lit.font-size",
+   "node": "skill-0-label-lit",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-0-label-lit.line-height",
+   "node": "skill-0-label-lit",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-1-label.font-size",
+   "node": "skill-1-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-1-label.line-height",
+   "node": "skill-1-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-1-label-lit.font-size",
+   "node": "skill-1-label-lit",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-1-label-lit.line-height",
+   "node": "skill-1-label-lit",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-2-label.font-size",
+   "node": "skill-2-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-2-label.line-height",
+   "node": "skill-2-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-2-label-lit.font-size",
+   "node": "skill-2-label-lit",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-2-label-lit.line-height",
+   "node": "skill-2-label-lit",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-3-label.font-size",
+   "node": "skill-3-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-3-label.line-height",
+   "node": "skill-3-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-3-label-lit.font-size",
+   "node": "skill-3-label-lit",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-3-label-lit.line-height",
+   "node": "skill-3-label-lit",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-4-label.font-size",
+   "node": "skill-4-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-4-label.line-height",
+   "node": "skill-4-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-4-label-lit.font-size",
+   "node": "skill-4-label-lit",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [22.3, {"state": "view.text"}]}]},
+     {"op": "/", "args": [22.3, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.skill-4-label-lit.line-height",
+   "node": "skill-4-label-lit",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [36.6, {"state": "view.text"}]}]},
+     {"op": "/", "args": [36.6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.restart_go-label.font-size",
+   "node": "restart_go-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [23.7, {"state": "view.text"}]}]},
+     {"op": "/", "args": [23.7, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.restart_go-label.line-height",
+   "node": "restart_go-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {"op": "*", "args": [1.6, {"op": "/", "args": [37.5, {"state": "view.text"}]}]},
+     {"op": "/", "args": [37.5, {"state": "view.text"}]}
     ]
    }
   },
@@ -565,10 +1138,338 @@
    "value": {"op": "/", "args": [22, {"state": "view.text"}]}
   },
   {
+   "id": "text.restart-description.width",
+   "node": "restart-description",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     788.4,
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 570.0, 517.5]}
+    ]
+   }
+  },
+  {
+   "id": "text.restart-description.height",
+   "node": "restart-description",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         110.4,
+         {
+          "op": "select",
+          "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "czech"]},
+               2,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "english"]},
+                 2,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "german"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "polish"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                       2,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             2
+            ]
+           },
+           23.0
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       },
+       208.5
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.restart_go.margin-top",
+   "node": "restart_go",
+   "property": "margin-top",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     {
+      "op": "-",
+      "args": [
+       {
+        "op": "+",
+        "args": [
+         591.6,
+         {
+          "op": "+",
+          "args": [
+           {
+            "op": "+",
+            "args": [
+             -73.60000000000001,
+             {
+              "op": "max",
+              "args": [
+               0,
+               {
+                "op": "/",
+                "args": [
+                 {
+                  "op": "-",
+                  "args": [
+                   {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
+                   {
+                    "op": "+",
+                    "args": [
+                     721.2,
+                     {
+                      "op": "*",
+                      "args": [
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                         110.4,
+                         {
+                          "op": "select",
+                          "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+                         }
+                        ]
+                       },
+                       {"state": "view.text"}
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "select",
+              "args": [
+               {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+               110.4,
+               {
+                "op": "select",
+                "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+               }
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "/", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 2]}
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "max",
+        "args": [
+         -27.0,
+         {
+          "op": "+",
+          "args": [
+           -73.0,
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "*",
+              "args": [
+               {
+                "op": "select",
+                "args": [
+                 {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "czech"]},
+                   2,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "english"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "german"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "polish"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                           2,
+                           {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 2, 3]}
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 2
+                ]
+               },
+               23.0
+              ]
+             },
+             {"state": "view.text"}
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       -27.0
+      ]
+     }
+    ]
+   }
+  },
+  {
    "id": "tall.skill-0.left",
    "node": "skill-0",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 32.4, 31.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     32.4,
+     31.5
+    ]
+   }
   },
   {
    "id": "tall.skill-0.margin-top",
@@ -577,7 +1478,20 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
      {
       "op": "-",
       "args": [
@@ -589,7 +1503,41 @@
           "op": "max",
           "args": [
            0,
-           {"op": "/", "args": [{"op": "-", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 794.8]}, 2]}
+           {
+            "op": "/",
+            "args": [
+             {
+              "op": "-",
+              "args": [
+               {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
+               {
+                "op": "+",
+                "args": [
+                 721.2,
+                 {
+                  "op": "*",
+                  "args": [
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                     110.4,
+                     {
+                      "op": "select",
+                      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+                     }
+                    ]
+                   },
+                   {"state": "view.text"}
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             2
+            ]
+           }
           ]
          }
         ]
@@ -605,169 +1553,625 @@
    "id": "tall.skill-0.width",
    "node": "skill-0",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 469.248, 293.28]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     469.248,
+     293.28
+    ]
+   }
   },
   {
    "id": "tall.skill-0.height",
    "node": "skill-0",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 72.0, 45.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     72.0,
+     45.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-art.top",
    "node": "skill-0-art",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, -24.48, -15.3]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     -24.48,
+     -15.3
+    ]
+   }
   },
   {
    "id": "tall.skill-0-art.width",
    "node": "skill-0-art",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-art.height",
    "node": "skill-0-art",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-plate.width",
    "node": "skill-0-plate",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-plate.height",
    "node": "skill-0-plate",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-plate-lit.width",
    "node": "skill-0-plate-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-plate-lit.height",
    "node": "skill-0-plate-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-focus.width",
    "node": "skill-0-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-focus.height",
    "node": "skill-0-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-marker.width",
    "node": "skill-0-marker",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-marker.height",
    "node": "skill-0-marker",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-marker-hot.width",
    "node": "skill-0-marker-hot",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-marker-hot.height",
    "node": "skill-0-marker-hot",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-label.left",
    "node": "skill-0-label",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-label.top",
    "node": "skill-0-label",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-0-label.width",
    "node": "skill-0-label",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-label.height",
    "node": "skill-0-label",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-0-label.font-size",
-   "node": "skill-0-label",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-0-label.line-height",
-   "node": "skill-0-label",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-0-label-lit.left",
    "node": "skill-0-label-lit",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-label-lit.top",
    "node": "skill-0-label-lit",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-0-label-lit.width",
    "node": "skill-0-label-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-0-label-lit.height",
    "node": "skill-0-label-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-0-label-lit.font-size",
-   "node": "skill-0-label-lit",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-0-label-lit.line-height",
-   "node": "skill-0-label-lit",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-1.left",
    "node": "skill-1",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 30.0, 30.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     30.0,
+     30.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1.margin-top",
@@ -776,7 +2180,20 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
      {
       "op": "-",
       "args": [
@@ -788,7 +2205,41 @@
           "op": "max",
           "args": [
            0,
-           {"op": "/", "args": [{"op": "-", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 794.8]}, 2]}
+           {
+            "op": "/",
+            "args": [
+             {
+              "op": "-",
+              "args": [
+               {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
+               {
+                "op": "+",
+                "args": [
+                 721.2,
+                 {
+                  "op": "*",
+                  "args": [
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                     110.4,
+                     {
+                      "op": "select",
+                      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+                     }
+                    ]
+                   },
+                   {"state": "view.text"}
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             2
+            ]
+           }
           ]
          }
         ]
@@ -804,169 +2255,625 @@
    "id": "tall.skill-1.width",
    "node": "skill-1",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 469.248, 293.28]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     469.248,
+     293.28
+    ]
+   }
   },
   {
    "id": "tall.skill-1.height",
    "node": "skill-1",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 72.0, 45.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     72.0,
+     45.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-art.top",
    "node": "skill-1-art",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, -24.48, -15.3]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     -24.48,
+     -15.3
+    ]
+   }
   },
   {
    "id": "tall.skill-1-art.width",
    "node": "skill-1-art",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-art.height",
    "node": "skill-1-art",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-plate.width",
    "node": "skill-1-plate",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-plate.height",
    "node": "skill-1-plate",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-plate-lit.width",
    "node": "skill-1-plate-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-plate-lit.height",
    "node": "skill-1-plate-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-focus.width",
    "node": "skill-1-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-focus.height",
    "node": "skill-1-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-marker.width",
    "node": "skill-1-marker",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-marker.height",
    "node": "skill-1-marker",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-marker-hot.width",
    "node": "skill-1-marker-hot",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-marker-hot.height",
    "node": "skill-1-marker-hot",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-label.left",
    "node": "skill-1-label",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-label.top",
    "node": "skill-1-label",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-1-label.width",
    "node": "skill-1-label",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-label.height",
    "node": "skill-1-label",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-1-label.font-size",
-   "node": "skill-1-label",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-1-label.line-height",
-   "node": "skill-1-label",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-1-label-lit.left",
    "node": "skill-1-label-lit",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-label-lit.top",
    "node": "skill-1-label-lit",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-1-label-lit.width",
    "node": "skill-1-label-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-1-label-lit.height",
    "node": "skill-1-label-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-1-label-lit.font-size",
-   "node": "skill-1-label-lit",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-1-label-lit.line-height",
-   "node": "skill-1-label-lit",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-2.left",
    "node": "skill-2",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 30.0, 30.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     30.0,
+     30.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2.margin-top",
@@ -975,7 +2882,20 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
      {
       "op": "-",
       "args": [
@@ -987,7 +2907,41 @@
           "op": "max",
           "args": [
            0,
-           {"op": "/", "args": [{"op": "-", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 794.8]}, 2]}
+           {
+            "op": "/",
+            "args": [
+             {
+              "op": "-",
+              "args": [
+               {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
+               {
+                "op": "+",
+                "args": [
+                 721.2,
+                 {
+                  "op": "*",
+                  "args": [
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                     110.4,
+                     {
+                      "op": "select",
+                      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+                     }
+                    ]
+                   },
+                   {"state": "view.text"}
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             2
+            ]
+           }
           ]
          }
         ]
@@ -1003,169 +2957,625 @@
    "id": "tall.skill-2.width",
    "node": "skill-2",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 469.248, 293.28]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     469.248,
+     293.28
+    ]
+   }
   },
   {
    "id": "tall.skill-2.height",
    "node": "skill-2",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 72.0, 45.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     72.0,
+     45.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-art.top",
    "node": "skill-2-art",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, -24.48, -15.3]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     -24.48,
+     -15.3
+    ]
+   }
   },
   {
    "id": "tall.skill-2-art.width",
    "node": "skill-2-art",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-art.height",
    "node": "skill-2-art",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-plate.width",
    "node": "skill-2-plate",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-plate.height",
    "node": "skill-2-plate",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-plate-lit.width",
    "node": "skill-2-plate-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-plate-lit.height",
    "node": "skill-2-plate-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-focus.width",
    "node": "skill-2-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-focus.height",
    "node": "skill-2-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-marker.width",
    "node": "skill-2-marker",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-marker.height",
    "node": "skill-2-marker",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-marker-hot.width",
    "node": "skill-2-marker-hot",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-marker-hot.height",
    "node": "skill-2-marker-hot",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-label.left",
    "node": "skill-2-label",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-label.top",
    "node": "skill-2-label",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-2-label.width",
    "node": "skill-2-label",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-label.height",
    "node": "skill-2-label",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-2-label.font-size",
-   "node": "skill-2-label",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-2-label.line-height",
-   "node": "skill-2-label",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-2-label-lit.left",
    "node": "skill-2-label-lit",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-label-lit.top",
    "node": "skill-2-label-lit",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-2-label-lit.width",
    "node": "skill-2-label-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-2-label-lit.height",
    "node": "skill-2-label-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-2-label-lit.font-size",
-   "node": "skill-2-label-lit",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-2-label-lit.line-height",
-   "node": "skill-2-label-lit",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-3.left",
    "node": "skill-3",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 30.0, 30.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     30.0,
+     30.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3.margin-top",
@@ -1174,7 +3584,20 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
      {
       "op": "-",
       "args": [
@@ -1186,7 +3609,41 @@
           "op": "max",
           "args": [
            0,
-           {"op": "/", "args": [{"op": "-", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 794.8]}, 2]}
+           {
+            "op": "/",
+            "args": [
+             {
+              "op": "-",
+              "args": [
+               {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
+               {
+                "op": "+",
+                "args": [
+                 721.2,
+                 {
+                  "op": "*",
+                  "args": [
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                     110.4,
+                     {
+                      "op": "select",
+                      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+                     }
+                    ]
+                   },
+                   {"state": "view.text"}
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             2
+            ]
+           }
           ]
          }
         ]
@@ -1202,169 +3659,625 @@
    "id": "tall.skill-3.width",
    "node": "skill-3",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 469.248, 293.28]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     469.248,
+     293.28
+    ]
+   }
   },
   {
    "id": "tall.skill-3.height",
    "node": "skill-3",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 72.0, 45.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     72.0,
+     45.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-art.top",
    "node": "skill-3-art",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, -24.48, -15.3]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     -24.48,
+     -15.3
+    ]
+   }
   },
   {
    "id": "tall.skill-3-art.width",
    "node": "skill-3-art",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-art.height",
    "node": "skill-3-art",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-plate.width",
    "node": "skill-3-plate",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-plate.height",
    "node": "skill-3-plate",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-plate-lit.width",
    "node": "skill-3-plate-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-plate-lit.height",
    "node": "skill-3-plate-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-focus.width",
    "node": "skill-3-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-focus.height",
    "node": "skill-3-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-marker.width",
    "node": "skill-3-marker",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-marker.height",
    "node": "skill-3-marker",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-marker-hot.width",
    "node": "skill-3-marker-hot",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-marker-hot.height",
    "node": "skill-3-marker-hot",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-label.left",
    "node": "skill-3-label",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-label.top",
    "node": "skill-3-label",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-3-label.width",
    "node": "skill-3-label",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-label.height",
    "node": "skill-3-label",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-3-label.font-size",
-   "node": "skill-3-label",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-3-label.line-height",
-   "node": "skill-3-label",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-3-label-lit.left",
    "node": "skill-3-label-lit",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-label-lit.top",
    "node": "skill-3-label-lit",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-3-label-lit.width",
    "node": "skill-3-label-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-3-label-lit.height",
    "node": "skill-3-label-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-3-label-lit.font-size",
-   "node": "skill-3-label-lit",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-3-label-lit.line-height",
-   "node": "skill-3-label-lit",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-4.left",
    "node": "skill-4",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 30.0, 30.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     30.0,
+     30.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4.margin-top",
@@ -1373,7 +4286,20 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
      {
       "op": "-",
       "args": [
@@ -1385,7 +4311,41 @@
           "op": "max",
           "args": [
            0,
-           {"op": "/", "args": [{"op": "-", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 794.8]}, 2]}
+           {
+            "op": "/",
+            "args": [
+             {
+              "op": "-",
+              "args": [
+               {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
+               {
+                "op": "+",
+                "args": [
+                 721.2,
+                 {
+                  "op": "*",
+                  "args": [
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                     110.4,
+                     {
+                      "op": "select",
+                      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+                     }
+                    ]
+                   },
+                   {"state": "view.text"}
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             2
+            ]
+           }
           ]
          }
         ]
@@ -1401,169 +4361,625 @@
    "id": "tall.skill-4.width",
    "node": "skill-4",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 486.5872, 304.117]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     486.5872,
+     304.117
+    ]
+   }
   },
   {
    "id": "tall.skill-4.height",
    "node": "skill-4",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 72.0, 45.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     72.0,
+     45.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-art.top",
    "node": "skill-4-art",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, -24.48, -15.3]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     -24.48,
+     -15.3
+    ]
+   }
   },
   {
    "id": "tall.skill-4-art.width",
    "node": "skill-4-art",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-art.height",
    "node": "skill-4-art",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-plate.width",
    "node": "skill-4-plate",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-plate.height",
    "node": "skill-4-plate",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-plate-lit.width",
    "node": "skill-4-plate-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-plate-lit.height",
    "node": "skill-4-plate-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-focus.width",
    "node": "skill-4-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-focus.height",
    "node": "skill-4-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-marker.width",
    "node": "skill-4-marker",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-marker.height",
    "node": "skill-4-marker",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-marker-hot.width",
    "node": "skill-4-marker-hot",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 499.2, 312.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     499.2,
+     312.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-marker-hot.height",
    "node": "skill-4-marker-hot",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 124.8, 78.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     124.8,
+     78.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-label.left",
    "node": "skill-4-label",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-label.top",
    "node": "skill-4-label",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-4-label.width",
    "node": "skill-4-label",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-label.height",
    "node": "skill-4-label",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-4-label.font-size",
-   "node": "skill-4-label",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-4-label.line-height",
-   "node": "skill-4-label",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.skill-4-label-lit.left",
    "node": "skill-4-label-lit",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 43.2, 27.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     43.2,
+     27.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-label-lit.top",
    "node": "skill-4-label-lit",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 31.2, 19.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     31.2,
+     19.5
+    ]
+   }
   },
   {
    "id": "tall.skill-4-label-lit.width",
    "node": "skill-4-label-lit",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 446.4, 279.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     446.4,
+     279.0
+    ]
+   }
   },
   {
    "id": "tall.skill-4-label-lit.height",
    "node": "skill-4-label-lit",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
-  },
-  {
-   "id": "tall.skill-4-label-lit.font-size",
-   "node": "skill-4-label-lit",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 35.68, 22.3]}
-  },
-  {
-   "id": "tall.skill-4-label-lit.line-height",
-   "node": "skill-4-label-lit",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 58.56, 36.6]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     58.56,
+     36.6
+    ]
+   }
   },
   {
    "id": "tall.restart-description.left",
    "node": "restart-description",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 105.6, 358.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     105.6,
+     358.5
+    ]
+   }
   },
   {
    "id": "tall.restart-description.margin-top",
@@ -1572,7 +4988,20 @@
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
      {
       "op": "-",
       "args": [
@@ -1584,7 +5013,41 @@
           "op": "max",
           "args": [
            0,
-           {"op": "/", "args": [{"op": "-", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 794.8]}, 2]}
+           {
+            "op": "/",
+            "args": [
+             {
+              "op": "-",
+              "args": [
+               {"op": "/", "args": [960.0, {"state": "view.aspect"}]},
+               {
+                "op": "+",
+                "args": [
+                 721.2,
+                 {
+                  "op": "*",
+                  "args": [
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+                     110.4,
+                     {
+                      "op": "select",
+                      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 73.60000000000001, 73.60000000000001]
+                     }
+                    ]
+                   },
+                   {"state": "view.text"}
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             2
+            ]
+           }
           ]
          }
         ]
@@ -1597,63 +5060,80 @@
    }
   },
   {
-   "id": "tall.restart-description.width",
-   "node": "restart-description",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 788.4, 517.5]}
-  },
-  {
-   "id": "tall.restart-description.height",
-   "node": "restart-description",
-   "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 73.6, 208.5]}
-  },
-  {
    "id": "tall.restart-description.font-size",
    "node": "restart-description",
    "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 28.8, 18.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     28.8,
+     18.0
+    ]
+   }
   },
   {
    "id": "tall.restart-description.line-height",
    "node": "restart-description",
    "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 36.8, 23.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     36.8,
+     23.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go.left",
    "node": "restart_go",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 37.5, 355.5]}
-  },
-  {
-   "id": "tall.restart_go.margin-top",
-   "node": "restart_go",
-   "property": "margin-top",
    "value": {
     "op": "select",
     "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
      {
-      "op": "-",
+      "op": "<",
       "args": [
+       {"state": "view.aspect"},
        {
-        "op": "+",
+        "op": "select",
         "args": [
-         591.6,
-         {
-          "op": "max",
-          "args": [
-           0,
-           {"op": "/", "args": [{"op": "-", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 794.8]}, 2]}
-          ]
-         }
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
         ]
-       },
-       {"op": "/", "args": [{"op": "/", "args": [960.0, {"state": "view.aspect"}]}, 2]}
+       }
       ]
      },
-     -27.0
+     37.5,
+     355.5
     ]
    }
   },
@@ -1661,103 +5141,391 @@
    "id": "tall.restart_go.width",
    "node": "restart_go",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 854.4, 534.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     854.4,
+     534.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go.height",
    "node": "restart_go",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 103.2, 64.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     103.2,
+     64.5
+    ]
+   }
   },
   {
    "id": "tall.restart_go-plate.width",
    "node": "restart_go-plate",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 854.4, 534.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     854.4,
+     534.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go-plate.height",
    "node": "restart_go-plate",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 103.2, 64.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     103.2,
+     64.5
+    ]
+   }
   },
   {
    "id": "tall.restart_go-focus.width",
    "node": "restart_go-focus",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 854.4, 534.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     854.4,
+     534.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go-focus.height",
    "node": "restart_go-focus",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 103.2, 64.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     103.2,
+     64.5
+    ]
+   }
   },
   {
    "id": "tall.restart_go-marker.width",
    "node": "restart_go-marker",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 854.4, 534.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     854.4,
+     534.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go-marker.height",
    "node": "restart_go-marker",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 103.2, 64.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     103.2,
+     64.5
+    ]
+   }
   },
   {
    "id": "tall.restart_go-marker-hot.width",
    "node": "restart_go-marker-hot",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 854.4, 534.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     854.4,
+     534.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go-marker-hot.height",
    "node": "restart_go-marker-hot",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 103.2, 64.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     103.2,
+     64.5
+    ]
+   }
   },
   {
    "id": "tall.restart_go-label.left",
    "node": "restart_go-label",
    "property": "left",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 67.2, 42.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     67.2,
+     42.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go-label.top",
    "node": "restart_go-label",
    "property": "top",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 14.4, 9.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     14.4,
+     9.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go-label.width",
    "node": "restart_go-label",
    "property": "width",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 475.2, 297.0]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     475.2,
+     297.0
+    ]
+   }
   },
   {
    "id": "tall.restart_go-label.height",
    "node": "restart_go-label",
    "property": "height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 60.0, 37.5]}
-  },
-  {
-   "id": "tall.restart_go-label.font-size",
-   "node": "restart_go-label",
-   "property": "font-size",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 37.92, 23.7]}
-  },
-  {
-   "id": "tall.restart_go-label.line-height",
-   "node": "restart_go-label",
-   "property": "line-height",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 60.0, 37.5]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     60.0,
+     37.5
+    ]
+   }
   },
   {
    "id": "tall.restart-backing-tall.display",
    "node": "restart-backing-tall",
    "property": "display",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, "block", "none"]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "<",
+      "args": [
+       {"state": "view.aspect"},
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+         1.0,
+         {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 1.0, 1.0]}
+        ]
+       }
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
   },
   {
    "id": "notice-0-symbol-1.display",

@@ -1010,9 +1010,18 @@ archived provenance; new scheduling belongs here.
   [follow the text size](ui/retained-screens.md#list-pages-follow-the-text-size-2-november-2026)
   (Load and Save Game, Demos, Join Game and Create Server's maps), with Load
   Game's and Demos' details stacked over a shrinking picture and their
-  furniture at its size (`LAY-004` partial). Player Setup, the Mods dialog,
-  the Objectives page, Create Server's options, Join Game's other controls,
-  Restart Level, Credits, Arena and the campaign skill page remain.
+  furniture at its size (`LAY-004` partial).
+  Progress, 3 November: the
+  [remaining pages follow the text size](ui/retained-screens.md#the-remaining-pages-follow-the-text-size-3-november-2026)
+  too: Create Server's options and advanced dialog, Player Setup and Join
+  Game's search stack each setting's value under its label in a scrolling
+  column; Restart Level, the campaign's difficulty and chapters, the Mods
+  dialog, the Objectives page, Join Game's status, empty state, details card
+  and entry dialogs, the Arena (with its ledger, reset question and
+  entrance) and Credits grow their content while furniture keeps its size
+  (`LAY-004` partial). Player Setup gained its tall arrangement. Engine
+  qualification of real fonts across every state and the native editor
+  remain.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

@@ -6,10 +6,12 @@ neither GUI source nor a deferred row number can select another asset silently.
 """
 from __future__ import annotations
 
-from build_retained_screens import (CANVAS_W, FULL, OLIVE, ORANGE, VALUE, U, Document, absolute, colour, group, keyword,
-                                    label, length, linear, number, path, rgb, solid, stroke, transform, typeface, vector)
+from build_retained_screens import (CANVAS_W, FULL, OLIVE, ORANGE, TEXT, VALUE, U, Document, absolute, colour, fixed_text, group, keyword,
+                                    label, length, linear, number, path, rgb, solid, stroke, text_sum, text_times, text_width, transform,
+                                    typeface, vector)
 from retained_create_server import text_row
-from retained_mp_menus import any_text, in_game_plate, value_row
+from retained_mp_menus import any_text, in_game_plate, stack_row, value_row
+from retained_saves import table_text
 
 MODEL_ROWS = 128  # Bounded choice page, not a limit on the installed catalog.
 ROTATION_LABEL = "#str_231547"
@@ -54,6 +56,29 @@ def rail_row(doc: Document) -> tuple[dict, list[str]]:
         controls.append(ident)
     return group("setup-rail", {"position": keyword("relative"), "width": length(WIDTH), "height": length(52),
                                  "flex-shrink": number(0)}, children), controls
+
+
+def stack_rail(doc: Document, row: dict) -> None:
+    """The rail colour row above 100 % text: its label across the row on a
+    line that grows with the text, the swatches, furniture, under it from the
+    label's edge (retained_mp_menus.stack_row's layout)."""
+    larger = {"op": ">", "args": [TEXT, 1]}
+    line = text_times(26)
+    height = row["properties"]["height"]["value"]
+    doc.bind("text.setup-rail.height", "setup-rail", "height", {"op": "select", "args": [larger, text_sum(height, line), height]})
+    caption = next(child for child in row["children"] if child["id"] == "setup-rail-label")["properties"]
+    for language, text in table_text("#str_200981").items():
+        if text_width(caption["font-family"]["value"], text, caption["font-size"]["value"] * 2) > WIDTH - 33:
+            raise SystemExit(f"the rail colour's label in {language} does not hold one line of its row at 200 % text")
+    doc.bind("text.setup-rail-label.width", "setup-rail-label", "width", {"op": "select", "args": [larger, WIDTH - 33, caption["width"]["value"]]})
+    doc.bind("text.setup-rail-label.height", "setup-rail-label", "height", {"op": "select", "args": [larger, line, caption["height"]["value"]]})
+    for child in row["children"]:
+        if child.get("control"):
+            index = int(child["id"].rsplit("-", 1)[1])
+            props = child["properties"]
+            doc.bind(f"text.{child['id']}.left", child["id"], "left", {"op": "select", "args": [larger, 21 + 44 * index, props["left"]["value"]]})
+            doc.bind(f"text.{child['id']}.top", child["id"], "top",
+                     {"op": "select", "args": [larger, text_sum(props["top"]["value"], line), props["top"]["value"]]})
 
 
 def player_setup(doc: Document) -> dict:
@@ -117,6 +142,15 @@ def player_setup(doc: Document) -> dict:
     for row in rows:
         row["properties"].update({"position": keyword("relative"), "left": length(0), "top": length(0),
                                    "flex-shrink": number(0)})
+    # Above 100 % text each setting's value stands under its label and the
+    # rows scroll (section 2's reflow); the plates are furniture.
+    for row in rows:
+        if row["id"] in ("setup-name", "setup-clan", "setup-model", "setup-rotation"):
+            stack_row(doc, row, WIDTH, VALUE_X, ROW_H)
+        elif row["id"] == "setup-rail":
+            stack_rail(doc, row)
+        else:
+            fixed_text(doc, row)
     fields = group("setup-fields", {**absolute(left=U*58, top=U*167, width=WIDTH+16, height=U*243),
                                       "overflow": keyword("auto"), "display": keyword("flex"), "flex-direction": keyword("column"),
                                       "row-gap": length(6)}, rows)
@@ -138,7 +172,82 @@ def player_setup(doc: Document) -> dict:
     notice = label("setup-notice", "#str_230030", {**absolute(left=U*67, top=U*413, width=U*520, height=40),
                                                    **typeface("lowpixel", 14, 20, rgb(VALUE)), "overflow": keyword("hidden")})
     doc.bind("setup-notice.text", "setup-notice", "text", {"state": "setup.notice"})
+    # The heading is furniture; the model's name and the notice are content,
+    # whose lines grow with the text.
+    fixed_text(doc, heading)
+    for node in (current, notice):
+        doc.bind(f"text.{node['id']}.height", node["id"], "height", text_times(node["properties"]["height"]["value"]))
     pane = group("setup-panel", {**absolute(left=0, top=0, width=CANVAS_W, height=720), "display": keyword("none")},
                  [model, heading, current, fields, notice])
     doc.bind("setup-panel.display", "setup-panel", "display", {"op": "select", "args": [{"state": "setup.open"}, "block", "none"]})
+    tall_player_setup(doc, pane, rows)
     return pane
+
+
+# A tall view's Player Setup (sections 3 and 13.3, "adapt, don't shrink"):
+# in the Multiplayer page's tall column, which runs the view's height, the
+# heading and the rows stand across the column up to 1.6 times their size,
+# the notice under them, and the model preview fills the rest of the height
+# down to the bottom band, the figure centred with its name under it.
+TALL_SETUP_MOST = 1.6
+TALL_SETUP_TOP, TALL_SETUP_BOTTOM = 110.0, 100.0   # dp: under the docked top band's title, over the docked bottom band
+FIGURE = (0.83, 0.226, 0.527)    # the figure's middle across the preview, its top and its height down it (fractions of the 4:3 box)
+TALL_PREVIEW_LEAST = 260.0       # dp: the figure's room the rows' scale leaves at least
+
+
+def tall_player_setup(doc: Document, pane: dict, rows: list) -> None:
+    from build_retained_screens import TALL_MARGIN, VIEW_HEIGHT, tall_bind, tall_condition, tall_scale
+    nodes = {node["id"]: node for node in pane["children"]}
+    heading, fields, current, notice, model = (nodes[ident] for ident in
+                                               ("setup-heading", "setup-fields", "setup-current-model", "setup-notice", "setup-preview"))
+    rows_h = sum(row["properties"]["height"]["value"] for row in rows) + 6 * (len(rows) - 1)
+    head_h = heading["properties"]["height"]["value"]
+    notice_h = notice["properties"]["height"]["value"]
+    label_h = current["properties"]["height"]["value"]
+    # The rows' scale: as large as leaves the figure its least room, from the
+    # landscape size up to 1.6 times it.
+    fixed = TALL_SETUP_TOP + 8 + 4 + 8 + TALL_PREVIEW_LEAST + TALL_SETUP_BOTTOM
+    scale = {"op": "max", "args": [1, {"op": "min", "args": [TALL_SETUP_MOST, {"op": "/", "args": [
+        text_sum(-fixed, VIEW_HEIGHT), round(head_h + rows_h + notice_h + label_h, 4)]}]}]}
+    times = lambda value: {"op": "*", "args": [scale, value]}  # noqa: E731
+    tall_bind(doc, pane, "height", VIEW_HEIGHT)
+    for node in (heading, fields, notice, current):
+        tall_scale(doc, node, scale, own=("width", "height"))
+    # The runtime places and sizes a field's caret, selection and composition
+    # in its scaled viewport: they take no scale of their own.
+    from build_retained_screens import walk_nodes
+    inks = {node["id"] for node in walk_nodes(fields) if node["id"].endswith(("-caret", "-selection", "-composition"))}
+    doc.bindings[:] = [binding for binding in doc.bindings if not (binding["node"] in inks and binding["property"] == "transform")]
+    for node in walk_nodes(fields):
+        if node["id"] in inks:
+            node["properties"].pop("transform", None)
+    tall_bind(doc, heading, "left", TALL_MARGIN)
+    tall_bind(doc, heading, "top", TALL_SETUP_TOP)
+    fields_top = text_sum(TALL_SETUP_TOP + 8, times(head_h))
+    # The notice and the model's name take their lines at the running text
+    # size; the rows, which scroll, leave the figure its least room.
+    notice_size = times({"op": "*", "args": [notice_h, {"state": "view.text"}]})
+    label_size = times({"op": "*", "args": [label_h, {"state": "view.text"}]})
+    fields_h = {"op": "min", "args": [times(rows_h), text_sum(-(4 + 8 + TALL_PREVIEW_LEAST + 8 + TALL_SETUP_BOTTOM), VIEW_HEIGHT,
+                                                              *({"op": "*", "args": [-1, part]} for part in (fields_top, notice_size, label_size)))]}
+    tall_bind(doc, fields, "left", TALL_MARGIN)
+    tall_bind(doc, fields, "top", fields_top)
+    tall_bind(doc, fields, "height", fields_h)
+    notice_top = text_sum(4, fields_top, fields_h)
+    tall_bind(doc, notice, "left", TALL_MARGIN)
+    tall_bind(doc, notice, "top", notice_top)
+    tall_bind(doc, notice, "width", CANVAS_W - 2 * TALL_MARGIN)
+    # The figure in the room left, its 4:3 preview grown so that the figure
+    # fills it, between its landscape size and 1.6 times it.
+    room_top = text_sum(8, notice_top, notice_size)
+    room = text_sum(-TALL_SETUP_BOTTOM - 8, VIEW_HEIGHT, {"op": "*", "args": [-1, room_top]}, {"op": "*", "args": [-1, label_size]})
+    width, height = model["properties"]["width"]["value"], model["properties"]["height"]["value"]
+    grown = {"op": "max", "args": [0.6, {"op": "min", "args": [TALL_SETUP_MOST, {"op": "/", "args": [room, round(FIGURE[2] * height, 4)]}]}]}
+    tall_bind(doc, model, "width", {"op": "*", "args": [width, grown]})
+    tall_bind(doc, model, "height", {"op": "*", "args": [height, grown]})
+    tall_bind(doc, model, "left", text_sum(CANVAS_W / 2, {"op": "*", "args": [-FIGURE[0] * width, grown]}))
+    tall_bind(doc, model, "top", text_sum(room_top, {"op": "*", "args": [-FIGURE[1] * height, grown]}))
+    # The model's name under the figure, centred on it.
+    tall_bind(doc, current, "left", text_sum(CANVAS_W / 2, times(-current["properties"]["width"]["value"] / 2)))
+    tall_bind(doc, current, "top", text_sum(room_top, {"op": "*", "args": [FIGURE[2] * height, grown]}, 8))
+    tall_condition(doc)

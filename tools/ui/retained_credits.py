@@ -188,6 +188,55 @@ def scan_bar(ident: str, rect: list[float]) -> dict:
                   mask={"paths": [path("edges", body, fill=edge)]})
 
 
+TEXT_ROOM = (40.0, 436.0)     # u: a screen's lines stand under the title and over the prompt bar
+TEXT_END = 619.0              # u: and end before the 4:3 view's 32 dp margin
+
+
+def grow_screen(doc: Document, body: str, nodes: list) -> None:
+    """Section 2's text size on one credits screen: its lines and scan bars
+    are a timed composition that cannot reflow into more screens, so above
+    100 % text the whole screen grows as one, its lines' boxes, pitch and
+    letters, about its lines' middle and leading edge, by the text size or
+    as far as its lines stand between the title and the prompt bar and,
+    measured in the stock words, end before the 4:3 view's margin, whichever
+    is less (a line already past it at 100 % aside). A bar keeps its sweep
+    and follows its line's height. Every binding gives the authored value
+    at 100 % (check_text_bindings)."""
+    from build_retained_screens import LARGER, TEXT, text_source, text_sum, text_width
+    text_source(doc)
+    words = {name: own_properties(child) for name, child in blocks(body, "windowDef") if not name.startswith("d_")}
+    lines = [node for node in nodes if node["type"] == "text" and words[node["id"]].get("text")]
+    if not lines:
+        return
+    def rect(node):
+        return [node["properties"][key]["value"] / U for key in ("left", "top", "width", "height")]
+    top = min(rect(node)[1] for node in lines)
+    bottom = max(rect(node)[1] + rect(node)[3] for node in lines)
+    middle, lead = (top + bottom) / 2, min(rect(node)[0] for node in lines)
+    reach = lead
+    for node in lines:
+        props = node["properties"]
+        drawn = max(text_width(props["font-family"]["value"], part, props["font-size"]["value"])
+                    for part in words[node["id"]]["text"].split("\\n")) / U
+        if rect(node)[0] + drawn <= TEXT_END:
+            reach = max(reach, rect(node)[0] + drawn)
+    fit = min((middle - TEXT_ROOM[0]) / (middle - top), (TEXT_ROOM[1] - middle) / (bottom - middle),
+              (TEXT_END - lead) / (reach - lead) if reach > lead else 2)
+    grown = {"op": "max", "args": [1, {"op": "min", "args": [TEXT, round(fit, 4)]}]}
+
+    def larger(ident: str, key: str, value) -> None:
+        authored = next(node for node in nodes if node["id"] == ident)["properties"][key]["value"]
+        doc.bind(f"text.{ident}.{key}", ident, key, {"op": "select", "args": [LARGER, value, authored]})
+    for node in nodes:
+        x, y, w, h = rect(node)
+        if node["type"] == "text":
+            larger(node["id"], "left", text_sum(U * lead, {"op": "*", "args": [round(U * (x - lead), 4), grown]}))
+            for key in ("font-size", "line-height"):
+                larger(node["id"], key, {"op": "/", "args": [{"op": "*", "args": [node["properties"][key]["value"], grown]}, TEXT]})
+        larger(node["id"], "top", text_sum(U * middle, {"op": "*", "args": [round(U * (y - middle), 4), grown]}))
+        larger(node["id"], "height", {"op": "*", "args": [round(U * h, 4), grown]})
+
+
 def credits_document() -> dict:
     text = MAINMENU.read_text(encoding="utf-8", errors="replace")
     colours = parse_desktop(text)
@@ -222,6 +271,7 @@ def credits_document() -> dict:
                                "text-align": keyword(("left", "center", "right")[align]), "transform": transform(),
                                "pointer-events": keyword("none")}))
             doc.bind(f"{name}.text", name, "text", {"state": key})
+        grow_screen(doc, screen_bodies[number_], nodes)
         ident = f"p_screen{number_}"
         info[ident] = {"kind": "screen", "rect": [0, 0, 640, 480]}
         screens.append(group(ident, {**absolute(left=0, top=0, width=CANVAS_W, height=720), "opacity": number(0),
@@ -329,6 +379,16 @@ def tall_credits_page(result: dict) -> dict:
     tall.fits(2 * (TALL_TEXT * TALL_TEXT_REACH + TALL_BANDS))
     stage = tall.nodes["credits-stage"]
     screens = [child for child in stage["children"] if child["id"].startswith("p_screen")]
+    # The names already stand 1.6 times their size there, as far as the
+    # column takes them, so they keep that size at every text size, as the
+    # settings rows keep theirs.
+    from build_retained_screens import TEXT, walk_nodes
+    inside = {node["id"] for screen in screens for node in walk_nodes(screen)}
+    for binding in tall.bindings:
+        if binding["id"].startswith("text.") and binding["node"] in inside:
+            authored = tall.nodes[binding["node"]]["properties"][binding["property"]]["value"]
+            kept = {"op": "/", "args": [authored, TEXT]} if binding["property"] in ("font-size", "line-height") else authored
+            binding["value"] = {"op": "select", "args": [tall.condition, kept, binding["value"]]}
     names = group("credits-names", {**FULL, "transform": transform(), "pointer-events": keyword("none")}, screens)
     stage["children"] = [child for child in stage["children"] if child not in screens] + [names]
     tall.nodes["credits-names"] = names

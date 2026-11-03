@@ -6,6 +6,37 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## The remaining pages follow the text size, 3 November 2026
+
+- Above 100 % text the pages the list increment left kept their 100 % rows:
+  Player Setup, the Mods dialog, the Objectives page, Create Server's options,
+  Join Game's other controls, Restart Level, Credits, the Arena page and the
+  campaign's difficulty page. Each now meets section 2's contract
+  (`LAY-004`): setting rows in a fixed column stack their value under their
+  label (`retained_mp_menus.stack_row`) and scroll; descriptions, details,
+  status lines and dialog contents grow in the room their frame leaves
+  (a picture giving its room where needed, plates moving down or aside);
+  Credits' screens grow as far as each one fits; furniture keeps its size.
+  Player Setup gained a tall arrangement, and Restart Level and the
+  campaign's difficulty take their tall column only where it holds them at
+  the running text size (`TallLayout.fits(height, larger)`).
+- At 100 % the documents evaluate as before in landscape and tall views
+  (bindings diffed at view.text 1 over twelve aspects and every language),
+  bar explicit property defaults, path art in fractions of the same box,
+  Player Setup's new tall arrangement and sub-0.0001 dp rounding of newly
+  fixed furniture in tall views. `fit_narrow` carries a binding on a part's
+  `top` over to its centred offset, and the tall layout scales a zero
+  length that a text binding moves.
+- The native screens test gains `CheckTextScaleCase` for every changed page
+  (100/150/200 % on 16:9, 4:3, 0.78 and 9:16; chains in order, parts in
+  their containers, controls and texts on screen, furniture at one size,
+  restore at 100 %) and a stand-in model renderer for Player Setup's
+  preview; all screens groups, the safe-area and settings runs,
+  `ui_retained_gate.py` and the register validator pass. OpenGL captures at
+  200 %, 16:9 and 9:16: Restart Level, the campaign's difficulty, Credits,
+  Arena and its ledger, Mods, the Objectives page, Create Server, Join Game
+  and Player Setup.
+
 ## Multi-view demo markers, keyframes and auto-tracking, 2 November 2026
 
 - MVD recordings are format 1.3. The new records are optional, so builds that

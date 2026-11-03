@@ -15489,6 +15489,626 @@
    "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "pause_completed_count"}, 0]}, "block", "none"]}
   },
   {
+   "id": "text.objectives-entry-0-title.max-height",
+   "node": "objectives-entry-0-title",
+   "property": "max-height",
+   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-entry-0-title.width",
+   "node": "objectives-entry-0-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
+  },
+  {
+   "id": "text.objectives-entry-0-text.width",
+   "node": "objectives-entry-0-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+  },
+  {
+   "id": "text.objectives-entry-1-title.max-height",
+   "node": "objectives-entry-1-title",
+   "property": "max-height",
+   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-entry-1-title.width",
+   "node": "objectives-entry-1-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
+  },
+  {
+   "id": "text.objectives-entry-1-text.width",
+   "node": "objectives-entry-1-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+  },
+  {
+   "id": "text.objectives-entry-2-title.max-height",
+   "node": "objectives-entry-2-title",
+   "property": "max-height",
+   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-entry-2-title.width",
+   "node": "objectives-entry-2-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
+  },
+  {
+   "id": "text.objectives-entry-2-text.width",
+   "node": "objectives-entry-2-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+  },
+  {
+   "id": "text.objectives-entry-3-title.max-height",
+   "node": "objectives-entry-3-title",
+   "property": "max-height",
+   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-entry-3-title.width",
+   "node": "objectives-entry-3-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
+  },
+  {
+   "id": "text.objectives-entry-3-text.width",
+   "node": "objectives-entry-3-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+  },
+  {
+   "id": "text.objectives-entry-4-title.max-height",
+   "node": "objectives-entry-4-title",
+   "property": "max-height",
+   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-entry-4-title.width",
+   "node": "objectives-entry-4-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
+  },
+  {
+   "id": "text.objectives-entry-4-text.width",
+   "node": "objectives-entry-4-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+  },
+  {
+   "id": "text.objectives-entry-5-title.max-height",
+   "node": "objectives-entry-5-title",
+   "property": "max-height",
+   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-entry-5-title.width",
+   "node": "objectives-entry-5-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
+  },
+  {
+   "id": "text.objectives-entry-5-text.width",
+   "node": "objectives-entry-5-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+  },
+  {
+   "id": "text.objectives-entry-6-title.max-height",
+   "node": "objectives-entry-6-title",
+   "property": "max-height",
+   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-entry-6-title.width",
+   "node": "objectives-entry-6-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
+  },
+  {
+   "id": "text.objectives-entry-6-text.width",
+   "node": "objectives-entry-6-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+  },
+  {
+   "id": "text.objectives-entry-7-title.max-height",
+   "node": "objectives-entry-7-title",
+   "property": "max-height",
+   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-entry-7-title.width",
+   "node": "objectives-entry-7-title",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
+  },
+  {
+   "id": "text.objectives-entry-7-text.width",
+   "node": "objectives-entry-7-text",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+  },
+  {
+   "id": "text.objectives-empty-text.height",
+   "node": "objectives-empty-text",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "max",
+      "args": [
+       109.5,
+       {
+        "op": "*",
+        "args": [
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "select",
+            "args": [
+             {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "french"]},
+               3,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "german"]},
+                 3,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "italian"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                     2,
+                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 3, 4]}
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "czech"]},
+               2,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "english"]},
+                 3,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "french"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "german"]},
+                     2,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "italian"]},
+                         3,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "polish"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "russian"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                               2,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                 2,
+                                 {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           24.0
+          ]
+         },
+         {"state": "view.text"}
+        ]
+       }
+      ]
+     },
+     109.5
+    ]
+   }
+  },
+  {
+   "id": "text.objectives-empty.height",
+   "node": "objectives-empty",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       88.5,
+       {
+        "op": "max",
+        "args": [
+         109.5,
+         {
+          "op": "*",
+          "args": [
+           {
+            "op": "*",
+            "args": [
+             {
+              "op": "select",
+              "args": [
+               {"op": ">", "args": [{"state": "view.text"}, 1.5]},
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "french"]},
+                 3,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "german"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "italian"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                       2,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "turkish"]}, 3, 4]}
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "czech"]},
+                 2,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "english"]},
+                   3,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "french"]},
+                     3,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "german"]},
+                       2,
+                       {
+                        "op": "select",
+                        "args": [
+                         {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                         2,
+                         {
+                          "op": "select",
+                          "args": [
+                           {"op": "==", "args": [{"state": "language"}, "italian"]},
+                           3,
+                           {
+                            "op": "select",
+                            "args": [
+                             {"op": "==", "args": [{"state": "language"}, "polish"]},
+                             3,
+                             {
+                              "op": "select",
+                              "args": [
+                               {"op": "==", "args": [{"state": "language"}, "russian"]},
+                               3,
+                               {
+                                "op": "select",
+                                "args": [
+                                 {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                                 2,
+                                 {
+                                  "op": "select",
+                                  "args": [
+                                   {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                                   2,
+                                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 3, 4]}
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             24.0
+            ]
+           },
+           {"state": "view.text"}
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     198.0
+    ]
+   }
+  },
+  {
+   "id": "text.objectives-done-0.height",
+   "node": "objectives-done-0",
+   "property": "height",
+   "value": {"op": "*", "args": [19.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-0-title.height",
+   "node": "objectives-done-0-title",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-0-title.text-overflow",
+   "node": "objectives-done-0-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.objectives-done-1.height",
+   "node": "objectives-done-1",
+   "property": "height",
+   "value": {"op": "*", "args": [19.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-1-title.height",
+   "node": "objectives-done-1-title",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-1-title.text-overflow",
+   "node": "objectives-done-1-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.objectives-done-2.height",
+   "node": "objectives-done-2",
+   "property": "height",
+   "value": {"op": "*", "args": [19.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-2-title.height",
+   "node": "objectives-done-2-title",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-2-title.text-overflow",
+   "node": "objectives-done-2-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.objectives-done-3.height",
+   "node": "objectives-done-3",
+   "property": "height",
+   "value": {"op": "*", "args": [19.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-3-title.height",
+   "node": "objectives-done-3-title",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-3-title.text-overflow",
+   "node": "objectives-done-3-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.objectives-done-4.height",
+   "node": "objectives-done-4",
+   "property": "height",
+   "value": {"op": "*", "args": [19.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-4-title.height",
+   "node": "objectives-done-4-title",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-4-title.text-overflow",
+   "node": "objectives-done-4-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.objectives-done-5.height",
+   "node": "objectives-done-5",
+   "property": "height",
+   "value": {"op": "*", "args": [19.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-5-title.height",
+   "node": "objectives-done-5-title",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-5-title.text-overflow",
+   "node": "objectives-done-5-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.objectives-done-6.height",
+   "node": "objectives-done-6",
+   "property": "height",
+   "value": {"op": "*", "args": [19.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-6-title.height",
+   "node": "objectives-done-6-title",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-6-title.text-overflow",
+   "node": "objectives-done-6-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.objectives-done-7.height",
+   "node": "objectives-done-7",
+   "property": "height",
+   "value": {"op": "*", "args": [19.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-7-title.height",
+   "node": "objectives-done-7-title",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-done-7-title.text-overflow",
+   "node": "objectives-done-7-title",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.objectives-heading.font-size",
+   "node": "objectives-heading",
+   "property": "font-size",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-heading.line-height",
+   "node": "objectives-heading",
+   "property": "line-height",
+   "value": {"op": "/", "args": [24, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-heading.letter-spacing",
+   "node": "objectives-heading",
+   "property": "letter-spacing",
+   "value": {"op": "/", "args": [-1.5, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-completed-label.font-size",
+   "node": "objectives-completed-label",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-completed-label.line-height",
+   "node": "objectives-completed-label",
+   "property": "line-height",
+   "value": {"op": "/", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-completed-count.font-size",
+   "node": "objectives-completed-count",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-completed-count.line-height",
+   "node": "objectives-completed-count",
+   "property": "line-height",
+   "value": {"op": "/", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-serial.font-size",
+   "node": "objectives-serial",
+   "property": "font-size",
+   "value": {"op": "/", "args": [13, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.objectives-serial.line-height",
+   "node": "objectives-serial",
+   "property": "line-height",
+   "value": {"op": "/", "args": [18, {"state": "view.text"}]}
+  },
+  {
    "id": "objectives_back-cap.display",
    "node": "objectives_back-cap",
    "property": "display",
@@ -28789,7 +29409,8 @@
                      "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
                      "color": {"type": "color", "value": [1, 1, 1, 0.4]},
                      "white-space": {"type": "keyword", "value": "nowrap"},
-                     "overflow": {"type": "keyword", "value": "hidden"}
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "clip"}
                     }
                    }
                   ]
@@ -28846,7 +29467,8 @@
                      "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
                      "color": {"type": "color", "value": [1, 1, 1, 0.4]},
                      "white-space": {"type": "keyword", "value": "nowrap"},
-                     "overflow": {"type": "keyword", "value": "hidden"}
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "clip"}
                     }
                    }
                   ]
@@ -28903,7 +29525,8 @@
                      "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
                      "color": {"type": "color", "value": [1, 1, 1, 0.4]},
                      "white-space": {"type": "keyword", "value": "nowrap"},
-                     "overflow": {"type": "keyword", "value": "hidden"}
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "clip"}
                     }
                    }
                   ]
@@ -28960,7 +29583,8 @@
                      "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
                      "color": {"type": "color", "value": [1, 1, 1, 0.4]},
                      "white-space": {"type": "keyword", "value": "nowrap"},
-                     "overflow": {"type": "keyword", "value": "hidden"}
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "clip"}
                     }
                    }
                   ]
@@ -29017,7 +29641,8 @@
                      "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
                      "color": {"type": "color", "value": [1, 1, 1, 0.4]},
                      "white-space": {"type": "keyword", "value": "nowrap"},
-                     "overflow": {"type": "keyword", "value": "hidden"}
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "clip"}
                     }
                    }
                   ]
@@ -29074,7 +29699,8 @@
                      "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
                      "color": {"type": "color", "value": [1, 1, 1, 0.4]},
                      "white-space": {"type": "keyword", "value": "nowrap"},
-                     "overflow": {"type": "keyword", "value": "hidden"}
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "clip"}
                     }
                    }
                   ]
@@ -29131,7 +29757,8 @@
                      "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
                      "color": {"type": "color", "value": [1, 1, 1, 0.4]},
                      "white-space": {"type": "keyword", "value": "nowrap"},
-                     "overflow": {"type": "keyword", "value": "hidden"}
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "clip"}
                     }
                    }
                   ]
@@ -29188,7 +29815,8 @@
                      "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
                      "color": {"type": "color", "value": [1, 1, 1, 0.4]},
                      "white-space": {"type": "keyword", "value": "nowrap"},
-                     "overflow": {"type": "keyword", "value": "hidden"}
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "clip"}
                     }
                    }
                   ]
