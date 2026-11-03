@@ -39,6 +39,7 @@ def main() -> None:
         "bool rvNavMesh::PadLanding(",
         "bool rvNavMesh::LandingSurvivable(",
         "bool rvNavMesh::AirInputLandingSafe(",
+        "bool rvNavMesh::KnockSlideCoastSafe(",
     ))
     header = (ROOT / "src/mpgame/bots/NavMesh.h").read_text(encoding="utf-8")
     bodies = function(header, "ID_INLINE bool NavAirSteer(").replace("ID_INLINE ", "") + "\n" + bodies
@@ -71,6 +72,32 @@ def main() -> None:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
         subprocess.run(command, cwd=path, check=True)
         subprocess.run([str(exe)], cwd=path, check=True)
+        origin_anchor = "idVec3 position = origin;\n\tidVec3 velocity = velocityIn;"
+        assert fixture.count(origin_anchor) == 1
+        mutated = fixture.replace(origin_anchor,
+            "idVec3 position = origin + idVec3( 0.0f, 0.0f, NAV_GROUND_OFFSET );\n\tidVec3 velocity = velocityIn;")
+        cpp.write_text(mutated, encoding="utf-8")
+        subprocess.run(command, cwd=path, check=True)
+        result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
+        assert result.returncode != 0, "lifted air-recovery origin mutation escaped"
+        print("Live air-recovery origin: artificial lift mutation rejected")
+        mutated = fixture.replace(
+            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit ) )",
+            "if ( wish.LengthSqr() > 0.0f && navMesh.AirInputLandingSafe( origin, velocity, wish, limit ) )")
+        assert mutated != fixture
+        cpp.write_text(mutated, encoding="utf-8")
+        subprocess.run(command, cwd=path, check=True)
+        result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
+        assert result.returncode != 0, "discarded safe-coast mutation escaped"
+        print("Proven air coast: nonzero-only mutation rejected")
+        anchor = "for ( int elapsed = 0; elapsed < knockMsec; elapsed += 16 )"
+        assert fixture.count(anchor) == 1
+        cpp.write_text(fixture.replace(anchor,
+            "for ( int elapsed = knockMsec; elapsed < knockMsec; elapsed += 16 )"), encoding="utf-8")
+        subprocess.run(command, cwd=path, check=True)
+        result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
+        assert result.returncode != 0, "omitted friction-free slide mutation escaped"
+        print("Grounded knockback: omitted slide mutation rejected")
         mutated = fixture.replace("!RecoveryStepClear( trace.endpos, stop, &supportedOrigin )", "true")
         assert mutated != fixture
         cpp.write_text(mutated, encoding="utf-8")

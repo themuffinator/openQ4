@@ -333,6 +333,8 @@ public:
 	bool					AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocity, const idVec3 &wish,
 											 float maxImpactDelta, idVec3 *touchdown = NULL,
 											 bool *landedSupported = NULL ) const;
+	bool					KnockSlideCoastSafe( const idVec3 &origin, const idVec3 &velocity,
+											 int knockMsec, float maxImpactDelta ) const;
 	// Diagnostics: would a route leg between these points be accepted as a
 	// walk now, and if not, which test refuses it.
 	bool					WalkLegAccepted( const idVec3 &from, const idVec3 &to, const char **failure ) const {

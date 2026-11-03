@@ -68,6 +68,7 @@ public:
 	void					SetMovementType( const pmtype_t type );
 	void					SetPlayerInput( const usercmd_t &cmd, const idAngles &newViewAngles );
 	void					SetKnockBack( const int knockBackTime );
+	int						GetKnockBack( void ) const;
 	void					SetDebugLevel( bool set );
 							// feed back from last physics frame
 	waterLevel_t			GetWaterLevel( void ) const;

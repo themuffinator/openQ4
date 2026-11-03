@@ -4694,8 +4694,14 @@ static bool BotBrakeAtEdge( idPlayer *self, idVec3 &moveDir ) {
 		return false;
 	}
 	moveDir.Set( -velocity.x, -velocity.y, 0.0f );
-	if ( moveDir.Normalize() <= 1.0f ) {
+	const float speed = moveDir.Normalize();
+	if ( speed <= 1.0f ) {
 		moveDir.Zero();
+	} else {
+		// Full reverse at walking speed can cross zero in one physics frame,
+		// then reverse again forever on a rim. Fade the wish as momentum falls
+		// so ground friction can finish the stop and supported recovery can start.
+		moveDir *= Min( 1.0f, speed / Max( 1.0f, pm_speed.GetFloat() ) );
 	}
 	return true;
 }
@@ -4834,7 +4840,7 @@ static void BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 	const float limit = BotMaxSafeFallDelta( self );
 	// Replanning must not replace a still-safe heading with a different one
 	// whose prediction starts from a slightly different point every 200 ms.
-	if ( wish.LengthSqr() > 0.0f && navMesh.AirInputLandingSafe( origin, velocity, wish, limit ) ) {
+	if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit ) ) {
 		return;
 	}
 	idVec3 brake( -velocity.x, -velocity.y, 0.0f );
@@ -4942,6 +4948,20 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 	if ( airRecovering && ( transported || self->health <= 0 ) ) {
 		airRecovering = false;
 	}
+	if ( !airRecovering && self->pfl.onGround && !transported && !traversalStarted &&
+		knockbackTime && gameLocal.time - knockbackTime <= BOT_AIR_RECOVER_SLIDE_MSEC &&
+		static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->GetKnockBack() > 0 && speed > pm_speed.GetFloat() &&
+		!LiquidAtFeet() && navMesh.IsValid() ) {
+		if ( navMesh.KnockSlideCoastSafe( self->GetPhysics()->GetOrigin(), velocity,
+			static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->GetKnockBack(), BotMaxSafeFallDelta( self ) ) ) {
+			// During the hit's friction-free slide, even grounded route input
+			// uses air acceleration. Preserve a safe coast before it leaves the
+			// ledge; airborne recovery alone can start after rescue is impossible.
+			cmd.forwardmove = cmd.rightmove = cmd.upmove = 0;
+			stuckTime = gameLocal.time;
+			return true;
+		}
+	}
 	if ( airRecovering && self->pfl.onGround ) {
 		if ( !airRecoverLanded ) {
 			airRecoverLanded = gameLocal.time;
@@ -4972,9 +4992,17 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 		  path[pathCorner + 1].travelType == NAVTRAVEL_TELEPORT );
 	const bool walkingFall = walking && !walkingDeparture && airborneSince &&
 		!airborneVoluntary && velocity.z <= 0.0f;
-	idVec3 touchdown;
-	if ( !airRecovering && ( ( !knocked && !walkingFall ) || !BotAirLandingUnsafe( self, touchdown ) ) ) {
+	// Route steering can spoil a survivable coast before the next prediction
+	// notices the lost landing. Own an unplanned knocked flight immediately;
+	// planned flight controllers still hand over only if their coast is unsafe.
+	const bool protectCoast = knocked && !traversalStarted && ( path.IsEmpty() || walking );
+	idVec3 touchdown = self->GetPhysics()->GetOrigin();
+	if ( !airRecovering && ( ( !knocked && !walkingFall ) ||
+		( !protectCoast && !BotAirLandingUnsafe( self, touchdown ) ) ) ) {
 		return false;
+	}
+	if ( !airRecovering ) {
+		airRecoverWish.Zero();
 	}
 	if ( !airRecovering || gameLocal.time - airRecoverPlanTime >= BOT_AIR_RECOVER_REPLAN_MSEC ) {
 		BotChooseAirInput( self, airRecoverWish );
@@ -5001,6 +5029,8 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 			self->entityNumber, gameLocal.time, self->GetPhysics()->GetOrigin().ToString( 1 ),
 			velocity.ToString( 1 ), touchdown.ToString( 1 ), airRecoverWish.ToString( 2 ) );
 	}
+	cmd.forwardmove = 0;
+	cmd.rightmove = 0;
 	if ( airRecoverWish.LengthSqr() > 0.0f ) {
 		ApplyMove( airRecoverWish, cmd );
 	}

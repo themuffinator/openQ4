@@ -222,24 +222,32 @@ def trials_for(impulse: dict) -> list[dict]:
 
 
 def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[dict]:
-    """Per trial: armed exactly once, died to the world, grounded alive."""
+    """Per trial: armed exactly once, died to the world, still grounded alive at the end."""
     outcomes = []
     for trial in trials:
         begin = f"MP_BOT_TRIAL_BEGIN {trial['name']}"
         end = f"MP_BOT_TRIAL_END {trial['name']}"
-        if begin not in sample or end not in sample:
+        starts = list(re.finditer(rf"^{re.escape(begin)}$", sample, re.M))
+        ends = list(re.finditer(rf"^{re.escape(end)}$", sample, re.M))
+        if len(starts) != 1 or len(ends) != 1 or starts[0].end() >= ends[0].start():
             outcomes.append({**trial, "armed": False, "died": None, "grounded": None, "survived": False,
                              "reason": "trial markers missing"})
             continue
-        body = sample.split(begin, 1)[1].split(end, 1)[0]
+        body = sample[starts[0].end():ends[0].start()]
         armed = len(re.findall(r"^BOT_(?:AIR|MOVE)_PROBE client=1 ", body, re.M)) == 1
         died = re.search(rf"^{re.escape(bot)} (?:was killed by world|died)$", body, re.M) is not None
         grounded = re.search(r"^BOT_PROBE_GROUNDED client=1 .* health=(\d+)$", body, re.M)
-        survived = armed and not died and grounded is not None and int(grounded.group(1)) > 0
+        terminal = re.findall(r"^MP_PHYSICS slot=1 grounded=([01]) health=(-?\d+) velocity=.*$", body, re.M)
+        final_grounded = bool(terminal and terminal[-1][0] == "1")
+        final_health = int(terminal[-1][1]) if terminal else None
+        survived = (armed and not died and grounded is not None and int(grounded.group(1)) > 0
+                    and final_grounded and final_health > 0)
         outcomes.append({**trial, "armed": armed, "died": died, "grounded": grounded is not None,
+                         "final_grounded": final_grounded, "final_health": final_health,
                          "survived": survived,
                          "reason": ("not armed" if not armed else "died to the world" if died else
-                                    "still airborne at the end" if grounded is None else "landed alive")})
+                                    "final state missing" if not terminal else
+                                    "not alive and grounded at the end" if not survived else "landed alive")})
     return outcomes
 
 
@@ -334,6 +342,7 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
         script += ["set bot_pause 1", "serverMapRestart", "waitMsec 1000", "god", "noclip", f"setviewpos {observer}",
                    neutral, "waitMsec 64", f"echo MP_BOT_TRIAL_BEGIN {trial['name']}",
                    *trial.get("setup", []), trial["command"], "set bot_pause 0", f"waitMsec {TRIAL_OBSERVE_MSEC}",
+                   "openq4_reportMPState",
                    f"echo MP_BOT_TRIAL_END {trial['name']}",
                    # A bot that died, or walked off later, would refuse or
                    # spoil the next trial: replace it with a fresh one.

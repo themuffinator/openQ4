@@ -165,13 +165,27 @@ def main() -> None:
     for t in trials:
         sample += f"MP_BOT_TRIAL_BEGIN {t['name']}\nBOT_AIR_PROBE client=1 time=1 origin=1 2 3\n"
         sample += "Rhodes was killed by world\n" if t["name"] != "air04" else \
-            "BOT_PROBE_GROUNDED client=1 time=2 origin=1 2 3 velocity=0 0 0 health=90\n"
+            ("BOT_PROBE_GROUNDED client=1 time=2 origin=1 2 3 velocity=0 0 0 health=90\n"
+             "MP_PHYSICS slot=1 grounded=1 health=90 velocity=0 0 0\n")
         sample += f"MP_BOT_TRIAL_END {t['name']}\n"
     assessed = {o["name"]: o for o in policy.assess_trials(sample, trials)}
     check(assessed["air04"]["survived"] and not assessed["air05"]["survived"] and assessed["air05"]["died"],
           "trial assessment separates landings from falls")
     check(policy.decide(candidate, list(assessed.values()), True)["status"] == "navigation",
           "one landing heading makes the fall recoverable")
+    prefix_trials = [{"name": "air0", "decisive": True}, {"name": "air04", "decisive": True}]
+    prefix = {o["name"]: o for o in policy.assess_trials(sample, prefix_trials)}
+    check(not prefix["air0"]["armed"] and prefix["air04"]["survived"],
+          "trial markers match the entire name, never a prefix")
+    duplicate = sample + sample[sample.index("MP_BOT_TRIAL_BEGIN air04"):sample.index("MP_BOT_TRIAL_END air04") + len("MP_BOT_TRIAL_END air04")] + "\n"
+    check(not policy.assess_trials(duplicate, [prefix_trials[1]])[0]["armed"],
+          "duplicate trial markers fail closed")
+    terminal = "MP_PHYSICS slot=1 grounded=1 health=90 velocity=0 0 0\n"
+    for replacement in ("", "MP_PHYSICS slot=1 grounded=0 health=90 velocity=0 0 -300\n",
+                        "MP_PHYSICS slot=1 grounded=1 health=0 velocity=0 0 0\n",
+                        terminal + "MP_PHYSICS slot=1 grounded=0 health=90 velocity=0 0 -300\n"):
+        rows = {o["name"]: o for o in policy.assess_trials(sample.replace(terminal, replacement), trials)}
+        check(not rows["air04"]["survived"], "an earlier touchdown cannot replace a live grounded final state")
     summary = policy.summarise([policy.decide(candidate, outcomes(), True),
                                 policy.decide(candidate, outcomes(survivor="air00"), True)])
     check(summary["navigation_world_deaths"] == 1 and summary["excluded_impulse_deaths"] == 1,
@@ -194,7 +208,8 @@ def main() -> None:
             sample = "\nMP_BOT_REPLAY_BEGIN\n"
             for trial in batch:
                 sample += f"MP_BOT_TRIAL_BEGIN {trial['name']}\nBOT_AIR_PROBE client=1 time=1\n"
-                sample += ("BOT_PROBE_GROUNDED client=1 time=2 health=90\n" if trial.get("counterfactual") else
+                sample += (("BOT_PROBE_GROUNDED client=1 time=2 health=90\n"
+                            "MP_PHYSICS slot=1 grounded=1 health=90 velocity=0 0 0\n") if trial.get("counterfactual") else
                            "Rhodes was killed by world\n")
                 sample += f"MP_BOT_TRIAL_END {trial['name']}\n"
             return len(calls) - 1 != failed_batch, sample, 0

@@ -1907,6 +1907,10 @@ void idPhysics_Player::SetKnockBack( const int knockBackTime ) {
 	current.movementTime = knockBackTime;
 }
 
+int idPhysics_Player::GetKnockBack( void ) const {
+	return ( current.movementFlags & PMF_TIME_KNOCKBACK ) ? current.movementTime : 0;
+}
+
 /*
 ================
 idPhysics_Player::SetDebugLevel

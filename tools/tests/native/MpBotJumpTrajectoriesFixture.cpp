@@ -208,6 +208,7 @@ public:
     bool PadLanding(idEntity*,const idVec3&,const idVec3*,idVec3&,float* = nullptr,float* = nullptr) const;
     bool LandingSurvivable(const idVec3&,const navCorner_t&,float) const;
     bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr) const;
+    bool KnockSlideCoastSafe(const idVec3&,const idVec3&,int,float) const;
     bool steeredPad=false;
     bool IsSteeredPadLanding(int,const idVec3&) const { return steeredPad; }
     static const idBounds& GetAgentBounds() { return agentBounds; }
@@ -649,6 +650,22 @@ int main() {
     {   // A knocked fall (q4ctf5/q4dm8): which fixed air input comes down on
         // supported, affordable ground with room to stop, on this world.
         const float inf=std::numeric_limits<float>::infinity();
+        // A fast fall just below a ledge hits its side. Lifting the prediction
+        // one unit invents clearance and approves a landing the live hull misses.
+        solids.clear(); Platform(24,1024,0.5f);
+        CHECK(!nav.AirInputLandingSafe({0,0,0},{500,0,0},{},inf));
+        CHECK(nav.AirInputLandingSafe({0,0,1},{500,0,0},{},inf));
+        // Knockback can carry a grounded player beyond its ordinary stopping
+        // reserve before friction returns. Follow the coast to the next floor.
+        solids.clear(); Platform(-1024,0,0);
+        CHECK(!nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,0},200,inf));
+        Platform(80,1024,-32);
+        CHECK(nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,0},200,inf));
+        CHECK(!nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,0},200,0));
+        CHECK(!nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,20},200,inf));
+        transported=true;
+        CHECK(!nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,0},200,inf));
+        transported=false;
         // CTF5 rail recovery: first contact is a rim, but inward momentum
         // retains shared hull support until the whole footprint is on floor.
         solids.clear(); Platform(0,1024,0);
@@ -723,6 +740,10 @@ int main() {
         chosen={0,1,0};
         BotChooseAirInput(&falling,chosen);
         CHECK(chosen.x==0 && chosen.y==1);
+        // Coasting is also a proven input; do not replace it with a brake
+        // simply because its vector is zero.
+        chosen={}; BotChooseAirInput(&falling,chosen);
+        CHECK(chosen.LengthSqr()==0);
 
         // A nearby live health pickup is preferable when all supported
         // landings exceed the health budget. Taken/hidden/other-instance

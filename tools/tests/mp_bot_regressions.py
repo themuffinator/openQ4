@@ -106,6 +106,25 @@ def main() -> None:
         result = subprocess.run([str(exe), "landings"], cwd=path, capture_output=True, text=True)
         assert result.returncode != 0, "knock-only walking-fall mutation escaped"
         print("Unpressed WALK recovery: knock-only mutation rejected")
+        mutated = harness.replace("!protectCoast && !BotAirLandingUnsafe", "!BotAirLandingUnsafe")
+        assert mutated != harness
+        cpp.write_text(mutated, encoding="utf-8")
+        subprocess.run(command, cwd=path, check=True)
+        result = subprocess.run([str(exe), "landings"], cwd=path, capture_output=True, text=True)
+        assert result.returncode != 0, "late knocked-coast ownership mutation escaped"
+        print("Knocked coast: late-ownership mutation rejected")
+        for label, anchor, replacement in (
+            ("grounded knock coast", "if ( !airRecovering && self->pfl.onGround && !transported && !traversalStarted &&",
+             "if ( false && !airRecovering && self->pfl.onGround && !transported && !traversalStarted &&"),
+            ("low-speed edge brake", "moveDir *= Min( 1.0f, speed / Max( 1.0f, pm_speed.GetFloat() ) );",
+             "moveDir *= 1.0f;"),
+        ):
+            assert harness.count(anchor) == 1
+            cpp.write_text(harness.replace(anchor, replacement), encoding="utf-8")
+            subprocess.run(command, cwd=path, check=True)
+            result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
+            assert result.returncode != 0, f"{label} mutation escaped"
+            print(f"{label}: reverted-fix mutation rejected")
         # A stale takeoff proof must not own movement after its flight loses
         # the landing. Exercise the failure control against production code.
         mutated = harness.replace("if ( dodgeHopAirborne && gameLocal.time >= dodgeHopCheckTime )",

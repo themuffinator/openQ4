@@ -102,6 +102,8 @@ struct Physics {
     idVec3 origin,velocity,gravity;
     idClipModel clip;
     float radius=1;
+    int knockback=0;
+    int GetKnockBack() const { return knockback; }
     const idVec3& GetOrigin() const { return origin; }
     const idVec3& GetLinearVelocity() const { return velocity; }
     const idVec3& GetGravity() const { return gravity; }
@@ -111,10 +113,15 @@ struct Physics {
     int ClipContents(const idClipModel*) const { return 1; }
     idMat3 GetAxis() const { return {}; }
 };
+struct usercmd_t;
+struct idPhysics_Player : Physics {
+    bool walking=true; float playerSpeed=320;
+    float CmdScale(const usercmd_t&,bool) const;
+};
 struct idEntity;
 struct Link { idEntity* next=nullptr; idEntity* Next() const { return next; } };
 struct idEntity {
-    Physics physics;
+    idPhysics_Player physics;
     Args spawnArgs;
     Link spawnNode;
     int kind=0,instance=0,entityNumber=0;
@@ -127,6 +134,7 @@ struct idEntity {
 };
 enum { NAVTRAVEL_WALK,NAVTRAVEL_JUMP,NAVTRAVEL_JUMPPAD,NAVTRAVEL_DROP,POWERUP_INVISIBILITY,POWERUP_QUADDAMAGE,POWERUP_DOUBLER,BUTTON_ATTACK,BOTCHAT_ITEM_DENIED,BUTTON_RUN,PMOD_SPEED,NAVTRAVEL_TELEPORT };
 struct idPlayer : idEntity {
+    Physics* GetPlayerPhysics() { return &physics; }
     float deltaViewAngles[3]={};
     const float* GetDeltaViewAngles() const { return deltaViewAngles; }
     float speedModifier=1;
@@ -224,6 +232,8 @@ struct rvNavPath {
 // distances; x positions in `blocked` refuse routes, in `unreachable` refuse
 // the field too.  A field given targets records how many it was asked for.
 struct Nav {
+    bool slideCoastSafe=false;
+    bool KnockSlideCoastSafe(const idVec3&,const idVec3&,int,float) const { return slideCoastSafe; }
     bool IsValid() const { return true; }
     int probes=0,searches=0,fields=0,snaps=0,lastTargets=-1;
     bool roam=false,fieldLive=false;
@@ -320,10 +330,6 @@ struct Nav {
 struct Command { int buttons=0; };
 struct SpeedCVar { float GetFloat() const { return 320; } } pm_speed;
 struct usercmd_t { int upmove=0,forwardmove=0,rightmove=0,buttons=0; int angles[3]={}; };
-struct idPhysics_Player {
-    bool walking=true; float playerSpeed=320;
-    float CmdScale(const usercmd_t&,bool) const;
-};
 struct rvGameState { bool IsType(int) const { return false; } };
 struct rvFreezeTagGameState : rvGameState {
     static int GetClassType() { return 1; }
@@ -1010,8 +1016,21 @@ void TestAirRecovery() {
     bot.knockbackTime=gameLocal.time-100; bot.airborneSince=gameLocal.time-84;
     CHECK(bot.RecoverInAir(&self,cmd) && cmd.forwardmove<0 && cmd.rightmove==0 && cmd.upmove==0);
     CHECK(bot.path.Num()==2); // a walking route resumes after the throw
-    // An arc that comes down on the floor is left to the route.
-    bot.airRecovering=false; airLandingUnsafe=false; cmd={}; CHECK(!bot.RecoverInAir(&self,cmd) && cmd.forwardmove==0);
+    // A safe knocked coast takes ownership before route steering can spoil it.
+    // Zero input clears any prior route command, and no old flight wish leaks in.
+    bot.airRecovering=false; airLandingUnsafe=false; airChoiceSet=true; airChoice={};
+    bot.airRecoverWish={1,0,0}; cmd.forwardmove=127; cmd.rightmove=127;
+    CHECK(bot.RecoverInAir(&self,cmd) && bot.airRecovering && cmd.forwardmove==0 && cmd.rightmove==0);
+    CHECK(bot.airRecoverWish.LengthSqr()==0 && bot.path.Num()==2);
+    airChoiceSet=false; bot.airRecovering=false;
+    self.pfl.onGround=true; self.physics.velocity={700,-300,0}; self.physics.knockback=200;
+    navMesh.slideCoastSafe=true;
+    cmd.forwardmove=127;
+    CHECK(bot.RecoverInAir(&self,cmd) && !bot.airRecovering && cmd.forwardmove==0);
+    navMesh.slideCoastSafe=false;
+    CHECK(!bot.RecoverInAir(&self,cmd));
+    self.physics.knockback=0;
+    CHECK(!bot.RecoverInAir(&self,cmd));
     airLandingUnsafe=true;
     // The ground, and a fall straight down, have nothing to brake.
     self.pfl.onGround=true; CHECK(!bot.RecoverInAir(&self,cmd)); self.pfl.onGround=false;
@@ -1095,7 +1114,7 @@ void TestAirRecovery() {
     }
     slipped=walker(); self.physics.velocity.z=20; CHECK(!slipped.RecoverInAir(&self,cmd));
     self.physics.velocity.z=-60; airLandingUnsafe=false; CHECK(!slipped.RecoverInAir(&self,cmd));
-    std::puts("Air recovery: unsafe knock/WALK falls recover; own jumps, planned departures, pad volumes and safe arcs untouched: PASS");
+    std::puts("Air recovery: knocked coasts and unsafe WALK falls protected; own jumps, planned departures and pad volumes untouched: PASS");
 }
 void TestUnexpectedPad() {
     Reset(); idPlayer self; rvJumpPad pad; idItem goal;
@@ -1455,6 +1474,10 @@ void TestRecoveryEdge() {
     self.physics.origin={-8,0,0}; cmd={}; CHECK(!bot.RecoverToNavMesh(&self,cmd));
     CHECK(cmd.forwardmove==0);
     idVec3 ordinaryMove(1,0,0); CHECK(BotBrakeAtEdge(&self,ordinaryMove) && ordinaryMove.LengthSqr()==0);
+    // A slow outward drift must decelerate without a full-speed reversal.
+    self.physics.velocity={40,0,0}; ordinaryMove={1,0,0};
+    CHECK(BotBrakeAtEdge(&self,ordinaryMove) && ordinaryMove.x<0 && ordinaryMove.x>=-0.126f);
+    self.physics.velocity={};
     self.physics.origin={-200,0,0}; cmd={}; CHECK(!bot.RecoverToNavMesh(&self,cmd));
     CHECK(cmd.forwardmove>0);
     bot.recoverWanderYaw=60; self.deltaViewAngles[1]=-37;

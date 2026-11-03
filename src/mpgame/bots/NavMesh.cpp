@@ -1057,7 +1057,9 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 	// Match the 16 ms player integration step. Doubling it changes the air
 	// acceleration before each sweep and misses narrow recoverable landings.
 	const float dt = NAV_PAD_STEP_SECONDS;
-	idVec3 position = origin + idVec3( 0.0f, 0.0f, NAV_GROUND_OFFSET );
+	// This is a live fall, not a generation probe. Lifting it invents clearance
+	// over a ledge whose side the real player hull can still hit.
+	idVec3 position = origin;
 	idVec3 velocity = velocityIn;
 	int unstuck = 0;
 	for ( int frame = 0; frame < 200; frame++ ) {
@@ -1114,6 +1116,46 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 		velocity += gravity * dt;
 	}
 	return false;
+}
+
+// Ground contact during knockback does not end the trajectory: friction is
+// disabled and route input still uses air acceleration. Prove a flat-floor
+// coast through that interval, then its fall or ordinary stopping reserve.
+// Steps, walls and slopes need a richer slide solver and remain unproven here.
+bool rvNavMesh::KnockSlideCoastSafe( const idVec3 &origin, const idVec3 &velocityIn,
+		int knockMsec, float maxImpactDelta ) const {
+	if ( knockMsec <= 0 || knockMsec > 1000 || velocityIn.z > 0.0f ) {
+		return false;
+	}
+	idVec3 position = origin;
+	idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );
+	const float dt = NAV_PAD_STEP_SECONDS;
+	const idVec3 groundProbe( 0.0f, 0.0f, 2.0f * CM_CLIP_EPSILON );
+	for ( int elapsed = 0; elapsed < knockMsec; elapsed += 16 ) {
+		trace_t ground;
+		if ( NavAgentTranslation( ground, position, position - groundProbe ) ) {
+			return AirInputLandingSafe( position, velocity, vec3_origin, maxImpactDelta );
+		}
+		if ( ground.c.normal.z < 0.999f || IsLethalFloor( ground.endpos ) ) {
+			return false;
+		}
+		trace_t across;
+		const idVec3 next = position + velocity * dt;
+		if ( TransportOnMove( position, next, -1 ) >= 0 || !NavAgentTranslation( across, position, next ) ) {
+			return false;
+		}
+		position = next;
+	}
+	// The next physics frame has ordinary friction/control. If already off
+	// the floor, the air proof owns the rest; never approve just the first touch.
+	trace_t ground;
+	if ( NavAgentTranslation( ground, position, position - groundProbe ) ) {
+		return AirInputLandingSafe( position, velocity, vec3_origin, maxImpactDelta );
+	}
+	const float speed = Max( 1.0f, pm_speed.GetFloat() );
+	const idVec3 stop = position + velocity * ( dt + velocity.Length() / ( 20.0f * speed ) );
+	return ground.c.normal.z >= 0.999f && !IsLethalFloor( ground.endpos ) &&
+		TransportOnMove( position, stop, -1 ) < 0 && LandingContinuationClear( position, stop );
 }
 
 bool rvNavMesh::LandingContinuationClear( const idVec3 &origin, const idVec3 &next ) const {

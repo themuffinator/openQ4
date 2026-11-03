@@ -3873,6 +3873,8 @@ static void Cmd_OpenQ4ReportMPState_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "MP_POSE slot=%d entity=%s origin=%s hidden=%d\n",
 			slot, player->GetName(), player->GetPhysics()->GetOrigin().ToString( 2 ),
 			player->IsHidden() );
+		gameLocal.Printf( "MP_PHYSICS slot=%d grounded=%d health=%d velocity=%s\n",
+			slot, player->pfl.onGround, player->health, player->GetPhysics()->GetLinearVelocity().ToString( 3 ) );
 		gameLocal.Printf( "MP_AIR slot=%d reservoir=%d percent=%d serverTime=%d\n", slot,
 			player->GetAirTics(), player->GetAirReadoutPercent(), player->GetAirReadoutServerTime() );
 		if ( gameLocal.isServer && player->spectating ) {
