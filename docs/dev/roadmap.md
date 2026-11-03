@@ -1190,6 +1190,11 @@ archived provenance; new scheduling belongs here.
   (`LAY-004` partial). Player Setup gained its tall arrangement. Engine
   qualification of real fonts across every state and the native editor
   remain.
+  The same day Campaign became the campaign choice with
+  [NEW GAME and CHAPTERS as its fourth-level children](ui/retained-screens.md#chapters-as-a-level-of-its-own-3-november-2026)
+  (`FLOW-050`): CHAPTERS is a page of its own through the same helper, and
+  the difficulty page keeps only the difficulty, Turbo and START GAME. The
+  classic campaign page is unchanged.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

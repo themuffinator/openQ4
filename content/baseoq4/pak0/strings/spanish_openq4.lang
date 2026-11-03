@@ -1431,6 +1431,7 @@
 	"#str_231548"	"Los ajustes del jugador cambiaron. Inténtalo de nuevo."
 	"#str_231549"	"No se puede aplicar este ajuste del jugador."
 	"#str_231550"	"Únete a una partida en un servidor, crea la tuya, mira tus demos o configura tu jugador."
+	"#str_231551"	"Este nivel no tiene autoguardado inicial, así que empieza de cero con tu dificultad actual y un arsenal estándar."
 	"#str_231560"	"Introduce un número de %s a %s."
 	"#str_230141"	"API de renderizado"
 	"#str_230142"	"Dispositivo de renderizado"

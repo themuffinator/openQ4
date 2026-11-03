@@ -5358,20 +5358,24 @@ static void Session_SetCampaignPageSkill( idUserInterface *gui, int skill, bool 
     gui->SetStateString( "skill_description", resolve ? common->GetLanguageDict()->GetString( descriptions[skill] ) : descriptions[skill] );
 }
 
-// A campaign page's verbs, the retained page's requests and the stock page's
+// A campaign page's verbs, the retained pages' requests and the stock page's
 // commands alike: a difficulty, turbo, START, a chapter and its start, and
-// BACK to the campaigns.
+// BACK to the campaigns (onto CHAPTERS from the retained CHAPTERS page).
 static void Session_HandleCampaignPageRequest( idSessionLocal &session, idUserInterface *gui, const char *request, bool retained ) {
     const char *campaign = Session_AwakeningPageActive() ? "awakening" : "quake4";
-    if ( !idStr::Icmp( request, "campaignSkillBack" ) ) {
-        if ( retained ) session.BeginRetainedCampaignSkill( gui, "", true ); else session.OpenCampaignSelector( true );
+    const bool chaptersBack = !idStr::Icmp( request, "campaignChaptersBack" );
+    if ( !idStr::Icmp( request, "campaignSkillBack" ) || chaptersBack ) {
+        if ( retained ) session.BeginRetainedCampaignSkill( gui, "", true, chaptersBack ); else session.OpenCampaignSelector( true );
         return;
     }
     if ( !idStr::Icmp( request, "campaignSkillStart" ) || !idStr::Icmp( request, "campaignChapterStart" ) ) {
         // A chapter's autosave brings back the difficulty it was written
-        // with; a fresh start takes the page's.
-        cvarSystem->SetCVarInteger( "g_skill", idMath::ClampInt( 0, 4, gui->State().GetInt( "skill", "1" ) ) );
-        cvarSystem->SetCVarBool( "g_turboMode", gui->State().GetBool( "turbo" ) );
+        // with; a fresh start takes the page's, where the page has one. The
+        // retained CHAPTERS page has none, so the current difficulty stands.
+        if ( gui->State().FindKey( "skill" ) != NULL ) {
+            cvarSystem->SetCVarInteger( "g_skill", idMath::ClampInt( 0, 4, gui->State().GetInt( "skill", "1" ) ) );
+            cvarSystem->SetCVarBool( "g_turboMode", gui->State().GetBool( "turbo" ) );
+        }
         if ( !idStr::Icmp( request, "campaignSkillStart" ) ) {
             session.SelectCampaign( campaign, true );
         } else if ( !session.StartCampaignChapter( gui->State().GetInt( retained ? "chapter.selected" : "chapters_sel_0", "-1" ) ) ) {
@@ -6532,6 +6536,7 @@ static const char *const RETAINED_LOADING_GUI = "guis/loading/loading.q4ui";
 static const char *const RETAINED_SINGLEPLAYER_GUI = "guis/menu/singleplayer.q4ui";
 static const char *const RETAINED_CAMPAIGNS_GUI = "guis/menu/campaigns.q4ui";
 static const char *const RETAINED_SKILL_GUI = "guis/menu/campaign_skill.q4ui";
+static const char *const RETAINED_CHAPTERS_GUI = "guis/menu/chapters.q4ui";
 // The Load Game page, which LOAD GAME on the title and the Marine pause hands
 // off to as to a stock page. Its list holds this many saves at a time and
 // pages through more (ROWS in tools/ui/retained_saves.py); a save without a
@@ -6906,7 +6911,7 @@ idUserInterface *idSessionLocal::FindRetainedGui( const char *path, bool shared,
 #endif
 
 
-void idSessionLocal::OpenCampaignSelector( bool campaigns, bool fromArena ) {
+void idSessionLocal::OpenCampaignSelector( bool campaigns, bool fromArena, bool fromChapters ) {
 #ifndef ID_DEDICATED
     // The stock selectors stand in when the retained one is off, missing or
     // cannot load.
@@ -6924,8 +6929,14 @@ void idSessionLocal::OpenCampaignSelector( bool campaigns, bool fromArena ) {
         const idCampaignContentInfo info = fileSystem->GetAwakeningContentInfo();
         gui->SetStateBool( "awakening_ready", info.ready );
         gui->SetStateBool( "awakening_present", info.present );
-        // The activation focuses the campaign being played.
-        gui->SetStateBool( "awakening_chosen", !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) );
+        // The campaign being played is the chosen one; the retained page's
+        // activation focuses NEW GAME, or CHAPTERS coming back from it.
+        const bool awakening = !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" );
+        gui->SetStateBool( "awakening_chosen", awakening );
+        if ( !stock ) {
+            gui->SetStateBool( "campaign.awakening", awakening && info.ready );
+            gui->SetStateBool( "from_chapters", fromChapters );
+        }
         gui->StateChanged( common->GetPresentationTime() );
     } else if ( gui != NULL ) {
         // Back from Arena returns onto ARENA; the activation reads it.
@@ -6947,7 +6958,7 @@ static bool Session_CampaignNeedsReload( const char *gameDir ) {
 }
 #endif
 
-void idSessionLocal::SelectCampaign( const char *campaign, bool start ) {
+void idSessionLocal::SelectCampaign( const char *campaign, bool start, bool chapters ) {
 #ifndef ID_DEDICATED
     const bool awakening = !idStr::Icmp( campaign, "awakening" );
     const bool arena = !idStr::Icmp( campaign, "arena" );
@@ -6972,6 +6983,7 @@ void idSessionLocal::SelectCampaign( const char *campaign, bool start ) {
         continuation.AppendArg( "campaignSelect" );
         continuation.AppendArg( campaign );
         if ( start ) continuation.AppendArg( "start" );
+        else if ( chapters ) continuation.AppendArg( "chapters" );
         cmdSystem->SetupReloadEngineMenu( continuation );
         return;
     }
@@ -6981,7 +6993,8 @@ void idSessionLocal::SelectCampaign( const char *campaign, bool start ) {
         StartNewGame( awakening ? "game/m01_stranarus_trench1" : "game/airdefense1" );
         return;
     }
-    if ( !arena && OpenRetainedCampaignSkill() ) return;
+    if ( !arena && ( chapters ? OpenRetainedCampaignChapters() : OpenRetainedCampaignSkill() ) ) return;
+    // The stock page holds its chapters too, a CHAPTERS press away.
     idUserInterface *page = !arena ? uiManager->FindGui( STOCK_CAMPAIGN_GUI, true, false, true ) : NULL;
     if ( page != NULL ) {
         // The stock campaign page, as the retained one: the campaign's
@@ -7008,6 +7021,21 @@ void idSessionLocal::SelectCampaign( const char *campaign, bool start ) {
 #endif
 }
 
+// The CHAPTERS page: the active campaign's levels, the chosen one focused.
+bool idSessionLocal::OpenRetainedCampaignChapters() {
+#ifdef ID_DEDICATED
+    return false;
+#else
+    if ( !Session_RetainedScreensEnabled() ) return false;
+    idUserInterface *gui = FindRetainedGui( RETAINED_CHAPTERS_GUI, true, false );
+    if ( !gui ) return false;
+    PublishCampaignChapters( gui );
+    SetGUI( gui, NULL );
+    gui->StateChanged( common->GetPresentationTime() );
+    return true;
+#endif
+}
+
 bool idSessionLocal::OpenRetainedCampaignSkill() {
 #ifdef ID_DEDICATED
     return false;
@@ -7018,25 +7046,25 @@ bool idSessionLocal::OpenRetainedCampaignSkill() {
     Session_SetCampaignPageSkill( gui, cvarSystem->GetCVarInteger( "g_skill" ), false );
     gui->SetStateBool( "turbo", false );
     gui->SetStateString( "campaign_title", Session_AwakeningPageActive() ? "#str_230040" : "#str_230039" );
-    PublishCampaignChapters( gui );
     SetGUI( gui, NULL );
     gui->StateChanged( common->GetPresentationTime() );
     return true;
 #endif
 }
 
-void idSessionLocal::BeginRetainedCampaignSkill( idUserInterface *from, const char *campaign, bool back ) {
+void idSessionLocal::BeginRetainedCampaignSkill( idUserInterface *from, const char *campaign, bool back, bool chapters ) {
 #ifndef ID_DEDICATED
     if ( !from || retainedSubpageFrom ) return;
     if ( !back && idStr::Icmp( campaign, "quake4" ) && idStr::Icmp( campaign, "awakening" ) ) return;
-    if ( FindRetainedGui( back ? RETAINED_CAMPAIGNS_GUI : RETAINED_SKILL_GUI, true, false ) == NULL ||
+    if ( FindRetainedGui( back ? RETAINED_CAMPAIGNS_GUI : chapters ? RETAINED_CHAPTERS_GUI : RETAINED_SKILL_GUI, true, false ) == NULL ||
          cvarSystem->GetCVarBool( "ui_retainedReducedMotion" ) ) {
-        if ( back ) OpenCampaignSelector( true ); else SelectCampaign( campaign );
+        if ( back ) OpenCampaignSelector( true, false, chapters ); else SelectCampaign( campaign, false, chapters );
         return;
     }
-    retainedDetailTarget = back ? 2 : 1;
+    retainedDetailTarget = back ? ( chapters ? 4 : 2 ) : ( chapters ? 3 : 1 );
     retainedDetailCampaign = campaign;
-    from->HandleNamedEvent( back ? "detailLeave" : !idStr::Icmp( campaign, "awakening" ) ? "detailEnterAwakening" : "detailEnterQuake4" );
+    from->HandleNamedEvent( back ? "detailLeave" : chapters ? "detailEnterChapters" :
+        !idStr::Icmp( campaign, "awakening" ) ? "detailEnterAwakening" : "detailEnterQuake4" );
     PumpApplicationActions( from );
     retainedSubpageFrom = from;
     retainedSubpageDeeper = !back;
@@ -7334,8 +7362,9 @@ void idSessionLocal::UpdateRetainedSubpage() {
 		const int target = retainedDetailTarget;
 		const idStr campaign = retainedDetailCampaign;
 		retainedDetailTarget = 0; retainedDetailCampaign.Clear();
-		if ( target == 2 ) OpenCampaignSelector( true ); else SelectCampaign( campaign );
-		if ( cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) common->Printf( "RETAINED_DETAIL handover level=%d gui=%s\n", target == 2 ? 3 : 4, guiActive ? guiActive->Name() : "-" );
+		const bool parent = target == 2 || target == 4;
+		if ( parent ) OpenCampaignSelector( true, false, target == 4 ); else SelectCampaign( campaign, false, target == 3 );
+		if ( cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) common->Printf( "RETAINED_DETAIL handover level=%d gui=%s\n", parent ? 3 : 4, guiActive ? guiActive->Name() : "-" );
 		return;
 	}
 	// The arriving document's activation fades its backing in; the page
@@ -7550,7 +7579,8 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 		}
 		return;
 	}
-	if ( gui && request && gui == guiActive && !idStr::Icmp( gui->Name(), RETAINED_SKILL_GUI ) ) {
+	if ( gui && request && gui == guiActive &&
+		 ( !idStr::Icmp( gui->Name(), RETAINED_SKILL_GUI ) || !idStr::Icmp( gui->Name(), RETAINED_CHAPTERS_GUI ) ) ) {
 		if ( retainedSubpageFrom ) return;
 		Session_HandleCampaignPageRequest( *this, gui, request, true );
 		return;
@@ -7653,8 +7683,11 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
         // A change of level in progress takes no further request.
         if ( retainedSubpageFrom != NULL ) return;
         if ( !idStr::Icmp( request, "campaigns" ) ) BeginRetainedSubpage( gui, true );
-        else if ( !idStr::Icmp( request, "campaignQuake4" ) ) BeginRetainedCampaignSkill( gui, "quake4" );
-        else if ( !idStr::Icmp( request, "campaignAwakening" ) ) BeginRetainedCampaignSkill( gui, "awakening" );
+        else if ( !idStr::Icmp( request, "campaignNew" ) || !idStr::Icmp( request, "campaignChapters" ) ) {
+            // The chosen campaign's difficulty (NEW GAME) or its levels (CHAPTERS).
+            BeginRetainedCampaignSkill( gui, gui->State().GetBool( "campaign.awakening" ) ? "awakening" : "quake4", false,
+                !idStr::Icmp( request, "campaignChapters" ) );
+        }
         else if ( !idStr::Icmp( request, "campaignArena" ) ) {
             // ARENA leads deeper to the Arena sub-page when the campaign needs
             // no engine reload into its game directory first; else it is

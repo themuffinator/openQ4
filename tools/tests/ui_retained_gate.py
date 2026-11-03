@@ -582,7 +582,7 @@ public:
     idUserInterface* guiRetainedReleasing = nullptr; int retainedReleaseUntil = 0;
     idUserInterface* retainedSubpageFrom = nullptr; bool retainedSubpageDeeper = false; int retainedSubpageBegan = 0, retainedSubpageUntil = 0;
     int retainedDetailTarget = 0; idStr retainedDetailCampaign;
-    bool OpenRetainedCampaignSkill(); void BeginRetainedCampaignSkill(idUserInterface*, const char*, bool = false);
+    bool OpenRetainedCampaignSkill(); bool OpenRetainedCampaignChapters(); void BeginRetainedCampaignSkill(idUserInterface*, const char*, bool = false, bool = false);
     idUserInterface* guiLoading = nullptr; bool retainedLoadingActive = false;
     int retainedLoadingTip = -1, retainedLoadingTipSlot = 0, retainedLoadingTipAt = 0; void PublishRetainedLoadingTip(bool);
     void BeginRetainedSubpage(idUserInterface*, bool, retainedSubpage_t = RETAINED_SUBPAGE_CAMPAIGN); void UpdateRetainedSubpage();
@@ -791,10 +791,10 @@ public:
     bool StartCampaignChapter(int chapter) { chapterStarts.push_back(chapter); return chapter >= 0; }
     void UpdateRetainedHome(); bool RetainedHomeInputBlocked() const; void RetainedHomeFrameEvent();
     void HandleRetainedSessionRequest(idUserInterface*, const char*);
-    void OpenCampaignSelector(bool, bool = false);
+    void OpenCampaignSelector(bool, bool = false, bool = false);
     std::vector<std::string> selected; int menus = 0;
     int starts = 0;
-    void SelectCampaign(const char* campaign, bool start = false) { selected.push_back(campaign); if (start) ++starts; else OpenRetainedCampaignSkill(); }
+    void SelectCampaign(const char* campaign, bool start = false, bool chapters = false) { selected.push_back(campaign); if (start) ++starts; else if (chapters) OpenRetainedCampaignChapters(); else OpenRetainedCampaignSkill(); }
     void StartMenu() { ++menus; guiActive = guiMainMenu; }
     // Another screen closes the SYSTEM page (CloseSystemSettings).
     void SetGUI(idUserInterface* gui, HandleGuiCommand_t handler) {
@@ -834,7 +834,7 @@ static struct {
 MAIN = r'''
 static const char* const DOCUMENTS[] = {"guis/menu/title.q4ui", "guis/menu/pause.q4ui", "guis/menu/pause_strogg.q4ui", "guis/loading/loading.q4ui",
     "guis/menu/singleplayer.q4ui", "guis/menu/campaigns.q4ui", "guis/menu/settings/system.q4ui", "guis/menu/mp_escape.q4ui",
-    "guis/menu/mp_welcome.q4ui", "guis/menu/campaign_skill.q4ui", "guis/menu/mp_summary.q4ui",
+    "guis/menu/mp_welcome.q4ui", "guis/menu/campaign_skill.q4ui", "guis/menu/chapters.q4ui", "guis/menu/mp_summary.q4ui",
     "guis/menu/loadgame.q4ui", "guis/menu/savegame.q4ui", "guis/menu/restartlevel.q4ui",
     "guis/menu/loadgame_strogg.q4ui", "guis/menu/savegame_strogg.q4ui", "guis/menu/restartlevel_strogg.q4ui",
     "guis/menu/demos.q4ui", "guis/menu/restartmenu.q4ui", "guis/menu/credits.q4ui",
@@ -2374,15 +2374,18 @@ int main() {
         loading.state["loading_mp"] = "1"; const size_t events = loading.named.size(); commonObject.time += 6000;
         s.PublishRetainedLoadingTip(false); s.PublishRetainedLoadingTip(true); CHECK(loading.named.size() == events);
     }
-    {   // Fourth level: both campaigns, cancellation, draft settings and Start.
+    {   // Fourth level: Campaign's choice and its two children, NEW GAME and
+        // CHAPTERS; cancellation, draft settings and Start.
         auto s = Session(true); s.OpenCampaignSelector(true); auto* parent = s.guiActive;
+        CHECK(parent->state["campaign.awakening"] == "0" && parent->state["from_chapters"] == "0");
         cvarSystemObject.SetCVarInteger("g_skill",1);
-        s.HandleRetainedSessionRequest(parent,"campaignQuake4");
+        s.HandleRetainedSessionRequest(parent,"campaignNew");
         CHECK(s.retainedDetailTarget == 1 && s.guiActive == parent && parent->named.back() == "detailEnterQuake4");
         sysEvent_t back; back.evType=SE_KEY; back.evValue=K_ESCAPE; back.evValue2=1;
         commonObject.time += 120; CHECK(s.RetainedSubpageEvent(&back));
         CHECK(s.retainedDetailTarget == 0 && s.guiActive == parent && parent->named.back() == "detailReverse150");
-        s.HandleRetainedSessionRequest(parent,"campaignAwakening");
+        // The chosen campaign decides NEW GAME's difficulty page.
+        parent->state["campaign.awakening"] = "1"; s.HandleRetainedSessionRequest(parent,"campaignNew");
         CHECK(parent->named.back() == "detailEnterAwakening");
         commonObject.time += 349; s.UpdateRetainedSubpage(); CHECK(s.guiActive == parent);
         commonObject.time += 1; s.UpdateRetainedSubpage(); auto* skill = s.guiActive;
@@ -2390,24 +2393,35 @@ int main() {
         s.HandleRetainedSessionRequest(skill,"campaignSkill4"); s.HandleRetainedSessionRequest(skill,"campaignSkillTurbo");
         CHECK(skill->State().GetInt("skill") == 4 && skill->State().GetBool("turbo") && cvarSystemObject.GetCVarInteger("g_skill") == 1);
         s.HandleRetainedSessionRequest(skill,"campaignSkillBack"); CHECK(s.retainedDetailTarget == 2);
-        commonObject.time += 300; s.UpdateRetainedSubpage(); CHECK(s.guiActive == parent && cvarSystemObject.GetCVarInteger("g_skill") == 1);
+        commonObject.time += 300; s.UpdateRetainedSubpage();
+        CHECK(s.guiActive == parent && parent->state["from_chapters"] == "0" && cvarSystemObject.GetCVarInteger("g_skill") == 1);
+        // CHAPTERS: the chosen campaign's levels, published as the page opens;
+        // a row's pick publishes them again, and START CHAPTER starts the
+        // chosen one at the current difficulty (the page has none of its own).
+        const size_t published = s.chapterPublishes.size();
+        s.HandleRetainedSessionRequest(parent,"campaignChapters");
+        CHECK(s.retainedDetailTarget == 3 && parent->named.back() == "detailEnterChapters");
+        commonObject.time += 350; s.UpdateRetainedSubpage(); auto* chapters = s.guiActive;
+        CHECK(std::string(chapters->Name()) == "guis/menu/chapters.q4ui" && s.selected.back() == "quake4");
+        CHECK(s.chapterPublishes.size() == published + 1 && s.chapterPublishes.back() == -1);
+        chapters->state["chapter.pick"] = "6"; s.HandleRetainedSessionRequest(chapters,"campaignChapterSelect");
+        CHECK(s.chapterPublishes.back() == 6);
+        chapters->state["chapter.selected"] = "6"; s.HandleRetainedSessionRequest(chapters,"campaignChapterStart");
+        CHECK(s.chapterStarts.size() == 1 && s.chapterStarts.back() == 6 && cvarSystemObject.GetCVarInteger("g_skill") == 1);
+        // BACK climbs to Campaign onto CHAPTERS.
+        s.HandleRetainedSessionRequest(chapters,"campaignChaptersBack");
+        CHECK(s.retainedDetailTarget == 4 && chapters->named.back() == "detailLeave");
+        commonObject.time += 300; s.UpdateRetainedSubpage(); CHECK(s.guiActive == parent && parent->state["from_chapters"] == "1");
         cvarSystemObject.strings["ui_retainedReducedMotion"]="1";
-        s.HandleRetainedSessionRequest(parent,"campaignQuake4"); CHECK(s.guiActive == skill && !s.retainedSubpageFrom);
+        s.HandleRetainedSessionRequest(parent,"campaignNew"); CHECK(s.guiActive == skill && !s.retainedSubpageFrom);
         CHECK(skill->State().GetInt("skill") == 1 && !skill->State().GetBool("turbo"));
         s.HandleRetainedSessionRequest(skill,"campaignSkill3"); s.HandleRetainedSessionRequest(skill,"campaignSkillTurbo");
         s.HandleRetainedSessionRequest(skill,"campaignSkillStart");
         CHECK(s.starts == 1 && cvarSystemObject.GetCVarInteger("g_skill") == 3 && cvarSystemObject.GetCVarBool("g_turboMode"));
-        // Opening the page publishes its chapters; a row's pick publishes it
-        // again, and START CHAPTER starts the chosen one at the page's choice.
-        CHECK(!s.chapterPublishes.empty() && s.chapterPublishes.back() == -1);
-        skill->state["chapter.pick"] = "6"; s.HandleRetainedSessionRequest(skill,"campaignChapterSelect");
-        CHECK(s.chapterPublishes.back() == 6);
-        skill->state["chapter.selected"] = "6"; s.HandleRetainedSessionRequest(skill,"campaignSkill2");
-        s.HandleRetainedSessionRequest(skill,"campaignChapterStart");
-        CHECK(s.chapterStarts.size() == 1 && s.chapterStarts.back() == 6 && cvarSystemObject.GetCVarInteger("g_skill") == 2);
-        auto disabled = Session(false); CHECK(!disabled.OpenRetainedCampaignSkill());
+        auto disabled = Session(false); CHECK(!disabled.OpenRetainedCampaignSkill() && !disabled.OpenRetainedCampaignChapters());
         auto missing = Session(true); fileSystemObject.files.erase("guis/menu/campaign_skill.q4ui");
-        CHECK(!missing.OpenRetainedCampaignSkill());
+        fileSystemObject.files.erase("guis/menu/chapters.q4ui");
+        CHECK(!missing.OpenRetainedCampaignSkill() && !missing.OpenRetainedCampaignChapters());
     }
     {   // Single Player and its Campaign sub-page (spec 1.10): the leaving document
         // plays its half, the other presents at the hand-over (350 ms deeper, 300 ms
@@ -4570,16 +4584,16 @@ def check_prompt_glyphs(compiler: str, directory: Path) -> None:
             assert pad.endswith('-pad') and pad[:-len('-pad')] in groups, (path.name, pad)
         shoulders += sum(1 for group_id in groups if group_id in ('tab-previous', 'tab-next', 'prompt-tabs-0', 'prompt-tabs-1'))
     # The title, both pauses, Single Player, Campaign, the campaign difficulty
-    # page, Multiplayer and SETTINGS, the seven pages with their own prompt bars and the
-    # Strogg pause's three, the loading screen, the Escape, Welcome and
-    # summary cards, the Arena pause card and the CONTROLS, GAME OPTIONS,
-    # DISPLAY (SYSTEM) and AUDIO sub-pages.
-    assert documents == 27, documents
+    # page and CHAPTERS, Multiplayer and SETTINGS, the seven pages with their own
+    # prompt bars and the Strogg pause's three, the loading screen, the Escape,
+    # Welcome and summary cards, the Arena pause card and the CONTROLS, GAME
+    # OPTIONS, DISPLAY (SYSTEM) and AUDIO sub-pages.
+    assert documents == 28, documents
     # The cards' and the settings sub-pages' tab keys take the shoulders, as do
     # the Escape and Welcome cards' Tabs prompts; every Accept and Back prompt
     # follows Swap Confirm and Back.
     assert shoulders == 16, shoulders
-    assert swapping == 53, swapping
+    assert swapping == 55, swapping
     print(f'ui_retained gate: prompt glyphs follow the active device in {documents} documents')
 
 
@@ -5371,7 +5385,7 @@ def main() -> int:
         for match in re.finditer(r'"([^"]+\.q4ui)"', source):
             path = match.group(1)
             allowed = {'guis/menu/settings/system.q4ui', 'guis/menu/title.q4ui', 'guis/menu/pause.q4ui', 'guis/menu/pause_strogg.q4ui',
-                       'guis/loading/loading.q4ui', 'guis/menu/singleplayer.q4ui', 'guis/menu/campaigns.q4ui', 'guis/menu/campaign_skill.q4ui',
+                       'guis/loading/loading.q4ui', 'guis/menu/singleplayer.q4ui', 'guis/menu/campaigns.q4ui', 'guis/menu/campaign_skill.q4ui', 'guis/menu/chapters.q4ui',
                        'guis/menu/mp_escape.q4ui', 'guis/menu/mp_welcome.q4ui', 'guis/menu/mp_summary.q4ui', 'guis/menu/loadgame.q4ui',
                        'guis/menu/savegame.q4ui', 'guis/menu/restartlevel.q4ui', 'guis/menu/loadgame_strogg.q4ui',
                        'guis/menu/savegame_strogg.q4ui', 'guis/menu/restartlevel_strogg.q4ui',
@@ -5550,8 +5564,11 @@ def main() -> int:
     # one handler (Session_HandleCampaignPageRequest).
     select_campaign = function_body(menu, 'void idSessionLocal::SelectCampaign(')
     assert select_campaign.index('OpenRetainedCampaignSkill()') < select_campaign.index('page->SetStateInt( "campaign_view", 1 );')
+    assert 'chapters ? OpenRetainedCampaignChapters() : OpenRetainedCampaignSkill()' in select_campaign
     assert 'PublishCampaignChapters( page );' in select_campaign
-    assert 'PublishCampaignChapters( gui );' in function_body(menu, 'bool idSessionLocal::OpenRetainedCampaignSkill(')
+    # The CHAPTERS page publishes the levels; the difficulty page has none now.
+    assert 'PublishCampaignChapters( gui );' in function_body(menu, 'bool idSessionLocal::OpenRetainedCampaignChapters(')
+    assert 'PublishCampaignChapters' not in function_body(menu, 'bool idSessionLocal::OpenRetainedCampaignSkill(')
     assert 'Session_HandleCampaignPageRequest( *this, gui, request, true );' in menu
     assert 'Session_HandleCampaignPageRequest( *this, gui, command, false );' in menu
     # The pause screens are named once more by PrefetchRetainedLevel, which
@@ -5742,6 +5759,7 @@ def main() -> int:
                      'content/baseoq4/pak0/guis/menu/pause_strogg.q4ui', 'content/baseoq4/pak0/guis/loading/loading.q4ui',
                      'content/baseoq4/pak0/guis/menu/singleplayer.q4ui', 'content/baseoq4/pak0/guis/menu/campaigns.q4ui',
                      'content/baseoq4/pak0/guis/menu/mp_escape.q4ui', 'content/baseoq4/pak0/guis/menu/campaign_skill.q4ui',
+                     'content/baseoq4/pak0/guis/menu/chapters.q4ui',
                      'content/baseoq4/pak0/guis/menu/mp_summary.q4ui', 'content/baseoq4/pak0/guis/menu/loadgame.q4ui'):
         text = (ROOT / relative).read_text(encoding='utf-8')
         document = json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
@@ -5812,7 +5830,7 @@ def main() -> int:
         'static void Session_RetainedSaveLabel(', 'static idStr Session_RetainedSaveShot(', 'static void Session_RetainedSaveStamp(',
         'static void Session_RetainedSaveDetails(', 'static void Session_PublishRetainedTitleState(', 'idUserInterface *idSessionLocal::FindRetainedGui(',
         'bool idSessionLocal::RetainedSystemAvailable(', 'bool idSessionLocal::ReturnSystemSettings(', 'void idSessionLocal::OpenCampaignSelector(',
-        'bool idSessionLocal::OpenRetainedCampaignSkill(', 'void idSessionLocal::BeginRetainedCampaignSkill(',
+        'bool idSessionLocal::OpenRetainedCampaignSkill(', 'bool idSessionLocal::OpenRetainedCampaignChapters(', 'void idSessionLocal::BeginRetainedCampaignSkill(',
         'bool idSessionLocal::RetainedHomeInputBlocked(',
         'void idSessionLocal::UpdateRetainedHome(', 'idUserInterface *idSessionLocal::RetainedHomeDocument(',
         'bool idSessionLocal::RetainedPauseIsStrogg(', 'void idSessionLocal::RetainedHomeFrameEvent(',

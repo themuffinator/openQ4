@@ -37,6 +37,8 @@ def child_transition(ui, doc, level, choices, parent_key):
 
     Use for every route from a sub-page to a detail page. Modal controls and
     sibling tabs keep their level. Back can retarget any in-flight descent.
+    Each choice is (name, key) or (name, key, row): the carry starts on its
+    navigation row, by default the choice's place in the list.
     """
     U=ui.U;slot=39+(level-1)*97
     doc.state['detail_title']={'type':'string','initial':choices[0][1]}
@@ -47,8 +49,8 @@ def child_transition(ui, doc, level, choices, parent_key):
     fits=ui.crumb_fits(parent_key)
     for suffix,scale in [('',ui.CRUMB_SCALE)]+[('-'+lang,fit) for lang,fit in fits.items()]:
         doc.timelines.add('detailCrumb'+suffix,350,[ui.track('title','transform',[(0,ui.transform()),(150,ui.crumb_transform(scale)),(350,ui.crumb_transform(scale))])])
-    for index,(name,key) in enumerate(choices):
-        start=ui.transform(tx=U*(44-slot),ty=U*(192.8+30*index-19))
+    for index,(name,key,*row) in enumerate(choices):
+        start=ui.transform(tx=U*(44-slot),ty=U*(192.8+30*(row[0] if row else index)-19))
         doc.timelines.add('detailEnter'+name,350,[
             ui.track('content','opacity',[(0,ui.number(1)),(150,ui.number(0)),(350,ui.number(0))]),
             ui.track('content','transform',[(0,ui.transform()),(300,ui.transform(tx=U*640)),(350,ui.transform(tx=U*640))]),
@@ -100,12 +102,12 @@ def check_chapter_text(ui):
         for language,text in texts.items():
             if ui.text_width(face,text,size)>width:
                 raise SystemExit(f"{key} in {language} ({text!r}) needs {ui.text_width(face,text,size):.0f} dp of {width:.0f}")
-    for key in ('#str_231286','#str_231287','#str_231288'):
+    for key in CHAPTER_DETAIL_KEYS:
         for language,text in table_text(key).items():
             if lines_needed('lowpixel',text,15,U*CHAPTER_DETAIL_W)>4:
                 raise SystemExit(f"{key} in {language} needs {lines_needed('lowpixel',text,15,U*CHAPTER_DETAIL_W)} lines of 4")
 
-CHAPTER_DETAIL_KEYS=('#str_231286','#str_231287','#str_231288')
+CHAPTER_DETAIL_KEYS=('#str_231286','#str_231551','#str_231288')  # saved, fresh at the current difficulty, locked
 CHAPTER_FLOOR=420.0      # u: above 100 % text the picture's column runs down to the docked bottom band's edge
 CHAPTER_PICTURE_LEAST=40.0   # u: a picture squeezed shorter than this gives way to the lines
 
@@ -161,16 +163,16 @@ def grow_chapter_detail(ui, doc, shot, name, detail, plates):
         doc.bind(f"text.{plate['id']}.top",plate['id'],'top',larger(under,prop(plate,'top')))
 
 def chapter_view(ui, doc):
-    """The campaign page's chapters (docs/user/campaigns.md): every level of
-    the campaign in campaign order, the ones not reached yet disabled, under
-    the Load Game page's LEVEL and STATUS columns. A row's first Accept
-    chooses its chapter, and the session publishes its levelshot, name and
-    how it starts; Accept on the chosen one, or START CHAPTER, starts it.
-    BACK and the page's Back return to the difficulty."""
+    """The campaign's chapters (docs/user/campaigns.md): every level of the
+    campaign in campaign order, the ones not reached yet disabled, under the
+    Load Game page's LEVEL and STATUS columns. A row's first Accept chooses
+    its chapter, and the session publishes its levelshot, name and how it
+    starts; Accept on the chosen one, or START CHAPTER, starts it. BACK runs
+    the document's back action."""
     from retained_saves import grow_rows,picture_frame,save_row,section_plate
     check_chapter_text(ui)
     U=ui.U;ROW_H=20.0
-    doc.state.update({'view':{'type':'number','initial':0},'chapter.count':{'type':'number','initial':0},
+    doc.state.update({'chapter.count':{'type':'number','initial':0},
         'chapter.first':{'type':'number','initial':0},'chapter.selected':{'type':'number','initial':-1},
         'chapter.pick':{'type':'number','initial':-1},'chapter.open':{'type':'boolean','initial':False},
         'chapter.shot':{'type':'string','initial':''},'chapter.name':{'type':'string','initial':''},
@@ -203,7 +205,7 @@ def chapter_view(ui, doc):
     doc.bind('chapter-detail.text','chapter-detail','text',{'state':'chapter.detail'})
     start=section_plate(doc,'chapter_start','#str_231289',left-8,top+height+90,action='chapterStart',label_w=CHAPTER_PLATE_LABEL)
     doc.bind('chapter_start.enabled','chapter_start','enabled',{'state':'chapter.open'})
-    back=section_plate(doc,'chapter_back','#str_230045',left-8,top+height+120,event='closeChapters',label_w=CHAPTER_PLATE_LABEL)
+    back=section_plate(doc,'chapter_back','#str_230045',left-8,top+height+120,action='back',label_w=CHAPTER_PLATE_LABEL)
     # Above 100 % text the levels' rows and the chosen level's name and
     # explanation grow with it (section 2's reflow); the headings and plates
     # are furniture and keep their size.
@@ -211,68 +213,16 @@ def chapter_view(ui, doc):
     for node in [*headings,start,back]:
         ui.fixed_text(doc,node)
     grow_chapter_detail(ui,doc,shot,name,detail,(start,back))
-    panel=ui.group('chapters',{**ui.absolute(left=0,top=0,width=ui.CANVAS_W,height=720),'display':ui.keyword('none')},
+    panel=ui.group('chapters',{**ui.absolute(left=0,top=0,width=ui.CANVAS_W,height=720)},
         [*headings,viewport,scrollbar,*shot,name,detail,start,back])
-    doc.bind('chapters.display','chapters','display',{'op':'select','args':[{'op':'==','args':[{'state':'view'},1]},'block','none']})
-    # Opening the chapters focuses the chosen one; closing them, CHAPTERS.
-    doc.events['openChapters']=[{'op':'setState','values':{'view':1}},{'op':'focus','control':'row-0'},
-        *[{'op':'if','condition':{'op':'==','args':[{'state':'chapter.selected'},i]},'then':[{'op':'focus','control':f'row-{i}'}]}
-          for i in range(1,CHAPTER_ROWS)]]
-    doc.events['closeChapters']=[{'op':'setState','values':{'view':0}},{'op':'focus','control':'chapters-plate'}]
     return panel
 
-def skill_document(ui):
-    U=ui.U;doc=ui.Document('openq4.campaign-skill')
-    doc.state.update({'skill':{'type':'number','initial':1},'turbo':{'type':'boolean','initial':False},
-        'campaign_title':{'type':'string','initial':'#str_230039'},'skill_description':{'type':'string','initial':'#str_200019'}})
-    skill_keys=['#str_200014','#str_200015','#str_200016','#str_200017','#str_41117']
-    buttons=[]
-    for i,key in enumerate(skill_keys):
-        action=doc.session('skill'+str(i),'campaignSkill'+str(i))
-        row=ui.navigation_plate(doc,'skill'+str(i),key,action=action)
-        mark=ui.vector('selected'+str(i),{**ui.absolute(left=ui.NAV_LEAD+U*25,top=U*10,width=U*5,height=U*10),'opacity':ui.number(0)},
-                       [ui.path('rail',[(0,0),(U*3,0),(U*3,U*10),(0,U*10)],fill=ui.solid(ui.rgb(ui.ORANGE)))])
-        row['children'].append(mark);doc.bind('selected'+str(i)+'.opacity','selected'+str(i),'opacity',{'op':'select','args':[{'op':'==','args':[{'state':'skill'},i]},1,0]})
-        buttons.append(row)
-    for ident,key,command in [('turbo','#str_41119','campaignSkillTurbo'),('start','#str_200020','campaignSkillStart')]:
-        doc.session(ident,command);buttons.append(ui.navigation_plate(doc,ident,key,action=ident))
-    # CHAPTERS opens the campaign's levels in the difficulty's place.
-    buttons.append(ui.navigation_plate(doc,'chapters-plate','#str_231280',event='openChapters'))
-    doc.session('back','campaignSkillBack');buttons.append(ui.navigation_plate(doc,'back','#str_230045',action='back'))
-    chapters=chapter_view(ui,doc)
-    doc.events['onBack']=[{'op':'if','condition':{'op':'==','args':[{'state':'view'},1]},
-        'then':[{'op':'call','event':'closeChapters'}],'else':[{'op':'action','action':'back'}]}]
-    bands=ui.framing_bands('band');bands[0]['properties']['transform']=top_at(ui,4);bands[1]['properties']['transform']=ui.transform(*ui.BOTTOM_TO_PAGE)
-    bounds={**ui.absolute(top=0,width=ui.CANVAS_W,height=720),'left':ui.length(50,'%'),'margin-left':ui.length(-ui.CANVAS_W/2)}
-    content=ui.group('content',{**bounds,'transform':ui.transform(),'opacity':ui.number(0)},[
-        ui.group('navigation',{**ui.absolute(left=0,top=U*172,width=U*357),'display':ui.keyword('flex'),'flex-direction':ui.keyword('column')},buttons),
-        ui.label('description','#str_200019',{**ui.absolute(left=U*387,top=U*184,width=U*226,height=U*148),**ui.typeface('lowpixel',18,26,ui.rgb(ui.OLIVE)),'display':ui.keyword('block')}),
-        ui.label('turbo-value','#str_41121',{**ui.absolute(left=U*270,top=U*325,width=U*77,height=U*25),**ui.typeface('marine',18,26,ui.rgb(ui.ORANGE)),'pointer-events':ui.keyword('none'),'display':ui.keyword('block')}),
-        chapters])
-    # Above 100 % text the chosen difficulty's description grows as a page's
-    # content column does, and TURBO's value keeps its size on its plate.
-    from retained_difficulty import DIFFICULTIES
-    parts={node['id']:node for node in content['children']}
-    ui.reflow_details(doc,parts['description'],[key for _,key in DIFFICULTIES])
-    ui.fixed_text(doc,parts['turbo-value'])
-    difficulty={'op':'==','args':[{'state':'view'},0]}
-    doc.bind('navigation.display','navigation','display',{'op':'select','args':[difficulty,'flex','none']})
-    for ident in ('description','turbo-value'):
-        doc.bind(ident+'.display',ident,'display',{'op':'select','args':[difficulty,'block','none']})
-    doc.bind('description.text','description','text',{'state':'skill_description'})
-    doc.bind('turbo-value.text','turbo-value','text',{'op':'select','args':[{'state':'turbo'},'#str_41120','#str_41121']})
-    titles=[]
-    for i,key in enumerate(('#str_42000','#str_230038')):
-        titles.append(breadcrumb(ui,doc,'crumb'+str(i),key,39+97*i))
-    titles.append(ui.page_title('title','#str_230039',233,19))
-    titles[-1]['properties']['opacity']=ui.number(1)
-    doc.bind('title.text','title','text',{'state':'campaign_title'})
-    title_group=ui.group('titles',bounds,titles)
-    doc.timelines.add('arrive',150,[ui.track('content','opacity',[(0,ui.number(0)),(150,ui.number(1))])])
-    doc.events['onActivate'].append({'op':'playTimeline','timeline':'arrive'})
-    # Each arrival focuses the chosen difficulty, as Restart Level's page does.
-    doc.events['onActivate'] += [{'op':'setState','values':{'view':0}},{'op':'focus','control':'skill0'},*[{'op':'if','condition':{'op':'==','args':[{'state':'skill'},i]},
-        'then':[{'op':'focus','control':'skill'+str(i)}]} for i in range(1,len(skill_keys))]]
+def detail_page_motion(ui, doc):
+    """A fourth-level page's own motion (spec 1.10): Back drops its title,
+    sweeps its content 640 u toward the leading edge over 300 ms as the top
+    band steps back a notch, and returns the CAMPAIGN crumb to the title slot
+    over the last 150 ms; leaving the screen places it at rest."""
+    U=ui.U
     doc.timelines.add('detailLeave',300,[
         ui.track('title','opacity',[(0,ui.number(0)),(300,ui.number(0))]),
         ui.track('content','opacity',[(0,ui.number(1)),(250,ui.number(0)),(300,ui.number(0))]),
@@ -289,6 +239,85 @@ def skill_document(ui):
         ui.track('crumb1','color',[(0,ui.colour([1,1,1,.4])),(1,ui.colour([1,1,1,.4]))]),
         ui.track('crumb1-clip','width',[(0,ui.length(U*ui.CRUMB_SPAN)),(1,ui.length(U*ui.CRUMB_SPAN))])])
     doc.events['onDeactivate']=[{'op':'playTimeline','timeline':'rest'}]
+
+def detail_page_frame(ui, doc, title_key, content_parts):
+    """A fourth-level page's frame: the bands a notch past the sub-page's,
+    the SINGLE PLAYER and CAMPAIGN crumbs, the title at the fourth level's
+    slot (233,19 u) and the content arriving over 150 ms. Returns the bands,
+    the content and the titles."""
+    U=ui.U
+    bands=ui.framing_bands('band');bands[0]['properties']['transform']=top_at(ui,4);bands[1]['properties']['transform']=ui.transform(*ui.BOTTOM_TO_PAGE)
+    bounds={**ui.absolute(top=0,width=ui.CANVAS_W,height=720),'left':ui.length(50,'%'),'margin-left':ui.length(-ui.CANVAS_W/2)}
+    content=ui.group('content',{**bounds,'transform':ui.transform(),'opacity':ui.number(0)},content_parts)
+    titles=[]
+    for i,key in enumerate(('#str_42000','#str_230038')):
+        titles.append(breadcrumb(ui,doc,'crumb'+str(i),key,39+97*i))
+    titles.append(ui.page_title('title',title_key,233,19))
+    titles[-1]['properties']['opacity']=ui.number(1)
+    title_group=ui.group('titles',bounds,titles)
+    doc.timelines.add('arrive',150,[ui.track('content','opacity',[(0,ui.number(0)),(150,ui.number(1))])])
+    doc.events['onActivate'].append({'op':'playTimeline','timeline':'arrive'})
+    return bands,content,title_group
+
+def chapters_document(ui):
+    """CHAPTERS, the Campaign sub-page's fourth-level child beside NEW GAME
+    (spec 1.10: Campaign's campaign choice, then New Campaign and Chapters):
+    the chosen campaign's levels under the SINGLE PLAYER and CAMPAIGN crumbs,
+    CHAPTERS carried into the title slot. Each arrival focuses the chosen
+    level, or the first; BACK and Back climb to Campaign onto CHAPTERS."""
+    doc=ui.Document('openq4.campaign-chapters')
+    panel=chapter_view(ui,doc)
+    doc.session('back','campaignChaptersBack')
+    doc.events['onBack']=[{'op':'action','action':'back'}]
+    bands,content,title_group=detail_page_frame(ui,doc,'#str_231280',[panel])
+    doc.events['onActivate'] += [{'op':'focus','control':'row-0'},
+        *[{'op':'if','condition':{'op':'==','args':[{'state':'chapter.selected'},i]},'then':[{'op':'focus','control':f'row-{i}'}]}
+          for i in range(1,CHAPTER_ROWS)]]
+    detail_page_motion(ui,doc)
+    result=doc.build(fit_page(ui,ui.group('screen',{**ui.FULL,'background-color':ui.colour([0,0,0,1])},[
+        *ui.lit_field('field',.7),*bands,content,title_group,
+        # Its parents' legends (section 13.4), since its own BACK is in the content.
+        ui.page_prompts(doc,in_canvas=False)])))
+    result['canvas']['minWidth']=960
+    from retained_tall import TallLayout,VIEW_HEIGHT
+    tall=TallLayout(result)
+    tall_chapters(ui,tall,{'op':'-','args':[0,{'op':'-','args':[{'op':'/','args':[VIEW_HEIGHT,2]},360]}]})
+    return result
+
+def skill_document(ui):
+    U=ui.U;doc=ui.Document('openq4.campaign-skill')
+    doc.state.update({'skill':{'type':'number','initial':1},'turbo':{'type':'boolean','initial':False},
+        'campaign_title':{'type':'string','initial':'#str_230039'},'skill_description':{'type':'string','initial':'#str_200019'}})
+    skill_keys=['#str_200014','#str_200015','#str_200016','#str_200017','#str_41117']
+    buttons=[]
+    for i,key in enumerate(skill_keys):
+        action=doc.session('skill'+str(i),'campaignSkill'+str(i))
+        row=ui.navigation_plate(doc,'skill'+str(i),key,action=action)
+        mark=ui.vector('selected'+str(i),{**ui.absolute(left=ui.NAV_LEAD+U*25,top=U*10,width=U*5,height=U*10),'opacity':ui.number(0)},
+                       [ui.path('rail',[(0,0),(U*3,0),(U*3,U*10),(0,U*10)],fill=ui.solid(ui.rgb(ui.ORANGE)))])
+        row['children'].append(mark);doc.bind('selected'+str(i)+'.opacity','selected'+str(i),'opacity',{'op':'select','args':[{'op':'==','args':[{'state':'skill'},i]},1,0]})
+        buttons.append(row)
+    for ident,key,command in [('turbo','#str_41119','campaignSkillTurbo'),('start','#str_200020','campaignSkillStart')]:
+        doc.session(ident,command);buttons.append(ui.navigation_plate(doc,ident,key,action=ident))
+    doc.session('back','campaignSkillBack');buttons.append(ui.navigation_plate(doc,'back','#str_230045',action='back'))
+    doc.events['onBack']=[{'op':'action','action':'back'}]
+    bands,content,title_group=detail_page_frame(ui,doc,'#str_230039',[
+        ui.group('navigation',{**ui.absolute(left=0,top=U*172,width=U*357),'display':ui.keyword('flex'),'flex-direction':ui.keyword('column')},buttons),
+        ui.label('description','#str_200019',{**ui.absolute(left=U*387,top=U*184,width=U*226,height=U*148),**ui.typeface('lowpixel',18,26,ui.rgb(ui.OLIVE)),'display':ui.keyword('block')}),
+        ui.label('turbo-value','#str_41121',{**ui.absolute(left=U*270,top=U*325,width=U*77,height=U*25),**ui.typeface('marine',18,26,ui.rgb(ui.ORANGE)),'pointer-events':ui.keyword('none'),'display':ui.keyword('block')})])
+    # Above 100 % text the chosen difficulty's description grows as a page's
+    # content column does, and TURBO's value keeps its size on its plate.
+    from retained_difficulty import DIFFICULTIES
+    parts={node['id']:node for node in content['children']}
+    ui.reflow_details(doc,parts['description'],[key for _,key in DIFFICULTIES])
+    ui.fixed_text(doc,parts['turbo-value'])
+    doc.bind('description.text','description','text',{'state':'skill_description'})
+    doc.bind('turbo-value.text','turbo-value','text',{'op':'select','args':[{'state':'turbo'},'#str_41120','#str_41121']})
+    doc.bind('title.text','title','text',{'state':'campaign_title'})
+    # Each arrival focuses the chosen difficulty, as Restart Level's page does.
+    doc.events['onActivate'] += [{'op':'focus','control':'skill0'},*[{'op':'if','condition':{'op':'==','args':[{'state':'skill'},i]},
+        'then':[{'op':'focus','control':'skill'+str(i)}]} for i in range(1,len(skill_keys))]]
+    detail_page_motion(ui,doc)
     result=doc.build(fit_page(ui,ui.group('screen',{**ui.FULL,'background-color':ui.colour([0,0,0,1])},[
         *ui.lit_field('field',.7),*bands,content,title_group,
         # Its parents' legends (section 13.4), since its own BACK is in the content.
@@ -301,10 +330,10 @@ def skill_document(ui):
 # difficulty's description under them from the plates' label inset to the
 # column's margin, centred between the docked bands. The content keeps its
 # centred 720 dp box, so the parts move by the column's place less the box's
-# top. CHAPTERS stands as the Load Game page does: the chosen level's
-# picture with START CHAPTER and BACK beside it, its name and explanation
-# under it across the column, then LEVEL and STATUS and the levels in
-# two-line rows down to the bottom band.
+# top. The CHAPTERS page stands as the Load Game page does (tall_chapters):
+# the chosen level's picture with START CHAPTER and BACK beside it, its name
+# and explanation under it across the column, then LEVEL and STATUS and the
+# levels in two-line rows down to the bottom band.
 TALL_SKILL_GROW=1.6
 TALL_SKILL_TOP,TALL_SKILL_BOTTOM=110.0,100.0   # dp: under the docked top band's title, over the docked bottom band
 TALL_SKILL_PLATE=30.0                           # u: a navigation plate's pitch
@@ -338,7 +367,6 @@ def tall_skill_page(ui,result):
                (ui.TALL_MARGIN*grow,TALL_SKILL_TOP+plates_h+24),grow,shift)
     tall.set('description','width',width)
     tall.set('description','height',described)
-    tall_chapters(ui,tall,{'op':'-','args':[0,box_top]})
     return result
 
 TALL_CHAPTER_DETAIL_LINES=3   # the explanation's lines across the column (four fit its 200 u in landscape)

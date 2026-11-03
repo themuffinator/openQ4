@@ -30,11 +30,11 @@ def main():
         'waitMsec 2000','testGUI guis/loading/initialization.q4ui','waitMsec 500',shot('initialization'),
         'set ui_retainedReducedMotion 1','openq4_retainedGui event onInit','waitMsec 300',shot('initialization-still'),
         'testGUI','set ui_retainedReducedMotion 0','campaignMenu','waitMsec 700',*accept('nav_campaign'),
-        'waitMsec 700',shot('campaigns'),*accept('nav_quake4'),'waitMsec 130',shot('detail-enter'),
+        'waitMsec 700',shot('campaigns'),*accept('nav_newgame'),'waitMsec 130',shot('detail-enter'),
         'waitMsec 700',shot('skill'),*accept('nav_skill4'),*accept('nav_turbo'),'waitMsec 400',shot('skill-warlord'),
         *accept('nav_back'),'waitMsec 150',shot('detail-leave'),'waitMsec 500',shot('campaigns-returned'),
-        *accept('nav_quake4'),'waitMsec 500',shot('skill-reopened'),
-        'set ui_retainedReducedMotion 1',*accept('nav_back'),'waitMsec 300',*accept('nav_quake4'),'waitMsec 300',shot('skill-reduced'),
+        *accept('nav_newgame'),'waitMsec 500',shot('skill-reopened'),
+        'set ui_retainedReducedMotion 1',*accept('nav_back'),'waitMsec 300',*accept('nav_newgame'),'waitMsec 300',shot('skill-reduced'),
     ])
     # Leave the original map scripts, cinematic camera and treatment timing in
     # charge. Captures span all three blinks and the bed exit.
@@ -63,7 +63,7 @@ def main():
     capture.SCENARIO_CVARS['crash-reduced']={**capture.SCENARIO_CVARS['crash'],'ui_retainedReducedMotion':'1','ui_reducedFlashing':'1'}
     capture.SCENARIO_CVARS['progression']={'ui_retainedCaptureLoadFade':'1'}
     capture.SCENARIOS['progression']=(None,[
-        'waitMsec 2000','campaignMenu','waitMsec 500',*accept('campaign'),'waitMsec 600',*accept('quake4'),
+        'waitMsec 2000','campaignMenu','waitMsec 500',*accept('campaign'),'waitMsec 600',*accept('newgame'),
         'waitMsec 600',*accept('skill2'),*accept('turbo'),shot('before-start'),*accept('start'),
         'waitMsec 2000','g_skill','g_turboMode',shot('campaign-started')])
     results=[]

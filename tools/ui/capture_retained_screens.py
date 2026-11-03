@@ -204,21 +204,26 @@ SCENARIOS = {
         'openq4_retainedGui inspect "admin-console-11"', 'screenshot "screenshots/mpadminremote-console.tga"',
         'disconnect', 'waitMsec 2000',
     ]),
-    # The campaign difficulty page, the fourth level: Campaign descends to it
-    # carrying QUAKE 4, its prompt bar where Campaign's is, and BACK climbs
-    # back.
+    # Campaign's two fourth-level children: QUAKE 4 is chosen (the rail) and
+    # NEW GAME descends to its difficulty page carrying QUAKE 4, BACK climbs
+    # back onto NEW GAME; CHAPTERS descends to the levels carrying its own
+    # label, and their BACK climbs back onto CHAPTERS.
     'campaignskill': (None, [
         'waitMsec 4000', 'campaignMenu', 'waitMsec 1200',
         'openq4_retainedGui focus campaign', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
-        'waitMsec 1200', 'openq4_retainedGui inspect "prompts"', 'screenshot "screenshots/campaignskill-campaign.tga"',
-        'openq4_retainedGui focus quake4', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1200', 'openq4_retainedGui focus quake4', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 400', 'openq4_retainedGui report', 'openq4_retainedGui inspect "prompts"',
+        'screenshot "screenshots/campaignskill-campaign.tga"',
+        'openq4_retainedGui focus newgame', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 1200', 'ui_retainedStatus', 'openq4_retainedGui report', 'openq4_retainedGui inspect "prompts"',
         'screenshot "screenshots/campaignskill.tga"',
-        # CHAPTERS opens the campaign's levels in the difficulty's place.
-        'openq4_retainedGui event openChapters', 'waitMsec 800', 'screenshot "screenshots/campaignskill-chapters.tga"',
-        'openq4_retainedGui event closeChapters', 'waitMsec 400',
         'openq4_retainedGui focus back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
-        'waitMsec 1200', 'ui_retainedStatus', 'screenshot "screenshots/campaignskill-back.tga"',
+        'waitMsec 1200', 'ui_retainedStatus', 'openq4_retainedGui report', 'screenshot "screenshots/campaignskill-back.tga"',
+        'openq4_retainedGui focus chapters', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 150', 'screenshot "screenshots/campaignskill-chapters-descending.tga"',
+        'waitMsec 1050', 'ui_retainedStatus', 'openq4_retainedGui report', 'screenshot "screenshots/campaignskill-chapters.tga"',
+        'openq4_retainedGui focus chapter_back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1200', 'ui_retainedStatus', 'openq4_retainedGui report', 'screenshot "screenshots/campaignskill-chapters-back.tga"',
     ]),
     'pause': ('game/airdefense1', [
         'openq4_assertMenuActivation 10000', 'waitMsec 1200', 'ui_retainedStatus', 'screenshot "screenshots/pause.tga"',

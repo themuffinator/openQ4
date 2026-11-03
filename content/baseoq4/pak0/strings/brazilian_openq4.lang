@@ -1431,6 +1431,7 @@
 	"#str_231548"	"As configurações do jogador mudaram. Tente novamente."
 	"#str_231549"	"Não foi possível aplicar esta configuração do jogador."
 	"#str_231550"	"Entre em uma partida em um servidor, hospede a sua, assista às suas demos ou configure seu jogador."
+	"#str_231551"	"Esta fase não tem salvamento automático inicial, então começa do zero na sua dificuldade atual, com um arsenal padrão."
 	"#str_231560"	"Digite um número de %s a %s."
 	"#str_230141"	"API de renderização"
 	"#str_230142"	"Dispositivo de renderização"

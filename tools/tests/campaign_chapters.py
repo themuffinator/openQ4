@@ -4,8 +4,9 @@
 Every level of a campaign is a chapter in campaign order; a level start
 records it as reached, a start autosave on disk counts too, and starting a
 chapter loads that autosave or starts the level fresh (docs/user/campaigns.md).
-Both menus reach the chapters from the campaign page, the fourth Single Player
-level: the retained campaign_skill.q4ui and the stock campaign_menu.gui.
+The retained menus reach them from Campaign's CHAPTERS, a fourth Single
+Player level of its own (chapters.q4ui) beside NEW GAME's difficulty page;
+the stock campaign_menu.gui keeps them on its campaign page.
 """
 from __future__ import annotations
 
@@ -35,7 +36,7 @@ AWAKENING = [
     ("game/m06_mcc_invasion", ""), ("game/m07_race", ""), ("game/m07_race1", ""), ("game/m07_race2", ""),
     ("game/m08_cryofac", ""), ("game/m09_valkaryne", ""),
 ]
-STRINGS = [f"#str_{key}" for key in range(231280, 231290)]
+STRINGS = [f"#str_{key}" for key in (*range(231280, 231290), 231551)]
 LANGUAGES = ("english", "french", "german", "italian", "spanish", "brazilian", "polish", "russian", "ukrainian",
              "czech", "hungarian", "turkish")
 
@@ -96,7 +97,8 @@ def main() -> int:
 
     # Both campaign pages share one set of verbs.
     handler = function_body(menu, "static void Session_HandleCampaignPageRequest(")
-    for verb in ("campaignSkillBack", "campaignSkillStart", "campaignChapterStart", "campaignChapterSelect", "campaignSkillTurbo"):
+    for verb in ("campaignSkillBack", "campaignSkillStart", "campaignChapterStart", "campaignChapterSelect", "campaignSkillTurbo",
+                 "campaignChaptersBack"):
         require(handler, f'!idStr::Icmp( request, "{verb}" )', "the campaign page's verbs")
     require(handler, 'retained ? "chapter.selected" : "chapters_sel_0"', "both pages name the chosen chapter")
     stock = function_body(menu, "bool idSessionLocal::HandleStockCampaignCommand(")
@@ -104,6 +106,8 @@ def main() -> int:
     require(menu, "Session_HandleCampaignPageRequest( *this, gui, request, true );", "the retained page's requests")
     allowlist = read("src/ui/UserInterfaceRetained.cpp")
     require(allowlist, '"campaignChapterSelect","campaignChapterStart"', "the retained page may request the chapters' verbs")
+    require(allowlist, '"campaignNew","campaignChapters"', "Campaign may open NEW GAME and CHAPTERS")
+    require(allowlist, '"campaignChaptersBack"', "CHAPTERS may climb back")
 
     # The stock pages: CAMPAIGN and the campaign page with its chapters.
     # A constant condition never holds in a GUI script, so none guards a
@@ -122,14 +126,22 @@ def main() -> int:
     chapter_start = gui[gui.index("windowDef cm_chapter_start\n"):gui.index("windowDef cm_chapter_back\n")]
     require(chapter_start, 'if ( "gui::chapter_open" == 1 ) {', "a locked chapter's START stays dark")
 
-    # The retained page: CHAPTERS in its column, a row for every chapter.
+    # The retained pages: Campaign's NEW GAME and CHAPTERS, and CHAPTERS'
+    # own page with a row for every chapter; the difficulty page has none.
+    campaigns = read("content/baseoq4/pak0/guis/menu/campaigns.q4ui")
+    for needle in ('"id": "newgame"', '"id": "chapters"', '"campaignNew"', '"campaignChapters"', '"detailEnterChapters"'):
+        require(campaigns, needle, "Campaign's NEW GAME and CHAPTERS")
     skill = read("content/baseoq4/pak0/guis/menu/campaign_skill.q4ui")
-    require(skill, '"id": "chapters-plate"', "the retained page's CHAPTERS")
-    rows = len(re.findall(r'"id": "row-\d+",\n\s*"type": "group"', skill)) or len(set(re.findall(r'"row-(\d+)"', skill)))
+    if "chapters-plate" in skill or "campaignChapterStart" in skill:
+        raise AssertionError("the difficulty page no longer holds the chapters")
+    page = read("content/baseoq4/pak0/guis/menu/chapters.q4ui")
+    rows = len(re.findall(r'"id": "row-\d+",\n\s*"type": "group"', page)) or len(set(re.findall(r'"row-(\d+)"', page)))
     if rows < len(QUAKE4):
-        raise AssertionError(f"the retained page holds {rows} chapter rows, fewer than Quake 4's {len(QUAKE4)} levels")
-    for request in ("campaignChapterSelect", "campaignChapterStart"):
-        require(skill, request, "the retained page's chapter requests")
+        raise AssertionError(f"the CHAPTERS page holds {rows} chapter rows, fewer than Quake 4's {len(QUAKE4)} levels")
+    for request in ("campaignChapterSelect", "campaignChapterStart", "campaignChaptersBack"):
+        require(page, request, "the CHAPTERS page's requests")
+    select = function_body(session, "static void Session_CampaignSelect_f(")
+    require(select, '"chapters"', "an engine reload into a campaign continues onto its CHAPTERS")
 
     # Every new text in every shipped language.
     for language in LANGUAGES:

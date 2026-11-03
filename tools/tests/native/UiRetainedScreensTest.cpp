@@ -1896,8 +1896,9 @@ static void CheckContinuity(ScreenHost& host, char** paths, const char* campaign
 	Check(parent.Initialize() && parent.LoadDocument(Read(campaignPath),"guis/menu/campaigns.q4ui",diagnostics),"campaign parent loads for detail continuity");
 	Check(parent.RunEvent("onActivate",0,effects,error),"campaign parent activates"); parent.Frame(viewport,.2);
 	double at = 1;
-	for (const char* event : {"detailEnterQuake4","detailEnterAwakening"}) {
-		Check(parent.RunEvent(event,at,effects,error),"both campaigns descend through the same detail transition"); parent.Frame(viewport,at+.15);
+	for (const char* event : {"detailEnterQuake4","detailEnterAwakening","detailEnterChapters"}) {
+		Check(parent.RunEvent(event,at,effects,error),"NEW GAME for both campaigns and CHAPTERS descend through the same detail transition");
+		parent.Frame(viewport,at+.15);
 		const float partial = float(parent.PresentedValue("band-top","transform")->data[0]);
 		Check(partial > 630 && partial < 775.5f,"detail band moves between its parent and child levels");
 		Check(parent.RunEvent("detailReverse150",at+.15,effects,error),"Back reverses an in-flight fourth level"); parent.Frame(viewport,at+.31);
@@ -5481,15 +5482,25 @@ static TextScaleCase RestartTextScale(const char* path, const char* name) {
 		{},{"skill-0","skill-4","restart_go","restart_back"},{1.f,1.f,1.f}};
 }
 
+// A document beside another one: CHAPTERS beside the campaign's difficulty page.
+static std::string Sibling(const char* path, const char* name) {
+	const std::string text = path;
+	const auto slash = text.find_last_of("/\\");
+	return (slash == std::string::npos ? std::string() : text.substr(0,slash+1))+name;
+}
+
 // The single-player pages' remaining text scale (LAY-004): Restart Level, the
-// campaign's difficulty and chapters, Credits and the Arena with its
+// campaign's difficulty, its CHAPTERS page, Credits and the Arena with its
 // ledger, reset question and entrance.
 static void CheckPagesTextScale(ScreenHost& host, char** argv) {
 	CheckTextScaleCase(host,RestartTextScale(argv[21],"guis/menu/restartlevel.q4ui"));
-	const std::vector<float> skillTall = {.886f,.7995f,.7653f};
+	// The difficulty page grows a fixed amount, so it takes its column in
+	// every portrait view that holds it (spec 1.36); CHAPTERS keeps 3:4.
 	CheckTextScaleCase(host,{argv[13],"guis/menu/campaign_skill.q4ui",{{"skill",1.0},{"turbo",true}},{"onActivate"},
-		{{{"back","description"},0,2},{{"description","prompts"},0,1}},{},{"skill0-label","start-label","chapters-plate-label","back-label"},
-		skillTall});
+		{{{"back","description"},0,2},{{"description","prompts"},0,1}},{},{"skill0-label","start-label","back-label"},
+		{1.f,1.f,.906f}});
+	const std::vector<float> chaptersTall = {.886f,.7995f,.7653f};
+	static const std::string chaptersPath = Sibling(argv[13],"chapters.q4ui");
 	StateValues chapters{{"chapter.count",3.0},{"chapter.first",0.0},{"chapter.selected",0.0},{"chapter.open",true},
 		{"chapter.name",std::string("AIR DEFENSE BUNKER")},
 		{"chapter.detail",std::string("Starts from this level's autosave, with the arsenal and difficulty you reached it with.")}};
@@ -5498,10 +5509,10 @@ static void CheckPagesTextScale(ScreenHost& host, char** argv) {
 		chapters["chapter.row"+std::to_string(row)+".name"] = std::string("Air Defense Bunker");
 		chapters["chapter.row"+std::to_string(row)+".location"] = std::string("Reached");
 	}
-	CheckTextScaleCase(host,{argv[13],"guis/menu/campaign_skill.q4ui",chapters,{"onActivate","openChapters"},
+	CheckTextScaleCase(host,{chaptersPath.c_str(),"guis/menu/chapters.q4ui",chapters,{"onActivate"},
 		{{{"chapter-shot-back","chapter-name","chapter-detail"}},{{"chapter-list","chapter_start-label"},1,1},
 		 {{"chapter-list","chapter_back-label"},1,1}},
-		{{"row-0-name","row-0"},{"row-0-location","row-0"}},{"chapter_start","chapter_back","row-0"},skillTall});
+		{{"row-0-name","row-0"},{"row-0-location","row-0"}},{"chapter_start","chapter_back","row-0"},chaptersTall});
 	// Credits: each screen's lines stand between the title and the prompt bar
 	// and grow with the text, by no more than it.
 	{
@@ -5748,6 +5759,7 @@ int main(int argc, char** argv) {
 	for (const auto& [page,name] : {std::pair{5,"guis/menu/singleplayer.q4ui"},std::pair{6,"guis/menu/campaigns.q4ui"},
 		std::pair{13,"guis/menu/campaign_skill.q4ui"},std::pair{26,"guis/menu/multiplayer.q4ui"}})
 		if (runs(page == 26 ? "mp-pages" : "pages")) CheckPagePrompts(host,argv[page],name,"",nullptr,nullptr,true);
+	if (runs("pages")) CheckPagePrompts(host,Sibling(argv[13],"chapters.q4ui").c_str(),"guis/menu/chapters.q4ui","",nullptr,nullptr,true);
 	if (runs("menus")) CheckMenuWrap(host,argv[1],argv[2],argv[21]);
 	if (runs("menus")) CheckTitleTextScale(host,argv[1]);
 	if (runs("pause")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");

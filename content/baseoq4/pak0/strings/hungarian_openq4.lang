@@ -1431,6 +1431,7 @@
 	"#str_231548"	"A játékos beállításai megváltoztak. Próbáld újra."
 	"#str_231549"	"A játékos ezen beállítása nem alkalmazható."
 	"#str_231550"	"Csatlakozz egy szerveren futó meccshez, indítsd a sajátodat, nézd meg a demóidat, vagy állítsd be a játékosodat."
+	"#str_231551"	"Ennek a pályának nincs automatikus mentése, ezért elölről indul a jelenlegi nehézségen, alap fegyverzettel."
 	"#str_231560"	"Adj meg egy számot %s és %s között."
 	"#str_230141"	"Renderelési háttérrendszer"
 	"#str_230142"	"Renderelő eszköz"
