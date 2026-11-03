@@ -356,6 +356,7 @@ public:
 
 
  	idUserInterface *		hud;				// Common hud
+	idUserInterface *		powerupHudCleared;	// openQ4: hud whose powerup slots are hidden with nothing owned since
 	idUserInterface *		mphud;				// hud overlay containing MP elements
 	
 	idUserInterface *		objectiveSystem;

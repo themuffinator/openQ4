@@ -290,13 +290,24 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   30/60/120/144/165/240/360 and uncapped, VSync/VRR where available, low-FPS catch-up,
   menu/loading/background policy and preset/Steam Deck overrides. Verify physical
   motion and pacing; a cap, average FPS or hidden capture alone cannot close it.
-  Added reference, 27 October: native 2560 x 1440 fullscreen `game/airdefense1`
-  starting-position rotations with the Remastered HUD and revised Ultra settings
-  must keep **every frame <=6.67 ms**. The first complete maximum-quality Vulkan
-  run with all effects and four cascades averages 38.5 FPS with a 37.55 ms
-  maximum on Vulkan (OpenGL: 30.9 FPS / 69.85 ms); qualification remains open.
-  Earlier MSAA-off measurements do not qualify this reference. See the
-  [airdefense checkpoint](ui/runtime-performance.md#airdefense-maximum-quality-reference-27-october-2026).
+  Added reference, 27 October, with the workload moved to Quality (the preset
+  below Ultra, its 144 FPS cap lifted) on 28 October: native 2560 x 1440
+  fullscreen `game/airdefense1` starting-position rotations with the Remastered
+  HUD must keep **every frame <=6.67 ms**. The first Quality run on Vulkan
+  averages 114.1 FPS (8.76 ms) with a 13.80 ms p99 and a 24.08 ms maximum;
+  qualification remains open. The earlier maximum-quality runs are historical.
+  See the [airdefense checkpoint](ui/runtime-performance.md#airdefense-maximum-quality-reference-27-october-2026)
+  and the [Quality workload](ui/runtime-performance.md#quality-workload-and-deferred-shadow-scrolling-28-october-2026).
+  On 3 November a [frame attribution](ui/runtime-performance.md#quality-frame-attribution-and-effect-culling-3-november-2026)
+  found this workload CPU-bound. One thread runs the game tic, the scene front
+  end and Vulkan command recording in turn, and a frame that takes a tic adds
+  about 3 ms to it, so GPU work alone cannot meet the floor. The front end
+  (36% of the main thread) and recording (26%) lead; the game tic takes 19%.
+  Effects now take the frustum test before the portal-area walk, and the HUD's
+  powerup clear runs once instead of every tic. Both are exact and cut about 4%
+  of main-thread work. `tools/debug/cpu_sampler.py` samples main-thread stacks
+  without an elevated shell. Meeting the floor still needs recording moved off
+  the main thread, a cheaper tic and front end, and less GPU post-processing.
   Progress: targets, budgets and the measurement procedure are declared in the
   [presentation owners contract](presentation-owners.md), with
   `presentation_look_runtime.py` for engine-side latency and smoothness; its
@@ -670,6 +681,11 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
   time and first-use rendering still cause measurable hitches;
   keep the user's stall-removal gate open. See the
   [checkpoint measurements](ui/runtime-performance.md#checkpoint-save-stalls-27-october-2026).
+  The 3 November [frame attribution](ui/runtime-performance.md#quality-frame-attribution-and-effect-culling-3-november-2026)
+  finds the Quality rotation CPU-bound on its main thread (see HF-07). Exact
+  effect-culling and HUD changes remove about 4% of that work. Per-frame ring
+  copies of static geometry (3.6%), fallback shadow volumes for prelit lights
+  (2.6%) and exact presentation-pose bounds (2.4%) remain measured candidates.
   Audit hot copy-helper GL state queries, cluster allocation/binning, per-frame
   pose work, shadow invalidation, render-target generations and upload lifetimes.
   Reuse existing job/measurement infrastructure. Shadow uniform caching already

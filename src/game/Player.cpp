@@ -1276,6 +1276,7 @@ idPlayer::idPlayer() {
 	weapon					= NULL;
 
 	hud						= NULL;
+	powerupHudCleared		= NULL;
 	mphud					= NULL;
 	objectiveSystem			= NULL;
 	objectiveSystemOpen		= false;
@@ -5610,8 +5611,12 @@ void idPlayer::UpdatePowerUps( void ) {
 	}
 
 	wearoff = -1;
-	if ( hud ) {
+	// openQ4: the stock script only hides the powerup slots. With nothing owned
+	// now and nothing shown on this hud since its last clear, it changes nothing,
+	// so it runs once rather than every tic.
+	if ( hud && ( inventory.powerups != 0 || hud != powerupHudCleared ) ) {
 		hud->HandleNamedEvent( "clearPowerups" );
+		powerupHudCleared = inventory.powerups != 0 ? NULL : hud;
 	}
 
 	for ( i = 0, index = 0; i < POWERUP_MAX; i++ ) {

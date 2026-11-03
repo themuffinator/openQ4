@@ -4,7 +4,7 @@
   "date": "2026-10-31",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "33bedd6585f89d60889c9904f91dee13a6a64925",
+    "engine_revision": "3d433d09a1462185bbce6297bf22c34ff50e9cbc",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -174,7 +174,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/runtime-performance.md",
       "scope": "Debug CPU fixture counters; release GPU/frame pacing/resource budgets unqualified.",
-      "sha256": "b1d892bd71d5d7100a116b5eb3b2f1ea4cddb95ccc9470b464992839a11e8e28"
+      "sha256": "2d1adbedc604c181d77fca3eea3bd5dec8da63684c002adb0f8d90452b047d8f"
     },
     "instance-persistence-foundation": {
       "kind": "qualified_foundation_checkpoint",
