@@ -81,6 +81,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | [#201: Windows ARM64 harness cleanup PR](https://github.com/themuffinator/openQ4/pull/201) | GOV-02/CORE-04: closed on 31 October as superseded by `9fe6f4d89`, which retries short-lived Windows executable locks during fixture cleanup. Main's Windows ARM64 push verification at `b9c663758` passed `openq4-imported-game-regressions` and all 305 native tests. |
 | [#203: complete push-payload history](https://github.com/themuffinator/openQ4/pull/203) / [#205: packaged saves rejected as build 1](https://github.com/themuffinator/openQ4/issues/205) | REL-01/Q4-05/GOV-02: source review approved at `e178a61b`; the exact build-history regression and all three shallow-checkout negative controls pass on Windows. Main's payloads at `b9c663758` passed CI but still used a single-commit checkout, so they also report build 1 (the real count is 1905). #203 merged on 31 October in `18117f896`. #205 closed on 31 October: the Windows x64 payload from push verification at `f0a86b0ec` (artifact 13033914500) reports build 1920. In SP on `game/airdefense1`, its save committed with header build 1920, format 4, and loaded back into gameplay in a fresh profile. The replacement was linked from #168, #170, #183, #184 and #192. The Linux, macOS and Windows ARM64 payloads were not loaded. |
 | [#204: missing music in signed macOS 0.14.000](https://github.com/themuffinator/openQ4/issues/204) | PLAT-04/AUD-01: the report uses MacSourcePorts' signed build of withdrawn 0.14.0. The reporter recalls music and console ambience also missing in 0.13.2; their log has been requested. Their Hannibal opaque-window report matches the portal fade-distance fix `d361e62ea`, and the briefing-hologram decal report is to be filed separately. Signing does not establish a later engine revision. Preserve saves and package separation in any comparison; 0.13.2 cannot read format-4 saves. |
+| [rebelancap/openQ4-ios: iPhone, iPad and Apple Vision Pro port](https://github.com/rebelancap/openQ4-ios) | IOS-01 through IOS-06: a tested external port (v1.1.0), pinned to withdrawn `v0.14.000` as patches over a pristine upstream; porting from it is preferred. Integrate shared fixes on main first, then the Apple targets, crediting its author. Its user reports do not qualify the integrated build. |
 | [26 October main verification](https://github.com/themuffinator/openQ4/actions/runs/40277373140) | GOV-02/CORE-04/PLAT-04: Windows x64, Linux x64/ARM64 and three macOS jobs passed. Windows ARM64 has the failures above; macOS Intel Metal timed out in renderer-foundation self-tests. The Windows payload subsequently proved unable to save because its shallow checkout produced build 1 (#205). Preserve those failures; passing CI did not qualify packaged save/load or the failed targets. |
 | [29 October main verification](https://github.com/themuffinator/openQ4/actions/runs/40951670759) | GOV-02/CORE-04/PLAT-04: all eight push-verification jobs passed at `b9c663758`, including Windows ARM64 (305/305 native tests) and the Intel macOS OpenGL route. Its payloads still report build 1 (#205), so this run does not qualify packaged save/load. |
 | [31 October main verification](https://github.com/themuffinator/openQ4/actions/runs/41175931810) | GOV-02/CORE-04/PLAT-04: all eight push-verification jobs passed at `f0a86b0ec`, the first run with #203, #189 and #191. Its Windows x64 payload reports build 1920 and passed the packaged SP save/load check (#205). |
@@ -99,7 +100,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | UI | Many retained screens and HUDs now run by default. The register preserves 352 rows, 312 active requirements and 40 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
 | Retail and Awakening | Canonical SP/MP sources and BSE are in-tree. Awakening is additive SP content under `q4xbase`, not a separate multiplayer module. Retail decl and BSE audits have already resolved extensive earlier gaps. |
 | Multiplayer | Dual-stack networking, pure asset checks and bounded rcon2 exist. Actual MP defaults are `net_mpLagCompensation 0` and `net_mpPredictMode 0`. Clients advertise bounded remote extrapolation, and server rewind subtracts it from the displayed pose age; the coupled implementation and remaining peer qualification are recorded under MP-07. Retail 2.85 interoperability is outside the current openQ4 2.41 protocol contract. |
-| Platforms | Windows x64 and Linux x64/Steam Deck are first-class platform targets; macOS arm64 and Linux ARM64 are previews; Windows ARM64 and Android are experimental. Renderer tiers are separate from platform tiers. |
+| Platforms | Windows x64 and Linux x64/Steam Deck are first-class platform targets; macOS arm64 and Linux ARM64 are previews; Windows ARM64 and Android are experimental. iOS, iPadOS and visionOS run only in an external port pinned to withdrawn `v0.14.000`; integration is IOS-01 through IOS-06. Renderer tiers are separate from platform tiers. |
 | Foundations and tools | The bounded job service, worker DDS prefetch, generated-cache experiments, native dmap/AAS commands, save-format compatibility readers and experimental map workspace already exist. Their remaining scope is defined below. |
 
 ## Delivery sequence and dependencies
@@ -109,8 +110,8 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07, MP-01 through MP-08, AUD-01; selected VR-01/VR-06 and AND-01/AND-03 scope | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering | HF-03 through HF-08, VK-01 through VK-07, REN-01 through REN-08 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
-| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
 the current timing and workload baseline; UI cutover depends on its complete
@@ -131,6 +132,7 @@ to a final project-wide phase. Important dependencies are:
 | Content pack split, trim and overlays (PKG-02 through PKG-04) | PKG-01's verifier first proves identical bulk-pack bytes across platforms and consecutive candidates. Client-only packs need their pure-server exemption before the dedicated server drops them. |
 | Enhanced physics default (PHYS-06) | PHYS-01's recorded baseline and budgets first; PHYS-04's behavior envelope and PHYS-05's save/multiplayer/demo integration must pass before `g_enhancedPhysics` defaults on. `0` always runs the unchanged legacy path. |
 | Steam integration (STEAM-02 through STEAM-06) | STEAM-01's app-identity, licence and distribution decision first. Joining and invites use MP-08's interoperability contract and the existing MP join flow. Steam absent or disabled always runs the unchanged path. |
+| iOS and visionOS (IOS-02 through IOS-06) | IOS-01's patch inventory and build, layout and distribution decisions first. Shared fixes land through IOS-02, with regression evidence on the existing platforms, before the Apple targets build on them. visionOS stereo shares the VR stereo front end (VR-01/VR-06). Device qualification needs Apple hardware this project does not have. |
 | Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
 
 ## Governance and baseline evidence
@@ -1079,6 +1081,116 @@ Sources: [Android build and packaging](android-build.md),
   Decide sideload/store packaging policy. Keep emulator/test-runtime results
   separate from headset support and x86_64 emulator builds separate from publication.
   Require AND-01's flavor-aware package verification and VR-06 lifecycle tests.
+
+## iOS, iPadOS and visionOS
+
+Sources: [rebelancap/openQ4-ios](https://github.com/rebelancap/openQ4-ios)
+(GPL-3.0; release v1.1.0, 13 October 2026), [platform support](platform-support.md),
+[macOS VM workflow](macos-vm-testing-workflow.md).
+
+Requested 3 November 2026. An external port already runs openQ4 on iPhone and
+iPad (iOS 16+) and on Apple Vision Pro (visionOS 2.5+), and it is published and
+tested. It plays the story campaign with saves, the Arena Campaign and openQ4
+multiplayer, with touch, gyro and controller input. On Vision Pro it adds a
+window mode and a stereoscopic, world-locked 3D screen. It uses the Vulkan
+renderer through a static MoltenVK, SDL3 and OpenAL Soft. Porting from it is
+preferred to a fresh implementation. It is not part of this repository.
+
+Its structure determines the work:
+- It pins openQ4 `v0.14.000` (`1621aa21`), the withdrawn release, in
+  `UPSTREAM.pin`, and keeps upstream pristine.
+- It applies 29 engine patches, two game patches and four SDL patches with
+  `patch --fuzz=0`. The largest are the Vulkan backend's live swapchain extent,
+  timers and stereo present (0019, 213 KB) and the SDL3 backend's input, text,
+  mouse, safe-area and screen changes (0005, 84 KB).
+- An Objective-C/Swift app shell (`ios/shell`, `ios/shell-visionos`) adds a
+  checksum-verified `q4base` import that fixes file-name case, settings, data-only
+  mods, Siri intents, audio sessions, diagnostics and four localized languages.
+- It builds with Xcode, xcodegen and CMake scripts. iOS loads no code outside
+  the signed app, so the renderer and both game modules link statically.
+
+Every item follows the project rules: Meson stays the primary build, SDL3 stays
+the platform layer, game-library changes land in `src/game` and `src/mpgame`,
+displayed text goes through the language tables, and the port's author is
+credited in `AGENTS.md`, `README.md` and the release notes when code lands.
+
+- [ ] **IOS-01 — P2, decision and integration plan: adopt the port.** Contact the
+  port's author and agree how they take part. Inventory every overlay patch,
+  shell file and build script, and class each one:
+  - a platform-neutral fix that belongs on main for every platform (for
+    example zip seek caching, OpenAL error latching, live swapchain extent and
+    pipeline-cache checkpoints, missing BC texture support, `vid_restart` under
+    a renderer module, in-world GUI touch, rumble);
+  - an Apple platform layer;
+  - port-only behaviour to drop or redesign.
+
+  Map each patch to the current main, which has moved well past `v0.14.000`:
+  portable saves (Q4-06), retained UI, the safe area and the renderer modules.
+  Record the decisions:
+  - **Build.** Use Meson cross files for the engine, renderer and game
+    libraries, with a generated Xcode app target for the shell, or
+    justify another split.
+  - **Repository layout.** Place the shell and Apple assets under
+    `mobile/apple/` (or as `docs/dev/source-layout.md` decides) and the SDL
+    patches under `subprojects/`.
+  - **Static modules.** Decide how static linking coexists with the dynamic
+    game-module and renderer-module contract.
+  - **Distribution.** Choose sideloaded IPAs or a store submission. The game
+    modules stay under the Quake 4 SDK EULA, so distribution is free and
+    non-commercial.
+
+  Gate: the inventory and decisions are documented, and the author has been
+  consulted.
+- [ ] **IOS-02 — P2, integration: shared engine fixes first.** Land the
+  platform-neutral patches from IOS-01 one by one, rebased onto main. Each needs
+  its own test or reproduction, and each must show that Windows, Linux, macOS
+  and Android are unchanged or improved. In-world GUI touch and the touch-look
+  model should serve Android too (AND-01, AND-04), not become a second
+  implementation. Reconcile the port's save handling (its payload-v3 GUI shapes,
+  stamp and refusal patches) with Q4-05, Q4-06 and Q4-07 instead of carrying a
+  separate reader.
+- [ ] **IOS-03 — P2, implementation: iOS and iPadOS client.**
+  - Build the engine, the Vulkan renderer and both game modules statically for
+    `arm64` device and simulator lanes, against MoltenVK, SDL3 and OpenAL Soft
+    through Meson subprojects.
+  - Port the app shell: display-link main loop, onboarding and `q4base`
+    import with the official 1.4.2 checksum table, settings, data-only mods,
+    audio-session interruptions, lifecycle and backgrounding.
+  - Bring over the touch controls, gyro aim and controller defaults.
+  - Use the retained UI and its safe area rather than port-specific menus.
+  - Localize every shell string through the project's language tables, in all
+    twelve languages, not only the port's four.
+  - Make the quality tier a mobile preset chosen from device results.
+
+  The macOS CI runner builds both lanes unsigned, and the simulator boots to
+  gameplay with retail assets where licensing allows.
+- [ ] **IOS-04 — P2, implementation: visionOS window and 3D mode.** Port the
+  window mode, ornament controls and the stereoscopic world-locked screen. Its
+  per-eye rendering, foveation, comfort and depth settings and controller input
+  carry over. Share the stereo eye in the render front end and the stereo
+  present path with the VR work (VR-01 and VR-06) rather than adding a second
+  stereo path. Declare what the 3D mode does not support, such as menu input.
+- [ ] **IOS-05 — P2, qualification: Apple devices.** Use real iPhone,
+  iPad (60 Hz and ProMotion) and Apple Vision Pro hardware. Cover:
+  - the SP campaign, Awakening and the Arena;
+  - save and load, including cross-loading portable saves with desktop and
+    Android (Q4-06; both targets are 64-bit little-endian);
+  - multiplayer with desktop peers;
+  - touch, gyro, controllers and rumble;
+  - audio interruptions, backgrounding, memory and thermal budgets, storage,
+    and the 3D mode's comfort and frame pacing.
+
+  Bind each report to the exact build hashes under the existing evidence
+  policy. This project has no Apple hardware, so accept contributor evidence
+  only on those terms. The port's existing user reports count as background,
+  not as qualification of the integrated build.
+- [ ] **IOS-06 — P3, release: packages and player documentation.** Add signed
+  IPA artifacts for iOS and visionOS to the manual release workflow under
+  IOS-01's distribution decision. Cover licences and notices, player
+  installation and data-import guides, and release notes. Then list the
+  platforms in [platform support](platform-support.md) at the tier their
+  evidence earns, and add a `README.md` bullet once players can install the
+  integrated build.
 
 ## New user interface
 
