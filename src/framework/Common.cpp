@@ -50,7 +50,12 @@ If you have questions concerning this license or the applicable additional terms
 #include "PerformancePreset.h"
 #include "CVarAssignmentCapture.h"
 #include "InitializationPresentation.h"
+#include <atomic>
 #include <chrono>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
 #include "FileSystemPathValidation.h"
 #include "SaveGameReleases.h"
 #include "../sys/NetworkEndpoint.h"
@@ -1313,6 +1318,63 @@ void idCommonLocal::SetRefreshOnPrint( bool set ) {
 
 /*
 ==================
+Common_QueueOffMainThread
+
+The console, the warning list and the error unwind belong to the main thread.
+The Vulkan render thread (r_vkRenderThread) records and presents a frame while
+the main thread runs the next game tic, so whatever it prints is queued here
+and replayed by the main thread, in order, at its next print or frame.
+==================
+*/
+struct comOffMainThreadPrint_t {
+	bool			warning;
+	std::string		text;
+};
+
+static std::thread::id						com_mainThreadId;
+static std::mutex							com_offMainThreadMutex;
+static std::vector<comOffMainThreadPrint_t>	com_offMainThreadPrints;
+static std::atomic<bool>					com_offMainThreadPending( false );
+static const size_t							COM_MAX_OFF_MAIN_THREAD_PRINTS = 1024;
+
+static bool Common_OnMainThread( void ) {
+	// before Init records the main thread, everything runs on it
+	return com_mainThreadId == std::thread::id() || std::this_thread::get_id() == com_mainThreadId;
+}
+
+static bool Common_QueueOffMainThread( bool warning, const char *text ) {
+	if ( Common_OnMainThread() ) {
+		return false;
+	}
+	std::lock_guard<std::mutex> lock( com_offMainThreadMutex );
+	if ( com_offMainThreadPrints.size() < COM_MAX_OFF_MAIN_THREAD_PRINTS ) {
+		com_offMainThreadPrints.push_back( { warning, text } );
+	}
+	com_offMainThreadPending.store( true, std::memory_order_release );
+	return true;
+}
+
+static void Common_FlushOffMainThreadPrints( void ) {
+	if ( !com_offMainThreadPending.load( std::memory_order_acquire ) || !Common_OnMainThread() ) {
+		return;
+	}
+	std::vector<comOffMainThreadPrint_t> prints;
+	{
+		std::lock_guard<std::mutex> lock( com_offMainThreadMutex );
+		prints.swap( com_offMainThreadPrints );
+		com_offMainThreadPending.store( false, std::memory_order_release );
+	}
+	for ( const comOffMainThreadPrint_t &print : prints ) {
+		if ( print.warning ) {
+			common->Warning( "%s", print.text.c_str() );
+		} else {
+			common->Printf( "%s", print.text.c_str() );
+		}
+	}
+}
+
+/*
+==================
 idCommonLocal::VPrintf
 
 A raw string should NEVER be passed as fmt, because of "%f" type crashes.
@@ -1346,6 +1408,11 @@ void idCommonLocal::VPrintf( const char *fmt, va_list args ) {
 		msg[sizeof(msg)-2] = '\n'; msg[sizeof(msg)-1] = '\0'; // avoid output garbling
 		Sys_Printf( "idCommon::VPrintf: truncated to %zu characters\n", strlen(msg)-1 );
 	}
+
+	if ( Common_QueueOffMainThread( false, msg ) ) {
+		return;
+	}
+	Common_FlushOffMainThreadPrints();
 
 	if ( rd_buffer ) {
 		const char *text = msg;
@@ -1522,7 +1589,14 @@ void idCommonLocal::DPrintf( const char *fmt, ... ) {
 	idStr::vsnPrintf( msg, sizeof(msg), fmt, argptr );
 	va_end( argptr );
 	msg[sizeof(msg)-1] = '\0';
-	
+
+	if ( !Common_OnMainThread() ) {
+		char colored[MAX_PRINT_MSG_SIZE];
+		idStr::snPrintf( colored, sizeof( colored ), S_COLOR_RED "%s", msg );
+		Common_QueueOffMainThread( false, colored );
+		return;
+	}
+
 	// never refresh the screen, which could cause reentrency problems
 	bool temp = com_refreshOnPrint;
 	com_refreshOnPrint = false;
@@ -1570,6 +1644,10 @@ void idCommonLocal::Warning( const char *fmt, ... ) {
 	idStr::vsnPrintf( msg, sizeof(msg), fmt, argptr );
 	va_end( argptr );
 	msg[sizeof(msg)-1] = 0;
+
+	if ( Common_QueueOffMainThread( true, msg ) ) {
+		return;
+	}
 
 	Printf( S_COLOR_YELLOW "WARNING: " S_COLOR_RED "%s\n", msg );
 
@@ -1693,6 +1771,20 @@ void idCommonLocal::Error( const char *fmt, ... ) {
 	int			currentTime;
 
 	int code = ERP_DROP;
+
+	if ( !Common_OnMainThread() ) {
+		// The error unwind belongs to the main thread. Record the message and
+		// unwind this thread only; its owner re-raises it on the main thread.
+		char msg[MAX_PRINT_MSG_SIZE];
+		va_start( argptr, fmt );
+		idStr::vsnPrintf( msg, sizeof( msg ), fmt, argptr );
+		va_end( argptr );
+		msg[sizeof( msg ) - 1] = '\0';
+		char warning[MAX_PRINT_MSG_SIZE];
+		idStr::snPrintf( warning, sizeof( warning ), "error off the main thread: %s", msg );
+		Common_QueueOffMainThread( true, warning );
+		throw idException( msg );
+	}
 
 	// always turn this off after an error
 	com_refreshOnPrint = false;
@@ -6318,6 +6410,7 @@ static void Common_EndFrameWork(int frame) {
 
 void idCommonLocal::Frame( void ) {
 	try {
+		Common_FlushOffMainThreadPrints();
 		if (commonFrameWorkProfile.Active()) commonFrameWorkProfile.Begin(Common_FrameWorkNow());
 		openQ4_BeginPresentationFrame();
 		Common_PresentationStallProbe();
@@ -6411,6 +6504,7 @@ idCommonLocal::GUIFrame
 =================
 */
 void idCommonLocal::GUIFrame( bool execCmd, bool network ) {
+	Common_FlushOffMainThreadPrints();
 	openQ4_BeginPresentationFrame();
 	Sys_GenerateEvents();
 	UI_SettingsFrame( false ); // Poll only: loading callbacks must never restart recursively.
@@ -7107,6 +7201,7 @@ idCommonLocal::Init
 */
 void idCommonLocal::Init( int argc, const char **argv, const char *cmdline ) {
 	try {
+		com_mainThreadId = std::this_thread::get_id();
 
 		// set interface pointers used by idLib
 		idLib::sys			= sys;

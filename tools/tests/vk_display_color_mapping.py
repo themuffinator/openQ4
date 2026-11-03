@@ -132,6 +132,7 @@ bool VK_Exec_CopyRender(idImage* source,int x,int y,int w,int h,int face,bool de
     return true;
 }
 VkDescriptorSet VK_GuiExecutor_GetImageDescriptor(unsigned handle){calls.push_back("descriptor");assert(handle==unsigned(vkExec.frameSlot+20));return failure=="descriptor"?0:handle;}
+static void R_RenderThread_Sync(const char*){} // no render thread in this harness
 void vkCmdSetViewport(int,int,int,const VkViewport* v){assert(v->x==0 && v->y==0 && v->width==textureWidth && v->height==textureHeight && v->maxDepth==1);}
 void vkCmdSetScissor(int,int,int,const VkRect2D* r){assert(r->offset.x==0 && r->offset.y==0 && int(r->extent.width)==textureWidth && int(r->extent.height)==textureHeight);}
 void vkCmdSetDepthTestEnable(int,int value){assert(value==VK_FALSE);}

@@ -528,6 +528,10 @@ int R_GetEffectiveSwapInterval( void ) {
 	return R_GetEffectiveSwapIntervalForState( r_loadingScreenSwapIntervalBypass );
 }
 
+bool R_LoadingScreenActive( void ) {
+	return r_loadingScreenSwapIntervalBypass;
+}
+
 idCVar r_gamma( "r_gamma", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "changes gamma tables", 0.5f, 3.0f );
 idCVar r_brightness( "r_brightness", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "changes gamma tables", 0.5f, 2.0f );
 
@@ -2947,6 +2951,8 @@ void idRenderSystemLocal::TakeScreenshot( int width, int height, const char *fil
 		return;
 	}
 
+	// the backend reads takingScreenshot live; finish the frame it is drawing
+	R_RenderThread_Sync( "screenshot" );
 	takingScreenshot = true;
 	r_screenshotCaptureFailed = false;
 
@@ -5621,6 +5627,7 @@ static void R_ShutdownRenderTargetsBeforeImagePurge( void ) {
 }
 
 static void R_ShutdownDeviceForRestart( void ) {
+	R_RenderThread_Shutdown();
 	R_ShutdownRenderTargetsBeforeImagePurge();
 
 	// Input is tied to the native window/context lifecycle.
@@ -6260,6 +6267,8 @@ void idRenderSystemLocal::Clear( void ) {
 	ambientCubeImage = NULL;
 	viewDef = NULL;
 	memset( &pc, 0, sizeof( pc ) );
+	memset( &renderThreadFrameCounters, 0, sizeof( renderThreadFrameCounters ) );
+	renderThreadFrameCountersValid = false;
 	memset( &lockSurfacesCmd, 0, sizeof( lockSurfacesCmd ) );
 	memset( &identitySpace, 0, sizeof( identitySpace ) );
 	logFile = NULL;
@@ -6328,6 +6337,7 @@ void idRenderSystemLocal::Init( void ) {
 	R_InitCvars();
 
 	R_InitCommands();
+	R_RenderThread_Init();
 
 	guiModel = new idGuiModel;
 	guiModel->Clear();
@@ -6372,6 +6382,7 @@ void idRenderSystemLocal::Shutdown( void ) {
 	if ( !imageOwnerShutdown.Allowed() ) return;
 	r_initialRendererDevicePending = false;
 	common->Printf( "idRenderSystem::Shutdown()\n" );
+	R_RenderThread_Shutdown();
 	R_RendererMetrics_ResetGpuFrameTiming( "renderer shutdown" );
 
 	R_DoneFreeType( );
@@ -6574,6 +6585,7 @@ idRenderSystemLocal::ShutdownOpenGL
 ========================
 */
 void idRenderSystemLocal::ShutdownOpenGL( void ) {
+	R_RenderThread_Shutdown();
 	CancelSavePreview();
 	r_recoverableRendererRestore = false;
 	if ( !glConfig.isInitialized ) {

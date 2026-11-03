@@ -956,6 +956,7 @@ static idImage *VK_Post_CaptureLinearScene( const viewDef_t *viewDef ) {
 }
 
 bool VK_PostProcess_LinearScreenshot( const char *fileName ) {
+	R_RenderThread_Sync( "readback" );
 	idStr path( fileName );
 	if ( path.Icmpn( "screenshots/", 12 ) != 0 || path.Find( ".." ) >= 0
 			|| path.Find( ':' ) >= 0 || path.Find( '\\' ) >= 0 || !path.CheckExtension( ".pfm" ) ) {

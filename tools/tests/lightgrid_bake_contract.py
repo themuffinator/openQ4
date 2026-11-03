@@ -221,8 +221,13 @@ def check_capture_release(lightgrid: str, render_system: str) -> None:
     require_order(finish, RELEASE, "a bake capture must release its frame as EndFrame does")
     if "RC_SWAP_BUFFERS" in finish or "GLimp_SwapBuffers" in finish:
         fail("a bake capture must not present")
-    # keep the capture tail in step with EndFrame's own release calls
-    require_order(block(render_system, "void idRenderSystemLocal::EndFrame("), RELEASE, "EndFrame's release calls")
+    # keep the capture tail in step with EndFrame's own release calls, which
+    # EndFrame runs through CompleteBackEndFrame (inline, or from the render
+    # thread's sync when r_vkRenderThread hands it the frame)
+    if "CompleteBackEndFrame();" not in block(render_system, "void idRenderSystemLocal::EndFrame("):
+        fail("EndFrame must release its frame through CompleteBackEndFrame")
+    require_order(block(render_system, "void idRenderSystemLocal::CompleteBackEndFrame("), RELEASE,
+                  "EndFrame's release calls")
 
     scene = block(lightgrid, "static void LightGrid_RenderCaptureScene(")
     require_order(scene, ("tr.BeginFrame(", "RB_ExecuteBackEndCommands( frameData->cmdHead );", "LightGrid_FinishCapture();"),

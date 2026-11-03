@@ -1390,6 +1390,7 @@ void VK_Device_PrintPipelineInfo( void ) {
 }
 
 void VK_Device_WaitIdleForTiming( void ) {
+	R_RenderThread_Sync( "device" );
 	if ( vkCtx.initialized && vkCtx.device != VK_NULL_HANDLE && !vkCtx.presentationBlocked ) {
 		vkDeviceWaitIdle( vkCtx.device );
 	}
@@ -1420,6 +1421,7 @@ VK_Device_RecreateSwapchain
 ====================
 */
 bool VK_Device_RecreateSwapchain( void ) {
+	R_RenderThread_Sync( "device" );
 	if ( !vkCtx.initialized || vkCtx.presentationBlocked ) {
 		return false;
 	}
@@ -1462,6 +1464,7 @@ presentation, which queues the full renderer restart.
 ====================
 */
 bool VK_Device_RecoverSurface( void ) {
+	R_RenderThread_Sync( "device" );
 	if ( !vkCtx.initialized || vkCtx.presentationBlocked ) return false;
 	if ( VK_GuiExecutor_FrameIsOpen() ) return false;
 	if ( vkWindowServices == NULL || vkWindowServices->CreateVulkanSurface == NULL ) {
@@ -2165,6 +2168,8 @@ VK_Device_WaitUploadBatch / VK_Device_FlushUploadBatch / VK_Device_BatchedUpload
 static const VkDeviceSize VK_UPLOAD_BATCH_BYTE_BUDGET = 64u << 20;
 
 void VK_Device_WaitUploadBatch( void ) {
+	// the queue and the upload command buffer belong to the render thread while a frame is in flight
+	R_RenderThread_Sync( "device" );
 	if ( !vkCtx.uploadBatchInFlight || vkCtx.presentationBlocked ) {
 		return;
 	}
@@ -2196,6 +2201,7 @@ void VK_Device_WaitUploadBatch( void ) {
 }
 
 void VK_Device_FlushUploadBatch( void ) {
+	R_RenderThread_Sync( "device" );
 	if ( !vkCtx.uploadBatchOpen || vkCtx.presentationBlocked ) {
 		return;
 	}
@@ -2229,6 +2235,7 @@ void VK_Device_FlushUploadBatch( void ) {
 
 bool VK_Device_BatchedUpload( vkImmediateRecord_t record, void *user,
 		VkBuffer staging, VmaAllocation stagingAllocation, VkDeviceSize stagingBytes, uint64_t* acceptedBatch ) {
+	R_RenderThread_Sync( "device" );
 	if ( vkCtx.device == VK_NULL_HANDLE || vkCtx.uploadCommandBuffer == VK_NULL_HANDLE || vkCtx.presentationBlocked ) {
 		return false;
 	}
@@ -2279,6 +2286,7 @@ VK_Device_DeferDestroy / VK_Device_FlushDeferredDestroys
 */
 void VK_Device_DeferDestroy( VkImage image, VkImageView view, VkBuffer buffer, VmaAllocation allocation,
 		VkImageView secondaryView ) {
+	R_RenderThread_Sync( "device" );
 	if ( image == VK_NULL_HANDLE && view == VK_NULL_HANDLE && secondaryView == VK_NULL_HANDLE
 			&& buffer == VK_NULL_HANDLE && allocation == NULL ) {
 		return;

@@ -1501,6 +1501,7 @@ idRenderWorldLocal::FreeWorld
 ================
 */
 void idRenderWorldLocal::FreeWorld() {
+	R_RenderThread_Sync( "world" );
 	int i;
 
 	// drop every memoized draw-surf area before the defs and portal areas the
@@ -2250,6 +2251,7 @@ is still useful for displaying a bare model
 =================
 */
 bool idRenderWorldLocal::InitFromMap( const char *name ) {
+	R_RenderThread_Sync( "world" );
 	Lexer *			src;
 	idToken			token;
 	idStr			filename;

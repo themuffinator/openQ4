@@ -24,6 +24,7 @@ SUPPORT = r'''
 #include <stdexcept>
 #include <string>
 #include <vector>
+static void R_RenderThread_Shutdown(){} // no render thread in this harness
 static bool R_ImagePolicyActive(){return false;}
 static bool R_ImagePolicyOperationAllowed(){return true;}
 static void R_ImagePolicyObserveError(const char*,int=0){}
@@ -476,6 +477,7 @@ using renderWindowParms_t = glimpParms_t;
 struct renderWindowRequest_t { renderWindowParms_t parms; } strictRequest;
 struct renderWindowState_t {};
 static bool strict=false,haveRequest=true;
+static void R_RenderThread_Sync(const char*){} // no render thread in this harness
 static bool R_IsRecoverableRendererRestart(){return strict;}
 static const renderWindowRequest_t* R_GetRecoverableWindowRequest(){return haveRequest?&strictRequest:nullptr;}
 void R_DisplayPresentationFailed(renderDisplayOutcome_t,int32_t){}
@@ -541,6 +543,7 @@ struct renderWindowRequest_t { renderWindowParms_t parms; } strictRequest;
 struct renderWindowState_t {};
 static bool strict=false,haveRequest=true,initialSizeOkay=true;
 static renderWindowParms_t observedParms={};
+static void R_RenderThread_Sync(const char*){} // no render thread in this harness
 static bool R_IsRecoverableRendererRestart(){return strict;}
 static bool R_ForceWindowForRendererRestart(){return false;}
 static const renderWindowRequest_t* R_GetRecoverableWindowRequest(){return haveRequest?&strictRequest:nullptr;}

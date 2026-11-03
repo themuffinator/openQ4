@@ -15,6 +15,7 @@ static bool traceDisposal=false,disposalOutsideScope=false;
 static std::function<void(const char*)> shutdownHook;
 static void ShutdownBoundary(const char* name){++shutdownCalls;if(shutdownHook)shutdownHook(name);}
 static bool r_initialRendererDevicePending=false;
+static void R_RenderThread_Shutdown(){} // no render thread in this harness
 static bool R_RendererRestartError(char* error,int size,const char* reason){idStr::Copynz(error,reason,size);return false;}
 struct {bool isInitialized=true;}glConfig;
 struct Common{void Printf(const char*){ShutdownBoundary("log");}} commonInstance;

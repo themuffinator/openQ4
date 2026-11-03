@@ -57,6 +57,7 @@ struct Cvar {
 } r_swapInterval,r_rendererMetrics,r_hiddenWindow;
 enum {RENDERER_WAIT_FRAME_FENCE,RENDERER_WAIT_SWAPCHAIN_IMAGE,RENDERER_PRESENT_WINDOW_STATE,RENDERER_PRESENT_CONTEXT,RENDERER_PRESENT_SWAP};
 static unsigned long long R_RendererMetrics_CpuClock(){return 0;}
+static void R_RenderThread_Sync(const char*){} // no render thread in this harness
 static void R_RendererMetrics_EndWaitPhase(int,unsigned long long){}
 static void R_RendererMetrics_EndUploadRetirement(unsigned long long){}
 static void R_RendererMetrics_EndPresentPhase(int,unsigned long long){}

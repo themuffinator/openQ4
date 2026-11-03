@@ -669,6 +669,30 @@ void R_ListGuis_f( const idCmdArgs &args );
 
 void *R_GetCommandBuffer( int bytes );
 
+/*
+	Render thread (Vulkan module, r_vkRenderThread; REN-07 in the roadmap).
+	EndFrame hands a finished frame to it and the next BeginFrame, or any
+	main-thread entry that is unsafe while the backend runs, calls
+	R_RenderThread_Sync first. Other modules run the backend on the calling
+	thread, so these are no-ops there.
+*/
+#if defined( OPENQ4_RENDERER_VK_MODULE )
+void	R_RenderThread_Init( void );
+bool	R_RenderThread_Begin( const emptyCommand_t *cmds );
+void	R_RenderThread_Sync( const char *reason );
+bool	R_RenderThread_InFlight( void );
+bool	R_RenderThread_OnRenderThread( void );
+void	R_RenderThread_Shutdown( void );
+#else
+ID_INLINE void	R_RenderThread_Init( void ) {}
+ID_INLINE bool	R_RenderThread_Begin( const emptyCommand_t * ) { return false; }
+ID_INLINE void	R_RenderThread_Sync( const char * ) {}
+ID_INLINE bool	R_RenderThread_InFlight( void ) { return false; }
+ID_INLINE bool	R_RenderThread_OnRenderThread( void ) { return false; }
+ID_INLINE void	R_RenderThread_Shutdown( void ) {}
+#endif
+bool	R_RenderThread_FrameQualifies( void );
+
 // this allows a global override of all materials
 bool R_GlobalShaderOverride( const idMaterial **shader );
 bool R_ValidateGLSLProgram( newShaderStage_t *stage );
@@ -958,6 +982,7 @@ public:
 	void					ResetSpecialEffects( void );
 	void					SetBackEndRenderer();			// sets tr.backEndRenderer based on cvars
 	void					ProcessPendingRenderTextureDeletes( void );
+	void					CompleteBackEndFrame( void );
 	void					RenderViewToViewport( const renderView_t *renderView, idScreenRect *viewport );
 	void					CaptureDepthRenderToImage( const char *imageName );
 	void					EmitFullscreenSpecialEffects( const renderView_t *renderView );
@@ -1028,6 +1053,10 @@ public:
 	viewDef_t *				viewDef;
 
 	performanceCounters_t	pc;					// performance counters
+	// the counters of a frame handed to the render thread; the next game tic
+	// counts into pc while that frame is still in flight
+	performanceCounters_t	renderThreadFrameCounters;
+	bool					renderThreadFrameCountersValid;
 
 	drawSurfsCommand_t		lockSurfacesCmd;	// use this when r_lockSurfaces = 1
 
@@ -1285,6 +1314,7 @@ extern idCVar r_rendererPerfThresholdP95;	// custom P95 benchmark threshold in m
 extern idCVar r_rendererPerfThresholdP99;	// custom P99 benchmark threshold in milliseconds
 extern idCVar r_rendererAdaptiveClusterGrid;	// use preset-driven cluster-grid dimensions
 void R_SetLoadingScreenSwapIntervalBypass( bool active );
+bool R_LoadingScreenActive( void );	// the session is inside a map change
 int R_GetEffectiveSwapInterval( void );
 extern idCVar r_rendererDynamicResolution;	// automatic 3D scale from delayed GPU time
 extern idCVar r_rendererUploadMegs;		// dynamic upload stream size in megabytes per frame buffer

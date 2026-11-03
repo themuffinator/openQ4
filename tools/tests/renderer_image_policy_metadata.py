@@ -53,6 +53,7 @@ struct idLib{static void FatalError(const char*,...){throw std::runtime_error("u
 struct FileSystem{void RecordLevelLoadResource(int,const char*,const char*,int,int){}} files;
 static FileSystem* fileSystem=&files;
 const char* va(const char*,...){return "observed declaration";}
+static void R_RenderThread_Sync(const char*){} // no render thread in this harness
 void R_NormalizeInternalImageName(idStr&){}
 textureUsage_t R_ImageUsageForName(const char*,textureUsage_t usage){return usage;}
 bool R_AllowImageDownSizeForName(const char*,bool allow){return allow;}

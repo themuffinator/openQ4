@@ -25,6 +25,7 @@ enum {FMT_RGBA8=1,TT_2D=2,TF_LINEAR=3,DS_DEFAULTED=4};
 struct idImageOpts {int width=0,height=0,textureType=TT_2D,format=0,numLevels=0;bool isPersistant=false;};
 struct idStr:std::string {using std::string::string;};
 const char* va(const char* format,unsigned value){static char text[128];std::snprintf(text,sizeof text,format,value);return text;}
+static void R_RenderThread_Sync(const char*){} // no render thread here
 struct idImage {
     idImageOpts options; bool scratch=true;
     int filter=TF_LINEAR,repeat=7,direct=0,legacy=0;

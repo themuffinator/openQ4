@@ -579,6 +579,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "level_load_cache.py",
         root / "tools" / "tests" / "lightgrid_map_identity.py",
         root / "tools" / "tests" / "lightgrid_bake_contract.py",
+        root / "tools" / "tests" / "renderer_render_thread_contract.py",
         root / "tools" / "tests" / "hdr_postprocess_math.py",
         root / "tools" / "tests" / "idstr_input_safety.py",
         root / "tools" / "tests" / "lexer_input_safety.py",

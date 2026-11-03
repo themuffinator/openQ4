@@ -34,6 +34,7 @@ static int checks=0,native=0,waits=0,resets=0,destroys=0,records=0,failure=0;
 static uint64_t serial=0;static bool exhausted=false,driftWait=false,driftReset=false,driftDestroy=false;
 #define TEST(x)do{++checks;if(!(x))throw std::runtime_error(#x);}while(0)
 uint64_t R_ImagePolicyNewResourceIdentity()noexcept{return exhausted?0:++serial;}
+static void R_RenderThread_Sync(const char*){} // no render thread in this harness
 void VK_Device_BlockPresentation(int,VkResult,const char*){vkCtx.presentationBlocked=true;}
 VkResult vkWaitForFences(VkDevice,uint32_t,const VkFence*,VkBool32,uint64_t){++native;++waits;if(driftWait)++vkCtx.uploadBatchSerial;return failure==1?VK_ERROR_DEVICE_LOST:VK_SUCCESS;}
 VkResult vkResetFences(VkDevice,uint32_t,const VkFence*){++native;++resets;if(driftReset)vkCtx.device=(VkDevice)7;return failure==2?VK_ERROR_DEVICE_LOST:VK_SUCCESS;}

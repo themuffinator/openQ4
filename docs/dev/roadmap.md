@@ -308,6 +308,13 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   of main-thread work. `tools/debug/cpu_sampler.py` samples main-thread stacks
   without an elevated shell. Meeting the floor still needs recording moved off
   the main thread, a cheaper tic and front end, and less GPU post-processing.
+  A render-thread prototype (`r_vkRenderThread`, default 0) moves Vulkan
+  recording, submit and present off the main thread; its design, hazards and
+  stages are under REN-07. Its first stage overlaps the backend only with the
+  next game tic. In paired rotations the median frame fell about 0.5 ms (9.21
+  to 8.69 ms), p95 and p99 did not improve, and a GPU-bound run showed no
+  gain. Overlapping the front end as well (stage 2) is what can lift the
+  steady floor.
   Progress: targets, budgets and the measurement procedure are declared in the
   [presentation owners contract](presentation-owners.md), with
   `presentation_look_runtime.py` for engine-side latency and smoothness; its
@@ -692,6 +699,150 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
   exists. Require at least five matched performance runs, unchanged quality/order,
   no p99 regression beyond the predeclared measurement tolerance in GOV-03 and
   bounded resources through at least 100 resize/scale cycles.
+  - **Render thread: ownership and stages (3 November).** HF-07's attribution
+    found one thread running the game tic (19% of it), the front end (36%) and
+    Vulkan recording, submit and present (26%) in turn. The boundary for a
+    render thread is `RB_ExecuteBackEndCommands`. Everything it reads must
+    either belong to the frame it was handed or stay frozen until that frame
+    completes.
+    - **Ownership.** The main thread owns the game, the render world (entity,
+      light and effect defs, decals, overlays), the front end, and the image
+      and decl managers. `EndFrame` hands frame N to the render thread. Until N
+      completes, the render thread owns:
+      - frame N's command chain, frame memory and vertex-cache temps;
+      - the Vulkan queue, command pool, upload batch, swapchain and deferred
+        destroys;
+      - backend-only state: executor rings and memos, the shadow atlas and its
+        caches, the classic domains and the metrics accumulators.
+
+      `R_RenderThread_Sync` runs on the main thread. It waits for the frame and
+      then completes it: render-texture deletes, metrics, `R_ToggleSmpFrame`
+      (frame memory and the deferred tri, light, entity and effect-model frees),
+      `vertexCache.EndFrame`, and finally the queued render-world changes. The
+      render thread never waits on the main thread. Its prints and warnings
+      queue for the main thread, and `common->Error` unwinds only the render
+      thread; the sync re-raises it on the main thread.
+    - **Stage 1, prototyped: `r_vkRenderThread 1` (default 0, Vulkan only).**
+      The next `BeginFrame` syncs, so only events, console commands, sound and
+      the game tic overlap the backend. Frame memory, the command chain, scene
+      packets, temporal state and vertex-cache temps keep one owner at a time,
+      so nothing needs double buffering. While a frame is in flight:
+      - Updates and frees of existing entity and light defs, and decals and
+        overlays on them, queue and apply in call order at the sync.
+        `GetRenderEntity` and `GetRenderLight` return the queued copy.
+        `ModelTrace`, `GuiTrace` and `Trace` sync first when they would see a
+        queued change.
+      - Effect snapshots defer their delete to the sync.
+      - Every other main-thread entry that touches backend-owned state syncs
+        first: frame memory, the vertex cache, dynamic-model rebuilds, image
+        creation, upload and purge, the upload batch and deferred destroys,
+        render textures, readbacks, screenshots and save previews,
+        special-effect changes, material cinematics, `vid_restart` and screen
+        parameters, and world load and free.
+      - Window-service polling and presentation recovery moved out of
+        `GLimp_SwapBuffers` to the main thread, at hand-off and completion:
+        they call SDL, set cvars and queue `vid_restart`.
+      - Captures, tiled screenshots, loading screens, the Alpha Labs overlay
+        (it walks the live lightDefs) and checked image reloads still run the
+        backend inline.
+
+      `renderThreadStats` counts threaded and inline frames, the main thread's
+      waits, and every early sync by reason.
+    - **Stage 1 limits.** The tic appends debug lines, polygons and text that
+      the backend may be drawing (debug only). Swapchain recreation and surface
+      recovery after a present error still run on the render thread. That is
+      correct on Windows; before the cvar is used on Wayland or macOS, the
+      surface-extent query and `SDL_Vulkan_CreateSurface` must move to the main
+      thread. Lazy image loads on first bind run on the render thread and
+      invalidate the consumed-policy observation epoch, which costs cache
+      receipts, not correctness.
+    - **Stage 1 evidence (3 November, native 2560 x 1440 fullscreen Quality
+      `game/airdefense1` rotations on a shared machine).**
+      - **Stability.** Six launches ran more than 20,000 threaded frames,
+        including a console `screenshot` (run inline) and a `vid_restart` with
+        the thread live. The logs show no warnings or errors, and no early sync:
+        during play only the `BeginFrame` wait fired.
+      - **Quietest launch** (five in-launch pairs, renderer metrics on). The
+        threaded median frame was 8.69 ms against 9.21 ms inline, better in four
+        of five pairs. The mean was 9.00 ms against 9.27 ms. p95 rose from 13.5
+        to 14.9 ms and p99 from 18.9 to 19.5 ms.
+      - **Loaded launch** (five pairs, after discarding a load spike). The
+        threaded mean was 12.85 ms against 13.23 ms, again better in four of
+        five pairs, but p95 rose from 19.7 to 21.3 ms. On non-tic frames the
+        threaded path was slower: 11.7 ms against 10.1 ms.
+      - **GPU-bound under peer load.** Peer clients on the same GPU kept GPU
+        time near 12.1 ms per frame in both modes, and the inline backend
+        already waited 2.0 ms per frame on the frame fence (17 µs on 3
+        November). The threaded backend's fence wait grew to 2.8 ms.
+      - **Stack samples** (`tools/debug/cpu_sampler.py`). Inline, the main
+        thread used 0.80 CPU-seconds per second, and the backend accounted for
+        46% of its samples, 21% of them driver waits. Threaded, the main thread
+        used 0.52 CPU-s/s and waited in `R_RenderThread_Sync` for 35% of its
+        samples. The render thread used 0.25 CPU-s/s, spent 38% of its samples
+        in driver waits and 27% idle.
+
+      Verdict: stage 1 is a working opt-in prototype, but it cannot meet the
+      floor. Only the tic overlaps the backend, the next front end still waits
+      for it every frame, and the tic's render-world updates now apply serially
+      at the sync. The tails did not improve; wake-up latency and the moved
+      updates are candidates, not yet shown. Repeat the pairs on a quiet machine
+      or the reference desktop before relying on the median gain. Stage 2 is the
+      lever for the floor. `r_vkRenderThread` stays 0.
+    - **Stage 2: overlap the front end too. Required to lift the steady
+      floor.** The 3 November audit found these hazards, each with its fix:
+      1. **Frame memory and the command chain.** Double-buffer `frameData`, as
+         idTech 4's SMP frame did, each half with its own deferred tri-surf
+         list. Backend `R_FrameAlloc` calls (shadow-caster
+         `R_CreatePackedSurfaceFrameCaches`, debug tools) move to the front end.
+      2. **Vertex cache.** Temp data is double-buffered, but the frame-temp
+         headers and the deferred static-free list are not; both need one list
+         per frame. Backend `Alloc`, `AllocFrameTemp` and `Touch` (shadow-caster
+         `R_CreateAmbientCache`, debug tools) move to the front end.
+      3. **Dynamic models.** Cached snapshots are rebuilt in place: verts,
+         `ambientCache`, the GPU-skinning palette, tangents and previous
+         positions. The backend also repairs deferred GPU-skinned surfaces in
+         place. Draw surfaces need frame copies, as BSE submit triangles
+         already have, and the repair moves to the front end. MD5R packed
+         shadow skinning reads `skinToModelTransforms`, which the front end
+         rewrites.
+      4. **Render world.** The backend reads `viewEntity::entityDef->parms`
+         (post-process filters, motion-history keys, MP outlines, bright skins
+         and rimlight). It also reads `viewLight::lightDef`: `parms`,
+         `frustumTris`, `index`, and the classification and projected-shadow
+         helpers. All of these become frame snapshots in `viewEntity_t` and
+         `viewLight_t`. The backend writes `shadowMapStencilFallbackSticky`;
+         that becomes a per-frame result the front end reads a frame late.
+         `FreeLightDef`'s `referencedFrameNum == tr.frameCount` test must also
+         cover the frame in flight. Entity, decal and effect-model frees defer
+         per frame.
+      5. **Frame identity.** The backend stamps and ages by `tr.frameCount`:
+         shadow caches and `VK_ShadowMap_LightState`, GPU timing, readbacks and
+         clustered generations. The classic domains validate front-end tokens
+         against `tr.frameCount + 1`. All of them must use the command's
+         `backEnd.frameCount`. `tr.primaryView`, `tr.specialEffects*`,
+         `tr.takingScreenshot` and `glConfig` are read live and need per-frame
+         copies.
+      6. **Scene packets.** There is one global front-end packet frame, cleared
+         by `BeginFrame`, with shared lookup-slot tables. It needs one frame per
+         frame in flight.
+      7. **Temporal presentation.** `BeginFrame` rewrites the frame state while
+         the backend checks `frameNumber == backEnd.frameCount`, and both
+         threads bump the history generation. It needs per-frame state, with
+         the generation handed back a frame late.
+      8. **Shared caches and counters.** The material-program `nativeFamilies`
+         map is written by both threads. GPU-skinning statistics, the deferred
+         skinning counter, the metrics accumulators and `backEnd.pc` are written
+         by both. The front end reads the shadow resources' known-good state and
+         the moment atlas's failure size, which the backend writes.
+      9. **Resource creation in the backend.** Cinematic decode, lazy
+         `ActuallyLoadImage`, first-use `ScratchImage` and
+         `CreateRenderTexture`, `R_ValidateGLSLProgram`, light-grid
+         availability and area images, and `SetSamplerState` on shared images
+         all run there. Move them to the front end, or to the main thread at
+         hand-off.
+      10. **Errors.** Remove the `common->Error` and `FatalError` paths that
+          tear the renderer down from inside the backend: two in
+          `vk_Interactions.cpp`, two in `vk_ShadowMap.cpp`.
 - [ ] **REN-08 — P1, qualification and targeted implementation: complete post-
   processing combinations.** Qualify motion blur independently of TAA: it has its
   own history, limited rigid-opaque object vectors and subview/time-gap resets;
