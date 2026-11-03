@@ -360,6 +360,11 @@ void FireDOTEntity::Restore( idRestoreGame *savefile ) {
 	savefile->ReadJoint( fireJoint );
 	int num;
 	savefile->ReadInt( num );
+	// A burning joint is a joint of the victim, and idAnimator::Restore accepts
+	// at most 4096 joints.
+	if ( num < 0 || num > 4096 ) {
+		savefile->Error( "FireDOTEntity::Restore: invalid burning joint count %d", num );
+	}
 	burningJoints.SetNum( num );
 	for ( int i = 0; i < num; i++ ) {
 		savefile->ReadInt( burningJoints[ i ] );

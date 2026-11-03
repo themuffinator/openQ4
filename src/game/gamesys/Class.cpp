@@ -699,6 +699,9 @@ bool idClass::PostEventArgs( const idEventDef *ev, int time, int numargs, ... ) 
 	va_start( args, numargs );
 	event = idEvent::Alloc( ev, numargs, args );
 	va_end( args );
+	if ( event == NULL ) {
+		return false;
+	}
 
 	event->Schedule( this, c, time );
 

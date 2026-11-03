@@ -467,6 +467,12 @@ idEvent *idEvent::Alloc( const idEventDef *evdef, int numargs, va_list args ) {
 	const char	*materialName;
 
 	if ( FreeEvents.IsListEmpty() ) {
+		// Map shutdown clears the whole queue, so an event posted while the map
+		// is torn down would never run. Dropping it keeps a full queue, which a
+		// refused load can leave behind, from raising a second error in teardown.
+		if ( gameLocal.GameState() == GAMESTATE_SHUTDOWN ) {
+			return NULL;
+		}
 		WriteDebugInfo( );
 		gameLocal.Error( "idEvent::Alloc : No more free events for '%s' event.", evdef->GetName() );
 	}

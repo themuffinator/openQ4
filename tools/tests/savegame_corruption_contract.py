@@ -1758,6 +1758,79 @@ def validate_restore_teardown_lists() -> None:
         if "lastRadioChatter.Restore" in restore:
             raise AssertionError(f"{module} radio chatter restores its static through a typed reference")
 
+        validate_failed_restore_teardown(module)
+
+
+def function_body(source: str, signature: str) -> str:
+    body = source[source.index(signature):]
+    return body[:body.index("\n}")]
+
+
+def validate_failed_restore_teardown(module: str) -> None:
+    """A refused load deletes a partly restored map without a second error.
+
+    Teardown destructors post events, raise SIG_REMOVED and eject vehicle
+    drivers, so none of them may run script on half-read state or fail on a
+    full event queue. Saved owners, indexes and bindings that later code
+    dereferences without checking are validated or replaced on restore.
+    """
+    event = read_game_libs(f"src/{module}/gamesys/Event.cpp")
+    alloc = function_body(event, "idEvent *idEvent::Alloc(")
+    full_queue = alloc[alloc.index("if ( FreeEvents.IsListEmpty() ) {"):alloc.index("WriteDebugInfo( );")]
+    require(full_queue, "gameLocal.GameState() == GAMESTATE_SHUTDOWN", f"{module} shutdown drops events on a full queue")
+    require(full_queue, "return NULL;", f"{module} shutdown event drop")
+    post = function_body(read_game_libs(f"src/{module}/gamesys/Class.cpp"), "bool idClass::PostEventArgs(")
+    require(post, "if ( event == NULL ) {", f"{module} PostEventArgs handles a dropped event")
+
+    entity = read_game_libs(f"src/{module}/Entity.cpp")
+    prepare = function_body(entity, "void idEntity::PrepareFailedRestoreShutdown( void ) {")
+    require(prepare, "signals->signal[ i ].Clear();", f"{module} failed restore drops signal threads")
+    restore = function_body(entity, "void idEntity::Restore( idRestoreGame *savefile ) {")
+    require(restore, "entityNumber == ENTITYNUM_NONE && restoredEntityNumber != ENTITYNUM_NONE",
+            f"{module} unregistered entity number check")
+
+    vehicle = read_game_libs(f"src/{module}/vehicle/Vehicle.cpp")
+    require(function_body(vehicle, "rvVehicle::~rvVehicle ( void ) {"), "!failedRestoreShutdown",
+            f"{module} failed restore skips driver ejection")
+    require(function_body(vehicle, "void rvVehicle::PrepareFailedRestoreShutdown( void ) {"),
+            "failedRestoreShutdown = true;", f"{module} vehicle failed-restore flag")
+    actor = read_game_libs(f"src/{module}/Actor.cpp")
+    occupant = function_body(actor, "void idActor::ValidateRestoredBindings( idRestoreGame *savefile ) const {")
+    require(occupant, "position >= vehicle->GetNumPositions()", f"{module} vehicle position bound")
+
+    af = function_body(read_game_libs(f"src/{module}/AF.cpp"), "void idAF::Restore( idRestoreGame *savefile, idEntity *owner ) {")
+    require(af, "self = ( savedSelf != NULL ) ? owner : NULL;", f"{module} articulated figure owner")
+    require(af, "physicsObj.SetSelf( owner );", f"{module} articulated figure physics owner")
+    require(read_game_libs(f"src/{module}/AFEntity.cpp"), "af.Restore( savefile, this );", f"{module} AF owner argument")
+    animator = function_body(read_game_libs(f"src/{module}/anim/Anim_Blend.cpp"), "void idAnimator::Restore( idRestoreGame *savefile ) {")
+    require(animator, "savefile->ReadObject( savedEntity );", f"{module} animator keeps its owner")
+    if "savefile->ReadObject( entity );" in animator:
+        raise AssertionError(f"{module} animator restores its owner from the save")
+    constraint = function_body(read_game_libs(f"src/{module}/physics/Physics_AF.cpp"),
+                               "void idAFConstraint::Restore( idRestoreGame *saveFile ) {")
+    require(constraint, "if ( boxIndex[i] != -1 ) {", f"{module} AF constraint box index check")
+
+    client = read_game_libs(f"src/{module}/client/ClientEntity.cpp")
+    binding = function_body(client, "void rvClientEntity::ValidateRestoredBinding( idRestoreGame *savefile ) const {")
+    require(binding, "bindNode.ListHead() != &master->clientEntities", f"{module} client entity master list")
+    require(binding, "idAnimatedEntity::GetClassType()", f"{module} client entity joint master")
+    require(function_body(client, "void rvClientEntity::Restore( idRestoreGame *savefile ) {"),
+            "entityNumber == -1 && restoredEntityNumber != -1", f"{module} unregistered client entity number check")
+    require(read_game_libs(f"src/{module}/gamesys/SaveGame.cpp"), "->ValidateRestoredBinding( this );",
+            f"{module} client entity binding validation pass")
+
+    target = read_game_libs(f"src/{module}/Target.cpp")
+    influence = function_body(target, "void idTarget_SetInfluence::Restore( idRestoreGame *savefile ) {")
+    if "Append( itemNum )" in influence:
+        raise AssertionError(f"{module} influence target restores unchecked entity numbers")
+    require(function_body(target, "static int Target_ReadInfluenceEntityNumber( idRestoreGame *savefile ) {"),
+            "itemNum >= MAX_GENTITIES", f"{module} influence entity number bound")
+
+    if module == "game":
+        fire = function_body(read_game_libs("src/game/awakening/DOTEntity.cpp"),
+                             "void FireDOTEntity::Restore( idRestoreGame *savefile ) {")
+        require(fire, "num < 0 || num > 4096", "game fire burning joint bound")
+
 
 def validate_validation_wiring() -> None:
     for relative_path in (

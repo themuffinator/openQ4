@@ -871,6 +871,11 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 	if ( entityNumber != ENTITYNUM_NONE && entityNumber != restoredEntityNumber ) {
 		savefile->Error( "idEntity::Restore: entity number %d does not match registered number %d", restoredEntityNumber, entityNumber );
 	}
+	// An entity missing from the master table has no number of its own. Taking
+	// the saved one would alias references to the entity registered there.
+	if ( entityNumber == ENTITYNUM_NONE && restoredEntityNumber != ENTITYNUM_NONE ) {
+		savefile->Error( "idEntity::Restore: entity number %d is not registered in the entity table", restoredEntityNumber );
+	}
 	entityNumber = restoredEntityNumber;
 	savefile->ReadInt( entityDefNumber );
 
@@ -1022,6 +1027,13 @@ void idEntity::PrepareFailedRestoreShutdown( void ) {
 	bindBody = -1;
 	teamMaster = NULL;
 	teamChain = NULL;
+
+	// SIG_REMOVED would run script threads that were only partly restored.
+	if ( signals ) {
+		for ( int i = 0; i < NUM_SIGNALS; i++ ) {
+			signals->signal[ i ].Clear();
+		}
+	}
 }
 
 void idEntity::RestoreBindingLinks( idRestoreGame *savefile ) {

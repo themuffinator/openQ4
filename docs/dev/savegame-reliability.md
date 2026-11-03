@@ -898,27 +898,78 @@ fixed in both game libraries, with no change to save bytes:
 `savegame_corruption_contract.py` pins the signal bound, the append-only lists
 in both trees, the physics re-attachment and the client-entity node owners.
 
-The same audit reported further teardown hazards that these changes do not
-address. They are not yet reproduced or fixed:
+A second pass on 3 November 2026 closed the audit's remaining hazards, again in
+both libraries and without changing save bytes. They need a CRC-valid save
+whose contents are wrong, from tampering or a writer defect, so valid saves
+restore as before:
 
-- A second error during unwinding still terminates the process. `~idEntity`
-  raises `SIG_REMOVED`, `~rvVehicle` runs driver exit scripts and `~idActor`
-  posts events; restoring every static object also posts `EV_PostRestore`, so
-  a saved event queue near `MAX_EVENTS` can fail once at restore and again in
-  teardown.
-- `idAF` and `idAnimator` read their owning entity from the save; the
-  articulated-figure path can reach a NULL animator or another entity's physics.
-  Articulated constraints read raw body indexes.
-- Vehicle occupants (driver, position index and count) are not cross-checked.
-- Client-entity bind masters and joints are unchecked, and an entity's bound
-  list is not cross-checked against those masters.
-- `idTarget_SetInfluence` indexes the entity table with saved numbers, and
-  Awakening's `FireDOTEntity` reads an unbounded joint count.
-- An object missing from its master table accepts any saved number, and a few
-  restore paths leak clip models or dictionaries when a read fails.
+- **A second error during teardown.** A refused load used to terminate the
+  process if teardown raised another error. Three teardown paths could:
+  - `~idEntity` raises `SIG_REMOVED` and runs the waiting script threads.
+  - `~rvVehicle` ejects drivers through their exit code.
+  - `~idActor` posts removal events. A saved event queue near `MAX_EVENTS`
+    could fail once at restore, when every object posts `EV_PostRestore`, and
+    again here.
 
-These require a CRC-valid save whose contents are wrong, from tampering or a
-writer defect. They remain Q4-05 work.
+  Now `PrepareFailedRestoreShutdown` clears each restored entity's signal
+  lists and marks restored vehicles, so no partly restored script or exit code
+  runs. During map shutdown a full event queue drops new events instead of
+  raising an error. `ClearEventList` discards the whole queue later in the same
+  shutdown, so an ordinary level change behaves as before.
+- **Articulated-figure and animator owners.** `idAF::Restore` used the saved
+  owner, which could give it a NULL animator or another entity's physics. It
+  now restores the figure, and its physics object, for the entity restoring it.
+  `idAnimator::Restore` keeps the owner that its entity assigned at
+  construction. A saved pointer to another entity would otherwise have let
+  `FreeData` deactivate that entity, even after it was deleted.
+- **Articulated constraint box indexes.** Only per-frame contact friction sets
+  a box constraint, so a saved constraint never has one. A saved box index
+  other than -1 used to reach through that NULL pointer in the solver; it is
+  now refused.
+- **Vehicle occupants.** An actor's saved vehicle position must be within the
+  vehicle's position list, which vehicle code indexes directly. A position
+  that names a different driver, or a mismatched driver count, only affects
+  logic, not memory safety, and is not checked.
+- **Client-entity bindings.** After all objects are read, a bound client entity
+  must be in its master's list, an unbound one in none, and a joint binding
+  needs an animated master, because `UpdateBind` casts the master to
+  `idAnimatedEntity`.
+- **Raw numbers and counts.** `idTarget_SetInfluence` entity numbers must index
+  the entity table, and Awakening's `FireDOTEntity` burning-joint count is
+  bounded like the animator's joint count.
+- **Unregistered objects.** An entity or client entity missing from its master
+  table now has to carry the unregistered number. Previously it took any saved
+  number, which could alias references to the object registered there.
+
+`savegame_corruption_contract.py` pins each check.
+`savegame_restore_bindings.py` checks that teardown clears restored signal
+lists and leaves other entities alone. `savegame_restore_identity.py` refuses a
+saved number for an unregistered object. Restore paths that leak a clip model
+or dictionary when a read fails remain. They only leak memory on a refused
+load.
+
+Valid saves are unaffected. On 3 November the staged build restored all 11
+release fixtures (v2 and v3, 0.9 to 0.13) and the three stamped 0.12.0 user
+saves through `savegame_restore_matrix.py`, with the inputs unchanged. The
+three unstamped legacy saves in that folder are refused by preflight, as
+before. The hidden 31-stage campaign chain (see
+[retail baseline ledger](retail-baseline-ledger.md#campaign-transition-chain-2-november-2026))
+also saved and restored every stage on OpenGL with no errors, in 714 seconds.
+`savegame_restore_recovery_runtime.py` used a fresh `game/storage1` save.
+Its binding cases (5) and thread cases (6) each refused the damaged save,
+opened the retained Load Game recovery page and loaded again.
+
+### Saving before the first frame after a load
+
+A save that runs after a load completes but before the first game frame writes
+NULL for references it cannot find in its object list. On `game/airdefense1`
+such a save logs 2080 `WriteObject FindIndex failed` lines. The same save one
+frame later logs none. The build from 1 November (`3941293b9`) behaves the
+same, so this predates the restore checks above. Console scripts reach this
+window by queuing `saveGame` behind `loadGame`. In play, a map's
+`func_savegame` appends `saveGame checkPoint` to the command buffer, so a
+checkpoint queued behind a load would do the same. Found on 3 November and not
+yet fixed (Q4-05).
 
 ## Remaining Raw Serialization (`raw1`)
 

@@ -47,6 +47,7 @@ rvVehicle::rvVehicle
 =====================
 */
 rvVehicle::rvVehicle ( void ) {
+	failedRestoreShutdown = false;
 	autoRight			= false;
 	hud					= NULL;
 	fovOffset			= 0.0f;
@@ -69,8 +70,9 @@ rvVehicle::rvVehicle ( void ) {
 rvVehicle::~rvVehicle ( void ) {
 	int i;
 	
-	// Force all the drivers out
-	for ( i = 0; i < positions.Num(); i ++ ) {
+	// Force all the drivers out, unless a refused load is deleting the map:
+	// their exit code would then run on partly restored state.
+	for ( i = 0; i < positions.Num() && !failedRestoreShutdown; i ++ ) {
 		idActor* driver = positions[i].GetDriver ( );
 		if ( !driver ) {
 			continue;
@@ -84,6 +86,16 @@ rvVehicle::~rvVehicle ( void ) {
 	}
 
 	positions.Clear ( );
+}
+
+/*
+================
+rvVehicle::PrepareFailedRestoreShutdown
+================
+*/
+void rvVehicle::PrepareFailedRestoreShutdown( void ) {
+	failedRestoreShutdown = true;
+	idActor::PrepareFailedRestoreShutdown();
 }
 
 /*

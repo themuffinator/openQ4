@@ -1657,6 +1657,9 @@ void idRestoreGame::RestoreObjects( void ) {
 		if ( objects[i]->IsType( idThread::GetClassType() ) ) {
 			static_cast<idThread *>( objects[i] )->ValidateRestoreOwnership( this );
 		}
+		if ( objects[i]->IsType( rvClientEntity::GetClassType() ) ) {
+			static_cast<rvClientEntity *>( objects[i] )->ValidateRestoredBinding( this );
+		}
 	}
 
 	// regenerate render entities and render lights because are not saved

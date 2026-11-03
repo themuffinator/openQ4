@@ -6,6 +6,23 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Damaged saves fail cleanly, 3 November 2026
+
+- **Refusing a damaged save no longer risks closing the game.** When a load
+  is refused part-way through, the half-loaded level is now cleared without
+  running its scripts or vehicle exit sequences, and without the second error
+  that used to end the game. Ragdolls, animations, vehicle seats, client-side
+  models and several entity lists are now checked as they load instead of
+  being trusted.
+- **Normal saves load exactly as before.** Every saved-game fixture from 0.9
+  to 0.13 still loads, and the whole stock campaign still saves and reloads on
+  every level.
+- Evidence: `savegame_corruption_contract.py`, `savegame_restore_bindings.py`,
+  `savegame_restore_identity.py`, `savegame_restore_matrix.py` (11 release
+  fixtures and three 0.12.0 saves), and the 31-stage campaign chain. See
+  [savegame reliability](savegame-reliability.md#owner-lists-and-physics-links-during-failed-load-teardown)
+  and roadmap Q4-05.
+
 ## Right stick in the menus, 3 November 2026
 
 - Section 13.5 gives the right stick the detail area and model previews; the

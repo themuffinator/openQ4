@@ -1037,6 +1037,25 @@ void idActor::Restore( idRestoreGame *savefile ) {
 
 /*
 ================
+idActor::ValidateRestoredBindings
+================
+*/
+void idActor::ValidateRestoredBindings( idRestoreGame *savefile ) const {
+	idAFEntity_Gibbable::ValidateRestoredBindings( savefile );
+
+	// Vehicle code indexes the vehicle's positions with the saved position.
+	const rvVehicle *vehicle = vehicleController.GetVehicle();
+	if ( vehicle != NULL ) {
+		const int position = vehicleController.GetPosition();
+		if ( position < 0 || position >= vehicle->GetNumPositions() ) {
+			savefile->Error( "idActor::Restore: actor '%s' holds position %d of vehicle '%s', which has %d",
+				name.c_str(), position, vehicle->GetName(), vehicle->GetNumPositions() );
+		}
+	}
+}
+
+/*
+================
 idActor::Hide
 ================
 */

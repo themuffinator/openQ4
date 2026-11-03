@@ -96,7 +96,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | Temporal rendering | Automatic TAAU supports subnative bilinear/bicubic scaling and dynamic resolution on eligible desktop GL/Vulkan paths; crop/nearest modes and VR are excluded. Rigid, skinned and first-person weapon motion vectors and reactive effect coverage exist. Dynamic resolution and GPU skinning remain opt-in. GLES has no temporal resolve. |
 | VR | The active source implements OpenGL PC OpenXR, stereo, tracked input, room scale, crouch, two-handed aiming, haptics, comfort controls and vehicle views. Vulkan/EGL/Quest work is recoverable from archived history, not active implementation. Real-headset qualification remains open. |
 | Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Device qualification and integration of archived onboarding/touch/lifecycle work remain open. |
-| UI | Many retained screens and HUDs now run by default. The register preserves 350 rows, 311 active requirements and 39 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
+| UI | Many retained screens and HUDs now run by default. The register preserves 352 rows, 312 active requirements and 40 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
 | Retail and Awakening | Canonical SP/MP sources and BSE are in-tree. Awakening is additive SP content under `q4xbase`, not a separate multiplayer module. Retail decl and BSE audits have already resolved extensive earlier gaps. |
 | Multiplayer | Dual-stack networking, pure asset checks and bounded rcon2 exist. Actual MP defaults are `net_mpLagCompensation 0` and `net_mpPredictMode 0`. Clients advertise bounded remote extrapolation, and server rewind subtracts it from the displayed pose age; the coupled implementation and remaining peer qualification are recorded under MP-07. Retail 2.85 interoperability is outside the current openQ4 2.41 protocol contract. |
 | Platforms | Windows x64 and Linux x64/Steam Deck are first-class platform targets; macOS arm64 and Linux ARM64 are previews; Windows ARM64 and Android are experimental. Renderer tiers are separate from platform tiers. |
@@ -916,7 +916,7 @@ The [visual specification](ui-visual-design.md),
 [product register](ui/product-requirements.md),
 [machine-readable requirements](ui/product-requirements.json) and
 [migration manifest](ui/migration-manifest.json) retain the full product contract.
-This roadmap adopts all **311 active requirements, 358 current source/include-bound
+This roadmap adopts all **312 active requirements, 358 current source/include-bound
 migration variants and seven final gates**. UI-10 reconciled retail/base/Awakening
 mounts while preserving the historical 271-entry manifest. The denominator follows
 effective source changes; it is not a fixed completion target. Scope contradictions
@@ -1180,6 +1180,18 @@ archived provenance; new scheduling belongs here.
   pass the actual SYSTEM layout matrix in twelve locales and windowed engine
   selection/restart checks on NVIDIA/Intel. This is functional and layout
   evidence only; the existing product, performance and platform gates remain.
+  Progress, 3 November: the initializing screen repainted only about eight
+  times a second with pauses of up to a second: a 30 Hz cap, a 10% repaint
+  share that counted single slow frames in full, and loading without
+  presentation hooks (the 1 s script compile). Every main-thread file read now
+  offers a time-paced repaint, at up to 60 Hz within half of the time during
+  the new 1.3 s entrance and a fifth after it (`FLOW-069`). Local vector meshes
+  in a zoom keep their compilation while it is at most a sqrt(2) step finer
+  than needed, and the machined bands became solid annuli (101k to a few
+  thousand vertices). Traces on a loaded machine: 12-22 frames and gaps up to
+  1.35 s before, 50-85 frames, a 23 ms first frame and gaps of 100-270 ms
+  after, for roughly 15-20% more startup time than reduced motion. An
+  idle-machine measurement and the GLES fallback remain.
 - [ ] **UI-08 — P1, qualification and decision: final cutover.** Complete all seven
   final gates with current source-bound behavior, visual/editor/performance and
   Windows/Linux/macOS/Android-GLES evidence, including dedicated packaging. Decide
@@ -1315,6 +1327,15 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   transform in the same call, so the first placement never renders. openQ4's
   current-transform placement matches what retail renders and is kept. The
   runtime qualification list above remains open.
+  Progress, 3 November: a hidden effect lifecycle probe on `game/airdefense1`
+  (OpenGL) samples `bse_speeds` through save, restore and demo playback. The
+  map's ambient effects come back after a load: about 103 active before the
+  save, 82 on the first restored frame and 101 six seconds later. The game
+  saved and restored right after firing, with no errors. A 16 MB
+  render demo recorded over the same scene plays to its end. This is lifecycle
+  evidence only. The particle and trace counters stay at 0, firing did not raise
+  the active count measurably, and BSE prints no counters during render-demo
+  playback. Per-effect behaviour and retail comparison remain open.
 - [ ] **Q4-04 — P1, qualification: Awakening campaign closure.** Play all thirteen
   maps and restore saves during unique weapon/status/vehicle/boss states; qualify
   freeze persistence, damage gates, animation speed, and turret effects. Recheck
@@ -1331,6 +1352,28 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   cannot be used before saving, because restore recompiles its "console"
   source name and fails, as retail's restore would. The other unique states,
   corpse-pin loss and base/Arena/MP isolation remain to qualify.
+  Progress, 3 November (hidden, input-free; saves reloaded in a fresh launch):
+  - **Speeder.** `game/m07_race` starts the player on the speeder. A save made
+    while driving reloads still on the bike at the saved spot, and driving goes
+    on. The race locks the exit.
+  - **Valkaryne.** Saved while she is docked and firing her death ray. After
+    the reload, destroying the Makron sphere makes her undock, and she attacks
+    with railgun and rockets.
+  - **Pain Lord.** Saved once the fight is live. After the reload, head hits
+    put him in pain and then stun, and both dude zones take damage. The kill
+    was not confirmed.
+  - **Pinned corpse.** A spike pins a killed Strogg marine on
+    `game/m01_stranarus_trench2`, and the save with the pinned corpse loads
+    without errors, unpinned as the bounded limitation describes.
+  - **Isolation.** In an Awakening run, `q4xbase` is on the search path and 13
+    `monster_q4x_*` definitions are loaded. After `campaignSelect quake4 start`
+    in the same process, and in fresh base and multiplayer launches, there is
+    no `q4xbase` path and no expansion definition.
+
+  Not reached: the turret and the walker. Neither took the in-game entry at
+  the positions tried, presumably locked or hidden until their sequences.
+  Arena was covered only as `game_mp` on `baseoq4`, not as a switch from the
+  Awakening menu. Full playthroughs remain.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus
@@ -1390,6 +1433,17 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   [radio-chatter reference](savegame-reliability.md#typed-spawn-references-during-restore)
   carried the previous map's spawn id into the next. It is now cleared with its
   chatter and restored only when it names one, so those saves load again.
+  Progress, 3 November: the audit's [remaining hazards](savegame-reliability.md#owner-lists-and-physics-links-during-failed-load-teardown)
+  are closed without changing save bytes. A refused load no longer runs partly
+  restored script or vehicle exit code during teardown, and a full event queue
+  no longer raises a second error there. Articulated figures and animators keep
+  their restoring entity as owner. Constraint box indexes, vehicle positions,
+  client-entity bindings, influence-target entity numbers, burning-joint counts
+  and unregistered objects' numbers are checked. Valid saves are unaffected:
+  all 11 release fixtures (0.9 to 0.13) restore, and the campaign chain passes
+  on OpenGL. Still open: leaks on refused loads, and a pre-existing defect
+  where a [save made before the first frame after a load](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
+  writes NULL references.
 - [ ] **Q4-06 — P3, decision: portable saves.** `raw1` native aggregates are not
   cross-platform saves. Inventory and normalize game plus GUI/interpolator raw
   blocks before introducing a versioned portable format and ABI/architecture

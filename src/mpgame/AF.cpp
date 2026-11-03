@@ -64,8 +64,12 @@ void idAF::Save( idSaveGame *savefile ) const {
 idAF::Restore
 ================
 */
-void idAF::Restore( idRestoreGame *savefile ) {
-	savefile->ReadObject( self );
+void idAF::Restore( idRestoreGame *savefile, idEntity *owner ) {
+	// Only the entity restoring the figure owns it. A saved pointer to any
+	// other entity would bind this figure's physics and animator into it.
+	idEntity *savedSelf = NULL;
+	savefile->ReadObject( savedSelf );
+	self = ( savedSelf != NULL ) ? owner : NULL;
 	savefile->ReadString( name );
 	savefile->ReadBool( hasBindConstraints );
 	savefile->ReadVec3( baseOrigin );
@@ -87,6 +91,7 @@ void idAF::Restore( idRestoreGame *savefile ) {
 	}
 
 	savefile->ReadStaticObject( physicsObj );
+	physicsObj.SetSelf( owner );
 
 	if ( self ) {
 		if ( isActive ) {

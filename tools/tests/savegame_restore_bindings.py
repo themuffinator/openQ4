@@ -36,9 +36,13 @@ struct Link {
 struct idClass { virtual ~idClass()=default; virtual bool IsType(int) const { return false; } };
 struct Physics { void SetMaster(idEntity*,bool) {} };
 constexpr int INVALID_JOINT=-1,EV_Remove=0;
+constexpr int NUM_SIGNALS=2;
+struct SignalThreads { int pending=1; void Clear() { pending=0; } };
+struct signalList_t { SignalThreads signal[NUM_SIGNALS]; };
 struct idEntity : idClass {
     bool alive=true;
     std::string name="fixture";
+    signalList_t* signals=nullptr;
     Link bindMaster{this},teamMaster{this},teamChain{this};
     Physics* physics=nullptr;
     struct { bool bindOrientated=false; } fl;
@@ -194,6 +198,9 @@ int main(int argc,char** argv) {
         inner.previousRestore=&outer;
         idRestoreGame::activeRestore=&inner;
         outside.teamChain=&outside;
+        // Teardown must not run SIG_REMOVED threads of partly restored entities.
+        signalList_t firstSignals,outsideSignals;
+        first.signals=&firstSignals; outside.signals=&outsideSignals;
         if(scenario==0)first.teamChain=&first;
         if(scenario==1) { first.teamChain=&second; second.teamChain=&first; }
         if(scenario==2) { first.teamMaster=&first; } // master without its tail
@@ -202,6 +209,10 @@ int main(int argc,char** argv) {
         try {
             if(!repro)idRestoreGame::PrepareMapShutdown();
             assert(outside.teamChain.value==&outside); // unrelated live entities are untouched
+            if(!repro) {
+                assert(firstSignals.signal[0].pending==0 && firstSignals.signal[1].pending==0);
+                assert(outsideSignals.signal[0].pending==1 && outsideSignals.signal[1].pending==1);
+            }
             first.Cleanup(); second.Cleanup();
             std::printf("binding cleanup %d: passed\n",scenario);
         } catch(const std::exception& error) {
