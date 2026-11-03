@@ -15492,145 +15492,49 @@
    "id": "text.objectives-entry-0-title.max-height",
    "node": "objectives-entry-0-title",
    "property": "max-height",
-   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
-  },
-  {
-   "id": "text.objectives-entry-0-title.width",
-   "node": "objectives-entry-0-title",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
-  },
-  {
-   "id": "text.objectives-entry-0-text.width",
-   "node": "objectives-entry-0-text",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+   "value": {"op": "*", "args": [{"op": "*", "args": [36.0, {"state": "view.text"}]}, {"state": "view.text"}]}
   },
   {
    "id": "text.objectives-entry-1-title.max-height",
    "node": "objectives-entry-1-title",
    "property": "max-height",
-   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
-  },
-  {
-   "id": "text.objectives-entry-1-title.width",
-   "node": "objectives-entry-1-title",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
-  },
-  {
-   "id": "text.objectives-entry-1-text.width",
-   "node": "objectives-entry-1-text",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+   "value": {"op": "*", "args": [{"op": "*", "args": [36.0, {"state": "view.text"}]}, {"state": "view.text"}]}
   },
   {
    "id": "text.objectives-entry-2-title.max-height",
    "node": "objectives-entry-2-title",
    "property": "max-height",
-   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
-  },
-  {
-   "id": "text.objectives-entry-2-title.width",
-   "node": "objectives-entry-2-title",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
-  },
-  {
-   "id": "text.objectives-entry-2-text.width",
-   "node": "objectives-entry-2-text",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+   "value": {"op": "*", "args": [{"op": "*", "args": [36.0, {"state": "view.text"}]}, {"state": "view.text"}]}
   },
   {
    "id": "text.objectives-entry-3-title.max-height",
    "node": "objectives-entry-3-title",
    "property": "max-height",
-   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
-  },
-  {
-   "id": "text.objectives-entry-3-title.width",
-   "node": "objectives-entry-3-title",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
-  },
-  {
-   "id": "text.objectives-entry-3-text.width",
-   "node": "objectives-entry-3-text",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+   "value": {"op": "*", "args": [{"op": "*", "args": [36.0, {"state": "view.text"}]}, {"state": "view.text"}]}
   },
   {
    "id": "text.objectives-entry-4-title.max-height",
    "node": "objectives-entry-4-title",
    "property": "max-height",
-   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
-  },
-  {
-   "id": "text.objectives-entry-4-title.width",
-   "node": "objectives-entry-4-title",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
-  },
-  {
-   "id": "text.objectives-entry-4-text.width",
-   "node": "objectives-entry-4-text",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+   "value": {"op": "*", "args": [{"op": "*", "args": [36.0, {"state": "view.text"}]}, {"state": "view.text"}]}
   },
   {
    "id": "text.objectives-entry-5-title.max-height",
    "node": "objectives-entry-5-title",
    "property": "max-height",
-   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
-  },
-  {
-   "id": "text.objectives-entry-5-title.width",
-   "node": "objectives-entry-5-title",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
-  },
-  {
-   "id": "text.objectives-entry-5-text.width",
-   "node": "objectives-entry-5-text",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+   "value": {"op": "*", "args": [{"op": "*", "args": [36.0, {"state": "view.text"}]}, {"state": "view.text"}]}
   },
   {
    "id": "text.objectives-entry-6-title.max-height",
    "node": "objectives-entry-6-title",
    "property": "max-height",
-   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
-  },
-  {
-   "id": "text.objectives-entry-6-title.width",
-   "node": "objectives-entry-6-title",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
-  },
-  {
-   "id": "text.objectives-entry-6-text.width",
-   "node": "objectives-entry-6-text",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+   "value": {"op": "*", "args": [{"op": "*", "args": [36.0, {"state": "view.text"}]}, {"state": "view.text"}]}
   },
   {
    "id": "text.objectives-entry-7-title.max-height",
    "node": "objectives-entry-7-title",
    "property": "max-height",
-   "value": {"op": "*", "args": [36.0, {"state": "view.text"}]}
-  },
-  {
-   "id": "text.objectives-entry-7-title.width",
-   "node": "objectives-entry-7-title",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 840.0, 462.0]}
-  },
-  {
-   "id": "text.objectives-entry-7-text.width",
-   "node": "objectives-entry-7-text",
-   "property": "width",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 624.0, 267.0]}
+   "value": {"op": "*", "args": [{"op": "*", "args": [36.0, {"state": "view.text"}]}, {"state": "view.text"}]}
   },
   {
    "id": "text.objectives-empty-text.height",

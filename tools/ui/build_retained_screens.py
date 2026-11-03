@@ -3932,15 +3932,12 @@ def grow_objectives(doc: Document, heading: dict, entries: list, empty: dict, co
     gives the authored value at 100 % (check_text_bindings)."""
     text_source(doc)
     for entry in entries:
-        # The title and description run on across the plate, so that their
-        # lines hold as much as they did at 100 %.
+        # The title and description keep their columns over the back bar,
+        # which darkens no further; a title takes the lines it needs to hold
+        # what its two held at 100 % (its glyphs and lines both grow).
         title = next(child for child in entry["children"] if child["id"].endswith("-title"))
-        doc.bind(f"text.{title['id']}.max-height", title["id"], "max-height", text_times(title["properties"]["max-height"]["value"]))
-        doc.bind(f"text.{title['id']}.width", title["id"], "width",
-                 {"op": "select", "args": [LARGER, U * (OBJ_WIDTH - 40), title["properties"]["width"]["value"]]})
-        description = next(node for node in walk_nodes(entry) if node["id"].endswith("-text"))
-        doc.bind(f"text.{description['id']}.width", description["id"], "width",
-                 {"op": "select", "args": [LARGER, U * (OBJ_WIDTH - 22 - 134 - 8 - 20), description["properties"]["width"]["value"]]})
+        doc.bind(f"text.{title['id']}.max-height", title["id"], "max-height",
+                 text_times(text_times(title["properties"]["max-height"]["value"])))
     nodes = {node["id"]: node for node in walk_nodes(empty)}
     sentence = nodes["objectives-empty-text"]["properties"]
     counts = wrapped_lines(("#str_200935",), "lowpixel", sentence["font-size"]["value"], sentence["width"]["value"])

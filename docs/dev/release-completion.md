@@ -33,9 +33,14 @@ See [player release status](../user/release-status.md).
   restore at 100 %) and a stand-in model renderer for Player Setup's
   preview; all screens groups, the safe-area and settings runs,
   `ui_retained_gate.py` and the register validator pass. OpenGL captures at
-  200 %, 16:9 and 9:16: Restart Level, the campaign's difficulty, Credits,
-  Arena and its ledger, Mods, the Objectives page, Create Server, Join Game
-  and Player Setup.
+  200 %, 16:9 and 9:16: Restart Level, the campaign's difficulty and
+  chapters, Credits, the Arena, Mods, the Objectives page, Create Server
+  with its advanced dialog, and Player Setup; Join Game at 16:9 (its
+  scenario's dedicated server could not take its port in the 9:16 runs).
+  The Arena's ledger, which needs a whole match, is qualified by the native
+  case only. The captures led to three fixes: the Arena's progress line
+  wraps rather than cutting its count, Join Game's status runs on to CLEAR
+  SORTING, and Objectives' text stays over the back bar.
 
 ## Damaged saves fail cleanly, 3 November 2026
 
