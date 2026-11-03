@@ -226,6 +226,11 @@ See [release status](../../user/release-status.md) and the
   Credits and Exit. Player Setup, also on the Multiplayer menu, edits your
   name, clan tag, model and rail colour in place beside a turning preview of
   your player, and each change applies at once.
+- **Right stick in the menus.** With a controller in the new interface, the
+  right stick scrolls the pause menu's objectives, the multiplayer scoreboard
+  and player list, and long confirmation messages without moving your
+  selection, and in Player Setup it turns the preview of your player, with
+  the Model rotation slider following.
 - **Menus on a touchscreen.** On a touchscreen (a phone, a tablet or the
   Steam Deck's screen), you can drag the lists of saves, demos, servers,
   chapters and settings with your finger, and a flicked list keeps going and

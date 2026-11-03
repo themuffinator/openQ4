@@ -403,6 +403,28 @@ SCENARIOS = {
         'openq4_retainedGui focus nav_resume', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 600', 'ui_retainedStatus',
     ]),
+    # The right stick on the OBJECTIVES page (section 13.5): held down for
+    # 250 ms it scrolls the list, which holds no control, 180 dp while the
+    # focus stays put; held up for a second it returns to the top. The map
+    # holds two open objectives, which fit, so four test rows join them after
+    # the pause publishes its state.
+    'pause-objectives-stick': ('game/airdefense1', [
+        'trigger objectiveIntro', 'waitMsec 500', 'trigger objectiveMedic', 'waitMsec 500', 'trigger completeObjectiveIntro',
+        'waitMsec 500', 'trigger objectiveReturnMedic', 'waitMsec 1500',
+        'openq4_assertMenuActivation 10000', 'waitMsec 1200',
+        *[f'openq4_retainedGui pending pause_objective_{row} "Test objective {row}"' for row in range(2, 6)],
+        *[f'openq4_retainedGui pending pause_objective_text_{row} "A test row that makes the list overflow."' for row in range(2, 6)],
+        'openq4_retainedGui state pause_objective_count 6', 'waitMsec 200',
+        'openq4_retainedGui event objectivesShow', 'waitMsec 1200', 'openq4_retainedGui report',
+        'screenshot "screenshots/objectives-stick-top.tga"',
+        'openq4_retainedGui stick 0 1 250', 'waitMsec 300', 'openq4_retainedGui report',
+        'screenshot "screenshots/objectives-stick-down.tga"',
+        'openq4_retainedGui stick 0 -1 1000', 'waitMsec 300', 'screenshot "screenshots/objectives-stick-up.tga"',
+        'openq4_retainedGui stick 0 -1 100',
+        'openq4_retainedGui event objectivesHide', 'waitMsec 900',
+        'openq4_retainedGui focus nav_resume', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 600', 'ui_retainedStatus',
+    ]),
     'loading': (None, [
         'waitMsec 3000', 'testGUI "guis/loading/loading.q4ui"', 'waitMsec 300',
         'openq4_retainedGui pending loading_levelshot gfx/guis/loadscreens/airdefense',
@@ -848,6 +870,24 @@ SCENARIOS = {
         'screenshot "screenshots/playersetup-turned.tga"',
         'openq4_retainedGui focus "setup-close"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 1200', 'openq4_retainedGui report', 'screenshot "screenshots/playersetup-closed.tga"',
+    ]),
+    # The right stick turns Player Setup's preview (section 13.5) through the
+    # session, which owns the Rotation row: held right for 500 ms it turns
+    # 200 to 290 degrees, held half left for two seconds back to 110, and the
+    # row's slider follows. Player Setup's rows are controls, so there is no
+    # detail area for up and down to scroll.
+    'playersetup-stick': (None, [
+        'waitMsec 7000',
+        'openq4_retainedGui focus nav_multiplayer', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1500', 'openq4_retainedGui focus setup', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 2000', 'openq4_retainedGui widget "setup-rotation"', 'screenshot "screenshots/playersetup-stick-start.tga"',
+        'openq4_retainedGui stick 1 0 500', 'waitMsec 400', 'openq4_retainedGui widget "setup-rotation"',
+        'screenshot "screenshots/playersetup-stick-right.tga"',
+        'openq4_retainedGui stick -0.5 0 2000', 'waitMsec 400', 'openq4_retainedGui widget "setup-rotation"',
+        'screenshot "screenshots/playersetup-stick-left.tga"',
+        'openq4_retainedGui stick 0 1 500',
+        'openq4_retainedGui focus "setup-close"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1200',
     ]),
     # The Create Server sub-page (FLOW-050), the default: CREATE SERVER on the
     # Multiplayer page goes deeper and the sub-page presents at 350 ms under

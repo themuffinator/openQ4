@@ -349,6 +349,46 @@ family through Prompt Style. The family shapes await art review under UI-05.
 Evidence for View glyphs: `.tmp/ui/view-glyphs/validation-evidence.json`,
 SHA-256 `d3870701f6e9d2e67bf53894eb59a5cc5ff0e8477369a2ac1e9f1ca658195d18`.
 
+### Right stick (3 November 2026)
+
+Section 13.5 gives the right stick the detail area and model previews. Each
+frame the session's pump (`PumpControllerDetailStick`, beside the left stick's
+navigation pump) reads the look stick, the left one when Southpaw swaps them,
+and hands its deflection to the retained view that takes the menu input: the
+home screen over the legacy menu, the multiplayer card over the game's menu or
+an active retained page (`RetainedStickTarget`). Nothing reaches a legacy GUI,
+a page while a change between menu levels holds the input, or a home screen
+whose hand-off holds it. Past a rest zone of 16 of 127 the rate follows the
+deflection, timed from the previous frame of the same push and never more
+than 100 ms of it, so a stalled frame cannot jump. Inverted look turns the
+view in play; the menus keep the stick's own sense.
+
+- **Up and down scroll the detail area**, 720 dp a second at full deflection
+  (`Runtime::ScrollDetail`). The detail area is the first scrolling container
+  in document order that shows, that input may reach (a dialog's scope
+  included) and that has content past its edge, and that holds no control: a
+  list of rows already scrolls with its focus, the left stick and the
+  triggers. Today those are the pause's OBJECTIVES page in both families, the
+  summary card's scoreboard, the Welcome card's roster and the bodies of the
+  DISPLAY page's confirmation and discard dialogs. Focus stays where it is
+  and nothing activates. An open choice list holds the stick, as it holds
+  the wheel.
+- **Left and right turn Player Setup's preview**, half a turn a second at
+  full deflection. The session owns the angle, as it owns the Rotation row
+  (`TurnRetainedPlayerSetup`), so the row's slider follows the model and the
+  angle wraps within the row's 0-360 degrees.
+
+`openq4_retainedGui stick <x> <y> <msec>` holds the stick for a harness
+without a device: the session turns the preview and the view scrolls its
+detail area. The `ui_controller_menu_pump.py` harness compiles the pump and
+its target against counted doubles (rest zone, timing, stalls, inverted look,
+each target and refusal), the focus-reveal native test scrolls a fixture's
+detail area past a hidden area, a fitting one and a list of buttons, and the
+`playersetup-stick` and `pause-objectives-stick` captures turn the preview
+from 200 to 290 and 110 degrees with the slider following, and scroll an
+Objectives page made to overflow down and back to the top. Holding a
+physical stick on each controller family remains part of the device runs.
+
 ### Settings rows (24 October 2026)
 
 Settings > Game Options > Controller offers both choices as rows, after Low

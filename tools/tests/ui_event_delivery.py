@@ -91,6 +91,7 @@ struct idSessionLocal {
     void HandleGameMenuReturn(const char*) { assert(false); }
 };
 static void PumpControllerMenuNavigation(idSessionLocal*) {}
+static void PumpControllerDetailStick(idSessionLocal*) {}
 static void SyncMainMenuSettingsScrollPages(idUserInterface* gui) {
     if(gui)assert(uiManagerLocal.allocations.Find(static_cast<idUserInterfaceManaged*>(gui)));
 }

@@ -451,6 +451,8 @@ static idStr Session_RetainedBoundKey( const char *binding ) {
 static const int MENU_CONTROLLER_AXIS_THRESHOLD = 50;
 static const int MENU_CONTROLLER_REPEAT_INITIAL_MSEC = 320;
 static const int MENU_CONTROLLER_REPEAT_MSEC = 110;
+// The right stick's rest zone in a retained menu, out of 127.
+static const int MENU_CONTROLLER_DETAIL_REST = 16;
 
 typedef struct menuControllerRepeat_s {
 	int		key;
@@ -597,6 +599,52 @@ static void PumpControllerMenuNavigation( idSessionLocal *session ) {
 		session->MenuEvent( &event );
 	}
 	menuControllerRepeat.nextTime = now + MENU_CONTROLLER_REPEAT_MSEC;
+}
+
+// The right stick (section 13.5; the left one when Southpaw swaps them) in a
+// retained menu: up and down scroll its detail area, left and right turn its
+// model preview. Past the rest zone the rate follows the deflection, timed
+// from the previous frame of the same push (at most 100 ms of it).
+#ifndef ID_DEDICATED
+static int menuDetailStickTime = -1;
+
+static float MenuDetailStickAxis( int value ) {
+	const int beyond = MenuControllerAbs( value ) - MENU_CONTROLLER_DETAIL_REST;
+	if ( beyond <= 0 ) {
+		return 0.0f;
+	}
+	const float deflection = idMath::ClampFloat( 0.0f, 1.0f, beyond / static_cast<float>( 127 - MENU_CONTROLLER_DETAIL_REST ) );
+	return value < 0 ? -deflection : deflection;
+}
+#endif
+
+static void PumpControllerDetailStick( idSessionLocal *session ) {
+#ifndef ID_DEDICATED
+	idUserInterface *gui = session != NULL ? session->RetainedStickTarget() : NULL;
+	int lookX = 0;
+	int lookY = 0;
+	if ( gui == NULL || !Sys_GetJoystickAxisState( AXIS_SIDE, lookX ) || !Sys_GetJoystickAxisState( AXIS_FORWARD, lookY ) ) {
+		menuDetailStickTime = -1;
+		return;
+	}
+	// Inverted look turns the view in play; the menus keep the stick's sense.
+	if ( cvarSystem->GetCVarBool( "in_joystickInvertLook" ) ) {
+		lookY = -lookY;
+	}
+	const float x = MenuDetailStickAxis( lookX );
+	const float y = MenuDetailStickAxis( lookY );
+	if ( x == 0.0f && y == 0.0f ) {
+		menuDetailStickTime = -1;
+		return;
+	}
+	const int now = common->GetPresentationTime();
+	const int gap = now - menuDetailStickTime;
+	const int elapsed = menuDetailStickTime >= 0 && gap > 0 && gap <= 250 ? Min( gap, 100 ) : 0;
+	menuDetailStickTime = now;
+	if ( elapsed > 0 ) {
+		session->RetainedDetailStick( gui, x, y, elapsed * 0.001f );
+	}
+#endif
 }
 
 static void ApplyMainMenuGunPositionChoice( idUserInterface *gui ) {
@@ -1995,6 +2043,37 @@ void idSessionLocal::HandleRetainedPlayerSetupRequest( idUserInterface *gui, con
 #endif
 }
 
+bool idSessionLocal::RetainedDetailStick( idUserInterface *gui, float x, float y, float seconds ) {
+#ifndef ID_DEDICATED
+	const bool scrolled = y != 0.0f && UI_RetainedDetailStick( gui, y, seconds );
+	const bool turned = x != 0.0f && TurnRetainedPlayerSetup( gui, x, seconds );
+	return scrolled || turned;
+#else
+	return false;
+#endif
+}
+
+// Full deflection turns the preview half a turn a second, wrapping within the
+// Rotation row's 0-360 degrees; the row's slider follows.
+bool idSessionLocal::TurnRetainedPlayerSetup( idUserInterface *gui, float x, float seconds ) {
+#ifndef ID_DEDICATED
+	if ( gui == NULL || gui != guiActive || gui != guiRetainedMpPage || !gui->State().GetBool( "setup.open" ) ||
+			!( seconds > 0.0f ) || x == 0.0f || x != x ) {
+		return false;
+	}
+	float rotation = fmodf( retainedSetupRotation + idMath::ClampFloat( -1.0f, 1.0f, x ) * 180.0f * seconds, 360.0f );
+	if ( rotation < 0.0f ) {
+		rotation += 360.0f;
+	}
+	retainedSetupRotation = rotation;
+	gui->SetStateFloat( "setup.rotation", retainedSetupRotation );
+	gui->StateChanged( common->GetPresentationTime() );
+	return true;
+#else
+	return false;
+#endif
+}
+
 /*
 ==============
 Main menu custom crosshair
@@ -2294,6 +2373,19 @@ bool idSessionLocal::RetainedInputTarget() const {
 		return true;
 	}
 	return UI_IsRetainedPath( guiActive->Name() );
+}
+
+idUserInterface *idSessionLocal::RetainedStickTarget() const {
+	if ( guiActive == NULL || ( retainedSubpageFrom != NULL && guiActive == retainedSubpageFrom ) ) {
+		return NULL;
+	}
+	if ( guiRetainedHome != NULL && guiActive == guiMainMenu ) {
+		return RetainedHomeInputBlocked() ? NULL : guiRetainedHome;
+	}
+	if ( RetainedMultiplayerCovers() ) {
+		return guiRetainedMultiplayer;
+	}
+	return UI_IsRetainedPath( guiActive->Name() ) ? guiActive : NULL;
 }
 
 bool idSessionLocal::RetainedSystemAvailable() const {
@@ -5899,6 +5991,7 @@ void idSessionLocal::GuiFrameEvents() {
 
 	if ( guiActive ) {
 		PumpControllerMenuNavigation( this );
+		PumpControllerDetailStick( this );
 		if ( guiTest ) {
 			gui = guiTest;
 		} else if ( guiActive ) {

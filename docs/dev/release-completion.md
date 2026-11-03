@@ -6,6 +6,29 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Right stick in the menus, 3 November 2026
+
+- Section 13.5 gives the right stick the detail area and model previews; the
+  retained menus ignored it. The session now pumps the look stick each frame
+  (`PumpControllerDetailStick`) to the retained view that takes the menu
+  input, past a 16/127 rest zone, timed from the previous frame of the push
+  and capped at 100 ms of it, with inverted look not inverting the menus.
+- Up and down scroll the detail area at up to 720 dp a second
+  (`Runtime::ScrollDetail`): the first shown, reachable scrolling container
+  with content past its edge that holds no control. Today that is the
+  pause's Objectives page (both families), the summary card's scoreboard,
+  the Welcome card's roster and the DISPLAY page's confirmation and discard
+  bodies; focus stays and nothing activates.
+- Left and right turn Player Setup's preview half a turn a second through the
+  session, which owns the Rotation row, so the slider follows the model.
+- `openq4_retainedGui stick <x> <y> <msec>` drives both for harnesses without
+  a device. `ui_controller_menu_pump.py` (38 checks), `ui_event_delivery.py`,
+  `ui_retained_gate.py`, all 168 UI native tests (the focus-reveal test gains
+  a detail-area fixture) and OpenGL 16:9 captures (`playersetup-stick`: 200 to
+  290 to 110 degrees with the slider following; `pause-objectives-stick`: an
+  Objectives page given four test rows scrolled down and back) pass. No
+  physical stick was held; per-family device runs remain.
+
 ## Multi-view demo markers, keyframes and auto-tracking, 2 November 2026
 
 - MVD recordings are format 1.3. The new records are optional, so builds that

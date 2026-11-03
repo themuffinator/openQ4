@@ -1056,6 +1056,12 @@ archived provenance; new scheduling belongs here.
   [fit views narrower than 4:3](ui/retained-screens.md#narrow-views-24-october-2026)
   (5:4, portrait), and the list pages [grow their lists](ui/retained-screens.md#tall-views-grow-the-lists-25-october-2026)
   into a tall view's extra height.
+  Progress, 3 November: the [right stick](ui/input-routing.md#right-stick-3-november-2026)
+  scrolls a retained menu's detail area (a scrolling area that holds no
+  control: the pause's Objectives page, the scoreboard and roster cards and
+  long dialog bodies) and turns Player Setup's preview, with its Rotation
+  slider following (`INP-011` partial). Physical per-family stick runs, View's
+  details beyond Join Game and the sticks' glyphs remain.
 - [ ] **UI-03 — P1, implementation: complete player and multiplayer workflows.**
   Finish tourney queue/arena/watch controls, model previews, full Match Control,
   map catalogs beyond 128 entries, stable refresh focus, contextual disabled

@@ -4,7 +4,7 @@
   "date": "2026-10-31",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "5bb8f5a64aff127ef33faba24a7359b97d0c1b69",
+    "engine_revision": "33bedd6585f89d60889c9904f91dee13a6a64925",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -120,7 +120,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/input-routing.md",
       "scope": "Semantic button/device ownership fixtures; no full widget, text, touch or platform acceptance.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47"
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a"
     },
     "interaction-foundation": {
       "kind": "implementation_checkpoint",
@@ -832,7 +832,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/input-routing.md",
       "scope": "The controller menu pump pairs each navigation step with its release on every retained input target, so a stick push no longer leaves focus moving on the Single Player, Campaign and SYSTEM pages. Qualified by a compiled pump test, a mutation pass and the session tests.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47"
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a"
     },
     "event-focus-tabs": {
       "kind": "implementation_checkpoint",
@@ -1040,7 +1040,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/input-routing.md",
       "scope": "Prompts follow the active device: the SDL family, the Prompt Style override, the adapter's prompt.glyphs and the vector glyphs of the prompt bars and the loading prompt, qualified by the gate, the adapter harness, the screens native test and live captures on OpenGL and Vulkan.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47"
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a"
     },
     "retained-card-glyphs-evidence": {
       "kind": "implementation_checkpoint",
@@ -1052,7 +1052,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/input-routing.md",
       "scope": "Swap Confirm and Back: the setting, the translation in every menu input path and the prompts that follow it, qualified by the adapter harness, the input test, the gate, the screens native test and live captures on OpenGL and Vulkan.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47"
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a"
     },
     "retained-network-quality-evidence": {
       "kind": "implementation_checkpoint",
@@ -1187,7 +1187,7 @@
       "baseline_engine_revision": "35a1e919c828b8fd5326f46e1dda9a975c8549aa",
       "companion_revision": "35a1e919c828b8fd5326f46e1dda9a975c8549aa",
       "scope": "UI-02/UI-03 controller settings, list paging and Join Game focus: Prompt Style (in_promptStyle) and Swap Confirm and Back (in_swapConfirmBack) as stock choice rows in Game Options > Controller in every shipped language, the later rows, hovers, anchors and scroll extent moved; PageUp/PageDown and Home/End moving focus a visible page through the scrolling list that holds a focused button or toggle (Runtime::Impl::PageList), the triggers sending them where a document declares no section events and stepping a focused slider coarsely; Join Game's row focus following its server through new orders, refreshes and filters onto its page. Settings coverage and GUI contracts, the focus reveal test at two densities with button and toggle rows, the adapter and session gate harnesses and an OpenGL English Settings and Load Game capture pass. Trigger and other button glyphs, right-stick detail scrolling and physical controller runs remain.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/controller-settings-paging/validation-evidence.json",
       "local_capture_summary_sha256": "4ee88d83dbf0f98347f95fa70529aeb463fc20bb7725aaad1f905b6a5a82831c"
     },
@@ -1197,7 +1197,7 @@
       "baseline_engine_revision": "1ce1599f4357cdf28b0ceffec83c0b3d2fb51fe6",
       "companion_revision": "1ce1599f4357cdf28b0ceffec83c0b3d2fb51fe6",
       "scope": "UI-02/INP-011: the gamepad Menu button runs a retained document's onMenuButton, once per press, where declared (Back elsewhere); Save Game, Restart Level and in-game Load Game ask the session for menuResume, which returns the pause and runs its RESUME during a single-player game.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/menu-button-resume/validation-evidence.json",
       "local_capture_summary_sha256": "7d791a2d806b2f192709d210e04b984d5ba59b3a49860c5564c28448e1af3782"
     },
@@ -1207,7 +1207,7 @@
       "baseline_engine_revision": "2bfcb60cc42b51d700b36386d065c104c0d9daf5",
       "companion_revision": "2bfcb60cc42b51d700b36386d065c104c0d9daf5",
       "scope": "UI-02/INP-011: the Menu button applies pending changes on the opt-in SYSTEM page (update_system_menu_button.py) and the Escape card's Admin page, and the adapter keeps it Back while a dialog or an open list holds the input (Runtime::ModalOpen, the focused widget's popupOpen).",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/menu-button-apply/validation-evidence.json",
       "local_capture_summary_sha256": "f8fea2394b50fc49215af334f825208e7b17f9fe35970f45b7adb3e9945665c6"
     },
@@ -1217,7 +1217,7 @@
       "baseline_engine_revision": "55ed6f210da77490d2389849e04d46faad92e9c0",
       "companion_revision": "55ed6f210da77490d2389849e04d46faad92e9c0",
       "scope": "UI-02/INP-011: section 13.5's trigger glyphs (LT/RT, L2/R2, ZL/ZR, Steam Deck's outlined L2/R2, generic chevrons) end the Escape card's Match and Admin section strips, a legend for a controller only.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/trigger-glyphs/validation-evidence.json",
       "local_capture_summary_sha256": "1de24fafd097c2ba6f764a6b37406e5972111dc88c79fa6b55a74db617779d59"
     },
@@ -1237,7 +1237,7 @@
       "baseline_engine_revision": "b038777b2b1cec823b34b80256d0c3f7d50ccc64",
       "companion_revision": "b038777b2b1cec823b34b80256d0c3f7d50ccc64",
       "scope": "UI-02/INP-011: section 13.5's Menu button glyphs (Xbox disc, PlayStation Options pill, Nintendo plus, Steam Deck ring, generic outlined pill) end the Escape card's Admin Apply changes plate, which the button presses, for a controller only.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/menu-glyphs/validation-evidence.json",
       "local_capture_summary_sha256": "c2bc17f9841b34b99304af21faa4c2f65104a3c8dad2af5a484488d67fa2a4cf"
     },
@@ -1247,7 +1247,7 @@
       "baseline_engine_revision": "d376ec693290957f26728185cdf287e81d3c5147",
       "companion_revision": "d376ec693290957f26728185cdf287e81d3c5147",
       "scope": "UI-02/INP-010: section 13.4's wrapping menus in the title, both pauses, the Arena pause and the Single Player, Campaign and Multiplayer pages (wrap_menu), and authored navigation that passes a move through a target that cannot take focus (Interaction::Authored).",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/menu-wrap/validation-evidence.json",
       "local_capture_summary_sha256": "c6e0cce45e07d6b112980a2399eb413fc22ad7d596deacc620a976f7b545739f"
     },
@@ -1257,7 +1257,7 @@
       "baseline_engine_revision": "fb6547f03d0f2c8b70fa4c120cad8943253be23a",
       "companion_revision": "fb6547f03d0f2c8b70fa4c120cad8943253be23a",
       "scope": "UI-02/INP-010: a confirmation's two actions wrap Left and Right (every retained confirmation), and Restart Level's five difficulties loop through RESTART LEVEL (section 13.4).",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/menu-wrap-dialogs/validation-evidence.json",
       "local_capture_summary_sha256": "950ee588fc31835335cb205174b5607db8e11dca821498d2d75cd8c66dfc91ff"
     },
@@ -1267,7 +1267,7 @@
       "baseline_engine_revision": "623165435f858b70cfc2a0053fa8d240cc6696c9",
       "companion_revision": "623165435f858b70cfc2a0053fa8d240cc6696c9",
       "scope": "UI-02/INP-010: each scrolling list (a scrollbar's viewport) remembers its last focused control, and a directional move entering the list from outside returns there (Interaction::Container, Remembered).",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/list-memory/validation-evidence.json",
       "local_capture_summary_sha256": "9c98d8f5eb69eefe7cff9d0178b72b6d6793ee74ac3e62fc9688e289ab72b090"
     },
@@ -1287,7 +1287,7 @@
       "baseline_engine_revision": "116b00bfd21a8c0ed101da46b3c84e94448ffa7d",
       "companion_revision": "116b00bfd21a8c0ed101da46b3c84e94448ffa7d",
       "scope": "UI-02/INP-011: the View button runs a retained document's onViewButton (Back elsewhere and in dialogs or open lists); Join Game's hides or shows its server details card; JOY8's default bind in play is _impulse19 (scores or objectives while held).",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/view-button/validation-evidence.json",
       "local_capture_summary_sha256": "d34fdad0c627ab5312d76888a780f35eee9f61cf8e8e0d39a52e03f19d7f1e7c"
     },
@@ -1327,7 +1327,7 @@
       "baseline_engine_revision": "87444682f370b0db50b18f943cd40e2299a67fe9",
       "companion_revision": "87444682f370b0db50b18f943cd40e2299a67fe9",
       "scope": "UI-02/INP-011 (bounded): the glyph families gain the View button (Xbox, PlayStation Create, Nintendo minus, Steam Deck, generic), shown at the top trailing corner of Join Game's server details card, which View hides, for a controller only; the keyboard shows none. The family shapes await art review under UI-05.",
-      "sha256": "6d36f107342c3554ecfad73d6ac0b74aa367d86416e7bb037bf6d04af9b0ec47",
+      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
       "local_capture_summary": ".tmp/ui/view-glyphs/validation-evidence.json",
       "local_capture_summary_sha256": "d3870701f6e9d2e67bf53894eb59a5cc5ff0e8477369a2ac1e9f1ca658195d18"
     },
@@ -6868,7 +6868,7 @@
         "retained-prompt-verbs"
       ],
       "acceptance_evidence": [],
-      "remaining": "Behind ui_retained, DEMOS on the title opens guis/menu/demos.q4ui over the title as LOAD GAME opens its page: the demo library newest first (multi-view, render, command, legacy and incomplete recordings, as the legacy browser probes them) under MULTI-VIEW, RENDER, LEGACY and INCOMPLETE filter tags, 64 rows a page, with the selected demo's map levelshot, kind, status and details; PLAY through the legacy browser's typed player, a demo that cannot start keeping the page with the reason; DELETE behind the stock confirmation naming the demo, for save-path recordings only; REFRESH keeping the selection; and empty states for an empty library and a filter that hides every demo. Playback keeps the legacy controls overlay. The Remastered playback controls in the bottom band (hidden after 3 s, the round-marker timeline, the controller and touch mapping), seek, follow and free camera from the retained page, Multiplayer's Demos sub-page, sorting, touch, independently reviewed captures at every scale and language, and acceptance remain."
+      "remaining": "Behind ui_retained, DEMOS on the Multiplayer page opens guis/menu/demos.q4ui as its sub-page under the MULTIPLAYER crumb (FLOW-050), the legacy browser standing in during playback: the demo library newest first (multi-view, render, command, legacy and incomplete recordings, as the legacy browser probes them) under MULTI-VIEW, RENDER, LEGACY and INCOMPLETE filter tags, 64 rows a page, with the selected demo's map levelshot, kind, status and details; PLAY through the legacy browser's typed player, a demo that cannot start keeping the page with the reason; DELETE behind the stock confirmation naming the demo, for save-path recordings only; REFRESH keeping the selection; and empty states for an empty library and a filter that hides every demo. Playback keeps the legacy controls overlay. The Remastered playback controls in the bottom band (hidden after 3 s, the round-marker timeline, the controller and touch mapping), seek, follow and free camera from the retained page, sorting, touch, independently reviewed captures at every scale and language, and acceptance remain."
     },
     {
       "id": "FLOW-014",
@@ -9263,7 +9263,7 @@
         "view-glyphs"
       ],
       "acceptance_evidence": [],
-      "remaining": "The shoulders (with Q and E) run a document's previous and next tab events, the triggers its previous and next section events, and the west and north face buttons its secondary and tertiary events, each once per press, never with Ctrl or Alt or while a field is being edited; without section events the triggers page the focused list a visible page at a time and step a focused slider coarsely (Join Game refreshes the list on west and sorts it by the next column on north). Prompts draw the active controller's family, the one the HUD's prompts use (from the gamepad type SDL reports: Xbox, PlayStation, Nintendo, Steam Deck under the steamdeck profile, or generic), as vector glyphs for the face buttons and the shoulders (LB and RB, L1 and R1, L and R), and the HUD's in_promptStyle overrides it for both. Nintendo layouts, a forced Nintendo style among them, confirm on the east button and go back on the south one, and in_swapConfirmBack forces either convention (both are rows in Game Options > Controller), in every menu input path (the stock windows, the retained adapter and runtime, and the sub-page change's Back), with the Accept and Back prompts following. The right stick's detail scrolling, View's details on pages beyond Join Game (View runs a document's onViewButton, hides or shows Join Game's server details, is Back elsewhere and in dialogs or open lists, and shows the scores while held in play), glyphs for the View button and the sticks (the triggers' glyphs end the Match and Admin section strips, and the Menu button's the Admin page's Apply changes plate), and the per-family controller runs remain.",
+      "remaining": "The shoulders (with Q and E) run a document's previous and next tab events, the triggers its previous and next section events, and the west and north face buttons its secondary and tertiary events, each once per press, never with Ctrl or Alt or while a field is being edited; without section events the triggers page the focused list a visible page at a time and step a focused slider coarsely (Join Game refreshes the list on west and sorts it by the next column on north). Prompts draw the active controller's family, the one the HUD's prompts use (from the gamepad type SDL reports: Xbox, PlayStation, Nintendo, Steam Deck under the steamdeck profile, or generic), as vector glyphs for the face buttons and the shoulders (LB and RB, L1 and R1, L and R), and the HUD's in_promptStyle overrides it for both. Nintendo layouts, a forced Nintendo style among them, confirm on the east button and go back on the south one, and in_swapConfirmBack forces either convention (both are rows in Game Options > Controller), in every menu input path (the stock windows, the retained adapter and runtime, and the sub-page change's Back), with the Accept and Back prompts following. The right stick scrolls the detail area, the first shown and reachable scrolling container that holds no control (the pause's Objectives page, the summary card's scoreboard, the Welcome card's roster and the DISPLAY page's dialog bodies), at up to 720 dp a second, and turns Player Setup's preview through the session, which owns its Rotation row, so the slider follows (pump harness, focus-reveal native test and engine captures that bind no evidence record). View's details on pages beyond Join Game (View runs a document's onViewButton, hides or shows Join Game's server details, is Back elsewhere and in dialogs or open lists, and shows the scores while held in play), glyphs for the View button and the sticks (the triggers' glyphs end the Match and Admin section strips, and the Menu button's the Admin page's Apply changes plate), and the per-family controller runs, a physical stick held on each family among them, remain.",
       "constraints": {
         "south": "accept",
         "east": "back",
