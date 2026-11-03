@@ -291,3 +291,40 @@ because retail lacks them. No blanket source/bitmap acceptance is granted.
 This audit found no safe compatibility-only override to remove without changing
 an intentional feature or a named diagnostic fixture. Their retirement or
 replacement requires the owning roadmap item's gameplay evidence.
+
+## Effect lifecycle telemetry, 3 November 2026
+
+Q4-03's earlier zero particle/trace counts came from missing instrumentation:
+only the effect counter was updated. `bse_speeds` now counts active particle
+units after segment updates (electricity contributes its individual bolts),
+actual game collision queries and serviced segments. The unmeasured texel
+coverage field is no longer printed as a misleading zero. Counters reset at the
+existing game-frame boundary and do not alter simulation or effect rendering.
+Render-demo playback still does not run that game-frame reporting path.
+
+`tools/tests/bse_lifecycle_runtime.py` provides a repeatable, hidden-window test
+using the installed retail `effects/levels/convoy/weld_sparks` on
+`game/airdefense1`. It filters other effects, starts the loop, stops it, waits for
+particles to expire, restarts it, saves the live effect, deletes its owner, then
+loads the live save in a fresh process. It requires positive effect, particle,
+trace and segment counts while active, twenty quiet frames after stop and
+deletion, and positive activity after restore. Both saves use the cross-load
+harness, which rejects unresolved references including in an immediate resave.
+The probe's log parser has positive and failing self-tests in CI.
+
+Run it against a freshly staged package with `--install-root`, `--basepath`,
+`--output` (a project-local disposable profile directory), and `--renderer gl`
+or `--renderer vulkan`. The output contains a summary `report.json`, each leg's
+save report and its engine log. Sound and mouse/joystick input are disabled.
+This establishes lifecycle telemetry only: collision response, visible particle
+shapes, lighting, sound, subviews, owner motion and retail visual/audio comparison
+remain separate Q4-03 acceptance requirements.
+
+The Windows x64 staged package passes all five checks on OpenGL and Vulkan.
+Reports and engine logs are in `.tmp/q4-roadmap/bse-gl/` and
+`.tmp/q4-roadmap/bse-vk/`; `.tmp/q4-roadmap/evidence.json` records package hashes
+and the complete task's checks. Both restored saves preserve their input object
+tables (1777 objects on GL, 1776 on Vulkan) and have zero unresolved references.
+Those counts come from separate simulations with random child effects, not a
+matched-frame comparison. Filtering intentionally produces warnings when the map
+tries to play other effect names; these are not missing assets.

@@ -1014,6 +1014,13 @@ Windows save/restore suite passes all 50 tests, including durability and portabl
 codec mutation checks. This evidence covers these allocation paths, not every
 possible allocation failure in the engine.
 
+The 11 existing release fixtures from 0.9 through 0.13 also restore and run
+30 gameplay tics on Windows/OpenGL with their input hashes unchanged
+(`.tmp/q4-roadmap/historical/run-20261103-222814-53856-0/report.json`). The
+matrix's v2 metadata parser was separately corrected: v2 has no ABI-string
+field, and its object count must not be treated as a string length. This changes
+the report only; the engine's historical readers are unchanged.
+
 ## Remaining Raw Serialization (`raw1`)
 
 Many high-risk scalars, flags, vectors, references, and arrays now use explicit

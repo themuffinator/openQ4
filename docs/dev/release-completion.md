@@ -21,6 +21,16 @@ See [player release status](../user/release-status.md).
   immediate resaves reload into gameplay on OpenGL and Vulkan. See
   [save reliability](savegame-reliability.md#saving-before-the-first-frame-after-a-load).
 
+## Effect diagnostics, 3 November 2026
+
+- Effect diagnostics now report particle activity and collision queries instead
+  of constant zeros. A new stock-effect probe passes start, stop, restart, owner
+  deletion and save restoration on OpenGL and Vulkan. This improves diagnostics
+  and lifecycle evidence; it does not establish complete retail effect parity.
+- The historical save matrix also reports v2 save metadata correctly, and all
+  11 existing 0.9–0.13 release fixtures restore with their inputs unchanged.
+  The engine's save readers have not changed.
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The
