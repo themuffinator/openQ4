@@ -109,8 +109,8 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07, MP-01 through MP-08, AUD-01; selected VR-01/VR-06 and AND-01/AND-03 scope | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering | HF-03 through HF-08, VK-01 through VK-07, REN-01 through REN-08 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
-| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
 the current timing and workload baseline; UI cutover depends on its complete
@@ -130,6 +130,7 @@ to a final project-wide phase. Important dependencies are:
 | Modern-renderer promotion | Each REN-01 shared-domain gate is separate from REN-02 aggregate visible-lighting ownership. Keep their defaults and rollback decisions independent. |
 | Content pack split, trim and overlays (PKG-02 through PKG-04) | PKG-01's verifier first proves identical bulk-pack bytes across platforms and consecutive candidates. Client-only packs need their pure-server exemption before the dedicated server drops them. |
 | Enhanced physics default (PHYS-06) | PHYS-01's recorded baseline and budgets first; PHYS-04's behavior envelope and PHYS-05's save/multiplayer/demo integration must pass before `g_enhancedPhysics` defaults on. `0` always runs the unchanged legacy path. |
+| Steam integration (STEAM-02 through STEAM-06) | STEAM-01's app-identity, licence and distribution decision first. Joining and invites use MP-08's interoperability contract and the existing MP join flow. Steam absent or disabled always runs the unchanged path. |
 | Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
 
 ## Governance and baseline evidence
@@ -2805,6 +2806,111 @@ Sources: [platform support](platform-support.md), [Deck QA](steam-deck-qa.md),
   (or Sparkle deltas), Android asset delivery, and whether the 2.8 GB of baked
   sources under `content/baseoq4/pak1` leave Git for digest-pinned artifacts.
 
+## Steam integration
+
+Sources: [platform support](platform-support.md), [Deck QA](steam-deck-qa.md),
+`src/framework/FileSystem.cpp` (Steam library discovery), the MP join screen and
+server browser under the retained UI.
+
+Requested 3 November 2026. Many players own Quake 4 on Steam and run openQ4 with
+the Steam client open, including on Steam Deck. Today openQ4 uses Steam only to
+find the installed game files; it has no Steamworks code. This work makes Steam's
+social features work for openQ4 players: friends see what they are playing and
+can join them in one click, invites arrive in the game, and the Deck's keyboard,
+overlay, screenshots and recordings behave as they do for native Steam games.
+Every item honors four product rules:
+
+1. **Seamless when detected, invisible when not.** The integration activates
+   only when a running Steam client and the Steam API are found at startup. When
+   either is missing, offline or fails to initialize, openQ4 behaves exactly as
+   it does today: no error dialog, no missing-library failure, no Steam-only UI
+   rows, and a single informational log line. GOG, retail-disc, Android and
+   assetless dedicated installs never depend on it.
+2. **One option.** An archived CVar (proposed `sys_steamIntegration`, default
+   `1`) with one localized Settings row turns it all off. Presence privacy is the
+   only sub-option a player sees. Dedicated servers never load the Steam API.
+3. **No gameplay coupling.** Steam never changes simulation, network protocol,
+   pure checks, saves or demos. Callbacks run on the main thread at a fixed point
+   in the frame, and a missing or hung Steam client cannot stall a frame.
+4. **Privacy first.** Presence never publishes server passwords, rcon details or
+   private LAN addresses to anyone except a friend the player explicitly invites.
+
+- [ ] **STEAM-01 — P2, decision: identity, licensing and distribution.** Settle
+  three questions before any code lands. (a) **App identity:** what Steam sees
+  openQ4 as: the player's own Quake 4 app (2210, and what that means for launch
+  options, overlay attachment and a friend's "Join Game" launching the retail
+  executable rather than openQ4), a non-Steam shortcut (overlay only, no API), or
+  a dedicated openQ4 app ID. Rich-presence display strings, achievements and
+  Steam Cloud need configuration only an app's owner can upload, so the answer
+  bounds which later items are possible; record each feature's dependency on it.
+  (b) **Licence:** the engine is GPLv3 with the Doom 3 additional terms and
+  Steamworks is proprietary. Review whether and how openQ4 may call the Steam API
+  (for example a dynamically loaded, separately licensed bridge module behind a
+  small openQ4-defined interface, like the renderer modules) and what may be
+  redistributed. No Steamworks headers or binaries enter Git or packages until
+  this review is recorded. (c) **Distribution:** which packages carry the bridge
+  and Steam API library (Windows x64, Linux x64/Deck, macOS arm64; none for
+  Android or ARM64 targets without a Steam client), and how the Windows
+  installer, AppImage and Flatpak/Steam Runtime cases find it. Exit: a recorded
+  decision with the supported feature set per identity option.
+- [ ] **STEAM-02 — P2, implementation: optional platform-services layer.** Add an
+  engine-side platform-services interface whose default is a no-op, plus the
+  Steam implementation chosen under STEAM-01, loaded at runtime only when Steam
+  is detected. It owns init/shutdown ordering with SDL3 and the renderers,
+  per-frame callback pumping, the local player's Steam identity and persona name
+  (offered as the default player name on first run, never overwriting a chosen
+  one), and overlay activation: opening the overlay pauses single-player like
+  the pause menu and releases mouse capture, and closing it restores both. Keep
+  the interface backend-neutral so another platform (for example Discord
+  presence) could implement it later without touching game code. Exit: with
+  Steam absent, startup, frame time and logs are unchanged against the pre-change
+  binary; with Steam present, the overlay opens over GL and Vulkan in windowed
+  and fullscreen modes without input or capture glitches.
+- [ ] **STEAM-03 — P2, implementation: rich presence.** Publish what the player
+  is doing, updated on state changes rather than every frame: main menu;
+  single-player campaign, chapter and map, with Quake 4 and The Awakening named
+  separately; SP Arena; multiplayer gametype, map, player count and team or
+  score summary; spectating; demo playback; loading. Use the game's localized
+  map and mode names. Set a `connect` value only while the player is on a
+  joinable, non-password, internet-reachable server, and group teammates with
+  Steam's player-group keys. A privacy setting offers full presence, presence
+  without join, or none. Exit: each state shows correctly in a friend's Steam
+  friends list on Windows, Linux and Deck, and no state publishes a password or
+  private address.
+- [ ] **STEAM-04 — P2, implementation: friends, invites and joining.** Accept
+  joins from every Steam path: "Join Game" in the friends list or overlay while
+  openQ4 is running, and launch-time connect arguments when it is not. Route each
+  through the existing MP join flow so version, protocol, pure-content, password
+  and full-server outcomes show the same localized messages as a manual join. If
+  the player is in single-player, confirm first and offer to save. Add **Invite
+  friends** to the multiplayer pause menu and scoreboard through Steam's invite
+  dialog; a direct invite to a password-protected server carries the password
+  only to that friend. Show friends who are playing openQ4, and their servers, in
+  the server browser and join screen. Keep openQ4's own UDP networking; Steam
+  relay or NAT traversal is OPT-09 scope. Exit: two machines on different
+  networks join each other by invite and by friends-list join, both while running
+  and from a cold launch, and each failure case reaches its correct message.
+- [ ] **STEAM-05 — P2, implementation: Deck and client conveniences.** Use Steam's
+  on-screen keyboard (floating where supported) for every text field when the
+  player is using a controller: player name, chat, console, server password,
+  save names and the server browser filter. Add F12 and engine `screenshot`
+  captures to the player's Steam screenshot library, tagged with the map name.
+  Add Steam game-recording timeline markers for meaningful moments (match start
+  and end, frags, deaths, flag captures, chapter and boss starts, Arena rounds)
+  using only built-in marker icons, with bounded rates so busy matches do not
+  flood the timeline. Exit: Deck game mode and desktop each show the keyboard on
+  focus and return the typed text, screenshots appear in the library with their
+  tag, and a recorded match shows its markers in order.
+- [ ] **STEAM-06 — P2, qualification: detection and lifecycle matrix.** On
+  Windows x64, Linux x64 (native and Steam Runtime), Steam Deck game and desktop
+  modes, and macOS arm64 where the bridge ships: Steam absent; Steam installed
+  but not running; Steam offline mode; Steam exiting or restarting mid-session;
+  launched from Steam versus directly; `vid_restart`, renderer switch, map and
+  mode changes, SP save/load, demo playback and long sessions. Every case starts,
+  plays and shuts down cleanly, presence never shows a stale state, and with the
+  integration off or Steam absent the build is indistinguishable from one
+  without it.
+
 ## Engine loading safety and developer tools
 
 Sources: [job service](parallel-job-system.md), [loading caches](loading-cache-modernization.md),
@@ -2904,6 +3010,7 @@ workstream with scope, dependencies and acceptance before implementation.
 | OPT-06 | Awakening's unreachable grapple/concussion/tether/gravgun/compass content: explicit content-completion project, not a blocker for the integrated SP campaign. No expansion multiplayer module. |
 | OPT-07 | HDR audio, ducking, geometric obstruction and reverb editing: optional authored-mix changes after retail audio qualification. |
 | OPT-08 | Additional idTech titles, wholesale SP/MP source unification, broad third-party feature ports and extra cosmetic color syntax: require a product/maintenance decision, source/license review and concrete benefit; the old TODO is not an implementation mandate. |
+| OPT-09 | Further Steam services beyond STEAM-02 through STEAM-05: lobbies and matchmaking, Steam relay/NAT traversal, Workshop mod distribution, Steam Cloud saves, achievements and stats, and Steam avatars in scoreboards (which needs a Steam ID exchange and its own privacy design). Each depends on the STEAM-01 app identity, and several need app-owner configuration. |
 
 ## Release qualification and completion rules
 
