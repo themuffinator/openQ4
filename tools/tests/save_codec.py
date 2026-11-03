@@ -25,9 +25,10 @@ TIMEOUT = 600
 # (name, exact text in the header, replacement). Each must change behaviour the
 # test pins; the replacement text must still compile.
 MUTATIONS = [
-    ("flag bit order", "mask |= ( flags[ i ] ? 1u : 0u ) << i;",
-     "mask |= ( flags[ i ] ? 1u : 0u ) << ( count - 1 - i );"),
-    ("flag reader accepts extra bits", "if ( count < 32 && ( mask >> count ) != 0 ) {", "if ( false ) {"),
+    ("flag bit order", "( ( flags[ i ] ? 1u : 0u ) << ( i - base ) )",
+     "( ( flags[ i ] ? 1u : 0u ) << ( 7 - ( i - base ) ) )"),
+    ("flag reader bit order", "flags[ i ] = ( ( value >> ( i - base ) ) & 1u ) != 0;",
+     "flags[ i ] = ( ( value >> ( 7 - ( i - base ) ) ) & 1u ) != 0;"),
     ("trace model header order", "\tw.WriteInt( static_cast<int>( trm.type ) );\n\tw.WriteInt( trm.numVerts );",
      "\tw.WriteInt( trm.numVerts );\n\tw.WriteInt( static_cast<int>( trm.type ) );"),
     ("trace model bool as int", "\tw.WriteBool( trm.isConvex );", "\tw.WriteInt( trm.isConvex ? 1 : 0 );"),

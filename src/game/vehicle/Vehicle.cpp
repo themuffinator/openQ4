@@ -193,7 +193,14 @@ void rvVehicle::Save ( idSaveGame *savefile ) const {
 	
 	savefile->WriteInt( autoCorrectionBegin );
 
-	savefile->Write( &vfl, sizeof( vfl ) );
+	// One bit per flag in declaration order: the bytes a raw copy of the struct wrote.
+	static_assert( sizeof( vfl ) == ( 17 + 7 ) / 8, "flag struct layout changed" );
+	const bool vflBits[] = {
+		vfl.forward, vfl.backward, vfl.left, vfl.right, vfl.driver, vfl.locked, vfl.godmode,
+		vfl.frozen, vfl.disableWeapons, vfl.disableMovement, vfl.scripted, vfl.endWithIdle,
+		vfl.flipEject, vfl.dead, vfl.strafe, vfl.missileWarningOn, vfl.stalled
+	};
+	SaveCodec_WriteFlagBytes( *savefile, vflBits );
 
 	savefile->WriteFloat ( damageStaticChance );
 	
@@ -263,7 +270,25 @@ void rvVehicle::Restore ( idRestoreGame *savefile ) {
 	
 	savefile->ReadInt( (int&)autoCorrectionBegin );
 
-	savefile->Read( &vfl, sizeof( vfl ) );
+	bool vflBits[ 17 ];
+	SaveCodec_ReadFlagBytes( *savefile, vflBits );
+	vfl.forward = vflBits[ 0 ];
+	vfl.backward = vflBits[ 1 ];
+	vfl.left = vflBits[ 2 ];
+	vfl.right = vflBits[ 3 ];
+	vfl.driver = vflBits[ 4 ];
+	vfl.locked = vflBits[ 5 ];
+	vfl.godmode = vflBits[ 6 ];
+	vfl.frozen = vflBits[ 7 ];
+	vfl.disableWeapons = vflBits[ 8 ];
+	vfl.disableMovement = vflBits[ 9 ];
+	vfl.scripted = vflBits[ 10 ];
+	vfl.endWithIdle = vflBits[ 11 ];
+	vfl.flipEject = vflBits[ 12 ];
+	vfl.dead = vflBits[ 13 ];
+	vfl.strafe = vflBits[ 14 ];
+	vfl.missileWarningOn = vflBits[ 15 ];
+	vfl.stalled = vflBits[ 16 ];
 
 	savefile->ReadFloat ( damageStaticChance );
 	

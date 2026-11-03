@@ -98,7 +98,12 @@ rvVehiclePart::Save
 ================
 */
 void rvVehiclePart::Save ( idSaveGame* savefile ) const {
-	savefile->Write( &fl, sizeof( fl ) );
+	// One bit per flag in declaration order: the bytes a raw copy of the struct wrote.
+	static_assert( sizeof( fl ) == ( 5 + 7 ) / 8, "flag struct layout changed" );
+	const bool flBits[] = {
+		fl.active, fl.left, fl.front, fl.useCenterMass, fl.useViewAxis
+	};
+	SaveCodec_WriteFlagBytes( *savefile, flBits );
 
 	savefile->WriteDict ( &spawnArgs );
 	parent.Save ( savefile );
@@ -119,7 +124,13 @@ rvVehiclePart::Restore
 void rvVehiclePart::Restore	( idRestoreGame* savefile ) {
 	int temp;
 	
-	savefile->Read( &fl, sizeof( fl ) );
+	bool flBits[ 5 ];
+	SaveCodec_ReadFlagBytes( *savefile, flBits );
+	fl.active = flBits[ 0 ];
+	fl.left = flBits[ 1 ];
+	fl.front = flBits[ 2 ];
+	fl.useCenterMass = flBits[ 3 ];
+	fl.useViewAxis = flBits[ 4 ];
 
 	savefile->ReadDict ( &spawnArgs );
 	parent.Restore ( savefile );

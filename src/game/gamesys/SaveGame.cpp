@@ -8,7 +8,6 @@
 #include "framework/SaveGameReleases.h"
 #include "framework/SaveDictionaryCache.h"
 #include "framework/SaveUserInterfaceCache.h"
-#include "idlib/SaveCodec.h"
 #include <memory>
 
 static idCVar g_saveDictionaryCache( "g_saveDictionaryCache", "1", CVAR_GAME | CVAR_INTEGER,

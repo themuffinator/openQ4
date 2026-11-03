@@ -1508,8 +1508,9 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   2. **Field codecs.**
      - Write each block whose layout is up to the compiler as explicit
        fixed-width little-endian fields.
-     - Flag bitfields become named 32-bit masks. Trace models, joint modifiers,
-       vehicle path targets and GUI interpolators are written field by field.
+     - Flag bitfields are written one bit per flag in declaration order, packed
+       as before. Trace models, joint modifiers, vehicle path targets and GUI
+       interpolators are written field by field.
      - The path targets' entity pointers restore through the typed reference
        check.
      - Padding and stale script pointer slots are written as zero, so the
@@ -1526,20 +1527,34 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      - joint quaternions and matrices;
      - interpolators, rebuilt through `Init` so no derived cache is saved;
      - vehicle path targets, with the entity reference left to the caller;
-     - flag masks;
+     - flag bitfields;
      - plain int and float arrays.
 
      Both game modules instantiate the codecs with the production types, so a
      renamed or retyped field breaks the build. `save_codec.py` compares
      golden bytes and requires eight source mutations to fail. It passes
      locally with MSVC, Clang on Windows and Linux, and GCC, and the meson
-     test runs it on each CI platform. The writer does not use the codecs
-     yet: switching it changes the save bytes, so it waits for payload
-     version 5 in stage 3. Still to do in this stage:
-     - the bit lists for the seven flag structs;
-     - the GUI window fields and transition interpolators;
-     - the PDA minigame fields;
-     - zeroing the script's pointer slots.
+     test runs it on each CI platform.
+     Second slice, 3 November: the blocks whose bytes need not change now go
+     through explicit fields, with no version change and existing saves
+     restoring unchanged:
+     - the seven flag bitfields;
+     - the joint, articulated-figure pose and pose-frame arrays;
+     - the vehicle joint maps;
+     - the hover-dampening angles;
+     - the GUI window layout fields.
+
+     All seven flag structs are one-bit `bool` fields. MSVC, GCC and Clang
+     pack those identically on little-endian targets, so the plan's 32-bit
+     masks gave way to the packed bits saves already hold. Each list must
+     follow its declaration (`savegame_raw_inventory.py`), and the codec is
+     checked against each compiler's raw layout. Direct raw writes fell from
+     23 to 7 per game tree. Still to do in this stage:
+     - zeroing the script's pointer slots;
+     - the PDA minigame fields.
+
+     Trace models, joint modifiers, path targets and the GUI interpolator
+     change bytes, so they move to stage 3 with payload version 5.
   3. **Wire revision.**
      - Payload version 5 carries a portable wire ABI stamp (`le64-portable1`),
        accepted from any family member.

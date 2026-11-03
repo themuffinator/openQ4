@@ -3519,6 +3519,11 @@ size_t idAnimator::Allocated( void ) const {
 	return size;
 }
 
+// Older saves copied these arrays raw; the explicit fields keep that layout.
+static_assert( sizeof( idJointMat ) == 12 * sizeof( float ), "idJointMat save layout changed" );
+static_assert( sizeof( idJointQuat ) == 8 * sizeof( float ), "idJointQuat save layout changed" );
+static_assert( sizeof( idAFPoseJointMod ) == sizeof( int ) + 12 * sizeof( float ), "idAFPoseJointMod save layout changed" );
+
 /*
 =====================
 idAnimator::Save
@@ -3539,7 +3544,9 @@ void idAnimator::Save( idSaveGame *savefile ) const {
 	}
 	
 	savefile->WriteInt( numJoints );
-	savefile->Write( joints, numJoints * sizeof( joints[0] ) );
+	for( i = 0; i < numJoints; i++ ) {
+		SaveCodec_WriteJointMat( *savefile, joints[ i ] );
+	}
 
 	savefile->WriteInt( lastTransformTime );
 	savefile->WriteBool( stoppedAnimatingUpdate );
@@ -3549,13 +3556,17 @@ void idAnimator::Save( idSaveGame *savefile ) const {
 	savefile->WriteFloat( AFPoseBlendWeight );
 
 	savefile->WriteInt( AFPoseJoints.Num() );
-	savefile->Write( AFPoseJoints.Ptr(), idLib::SizeToInt( AFPoseJoints.MemoryUsed(), "idAnimator::Save" ) );
+	SaveCodec_WriteInts( *savefile, AFPoseJoints.Ptr(), AFPoseJoints.Num() );
 
 	savefile->WriteInt( AFPoseJointMods.Num() );
-	savefile->Write( AFPoseJointMods.Ptr(), idLib::SizeToInt( AFPoseJointMods.MemoryUsed(), "idAnimator::Save" ) );
+	for( i = 0; i < AFPoseJointMods.Num(); i++ ) {
+		SaveCodec_WritePoseJointMod( *savefile, AFPoseJointMods[ i ] );
+	}
 
 	savefile->WriteInt( AFPoseJointFrameSize );
-	savefile->Write( AFPoseJointFrame, AFPoseJointFrameSize * sizeof( AFPoseJointFrame[0] ) );
+	for( i = 0; i < AFPoseJointFrameSize; i++ ) {
+		SaveCodec_WriteJointQuat( *savefile, AFPoseJointFrame[ i ] );
+	}
 
 	savefile->WriteBounds( AFPoseBounds );
 	savefile->WriteInt( AFPoseTime );
@@ -3656,7 +3667,9 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 //amccarthy: Added allocation tag
 	joints = numJoints ? (idJointMat *) Mem_Alloc16( numJoints * sizeof( joints[0] ), MA_ANIM ) : NULL;
 //RAVEN END
-	savefile->Read( joints, numJoints * sizeof( joints[0] ) );
+	for( i = 0; i < numJoints; i++ ) {
+		SaveCodec_ReadJointMat( *savefile, joints[ i ] );
+	}
 
 	savefile->ReadInt( lastTransformTime );
 	savefile->ReadBool( stoppedAnimatingUpdate );
@@ -3671,7 +3684,7 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	}
 	AFPoseJoints.SetGranularity( 1 );
 	AFPoseJoints.SetNum( num );
-	savefile->Read( AFPoseJoints.Ptr(), idLib::SizeToInt( AFPoseJoints.MemoryUsed(), "idAnimator::Restore" ) );
+	SaveCodec_ReadInts( *savefile, AFPoseJoints.Ptr(), AFPoseJoints.Num() );
 
 	savefile->ReadInt( num );
 	if ( num < 0 || num > maxSaveGameAnimatorItems ) {
@@ -3679,14 +3692,18 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	}
 	AFPoseJointMods.SetGranularity( 1 );
 	AFPoseJointMods.SetNum( num );
-	savefile->Read( AFPoseJointMods.Ptr(), idLib::SizeToInt( AFPoseJointMods.MemoryUsed(), "idAnimator::Restore" ) );
+	for( i = 0; i < AFPoseJointMods.Num(); i++ ) {
+		SaveCodec_ReadPoseJointMod( *savefile, AFPoseJointMods[ i ], AF_JOINTMOD_BOTH + 1 );
+	}
 
 	savefile->ReadInt( AFPoseJointFrameSize );
 	if ( AFPoseJointFrameSize < 0 || AFPoseJointFrameSize > maxSaveGameAnimatorItems ) {
 		savefile->Error( "idAnimator::Restore: invalid AF pose joint frame size %d", AFPoseJointFrameSize );
 	}
 	AFPoseJointFrame = AFPoseJointFrameSize ? (idJointQuat *)Mem_Alloc16( AFPoseJointFrameSize * sizeof( AFPoseJointFrame[0] ), MA_ANIM ) : NULL;
-	savefile->Read( AFPoseJointFrame, AFPoseJointFrameSize * sizeof( AFPoseJointFrame[0] ) );
+	for( i = 0; i < AFPoseJointFrameSize; i++ ) {
+		SaveCodec_ReadJointQuat( *savefile, AFPoseJointFrame[ i ] );
+	}
 
 	savefile->ReadBounds( AFPoseBounds );
 	savefile->ReadInt( AFPoseTime );

@@ -763,8 +763,8 @@ void rvVehiclePosition::Save ( idSaveGame* savefile ) const {
 	savefile->WriteVec3 ( mEyeOffset );
 	savefile->WriteMat3( mEyeJointTransform );
 	savefile->WriteAngles( mDeltaEyeAxisScale );
-	savefile->Write ( mEyeJointAxisMap, sizeof mEyeJointAxisMap );
-	savefile->Write ( mEyeJointDirMap, sizeof mEyeJointDirMap );
+	SaveCodec_WriteInts( *savefile, mEyeJointAxisMap, 3 );
+	SaveCodec_WriteInts( *savefile, mEyeJointDirMap, 3 );
 
 	savefile->WriteMat3 ( mAxisOffset );
 
@@ -772,8 +772,8 @@ void rvVehiclePosition::Save ( idSaveGame* savefile ) const {
 	savefile->WriteVec3 ( mDriverOffset );
 	savefile->WriteMat3 ( mDriverJointTransform );
 	savefile->WriteAngles( mDeltaDriverAxisScale );
-	savefile->Write ( mDriverJointAxisMap, sizeof mDriverJointAxisMap );
-	savefile->Write ( mDriverJointDirMap, sizeof mDriverJointDirMap );
+	SaveCodec_WriteInts( *savefile, mDriverJointAxisMap, 3 );
+	SaveCodec_WriteInts( *savefile, mDriverJointDirMap, 3 );
 
 	savefile->WriteVec3 ( mExitPosOffset );
 	savefile->WriteMat3 ( mExitAxisOffset );
@@ -782,7 +782,13 @@ void rvVehiclePosition::Save ( idSaveGame* savefile ) const {
 
 	savefile->WriteString ( mInternalSurface );
 
-	savefile->Write ( &fl, sizeof ( fl ) );
+	// One bit per flag in declaration order: the bytes a raw copy of the struct wrote.
+	static_assert( sizeof( fl ) == ( 7 + 7 ) / 8, "flag struct layout changed" );
+	const bool flBits[] = {
+		fl.inputValid, fl.engine, fl.driverVisible, fl.depthHack, fl.internalView,
+		fl.bindDriver, fl.stalled
+	};
+	SaveCodec_WriteFlagBytes( *savefile, flBits );
 
 	savefile->WriteInt ( mSoundPart );
 	savefile->WriteFloat ( mSoundMaxSpeed );
@@ -865,8 +871,8 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 	savefile->ReadVec3 ( mEyeOffset );
 	savefile->ReadMat3 ( mEyeJointTransform );
 	savefile->ReadAngles( mDeltaEyeAxisScale );
-	savefile->Read( mEyeJointAxisMap, sizeof mEyeJointAxisMap );
-	savefile->Read( mEyeJointDirMap, sizeof mEyeJointDirMap );
+	SaveCodec_ReadInts( *savefile, mEyeJointAxisMap, 3 );
+	SaveCodec_ReadInts( *savefile, mEyeJointDirMap, 3 );
 
 	savefile->ReadMat3 ( mAxisOffset );
 
@@ -874,8 +880,8 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 	savefile->ReadVec3 ( mDriverOffset );
 	savefile->ReadMat3 ( mDriverJointTransform );
 	savefile->ReadAngles( mDeltaDriverAxisScale );
-	savefile->Read( mDriverJointAxisMap, sizeof mDriverJointAxisMap );
-	savefile->Read( mDriverJointDirMap, sizeof mDriverJointDirMap );
+	SaveCodec_ReadInts( *savefile, mDriverJointAxisMap, 3 );
+	SaveCodec_ReadInts( *savefile, mDriverJointDirMap, 3 );
 
 	savefile->ReadVec3 ( mExitPosOffset );
 	savefile->ReadMat3 ( mExitAxisOffset );
@@ -884,7 +890,15 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 
 	savefile->ReadString ( mInternalSurface );
 
-	savefile->Read ( &fl, sizeof(fl) );
+	bool flBits[ 7 ];
+	SaveCodec_ReadFlagBytes( *savefile, flBits );
+	fl.inputValid = flBits[ 0 ];
+	fl.engine = flBits[ 1 ];
+	fl.driverVisible = flBits[ 2 ];
+	fl.depthHack = flBits[ 3 ];
+	fl.internalView = flBits[ 4 ];
+	fl.bindDriver = flBits[ 5 ];
+	fl.stalled = flBits[ 6 ];
 	savefile->ReadInt ( mSoundPart );
 	savefile->ReadFloat ( mSoundMaxSpeed );
 }

@@ -14,12 +14,13 @@
 		w.WriteInt( int )      32-bit two's complement, little-endian
 		w.WriteFloat( float )  IEEE-754 binary32, little-endian
 		w.WriteBool( bool )    one byte, 0 or 1
+		w.WriteByte( byte )    one byte
 
 	idSaveGame, idRestoreGame and idFile already encode these primitives
 	explicitly, so the bytes do not depend on padding, bitfield allocation,
 	enum width or pointer width. Readers provide the matching ReadInt,
-	ReadFloat and ReadBool, plus Error( fmt, ... ), which must not return.
-	Counts are checked before they are used.
+	ReadFloat, ReadBool and ReadByte, plus Error( fmt, ... ), which must not
+	return. Counts are checked before they are used.
 
 	The field orders below are a save format. Changing one is a payload
 	version change; tools/tests/save_codec.py pins every order in golden
@@ -106,33 +107,37 @@ void SaveCodec_ReadFloats( reader &r, float *values, int count ) {
 
 /*
 ================
-SaveCodec_WriteFlags
+SaveCodec_WriteFlagBytes
 
-A flag bitfield as a 32-bit mask: bit i holds the i-th listed flag. The list
-is the format; a reader rejects bits beyond it.
+A struct of one-bit bool fields as its listed flags: flag i in bit i % 8 of
+byte i / 8, low bit first, in ( count + 7 ) / 8 bytes. MSVC, GCC and Clang all
+lay such a struct out this way on little-endian targets, so these are the
+bytes a raw copy of the struct wrote, with the unused bits cleared. The list
+is the format and must follow the declaration order.
+
+Readers ignore the bits beyond the list, because older saves copied whatever
+those bits held.
 ================
 */
 template< class writer, int count >
-void SaveCodec_WriteFlags( writer &w, const bool ( &flags )[ count ] ) {
-	static_assert( count > 0 && count <= 32, "SaveCodec flag masks hold 1 to 32 flags" );
-	unsigned int mask = 0;
-	for ( int i = 0; i < count; i++ ) {
-		mask |= ( flags[ i ] ? 1u : 0u ) << i;
+void SaveCodec_WriteFlagBytes( writer &w, const bool ( &flags )[ count ] ) {
+	for ( int base = 0; base < count; base += 8 ) {
+		unsigned char value = 0;
+		for ( int i = base; i < count && i < base + 8; i++ ) {
+			value = static_cast<unsigned char>( value | ( ( flags[ i ] ? 1u : 0u ) << ( i - base ) ) );
+		}
+		w.WriteByte( value );
 	}
-	w.WriteInt( static_cast<int>( mask ) );
 }
 
 template< class reader, int count >
-void SaveCodec_ReadFlags( reader &r, bool ( &flags )[ count ], const char *context ) {
-	static_assert( count > 0 && count <= 32, "SaveCodec flag masks hold 1 to 32 flags" );
-	int value;
-	r.ReadInt( value );
-	const unsigned int mask = static_cast<unsigned int>( value );
-	if ( count < 32 && ( mask >> count ) != 0 ) {
-		r.Error( "%s: flag mask 0x%08x sets bits beyond its %d flags", context, mask, count );
-	}
-	for ( int i = 0; i < count; i++ ) {
-		flags[ i ] = ( ( mask >> i ) & 1u ) != 0;
+void SaveCodec_ReadFlagBytes( reader &r, bool ( &flags )[ count ] ) {
+	for ( int base = 0; base < count; base += 8 ) {
+		unsigned char value;
+		r.ReadByte( value );
+		for ( int i = base; i < count && i < base + 8; i++ ) {
+			flags[ i ] = ( ( value >> ( i - base ) ) & 1u ) != 0;
+		}
 	}
 }
 

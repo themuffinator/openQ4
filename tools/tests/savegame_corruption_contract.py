@@ -1329,8 +1329,12 @@ def validate_minigame_restore_contract() -> None:
             "common->Error( \"%s: refusing non-finite %s\"",
             "common->DPrintf( \"%s: zeroing non-finite %s at offset %d\\n\"",
             "value = 0.0f;",
-            "static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const type &value, const char *context, const char *fieldName )",
-            "static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, type &value, const char *context, const char *fieldName )",
+            # Layout fields are typed (Q4-06); an untyped field does not compile.
+            "static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, float value, const char *context, const char *fieldName )",
+            "static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idRectangle &value, const char *context, const char *fieldName )",
+            "bool OpenQ4_WriteSaveGameField( idFile *savefile, const type &value, const char *context, const char *fieldName ) = delete;",
+            "bool OpenQ4_ReadSaveGameField( idFile *savefile, type &value, const char *context, const char *fieldName ) = delete;",
+            "static ID_INLINE bool OpenQ4_ReadSaveGameRawField( idFile *savefile, type &value, const char *context, const char *fieldName )",
             "common->Error( \"%s: truncated %s at offset %d (read %d of %d)\"",
             "OpenQ4_ReadSaveGameBool( savefile, eval, \"idWinBool::ReadFromSaveGame\", \"eval flag\" )",
             "OpenQ4_ReadSaveGameBool( savefile, data, \"idWinBool::ReadFromSaveGame\", \"value\" )",
@@ -1342,7 +1346,7 @@ def validate_minigame_restore_contract() -> None:
         "src/ui/Window.cpp": (
             "OpenQ4_ReadSaveGameInt( savefile, offset, \"idWindow::ReadSaveGameTransition\", \"offset\" )",
             "Window_ReadSaveGameTransitionInterpolate( savefile, trans.interp )",
-            "OpenQ4_ReadSaveGameField( savefile, interp, \"idWindow::ReadSaveGameTransition\", \"interpolate state\" )",
+            "OpenQ4_ReadSaveGameRawField( savefile, interp, \"idWindow::ReadSaveGameTransition\", \"interpolate state\" )",
             "openQ4SaveGameLegacyInterpolate_t<idVec4> saved;",
             "OpenQ4_SaveGameHasInterpolatorCacheFlag( OpenQ4_SaveGameRestoreLayoutBuild( savefile ) )",
             "OpenQ4_ReadSaveGameBytes( savefile, &string[0], len, \"idWindow::ReadSaveGameString\", \"string\" )",

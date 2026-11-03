@@ -19,6 +19,10 @@ listed below with a class:
 
 A new, removed or recounted raw call fails until this table is updated, so a change
 to the save format is always reviewed. The SP and MP trees must stay identical.
+
+Blocks already converted to explicit fields (stage 2) leave the table. The flag
+bitfields among them keep their old bytes only while each saved flag list follows
+its struct's declaration order, so FLAG_LISTS checks that order as well.
 """
 from __future__ import annotations
 
@@ -29,7 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 RAW = re.compile(r"\b(?:savefile|saveFile)\s*->\s*(?:Write|Read)\s*\(")
-HELPER = re.compile(r"\bOpenQ4_(?:Write|Read)SaveGame(?:Field|Bytes)\s*\(")
+HELPER = re.compile(r"\bOpenQ4_(?:Write|Read)SaveGame(?:RawField|Bytes)\s*\(")
 # Script globals are copied one byte at a time from the program's variable block.
 SCRIPT_BYTES = re.compile(r"\bsavefile\s*->\s*(?:Write|Read)Byte\s*\(\s*variables\s*\[")
 
@@ -50,44 +54,21 @@ def flag(name: str, receiver: str = "savefile") -> list[str]:
 
 # Relative path -> class -> calls. A call listed twice must occur twice.
 GAME: dict[str, dict[str, list[str]]] = {
-    "BrittleFracture.cpp": {"bitfield": flag("fl")},
+    # The flag bitfields and LE-scalar blocks were converted to explicit fields
+    # with unchanged bytes (Q4-06 stage 2); FLAG_LISTS below pins their order.
     "SecurityCamera.cpp": {"aggregate": [W("&trm,sizeof(trm)"), R("&trm,sizeof(trm)")]},
-    "ai/Monster_ConvoyHover.cpp": {
-        "bitfield": flag("myfl"),
-        "le-scalars": [W("hoverDampening,sizeof(idAngles)*DAMPEN_ANGLE_SAMPLES"),
-                       R("hoverDampening,sizeof(idAngles)*DAMPEN_ANGLE_SAMPLES")],
-    },
     "anim/Anim_Blend.cpp": {
         "aggregate": [W("jointMods[i],sizeof(*jointMods[i])"), R("&jointMod,sizeof(jointMod)")],
-        "le-scalars": [
-            W("joints,numJoints*sizeof(joints[0])"), R("joints,numJoints*sizeof(joints[0])"),
-            W('AFPoseJoints.Ptr(),idLib::SizeToInt(AFPoseJoints.MemoryUsed(),"idAnimator::Save")'),
-            R('AFPoseJoints.Ptr(),idLib::SizeToInt(AFPoseJoints.MemoryUsed(),"idAnimator::Restore")'),
-            W('AFPoseJointMods.Ptr(),idLib::SizeToInt(AFPoseJointMods.MemoryUsed(),"idAnimator::Save")'),
-            R('AFPoseJointMods.Ptr(),idLib::SizeToInt(AFPoseJointMods.MemoryUsed(),"idAnimator::Restore")'),
-            W("AFPoseJointFrame,AFPoseJointFrameSize*sizeof(AFPoseJointFrame[0])"),
-            R("AFPoseJointFrame,AFPoseJointFrameSize*sizeof(AFPoseJointFrame[0])"),
-        ],
         "legacy-reader": [R("&saved,sizeof(saved)")],
     },
     "physics/Clip.cpp": {"aggregate": [W("&entry->trm,sizeof(entry->trm)"), R("&entry->trm,sizeof(entry->trm)")]},
-    # The constraint and body flag structs share the expression `fl`.
-    "physics/Physics_AF.cpp": {"bitfield": flag("fl", "saveFile") * 2},
     "script/Script_Interpreter.cpp": {"script-storage": [W("&localstack,localstackUsed"), R("localstack,localstackUsed")]},
     "script/Script_Program.cpp": {
         "script-storage": [W("data,savedSize"), R("data,savedSize"),
                            "savefile->WriteByte(variables[", "savefile->WriteByte(variables[",
                            "savefile->ReadByte(variables[", "savefile->ReadByte(variables["],
     },
-    "vehicle/Vehicle.cpp": {"bitfield": flag("vfl")},
     "vehicle/VehicleDriver.cpp": {"aggregate": flag("pathTargetInfo") + flag("lastPathTargetInfo")},
-    "vehicle/VehicleParts.cpp": {"bitfield": flag("fl")},
-    "vehicle/VehiclePosition.cpp": {
-        "bitfield": [W("&fl,sizeof(fl)"), R("&fl,sizeof(fl)")],
-        "le-scalars": [f"savefile->{op}({name},sizeof{name})"
-                       for name in ("mEyeJointAxisMap", "mEyeJointDirMap", "mDriverJointAxisMap", "mDriverJointDirMap")
-                       for op in ("Write", "Read")],
-    },
     # Historical decoders only; the current writer saves these through typed fields.
     "Entity.cpp": {"legacy-reader": [R("&fl,sizeof(fl)")]},
     "Mover.cpp": {"legacy-reader": [R("&move,sizeof(move)"), R("&rot,sizeof(rot)")]},
@@ -110,46 +91,31 @@ GAME: dict[str, dict[str, list[str]]] = {
 # `sizeof(&waistJoint)` above is written `sizeof(waistJoint)` in the source.
 GAME["IK.cpp"]["legacy-reader"][0] = R("&waistJoint,sizeof(waistJoint)")
 
-# Direct raw writes per game tree. Q4-06 stage 2 drives this to zero.
-GAME_DIRECT_WRITES = 23
+# Direct raw writes per game tree. Q4-06 drives this to zero; the remaining
+# aggregates and script storage change bytes, so they wait for payload v5.
+GAME_DIRECT_WRITES = 7
 
 
 def field(op: str, name: str, context: str, label: str) -> str:
-    return f'OpenQ4_{op}SaveGameField(savefile,{name},"{context}","{label}")'
+    return f'OpenQ4_{op}SaveGameRawField(savefile,{name},"{context}","{label}")'
 
 
-def window_fields(context_write: str, context_read: str, names: list[tuple[str, str, str]]) -> list[str]:
-    calls = []
-    for written, read, label in names:
-        calls.append(field("Write", written, context_write, label))
-        calls.append(field("Read", read, context_read, label))
-    return calls
-
-
-WINDOW_SCALARS = [
-    ("actualX", "savedActualX", "actualX"), ("actualY", "savedActualY", "actualY"),
-    ("borderSize", "savedBorderSize", "bordersize"), ("childID", "savedChildID", "childID"),
-    ("clientRect", "savedClientRect", "clientrect"), ("cursor", "savedCursor", "cursor"),
-    ("drawRect", "savedDrawRect", "drawrect"), ("flags", "savedFlags", "flags"),
-    ("fontNum", "savedFontNum", "fontnumber"), ("forceAspectHeight", "savedForceAspectHeight", "forceaspectheight"),
-    ("forceAspectWidth", "savedForceAspectWidth", "forceaspectwidth"), ("lastTimeRun", "savedLastTimeRun", "lasttimerun"),
-    ("matScalex", "savedMatScaleX", "materialscalex"), ("matScaley", "savedMatScaleY", "materialscaley"),
-    ("origin", "savedOrigin", "origin"), ("savedTextSpacing", "savedTextSpacing", "textspacing"),
-    ("savedTextStyle", "savedTextStyle", "textstyle"), ("shear", "savedShear", "shear"),
-    ("textAlign", "savedTextAlign", "textalign"), ("textAlignx", "savedTextAlignX", "textalignx"),
-    ("textAligny", "savedTextAlignY", "textaligny"), ("textRect", "savedTextRect", "textrect"),
-    ("textShadow", "savedTextShadow", "textshadow"), ("timeLine", "savedTimeLine", "timeline"),
-    ("xOffset", "savedXOffset", "xoffset"), ("yOffset", "savedYOffset", "yoffset"),
-]
-SIMPLE_SCALARS = [
-    ("borderSize", "savedBorderSize", "bordersize"), ("clientRect", "savedClientRect", "clientrect"),
-    ("drawRect", "savedDrawRect", "drawrect"), ("flags", "savedFlags", "flags"),
-    ("fontNum", "savedFontNum", "fontnumber"), ("matScalex", "savedMatScaleX", "materialscalex"),
-    ("matScaley", "savedMatScaleY", "materialscaley"), ("origin", "savedOrigin", "origin"),
-    ("textAlign", "savedTextAlign", "textalign"), ("textAlignx", "savedTextAlignX", "textalignx"),
-    ("textAligny", "savedTextAlignY", "textaligny"), ("textRect", "savedTextRect", "textrect"),
-    ("textShadow", "savedTextShadow", "textshadow"), ("textSpacing", "savedTextSpacing", "textspacing"),
-    ("textStyle", "savedTextStyle", "textstyle"),
+# Flag bitfields written one bit per flag (SaveCodec_WriteFlagBytes). Each list
+# in the save and restore code must follow its struct's declaration order, or
+# the bytes would move: (source, save function, restore function, struct
+# source, declaration marker, member).
+FLAG_LISTS = [
+    ("Entity.cpp", "idEntity::WriteFlagBytes(", "idEntity::ReadFlagBytes(", "Entity.h", "struct entityFlags_s", "fl"),
+    ("physics/Physics_AF.cpp", "idAFConstraint::Save(", "idAFConstraint::Restore(", "physics/Physics_AF.h",
+     "struct constraintFlags_s", "fl"),
+    ("physics/Physics_AF.cpp", "idAFBody::Save(", "idAFBody::Restore(", "physics/Physics_AF.h", "struct bodyFlags_s", "fl"),
+    ("vehicle/Vehicle.cpp", "rvVehicle::Save (", "rvVehicle::Restore (", "vehicle/Vehicle.h", "struct vehicleFlags_s", "vfl"),
+    ("vehicle/VehiclePosition.cpp", "rvVehiclePosition::Save (", "rvVehiclePosition::Restore (", "vehicle/Vehicle.h",
+     "struct positionFlags_s", "fl"),
+    ("vehicle/VehicleParts.cpp", "rvVehiclePart::Save (", "rvVehiclePart::Restore\t(", "vehicle/VehicleParts.h",
+     "typedef struct partFlags_s", "fl"),
+    ("ai/Monster_ConvoyHover.cpp", "rvMonsterConvoyHover::Save (", "rvMonsterConvoyHover::Restore (",
+     "ai/Monster_ConvoyHover.cpp", "struct {", "myfl"),
 ]
 
 
@@ -158,8 +124,9 @@ def minigame(names: list[str], extra: list[str] | None = None) -> list[str]:
 
 
 UI: dict[str, dict[str, list[str]]] = {
+    # Window layout fields go through the typed OpenQ4_*SaveGameField overloads
+    # (same bytes as the raw copy); only the transition interpolator is raw.
     "Window.cpp": {
-        "le-scalars": window_fields("idWindow::WriteToSaveGame", "idWindow::ReadFromSaveGame", WINDOW_SCALARS),
         "aggregate": [field("Write", "trans.interp", "idWindow::WriteSaveGameTransition", "interpolatestate"),
                       field("Read", "interp", "idWindow::ReadSaveGameTransition", "interpolatestate"),
                       field("Read", "saved", "idWindow::ReadSaveGameTransition", "interpolatestate")],
@@ -167,15 +134,14 @@ UI: dict[str, dict[str, list[str]]] = {
                   'OpenQ4_ReadSaveGameBytes(savefile,&string[0],len,"idWindow::ReadSaveGameString","string")'],
     },
     "SimpleWindow.cpp": {
-        "le-scalars": window_fields("idSimpleWindow::WriteToSaveGame", "idSimpleWindow::ReadFromSaveGame", SIMPLE_SCALARS),
-        "bytes": ['OpenQ4_WriteSaveGameBytes(savefile,background->GetName(),stringLen,"idSimpleWindow::WriteToSaveGame","backgroundname")',
+        "bytes":['OpenQ4_WriteSaveGameBytes(savefile,background->GetName(),stringLen,"idSimpleWindow::WriteToSaveGame","backgroundname")',
                   'OpenQ4_ReadSaveGameBytes(savefile,&(backName)[0],stringLen,"idSimpleWindow::ReadFromSaveGame","backgroundname")'],
     },
     "Winvar.h": {
         "helper": ["OpenQ4_WriteSaveGameBytes(idFile*savefile,constvoid*buffer,intlen,constchar*context,constchar*fieldName)",
                    "OpenQ4_ReadSaveGameBytes(idFile*savefile,void*buffer,intlen,constchar*context,constchar*fieldName)",
-                   "OpenQ4_WriteSaveGameField(idFile*savefile,consttype&value,constchar*context,constchar*fieldName)",
-                   "OpenQ4_ReadSaveGameField(idFile*savefile,type&value,constchar*context,constchar*fieldName)",
+                   "OpenQ4_WriteSaveGameRawField(idFile*savefile,consttype&value,constchar*context,constchar*fieldName)",
+                   "OpenQ4_ReadSaveGameRawField(idFile*savefile,type&value,constchar*context,constchar*fieldName)",
                    "OpenQ4_WriteSaveGameBytes(savefile,&value,sizeof(value),context,fieldName)",
                    "OpenQ4_ReadSaveGameBytes(savefile,&value,sizeof(value),context,fieldName)",
                    W("buffer,len"), R("buffer,len")],
@@ -280,6 +246,35 @@ def validate_script_slot_widths() -> None:
             raise AssertionError(f"script type '{name}' no longer has size {size}; reclassify script storage")
 
 
+def body_after(text: str, marker: str) -> str:
+    start = text.index(marker)
+    return text[start:text.index("\n}", start)]
+
+
+def validate_flag_lists(tree: str) -> list[str]:
+    problems = []
+    for source, save, restore, header, marker, member in FLAG_LISTS:
+        text = (ROOT / "src" / tree / source).read_text(encoding="latin-1")
+        declared_text = (ROOT / "src" / tree / header).read_text(encoding="latin-1")
+        if marker == "struct {":
+            block = re.search(r"struct\s*\{([^}]*)\}\s*" + member + r"\s*;", declared_text).group(1)
+        else:
+            start = declared_text.index(marker)
+            block = declared_text[start:declared_text.index("}", start)]
+        declared = re.findall(r"\bbool\s+(\w+)\s*:\s*1\s*;", block)
+        saved_list = re.search(member + r"Bits\[\]\s*=\s*\{(.*?)\};", body_after(text, save), re.S)
+        saved = re.findall(re.escape(member) + r"\.(\w+)", saved_list.group(1)) if saved_list else []
+        restored = sorted((int(index), name) for name, index in re.findall(
+            re.escape(member) + r"\.(\w+)\s*=\s*" + re.escape(member) + r"Bits\[\s*(\d+)\s*\]", body_after(text, restore)))
+        if not declared or saved != declared or [name for _, name in restored] != declared or \
+                [index for index, _ in restored] != list(range(len(declared))):
+            problems.append(f"src/{tree}/{source}: {member} flag list does not follow {marker} in {header} "
+                            f"(declared {declared}, saved {saved}, restored {[n for _, n in restored]})")
+        if f"static_assert( sizeof( {member} ) == ( {len(declared)} + 7 ) / 8" not in body_after(text, save):
+            problems.append(f"src/{tree}/{source}: {save} lacks the {member} layout assertion")
+    return problems
+
+
 def self_test() -> None:
     sample = "void f(idSaveGame *savefile){ savefile->Write( &newBlock, sizeof( newBlock ) ); savefile->WriteInt( x ); }"
     found = calls_in(sample)
@@ -294,6 +289,7 @@ def main() -> None:
     problems = []
     for tree in ("game", "mpgame"):
         problems += compare(f"src/{tree}", scan(ROOT / "src" / tree), GAME)
+        problems += validate_flag_lists(tree)
     problems += compare("src/ui", scan(ROOT / "src" / "ui"), UI)
     writes = sum(1 for classes in GAME.values() for name, calls in classes.items() if name != "legacy-reader"
                  for call in calls if "->Write(" in call)

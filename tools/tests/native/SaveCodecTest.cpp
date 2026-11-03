@@ -63,6 +63,7 @@ public:
 	void WriteInt( int value ) { Put( static_cast<std::uint32_t>( value ) ); }
 	void WriteFloat( float value ) { std::uint32_t bits; std::memcpy( &bits, &value, 4 ); Put( bits ); }
 	void WriteBool( bool value ) { bytes.push_back( value ? 1 : 0 ); }
+	void WriteByte( unsigned char value ) { bytes.push_back( value ); }
 private:
 	void Put( std::uint32_t value ) {
 		for ( int i = 0; i < 4; i++ ) {
@@ -84,6 +85,7 @@ public:
 		}
 		value = raw != 0;
 	}
+	void ReadByte( unsigned char &value ) { Need( 1 ); value = bytes[ offset++ ]; }
 	[[noreturn]] void Error( const char *fmt, ... ) { throw std::runtime_error( fmt ); }
 	bool Finished() const { return offset == bytes.size(); }
 private:
@@ -221,23 +223,56 @@ static void TestPrimitives() {
 	Golden( "primitives", writer, "04030201feffffff0000803f000000bf0100" );
 }
 
+// The game's flag structs are one-bit bool fields. These two mirror the
+// smallest and the 17-flag vehicle layout; the test compares this compiler's
+// raw bytes with the codec's, which is what keeps converted saves unchanged.
+struct Flags5 { bool a : 1; bool b : 1; bool c : 1; bool d : 1; bool e : 1; };
+struct Flags17 {
+	bool f0 : 1; bool f1 : 1; bool f2 : 1; bool f3 : 1; bool f4 : 1; bool f5 : 1; bool f6 : 1; bool f7 : 1;
+	bool f8 : 1; bool f9 : 1; bool f10 : 1; bool f11 : 1; bool f12 : 1; bool f13 : 1; bool f14 : 1; bool f15 : 1;
+	bool f16 : 1;
+};
+
+static std::vector<unsigned char> RawBytes( const void *data, size_t size ) {
+	const unsigned char *bytes = static_cast<const unsigned char *>( data );
+	return std::vector<unsigned char>( bytes, bytes + size );
+}
+
 static void TestFlags() {
 	Writer writer;
 	const bool flags[ 5 ] = { true, false, true, true, false };
-	SaveCodec_WriteFlags( writer, flags );
-	Golden( "flags", writer, "0d000000" );
+	SaveCodec_WriteFlagBytes( writer, flags );
+	Golden( "flags", writer, "0d" );
 	Reader reader( writer.bytes );
 	bool decoded[ 5 ];
-	SaveCodec_ReadFlags( reader, decoded, "flags" );
+	SaveCodec_ReadFlagBytes( reader, decoded );
 	Check( std::memcmp( decoded, flags, sizeof( flags ) ) == 0 && reader.Finished(), "flags round trip" );
-	Rejects( "flag bits beyond the list", Bytes( "2d000000" ), []( Reader &r ) { bool f[ 5 ]; SaveCodec_ReadFlags( r, f, "flags" ); } );
-	Writer full;
-	bool all[ 32 ];
-	for ( bool &flag : all ) {
-		flag = true;
+
+	// Old saves copied the unused bits as they were; readers ignore them.
+	const std::vector<unsigned char> dirtyBytes = Bytes( "ed" );
+	Reader dirty( dirtyBytes );
+	SaveCodec_ReadFlagBytes( dirty, decoded );
+	Check( std::memcmp( decoded, flags, sizeof( flags ) ) == 0, "flag bits beyond the list are ignored" );
+
+	Flags5 raw5 = {};
+	raw5.a = true; raw5.c = true; raw5.d = true;
+	Check( sizeof( Flags5 ) == 1 && RawBytes( &raw5, sizeof( raw5 ) ) == writer.bytes, "5-flag struct layout matches the codec" );
+
+	bool vehicle[ 17 ];
+	for ( int i = 0; i < 17; i++ ) {
+		vehicle[ i ] = ( i % 3 ) == 0 || i == 16;
 	}
-	SaveCodec_WriteFlags( full, all );
-	Golden( "32 flags", full, "ffffffff" );
+	Writer vehicleWriter;
+	SaveCodec_WriteFlagBytes( vehicleWriter, vehicle );
+	Golden( "17 flags", vehicleWriter, "4992" "01" );
+	Flags17 raw17 = {};
+	raw17.f0 = raw17.f3 = raw17.f6 = raw17.f9 = raw17.f12 = raw17.f15 = raw17.f16 = true;
+	Check( sizeof( Flags17 ) == 3 && RawBytes( &raw17, sizeof( raw17 ) ) == vehicleWriter.bytes, "17-flag struct layout matches the codec" );
+	Reader vehicleReader( vehicleWriter.bytes );
+	bool vehicleDecoded[ 17 ];
+	SaveCodec_ReadFlagBytes( vehicleReader, vehicleDecoded );
+	Check( std::memcmp( vehicleDecoded, vehicle, sizeof( vehicle ) ) == 0 && vehicleReader.Finished(), "17 flags round trip" );
+	Rejects( "truncated flags", Bytes( "4992" ), []( Reader &r ) { bool f[ 17 ]; SaveCodec_ReadFlagBytes( r, f ); } );
 }
 
 static TraceModel SampleTraceModel() {

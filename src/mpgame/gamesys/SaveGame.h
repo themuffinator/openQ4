@@ -3,6 +3,7 @@
 #define __SAVEGAME_H__
 
 #include <memory>
+#include "idlib/SaveCodec.h"
 class SaveUserInterfaceCache;
 
 /*

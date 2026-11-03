@@ -740,6 +740,57 @@ idEntity::~idEntity( void ) {
 
 /*
 ================
+idEntity::WriteFlagBytes
+
+The entity flags as the bytes a raw copy of the struct wrote: one bit per flag
+in declaration order (SaveCodec_WriteFlagBytes).
+================
+*/
+void idEntity::WriteFlagBytes( idSaveGame *savefile ) const {
+	// One bit per flag in declaration order: the bytes a raw copy of the struct wrote.
+	static_assert( sizeof( fl ) == ( 20 + 7 ) / 8, "flag struct layout changed" );
+	const bool flBits[] = {
+		fl.notarget, fl.noknockback, fl.takedamage, fl.hidden, fl.bindOrientated,
+		fl.solidForTeam, fl.forcePhysicsUpdate, fl.selected, fl.neverDormant, fl.isDormant,
+		fl.hasAwakened, fl.networkSync, fl.networkStale, fl.triggerAnim, fl.usable,
+		fl.isAIObstacle, fl.persistAcrossInstances, fl.exitedVehicle, fl.allowAutoBlink,
+		fl.quickBurn
+	};
+	SaveCodec_WriteFlagBytes( *savefile, flBits );
+}
+
+/*
+================
+idEntity::ReadFlagBytes
+================
+*/
+void idEntity::ReadFlagBytes( idRestoreGame *savefile ) {
+	bool flBits[ 20 ];
+	SaveCodec_ReadFlagBytes( *savefile, flBits );
+	fl.notarget = flBits[ 0 ];
+	fl.noknockback = flBits[ 1 ];
+	fl.takedamage = flBits[ 2 ];
+	fl.hidden = flBits[ 3 ];
+	fl.bindOrientated = flBits[ 4 ];
+	fl.solidForTeam = flBits[ 5 ];
+	fl.forcePhysicsUpdate = flBits[ 6 ];
+	fl.selected = flBits[ 7 ];
+	fl.neverDormant = flBits[ 8 ];
+	fl.isDormant = flBits[ 9 ];
+	fl.hasAwakened = flBits[ 10 ];
+	fl.networkSync = flBits[ 11 ];
+	fl.networkStale = flBits[ 12 ];
+	fl.triggerAnim = flBits[ 13 ];
+	fl.usable = flBits[ 14 ];
+	fl.isAIObstacle = flBits[ 15 ];
+	fl.persistAcrossInstances = flBits[ 16 ];
+	fl.exitedVehicle = flBits[ 17 ];
+	fl.allowAutoBlink = flBits[ 18 ];
+	fl.quickBurn = flBits[ 19 ];
+}
+
+/*
+================
 idEntity::Save
 ================
 */
