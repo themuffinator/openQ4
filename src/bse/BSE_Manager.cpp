@@ -319,7 +319,7 @@ bool rvBSEManagerLocal::ServiceEffect(class rvRenderEffectLocal* def, float owne
 	const idBounds currentLocalBounds = def->effect->GetCurrentLocalBounds();
 	def->referenceBounds = currentLocalBounds;
 	if (bse_speeds.GetBool())
-		++rvBSEManagerLocal::mPerfCounters[0];
+		++rvBSEManagerLocal::mPerfCounters[PERF_NUM_BSE];
 	if (bse_debug.GetInteger())
 		def->effect->EvaluateCost();
 
@@ -432,11 +432,9 @@ void rvBSEManagerLocal::StartFrame(void) {
 
 	if (bse_speeds.GetInteger())
 	{
-		rvBSEManagerLocal::mPerfCounters[0] = 0;
-		rvBSEManagerLocal::mPerfCounters[1] = 0;
-		rvBSEManagerLocal::mPerfCounters[2] = 0;
-		rvBSEManagerLocal::mPerfCounters[3] = 0;
-		rvBSEManagerLocal::mPerfCounters[4] = 0;
+		for (int i = 0; i < NUM_PERF_COUNTERS; ++i) {
+			rvBSEManagerLocal::mPerfCounters[i] = 0;
+		}
 	}
 }
 
@@ -450,11 +448,13 @@ void rvBSEManagerLocal::EndFrame(void) {
 	}
 
 	if (bse_speeds.GetInteger()) {
-		common->Printf("bse_active: %i particles: %i traces: %i texels: %g\n",
-			rvBSEManagerLocal::mPerfCounters[0],
-			rvBSEManagerLocal::mPerfCounters[2],
-			rvBSEManagerLocal::mPerfCounters[1],
-			(double)rvBSEManagerLocal::mPerfCounters[3] * 0.00000095367431640625);
+		// Active particle units include individual electricity bolts. Texel
+		// coverage is not measured; do not report a misleading constant zero.
+		common->Printf("bse_active: %i particles: %i traces: %i segments: %i\n",
+			rvBSEManagerLocal::mPerfCounters[PERF_NUM_BSE],
+			rvBSEManagerLocal::mPerfCounters[PERF_NUM_PARTICLES],
+			rvBSEManagerLocal::mPerfCounters[PERF_NUM_TRACES],
+			rvBSEManagerLocal::mPerfCounters[PERF_NUM_SEGMENTS]);
 	}
 }
 

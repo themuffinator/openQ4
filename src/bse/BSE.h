@@ -49,6 +49,8 @@ enum eBSEPerfCounter
 	NUM_PERF_COUNTERS
 };
 
+extern idCVar bse_speeds;
+
 enum eBSESegment
 {
 	SEG_NONE = 0,
@@ -586,6 +588,12 @@ class rvRenderEffectLocal;
 class rvBSEManagerLocal : public rvBSEManager
 {
 public:
+	static void AddPerfCounter(eBSEPerfCounter counter, int count = 1) {
+		if (bse_speeds.GetBool() && count > 0) {
+			mPerfCounters[counter] += count;
+		}
+	}
+
 	virtual	bool				Init(void);
 	virtual	bool				Shutdown(void);
 

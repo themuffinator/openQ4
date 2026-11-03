@@ -254,6 +254,7 @@ private:
 	idFile *				file;
 
 	idList<idClass *>		objects;
+	idList<idClass *>		postRestoreObjects;	// embedded objects, never serialized as event targets
 	idHashIndex				objectHash;
 	bool					ownsObjects;
 	idRestoreGame *			previousRestore;

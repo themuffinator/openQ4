@@ -1511,6 +1511,11 @@ void idRestoreGame::ObjectDestroyed( const idClass *object ) {
 	// the restore list. Retire every such pointer before cleanup can visit it.
 	const int key = SaveGame_ObjectHashKey( object );
 	for ( idRestoreGame *restore = activeRestore; restore != NULL; restore = restore->previousRestore ) {
+		for ( int i = 0; i < restore->postRestoreObjects.Num(); ++i ) {
+			if ( restore->postRestoreObjects[i] == object ) {
+				restore->postRestoreObjects[i] = NULL;
+			}
+		}
 		for ( int index = restore->objectHash.First( key ); index >= 0; index = restore->objectHash.Next( index ) ) {
 			if ( index < restore->objects.Num() && restore->objects[index] == object ) {
 				restore->objects[index] = NULL;
@@ -1533,6 +1538,7 @@ void idRestoreGame::ReleaseObjects( void ) {
 	ownsObjects = false;
 	objectHash.Clear();
 	objects.Clear();
+	postRestoreObjects.Clear();
 }
 
 void idRestoreGame::PrepareMapShutdown( void ) {
@@ -1670,6 +1676,16 @@ void idRestoreGame::RestoreObjects( void ) {
 			static_cast<rvClientEntity *>( objects[i] )->ValidateRestoredBinding( this );
 		}
 	}
+
+	// Embedded physics/force objects have no saved object-table index. Complete
+	// their fixups only after every forward reference and graph has been read
+	// and validated, without putting unsaveable targets on the gameplay queue.
+	for ( i = 0; i < postRestoreObjects.Num(); ++i ) {
+		if ( postRestoreObjects[i] != NULL ) {
+			postRestoreObjects[i]->ProcessEvent( &EV_PostRestore );
+		}
+	}
+	postRestoreObjects.Clear();
 
 	// regenerate render entities and render lights because are not saved
 	for( i = 1; i < objects.Num(); i++ ) {
@@ -2100,7 +2116,7 @@ void idRestoreGame::ReadStaticObject( idClass &obj ) {
 	CallRestore_r( obj.GetType(), &obj );
 
 // RAVEN BEGIN
-	obj.PostEventMS( &EV_PostRestore, 0 );
+	postRestoreObjects.Append( &obj );
 // RAVEN END
 }
 
@@ -2939,12 +2955,15 @@ void idRestoreGame::ReadClipModel( idClipModel *&clipModel ) {
 	bool restoreClipModel;
 
 	ReadBool( restoreClipModel );
+	std::unique_ptr<idClipModel> restored;
 	if ( restoreClipModel ) {
-		clipModel = new idClipModel();
-		clipModel->Restore( this );
-	} else {
-		clipModel = NULL;
+		restored.reset( new idClipModel() );
+		restored->Restore( this );
 	}
+	// Keep the previous owned model until the entire replacement is valid.
+	// A failed read releases the temporary, including any trace-cache reference.
+	delete clipModel;
+	clipModel = restored.release();
 }
 
 /*

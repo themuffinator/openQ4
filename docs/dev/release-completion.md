@@ -6,6 +6,31 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Immediate resaves and interrupted loads, 3 November 2026
+
+- **Saving immediately after loading now produces a loadable save.** This also
+  protects a checkpoint queued behind a load. Previously, saving before gameplay
+  resumed could leave the new slot unable to load. Already-damaged slots are not
+  repaired; load a healthy slot and save again.
+- **Interrupted loads clean up more reliably.** Partially read inventory items,
+  collision models and collision-cache records are released, and an unfinished
+  list of collision models no longer exposes unset pointers during cleanup.
+- The save format and existing compatibility readers are unchanged. The new
+  failure-path tests pass for both game libraries on Windows and Linux, including
+  deliberate regressions. All 50 focused Windows save/restore tests pass, and
+  immediate resaves reload into gameplay on OpenGL and Vulkan. See
+  [save reliability](savegame-reliability.md#saving-before-the-first-frame-after-a-load).
+
+## Effect diagnostics, 3 November 2026
+
+- Effect diagnostics now report particle activity and collision queries instead
+  of constant zeros. A new stock-effect probe passes start, stop, restart, owner
+  deletion and save restoration on OpenGL and Vulkan. This improves diagnostics
+  and lifecycle evidence; it does not establish complete retail effect parity.
+- The historical save matrix also reports v2 save metadata correctly, and all
+  11 existing 0.9–0.13 release fixtures restore with their inputs unchanged.
+  The engine's save readers have not changed.
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The

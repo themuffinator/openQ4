@@ -14,16 +14,15 @@ files between platforms (WSL, SSH or a shared folder) and runs the legs in turn:
   time, plays ``--play-frames`` tics and saves ``<tag>``, the resave that
   travels back to the source platform.
 
-The frozen save only records the restore: it runs before the first game frame
-after the load, where a save writes NULL for references it cannot resolve
-(savegame-reliability.md), so it is compared, never loaded. Every leg runs with
-``com_fixedTic 1``, one game tic per frame, so frame counts are game time on any
-platform.
+The frozen save runs before the first game frame after the load. It must be
+loadable too: use it as another load leg's input to exercise immediate resaves.
+Every leg runs with ``com_fixedTic 1``, one game tic per frame, so frame counts
+are game time on any platform.
 
 A leg passes when the client loaded the map or restored the save without an
 error, ran its after-load config to the end, and wrote every save as payload
-version 5 stamped ``le64-portable1``. The saves that can travel (the write
-leg's save and the load leg's resave) must log no unresolved reference, and a
+version 5 stamped ``le64-portable1``. Every save, including the frozen save,
+must log no unresolved reference, and a
 load leg's frozen save must begin with its input's object table: the class of
 every saved object, in order. Objects the restore itself creates (an Awakening
 level restarts some looping client effects) may follow; the report counts them
@@ -303,9 +302,8 @@ def run_leg(args: argparse.Namespace) -> int:
                      for path in (log, stdout_path) if path.is_file())
     errors = ERROR_PATTERN.findall(text) + SIGNAL_PATTERN.findall(text) + RESTORE_FAILED.findall(text)
     rejections = PREFLIGHT_REJECTED.findall(text)
-    # Only the save that travels must resolve every reference (see the docstring).
     log_text = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
-    unresolved = len(UNRESOLVED_REFERENCE.findall(log_text.partition(RESAVE_MARKER)[2]))
+    unresolved = len(UNRESOLVED_REFERENCE.findall(log_text))
     started_map = (RESTORE_STARTED if args.mode == "load" else MAP_STARTED).search(text) is not None
     problems = []
     if timed_out:
@@ -346,6 +344,7 @@ def run_leg(args: argparse.Namespace) -> int:
         "mode": args.mode, "tag": args.tag, "platform": f"{sys.platform}-{platform.machine().lower()}",
         "map": args.map, "game": args.game, "input": str(args.input) if args.input else None,
         "client": str(client), "passed": not problems, "problems": problems,
+        "unresolvedReferences": unresolved,
         "seconds": round(time.monotonic() - started, 1), "errors": (errors + rejections)[:5],
         "saves": saves, "inputVsFrozen": comparison,
         "objectTable": payloads[slots[-1]].objects if slots[-1] in payloads else [],
@@ -423,7 +422,9 @@ def self_test() -> int:
     assert command[command.index("com_fixedTic") + 1] == "1" and command[command.index("g_stopTime") + 1] == "1"
 
     # A leg refuses an input inside its own --home.
-    with tempfile.TemporaryDirectory() as temp:
+    scratch = Path(__file__).resolve().parents[2] / ".tmp"
+    scratch.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="save-cross-load-", dir=scratch) as temp:
         home = Path(temp) / "home"
         inside = home / "baseoq4" / "savegames" / "x.save"
         inside.parent.mkdir(parents=True)

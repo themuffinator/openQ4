@@ -740,6 +740,7 @@ bool rvParticle::RunPhysics(rvBSE* effect, rvSegmentTemplate* st, float time) {
 	trace_t trace;
 	idVec3 source = sourceWorld;
 	idVec3 dest = destWorld;
+	rvBSEManagerLocal::AddPerfCounter(PERF_NUM_TRACES);
 	game->Translation(trace, source, dest, trm, CONTENTS_SOLID | CONTENTS_RENDERMODEL);
 	if (trace.fraction >= 1.0f) {
 		return false;

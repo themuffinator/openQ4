@@ -944,9 +944,8 @@ restore as before:
 `savegame_corruption_contract.py` pins each check.
 `savegame_restore_bindings.py` checks that teardown clears restored signal
 lists and leaves other entities alone. `savegame_restore_identity.py` refuses a
-saved number for an unregistered object. Restore paths that leak a clip model
-or dictionary when a read fails remain. They only leak memory on a refused
-load.
+saved number for an unregistered object. The allocation and embedded-object
+fixup paths below were completed later on 3 November.
 
 Valid saves are unaffected. On 3 November the staged build restored all 11
 release fixtures (v2 and v3, 0.9 to 0.13) and the three stamped 0.12.0 user
@@ -961,15 +960,66 @@ opened the retained Load Game recovery page and loaded again.
 
 ### Saving before the first frame after a load
 
-A save that runs after a load completes but before the first game frame writes
-NULL for references it cannot find in its object list. On `game/airdefense1`
-such a save logs 2080 `WriteObject FindIndex failed` lines. The same save one
-frame later logs none. The build from 1 November (`3941293b9`) behaves the
-same, so this predates the restore checks above. Console scripts reach this
-window by queuing `saveGame` behind `loadGame`. In play, a map's
-`func_savegame` appends `saveGame checkPoint` to the command buffer, so a
-checkpoint queued behind a load would do the same. Found on 3 November and not
-yet fixed (Q4-05).
+Fixed 3 November (Q4-05), in both game libraries. `ReadStaticObject` queued
+`<postRestore>` events for embedded physics and force objects. Those objects
+have no object-table index, so saving before the first game frame wrote NULL
+event targets. A subsequent load refused the save with `idEvent::Restore:
+event '<postRestore>' has a NULL target object`. This also affected a checkpoint
+queued behind a load. The earlier 2080 unresolved-reference diagnostic on
+`game/airdefense1` was a symptom of this queue, not a missing master-table entry.
+
+The restore transaction now collects these fixups separately and executes them
+after the footer, forward references and owning graphs have passed validation,
+before visual refresh and before returning to gameplay. It does not service
+unrelated timed events or advance game time. Destroyed objects are removed from
+the pending fixups. The spline-physics fixup still runs after its referenced
+spline entity has restored. The saved format and historical readers are unchanged.
+
+`savegame_restore_resources.py` executes the production methods in both game
+trees, checks callback ordering, and requires failed reads or validation to run
+no callbacks. A mutation that returns embedded targets to the event queue fails.
+`savegame_cross_load.py` now rejects unresolved references in **every** save,
+including its frozen immediate resave, which was previously exempt. Its frozen
+save can also be supplied as the next load leg's input.
+
+Windowed, hidden Windows x64 probes on `game/airdefense1`, using the installed
+retail assets, reproduce the old refusal and pass immediate resave, reload and
+30 tics of gameplay on both OpenGL and Vulkan. Each fixed frozen save retains
+all 1896 input objects and logs zero unresolved references. Evidence is under
+`.tmp/q4-roadmap/` (before-write, before-load, before-frozen, after-gl, frozen-gl,
+after-vk and frozen-vk). These checks do not repair already-invalid saves.
+
+### Allocations during interrupted restores
+
+Completed 3 November (Q4-05), without changing save bytes:
+
+- Inventory dictionaries and trace-cache records remain scoped allocations until
+  their complete read succeeds and their owning list accepts them.
+- `ReadClipModel` holds a replacement locally until its restore succeeds, then
+  releases the old owned model. Interrupted reads destroy the partial model and
+  release any acquired trace-cache reference. Reading an absent model also
+  releases a previous model.
+- Static multi-body physics appends initialized clip-model slots as it reads
+  them. An interrupted list no longer leaves unset pointers for teardown.
+- Particle physics consumes the historical bounds fields without constructing
+  a redundant clip model that the subsequent complete-model read would overwrite.
+
+The native resource fixture injects failure at every read through these owning
+transactions, including later list entries, old and empty clip-model slots,
+present and absent models, and both portable and historical trace records.
+Deliberate ownership regressions for dictionaries, clip models and trace-cache
+records all fail. Windows Clang and Linux Clang runs pass for both game libraries;
+the fixture is also a Meson native test built with MSVC on Windows. The focused
+Windows save/restore suite passes all 50 tests, including durability and portable
+codec mutation checks. This evidence covers these allocation paths, not every
+possible allocation failure in the engine.
+
+The 11 existing release fixtures from 0.9 through 0.13 also restore and run
+30 gameplay tics on Windows/OpenGL with their input hashes unchanged
+(`.tmp/q4-roadmap/historical/run-20261103-222814-53856-0/report.json`). The
+matrix's v2 metadata parser was separately corrected: v2 has no ABI-string
+field, and its object count must not be treated as a string length. This changes
+the report only; the engine's historical readers are unchanged.
 
 ## Remaining Raw Serialization (`raw1`)
 

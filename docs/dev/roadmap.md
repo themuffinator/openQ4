@@ -1647,6 +1647,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   evidence only. The particle and trace counters stay at 0, firing did not raise
   the active count measurably, and BSE prints no counters during render-demo
   playback. Per-effect behaviour and retail comparison remain open.
+  Later on 3 November: the zero counters were traced to missing instrumentation.
+  Particle units, collision queries and serviced segments now update
+  `bse_speeds`; unmeasured texel coverage is no longer printed as zero.
+  The [stock spark lifecycle probe](retail-baseline-ledger.md#effect-lifecycle-telemetry-3-november-2026)
+  passes start, stop, restart, owner deletion and saved-loop restoration on both
+  OpenGL and Vulkan, including nonzero particle/trace activity and quiet frames
+  after stop/delete. Immediate resaves contain no unresolved references. This is
+  scoped lifecycle evidence, not visual/audio parity or the whole list above.
 - [ ] **Q4-04 — P1, qualification: Awakening campaign closure.** Play all thirteen
   maps and restore saves during unique weapon/status/vehicle/boss states; qualify
   freeze persistence, damage gates, animation speed, and turret effects. Recheck
@@ -1752,9 +1760,17 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   client-entity bindings, influence-target entity numbers, burning-joint counts
   and unregistered objects' numbers are checked. Valid saves are unaffected:
   all 11 release fixtures (0.9 to 0.13) restore, and the campaign chain passes
-  on OpenGL. Still open: leaks on refused loads, and a pre-existing defect
-  where a [save made before the first frame after a load](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
-  writes NULL references.
+  on OpenGL. Later on 3 November, the identified
+  [restore allocation leaks](savegame-reliability.md#allocations-during-interrupted-restores)
+  and the [immediate-resave defect](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
+  were fixed in both libraries without changing save bytes. Embedded physics
+  fixups complete inside the restore transaction instead of putting unsaveable
+  targets on the event queue. Dictionaries and trace records have scoped owners,
+  clip-model replacement is transactional, and partially read clip-model lists
+  are safe to destroy. Native read-failure and mutation controls pass on Windows
+  and Linux; all 50 Windows save/restore tests pass. On OpenGL and Vulkan the
+  immediate resave now reloads into gameplay with zero unresolved references.
+  Broader owning-graph/partial-constructor and platform qualification remains open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.
@@ -1944,10 +1960,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   waits on their copy of `mon4.gui` or a window-by-window comparison of the
   attachment. The cited `.tmp/stage-two/` evidence directories are gone from the
   checkout; their recorded hashes remain.
+  Later on 3 November: the historical-matrix stamp parser was corrected for v2,
+  which has no wire-ABI string. It had reported object-table bytes as an ABI.
+  Bounded v2–v5 parser fixtures now run with its existing CI self-test; this is a
+  reporting correction, not a change to historical save admission.
 - [ ] **Q4-08 — P2, investigation and qualification: save cost and durability.**
   Measure large-save CRC/sync time and fault behavior across target filesystems.
-  Directory metadata is not synced and full power-loss atomicity is not established.
-  Define any stronger durability guarantee before implementing it; qualify partial
+  Directory synchronization is implemented as recorded below; actual power-cut
+  behavior and the remaining filesystems still need qualification. Qualify partial
   writes, replace failures, process interruption and preservation of the last valid
   save independently from object-restore recovery in Q4-05.
   Progress, 2 November: the [guarantee](savegame-reliability.md#durability-guarantee)
