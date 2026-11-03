@@ -1256,6 +1256,7 @@
 	"#str_231103"	"Questo salvataggio è danneggiato o proviene da una versione incompatibile."
 	"#str_231190"	"Impossibile ripristinare questo salvataggio. Scegli un altro salvataggio o inizia una nuova partita."
 	"#str_231191"	"CARICAMENTO NON RIUSCITO"
+	"#str_231192"	"Questo salvataggio è stato creato su un'altra piattaforma e non può essere caricato su questa."
 	"#str_231104"	"Impossibile leggere questo salvataggio."
 	"#str_231105"	"Impossibile eliminare questo salvataggio."
 	"#str_231106"	"SALVATAGGI PIÙ RECENTI"

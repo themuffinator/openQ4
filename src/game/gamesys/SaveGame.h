@@ -14,10 +14,12 @@ Save game related helper classes.
 
 const int INITIAL_RELEASE_BUILD_NUMBER = 1262;
 const int OPENQ4_SAVEGAME_COMPATIBILITY_MAGIC = 'O' | ( 'Q' << 8 ) | ( '4' << 16 ) | ( 'S' << 24 );
-const int OPENQ4_SAVEGAME_COMPATIBILITY_VERSION = 4;
-const int OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION = 3;
+const int OPENQ4_SAVEGAME_COMPATIBILITY_VERSION = 5;
 // Packed flags, typed fields and integrity trailers were introduced in v3.
 const int OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION = 3;
+// Explicit field encodings for the last native-layout blocks and the portable
+// wire-ABI stamp were introduced in v5 (SaveGameReleases.h).
+const int OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION = 5;
 const int OPENQ4_SAVEGAME_SYNC_MAGIC = 'O' | ( 'Q' << 8 ) | ( '4' << 16 ) | ( 'Y' << 24 );
 const int OPENQ4_SAVEGAME_FOOTER_MAGIC = 'O' | ( 'Q' << 8 ) | ( '4' << 16 ) | ( 'F' << 24 );
 const int OPENQ4_SAVEGAME_FOOTER_VERSION = 1;
@@ -97,6 +99,7 @@ public:
 	void					WriteUsercmd( const usercmd_t &usercmd );
 	void					WriteContactInfo( const contactInfo_t &contactInfo );
 	void					WriteTrace( const trace_t &trace );
+	void					WriteTraceModel( const idTraceModel &trace );
 	void					WriteClipModel( const class idClipModel *clipModel );
 	void					WriteSoundCommands( void );
 
@@ -212,6 +215,9 @@ public:
 	void					ReadUsercmd( usercmd_t &usercmd );
 	void					ReadContactInfo( contactInfo_t &contactInfo );
 	void					ReadTrace( trace_t &trace );
+							// A version 5 trace model; earlier payloads hold the raw
+							// structure, which the caller reads itself.
+	void					ReadTraceModel( idTraceModel &trace );
 	void					ReadClipModel( idClipModel *&clipModel );
 	void					ReadSoundCommands( void );
 

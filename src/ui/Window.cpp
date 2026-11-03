@@ -38,6 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "AudioGraph.h"
 #include "../framework/Session.h"
 #include "../framework/SaveGameReleases.h"
+#include "../idlib/SaveCodec.h"
 #include "EditWindow.h"
 #include "ChoiceWindow.h"
 #include "SliderWindow.h"
@@ -4812,6 +4813,27 @@ bool idWindow::WriteSaveGameString( const char *string, idFile *savefile ) {
 }
 
 /*
+The floats of a transition's interpolator through the typed GUI field helpers,
+as a SaveCodec writer and reader (idlib/SaveCodec.h). The helpers report a
+failed write or a truncated read through common->Error. A GUI expression can
+leave a non-finite value in a transition; it is saved as zero, as
+OpenQ4_SanitizeSaveGameWinVar saves the variables themselves.
+*/
+struct windowSaveGameFloats_t {
+	idFile *	file;
+	bool		ok;
+
+	void		WriteFloat( float value ) {
+					ok = ok && OpenQ4_WriteSaveGameFloat( file, std::isfinite( value ) ? value : 0.0f,
+						"idWindow::WriteSaveGameTransition", "interpolate state" );
+				}
+	void		ReadFloat( float &value ) {
+					value = 0.0f;
+					ok = ok && OpenQ4_ReadSaveGameFloat( file, value, "idWindow::ReadSaveGameTransition", "interpolate state" );
+				}
+};
+
+/*
 ===============
 idWindow::WriteSaveGameTransition
 ===============
@@ -4851,19 +4873,26 @@ bool idWindow::WriteSaveGameTransition( idTransitionData &trans, idFile *savefil
 		return false;
 	}
 	const int savedOffset = static_cast<int>( transitionOffset );
+	windowSaveGameFloats_t out = { savefile, true };
 	if ( !OpenQ4_WriteSaveGameInt( savefile, savedOffset, "idWindow::WriteSaveGameTransition", "target offset" ) ||
-		 !WriteSaveGameString( winName, savefile ) ||
-		 !OpenQ4_WriteSaveGameRawField( savefile, trans.interp, "idWindow::WriteSaveGameTransition", "interpolate state" ) ) {
+		 !WriteSaveGameString( winName, savefile ) ) {
 		return false;
 	}
-	return true;
+	SaveCodec_WriteInterpolate( out, trans.interp );
+	return out.ok;
 }
 
-openQ4SaveGameRestore_t openQ4_saveGameRestore = { NULL, 0 };
+openQ4SaveGameRestore_t openQ4_saveGameRestore = { NULL, 0, 0 };
 
-// A transition's interpolator is saved as raw bytes; one from a payload written
-// before build 1582 has the shorter layout described in SaveGameReleases.h.
+// A transition's interpolator is saved by its defining values from payload
+// version 5. Earlier payloads hold raw bytes, and one written before build
+// 1582 has the shorter layout described in SaveGameReleases.h.
 static bool Window_ReadSaveGameTransitionInterpolate( idFile *savefile, idInterpolateAccelDecelLinear<idVec4> &interp ) {
+	if ( OpenQ4_SaveGameRestoreIsPortable( savefile ) ) {
+		windowSaveGameFloats_t saved = { savefile, true };
+		SaveCodec_ReadInterpolate( saved, interp );
+		return saved.ok;
+	}
 	if ( OpenQ4_SaveGameHasInterpolatorCacheFlag( OpenQ4_SaveGameRestoreLayoutBuild( savefile ) ) ) {
 		return OpenQ4_ReadSaveGameRawField( savefile, interp, "idWindow::ReadSaveGameTransition", "interpolate state" );
 	}

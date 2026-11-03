@@ -10,28 +10,60 @@ load. Reliability mechanisms and implementation detail are documented in
 
 | Save payload | Current decision |
 | --- | --- |
-| Version 4, exact wire-ABI stamp, build at or above the verified floor, valid integrity/footer | Current writer and reader; persistent Awakening status |
+| Version 5, `le64-portable1` stamp, on a 64-bit little-endian build, valid integrity/footer | Current writer and reader; explicit field encodings (see [Version 5](#version-5)); moving saves between platforms is not yet qualified |
+| Version 5 with any other stamp, or on a build outside the 64-bit little-endian family | Rejected before map teardown as made on another platform |
+| Version 4, exact wire-ABI stamp, build at or above the verified floor, valid integrity/footer | Supported format path; persistent Awakening status |
 | Version 3, exact wire-ABI stamp, layout build at or above the verified floor, valid integrity/footer | Supported format path; build/source drift is diagnostic only |
 | Version 3 stamped build 1 by a listed release (0.10.0–0.13.0) | Read as that release's build (see below) |
 | Version 3, layout build below the verified floor (including an unlisted build-1 snapshot) | Rejected before map teardown |
-| Version 3, different wire-ABI stamp | Rejected before map teardown |
+| Version 3 or 4, different wire-ABI stamp | Rejected before map teardown as made on another platform |
 | Version 2 (0.6.95–0.9.0), build 546 or later, Windows x64 runtime | Read as the layout it shipped (see [Version 2](#version-2)) |
 | Version 2 before build 546, or on another platform | Rejected before map teardown |
 | Unstamped legacy payload (0.6.92 and earlier) | Accepted only when its marker equals the current build and the runtime stamp is Windows/MSVC x64 little-endian `raw1`; in practice no current build writes one, so every unstamped save is refused |
 | Empty, negative-length, or over-512-MiB `.save` | Rejected before header or CRC preflight |
-| Payload version newer than 4 | Rejected; no forward-compatibility guessing |
+| Payload version newer than 5 | Rejected; no forward-compatibility guessing |
 | Multiplayer/dedicated save | Not a supported player-facing feature |
 
 The outer session-header reader accepts outer versions `1834`, `0`, and `1` so
 that the payload can be examined. Passing that outer check does not override the
 payload policy in this document.
 
+## Version 5
+
+Version 5 is the only format written by current builds (roadmap Q4-06 stage 3).
+It moves no field. It replaces the last blocks that were copied as the compiler
+laid them out with explicit fields:
+
+- trace models, in the clip-model cache and on security cameras: type, the used
+  vertices, edges and polygons, offset, bounds and the convex flag;
+- animator joint modifiers: joint, rotation rows, position, both transform modes
+  as int32, the angular-velocity interpolator by its defining values, last
+  update time and collapse joint;
+- vehicle-driver path targets: the target through the typed entity reference,
+  then its distance, range, throttle and exit flag;
+- GUI transition interpolators, by their defining values. A non-finite value left
+  by a GUI expression is saved as zero, as the GUI variables already are.
+
+Every other field already had an explicit width and byte order. Script storage
+is little-endian, and its 8-byte pointer slots hold zeroed temporaries or
+compile-time values (see [Portable revision](#portable-revision)). The payload
+therefore carries the wire ABI `le64-portable1` instead of the writing build's
+`raw1` stamp, and every 64-bit little-endian build accepts it. A build outside
+that family would stamp and accept only its own wire ABI. No supported target
+is outside it.
+
+Format eligibility is not yet transfer support. Until Q4-06 stage 4 has
+cross-loaded saves between platforms, the
+[platform policy](#platform-and-architecture-policy) still states what players
+may rely on. Versions 4 and 3 keep their decoders and the exact `raw1` match
+below. Builds from before version 5 cannot load a version 5 save.
+
 ## Version 4 and the Version 3 Decoder
 
-Version 4 is the only format written by current builds. Version 3 retains its
-bounded decoder and verified build floor. The complete file must be
-no larger than 512 MiB, including its integrity trailer, and the payload wire-ABI
-stamp must exactly equal the running build's stamp:
+Version 4 was written until version 5 replaced it. Current builds still read it,
+and version 3 through its bounded decoder and verified build floor. The complete
+file must be no larger than 512 MiB, including its integrity trailer, and the
+payload wire-ABI stamp must exactly equal the running build's stamp:
 
 ```text
 <os>-<compiler-abi>-<architecture>-<endian>-raw1
@@ -287,7 +319,8 @@ already carries, is the realistic remedy for these and is not implemented.
 Backward compatibility means a newer runtime reading an older save. It is
 supported only through an explicit decoder or allowlist:
 
-- current v4 and decoded v3 on the exact ABI path at or above the verified build floor;
+- current v5 on every 64-bit little-endian build;
+- v4 and decoded v3 on the exact ABI path at or above the verified build floor;
 - version 2 from build 546 on the Windows x64 path;
 - build-1 releases 0.10.0 through 0.13.0, read as their release builds;
 - fields added within v3 and v4, through their recorded per-field build thresholds
@@ -298,7 +331,7 @@ supported only through an explicit decoder or allowlist:
 
 Unsupported saves fail closed before map teardown when total size, header,
 version, ABI, allowlist, integrity, footer, or map preflight fails. The 512 MiB
-limit applies equally to v4, v3, v2 and unstamped legacy input. No in-place
+limit applies equally to v5, v4, v3, v2 and unstamped legacy input. No in-place
 conversion or repair tool is currently provided. Players should retain a copy of
 important slots before upgrading, especially when moving from an unlisted
 development build.
@@ -312,14 +345,15 @@ Forward compatibility means an older runtime reading a save written by a newer
 format. It is not promised. Unknown payload, footer, integrity, or raw-layout
 versions are rejected instead of being parsed as the nearest known layout.
 
-Version 4 saves cannot be loaded by older v3-only engines. Players who need to
-return to an older executable must keep their original v3 slots. The new reader
-retains a bounded v3 decoder; the writer always stamps its new layout as v4.
+Version 5 saves cannot be loaded by builds that write version 4, and version 4
+saves cannot be loaded by older v3-only engines. Players who need to return to an
+older executable must keep their original slots. The current reader retains the
+v4 reader and a bounded v3 decoder; the writer always stamps its layout as v5.
 
 ## Platform and Architecture Policy
 
-The `raw1` stamp is deliberately restrictive because native-layout fields remain.
-Current policy is:
+Versions 2 to 4 carry the `raw1` stamp. It is deliberately restrictive because
+those payloads contain native-layout fields. For them, the policy is:
 
 - same OS ABI, compiler ABI, architecture, endian, and raw revision: format may
   be eligible;
@@ -331,16 +365,18 @@ Current policy is:
 - same-platform eligibility does not supersede the project's platform support
   and release evidence gates.
 
-Cross-platform transfer can be considered only after the remaining raw inventory
-is normalized, a portable wire revision is defined, fixtures are verified on each
-supported ABI, and the policy is deliberately revised. It must not be inferred
-from the typed fields already migrated.
+Version 5 normalized the remaining raw inventory and defined the portable wire
+revision, so its saves are format-eligible on every 64-bit little-endian build.
+Cross-platform transfer is still not supported. It becomes supported only once
+fixtures are cross-loaded on each supported ABI (Q4-06 stage 4) and this policy
+is deliberately revised (stage 5). Players must not infer it from the stamp.
 
-### Planned portable revision
+### Portable revision
 
-Decided on 3 November 2026 and scheduled as roadmap Q4-06 (P3). Until its
-stages close, the rules above remain in force. The revision is defined as
-follows:
+Decided on 3 November 2026 and scheduled as roadmap Q4-06 (P3). Stages 1 to 3
+have landed: payload version 5 implements the encoding and stamp below. Until
+stages 4 and 5 close, the platform rules above are what players may rely on.
+The revision is defined as follows:
 
 - **Family.** 64-bit little-endian builds with IEEE-754 binary32 floats and
   8-bit bytes: Windows x64 and ARM64, Linux x64 and ARM64, macOS arm64, and
@@ -421,7 +457,9 @@ precedent for adding fields within v3.
 
 Compatibility failures must identify the rejected layer—total size, outer
 version, payload version, ABI, v2 snapshot, legacy build, CRC, footer, or
-map—without attempting a partial restore. The running map remains active for
+map—without attempting a partial restore. A refused wire-ABI stamp tells the
+player the save was made on another platform and cannot be loaded on this one;
+other preflight failures keep the damaged-or-incompatible notice. The running map remains active for
 failures caught by engine preflight. The fresh-map initialization fallback handles
 an explicit `false` return from `InitFromSaveGame`, such as a changed script
 program. Deeper recoverable semantic errors now unwind the scoped restore owner

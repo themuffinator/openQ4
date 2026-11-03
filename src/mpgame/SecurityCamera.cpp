@@ -62,7 +62,7 @@ void idSecurityCamera::Save( idSaveGame *savefile ) const {
 							
 	savefile->WriteInt( pvsArea );
 	savefile->WriteStaticObject( physicsObj );
-	savefile->Write( &trm, sizeof( trm ) );
+	savefile->WriteTraceModel( trm );
 }
 
 /*
@@ -90,7 +90,11 @@ void idSecurityCamera::Restore( idRestoreGame *savefile ) {
 							
 	savefile->ReadInt( pvsArea );
 	savefile->ReadStaticObject( physicsObj );
-	savefile->Read( &trm, sizeof( trm ) );
+	if ( savefile->GetOpenQ4SaveGameCompatibilityVersion() >= OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION ) {
+		savefile->ReadTraceModel( trm );
+	} else {
+		savefile->Read( &trm, sizeof( trm ) );
+	}
 }
 
 /*

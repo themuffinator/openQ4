@@ -1251,6 +1251,7 @@
 	"#str_231103"	"Dieser Spielstand ist beschädigt oder stammt aus einer inkompatiblen Version."
 	"#str_231190"	"Dieser Spielstand konnte nicht wiederhergestellt werden. Wähle einen anderen Spielstand oder starte ein neues Spiel."
 	"#str_231191"	"LADEN FEHLGESCHLAGEN"
+	"#str_231192"	"Dieser Spielstand wurde auf einer anderen Plattform erstellt und kann auf dieser nicht geladen werden."
 	"#str_231104"	"Dieser Spielstand konnte nicht gelesen werden."
 	"#str_231105"	"Dieser Spielstand konnte nicht gelöscht werden."
 	"#str_231106"	"NEUERE SPIELSTÄNDE"

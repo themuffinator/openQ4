@@ -1256,6 +1256,7 @@
 	"#str_231103"	"Cette sauvegarde est endommagée ou provient d'une version incompatible."
 	"#str_231190"	"Impossible de restaurer cette sauvegarde. Choisissez une autre sauvegarde ou commencez une nouvelle partie."
 	"#str_231191"	"ÉCHEC DU CHARGEMENT"
+	"#str_231192"	"Cette sauvegarde a été créée sur une autre plateforme et ne peut pas être chargée sur celle-ci."
 	"#str_231104"	"Impossible de lire cette sauvegarde."
 	"#str_231105"	"Impossible de supprimer cette sauvegarde."
 	"#str_231106"	"SAUVEGARDES PLUS RÉCENTES"

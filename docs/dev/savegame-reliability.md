@@ -975,10 +975,12 @@ yet fixed (Q4-05).
 
 Many high-risk scalars, flags, vectors, references, and arrays now use explicit
 typed fields, including v3 branches that retain raw v2 readers where required.
-The payload is not yet architecture-neutral. Its ABI stamp ends in `raw1` because
-native-layout blocks remain.
+Payloads up to version 4 are not architecture-neutral: their ABI stamp ends in
+`raw1` because they hold native-layout blocks. Version 5 writes the last of
+those blocks as explicit fields and carries the portable stamp `le64-portable1`
+([Q4-06 stage 3](#payload-version-5-q4-06-stage-3)).
 
-Each of the SP and MP source trees writes 23 direct raw blocks:
+Before Q4-06, each of the SP and MP source trees wrote 23 direct raw blocks:
 
 | Relative source | Raw writes |
 | --- | ---: |
@@ -1019,6 +1021,13 @@ transition interpolator (an aggregate), 12 byte payloads, 8 helper definitions
 and 6 legacy reads for the minigames' unversioned format. The test also pins
 the script type widths that the script storage depends on.
 
+Stage 3 (payload version 5) converted the remaining aggregates. Each tree now
+writes 2 direct raw blocks, both script storage, and keeps 45 legacy-reader
+reads for versions 2 to 4. On the GUI side, the interpolator's two raw reads
+remain for those versions, beside the 12 byte payloads, 6 helper definitions
+and the minigames' 6 legacy reads. A new raw write in either game tree fails
+the test.
+
 Saved primitives are already portable: `WriteInt`, `WriteFloat`, the vector
 and matrix writers and `WriteShort` swap to little-endian, `WriteBool` writes
 one byte, and strings are 8-bit bytes. Portability fails only on the blocks
@@ -1027,15 +1036,15 @@ below, classified for [Q4-06](roadmap.md):
 | Block | Where | Why it is not portable | Codec | State |
 | --- | --- | --- | --- | --- |
 | Flag bitfields (`fl`, `vfl`, `myfl`) | Entity flags (saved by `BrittleFracture`), `Physics_AF` (constraint and body), `Vehicle`, `VehicleParts`, `VehiclePosition`, `Monster_ConvoyHover` | Bit allocation is up to the compiler | One bit per flag in declaration order, packed as before | Converted, same bytes |
-| `idTraceModel` | `physics/Clip.cpp`, `SecurityCamera.cpp` | Aggregate with an enum, a bool and padding | Field by field | Payload v5 |
-| `jointMod_t` | `anim/Anim_Blend.cpp` | Holds an `idInterpolateAccelDecelLinear` template whose layout already changed once (build 1582) | Field by field | Payload v5 |
-| `PathTargetInfo`, current and last | `vehicle/VehicleDriver.cpp` | Entity pointer saved as a raw spawn id, a bool and padding; bypasses typed reference restore | Fields, typed entity reference | Payload v5 |
+| `idTraceModel` | `physics/Clip.cpp`, `SecurityCamera.cpp` | Aggregate with an enum, a bool and padding | Field by field | Converted in payload v5 |
+| `jointMod_t` | `anim/Anim_Blend.cpp` | Holds an `idInterpolateAccelDecelLinear` template whose layout already changed once (build 1582) | Field by field | Converted in payload v5 |
+| `PathTargetInfo`, current and last | `vehicle/VehicleDriver.cpp` | Entity pointer saved as a raw spawn id, a bool and padding; bypasses typed reference restore | Fields, typed entity reference | Converted in payload v5 |
 | Joints, AF pose joints, pose modifiers and pose frame | `anim/Anim_Blend.cpp` | `idJointMat`, `int`, `idAFPoseJointMod` and `idJointQuat` arrays: floats and int32 with no padding, so portable by accident | Explicit floats and ints | Converted, same bytes |
 | Eye and driver joint axis and direction maps | `vehicle/VehiclePosition.cpp` | int32 arrays, portable on little-endian | `WriteInt` per element | Converted, same bytes |
 | Hover dampening samples | `ai/Monster_ConvoyHover.cpp` | `idAngles` array, portable on little-endian | Angles per sample | Converted, same bytes |
 | Interpreter stack, global variables and script object data | `script/Script_Interpreter.cpp`, `script/Script_Program.cpp` (globals go through `WriteByte`, one byte at a time, so they are outside the direct-call count) | Script values in host byte order. Function, pointer, namespace and script-event slots are `intptr_t` wide: 8 bytes on every family member, but their bytes are compile-time or expression temporaries | Scalar block with the address temporaries zeroed (`idProgram::ZeroPointerLocals`) | Converted; dead slots now zero |
 | GUI window fields | `src/ui/Window.cpp` (27), `src/ui/SimpleWindow.cpp` (15) | Floats, ints, rectangles and vectors, portable on little-endian | Typed `OpenQ4_*SaveGameField` overloads | Converted, same bytes |
-| GUI transition interpolator | `src/ui/Window.cpp` | Template aggregate | `SaveCodec_WriteInterpolate` | Payload v5 |
+| GUI transition interpolator | `src/ui/Window.cpp` | Template aggregate | `SaveCodec_WriteInterpolate` | Converted in payload v5 |
 | PDA minigame fields | `src/ui/GameBearShootWindow.cpp`, `GameBustOutWindow.cpp`, `GameSSDWindow.cpp` | bool, float and vector fields written by `sizeof` | Typed `OpenQ4_*SaveGameField` overloads | Converted, same bytes |
 
 The script stack is the one place whose bytes changed. Address temporaries
@@ -1071,10 +1080,11 @@ Runtime evidence for the converted blocks, 3 November 2026:
   that saves the entity flags, so that path rests on the native layout test
   and the order check.
 
-Padding inside these blocks is currently written uninitialized, so two saves of
-the same state can differ byte for byte.
+Up to version 4, padding inside the aggregate blocks was written uninitialized,
+so two saves of the same state could differ byte for byte. Version 5 writes no
+aggregate as the compiler laid it out, so no padding reaches the save.
 
-**Portable codecs (Q4-06 stage 2, in progress).** `src/idlib/SaveCodec.h` holds
+**Portable codecs (Q4-06 stages 2 and 3).** `src/idlib/SaveCodec.h` holds
 header-only templates that write each aggregate through a writer's typed
 `WriteInt`, `WriteFloat` and `WriteBool`. Those primitives are already
 little-endian in `idSaveGame`, `idRestoreGame` and `idFile`. Readers check
@@ -1090,14 +1100,15 @@ every count and enum value before using it. The header covers:
 - flag bitfields as packed bits (above);
 - int and float arrays.
 
-`SaveGame.cpp` in both game trees instantiates the codecs with the production
-types. `tools/tests/save_codec.py` builds
+The save code in both game trees calls every codec with the production types,
+so a renamed or retyped field breaks the build. `tools/tests/save_codec.py` builds
 `tools/tests/native/SaveCodecTest.cpp` with the platform compiler and compares
 each codec's bytes with fixed hex. It then requires eight source mutations of
 the header to fail: field order, flag bit order in writer and reader, bool
-width and removed bounds checks. The flag, array and pose codecs now write the
-saves; the trace model, joint modifier, path target and interpolator codecs
-change bytes, so they wait for payload version 5 (stage 3).
+width and removed bounds checks. The flag, array and pose codecs write every
+save with its old bytes. The trace model, joint modifier, path target and
+interpolator codecs change bytes, so they write from payload version 5 on, and
+the raw readers stay for versions 2 to 4.
 
 **Pointer-sized script slots across save points (3 November 2026).** A thread
 can only be saved while it is suspended inside a call. A raw pointer can
@@ -1119,14 +1130,63 @@ an object field from a function that waits would hold such a pointer. That
 already breaks loading on the same platform, because the address differs on
 the next run, and portable saves do not make it worse.
 
+### Payload version 5 (Q4-06 stage 3)
+
+Version 5 writes the four remaining aggregates through the codecs above:
+- trace models, in the clip-model cache and on security cameras
+  (`WriteTraceModel`/`ReadTraceModel`, every count bounded);
+- joint modifiers, with both transform modes range-checked;
+- vehicle path targets, whose entity now restores through
+  `idEntityPtr::Restore` and its class check instead of a raw spawn id;
+- GUI transition interpolators, through the typed GUI float encoder, which saves
+  a non-finite value as zero.
+
+The writer stamps `le64-portable1`, taken from the shared
+`OpenQ4_SaveGamePortableWireABI` in `SaveGameReleases.h`. A build with pointers
+other than 64 bits, or a big-endian one, stamps its own wire ABI instead. The
+engine preflight and both game libraries accept version 5 only with the
+portable stamp, and versions 2 to 4 only with the exact `raw1` stamp, so a
+foreign stamp is refused before map teardown. The preflight then reports it as
+`LOADGAME_FAILURE_PLATFORM`, and the Load Game page shows `#str_231192`,
+translated in all twelve language tables. Each changed reader keeps its raw
+branch for versions 2 to 4. The GUI branch follows the payload version, which
+the session publishes beside the layout build for the duration of the restore.
+
+Runtime evidence, 3 November 2026 (Windows x64, staged build 2015):
+- **Old saves.** `savegame_restore_matrix.py` restores the 11 release fixtures
+  and the three stamped 0.12.0 saves and refuses the three unstamped ones, as
+  before. It also restores six v4 saves from builds 1769 to 1958 on
+  `hangar1`, `recomp`, `airdefense2`, `airdefense1` and `medlabs`, which
+  exercises the retained raw readers. A seventh v4 save, from a UI test, lists
+  a script compiled at the console (`console`) among its program files, and no
+  build can recompile that.
+- **New saves.** Fresh v5 saves, each checked for version 5 and
+  `le64-portable1`, round-trip on `game/airdefense1`, `game/convoy1`,
+  `game/walker`, `game/hangar1`, `game/process1` and `game/storage1`, and on
+  `game/convoy1` with a spawned convoy hover. They come out 4 to 5 percent
+  smaller than v4 saves of the same maps, mostly because a trace model now
+  carries only its used elements.
+- **Refusals.** A v5 save restamped `be64-portable1`, the same save marked
+  version 4, and a v4 save restamped `windows-msvcabi-x86-le-raw1`, each with
+  a valid CRC, are refused with the wire-ABI warning. No load starts, and the
+  running map then saves normally. The unaltered copy loads.
+- **Recovery.** `savegame_restore_cleanup_runtime.py` and
+  `savegame_restore_recovery_runtime.py` (registrations, GUIs, classes) pass
+  on a v5 `storage1` save.
+
+The changed sources compile with MSVC, and with GCC and Clang on Linux. Linux
+and macOS runtime round trips belong to stage 4.
+
 Consequences:
 
-- v3 currently requires an exact OS ABI, compiler ABI, architecture, endian, and
-  raw-layout revision match;
-- a Windows/MSVC x64 little-endian save is not eligible on Linux x64, macOS
-  arm64, Windows arm64, or another stamp;
-- fixed-width typed migrations improve safety but do not make the whole payload
-  portable until the remaining inventory is removed and the ABI policy changes.
+- versions 3 and 4 require an exact OS ABI, compiler ABI, architecture, endian,
+  and raw-layout revision match;
+- a Windows/MSVC x64 little-endian v3 or v4 save is not eligible on Linux x64,
+  macOS arm64, Windows arm64, or another stamp;
+- version 5 is format-eligible on every 64-bit little-endian build, but moving
+  saves between platforms is supported only once the Q4-06 stage 4
+  qualification passes and the [platform policy](savegame-compatibility-policy.md#platform-and-architecture-policy)
+  is revised.
 
 ## Schema-Bump Rules
 

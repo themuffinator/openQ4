@@ -307,13 +307,8 @@ static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idRectangle &v
 template< class type >
 bool OpenQ4_ReadSaveGameField( idFile *savefile, type &value, const char *context, const char *fieldName ) = delete;
 
-// Aggregates still copied as laid out (the transition interpolator). Q4-06
-// stage 3 replaces this with SaveCodec_WriteInterpolate under a new version.
-template< class type >
-static ID_INLINE bool OpenQ4_WriteSaveGameRawField( idFile *savefile, const type &value, const char *context, const char *fieldName ) {
-	return OpenQ4_WriteSaveGameBytes( savefile, &value, sizeof( value ), context, fieldName );
-}
-
+// Aggregates as an earlier build laid them out (transition interpolators in
+// payloads before version 5, which writes SaveCodec_WriteInterpolate).
 template< class type >
 static ID_INLINE bool OpenQ4_ReadSaveGameRawField( idFile *savefile, type &value, const char *context, const char *fieldName ) {
 	return OpenQ4_ReadSaveGameBytes( savefile, &value, sizeof( value ), context, fieldName );

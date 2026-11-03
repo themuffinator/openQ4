@@ -7568,6 +7568,7 @@ static const char *Session_LoadFailureText( int failure ) {
 	switch ( failure ) {
 		case idSessionLocal::LOADGAME_FAILURE_MAP:		return "#str_231102";
 		case idSessionLocal::LOADGAME_FAILURE_DAMAGED:	return "#str_231103";
+		case idSessionLocal::LOADGAME_FAILURE_PLATFORM:	return "#str_231192";
 		case idSessionLocal::LOADGAME_FAILURE_RESTORE:	return "#str_231190";
 		default:										return "#str_231104";
 	}

@@ -6,6 +6,32 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Save format ready for other platforms, 3 November 2026
+
+- **New saves use a platform-neutral format.** Saves now record every value
+  with a fixed size and byte order, so the same file is valid on every 64-bit
+  openQ4 build (Windows, Linux, macOS and Android, on x64 or ARM64). Moving
+  saves between platforms is not supported yet: it will be announced once
+  saves have been cross-loaded on each platform.
+- **Existing saves still load, on the system that made them.** Saves from
+  0.9 to the current development builds load as before. A save that another
+  platform's build made is now refused with **This save was made on another
+  platform and cannot be loaded on this one**, instead of the damaged-save
+  message, and the game you are playing keeps running.
+- **Older builds cannot load new saves.** Keep a copy of any slot you want to
+  take back to an earlier build.
+- Evidence (Windows x64): `savegame_restore_matrix.py` restores the 11 release
+  fixtures and three stamped 0.12.0 saves, and refuses the three unstamped
+  saves as before. It also restores v4 saves from builds 1769 to 1958 through
+  the retained readers. Fresh saves round-trip on six stock maps (save, load,
+  save, load). Saves restamped for another platform are refused before the
+  level unloads. Static checks: `savegame_raw_inventory.py` (2 raw writes per
+  game tree, both script storage), `savegame_v3_contract.py`,
+  `savegame_corruption_contract.py`, `save_codec.py` and the 50 meson
+  save/restore tests. Linux and macOS runtime round trips follow in roadmap
+  Q4-06 stage 4. See
+  [savegame compatibility](savegame-compatibility-policy.md#version-5).
+
 ## Section summaries, 3 November 2026
 
 - Section 13.7 has a section that leads deeper summarize itself in the

@@ -1251,6 +1251,7 @@
 	"#str_231103"	"Tato uložená pozice je poškozená nebo pochází z nekompatibilní verze."
 	"#str_231190"	"Tuto uloženou pozici nelze obnovit. Vyberte jinou pozici nebo začněte novou hru."
 	"#str_231191"	"NAČÍTÁNÍ SELHALO"
+	"#str_231192"	"Tato uložená pozice byla vytvořena na jiné platformě a na této ji nelze načíst."
 	"#str_231104"	"Tuto uloženou pozici nelze přečíst."
 	"#str_231105"	"Tuto uloženou pozici nelze smazat."
 	"#str_231106"	"NOVĚJŠÍ POZICE"

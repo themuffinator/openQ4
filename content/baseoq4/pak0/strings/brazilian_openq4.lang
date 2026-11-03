@@ -1251,6 +1251,7 @@
 	"#str_231103"	"Este jogo salvo está danificado ou vem de uma versão incompatível."
 	"#str_231190"	"Não foi possível restaurar este jogo salvo. Escolha outro jogo salvo ou inicie um novo jogo."
 	"#str_231191"	"FALHA AO CARREGAR"
+	"#str_231192"	"Este jogo salvo foi criado em outra plataforma e não pode ser carregado nesta."
 	"#str_231104"	"Não foi possível ler este jogo salvo."
 	"#str_231105"	"Não foi possível excluir este jogo salvo."
 	"#str_231106"	"JOGOS SALVOS MAIS RECENTES"

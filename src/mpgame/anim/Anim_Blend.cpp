@@ -3513,7 +3513,7 @@ void idAnimator::Save( idSaveGame *savefile ) const {
 
 	savefile->WriteInt( jointMods.Num() );
 	for( i = 0; i < jointMods.Num(); i++ ) {
-		savefile->Write( jointMods[ i ], sizeof( *jointMods[ i ] ) );
+		SaveCodec_WriteJointMod( *savefile, *jointMods[ i ] );
 	}
 	
 	savefile->WriteInt( numJoints );
@@ -3559,8 +3559,9 @@ void idAnimator::Save( idSaveGame *savefile ) const {
 =====================
 Anim_ReadSavedJointMod
 
-Joint modifiers are saved as raw jointMod_t records. One written before build
-1582 holds the shorter interpolator described in SaveGameReleases.h.
+Joint modifiers are saved field by field from payload version 5. Earlier
+payloads hold raw jointMod_t records, and one written before build 1582 holds
+the shorter interpolator described in SaveGameReleases.h.
 =====================
 */
 typedef struct {
@@ -3575,6 +3576,10 @@ typedef struct {
 } legacyJointMod_t;
 
 static void Anim_ReadSavedJointMod( idRestoreGame *savefile, jointMod_t &jointMod ) {
+	if ( savefile->GetOpenQ4SaveGameCompatibilityVersion() >= OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION ) {
+		SaveCodec_ReadJointMod( *savefile, jointMod, JOINTMOD_COLLAPSE + 1 );
+		return;
+	}
 	if ( savefile->HasOpenQ4InterpolatorCacheSaveLayout() ) {
 		savefile->Read( &jointMod, sizeof( jointMod ) );
 		return;

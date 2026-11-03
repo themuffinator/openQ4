@@ -502,6 +502,7 @@ public:
 		LOADGAME_FAILURE_UNREADABLE,	// missing, or unreadable
 		LOADGAME_FAILURE_DAMAGED,		// truncated, damaged or from an incompatible version
 		LOADGAME_FAILURE_MAP,		// its level is not installed
+		LOADGAME_FAILURE_PLATFORM,	// another platform's build wrote it (wire ABI)
 		LOADGAME_FAILURE_RESTORE		// semantic restore failed after map teardown
 	};
 	loadGameFailure_t	loadGameFailure;

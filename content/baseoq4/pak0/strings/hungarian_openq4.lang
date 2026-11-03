@@ -1251,6 +1251,7 @@
 	"#str_231103"	"Ez a mentés sérült, vagy nem kompatibilis verzióból származik."
 	"#str_231190"	"Ez a mentés nem állítható vissza. Válassz másik mentést, vagy kezdj új játékot."
 	"#str_231191"	"SIKERTELEN BETÖLTÉS"
+	"#str_231192"	"Ez a mentés egy másik platformon készült, és ezen nem tölthető be."
 	"#str_231104"	"Ezt a mentést nem sikerült beolvasni."
 	"#str_231105"	"Ezt a mentést nem sikerült törölni."
 	"#str_231106"	"ÚJABB MENTÉSEK"
