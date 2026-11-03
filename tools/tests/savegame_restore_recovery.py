@@ -35,6 +35,7 @@ struct idStr {
     void StripFileExtension() { auto n=value.rfind('.'); if(n!=std::string::npos)value.resize(n); }
     operator const char*() const { return value.c_str(); }
     static void vsnPrintf(char* out,size_t size,const char* fmt,va_list args) { std::vsnprintf(out,size,fmt,args); }
+    static void snPrintf(char* out,size_t size,const char* fmt,...) { va_list a; va_start(a,fmt); std::vsnprintf(out,size,fmt,a); va_end(a); }
 };
 struct StringList {
     std::vector<std::string> values;
@@ -52,6 +53,10 @@ struct Renderer { bool running=true; bool IsOpenGLRunning() { return running; } 
 struct Commands { int restarts=0; void BufferCommandText(int,const char*) { ++restarts; } } commands,*cmdSystem=&commands;
 struct Arena { bool cleanup=false; int aborts=0; int recorded=0; bool NeedsCleanup() { return cleanup; } void RecordDecidedResult() { ++recorded; } void AbortMatch() { assert(recorded==aborts+1); ++aborts; } } arenaCampaign;
 bool com_refreshOnPrint=true;
+// Error() queues and unwinds only off the main thread; these runs are on it
+#define MAX_PRINT_MSG_SIZE 4096
+static bool Common_OnMainThread() { return true; }
+static bool Common_QueueOffMainThread(bool,const char*) { return false; }
 int com_errorEntered=0,com_editors=0,ticks=1000,clipboardWrites=0,flushes=0,shutdowns=0;
 bool liveRestore=false,restoredObjectsUnwound=false;
 std::vector<std::string> events;

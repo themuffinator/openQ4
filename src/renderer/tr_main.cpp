@@ -271,6 +271,9 @@ R_ToggleSmpFrame
 ====================
 */
 void R_ToggleSmpFrame( void ) {
+	// captures and bakes reset frame memory directly; a frame on the render
+	// thread may still be reading it
+	R_RenderThread_Sync( "frame reset" );
 	if ( r_lockSurfaces.GetBool() ) {
 		return;
 	}
@@ -541,6 +544,10 @@ void *R_FrameAlloc( int bytes ) {
 	frameData_t		*frame;
 	frameMemoryBlock_t	*block;
 	void			*buf;
+
+	// a frame on the render thread owns frame memory until it completes;
+	// the backend's own allocations run on that thread
+	R_RenderThread_Sync( "frame memory" );
 
 	// A negative size (an overflowed count*sizeof in a caller) would round to a
 	// still-negative value, pass the first-fit test below, rewind block->used,

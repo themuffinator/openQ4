@@ -225,6 +225,7 @@ public:
 
 	virtual bool			HasSkybox( int areaNum );
 	void					FreeDeferredLightDefs();
+	void					ApplyPendingDefOps( void );
 
 	//-----------------------
 
@@ -262,6 +263,44 @@ public:
 
 	idList<idRenderLightLocal*>		lightDefs;
 	idList<idRenderLightLocal*>		deferredFreeLightDefs;
+	// entityDefs freed while the render thread still draws a frame that
+	// references them (r_vkRenderThread); deleted with the deferred lights
+	idList<idRenderEntityLocal*>	deferredFreeEntityDefs;
+
+	// Render thread stage 1 (r_vkRenderThread, REN-07). While a frame records
+	// on the render thread, the game's changes to existing defs it may draw,
+	// and to their decals and overlays, are queued here and applied in call
+	// order by the next R_RenderThread_Sync, before the next front end runs.
+	typedef enum {
+		PENDING_UPDATE_ENTITY,
+		PENDING_FREE_ENTITY,
+		PENDING_UPDATE_LIGHT,
+		PENDING_FREE_LIGHT,
+		PENDING_DECAL_ONTO_WORLD,
+		PENDING_DECAL,
+		PENDING_OVERLAY,
+		PENDING_REMOVE_DECALS
+	} pendingDefOpType_t;
+	typedef struct {
+		pendingDefOpType_t	type;
+		qhandle_t			handle;
+		renderEntity_t		entity;
+		renderLight_t		light;
+		idFixedWinding *	winding;
+		idVec3				projectionOrigin;
+		bool				parallel;
+		float				fadeDepth;
+		const idMaterial *	material;
+		int					startTime;
+		idPlane				localTextureAxis[2];
+	} pendingDefOp_t;
+	idList<pendingDefOp_t>			pendingDefOps;
+	// effect snapshots deleted while the in-flight frame may still draw them
+	idList<idRenderModel *>			pendingModelDeletes;
+
+	pendingDefOp_t *				QueueDefOp( pendingDefOpType_t type, qhandle_t handle );
+	const pendingDefOp_t *			FindPendingDefOp( qhandle_t handle, bool light ) const;
+	void							DeleteEffectModel( idRenderModel *model );
 // jmarshall: BSE
 	idList<rvRenderEffectLocal*>	effectsDef;
 // jmarshll end

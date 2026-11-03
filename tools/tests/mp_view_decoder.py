@@ -56,13 +56,26 @@ int main(int argc, char **argv) {
         "\"side\":%d,\"competition_side\":%d,\"roles\":%u,\"active\":%d,"
         "\"phase\":%d,\"round\":%d,\"pause\":%d,\"engine\":%llu,\"match\":%llu,"
         "\"ready\":%d,\"ready_eligible\":%d,\"queue_state\":%d,"
-        "\"has_queue_position\":%d,\"queue_position\":%u,\"vitals\":[",
+        "\"has_queue_position\":%d,\"queue_position\":%u,",
         p.sessionId, p.sessionRevision, p.recipient.slot, p.recipient.participantId, p.recipient.bindingGeneration,
         p.recipient.side, p.recipient.competitionSide, p.recipient.publicRoleMask,
         p.recipient.active, p.lifecycle.phase, p.lifecycle.round, p.lifecycle.pauseState,
         p.clocks.engineTimeMsec, p.clocks.matchTimeMsec, p.recipient.ready,
         p.recipient.readyEligible, p.recipient.queueState, p.recipient.hasQueuePosition,
         p.recipient.queuePosition);
+    const auto &l = p.lifecycle;
+    printf("\"pause_kind\":%d,\"pause_reason\":%d,\"pause_owner\":%d,\"has_pause_expiry\":%d,"
+        "\"pause_expiry\":%llu,\"resume_policy\":%d,\"readiness\":{\"blockers\":%u,\"ready\":%u,"
+        "\"eligible\":%u,\"active_humans\":%u,\"vacant_required\":%u},\"timeouts\":[",
+        l.pauseKind, l.pauseReason, l.pauseOwnerSide, l.hasPauseExpiry, l.pauseExpiryEngineMsec,
+        l.resumePolicy, p.readiness.blockers, p.readiness.readyCount, p.readiness.eligibleCount,
+        p.readiness.activeHumans, p.readiness.vacantRequiredSeats);
+    for (int i = 0; i < MP_MATCH_VIEW_SIDE_COUNT; ++i) {
+        const auto &t = p.timeoutBudgets[i];
+        printf("%s{\"configured\":%u,\"remaining\":%u,\"consumed\":%u,\"seconds\":%u}",
+            i ? "," : "", t.configured, t.remaining, t.consumed, t.durationSeconds);
+    }
+    printf("],\"vitals\":[");
     for (int i = 0; i < view.teamVitalCount; ++i) {
         const auto &v = view.teamVitals[i];
         printf("%s{\"participant\":%u,\"side\":%d,\"health\":%u,\"armor\":%u}",

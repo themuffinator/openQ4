@@ -3992,6 +3992,8 @@ void VK_GuiExecutor_SetClearColor( const float color[ 4 ] ) {
 }
 
 bool VK_GuiExecutor_BeginFrame( void ) {
+	// main-thread recording (captures, self-tests, render-target changes) waits for the render thread
+	R_RenderThread_Sync( "executor" );
 	static bool loggedNotInitialized = false;
 	static bool loggedInitFailed = false;
 	// Failed submissions can leave an unsignaled fence or an unconsumed binary
@@ -4616,6 +4618,7 @@ static void VK_Exec_TransitionActiveTargetToAttachments( void ) {
 }
 
 bool VK_Exec_SetRenderTarget( idRenderTexture *renderTexture, int cubeFace, bool samplePreviousDepth ) {
+	R_RenderThread_Sync( "executor" );
 	if ( cubeFace < 0 || cubeFace >= 6 || ( renderTexture == NULL && cubeFace != 0 ) ) {
 		return false;
 	}
@@ -7146,6 +7149,7 @@ void RB_ReleaseSavePreview() {
 }
 
 bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixels, int components ) {
+	R_RenderThread_Sync( "readback" );
 	if ( components != 3 && components != 4 ) {
 		return false;
 	}
@@ -7487,6 +7491,7 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 }
 
 bool VK_GuiExecutor_EndFrameAndPresent( void ) {
+	R_RenderThread_Sync( "executor" );
 	if ( vkCtx.presentationBlocked ) return false;
 	(void)VK_DisplayColorMapping_Apply();
 	return VK_GuiExecutor_SubmitFrame( true );
@@ -15727,6 +15732,7 @@ bool VK_Exec_ReadLinearScreenshot( idImage *image, idList<float> &values ) {
 }
 
 bool VK_Exec_ReadImageScreenshot( idImage *image, idList<byte> &pixels ) {
+	R_RenderThread_Sync( "readback" );
 	return VK_Exec_ReadImage( image, NULL, &pixels, true );
 }
 

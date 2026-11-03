@@ -4692,6 +4692,8 @@ idMaterial::CinematicStatus
 =============
 */
 int idMaterial::CinematicStatus( int time ) const {
+	// the backend decodes these cinematics while it records a frame
+	R_RenderThread_Sync( "cinematic" );
 	if ( !stages || !stages[0].texture.cinematic ) {
 		return FMV_IDLE;
 	}
@@ -4706,6 +4708,7 @@ idMaterial::UpdateCinematic
 =============
 */
 void idMaterial::UpdateCinematic( int time ) const {
+	R_RenderThread_Sync( "cinematic" );
 	if ( !stages || !stages[0].texture.cinematic || !backEnd.viewDef ) {
 		return;
 	}
@@ -4718,6 +4721,7 @@ idMaterial::CloseCinematic
 =============
 */
 void idMaterial::CloseCinematic( void ) const {
+	R_RenderThread_Sync( "cinematic" );
 	for( int i = 0; i < numStages; i++ ) {
 		if ( stages[i].texture.cinematic ) {
 			stages[i].texture.cinematic->Close();
@@ -4733,6 +4737,7 @@ idMaterial::ResetCinematicTime
 =============
 */
 void idMaterial::ResetCinematicTime( int time ) const {
+	R_RenderThread_Sync( "cinematic" );
 	for( int i = 0; i < numStages; i++ ) {
 		if ( stages[i].texture.cinematic ) {
 			stages[i].texture.cinematic->ResetTime( time );

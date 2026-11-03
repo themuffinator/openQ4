@@ -40,7 +40,14 @@ void idInterpreter::Save( idSaveGame *savefile ) const {
 	savefile->WriteInt( maxStackDepth );
 
 	savefile->WriteInt( localstackUsed );
-	savefile->Write( &localstack, localstackUsed );
+	// Address temporaries are written as zero (idProgram::ZeroPointerLocals).
+	byte savedStack[ LOCALSTACK_SIZE ];
+	memcpy( savedStack, localstack, localstackUsed );
+	gameLocal.program.ZeroPointerLocals( savedStack, localstackUsed, currentFunction, localstackBase );
+	for( i = 0; i < callStackDepth; i++ ) {
+		gameLocal.program.ZeroPointerLocals( savedStack, localstackUsed, callStack[i].f, callStack[i].stackbase );
+	}
+	savefile->Write( savedStack, localstackUsed );
 
 	savefile->WriteInt( localstackBase );
 	savefile->WriteInt( maxLocalstackUsed );

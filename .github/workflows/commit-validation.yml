@@ -132,6 +132,7 @@ jobs:
             tools/tests/mp_bot_drop_replay.py \
             tools/tests/mp_bot_rim_replay.py \
             tools/tests/mp_roster_smoke.py \
+            tools/tests/mp_match_edges_smoke.py \
             tools/tests/mp_round_remote_smoke.py \
             tools/tests/mp_tourney_smoke.py \
             tools/tests/parser_include_paths_contract.py \
@@ -251,6 +252,7 @@ jobs:
             tools/tests/level_load_cache.py \
             tools/tests/lightgrid_map_identity.py \
             tools/tests/lightgrid_bake_contract.py \
+            tools/tests/renderer_render_thread_contract.py \
             tools/tests/hdr_postprocess_math.py \
             tools/tests/idstr_input_safety.py \
             tools/tests/lexer_input_safety.py \
@@ -737,6 +739,7 @@ jobs:
           python tools/tests/level_load_cache.py
           python tools/tests/lightgrid_map_identity.py
           python tools/tests/lightgrid_bake_contract.py
+          python tools/tests/renderer_render_thread_contract.py
           python tools/tests/hdr_postprocess_math.py
           python tools/tests/idstr_input_safety.py
           python tools/tests/lexer_input_safety.py

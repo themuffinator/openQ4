@@ -458,6 +458,7 @@ void GLimp_Shutdown( void ) {
 }
 
 bool GLimp_SetScreenParms( glimpParms_t parms ) {
+	R_RenderThread_Sync( "screen parms" );
 	if ( vkBackendServices == NULL ) {
 		R_DisplayPresentationFailed( RDP_SCREEN_FAILED );
 		return false;
@@ -498,19 +499,57 @@ bool GLimp_SetScreenParms( glimpParms_t parms ) {
 	return true;
 }
 
-void GLimp_SwapBuffers( void ) {
-	// A latched device queues its own recovery restart (VulkanDevice.cpp).
+/*
+====================
+VK_Backend_PollWindowState
+
+Recovery servicing and the window poll belong to the main thread: recovery
+sets cvars and buffers commands, and the window services call SDL. A frame on
+the render thread (r_vkRenderThread) uses the state its hand-off polled.
+====================
+*/
+static renderModuleWindowInfo_t	vkThreadedWindowInfo;
+static bool						vkThreadedWindowInfoValid = false;
+
+static bool VK_Backend_PollWindowState( renderModuleWindowInfo_t &info ) {
+	if ( vkBackendServices == NULL || vkBackendServices->RefreshNativeWindowHandles == NULL ) {
+		return false;
+	}
+	memset( &info, 0, sizeof( info ) );
+	vkBackendServices->RefreshNativeWindowHandles( &info );
+	glConfig.uiViewportX = info.uiViewportX;
+	glConfig.uiViewportY = info.uiViewportY;
+	glConfig.uiViewportWidth = info.uiViewportWidth;
+	glConfig.uiViewportHeight = info.uiViewportHeight;
+	return true;
+}
+
+void VK_Backend_PrepareThreadedFrame( void ) {
 	VK_Device_ServicePresentationRecovery();
+	vkThreadedWindowInfoValid = VK_Backend_PollWindowState( vkThreadedWindowInfo );
+}
+
+void VK_Backend_CompleteThreadedFrame( void ) {
+	// a device the render thread latched queues its recovery restart here
+	VK_Device_ServicePresentationRecovery();
+}
+
+void GLimp_SwapBuffers( void ) {
+	const bool threaded = R_RenderThread_OnRenderThread();
+	if ( !threaded ) {
+		// A latched device queues its own recovery restart (VulkanDevice.cpp).
+		VK_Device_ServicePresentationRecovery();
+	}
 	// live window-state poll, mirroring the GL seam
-	if ( vkBackendServices != NULL && vkBackendServices->RefreshNativeWindowHandles != NULL ) {
+	if ( threaded ? vkThreadedWindowInfoValid
+			: ( vkBackendServices != NULL && vkBackendServices->RefreshNativeWindowHandles != NULL ) ) {
 		const unsigned long long windowBegin = r_rendererMetrics.GetInteger() > 0 ? R_RendererMetrics_CpuClock() : 0;
 		renderModuleWindowInfo_t info;
-		memset( &info, 0, sizeof( info ) );
-		vkBackendServices->RefreshNativeWindowHandles( &info );
-		glConfig.uiViewportX = info.uiViewportX;
-		glConfig.uiViewportY = info.uiViewportY;
-		glConfig.uiViewportWidth = info.uiViewportWidth;
-		glConfig.uiViewportHeight = info.uiViewportHeight;
+		if ( threaded ) {
+			info = vkThreadedWindowInfo;
+		} else {
+			VK_Backend_PollWindowState( info );
+		}
 		if ( info.pixelWidth > 0 && info.pixelHeight > 0
 				&& ( (uint32_t)info.pixelWidth != vkCtx.swapchainExtent.width
 					|| (uint32_t)info.pixelHeight != vkCtx.swapchainExtent.height ) ) {
@@ -931,10 +970,12 @@ idRenderTexture::idRenderTexture( idImage *colorImage, idImage *depthImage ) {
 }
 
 idRenderTexture::~idRenderTexture() {
+	R_RenderThread_Sync( "render texture" );
 	ReleaseDeviceHandle();
 }
 
 bool idRenderTexture::Resize( int width, int height ) {
+	R_RenderThread_Sync( "render texture" );
 	if ( width <= 0 || height <= 0 || ( colorImages.Num() == 0 && depthImage == NULL ) ) {
 		return false;
 	}

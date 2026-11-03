@@ -791,6 +791,7 @@ def validate_validation_wiring() -> None:
         "mp_control_smoke.py",
         "mp_duel_queue_smoke.py",
         "mp_match_control_team_join_smoke.py",
+        "mp_match_edges_smoke.py",
         "mp_match_flow_smoke.py",
         "mp_mvd_smoke.py",
         "mp_pause_lifecycle_smoke.py",

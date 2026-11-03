@@ -400,6 +400,7 @@ void idVertexCache::PurgeAll() {
 		// through idRenderSystem::Shutdown() long before R_InitOpenGL() ran.
 		return;
 	}
+	R_RenderThread_Sync( "vertex cache" );
 	while( staticHeaders.next != &staticHeaders ) {
 		ActuallyFree( staticHeaders.next );
 	}
@@ -447,6 +448,8 @@ idVertexCache::Alloc
 ===========
 */
 void idVertexCache::Alloc( void *data, int size, vertCache_t **buffer, bool indexBuffer ) {
+	// a frame on the render thread owns the cache lists until it completes
+	R_RenderThread_Sync( "vertex cache" );
 	vertCache_t	*block;
 
 	if ( size < 0 ) {
@@ -535,6 +538,7 @@ idVertexCache::Touch
 ===========
 */
 void idVertexCache::Touch( vertCache_t *block ) {
+	R_RenderThread_Sync( "vertex cache" );
 	if ( !block ) {
 		common->Error( "idVertexCache Touch: NULL pointer" );
 	}
@@ -564,6 +568,7 @@ idVertexCache::Free
 ===========
 */
 void idVertexCache::Free( vertCache_t *block ) {
+	R_RenderThread_Sync( "vertex cache" );
 	if (!block) {
 		return;
 	}
@@ -598,6 +603,7 @@ there may still be future references to dynamically created surfaces.
 ===========
 */
 vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size, bool indexBuffer ) {
+	R_RenderThread_Sync( "vertex cache" );
 	vertCache_t	*block;
 
 	if ( size < 0 ) {

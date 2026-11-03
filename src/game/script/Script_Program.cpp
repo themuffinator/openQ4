@@ -1499,6 +1499,7 @@ idProgram::AllocDef
 */
 idVarDef *idProgram::AllocDef( idTypeDef *type, const char *name, idVarDef *scope, bool constant ) {
 	saveChecksumValid = false;
+	pointerLocalsValid = false;
 	idVarDef	*def;
 	idStr		element;
 	idVarDef	*def_x;
@@ -1686,6 +1687,7 @@ idProgram::FreeDef
 */
 void idProgram::FreeDef( idVarDef *def, const idVarDef *scope ) {
 	saveChecksumValid = false;
+	pointerLocalsValid = false;
 	idVarDef *e;
 	int i;
 
@@ -1903,6 +1905,7 @@ idProgram::AllocStatement
 */
 statement_t *idProgram::AllocStatement( void ) {
 	saveChecksumValid = false;
+	pointerLocalsValid = false;
 	if ( statements.Num() >= statements.Max() ) {
 		throw idCompileError( va( "Exceeded maximum allowed number of statements (%d)", statements.Max() ) );
 	}
@@ -2247,6 +2250,7 @@ idProgram::FreeData
 */
 void idProgram::FreeData( void ) {
 	saveChecksumValid = false;
+	pointerLocalsValid = false;
 	int i;
 
 	// free the defs
@@ -2455,6 +2459,48 @@ int idProgram::GetSaveChecksum( void ) const {
 
 /*
 ================
+idProgram::ZeroPointerLocals
+
+Clears the pointer-typed locals of one frame in a copy of a thread's local
+stack. Those are OP_ADDRESS temporaries holding raw addresses into script
+objects. In shipped scripts no save point falls between an address and the
+store that uses it, so their bytes are stale. Writing them as zero keeps saves
+deterministic and free of pointer-width values, and a store through a restored
+slot is skipped (OP_STOREP_* checks for NULL) instead of writing through an
+address from another process (roadmap Q4-06).
+================
+*/
+void idProgram::ZeroPointerLocals( byte *stack, int stackUsed, const function_t *func, int stackBase ) const {
+	if ( func == NULL || functions.Num() == 0 ) {
+		return;
+	}
+	if ( !pointerLocalsValid ) {
+		pointerLocalFunctions.Clear();
+		pointerLocalOffsets.Clear();
+		for ( int i = 0; i < varDefs.Num(); i++ ) {
+			const idVarDef *def = varDefs[ i ];
+			if ( def != NULL && def->Type() == ev_pointer && def->initialized == idVarDef::stackVariable &&
+				 def->scope != NULL && def->scope->Type() == ev_function && def->scope->value.functionPtr != NULL ) {
+				pointerLocalFunctions.Append( static_cast<int>( def->scope->value.functionPtr - &functions[ 0 ] ) );
+				pointerLocalOffsets.Append( def->value.stackOffset );
+			}
+		}
+		pointerLocalsValid = true;
+	}
+	const int index = static_cast<int>( func - &functions[ 0 ] );
+	for ( int i = 0; i < pointerLocalFunctions.Num(); i++ ) {
+		if ( pointerLocalFunctions[ i ] != index ) {
+			continue;
+		}
+		const int start = stackBase + pointerLocalOffsets[ i ];
+		if ( start >= 0 && start + static_cast<int>( sizeof( intptr_t ) ) <= stackUsed ) {
+			memset( stack + start, 0, sizeof( intptr_t ) );
+		}
+	}
+}
+
+/*
+================
 idProgram::CalculateChecksum
 ================
 */
@@ -2514,6 +2560,7 @@ Restores all variables to their initial value
 */
 void idProgram::Restart( void ) {
 	saveChecksumValid = false;
+	pointerLocalsValid = false;
 	int i;
 
 	idThread::Restart();

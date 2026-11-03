@@ -70,12 +70,15 @@ class RosterRun(SeriesRun):
             "net_allowCheats": "1", "com_skipLoadingContinue": "1",
             "g_autoExecAfterMapLoad": "series_start.cfg", "g_autoExecAfterMapLoadDelayMs": "500",
             "oq4_series_cmd_1": "exec series_step_1.cfg", "net_port": str(a.port + port_offset),
+            # Loopback-only peers: no firewall prompt for a new executable path.
+            "net_ip": "127.0.0.1", "net_enableIPv6": "0",
         }
         if role == "host":
             cvars.update(net_serverDedicated="0", net_LANServer="1", si_pure="0", si_maxPlayers="4",
                          si_gameType="Team DM", bot_minPlayers="0", g_matchProfile="competitive_tdm",
                          g_gameReviewPause="90", g_refPassword="mprostersmokeonly",
                          si_mapCycle="", g_mapCycle="")
+        cvars.update(self.launch_overrides(role))
         command = [str(self.runtime / a.executable_name)]
         for key, value in cvars.items():
             command += ["+set", key, value]
@@ -125,8 +128,8 @@ class RosterRun(SeriesRun):
             raise RuntimeError("runtime decoder lacks roster/proposal fields; regenerate its pinned decoder")
         return view
 
-    def sample(self, role, label, predicate=lambda view: True):
-        view = self.await_view(role, label, predicate)
+    def sample(self, role, label, predicate=lambda view: True, timeout=30):
+        view = self.await_view(role, label, predicate, timeout)
         folder = self.output / "views"
         folder.mkdir(exist_ok=True)
         shutil.copy2(self.games[role] / f"match-probe/view-{ROLES[role][0]}.bin", folder / f"{label}.bin")

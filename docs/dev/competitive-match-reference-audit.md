@@ -987,6 +987,11 @@ framework with substantial scoped live evidence and specific release checks
 still open, while stopping short of an independent tournament-certification
 claim.
 
+The [3 November live closure runs](#live-closure-scenarios-2026-11-03) cover the
+named substitution, invitation-expiry, proposal-execution, map-load rollback,
+countdown, timeout-charging, stale-camera and spectator-invitation edges in
+items 2, 3 and 5; the limits recorded there still apply.
+
 ## Summary chat clipping qualification (2026-09-07)
 
 The shared GUI clipper could produce a negative height or width for glyphs
@@ -1146,3 +1151,81 @@ substitution, timed invitation expiry, proposal execution through Match
 Control, physical localized input and the rest of the release closure order)
 still need runtime evidence, and the post-commit series rollback limit is
 unchanged.
+
+## Live closure scenarios (2026-11-03)
+
+The eight live scenarios that the 23 October review left open now have runtime
+reports. One staged Windows x64 OpenGL runtime served every run: a
+debugoptimized build of `1e1f3e88a` from a clean worktree, whose only
+uncommitted changes were the test harnesses (the log banner reads
+`0.13.2-dev+g1e1f3e88.dirty`). Each report directory carries
+`runtime-manifest.json` with the SHA-256 of every staged binary and pack:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `openQ4-client_x64.exe` | `b83a10fd49a52663a275b17d86e041538fe0f79fe1f3d29c5f6abb55464a2f76` |
+| `baseoq4/game-mp_x64.dll` | `6f61301718802436b77ccc425fd93507600418c00c917b5e415d53c895b2b1d3` |
+| `baseoq4/pak0.pk4` | `1f4f336b81c2c9b55bb14018e54dc23a9437ae8927555e6ea632ffdc745275dc` |
+| `renderer-gl_x64.dll` | `4ddb636d537bc270b7ab4a593543c57a90d0c9698bbdd131753fbae4ed9c714e` |
+
+All peers ran hidden 960x540 windows on stock assets, bound to `127.0.0.1`,
+and were driven by engine diagnostic commands and Match Control's native menu
+handlers. No operating-system input was used. Evidence is under
+`.tmp/mp01-live-20261103/`.
+
+`tools/tests/mp_match_edges_smoke.py` (three humans, Team DM, competitive
+profile) passed 29 accepted-view checkpoints in 554.5 seconds, and all four
+client lifetimes exited with code 0 (`edges/report.json`, SHA-256
+`1e0de4295f6a81380ca04bb6d49523b966f5cbbdcda516b5f492fb8ef6b23f05`).
+`tools/tests/mp_series_smoke.py --missing-map-retry` (two humans, Team DM BO1)
+passed with 12 engine captures and both exits 0 (`series-rollback/report.json`,
+SHA-256 `7ab9e826e00325fb7fdbf816339b6044ef2d957a5f93366c60152987e94713e2`;
+`series-rollback-repeat` is an earlier passing run). The committed harness
+differs from that run only in reading the option through a defaulted
+attribute, so that other fixtures reusing `SeriesRun.run()` keep working. A
+default BO1 run on the committed harness also passes (`series-bo1-regression`).
+
+| Scenario | Checkpoints | Result |
+| --- | --- | --- |
+| Captain substitution | `bench-accepted`, `bench-promoted`, `captain-benched`, `bench-restored`, `promoted-player-benched`, `bench-left` | **Pass.** With two seats per side, an invited substitute waits on the Strogg bench. The host's substitution makes it the active Strogg captain and benches the old captain, without the captain role. The reverse substitution restores the original captain, and the substitute then leaves the bench. |
+| Timed invitation expiry | `expiring-invitation`, `invitation-expired`, `expired-accept-denied` | **Pass.** The invitation reports the 60-second lifetime (55.0 s remaining when first observed) and is gone 1.5 s after its deadline. The stale acceptance from the still-selected row leaves the target unrostered. |
+| Proposals through native actions | `abort-ballot-open`, `abort-ballot-caller`, `referee-during-vote`, `passed-abort-executed` | **Global: pass.** The Strogg captain selects the side scope, then creates an abort ballot. It opens as a global ballot (scope 0, no side ballot on either captain) with two voters and the caller's YES. A referee sign-in during the vote moves the session from revision 94 to 95. The host's YES then executes the ballot at revision 96, and the match goes to review. **Side: not reachable**, see below. |
+| Duplicate and simultaneous timeouts | `duplicate-timeout-paused`, `simultaneous-timeout-settled` | **Pass.** Two timeout requests in one frame from the Strogg captain pause the match once and charge Strogg once (consumed 0/1). After the resume, both captains request together. One pause results, its owner (Marine in this run) is charged once, and the other request is refused uncharged (1 of 2 remaining per side). |
+| Countdown cancellation | `countdown-started`, `countdown-cancelled`, `unready-after-cancel`; `disconnect-countdown-started`, `countdown-cancelled-by-disconnect` | **Pass, both causes.** A staged 25-second countdown returns to warmup in the same session when the Strogg captain unreadies (sampled 6.9 s after it started). In the next warmup, the followed Strogg captain disconnects 6.0 s into a new countdown. The match returns to warmup, the departed captain's seat is released, and readiness reports one vacant required seat. |
+| Failed series map load rollback | `series-rollback` captures `map-load-failure-1/2`, then `map-1-live` to `series-complete` | **Pass.** The BO1 pool holds one map that is declared but has no files. When the final veto schedules it, the preflight refuses the load and records the failure durably: the series stays READY with the same next map, and the session, current map and both peers' loaded maps are unchanged. A second Advance records exactly one more failure (series revision 5 to 6) and rewrites the checkpoint. With the map files restored (copies of stock q4dm1), Advance loads the map, which plays, forfeits and completes the series with published JSON, MVD and final report. |
+| Stale follow targets | `referee-following-client`, `follow-released-on-disconnect`, `followed-slot-replacement`, `replacement-not-followed` | **Pass.** The referee follows the Strogg captain, and the captain's disconnect releases that camera. The replacement reuses slot 1 with a new participant (4) and binding generation (3), and with no captain or referee role. The referee's camera does not return to the reused slot. |
+| Captain spectator-invitation denial | `invited-spectator-live`, `invited-spectator-after-follow` | **Pass.** During live play, a neutral spectator who holds a Strogg captain's invitation receives no follow targets. Its explicit `follow 1` is refused: the server allows no target and the spectator stays on its free camera. |
+
+No product defect surfaced, so no source change or contract was needed.
+Findings and limits:
+
+- **Side proposals have no creation surface.** The protocol and adapter accept
+  a side-scoped `proposal_create`, and the view publishes the recipient's
+  own-side ballot. But every Match Control creation template is global, and the
+  scope selector only addresses an existing ballot for voting or cancellation,
+  as [match-control-ui-contract.md](match-control-ui-contract.md) specifies.
+  The run shows that selecting the side scope still creates a global ballot. Side
+  ballot display, thresholds and execution stay unqualified until a targeted
+  template passes the protocol and authorization review the contract requires.
+- The map-load rollback covers the preflight path. A map whose files exist but
+  fail to load after `MAP_ACTIVE` is committed remains the documented
+  post-commit limit, and it was not exercised.
+- The engine reports a spectator's free camera as following its own slot
+  (`MP_CAMERA ... target=<self> following=1`); camera checks exclude that entry.
+- Team-timeout budgets are charged when the pending pause commits, so charges
+  are judged in the PAUSED view, not the transient PENDING one.
+
+Failed attempts are retained beside the evidence. `edges-r1` stopped on the
+self-slot camera entry described above. `edges-r2` timed out admitting the
+observer while another session's compiler sweep saturated the CPU: its host
+advanced 12 seconds of game time in about two minutes. That was starvation,
+not a hang. `edges-r3` lost an injected host command: two injections inside
+one pump period replaced the command selector before the first ran. The
+fixture now waits for each request's echo. The edges fixture was first drafted
+in a separate worktree, where its earlier runs failed for these same reasons
+and on the 10-second default countdown, which ended before a cooldown-paced
+unready could land; the fixture now stages 25 seconds.
+
+These reports do not close MP-01. Physical localized keyboard and controller
+workflows, side-ballot qualification, the post-commit map-load limit, other
+renderers and platforms, and the remaining release closure order stay open.

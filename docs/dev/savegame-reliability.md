@@ -1011,11 +1011,13 @@ script-storage calls, plus 40 legacy-reader reads. Those reads serve only the
 v2 and v3 historical decoders; the current writer saves those fields typed.
 
 Stage 2's second slice converted every bitfield and LE-scalar block with
-unchanged bytes, which leaves 7 direct raw writes per tree: 10 aggregate and 8
-script-storage calls. On the GUI side, the window layout fields now go through
-typed encoders, leaving 75 PDA minigame calls, 3 calls for the transition
-interpolator (an aggregate), 12 byte payloads and 8 helper definitions. The
-test also pins the script type widths that the script storage depends on.
+unchanged bytes. That leaves 7 direct raw writes per tree: 10 aggregate and 8
+script-storage calls, the stack among them now written from a copy with its
+address temporaries zeroed. On the GUI side, the window layout fields and the
+PDA minigame fields now go through typed encoders. That leaves 3 calls for the
+transition interpolator (an aggregate), 12 byte payloads, 8 helper definitions
+and 6 legacy reads for the minigames' unversioned format. The test also pins
+the script type widths that the script storage depends on.
 
 Saved primitives are already portable: `WriteInt`, `WriteFloat`, the vector
 and matrix writers and `WriteShort` swap to little-endian, `WriteBool` writes
@@ -1031,10 +1033,20 @@ below, classified for [Q4-06](roadmap.md):
 | Joints, AF pose joints, pose modifiers and pose frame | `anim/Anim_Blend.cpp` | `idJointMat`, `int`, `idAFPoseJointMod` and `idJointQuat` arrays: floats and int32 with no padding, so portable by accident | Explicit floats and ints | Converted, same bytes |
 | Eye and driver joint axis and direction maps | `vehicle/VehiclePosition.cpp` | int32 arrays, portable on little-endian | `WriteInt` per element | Converted, same bytes |
 | Hover dampening samples | `ai/Monster_ConvoyHover.cpp` | `idAngles` array, portable on little-endian | Angles per sample | Converted, same bytes |
-| Interpreter stack, global variables and script object data | `script/Script_Interpreter.cpp`, `script/Script_Program.cpp` (globals go through `WriteByte`, one byte at a time, so they are outside the direct-call count) | Script values in host byte order. Function, pointer, namespace and script-event slots are `intptr_t` wide: 8 bytes on every family member, but their bytes are compile-time or expression temporaries | Scalar block with those slots zeroed, or a typed walk | Open |
+| Interpreter stack, global variables and script object data | `script/Script_Interpreter.cpp`, `script/Script_Program.cpp` (globals go through `WriteByte`, one byte at a time, so they are outside the direct-call count) | Script values in host byte order. Function, pointer, namespace and script-event slots are `intptr_t` wide: 8 bytes on every family member, but their bytes are compile-time or expression temporaries | Scalar block with the address temporaries zeroed (`idProgram::ZeroPointerLocals`) | Converted; dead slots now zero |
 | GUI window fields | `src/ui/Window.cpp` (27), `src/ui/SimpleWindow.cpp` (15) | Floats, ints, rectangles and vectors, portable on little-endian | Typed `OpenQ4_*SaveGameField` overloads | Converted, same bytes |
 | GUI transition interpolator | `src/ui/Window.cpp` | Template aggregate | `SaveCodec_WriteInterpolate` | Payload v5 |
-| PDA minigame fields | `src/ui/GameBearShootWindow.cpp`, `GameBustOutWindow.cpp`, `GameSSDWindow.cpp` | bool, float and vector fields written by `sizeof` | Explicit fields | Open |
+| PDA minigame fields | `src/ui/GameBearShootWindow.cpp`, `GameBustOutWindow.cpp`, `GameSSDWindow.cpp` | bool, float and vector fields written by `sizeof` | Typed `OpenQ4_*SaveGameField` overloads | Converted, same bytes |
+
+The script stack is the one place whose bytes changed. Address temporaries
+held stale raw pointers that nothing reads after a load, and they are now
+written as zero. `idProgram::ZeroPointerLocals` finds every pointer-typed stack
+local from the program's definitions, caching them until the definitions
+change. The interpreter clears those slots for the current frame and each
+saved caller frame in a copy of the stack. Readers are unchanged. A restored
+store through such a slot is skipped, because `OP_STOREP_*` checks for NULL,
+where a stale pointer from an older save would have written through another
+process's address.
 
 The converted blocks write exactly the bytes their raw copies wrote, so they
 need no version change, and existing saves restore through the new readers.

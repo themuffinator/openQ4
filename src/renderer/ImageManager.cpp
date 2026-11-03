@@ -917,6 +917,8 @@ copies the name, and adds it to the hash chain.
 ==============
 */
 idImage *idImageManager::AllocImage( const char *name ) {
+	// the image list and hash are read by a frame on the render thread
+	R_RenderThread_Sync( "image" );
 	if (strlen(name) >= MAX_IMAGE_NAME ) {
 		common->Error ("idImageManager::AllocImage: \"%s\" is too long\n", name);
 	}

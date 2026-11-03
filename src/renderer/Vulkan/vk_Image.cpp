@@ -683,6 +683,7 @@ bool VK_Image_GetRenderTargetAttachments( const idRenderTexture *target, int cub
 }
 
 void VK_Image_ShutdownAll( void ) {
+	R_RenderThread_Sync( "image" );
 	for ( int i = 0; i < VK_MAX_IMAGES; i++ ) {
 		if ( !vkImages[ i ].inUse ) {
 			continue;
@@ -715,6 +716,7 @@ idImage::PurgeImage
 */
 void idImage::PurgeImage( void ) {
 	if ( !R_ImagePolicyContentMutation() ) return;
+	R_RenderThread_Sync( "image" );
 	vkImageEntry_t *entry = VK_Image_GetEntry( texnum );
 	if ( entry != NULL ) {
 		// the image may still be referenced by an in-flight frame
@@ -803,6 +805,7 @@ exactly like the GL half without a context; the InitOpenGL seam reloads.
 void idImage::AllocImage( void ) {
 	renderImageOperation_t imageOperation( this );
 	if ( !imageOperation.Allowed() ) return;
+	R_RenderThread_Sync( "image" );
 
 	PurgeImage();
 	storageGeneration++;
@@ -1139,6 +1142,7 @@ static void VK_Image_RecordUpload( VkCommandBuffer cmd, void *user ) {
 void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int height, const void *pic, int pixelPitch ) const {
 	renderImageOperation_t imageOperation( this, true, mipLevel, z, x == 0 && y == 0 ? width : 0, height );
 	if ( !imageOperation.Allowed() ) return;
+	R_RenderThread_Sync( "image" );
 
 	vkImageEntry_t *entry = VK_Image_GetEntry( texnum );
 	if ( entry != NULL ) {
@@ -1306,6 +1310,7 @@ executor's descriptor cache re-bind.
 ====================
 */
 void idImage::SetTexParameters( void ) {
+	R_RenderThread_Sync( "image" );
 	vkImageEntry_t *entry = VK_Image_GetEntry( texnum );
 	if ( entry == NULL ) {
 		return;
@@ -1352,6 +1357,7 @@ void idImage::Resize( int width, int height ) {
 		return;
 	}
 	if ( !R_ImagePolicyContentMutation() ) return;
+	R_RenderThread_Sync( "image" );
 	opts.width = width;
 	opts.height = height;
 	AllocImage();

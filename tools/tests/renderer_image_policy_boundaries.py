@@ -44,6 +44,7 @@ static int fail=0;
 template<class T> T Max(T a,T b){return std::max(a,b);}
 template<class T> T Min(T a,T b){return std::min(a,b);}
 bool R_ImagePolicyOperationAllowed(){return allowed;}
+static void R_RenderThread_Sync(const char*){} // no render thread in this harness
 bool R_ImagePolicyContentMutation(){return allowed;}
 void R_ImagePolicyObserveError(const char*,int=0){++errors;}
 struct Common {void Warning(const char*,...) {}} commonObject;
@@ -142,6 +143,7 @@ ENTRY_SUPPORT = r'''
 static bool allowed=false;static int mutations=0,checks=0,observed=0,logged=0;
 #define TEST(x) do{++checks;if(!(x))throw std::runtime_error(#x);}while(0)
 bool R_ImagePolicyOperationAllowed(){return allowed;}
+static void R_RenderThread_Sync(const char*){} // no render thread in this harness
 bool R_ImagePolicyContentMutation(){return allowed;}
 void R_ImagePolicyObserveError(const char*,int){++observed;}
 struct idImage{void ActuallyLoadImage(bool);void Reload(bool);void PurgeGL();void PurgeVK();};

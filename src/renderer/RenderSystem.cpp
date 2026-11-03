@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "RendererBootstrap.h"
 #include "RendererMetrics.h"
 #include "RendererModule.h"
+#include "RendererResourceSettings.h"
 #include "RendererUpload.h"
 #include "ScenePackets.h"
 #include "TemporalPresentation.h"
@@ -345,6 +346,8 @@ static void R_SubmitDeferredCommands( void ) {
 }
 
 static void R_IssueRenderCommands( void ) {
+	// captures and other inline flushes need the previous frame finished
+	R_RenderThread_Sync( "inline issue" );
 	R_SubmitDeferredCommands();
 
 	if ( frameData->cmdHead->commandId == RC_NOP
@@ -371,10 +374,47 @@ static void R_IssueRenderCommands( void ) {
 }
 
 /*
+====================
+R_IssueRenderCommandsOnRenderThread
+
+Hands this frame's commands to the render thread (r_vkRenderThread). False
+means the caller runs them inline.
+====================
+*/
+static bool R_IssueRenderCommandsOnRenderThread( void ) {
+	R_SubmitDeferredCommands();
+	if ( frameData->cmdHead->commandId == RC_NOP && !frameData->cmdHead->next ) {
+		return false;
+	}
+	return R_RenderThread_Begin( frameData->cmdHead );
+}
+
+/*
+====================
+R_RenderThread_FrameQualifies
+
+Stage 1 runs only ordinary presented frames on the render thread. Captures,
+tiled screenshots and loading screens keep the inline backend: they read the
+result back, or interleave with level loading that creates and destroys
+device resources. VR presents only on OpenGL.
+====================
+*/
+bool R_RenderThread_FrameQualifies( void ) {
+	// The Alpha Labs overlay walks the world's live lightDefs, which the game
+	// tic adds to and frees. A checked image reload binds image work to the
+	// main thread.
+	return !tr.takingScreenshot
+		&& tr.tiledViewport[0] == 0
+		&& !R_LoadingScreenActive()
+		&& ( tr.specialEffectsEnabled & SPECIAL_EFFECT_AL ) == 0
+		&& !R_ImagePolicyActive();
+}
+
+/*
 ============
 R_GetCommandBuffer
 
-Returns memory for a command buffer (stretchPicCommand_t, 
+Returns memory for a command buffer (stretchPicCommand_t,
 drawSurfsCommand_t, etc) and links it to the end of the
 current command chain.
 ============
@@ -382,6 +422,8 @@ current command chain.
 void *R_GetCommandBuffer( int bytes ) {
 	emptyCommand_t	*cmd;
 
+	// the chain still belongs to the render thread until the frame completes
+	R_RenderThread_Sync( "command buffer" );
 	cmd = (emptyCommand_t *)R_FrameAlloc( bytes );
 	cmd->next = NULL;
 	frameData->cmdTail->next = &cmd->commandId;
@@ -665,6 +707,10 @@ void idRenderSystemLocal::SetSpecialEffect( ESpecialEffectType Which, bool Enabl
 	if ( Which <= SPECIAL_EFFECT_NONE || Which >= SPECIAL_EFFECT_MAX ) {
 		return;
 	}
+	// the backend reads these live while it records the frame
+	if ( ( ( specialEffectsEnabled & Which ) != 0 ) != Enabled ) {
+		R_RenderThread_Sync( "special effect" );
+	}
 
 	if ( Enabled ) {
 		specialEffectsEnabled |= Which;
@@ -694,6 +740,9 @@ void idRenderSystemLocal::SetSpecialEffectParm( ESpecialEffectType Which, int Pa
 	if ( Parm < 0 || Parm >= MAX_ENTITY_SHADER_PARMS ) {
 		return;
 	}
+	if ( specialEffectParms[ Which ][ Parm ] != Value ) {
+		R_RenderThread_Sync( "special effect" );
+	}
 
 	specialEffectParms[ Which ][ Parm ] = Value;
 }
@@ -708,6 +757,7 @@ idRenderSystemLocal::ShutdownSpecialEffects
 =============
 */
 void idRenderSystemLocal::ShutdownSpecialEffects( void ) {
+	R_RenderThread_Sync( "special effect" );
 	if ( specialBlurDepthRenderTexture != NULL ) {
 		DestroyRenderTexture( specialBlurDepthRenderTexture );
 		specialBlurDepthRenderTexture = NULL;
@@ -909,6 +959,7 @@ generated GUI content (player stat graphs).
 =============
 */
 bool idRenderSystemLocal::UploadMaterialStageScratchImage( const idMaterial *material, int stageIndex, const byte *data, int width, int height ) {
+	R_RenderThread_Sync( "image" );
 	if ( material == NULL || data == NULL || stageIndex < 0 || stageIndex >= material->GetNumStages() ) {
 		return false;
 	}
@@ -1397,6 +1448,9 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	if ( !glConfig.isInitialized ) {
 		return;
 	}
+	// The previous frame may still be recording on the render thread; this
+	// frame's front end reuses its frame memory and vertex-cache temps.
+	R_RenderThread_Sync( "frame" );
 	R_RendererMetrics_MarkCpuFrameBegin();
 
 	// determine which back end we will use
@@ -1612,17 +1666,63 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 
 	// start the back end up again with the new command list
 	R_RendererMetrics_MarkFrameSubmitBegin();
-	R_IssueRenderCommands();
+	const int frameFrontEndMsec = pc.frontEndMsec;
+	if ( R_IssueRenderCommandsOnRenderThread() ) {
+		renderThreadFrameCounters = pc;
+		renderThreadFrameCountersValid = true;
+		memset( &pc, 0, sizeof( pc ) );
+		// The render thread owns this frame's commands, frame memory and
+		// vertex-cache temps until R_RenderThread_Sync completes the frame.
+		// The back-end time reported here is the previous frame's.
+		if ( frontEndMsec ) {
+			*frontEndMsec = frameFrontEndMsec;
+		}
+		if ( backEndMsec ) {
+			*backEndMsec = backEnd.pc.msec;
+		}
+	} else {
+		R_IssueRenderCommands();
+		CompleteBackEndFrame();
+
+		// save out timing information after the backend has consumed the frame.
+		if ( frontEndMsec ) {
+			*frontEndMsec = frameFrontEndMsec;
+		}
+		if ( backEndMsec ) {
+			*backEndMsec = backEnd.pc.msec;
+		}
+	}
+
+	if ( session->writeDemo ) {
+		session->writeDemo->WriteInt( DS_RENDER );
+		session->writeDemo->WriteInt( DC_END_FRAME );
+		if ( r_showDemo.GetBool() ) {
+			common->Printf( "write DC_END_FRAME\n" );
+		}
+	}
+
+}
+
+/*
+===============
+idRenderSystemLocal::CompleteBackEndFrame
+
+The bookkeeping that follows the backend's consumption of a frame. EndFrame
+runs it inline; with the render thread (r_vkRenderThread) the main thread
+runs it in R_RenderThread_Sync once the thread has finished the frame.
+===============
+*/
+void idRenderSystemLocal::CompleteBackEndFrame( void ) {
+	performanceCounters_t ticCounters;
+	const bool threadedFrame = renderThreadFrameCountersValid;
+	if ( threadedFrame ) {
+		ticCounters = pc;
+		pc = renderThreadFrameCounters;
+		renderThreadFrameCountersValid = false;
+	}
+
 	FinishVRFrame();
 	ProcessPendingRenderTextureDeletes();
-
-	// save out timing information after the backend has consumed the frame.
-	if ( frontEndMsec ) {
-		*frontEndMsec = pc.frontEndMsec;
-	}
-	if ( backEndMsec ) {
-		*backEndMsec = backEnd.pc.msec;
-	}
 
 	R_RendererMetrics_EndFrame(
 		pc.frontEndMsec,
@@ -1638,22 +1738,22 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	// print any other statistics and clear all of them
 	R_PerformanceCounters();
 
-	// use the other buffers next frame, because another CPU
-	// may still be rendering into the current buffers
+	// reset frame memory and the command chain for the next frame
 	R_ToggleSmpFrame();
 
 	// we can now release the vertexes used this frame
 	vertexCache.EndFrame();
 	R_RendererUpload_EndFrame();
 
-	if ( session->writeDemo ) {
-		session->writeDemo->WriteInt( DS_RENDER );
-		session->writeDemo->WriteInt( DC_END_FRAME );
-		if ( r_showDemo.GetBool() ) {
-			common->Printf( "write DC_END_FRAME\n" );
+	if ( threadedFrame ) {
+		pc = ticCounters;
+		// the game tic's changes to defs the finished frame drew
+		for ( int i = 0; i < worlds.Num(); i++ ) {
+			if ( worlds[i] != NULL ) {
+				worlds[i]->ApplyPendingDefOps();
+			}
 		}
 	}
-
 }
 
 /*
@@ -2103,10 +2203,13 @@ static byte *R_ResampleCaptureToAspectRGBA( const byte *source, int sourceWidth,
 }
 
 bool idRenderSystemLocal::BeginSavePreview() {
+	// the preview state machine is shared with the frame on the render thread
+	R_RenderThread_Sync( "save preview" );
 	return glConfig.isInitialized && RB_RequestSavePreview();
 }
 
 int idRenderSystemLocal::PollSavePreview( const char *fileName ) {
+	R_RenderThread_Sync( "save preview" );
 	const byte *pixels = NULL;
 	int width = 0, height = 0;
 	bool topDown = false, bgra = false;
@@ -2123,6 +2226,7 @@ int idRenderSystemLocal::PollSavePreview( const char *fileName ) {
 }
 
 void idRenderSystemLocal::CancelSavePreview() {
+	R_RenderThread_Sync( "save preview" );
 	RB_ReleaseSavePreview();
 }
 
@@ -2149,6 +2253,7 @@ void idRenderSystemLocal::CaptureRenderToFile( const char *fileName, bool fixAlp
 		return;
 	}
 
+	R_RenderThread_Sync( "screenshot" );
 	guiModel->EmitFullScreen();
 	guiModel->Clear();
 	const bool wasTakingScreenshot = tr.takingScreenshot;
@@ -2205,6 +2310,7 @@ FreeRenderWorld
 ==============
 */
 void idRenderSystemLocal::FreeRenderWorld( idRenderWorld *rw ) {
+	R_RenderThread_Sync( "world" );
 	if ( primaryWorld == rw ) {
 		primaryWorld = NULL;
 	}
@@ -2234,6 +2340,7 @@ idRenderSystemLocal::UploadImage
 ===============
 */
 bool idRenderSystemLocal::UploadImage( const char *imageName, const byte *data, int width, int height  ) {
+	R_RenderThread_Sync( "image" );
 	if ( data == NULL || width <= 0 || height <= 0 ) return false;
 	idImage *image = globalImages->GetImage( imageName );
 	if ( !image ) {
@@ -2348,6 +2455,7 @@ idRenderSystemLocal::CreateImage
 ===============
 */
 idImage* idRenderSystemLocal::CreateImage(const char* name, idImageOpts* opts, textureFilter_t textureFilter) {
+	R_RenderThread_Sync( "image" );
 	// Adopt existing intrinsic placeholders through the same ownership path as
 	// new images. Allocating them directly leaves their generators in charge of
 	// reload, which discards the render target's current size and format.
@@ -2534,6 +2642,7 @@ idRenderSystemLocal::ResizeImage
 ===============
 */
 void idRenderSystemLocal::ResizeImage(idImage* image, int width, int height) {
+	R_RenderThread_Sync( "image" );
 	image->Resize(width, height);
 }
 
@@ -2908,6 +3017,7 @@ idRenderSystemLocal::ResizeRenderTexture
 ===============
 */
 bool idRenderSystemLocal::ResizeRenderTexture(idRenderTexture*& renderTexture, int width, int height) {
+	R_RenderThread_Sync( "render texture" );
 	if ( renderTexture == NULL ) {
 		return false;
 	}
@@ -3021,6 +3131,7 @@ idRenderSystemLocal::CreateRenderTexture
 ===============
 */
 idRenderTexture* idRenderSystemLocal::CreateRenderTexture(idImage* albedoImage, idImage* depthImage, idImage* albedoImage2, idImage* albedoImage3) {
+	R_RenderThread_Sync( "render texture" );
 	// Creation runs on the active GL thread. Latch a rejected attachment/storage
 	// set so helpers that keep a NULL pointer do not recreate and re-log the same
 	// unsupported FBO every frame. Context changes and image reallocations retry.
@@ -3063,6 +3174,7 @@ idRenderSystemLocal::DestroyRenderTexture
 ===============
 */
 void idRenderSystemLocal::DestroyRenderTexture( idRenderTexture* renderTexture ) {
+	R_RenderThread_Sync( "render texture" );
 	if ( renderTexture == nullptr ) {
 		return;
 	}
