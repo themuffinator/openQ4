@@ -40,7 +40,6 @@ See [player release status](../user/release-status.md).
   keys). A stale `static void GfxInfo_f( void )` declaration of an overload
   that never existed is gone (clang `-Wunused-function`).
 
-
 ## Damaged saves fail cleanly, 3 November 2026
 
 - **Refusing a damaged save no longer risks closing the game.** When a load
