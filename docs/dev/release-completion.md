@@ -6,6 +6,21 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Immediate resaves and interrupted loads, 3 November 2026
+
+- **Saving immediately after loading now produces a loadable save.** This also
+  protects a checkpoint queued behind a load. Previously, saving before gameplay
+  resumed could leave the new slot unable to load. Already-damaged slots are not
+  repaired; load a healthy slot and save again.
+- **Interrupted loads clean up more reliably.** Partially read inventory items,
+  collision models and collision-cache records are released, and an unfinished
+  list of collision models no longer exposes unset pointers during cleanup.
+- The save format and existing compatibility readers are unchanged. The new
+  failure-path tests pass for both game libraries on Windows and Linux, including
+  deliberate regressions. All 50 focused Windows save/restore tests pass, and
+  immediate resaves reload into gameplay on OpenGL and Vulkan. See
+  [save reliability](savegame-reliability.md#saving-before-the-first-frame-after-a-load).
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The

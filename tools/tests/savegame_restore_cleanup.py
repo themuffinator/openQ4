@@ -76,6 +76,7 @@ public:
 };
 struct idRestoreGame {
     idList<idClass*> objects;
+    idList<idClass*> postRestoreObjects;
     idHashIndex objectHash;
     bool ownsObjects=false;
     idRestoreGame* previousRestore=nullptr;
@@ -135,10 +136,13 @@ int main(int argc,char** argv) {
             idRestoreGame outer,inner;
             auto first=new idClass; auto second=new idClass;
             outer.objects.entries={nullptr,first}; inner.objects.entries={nullptr,second};
+            outer.postRestoreObjects.entries={first,second};
             outer.BeginObjectOwnership(); outer.TrackObject(1);
             inner.BeginObjectOwnership(); inner.TrackObject(1);
             delete first;
+            if(outer.postRestoreObjects.entries[0]) throw std::runtime_error("destroyed fixup target retained");
             outer.ReleaseObjects();
+            if(outer.postRestoreObjects.Num()) throw std::runtime_error("released fixup targets retained");
             if(idRestoreGame::activeRestore!=&inner || inner.previousRestore) throw std::runtime_error("nested owner unlink failed");
             inner.DeleteObjects();
         }

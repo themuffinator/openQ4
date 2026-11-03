@@ -1752,9 +1752,17 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   client-entity bindings, influence-target entity numbers, burning-joint counts
   and unregistered objects' numbers are checked. Valid saves are unaffected:
   all 11 release fixtures (0.9 to 0.13) restore, and the campaign chain passes
-  on OpenGL. Still open: leaks on refused loads, and a pre-existing defect
-  where a [save made before the first frame after a load](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
-  writes NULL references.
+  on OpenGL. Later on 3 November, the identified
+  [restore allocation leaks](savegame-reliability.md#allocations-during-interrupted-restores)
+  and the [immediate-resave defect](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
+  were fixed in both libraries without changing save bytes. Embedded physics
+  fixups complete inside the restore transaction instead of putting unsaveable
+  targets on the event queue. Dictionaries and trace records have scoped owners,
+  clip-model replacement is transactional, and partially read clip-model lists
+  are safe to destroy. Native read-failure and mutation controls pass on Windows
+  and Linux; all 50 Windows save/restore tests pass. On OpenGL and Vulkan the
+  immediate resave now reloads into gameplay with zero unresolved references.
+  Broader owning-graph/partial-constructor and platform qualification remains open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.

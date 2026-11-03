@@ -824,10 +824,11 @@ void idInventory::Restore( idRestoreGame *savefile ) {
 		savefile->Error( "idInventory::Restore: invalid item count %d", num );
 	}
 	for( i = 0; i < num; i++ ) {
-		idDict *itemdict = new idDict;
+		std::unique_ptr<idDict> itemdict( new idDict );
 
-		savefile->ReadDict( itemdict );
-		items.Append( itemdict );
+		savefile->ReadDict( itemdict.get() );
+		items.Append( itemdict.get() );
+		itemdict.release();
 	}
 
 	// TORESTORE: idStrList				pdas;

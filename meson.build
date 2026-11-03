@@ -516,6 +516,20 @@ if get_option('build_native_tests')
   test('openq4-restore-recovery', restore_recovery_test, timeout: 30)
 
   foreach game_mode : ['game', 'mpgame']
+    restore_resources_source = custom_target(
+      'openq4-restore-resources-' + game_mode + '-source',
+      input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp',
+                   'src' / game_mode / 'Player.cpp', 'src' / game_mode / 'physics' / 'Clip.cpp',
+                   'src' / game_mode / 'physics' / 'Physics_StaticMulti.cpp',
+                   'src' / game_mode / 'physics' / 'Physics_Particle.cpp'),
+      output: 'RestoreResources-' + game_mode + '.cpp',
+      command: [py, files('tools/tests/savegame_restore_resources.py'), '--generate-native', game_mode, '@OUTPUT@'],
+    )
+    restore_resources_test = executable(
+      'openq4-restore-resources-' + game_mode, restore_resources_source,
+      cpp_args: ['-UNDEBUG'], install: false,
+    )
+    test('openq4-restore-resources-' + game_mode, restore_resources_test, timeout: 30)
     restore_identity_source = custom_target(
       'openq4-restore-identity-' + game_mode + '-source',
       input: files('src' / game_mode / 'Entity.cpp', 'src' / game_mode / 'client' / 'ClientEntity.cpp',
