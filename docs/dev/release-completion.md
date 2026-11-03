@@ -3121,6 +3121,12 @@ heading. It is not the contents of the 14 September 2026 release. See the
   restrained death grade and complete the black fade before loading.
   Windowed GL/Vulkan gameplay, native layout/geometry and gate evidence are
   recorded in `docs/dev/ui/retained-screens.md`; wider UI migration stays open.
+- [x] Make the initializing screen smooth: repaint it up to 60 times a second
+  whenever startup reads a file, within a bounded share of startup time, and
+  open it with a 1.3 s entrance in which the mechanism zooms down to its seat
+  as its gears wind in and the clamps close; step lines rise into place over a
+  cascading rule (visual specification 1.37, `FLOW-069`). Engine traces and
+  captures are recorded in the roadmap's UI-07 progress note.
 - [x] Resolve title pointer lag, wide/tall loading anchors, retained weapon
   scopes and monster flesh impacts. The title keeps scene parallax while its
   vector framing stays cached; loading furniture uses opposite virtual edges;

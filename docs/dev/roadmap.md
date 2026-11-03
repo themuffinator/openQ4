@@ -1204,11 +1204,15 @@ archived provenance; new scheduling belongs here.
   offers a time-paced repaint, at up to 60 Hz within half of the time during
   the new 1.3 s entrance and a fifth after it (`FLOW-069`). Local vector meshes
   in a zoom keep their compilation while it is at most a sqrt(2) step finer
-  than needed, and the machined bands became solid annuli (101k to a few
-  thousand vertices). Traces on a loaded machine: 12-22 frames and gaps up to
-  1.35 s before, 50-85 frames, a 23 ms first frame and gaps of 100-270 ms
-  after, for roughly 15-20% more startup time than reduced motion. An
-  idle-machine measurement and the GLES fallback remain.
+  than needed, the machined bands became solid annuli (101k to a few thousand
+  vertices), the lettering holds still (a fade or group layer recompiled or
+  recolored its 50k glow vertices) and the screen adds no atlas rasters, whose
+  CPU raster stalled the frame. Windowed GL traces on a heavily loaded machine:
+  12-22 frames, a 100-330 ms first frame and gaps up to 1.35 s before; 57-88
+  frames, a 13-23 ms first frame, entrance frames of 3-19 ms and loading gaps
+  of 50-150 ms after, apart from machine-wide stalls that reduced motion shows
+  too. Repaints cost 0.4-0.7 s of a 2.5-3.5 s start; an idle-machine
+  measurement and the GLES fallback remain.
 - [ ] **UI-08 — P1, qualification and decision: final cutover.** Complete all seven
   final gates with current source-bound behavior, visual/editor/performance and
   Windows/Linux/macOS/Android-GLES evidence, including dedicated packaging. Decide

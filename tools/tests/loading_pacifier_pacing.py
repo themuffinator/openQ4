@@ -129,6 +129,10 @@ def validate_read_count_granularity() -> None:
             "AddToReadCount main-thread presentation")
     require_order(body, "readCount =", "session->PacifierUpdate();",
                   "AddToReadCount progress accounting before pacifier offer")
+    # Startup is different: the initialization screen paces itself by time, and
+    # its small script/decl/GUI reads are the only moments some steps offer.
+    require_order(body, "session->PacifierUpdate();", "openQ4_UpdateInitialization();",
+                  "AddToReadCount offers every main-thread startup read to the initialization screen")
 
     # Progress accuracy must not regress: readCount still advances every chunk.
     require(body, "readCount =", "AddToReadCount progress accounting")

@@ -399,7 +399,7 @@ public:
 			++cached.stableFrames;
 		}
 		cached.lastFrame=frame;
-		if (ui_retainedAtlas.GetBool() && (!handle || idStr::Icmp(material->GetName(),"_retainedMultiply")==0) &&
+		if (ui_retainedAtlas.GetBool() && rasterNewMeshes && (!handle || idStr::Icmp(material->GetName(),"_retainedMultiply")==0) &&
 			!cached.rasterTried && cached.stableFrames>=2 && vertices.size()>=64) {
 			cached.rasterTried=true;
 			CacheRaster(cached,vertices,indices);
@@ -790,6 +790,9 @@ public:
 	float viewportX = 0, viewportY = 0;
 	int captureWidth = 0, captureHeight = 0;
 	bool softFocus = false;
+	// Startup's screen lives seconds: a CPU raster of its large meshes stalls the
+	// frame it lands in and saves less submission than it costs.
+	bool rasterNewMeshes = true;
 private:
 	static constexpr unsigned ModelCapacity=64;
 	static constexpr std::uint64_t ModelPixelBudget=16u*1024u*1024u; // Colour/resolved RGBA plus depth/stencil: at most 256 MiB.
@@ -1149,6 +1152,7 @@ std::string currentPath;
 std::string savedCheckpoint;
 int restartGeneration = -1, languageGeneration = -1;
 retainedUIView_t* initializationView = nullptr;
+bool initializationEntered = false; // onEnter ran: the first frame is on screen.
 std::uint64_t languageRevision = 0, loadedLanguageRevision = (std::numeric_limits<std::uint64_t>::max)();
 const std::chrono::steady_clock::time_point epoch = std::chrono::steady_clock::now();
 struct ProfileSample { openq4::ui::RuntimeStatistics statistics; double engineMilliseconds; };
@@ -1866,6 +1870,15 @@ bool RetainedUI_DrawInitialization(const char* message) {
 		if (!initializationView->runtime->RunEvent("onInit",PresentationTime(),effects,error)) {
 			RetainedUI_EndInitialization(); return false;
 		}
+		initializationEntered = false;
+	} else if (!initializationEntered) {
+		// The first frame pays document and geometry creation behind the
+		// entrance's veiled opening pose. Restart the entrance once that frame
+		// is on screen, so its cost cannot skip the entrance's first frames.
+		initializationEntered = true;
+		openq4::ui::Runtime::EventEffects effects; std::string error;
+		if (!initializationView->runtime->RunEvent("onEnter",PresentationTime(),effects,error) && ui_retainedTrace.GetBool())
+			common->Printf("RETAINED_INITIALIZATION onEnter failed: %s\n",error.c_str());
 	}
 	if (!RetainedUI_PrepareView(initializationView)) return false;
 	std::string error;
@@ -1885,7 +1898,16 @@ bool RetainedUI_DrawInitialization(const char* message) {
 	openq4::ui::Viewport viewport;
 	if (!RetainedUI_DefaultViewport(viewport)) return false;
 	viewport.canvasHeight = 720; viewport.canvasMinWidth = 960; viewport.fitScale = 1;
-	return RetainedUI_DrawViewRoot(initializationView,viewport);
+	host.rasterNewMeshes = false;
+	const bool drawn = RetainedUI_DrawViewRoot(initializationView,viewport);
+	host.rasterNewMeshes = true;
+	if (ui_retainedTrace.GetBool()) {
+		const auto& s = initializationView->runtime->Statistics();
+		common->Printf("RETAINED_INITIALIZATION_FRAME paths=%llu vertices=%llu draws=%llu layers=%llu\n",
+			(unsigned long long)s.vectorPathsCompiled,
+			(unsigned long long)s.submittedVertices,(unsigned long long)s.drawCalls,(unsigned long long)s.layerComposites);
+	}
+	return drawn;
 }
 bool RetainedUI_DrawViewRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport) {
 	const auto started = std::chrono::steady_clock::now();

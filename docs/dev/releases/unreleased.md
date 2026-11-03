@@ -170,9 +170,10 @@ See [release status](../../user/release-status.md) and the
   the playing line's audio, including pauses between words. Classic retains
   its original animation.
 - **A more consistent new interface.** Startup now uses the animated vector
-  initialization screen. Its rings and light sweep update during loading,
-  with much cheaper animation and automatic backoff to keep startup work
-  moving on slower systems. Reduced Motion keeps it still.
+  initialization screen. It opens with a quick zoom as its gears wind into
+  place, then keeps turning smoothly while the game loads, and each loading
+  step slides in instead of flickering. Slower systems still give most of
+  the time to loading. Reduced Motion keeps it still.
   Campaign difficulty and Turbo options open on a
   fourth menu level with matching breadcrumbs and smooth Back transitions.
   The Settings hub includes a confirmation before restoring defaults and

@@ -2073,8 +2073,14 @@ void idFileSystemLocal::AddToReadCount( const int count ) {
 		}
 	}
 
-	if ( offerPacifier && std::this_thread::get_id() == fileSystemMainThread && session != NULL ) {
-		session->PacifierUpdate();
+	if ( std::this_thread::get_id() == fileSystemMainThread ) {
+		if ( offerPacifier && session != NULL ) {
+			session->PacifierUpdate();
+		} else {
+			// Startup reads are mostly small script/decl/GUI files. The animated
+			// initialization screen paces itself by time, so offer it every read.
+			openQ4_UpdateInitialization();
+		}
 	}
 }
 

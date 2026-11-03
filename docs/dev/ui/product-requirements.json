@@ -1,10 +1,10 @@
 {
-  "schema_version": 21,
+  "schema_version": 22,
   "id_namespace": "openq4.ui.product",
-  "date": "2026-10-31",
+  "date": "2026-11-03",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "3d433d09a1462185bbce6297bf22c34ff50e9cbc",
+    "engine_revision": "5dc27bc3bd668bdfa2b5252024b4c4e9b4eaa1a5",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -14,7 +14,7 @@
     "visual": {
       "path": "docs/dev/ui-visual-design.md",
       "authority": "normative visual, interaction and editor contract",
-      "sha256": "4c535c4bc06a9080cd371e8a1d21c9cd7716113a57f6d4368bee48aa2d955935"
+      "sha256": "bdaa904e63a78210b25c50ce8854786bf18fb068e43b1fba900a0dc24e7e7fce"
     },
     "product": {
       "path": "docs/dev/archive/2026-10-18/plans/ui-product-completion.md",
@@ -2300,6 +2300,18 @@
       "carried_evidence": [
         "hud-wheel-continuation-20261009"
       ]
+    },
+    {
+      "superseded": "FLOW-057",
+      "successors": [
+        "FLOW-069"
+      ],
+      "normative_change": "Visual 1.37 gives the initializing screen an entrance, repaints it up to 60 times a second within a bounded share of startup time instead of at most 30, and replaces the step flicker and pulsing current segment with a rising line, a gliding marker and a cascading fill; every other initializing rule is carried unchanged.",
+      "source_refs": [
+        "visual:14",
+        "visual:Version 1.37"
+      ],
+      "carried_evidence": []
     }
   ],
   "requirements": [
@@ -15085,6 +15097,156 @@
         "max_columns": 2,
         "rows_per_column": 14,
         "row_pitch_u": 24
+      }
+    },
+    {
+      "id": "FLOW-069",
+      "title": "Initializing screen",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:14",
+        "visual:8",
+        "visual:Version 1.37"
+      ],
+      "requirement": "Show the initializing screen from the first frame the renderer can draw until the menus are ready, with the stock status line for each step, localized: LOADING... twice, then INITIALIZING SOUND..., NETWORK..., RENDER SYSTEM... and USER INTERFACE..., LOADING GAME... and INITIALIZING MENUS... (#str_104343 to #str_104351). Classic keeps the stock picture stretched over the canvas, pillarboxed in #181A08 under aspect correction, with the console's 8x16 u line in #F09E0D centered across the canvas with its top at 410 u. Remastered draws the ART-031 layers, extends the field and rings to any view, and sets the line in Marine 16 dp in #F09E0D on the stock line's middle at 418 u, each new step's line fading in from nothing over 280 ms while rising 5 u, over a 168 u rule of one segment per step (done 0.55, pending 0.15) along which a marker pulsing between 0.62 and 0.95 over 800 ms glides to the current segment over 440 ms, each segment a step reaches fading in to done over 300 ms, 70 ms after the one to its left. It turns the plate band counterclockwise once every 180 s and the teeth clockwise once every 120 s on the presentation clock, beneath the fixed clamps, emblem and lettering, and repaints at each step and, between steps, whenever loading offers a moment (every file read), at most 60 times a second, its smoothed repaint cost taking at most half of the time during the entrance and a fifth after it, never sleeping or catching up frames. Remastered opens with a 1.3 s entrance after one black frame: the mechanism (rings, plates, teeth, clamps and emblem) drops from 1.8 times its size to its seat about the rings' center, 1.4 % under size and back by 1080 ms, the teeth winding in from 150 degrees counterclockwise and the plate band from 90 degrees clockwise by 960 ms, the black lifting over 240 ms; the clamps close from 16 % wide and 20 degrees back between 470 and 740 ms, settling by 900 ms; the halo flares to full as they lock (560-760 ms) and eases to 0.40, the sweep fades in from 600 ms and the status line and rule rise 6 u into place from 640 to 1000 ms, while the lettering holds still, appearing as the black lifts, and the glint's first pass crosses it at 940 ms. Remastered adds quiet accents on the same clock: a warm light sweeping the rings clockwise once every 10 s (additive #5E6E24 rising over its first 7.5 degrees to 0.26 from the inner ring through the teeth and half that on the grooves, fading through a 60-degree tail, with #C9D98A arcs on the ring edges at its leading edge); a #FF8340 halo behind the emblem at up to 0.10, out to 168 u, breathing between 0.40 and 1.00 of that over 6 s; fourteen #FFB070 embers of 0.6-1.2 u rising through the rings over 6-11 s at most 0.50; and a white glint crossing QUAKE 4 in 900 ms every 9 s, clipped to the letters. Classic shows none of them. Reduced motion holds the rings still, keeps the sweep as a fixed key light at the upper left (its leading edge 38 degrees counterclockwise from the top) and the halo at 0.80, and drops the embers, the glint, the marker and the entrance, changing the line and the rule at once.",
+      "dependencies": [
+        "FLOW-047",
+        "ART-031",
+        "MOT-001",
+        "MOT-005",
+        "TXT-005"
+      ],
+      "acceptance_evidence_needed": [
+        "Startup captures on GL, Vulkan and the GLES fallback at 4:3, 16:9 and 21:9 in Classic and Remastered for every step, a trace of the repaint cadence and ring angles across a slow start, and a reduced-motion run. Include one sweep turn and glint in Remastered and their absence in Classic.",
+        "A frame trace of the entrance and of a multi-step jump showing their cadence and timing, and a startup-time comparison against reduced motion that bounds the repaints' share."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implemented in tools/ui/build_retained_initialization.py, src/framework/InitializationPresentation.h and the startup presentation hooks; engine traces and testGUI captures exist but bind no evidence record yet. Acceptance evidence covering the entire stated requirement is required.",
+      "constraints": {
+        "band_turn_ms": 180000,
+        "teeth_turn_ms": 120000,
+        "max_repaint_hz": 60,
+        "classic_line_top_u": 410,
+        "remastered_line_middle_u": 418,
+        "status_color": "#F09E0D",
+        "rule_u": 168,
+        "rule_alpha": {
+          "done": 0.55,
+          "current": [
+            0.62,
+            0.95
+          ],
+          "pending": 0.15
+        },
+        "pillarbox": "#181A08",
+        "steps": [
+          "#str_104343",
+          "#str_104346",
+          "#str_104347",
+          "#str_104348",
+          "#str_104349",
+          "#str_104350",
+          "#str_104351"
+        ],
+        "current_pulse_ms": 800,
+        "accents": {
+          "sweep": {
+            "turn_ms": 10000,
+            "color": "#5E6E24",
+            "alpha": 0.26,
+            "groove_alpha": 0.13,
+            "rise_deg": 7.5,
+            "tail_deg": 60,
+            "rim": "#C9D98A"
+          },
+          "halo": {
+            "color": "#FF8340",
+            "alpha": 0.1,
+            "radius_u": 168,
+            "breathe_ms": 6000,
+            "range": [
+              0.4,
+              1.0
+            ]
+          },
+          "embers": {
+            "count": 14,
+            "size_u": [
+              0.6,
+              1.2
+            ],
+            "color": "#FFB070",
+            "life_ms": [
+              6000,
+              11000
+            ],
+            "max_alpha": 0.5
+          },
+          "glint": {
+            "every_ms": 9000,
+            "cross_ms": 900
+          },
+          "reduced_motion": {
+            "key_light_deg": -38,
+            "halo": 0.8
+          }
+        },
+        "repaint_time_share": {
+          "entrance": 0.5,
+          "after": 0.2
+        },
+        "step_arrival": {
+          "fade_ms": 280,
+          "rise_u": 5,
+          "marker_glide_ms": 440,
+          "segment_fill_ms": 300,
+          "segment_stagger_ms": 70
+        },
+        "entrance": {
+          "duration_ms": 1300,
+          "veil_ms": 240,
+          "from_scale": 1.8,
+          "undershoot_scale": 0.986,
+          "seat_ms": [
+            820,
+            1080
+          ],
+          "teeth_from_deg": -150,
+          "band_from_deg": 90,
+          "spin_ms": 960,
+          "clamps": {
+            "from_scale": 1.16,
+            "from_deg": -20,
+            "close_ms": [
+              470,
+              740
+            ],
+            "settle_ms": 900,
+            "overshoot_scale": 0.985
+          },
+          "halo_flare_ms": [
+            560,
+            760
+          ],
+          "halo_after": 0.4,
+          "sweep_from_ms": 600,
+          "status_ms": [
+            640,
+            1000
+          ],
+          "status_rise_u": 6,
+          "first_glint_ms": 940
+        }
       }
     }
   ],

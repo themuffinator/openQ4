@@ -1808,7 +1808,12 @@ static void CheckContinuity(ScreenHost& host, char** paths, const char* campaign
 		for (const auto& d : diagnostics) std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());
 		Check(loaded,"initialization, fourth-level and game effects load in the native runtime");
 		Viewport viewport; viewport.canvasHeight = 720; viewport.canvasMinWidth = 960;
-		if (kind == 0) Check(runtime.RunEvent("onInit",0,effects,error),"initialization starts its presentation timelines");
+		if (kind == 0) {
+			Check(runtime.RunEvent("onInit",0,effects,error),"initialization starts its presentation timelines");
+			viewport.width = 1280; viewport.height = 720; runtime.Frame(viewport,.05);
+			Check(runtime.PresentedValue("mechanism","transform")->data[2] > 1.4 && runtime.PresentedValue("veil","opacity")->data[0] > .5,
+				"initialization opens on its mechanism scaled up behind a veil");
+		}
 		if (kind == 1) Check(runtime.RunEvent("onActivate",0,effects,error),"fourth-level arrival starts");
 		if (kind == 2) { host.softFocus = true; Check(runtime.SetState({{"death_amount",1.0}},error,0),"death input accepts full amount"); }
 		for (const auto size : {std::pair{1280,720},std::pair{2560,1080},std::pair{720,1280}}) {
@@ -1827,9 +1832,22 @@ static void CheckContinuity(ScreenHost& host, char** paths, const char* campaign
 			size_t vertices = 0; for (const auto& draw : host.draws) vertices += draw.vertices.size();
 			std::fprintf(stderr,"Initialization at 4K: %zu vertices\n",vertices);
 			Check(vertices * 64 < 30 * 1024 * 1024,"initialization leaves room for the terminal fade inside Vulkan's geometry ring at 4K");
+			Check(Near(float(runtime.PresentedValue("mechanism","transform")->data[2]),1,.0001f) && runtime.PresentedValue("veil","opacity")->data[0] == 0 &&
+				runtime.PresentedValue("status-block","opacity")->data[0] == 1,
+				"the entrance seats the mechanism and reveals the status line");
+			Check(runtime.SetState({{"step",4.0}},error,1.6) && runtime.RunEvent("stepChanged",1.6,effects,error),"a later startup step arrives");
+			runtime.Frame(viewport,1.62);
+			const float glide = float(runtime.PresentedValue("progress-marker","transform")->data[0]);
+			Check(runtime.PresentedValue("progress-3-done","opacity")->data[0] < .1 && glide > 0 && glide < 144,
+				"a step jump fills its segments in turn behind a gliding marker");
+			runtime.Frame(viewport,1.99);
+			Check(Near(float(runtime.PresentedValue("progress-0-done","opacity")->data[0]),.55f,.001f) &&
+				float(runtime.PresentedValue("progress-marker","transform")->data[0]) > 120,"the step marker nears the current step");
 			runtime.SetReducedMotion(true,2); host.reducedMotion = true;
 			Check(runtime.RunEvent("onInit",2,effects,error),"reduced-motion initialization starts"); runtime.Frame(viewport,2.2);
 			Check(Near(float(runtime.PresentedValue("sweep","transform")->data[4]),-38,.01f) && runtime.PresentedValue("ember-0","display")->text == "none", "reduced motion holds a fixed key light and omits sparks");
+			Check(runtime.PresentedValue("veil","display")->text == "none" && runtime.PresentedValue("progress-marker","display")->text == "none",
+				"reduced motion has no entrance veil or gliding step marker");
 			host.reducedMotion = false;
 		} else if (kind == 1) {
 			Check(runtime.RunEvent("detailLeave",2,effects,error),"fourth level returns to its parent"); runtime.Frame(viewport,2.3);
