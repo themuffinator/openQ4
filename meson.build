@@ -1453,7 +1453,7 @@ if build_engine or get_option('build_native_tests')
       meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/multiplayer.q4ui',
       meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/createserver.q4ui',
       meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/joingame.q4ui']
-    retained_screens_groups = {'menus': 120, 'loading-hud': 120, 'pages': 120, 'strogg-pages': 120, 'mp-pages': 120, 'mp-card': 120,
+    retained_screens_groups = {'menus': 120, 'pause': 120, 'strogg-pause': 120, 'loading-hud': 120, 'pages': 120, 'strogg-pages': 120, 'mp-pages': 120, 'mp-card': 120,
       'mp-vote-match': 120, 'mp-admin': 120, 'mp-settings-welcome': 120, 'pointer-reach': 120, 'optics': 240}
     foreach group, timeout : retained_screens_groups
       test('openq4-ui-retained-screens-' + group, openq4_ui_retained_screens_test,

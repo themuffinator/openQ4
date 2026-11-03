@@ -5416,8 +5416,8 @@ int main(int argc, char** argv) {
 	if (runs("pages")) CheckPagePrompts(host,argv[24],"guis/menu/credits.q4ui","credits_back","back",nullptr,false);
 	if (runs("mp-pages")) CheckPagePrompts(host,argv[27],"guis/menu/createserver.q4ui","create_back","back",nullptr,true);
 	if (runs("mp-pages")) CheckPagePrompts(host,argv[28],"guis/menu/joingame.q4ui","join_back","back",nullptr,true);
-	if (runs("menus")) CheckPagePrompts(host,argv[2],"guis/menu/pause.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow","objectives-prompts");
-	if (runs("menus")) CheckPagePrompts(host,argv[4],"guis/menu/pause_strogg.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow",
+	if (runs("pause")) CheckPagePrompts(host,argv[2],"guis/menu/pause.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow","objectives-prompts");
+	if (runs("strogg-pause")) CheckPagePrompts(host,argv[4],"guis/menu/pause_strogg.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow",
 		"objectives-prompts");
 	// The legends: Single Player, Campaign, the campaign difficulty page and
 	// Multiplayer, whose own BACK is in the content.
@@ -5426,8 +5426,8 @@ int main(int argc, char** argv) {
 		if (runs(page == 26 ? "mp-pages" : "pages")) CheckPagePrompts(host,argv[page],name,"",nullptr,nullptr,true);
 	if (runs("menus")) CheckMenuWrap(host,argv[1],argv[2],argv[21]);
 	if (runs("menus")) CheckTitleTextScale(host,argv[1]);
-	if (runs("menus")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");
-	if (runs("menus")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.q4ui");
+	if (runs("pause")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");
+	if (runs("strogg-pause")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.q4ui");
 	if (runs("menus")) CheckColumnPageTextScale(host,argv[5],"guis/menu/singleplayer.q4ui",{},{},"description");
 	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.q4ui",{{"awakening_ready",true}},{},"available");
 	// Title: canvas scaling, the lit field, the multiplied emblem and CONTINUE.
@@ -5684,7 +5684,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	// Pause: the level block binds the mission, difficulty, objectives and shot.
-	if (runs("menus")) {
+	if (runs("pause")) {
 		const auto source = Read(argv[2]);
 		Document document; std::vector<Diagnostic> diagnostics;
 		const bool valid = document.Load(source,diagnostics);
@@ -5995,7 +5995,7 @@ int main(int argc, char** argv) {
 	}
 	// Strogg pause (section 13.7): the Marine pause's level block and verbs in
 	// the Strogg family, every label arriving in runes and translating.
-	if (runs("menus")) {
+	if (runs("strogg-pause")) {
 		const auto source = Read(argv[4]);
 		Document document; std::vector<Diagnostic> diagnostics;
 		const bool valid = document.Load(source,diagnostics);
