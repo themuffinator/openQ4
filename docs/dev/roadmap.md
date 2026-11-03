@@ -129,6 +129,7 @@ to a final project-wide phase. Important dependencies are:
 | Android sustained operation | AND-02 includes AUD-03/CORE-03 aggregate memory and cancellation behavior, not only renderer FPS. |
 | Modern-renderer promotion | Each REN-01 shared-domain gate is separate from REN-02 aggregate visible-lighting ownership. Keep their defaults and rollback decisions independent. |
 | Content pack split, trim and overlays (PKG-02 through PKG-04) | PKG-01's verifier first proves identical bulk-pack bytes across platforms and consecutive candidates. Client-only packs need their pure-server exemption before the dedicated server drops them. |
+| Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
 
 ## Governance and baseline evidence
 
@@ -1444,11 +1445,64 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   on OpenGL. Still open: leaks on refused loads, and a pre-existing defect
   where a [save made before the first frame after a load](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
   writes NULL references.
-- [ ] **Q4-06 — P3, decision: portable saves.** `raw1` native aggregates are not
-  cross-platform saves. Inventory and normalize game plus GUI/interpolator raw
-  blocks before introducing a versioned portable format and ABI/architecture
-  fixture matrix. Keep existing decoders and explicit unsupported-format handling.
-  Retail proprietary game-DLL/save interchangeability is not a project target.
+- [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
+  3 November 2026: build a portable save format, so that a save written on one
+  supported platform loads on the others.
+  - **Scope.** Every supported, preview and experimental target is 64-bit
+    little-endian: Windows x64 and ARM64, Linux x64 and ARM64, macOS arm64, and
+    Android arm64 including Quest. The portable revision is defined for that
+    family only; 32-bit and big-endian builds keep refusing it.
+  - **Existing saves.** `raw1` saves keep loading, through the current decoders,
+    only on the ABI that wrote them.
+  - **Out of scope.** Interchange with the proprietary retail game DLLs and their
+    saves.
+
+  The [technical contract](savegame-compatibility-policy.md#planned-portable-revision)
+  and the [block inventory](savegame-reliability.md#remaining-raw-serialization-raw1)
+  are the supporting references. The stages run in order, and each closes on its
+  own gate:
+  1. **Inventory gate.** Restore an in-tree test that finds every native-layout
+     read and write in both game trees, the engine GUI save code and script
+     storage, and fails on any unclassified addition. The inventory that
+     `savegame-reliability.md` described as locked has had no in-tree test since
+     the source consolidation. The stage also confirms that the script's
+     `intptr_t`-sized slots never carry a live value across a save point.
+     Gate: the test runs in CI and assigns every block a class.
+  2. **Field codecs.**
+     - Write each block whose layout is up to the compiler as explicit
+       fixed-width little-endian fields.
+     - Flag bitfields become named 32-bit masks. Trace models, joint modifiers,
+       vehicle path targets and GUI interpolators are written field by field.
+     - The path targets' entity pointers restore through the typed reference
+       check.
+     - Padding and stale script pointer slots are written as zero, so the
+       encoder is deterministic.
+
+     Gate: golden-byte native tests for each codec pass in CI on Windows MSVC,
+     Linux GCC and Clang, macOS arm64 and Linux ARM64 (qemu), with mutation
+     controls.
+  3. **Wire revision.**
+     - Payload version 5 carries a portable wire ABI stamp (`le64-portable1`),
+       accepted from any family member.
+     - The v2 to v4 readers keep their exact `raw1` matching.
+     - Any other stamp is refused before map teardown with a localized player
+       message.
+
+     Gate: a v5 round trip on each CI platform. All historical fixtures still
+     restore (`savegame_restore_matrix.py`). The schema-bump rules, contracts and
+     compatibility policy are updated in the same change.
+  4. **Cross-platform qualification.** Save on one platform, then restore,
+     resave and reload on another, on stock and Awakening maps, in both
+     directions. Start with Windows x64 and Linux x64 (WSL), then macOS arm64
+     through the VM workflow and one ARM64 Linux or Android target.
+     Gate: every direction restores into gameplay without errors, its resave
+     restores again on the source platform, and both platforms report the same
+     object table.
+  5. **Release.** Player documentation on moving saves between platforms,
+     release notes and the revised platform table. Gate: published with the
+     evidence above.
+
+  Q4-06 stays optional (P3) and never blocks shipping a supported configuration.
 - [ ] **Q4-07 — P1, qualification: genuine historical save corpus.** Complete the
   historic-binary corpus for 0.6.95, 0.8, 0.10, 0.11 and 0.13 where current evidence
   uses equivalent/restamped fixtures. Qualify the exact HiDef #123 fixture and

@@ -978,8 +978,7 @@ typed fields, including v3 branches that retain raw v2 readers where required.
 The payload is not yet architecture-neutral. Its ABI stamp ends in `raw1` because
 native-layout blocks remain.
 
-The GameLib corruption contract locks the following direct raw-write inventory in
-each of the SP and MP source trees (22 calls per tree):
+Each of the SP and MP source trees writes 22 direct raw blocks:
 
 | Relative source | Raw writes |
 | --- | ---: |
@@ -996,10 +995,33 @@ each of the SP and MP source trees (22 calls per tree):
 | `vehicle/VehicleParts.cpp` | 1 |
 | `vehicle/VehiclePosition.cpp` | 5 |
 
-Engine-owned GUI/window and interpolation aggregates also retain fixed native
-layout in parts of the positional payload. The table above is the exact locked
-GameLib *direct-call* inventory, not a claim that these are the only native-layout
-bytes reachable through all helper functions.
+This inventory was described as locked by the GameLib corruption contract, but
+a 3 November 2026 check found that no in-tree test counts these writes. The
+check was apparently lost when the game sources were consolidated, so nothing
+currently stops a new raw write. Q4-06 stage 1 restores the gate. The table is
+the direct-call inventory only, not every native-layout byte reachable through
+helpers. The other raw reads in the game trees serve the v2 and legacy readers.
+
+Saved primitives are already portable: `WriteInt`, `WriteFloat`, the vector
+and matrix writers and `WriteShort` swap to little-endian, `WriteBool` writes
+one byte, and strings are 8-bit bytes. Portability fails only on the blocks
+below, classified for [Q4-06](roadmap.md):
+
+| Block | Where | Why it is not portable | Planned codec |
+| --- | --- | --- | --- |
+| Flag bitfields (`fl`, `vfl`, `myfl`) | `BrittleFracture`, `Physics_AF` (constraint and body), `Vehicle`, `VehicleParts`, `VehiclePosition`, `Monster_ConvoyHover` | Bit allocation is up to the compiler; MSVC starts a new unit when the declared type changes, GCC and Clang do not | Named 32-bit masks |
+| `idTraceModel` | `physics/Clip.cpp`, `SecurityCamera.cpp` | Aggregate with an enum, a bool and padding | Field by field |
+| `jointMod_t` | `anim/Anim_Blend.cpp` | Holds an `idInterpolateAccelDecelLinear` template whose layout already changed once (build 1582) | Field by field |
+| `PathTargetInfo`, current and last | `vehicle/VehicleDriver.cpp` | Entity pointer saved as a raw spawn id, a bool and padding; bypasses typed reference restore | Fields, typed entity reference |
+| Joints, AF pose joints, pose modifiers and pose frame | `anim/Anim_Blend.cpp` | `idJointMat`, `int`, `idAFPoseJointMod` and `idJointQuat` arrays: floats and int32 with no padding today, so portable by accident | Explicit floats and ints |
+| Eye and driver joint axis and direction maps | `vehicle/VehiclePosition.cpp` | int32 arrays, portable on little-endian | `WriteInt` per element |
+| Hover dampening samples | `ai/Monster_ConvoyHover.cpp` | `idAngles` array, portable on little-endian | Angles per sample |
+| Interpreter stack, global variables and script object data | `script/Script_Interpreter.cpp`, `script/Script_Program.cpp` (globals go through `WriteByte`, one byte at a time, so they are outside the direct-call count) | Script values in host byte order. Function, pointer, namespace and script-event slots are `intptr_t` wide: 8 bytes on every family member, but their bytes are compile-time or expression temporaries | Scalar block with those slots zeroed, or a typed walk |
+| GUI window fields | `src/ui/Window.cpp` (27), `src/ui/SimpleWindow.cpp` (15), `idWinVar` | Floats, ints, rectangles and colours are portable on little-endian; the transition interpolators are template aggregates | Explicit fields |
+| PDA minigame fields | `src/ui/GameBearShootWindow.cpp`, `GameBustOutWindow.cpp`, `GameSSDWindow.cpp` | bool, float and vector fields written by `sizeof` | Explicit fields |
+
+Padding inside these blocks is currently written uninitialized, so two saves of
+the same state can differ byte for byte.
 
 Consequences:
 
