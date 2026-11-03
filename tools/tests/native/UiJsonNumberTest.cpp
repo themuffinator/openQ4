@@ -1,18 +1,18 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
-// JsonCpp number decoding with openQ4's subnormal-numbers.patch. Both readers
-// decode through `istringstream >> double`, so they are run against the
-// platform's num_get and against the num_get contract of libc++ over a gdtoa
-// strtod (Apple, FreeBSD, Android). There strtod reports ERANGE for every
-// subnormal or underflowing result, and libc++ sets failbit but still stores
-// the value. The MSVC STL and libstdc++ never fail there, so only the emulated
-// facet reaches the patched branch on Windows and Linux.
+// JsonCpp number decoding with openQ4's subnormal-numbers.patch. A number
+// from_chars cannot take whole and in range falls back to
+// `istringstream >> double`, which JsonCpp 1.9.8 imbues with the classic
+// locale, so it decodes with the platform's own num_get and no test facet can
+// reach it. Under libc++ over a gdtoa strtod (Apple, FreeBSD, Android), strtod
+// reports ERANGE for every subnormal or underflowing result and libc++ sets
+// failbit but still stores the value: only there do these numbers take the
+// patched branch, which the macOS jobs run. The MSVC STL and libstdc++ decode
+// subnormals without failing.
 #include <json/json.h>
-#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <locale>
 #include <memory>
 #include <string>
 #if defined(__SSE__) || defined(_M_X64)
@@ -40,29 +40,6 @@ struct DenormalsAreZero {
 #else
 	DenormalsAreZero(){}
 #endif
-};
-
-// libc++'s __num_get_float fed by a gdtoa strtod. Stage 2 gathers the field;
-// a partial conversion fails with 0, and a range error fails but keeps the
-// value, which is subnormal, zero after underflow or infinite after overflow.
-class LibcxxGdtoaNumGet final : public std::num_get<char> {
-protected:
-	using std::num_get<char>::do_get;
-	iter_type do_get(iter_type in, iter_type end, std::ios_base&, std::ios_base::iostate& state, double& value) const override {
-		std::string field;
-		for (; in != end && *in != '\0' && std::strchr("0123456789+-.eE",*in); ++in) field += *in;
-		if (in == end) state |= std::ios_base::eofbit;
-		char* stop = nullptr;
-		errno = 0;
-		const double parsed = std::strtod(field.c_str(),&stop);
-		const bool range = errno == ERANGE;
-		if (field.empty() || stop != field.c_str() + field.size()) { state |= std::ios_base::failbit; value = 0; return in; }
-		const bool nonzeroDigits = field.find_first_of("123456789") < field.find_first_of("eE");
-		const bool tiny = (Bits(parsed) & 0x7fffffffffffffffULL) < 0x0010000000000000ULL && nonzeroDigits;
-		if (range || tiny) state |= std::ios_base::failbit;
-		value = parsed;
-		return in;
-	}
 };
 
 static bool Parse(const std::string& text, bool legacy, Json::Value& root, std::string& errors) {
@@ -107,15 +84,19 @@ static void Numbers() {
 int main() {
 	Numbers();
 	{ DenormalsAreZero daz; Numbers(); }
-	const std::locale original = std::locale::global(std::locale(std::locale::classic(),new LibcxxGdtoaNumGet));
-	Numbers();
-	{ DenormalsAreZero daz; Numbers(); }
-	// Underflow to zero stays an error, and overflow still decodes as infinity.
+	// Overflow decodes as infinity everywhere. Underflow to zero is an error
+	// where num_get reports it (libc++, the MSVC STL); libstdc++'s num_get
+	// does not, so there it decodes as a signed zero.
+	Decodes("1e309",0x7ff0000000000000ULL);
+	Decodes("-1e309",0xfff0000000000000ULL);
+#if defined(__GLIBCXX__)
+	Decodes("1e-400",0x0000000000000000ULL);
+	Decodes("-1e-400",0x8000000000000000ULL);
+	Decodes("2e-324",0x0000000000000000ULL);
+#else
 	Rejects("1e-400");
 	Rejects("-1e-400");
 	Rejects("2e-324");
-	Decodes("1e309",0x7ff0000000000000ULL);
-	Decodes("-1e309",0xfff0000000000000ULL);
-	std::locale::global(original);
+#endif
 	std::printf("UiJsonNumberTest: %u checks passed\n",checks);
 }
