@@ -109,7 +109,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07, MP-01 through MP-08, AUD-01; selected VR-01/VR-06 and AND-01/AND-03 scope | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering | HF-03 through HF-08, VK-01 through VK-07, REN-01 through REN-08 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
 | 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
@@ -129,6 +129,7 @@ to a final project-wide phase. Important dependencies are:
 | Android sustained operation | AND-02 includes AUD-03/CORE-03 aggregate memory and cancellation behavior, not only renderer FPS. |
 | Modern-renderer promotion | Each REN-01 shared-domain gate is separate from REN-02 aggregate visible-lighting ownership. Keep their defaults and rollback decisions independent. |
 | Content pack split, trim and overlays (PKG-02 through PKG-04) | PKG-01's verifier first proves identical bulk-pack bytes across platforms and consecutive candidates. Client-only packs need their pure-server exemption before the dedicated server drops them. |
+| Enhanced physics default (PHYS-06) | PHYS-01's recorded baseline and budgets first; PHYS-04's behavior envelope and PHYS-05's save/multiplayer/demo integration must pass before `g_enhancedPhysics` defaults on. `0` always runs the unchanged legacy path. |
 | Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
 
 ## Governance and baseline evidence
@@ -1788,6 +1789,100 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   adds about 1 ms on NTFS and 7 ms on ext4. Remaining: macOS APFS (the new
   native test runs there in CI), removable and network filesystems, and any
   power-cut test.
+
+## Rigid-body and ragdoll physics
+
+Sources: `src/game/physics/` and `src/mpgame/physics/` (`Physics_RigidBody`,
+`Physics_AF`, `Clip`), `src/game/AF.cpp`, `src/game/AFEntity.cpp`, the `af_*` and
+`rb_*` CVars in `gamesys/SysCvar.cpp`.
+
+Requested 3 November 2026. The legacy simulation integrates rigid bodies with a
+plain Euler step and solves articulated figures with an LCP per frame, without
+contact persistence, warm starting, island sleeping or continuous collision. The
+enhanced mode replaces that with a more stable and more realistic simulation that
+is also cheaper to run. Every item honors three product rules:
+
+1. **One option.** A single archived CVar, `g_enhancedPhysics` (default `0`
+   until PHYS-06 promotes it), with one localized Settings row, turns the whole
+   enhancement on. There are no separate player-facing sub-options; any tuning
+   CVars are cheat-protected developer controls. `0` runs the legacy code path
+   unchanged: the same code, results and save bytes as before this work, which
+   a deterministic replay against the pre-change binary proves.
+2. **Highly optimized.** On the declared reference workloads, enhanced mode costs
+   no more aggregate physics CPU time than legacy, and its worst frame is no
+   worse. Any exception is declared with its bound before promotion, never
+   discovered afterwards.
+3. **No behavior breakage.** Damage, splash and death pushes deliver the same
+   momentum as legacy. Ragdolls must never fly across the map from a light hit,
+   explode from interpenetration, jitter at rest or gain energy during contact
+   resolution. Scripted set pieces, progression and authored AF/entity defs keep
+   working unmodified with stock assets.
+
+- [ ] **PHYS-01 — P2, investigation and decision: legacy baseline and enhanced
+  contract.** Measure legacy rigid-body and AF costs (`af_showTimings`,
+  `rb_showTimings`, the CPU sampler) on fixed workloads: a combat-heavy SP scene
+  with several ragdolls, an explosion clearing moveables and debris, an MP
+  frag-heavy round with bots, and a scripted AF set piece. Inventory reproduced
+  legacy defects (resting jitter, limbs stuck in or through walls, tunnelling of
+  small fast bodies, joint stretching, sliding corpses, endless twitching) with
+  saves or repros. Record the momentum each damage path applies today (direct
+  hit, splash, death push, melee, vehicle impact, `g_corpseSink`) as the
+  behavior envelope PHYS-04 must keep. Declare the per-workload CPU budgets,
+  replay tolerance and the CVar/UI/localization contract. Close when the
+  baseline and budgets are recorded in a physics reference doc.
+- [ ] **PHYS-02 — P2, implementation: enhanced rigid bodies.** Behind
+  `g_enhancedPhysics 1`: a semi-implicit integrator, persistent contact
+  manifolds with warm-started impulse solving, rolling/spinning friction,
+  stable resting stacks, island-based sleeping with a correct wake on any
+  touch, push or script move, and swept collision only for small fast bodies
+  that would otherwise tunnel. Share one implementation between the SP and MP
+  game trees. Gate on the PHYS-01 rigid-body workloads meeting their CPU
+  budgets, no tunnelling in the defect repros and no energy gain in resting or
+  stacked cases.
+- [ ] **PHYS-03 — P2, implementation: enhanced ragdolls and articulated
+  figures.** Behind the same switch: a warm-started iterative constraint solver
+  for AFs, stable cone/twist joint limits that cannot explode when violated,
+  bounded penetration recovery that removes overlap without adding velocity,
+  self-collision where the AF def asks for it, and settling to sleep. At death,
+  the ragdoll inherits the animated pose's actual joint velocities instead of
+  starting from rest plus an impulse, so bodies fall naturally from their
+  motion. Keep reading stock AF defs as authored: masses, limits and contact
+  friction keep their meaning, with no replacement assets. Gate on the PHYS-01
+  ragdoll workloads meeting their CPU budgets and the defect repros resolved.
+- [ ] **PHYS-04 — P1 for promotion, qualification: behavior preservation and
+  the impulse guard.** Prove enhanced mode keeps the PHYS-01 envelope. Every
+  external impulse delivers the same linear momentum as legacy, distributed
+  over the bodies it hits by their masses. A per-hit velocity change is
+  bounded relative to the struck body's mass and the legacy result. The
+  solver may never raise a body's kinetic energy except through a declared
+  external force. An executable test drives light hits (machinegun, melee,
+  small splash, weak vehicle bumps) into resting and falling corpses and
+  fails if any body leaves the legacy displacement envelope. Heavy hits
+  (rockets, grenades, Dark Matter Gun, gibbing thresholds) stay within the
+  declared tolerance. A runtime telemetry counter records clamps and peak
+  body speeds. Cover AI ragdolls, player corpses in MP, hanging and
+  constrained bodies, moveables, debris, and Awakening `q4xbase` content.
+  Scripted AF set pieces, vehicles and trigger-driven moveables must complete
+  their progression in the Q4-02 campaign chain with the switch on.
+- [ ] **PHYS-05 — P1 for promotion, integration: saves, multiplayer, demos and
+  presentation.** Saves load in either mode and survive switching between
+  them. Enhanced-only state is either rebuilt on load or written in a
+  versioned block that legacy reads ignore, coordinated with Q4-05/Q4-06. In
+  multiplayer the server's value governs both networked physics and
+  client-local corpses (published in serverinfo), so all peers and MVD
+  playback simulate the same mode. A client's own setting never changes
+  authoritative results, and changing it takes effect at map load. Active
+  ragdoll and debris interpolation (HF) keeps working with the new solver's
+  sample cadence. Dedicated servers run the same mode without effect or
+  renderer dependencies.
+- [ ] **PHYS-06 — P2, qualification and decision: promotion.** Repeat the
+  PHYS-01 workloads with the switch on and off on Windows x64 and Linux x64,
+  plus one ARM64 preview target, and record CPU distributions, worst frames and
+  failures. Run the PHYS-04 envelope tests and in-game, windowed visual checks of
+  combat, explosions and set pieces. Decide whether `g_enhancedPhysics`
+  defaults to `1` for fresh profiles. Upgraded profiles keep a saved explicit
+  choice, and `0` remains a supported fallback. Update the capability matrix
+  and release notes with the decision.
 
 ## Multiplayer bots Arena and demos
 
