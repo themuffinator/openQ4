@@ -415,6 +415,7 @@ jobs:
             tools/tests/turbo_scripted_movers.py \
             tools/tests/savegame_pointer_width_safety.py \
             tools/tests/savegame_v3_contract.py \
+            tools/tests/savegame_raw_inventory.py \
             tools/tests/sdl3_input_parity.py \
             tools/tests/sys_event_queue_ownership.py \
             tools/tests/event_journal.py \
@@ -893,6 +894,7 @@ jobs:
           python tools/tests/turbo_scripted_movers.py
           python tools/tests/savegame_pointer_width_safety.py
           python tools/tests/savegame_v3_contract.py
+          python tools/tests/savegame_raw_inventory.py
           python tools/tests/sdl3_input_parity.py
           python tools/tests/sys_event_queue_ownership.py
           python tools/tests/event_journal.py

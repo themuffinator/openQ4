@@ -978,7 +978,7 @@ typed fields, including v3 branches that retain raw v2 readers where required.
 The payload is not yet architecture-neutral. Its ABI stamp ends in `raw1` because
 native-layout blocks remain.
 
-Each of the SP and MP source trees writes 22 direct raw blocks:
+Each of the SP and MP source trees writes 23 direct raw blocks:
 
 | Relative source | Raw writes |
 | --- | ---: |
@@ -995,12 +995,28 @@ Each of the SP and MP source trees writes 22 direct raw blocks:
 | `vehicle/VehicleParts.cpp` | 1 |
 | `vehicle/VehiclePosition.cpp` | 5 |
 
-This inventory was described as locked by the GameLib corruption contract, but
-a 3 November 2026 check found that no in-tree test counts these writes. The
-check was apparently lost when the game sources were consolidated, so nothing
-currently stops a new raw write. Q4-06 stage 1 restores the gate. The table is
-the direct-call inventory only, not every native-layout byte reachable through
-helpers. The other raw reads in the game trees serve the v2 and legacy readers.
+This inventory was described as locked by the GameLib corruption contract, which
+also gave its total as 22; the rows add up to 23. A 3 November 2026 check found
+that no in-tree test counted these writes, apparently since the game sources
+were consolidated, so nothing stopped a new raw write.
+`savegame_raw_inventory.py` (Q4-06 stage 1) restores the gate. It finds every
+raw save call in both game trees and the GUI save code: memory `Write`/`Read`,
+the GUI byte and field helpers, and the script globals' byte loop. It requires
+each call to be listed with its class (bitfield, aggregate, LE scalars, script
+storage, bytes, legacy reader or helper) and fails on any unlisted, missing or
+recounted call. The two game trees must match.
+
+Per tree, the classes are:
+- 14 bitfield calls;
+- 10 aggregate calls;
+- 18 LE-scalar calls;
+- 8 script-storage calls;
+- 40 legacy-reader reads, which serve only the v2 and v3 historical decoders
+  (the current writer saves those fields typed).
+
+The GUI side has 157 LE-scalar calls, 3 aggregate (transition interpolator)
+calls, 12 byte payloads and 8 helper definitions. The test also pins the script
+type widths that the script storage depends on.
 
 Saved primitives are already portable: `WriteInt`, `WriteFloat`, the vector
 and matrix writers and `WriteShort` swap to little-endian, `WriteBool` writes
@@ -1022,6 +1038,26 @@ below, classified for [Q4-06](roadmap.md):
 
 Padding inside these blocks is currently written uninitialized, so two saves of
 the same state can differ byte for byte.
+
+**Pointer-sized script slots across save points (3 November 2026).** A thread
+can only be saved while it is suspended inside a call. A raw pointer can
+therefore reach a save only if a call falls between an `OP_ADDRESS`, which
+stores a pointer into a temporary, and the `OP_STOREP_*` that writes through
+it. `disasmScript` dumps of the compiled stock program (84,494 statements,
+including every stock map script) and of The Awakening's (108,760) were
+checked:
+
+- Both contain the same 21 address temporaries, all matched to their stores.
+- Seven have a call before the store: `getFloatKey`, `getKey` or
+  `sys.getEntity`, which return at once and never suspend a thread.
+- No runtime slot of the function, namespace or script-event types occurs.
+  Every pointer slot is an interpreter-stack temporary, `pointer stack[n]`.
+
+So no pointer-sized slot carries a live value across a save point in shipped
+content, and a portable writer can zero those slots. A mod script that assigns
+an object field from a function that waits would hold such a pointer. That
+already breaks loading on the same platform, because the address differs on
+the next run, and portable saves do not make it worse.
 
 Consequences:
 

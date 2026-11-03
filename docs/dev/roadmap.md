@@ -1484,6 +1484,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      the source consolidation. The stage also confirms that the script's
      `intptr_t`-sized slots never carry a live value across a save point.
      Gate: the test runs in CI and assigns every block a class.
+     Done, 3 November: `savegame_raw_inventory.py` is in the validation runner
+     and both CI workflows; it has not run in CI yet. It finds 23 direct raw
+     writes per game tree, not the 22 the old table claimed, and classifies
+     every raw save call in both trees and the GUI. It fails on any unlisted,
+     missing or recounted call, and on any change to the script type widths.
+     Disassembled stock and Awakening scripts hold pointer slots only as
+     interpreter-stack address temporaries, none of them live across a
+     suspending call; see the [inventory](savegame-reliability.md#remaining-raw-serialization-raw1).
   2. **Field codecs.**
      - Write each block whose layout is up to the compiler as explicit
        fixed-width little-endian fields.
