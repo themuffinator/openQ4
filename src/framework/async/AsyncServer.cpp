@@ -61,6 +61,9 @@ const int OOB_INFO_MAX_PER_SOURCE = 16;
 const int OOB_CHALLENGE_MAX_PER_SOURCE = 4;
 const int OOB_INFO_MAX_GLOBAL = 512;
 const int OOB_CHALLENGE_MAX_GLOBAL = 256;
+// A Quake 4 1.4.x client (protocol 2.85) follows the client id in its challenge
+// request with one byte: whether it is itself a dedicated server.
+const int RETAIL_CHALLENGE_REQUEST_BYTES = 5;
 
 static ID_INLINE bool AsyncServer_SameEndpoint( const netadr_t &left, const netadr_t &right ) {
 	return left.port == right.port && Sys_CompareNetAdrBase( left, right );
@@ -2136,6 +2139,17 @@ void idAsyncServer::ProcessChallengeMessage( const netadr_t from, const idBitMsg
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_MESSAGE_SIZE];
 
+	// A retail client would only be refused for its protocol at the connect
+	// step, and it never gets there: without an answer to its challenge it
+	// waits until the player gives up. Its challenge layout already identifies
+	// it, so refuse it now with the print it shows in its connect dialog.
+	if ( msg.GetRemainingData() == RETAIL_CHALLENGE_REQUEST_BYTES ) {
+		if ( AllowConnectionlessResponse( from, false ) ) {
+			common->DPrintf( "challenge from %s has the Quake 4 1.4.x layout; refusing its protocol\n", Sys_NetAdrToString( from ) );
+			PrintOOB( from, SERVER_PRINT_BADPROTOCOL, va( "server uses protocol %d.%d\n", ASYNC_PROTOCOL_MAJOR, ASYNC_PROTOCOL_MINOR ) );
+		}
+		return;
+	}
 	if ( msg.GetRemainingData() != 4 ) {
 		return;
 	}

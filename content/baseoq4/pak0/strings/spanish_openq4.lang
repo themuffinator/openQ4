@@ -1439,6 +1439,7 @@
 	"#str_231556"	"Mira las demos que has grabado y sigue a cualquier jugador en las demos multivista."
 	"#str_231557"	"Elige tu nombre, nombre de clan, modelo de jugador y color del cañón magnético."
 	"#str_231560"	"Introduce un número de %s a %s."
+	"#str_231570"	"%s usa el protocolo de red %d.%d. Esta versión de openQ4 usa el protocolo %d.%d y no puede unirse. Los servidores de Quake 4 1.4.2 usan el protocolo 2.85."
 	"#str_230141"	"API de renderizado"
 	"#str_230142"	"Dispositivo de renderizado"
 	"#str_230143"	"Automático;OpenGL;Vulkan;OpenGL ES"

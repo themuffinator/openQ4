@@ -1439,6 +1439,7 @@
 	"#str_231556"	"Assista às demos que você gravou e acompanhe qualquer jogador em uma demo multivisão."
 	"#str_231557"	"Defina seu nome, tag do clã, modelo de jogador e cor do rail."
 	"#str_231560"	"Digite um número de %s a %s."
+	"#str_231570"	"%s usa o protocolo de rede %d.%d. Esta versão do openQ4 usa o protocolo %d.%d e não pode entrar. Servidores do Quake 4 1.4.2 usam o protocolo 2.85."
 	"#str_230141"	"API de renderização"
 	"#str_230142"	"Dispositivo de renderização"
 	"#str_230143"	"Automático;OpenGL;Vulkan;OpenGL ES"

@@ -191,6 +191,15 @@ def validate_bind_plan() -> None:
     require_before(local, "TextAppendChar( buffer, '[' );", "TextAppendChar( buffer, ':' );", "local server endpoint text")
 
 
+def _validate_discovery_join(source: str, platform: str) -> None:
+    join = function_body(source, "_JoinDiscoveryGroup(", f"{platform} discovery group join")
+    require(join, "IPV6_JOIN_GROUP", f"{platform} discovery group join")
+    if platform == "Windows":
+        reject(join, "IsIPv6AllNodes", "Windows joins the all-nodes discovery group explicitly")
+    else:
+        require(join, "idNetworkEndpoint::IsIPv6AllNodes( groupAddress )", f"{platform} implicit all-nodes membership")
+
+
 def validate_platform_ipv6_transport(relative_path: str, platform: str) -> None:
     source = read(relative_path)
 
@@ -261,10 +270,13 @@ def validate_platform_ipv6_transport(relative_path: str, platform: str) -> None:
         "setsockopt( newsocket, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,",
         f"{platform} multicast hop limit",
     )
-    # Any discovery group other than the implicit all-nodes one has to be joined
-    # or a server never receives a scan sent to it.
+    # A server has to be a member of the discovery group or it never receives a
+    # scan sent to it. Linux delivers the all-nodes group to every socket;
+    # Windows only to sockets that joined it (measured 3 November 2026: a
+    # socket on this host's own link-local address received an ff02::1 scan
+    # only after IPV6_JOIN_GROUP).
     require(source, "IPV6_JOIN_GROUP,", f"{platform} discovery group membership")
-    require(source, "idNetworkEndpoint::IsIPv6AllNodes( groupAddress )", f"{platform} implicit all-nodes membership")
+    _validate_discovery_join(source, platform)
 
     # LAN classification has to recognize a global-unicast neighbour on the same
     # link, which the address scope rules alone cannot decide.
@@ -985,6 +997,17 @@ def validate_connect_failover() -> None:
 def validate_critical_mutation_sensitivity() -> None:
     """Prove the contracts above actually reject the regressions they describe."""
     header = read("src/sys/NetworkEndpoint.h")
+
+    windows = read(WINDOWS_NET)
+    multicast_only = "if ( !idNetworkEndpoint::IsIPv6Multicast( groupAddress ) ) {"
+    if windows.count(multicast_only) != 1:
+        raise AssertionError("Windows discovery join mutation anchor is not unique")
+    expect_contract_rejection(
+        lambda candidate: _validate_discovery_join(candidate, "Windows"),
+        windows.replace(multicast_only, "if ( !idNetworkEndpoint::IsIPv6Multicast( groupAddress ) || "
+                        "idNetworkEndpoint::IsIPv6AllNodes( groupAddress ) ) {", 1),
+        "a Windows server skips joining ff02::1 and never hears an IPv6 LAN scan",
+    )
 
     tie_break = "if ( runLength > bestLength )"
     if header.count(tie_break) != 1:

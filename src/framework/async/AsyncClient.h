@@ -157,6 +157,12 @@ private:
 	int					connectCandidateCount;
 	int					connectCandidateIndex;		// the candidate in serverAddress
 	int					connectChallengesSent;		// challenges sent to it so far
+	// openQ4: the protocol of the server in serverAddress, from its answer to the
+	// getInfo sent with each challenge. A Quake 4 1.4.x server answers the
+	// challenge itself exactly as an openQ4 server does, game directory included.
+	int					connectInfoRequests;		// getInfo requests sent to it so far
+	bool				connectProtocolKnown;		// it answered with our protocol
+	bool				connectChallengeDeferred;	// a challenge answer awaits that
 	int					serverId;					// server identification
 	int					serverChallenge;			// challenge from server
 	int					serverMessageSequence;		// sequence number of last server message
@@ -220,6 +226,7 @@ private:
 	void				ProcessConnectResponseMessage( const netadr_t from, const idBitMsg &msg );
 	void				ProcessDisconnectMessage( const netadr_t from, const idBitMsg &msg );
 	void				ProcessInfoResponseMessage( const netadr_t from, const idBitMsg &msg );
+	bool				CheckConnectServerProtocol( const netadr_t from, int challenge, int protocol );
 	void				ProcessPrintMessage( const netadr_t from, const idBitMsg &msg );
 	void				ProcessRemoteConsole2ChallengeResponse( const netadr_t from, const idBitMsg &msg );
 	void				ProcessRemoteConsole2Complete( const netadr_t from, const idBitMsg &msg );

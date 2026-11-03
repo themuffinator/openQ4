@@ -200,8 +200,9 @@ inline bool IsIPv6Multicast( const unsigned char *ip6 ) {
 }
 
 // ff02::1, the link-local all-nodes group. Every IPv6 node is a permanent
-// member, so a socket must not try to join it explicitly; any other discovery
-// group does have to be joined or a scan is never delivered.
+// member, and Linux delivers it to every socket, so the POSIX layer joins only
+// other discovery groups. Windows delivers a group only to sockets that joined
+// it, so win_net joins this one as well.
 inline bool IsIPv6AllNodes( const unsigned char *ip6 ) {
 	if ( ip6 == NULL || ip6[0] != 0xff || ip6[1] != 0x02 ) {
 		return false;

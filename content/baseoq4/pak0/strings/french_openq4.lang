@@ -1444,6 +1444,7 @@
 	"#str_231556"	"Regardez les démos que vous avez enregistrées et suivez n’importe quel joueur dans une démo multivue."
 	"#str_231557"	"Choisissez votre nom, votre nom de clan, votre modèle et la couleur de votre rail."
 	"#str_231560"	"Saisissez un nombre de %s à %s."
+	"#str_231570"	"%s utilise le protocole réseau %d.%d. Cette version d'openQ4 utilise le protocole %d.%d et ne peut pas le rejoindre. Les serveurs Quake 4 1.4.2 utilisent le protocole 2.85."
 	"#str_230141"	"Moteur de rendu"
 	"#str_230142"	"Périphérique de rendu"
 	"#str_230143"	"Automatique;OpenGL;Vulkan;OpenGL ES"

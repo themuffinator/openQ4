@@ -1311,6 +1311,12 @@
    }
   },
   {
+   "id": "load-grid.display",
+   "node": "load-grid",
+   "property": "display",
+   "value": {"op": "select", "args": [{"state": "loading_intro"}, "none", "block"]}
+  },
+  {
    "id": "safe.load-shot.left",
    "node": "load-shot",
    "property": "left",
@@ -1820,6 +1826,7 @@
      "position": {"type": "keyword", "value": "absolute"},
      "left": {"type": "length", "value": 0, "unit": "dp"},
      "top": {"type": "length", "value": 0, "unit": "dp"},
+     "display": {"type": "keyword", "value": "block"},
      "right": {"type": "length", "value": 0, "unit": "dp"},
      "bottom": {"type": "length", "value": 0, "unit": "dp"}
     },
@@ -4591,67 +4598,6 @@
          {"id": "p0", "op": "move", "points": [[21.0, 57.0]]},
          {"id": "p1", "op": "line", "points": [[21.0, 21.0]]},
          {"id": "p2", "op": "line", "points": [[57.0, 21.0]]}
-        ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.55]}},
-         "widthDp": 1.2,
-         "minimumPixels": 1,
-         "join": "miter",
-         "cap": "butt"
-        },
-        "blend": "additive"
-       }
-      ]
-     },
-     {
-      "id": "bracket-tr",
-      "type": "vector",
-      "properties": {
-       "position": {"type": "keyword", "value": "absolute"},
-       "top": {"type": "length", "value": 42.0, "unit": "dp"},
-       "width": {"type": "length", "value": 78.0, "unit": "dp"},
-       "height": {"type": "length", "value": 78.0, "unit": "dp"},
-       "right": {"type": "length", "value": 12.0, "unit": "dp"}
-      },
-      "paths": [
-       {
-        "id": "halo",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[57.0, 57.0]]},
-         {"id": "p1", "op": "line", "points": [[57.0, 21.0]]},
-         {"id": "p2", "op": "line", "points": [[21.0, 21.0]]}
-        ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.3137, 0.1765, 0.0784, 0.55]}},
-         "widthDp": 10.5,
-         "minimumPixels": 1,
-         "join": "miter",
-         "cap": "butt"
-        },
-        "blend": "additive"
-       },
-       {
-        "id": "core",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[57.0, 57.0]]},
-         {"id": "p1", "op": "line", "points": [[57.0, 21.0]]},
-         {"id": "p2", "op": "line", "points": [[21.0, 21.0]]}
-        ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.2275, 0.2275, 0.2275, 1.0]}},
-         "widthDp": 1.8,
-         "minimumPixels": 1,
-         "join": "miter",
-         "cap": "butt"
-        },
-        "blend": "additive"
-       },
-       {
-        "id": "white",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[57.0, 57.0]]},
-         {"id": "p1", "op": "line", "points": [[57.0, 21.0]]},
-         {"id": "p2", "op": "line", "points": [[21.0, 21.0]]}
         ],
         "stroke": {
          "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.55]}},

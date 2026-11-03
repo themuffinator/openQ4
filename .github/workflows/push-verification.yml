@@ -230,6 +230,9 @@ jobs:
             tools/tests/ui_generated_images.py \
             tools/tests/arena_sound_runtime.py \
             tools/tests/mp_wsl_peer_smoke.py \
+            tools/tests/mp_lan_reconnect_smoke.py \
+            tools/tests/mp_mod_admission_smoke.py \
+            tools/tests/mp_retail_protocol_smoke.py \
             tools/tests/openxr_lifecycle_runtime.py \
             tools/tests/savegame_restore_cleanup_runtime.py \
             tools/tests/savegame_restore_recovery_runtime.py \

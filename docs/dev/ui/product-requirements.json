@@ -4,7 +4,7 @@
   "date": "2026-11-03",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "1fb7aaedc96461d656e4bc40e54f0a70e9c277c9",
+    "engine_revision": "e3403acc37a24bbe386387c858832709efbee94d",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,

@@ -126,6 +126,12 @@ supplying its own game module. Content-only mods can continue to use the base
 openQ4 module. An administrator who intentionally operates a code-bearing mod
 must set `net_serverAllowServerMod 1` and distribute a complete, trusted package
 to clients separately; the setting does not make module code downloadable.
+openQ4 never loads a game module from the save folder or from inside a PK4.
+
+A mod is recognised only with a complete `mod.json` (`name`, `version`,
+`releaseDate`, `website`, `author` and `requiredopenQ4Version`). If a field is
+missing, the log says `Ignoring fs_game '<mod>'` and the server runs the normal
+openQ4 game, so clients without that mod can join it.
 
 The token is the same on Windows, Linux, and macOS, and it only works between
 openQ4 builds. Retail multiplayer servers expect the checksum of a `q4mp` game
@@ -176,9 +182,21 @@ explicitly enables the legacy path.
 
 Retail Quake 4 clients cannot join an openQ4 server, and openQ4 cannot join a
 retail server. openQ4 uses network protocol 2.41, while retail Quake 4 1.4.2
-uses 2.85, and each side rejects the other when connecting. The two protocols
-also differ beyond the version number, including the reliable message numbering
-and the player input format.
+uses 2.85. The two protocols also differ beyond the version number, including
+the reliable message numbering and the player input format.
+
+Each side is told why instead of being left waiting:
+
+- A LAN scan leaves retail servers out of the server list. Connecting to one
+  directly shows **Network protocol mismatch** with both protocol versions.
+  openQ4 checks the protocol before it would switch to the retail server's
+  `q4mp` folder, so it no longer stops with a message about a missing mod.
+- A retail client that tries an openQ4 server is answered with `server uses
+  protocol 2.41`, the same message a retail server sends for a protocol
+  mismatch.
+
+Joining retail servers would be a separate project, not a version-number
+change.
 
 ## Standards and provenance
 

@@ -337,9 +337,11 @@ static bool Net_MulticastGroupSockadr( unsigned short port, struct sockaddr_in6 
 ====================
 Net_JoinDiscoveryGroup
 
-Membership in the link-local all-nodes group is automatic, but any other
-configured discovery group has to be joined explicitly on every link or a
-server never receives a LAN scan sent to it.
+Windows hands a socket only the multicast of groups that socket has joined,
+the link-local all-nodes group included: the host's own membership of ff02::1
+is not enough, unlike on Linux. So the discovery group, even the default
+ff02::1, is joined explicitly on every link, or a server never receives a LAN
+scan sent to it.
 ====================
 */
 static void Net_JoinDiscoveryGroup( SOCKET newsocket ) {
@@ -350,7 +352,7 @@ static void Net_JoinDiscoveryGroup( SOCKET newsocket ) {
 
 	unsigned char groupAddress[16];
 	memcpy( groupAddress, &group.sin6_addr, sizeof( groupAddress ) );
-	if ( !idNetworkEndpoint::IsIPv6Multicast( groupAddress ) || idNetworkEndpoint::IsIPv6AllNodes( groupAddress ) ) {
+	if ( !idNetworkEndpoint::IsIPv6Multicast( groupAddress ) ) {
 		return;
 	}
 

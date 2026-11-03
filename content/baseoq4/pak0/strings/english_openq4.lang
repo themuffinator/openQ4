@@ -1439,6 +1439,7 @@
 	"#str_231556"	"Watch the demos you have recorded, and follow any player in a multi-view demo."
 	"#str_231557"	"Set your name, clan tag, player model and rail color."
 	"#str_231560"	"Enter a number from %s to %s."
+	"#str_231570"	"%s uses network protocol %d.%d. This version of openQ4 uses protocol %d.%d and cannot join it. Quake 4 1.4.2 servers use protocol 2.85."
 	"#str_230141"	"Rendering backend"
 	"#str_230142"	"Rendering device"
 	"#str_230143"	"Automatic;OpenGL;Vulkan;OpenGL ES"

@@ -710,6 +710,11 @@ def validate_validation_wiring() -> None:
         # the reference desktop; --dry-run prints the plan without launching.
         "presentation_reference_suite.py",
         "mp_wsl_peer_smoke.py",
+        # LAN discovery, successive reconnects and retail 2.85 refusal launch a
+        # staged dedicated server and client (and the retail Quake4Ded.exe).
+        "mp_lan_reconnect_smoke.py",
+        "mp_mod_admission_smoke.py",
+        "mp_retail_protocol_smoke.py",
         "openxr_lifecycle_runtime.py",
         "savegame_restore_cleanup_runtime.py",
         "savegame_restore_recovery_runtime.py",

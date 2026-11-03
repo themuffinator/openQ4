@@ -1439,6 +1439,7 @@
 	"#str_231556"	"Sleduj nahraná dema a v multiview demech se drž kteréhokoli hráče."
 	"#str_231557"	"Nastav si jméno, tag klanu, model hráče a barvu railgunu."
 	"#str_231560"	"Zadej číslo od %s do %s."
+	"#str_231570"	"%s používá síťový protokol %d.%d. Tato verze openQ4 používá protokol %d.%d a nemůže se připojit. Servery Quake 4 1.4.2 používají protokol 2.85."
 	"#str_230141"	"Vykreslovací rozhraní"
 	"#str_230142"	"Vykreslovací zařízení"
 	"#str_230143"	"Automaticky;OpenGL;Vulkan;OpenGL ES"

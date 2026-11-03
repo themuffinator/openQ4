@@ -6285,7 +6285,10 @@ void idFileSystemLocal::Startup( void ) {
 		}
 
 		common->Warning( "Ignoring fs_game '%s': %s", fs_game.GetString(), invalidReason.c_str() );
-		fs_game.SetString( "" );
+		// Fall back to the default openQ4 game, not to retail-only content: an
+		// empty fs_game also drops the openQ4 runtime underlay (strings, GUIs,
+		// staged overrides), leaving a half-working game and serverinfo.
+		fs_game.SetString( OPENQ4_GAMEDIR );
 	}
 
 	// File writes should use the selected game directory even while search paths

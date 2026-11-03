@@ -245,6 +245,8 @@ struct idBitMsg {
 struct idAsyncClient {
     idServerScan serverList;
     void ProcessInfoResponseMessage(const netadr_t,const idBitMsg&);
+    // Not connecting, so no reply is the connection's protocol check.
+    bool CheckConnectServerProtocol(const netadr_t,int,int){return false;}
 };
 '''
 

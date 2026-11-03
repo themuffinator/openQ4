@@ -2263,6 +2263,27 @@ claim peer combinations that have not been tested.
   ([evidence](mp-network-qualification.md#congestion-rate-control-and-burst-loss-24-october-2026)).
   Whether the server should adapt its rate on its own is a design decision;
   the networking guide tells players to lower `net_clientMaxRate`.
+  Progress, 3 November: the checks one machine can qualify pass, and three
+  defects are fixed
+  ([evidence](mp-network-qualification.md#discovery-reconnects-content-and-retail-refusal-3-november-2026)).
+  A LAN scan lists a pure dedicated server over IPv4 loopback and over this
+  host's own scoped link-local IPv6 address. The client then joins it three
+  times in a row, through the scan, by endpoint and by `reconnect`, in the same
+  slot. IPv6 loopback has no link to scan and joins by endpoint. Windows
+  servers never heard IPv6 scans: Windows delivers `ff02::1` only to sockets
+  that joined it, and they now do. Ordered pure content, content-only mods and
+  trusted local modules pass eight scenarios. A matching client joins, a
+  missing or altered package is refused, modules in the save path or a PK4 are
+  ignored, and a mod's module loads only with `net_serverAllowServerMod 1`. An
+  incomplete `mod.json` now falls back to the openQ4 game, not retail-only
+  content. The retail `Quake4Ded.exe` (2.85) is left out of the scan and
+  refused for its protocol before openQ4 follows it into `q4mp`; it used to be
+  refused as a missing mod. A 1.4.2 client's challenge, reproduced from
+  `Quake4.exe`, is now answered with `server uses protocol 2.41` instead of
+  silence. The pure token stays a same-platform compatibility check, not
+  cryptographic module verification or anti-cheat. Real WAN, cross-machine and
+  other-architecture peers, real multi-record DNS and the retail client binary
+  itself remain open; the user deferred the peer gates on 28 October.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,

@@ -1439,6 +1439,7 @@
 	"#str_231556"	"Nézd meg a felvett demóidat, és kövess bármelyik játékost a többnézetes demókban."
 	"#str_231557"	"Állítsd be a neved, a klánjeled, a játékosmodelled és a railgun színét."
 	"#str_231560"	"Adj meg egy számot %s és %s között."
+	"#str_231570"	"%s hálózati protokollja: %d.%d. Az openQ4 ezen verziójának protokollja: %d.%d, ezért nem tud csatlakozni. A Quake 4 1.4.2 szerverek protokollja: 2.85."
 	"#str_230141"	"Renderelési háttérrendszer"
 	"#str_230142"	"Renderelő eszköz"
 	"#str_230143"	"Automatikus;OpenGL;Vulkan;OpenGL ES"
