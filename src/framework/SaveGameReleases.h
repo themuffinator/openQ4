@@ -67,6 +67,33 @@ static const int OPENQ4_SAVEGAME_V2_FIRST_RELEASE_BUILD = 546;
 static const char *OPENQ4_SAVEGAME_V2_WIRE_ABI = "windows-msvcabi-x64-le-raw1";
 
 /*
+	Version 5 (roadmap Q4-06) writes every field with an explicit width and byte
+	order, so one payload serves every 64-bit little-endian build: Windows,
+	Linux, macOS and Android, on x64 or ARM64. It carries the stamp below.
+	Versions 2 to 4 keep the exact raw1 stamp of the build that wrote them.
+*/
+static const int OPENQ4_SAVEGAME_PORTABLE_VERSION = 5;
+static const char *OPENQ4_SAVEGAME_PORTABLE_WIRE_ABI = "le64-portable1";
+
+/*
+====================
+OpenQ4_SaveGamePortableWireABI
+
+The stamp a version 5 payload carries and must carry to load. A build outside
+the portable family (pointers other than 64 bits, or big-endian) stamps its own
+wire ABI instead, so it reads only its own payloads and refuses portable ones
+before map teardown.
+====================
+*/
+static inline const char *OpenQ4_SaveGamePortableWireABI( const char *nativeWireABI ) {
+#if defined( __BYTE_ORDER__ ) && defined( __ORDER_BIG_ENDIAN__ ) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	return nativeWireABI;
+#else
+	return sizeof( void * ) == 8 ? OPENQ4_SAVEGAME_PORTABLE_WIRE_ABI : nativeWireABI;
+#endif
+}
+
+/*
 ====================
 OpenQ4_SaveGameLayoutBuild
 
@@ -176,13 +203,14 @@ static inline const openQ4SaveGameGuiRevision_t *OpenQ4_FindSaveGameGuiRevision(
 /*
 The payload a game restore is reading, which the session sets for the duration
 of the restore. GUI records the game reads from that file (their transitions)
-use the layout of the build that wrote it; every other read, such as an
-in-memory GUI snapshot, uses the current layout. Defined in ui/Window.cpp,
-which every engine target links.
+use the format version and layout of the build that wrote it; every other read,
+such as an in-memory GUI snapshot, uses the current ones. Defined in
+ui/Window.cpp, which every engine target links.
 */
 struct openQ4SaveGameRestore_t {
 	const idFile *		file;
 	int					layoutBuild;
+	int					version;		// payload version; 0 for an unstamped payload
 };
 extern openQ4SaveGameRestore_t openQ4_saveGameRestore;
 
@@ -191,6 +219,12 @@ static const int OPENQ4_SAVEGAME_CURRENT_LAYOUT = 0x7fffffff;
 // The layout build of what `file` holds: the restored payload's, or current.
 static inline int OpenQ4_SaveGameRestoreLayoutBuild( const idFile *file ) {
 	return file != NULL && file == openQ4_saveGameRestore.file ? openQ4_saveGameRestore.layoutBuild : OPENQ4_SAVEGAME_CURRENT_LAYOUT;
+}
+
+// Whether what `file` holds uses the version 5 encodings: the restored payload
+// from version 5 on, and anything the current build wrote.
+static inline bool OpenQ4_SaveGameRestoreIsPortable( const idFile *file ) {
+	return file == NULL || file != openQ4_saveGameRestore.file || openQ4_saveGameRestore.version >= OPENQ4_SAVEGAME_PORTABLE_VERSION;
 }
 #endif
 

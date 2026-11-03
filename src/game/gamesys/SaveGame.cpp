@@ -1375,6 +1375,15 @@ void idSaveGame::WriteTrace( const trace_t &trace ) {
 
 /*
 ===================
+idSaveGame::WriteTraceModel
+===================
+*/
+void idSaveGame::WriteTraceModel( const idTraceModel &trace ) {
+	SaveCodec_WriteTraceModel( *this, trace );
+}
+
+/*
+===================
 idSaveGame::WriteClipModel
 ===================
 */
@@ -1411,7 +1420,7 @@ void idSaveGame::WriteBuildNumber( const int value ) {
 	WriteInt( value );
 	WriteString( OPENQ4_SAVEGAME_COMPAT_SOURCE_HASH );
 	WriteInt( OPENQ4_SAVEGAME_COMPAT_SOURCE_FILE_COUNT );
-	WriteString( OpenQ4SaveGameWireABI() );
+	WriteString( OpenQ4_SaveGamePortableWireABI( OpenQ4SaveGameWireABI() ) );
 }
 
 /*
@@ -2913,6 +2922,16 @@ void idRestoreGame::ReadTrace( trace_t &trace ) {
 
 /*
 =====================
+idRestoreGame::ReadTraceModel
+=====================
+*/
+void idRestoreGame::ReadTraceModel( idTraceModel &trace ) {
+	SaveCodec_ReadTraceModel( *this, trace, TRM_CUSTOM + 1, MAX_TRACEMODEL_VERTS, MAX_TRACEMODEL_EDGES,
+		MAX_TRACEMODEL_POLYS, MAX_TRACEMODEL_POLYEDGES );
+}
+
+/*
+=====================
 idRestoreGame::ReadClipModel
 =====================
 */
@@ -2983,9 +3002,8 @@ void idRestoreGame::ReadBuildNumber( void ) {
 	openQ4SaveGameLayoutBuild = OpenQ4_SaveGameLayoutBuild( openQ4SaveGameCompatibilityVersion, buildNumber,
 		openQ4SaveGameCompatibilityStamp.c_str(), openQ4SaveGameCompatibilitySourceFileCount );
 
-	if ( openQ4SaveGameCompatibilityVersion != OPENQ4_SAVEGAME_COMPATIBILITY_VERSION &&
-		 openQ4SaveGameCompatibilityVersion != OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION &&
-		 openQ4SaveGameCompatibilityVersion != OPENQ4_SAVEGAME_V2_VERSION ) {
+	if ( openQ4SaveGameCompatibilityVersion < OPENQ4_SAVEGAME_V2_VERSION ||
+		 openQ4SaveGameCompatibilityVersion > OPENQ4_SAVEGAME_COMPATIBILITY_VERSION ) {
 		openQ4SaveGameCompatibilityError = va(
 			"payload format version %d is not supported (supported %d to %d)",
 			openQ4SaveGameCompatibilityVersion,
@@ -3000,10 +3018,14 @@ void idRestoreGame::ReadBuildNumber( void ) {
 		if ( openQ4SaveGameCompatibilityVersion >= OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION ) {
 			ReadString( savedWireABI );
 		}
-		if ( savedWireABI.Icmp( OpenQ4SaveGameWireABI() ) != 0 ) {
+		// Version 5 loads on every build in the portable family; earlier
+		// versions only on the wire ABI that wrote them.
+		const char *wireABI = openQ4SaveGameCompatibilityVersion >= OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION ?
+			OpenQ4_SaveGamePortableWireABI( OpenQ4SaveGameWireABI() ) : OpenQ4SaveGameWireABI();
+		if ( savedWireABI.Icmp( wireABI ) != 0 ) {
 			openQ4SaveGameCompatibilityError = va(
 				"wire ABI %s does not match current ABI %s",
-				savedWireABI.c_str(), OpenQ4SaveGameWireABI() );
+				savedWireABI.c_str(), wireABI );
 			return;
 		}
 		if ( openQ4SaveGameCompatibilitySourceFileCount < 0 || openQ4SaveGameCompatibilityStamp.IsEmpty() ) {
@@ -3243,24 +3265,6 @@ void Cmd_CheckSave_f( const idCmdArgs &args )
 	common->Printf( "checkSave: save/restore round trip completed\n" );
 }
 
-/*
-================
-Portable codec layouts (roadmap Q4-06)
-
-The portable save codecs name the fields of these production types. Building
-them here makes a renamed or retyped field a compile error before the codecs
-replace the raw blocks in the writer.
-================
-*/
-template void SaveCodec_WriteTraceModel( idSaveGame &, const idTraceModel & );
-template void SaveCodec_ReadTraceModel( idRestoreGame &, idTraceModel &, int, int, int, int, int );
-template void SaveCodec_WriteJointMod( idSaveGame &, const jointMod_t & );
-template void SaveCodec_ReadJointMod( idRestoreGame &, jointMod_t &, int );
-template void SaveCodec_WritePoseJointMod( idSaveGame &, const idAFPoseJointMod & );
-template void SaveCodec_ReadPoseJointMod( idRestoreGame &, idAFPoseJointMod &, int );
-template void SaveCodec_WriteJointQuat( idSaveGame &, const idJointQuat & );
-template void SaveCodec_ReadJointQuat( idRestoreGame &, idJointQuat & );
-template void SaveCodec_WriteJointMat( idSaveGame &, const idJointMat & );
-template void SaveCodec_ReadJointMat( idRestoreGame &, idJointMat & );
-template void SaveCodec_WriteValue( idSaveGame &, const idAngles & );
-template void SaveCodec_ReadValue( idRestoreGame &, idAngles & );
+static_assert( OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION == OPENQ4_SAVEGAME_PORTABLE_VERSION &&
+	OPENQ4_SAVEGAME_COMPATIBILITY_VERSION == OPENQ4_SAVEGAME_PORTABLE_VERSION,
+	"the game libraries and the engine preflight agree on the portable payload" );

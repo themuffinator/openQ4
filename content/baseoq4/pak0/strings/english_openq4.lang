@@ -1251,6 +1251,7 @@
 	"#str_231103"	"This save is damaged or comes from an incompatible version."
 	"#str_231190"	"Could not restore this save. Choose another save or start a new game."
 	"#str_231191"	"LOAD FAILED"
+	"#str_231192"	"This save was made on another platform and cannot be loaded on this one."
 	"#str_231104"	"This save could not be read."
 	"#str_231105"	"This save could not be deleted."
 	"#str_231106"	"NEWER SAVES"

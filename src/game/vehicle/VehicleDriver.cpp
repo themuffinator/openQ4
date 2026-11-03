@@ -777,8 +777,9 @@ rvVehicleDriver::Save
 ================
 */
 void rvVehicleDriver::Save ( idSaveGame *savefile ) const {
-	savefile->Write ( &pathTargetInfo, sizeof ( pathTargetInfo ) );
-	savefile->Write ( &lastPathTargetInfo, sizeof ( lastPathTargetInfo ) );
+	const auto writeNode = [savefile]( const idEntityPtr<idEntity> &node ) { node.Save( savefile ); };
+	SaveCodec_WritePathTarget( *savefile, pathTargetInfo, writeNode );
+	SaveCodec_WritePathTarget( *savefile, lastPathTargetInfo, writeNode );
 	savefile->WriteFloat ( currentThrottle );
 
 	faceTarget.Save ( savefile );
@@ -811,8 +812,16 @@ rvVehicleDriver::Restore
 ================
 */
 void rvVehicleDriver::Restore ( idRestoreGame *savefile ) {
-	savefile->Read ( &pathTargetInfo, sizeof ( pathTargetInfo ) );
-	savefile->Read ( &lastPathTargetInfo, sizeof ( lastPathTargetInfo ) );
+	// Path targets are saved field by field from payload version 5; earlier
+	// payloads hold the raw structures, target spawn id included.
+	if ( savefile->GetOpenQ4SaveGameCompatibilityVersion() >= OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION ) {
+		const auto readNode = [savefile]( idEntityPtr<idEntity> &node ) { node.Restore( savefile ); };
+		SaveCodec_ReadPathTarget( *savefile, pathTargetInfo, readNode );
+		SaveCodec_ReadPathTarget( *savefile, lastPathTargetInfo, readNode );
+	} else {
+		savefile->Read ( &pathTargetInfo, sizeof ( pathTargetInfo ) );
+		savefile->Read ( &lastPathTargetInfo, sizeof ( lastPathTargetInfo ) );
+	}
 	savefile->ReadFloat ( currentThrottle );
 
 	faceTarget.Restore ( savefile );

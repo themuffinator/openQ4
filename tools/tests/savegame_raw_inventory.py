@@ -20,9 +20,11 @@ listed below with a class:
 A new, removed or recounted raw call fails until this table is updated, so a change
 to the save format is always reviewed. The SP and MP trees must stay identical.
 
-Blocks already converted to explicit fields (stage 2) leave the table. The flag
-bitfields among them keep their old bytes only while each saved flag list follows
-its struct's declaration order, so FLAG_LISTS checks that order as well.
+Blocks already converted to explicit fields leave the table. Stage 2 converted
+those whose bytes stay the same. Stage 3 converted the rest under payload version
+5, so their raw reads remain only as legacy readers for versions 2 to 4. The flag
+bitfields keep their old bytes only while each saved flag list follows its
+struct's declaration order, so FLAG_LISTS checks that order as well.
 """
 from __future__ import annotations
 
@@ -48,20 +50,19 @@ def R(text: str) -> str:
     return "savefile->Read(" + text + ")"
 
 
-def flag(name: str, receiver: str = "savefile") -> list[str]:
-    return [f"{receiver}->Write(&{name},sizeof({name}))", f"{receiver}->Read(&{name},sizeof({name}))"]
-
-
 # Relative path -> class -> calls. A call listed twice must occur twice.
 GAME: dict[str, dict[str, list[str]]] = {
     # The flag bitfields and LE-scalar blocks were converted to explicit fields
     # with unchanged bytes (Q4-06 stage 2); FLAG_LISTS below pins their order.
-    "SecurityCamera.cpp": {"aggregate": [W("&trm,sizeof(trm)"), R("&trm,sizeof(trm)")]},
-    "anim/Anim_Blend.cpp": {
-        "aggregate": [W("jointMods[i],sizeof(*jointMods[i])"), R("&jointMod,sizeof(jointMod)")],
-        "legacy-reader": [R("&saved,sizeof(saved)")],
-    },
-    "physics/Clip.cpp": {"aggregate": [W("&entry->trm,sizeof(entry->trm)"), R("&entry->trm,sizeof(entry->trm)")]},
+    # Version 5 writes trace models, joint modifiers and path targets through
+    # SaveCodec; these reads decode the raw structures of versions 2 to 4.
+    "SecurityCamera.cpp": {"legacy-reader": [R("&trm,sizeof(trm)")]},
+    "anim/Anim_Blend.cpp": {"legacy-reader": [R("&jointMod,sizeof(jointMod)"), R("&saved,sizeof(saved)")]},
+    "physics/Clip.cpp": {"legacy-reader": [R("&entry->trm,sizeof(entry->trm)")]},
+    "vehicle/VehicleDriver.cpp": {"legacy-reader": [R("&pathTargetInfo,sizeof(pathTargetInfo)"),
+                                                    R("&lastPathTargetInfo,sizeof(lastPathTargetInfo)")]},
+    # Script values are little-endian ints and floats, and its pointer-sized
+    # slots are 8 bytes on every portable build (validate_script_slot_widths).
     # Written from a copy whose address temporaries are zeroed (ZeroPointerLocals).
     "script/Script_Interpreter.cpp": {"script-storage": [W("savedStack,localstackUsed"), R("localstack,localstackUsed")]},
     "script/Script_Program.cpp": {
@@ -69,7 +70,6 @@ GAME: dict[str, dict[str, list[str]]] = {
                            "savefile->WriteByte(variables[", "savefile->WriteByte(variables[",
                            "savefile->ReadByte(variables[", "savefile->ReadByte(variables["],
     },
-    "vehicle/VehicleDriver.cpp": {"aggregate": flag("pathTargetInfo") + flag("lastPathTargetInfo")},
     # Historical decoders only; the current writer saves these through typed fields.
     "Entity.cpp": {"legacy-reader": [R("&fl,sizeof(fl)")]},
     "Mover.cpp": {"legacy-reader": [R("&move,sizeof(move)"), R("&rot,sizeof(rot)")]},
@@ -92,9 +92,9 @@ GAME: dict[str, dict[str, list[str]]] = {
 # `sizeof(&waistJoint)` above is written `sizeof(waistJoint)` in the source.
 GAME["IK.cpp"]["legacy-reader"][0] = R("&waistJoint,sizeof(waistJoint)")
 
-# Direct raw writes per game tree. Q4-06 drives this to zero; the remaining
-# aggregates and script storage change bytes, so they wait for payload v5.
-GAME_DIRECT_WRITES = 7
+# Direct raw writes per game tree: only script storage, whose bytes are the
+# same on every 64-bit little-endian build. A new aggregate write fails here.
+GAME_DIRECT_WRITES = 2
 
 
 def field(op: str, name: str, context: str, label: str) -> str:
@@ -122,11 +122,11 @@ FLAG_LISTS = [
 
 UI: dict[str, dict[str, list[str]]] = {
     # Window layout fields go through the typed OpenQ4_*SaveGameField overloads
-    # (same bytes as the raw copy); only the transition interpolator is raw.
+    # (same bytes as the raw copy). Version 5 writes the transition interpolator
+    # through SaveCodec; these reads decode the raw records of versions 2 to 4.
     "Window.cpp": {
-        "aggregate": [field("Write", "trans.interp", "idWindow::WriteSaveGameTransition", "interpolatestate"),
-                      field("Read", "interp", "idWindow::ReadSaveGameTransition", "interpolatestate"),
-                      field("Read", "saved", "idWindow::ReadSaveGameTransition", "interpolatestate")],
+        "legacy-reader": [field("Read", "interp", "idWindow::ReadSaveGameTransition", "interpolatestate"),
+                          field("Read", "saved", "idWindow::ReadSaveGameTransition", "interpolatestate")],
         "bytes": ['OpenQ4_WriteSaveGameBytes(savefile,string,len,"idWindow::WriteSaveGameString","string")',
                   'OpenQ4_ReadSaveGameBytes(savefile,&string[0],len,"idWindow::ReadSaveGameString","string")'],
     },
@@ -137,9 +137,7 @@ UI: dict[str, dict[str, list[str]]] = {
     "Winvar.h": {
         "helper": ["OpenQ4_WriteSaveGameBytes(idFile*savefile,constvoid*buffer,intlen,constchar*context,constchar*fieldName)",
                    "OpenQ4_ReadSaveGameBytes(idFile*savefile,void*buffer,intlen,constchar*context,constchar*fieldName)",
-                   "OpenQ4_WriteSaveGameRawField(idFile*savefile,consttype&value,constchar*context,constchar*fieldName)",
                    "OpenQ4_ReadSaveGameRawField(idFile*savefile,type&value,constchar*context,constchar*fieldName)",
-                   "OpenQ4_WriteSaveGameBytes(savefile,&value,sizeof(value),context,fieldName)",
                    "OpenQ4_ReadSaveGameBytes(savefile,&value,sizeof(value),context,fieldName)",
                    W("buffer,len"), R("buffer,len")],
         "bytes": ['OpenQ4_WriteSaveGameBytes(savefile,data.c_str(),len,"idWinStr::WriteToSaveGame","string")',

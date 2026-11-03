@@ -1307,6 +1307,7 @@
 	"#str_231103"	"Ten zapis jest uszkodzony lub pochodzi z niezgodnej wersji."
 	"#str_231190"	"Nie udało się przywrócić tego zapisu. Wybierz inny zapis lub rozpocznij nową grę."
 	"#str_231191"	"BŁĄD WCZYTYWANIA"
+	"#str_231192"	"Ten zapis utworzono na innej platformie i nie można go wczytać na tej."
 	"#str_231104"	"Nie udało się odczytać tego zapisu."
 	"#str_231105"	"Nie udało się usunąć tego zapisu."
 	"#str_231106"	"NOWSZE ZAPISY"

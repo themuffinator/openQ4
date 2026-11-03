@@ -1654,7 +1654,7 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   - **Out of scope.** Interchange with the proprietary retail game DLLs and their
     saves.
 
-  The [technical contract](savegame-compatibility-policy.md#planned-portable-revision)
+  The [technical contract](savegame-compatibility-policy.md#portable-revision)
   and the [block inventory](savegame-reliability.md#remaining-raw-serialization-raw1)
   are the supporting references. The stages run in order, and each closes on its
   own gate:
@@ -1740,6 +1740,32 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      Gate: a v5 round trip on each CI platform. All historical fixtures still
      restore (`savegame_restore_matrix.py`). The schema-bump rules, contracts and
      compatibility policy are updated in the same change.
+     Implemented, 3 November. Version 5 writes trace models, joint modifiers,
+     vehicle path targets and GUI transition interpolators through
+     `SaveCodec.h`. Path targets now restore their entity through the typed
+     reference check. Saves are stamped `le64-portable1`, which every 64-bit
+     little-endian build accepts; a build outside that family would stamp its
+     own wire ABI. The v2 to v4 readers keep their raw branches and exact `raw1`
+     match. A refused stamp shows a new notice, "made on another platform", in
+     all twelve language tables. Direct raw writes fell from 7 to 2 per game
+     tree, both script storage. Contracts, inventory, policy and reliability
+     documents changed with it.
+     Evidence on Windows x64:
+     - the historical matrix again restores 14 of 17 saves, refusing the three
+       unstamped ones, and six v4 saves from builds 1769 to 1958 restore
+       through the retained readers (a seventh holds a script compiled at the
+       console, which no build can restore);
+     - fresh v5 saves round-trip on six stock maps and with a spawned convoy
+       hover;
+     - saves restamped `be64-portable1`, set to v4 with the portable stamp, or
+       stamped for Windows x86 are refused before teardown, the running map
+       carries on, and the unaltered save loads;
+     - the restore cleanup and recovery runtime probes pass on a v5 save.
+
+     The changed sources also compile with GCC and Clang. Still open for the
+     gate: CI has no game assets, so on the CI platforms only the codec golden
+     tests run, and only after a push. The runtime round trip on Linux and
+     macOS moves into stage 4, which sets up those runtimes anyway.
   4. **Cross-platform qualification.** Save on one platform, then restore,
      resave and reload on another, on stock and Awakening maps, in both
      directions. Start with Windows x64 and Linux x64 (WSL), then macOS arm64

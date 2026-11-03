@@ -45,7 +45,7 @@ struct StringList {
     }
     void AddUnique(const char* text) { values.emplace_back(text); }
 };
-struct RestoreScope { const void* file=nullptr; int layoutBuild=0; } openQ4_saveGameRestore;
+struct RestoreScope { const void* file=nullptr; int layoutBuild=0; int version=0; } openQ4_saveGameRestore;
 struct CVars { int copy=0; bool fullscreen=false;
     int GetCVarInteger(const char*) { return copy; } bool GetCVarBool(const char*) { return fullscreen; }
 } cvars, *cvarSystem=&cvars;
@@ -85,7 +85,7 @@ public:
 class idSessionLocal {
 public:
     enum loadGameFailure_t { LOADGAME_FAILURE_NONE, LOADGAME_FAILURE_UNREADABLE,
-        LOADGAME_FAILURE_DAMAGED, LOADGAME_FAILURE_MAP, LOADGAME_FAILURE_RESTORE };
+        LOADGAME_FAILURE_DAMAGED, LOADGAME_FAILURE_MAP, LOADGAME_FAILURE_PLATFORM, LOADGAME_FAILURE_RESTORE };
     loadGameFailure_t loadGameFailure=LOADGAME_FAILURE_NONE;
     GUI home,page;
     GUI* guiRetainedHome=nullptr;
@@ -137,7 +137,7 @@ void reset() {
     clipboardWrites=flushes=shutdowns=0; ticks+=1000;
     liveRestore=restoredObjectsUnwound=false; events.clear();
 }
-void arm() { openQ4_saveGameRestore.file=&sessionLocal; openQ4_saveGameRestore.layoutBuild=1687; }
+void arm() { openQ4_saveGameRestore.file=&sessionLocal; openQ4_saveGameRestore.layoutBuild=1687; openQ4_saveGameRestore.version=5; }
 void transactions() {
     reset(); arm();
     assert(session->ExecuteSaveGameMapChange("Good"));
@@ -145,7 +145,8 @@ void transactions() {
     assert(openQ4_saveGameRestore.file && clipboardWrites==0);
     reset(); arm(); session->shouldFail=true;
     assert(!session->ExecuteSaveGameMapChange("Damaged"));
-    assert(restoredObjectsUnwound && !openQ4_saveGameRestore.file && openQ4_saveGameRestore.layoutBuild==0);
+    assert(restoredObjectsUnwound && !openQ4_saveGameRestore.file && openQ4_saveGameRestore.layoutBuild==0 &&
+        openQ4_saveGameRestore.version==0);
     assert((events==std::vector<std::string>{"unwind","warning","stop","menu","home"}));
     assert(session->stops==1 && session->loadGameFailure==idSessionLocal::LOADGAME_FAILURE_RESTORE);
     assert(common->warnings==1 && common->warning.find("bad saved object 17")!=std::string::npos);

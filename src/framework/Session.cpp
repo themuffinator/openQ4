@@ -399,8 +399,11 @@ static const int SESSION_SAVE_PREVIEW_DELETE_MAGIC = 'O' | ( 'Q' << 8 ) | ( '4' 
 static const int SESSION_SAVE_PREVIEW_DELETE_VERSION = 1;
 static const char *SESSION_SAVEGAME_NO_OVERWRITE_TOKEN = "nooverwrite";
 static const int SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_MAGIC = 'O' | ( 'Q' << 8 ) | ( '4' << 16 ) | ( 'S' << 24 );
-static const int SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_VERSION = 4;
-static const int SESSION_OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION = 3;
+static const int SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_VERSION = 5;
+// Wire-ABI stamps and integrity trailers were introduced in v3.
+static const int SESSION_OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION = 3;
+static_assert( SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_VERSION == OPENQ4_SAVEGAME_PORTABLE_VERSION,
+	"the current payload is the portable one" );
 // Oldest v3 layout this build has a verified decoder for: the build that
 // introduced v3. A payload's layout build is the build it carries, or for a
 // release that stamped build 1, its release's build (SaveGameReleases.h); the
@@ -926,10 +929,19 @@ struct sessionVerifiedSaveChecksum_t {
 	unsigned int checksum;
 };
 
-static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath, bool allowLegacyPayload, int *layoutBuildOut = NULL,
+// What payload preflight read, for the restore and the Load Game page.
+struct sessionSaveGamePayload_t {
+	int		version;		// payload version; 0 for an unstamped payload
+	int		layoutBuild;
+	bool	otherPlatform;	// refused because another platform's build wrote it
+};
+
+static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath, bool allowLegacyPayload, sessionSaveGamePayload_t *payloadOut = NULL,
 		const sessionVerifiedSaveChecksum_t *verifiedChecksum = NULL ) {
-	if ( layoutBuildOut != NULL ) {
-		*layoutBuildOut = BUILD_NUMBER;
+	if ( payloadOut != NULL ) {
+		payloadOut->version = 0;
+		payloadOut->layoutBuild = BUILD_NUMBER;
+		payloadOut->otherPlatform = false;
 	}
 	int fileLength = -1;
 	if ( !Session_GetBoundedSaveGameLength( file, savePath, "payload preflight", fileLength ) ) {
@@ -982,16 +994,15 @@ static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath
 		Session_ReadSaveGameString( file, payloadSourceStamp, SESSION_OPENQ4_SAVEGAME_SOURCE_STAMP_MAX_BYTES, "payload source stamp", savePath.c_str() ) &&
 		Session_ReadSaveGameInt( file, payloadSourceFileCount, "payload source file count", savePath.c_str() );
 
-	if ( valid && payloadVersion != SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_VERSION &&
-		 payloadVersion != SESSION_OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION &&
-		 payloadVersion != OPENQ4_SAVEGAME_V2_VERSION ) {
+	if ( valid && ( payloadVersion < OPENQ4_SAVEGAME_V2_VERSION ||
+		 payloadVersion > SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_VERSION ) ) {
 		common->Warning( "Savegame '%s' has unsupported payload version %d (supported %d to %d)",
 			savePath.c_str(), payloadVersion,
 			OPENQ4_SAVEGAME_V2_VERSION,
 			SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_VERSION );
 		valid = false;
 	}
-	if ( valid && payloadVersion >= SESSION_OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION ) {
+	if ( valid && payloadVersion >= SESSION_OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION ) {
 		valid = Session_ReadSaveGameString( file, payloadWireABI, SESSION_OPENQ4_SAVEGAME_ABI_STAMP_MAX_BYTES,
 			"payload wire ABI", savePath.c_str() );
 	} else if ( valid ) {
@@ -1009,12 +1020,20 @@ static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath
 		const int layoutBuild = OpenQ4_SaveGameLayoutBuild( payloadVersion, payloadBuild, payloadSourceStamp.c_str(), payloadSourceFileCount );
 		const int minimumBuild = payloadVersion == OPENQ4_SAVEGAME_V2_VERSION ?
 			OPENQ4_SAVEGAME_V2_FIRST_RELEASE_BUILD : SESSION_OPENQ4_SAVEGAME_MINIMUM_SUPPORTED_BUILD;
-		if ( layoutBuildOut != NULL ) {
-			*layoutBuildOut = layoutBuild;
+		// Version 5 loads on every build in the portable family; earlier
+		// versions only on the wire ABI that wrote them.
+		const char *wireABI = payloadVersion >= OPENQ4_SAVEGAME_PORTABLE_VERSION ?
+			OpenQ4_SaveGamePortableWireABI( Session_GetSaveGameWireABI() ) : Session_GetSaveGameWireABI();
+		if ( payloadOut != NULL ) {
+			payloadOut->version = payloadVersion;
+			payloadOut->layoutBuild = layoutBuild;
 		}
-		if ( payloadWireABI.Icmp( Session_GetSaveGameWireABI() ) != 0 ) {
+		if ( payloadWireABI.Icmp( wireABI ) != 0 ) {
 			common->Warning( "Savegame '%s' wire ABI '%s' is incompatible with this '%s' build",
-				savePath.c_str(), payloadWireABI.c_str(), Session_GetSaveGameWireABI() );
+				savePath.c_str(), payloadWireABI.c_str(), wireABI );
+			if ( payloadOut != NULL ) {
+				payloadOut->otherPlatform = true;
+			}
 			valid = false;
 		} else if ( layoutBuild < minimumBuild ) {
 			common->Warning( "Savegame '%s' was written by an older openQ4 (build %d, below build %d, the oldest this build can restore)",
@@ -1035,7 +1054,7 @@ static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath
 
 	const int compatibilityHeaderEnd = file->Tell();
 	int protectedLength = fileLength;
-	if ( valid && payloadVersion >= SESSION_OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION ) {
+	if ( valid && payloadVersion >= SESSION_OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION ) {
 		const int integrityOffset = fileLength - SESSION_OPENQ4_SAVEGAME_INTEGRITY_BYTES;
 		if ( integrityOffset <= compatibilityHeaderEnd + SESSION_OPENQ4_SAVEGAME_FOOTER_BYTES ||
 			 file->Seek( integrityOffset, FS_SEEK_SET ) != 0 ) {
@@ -8757,6 +8776,7 @@ bool idSessionLocal::ExecuteSaveGameMapChange( const char *saveName ) {
 		// normal error policy again, close its file and present a fresh menu.
 		openQ4_saveGameRestore.file = NULL;
 		openQ4_saveGameRestore.layoutBuild = 0;
+		openQ4_saveGameRestore.version = 0;
 		common->Warning( "LoadGame '%s': could not restore saved state: %s", saveName, error.error );
 		Stop();
 		loadGameFailure = LOADGAME_FAILURE_RESTORE;
@@ -8885,11 +8905,14 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	for ( i = 0; headerValid && i < MAX_ASYNC_CLIENTS; i++ ) {
 		headerValid = Session_ReadSaveGameDict( loadGameFile, loadedPersistentPlayerInfo[i], va( "persistent player info %d", i ), in.c_str() );
 	}
-	int payloadLayoutBuild = BUILD_NUMBER;
+	sessionSaveGamePayload_t payload = { 0, BUILD_NUMBER, false };
 	if ( headerValid ) {
 		// Reject truncated, stale, or source-incompatible payloads before
 		// ExecuteMapChange tears down the currently running map.
-		headerValid = Session_ValidateSaveGamePayload( loadGameFile, in, true, &payloadLayoutBuild );
+		headerValid = Session_ValidateSaveGamePayload( loadGameFile, in, true, &payload );
+		if ( payload.otherPlatform ) {
+			loadGameFailure = LOADGAME_FAILURE_PLATFORM;
+		}
 	}
 	if ( headerValid && saveMap.IsEmpty() ) {
 		common->Warning( "Savegame '%s' has an empty map name", in.c_str() );
@@ -8925,17 +8948,20 @@ bool idSessionLocal::LoadGame( const char *saveName ) {
 	common->DPrintf( "loading a v%d savegame\n", savegameVersion );
 
 	// The game reads the payload's GUI records through the engine, which reads
-	// them in the layout of the build that wrote it until the restore ends.
+	// them in the format and layout of the build that wrote it until the
+	// restore ends.
 	struct sessionSaveGameRestoreScope_t {
-		sessionSaveGameRestoreScope_t( const idFile *file, int layoutBuild ) {
+		sessionSaveGameRestoreScope_t( const idFile *file, const sessionSaveGamePayload_t &payload ) {
 			openQ4_saveGameRestore.file = file;
-			openQ4_saveGameRestore.layoutBuild = layoutBuild;
+			openQ4_saveGameRestore.layoutBuild = payload.layoutBuild;
+			openQ4_saveGameRestore.version = payload.version;
 		}
 		~sessionSaveGameRestoreScope_t() {
 			openQ4_saveGameRestore.file = NULL;
 			openQ4_saveGameRestore.layoutBuild = 0;
+			openQ4_saveGameRestore.version = 0;
 		}
-	} saveGameRestoreScope( savegameFile, payloadLayoutBuild );
+	} saveGameRestoreScope( savegameFile, payload );
 
 	if ( saveMap.Length() > 0 ) {
 		// Start loading map

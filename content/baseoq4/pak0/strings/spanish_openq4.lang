@@ -1251,6 +1251,7 @@
 	"#str_231103"	"Esta partida guardada está dañada o procede de una versión incompatible."
 	"#str_231190"	"No se pudo restaurar esta partida. Elige otra partida guardada o inicia una nueva."
 	"#str_231191"	"ERROR AL CARGAR"
+	"#str_231192"	"Esta partida guardada se creó en otra plataforma y no se puede cargar en esta."
 	"#str_231104"	"No se ha podido leer esta partida guardada."
 	"#str_231105"	"No se ha podido eliminar esta partida guardada."
 	"#str_231106"	"PARTIDAS MÁS RECIENTES"

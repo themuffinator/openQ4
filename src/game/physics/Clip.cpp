@@ -323,7 +323,7 @@ void idClipModel::SaveTraceModels( idSaveGame *savefile ) {
 	for ( i = 0; i < traceModelCache.Num(); i++ ) {
 		trmCache_t *entry = traceModelCache[i];
 
-		savefile->Write( &entry->trm, sizeof( entry->trm ) );
+		savefile->WriteTraceModel( entry->trm );
 		savefile->WriteFloat( entry->volume );
 		savefile->WriteVec3( entry->centerOfMass );
 		savefile->WriteMat3( entry->inertiaTensor );
@@ -350,7 +350,11 @@ void idClipModel::RestoreTraceModels( idRestoreGame *savefile ) {
 	for ( i = 0; i < num; i++ ) {
 		trmCache_t *entry = new trmCache_t;
 
-		savefile->Read( &entry->trm, sizeof( entry->trm ) );
+		if ( savefile->GetOpenQ4SaveGameCompatibilityVersion() >= OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION ) {
+			savefile->ReadTraceModel( entry->trm );
+		} else {
+			savefile->Read( &entry->trm, sizeof( entry->trm ) );
+		}
 		if ( !SaveGameTraceModelBoundsCheck( entry->trm ) ) {
 			delete entry;
 			savefile->Error( "idClipModel::RestoreTraceModels: invalid trace model %d", i );

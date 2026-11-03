@@ -31,9 +31,9 @@ def checksum_fixture(data):
         nonlocal position
         length=integer(); assert 0<=length<4096
         result=data[position:position+length].decode('ascii'); position+=length; return result
-    assert integer()==int.from_bytes(b'OQ4S','little') and integer()==4
+    assert integer()==int.from_bytes(b'OQ4S','little') and integer()==5
     build=integer(); snapshot=string(); source_count=integer(); abi=string()
-    assert abi=='windows-msvcabi-x64-le-raw1' and len(snapshot)==64
+    assert abi=='le64-portable1' and len(snapshot)==64
     objects=integer(); assert 0<objects<20000
     classes=[string() for _ in range(objects)]
     assert all(re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*',name) for name in classes)

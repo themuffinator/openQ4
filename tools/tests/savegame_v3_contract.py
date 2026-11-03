@@ -302,12 +302,13 @@ def validate_release_layout_contract(session: str, sp: str, mp: str, minimum_bui
     require(session, '#include "SaveGameReleases.h"', "engine release snapshot table")
     require(session, "layoutBuild < minimumBuild", "engine layout build floor")
     require(session, "OPENQ4_SAVEGAME_V2_FIRST_RELEASE_BUILD : SESSION_OPENQ4_SAVEGAME_MINIMUM_SUPPORTED_BUILD;", "engine per-version floor")
-    require(session, "saveGameRestoreScope( savegameFile, payloadLayoutBuild )", "engine restore layout scope")
+    require(session, "saveGameRestoreScope( savegameFile, payload )", "engine restore layout scope")
+    require(session, "openQ4_saveGameRestore.version = payload.version;", "engine restore format scope")
     for source, context in ((sp, "SP GameLib"), (mp, "MP GameLib")):
         for token in (
             '#include "framework/SaveGameReleases.h"',
             "openQ4SaveGameLayoutBuild = OpenQ4_SaveGameLayoutBuild( openQ4SaveGameCompatibilityVersion, buildNumber,",
-            "openQ4SaveGameCompatibilityVersion != OPENQ4_SAVEGAME_V2_VERSION",
+            "openQ4SaveGameCompatibilityVersion < OPENQ4_SAVEGAME_V2_VERSION",
             "idStr savedWireABI = OPENQ4_SAVEGAME_V2_WIRE_ABI;",
             "return openQ4SaveGameLayoutBuild >= firstBuildWithField;",
             "return OpenQ4_SaveGameHasInterpolatorCacheFlag( openQ4SaveGameLayoutBuild );",
@@ -385,16 +386,24 @@ def validate_source_contracts() -> None:
     mp_player = read(GAME_LIBS_ROOT / "src/mpgame/Player.cpp")
     mp_physics_player = read(GAME_LIBS_ROOT / "src/mpgame/physics/Physics_Player.cpp")
     game_file_h = read(GAME_LIBS_ROOT / "src/framework/File.h")
+    releases_h = read(ROOT / "src/framework/SaveGameReleases.h")
 
-    if constant(session, "SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_VERSION") != 4:
-        raise AssertionError("Engine writer must use v4 for persistent Awakening status")
-    if constant(session, "SESSION_OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION") != 3:
+    # v5 (portable encodings, roadmap Q4-06) is written; v2 to v4 stay readable
+    # on the wire ABI that wrote them, and v4 still carries Awakening status.
+    if constant(session, "SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_VERSION") != 5:
+        raise AssertionError("Engine writer must use the v5 portable payload")
+    if constant(session, "SESSION_OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION") != 3:
         raise AssertionError("Engine must retain its bounded v3 reader")
+    if constant(releases_h, "OPENQ4_SAVEGAME_PORTABLE_VERSION") != 5:
+        raise AssertionError("The portable payload must be version 5")
+    require(releases_h, 'OPENQ4_SAVEGAME_PORTABLE_WIRE_ABI = "le64-portable1"', "portable wire ABI stamp")
     for source, context in ((sp_h, "SP GameLib"), (mp_h, "MP GameLib")):
-        if constant(source, "OPENQ4_SAVEGAME_COMPATIBILITY_VERSION") != 4:
-            raise AssertionError(f"{context} current save format differs from engine v4")
-        if constant(source, "OPENQ4_SAVEGAME_PREVIOUS_COMPATIBILITY_VERSION") != 3:
-            raise AssertionError(f"{context} previous save reader differs from engine v3")
+        if constant(source, "OPENQ4_SAVEGAME_COMPATIBILITY_VERSION") != 5:
+            raise AssertionError(f"{context} current save format differs from engine v5")
+        if constant(source, "OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION") != 5:
+            raise AssertionError(f"{context} portable save format differs from engine v5")
+        if constant(source, "OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION") != 3:
+            raise AssertionError(f"{context} typed save reader differs from engine v3")
 
     # A save is only claimed when a verified decoder exists for its layout. The
     # per-snapshot allowlists made that claim for tuples that were never

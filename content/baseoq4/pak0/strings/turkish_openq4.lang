@@ -1251,6 +1251,7 @@
 	"#str_231103"	"Bu kayıt bozuk ya da uyumsuz bir sürümden."
 	"#str_231190"	"Bu kayıt geri yüklenemedi. Başka bir kayıt seçin veya yeni bir oyun başlatın."
 	"#str_231191"	"YÜKLEME BAŞARISIZ"
+	"#str_231192"	"Bu kayıt başka bir platformda oluşturuldu ve bu platformda yüklenemez."
 	"#str_231104"	"Bu kayıt okunamadı."
 	"#str_231105"	"Bu kayıt silinemedi."
 	"#str_231106"	"DAHA YENİ KAYITLAR"
