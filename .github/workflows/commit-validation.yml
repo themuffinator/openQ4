@@ -132,6 +132,7 @@ jobs:
             tools/tests/mp_bot_drop_replay.py \
             tools/tests/mp_bot_rim_replay.py \
             tools/tests/mp_roster_smoke.py \
+            tools/tests/mp_match_edges_smoke.py \
             tools/tests/mp_round_remote_smoke.py \
             tools/tests/mp_tourney_smoke.py \
             tools/tests/parser_include_paths_contract.py \

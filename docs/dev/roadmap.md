@@ -1809,6 +1809,21 @@ claim peer combinations that have not been tested.
   contracts fail against each reverted fix; all 52 asset-free `mp_match_*`
   contracts pass. [Details](competitive-match-reference-audit.md#proposal-revalidation-veto-side-and-follow-identity-2026-10-23).
   The live runtime scenarios above remain open.
+  Progress, 3 November: the eight live scenarios from that review now pass on
+  one staged OpenGL build of `1e1f3e88a`, with reports bound to its binary
+  hashes. The new `mp_match_edges_smoke.py` covers captain substitution both
+  ways and timed invitation expiry. It also covers countdown cancellation by an
+  unready player and by a captain's disconnect, once-only charging of duplicate
+  and simultaneous timeouts, and a passed global abort ballot that executes
+  after a mid-vote session change. Follow targets are released on disconnect
+  and not inherited on slot reuse, and an invited spectator is refused cameras.
+  `mp_series_smoke.py --missing-map-retry` rolls a failed series map load back
+  to READY twice, then plays the retry. No product defect surfaced. Side
+  proposals cannot be qualified: every Match Control creation template is
+  global by contract, so no shipped surface creates a side ballot
+  ([evidence and limits](competitive-match-reference-audit.md#live-closure-scenarios-2026-11-03)).
+  Physical keyboard/controller workflows, side ballots, the post-commit
+  map-load limit and the rest of the release order remain open.
 - [ ] **MP-02 — P1, qualification and targeted fixes: bot traversal safety.** Rerun
   staged q4dm8/q4ctf3/q4ctf5/q4dz3 after the exact-state jump/unroutable-pad fixes,
   then the complete declared-map sweep including warmup (currently 33 variants).
