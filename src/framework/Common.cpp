@@ -6193,6 +6193,8 @@ idStr initializationMessage;
 openq4::InitializationPresentation initializationPacing;
 int initializationFrames = 0;
 double initializationLastFrame = 0, initializationMaxGap = 0, initializationDrawMsec = 0;
+// Trace-only: where loading starves presentation, and what each frame costs.
+double initializationStart = 0, initializationLastHook = 0, initializationMaxHookGap = 0, initializationSubmit = 0;
 double InitializationMilliseconds() {
 	return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
@@ -6202,6 +6204,8 @@ struct InitializationScope {
 		initializationPacing = {};
 		initializationFrames = 0;
 		initializationLastFrame = initializationMaxGap = initializationDrawMsec = 0;
+		initializationStart = initializationLastHook = InitializationMilliseconds();
+		initializationMaxHookGap = initializationSubmit = 0;
 		initializationActive = true;
 	}
 	void Finish() {
@@ -6210,8 +6214,9 @@ struct InitializationScope {
 		initializationMessage.Clear();
 		RetainedUI_EndInitialization();
 		if ( cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) {
-			common->Printf( "INITIALIZATION_PRESENTATION frames=%d drawMsec=%.3f maxGapMsec=%.3f\n",
-				initializationFrames, initializationDrawMsec, initializationMaxGap );
+			common->Printf( "INITIALIZATION_PRESENTATION frames=%d drawMsec=%.3f maxGapMsec=%.3f maxHookGapMsec=%.3f totalMsec=%.3f\n",
+				initializationFrames, initializationDrawMsec, initializationMaxGap, initializationMaxHookGap,
+				InitializationMilliseconds() - initializationStart );
 		}
 	}
 	~InitializationScope() { Finish(); }
@@ -6221,6 +6226,14 @@ struct InitializationScope {
 bool openQ4_UpdateInitialization( void ) {
 	// Thread-local ownership is checked before touching shared renderer/UI state.
 	if ( !initializationActive ) return false;
+	if ( !initializationDrawing ) {
+		const double now = InitializationMilliseconds(), gap = now - initializationLastHook;
+		initializationLastHook = now;
+		initializationMaxHookGap = Max( initializationMaxHookGap, gap );
+		if ( gap > 50 && cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) {
+			common->Printf( "INITIALIZATION_HOOK_GAP msec=%.1f\n", gap );
+		}
+	}
 	if ( initializationDrawing || initializationMessage.IsEmpty() ||
 		!initializationPacing.Due( InitializationMilliseconds(), openQ4_GetRequestedPresentationCap() ) ||
 		!RetainedUI_CanUpdateInitialization() ) return true;
@@ -6247,6 +6260,11 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 				if ( initializationFrames++ ) initializationMaxGap = Max( initializationMaxGap, end - initializationLastFrame );
 				initializationLastFrame = end;
 				initializationDrawMsec += end - start;
+				if ( cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) {
+					common->Printf( "INITIALIZATION_FRAME at=%.1f build=%.2f present=%.2f\n", end - initializationStart,
+						( initializationSubmit > start ? initializationSubmit : end ) - start,
+						initializationSubmit > start ? end - initializationSubmit : 0.0 );
+				}
 			}
 		}
 	} drawingScope;
@@ -6255,6 +6273,7 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 	UI_SettingsRenderFrame settingsFrame;
 	renderSystem->BeginFrame( renderSystem->GetScreenWidth(), renderSystem->GetScreenHeight() );
 	if ( RetainedUI_DrawInitialization( msg ) ) {
+		initializationSubmit = InitializationMilliseconds();
 		settingsFrame.Submitting();
 		renderSystem->EndFrame( NULL, NULL );
 		settingsFrame.Presented();

@@ -161,13 +161,117 @@ static ID_INLINE bool OpenQ4_ReadSaveGameFloat( idFile *savefile, float &value, 
 	return true;
 }
 
+/*
+================
+OpenQ4_WriteSaveGameField
+
+One GUI layout field through an explicit little-endian encoder. These are the
+bytes a raw copy of the field wrote on every supported target. Floats keep
+their bits, non-finite values included, as the raw copy did; callers check
+them. A field type without an overload does not compile (roadmap Q4-06).
+================
+*/
+static ID_INLINE bool OpenQ4_CheckSaveGameField( int transferred, int expected, int offset, bool writing, const char *context, const char *fieldName ) {
+	if ( transferred != expected ) {
+		common->Error( "%s: %s %s at offset %d (%d of %d bytes)", context ? context : ( writing ? "savegame write" : "savegame restore" ),
+			writing ? "failed to write" : "truncated", fieldName ? fieldName : "field", offset, transferred, expected );
+		return false;
+	}
+	return true;
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, float value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->WriteFloat( value ), 4, offset, true, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, int value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->WriteInt( value ), 4, offset, true, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, unsigned int value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->WriteUnsignedInt( value ), 4, offset, true, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, signed char value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->WriteChar( static_cast<char>( value ) ), 1, offset, true, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, unsigned char value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->WriteUnsignedChar( value ), 1, offset, true, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const idVec2 &value, const char *context, const char *fieldName ) {
+	return OpenQ4_WriteSaveGameField( savefile, value.x, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.y, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const idRectangle &value, const char *context, const char *fieldName ) {
+	return OpenQ4_WriteSaveGameField( savefile, value.x, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.y, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.w, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.h, context, fieldName );
+}
+
 template< class type >
-static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const type &value, const char *context, const char *fieldName ) {
+bool OpenQ4_WriteSaveGameField( idFile *savefile, const type &value, const char *context, const char *fieldName ) = delete;
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, float &value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->ReadFloat( value ), 4, offset, false, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, int &value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->ReadInt( value ), 4, offset, false, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, unsigned int &value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->ReadUnsignedInt( value ), 4, offset, false, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, signed char &value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	char raw = 0;
+	const int bytesRead = savefile->ReadChar( raw );
+	value = static_cast<signed char>( raw );
+	return OpenQ4_CheckSaveGameField( bytesRead, 1, offset, false, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, unsigned char &value, const char *context, const char *fieldName ) {
+	const int offset = savefile->Tell();
+	return OpenQ4_CheckSaveGameField( savefile->ReadUnsignedChar( value ), 1, offset, false, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idVec2 &value, const char *context, const char *fieldName ) {
+	return OpenQ4_ReadSaveGameField( savefile, value.x, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.y, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idRectangle &value, const char *context, const char *fieldName ) {
+	return OpenQ4_ReadSaveGameField( savefile, value.x, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.y, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.w, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.h, context, fieldName );
+}
+
+template< class type >
+bool OpenQ4_ReadSaveGameField( idFile *savefile, type &value, const char *context, const char *fieldName ) = delete;
+
+// Aggregates still copied as laid out (the transition interpolator). Q4-06
+// stage 3 replaces this with SaveCodec_WriteInterpolate under a new version.
+template< class type >
+static ID_INLINE bool OpenQ4_WriteSaveGameRawField( idFile *savefile, const type &value, const char *context, const char *fieldName ) {
 	return OpenQ4_WriteSaveGameBytes( savefile, &value, sizeof( value ), context, fieldName );
 }
 
 template< class type >
-static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, type &value, const char *context, const char *fieldName ) {
+static ID_INLINE bool OpenQ4_ReadSaveGameRawField( idFile *savefile, type &value, const char *context, const char *fieldName ) {
 	return OpenQ4_ReadSaveGameBytes( savefile, &value, sizeof( value ), context, fieldName );
 }
 

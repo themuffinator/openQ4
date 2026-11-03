@@ -978,7 +978,7 @@ typed fields, including v3 branches that retain raw v2 readers where required.
 The payload is not yet architecture-neutral. Its ABI stamp ends in `raw1` because
 native-layout blocks remain.
 
-Each of the SP and MP source trees writes 22 direct raw blocks:
+Each of the SP and MP source trees writes 23 direct raw blocks:
 
 | Relative source | Raw writes |
 | --- | ---: |
@@ -995,33 +995,117 @@ Each of the SP and MP source trees writes 22 direct raw blocks:
 | `vehicle/VehicleParts.cpp` | 1 |
 | `vehicle/VehiclePosition.cpp` | 5 |
 
-This inventory was described as locked by the GameLib corruption contract, but
-a 3 November 2026 check found that no in-tree test counts these writes. The
-check was apparently lost when the game sources were consolidated, so nothing
-currently stops a new raw write. Q4-06 stage 1 restores the gate. The table is
-the direct-call inventory only, not every native-layout byte reachable through
-helpers. The other raw reads in the game trees serve the v2 and legacy readers.
+This inventory was described as locked by the GameLib corruption contract, which
+also gave its total as 22; the rows add up to 23. A 3 November 2026 check found
+that no in-tree test counted these writes, apparently since the game sources
+were consolidated, so nothing stopped a new raw write.
+`savegame_raw_inventory.py` (Q4-06 stage 1) restores the gate. It finds every
+raw save call in both game trees and the GUI save code: memory `Write`/`Read`,
+the GUI byte and field helpers, and the script globals' byte loop. It requires
+each call to be listed with its class (bitfield, aggregate, LE scalars, script
+storage, bytes, legacy reader or helper) and fails on any unlisted, missing or
+recounted call. The two game trees must match.
+
+At first each tree had 14 bitfield calls, 10 aggregate, 18 LE-scalar and 8
+script-storage calls, plus 40 legacy-reader reads. Those reads serve only the
+v2 and v3 historical decoders; the current writer saves those fields typed.
+
+Stage 2's second slice converted every bitfield and LE-scalar block with
+unchanged bytes, which leaves 7 direct raw writes per tree: 10 aggregate and 8
+script-storage calls. On the GUI side, the window layout fields now go through
+typed encoders, leaving 75 PDA minigame calls, 3 calls for the transition
+interpolator (an aggregate), 12 byte payloads and 8 helper definitions. The
+test also pins the script type widths that the script storage depends on.
 
 Saved primitives are already portable: `WriteInt`, `WriteFloat`, the vector
 and matrix writers and `WriteShort` swap to little-endian, `WriteBool` writes
 one byte, and strings are 8-bit bytes. Portability fails only on the blocks
 below, classified for [Q4-06](roadmap.md):
 
-| Block | Where | Why it is not portable | Planned codec |
-| --- | --- | --- | --- |
-| Flag bitfields (`fl`, `vfl`, `myfl`) | `BrittleFracture`, `Physics_AF` (constraint and body), `Vehicle`, `VehicleParts`, `VehiclePosition`, `Monster_ConvoyHover` | Bit allocation is up to the compiler; MSVC starts a new unit when the declared type changes, GCC and Clang do not | Named 32-bit masks |
-| `idTraceModel` | `physics/Clip.cpp`, `SecurityCamera.cpp` | Aggregate with an enum, a bool and padding | Field by field |
-| `jointMod_t` | `anim/Anim_Blend.cpp` | Holds an `idInterpolateAccelDecelLinear` template whose layout already changed once (build 1582) | Field by field |
-| `PathTargetInfo`, current and last | `vehicle/VehicleDriver.cpp` | Entity pointer saved as a raw spawn id, a bool and padding; bypasses typed reference restore | Fields, typed entity reference |
-| Joints, AF pose joints, pose modifiers and pose frame | `anim/Anim_Blend.cpp` | `idJointMat`, `int`, `idAFPoseJointMod` and `idJointQuat` arrays: floats and int32 with no padding today, so portable by accident | Explicit floats and ints |
-| Eye and driver joint axis and direction maps | `vehicle/VehiclePosition.cpp` | int32 arrays, portable on little-endian | `WriteInt` per element |
-| Hover dampening samples | `ai/Monster_ConvoyHover.cpp` | `idAngles` array, portable on little-endian | Angles per sample |
-| Interpreter stack, global variables and script object data | `script/Script_Interpreter.cpp`, `script/Script_Program.cpp` (globals go through `WriteByte`, one byte at a time, so they are outside the direct-call count) | Script values in host byte order. Function, pointer, namespace and script-event slots are `intptr_t` wide: 8 bytes on every family member, but their bytes are compile-time or expression temporaries | Scalar block with those slots zeroed, or a typed walk |
-| GUI window fields | `src/ui/Window.cpp` (27), `src/ui/SimpleWindow.cpp` (15), `idWinVar` | Floats, ints, rectangles and colours are portable on little-endian; the transition interpolators are template aggregates | Explicit fields |
-| PDA minigame fields | `src/ui/GameBearShootWindow.cpp`, `GameBustOutWindow.cpp`, `GameSSDWindow.cpp` | bool, float and vector fields written by `sizeof` | Explicit fields |
+| Block | Where | Why it is not portable | Codec | State |
+| --- | --- | --- | --- | --- |
+| Flag bitfields (`fl`, `vfl`, `myfl`) | Entity flags (saved by `BrittleFracture`), `Physics_AF` (constraint and body), `Vehicle`, `VehicleParts`, `VehiclePosition`, `Monster_ConvoyHover` | Bit allocation is up to the compiler | One bit per flag in declaration order, packed as before | Converted, same bytes |
+| `idTraceModel` | `physics/Clip.cpp`, `SecurityCamera.cpp` | Aggregate with an enum, a bool and padding | Field by field | Payload v5 |
+| `jointMod_t` | `anim/Anim_Blend.cpp` | Holds an `idInterpolateAccelDecelLinear` template whose layout already changed once (build 1582) | Field by field | Payload v5 |
+| `PathTargetInfo`, current and last | `vehicle/VehicleDriver.cpp` | Entity pointer saved as a raw spawn id, a bool and padding; bypasses typed reference restore | Fields, typed entity reference | Payload v5 |
+| Joints, AF pose joints, pose modifiers and pose frame | `anim/Anim_Blend.cpp` | `idJointMat`, `int`, `idAFPoseJointMod` and `idJointQuat` arrays: floats and int32 with no padding, so portable by accident | Explicit floats and ints | Converted, same bytes |
+| Eye and driver joint axis and direction maps | `vehicle/VehiclePosition.cpp` | int32 arrays, portable on little-endian | `WriteInt` per element | Converted, same bytes |
+| Hover dampening samples | `ai/Monster_ConvoyHover.cpp` | `idAngles` array, portable on little-endian | Angles per sample | Converted, same bytes |
+| Interpreter stack, global variables and script object data | `script/Script_Interpreter.cpp`, `script/Script_Program.cpp` (globals go through `WriteByte`, one byte at a time, so they are outside the direct-call count) | Script values in host byte order. Function, pointer, namespace and script-event slots are `intptr_t` wide: 8 bytes on every family member, but their bytes are compile-time or expression temporaries | Scalar block with those slots zeroed, or a typed walk | Open |
+| GUI window fields | `src/ui/Window.cpp` (27), `src/ui/SimpleWindow.cpp` (15) | Floats, ints, rectangles and vectors, portable on little-endian | Typed `OpenQ4_*SaveGameField` overloads | Converted, same bytes |
+| GUI transition interpolator | `src/ui/Window.cpp` | Template aggregate | `SaveCodec_WriteInterpolate` | Payload v5 |
+| PDA minigame fields | `src/ui/GameBearShootWindow.cpp`, `GameBustOutWindow.cpp`, `GameSSDWindow.cpp` | bool, float and vector fields written by `sizeof` | Explicit fields | Open |
+
+The converted blocks write exactly the bytes their raw copies wrote, so they
+need no version change, and existing saves restore through the new readers.
+The flag bitfields are all one-bit `bool` fields. MSVC, GCC and Clang lay
+those out the same way on little-endian targets: field *i* is bit *i % 8* of
+byte *i / 8*, in *(n + 7) / 8* bytes. `SaveCodec_WriteFlagBytes` writes exactly
+that layout from a list in declaration order, clearing the unused bits that
+raw copies left as they were. Readers ignore those bits. Each struct's size is
+asserted in its save function. `savegame_raw_inventory.py` checks every list
+against its declaration, and `SaveCodecTest.cpp` compares the codec with this
+compiler's raw bytes for 5- and 17-flag structs.
+
+Runtime evidence for the converted blocks, 3 November 2026:
+- **Old saves.** The staged build restored all 11 release fixtures and the
+  three stamped 0.12.0 saves (`savegame_restore_matrix.py`), with the inputs
+  unchanged.
+- **New saves.** Fresh saves round-trip on `game/airdefense1`,
+  `game/convoy1`, `game/walker`, `game/hangar1` and `game/process1` (save,
+  load, save again, load), with no errors. Their saves hold vehicles and
+  articulated figures. `game/convoy1` also passes with a spawned convoy hover.
+- **Not exercised.** No stock map places breakable glass, the only entity
+  that saves the entity flags, so that path rests on the native layout test
+  and the order check.
 
 Padding inside these blocks is currently written uninitialized, so two saves of
 the same state can differ byte for byte.
+
+**Portable codecs (Q4-06 stage 2, in progress).** `src/idlib/SaveCodec.h` holds
+header-only templates that write each aggregate through a writer's typed
+`WriteInt`, `WriteFloat` and `WriteBool`. Those primitives are already
+little-endian in `idSaveGame`, `idRestoreGame` and `idFile`. Readers check
+every count and enum value before using it. The header covers:
+- trace models (used elements only, edge 0 skipped);
+- joint modifiers;
+- articulated-figure pose modifiers;
+- joint quaternions and matrices;
+- `idInterpolateAccelDecelLinear`, by its defining values and rebuilt through
+  `Init`, so the extrapolation cache that changed at build 1582 is never saved;
+- vehicle path targets, with the entity reference written by the caller's
+  typed reference code;
+- flag bitfields as packed bits (above);
+- int and float arrays.
+
+`SaveGame.cpp` in both game trees instantiates the codecs with the production
+types. `tools/tests/save_codec.py` builds
+`tools/tests/native/SaveCodecTest.cpp` with the platform compiler and compares
+each codec's bytes with fixed hex. It then requires eight source mutations of
+the header to fail: field order, flag bit order in writer and reader, bool
+width and removed bounds checks. The flag, array and pose codecs now write the
+saves; the trace model, joint modifier, path target and interpolator codecs
+change bytes, so they wait for payload version 5 (stage 3).
+
+**Pointer-sized script slots across save points (3 November 2026).** A thread
+can only be saved while it is suspended inside a call. A raw pointer can
+therefore reach a save only if a call falls between an `OP_ADDRESS`, which
+stores a pointer into a temporary, and the `OP_STOREP_*` that writes through
+it. `disasmScript` dumps of the compiled stock program (84,494 statements,
+including every stock map script) and of The Awakening's (108,760) were
+checked:
+
+- Both contain the same 21 address temporaries, all matched to their stores.
+- Seven have a call before the store: `getFloatKey`, `getKey` or
+  `sys.getEntity`, which return at once and never suspend a thread.
+- No runtime slot of the function, namespace or script-event types occurs.
+  Every pointer slot is an interpreter-stack temporary, `pointer stack[n]`.
+
+So no pointer-sized slot carries a live value across a save point in shipped
+content, and a portable writer can zero those slots. A mod script that assigns
+an object field from a function that waits would hold such a pointer. That
+already breaks loading on the same platform, because the address differs on
+the next run, and portable saves do not make it worse.
 
 Consequences:
 

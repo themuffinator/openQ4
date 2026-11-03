@@ -105,6 +105,61 @@ def check_chapter_text(ui):
             if lines_needed('lowpixel',text,15,U*CHAPTER_DETAIL_W)>4:
                 raise SystemExit(f"{key} in {language} needs {lines_needed('lowpixel',text,15,U*CHAPTER_DETAIL_W)} lines of 4")
 
+CHAPTER_DETAIL_KEYS=('#str_231286','#str_231287','#str_231288')
+CHAPTER_FLOOR=420.0      # u: above 100 % text the picture's column runs down to the docked bottom band's edge
+CHAPTER_PICTURE_LEAST=40.0   # u: a picture squeezed shorter than this gives way to the lines
+
+def grow_chapter_detail(ui, doc, shot, name, detail, plates):
+    """The chosen level's name and explanation follow the text size (section
+    2's reflow): above 100 % the name's line grows and the explanation takes
+    the lines the running language's longest needs at the running size, both
+    under the picture, which gives them its room down to the docked bottom
+    band, shrinking about its top leading corner with its aspect kept and
+    giving way altogether where too little is left. START CHAPTER and BACK,
+    whose room that is, stand side by side under the levels instead. Every
+    binding gives the authored value at 100 % (check_text_bindings)."""
+    U=ui.U;ui.text_source(doc);LARGER=ui.LARGER
+    def prop(node,key): return node['properties'][key]['value']
+    def larger(grown,authored): return {'op':'select','args':[LARGER,grown,authored]}
+    counts=ui.wrapped_lines(CHAPTER_DETAIL_KEYS,'lowpixel',prop(detail,'font-size'),prop(detail,'width'))
+    lines=ui.text_buckets({scale:ui.per_language(doc,{language:found[scale] for language,found in counts.items()}) for scale in (1.5,2)})
+    line=prop(detail,'line-height')
+    name_h=ui.text_times(prop(name,'height'));detail_h=ui.text_times({'op':'*','args':[lines,line]})
+    back_part,picture,border=shot
+    top,picture_h,picture_w=prop(back_part,'top'),prop(back_part,'height'),prop(back_part,'width')
+    name_gap=prop(name,'top')-(top+picture_h);detail_gap=prop(detail,'top')-(prop(name,'top')+prop(name,'height'))
+    for language,found in counts.items():
+        if top+name_gap+prop(name,'height')*2+detail_gap+found[2]*line*2>U*CHAPTER_FLOOR:
+            raise SystemExit(f"a chapter's explanation in {language} needs {found[2]} lines at 200 % text, more than its column holds")
+    room=ui.text_sum(U*CHAPTER_FLOOR-top-name_gap-detail_gap,{'op':'*','args':[-1,name_h]},{'op':'*','args':[-1,detail_h]})
+    height={'op':'max','args':[0,{'op':'min','args':[picture_h,room]}]}
+    scale={'op':'/','args':[height,picture_h]}
+    for node in shot:
+        inset=picture_h-prop(node,'height')        # the picture inside the frame's 1 u border
+        doc.bind(f"text.{node['id']}.height",node['id'],'height',larger({'op':'max','args':[0,ui.text_sum(-inset,height)]},prop(node,'height')))
+        doc.bind(f"text.{node['id']}.width",node['id'],'width',
+                 larger({'op':'max','args':[0,ui.text_sum(-inset,{'op':'*','args':[picture_w,scale]})]},prop(node,'width')))
+        node['properties']['display']=ui.keyword('block')
+        doc.bind(f"text.{node['id']}.display",node['id'],'display',
+                 {'op':'select','args':[{'op':'&&','args':[LARGER,{'op':'<','args':[height,U*CHAPTER_PICTURE_LEAST]}]},'none','block']})
+    name_top={'op':'select','args':[{'op':'<','args':[height,U*CHAPTER_PICTURE_LEAST]},top,ui.text_sum(top,height)]}
+    doc.bind(f"text.{name['id']}.top",name['id'],'top',larger(ui.text_sum(name_gap,name_top),prop(name,'top')))
+    doc.bind(f"text.{name['id']}.height",name['id'],'height',name_h)
+    # The name runs on as far as the explanation does, ending in an ellipsis
+    # past it: the levels' list names it in full.
+    doc.bind(f"text.{name['id']}.width",name['id'],'width',larger(prop(detail,'width'),prop(name,'width')))
+    name['properties']['text-overflow']=ui.keyword('clip')
+    doc.bind(f"text.{name['id']}.text-overflow",name['id'],'text-overflow',larger('ellipsis','clip'))
+    doc.bind(f"text.{detail['id']}.top",detail['id'],'top',larger(ui.text_sum(name_gap+detail_gap,name_top,name_h),prop(detail,'top')))
+    doc.bind(f"text.{detail['id']}.height",detail['id'],'height',larger(detail_h,prop(detail,'height')))
+    # The plates side by side under the levels, their labels just clear of the list.
+    art=next(child for child in plates[0]['children'] if child['id'].endswith('-art'))
+    label=next(child for child in art['children'] if child['id'].endswith('-label'))
+    under=round(U*(CHAPTER_TOP+CHAPTER_LIST_H)+2-prop(art,'top')-prop(label,'top'),4)
+    for index,plate in enumerate(plates):
+        doc.bind(f"text.{plate['id']}.left",plate['id'],'left',larger(U*(CHAPTER_LEFT-8+index*208),prop(plate,'left')))
+        doc.bind(f"text.{plate['id']}.top",plate['id'],'top',larger(under,prop(plate,'top')))
+
 def chapter_view(ui, doc):
     """The campaign page's chapters (docs/user/campaigns.md): every level of
     the campaign in campaign order, the ones not reached yet disabled, under
@@ -112,7 +167,7 @@ def chapter_view(ui, doc):
     chooses its chapter, and the session publishes its levelshot, name and
     how it starts; Accept on the chosen one, or START CHAPTER, starts it.
     BACK and the page's Back return to the difficulty."""
-    from retained_saves import picture_frame,save_row,section_plate
+    from retained_saves import grow_rows,picture_frame,save_row,section_plate
     check_chapter_text(ui)
     U=ui.U;ROW_H=20.0
     doc.state.update({'view':{'type':'number','initial':0},'chapter.count':{'type':'number','initial':0},
@@ -149,6 +204,13 @@ def chapter_view(ui, doc):
     start=section_plate(doc,'chapter_start','#str_231289',left-8,top+height+90,action='chapterStart',label_w=CHAPTER_PLATE_LABEL)
     doc.bind('chapter_start.enabled','chapter_start','enabled',{'state':'chapter.open'})
     back=section_plate(doc,'chapter_back','#str_230045',left-8,top+height+120,event='closeChapters',label_w=CHAPTER_PLATE_LABEL)
+    # Above 100 % text the levels' rows and the chosen level's name and
+    # explanation grow with it (section 2's reflow); the headings and plates
+    # are furniture and keep their size.
+    grow_rows(doc,column)
+    for node in [*headings,start,back]:
+        ui.fixed_text(doc,node)
+    grow_chapter_detail(ui,doc,shot,name,detail,(start,back))
     panel=ui.group('chapters',{**ui.absolute(left=0,top=0,width=ui.CANVAS_W,height=720),'display':ui.keyword('none')},
         [*headings,viewport,scrollbar,*shot,name,detail,start,back])
     doc.bind('chapters.display','chapters','display',{'op':'select','args':[{'op':'==','args':[{'state':'view'},1]},'block','none']})
@@ -187,6 +249,12 @@ def skill_document(ui):
         ui.label('description','#str_200019',{**ui.absolute(left=U*387,top=U*184,width=U*226,height=U*148),**ui.typeface('lowpixel',18,26,ui.rgb(ui.OLIVE)),'display':ui.keyword('block')}),
         ui.label('turbo-value','#str_41121',{**ui.absolute(left=U*270,top=U*325,width=U*77,height=U*25),**ui.typeface('marine',18,26,ui.rgb(ui.ORANGE)),'pointer-events':ui.keyword('none'),'display':ui.keyword('block')}),
         chapters])
+    # Above 100 % text the chosen difficulty's description grows as a page's
+    # content column does, and TURBO's value keeps its size on its plate.
+    from retained_difficulty import DIFFICULTIES
+    parts={node['id']:node for node in content['children']}
+    ui.reflow_details(doc,parts['description'],[key for _,key in DIFFICULTIES])
+    ui.fixed_text(doc,parts['turbo-value'])
     difficulty={'op':'==','args':[{'state':'view'},0]}
     doc.bind('navigation.display','navigation','display',{'op':'select','args':[difficulty,'flex','none']})
     for ident in ('description','turbo-value'):
@@ -243,7 +311,6 @@ TALL_SKILL_PLATE=30.0                           # u: a navigation plate's pitch
 
 def tall_skill_page(ui,result):
     from retained_difficulty import DIFFICULTIES
-    from retained_saves import lines_needed,table_text
     from retained_tall import VIEW_HEIGHT,TallLayout
     U,grow=ui.U,TALL_SKILL_GROW
     tall=TallLayout(result)
@@ -252,11 +319,19 @@ def tall_skill_page(ui,result):
     width=ui.CANVAS_W-ui.TALL_MARGIN*(1+grow)
     style=tall.nodes['description']['properties']
     size,line=style['font-size']['value'],style['line-height']['value']
-    lines=max(lines_needed('lowpixel',text,size,width/grow) for _,key in DIFFICULTIES for text in table_text(key).values())
-    described=lines*line*grow
+    # The description takes the lines its longest text needs in its width at
+    # the running text size (section 2).
+    counts=ui.wrapped_lines([key for _,key in DIFFICULTIES],'lowpixel',size,width/grow)
+    lines={scale:max(found[scale] for found in counts.values()) for scale in (1,1.5,2)}
+    TEXT=ui.TEXT
+    described={'op':'*','args':[{'op':'select','args':[{'op':'>','args':[TEXT,1.5]},lines[2]*line*grow,
+               {'op':'select','args':[{'op':'>','args':[TEXT,1]},lines[1.5]*line*grow,lines[1]*line*grow]}]},TEXT]}
     box_top={'op':'-','args':[{'op':'/','args':[VIEW_HEIGHT,2]},360]}
-    tall.fits(TALL_SKILL_TOP+plates_h+24+described+TALL_SKILL_BOTTOM)
-    shift={'op':'-','args':[tall.centred(plates_h+24+described,TALL_SKILL_TOP,TALL_SKILL_BOTTOM),box_top]}
+    tall.fits(TALL_SKILL_TOP+plates_h+24+lines[1]*line*grow+TALL_SKILL_BOTTOM,
+              {scale:TALL_SKILL_TOP+plates_h+24+lines[scale]*line*grow*scale+TALL_SKILL_BOTTOM for scale in (1.5,2)})
+    centred={'op':'max','args':[0,{'op':'/','args':[{'op':'-','args':[VIEW_HEIGHT,ui.text_sum(TALL_SKILL_TOP+TALL_SKILL_BOTTOM+plates_h+24,
+                                                                                                 described)]},2]}]}
+    shift={'op':'-','args':[centred,box_top]}
     origin=(0,tall.dp('navigation','top'))
     tall.block(('navigation','turbo-value'),origin,(0,TALL_SKILL_TOP),grow,shift)
     tall.block(('description',),(tall.dp('description','left'),tall.dp('description','top')),
@@ -268,31 +343,49 @@ def tall_skill_page(ui,result):
 
 TALL_CHAPTER_DETAIL_LINES=3   # the explanation's lines across the column (four fit its 200 u in landscape)
 TALL_CHAPTER_ROWS=3           # the levels the list shows at least
+TALL_CHAPTER_ROWS_LEAST={1:3,1.5:2,2:1}   # by text size, at the least portrait view that holds it
 
 def tall_chapters(ui,tall,shift):
     from retained_saves import ROW_H,SAVE_LINES,TALL_GROW,TALL_PLATE_PITCH,TALL_PLATES,tall_list
     from retained_tall import CONTENT_W,MARGIN,VIEW_HEIGHT
-    U=ui.U;left,top,width,height=CHAPTER_PICTURE
+    U=ui.U;left,top,width,height=CHAPTER_PICTURE;TEXT=ui.TEXT
     picture_top=TALL_SKILL_TOP
-    tall.block(('chapter-shot-back','chapter-shot','chapter-shot-border'),(U*left,U*top),(MARGIN,picture_top),TALL_GROW,shift)
+    pictures=('chapter-shot-back','chapter-shot','chapter-shot-border')
+    tall.block(pictures,(U*left,U*top),(MARGIN,picture_top),TALL_GROW,shift)
+    # The picture keeps the tall view's size, beside the plates; the name and
+    # explanation under it grow with the text across the column.
+    for ident in pictures:
+        for key in ('width','height'):
+            tall.set(ident,key,tall.dp(ident,key)*TALL_GROW)
+        found=next(binding for binding in tall.bindings if binding['node']==ident and binding['property']=='display')
+        found['value']={'op':'select','args':[tall.condition,'block',found['value']]}
     beside=MARGIN+U*width*TALL_GROW+24
     for index,ident in enumerate(('chapter_start','chapter_back')):
         tall.block((ident,),(tall.dp(ident,'left'),tall.dp(ident,'top')),(beside,picture_top+40+index*TALL_PLATE_PITCH),TALL_PLATES,shift)
     name_top=picture_top+U*height*TALL_GROW+12
     tall.block(('chapter-name',),(U*left,U*(top+height+5)),(MARGIN,name_top),TALL_GROW,shift)
-    detail_top=name_top+U*18*TALL_GROW+4
-    tall.block(('chapter-detail',),(U*left,U*(top+height+26)),(MARGIN,detail_top),TALL_GROW,shift)
-    detail_h=TALL_CHAPTER_DETAIL_LINES*tall.dp('chapter-detail','line-height')*TALL_GROW
+    name_h=U*18*TALL_GROW
+    named=ui.text_sum(shift,{'op':'*','args':[name_h,{'op':'-','args':[TEXT,1]}]})   # the name's growth past 100 %
+    detail_top=name_top+name_h+4
+    tall.block(('chapter-detail',),(U*left,U*(top+height+26)),(MARGIN,detail_top),TALL_GROW,named)
+    line=tall.dp('chapter-detail','line-height')*TALL_GROW
+    counts=ui.wrapped_lines(CHAPTER_DETAIL_KEYS,'lowpixel',tall.dp('chapter-detail','font-size'),CONTENT_W/TALL_GROW)
+    lines={scale:max(TALL_CHAPTER_DETAIL_LINES if scale==1 else 0,*(found[scale] for found in counts.values())) for scale in (1,1.5,2)}
+    detail_h={'op':'*','args':[{'op':'select','args':[{'op':'>','args':[TEXT,1.5]},lines[2]*line,
+              {'op':'select','args':[{'op':'>','args':[TEXT,1]},lines[1.5]*line,lines[1]*line]}]},TEXT]}
     for ident in ('chapter-name','chapter-detail'):
         tall.set(ident,'width',CONTENT_W)
     tall.set('chapter-detail','height',detail_h)
+    grown=ui.text_sum(named,detail_h,-lines[1]*line)   # the shift and both lines' growth past 100 %
     list_w=CONTENT_W-40
     heads={'name':(tall.dp('chapter-head-level','left'),tall.dp('chapter-head-level','top')),
            'location':(tall.dp('chapter-head-status','left'),tall.dp('chapter-head-status','top'))}
-    heads_top=detail_top+detail_h+24
+    heads_top=detail_top+lines[1]*line+24
     # The list runs to the prompt bar over the bottom band, its top in view dp.
-    lines=len(SAVE_LINES);list_top=heads_top+lines*U*14*TALL_GROW+10
-    height={'op':'-','args':[VIEW_HEIGHT,round(list_top+TALL_SKILL_BOTTOM,4)]}
-    tall_list(tall,'chapter',SAVE_LINES,list_w,heads,heads_top,shift,height,{'name':'chapter-head-level','location':'chapter-head-status'})
-    # The list shows three levels at least.
-    tall.fits(list_top+TALL_CHAPTER_ROWS*lines*U*ROW_H*TALL_GROW+TALL_SKILL_BOTTOM)
+    rows=len(SAVE_LINES);list_top=heads_top+rows*U*14*TALL_GROW+10
+    below=ui.text_sum(-list_top-TALL_SKILL_BOTTOM,VIEW_HEIGHT,{'op':'*','args':[-1,ui.text_sum(grown,{'op':'*','args':[-1,shift]})]})
+    tall_list(tall,'chapter',SAVE_LINES,list_w,heads,heads_top,grown,below,{'name':'chapter-head-level','location':'chapter-head-status'})
+    # The list shows three levels at least, two at 150 % text and one at 200 %.
+    least={scale:list_top+name_h*(scale-1)+(lines[scale]*scale-lines[1])*line+
+           TALL_CHAPTER_ROWS_LEAST[scale]*rows*U*ROW_H*TALL_GROW*scale+TALL_SKILL_BOTTOM for scale in (1,1.5,2)}
+    tall.fits(least[1],{scale:least[scale] for scale in (1.5,2)})

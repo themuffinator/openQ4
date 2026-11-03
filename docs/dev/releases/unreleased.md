@@ -170,9 +170,10 @@ See [release status](../../user/release-status.md) and the
   the playing line's audio, including pauses between words. Classic retains
   its original animation.
 - **A more consistent new interface.** Startup now uses the animated vector
-  initialization screen. Its rings and light sweep update during loading,
-  with much cheaper animation and automatic backoff to keep startup work
-  moving on slower systems. Reduced Motion keeps it still.
+  initialization screen. It opens with a quick zoom as its gears wind into
+  place, then keeps turning smoothly while the game loads, and each loading
+  step slides in instead of flickering. Slower systems still give most of
+  the time to loading. Reduced Motion keeps it still.
   Campaign difficulty and Turbo options open on a
   fourth menu level with matching breadcrumbs and smooth Back transitions.
   The Settings hub includes a confirmation before restoring defaults and
@@ -197,8 +198,14 @@ See [release status](../../user/release-status.md) and the
   stays intact. The lists of saves, demos, servers and maps now grow their
   rows with the text too, so names stay whole in their rows (a name too long
   for its column ends in "…"), and the selected save's or demo's details
-  stand one under another above a smaller picture. Player Setup, Create
-  Server's options and a few other pages still use their normal sizes.
+  stand one under another above a smaller picture. The remaining pages
+  follow too: in Create Server, Player Setup and the server search each
+  setting's value moves under its label so nothing is cut off, and the
+  difficulty pages, chapters, Mods list, objectives, server browser
+  details, Arena and Credits grow their text while their buttons stay put.
+- **Player Setup on tall screens.** On a portrait screen the player setup
+  fields now span the screen at a readable size with your character shown
+  large underneath, instead of everything squeezed into the top third.
 - **Menus on tall screens.** On a portrait or rotated screen, the main menu,
   the pause menu and the Settings, Single Player, Campaign and Multiplayer
   menus in the new interface now fill the height: their buttons are larger
@@ -365,6 +372,12 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- A long multiplayer chat message with an icon in it no longer repeats the
+  icon at the start of the next line when it wraps.
+- On a first launch that starts a map from the command line or a shortcut
+  (for example `+devmap`), the game goes straight to the map instead of
+  sometimes opening the main menu first. The menu used to win on a slow first
+  frame and loaded player models and crosshairs late.
 - Demos recorded on servers without cheats can be paused, slowed and sped up
   again, and the playback timeline follows the position. Playback took over
   the server's cheat setting, which locked those controls.

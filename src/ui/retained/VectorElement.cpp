@@ -185,7 +185,17 @@ void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 		const auto output = options.transform;
 		// Round upwards with headroom: sub-pixel float noise during rotation must
 		// not invalidate a mesh, and curve error stays below tolerance at this DPI.
-		const double scale = (std::round(output.MaximumScale()*64)+1)/64;
+		const double needed = output.MaximumScale();
+		double scale = (std::round(needed*64)+1)/64;
+		// A scale in motion (a zoom) would compile every frame. Keep a compilation
+		// while it is finer than needed by at most a sqrt(2) step; a growing scale
+		// compiles one step ahead. A scale at rest compiles exactly again.
+		if (cachedLocalMesh && !cache.empty() && std::abs(needed-localScale) > needed*1e-4) {
+			const double compiled = cache.front().signature[2], step = std::sqrt(2.0);
+			if (compiled >= scale && compiled <= scale*step) scale = compiled;
+			else if (needed > localScale) scale = (std::round(needed*step*64)+1)/64;
+		}
+		localScale = needed;
 		localTransform.SetColumns({float(output.a/scale),float(output.b/scale),0,0},
 			{float(output.c/scale),float(output.d/scale),0,0}, {0,0,1,0},
 			{float(output.tx),float(output.ty),0,1});

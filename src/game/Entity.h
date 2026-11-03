@@ -197,6 +197,8 @@ public:
 	void					Save( idSaveGame *savefile ) const;
 	void					Restore( idRestoreGame *savefile );
 	void					RestoreBindingLinks( idRestoreGame *savefile );
+	void					WriteFlagBytes( idSaveGame *savefile ) const;
+	void					ReadFlagBytes( idRestoreGame *savefile );
 	virtual void			ValidateRestoredBindings( idRestoreGame *savefile ) const;
 	virtual void			PrepareFailedRestoreShutdown( void );
 

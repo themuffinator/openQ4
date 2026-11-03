@@ -71,6 +71,7 @@ private:
 	RuntimeStatistics* statistics = nullptr;
 	std::array<double,12> previous{}; // The exact signature of the last render.
 	double previousX = 0, previousY = 0; // Its whole output translation.
+	double localScale = 0; // A local mesh's output scale at its last render.
 	bool valid = false;
 	std::array<float,6> renderInputs{};
 	Rml::Matrix4f renderTransform=Rml::Matrix4f::Identity(), cachedTransform=Rml::Matrix4f::Identity();

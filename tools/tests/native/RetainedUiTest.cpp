@@ -88,15 +88,18 @@ static void CheckInitializationPacing() {
 	openq4::InitializationPresentation pacing;
 	Check(!pacing.Due(1000,60),"startup cannot redraw before its first frame");
 	pacing.Presented(0,100); // Cold compilation is paid once.
-	Check(!pacing.Due(130,60) && pacing.Due(134,60),"startup caps high/uncapped presentation at 30 Hz");
-	Check(!pacing.Due(134,15) && pacing.Due(167,15),"startup respects a lower presentation cap");
-	pacing.Presented(134,135);
-	Check(!pacing.Due(167,0) && pacing.Due(168,0),"warm inexpensive frames retain a 30 Hz start-to-start cadence");
-	pacing.Presented(168,188); // A blocked present must give loading most of the time.
-	Check(!pacing.Due(367,60) && pacing.Due(368,60),"slow startup redraws reserve 90 percent of subsequent time for loading");
-	Check(!pacing.Due(180,60),"a backwards clock cannot cause a redraw burst");
-	pacing.Presented(1000,1001);
-	Check(!pacing.Due(1001,60),"a late checkpoint never produces catch-up frames");
+	Check(!pacing.Due(116,0) && pacing.Due(117,0),"startup caps uncapped presentation at 60 Hz");
+	Check(!pacing.Due(116,240) && pacing.Due(117,240),"startup caps high presentation at 60 Hz");
+	Check(!pacing.Due(149,20) && pacing.Due(150,20),"startup respects a lower presentation cap");
+	pacing.Presented(150,152);
+	Check(!pacing.Due(166,60) && pacing.Due(167,60),"warm inexpensive frames keep a 60 Hz start-to-start cadence");
+	pacing.Presented(167,207); // 40 ms: smoothed to 11.5 ms of cost.
+	Check(!pacing.Due(218,60) && pacing.Due(219,60),"one blocked present is smoothed instead of stalling the entrance");
+	for (int i = 0; i < 40; ++i) pacing.Presented(2000+i*100,2020+i*100);
+	Check(!pacing.Due(5995,60) && pacing.Due(6001,60),"slow startup redraws reserve four fifths of later time for loading");
+	Check(!pacing.Due(5900,60),"a backwards clock cannot cause a redraw burst");
+	pacing.Presented(9000,9001);
+	Check(!pacing.Due(9001,60),"a late checkpoint never produces catch-up frames");
 }
 static void CheckTypedActionDescriptors() {
 	const std::string source = R"json({

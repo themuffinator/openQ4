@@ -4853,7 +4853,7 @@ bool idWindow::WriteSaveGameTransition( idTransitionData &trans, idFile *savefil
 	const int savedOffset = static_cast<int>( transitionOffset );
 	if ( !OpenQ4_WriteSaveGameInt( savefile, savedOffset, "idWindow::WriteSaveGameTransition", "target offset" ) ||
 		 !WriteSaveGameString( winName, savefile ) ||
-		 !OpenQ4_WriteSaveGameField( savefile, trans.interp, "idWindow::WriteSaveGameTransition", "interpolate state" ) ) {
+		 !OpenQ4_WriteSaveGameRawField( savefile, trans.interp, "idWindow::WriteSaveGameTransition", "interpolate state" ) ) {
 		return false;
 	}
 	return true;
@@ -4865,10 +4865,10 @@ openQ4SaveGameRestore_t openQ4_saveGameRestore = { NULL, 0 };
 // before build 1582 has the shorter layout described in SaveGameReleases.h.
 static bool Window_ReadSaveGameTransitionInterpolate( idFile *savefile, idInterpolateAccelDecelLinear<idVec4> &interp ) {
 	if ( OpenQ4_SaveGameHasInterpolatorCacheFlag( OpenQ4_SaveGameRestoreLayoutBuild( savefile ) ) ) {
-		return OpenQ4_ReadSaveGameField( savefile, interp, "idWindow::ReadSaveGameTransition", "interpolate state" );
+		return OpenQ4_ReadSaveGameRawField( savefile, interp, "idWindow::ReadSaveGameTransition", "interpolate state" );
 	}
 	openQ4SaveGameLegacyInterpolate_t<idVec4> saved;
-	if ( !OpenQ4_ReadSaveGameField( savefile, saved, "idWindow::ReadSaveGameTransition", "interpolate state" ) ) {
+	if ( !OpenQ4_ReadSaveGameRawField( savefile, saved, "idWindow::ReadSaveGameTransition", "interpolate state" ) ) {
 		return false;
 	}
 	saved.ToInterpolate( interp );

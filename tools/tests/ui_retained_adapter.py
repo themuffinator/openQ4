@@ -443,6 +443,7 @@ public:
     bool ScrollChoicePopup(const std::string& id,std::uint64_t token,ScrollStep step,double seconds) {
         choiceCalls.push_back({"scroll",id,token,step,seconds});return choiceResult;
     }
+    bool ScrollDetail(float,double) { return false; }
     std::vector<std::string> timelines;
     std::vector<std::pair<std::string,double>> eligibilityQueries;
     std::set<std::string> disabledControls;

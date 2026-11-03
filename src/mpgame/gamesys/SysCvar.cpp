@@ -536,7 +536,7 @@ idCVar pm_swimSpeedFast(			"pm_swimSpeedFast",			"200",			CVAR_GAME | CVAR_NETWO
 idCVar g_liquidDamageInterval(		"g_liquidDamageInterval",	"500",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER, "milliseconds between lava and slime damage ticks" );
 idCVar g_drownDamageMax(			"g_drownDamageMax",			"15",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER, "maximum damage per drowning tick, the ramp starts at the damage def's value and climbs to this" );
 idCVar g_liquidScreenTint(			"g_liquidScreenTint",		"1",			CVAR_GAME | CVAR_FLOAT | CVAR_ARCHIVE, "strength of the full screen tint while the camera is under a liquid surface, 0 disables it", 0.0f, 1.0f );
-idCVar g_debugLiquid(				"g_debugLiquid",			"0",			CVAR_GAME | CVAR_BOOL, "print player liquid state changes and liquid damage to the console" );
+idCVar g_debugLiquid(				"g_debugLiquid",			"0",			CVAR_GAME | CVAR_BOOL, "print player liquid state changes, liquid damage and projectile surface crossings to the console" );
 idCVar g_liquidTestVolume(          "g_liquidTestVolume",       "",             CVAR_GAME, "dev aid: spawn a liquid volume around the player on spawn - water, slime or lava, empty to disable" );
 idCVar g_liquidTestVolumeSize(      "g_liquidTestVolumeSize",   "640",          CVAR_GAME | CVAR_FLOAT, "cube size of the g_liquidTestVolume box" );
 // openQ4 END

@@ -22,7 +22,7 @@ page in the Strogg family (restartlevel_strogg.q4ui, see retained_saves.py).
 from __future__ import annotations
 
 from build_retained_screens import fit_narrow
-from build_retained_screens import (CANVAS_W, FULL, LANGUAGES, OLIVE, U, Document, absolute, colour, font,
+from build_retained_screens import (CANVAS_W, FULL, LANGUAGES, OLIVE, U, Document, absolute, colour, fixed_text, font,
                                     group, keyword, label, length, linear, number, page_prompts, path, rgb,
                                     solid, stroke, text_width, track, transform, typeface, vector, wrap_menu)
 from retained_saves import MARINE, STROGG_SHOULDER, Family, backing, lines_needed, section_plate, table_text
@@ -37,6 +37,7 @@ DESCRIPTION_LINE = 23.0                        # dp
 PRIMARY = (237.0, 222.0, 356.0, 43.0)          # new_bstart (b6_light)
 PRIMARY_LABEL = (28.0, 6.0, 198.0, 25.0)       # new_t_bstart, from the plate's corner
 PRIMARY_TEXT = 23.7                            # dp: Marine textscale 0.33
+DESCRIPTION_END = 619.0                        # u: above 100 % text the description runs on to the 4:3 view's 32 dp margin
 
 
 def primary_plate(doc: Document, ident: str, key: str, left: float, top: float, width: float, height: float, *,
@@ -138,6 +139,32 @@ def difficulty_description(doc: Document, ident: str, key: str, family: Family =
     return node
 
 
+def grow_description(doc: Document, node: dict, below: tuple) -> None:
+    """Section 2's reflow of the chosen difficulty's description: above 100 %
+    text it runs on to the 4:3 view's margin and takes the lines the running
+    language's longest description needs at the running size, and the parts
+    under it (`below`, RESTART LEVEL) move down as far as it grew past the
+    lines it held at 100 %, never up. Every binding gives the authored value
+    at 100 % (check_text_bindings)."""
+    from build_retained_screens import LARGER, per_language, text_buckets, text_source, text_sum, text_times, wrapped_lines
+    text_source(doc)
+    props = node["properties"]
+    left, width, height = (props[key]["value"] for key in ("left", "width", "height"))
+    wide = U * DESCRIPTION_END - left
+    counts = wrapped_lines([key for _, key in DIFFICULTIES], "lowpixel", DESCRIPTION_TEXT, wide)
+    lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+    needed = text_times({"op": "*", "args": [lines, DESCRIPTION_LINE]})
+    held = max(found[1] for found in counts.values()) * DESCRIPTION_LINE
+    doc.bind(f"text.{node['id']}.width", node["id"], "width", {"op": "select", "args": [LARGER, wide, width]})
+    doc.bind(f"text.{node['id']}.height", node["id"], "height", {"op": "select", "args": [LARGER, needed, height]})
+    for part in below:
+        # A part the narrow-view fit centres moves by its offset from the middle.
+        place = "top" if part["properties"]["top"].get("unit") == "dp" else "margin-top"
+        authored = part["properties"][place]["value"]
+        moved = {"op": "max", "args": [authored, text_sum(authored - held, needed)]}
+        doc.bind(f"text.{part['id']}.{place}", part["id"], place, {"op": "select", "args": [LARGER, moved, authored]})
+
+
 def focus_chosen(key: str) -> list:
     """Steps that focus the plate holding the choice; the last request wins."""
     steps = [{"op": "focus", "control": "skill-0"}]
@@ -182,6 +209,10 @@ def restart_level_document(family: Family = MARINE) -> dict:
     plates = difficulty_plates(doc, "restart.skill", family)
     description = difficulty_description(doc, "restart-description", "restart.skill", family)
     go = primary_plate(doc, "restart_go", "#str_229983", *PRIMARY, action="go", family=family)
+    # Above 100 % text the plates' labels keep their size (furniture) and the
+    # description grows, RESTART LEVEL moving down under it (section 2).
+    for node in [*plates, go]:
+        fixed_text(doc, node)
     # The five difficulties wrap through RESTART LEVEL (section 13.4).
     wrap_menu(plates, [go])
     back = page_prompts(doc, "restart_back", action="back", **family.prompts())
@@ -200,7 +231,9 @@ def restart_level_document(family: Family = MARINE) -> dict:
     doc.events["onDeactivate"] = [{"op": "playTimeline", "timeline": "rest"}]
     root = group("screen", {**FULL, "font-family": font("marine"), "font-size": length(16), "color": colour([1, 1, 1, 0.8])},
                  [backing("restart-backing"), stage])
-    return tall_restart_page(fit_narrow(doc.build(root), pages=True), family)
+    result = fit_narrow(doc.build(root), pages=True)
+    grow_description(doc, description, (go,))
+    return tall_restart_page(result, family)
 
 
 # A tall view's Restart Level page (retained_tall), as the menu levels'
@@ -212,20 +245,26 @@ TALL_TOP, TALL_BOTTOM = 110.0, 100.0        # dp: under the docked top band's ti
 
 
 def tall_restart_page(result: dict, family: Family) -> dict:
-    from build_retained_screens import TALL_MARGIN
+    from build_retained_screens import TALL_MARGIN, TEXT, VIEW_HEIGHT, evaluate, text_sum, wrapped_lines
     from retained_saves import BACKING_ALPHA
     from retained_tall import MARGIN, TallLayout
     tall = TallLayout(result)
-    # The description takes the lines its longest text needs in its width.
+    # The description takes the lines its longest text needs in its width at
+    # the running text size, and RESTART LEVEL follows it (section 2).
     width = CANVAS_W - TALL_MARGIN * (1 + TALL_GROW)
-    lines = max(lines_needed("lowpixel", text, DESCRIPTION_TEXT, width / TALL_GROW)
-                for _, key in DIFFICULTIES for text in table_text(key).values())
+    counts = wrapped_lines([key for _, key in DIFFICULTIES], "lowpixel", DESCRIPTION_TEXT, width / TALL_GROW)
+    lines = {scale: max(found[scale] for found in counts.values()) for scale in (1, 1.5, 2)}
+    line = DESCRIPTION_LINE * TALL_GROW
+    description_h = {"op": "*", "args": [{"op": "select", "args": [{"op": ">", "args": [TEXT, 1.5]}, lines[2] * line,
+                     {"op": "select", "args": [{"op": ">", "args": [TEXT, 1]}, lines[1.5] * line, lines[1] * line]}]}, TEXT]}
     plates_h = U * (PLATES[-1][1] - PLATES[0][1] + 30) * TALL_GROW
-    description_h = lines * DESCRIPTION_LINE * TALL_GROW
     go_h = U * PRIMARY[3] * TALL_GROW
-    column = plates_h + 24 + description_h + 24 + go_h
-    tall.fits(TALL_TOP + column + TALL_BOTTOM)
-    shift = tall.centred(column, TALL_TOP, TALL_BOTTOM)
+    fixed = plates_h + 24 + 24 + go_h
+    tall.fits(TALL_TOP + fixed + lines[1] * line + TALL_BOTTOM,
+              {scale: TALL_TOP + fixed + lines[scale] * line * scale + TALL_BOTTOM for scale in (1.5, 2)})
+    # The column centred between the bands, where the view leaves room.
+    shift = {"op": "max", "args": [0, {"op": "/", "args": [{"op": "-", "args": [VIEW_HEIGHT, text_sum(TALL_TOP + TALL_BOTTOM + fixed,
+                                                                                                            description_h)]}, 2]}]}
     origin = (U * min(left for left, _ in PLATES), U * PLATES[0][1])
     tall.block(tuple(f"skill-{index}" for index in range(len(PLATES))), origin, (origin[0], TALL_TOP), TALL_GROW, shift)
     description_top = TALL_TOP + plates_h + 24
@@ -233,7 +272,9 @@ def tall_restart_page(result: dict, family: Family) -> dict:
                shift)
     tall.set("restart-description", "width", width)
     tall.set("restart-description", "height", description_h)
-    tall.block(("restart_go",), (U * PRIMARY[0], U * PRIMARY[1]), (MARGIN, description_top + description_h + 24), TALL_GROW, shift)
+    held = evaluate(description_h, {"view.text": 1})
+    tall.block(("restart_go",), (U * PRIMARY[0], U * PRIMARY[1]), (MARGIN, description_top + held + 24), TALL_GROW,
+               text_sum(shift, description_h, -held))
     tall.shade("restart-backing", BACKING_ALPHA)
     return result
 

@@ -88,3 +88,34 @@ Still open: swimming under player control (it needs real input, which is never
 synthesised), projectiles entering and leaving liquids, and splash, bubble and
 wade presentation checked by eye. Swimming monsters, new swim animations and
 moving liquid volumes stay deferred.
+
+## Projectile liquid crossings, 3 November 2026
+
+`g_debugLiquid 1` now also logs each projectile surface crossing on the server,
+with the projectile, entered or left, the liquid contents, the boundary point
+and the speed. The line follows the shared splash call in the same branch, so
+every logged crossing also played the splash. Clients never detect crossings
+themselves; they receive the server's splash.
+
+A 120-second audit of six skill-4 bots in the liquid lab
+(`mp_bot_audit.py --map mp/liquid_lab --set g_debugLiquid=1`,
+`.tmp/wt-mp01-tools/liquid-proj/`) simulated about 87 seconds: 52 kills, no
+world deaths and one stuck event. It logged 58 crossings:
+
+| Projectile | Entered | Left |
+| --- | --- | --- |
+| Hyperblaster bolt | 23 | 23 |
+| Rocket | 10 | 2 |
+| By liquid | water 28, lava 3, slime 2 | water 25 |
+
+- Every exit came from a shot fired under water: projectiles launched inside a
+  pool travel out of it.
+- Entries carried on to impacts below the surface; liquid stops nothing.
+- Crossing speeds follow each weapon's own speed curve: hyperblaster bolts at
+  1457-1950 units/s as they accelerate, rockets at 518-935. The crossing leaves
+  velocity untouched.
+- No projectile crossed a pool and out again within one second; the lab's
+  pools are deep enough that a shot fired into one ends on its floor.
+
+Still open: swimming under player control (real input only) and splash, bubble
+and wade presentation checked by eye.

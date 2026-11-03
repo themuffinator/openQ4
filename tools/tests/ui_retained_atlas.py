@@ -46,6 +46,7 @@ struct Renderer {
 struct {bool enabled=true;bool GetBool()const{return enabled;}} ui_retainedAtlas;
 struct Host {
     int viewportWidth=2*(TEST_ATLAS_SIZE-2)+260,viewportHeight=720;
+    bool rasterNewMeshes=true;
     std::uint64_t frame=1;
     std::uint64_t RenderFrame()const{return frame;}
     unsigned long long rasterDraws=0,rasterSavedVertices=0;
@@ -73,6 +74,11 @@ int main(){
     }
     const auto wideVertices=vertices;const auto wideIndices=indices;
     Host host;
+    // Startup's short-lived screen keeps its meshes out of the atlas.
+    host.rasterNewMeshes=false;
+    for(int i=0;i<4;++i){++host.frame;host.DrawMesh(9,1,vertices,indices,0);host.EndRoot();}
+    assert(host.meshes.at(9).rasterTiles.empty() && !host.meshes.at(9).rasterTried && host.atlasPages.empty());
+    host.ReleaseMesh(9);host.rasterNewMeshes=true;
     renderer.uploadOk=false;
     for(int i=0;i<4;++i){++host.frame;renderer.calls=0;host.DrawMesh(1,1,vertices,indices,0);host.EndRoot();}
     assert(host.meshes.at(1).rasterTiles.size()==3 && host.atlasPages.size()==1);

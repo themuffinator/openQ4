@@ -9665,11 +9665,11 @@ void idSessionLocal::Draw() {
 #if ID_CONSOLE_LOCK
 		if ( con_allowConsole.GetBool() ) {
 			drawingFallbackLoadingScreen = true;
-			if ( fallbackMenuStartTime < 0 ) {
-				fallbackMenuStartTime = Sys_Milliseconds();
-			}
+			const bool firstFallback = fallbackMenuStartTime < 0;
 			Session_DrawFallbackLoadingScreen();
-			if ( guiMainMenu != NULL && ( Sys_Milliseconds() - fallbackMenuStartTime ) >= fallbackMenuDelayMs ) {
+			if ( firstFallback ) {
+				fallbackMenuStartTime = Sys_Milliseconds();
+			} else if ( guiMainMenu != NULL && ( Sys_Milliseconds() - fallbackMenuStartTime ) >= fallbackMenuDelayMs ) {
 				StartMenu();
 			}
 		} else {
@@ -9687,11 +9687,15 @@ void idSessionLocal::Draw() {
 #else
 		// when this fallback branch is hit, show loading instead of a full-screen console
 		drawingFallbackLoadingScreen = true;
-		if ( fallbackMenuStartTime < 0 ) {
-			fallbackMenuStartTime = Sys_Milliseconds();
-		}
+		// The watchdog counts from the end of the first fallback frame. That
+		// frame can take seconds (after a renderer change it restores the
+		// menus' resources), and startup commands still waiting, such as a
+		// +devmap, must get a frame to run before the main menu opens.
+		const bool firstFallback = fallbackMenuStartTime < 0;
 		Session_DrawFallbackLoadingScreen();
-		if ( guiMainMenu != NULL && ( Sys_Milliseconds() - fallbackMenuStartTime ) >= fallbackMenuDelayMs ) {
+		if ( firstFallback ) {
+			fallbackMenuStartTime = Sys_Milliseconds();
+		} else if ( guiMainMenu != NULL && ( Sys_Milliseconds() - fallbackMenuStartTime ) >= fallbackMenuDelayMs ) {
 			StartMenu();
 		}
 #endif

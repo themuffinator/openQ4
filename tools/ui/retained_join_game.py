@@ -41,6 +41,7 @@ from build_retained_screens import (FULL, OLIVE, ORANGE, PROGRESS, U, VALUE, VER
                                     objectives_scrollbar,
                                     page_prompts, path, rgb, solid, stroke, text_width, track, typeface, vector)
 from retained_create_server import header_band, text_row
+from retained_mp_menus import stack_row
 from retained_difficulty import check_fits, primary_plate
 from retained_saves import (BACKING_ALPHA, ERROR, HEADING, PLACEHOLDER, bind_selected, grow_rows, pager_row, picture_frame, row_plates,
                            row_states, table_text)
@@ -563,6 +564,14 @@ def join_ip_modal(doc: Document) -> dict:
                      caption=False)
     column = group("join-ip-rows", {**absolute(left=U * 25, top=U * 25, width=row_w, height=U * ENTRY_ROW), "display": keyword("flex"),
                                     "flex-direction": keyword("column")}, [field])
+    # Above 100 % text the field grows in its place, the lines under it move
+    # down and grow, and the dialog grows with them (section 2's reflow).
+    from build_retained_screens import LARGER, TEXT, text_source, text_sum, text_times
+    text_source(doc)
+    stack_row(doc, field, row_w, 29, U * ENTRY_ROW)
+    doc.bind("text.join-ip-rows.height", "join-ip-rows", "height", text_times(U * ENTRY_ROW))
+    line = U * 16
+    grown = lambda height: {"op": "*", "args": [height, {"op": "-", "args": [TEXT, 1]}]}
     error = label("join-address-error", PLACEHOLDER, {**absolute(left=U * 25 + 21, top=U * 51, width=row_w - 21, height=U * 16),
                                                       **typeface("lowpixel", 13, U * 16, rgb(ERROR)), "white-space": keyword("nowrap"),
                                                       "overflow": keyword("hidden"), "display": keyword("none")})
@@ -576,13 +585,20 @@ def join_ip_modal(doc: Document) -> dict:
                                                                  height=U * 16), **typeface("marine", 15, U * 16, rgb(VALUE, 0.8)),
                                                        "white-space": keyword("nowrap"), "overflow": keyword("hidden")})
     doc.bind("join-yourip-value.text", "join-yourip-value", "text", {"state": "join.clientip"})
+    for node, below in ((error, grown(U * ENTRY_ROW)), (yours, text_sum(grown(U * ENTRY_ROW), grown(line))),
+                        (address, text_sum(grown(U * ENTRY_ROW), grown(line)))):
+        top = node["properties"]["top"]["value"]
+        doc.bind(f"text.{node['id']}.top", node["id"], "top", {"op": "select", "args": [LARGER, text_sum(top, below), top]})
+        doc.bind(f"text.{node['id']}.height", node["id"], "height", text_times(line))
+    # "your ip address:" keeps its size, centred in its grown line.
+    doc.bind("text.join-yourip.font-size", "join-yourip", "font-size", {"op": "/", "args": [yours["properties"]["font-size"]["value"], TEXT]})
     doc.events["joinIpConnect"] = [{"op": "if", "condition": {"op": "!=", "args": [{"state": "join.address"}, ""]},
                                     "then": [{"op": "action", "action": "joinConnect"}]}]
     # Each opening starts without the last refusal's reason.
     doc.events["joinIpOpen"] = [{"op": "setState", "values": {"join.addressError": ""}}, {"op": "call", "event": "joinIpModalShow"}]
     modal = confirmation(doc, "joinIpModal", "#str_200025", PLACEHOLDER, None, yes_event="joinIpConnect", wide_title=True,
                          contents=[column, error, yours, address], yes_key="#str_200171", no_key="#str_200168", initial="join-address",
-                         width_dp=width_dp, action_w=action_w)
+                         width_dp=width_dp, action_w=action_w, contents_grow=text_sum(grown(U * ENTRY_ROW), grown(line), grown(line)))
     doc.bind("joinIpModal_yes.enabled", "joinIpModal_yes", "enabled", {"op": "!=", "args": [{"state": "join.address"}, ""]})
     return modal
 
@@ -602,10 +618,17 @@ def find_modal(doc: Document) -> dict:
                      U * ENTRY_ROW, allow_empty=True)
     column = group("join-find-rows", {**absolute(left=U * 25, top=U * 25, width=row_w, height=U * ENTRY_ROW), "display": keyword("flex"),
                                       "flex-direction": keyword("column")}, [field])
+    # Above 100 % text the field stands under SEARCH FOR: and the dialog grows
+    # with its row (section 2's reflow).
+    from build_retained_screens import text_sum
+    stack_row(doc, field, row_w, round(row_w * 0.42, 1), U * ENTRY_ROW)
+    height = next(binding["value"] for binding in doc.bindings if binding["id"] == "text.join-find.height")
+    doc.bind("text.join-find-rows.height", "join-find-rows", "height", height)
     doc.events["findSearch"] = search
     doc.events["findOpen"] = [{"op": "call", "event": "findModalShow"}]
     return confirmation(doc, "findModal", "#str_200182", PLACEHOLDER, None, yes_event="findSearch", wide_title=True, contents=[column],
-                        yes_key="#str_200257", no_key="#str_200168", initial="join-find", width_dp=width_dp, action_w=action_w)
+                        yes_key="#str_200257", no_key="#str_200168", initial="join-find", width_dp=width_dp, action_w=action_w,
+                        contents_grow=text_sum(height, -U * ENTRY_ROW))
 
 
 def search_tag(doc: Document) -> dict:
@@ -844,15 +867,94 @@ def join_game_document() -> dict:
     doc.bind("join_favorite.enabled", "join_favorite", "enabled", {"op": ">=", "args": [{"state": "join.selected"}, 0]})
     back = page_prompts(doc, "join_back", action="back", verbs=(VERB_JOIN,))
     detail = detail_card(doc)
-    # Above 100 % text only the servers' rows grow for now (grow_rows); the
-    # filters, headings, status, actions and details card keep their size.
+    # Above 100 % text the servers' rows, the empty state's sentence, the
+    # scan's status and the details card grow with it (section 2's reflow);
+    # the filters, headings, tags and actions are furniture and keep their
+    # size.
     from build_retained_screens import fixed_text
-    for node in [*parts, join, favorite, detail]:
-        if node["id"] != "servers-list":
+    grow_empty_line(doc, empty, fixes)
+    grow_card(doc, detail)
+    for node in [*parts, join, favorite]:
+        if node["id"] not in ("servers-list", "join-status", "join-empty"):
             fixed_text(doc, node)
-    return tall_join_page(subpage_document(doc, "join", "#str_200002", "#str_200187", "join_newlist",
-                                           [*parts, join, favorite, back, detail],
-                                           [join_ip_modal(doc), find_modal(doc)], stretch=("servers-list",)))
+    result = subpage_document(doc, "join", "#str_200002", "#str_200187", "join_newlist", [*parts, join, favorite, back, detail],
+                              [join_ip_modal(doc), find_modal(doc)], stretch=("servers-list",))
+    grow_status(doc, result)
+    return tall_join_page(result)
+
+
+def grow_empty_line(doc: Document, sentence: dict, plates: list) -> None:
+    """The empty list's sentence above 100 % text: it wraps onto the lines the
+    running language needs and CLEAR FILTERS or GET NEW LIST moves down with
+    it (retained_saves.grow_empty's rule)."""
+    from build_retained_screens import LARGER, per_language, text_buckets, text_source, text_sum, text_times, wrapped_lines
+    text_source(doc)
+    props = sentence["properties"]
+    counts = wrapped_lines(("#str_231133", "#str_231134"), props["font-family"]["value"], props["font-size"]["value"], props["width"]["value"])
+    lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+    authored = props["height"]["value"]
+    needed = {"op": "max", "args": [authored, text_times({"op": "*", "args": [lines, props["line-height"]["value"]]})]}
+    doc.bind("text.join-empty.height", "join-empty", "height", {"op": "select", "args": [LARGER, needed, authored]})
+    doc.bind("text.join-empty.white-space", "join-empty", "white-space", {"op": "select", "args": [LARGER, "normal", "nowrap"]})
+    for plate in plates:
+        top = plate["properties"]["top"]["value"]
+        doc.bind(f"text.{plate['id']}.top", plate["id"], "top", {"op": "select", "args": [LARGER, text_sum(top - authored, needed), top]})
+
+
+def grow_card(doc: Document, card: dict) -> None:
+    """The details card above 100 % text: the card and everything on it are
+    the text size times their 100 % size, so its lines keep their pitch and
+    columns; its headings are furniture and keep their size. The runtime
+    still sets the card beside its row."""
+    from build_retained_screens import fixed_text, in_fractions, text_source, text_times, walk_nodes
+    text_source(doc)
+    def walk(node: dict, box: tuple) -> None:
+        props = node.get("properties", {})
+        size = []
+        for key, extent in (("width", box[0]), ("height", box[1])):
+            found = props.get(key) or {}
+            size.append(found["value"] if found.get("unit") == "dp" else found["value"] * extent / 100 if found.get("unit") == "%" and extent else None)
+        if node.get("type") == "vector" and size[0] and size[1]:
+            in_fractions(node, *size)
+        for key in ("left", "top", "width", "height"):
+            found = props.get(key) or {}
+            if found.get("type") == "length" and found.get("unit") == "dp" and found["value"]:
+                doc.bind(f"text.{node['id']}.{key}", node["id"], key, text_times(found["value"]))
+        for child in node.get("children", []):
+            walk(child, tuple(size))
+    walk(card, (None, None))
+    for node in walk_nodes(card):
+        if node["id"] in ("join-detail-players", "join-detail-settings"):
+            fixed_text(doc, node)
+
+
+def grow_status(doc: Document, result: dict) -> None:
+    """The scan's status above 100 % text: its line grows upward with the
+    text from where it stands over the bottom band, and the filter row over
+    it and the list's foot move up as far, the list scrolling through fewer
+    rows (the narrow-view fit holds these parts from the view's bottom).
+    Every binding gives the authored value at 100 % (check_text_bindings)."""
+    from build_retained_screens import LARGER, TEXT, text_source, text_sum, text_times, walk_nodes
+    text_source(doc)
+    nodes = {node["id"]: node for node in walk_nodes(result["root"])}
+    status = nodes["join-status"]["properties"]
+    height = status["height"]["value"]
+    growth = {"op": "*", "args": [height, {"op": "-", "args": [TEXT, 1]}]}
+    doc.bind("text.join-status.height", "join-status", "height", text_times(height))
+    # Without a player search's tag after it, the status runs on to CLEAR
+    # SORTING.
+    searching = {"op": "!=", "args": [{"state": "join.search"}, ""]}
+    width = status["width"]["value"]
+    room = round(U * (CLEAR_SORT[0] - clear_sort_width() - STATUS[0] - 6), 4)
+    doc.bind("text.join-status.width", "join-status", "width",
+             {"op": "select", "args": [{"op": "&&", "args": [LARGER, {"op": "!", "args": [searching]}]}, room, width]})
+    status["text-overflow"] = {"type": "keyword", "value": "clip"}
+    doc.bind("text.join-status.text-overflow", "join-status", "text-overflow", {"op": "select", "args": [LARGER, "ellipsis", "clip"]})
+    moved = ["servers-list", "servers_scroll", "join-gametype-value", "join_gametype_previous", "join_gametype_next"]
+    moved += [f"join_filter_{ident}" for ident, *_ in filter_tags()]
+    for ident in moved:
+        bottom = nodes[ident]["properties"]["bottom"]["value"]
+        doc.bind(f"text.{ident}.bottom", ident, "bottom", {"op": "select", "args": [LARGER, text_sum(bottom, growth), bottom]})
 
 
 # A tall view's Join Game page (retained_tall): the mod spinner and the source
@@ -919,8 +1021,13 @@ def tall_join_page(result: dict) -> dict:
     tall.top("join-loading", list_top)
     tall.bind("join-loading", "width", list_w)
     empty_left = tall.dp("join-empty-heading", "left")
-    tall.block(("join-empty-heading", "join-empty", "join_emptyclear", "join_emptynew"), (empty_left, tall.canvas_top("join-empty-heading")),
-               (MARGIN + 6, list_top + 12), TALL_CONTROLS)
+    origin = (empty_left, tall.canvas_top("join-empty-heading"))
+    # The action moves down by what the sentence grew with the text, grown.
+    from build_retained_screens import text_sum
+    sentence = next(binding["value"] for binding in tall.bindings if binding["id"] == "text.join-empty.height")
+    grew = {"op": "*", "args": [TALL_CONTROLS, text_sum(sentence, -tall.dp("join-empty", "height"))]}
+    tall.block(("join-empty-heading", "join-empty"), origin, (MARGIN + 6, list_top + 12), TALL_CONTROLS)
+    tall.block(("join_emptyclear", "join_emptynew"), origin, (MARGIN + 6, list_top + 12), TALL_CONTROLS, grew)
     for node in ("join-empty-heading", "join-empty"):
         tall.set(node, "width", list_w - 12)
     tall_join_foot(tall)

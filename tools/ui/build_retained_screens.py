@@ -297,6 +297,8 @@ def evaluate(expression, state: dict):
     op = expression["op"]
     if op == "select":
         return args[1] if args[0] else args[2]
+    if op == "!":
+        return not args[0]
     operations = {"+": lambda a, b: a + b, "-": lambda a, b: a - b, "*": lambda a, b: a * b, "/": lambda a, b: a / b,
                   "min": min, "max": max, "==": lambda a, b: a == b, "!=": lambda a, b: a != b, "<": lambda a, b: a < b,
                   "<=": lambda a, b: a <= b, ">": lambda a, b: a > b, ">=": lambda a, b: a >= b,
@@ -306,6 +308,7 @@ def evaluate(expression, state: dict):
 
 DETAIL_CEILING = 60.0    # u: a page's content column rises no higher, under the docked top band
 DETAIL_FLOOR = 420.0     # u: and runs down to here, over the docked bottom band's edge
+DETAIL_LEFT = 395.0      # u: the stock content column's leading edge
 DETAIL_WIDE = 224.0      # u: from 395 u to the 4:3 view's 32 dp margin
 
 
@@ -316,13 +319,15 @@ def reflow_details(doc: "Document", details: dict, keys) -> None:
     place beside the first plate while its lines fit above the docked bottom
     band, and otherwise rises as far as the running language needs, never
     past the docked top band. Generation fails where a shipped language's
-    description would outgrow that."""
+    description would outgrow that. `details` may be the description's own
+    label, in a column that starts elsewhere than 395 u (the campaign's
+    difficulty): it runs on to the same margin."""
     props = details["properties"]
     top, width, height = props["top"]["value"], props["width"]["value"], props["height"]["value"]
-    labels = [child for child in details["children"] if child.get("type") == "text"]
+    labels = [details] if details.get("type") == "text" else [child for child in details["children"] if child.get("type") == "text"]
     style = labels[0]["properties"]
     face, size, line = style["font-family"]["value"], style["font-size"]["value"], style["line-height"]["value"]
-    wide, floor, ceiling = U * DETAIL_WIDE, U * DETAIL_FLOOR, U * DETAIL_CEILING
+    wide, floor, ceiling = U * (DETAIL_LEFT + DETAIL_WIDE) - props["left"]["value"], U * DETAIL_FLOOR, U * DETAIL_CEILING
     counts = wrapped_lines(keys, face, size, wide)
     for language, found in counts.items():
         if found[2] * line * 2 > floor - ceiling:
@@ -331,7 +336,7 @@ def reflow_details(doc: "Document", details: dict, keys) -> None:
     text_source(doc)
     risen = {"op": "min", "args": [top, {"op": "-", "args": [floor, text_times({"op": "*", "args": [lines, line]})]}]}
     tall = {"op": "-", "args": [floor, risen]}
-    for node in [details, *labels]:
+    for node in [details, *(label for label in labels if label is not details)]:
         ident, own = node["id"], node["properties"]
         if node is details:
             doc.bind(f"text.{ident}.top", ident, "top", {"op": "select", "args": [LARGER, risen, own["top"]["value"]]})
@@ -411,6 +416,7 @@ def tall_scale(doc: "Document", node: dict, scale, own: tuple = ()) -> None:
     from retained_settings_rows import _runtime_owned
     skipped = {(entry["node"], entry["property"]) for timeline in doc.timelines.items for entry in timeline["tracks"]}
     _runtime_owned(node, skipped)
+    bound = {(binding["node"], binding["property"]) for binding in doc.bindings}
 
     def current(item: dict, key: str):
         return next((binding["value"] for binding in doc.bindings if binding["node"] == item["id"] and binding["property"] == key),
@@ -441,7 +447,9 @@ def tall_scale(doc: "Document", node: dict, scale, own: tuple = ()) -> None:
             else:
                 in_fractions(item, *size)
         for key, found in list(props.items()):
-            if (found.get("type") == "length" and found.get("unit") == "dp" and found["value"] and (item["id"], key) not in skipped
+            # A zero length scales only where a text binding moves it.
+            moved = found.get("value") or (item["id"], key) in bound
+            if (found.get("type") == "length" and found.get("unit") == "dp" and moved and (item["id"], key) not in skipped
                     and key not in kept and (item is not node or key in own or key in TEXT_LENGTHS)):
                 tall_bind(doc, item, key, lambda value: {"op": "*", "args": [scale, value]})
         for child in item.get("children", []):
@@ -1021,6 +1029,12 @@ def fit_narrow(result: dict, pages: bool = False, stretch: tuple = ()) -> dict:
         else:
             props["top"] = length(50, "%")
             props["margin-top"] = length(round(top[0] - 360, 4))
+            # A length that follows the text size (a confirmation growing with
+            # its body) moves the offset from the middle instead.
+            for binding in result.get("bindings", []):
+                if binding["node"] == node.get("id") and binding["property"] == "top":
+                    binding["property"] = "margin-top"
+                    binding["value"] = text_sum(-360, binding["value"])
 
     def walk(node: dict, in_canvas: bool = False) -> None:
         props = node.get("properties", {})
@@ -1285,7 +1299,7 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
                  height_u: float = 136.0, top_u: float = 155.0, actions_u: float = 96.0, contents: list | None = None,
                  yes_key: str = "#str_200157", no_key: str = "#str_200158", initial: str | None = None,
                  width_dp: float = 480.0, action_w: float = 180, action_text: float = 20.0, close_w: float = CLOSE_W,
-                 strogg: bool = False) -> dict:
+                 strogg: bool = False, contents_grow=None) -> dict:
     """A stock confirmation modal (section 6) over the soft-focused screen: an
     additive glow behind the 480 dp dialog, and inside it the stock popup
     art's black 0.70 silhouette, inset so a 6 dp lit margin shows beside it,
@@ -1463,20 +1477,27 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
     shown_contents = group(f"{ident}-contents", {**FULL, "display": keyword("none")}, [*title, *body, *actions])
     dialog = group(f"{ident}-dialog", absolute(left=left, top=top, width=width, height=height),
                    [glow, soft_glow, frame, shown_contents])
-    if body_nodes is None and body_key.startswith("#str_") and body_key != "#str_230030":
-        box = body[0]["properties"]
-        body_face, body_size = box["font-family"]["value"], box["font-size"]["value"]
-        body_line, body_h = box["line-height"]["value"], box["height"]["value"]
-        counts = wrapped_lines((body_key,), body_face, body_size, box["width"]["value"])
-        lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+    known_body = body_nodes is None and body_key.startswith("#str_") and body_key != "#str_230030"
+    if known_body or contents_grow is not None:
         text_source(doc)
-        extra = {"op": "select", "args": [LARGER, {"op": "max", "args": [0, text_sum(text_times({"op": "*", "args": [lines, body_line]}),
-                                                                                        -body_h)]}, 0]}
-        if 2 * body_line * max(found[2] for found in counts.values()) - body_h > 720 - height - 2 * U * 12:
-            raise SystemExit(f"{ident}: the body {body_key} would outgrow the view at 200 % text")
+        if known_body:
+            box = body[0]["properties"]
+            body_face, body_size = box["font-family"]["value"], box["font-size"]["value"]
+            body_line, body_h = box["line-height"]["value"], box["height"]["value"]
+            counts = wrapped_lines((body_key,), body_face, body_size, box["width"]["value"])
+            lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()})
+                                  for scale in (1.5, 2)})
+            extra = {"op": "select", "args": [LARGER, {"op": "max", "args": [0, text_sum(text_times({"op": "*", "args": [lines, body_line]}),
+                                                                                            -body_h)]}, 0]}
+            if 2 * body_line * max(found[2] for found in counts.values()) - body_h > 720 - height - 2 * U * 12:
+                raise SystemExit(f"{ident}: the body {body_key} would outgrow the view at 200 % text")
+        else:
+            # Contents that grow with the text (an entry dialog's field) say by
+            # how much; the dialog grows with them as with a body.
+            extra = {"op": "select", "args": [LARGER, contents_grow, 0]}
         from_foot(frame["paths"], height, height / 2)
         grown = lambda node, key: doc.bind(f"text.{node['id']}.{key}", node["id"], key, text_sum(node["properties"][key]["value"], extra))
-        for node in (dialog, frame, glow, soft_glow, body[0]):
+        for node in (dialog, frame, glow, soft_glow, *(body[:1] if known_body else ())):
             grown(node, "height")
         for plate in actions:
             grown(plate, "top")
@@ -1527,6 +1548,43 @@ MODS_LIST = (22.0, 25.0, 274.0, 147.0)    # u, in the dialog: the stock pop_mods
 MODS_HEAD_TOP, MODS_ROW_H, MODS_VERSION_X = 12.0, 20.0, 200.0
 MODS_DETAIL_TOP, MODS_DETAIL_PITCH, MODS_VALUE_X = 178.0, 15.0, 98.0
 MODS_DETAILS = (("author", "#str_41112"), ("date", "#str_41113"), ("engine", "#str_41114"), ("directory", "#str_41115"))
+
+
+def grow_mods(doc: Document, parts: list, column: dict) -> None:
+    """Section 2's reflow in the MODS dialog: above 100 % text the mods' rows
+    grow with it (retained_saves.grow_rows), and the selected mod's detail
+    lines stand on a pitch that grows with it from the same foot over the
+    actions, each value ending in an ellipsis past the dialog; the list gives
+    them the room, scrolling through fewer rows. NAME, VERSION and the
+    details' labels are furniture and keep their size, each label in its
+    grown line. Every binding gives the authored value at 100 %
+    (check_text_bindings)."""
+    from retained_saves import grow_rows
+    grow_rows(doc, column)
+    text_source(doc)
+    nodes = {node["id"]: node for part in parts for node in walk_nodes(part)}
+    growth = {"op": "*", "args": [U * MODS_DETAIL_PITCH * len(MODS_DETAILS), {"op": "-", "args": [TEXT, 1]}]}
+    for index, (detail, _) in enumerate(MODS_DETAILS):
+        top = U * (MODS_DETAIL_TOP + MODS_DETAIL_PITCH * index)
+        moved = text_sum(top - U * MODS_DETAIL_PITCH * index, {"op": "*", "args": [U * MODS_DETAIL_PITCH * index, TEXT]},
+                         {"op": "*", "args": [-1, growth]})
+        for ident in (f"mods-{detail}-label", f"mods-{detail}"):
+            props = nodes[ident]["properties"]
+            doc.bind(f"text.{ident}.top", ident, "top", {"op": "select", "args": [LARGER, moved, top]})
+            doc.bind(f"text.{ident}.height", ident, "height", text_times(props["height"]["value"]))
+        # The label keeps its size, centred in its line as the value's line grows.
+        label_props = nodes[f"mods-{detail}-label"]["properties"]
+        doc.bind(f"text.mods-{detail}-label.font-size", f"mods-{detail}-label", "font-size",
+                 {"op": "/", "args": [label_props["font-size"]["value"], TEXT]})
+        value = nodes[f"mods-{detail}"]["properties"]
+        value["text-overflow"] = keyword("clip")
+        doc.bind(f"text.mods-{detail}.text-overflow", f"mods-{detail}", "text-overflow", {"op": "select", "args": [LARGER, "ellipsis", "clip"]})
+    for ident in ("mods-list", "mods_scroll"):
+        height = nodes[ident]["properties"]["height"]["value"]
+        doc.bind(f"text.{ident}.height", ident, "height", {"op": "select", "args": [LARGER, text_sum(height, {"op": "*", "args": [-1, growth]}),
+                                                                                    height]})
+    for ident in ("mods-head-name", "mods-head-version"):
+        fixed_text(doc, nodes[ident])
 
 
 def mods_modal(doc: Document) -> dict:
@@ -1604,6 +1662,7 @@ def mods_modal(doc: Document) -> dict:
         parts.append(label(value, "#str_230030", {**absolute(left=U * (left + value_x), top=y, width=U * (list_w - value_x), height=U * 14),
                            **typeface("lowpixel", 15, U * 14, [1, 1, 1, 0.8]), "white-space": keyword("nowrap"), "overflow": keyword("hidden")}))
         doc.bind(f"{value}.text", value, "text", {"state": f"mods.{detail}"})
+    grow_mods(doc, parts, column_node)
     modal = confirmation(doc, "modsModal", "#str_200166", "#str_230030", None, yes_event="modsLoadConfirmed",
                          dim=(("wordmark", "image-color", colour([1, 1, 1, 1]), colour([0.4, 0.4, 0.4, 1])),), height_u=MODS_HEIGHT, top_u=MODS_TOP,
                          actions_u=MODS_HEIGHT - 40, contents=parts, yes_key="#str_200167", no_key="#str_200168",
@@ -3863,6 +3922,42 @@ def objectives_scrollbar(doc: Document, ident: str, viewport: str, tint: str, ho
                           "parts": {"track": f"{ident}-track", "thumb": f"{ident}-thumb"}, "states": ids})
 
 
+def grow_objectives(doc: Document, heading: dict, entries: list, empty: dict, completed_rows: list, serial: dict) -> None:
+    """Section 2's reflow on the OBJECTIVES page: above 100 % text an open
+    objective's plate already grows with its wrapping description, and its
+    title keeps its two lines; the empty state's line takes the lines the
+    running language needs and its plate grows with it; each completed
+    objective's row grows with its title. The heading, COMPLETED with its
+    count and the serial are furniture and keep their size. Every binding
+    gives the authored value at 100 % (check_text_bindings)."""
+    text_source(doc)
+    for entry in entries:
+        # The title and description keep their columns over the back bar,
+        # which darkens no further; a title takes the lines it needs to hold
+        # what its two held at 100 % (its glyphs and lines both grow).
+        title = next(child for child in entry["children"] if child["id"].endswith("-title"))
+        doc.bind(f"text.{title['id']}.max-height", title["id"], "max-height",
+                 text_times(text_times(title["properties"]["max-height"]["value"])))
+    nodes = {node["id"]: node for node in walk_nodes(empty)}
+    sentence = nodes["objectives-empty-text"]["properties"]
+    counts = wrapped_lines(("#str_200935",), "lowpixel", sentence["font-size"]["value"], sentence["width"]["value"])
+    lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+    authored = sentence["height"]["value"]
+    needed = {"op": "max", "args": [authored, text_times({"op": "*", "args": [lines, sentence["line-height"]["value"]]})]}
+    doc.bind("text.objectives-empty-text.height", "objectives-empty-text", "height", {"op": "select", "args": [LARGER, needed, authored]})
+    plate = empty["properties"]["height"]["value"]
+    doc.bind("text.objectives-empty.height", "objectives-empty", "height",
+             {"op": "select", "args": [LARGER, text_sum(plate - authored, needed), plate]})
+    for row in completed_rows[1:]:
+        doc.bind(f"text.{row['id']}.height", row["id"], "height", text_times(row["properties"]["height"]["value"]))
+        title = next(child for child in row["children"] if child["id"].endswith("-title"))
+        doc.bind(f"text.{title['id']}.height", title["id"], "height", text_times(title["properties"]["height"]["value"]))
+        title["properties"]["text-overflow"] = keyword("clip")
+        doc.bind(f"text.{title['id']}.text-overflow", title["id"], "text-overflow", {"op": "select", "args": [LARGER, "ellipsis", "clip"]})
+    for node in (heading, completed_rows[0], serial):
+        fixed_text(doc, node)
+
+
 def objectives_page(doc: Document, strogg: bool) -> tuple:
     """The OBJECTIVES page (sections 13.7 and 14.11). Choosing OBJECTIVES
     docks the bands as a page hand-off does and carries the label into the
@@ -3977,6 +4072,7 @@ def objectives_page(doc: Document, strogg: bool) -> tuple:
         "display": keyword("block"), "margin-left": length(U * (OBJ_LEFT + 12)), "margin-top": length(U * 12),
         "margin-bottom": length(U * 8), **typeface("r_strogg" if strogg else "marine", 13, 18, rgb(OBJ_SERIAL, 0.25)),
         "white-space": keyword("nowrap")})
+    grow_objectives(doc, heading, entries, empty, completed_rows, serial)
     column = group("objectives-column", {"position": keyword("relative"), "display": keyword("block")},
                    [*entries, empty, completed, serial])
     viewport = group("objectives-list", {**absolute(left=0, top=U * OBJ_TOP, width=U * (OBJ_LEFT + OBJ_WIDTH + 2),

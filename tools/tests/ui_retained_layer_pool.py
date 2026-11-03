@@ -160,6 +160,7 @@ Declarations* declManager=&declarations;
 struct {bool GetBool()const{return false;}} ui_retainedAtlas;
 struct Host {
     int viewportWidth=1280,viewportHeight=720;
+    bool rasterNewMeshes=true;
     struct AtlasPage {bool dirty=false;const idMaterial* material=nullptr;const idMaterial* multiplyMaterial=nullptr;std::uint64_t lastFrame=0;int references=0;};
     std::vector<AtlasPage> atlasPages;
     unsigned rasterDraws=0,rasterSavedVertices=0;

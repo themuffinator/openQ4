@@ -38,7 +38,7 @@ from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE
                                     objectives_scrollbar, page_prompts, page_title, path, rgb, solid, stroke, text_width, track,
                                     transform, typeface, vector)
 from retained_difficulty import check_fits, primary_plate
-from retained_mp_menus import match_number_row, row_face, row_states as setting_states, value_row
+from retained_mp_menus import match_number_row, row_face, row_states as setting_states, stack_row, value_row
 from retained_saves import PLACEHOLDER, backing, bind_selected, grow_rows, pager_row, picture_frame, row_plates, row_states, table_text
 from retained_subpage import subpage_document
 
@@ -422,16 +422,28 @@ def advanced_dialog(doc: Document) -> dict:
     rows_end = ADVANCED_ROWS_TOP + ROW_PITCH * len(rows)
     height_u = rows_end + ADVANCED_GAP + ADVANCED_FOOT
     top_u = min(ADVANCED_TOP, (480 - height_u) / 2)
+    # Above 100 % text each row's value stands under its label (section 2's
+    # reflow) and the rows scroll in the dialog's room.
+    for row in rows:
+        stack_row(doc, row, U * 377, U * ADVANCED_VALUE_X, U * ROW_PITCH)
     column = group("advanced-rows", {**absolute(left=U * 25, top=U * ADVANCED_ROWS_TOP, width=U * 377,
                                                 height=U * ROW_PITCH * len(rows)),
-                                     "display": keyword("flex"), "flex-direction": keyword("column")}, rows)
+                                     "display": keyword("flex"), "flex-direction": keyword("column"), "overflow": keyword("auto")}, rows)
     close_w = round(min(width - 66, max(210.0, max(text_width("marine", text, 20) for text in table_text("#str_200075").values()) + 50)), 1)
     modal = confirmation(doc, "advancedModal", "#str_200066", PLACEHOLDER, None, close_key="#str_200075", wide_title=True,
                          height_u=height_u, top_u=top_u, actions_u=rows_end + ADVANCED_GAP, contents=[column],
                          width_dp=width, close_w=close_w, initial="create-usepass")
     # PLAYER BAN LIST nests in this dialog's scope, as the stock popup opened
     # over its own: it stands over it, and closing it returns the focus here.
-    modal["children"].append(ban_list_modal(doc))
+    bans = ban_list_modal(doc)
+    # Above 100 % text the bans' rows grow with it (section 2's reflow); the
+    # headings are furniture and keep their size.
+    from build_retained_screens import fixed_text, walk_nodes
+    nodes = {node["id"]: node for node in walk_nodes(bans)}
+    grow_rows(doc, nodes["ban-column"])
+    for ident in ("ban-head-name", "ban-head-guid"):
+        fixed_text(doc, nodes[ident])
+    modal["children"].append(bans)
     return modal
 
 
@@ -533,9 +545,14 @@ def create_server_document() -> dict:
     show_when(doc, by_state["tourneylimit"], controls["tourneylimit"], tourney)
     lock_unless(doc, controls["autobalance"], team)
     lock_unless(doc, controls["teamdamage"], team)
+    # Above 100 % text each row's value stands under its label (section 2's
+    # reflow) and the rows scroll in the options' room.
+    for row in [name, *rows]:
+        stack_row(doc, row, U * OPTIONS[2], U * VALUE_X, U * ROW_PITCH)
     column = group("create-options", {**absolute(left=U * OPTIONS[0], top=U * OPTIONS[1], width=U * OPTIONS[2],
                                                  height=U * ROW_PITCH * 11),
-                                      "display": keyword("flex"), "flex-direction": keyword("column")}, [name, *rows])
+                                      "display": keyword("flex"), "flex-direction": keyword("column"), "overflow": keyword("auto")},
+                   [name, *rows])
     advanced = action_plate(doc, "create_advanced", "#str_200065", U * OPTIONS[0], U * ADVANCED_BUTTON_TOP - 5, event="advancedModalShow",
                             width=U * OPTIONS[2])
     start = primary_plate(doc, "create_start", "#str_200026", *START, action="createStart", label_box=(43.0, 6.0, 215.0, 25.0), text=23.7,
@@ -543,10 +560,10 @@ def create_server_document() -> dict:
     back = page_prompts(doc, "create_back", action="back")
 
     modal = advanced_dialog(doc)
-    # Above 100 % text only the maps' rows grow for now (grow_rows); the
-    # headings, the options, ADVANCED OPTIONS and CREATE SERVER keep their size.
+    # Above 100 % text the maps' rows and the options grow; the headings,
+    # ADVANCED OPTIONS and CREATE SERVER are furniture and keep their size.
     from build_retained_screens import fixed_text
-    for node in [*headings, *shot, scrollbar, column, advanced, start]:
+    for node in [*headings, *shot, scrollbar, advanced, start]:
         fixed_text(doc, node)
     return tall_create_page(subpage_document(doc, "create", "#str_200002", "#str_200026", "create_start",
                                              [*headings, *shot, viewport, scrollbar, column, advanced, start, back], [modal]))
