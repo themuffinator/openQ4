@@ -3630,10 +3630,12 @@ Restart the server on a different map
 ==================
 */
 static void Session_CampaignSelect_f( const idCmdArgs &args ) {
-    if ( args.Argc() < 2 || args.Argc() > 3 || ( args.Argc() == 3 && idStr::Icmp( args.Argv( 2 ), "start" ) ) ) {
-        common->Printf( "usage: campaignSelect quake4|awakening|arena [start]\n" ); return;
+    const bool start = args.Argc() == 3 && !idStr::Icmp( args.Argv( 2 ), "start" );
+    const bool chapters = args.Argc() == 3 && !idStr::Icmp( args.Argv( 2 ), "chapters" );
+    if ( args.Argc() < 2 || args.Argc() > 3 || ( args.Argc() == 3 && !start && !chapters ) ) {
+        common->Printf( "usage: campaignSelect quake4|awakening|arena [start|chapters]\n" ); return;
     }
-    sessLocal.SelectCampaign( args.Argv( 1 ), args.Argc() == 3 );
+    sessLocal.SelectCampaign( args.Argv( 1 ), start, chapters );
 }
 
 static void Session_CampaignMenu_f( const idCmdArgs &args ) {
@@ -7011,6 +7013,8 @@ static const char *const SESSION_CHAPTER_STATUS_FRESH = "#str_231284";
 static const char *const SESSION_CHAPTER_STATUS_LOCKED = "#str_231285";
 static const char *const SESSION_CHAPTER_DETAIL_SAVED = "#str_231286";
 static const char *const SESSION_CHAPTER_DETAIL_FRESH = "#str_231287";
+// A fresh start from a page with no difficulty of its own (the retained CHAPTERS page).
+static const char *const SESSION_CHAPTER_DETAIL_FRESH_CURRENT = "#str_231551";
 static const char *const SESSION_CHAPTER_DETAIL_LOCKED = "#str_231288";
 
 static bool Session_AwakeningCampaignActive() {
@@ -7170,7 +7174,8 @@ void idSessionLocal::PublishCampaignChapters( idUserInterface *gui, int select )
 	const bool open = ( reached & ( 1 << chosen ) ) != 0;
 	const bool saved = open && saves[chosen].Length() > 0;
 	const idStr shot = open ? RetainedPauseShot( chapters[chosen].map, chapters[chosen].entityFilter ) : idStr( "gfx/guis/loadscreens/generic" );
-	const char *detail = language->GetString( !open ? SESSION_CHAPTER_DETAIL_LOCKED : saved ? SESSION_CHAPTER_DETAIL_SAVED : SESSION_CHAPTER_DETAIL_FRESH );
+	const char *fresh = gui->State().FindKey( "skill" ) != NULL ? SESSION_CHAPTER_DETAIL_FRESH : SESSION_CHAPTER_DETAIL_FRESH_CURRENT;
+	const char *detail = language->GetString( !open ? SESSION_CHAPTER_DETAIL_LOCKED : saved ? SESSION_CHAPTER_DETAIL_SAVED : fresh );
 	if ( retained ) {
 		gui->SetStateInt( "chapter.count", count );
 		gui->SetStateInt( "chapter.first", 0 );

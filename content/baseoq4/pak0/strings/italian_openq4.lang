@@ -1436,6 +1436,7 @@
 	"#str_231548"	"Le impostazioni del giocatore sono cambiate. Riprova."
 	"#str_231549"	"Impossibile applicare questa impostazione del giocatore."
 	"#str_231550"	"Unisciti a una partita su un server, ospitane una tua, guarda le tue demo o configura il tuo giocatore."
+	"#str_231551"	"Questo livello non ha un salvataggio automatico iniziale: parte da zero alla tua difficoltà attuale, con un arsenale standard."
 	"#str_231560"	"Inserisci un numero da %s a %s."
 	"#str_230141"	"API di rendering"
 	"#str_230142"	"Dispositivo di rendering"

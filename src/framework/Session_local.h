@@ -270,16 +270,21 @@ public:
 	virtual void		ExitMenu();
 	virtual void		GuiFrameEvents();
 	virtual void		SetGUI( idUserInterface *gui, HandleGuiCommand_t handle );
-	void OpenCampaignSelector( bool campaigns, bool fromArena = false );
-	void SelectCampaign( const char *campaign, bool start = false );
+	void OpenCampaignSelector( bool campaigns, bool fromArena = false, bool fromChapters = false );
+	// A campaign entered: its game started, its levels (chapters), or else its
+	// difficulty page, after any engine reload into its game directory.
+	void SelectCampaign( const char *campaign, bool start = false, bool chapters = false );
 	bool OpenRetainedCampaignSkill();
+	bool OpenRetainedCampaignChapters();
 	// The active campaign's chapters: every level in campaign order, each
 	// unlocked once the player reaches it (Session.cpp).
 	void RecordCampaignChapter();
 	void PublishCampaignChapters( idUserInterface *gui, int select = -1 );
 	bool StartCampaignChapter( int chapter );
 	bool HandleStockCampaignCommand( idUserInterface *gui, const char *menuCommand );
-	void BeginRetainedCampaignSkill( idUserInterface *from, const char *campaign, bool back = false );
+	// The change between Campaign and a fourth-level child: its difficulty
+	// page, or its levels with `chapters`; `back` climbs to Campaign.
+	void BeginRetainedCampaignSkill( idUserInterface *from, const char *campaign, bool back = false, bool chapters = false );
 	// Single Player's retained Arena sub-page (guis/menu/arena.q4ui): the
 	// Arena campaign's browser where it can present (NULL: the stock one
 	// presents), and the page while it is loaded, which the campaign
@@ -713,7 +718,7 @@ public:
 	bool				retainedSubpageDeeper;	// going to the sub-page, or back to the page
 	int					retainedSubpageBegan;	// presentation time the change began
 	int					retainedSubpageUntil;	// presentation time of the hand-over
-	int                     retainedDetailTarget = 0; // 0: normal level change, 1: skill, 2: campaign parent
+	int                     retainedDetailTarget = 0; // 0: normal level change, 1: skill, 2: campaign parent, 3: chapters, 4: campaign parent onto CHAPTERS
 	idStr                   retainedDetailCampaign;
 	bool                    wipeToBlack = false;
 	int                     wipeFadeStarted = 0, wipeFadeDuration = 0;

@@ -215,9 +215,10 @@ bool ApplicationState(const DocumentModel& model, const idDict& dictionary, Stat
 bool SessionMenuCommand(const std::string& command) {
 	static const std::set<std::string> commands = {"continue","singlePlayer","loadGame","saveGame","multiplayer","settings",
 		"mods","updates","credits","quit","resume","menuResume","restartLevel","quitToMenu",
-        "campaigns","campaignQuake4","campaignAwakening","campaignArena","campaignBack","campaignHome",
+        "campaigns","campaignNew","campaignChapters","campaignArena","campaignBack","campaignHome",
         "campaignSkill0","campaignSkill1","campaignSkill2","campaignSkill3","campaignSkill4",
         "campaignSkillTurbo","campaignSkillStart","campaignSkillBack","campaignChapterSelect","campaignChapterStart",
+        "campaignChaptersBack",
         "loadBack","loadSelect","loadSave","loadDelete","loadNewer","loadOlder","loadNewGame",
         "saveBack","saveSelect","saveSave","saveOverwrite","saveNewer","saveOlder","restartBack","restartGo",
         "saveListRefresh","saveListSort","saveListFilterManual","saveListFilterAuto","saveListClear",

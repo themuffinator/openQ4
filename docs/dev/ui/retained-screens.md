@@ -1435,6 +1435,52 @@ there only `ui_retainedMultiplayer 1` offers the page.
   climbs back; `createserverstart` chooses Team DM and starts a listen server
   on the loopback, following the reloaded module.
 
+## Chapters as a level of its own (3 November 2026)
+
+Section 13.7's menu levels give Campaign a campaign choice and then two
+children, New Campaign (the difficulty) and Chapters (the reached missions),
+and its fourth level says every child route beneath a sub-page uses the same
+helper. The retained menus now follow it (FLOW-050):
+
+- **Campaign** (`campaigns.q4ui`) holds QUAKE 4 and THE AWAKENING as a
+  choice, the chosen one marked with the orange rail the difficulty page
+  uses (`campaign.awakening`, the campaign being played when the page
+  opens; THE AWAKENING only where its content is ready). Accept on either
+  chooses it and moves the focus to NEW GAME (`#str_200000`, the stock New
+  Game label). NEW GAME and CHAPTERS (`campaignNew`, `campaignChapters`) go
+  one level deeper through `child_transition`: NEW GAME carries the chosen
+  campaign's label from its row into the title slot, as Accept on the
+  campaign did before, and CHAPTERS carries its own (`detailEnterChapters`).
+  Every arrival focuses NEW GAME, or CHAPTERS coming back from it
+  (`from_chapters`).
+- **The difficulty page** (`campaign_skill.q4ui`) keeps its difficulty,
+  Turbo, START GAME and BACK and loses its CHAPTERS plate and the in-place
+  view. With the chapters gone it grows a fixed amount, so in tall views it
+  takes its column in every portrait view that holds it (visual
+  specification 1.36), at 0.906 at 200 % text.
+- **CHAPTERS** (`chapters.q4ui`, `retained_menu_levels.chapters_document`) is
+  the levels list in the fourth level's frame under the SINGLE PLAYER and
+  CAMPAIGN crumbs, titled CHAPTERS. Its rows, picture, name, explanation,
+  START CHAPTER, text size and tall view are the ones the difficulty page
+  held. Each arrival focuses the chosen level, or the first. BACK and Back
+  (`campaignChaptersBack`) climb to Campaign onto CHAPTERS. A chapter started
+  fresh, without its autosave, takes the current difficulty, since the page
+  has none of its own.
+- **The session** routes both children through `BeginRetainedCampaignSkill`
+  (detail targets 3 and 4 for CHAPTERS and the climb back onto it), and
+  `SelectCampaign`'s engine reload into The Awakening continues with
+  `campaignSelect awakening chapters` onto CHAPTERS. Where the CHAPTERS page
+  cannot present, or under reduced motion, the change hands over at once, and
+  the stock campaign page with its own CHAPTERS stands in. The classic menus
+  keep that page.
+
+`ui_retained_gate.py` follows both routes (the choice, cancellation,
+drafts, publication, a pick and a start at the current difficulty, the climb
+back onto CHAPTERS, reduced motion and the missing documents),
+`campaign_chapters.py` pins the documents and verbs, and the native screens'
+continuity, page prompts and text-scale checks cover the new page. The
+`campaignskill` capture walks Campaign, NEW GAME, Back, CHAPTERS and Back.
+
 ## Demos as a Multiplayer sub-page (2 November 2026)
 
 Section 9 makes the demo library a section of the Multiplayer page that
@@ -3682,13 +3728,13 @@ what remains across every retained menu.
 - The Welcome card's own opening runs on the clock the load left standing
   and ends at once, so the hand-off reveals the card already softened. A
   first card frame slower than the fade still cuts it short.
-- The sub-page level covers Single Player's Campaign, whose difficulty setup
-  uses the fourth level, and Arena, and Multiplayer's Create Server, Join
-  Game and Demos; Player Setup edits in place on the Multiplayer page. The
-  retained Join Game shows a server's players and rules in the stock
+- The sub-page level covers Single Player's Campaign, whose NEW GAME and
+  CHAPTERS use the fourth level, and Arena, and Multiplayer's Create Server,
+  Join Game and Demos; Player Setup edits in place on the Multiplayer page.
+  The retained Join Game shows a server's players and rules in the stock
   tooltip's card rather than a docked detail column, and has no prompt bar
-  yet (Join, Spectate and Favorite). Campaign's Chapters is not yet a level
-  of its own, and no section summarizes itself with a levelshot. The
+  yet (Join, Spectate and Favorite). No section summarizes itself with a
+  levelshot, and the classic campaign page keeps CHAPTERS on it. The
   Single Player page keeps the home navigation plates and the
   BACK row instead of the section layout (navigation from 14 u, content from
   228 u) and the Back action in the bottom band; Classic is not built. A

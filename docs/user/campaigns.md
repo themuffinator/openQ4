@@ -2,12 +2,17 @@
 
 > **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
 
-Open **Single Player → Campaign** to choose Quake 4 or The Awakening. Selecting
-a campaign opens its page: the difficulty, Turbo Mode, **Start Game** and
-**Chapters**. Back climbs one level at a time, from the campaign page to
-Campaign, then Single Player, then the main menu, where Continue and Load Game
-use that campaign's saves. Choosing a campaign does not overwrite a saved game.
-The classic and the new menus have the same four levels.
+Open **Single Player → Campaign** to choose Quake 4 or The Awakening; the
+campaign you are playing is chosen already, marked with an orange bar. Then
+pick **New Game** to set the difficulty and Turbo Mode and start, or
+**Chapters** to start from a level you have reached. Each opens its own page,
+and Back climbs one level at a time: to Campaign, then Single Player, then the
+main menu, where Continue and Load Game use that campaign's saves. Choosing a
+campaign does not overwrite a saved game.
+
+The classic menus (`ui_retained 0`) open a campaign's page as soon as you
+choose it, with the difficulty, Turbo Mode, **Start Game** and **Chapters**
+together on that page.
 
 ## Chapters
 
@@ -24,8 +29,9 @@ levelshot.
   configuration (`ui_chaptersQuake4` and `ui_chaptersAwakening`).
 - A chapter starts from its level's start autosave, with the arsenal and
   difficulty you reached it with. If that autosave is gone, the level starts
-  fresh at the difficulty chosen on the page, with the map's standard test
-  arsenal where it has one, and writes a new start autosave.
+  fresh at your current difficulty (in the classic menus, the one chosen on
+  the campaign page), with the map's standard test arsenal where it has one,
+  and writes a new start autosave.
 - Levels you have not reached are listed but locked.
 
 The Awakening option becomes available when openQ4 finds its campaign content.

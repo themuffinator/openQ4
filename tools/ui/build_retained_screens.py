@@ -40,6 +40,7 @@ OUTPUTS = {
     "singleplayer": PAK0 / "guis" / "menu" / "singleplayer.q4ui",
     "campaigns": PAK0 / "guis" / "menu" / "campaigns.q4ui",
     "skill": PAK0 / "guis" / "menu" / "campaign_skill.q4ui",
+    "chapters": PAK0 / "guis" / "menu" / "chapters.q4ui",
     "loadgame": PAK0 / "guis" / "menu" / "loadgame.q4ui",
     "savegame": PAK0 / "guis" / "menu" / "savegame.q4ui",
     "restartlevel": PAK0 / "guis" / "menu" / "restartlevel.q4ui",
@@ -2885,20 +2886,34 @@ def campaign_document(campaigns: bool) -> dict:
     back = "campaignBack" if campaigns else "campaignHome"
     doc.session("back", back)
     doc.events["onBack"] = [{"op": "action", "action": "back"}]
+    buttons = []
     if campaigns:
+        # The campaign choice, then its two children (spec 1.10's menu levels):
+        # QUAKE 4 and THE AWAKENING choose the campaign, the chosen one marked
+        # with the orange rail, and move the focus to NEW GAME; NEW GAME and
+        # CHAPTERS go deeper to the chosen campaign's difficulty or its levels.
         doc.state.update({"awakening_ready": {"type": "boolean", "initial": False},
                           "awakening_present": {"type": "boolean", "initial": False},
-                          "awakening_chosen": {"type": "boolean", "initial": False}})
-        rows = [("quake4", "#str_230039", "campaignQuake4"),
-                ("awakening", "#str_230040", "campaignAwakening")]
+                          "awakening_chosen": {"type": "boolean", "initial": False},
+                          "campaign.awakening": {"type": "boolean", "initial": False},
+                          "from_chapters": {"type": "boolean", "initial": False}})
+        for ident, key, event, awakening in (("quake4", "#str_230039", "chooseQuake4", False),
+                                             ("awakening", "#str_230040", "chooseAwakening", True)):
+            row = navigation_plate(doc, ident, key, event=event)
+            mark = vector(f"chosen-{ident}", {**absolute(left=NAV_LEAD + U * 25, top=U * 10, width=U * 5, height=U * 10), "opacity": number(0)},
+                          [path("rail", [(0, 0), (U * 3, 0), (U * 3, U * 10), (0, U * 10)], fill=solid(rgb(ORANGE)))])
+            row["children"].append(mark)
+            chosen = {"state": "campaign.awakening"} if awakening else {"op": "!", "args": [{"state": "campaign.awakening"}]}
+            doc.bind(f"chosen-{ident}.opacity", f"chosen-{ident}", "opacity", {"op": "select", "args": [chosen, 1, 0]})
+            doc.events[event] = [{"op": "setState", "values": {"campaign.awakening": awakening}}, {"op": "focus", "control": "newgame"}]
+            buttons.append(row)
+        doc.bind("awakening.enabled", "awakening", "enabled", {"state": "awakening_ready"})
+        rows = [("newgame", "#str_200000", "campaignNew"), ("chapters", "#str_231280", "campaignChapters")]
     else:
         rows = [("campaign", "#str_230038", "campaigns"), ("arena", "#str_42002", "campaignArena")]
-    buttons = []
     for ident, key, action in rows:
         doc.session(action, action)
         buttons.append(navigation_plate(doc, ident, key, action=action))
-    if campaigns:
-        doc.bind("awakening.enabled", "awakening", "enabled", {"state": "awakening_ready"})
     buttons.append(navigation_plate(doc, "back", "#str_230045", action="back"))
     wrap_menu(buttons)
     details = []
@@ -2996,11 +3011,10 @@ def campaign_document(campaigns: bool) -> dict:
             doc.timelines.add(f"crumbRest{suffix}", 1, [track("crumb", "transform", [(0, fitted), (1, fitted)])])
             doc.timelines.add(f"crumbReturn{suffix}", 300, [track("crumb", "transform", [(0, fitted), (150, fitted), (300, identity)])])
         doc.events["onDeactivate"] = [{"op": "playTimeline", "timeline": "rest"}, *by_language(doc, "crumbRest", fits)]
-        # Every arrival shows the sub-page at once, with the focus on the
-        # campaign being played: QUAKE 4 unless it is the expansion (section
-        # 13.4's primary action, or the one last chosen).
-        chosen = [{"op": "focus", "control": "quake4"},
-                  {"op": "if", "condition": {"state": "awakening_chosen"}, "then": [{"op": "focus", "control": "awakening"}]}]
+        # Every arrival shows the sub-page at once, with the focus on NEW GAME
+        # (section 13.4's primary action), or on CHAPTERS coming back from it.
+        chosen = [{"op": "focus", "control": "newgame"},
+                  {"op": "if", "condition": {"state": "from_chapters"}, "then": [{"op": "focus", "control": "chapters"}]}]
         doc.events["onActivate"] = [{"op": "playTimeline", "timeline": "arrive"}, *by_language(doc, "crumbRest", fits), *chosen]
         doc.events["subpageLeave"] = [{"op": "playTimeline", "timeline": "subpageLeave"}, *by_language(doc, "crumbReturn", fits)]
     else:
@@ -3077,7 +3091,9 @@ def campaign_document(campaigns: bool) -> dict:
         title_node = titles_group["children"][1]
         title_node["properties"]["left"] = length(0)
         titles_group["children"][1] = group("detail-title-clip", {**absolute(left=U * SUBPAGE_SLOT[0],top=0,width=U * PAGE_TITLE_W,height=U * 40),"overflow":keyword("hidden")}, [title_node])
-        titles_group["children"].append(retained_menu_levels.child_transition(types.SimpleNamespace(**globals()),doc,3,[("Quake4","#str_230039"),("Awakening","#str_230040")],"#str_230038"))
+        # NEW GAME carries the chosen campaign's label from its row, CHAPTERS its own.
+        titles_group["children"].append(retained_menu_levels.child_transition(types.SimpleNamespace(**globals()),doc,3,
+            [("Quake4","#str_230039",0),("Awakening","#str_230040",1),("Chapters","#str_231280",3)],"#str_230038"))
     result = doc.build(retained_menu_levels.fit_page(types.SimpleNamespace(**globals()),group("screen", {**FULL, "background-color": colour([0, 0, 0, 1])}, [
         *lit_field("field", 0.7), *bands, content, titles_group,
         # The pages' prompt bar, as legends: the page's own BACK is its button.
@@ -4737,6 +4753,7 @@ def main() -> int:
                  "loading": loading_document(),
                  "singleplayer": campaign_document(False), "campaigns": campaign_document(True),
                  "skill": retained_menu_levels.skill_document(types.SimpleNamespace(**globals())),
+                 "chapters": retained_menu_levels.chapters_document(types.SimpleNamespace(**globals())),
                  "loadgame": load_game_document(), "savegame": save_game_document(), "restartlevel": restart_level_document(),
                  "loadgame_strogg": load_game_document(STROGG), "savegame_strogg": save_game_document(STROGG),
                  "restartlevel_strogg": restart_level_document(STROGG),

@@ -233,6 +233,12 @@ See [release status](../../user/release-status.md) and the
   Credits and Exit. Player Setup, also on the Multiplayer menu, edits your
   name, clan tag, model and rail colour in place beside a turning preview of
   your player, and each change applies at once.
+- **Campaign: New Game and Chapters.** In the new interface, Single Player →
+  Campaign now has you choose Quake 4 or The Awakening (the one you are
+  playing is already chosen), then **New Game** for the difficulty and Turbo
+  Mode, or **Chapters** to restart from any level you have reached, each on a
+  page of its own with Back returning to where you were. The classic menus
+  keep everything on the campaign page.
 - **Right stick in the menus.** With a controller in the new interface, the
   right stick scrolls the pause menu's objectives, the multiplayer scoreboard
   and player list, and long confirmation messages without moving your

@@ -6,6 +6,28 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Campaign's NEW GAME and CHAPTERS, 3 November 2026
+
+- Visual specification section 13.7 gives Campaign a campaign choice, then
+  New Campaign and Chapters as fourth-level children built with the same
+  helper. The retained Campaign page now holds QUAKE 4 and THE AWAKENING as a
+  choice (the orange rail marks the chosen one, the campaign being played by
+  default), then NEW GAME (`#str_200000`) and CHAPTERS, which go deeper
+  through `child_transition` (`campaignNew`, `campaignChapters`). NEW GAME
+  carries the chosen campaign's label into the title slot, and CHAPTERS its
+  own.
+- CHAPTERS is a document of its own (`chapters.q4ui`). It has the levels list,
+  picture, START CHAPTER, text size and tall view the difficulty page held,
+  and Back climbs onto CHAPTERS (`campaignChaptersBack`). A chapter started
+  without its autosave takes the current difficulty. The difficulty page
+  keeps its difficulty, Turbo and START GAME. Its tall view now takes any
+  portrait view that holds it (0.906 at 200 % text), as section 13.7 asks of
+  fixed-growth pages. An engine reload into The Awakening continues with
+  `campaignSelect awakening chapters`. The classic campaign page is
+  unchanged.
+- `ui_retained_gate.py`, `campaign_chapters.py`, the native screens tests
+  and the `campaignskill` OpenGL capture pass (see retained-screens.md).
+
 ## Fallback menu watchdog waits for a second frame, 3 November 2026
 
 - On a fresh profile the first-launch preset restarts the renderer during
