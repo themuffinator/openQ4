@@ -53,6 +53,7 @@ public:
 
 	void				Save				( idSaveGame *savefile ) const;
 	void				Restore				( idRestoreGame *savefile );
+	void				ValidateRestoredBinding( idRestoreGame *savefile ) const;
 
 	virtual void		GetImpactInfo		( idEntity *ent, int id, const idVec3 &point, impactInfo_t *info );
 	virtual void		ApplyImpulse		( idEntity *ent, int id, const idVec3 &point, const idVec3 &impulse, bool splash );

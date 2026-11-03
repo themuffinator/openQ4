@@ -96,7 +96,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | Temporal rendering | Automatic TAAU supports subnative bilinear/bicubic scaling and dynamic resolution on eligible desktop GL/Vulkan paths; crop/nearest modes and VR are excluded. Rigid, skinned and first-person weapon motion vectors and reactive effect coverage exist. Dynamic resolution and GPU skinning remain opt-in. GLES has no temporal resolve. |
 | VR | The active source implements OpenGL PC OpenXR, stereo, tracked input, room scale, crouch, two-handed aiming, haptics, comfort controls and vehicle views. Vulkan/EGL/Quest work is recoverable from archived history, not active implementation. Real-headset qualification remains open. |
 | Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Device qualification and integration of archived onboarding/touch/lifecycle work remain open. |
-| UI | Many retained screens and HUDs now run by default. The register preserves 350 rows, 311 active requirements and 39 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
+| UI | Many retained screens and HUDs now run by default. The register preserves 352 rows, 312 active requirements and 40 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
 | Retail and Awakening | Canonical SP/MP sources and BSE are in-tree. Awakening is additive SP content under `q4xbase`, not a separate multiplayer module. Retail decl and BSE audits have already resolved extensive earlier gaps. |
 | Multiplayer | Dual-stack networking, pure asset checks and bounded rcon2 exist. Actual MP defaults are `net_mpLagCompensation 0` and `net_mpPredictMode 0`. Clients advertise bounded remote extrapolation, and server rewind subtracts it from the displayed pose age; the coupled implementation and remaining peer qualification are recorded under MP-07. Retail 2.85 interoperability is outside the current openQ4 2.41 protocol contract. |
 | Platforms | Windows x64 and Linux x64/Steam Deck are first-class platform targets; macOS arm64 and Linux ARM64 are previews; Windows ARM64 and Android are experimental. Renderer tiers are separate from platform tiers. |
@@ -129,6 +129,7 @@ to a final project-wide phase. Important dependencies are:
 | Android sustained operation | AND-02 includes AUD-03/CORE-03 aggregate memory and cancellation behavior, not only renderer FPS. |
 | Modern-renderer promotion | Each REN-01 shared-domain gate is separate from REN-02 aggregate visible-lighting ownership. Keep their defaults and rollback decisions independent. |
 | Content pack split, trim and overlays (PKG-02 through PKG-04) | PKG-01's verifier first proves identical bulk-pack bytes across platforms and consecutive candidates. Client-only packs need their pure-server exemption before the dedicated server drops them. |
+| Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
 
 ## Governance and baseline evidence
 
@@ -289,13 +290,24 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   30/60/120/144/165/240/360 and uncapped, VSync/VRR where available, low-FPS catch-up,
   menu/loading/background policy and preset/Steam Deck overrides. Verify physical
   motion and pacing; a cap, average FPS or hidden capture alone cannot close it.
-  Added reference, 27 October: native 2560 x 1440 fullscreen `game/airdefense1`
-  starting-position rotations with the Remastered HUD and revised Ultra settings
-  must keep **every frame <=6.67 ms**. The first complete maximum-quality Vulkan
-  run with all effects and four cascades averages 38.5 FPS with a 37.55 ms
-  maximum on Vulkan (OpenGL: 30.9 FPS / 69.85 ms); qualification remains open.
-  Earlier MSAA-off measurements do not qualify this reference. See the
-  [airdefense checkpoint](ui/runtime-performance.md#airdefense-maximum-quality-reference-27-october-2026).
+  Added reference, 27 October, with the workload moved to Quality (the preset
+  below Ultra, its 144 FPS cap lifted) on 28 October: native 2560 x 1440
+  fullscreen `game/airdefense1` starting-position rotations with the Remastered
+  HUD must keep **every frame <=6.67 ms**. The first Quality run on Vulkan
+  averages 114.1 FPS (8.76 ms) with a 13.80 ms p99 and a 24.08 ms maximum;
+  qualification remains open. The earlier maximum-quality runs are historical.
+  See the [airdefense checkpoint](ui/runtime-performance.md#airdefense-maximum-quality-reference-27-october-2026)
+  and the [Quality workload](ui/runtime-performance.md#quality-workload-and-deferred-shadow-scrolling-28-october-2026).
+  On 3 November a [frame attribution](ui/runtime-performance.md#quality-frame-attribution-and-effect-culling-3-november-2026)
+  found this workload CPU-bound. One thread runs the game tic, the scene front
+  end and Vulkan command recording in turn, and a frame that takes a tic adds
+  about 3 ms to it, so GPU work alone cannot meet the floor. The front end
+  (36% of the main thread) and recording (26%) lead; the game tic takes 19%.
+  Effects now take the frustum test before the portal-area walk, and the HUD's
+  powerup clear runs once instead of every tic. Both are exact and cut about 4%
+  of main-thread work. `tools/debug/cpu_sampler.py` samples main-thread stacks
+  without an elevated shell. Meeting the floor still needs recording moved off
+  the main thread, a cheaper tic and front end, and less GPU post-processing.
   Progress: targets, budgets and the measurement procedure are declared in the
   [presentation owners contract](presentation-owners.md), with
   `presentation_look_runtime.py` for engine-side latency and smoothness; its
@@ -669,6 +681,11 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
   time and first-use rendering still cause measurable hitches;
   keep the user's stall-removal gate open. See the
   [checkpoint measurements](ui/runtime-performance.md#checkpoint-save-stalls-27-october-2026).
+  The 3 November [frame attribution](ui/runtime-performance.md#quality-frame-attribution-and-effect-culling-3-november-2026)
+  finds the Quality rotation CPU-bound on its main thread (see HF-07). Exact
+  effect-culling and HUD changes remove about 4% of that work. Per-frame ring
+  copies of static geometry (3.6%), fallback shadow volumes for prelit lights
+  (2.6%) and exact presentation-pose bounds (2.4%) remain measured candidates.
   Audit hot copy-helper GL state queries, cluster allocation/binning, per-frame
   pose work, shadow invalidation, render-target generations and upload lifetimes.
   Reuse existing job/measurement infrastructure. Shadow uniform caching already
@@ -916,7 +933,7 @@ The [visual specification](ui-visual-design.md),
 [product register](ui/product-requirements.md),
 [machine-readable requirements](ui/product-requirements.json) and
 [migration manifest](ui/migration-manifest.json) retain the full product contract.
-This roadmap adopts all **311 active requirements, 358 current source/include-bound
+This roadmap adopts all **312 active requirements, 358 current source/include-bound
 migration variants and seven final gates**. UI-10 reconciled retail/base/Awakening
 mounts while preserving the historical 271-entry manifest. The denominator follows
 effective source changes; it is not a fixed completion target. Scope contradictions
@@ -1065,6 +1082,12 @@ archived provenance; new scheduling belongs here.
   [fit views narrower than 4:3](ui/retained-screens.md#narrow-views-24-october-2026)
   (5:4, portrait), and the list pages [grow their lists](ui/retained-screens.md#tall-views-grow-the-lists-25-october-2026)
   into a tall view's extra height.
+  Progress, 3 November: the [right stick](ui/input-routing.md#right-stick-3-november-2026)
+  scrolls a retained menu's detail area (a scrolling area that holds no
+  control: the pause's Objectives page, the scoreboard and roster cards and
+  long dialog bodies) and turns Player Setup's preview, with its Rotation
+  slider following (`INP-011` partial). Physical per-family stick runs, View's
+  details beyond Join Game and the sticks' glyphs remain.
 - [ ] **UI-03 — P1, implementation: complete player and multiplayer workflows.**
   Finish tourney queue/arena/watch controls, model previews, full Match Control,
   map catalogs beyond 128 entries, stable refresh focus, contextual disabled
@@ -1183,6 +1206,18 @@ archived provenance; new scheduling belongs here.
   pass the actual SYSTEM layout matrix in twelve locales and windowed engine
   selection/restart checks on NVIDIA/Intel. This is functional and layout
   evidence only; the existing product, performance and platform gates remain.
+  Progress, 3 November: the initializing screen repainted only about eight
+  times a second with pauses of up to a second: a 30 Hz cap, a 10% repaint
+  share that counted single slow frames in full, and loading without
+  presentation hooks (the 1 s script compile). Every main-thread file read now
+  offers a time-paced repaint, at up to 60 Hz within half of the time during
+  the new 1.3 s entrance and a fifth after it (`FLOW-069`). Local vector meshes
+  in a zoom keep their compilation while it is at most a sqrt(2) step finer
+  than needed, and the machined bands became solid annuli (101k to a few
+  thousand vertices). Traces on a loaded machine: 12-22 frames and gaps up to
+  1.35 s before, 50-85 frames, a 23 ms first frame and gaps of 100-270 ms
+  after, for roughly 15-20% more startup time than reduced motion. An
+  idle-machine measurement and the GLES fallback remain.
 - [ ] **UI-08 — P1, qualification and decision: final cutover.** Complete all seven
   final gates with current source-bound behavior, visual/editor/performance and
   Windows/Linux/macOS/Android-GLES evidence, including dedicated packaging. Decide
@@ -1318,6 +1353,15 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   transform in the same call, so the first placement never renders. openQ4's
   current-transform placement matches what retail renders and is kept. The
   runtime qualification list above remains open.
+  Progress, 3 November: a hidden effect lifecycle probe on `game/airdefense1`
+  (OpenGL) samples `bse_speeds` through save, restore and demo playback. The
+  map's ambient effects come back after a load: about 103 active before the
+  save, 82 on the first restored frame and 101 six seconds later. The game
+  saved and restored right after firing, with no errors. A 16 MB
+  render demo recorded over the same scene plays to its end. This is lifecycle
+  evidence only. The particle and trace counters stay at 0, firing did not raise
+  the active count measurably, and BSE prints no counters during render-demo
+  playback. Per-effect behaviour and retail comparison remain open.
 - [ ] **Q4-04 — P1, qualification: Awakening campaign closure.** Play all thirteen
   maps and restore saves during unique weapon/status/vehicle/boss states; qualify
   freeze persistence, damage gates, animation speed, and turret effects. Recheck
@@ -1334,6 +1378,28 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   cannot be used before saving, because restore recompiles its "console"
   source name and fails, as retail's restore would. The other unique states,
   corpse-pin loss and base/Arena/MP isolation remain to qualify.
+  Progress, 3 November (hidden, input-free; saves reloaded in a fresh launch):
+  - **Speeder.** `game/m07_race` starts the player on the speeder. A save made
+    while driving reloads still on the bike at the saved spot, and driving goes
+    on. The race locks the exit.
+  - **Valkaryne.** Saved while she is docked and firing her death ray. After
+    the reload, destroying the Makron sphere makes her undock, and she attacks
+    with railgun and rockets.
+  - **Pain Lord.** Saved once the fight is live. After the reload, head hits
+    put him in pain and then stun, and both dude zones take damage. The kill
+    was not confirmed.
+  - **Pinned corpse.** A spike pins a killed Strogg marine on
+    `game/m01_stranarus_trench2`, and the save with the pinned corpse loads
+    without errors, unpinned as the bounded limitation describes.
+  - **Isolation.** In an Awakening run, `q4xbase` is on the search path and 13
+    `monster_q4x_*` definitions are loaded. After `campaignSelect quake4 start`
+    in the same process, and in fresh base and multiplayer launches, there is
+    no `q4xbase` path and no expansion definition.
+
+  Not reached: the turret and the walker. Neither took the in-game entry at
+  the positions tried, presumably locked or hidden until their sequences.
+  Arena was covered only as `game_mp` on `baseoq4`, not as a switch from the
+  Awakening menu. Full playthroughs remain.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus
@@ -1393,11 +1459,75 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   [radio-chatter reference](savegame-reliability.md#typed-spawn-references-during-restore)
   carried the previous map's spawn id into the next. It is now cleared with its
   chatter and restored only when it names one, so those saves load again.
-- [ ] **Q4-06 — P3, decision: portable saves.** `raw1` native aggregates are not
-  cross-platform saves. Inventory and normalize game plus GUI/interpolator raw
-  blocks before introducing a versioned portable format and ABI/architecture
-  fixture matrix. Keep existing decoders and explicit unsupported-format handling.
-  Retail proprietary game-DLL/save interchangeability is not a project target.
+  Progress, 3 November: the audit's [remaining hazards](savegame-reliability.md#owner-lists-and-physics-links-during-failed-load-teardown)
+  are closed without changing save bytes. A refused load no longer runs partly
+  restored script or vehicle exit code during teardown, and a full event queue
+  no longer raises a second error there. Articulated figures and animators keep
+  their restoring entity as owner. Constraint box indexes, vehicle positions,
+  client-entity bindings, influence-target entity numbers, burning-joint counts
+  and unregistered objects' numbers are checked. Valid saves are unaffected:
+  all 11 release fixtures (0.9 to 0.13) restore, and the campaign chain passes
+  on OpenGL. Still open: leaks on refused loads, and a pre-existing defect
+  where a [save made before the first frame after a load](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
+  writes NULL references.
+- [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
+  3 November 2026: build a portable save format, so that a save written on one
+  supported platform loads on the others.
+  - **Scope.** Every supported, preview and experimental target is 64-bit
+    little-endian: Windows x64 and ARM64, Linux x64 and ARM64, macOS arm64, and
+    Android arm64 including Quest. The portable revision is defined for that
+    family only; 32-bit and big-endian builds keep refusing it.
+  - **Existing saves.** `raw1` saves keep loading, through the current decoders,
+    only on the ABI that wrote them.
+  - **Out of scope.** Interchange with the proprietary retail game DLLs and their
+    saves.
+
+  The [technical contract](savegame-compatibility-policy.md#planned-portable-revision)
+  and the [block inventory](savegame-reliability.md#remaining-raw-serialization-raw1)
+  are the supporting references. The stages run in order, and each closes on its
+  own gate:
+  1. **Inventory gate.** Restore an in-tree test that finds every native-layout
+     read and write in both game trees, the engine GUI save code and script
+     storage, and fails on any unclassified addition. The inventory that
+     `savegame-reliability.md` described as locked has had no in-tree test since
+     the source consolidation. The stage also confirms that the script's
+     `intptr_t`-sized slots never carry a live value across a save point.
+     Gate: the test runs in CI and assigns every block a class.
+  2. **Field codecs.**
+     - Write each block whose layout is up to the compiler as explicit
+       fixed-width little-endian fields.
+     - Flag bitfields become named 32-bit masks. Trace models, joint modifiers,
+       vehicle path targets and GUI interpolators are written field by field.
+     - The path targets' entity pointers restore through the typed reference
+       check.
+     - Padding and stale script pointer slots are written as zero, so the
+       encoder is deterministic.
+
+     Gate: golden-byte native tests for each codec pass in CI on Windows MSVC,
+     Linux GCC and Clang, macOS arm64 and Linux ARM64 (qemu), with mutation
+     controls.
+  3. **Wire revision.**
+     - Payload version 5 carries a portable wire ABI stamp (`le64-portable1`),
+       accepted from any family member.
+     - The v2 to v4 readers keep their exact `raw1` matching.
+     - Any other stamp is refused before map teardown with a localized player
+       message.
+
+     Gate: a v5 round trip on each CI platform. All historical fixtures still
+     restore (`savegame_restore_matrix.py`). The schema-bump rules, contracts and
+     compatibility policy are updated in the same change.
+  4. **Cross-platform qualification.** Save on one platform, then restore,
+     resave and reload on another, on stock and Awakening maps, in both
+     directions. Start with Windows x64 and Linux x64 (WSL), then macOS arm64
+     through the VM workflow and one ARM64 Linux or Android target.
+     Gate: every direction restores into gameplay without errors, its resave
+     restores again on the source platform, and both platforms report the same
+     object table.
+  5. **Release.** Player documentation on moving saves between platforms,
+     release notes and the revised platform table. Gate: published with the
+     evidence above.
+
+  Q4-06 stays optional (P3) and never blocks shipping a supported configuration.
 - [ ] **Q4-07 — P1, qualification: genuine historical save corpus.** Complete the
   historic-binary corpus for 0.6.95, 0.8, 0.10, 0.11 and 0.13 where current evidence
   uses equivalent/restamped fixtures. Qualify the exact HiDef #123 fixture and

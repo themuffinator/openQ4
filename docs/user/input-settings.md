@@ -116,6 +116,13 @@ Suggested adjustments:
 - If triggers fire too easily, raise `Trigger Press`.
 - If triggers feel unresponsive, lower `Trigger Press`.
 
+In the new menus (`ui_retained 1`), the left stick and D-pad move the
+selection. The right stick (the left one with Southpaw) scrolls panels that
+have no rows to select, such as the pause menu's objectives, the multiplayer
+scoreboard and player list and long confirmation messages, and in Player
+Setup it turns the preview of your player. Invert Look does not affect the
+menus.
+
 Advanced movement tuning is available from the console:
 
 ```cfg

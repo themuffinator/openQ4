@@ -24,6 +24,10 @@ const openq4::ui::DocumentModel* UI_RetainedDocumentModel(idUserInterface* gui);
 int UI_RetainedStateNames(idUserInterface* gui, const char* prefix, std::vector<std::string>& names);
 // Read semantic focus so a refreshed catalog can follow the same entry.
 std::string UI_RetainedFocusedControl(idUserInterface* gui);
+// The right stick's vertical deflection in a retained menu (section 13.5),
+// past the rest zone in -1..1, held for `seconds`: it scrolls the detail area.
+// Whether the area moved.
+bool UI_RetainedDetailStick(idUserInterface* gui, float y, float seconds);
 
 // Engine adapter for explicit .q4ui resources. The public game ABI remains
 // idUserInterface; RmlUi, canonical nodes and device ownership stay private.
@@ -35,6 +39,7 @@ class idUserInterfaceRetained final : public idUserInterfaceManaged {
 	friend const openq4::ui::DocumentModel* UI_RetainedDocumentModel(idUserInterface*);
 	friend int UI_RetainedStateNames(idUserInterface*, const char*, std::vector<std::string>&);
 	friend std::string UI_RetainedFocusedControl(idUserInterface*);
+	friend bool UI_RetainedDetailStick(idUserInterface*, float, float);
 public:
 	explicit idUserInterfaceRetained(bool managed = true);
 	~idUserInterfaceRetained() override;

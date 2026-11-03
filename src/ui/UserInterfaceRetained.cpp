@@ -934,6 +934,13 @@ struct idUserInterfaceRetained::Impl {
 		std::string error;
 		if (!changed.empty() && !RuntimeView()->SetState(changed,error,RetainedUI_PresentationTime())) Error(error);
 	}
+	// The right stick's vertical deflection (section 13.5), -1..1 held for
+	// `seconds`: full deflection scrolls the detail area 720 dp a second.
+	bool DetailStick(float y, float seconds) {
+		auto* runtime = RuntimeView();
+		if (!runtime || !std::isfinite(y) || y == 0 || !std::isfinite(seconds) || seconds <= 0) return false;
+		return runtime->ScrollDetail(idMath::ClampFloat(-1,1,y)*720.0f*seconds,RetainedUI_PresentationTime());
+	}
 	// Preserve undeclared and unrelated pending dictionary keys. Publish only
 	// the programs' explicit application writes, using round-trip numbers.
 	void PublishWrites(const StateValues& writes) {
@@ -2146,6 +2153,11 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		idStr value = args.Argv(3);
 		for (int line = 4; line < args.Argc(); ++line) { value += "\n"; value += args.Argv(line); }
 		owner.SetStateString(args.Argv(2),value.c_str()); owner.StateChanged(common->GetPresentationTime()); okay = impl.lastError.empty();
+	} else if (verb == "stick" && args.Argc() == 5) {
+		// The right stick held at x,y (-1..1) for the given milliseconds,
+		// without a device: here it scrolls the detail area, and the session
+		// turns its preview (Session_RetainedGui_f).
+		okay = impl.DetailStick(static_cast<float>(atof(args.Argv(3))),static_cast<float>(atof(args.Argv(4)))*0.001f);
 	} else if (verb == "event" && args.Argc() == 3) {
 		owner.HandleNamedEvent(args.Argv(2)); okay = impl.lastError.empty();
 	} else if (verb == "trigger" && args.Argc() == 2) {
@@ -2195,6 +2207,13 @@ std::string UI_RetainedFocusedControl(idUserInterface* gui) {
 	if (found == diagnosticViews.end()) return {};
 	const auto* runtime = (*found)->impl->RuntimeView();
 	return runtime ? runtime->FocusedControl() : std::string();
+}
+
+bool UI_RetainedDetailStick(idUserInterface* gui, float y, float seconds) {
+	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
+	if (found == diagnosticViews.end()) return false;
+	auto& impl = *(*found)->impl;
+	return impl.Prepare() && impl.AcceptInput() && impl.DetailStick(y,seconds);
 }
 
 int UI_RetainedStateNames(idUserInterface* gui, const char* prefix, std::vector<std::string>& names) {

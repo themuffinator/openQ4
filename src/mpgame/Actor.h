@@ -134,6 +134,7 @@ public:
 
 	void					Save( idSaveGame *savefile ) const;
 	void					Restore( idRestoreGame *savefile );
+	virtual void			ValidateRestoredBindings( idRestoreGame *savefile ) const override;
 
 	virtual void			Hide( void );
 	virtual void			Show( void );

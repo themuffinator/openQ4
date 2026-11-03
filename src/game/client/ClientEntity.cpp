@@ -378,6 +378,9 @@ void rvClientEntity::Restore( idRestoreGame *savefile ) {
 	if ( entityNumber != -1 && entityNumber != restoredEntityNumber ) {
 		savefile->Error( "rvClientEntity::Restore: client entity number %d does not match registered number %d", restoredEntityNumber, entityNumber );
 	}
+	if ( entityNumber == -1 && restoredEntityNumber != -1 ) {
+		savefile->Error( "rvClientEntity::Restore: client entity number %d is not registered in the client entity table", restoredEntityNumber );
+	}
 	entityNumber = restoredEntityNumber;
 
 	// idLinkList<rvClientEntity>	spawnNode;		- reconstructed in the master entity load
@@ -393,6 +396,31 @@ void rvClientEntity::Restore( idRestoreGame *savefile ) {
 	savefile->ReadJoint( bindJoint );
 	
 	savefile->ReadRefSound( refSound );
+}
+
+/*
+================
+rvClientEntity::ValidateRestoredBinding
+
+Runs once every object is restored. A bound client entity must sit in its
+master's list, which binding and teardown walk, and a joint binding needs an
+animated master: UpdateBind casts the master to idAnimatedEntity.
+================
+*/
+void rvClientEntity::ValidateRestoredBinding( idRestoreGame *savefile ) const {
+	const idEntity *master = bindMaster.GetEntity();
+	if ( master == NULL ) {
+		if ( bindNode.InList() ) {
+			savefile->Error( "rvClientEntity::Restore: unbound client entity %d is listed by an entity", entityNumber );
+		}
+		return;
+	}
+	if ( bindNode.ListHead() != &master->clientEntities ) {
+		savefile->Error( "rvClientEntity::Restore: client entity %d is missing from the list of its master '%s'", entityNumber, master->GetName() );
+	}
+	if ( bindJoint != INVALID_JOINT && !master->IsType( idAnimatedEntity::GetClassType() ) ) {
+		savefile->Error( "rvClientEntity::Restore: client entity %d is bound to a joint of non-animated '%s'", entityNumber, master->GetName() );
+	}
 }
 
 /*

@@ -53,8 +53,14 @@ template<class Entity> void exercise(const char* label,int invalidLower,int limi
     Entity registered;
     idRestoreGame valid{3}; registered.Restore(&valid);
     assert(registered.entityNumber==3);
+    // An object missing from the master table has no number of its own: taking
+    // a saved one would alias references to whatever is registered there.
     Entity unregistered; unregistered.entityNumber=none;
-    unregistered.Restore(&valid); assert(unregistered.entityNumber==3);
+    bool rejected=false;
+    try { unregistered.Restore(&valid); } catch(const std::runtime_error&) { rejected=true; }
+    assert(rejected && unregistered.entityNumber==none);
+    idRestoreGame unnumbered{none}; unregistered.Restore(&unnumbered);
+    assert(unregistered.entityNumber==none);
 }
 template<class Entity> void tableCases(int none) {
     for(int scenario=0;scenario<4;++scenario) {

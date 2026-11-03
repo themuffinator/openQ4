@@ -3049,3 +3049,61 @@ The patch and source hashes remain in
 grid metadata or unused test/helper remains in the active renderer. Existing
 optional pipeline counters and previously accepted optimizations remain.
 The strict frame floor and checkpoint-stall removal are still open.
+
+### Quality frame attribution and effect culling, 3 November 2026
+
+The machine ran about a dozen other sessions' builds and clients throughout,
+so absolute timings below are inflated and only their proportions are used.
+Every run is the native 2560 x 1440 fullscreen Quality rotation from
+`game/airdefense1` on Vulkan, from a separately staged runtime.
+
+A 2,048-frame GPU phase profile (`r_vkGpuPhaseProfile`) averages 9.21 ms per
+frame (p99 11.40 ms, maximum 14.40 ms): 6.96 ms for the main view and 1.39 ms
+for the portal sky. Within the main view, SSAO takes 2.06 ms (0.37 ms depth
+capture, 1.69 ms drawing), lights 1.90 ms including 0.65 ms of shadow maps,
+bloom and tone mapping 1.05 ms, the depth prepass 0.83 ms, the two ambient
+walks 0.90 ms and SMAA 0.21 ms.
+
+The CPU is the tighter limit. With renderer metrics on, the main thread spends
+7.3 ms per frame building the frame (game draw and render front end) and
+3.8 ms recording and submitting it on Vulkan, while the frame-fence wait is
+17 µs at the median: the GPU waits for the CPU. One thread runs the game tic,
+the front end and the backend in turn, and the 60 Hz tic lands in about half
+of the frames. `profileFrameWork` puts the tic at 2.91 ms on the frames that
+run one, against a 6.67 ms budget for the whole frame. GPU work alone
+therefore cannot close the every-frame floor.
+
+`tools/debug/cpu_sampler.py` attributes main-thread time without an elevated
+shell (ETW sampling needs one). It suspends the busiest threads for about
+0.3 ms per sample, copies the stack, and walks it offline with dbghelp. An
+earlier version walked the live stack and held the thread for about 20 ms per
+sample. The engine answered each stall with catch-up tics, which inflated the
+game tic to 53% of the samples. Keep the client running until `record`
+finishes: the walk still reads code and unwind data from the process. A clean
+4,091-sample profile over 30 seconds of rotation:
+
+| Main-thread share | Work |
+| --- | --- |
+| 19% | Game tic: BSE client effects 4.6%, player 3.6%, AI 2.8%, articulated figures 1.8% |
+| 36% | Scene front end: effects 18.7% (particle geometry 10.2%, servicing 3.6%, area tests 3.2%), models and interactions 14.2% (shadow volumes for prelit lights 2.6%) |
+| 7% | HUD: legacy GUI state 2.2%, Remastered/retained drawing 4.5% |
+| 6% | Presentation poses (exact bounds from every mesh vertex 2.4%) |
+| 26% | Vulkan backend: per-frame geometry copies into the ring 3.6%, single-draw interactions 3.5%, shadow atlas 2.7%, frame submit 2.4% |
+
+Three exact changes follow from it:
+
+- Effects take the cheap frustum test before the portal-area walk, both before
+  and after their geometry is rebuilt. Both tests must pass and neither has side
+  effects, so the same effects draw. Area tests fell from 3.2% to 1.0% of the
+  main thread, and the effect front end from 18.7% to 15.5%.
+- `idPlayer::UpdatePowerUps` ran the stock HUD's `clearPowerups` script every
+  tic. With no powerup owned and none shown since this HUD's last clear, the
+  script changes nothing, so it now runs once (1.1% to under 0.1%).
+- BSE servicing no longer copies each effect's name into an `idStr` before the
+  filter check.
+
+The candidate run logged no new warnings or errors. The ring copies of static
+world geometry, prelight fallback volumes and exact presentation bounds remain
+measured candidates; each needs a lifetime or policy change, not just a
+reordering. The remaining gap needs backend recording off the main thread, a
+cheaper tic and front end, and less GPU post-processing work at Quality.

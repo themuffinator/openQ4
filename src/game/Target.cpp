@@ -848,12 +848,27 @@ void idTarget_SetInfluence::Save( idSaveGame *savefile ) const {
 
 /*
 ================
+Target_ReadInfluenceEntityNumber
+
+The influence lists hold entity numbers, which index gameLocal.entities.
+================
+*/
+static int Target_ReadInfluenceEntityNumber( idRestoreGame *savefile ) {
+	int itemNum;
+	savefile->ReadInt( itemNum );
+	if ( itemNum < 0 || itemNum >= MAX_GENTITIES ) {
+		savefile->Error( "idTarget_SetInfluence::Restore: invalid entity number %d", itemNum );
+	}
+	return itemNum;
+}
+
+/*
+================
 idTarget_SetInfluence::Restore
 ================
 */
 void idTarget_SetInfluence::Restore( idRestoreGame *savefile ) {
 	int i, num;
-	int itemNum;
 	float set;
 
 	savefile->ReadInt( num );
@@ -861,8 +876,7 @@ void idTarget_SetInfluence::Restore( idRestoreGame *savefile ) {
 		savefile->Error( "idTarget_SetInfluence::Restore: invalid light list count %d", num );
 	}
 	for( i = 0; i < num; i++ ) {
-		savefile->ReadInt( itemNum );
-		lightList.Append( itemNum );
+		lightList.Append( Target_ReadInfluenceEntityNumber( savefile ) );
 	}
 
 	savefile->ReadInt( num );
@@ -870,8 +884,7 @@ void idTarget_SetInfluence::Restore( idRestoreGame *savefile ) {
 		savefile->Error( "idTarget_SetInfluence::Restore: invalid gui list count %d", num );
 	}
 	for( i = 0; i < num; i++ ) {
-		savefile->ReadInt( itemNum );
-		guiList.Append( itemNum );
+		guiList.Append( Target_ReadInfluenceEntityNumber( savefile ) );
 	}
 
 	savefile->ReadInt( num );
@@ -879,8 +892,7 @@ void idTarget_SetInfluence::Restore( idRestoreGame *savefile ) {
 		savefile->Error( "idTarget_SetInfluence::Restore: invalid sound list count %d", num );
 	}
 	for( i = 0; i < num; i++ ) {
-		savefile->ReadInt( itemNum );
-		soundList.Append( itemNum );
+		soundList.Append( Target_ReadInfluenceEntityNumber( savefile ) );
 	}
 
 	savefile->ReadInt( num );
@@ -888,8 +900,7 @@ void idTarget_SetInfluence::Restore( idRestoreGame *savefile ) {
 		savefile->Error( "idTarget_SetInfluence::Restore: invalid generic list count %d", num );
 	}
 	for ( i = 0; i < num; i++ ) {
-		savefile->ReadInt( itemNum );
-		genericList.Append( itemNum );
+		genericList.Append( Target_ReadInfluenceEntityNumber( savefile ) );
 	}
 
 	savefile->ReadFloat( flashIn );

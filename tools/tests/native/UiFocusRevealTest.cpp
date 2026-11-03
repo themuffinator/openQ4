@@ -179,4 +179,46 @@ static void ListPaging(){
         Check(runtime.TakeActions().empty()&&host.errors==0,"paging activates nothing");
     }
 }
-int main(int argc,char**){if(argc>1){View v(2);v.Focus();FullInset(v,"outer");return 0;}BasicAndNested();InputAndResize();LimitsAndHelper();HorizontalAndProjection();LayoutReflow();ListPaging();std::printf("PASS %u checks\n",checks);}
+// The right stick scrolls the detail area (section 13.5): the first scrolling
+// container that shows, has somewhere to go and holds no control. A hidden
+// one, one whose content fits and a list of buttons are passed over; focus
+// stays and nothing activates. A document of lists alone has no detail area.
+static std::string DetailSource(){
+    Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="detail-scroll";source["state"]["flag"]["type"]="boolean";source["state"]["flag"]["initial"]=false;
+    auto root=Box("root",0,0,640,360);
+    const auto area=[&](const char* id,double x,double contentHeight,bool hidden){
+        auto box=Box(id,x,40,120,150);box["properties"]["overflow"]=Typed("keyword","auto");
+        if(hidden)box["properties"]["display"]=Typed("keyword","none");
+        auto content=Box((std::string(id)+"-content").c_str(),0,0,120,contentHeight);box["children"].append(content);return box;};
+    root["children"].append(area("hidden-notes",10,600,true));
+    root["children"].append(area("short-notes",140,100,false));
+    auto list=Box("list",270,40,120,150);list["properties"]["overflow"]=Typed("keyword","auto");
+    auto rows=Box("list-content",0,0,120,600);
+    for(int i=0;i<20;++i){auto row=Box(("row-"+std::to_string(i)).c_str(),0,30.*i,100,30);AddButton(source,row);rows["children"].append(row);}
+    list["children"].append(rows);root["children"].append(list);
+    root["children"].append(area("notes",400,600,false));
+    source["events"]["pick"]=Json::Value(Json::arrayValue);source["root"]=root;
+    Json::StreamWriterBuilder writer;writer["indentation"]="";return Json::writeString(writer,source);
+}
+static void DetailScroll(){
+    for(float density:{1.f,2.f}){
+        TestHost host;Runtime runtime{host};Viewport viewport;viewport.width=1280;viewport.height=720;viewport.displayScale=density;double time=1;
+        std::vector<Diagnostic> diagnostics;const bool parsed=runtime.LoadDocument(DetailSource(),"detail-scroll.q4ui",diagnostics);
+        for(auto& d:diagnostics)std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());Check(parsed,"detail fixture parses");runtime.Frame(viewport,time);
+        Check(runtime.FocusControl("row-0",time),"focus a list row");runtime.Frame(viewport,time+=.01);
+        auto* document=Rml::GetContext(0)->GetDocument(0);auto* notes=document->GetElementById("notes");auto* list=document->GetElementById("list");
+        const float scale=notes->GetClientHeight()/150.f;
+        Check(runtime.ScrollDetail(100,time+=.01)&&Near(notes->GetScrollTop(),100*scale,.5f),"the stick scrolls the detail area in dp");
+        Check(list->GetScrollTop()==0&&document->GetElementById("short-notes")->GetScrollTop()==0&&document->GetElementById("hidden-notes")->GetScrollTop()==0,
+            "a list of controls, a fitting area and a hidden one stay");
+        Check(runtime.ScrollDetail(-30,time+=.01)&&Near(notes->GetScrollTop(),70*scale,.5f),"up scrolls back");
+        Check(runtime.ScrollDetail(-1000,time+=.01)&&notes->GetScrollTop()==0&&!runtime.ScrollDetail(-10,time+=.01),"the start holds");
+        Check(runtime.ScrollDetail(100000,time+=.01)&&!runtime.ScrollDetail(10,time+=.01),"the end holds");
+        Check(runtime.FocusedControl()=="row-0"&&runtime.TakeActions().empty()&&host.errors==0,"focus stays and nothing activates");
+        Check(runtime.ScrollDetail(0,time)==false,"no deflection, no movement");
+    }
+    TestHost host;Runtime runtime{host};Viewport viewport;viewport.width=1280;viewport.height=720;double time=1;
+    std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(ListSource(true),"list-paging.q4ui",diagnostics),"list fixture parses");runtime.Frame(viewport,time);
+    Check(!runtime.ScrollDetail(100,time+.01),"lists alone have no detail area");
+}
+int main(int argc,char**){if(argc>1){View v(2);v.Focus();FullInset(v,"outer");return 0;}BasicAndNested();InputAndResize();LimitsAndHelper();HorizontalAndProjection();LayoutReflow();ListPaging();DetailScroll();std::printf("PASS %u checks\n",checks);}

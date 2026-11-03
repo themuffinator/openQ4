@@ -2878,14 +2878,15 @@ void R_AddEffectSurfaces(void) {
 		if ( !canDeferLoopService ) {
 			// Pre-render culling is a broad-phase optimization. Require cached
 			// rendered bounds so new or previously hidden effects get one chance
-			// to build current geometry before any portal/PVS rejection.
-			if ( R_CullEffectByArea( world, def, true ) ) {
-				++dropAreaCull;
+			// to build current geometry before any portal/PVS rejection. The
+			// frustum test is the cheaper of the two, so it runs first.
+			if ( R_CullEffectByFrustum( def ) ) {
+				++dropDefFrustumCull;
 				continue;
 			}
 
-			if ( R_CullEffectByFrustum( def ) ) {
-				++dropDefFrustumCull;
+			if ( R_CullEffectByArea( world, def, true ) ) {
+				++dropAreaCull;
 				continue;
 			}
 		}
@@ -2911,6 +2912,19 @@ void R_AddEffectSurfaces(void) {
 		}
 		def->referenceBounds = localBounds;
 
+		// Both tests below must pass and neither has side effects, so the cheap
+		// frustum test runs before the portal-area walk.
+		float modelMatrix[16];
+		R_AxisToModelMatrix(def->parms.axis, def->parms.origin, modelMatrix);
+		if (bse_useFrustumCull.GetBool() && !R_ShouldDisableEntityCullingForLevelshot()) {
+			idBounds expandedBounds = localBounds;
+			expandedBounds.ExpandSelf( Max( 0.0f, bse_frustumCullExpand.GetFloat() ) );
+			if (R_CullLocalBox(expandedBounds, modelMatrix, 5, tr.viewDef->frustum)) {
+				++dropFrustumCull;
+				continue;
+			}
+		}
+
 		// Now that BSE has rebuilt the model for this view, run the authoritative
 		// area test with actual particle/trail bounds.
 		if ( R_CullEffectByArea( world, def ) ) {
@@ -2922,17 +2936,8 @@ void R_AddEffectSurfaces(void) {
 		vEffect->entityDef = NULL;
 		vEffect->weaponDepthHack = (def->parms.weaponDepthHackInViewID != 0 && def->parms.weaponDepthHackInViewID == tr.viewDef->renderView.viewID);
 		vEffect->modelDepthHack = def->parms.modelDepthHack;
-		R_AxisToModelMatrix(def->parms.axis, def->parms.origin, vEffect->modelMatrix);
+		memcpy(vEffect->modelMatrix, modelMatrix, sizeof(modelMatrix));
 		myGlMultMatrix(vEffect->modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, vEffect->modelViewMatrix);
-
-		if (bse_useFrustumCull.GetBool() && !R_ShouldDisableEntityCullingForLevelshot()) {
-			idBounds expandedBounds = localBounds;
-			expandedBounds.ExpandSelf( Max( 0.0f, bse_frustumCullExpand.GetFloat() ) );
-			if (R_CullLocalBox(expandedBounds, vEffect->modelMatrix, 5, tr.viewDef->frustum)) {
-				++dropFrustumCull;
-				continue;
-			}
-		}
 
 		// Stock Quake 4 effects are portal-scissored from area visibility, not
 		// tightly projected from dynamic-model bounds. Bound-based scissors can

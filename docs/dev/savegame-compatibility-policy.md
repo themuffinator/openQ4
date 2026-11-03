@@ -336,6 +336,49 @@ is normalized, a portable wire revision is defined, fixtures are verified on eac
 supported ABI, and the policy is deliberately revised. It must not be inferred
 from the typed fields already migrated.
 
+### Planned portable revision
+
+Decided on 3 November 2026 and scheduled as roadmap Q4-06 (P3). Until its
+stages close, the rules above remain in force. The revision is defined as
+follows:
+
+- **Family.** 64-bit little-endian builds with IEEE-754 binary32 floats and
+  8-bit bytes: Windows x64 and ARM64, Linux x64 and ARM64, macOS arm64, and
+  Android arm64. A build outside the family refuses portable saves before map
+  teardown.
+- **Encoding.** Every field has an explicit width and byte order. No saved byte
+  may depend on:
+  - the size or padding of a compiler-laid-out aggregate;
+  - bitfield order;
+  - enum width (enums are written as int32);
+  - pointer width;
+  - uninitialized memory.
+
+  `bool` stays one byte, through `WriteBool`.
+- **Script storage.** The script's function, pointer, namespace and
+  script-event slots are `intptr_t` wide. Their saved bytes are compile-time
+  values or expression temporaries, so the portable writer zeroes them, and the
+  reader ignores them once stage 1 has confirmed that no live value crosses a
+  save point.
+- **Stamp and version.** Payload version 5 with the wire ABI `le64-portable1`.
+  Any family member accepts it. Versions 2 to 4 keep exact `raw1` matching, so
+  an existing save still loads only on the ABI that wrote it.
+- **Determinism.** The encoder writes the same bytes for the same state on
+  every family member. Simulation after a load is not required to be
+  bit-identical across architectures.
+- **Names.** Saves carry decl, model and sound names. Case-sensitive
+  filesystems resolve them through the existing case handling, and
+  qualification includes Linux.
+- **Evidence.**
+  - Golden-byte codec tests on every CI platform.
+  - Cross-load in both directions between Windows x64 and Linux x64, then
+    macOS arm64 and one ARM64 Linux or Android target, on stock and Awakening
+    maps.
+  - The historical fixtures restoring unchanged.
+
+  Only then does the platform table above change, and the player documentation
+  describe moving saves.
+
 ## Schema Governance
 
 The payload version is the compatibility boundary. Any change that alters the

@@ -4843,12 +4843,18 @@ static void Session_RetainedGui_f( const idCmdArgs &args ) {
 	} else if ( sessLocal.RetainedMultiplayerCovers() ) {
 		gui = sessLocal.guiRetainedMultiplayer;
 	}
+	// The right stick held at x,y for the given milliseconds: the session turns
+	// Player Setup's preview here, and the view scrolls its detail area below.
+	if ( args.Argc() == 5 && !idStr::Cmp( args.Argv( 1 ), "stick" ) ) {
+		const bool turned = sessLocal.TurnRetainedPlayerSetup( gui, atof( args.Argv( 2 ) ), atof( args.Argv( 4 ) ) * 0.001f );
+		common->Printf( "RETAINED_GUI_STICK turned=%d rotation=%.2f\n", turned ? 1 : 0, sessLocal.retainedSetupRotation );
+	}
 	if ( UI_RetainedDiagnostic( gui, args ) ) {
 		sessLocal.DispatchCommand( gui, "openq4-retained-actions" );
 		return;
 	}
 #endif
-	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | inspect <id> | widget <id> | focus <id> | menu <action> <0|1> | number <begin|replace|select|preedit|input|undo|redo|commit|keep|reload|cancel> <id> [text or offsets] | state <id> <value> | pending <key> <value> | lines <key> <line> [line ...] | presentation <alias> <value> <override:0|1> | event <name> | trigger | update | save | restore\n" );
+	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | inspect <id> | widget <id> | focus <id> | menu <action> <0|1> | stick <x> <y> <msec> | number <begin|replace|select|preedit|input|undo|redo|commit|keep|reload|cancel> <id> [text or offsets] | state <id> <value> | pending <key> <value> | lines <key> <line> [line ...] | presentation <alias> <value> <override:0|1> | event <name> | trigger | update | save | restore\n" );
 }
 
 // The summary card's chat field without device input: "<text>" types it with

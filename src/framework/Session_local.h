@@ -299,6 +299,9 @@ public:
 	// Whether menu input reaches a retained view: the home screen over the
 	// legacy menu, or an active retained document such as the SYSTEM page.
 	bool				RetainedInputTarget() const;
+	// The retained view that takes the menu input now, as MenuEvent routes it,
+	// or NULL while none does or a change between menu levels holds it.
+	idUserInterface *	RetainedStickTarget() const;
 	bool				RetainedHomeInputBlocked() const;
 	void				RetainedHomeFrameEvent();
 	void				DrawRetainedHome( int presentationTime );
@@ -423,6 +426,11 @@ public:
 	bool				OpenRetainedPlayerSetup( idUserInterface *gui );
 	bool				PublishRetainedPlayerSetup( idUserInterface *gui, bool rebuild = false );
 	void				HandleRetainedPlayerSetupRequest( idUserInterface *gui, const char *payload );
+	// The right stick (section 13.5), its deflection -1..1 held for `seconds`:
+	// y scrolls the view's detail area and x turns Player Setup's preview, as
+	// its Rotation row does. Whether anything moved.
+	bool				RetainedDetailStick( idUserInterface *gui, float x, float y, float seconds );
+	bool				TurnRetainedPlayerSetup( idUserInterface *gui, float x, float seconds );
 	idUserInterface *	RetainedSettingsPage();
 	bool				OpenRetainedSettingsPage( const char *section = NULL );
 	void				HandleRetainedSettingsPageRequest( idUserInterface *gui, const char *request );

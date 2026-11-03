@@ -2401,6 +2401,36 @@ struct Runtime::Impl {
 		const Row* target = farthest ? farthest : nearest;
 		return target && interaction.Focus(target->id);
 	}
+	// The detail area the right stick scrolls (section 13.5): the first
+	// scrolling container, in document order, that shows, that input may reach,
+	// that has content past its edge and that holds no control, such as the
+	// pause's objectives. A list of controls scrolls with its focus instead.
+	Rml::Element* DetailArea() {
+		if (!document) return nullptr;
+		std::function<bool(Rml::Element*)> holdsControl = [&](Rml::Element* node) {
+			for (int i = 0; i < node->GetNumChildren(); ++i) {
+				auto* child = node->GetChild(i);
+				const auto& id = child->GetId();
+				if ((!id.empty() && std::find(controls.begin(),controls.end(),id) != controls.end()) || holdsControl(child)) return true;
+			}
+			return false;
+		};
+		Rml::Element* found = nullptr;
+		std::function<void(Rml::Element*)> visit = [&](Rml::Element* node) {
+			for (int i = 0; i < node->GetNumChildren() && !found; ++i) {
+				auto* child = node->GetChild(i);
+				if (!child->IsVisible()) continue;
+				const auto overflow = child->GetComputedValues().overflow_y();
+				if ((overflow == Rml::Style::Overflow::Auto || overflow == Rml::Style::Overflow::Scroll) && !child->GetId().empty() &&
+					interaction.AllowsNode(child->GetId()) && child->GetScrollHeight() > child->GetClientHeight()+.5f && !holdsControl(child)) {
+					found = child; return;
+				}
+				visit(child);
+			}
+		};
+		visit(document);
+		return found;
+	}
 	std::vector<Rml::Vector2f> FocusLayout() const {
 		std::vector<Rml::Vector2f> result;
 		if (!document || interaction.Focused().empty()) return result;
@@ -4112,6 +4142,20 @@ void Runtime::PointerWheel(int rows, double seconds) {
 			impl->presentationDirty=true;
         }
     }
+}
+bool Runtime::ScrollDetail(float dp, double seconds) {
+    if(!Mutate())return false;
+	if (!std::isfinite(dp) || dp == 0) return false;
+	if (!impl->UpdateInteraction(seconds,false,true)) return false;
+	// An open choice list holds the input, as it does the wheel's.
+	for (const auto& id : impl->controls) if (const auto widget = impl->interaction.Widget(id); widget && widget->popupOpen) return false;
+	auto* area = impl->DetailArea();
+	if (!area) return false;
+	const float before = area->GetScrollTop();
+	area->SetScrollTop(before+dp*impl->viewport.DpRatio());
+	if (area->GetScrollTop() == before) return false;
+	impl->presentationDirty = true;
+	return true;
 }
 void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
     if(!Mutate())return;

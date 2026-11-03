@@ -250,6 +250,11 @@ void idAFConstraint::Restore( idRestoreGame *saveFile ) {
 
 	for (int i=0; i<6; ++i) {
         saveFile->ReadInt ( boxIndex[i] );
+		// Only per-frame contact friction sets a box constraint; a saved
+		// constraint has none, so another index would reach through NULL.
+		if ( boxIndex[i] != -1 ) {
+			saveFile->Error( "idAFConstraint::Restore: constraint '%s' has box index %d without a box constraint", name.c_str(), boxIndex[i] );
+		}
 	}
 
 	saveFile->ReadInt ( firstIndex );	// cnicholson: Added unsaved var

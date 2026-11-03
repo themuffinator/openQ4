@@ -31,7 +31,7 @@ public:
 							~idAF( void );
 
 	void					Save( idSaveGame *savefile ) const;
-	void					Restore( idRestoreGame *savefile );
+	void					Restore( idRestoreGame *savefile, idEntity *owner );
 
 	void					SetAnimator( idAnimator *a ) { animator = a; }
 // RAVEN BEGIN

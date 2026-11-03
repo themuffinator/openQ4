@@ -330,6 +330,11 @@ public:
 	void PointerMove(float windowX, float windowY, double monotonicSeconds);
 	void PointerButton(bool down, double monotonicSeconds);
 	void PointerWheel(int rows, double monotonicSeconds);
+	// The right stick (section 13.5) scrolls the detail area dp density-
+	// independent pixels, positive toward its end: the first scrolling
+	// container that shows, that input may reach and that holds no control,
+	// such as the pause's objectives. False when none can move.
+	bool ScrollDetail(float dp, double monotonicSeconds);
 	// Whether the pointer is a finger (section 13.6): a touch that moves past
 	// 8 dp is no longer a tap, so its release activates nothing. In a
 	// scrolling container it drags the content, which keeps its release

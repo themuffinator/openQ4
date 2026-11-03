@@ -300,8 +300,8 @@ bool rvBSEManagerLocal::ServiceEffect(class rvRenderEffectLocal* def, float owne
 		presentationTime = pauseTime;
 	}
 
-	const idStr effectName = def->parms.declEffect ? def->parms.declEffect->GetName() : "";
-	if (Filtered(effectName.c_str(), EC_IGNORE)) {
+	const char* effectName = def->parms.declEffect ? def->parms.declEffect->GetName() : "";
+	if (Filtered(effectName, EC_IGNORE)) {
 		def->expired = true;
 		return true;
 	}

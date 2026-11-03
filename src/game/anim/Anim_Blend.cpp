@@ -3622,7 +3622,13 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	const int maxSaveGameAnimatorItems = 4096;
 
 	savefile->ReadModelDef( modelDef );
-	savefile->ReadObject( entity );
+	// The owning entity assigned itself at construction. A saved pointer to
+	// another entity would let FreeData deactivate that one, even once deleted.
+	idEntity *savedEntity = NULL;
+	savefile->ReadObject( savedEntity );
+	if ( entity == NULL ) {
+		entity = savedEntity;
+	}
 
 	savefile->ReadInt( num );
 	if ( num < 0 || num > maxSaveGameAnimatorItems ) {

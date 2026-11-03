@@ -144,6 +144,7 @@ public:
 
 	void					Save					( idSaveGame *savefile ) const;
 	void					Restore					( idRestoreGame *savefile );
+	virtual void			PrepareFailedRestoreShutdown( void ) override;
 
 	virtual	void			Damage					( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, const char *damageDefName, const float damageScale, const int location );
 	virtual void			Killed					( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
@@ -237,6 +238,7 @@ protected:
 
 	idList<rvVehiclePosition>	positions;
 	int							drivers;
+	bool						failedRestoreShutdown;	// a refused load is deleting this vehicle
 
 	idUserInterface *			hud;
 	float						fovOffset;

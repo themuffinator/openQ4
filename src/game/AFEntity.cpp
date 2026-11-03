@@ -943,7 +943,7 @@ void idAFEntity_Base::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( nextSoundTime );
 	LinkCombat();
 
-	af.Restore( savefile );
+	af.Restore( savefile, this );
 }
 
 /*
