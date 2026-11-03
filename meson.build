@@ -1696,6 +1696,11 @@ if build_engine or get_option('build_native_tests')
     test('openq4-savegame-durability', py,
       args: [meson.project_source_root() / 'tools/tests/savegame_durability.py',
         '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: durable_file_timeout)
+    # Portable save codecs (roadmap Q4-06): golden bytes with this platform's
+    # compiler, and source mutations the golden checks must catch.
+    test('openq4-save-codec', py,
+      args: [meson.project_source_root() / 'tools/tests/save_codec.py',
+        '--compiler', ui_test_cpp.cmd_array()[-1]], timeout: durable_file_timeout)
     openq4_ui_state_test = executable(
       'openq4-ui-state-test',
       files('tools/tests/native/UiStateTest.cpp'),

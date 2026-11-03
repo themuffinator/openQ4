@@ -1039,6 +1039,31 @@ below, classified for [Q4-06](roadmap.md):
 Padding inside these blocks is currently written uninitialized, so two saves of
 the same state can differ byte for byte.
 
+**Portable codecs (Q4-06 stage 2, in progress).** `src/idlib/SaveCodec.h` holds
+header-only templates that write each aggregate through a writer's typed
+`WriteInt`, `WriteFloat` and `WriteBool`. Those primitives are already
+little-endian in `idSaveGame`, `idRestoreGame` and `idFile`. Readers check
+every count and enum value before using it. The header covers:
+- trace models (used elements only, edge 0 skipped);
+- joint modifiers;
+- articulated-figure pose modifiers;
+- joint quaternions and matrices;
+- `idInterpolateAccelDecelLinear`, by its defining values and rebuilt through
+  `Init`, so the extrapolation cache that changed at build 1582 is never saved;
+- vehicle path targets, with the entity reference written by the caller's
+  typed reference code;
+- flag masks, where bit *i* is the *i*-th listed flag and a reader rejects
+  bits beyond the list;
+- int and float arrays.
+
+`SaveGame.cpp` in both game trees instantiates the codecs with the production
+types. `tools/tests/save_codec.py` builds
+`tools/tests/native/SaveCodecTest.cpp` with the platform compiler and compares
+each codec's bytes with fixed hex. It then requires eight source mutations of
+the header to fail: field order, flag bit order, bool width and removed bounds
+checks. The writer does not call the codecs yet, because doing so changes the
+save bytes, which needs payload version 5 (stage 3).
+
 **Pointer-sized script slots across save points (3 November 2026).** A thread
 can only be saved while it is suspended inside a call. A raw pointer can
 therefore reach a save only if a call falls between an `OP_ADDRESS`, which

@@ -841,6 +841,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'ui_settings_service.py', []),
         (root / "tools" / "tests" / 'durable_file.py', ['--mutations']),
         (root / "tools" / "tests" / 'savegame_durability.py', []),
+        (root / "tools" / "tests" / 'save_codec.py', []),
         (root / "tools" / "tests" / 'settings_configuration_persistence.py', []),
         (root / "tools" / "tests" / 'sdl3_settings_placement.py', []),
         (root / "tools" / "tests" / 'ui_system_display.py', []),

@@ -1509,6 +1509,28 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      Gate: golden-byte native tests for each codec pass in CI on Windows MSVC,
      Linux GCC and Clang, macOS arm64 and Linux ARM64 (qemu), with mutation
      controls.
+     First slice, 3 November: `src/idlib/SaveCodec.h` fixes the portable field
+     order for these:
+     - trace models;
+     - joint modifiers;
+     - articulated-figure pose modifiers;
+     - joint quaternions and matrices;
+     - interpolators, rebuilt through `Init` so no derived cache is saved;
+     - vehicle path targets, with the entity reference left to the caller;
+     - flag masks;
+     - plain int and float arrays.
+
+     Both game modules instantiate the codecs with the production types, so a
+     renamed or retyped field breaks the build. `save_codec.py` compares
+     golden bytes and requires eight source mutations to fail. It passes
+     locally with MSVC, Clang on Windows and Linux, and GCC, and the meson
+     test runs it on each CI platform. The writer does not use the codecs
+     yet: switching it changes the save bytes, so it waits for payload
+     version 5 in stage 3. Still to do in this stage:
+     - the bit lists for the seven flag structs;
+     - the GUI window fields and transition interpolators;
+     - the PDA minigame fields;
+     - zeroing the script's pointer slots.
   3. **Wire revision.**
      - Payload version 5 carries a portable wire ABI stamp (`le64-portable1`),
        accepted from any family member.
