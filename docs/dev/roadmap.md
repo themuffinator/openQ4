@@ -402,6 +402,10 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   device/surface loss, resize, captures, long sessions and final-package budgets.
   Software Vulkan CI remains useful regression evidence but cannot promote a
   physical platform or change `best` by itself.
+  Progress, 3 November: the [qualification runner contract](vulkan-support-evidence.md)
+  now records hidden/offscreen versus synchronous-benchmark scope explicitly and
+  refuses configuration overrides of its window/input/filesystem invariants.
+  Physical AMD, Linux and Apple hardware results are still required.
 - [ ] **VK-02 — P1, investigation and qualification: visible presentation pacing.**
   Reproduce the hybrid-adapter/power-state conditions using current foreground
   windowed workloads and unchanged budgets. Separate host scheduling, fence waits,
@@ -450,7 +454,13 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   pass on a clean build of that commit: authored GLSL (20 controls), live reload
   and repair (16) and translated ARB (15), each within one display level of
   OpenGL with exact recovery images and no validation messages. Capacity and
-  eviction limits, the authored-lighting laboratory and mod content remain open.
+  eviction limits, the authored-lighting laboratory and mod content remained open
+  at that checkpoint. Progress, 3 November: [compiler-storage recovery](vulkan-material-programs.md#compiler-storage-recovery-3-november-2026-vk-04)
+  fixes rejection of large-source edits before the version table fills. Validated
+  GPU runs now cover 271 small-source versions and 181 padded-source versions,
+  safe eviction at both limits and exact reload/restart recovery. Descriptor,
+  uniform and pipeline exhaustion, broader authored lighting and mod content
+  remain open.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
@@ -463,6 +473,12 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   combine. `rendererVulkanHDRInfo` reports the main view's outcome and per-map
   admission counts. The GPU self-tests pass under validation. No declined
   combination was admitted; classic ambient blends were shown unsafe to admit.
+  Progress, 3 November: [in-frame HDR cubemap capture](vulkan-hdr.md#hdr-cubemap-capture-3-november-2026-vk-05vk-07)
+  now uses the existing float scene target without stretching the capture's
+  viewport. This fixes a reproduced 81-level cube-face difference; all 42
+  paired post/cubemap controls pass within one level, with exact main-view
+  recovery. Complete-view material admission remains required. Tiled/out-of-frame
+  captures and arbitrary portal/nested/material combinations remain open.
 - [ ] **VK-06 — P2, measured optimization: submission and resource lifetime.**
   Profile descriptor/pipeline churn, barriers, command recording, uploads and
   attachment reuse before changing them. Preserve GUI/transparency/post order,
@@ -481,6 +497,10 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   first-encounter hitch exceeds that. The cache keeps one blob for the last
   device; switching adapters (including the new automatic retry) discards it.
   Indirect/Hi-Z, parallel recording and upload overlap still need their profile.
+  Progress, 3 November: [opt-in executor counters](vulkan-resource-profiling.md)
+  expose descriptor reuse/churn, mapped-ring uploads, target changes, rendering
+  scopes, barriers and submissions alongside the existing memory/pipeline report.
+  They introduce no GPU wait/query and do not establish production overlap.
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,
@@ -493,8 +513,12 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   frame or a skewed, resized rectangle as success, failed captures are not saved
   as screenshots, hidden-window frames are readable whatever the surface allows,
   and stencil readbacks print their frame, age, view and target and are dropped
-  after a failed submission. GL-contract comparisons for cubemaps, nested
-  targets, MSAA and capture-time resize/restart remain open.
+  after a failed submission. Progress, 3 November: the [paired capture sequence](vulkan-captures.md#cubemap-and-write-failure-qualification-3-november-2026)
+  passes 121 RGBA/cubemap comparisons at 4x MSAA within one display level,
+  with exact per-backend resize/restart recovery. Failed filesystem writes now
+  fail screenshots, stop incomplete cubemaps and prevent incomplete probe reloads.
+  Arbitrary nested targets and the remaining debug/readback combinations stay
+  open; this fixture does not qualify all of VK-07.
 
 ## Modern rendering engine
 

@@ -3,8 +3,7 @@
 
 Each suite drives the staged client against the retail Quake 4 assets with no
 input (hidden window, engine-side captures only) and writes one report.json
-that a reviewer, and tools/validation/vulkan_support_evidence.py, can check
-without trusting the operator:
+that a reviewer can check against its retained artifacts:
 
 - sp-sweep   every stock single-player map loads and draws its opening view
 - mp-sweep   loopback-only listen servers host bot matches on stock MP maps
@@ -141,6 +140,15 @@ HEX40 = re.compile(r"[0-9a-f]{40}")
 CONFIG_ID = re.compile(r"[a-z][a-z0-9-]{0,15}")
 CVAR_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 API_ALIASES = {"vk": "vulkan", "vulkan": "vulkan", "gl": "gl", "opengl": "gl"}
+# These are report/launch invariants, not device/preset variations. In
+# particular, hidden Vulkan renders offscreen and cannot qualify presentation.
+FIXED_RUN_CVARS = {
+    "r_renderapi", "r_hiddenwindow", "r_fullscreen", "r_borderless",
+    "r_mode", "r_customwidth", "r_customheight", "r_windowwidth", "r_windowheight",
+    "in_mouse", "in_joystick", "r_vkvalidation", "ui_autojoin",
+    "fs_basepath", "fs_cdpath", "fs_savepath", "fs_devpath", "fs_game",
+    "logfile", "logfilename", "g_autoexecaftermapload", "g_autoexecaftermaploaddelayms",
+}
 
 # Software rasterizers are regression coverage, never hardware qualification.
 VK_PHYSICAL_DEVICE_TYPES = (1, 2)  # integrated, discrete
@@ -171,8 +179,8 @@ def parse_config(text: str) -> RunConfig:
         name, equals, value = item.partition("=")
         if not equals or CVAR_NAME.fullmatch(name) is None:
             raise ValueError(f"config {text!r}: malformed cvar assignment {item!r}")
-        if name.casefold() == "r_renderapi":
-            raise ValueError(f"config {text!r}: the api field selects r_renderApi")
+        if name.casefold() in FIXED_RUN_CVARS:
+            raise ValueError(f"config {text!r}: {name} is fixed by the qualification runner")
         cvars.append((name, value))
     return RunConfig(ident, api, tuple(cvars))
 
@@ -692,6 +700,9 @@ class Qualification:
         return {
             "r_vkValidation": "1" if self.validation_enabled() else "0",
             "r_hiddenWindow": "1",
+            "r_fullscreen": "0",
+            "r_borderless": "0",
+            "r_borderlessDefaultMigrated": "1",
             "in_mouse": "0",
             "in_joystick": "0",
             "s_noSound": "1",
@@ -1202,6 +1213,13 @@ def run_suite(args: argparse.Namespace) -> int:
     state_path = output / "state.json"
     settings = {
         "suite": args.suite,
+        "evidenceScope": {
+            "window": "hidden",
+            "vulkanPresentation": "offscreen",
+            "displayLatencyMeasured": False,
+            "supportPromotion": False,
+            "timing": "synchronous-offscreen-benchmark" if args.suite == "benchmark" else "functional",
+        },
         "configs": [config.as_dict() for config in args.configs],
         "reference": args.reference,
         "maps": list(args.maps) if args.maps else None,
@@ -1334,7 +1352,9 @@ def run_self_test() -> int:
     check(parse_version("0.13.2") == (None, False), "release version without SHA")
     config = parse_config("intel=vulkan:r_vkDevice=2,r_multiSamples=4")
     check(config == RunConfig("intel", "vulkan", (("r_vkDevice", "2"), ("r_multiSamples", "4"))), "config")
-    for bad in ("Intel=vulkan", "vk=metal", "vk=vulkan:r_renderApi=gl", "vk=vulkan:junk", "novalue"):
+    for bad in ("Intel=vulkan", "vk=metal", "vk=vulkan:r_renderApi=gl", "vk=vulkan:junk", "novalue",
+                "vk=vulkan:R_HIDDENWINDOW=0", "vk=vulkan:r_fullscreen=1", "vk=vulkan:in_mouse=1",
+                "vk=vulkan:r_vkValidation=0", "vk=vulkan:fs_savepath=elsewhere"):
         try:
             parse_config(bad)
         except ValueError:
@@ -1399,7 +1419,8 @@ def run_self_test() -> int:
     normalized = normalize_warnings(["WARNING:  a  b C:\\run\\x"], {"C:\\run": "<run>"})
     check(normalized == {"WARNING: a b <run>\\x"}, "warning normalization")
 
-    with tempfile.TemporaryDirectory() as scratch:
+    (ROOT / '.tmp').mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='vulkan-qualification-', dir=ROOT / '.tmp') as scratch:
         drawn = Path(scratch) / "drawn.tga"
         blank = Path(scratch) / "blank.tga"
         write_test_tga(drawn, 64, 36, True)

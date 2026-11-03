@@ -31,6 +31,30 @@ See [player release status](../user/release-status.md).
   11 existing 0.9–0.13 release fixtures restore with their inputs unchanged.
   The engine's save readers have not changed.
 
+## Vulkan shader editing and engine captures, 3 November 2026
+
+- **Long shader-editing sessions keep working.** Vulkan now reclaims obsolete
+  compiled sources when their storage fills, avoiding missing material stages
+  after repeated edits to large shaders. Programs still used by the current
+  frame remain protected.
+- **HDR cubemap captures preserve the intended brightness.** In-frame engine
+  captures now use the same floating-point scene target as an ordinary HDR
+  view, with correct viewport size and main-view recovery. This extends the
+  internal linear-HDR laboratory; it does not add HDR monitor output.
+- **Failed captures report failure.** An incomplete screenshot write no longer
+  reports success. Cubemap capture stops at the failed face, and incomplete
+  reflection probes are not reloaded.
+- Developer evidence: live shader-edit tests cover both the 256-version and
+  32 MiB limits with exact image recovery. The 4x MSAA capture suite passes
+  121 GL/Vulkan pairs, and the HDR post/cubemap suite passes 42, both within one
+  display level. Native cache/compiler/device/report contracts pass. See
+  [authored programs](vulkan-material-programs.md), [captures](vulkan-captures.md)
+  and [HDR](vulkan-hdr.md) for scope and retained failing controls.
+- Opt-in resource counters and a visible, input-disabled pacing harness now
+  collect the evidence needed for later Vulkan optimization and presentation
+  qualification. They do not promote another driver/platform or claim a
+  performance improvement. Open gates remain in [the roadmap](roadmap.md).
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The

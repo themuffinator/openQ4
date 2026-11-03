@@ -80,6 +80,15 @@
 extern idCVar r_skipDynamicTextures;
 static idCVar r_vkCopyResolveScratchReference( "r_vkCopyResolveScratchReference", "0", CVAR_RENDERER | CVAR_BOOL,
 	"resolve color captures through an intermediate image even when no conversion is needed" );
+static idCVar r_vkResourceProfile( "r_vkResourceProfile", "0", CVAR_RENDERER | CVAR_BOOL,
+	"count executor resource operations for rendererVulkanMemoryInfo; reset its interval with rendererVulkanMemoryInfo reset" );
+
+// Opt-in operation counts, not timings. No GPU query, readback or wait is
+// introduced. These cover this executor only, not upload/shadow command buffers.
+static struct {
+	uint64 frames, descriptorHits, descriptorUpdates, descriptorRetirements;
+	uint64 ringBytes, ringAllocations, targetChanges, renderingScopes, barriers, submissions;
+} vkResourceProfile;
 
 // vk_Interactions.cpp: the Phase F1 per-light interaction pass, inserted
 // between the depth fill and the ambient walks
@@ -669,6 +678,23 @@ static vkPipelineTarget_t VK_Exec_SwapchainPipelineTarget( void ) {
 	return target;
 }
 
+void VK_Exec_PrintResourceInfo( bool reset ) {
+	int resident = 0, retired = 0;
+	for ( int i = 0; i < VK_MAX_IMAGES; ++i ) {
+		if ( vkExec.descriptorCache[i].set != VK_NULL_HANDLE ) { ++resident; }
+	}
+	for ( int i = 0; i < VK_FRAMES_IN_FLIGHT; ++i ) { retired += vkExec.numRetiredSets[i]; }
+	common->Printf( "Vulkan executor resources: enabled=%d frames=%llu imageHits=%llu imageUpdates=%llu imageRetirements=%llu residentSets=%d retiredSets=%d ringBytes=%llu ringAllocs=%llu targetChanges=%llu scopes=%llu barriers=%llu submits=%llu\n",
+		r_vkResourceProfile.GetBool() ? 1 : 0,
+		(unsigned long long)vkResourceProfile.frames, (unsigned long long)vkResourceProfile.descriptorHits,
+		(unsigned long long)vkResourceProfile.descriptorUpdates, (unsigned long long)vkResourceProfile.descriptorRetirements,
+		resident, retired, (unsigned long long)vkResourceProfile.ringBytes,
+		(unsigned long long)vkResourceProfile.ringAllocations, (unsigned long long)vkResourceProfile.targetChanges,
+		(unsigned long long)vkResourceProfile.renderingScopes, (unsigned long long)vkResourceProfile.barriers,
+		(unsigned long long)vkResourceProfile.submissions );
+	if ( reset ) { memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) ); }
+}
+
 static vkPipelineTarget_t VK_Exec_CurrentPipelineTarget( void ) {
 	if ( vkExec.frameOpen ) {
 		vkPipelineTarget_t target = vkExec.activePipelineTarget;
@@ -794,6 +820,10 @@ static int VK_Ring_Alloc( vkRing_t &ring, const void *data, size_t bytes, int al
 		return -1;
 	}
 	memcpy( ring.mapped + offset, data, bytes );
+	if ( r_vkResourceProfile.GetBool() ) {
+		vkResourceProfile.ringBytes += bytes;
+		++vkResourceProfile.ringAllocations;
+	}
 	// Host writes are flushed once per ring in VK_GuiExecutor_SubmitFrame, before
 	// the queue submit that consumes them, rather than once per allocation.
 	ring.cursor = static_cast<int>( offset + bytes );
@@ -2674,6 +2704,7 @@ static VkDescriptorSet VK_GuiExecutor_GetImageDescriptor( unsigned int texnum ) 
 
 	vkDescriptorCacheEntry_t &cached = vkExec.descriptorCache[ texnum ];
 	if ( cached.set != VK_NULL_HANDLE && cached.generation == entry->generation ) {
+		if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.descriptorHits; }
 		return cached.set;
 	}
 
@@ -2691,6 +2722,7 @@ static VkDescriptorSet VK_GuiExecutor_GetImageDescriptor( unsigned int texnum ) 
 		}
 		vkExec.retiredSets[ vkExec.frameSlot ]
 				[ vkExec.numRetiredSets[ vkExec.frameSlot ]++ ] = cached.set;
+		if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.descriptorRetirements; }
 		cached.set = VK_NULL_HANDLE;
 	}
 
@@ -2729,6 +2761,7 @@ static VkDescriptorSet VK_GuiExecutor_GetImageDescriptor( unsigned int texnum ) 
 	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	write.pImageInfo = &imageInfo;
 	vkUpdateDescriptorSets( vkCtx.device, 1, &write, 0, NULL );
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.descriptorUpdates; }
 
 	cached.generation = entry->generation;
 	return cached.set;
@@ -2963,6 +2996,7 @@ static bool VK_GuiExecutor_Init( void ) {
 	if ( vkExec.initialized ) {
 		return true;
 	}
+	memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) );
 	memset( &vkExec, 0, sizeof( vkExec ) );
 	vkGuiExecutorInitGuard_t initGuard;
 	if ( vkCtx.deviceProperties.limits.maxUniformBufferRange
@@ -3679,6 +3713,7 @@ void VK_GuiExecutor_Shutdown( void ) {
 	vkExec.temporalSceneResolveColorImage = NULL;
 	vkExec.temporalSceneResolveDepthImage = NULL;
 	if ( vkCtx.device == VK_NULL_HANDLE ) {
+		memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) );
 		memset( &vkExec, 0, sizeof( vkExec ) );
 		return;
 	}
@@ -3976,6 +4011,7 @@ void VK_GuiExecutor_Shutdown( void ) {
 			vmaDestroyBuffer( vkCtx.allocator, vkExec.uniformRings[ i ].buffer, vkExec.uniformRings[ i ].allocation );
 		}
 	}
+	memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) );
 	memset( &vkExec, 0, sizeof( vkExec ) );
 }
 
@@ -4252,6 +4288,7 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dep.imageMemoryBarrierCount = 2;
 	dep.pImageMemoryBarriers = toAttachment;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( cmd, &dep );
 
 	vkExec.frameSlot = slot;
@@ -4280,6 +4317,7 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	vkExec.uniformRings[ slot ].cursor = 0;
 	VK_Exec_BakedBeginFrame( slot );
 	VK_MaterialPrograms_BeginFrame( slot );
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.frames; }
 	vkExec.vertexRings[ slot ].overflowWarned = false;
 	vkExec.indexRings[ slot ].overflowWarned = false;
 	vkExec.uniformRings[ slot ].overflowWarned = false;
@@ -4349,6 +4387,7 @@ static void VK_Exec_BarrierActiveTargetForLoad( void ) {
 	dependency.imageMemoryBarrierCount = count;
 	dependency.pImageMemoryBarriers = barriers;
 	if ( dependency.imageMemoryBarrierCount != 0 ) {
+		if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 		vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 	}
 }
@@ -4405,6 +4444,7 @@ bool VK_Exec_BeginMainRendering( bool clearColorDepth ) {
 			ri.pStencilAttachment = &depth;
 		}
 	}
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.renderingScopes; }
 	vkCmdBeginRendering( cmd, &ri );
 
 	// baseline dynamic state: 2D semantics (depth/cull off); the world
@@ -4526,6 +4566,7 @@ static void VK_Exec_TransitionImage( vkImageEntry_t *entry, VkImageLayout newLay
 	dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dep.imageMemoryBarrierCount = 1;
 	dep.pImageMemoryBarriers = &barrier;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dep );
 	entry->layout = newLayout;
 }
@@ -4551,6 +4592,7 @@ static void VK_Exec_TransitionSwapchain( VkImageLayout oldLayout, VkImageLayout 
 	dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dep.imageMemoryBarrierCount = 1;
 	dep.pImageMemoryBarriers = &barrier;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dep );
 }
 
@@ -4575,6 +4617,7 @@ static void VK_Exec_TransitionSwapchainDepth( VkImageLayout oldLayout, VkImageLa
 	dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dep.imageMemoryBarrierCount = 1;
 	dep.pImageMemoryBarriers = &barrier;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dep );
 }
 
@@ -4655,6 +4698,7 @@ bool VK_Exec_SetRenderTarget( idRenderTexture *renderTexture, int cubeFace, bool
 	VK_Exec_EndMainRendering();
 	VK_Exec_TransitionActiveTargetToSampled( samplePreviousDepth );
 
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.targetChanges; }
 	vkExec.activeRenderTexture = renderTexture;
 	vkExec.activeCubeFace = cubeFace;
 	memcpy( vkExec.activeColorEntries, attachments.colors, sizeof( attachments.colors ) );
@@ -4865,6 +4909,19 @@ static bool VK_TemporalPresentation_RootCoversNativeOutput(
 	return rootView->viewport.x1 == 0 && rootView->viewport.y1 == 0
 		&& width == (int)vkCtx.swapchainExtent.width
 		&& height == (int)vkCtx.swapchainExtent.height;
+}
+
+// Direct engine captures (envshot/probe faces) do not pass through the game's
+// scene target. Keep an in-frame capture in the same float attachment as an
+// ordinary HDR view, without scaling its smaller viewport to the whole window.
+// Tiled/off-frame rectangles retain the existing path; this does not admit
+// arbitrary nested targets or bypass complete-view material/post validation.
+static bool VK_TemporalPresentation_HDRCaptureInFrame( const viewDef_t *view ) {
+	return tr.takingScreenshot && VK_PostProcess_HDRSceneRequested() && view != NULL
+		&& view->viewport.x1 >= 0 && view->viewport.y1 >= 0
+		&& view->viewport.x2 >= view->viewport.x1 && view->viewport.y2 >= view->viewport.y1
+		&& view->viewport.x2 < (int)vkCtx.swapchainExtent.width
+		&& view->viewport.y2 < (int)vkCtx.swapchainExtent.height;
 }
 
 // Every opt-in shared adapter that the 3D walk gates on a native scene.
@@ -5735,9 +5792,17 @@ static bool VK_TemporalPresentation_BeginView( const viewDef_t *viewDef,
 
 	int targetWidth = 0;
 	int targetHeight = 0;
-	if ( !VK_TemporalPresentation_BackendSceneRequested( rootView,
-			targetWidth, targetHeight )
-			|| !VK_TemporalPresentation_EnsureSceneTarget(
+	bool captureScene = false;
+	if ( !VK_TemporalPresentation_BackendSceneRequested( rootView, targetWidth, targetHeight ) ) {
+		if ( !VK_TemporalPresentation_HDRCaptureInFrame( rootView )
+				|| vkExec.temporalResolveVertModule == VK_NULL_HANDLE
+				|| vkExec.temporalResolveFragModule == VK_NULL_HANDLE
+				|| VK_TemporalPresentation_GetResolvePipeline() == VK_NULL_HANDLE ) { return false; }
+		captureScene = true;
+		targetWidth = (int)vkCtx.swapchainExtent.width;
+		targetHeight = (int)vkCtx.swapchainExtent.height;
+	}
+	if ( !VK_TemporalPresentation_EnsureSceneTarget(
 				targetWidth, targetHeight ) ) {
 		return false;
 	}
@@ -5757,8 +5822,12 @@ static bool VK_TemporalPresentation_BeginView( const viewDef_t *viewDef,
 		vkExec.temporalSceneRoot = rootView;
 	}
 	vkExec.temporalScenePendingComposite = true;
+	// The attachment stays window-sized so the spatial presenter copies it
+	// one-to-one. Only the capture's original rectangle is rendered/read back.
+	const int viewWidth = captureScene ? viewDef->viewport.x2 - viewDef->viewport.x1 + 1 : targetWidth;
+	const int viewHeight = captureScene ? viewDef->viewport.y2 - viewDef->viewport.y1 + 1 : targetHeight;
 	if ( !VK_TemporalPresentation_BeginScale( scaleState, viewDef, rootView,
-			targetWidth, targetHeight, true ) ) {
+			viewWidth, viewHeight, true ) ) {
 		(void)VK_Exec_SetRenderTarget( NULL );
 		vkExec.temporalScenePendingComposite = false;
 		vkExec.temporalSceneRoot = NULL;
@@ -6347,6 +6416,7 @@ static void VK_Exec_DepthResolveBarrier( vkImageEntry_t *sourceDepth,
 	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependency.imageMemoryBarrierCount = 2;
 	dependency.pImageMemoryBarriers = barriers;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 
 	sourceDepth->layout = beforeResolve
@@ -6435,6 +6505,7 @@ static bool VK_Exec_ResolveDepthImage( vkImageEntry_t *sourceDepth,
 		renderingInfo.renderArea.extent.height = height;
 		renderingInfo.layerCount = 1;
 		renderingInfo.pDepthAttachment = &depthAttachment;
+		if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.renderingScopes; }
 		vkCmdBeginRendering( vkExec.cmd, &renderingInfo );
 		vkCmdEndRendering( vkExec.cmd );
 
@@ -6567,6 +6638,7 @@ static bool VK_Exec_ResolveStencilImage( vkImageEntry_t *sourceDepth,
 	renderingInfo.layerCount = 1;
 	renderingInfo.pDepthAttachment = &attachment;
 	renderingInfo.pStencilAttachment = &attachment;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.renderingScopes; }
 	vkCmdBeginRendering( vkExec.cmd, &renderingInfo );
 	vkCmdEndRendering( vkExec.cmd );
 
@@ -6698,6 +6770,7 @@ bool VK_Exec_QueueStencilReadback( int mode, const char **failure ) {
 		dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 		dep.bufferMemoryBarrierCount = 1;
 		dep.pBufferMemoryBarriers = &toHost;
+		if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 		vkCmdPipelineBarrier2( vkExec.cmd, &dep );
 		readback->width = (int)width;
 		readback->height = (int)height;
@@ -6770,6 +6843,7 @@ static void VK_Exec_ResolveColorImage( vkImageEntry_t *source, vkImageEntry_t *d
 	rendering.colorAttachmentCount = 1;
 	rendering.pColorAttachments = &color;
 	VkCommandBuffer cmd = vkExec.cmd;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.renderingScopes; }
 	vkCmdBeginRendering( cmd, &rendering );
 	VkViewport viewport = {};
 	viewport.width = float( width );
@@ -7113,6 +7187,7 @@ void RB_QueueSavePreview() {
 	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependency.bufferMemoryBarrierCount = 1;
 	dependency.pBufferMemoryBarriers = &barrier;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 	vkSavePreview.slot = vkExec.frameSlot;
@@ -7181,7 +7256,8 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 	// capture) cannot be clipped without skewing every row, so it fails.
 	const int framebufferWidth = (int)vkCtx.swapchainExtent.width;
 	const int framebufferHeight = (int)vkCtx.swapchainExtent.height;
-	if ( x < 0 || y < 0 || x + width > framebufferWidth || y + height > framebufferHeight ) {
+	if ( x < 0 || y < 0 || width > framebufferWidth || height > framebufferHeight
+			|| x > framebufferWidth - width || y > framebufferHeight - height ) {
 		common->Warning( "Vulkan: glReadPixels rectangle %d,%d %dx%d is outside the %dx%d frame",
 				x, y, width, height, framebufferWidth, framebufferHeight );
 		return false;
@@ -7368,6 +7444,7 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 		dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 		dep.imageMemoryBarrierCount = 1;
 		dep.pImageMemoryBarriers = &toPresent;
+		if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 		vkCmdPipelineBarrier2( cmd, &dep );
 	}
 
@@ -7424,6 +7501,7 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 	si.pCommandBufferInfos = &cmdInfo;
 	si.signalSemaphoreInfoCount = presentImage ? 1 : 0;
 	si.pSignalSemaphoreInfos = presentImage ? &signalInfo : NULL;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.submissions; }
 	const VkResult submitted = vkQueueSubmit2( vkCtx.graphicsQueue, 1, &si, vkCtx.frameFences[ slot ] );
 	if ( submitted != VK_SUCCESS ) {
 		VK_GpuFrameTiming_SubmitFailed( slot );
@@ -7886,6 +7964,7 @@ static bool VK_GpuSkinning_DispatchView( const viewDef_t *viewDef ) {
 	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependency.bufferMemoryBarrierCount = 1;
 	dependency.pBufferMemoryBarriers = &hostToCompute;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 
 	vkCmdBindPipeline( vkExec.cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -7922,6 +8001,7 @@ static bool VK_GpuSkinning_DispatchView( const viewDef_t *viewDef ) {
 	computeToVertex.offset = static_cast<VkDeviceSize>( firstOutput );
 	computeToVertex.size = static_cast<VkDeviceSize>( lastOutput - firstOutput );
 	dependency.pBufferMemoryBarriers = &computeToVertex;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 
 	if ( !VK_Exec_BeginMainRendering( false ) ) {
@@ -8761,6 +8841,7 @@ bool VK_Exec_QueueHDRExposureReadback( idImage *image, unsigned int generation, 
 	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependency.bufferMemoryBarrierCount = 1;
 	dependency.pBufferMemoryBarriers = &barrier;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 	VK_Exec_TransitionImage( entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 	readback.generation = generation;
@@ -15084,6 +15165,7 @@ static bool VK_Exec_CheckCubeCaptures( idImage *colorImage, idImage *depthImage,
 	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependency.bufferMemoryBarrierCount = 1;
 	dependency.pBufferMemoryBarriers = &toHost;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 	const int slot = vkExec.frameSlot;
 	if ( !VK_Exec_SetRenderTarget( NULL ) || !VK_GuiExecutor_EndFrameAndPresent()
@@ -15350,6 +15432,7 @@ static bool VK_Exec_CheckMRT( idRenderTexture &target, int size, int layers,
 	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependency.bufferMemoryBarrierCount = 1;
 	dependency.pBufferMemoryBarriers = &barrier;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 	const int slot = vkExec.frameSlot;
 	if ( !VK_Exec_SetRenderTarget( NULL ) || !VK_GuiExecutor_EndFrameAndPresent()
@@ -15677,6 +15760,7 @@ static bool VK_Exec_ReadImage( idImage *image, idList<float> *values, idList<byt
 	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dependency.bufferMemoryBarrierCount = 1;
 	dependency.pBufferMemoryBarriers = &barrier;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 	const int slot = vkExec.frameSlot;
 	if ( preserveFrame ) { R_RendererMetrics_ResetGpuFrameTiming( "Vulkan image readback" ); }

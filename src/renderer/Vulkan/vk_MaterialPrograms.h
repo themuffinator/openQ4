@@ -38,7 +38,7 @@ bool VK_MaterialPrograms_ReportOnce( const char *subject, const char *reason );
 void VK_MaterialPrograms_Reload();
 // reportShaderPrograms: every version with its state, diagnostic, draws and
 // skips since the last reload, plus capacity and suppression counters.
-void VK_MaterialPrograms_Report();
+void VK_MaterialPrograms_Report( bool detailed = true );
 void VK_MaterialPrograms_BeginFrame( int slot );
 void VK_MaterialPrograms_Shutdown();
 

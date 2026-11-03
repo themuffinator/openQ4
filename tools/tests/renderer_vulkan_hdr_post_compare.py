@@ -48,6 +48,20 @@ def main():
             delta = np.abs(np.asarray(a.convert('RGB'), dtype=np.int16) - np.asarray(b.convert('RGB'), dtype=np.int16))
         checks[name] = dict(maximumByteError=int(delta.max()),
             pixelsAbove2=int(np.count_nonzero(delta.max(axis=2) > 2)), meanByteError=float(delta.mean()))
+    cubes = [report['postProof']['checks'].get('cube-captures', {}) for report in (vk, gl)]
+    assert all(set(cube) == {'px', 'nx', 'py', 'ny', 'pz', 'nz'} for cube in cubes), 'missing HDR cubemap faces'
+    for face in sorted(cubes[0]):
+        arrays = []
+        for cube in cubes:
+            artifact = cube[face]
+            path = Path(artifact['path'])
+            assert lab.digest(path) == artifact['sha256'], path
+            with Image.open(path) as image:
+                assert image.size == (256, 256), path
+                arrays.append(np.asarray(image.convert('RGB'), dtype=np.int16))
+        delta = np.abs(arrays[0] - arrays[1])
+        checks['cube/' + face] = dict(maximumByteError=int(delta.max()),
+            pixelsAbove2=int(np.count_nonzero(delta.max(axis=2) > 2)), meanByteError=float(delta.mean()))
     passed = all(check['maximumByteError'] <= 2 for check in checks.values())
     proof = dict(status='pass' if passed else 'fail',
         scope='Paired full-frame bloom/exposure and recovery controls at 0x; native failure injection is independently qualified.',

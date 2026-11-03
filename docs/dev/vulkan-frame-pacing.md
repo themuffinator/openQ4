@@ -1,6 +1,8 @@
 # Vulkan frame pacing investigation
 
-Status: unresolved. Vulkan remains experimental. This investigation separates
+Status: unresolved for the conditions described below. Windows x64 NVIDIA/Intel
+Vulkan support does not qualify every presentation/power configuration; Linux
+and macOS remain experimental. This investigation separates
 CPU work, GPU execution and synchronization waits; it does not establish a
 performance improvement or complete renderer qualification.
 
