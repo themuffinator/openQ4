@@ -877,8 +877,8 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **123 partial, 228 pending and 0 verified requirements**, counting the
-39 superseded rows at their recorded states. `BEH-002`
+There are **123 partial, 229 pending and 0 verified requirements**, counting the
+40 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -1224,3 +1224,19 @@ revision re-binds the visual specification and the three evidence records that
 bind `remastered-hud.md`. There are 350 rows, 311 active requirements and 39
 historical superseded rows; the 358 migration variants and seven final gates
 remain unaccepted.
+
+## Revision 22: the initializing screen's entrance and cadence
+
+Visual specification 1.37 gives the Remastered initializing screen an entrance
+and a smoother cadence. Startup repainted it only about eight times a second,
+with pauses of up to a second, so its turning rings stepped and stalled. It now
+repaints up to 60 times a second whenever loading offers a moment, its repaints
+taking at most half of the time while the entrance plays and a fifth after it.
+The 1.3 s entrance drops the mechanism from 1.8 times its size to its seat as
+its gears wind in and the clamps close, and each step's line rises into place
+while a marker glides along a cascading rule. `FLOW-057` quoted the 30 Hz
+ceiling and the step flicker, so `FLOW-069` supersedes it, carrying every other
+initializing rule. It is pending; engine traces and captures of the entrance
+bind no evidence record yet. The revision re-binds the visual specification.
+There are 352 rows, 312 active requirements and 40 historical superseded rows;
+the 358 migration variants and seven final gates remain unaccepted.

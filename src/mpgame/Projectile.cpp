@@ -676,6 +676,11 @@ void idProjectile::Think( void ) {
 			// A volume crossing always uses the shared splash and its explicit reliable sound. Caller
 			// impact effects are collision-only; choosing one here suppresses the dedicated sound.
 			gameLocal.PlayLiquidImpact( crossedLiquid, surfacePoint, surfaceNormal, this, NULL );
+			if ( g_debugLiquid.GetBool() ) {
+				gameLocal.Printf( "liquid projectile: %s ent=%d %s contents=0x%x surface=(%.1f %.1f %.1f) speed=%.1f time=%d\n",
+					GetEntityDefName(), entityNumber, currentLiquid ? "entered" : "left", crossedLiquid,
+					surfacePoint.x, surfacePoint.y, surfacePoint.z, physicsObj.GetLinearVelocity().Length(), gameLocal.time );
+			}
 		}
 // openQ4 END
 		

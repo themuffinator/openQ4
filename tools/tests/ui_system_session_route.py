@@ -199,6 +199,7 @@ struct idSessionLocal {
     void TestGUI(const char*){CHECK(false);}
 } sessLocal;
 static void PumpControllerMenuNavigation(idSessionLocal*){}
+static void PumpControllerDetailStick(idSessionLocal*){}
 static void SyncMainMenuSettingsScrollPages(idUserInterface* gui){CHECK(!gui || !gui->retired);}
 static std::vector<std::string> dispatched;
 // The main menu's command handler, where a scenario asks for it: the button's

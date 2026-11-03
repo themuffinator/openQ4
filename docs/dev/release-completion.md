@@ -42,6 +42,56 @@ See [player release status](../user/release-status.md).
   wraps rather than cutting its count, Join Game's status runs on to CLEAR
   SORTING, and Objectives' text stays over the back bar.
 
+## Fallback menu watchdog waits for a second frame, 3 November 2026
+
+- On a fresh profile the first-launch preset restarts the renderer during
+  initialization. The first frame afterwards draws the fallback loading screen
+  while it restores the retained menus' fonts and eight documents, which took
+  1.9 s on an idle machine and 5.8 s under load. The watchdog counted that
+  frame toward its 3 s and, past it, opened the stock main menu before a
+  startup `+devmap` could run. That loaded 65 decls late: the player models,
+  the Player Setup preview's media and the crosshairs. It was intermittent:
+  1 of 6 fresh probes on 10404e2c2. Reported by the general-fixes session.
+- `idSessionLocal::Draw` now starts the watchdog when the first fallback
+  frame ends, in both console-lock branches, so a pending command always gets
+  a frame. Four fresh-profile probes after the fix logged 0 late loads, and
+  `loading_wipe_capture_crop_contract.py`, `settings_menu_coverage.py` and
+  `ui_retained_gate.py` pass.
+
+## General fixes round 2, 3 November 2026
+
+- Push Verification on dcb04ea9b failed on Linux x64, Linux ARM64 and macOS
+  Intel. `openq4-ui-json-number` failed on Linux because JsonCpp 1.9.8
+  imbues its number stream with the classic locale, so the test's global
+  libc++/gdtoa `num_get` emulation no longer reaches the parser, and
+  libstdc++'s own `num_get` decodes `1e-400` as zero. The emulation is gone.
+  The patched subnormal branch is exercised natively on libc++ (the macOS
+  jobs), and the test now states each platform's underflow result. It
+  reproduced and passes under GCC 13 in WSL, and passes with MSVC.
+- `openq4-ui-retained-screens-menus` timed out at 120 s on the macOS Intel
+  runner (49-57 s there before). It ran 18 s alone on this machine, over the
+  ~8 s a group should take, so its pause and Strogg pause checks are now the
+  `pause` and `strogg-pause` groups (4.9, 3.1 and 2.3 s), with the same
+  checks. JsonCpp 1.9.8 was ruled out: it parses `mp_escape.q4ui` as fast as
+  1.9.6, with or without `from_chars`.
+- The right-stick change (10404e2c2, unpushed) left five extracting
+  harnesses unable to compile: `ui_number_clipboard`, `ui_retained_adapter`
+  and `ui_text_owner` lacked `Runtime::ScrollDetail` in their shared stand-in,
+  and `ui_session_test_gui` and `ui_system_session_route` lacked
+  `PumpControllerDetailStick`. They now carry both.
+- Chat: `idStr::GetLastColorCode` tested
+  `escapeType == S_ESCAPE_COLORINDEX || S_ESCAPE_COLOR`, which is true for
+  every escape. The chat window carries a wrapped line's last color code onto
+  the next line, so a line whose last escape was an icon (`^i...`) or a
+  command repeated it at the start of the next line. It now returns the last
+  color code, and nothing after a `^r` reset.
+  `tools/tests/idstr_last_color_code.py` runs the production function, and
+  two single reversals fail (the old test, and no reset rule).
+- `idDict::FindKeyIndex` returned `NULL` (index 0, the first pair) for an
+  empty key instead of -1. No current caller passes one (`Set` refuses empty
+  keys). A stale `static void GfxInfo_f( void )` declaration of an overload
+  that never existed is gone (clang `-Wunused-function`).
+
 ## Damaged saves fail cleanly, 3 November 2026
 
 - **Refusing a damaged save no longer risks closing the game.** When a load
@@ -3123,6 +3173,12 @@ heading. It is not the contents of the 14 September 2026 release. See the
   restrained death grade and complete the black fade before loading.
   Windowed GL/Vulkan gameplay, native layout/geometry and gate evidence are
   recorded in `docs/dev/ui/retained-screens.md`; wider UI migration stays open.
+- [x] Make the initializing screen smooth: repaint it up to 60 times a second
+  whenever startup reads a file, within a bounded share of startup time, and
+  open it with a 1.3 s entrance in which the mechanism zooms down to its seat
+  as its gears wind in and the clamps close; step lines rise into place over a
+  cascading rule (visual specification 1.37, `FLOW-069`). Engine traces and
+  captures are recorded in the roadmap's UI-07 progress note.
 - [x] Resolve title pointer lag, wide/tall loading anchors, retained weapon
   scopes and monster flesh impacts. The title keeps scene parallax while its
   vector framing stays cached; loading furniture uses opposite virtual edges;

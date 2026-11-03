@@ -135,6 +135,7 @@ static bool RetainedUI_IsOpen() { return false; }
 static void RetainedUI_FrameInput() { assert(false); }
 static void ClearMenuControllerRepeatState() {}
 static void PumpControllerMenuNavigation(idSessionLocal*) {}
+static void PumpControllerDetailStick(idSessionLocal*) {}
 static std::vector<idUserInterface*> synchronized;
 static void SyncMainMenuSettingsScrollPages(idUserInterface* gui) {
     assert(!gui || !gui->retired);

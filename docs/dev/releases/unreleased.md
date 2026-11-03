@@ -170,9 +170,10 @@ See [release status](../../user/release-status.md) and the
   the playing line's audio, including pauses between words. Classic retains
   its original animation.
 - **A more consistent new interface.** Startup now uses the animated vector
-  initialization screen. Its rings and light sweep update during loading,
-  with much cheaper animation and automatic backoff to keep startup work
-  moving on slower systems. Reduced Motion keeps it still.
+  initialization screen. It opens with a quick zoom as its gears wind into
+  place, then keeps turning smoothly while the game loads, and each loading
+  step slides in instead of flickering. Slower systems still give most of
+  the time to loading. Reduced Motion keeps it still.
   Campaign difficulty and Turbo options open on a
   fourth menu level with matching breadcrumbs and smooth Back transitions.
   The Settings hub includes a confirmation before restoring defaults and
@@ -371,6 +372,12 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- A long multiplayer chat message with an icon in it no longer repeats the
+  icon at the start of the next line when it wraps.
+- On a first launch that starts a map from the command line or a shortcut
+  (for example `+devmap`), the game goes straight to the map instead of
+  sometimes opening the main menu first. The menu used to win on a slow first
+  frame and loaded player models and crosshairs late.
 - Demos recorded on servers without cheats can be paused, slowed and sped up
   again, and the playback timeline follows the position. Playback took over
   the server's cheat setting, which locked those controls.

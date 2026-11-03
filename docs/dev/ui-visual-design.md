@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.36, 1 November 2026 (1.35 earlier that day, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.37, 3 November 2026 (1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -3300,16 +3300,34 @@ rings are circles on the 640x480 canvas. Its parts, measured on the canvas:
   counterclockwise once every 180 s and the teeth clockwise once every 120 s,
   beneath the fixed clamps, emblem and lettering. They turn on the presentation
   clock (section 8), so every repaint finds them where continuous motion would
-  have. The screen repaints at each step and, during a long step, whenever the
-  engine can, at most 30 times a second. Reduced motion holds them still.
-  Reuse the dim rotating artwork's geometry and reduce optional redraws when
-  their measured cost would take time from loading; never prolong startup to
-  show an animation or wait for a full turn.
+  have. The screen repaints at each step and, between steps, whenever loading
+  offers it a moment (every file read does), at most 60 times a second.
+  Repaints may take half of the time while the entrance plays and a fifth after
+  it, measured over the last few frames, so one slow frame does not stall the
+  motion and a slow device still keeps most of the time for loading. Never
+  sleep, catch up missed frames or wait for a full turn. Reduced motion holds
+  the rings still and repaints only at each step. Reuse the dim rotating
+  artwork's geometry: the machined bands are solid annuli without coverage, so
+  they turn and scale as one compiled mesh.
+- **Entrance.** The first frame, which builds the document, is black. Then,
+  over 1.3 s, the mechanism (rings, plates, teeth, clamps and emblem) drops
+  from 1.8 times its size to its seat about the rings' center, decelerating
+  hard, passes 1.4 % under size and settles back by 1080 ms. The teeth wind
+  in from 150 degrees counterclockwise and the plate band from 90 degrees
+  clockwise, both at rest by 960 ms. The black lifts over the first 240 ms.
+  The clamps wait 16 % wide and 20 degrees back, then close on the plates
+  between 470 and 740 ms with a small overshoot, settled by 900 ms. The halo
+  flares from nothing to full as they lock (560–760 ms) and eases to 0.40,
+  where its breathing takes over; the light sweep fades in from 600 ms, and
+  the status line and rule rise 6 u into place from 640 to 1000 ms. The
+  lettering holds still in place throughout, appearing as the black lifts,
+  and the glint's first pass crosses it as the clamps lock, 940 ms in.
+  Reduced motion shows the screen at rest from the first frame.
 - **Accents.** Remastered adds four quiet layers that keep close to the stock
   picture, on the presentation clock with the rings. Reduced motion holds the
   sweep still as a key light at the upper left, its leading edge 38 degrees
   counterclockwise from the top, keeps the halo at 0.80 of its strength and
-  drops the embers, the glint and the status pulse.
+  drops the embers, the glint and the step marker.
   - **Light sweep.** A warm light turns clockwise round the rings once every
     10 s, added in #5E6E24. It rises over its first 7.5 degrees to 0.26 from the
     inner ring through the teeth (161–250 u) and half that on the grooves out to
@@ -3323,10 +3341,13 @@ rings are circles on the 640x480 canvas. Its parts, measured on the canvas:
   - **Glint.** Every 9 s a narrow white light crosses QUAKE 4 from left to right
     in 900 ms, clipped to the letters.
 - **Status.** The line is Marine 16 dp in #F09E0D, centered on the stock line's
-  middle at 418 u. Each new step replaces it, flickering in from 0.35 to full
-  over 120 ms. A 168 u rule under it holds one segment per step: done at 0.55
-  and pending at 0.15, while the current segment pulses between 0.62 and 0.95
-  over 800 ms.
+  middle at 418 u. Each new step's line fades in from nothing over 280 ms
+  while rising 5 u into place. A 168 u rule under it holds one segment per
+  step: done at 0.55 and pending at 0.15. A marker pulsing between 0.62 and
+  0.95 over 800 ms glides to the current segment over 440 ms; each segment a
+  step reaches fades in to done over 300 ms behind it, 70 ms after the one to
+  its left when a step reaches several. Reduced motion changes the line and
+  the rule at once, without the marker.
 - **Classic** keeps the stock picture and line, without the accents.
 
 ### 14.18 Multiplayer menus
@@ -4065,6 +4086,19 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.37: the initializing screen's entrance and cadence
+
+Section 14.17's Remastered initializing screen was meant to move, but startup
+repainted it only about eight times a second, with pauses of up to a second.
+It now repaints up to 60 times a second whenever loading offers a moment,
+within half of the time during its entrance and a fifth after it. It opens
+with an entrance: from black, the mechanism drops from 1.8 times its size to
+its seat behind the still lettering, its gears winding in, the clamps close
+on it and the halo flares as they lock, before the status line arrives. Each
+step's line fades and rises into place instead of flickering, and a marker
+glides along the rule while the segments behind it fill in turn. Register
+revision 22 supersedes `FLOW-057` with `FLOW-069`; nothing is accepted.
 
 ### Version 1.36: the column in every portrait view that holds it
 

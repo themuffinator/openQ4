@@ -1812,7 +1812,12 @@ static void CheckContinuity(ScreenHost& host, char** paths, const char* campaign
 		for (const auto& d : diagnostics) std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());
 		Check(loaded,"initialization, fourth-level and game effects load in the native runtime");
 		Viewport viewport; viewport.canvasHeight = 720; viewport.canvasMinWidth = 960;
-		if (kind == 0) Check(runtime.RunEvent("onInit",0,effects,error),"initialization starts its presentation timelines");
+		if (kind == 0) {
+			Check(runtime.RunEvent("onInit",0,effects,error),"initialization starts its presentation timelines");
+			viewport.width = 1280; viewport.height = 720; runtime.Frame(viewport,.05);
+			Check(runtime.PresentedValue("mechanism","transform")->data[2] > 1.4 && runtime.PresentedValue("veil","opacity")->data[0] > .5,
+				"initialization opens on its mechanism scaled up behind a veil");
+		}
 		if (kind == 1) Check(runtime.RunEvent("onActivate",0,effects,error),"fourth-level arrival starts");
 		if (kind == 2) { host.softFocus = true; Check(runtime.SetState({{"death_amount",1.0}},error,0),"death input accepts full amount"); }
 		for (const auto size : {std::pair{1280,720},std::pair{2560,1080},std::pair{720,1280}}) {
@@ -1831,9 +1836,22 @@ static void CheckContinuity(ScreenHost& host, char** paths, const char* campaign
 			size_t vertices = 0; for (const auto& draw : host.draws) vertices += draw.vertices.size();
 			std::fprintf(stderr,"Initialization at 4K: %zu vertices\n",vertices);
 			Check(vertices * 64 < 30 * 1024 * 1024,"initialization leaves room for the terminal fade inside Vulkan's geometry ring at 4K");
+			Check(Near(float(runtime.PresentedValue("mechanism","transform")->data[2]),1,.0001f) && runtime.PresentedValue("veil","opacity")->data[0] == 0 &&
+				runtime.PresentedValue("status-block","opacity")->data[0] == 1,
+				"the entrance seats the mechanism and reveals the status line");
+			Check(runtime.SetState({{"step",4.0}},error,1.6) && runtime.RunEvent("stepChanged",1.6,effects,error),"a later startup step arrives");
+			runtime.Frame(viewport,1.62);
+			const float glide = float(runtime.PresentedValue("progress-marker","transform")->data[0]);
+			Check(runtime.PresentedValue("progress-3-done","opacity")->data[0] < .1 && glide > 0 && glide < 144,
+				"a step jump fills its segments in turn behind a gliding marker");
+			runtime.Frame(viewport,1.99);
+			Check(Near(float(runtime.PresentedValue("progress-0-done","opacity")->data[0]),.55f,.001f) &&
+				float(runtime.PresentedValue("progress-marker","transform")->data[0]) > 120,"the step marker nears the current step");
 			runtime.SetReducedMotion(true,2); host.reducedMotion = true;
 			Check(runtime.RunEvent("onInit",2,effects,error),"reduced-motion initialization starts"); runtime.Frame(viewport,2.2);
 			Check(Near(float(runtime.PresentedValue("sweep","transform")->data[4]),-38,.01f) && runtime.PresentedValue("ember-0","display")->text == "none", "reduced motion holds a fixed key light and omits sparks");
+			Check(runtime.PresentedValue("veil","display")->text == "none" && runtime.PresentedValue("progress-marker","display")->text == "none",
+				"reduced motion has no entrance veil or gliding step marker");
 			host.reducedMotion = false;
 		} else if (kind == 1) {
 			Check(runtime.RunEvent("detailLeave",2,effects,error),"fourth level returns to its parent"); runtime.Frame(viewport,2.3);
@@ -5722,8 +5740,8 @@ int main(int argc, char** argv) {
 	if (runs("pages")) CheckPagePrompts(host,argv[24],"guis/menu/credits.q4ui","credits_back","back",nullptr,false);
 	if (runs("mp-pages")) CheckPagePrompts(host,argv[27],"guis/menu/createserver.q4ui","create_back","back",nullptr,true);
 	if (runs("mp-pages")) CheckPagePrompts(host,argv[28],"guis/menu/joingame.q4ui","join_back","back",nullptr,true);
-	if (runs("menus")) CheckPagePrompts(host,argv[2],"guis/menu/pause.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow","objectives-prompts");
-	if (runs("menus")) CheckPagePrompts(host,argv[4],"guis/menu/pause_strogg.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow",
+	if (runs("pause")) CheckPagePrompts(host,argv[2],"guis/menu/pause.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow","objectives-prompts");
+	if (runs("strogg-pause")) CheckPagePrompts(host,argv[4],"guis/menu/pause_strogg.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow",
 		"objectives-prompts");
 	// The legends: Single Player, Campaign, the campaign difficulty page and
 	// Multiplayer, whose own BACK is in the content.
@@ -5732,8 +5750,8 @@ int main(int argc, char** argv) {
 		if (runs(page == 26 ? "mp-pages" : "pages")) CheckPagePrompts(host,argv[page],name,"",nullptr,nullptr,true);
 	if (runs("menus")) CheckMenuWrap(host,argv[1],argv[2],argv[21]);
 	if (runs("menus")) CheckTitleTextScale(host,argv[1]);
-	if (runs("menus")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");
-	if (runs("menus")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.q4ui");
+	if (runs("pause")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");
+	if (runs("strogg-pause")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.q4ui");
 	if (runs("menus")) CheckColumnPageTextScale(host,argv[5],"guis/menu/singleplayer.q4ui",{},{},"description");
 	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.q4ui",{{"awakening_ready",true}},{},"available");
 	// Title: canvas scaling, the lit field, the multiplied emblem and CONTINUE.
@@ -5990,7 +6008,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	// Pause: the level block binds the mission, difficulty, objectives and shot.
-	if (runs("menus")) {
+	if (runs("pause")) {
 		const auto source = Read(argv[2]);
 		Document document; std::vector<Diagnostic> diagnostics;
 		const bool valid = document.Load(source,diagnostics);
@@ -6301,7 +6319,7 @@ int main(int argc, char** argv) {
 	}
 	// Strogg pause (section 13.7): the Marine pause's level block and verbs in
 	// the Strogg family, every label arriving in runes and translating.
-	if (runs("menus")) {
+	if (runs("strogg-pause")) {
 		const auto source = Read(argv[4]);
 		Document document; std::vector<Diagnostic> diagnostics;
 		const bool valid = document.Load(source,diagnostics);

@@ -1213,11 +1213,15 @@ archived provenance; new scheduling belongs here.
   offers a time-paced repaint, at up to 60 Hz within half of the time during
   the new 1.3 s entrance and a fifth after it (`FLOW-069`). Local vector meshes
   in a zoom keep their compilation while it is at most a sqrt(2) step finer
-  than needed, and the machined bands became solid annuli (101k to a few
-  thousand vertices). Traces on a loaded machine: 12-22 frames and gaps up to
-  1.35 s before, 50-85 frames, a 23 ms first frame and gaps of 100-270 ms
-  after, for roughly 15-20% more startup time than reduced motion. An
-  idle-machine measurement and the GLES fallback remain.
+  than needed, the machined bands became solid annuli (101k to a few thousand
+  vertices), the lettering holds still (a fade or group layer recompiled or
+  recolored its 50k glow vertices) and the screen adds no atlas rasters, whose
+  CPU raster stalled the frame. Windowed GL traces on a heavily loaded machine:
+  12-22 frames, a 100-330 ms first frame and gaps up to 1.35 s before; 57-88
+  frames, a 13-23 ms first frame, entrance frames of 3-19 ms and loading gaps
+  of 50-150 ms after, apart from machine-wide stalls that reduced motion shows
+  too. Repaints cost 0.4-0.7 s of a 2.5-3.5 s start; an idle-machine
+  measurement and the GLES fallback remain.
 - [ ] **UI-08 — P1, qualification and decision: final cutover.** Complete all seven
   final gates with current source-bound behavior, visual/editor/performance and
   Windows/Linux/macOS/Android-GLES evidence, including dedicated packaging. Decide
@@ -1493,6 +1497,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      the source consolidation. The stage also confirms that the script's
      `intptr_t`-sized slots never carry a live value across a save point.
      Gate: the test runs in CI and assigns every block a class.
+     Done, 3 November: `savegame_raw_inventory.py` is in the validation runner
+     and both CI workflows; it has not run in CI yet. It finds 23 direct raw
+     writes per game tree, not the 22 the old table claimed, and classifies
+     every raw save call in both trees and the GUI. It fails on any unlisted,
+     missing or recounted call, and on any change to the script type widths.
+     Disassembled stock and Awakening scripts hold pointer slots only as
+     interpreter-stack address temporaries, none of them live across a
+     suspending call; see the [inventory](savegame-reliability.md#remaining-raw-serialization-raw1).
   2. **Field codecs.**
      - Write each block whose layout is up to the compiler as explicit
        fixed-width little-endian fields.
@@ -1506,6 +1518,28 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      Gate: golden-byte native tests for each codec pass in CI on Windows MSVC,
      Linux GCC and Clang, macOS arm64 and Linux ARM64 (qemu), with mutation
      controls.
+     First slice, 3 November: `src/idlib/SaveCodec.h` fixes the portable field
+     order for these:
+     - trace models;
+     - joint modifiers;
+     - articulated-figure pose modifiers;
+     - joint quaternions and matrices;
+     - interpolators, rebuilt through `Init` so no derived cache is saved;
+     - vehicle path targets, with the entity reference left to the caller;
+     - flag masks;
+     - plain int and float arrays.
+
+     Both game modules instantiate the codecs with the production types, so a
+     renamed or retyped field breaks the build. `save_codec.py` compares
+     golden bytes and requires eight source mutations to fail. It passes
+     locally with MSVC, Clang on Windows and Linux, and GCC, and the meson
+     test runs it on each CI platform. The writer does not use the codecs
+     yet: switching it changes the save bytes, so it waits for payload
+     version 5 in stage 3. Still to do in this stage:
+     - the bit lists for the seven flag structs;
+     - the GUI window fields and transition interpolators;
+     - the PDA minigame fields;
+     - zeroing the script's pointer slots.
   3. **Wire revision.**
      - Payload version 5 carries a portable wire ABI stamp (`le64-portable1`),
        accepted from any family member.
@@ -1716,7 +1750,7 @@ claim peer combinations that have not been tested.
   diagonal cases now land alive and all four direct-approach controls survive.
   This isolates and repairs a defect without claiming the original match's exact
   cause. Current long-match/catalog and controlled timing gates remain open.
-- [ ] **MP-03 — P2, implementation and qualification: broader bot navigation.**
+- [x] **MP-03 — P2, implementation and qualification: broader bot navigation.**
   Audit custom-map ladders/lifts, shallow trenches, route-cost approximations,
   pad/player collisions, graph limits, optional caching and debug growth. Extend
   only demonstrated gaps; bots and personality/chat/roster systems already exist.
@@ -1730,6 +1764,13 @@ claim peer combinations that have not been tested.
   no longer fills, because the server frame clears debug lines as single
   player does. Graph limits are unchanged and documented; caching remains a
   non-goal while generation stays lazy.
+  Completed, 3 November: the last two audit subjects are recorded limits, not
+  defects. Role allocation compares landmark route-cost lower bounds, and a pad
+  landing is flown without other players in the way; off-route recovery
+  re-routes from wherever a bot lands ([known limits](mp-bots.md#known-limits)).
+  Every audited subject now has a recorded outcome, and the only demonstrated
+  gaps (trench rims, the debug-line pool) are fixed. Lifts in custom maps stay
+  unmodelled; the strict long-match and timing gates remain under MP-02.
 - [ ] **MP-04 — P1, implementation and qualification: Arena completion.** Resolve
   world-pause versus continuing sound, restart/map-navigation cost and physical
   pause navigation. Capture victory/defeat/draw ledgers, progression and ceremony
@@ -1882,6 +1923,14 @@ claim peer combinations that have not been tested.
   are deferred, so no AAS swim consumer is in the selected scope. Remaining:
   player-controlled swimming (real input only), projectiles crossing liquids,
   and splash, bubble and wade presentation checked by eye.
+  Progress, 3 November: projectiles crossing liquids are qualified on the
+  server. `g_debugLiquid` now logs each crossing, and a 120-second six-bot
+  liquid-lab audit recorded 58 hyperblaster and rocket crossings of water,
+  lava and slime. Shots fired under water leave the pool, shots fired into it
+  carry on to impacts below the surface, and every crossing plays the splash
+  at the boundary ([evidence](liquid-qualification.md#projectile-liquid-crossings-3-november-2026)).
+  Remaining: player-controlled swimming (real input only), and splash, bubble
+  and wade presentation checked by eye.
 - [ ] **MP-07 — P1, implementation and qualification: coupled prediction and
   rewind.** In `src/mpgame/gamesys/SysCvar.cpp` both enhanced prediction and lag
   compensation default off. Preserve the coupled displayed-pose-age and rewind
