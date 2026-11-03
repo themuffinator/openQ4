@@ -1707,7 +1707,7 @@ claim peer combinations that have not been tested.
   diagonal cases now land alive and all four direct-approach controls survive.
   This isolates and repairs a defect without claiming the original match's exact
   cause. Current long-match/catalog and controlled timing gates remain open.
-- [ ] **MP-03 — P2, implementation and qualification: broader bot navigation.**
+- [x] **MP-03 — P2, implementation and qualification: broader bot navigation.**
   Audit custom-map ladders/lifts, shallow trenches, route-cost approximations,
   pad/player collisions, graph limits, optional caching and debug growth. Extend
   only demonstrated gaps; bots and personality/chat/roster systems already exist.
@@ -1721,6 +1721,13 @@ claim peer combinations that have not been tested.
   no longer fills, because the server frame clears debug lines as single
   player does. Graph limits are unchanged and documented; caching remains a
   non-goal while generation stays lazy.
+  Completed, 3 November: the last two audit subjects are recorded limits, not
+  defects. Role allocation compares landmark route-cost lower bounds, and a pad
+  landing is flown without other players in the way; off-route recovery
+  re-routes from wherever a bot lands ([known limits](mp-bots.md#known-limits)).
+  Every audited subject now has a recorded outcome, and the only demonstrated
+  gaps (trench rims, the debug-line pool) are fixed. Lifts in custom maps stay
+  unmodelled; the strict long-match and timing gates remain under MP-02.
 - [ ] **MP-04 — P1, implementation and qualification: Arena completion.** Resolve
   world-pause versus continuing sound, restart/map-navigation cost and physical
   pause navigation. Capture victory/defeat/draw ledgers, progression and ceremony
@@ -1873,6 +1880,14 @@ claim peer combinations that have not been tested.
   are deferred, so no AAS swim consumer is in the selected scope. Remaining:
   player-controlled swimming (real input only), projectiles crossing liquids,
   and splash, bubble and wade presentation checked by eye.
+  Progress, 3 November: projectiles crossing liquids are qualified on the
+  server. `g_debugLiquid` now logs each crossing, and a 120-second six-bot
+  liquid-lab audit recorded 58 hyperblaster and rocket crossings of water,
+  lava and slime. Shots fired under water leave the pool, shots fired into it
+  carry on to impacts below the surface, and every crossing plays the splash
+  at the boundary ([evidence](liquid-qualification.md#projectile-liquid-crossings-3-november-2026)).
+  Remaining: player-controlled swimming (real input only), and splash, bubble
+  and wade presentation checked by eye.
 - [ ] **MP-07 — P1, implementation and qualification: coupled prediction and
   rewind.** In `src/mpgame/gamesys/SysCvar.cpp` both enhanced prediction and lag
   compensation default off. Preserve the coupled displayed-pose-age and rewind
