@@ -3051,6 +3051,22 @@ static void CheckArenaPage(ScreenHost& host, const char* pagePath, const char* p
 	page.Frame(viewport,10.05);
 	Check(page.FocusedControl() == "arena" && Near(static_cast<float>(page.PresentedValue("arena-carry","opacity")->data[0]),0,.001f),
 		"onto ARENA, with no carry");
+	// Each section summarizes itself in the column while it is the subject
+	// (section 13.7), over its levelshot once the session names one; BACK
+	// keeps the description.
+	const auto lit = [&](const char* node) { const auto found = page.PresentedValue(node,"opacity"); return found ? static_cast<float>(found->data[0]) : -1.f; };
+	const auto shown = [&](const char* node) { const auto found = page.PresentedValue(node,"display"); return found ? found->text : std::string("?"); };
+	Check(page.SetState({{"summary.arena.shot",std::string("gfx/guis/loadscreens/arena1")}},error,10.1),"the session names ARENA's levelshot");
+	page.Frame(viewport,10.15);
+	Check(Near(lit("summary-arena"),1,.001f) && Near(lit("summary-campaign"),0,.001f) && Near(lit("description"),0,.001f) &&
+		shown("summary-arena-shots") == "block" && Near(lit("summary-arena-shots"),1,.001f),"ARENA summarizes itself over its match's levelshot");
+	Check(page.FocusControl("campaign",10.2),"focus CAMPAIGN");
+	page.Frame(viewport,10.25);
+	Check(Near(lit("summary-campaign"),1,.001f) && Near(lit("summary-arena-shots"),0,.001f) && shown("summary-campaign-shots") == "none",
+		"CAMPAIGN without a save shows no picture");
+	Check(page.FocusControl("back",10.3),"focus BACK");
+	page.Frame(viewport,10.35);
+	Check(Near(lit("description"),1,.001f) && Near(lit("summary-campaign"),0,.001f),"BACK keeps the description");
 }
 
 // The Multiplayer page (FLOW-050): the stock Multiplayer page's level in the
@@ -3105,6 +3121,28 @@ static void CheckMultiplayerPage(ScreenHost& host, const char* path) {
 		"the plates show at once and the description fades in");
 	runtime.Frame(viewport,1.2);
 	Check(Near(value("details","opacity"),1,.01f),"by 150 ms the description is in");
+	// Each section summarizes itself in the column while it is the subject
+	// (section 13.7), CREATE SERVER over si_map's levelshot once the session
+	// names one; BACK, or no subject, keeps the description.
+	const char* const summaries[] = {"summary-join","summary-create","summary-demos","summary-setup"};
+	for (int row = 0; row < 4; ++row) {
+		Check(runtime.FocusControl(rows[row],1.21+row*.01),"focus a section");
+		runtime.Frame(viewport,1.215+row*.01);
+		bool alone = Near(value("description","opacity"),0,.001f);
+		for (int other = 0; other < 4; ++other) alone = alone && Near(value(summaries[other],"opacity"),other == row ? 1.f : 0.f,.001f);
+		Check(alone && Near(bounds(summaries[row]).y,details.y,.5f),"its summary takes the description's place");
+		Check(text("summary-create-shots","display") == "none","no levelshot shows while the session names none");
+	}
+	Check(runtime.SetState({{"summary.create.shot",std::string("gfx/guis/loadscreens/q4dm5")}},error,1.26) && runtime.FocusControl("create",1.26),
+		"the session names CREATE SERVER's levelshot");
+	runtime.Frame(viewport,1.265);
+	const auto shot = bounds("summary-create-shot-back");
+	Check(text("summary-create-shots","display") == "block" && Near(value("summary-create-shots","opacity"),1,.001f) &&
+		Near(shot.x,x0+395*u,.5f) && Near(shot.y,77*u,.5f) && shot.y+shot.height <= details.y+.5f,"its levelshot stands over the column");
+	Check(runtime.FocusControl("back",1.27),"focus BACK");
+	runtime.Frame(viewport,1.275);
+	Check(Near(value("description","opacity"),1,.001f) && Near(value("summary-create","opacity"),0,.001f) &&
+		Near(value("summary-create-shots","opacity"),0,.001f),"BACK keeps the description");
 	Check(runtime.RunEvent("onBack",1.3,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "back",
 		"Back asks for the title");
 	// A section's choice: the page leaves as the stock page leaves for one.
@@ -4075,7 +4113,7 @@ static bool InTallRoom(const Bounds& box, const Viewport& view, float dp, float 
 // inset to the column's 66 dp margin, in the room between the bands. Each
 // description fills it.
 static void CheckContentColumn(Runtime& runtime, const Viewport& view, float text, const Bounds& canvas, float dp, bool tall,
-	std::initializer_list<const char*> labels) {
+	const std::vector<const char*>& labels) {
 	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a column node is laid out"); return b; };
 	const float u = 1.5f*dp;
 	const auto column = bounds("details");
@@ -4184,10 +4222,10 @@ static void CheckPauseTextScale(ScreenHost& host, const char* path, const char* 
 // Campaign (its available note), Multiplayer and SETTINGS (whose question
 // grows).
 static void CheckColumnPageTextScale(ScreenHost& host, const char* path, const char* name, const StateValues& states,
-	const std::vector<std::string>& dialogs, const char* label) {
+	const std::vector<std::string>& dialogs, std::vector<const char*> labels) {
 	CheckPageTextScale(host,path,name,"content",{"onActivate"},states,dialogs,
-		[label](Runtime& runtime, const Viewport& view, float text, const Bounds& canvas, float dp, bool tall) {
-			CheckContentColumn(runtime,view,text,canvas,dp,tall,{label});
+		[labels](Runtime& runtime, const Viewport& view, float text, const Bounds& canvas, float dp, bool tall) {
+			CheckContentColumn(runtime,view,text,canvas,dp,tall,labels);
 		});
 }
 
@@ -5710,7 +5748,7 @@ int main(int argc, char** argv) {
  }
  if (argc == 3 && std::string(argv[1]) == "--settings") {
      ScreenHost host; CheckSettingsPage(host,argv[2]);
-     CheckColumnPageTextScale(host,argv[2],"guis/menu/settings.q4ui",{},{"defaultsModal"},"description");
+     CheckColumnPageTextScale(host,argv[2],"guis/menu/settings.q4ui",{},{"defaultsModal"},{"description"});
      std::printf("retained SETTINGS page: %d checks passed\n",checks); return 0;
  }
  if (argc == 3 && std::string(argv[1]) == "--controls") {
@@ -5800,8 +5838,8 @@ int main(int argc, char** argv) {
 	if (runs("menus")) CheckTitleTextScale(host,argv[1]);
 	if (runs("pause")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");
 	if (runs("strogg-pause")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.q4ui");
-	if (runs("menus")) CheckColumnPageTextScale(host,argv[5],"guis/menu/singleplayer.q4ui",{},{},"description");
-	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.q4ui",{{"awakening_ready",true}},{},"available");
+	if (runs("menus")) CheckColumnPageTextScale(host,argv[5],"guis/menu/singleplayer.q4ui",{},{},{"description","summary-campaign","summary-arena"});
+	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.q4ui",{{"awakening_ready",true}},{},{"available"});
 	// Title: canvas scaling, the lit field, the multiplied emblem and CONTINUE.
 	if (runs("menus")) {
 		const auto source = Read(argv[1]);
@@ -7017,7 +7055,8 @@ int main(int argc, char** argv) {
 	if (runs("pages")) CheckCreditsPage(host,argv[24]);
 	if (runs("pages")) CheckArenaPage(host,argv[5],argv[25]);
 	if (runs("mp-pages")) CheckMultiplayerPage(host,argv[26]);
-	if (runs("mp-pages")) CheckColumnPageTextScale(host,argv[26],"guis/menu/multiplayer.q4ui",{},{},"description");
+	if (runs("mp-pages")) CheckColumnPageTextScale(host,argv[26],"guis/menu/multiplayer.q4ui",{},{},
+		{"description","summary-join","summary-create","summary-demos","summary-setup"});
 	if (runs("mp-pages")) CheckCreateServerPage(host,argv[27]);
 	if (runs("mp-pages")) CheckCreateServerBanList(host,argv[27]);
 	if (runs("mp-pages")) CheckJoinGamePage(host,argv[28]);

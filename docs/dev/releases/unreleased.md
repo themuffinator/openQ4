@@ -238,6 +238,10 @@ See [release status](../../user/release-status.md) and the
   spectator. With a controller, press the left stick to spectate and the
   right stick to add or remove the server from your favorites; the stick
   symbols show beside the two buttons.
+- **Menus explain their sections.** In the new interface, the Single Player
+  and Multiplayer menus describe the section you point at or select beside
+  the list, with a picture where one fits: the level of your latest save for
+  Campaign, the next Arena match, and the map Create Server will host.
 - **Campaign: New Game and Chapters.** In the new interface, Single Player →
   Campaign now has you choose Quake 4 or The Awakening (the one you are
   playing is already chosen), then **New Game** for the difficulty and Turbo

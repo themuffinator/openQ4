@@ -1862,6 +1862,22 @@ void idArenaCampaign::UpdateMainMenuGui( idUserInterface *gui ) {
 
 /*
 ================
+idArenaCampaign::SelectedLevelshot
+================
+*/
+idStr idArenaCampaign::SelectedLevelshot() {
+	if ( state == NULL || !state->loaded ) {
+		return idStr();
+	}
+	ArenaResolveSelection( state );
+	const arenaMatch_t &match = state->tiers[ui_arenaSelectedTier.GetInteger()].matches[ui_arenaSelectedMatch.GetInteger()];
+	const idDict *mapDecl = NULL;
+	ArenaMapSupportsMatch( match, &mapDecl );
+	return ArenaLevelshot( match, mapDecl );
+}
+
+/*
+================
 idArenaCampaign::UpdateGui
 ================
 */

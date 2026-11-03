@@ -326,7 +326,8 @@ public:
 private:
 	// The detail card: a declared numeric state, a card node holding no
 	// controls whose left and top the runtime owns, and a definition whenever a
-	// control names a detail.
+	// control names a detail. Without a card the state alone follows the
+	// subject, for content the page keeps in place.
 	void ReadDetail(const Json::Value& root) {
 		if (!root.isMember("detail")) {
 			Require(detailControls.empty(),root,detailControls.empty() ? "" : detailControls.front().second,
@@ -337,11 +338,15 @@ private:
 		Fields(detail,"/detail",{"state","card","none","extensions"});
 		DetailSpec spec;
 		spec.state = Id(detail["state"],"/detail/state");
-		spec.card = Id(detail["card"],"/detail/card");
 		if (detail.isMember("none")) spec.none = Numeric(detail["none"],"/detail/none",-1e9,1e9);
 		const auto declared = model.state.find(spec.state);
 		Require(declared != model.state.end() && std::holds_alternative<double>(declared->second.initial),detail["state"],"/detail/state",
 			"The detail state must be a declared number");
+		if (!detail.isMember("card")) {
+			model.detail = std::move(spec);
+			return;
+		}
+		spec.card = Id(detail["card"],"/detail/card");
 		const auto* card = model.FindNode(spec.card);
 		Require(card != nullptr && card->id != model.root.id,detail["card"],"/detail/card","The detail card must be a node below the root");
 		Require(!HasControl(*card),detail["card"],"/detail/card","The detail card cannot hold controls");

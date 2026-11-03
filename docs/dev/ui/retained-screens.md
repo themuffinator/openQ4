@@ -551,6 +551,23 @@ after editing the script; `--check` fails when an output is stale.
   sub-page, Arena the [Arena page](#arena-page). The page arrives with the
   focus on CAMPAIGN and the Campaign sub-page on the campaign being played,
   QUAKE 4 unless it is the expansion:
+  - **Section summaries.** Each section summarizes itself in the content
+    column while it is the subject (section 13.7): the plate under the
+    pointer, or the focused one after keys, a controller or arrival. The
+    column shows that section's sentence in the description's place, and the
+    page's description for BACK or with no subject. A control's feedback
+    reaches only its own subtree, so each plate names its section as a
+    `detail` and the document's cardless detail definition keeps the runtime's
+    subject in `summary.section`, which the column binds ([interaction
+    contract](interaction.md#detail-cards)). CAMPAIGN stands over the newest
+    save's levelshot, the one CONTINUE shows, and ARENA over the match its
+    page would open on; the session publishes both as the page opens
+    (`summary.campaign.shot`, `summary.arena.shot`), read as precaches, and a
+    levelshot still waiting for the front end's idle frames is read there
+    instead. The picture stands 140x105 u at 395,77 u, over the column under
+    the docked top band, and shows only while the session names one, while
+    the column's text stays clear of it, and never in a tall view, where the
+    column stands under the plates.
   - **Sub-page state.** The top band stands one notch pitch (97 u) further
     toward the trailing edge while the bottom band stays docked. The parent
     title is the crumb in the band's thin span at 39,12 u and 0.40, cut at
@@ -1306,6 +1323,13 @@ Multiplayer page's level (section 9 "Menu levels", FLOW-050).
   FRIENDS LIST, which the stock menu hides and nothing handles, is gone. The
   generator fails when a language's label or description would not fit.
   Arriving from the title focuses JOIN GAME, the primary action.
+- **Summaries.** As on the Single Player page, each section summarizes
+  itself in the content column while it is the subject, and BACK, or no
+  subject, keeps the page's description. CREATE SERVER stands over the
+  levelshot of the map it would host (`si_map`), which the session publishes
+  as the page opens (`summary.create.shot`) and takes out of the idle-frame
+  queue; JOIN GAME, DEMOS and PLAYER SETUP have no levelshot that fits.
+  Player Setup's editor hides the column and its picture.
 - **Sections.** CREATE SERVER goes one level deeper to the retained
   [Create Server sub-page](#create-server-sub-page), JOIN GAME to the
   retained [Join Game sub-page](#join-game-sub-page) and DEMOS to the
@@ -1513,6 +1537,38 @@ back onto CHAPTERS, reduced motion and the missing documents),
 `campaign_chapters.py` pins the documents and verbs, and the native screens'
 continuity, page prompts and text-scale checks cover the new page. The
 `campaignskill` capture walks Campaign, NEW GAME, Back, CHAPTERS and Back.
+
+## Section summaries (3 November 2026)
+
+Section 13.7 says a section that leads deeper summarizes itself in the
+content column, with a levelshot where one fits, until Accept opens it. The
+Single Player and Multiplayer pages now do (FLOW-050): each section's
+sentence (`#str_231552` to `#str_231557`) takes the description's place
+while it is the subject, CAMPAIGN, ARENA and CREATE SERVER over a levelshot
+the session publishes as the page opens, and BACK keeps the description.
+[Single Player and Campaign](#screens) and the
+[Multiplayer page](#multiplayer-page) describe the pages.
+
+- **Why a detail state.** A control's feedback reaches only its own subtree,
+  so a plate cannot light a node in the content column. The document format's
+  detail definition now takes an optional card: without one, the runtime only
+  writes the subject's detail to its state (`summary.section`), and the
+  column's bindings show that section's summary. The subject is the plate
+  under the pointer while the pointer moved last, else the focused one,
+  so the pointer and the keys reach the same summary
+  ([interaction contract](interaction.md#detail-cards)).
+- **Pictures.** The levelshot stands 140x105 u at 395,77 u, over the column
+  under the docked top band. It shows only while the session names one and
+  the column's text, grown, stays clear of it, and never in a tall view. The
+  session reads it as a precache and takes it out of the idle-frame queue
+  (`Session_PublishSummaryShot`). ARENA's comes from
+  `idArenaCampaign::SelectedLevelshot`, the match the Arena page would open
+  on.
+
+`UiDocumentTest` accepts the cardless definition, `ui_retained_gate.py`
+checks the published pictures and their precaches, the menus, pages and
+mp-pages native groups walk the subjects and the column's text scale, and
+the `summaries` capture walks both pages at 16:9 and 9:16.
 
 ## Demos as a Multiplayer sub-page (2 November 2026)
 
@@ -3771,8 +3827,10 @@ what remains across every retained menu.
   The retained Join Game shows a server's players and rules in the stock
   tooltip's card rather than a docked detail column, and its SPECTATE and
   favorite toggle carry their stick presses on the plates, since the prompt
-  bar has no room for them. No section summarizes itself with a levelshot,
-  and the classic campaign page keeps CHAPTERS on it. The
+  bar has no room for them. The Single Player and Multiplayer pages'
+  sections summarize themselves; Campaign's QUAKE 4, THE AWAKENING, NEW GAME
+  and CHAPTERS and SETTINGS' sections do not yet, and the summaries switch
+  without the plates' fade. The classic campaign page keeps CHAPTERS on it. The
   Single Player page keeps the home navigation plates and the
   BACK row instead of the section layout (navigation from 14 u, content from
   228 u) and the Back action in the bottom band; Classic is not built. A

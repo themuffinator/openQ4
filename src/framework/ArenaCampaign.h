@@ -38,6 +38,9 @@ public:
 	void					CloseMenu();
 	bool					HandleGuiCommand( const char *menuCommand );
 	void					UpdateMainMenuGui( idUserInterface *gui );
+	// The levelshot of the match the browser would open on; empty with no
+	// campaign loaded.
+	idStr					SelectedLevelshot();
 
 	// Called by SpawnServer on both sides of a game-module reload. Returns
 	// false only when an Arena launch was active but can no longer be prepared.

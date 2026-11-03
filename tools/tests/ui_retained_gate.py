@@ -214,6 +214,8 @@ struct ArenaCampaign {
     std::vector<std::string> commands; bool HandleGuiCommand(const char* command) { commands.push_back(command); return true; }
     // The browser opening (the Arena page where it can), and the entrance holding it.
     int browsers = 0; bool entering = false; void OpenBrowser() { ++browsers; } bool IsEntering() const { return entering; }
+    // The levelshot of the match the browser would open on.
+    std::string levelshot; idStr SelectedLevelshot() const { return idStr(levelshot.c_str()); }
 } arenaCampaign;
 struct MapSpawnData { idDict serverInfo; };
 // A map decl plays the game types it names with "1"; the production MAPScan
@@ -1651,8 +1653,14 @@ int main() {
         CHECK(create && std::string(create->Name()) == "guis/menu/createserver.q4ui" && s.RetainedCreateServerPage() == create);
         // Each map's levelshot waits for the title's idle frames, or for the page.
         CHECK(s.retainedLevelshots.Num() == 3 && std::count(precached.begin(), precached.end(), std::string("gfx/guis/loadscreens/q4dm5")) == 0);
+        const int opening = latePrecaches;
         s.HandleRetainedSessionRequest(s.guiRetainedHome, "multiplayer"); commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
         auto* page = s.guiRetainedMpPage; CHECK(s.guiActive == page);
+        // CREATE SERVER's summary (section 13.7) shows si_map's levelshot,
+        // read as the page opens and so no longer waiting for the idle frames.
+        CHECK(page->state["summary.create.shot"] == "gfx/guis/loadscreens/q4dm5");
+        CHECK(s.retainedLevelshots.Num() == 2 && latePrecaches == opening);
+        CHECK(std::count(precached.begin(), precached.end(), std::string("gfx/guis/loadscreens/q4dm5")) == 1);
         s.HandleRetainedSessionRequest(page, "multiplayerCreate");
         CHECK(s.retainedSubpageFrom == page && page->named.back() == "subpageEnterCreate" && s.retainedSubpageDeeper &&
               s.retainedSubpageKind == RETAINED_SUBPAGE_CREATE_SERVER && s.retainedSubpageUntil == commonObject.time + 350 &&
@@ -2341,6 +2349,23 @@ int main() {
         CHECK(s.guiRetainedHome != nullptr && s.guiRetainedHome == s.guiRetainedTitle && s.guiRetainedHome->active &&
               s.guiRetainedHome->named.back() == "returnHome" && !s.retainedPageReturn);
         CHECK(s.played.size() == played + 1 && s.played.back() == "play main_menu_selection" && s.menus == 0);
+    }
+    {   // The Single Player page's section summaries (section 13.7): CAMPAIGN
+        // over the newest save's picture (CONTINUE's), ARENA over the match its
+        // browser would open on, each read as a precache; a levelshot still
+        // waiting for the idle frames is read there instead, once. Without a
+        // save or a loaded campaign, neither shows a picture.
+        auto s = Session(true); s.saves = {"quick", "autosave"}; arenaCampaign.levelshot = "gfx/guis/loadscreens/arena1";
+        idSessionLocal::retainedLevelshot_t queued; queued.name = "gfx/guis/loadscreens/arena1"; queued.material = true;
+        s.retainedLevelshots.Append(queued);
+        s.OpenCampaignSelector(false); auto* page = s.guiActive;
+        CHECK(page->state["summary.campaign.shot"] == "savegames/quick.tga" && page->state["summary.arena.shot"] == "gfx/guis/loadscreens/arena1");
+        CHECK(std::count(precached.begin(), precached.end(), std::string("savegames/quick.tga")) == 1 &&
+              std::count(precached.begin(), precached.end(), std::string("gfx/guis/loadscreens/arena1")) == 1);
+        CHECK(latePrecaches == 0 && !declManagerObject.insideLoad && s.retainedLevelshots.Num() == 0 &&
+              declManagerObject.materials.back() == "gfx/guis/loadscreens/arena1");
+        auto fresh = Session(true); fresh.OpenCampaignSelector(false);
+        CHECK(fresh.guiActive->state["summary.campaign.shot"] == "" && fresh.guiActive->state["summary.arena.shot"] == "" && precached.empty());
     }
     {   // The campaign selectors: the retained ones while installed, the stock ones otherwise.
         auto s = Session(true); s.OpenCampaignSelector(false);
@@ -5837,7 +5862,9 @@ def main() -> int:
         'static bool Session_RetainedHomePopup(', 'static const char *Session_RetainedHomeMissingPage(',
         'static bool Session_RetainedMultiplayerRoutes(',
         'static void Session_RetainedSaveLabel(', 'static idStr Session_RetainedSaveShot(', 'static void Session_RetainedSaveStamp(',
-        'static void Session_RetainedSaveDetails(', 'static void Session_PublishRetainedTitleState(', 'idUserInterface *idSessionLocal::FindRetainedGui(',
+        'static void Session_RetainedSaveDetails(', 'static void Session_PublishRetainedTitleState(',
+        'static void Session_PublishSummaryShot(', 'static void Session_PublishSinglePlayerSummaries(',
+        'static void Session_PublishMultiplayerSummaries(', 'idUserInterface *idSessionLocal::FindRetainedGui(',
         'bool idSessionLocal::RetainedSystemAvailable(', 'bool idSessionLocal::ReturnSystemSettings(', 'void idSessionLocal::OpenCampaignSelector(',
         'bool idSessionLocal::OpenRetainedCampaignSkill(', 'bool idSessionLocal::OpenRetainedCampaignChapters(', 'void idSessionLocal::BeginRetainedCampaignSkill(',
         'bool idSessionLocal::RetainedHomeInputBlocked(',

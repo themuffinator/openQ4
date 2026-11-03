@@ -6,6 +6,28 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Section summaries, 3 November 2026
+
+- Section 13.7 has a section that leads deeper summarize itself in the
+  content column, with a levelshot where one fits. The Single Player page's
+  CAMPAIGN and ARENA and the Multiplayer page's JOIN GAME, CREATE SERVER,
+  DEMOS and PLAYER SETUP now show a sentence of their own there
+  (`#str_231552` to `#str_231557`, in all twelve tables) while they are the
+  subject, and BACK keeps the page's description.
+- A control's feedback reaches only its own subtree, so the plates could not
+  light the column. The document format's detail definition now takes an
+  optional `card`: without one the runtime only writes the subject's detail
+  to its state, and the column binds `summary.section`.
+- CAMPAIGN stands over the newest save's levelshot, ARENA over the match the
+  Arena page would open on (`idArenaCampaign::SelectedLevelshot`) and CREATE
+  SERVER over `si_map`'s. The session publishes them as each page opens,
+  reads them as precaches and takes them out of the idle-frame queue. No
+  picture shows in a tall view or when text would reach it.
+- `UiDocumentTest`, `ui_retained_gate.py`, the session harnesses, the 170 UI
+  native tests and the `summaries` OpenGL capture (16:9 and 9:16) pass.
+  Opening the Multiplayer page still late-loads Player Setup's preview model
+  and crosshairs, as it did before this change.
+
 ## Spectate on Join Game, 3 November 2026
 
 - Section 13.7's list pattern names Join, Spectate and Favorite. The prompt

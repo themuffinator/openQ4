@@ -92,6 +92,15 @@ may sit inside it. It never takes the focus, and it should not take the
 pointer (`pointer-events: none`). `UiDocumentTest` holds the schema, and
 `RetainedUiTest` holds the subject and the placement.
 
+A definition without `card` (`{"state": "summary.section", "none": -1}`)
+keeps only the state: the runtime writes the subject's detail as above and
+places nothing, and the document's bindings show what it names where it
+stands. The menu levels' section summaries use it (section 13.7): a
+control's feedback reaches only its own subtree, so a plate cannot light a
+summary in the content column itself; it names its section, and the column
+shows that section's summary, or the page's description for BACK or when
+nothing is the subject.
+
 ## Interaction ownership
 
 `Interaction` is independent of RmlUi, engine headers and devices. The layout

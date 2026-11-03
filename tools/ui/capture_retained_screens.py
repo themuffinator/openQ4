@@ -1460,6 +1460,28 @@ SCENARIOS = {
     ]),
     # Back on the Single Player page the title's SINGLE PLAYER opened returns
     # the title, its bands coming home and SINGLE PLAYER still focused.
+    # Each section summarizes itself in the content column while it is the
+    # subject (section 13.7): Single Player's CAMPAIGN (no save in a fresh
+    # profile, so no picture) and ARENA over its chosen match's levelshot,
+    # then Multiplayer's JOIN GAME and CREATE SERVER over si_map's; BACK
+    # keeps the page's description.
+    'summaries': (None, [
+        # A fresh build's first start can run past the usual wait; the title
+        # refuses focus until it has arrived.
+        'waitMsec 7000', 'openq4_retainedGui focus nav_singleplayer', 'openq4_retainedGui menu accept 1',
+        'openq4_retainedGui menu accept 0', 'waitMsec 1800', 'openq4_retainedGui inspect "summary-campaign"',
+        'screenshot "screenshots/summaries-campaign.tga"',
+        'openq4_retainedGui focus arena', 'waitMsec 300', 'openq4_retainedGui inspect "summary-arena-shot"',
+        'screenshot "screenshots/summaries-arena.tga"',
+        'openq4_retainedGui focus back', 'waitMsec 300', 'openq4_retainedGui inspect "description"',
+        'screenshot "screenshots/summaries-back.tga"',
+        'openq4_retainedGui menu back 1', 'openq4_retainedGui menu back 0', 'waitMsec 1500',
+        'openq4_retainedGui focus nav_multiplayer', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 2500', 'openq4_retainedGui inspect "summary-join"', 'screenshot "screenshots/summaries-join.tga"',
+        'openq4_retainedGui focus create', 'waitMsec 300', 'openq4_retainedGui inspect "summary-create-shot"',
+        'screenshot "screenshots/summaries-create.tga"',
+        'openq4_retainedGui focus setup', 'waitMsec 300', 'screenshot "screenshots/summaries-setup.tga"',
+    ]),
     'singleplayer-back': (None, [
         'waitMsec 4000', 'openq4_retainedGui focus nav_singleplayer', 'openq4_retainedGui menu accept 1',
         'openq4_retainedGui menu accept 0', 'waitMsec 1800', 'ui_retainedStatus', 'screenshot "screenshots/singleplayer-page.tga"',
@@ -1634,7 +1656,7 @@ SCENARIO_CVARS = {'mpcard-prompts': {'ui_retainedMultiplayer': '1'}, 'mpcard-tri
                   'settings-system': {'ui_retainedSystem': '1'},
                   'fallback-loading': {'developer': '1'}, 'subpage-reduced': {'ui_retainedReducedMotion': '1'},
                   'arenafail': {'net_port': str(SCENARIO_PORTS['arenafail']), 'net_ip': '127.0.0.1'},
-                  'multiplayer': {'net_allowCheats': '1'},
+                  'multiplayer': {'net_allowCheats': '1'}, 'summaries': {'si_map': 'mp/q4dm5'},
                   'createserverstart': {'net_ip': '127.0.0.1'},
                   'joingame': {'net_ip': '127.0.0.1'}, 'joingameaddress': {'net_ip': '127.0.0.1'},
                   'join-details-view': {'net_ip': '127.0.0.1'}, 'join-view-glyphs': {'net_ip': '127.0.0.1'},

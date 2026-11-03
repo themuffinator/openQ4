@@ -228,6 +228,8 @@ struct Control {
 // than 555 dp into the card's containing block; 6 dp under a focused control,
 // over it when the card would cross the view's edge; always 16 dp inside the
 // view. The card holds no controls and the runtime owns its left and top.
+// Without a card (empty) only the state follows the subject: the document's
+// bindings show what it names in place, as a page section's summary does.
 struct DetailSpec {
 	std::string state, card;
 	double none = -1;

@@ -6872,6 +6872,53 @@ static void Session_PublishRetainedTitleState( idUserInterface *gui, idSessionLo
 	gui->StateChanged( common->GetPresentationTime() );
 }
 
+// A page section's summary picture (section 13.7), read now as a precache
+// rather than a late load; an empty name shows none. A levelshot still
+// waiting for the idle frames (map's, or the picture itself) is read here
+// instead, so each is read once.
+static void Session_PublishSummaryShot( idSessionLocal *session, idUserInterface *page, const char *state, const idStr &shot,
+	const char *map = NULL ) {
+	if ( shot.Length() > 0 ) {
+		const bool insideLoad = declManager->GetInsideLoad();
+		declManager->SetInsideLoad( true );
+		for ( int i = session->retainedLevelshots.Num() - 1; i >= 0; i-- ) {
+			const idSessionLocal::retainedLevelshot_t &queued = session->retainedLevelshots[ i ];
+			if ( queued.map ? map != NULL && !idStr::Icmp( queued.name.c_str(), map ) : !idStr::Icmp( queued.name.c_str(), shot.c_str() ) ) {
+				if ( queued.material ) {
+					declManager->FindMaterial( queued.name.c_str() );
+				}
+				session->retainedLevelshots.RemoveIndex( i );
+			}
+		}
+		UI_RetainedPrecacheImage( shot.c_str() );
+		declManager->SetInsideLoad( insideLoad );
+	}
+	page->SetStateString( state, shot.c_str() );
+}
+
+// Single Player's summaries: CAMPAIGN over the newest save's levelshot (the
+// one CONTINUE shows), ARENA over the match its browser would start.
+static void Session_PublishSinglePlayerSummaries( idUserInterface *page, idSessionLocal *session ) {
+	idStrList fileList;
+	idList<fileTIME_T> fileTimes;
+	session->GetSaveGameList( fileList, fileTimes );
+	idStr campaign;
+	if ( fileTimes.Num() > 0 ) {
+		const idStr &slot = fileList[ fileTimes[0].index ];
+		sessionMenuSaveDescription_t description;
+		const bool described = Session_MenuReadSaveDescription( slot, description );
+		campaign = Session_RetainedSaveShot( slot, description, described, "" );
+	}
+	Session_PublishSummaryShot( session, page, "summary.campaign.shot", campaign );
+	Session_PublishSummaryShot( session, page, "summary.arena.shot", arenaCampaign.SelectedLevelshot() );
+}
+
+// Multiplayer's summaries: CREATE SERVER over the map it would host.
+static void Session_PublishMultiplayerSummaries( idUserInterface *page, idSessionLocal *session ) {
+	const char *map = cvarSystem->GetCVarString( "si_map" );
+	Session_PublishSummaryShot( session, page, "summary.create.shot", map[0] != '\0' ? session->RetainedPauseShot( map ) : idStr(), map );
+}
+
 /*
 ===============
 idSessionLocal::FindRetainedGui
@@ -6941,6 +6988,7 @@ void idSessionLocal::OpenCampaignSelector( bool campaigns, bool fromArena, bool 
     } else if ( gui != NULL ) {
         // Back from Arena returns onto ARENA; the activation reads it.
         gui->SetStateBool( "from_arena", fromArena );
+        if ( !stock ) Session_PublishSinglePlayerSummaries( gui, this );
         gui->StateChanged( common->GetPresentationTime() );
     }
     SetGUI( gui, NULL );
@@ -7876,6 +7924,7 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 		page->SetStateBool( "from_join", false );
 		page->SetStateBool( "from_demos", false );
 		page->SetStateBool( "from_setup", false );
+		Session_PublishMultiplayerSummaries( page, this );
 		page->StateChanged( common->GetPresentationTime() );
 	} else if ( settings ) {
 		// From the home the page starts on CONTROLS.
@@ -8603,6 +8652,7 @@ bool idSessionLocal::OpenRetainedMultiplayerPage( const char *section ) {
 	page->SetStateBool( "from_join", section != NULL && !idStr::Icmp( section, "join" ) );
 	page->SetStateBool( "from_demos", section != NULL && !idStr::Icmp( section, "demos" ) );
 	page->SetStateBool( "from_setup", section != NULL && !idStr::Icmp( section, "setup" ) );
+	Session_PublishMultiplayerSummaries( page, this );
 	page->StateChanged( common->GetPresentationTime() );
 	SetGUI( page, NULL );
 	return true;

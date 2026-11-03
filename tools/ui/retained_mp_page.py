@@ -27,13 +27,18 @@ from build_retained_screens import (ACCEL, BOTTOM_TO_PAGE, CANVAS_W, CRUMB_SCALE
                                     SUBPAGE_REVERSE_MS, SUBPAGE_SLOT, TITLE_SLOT, TOP_TO_PAGE, TOP_TO_SUBPAGE, U, Document, absolute,
                                     by_language, colour, crumb_fits, crumb_transform, fixed_text, framing_bands, group, keyword, label,
                                     length, lit_field, navigation_plate, number, page_prompts, reflow_details, rgb, tall_page, OLIVE, track, transform,
-                                    typeface, wrap_menu)
+                                    typeface, wrap_menu, section_summaries, summary_subject, fit_summary_shots, SUMMARY_JOIN,
+                                    SUMMARY_CREATE, SUMMARY_DEMOS, SUMMARY_SETUP)
 from retained_difficulty import check_fits
 
 NAV_TOP = 181.0    # the stock Multiplayer page's first button (mp_b1)
 SECTIONS = (("join", "#str_200187", "multiplayerJoin"), ("create", "#str_200026", "multiplayerCreate"),
             ("demos", "#str_41500", "multiplayerDemos"), ("setup", "#str_231122", "multiplayerSetup"))
 DESCRIPTION = "#str_231550"    # the page's description, naming its four sections
+# Each section summarizes itself in the content column while it has focus or
+# hover (section 13.7): CREATE SERVER over its map's levelshot.
+SUMMARIES = [("join", SUMMARY_JOIN, None), ("create", SUMMARY_CREATE, "summary.create.shot"),
+             ("demos", SUMMARY_DEMOS, None), ("setup", SUMMARY_SETUP, None)]
 DEPART_MS = 300    # the stock page's slide; the stock page arrives at 500 ms
 DETAILS = (210.0, 140.0)    # the content column's box, u
 DETAIL_TEXT, DETAIL_LINE = 18, 26
@@ -50,7 +55,8 @@ def check_multiplayer_fits() -> None:
     labels = [key for _, key, _ in SECTIONS] + ["#str_230045"]
     check_fits(tuple((key, "marine", 24, U * 314 / 1.03) for key in labels) +
                (("#str_200002", "marine", 18, U * PAGE_TITLE_W),),
-               ((DESCRIPTION, "lowpixel", DETAIL_TEXT, U * DETAILS[0], int(U * DETAILS[1] // DETAIL_LINE)),))
+               tuple((key, "lowpixel", DETAIL_TEXT, U * DETAILS[0], int(U * DETAILS[1] // DETAIL_LINE))
+                     for key in (DESCRIPTION, *(key for _, key, _ in SUMMARIES))))
 
 
 def multiplayer_document() -> dict:
@@ -89,7 +95,7 @@ def multiplayer_document() -> dict:
     buttons = []
     for ident, key, action in SECTIONS:
         doc.session(action, action)
-        buttons.append(navigation_plate(doc, ident, key, action=action))
+        buttons.append(navigation_plate(doc, ident, key, action=action, subject=summary_subject(ident, SUMMARIES)))
     buttons.append(navigation_plate(doc, "back", "#str_230045", action="back"))
     wrap_menu(buttons)
     description = label("description", DESCRIPTION, {**absolute(left=0, top=0, width=U * DETAILS[0], height=U * DETAILS[1]),
@@ -101,13 +107,19 @@ def multiplayer_document() -> dict:
     canvas = {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2)}
     details = group("details", {**absolute(left=U * 395, top=U * 190, width=U * DETAILS[0], height=U * DETAILS[1]), "opacity": number(0)},
                     [description])
-    # The description grows with the text above 100 % (section 2).
-    reflow_details(doc, details, (DESCRIPTION,))
+    summary_keys, shots = section_summaries(doc, details, SUMMARIES)
+    # The description, and each summary, grows with the text above 100 % (section 2).
+    reflowed = reflow_details(doc, details, (DESCRIPTION, *summary_keys))
     navigation = group("navigation", {**absolute(left=0, top=U * NAV_TOP, width=U * 357), "display": keyword("flex"),
                                       "flex-direction": keyword("column"), "opacity": number(1)}, buttons)
-    content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [navigation, details])
+    content = group("content", {**canvas, "transform": transform(), "opacity": number(1)}, [navigation, details, *shots])
     # A tall view stands the plates and the description in one column.
-    tall_page(doc, content, navigation, details, (DESCRIPTION,))
+    tall_page(doc, content, navigation, details, (DESCRIPTION, *summary_keys))
+    fit_summary_shots(doc, shots, SUMMARIES, reflowed)
+    # Player Setup's editor takes the column's place, its levelshots too.
+    for shot in shots:
+        binding = next(b for b in doc.bindings if b["node"] == shot["id"] and b["property"] == "display")
+        binding["value"] = {"op": "select", "args": [{"state": "setup.open"}, "none", binding["value"]]}
     from retained_player_setup import player_setup
     content["children"].append(player_setup(doc))
     for ident in ("navigation", "details"):

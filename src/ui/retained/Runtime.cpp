@@ -2283,9 +2283,9 @@ struct Runtime::Impl {
 		state = std::move(candidate); ApplyControlBindings(); ApplyMotion(); return true;
 	}
 	// Places the detail card beside its subject by the card's measured box
-	// (DetailSpec). A hidden card is not placed. True when it moved.
+	// (DetailSpec). A hidden card, or none, is not placed. True when it moved.
 	bool PlaceDetailCard() {
-		if (!canonical || !canonical->Model().detail || detailSubject.empty()) return false;
+		if (!canonical || !canonical->Model().detail || canonical->Model().detail->card.empty() || detailSubject.empty()) return false;
 		auto* card = CanonicalElement(canonical->Model().detail->card);
 		auto* subject = CanonicalElement(detailSubject);
 		if (!card || !subject) return false;

@@ -418,8 +418,9 @@ static void CheckCompletionSchema() {
 }
 
 // A detail card: a control naming a detail needs the document's definition,
-// whose state is a declared number and whose card is a node below the root
-// that holds no controls and whose left and top nothing else owns.
+// whose state is a declared number and whose card, where it names one, is a
+// node below the root that holds no controls and whose left and top nothing
+// else owns.
 static void CheckDetailSchema() {
 	const auto document = [](const std::string& detail, const std::string& control, const std::string& timelines = "",
 		const std::string& bindings = "") {
@@ -468,6 +469,13 @@ static void CheckDetailSchema() {
 		"cannot be animated"),"or animates its top");
 	Check(refused(document(R"(,"detail":{"state":"subject","card":"card","side":"left"})",""),"Unknown field"),"the definition has no other fields");
 	Check(refused(document(definition,R"(,"detail":"three")"),"number"),"a control's detail is a number");
+	// Without a card only the state follows the subject (a page section's
+	// summary, shown in place), and the card's left and top are anyone's.
+	Check(valid(document(R"(,"detail":{"state":"subject"})",R"(,"detail":2)",
+		"",R"(,"bindings":[{"id":"left","node":"card","property":"left","value":{"state":"subject"}}])"),model) &&
+		model.Model().detail && model.Model().detail->card.empty() && model.Model().detail->none == -1,
+		"a definition without a card names only its state");
+	Check(refused(document(R"(,"detail":{"card":"card"})",""),"stable ID"),"a definition always names its state");
 }
 
 int main() {

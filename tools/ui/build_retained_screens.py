@@ -343,6 +343,82 @@ def reflow_details(doc: "Document", details: dict, keys) -> None:
             doc.bind(f"text.{ident}.top", ident, "top", {"op": "select", "args": [LARGER, risen, own["top"]["value"]]})
         doc.bind(f"text.{ident}.width", ident, "width", {"op": "select", "args": [LARGER, wide, own["width"]["value"]]})
         doc.bind(f"text.{ident}.height", ident, "height", {"op": "select", "args": [LARGER, tall, own["height"]["value"]]})
+    # Where the column starts above 100 % text, for what stands over it.
+    return {"op": "select", "args": [LARGER, risen, top]}
+
+
+# A page section's summary (section 13.7: a section that leads deeper
+# summarizes itself in the content column, with a levelshot where one fits,
+# until Accept opens it): its sentence in the description's place and, where
+# the session publishes one, a levelshot over the column. The picture is
+# 4:3 like the levelshots, 8 u over the column, under the docked top band.
+SUMMARY_SHOT = (395.0, 77.0, 140.0, 105.0)   # u: left, top, width, height
+# The sections' sentences, in every shipped language.
+SUMMARY_CAMPAIGN, SUMMARY_ARENA = "#str_231552", "#str_231553"
+SUMMARY_JOIN, SUMMARY_CREATE, SUMMARY_DEMOS, SUMMARY_SETUP = "#str_231554", "#str_231555", "#str_231556", "#str_231557"
+
+
+# The section the pointer is over, else the focused one, as the runtime writes
+# it (the document's detail definition, without a card): its index, or -1.
+SUMMARY_STATE = "summary.section"
+
+
+def summary_id(ident: str) -> str:
+    return f"summary-{ident}"
+
+
+def section_summaries(doc: Document, details: dict, sections: list) -> tuple:
+    """Each of `sections` (plate ident, sentence key, the state naming its
+    levelshot or None) gets its summary: a label in `details`, laid as the
+    description is, and where it has a levelshot a picture over the column.
+    A control's feedback reaches only its own subtree, so the plates name
+    their sections (`summary_subject`) and the runtime writes the subject's
+    to SUMMARY_STATE: its summary shows, and the description shows for BACK,
+    or with no subject. Returns the summary keys, for the column's fit and
+    reflow, and the pictures' groups, which `reflowed` (reflow_details'
+    result) and the tall view keep clear of the text."""
+    from retained_saves import picture_frame
+    doc.state[SUMMARY_STATE] = {"type": "number", "initial": -1}
+    doc.detail = {"state": SUMMARY_STATE, "none": -1}
+
+    def shown(index: int) -> dict:
+        return {"op": "select", "args": [{"op": "==", "args": [{"state": SUMMARY_STATE}, index]}, 1, 0]}
+    description = next(child for child in details["children"] if child.get("type") == "text")
+    description["properties"]["opacity"] = number(1)
+    doc.bind(f"{description['id']}.opacity", description["id"], "opacity", shown(-1))
+    style = {key: value for key, value in description["properties"].items() if key != "text"}
+    shots = []
+    for index, (ident, key, shot_state) in enumerate(sections):
+        details["children"].append(label(summary_id(ident), key, {**style, "opacity": number(0)}))
+        doc.bind(f"{summary_id(ident)}.opacity", summary_id(ident), "opacity", shown(index))
+        if shot_state:
+            doc.state[shot_state] = {"type": "string", "initial": ""}
+            left, top, width, height = SUMMARY_SHOT
+            frame = picture_frame(f"{summary_id(ident)}-shot", left, top, width, height)
+            shots.append(group(f"{summary_id(ident)}-shots", {**absolute(left=0, top=0, width=CANVAS_W, height=720),
+                                                                "opacity": number(0), "pointer-events": keyword("none")}, frame))
+            doc.bind(f"{summary_id(ident)}-shots.opacity", f"{summary_id(ident)}-shots", "opacity", shown(index))
+            doc.bind(f"{summary_id(ident)}-shot.image", f"{summary_id(ident)}-shot", "image", {"state": shot_state})
+    return [key for _, key, _ in sections], shots
+
+
+def summary_subject(ident: str, sections: list) -> int | None:
+    """The detail a section's plate names: its index in `sections`."""
+    return next((index for index, (section, _key, _shot) in enumerate(sections) if section == ident), None)
+
+
+def fit_summary_shots(doc: Document, shots: list, sections: list, reflowed) -> None:
+    """A section's levelshot shows while the session names one, while the
+    column's text, grown, stays clear of it, and never in a tall view, where
+    the column stands under the plates."""
+    _left, top, _width, height = SUMMARY_SHOT
+    clear = {"op": ">=", "args": [reflowed, U * (top + height + 8)]}
+    for node, (ident, _key, shot_state) in zip(shots, [s for s in sections if s[2]]):
+        named = {"op": "!=", "args": [{"state": shot_state}, ""]}
+        node["properties"]["display"] = keyword("none")
+        doc.bind(f"{node['id']}.display", node["id"], "display",
+                 {"op": "select", "args": [{"op": "&&", "args": [named, clear]}, "block", "none"]})
+        tall_bind(doc, node, "display", "none")
 
 
 # Tall views of the menu levels (sections 3 and 13.3, "adapt, don't shrink"):
@@ -808,13 +884,14 @@ NAV_LEAD = 900.0  # a navigation button starts this far left of the canvas, past
 
 
 def navigation_plate(doc: Document, ident: str, key: str, *, action: str | None = None,
-                     event: str | None = None, detail: dict | None = None) -> dict:
+                     event: str | None = None, detail: dict | None = None, subject: int | None = None) -> dict:
     """A dark navigation plate that bleeds off the leading edge (section 9):
     b1_dark drawn at 413x52 u on a 30 u pitch, its visible band rows 16-45 of
     64, opaque to 44 %, half at 62 %, gone by 88 % of the width (Appendix B.1);
     the corner marker at 32 u and a Marine 24 dp label at 44 u. The whole
     30 u pitch is the target, from the view's leading edge to 357 u. `detail`
-    is the item's message-line explanation, shown while it has hover or focus."""
+    is the item's message-line explanation, shown while it has hover or focus;
+    `subject` the detail it names, a page section's (section_summaries)."""
     lead = NAV_LEAD
     width = lead + 357 * U
     x0 = lead                                     # canvas x = 0 in button coordinates
@@ -877,6 +954,8 @@ def navigation_plate(doc: Document, ident: str, key: str, *, action: str | None 
         control["action"] = action
     else:
         control["event"] = event
+    if subject is not None:
+        control["detail"] = subject
     # The label keeps its size in the plate's band on the stock 30 u pitch
     # at any text size, as the title it carries into does.
     fixed_text(doc, text_node)
@@ -2967,9 +3046,13 @@ def campaign_document(campaigns: bool) -> dict:
         rows = [("newgame", "#str_200000", "campaignNew"), ("chapters", "#str_231280", "campaignChapters")]
     else:
         rows = [("campaign", "#str_230038", "campaigns"), ("arena", "#str_42002", "campaignArena")]
+    # Single Player's sections summarize themselves (section 13.7): CAMPAIGN
+    # over the newest save's levelshot, ARENA over its chosen match's.
+    summaries = [] if campaigns else [("campaign", SUMMARY_CAMPAIGN, "summary.campaign.shot"),
+                                      ("arena", SUMMARY_ARENA, "summary.arena.shot")]
     for ident, key, action in rows:
         doc.session(action, action)
-        buttons.append(navigation_plate(doc, ident, key, action=action))
+        buttons.append(navigation_plate(doc, ident, key, action=action, subject=summary_subject(ident, summaries)))
     buttons.append(navigation_plate(doc, "back", "#str_230045", action="back"))
     wrap_menu(buttons)
     details = []
@@ -2992,14 +3075,18 @@ def campaign_document(campaigns: bool) -> dict:
     bands[1]["properties"]["transform"] = transform(*BOTTOM_TO_PAGE)
     nav_top = 190.0
     details_group = group("details", {**absolute(left=U * 395, top=U * 190, width=U * 210, height=U * 140), "opacity": number(0)}, details)
-    # The description grows with the text above 100 % (section 2).
-    reflow_details(doc, details_group, [node["properties"]["text"]["value"] for node in details])
+    keys = [node["properties"]["text"]["value"] for node in details]
+    summary_keys, shots = section_summaries(doc, details_group, summaries) if summaries else ([], [])
+    # The description, and each summary, grows with the text above 100 % (section 2).
+    reflowed = reflow_details(doc, details_group, keys + summary_keys)
     navigation = group("navigation", {**absolute(left=0, top=U * nav_top, width=U * 357), "display": keyword("flex"),
                                       "flex-direction": keyword("column"), "opacity": number(1)}, buttons)
     content = group("content", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2),
-                                "transform": transform(), "opacity": number(1)}, [navigation, details_group])
+                                "transform": transform(), "opacity": number(1)}, [navigation, details_group, *shots])
     # A tall view stands the plates and the description in one column.
-    tall_page(doc, content, navigation, details_group, [node["properties"]["text"]["value"] for node in details])
+    tall_page(doc, content, navigation, details_group, keys + summary_keys)
+    if summaries:
+        fit_summary_shots(doc, shots, summaries, reflowed)
     # The titles ride outside the sweeping content, in canvas coordinates.
     crumb_key = "#str_42000"
     if campaigns:
