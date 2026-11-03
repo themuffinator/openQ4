@@ -2334,6 +2334,98 @@ Create Server's options and Join Game's other controls (which keep their
 size), Restart Level, Credits, the Arena page and the campaign skill page
 keep their 100 % rows; the scrollbar's wheel step stays one 100 % row.
 
+## The remaining pages follow the text size (3 November 2026)
+
+Section 2's text-scale contract (`LAY-004`) now holds on the retained pages
+the list increment left: furniture keeps its size (`fixed_text`), content
+grows with the text in the room its frame leaves, and no essential action
+leaves the screen.
+
+- **Setting rows** (Create Server's options and its advanced dialog, Player
+  Setup, Join Game's FIND PLAYER/CLAN): a column that cannot widen stacks
+  each row above 100 % (`retained_mp_menus.stack_row`): the row grows with
+  the text, its label runs across the row on the lines the running language
+  needs (two where a long translation does), and the value, check box,
+  slider or field stands under it from the label's edge, a choice's value
+  ending in an ellipsis past the row (its list shows it whole). Check boxes,
+  chevrons and slider tracks keep their size; a choice's options grow with
+  the text. Create Server's options and advanced rows scroll in their
+  column, as Player Setup's already did; a lone entry field (JOIN IP
+  ADDRESS) grows in its place. The entry dialogs, the Arena's reset question
+  and its ledger grow with what they hold, as a confirmation grows with its
+  body (`confirmation`'s `contents_grow`).
+- **Player Setup's rail colour** keeps its swatches' size, under its label;
+  PREVIOUS, NEXT, CLOSE and the heading keep theirs. The model's name and the
+  notice grow.
+- **Restart Level** (both families): the chosen difficulty's description
+  runs on to the 4:3 view's margin and takes the lines the running language
+  needs, and RESTART LEVEL moves down under it; the plates keep their size.
+- **The campaign's difficulty** grows its description as a page's content
+  column does (`reflow_details`, which now takes a lone label whose column
+  starts elsewhere than 395 u), and TURBO's value keeps its size. In
+  CHAPTERS the levels' rows grow (`grow_rows`), the chosen level's name and
+  explanation grow under the picture, which gives them its room down to the
+  docked bottom band (and gives way where too little is left), and START
+  CHAPTER and BACK stand side by side under the levels instead.
+- **Objectives**: an objective's title keeps its two lines and runs on
+  across the plate with its description; the empty state's line and plate
+  grow; each completed objective's row grows, its title ending in an
+  ellipsis. The heading, COMPLETED and the serial keep their size.
+- **MODS**: the mods' rows grow, and the selected mod's details stand on a
+  pitch that grows from the same foot over the actions, the list scrolling
+  through fewer rows; NAME, VERSION and the details' labels keep their size.
+- **Credits**: a screen is a timed composition that cannot reflow into more
+  screens, so each grows as one, lines, pitch and letters, by the text size
+  or as far as its lines stand between the title and the prompt bar and end
+  before the 4:3 view's margin, whichever is less (from about 1.05 times on
+  the fullest screens to 2.1 on the shortest).
+- **Join Game**: the scan's status grows upward from its place, the filter
+  row and the list's foot moving up with it; the empty state's sentence
+  wraps onto the lines it needs, its action moving down; the details card
+  grows as one with the text, its headings keeping their size. The sources,
+  spinners, filter tags, headings and actions keep their size.
+- **Arena**: the chosen match's name, description and info grow under its
+  levelshot, which gives them its room from its foot (and gives way, with
+  its best-result badge, where too little is left); DIFFICULTY, its steps
+  and START MATCH move down only as far as the lines still need. The
+  match's and the tier's descriptions keep the three lines the stock boxes
+  give them, so at 200 % a long one shows less of itself than at 100 %
+  (a known limit: the column has no room for more). The briefing grows down
+  the matches' column, its static rule giving way where it would cross the
+  bottom band (the path above it says the same); the progress line wraps
+  onto a second line under the ladder so that its count stays whole. The
+  entrance card grows as one, up to 1.25 times, which the canvas holds.
+- **Tall views.** Restart Level, the campaign's difficulty and its chapters
+  follow the text in their tall column too, and take it only in a portrait
+  view that holds it at the running size (`TallLayout.fits` now takes the
+  heights at 150 and 200 %); in the views between, their landscape
+  arrangement stands. Their chapters' list shows two levels at least at
+  150 % and one at 200 % in the shortest such view. Player Setup gains a
+  tall arrangement in the Multiplayer page's column: the heading and rows
+  across the column up to 1.6 times their size, the notice under them, and
+  the model preview filling the rest of the height with the figure centred
+  and its name under it. Credits' names and the Arena's content keep the
+  tall view's own size there, as the list pages' details do.
+- **At 100 %** every property evaluates as before in landscape and tall
+  views (the bindings diffed against the previous documents at view.text 1
+  over twelve aspects and every language), but for property defaults made
+  explicit (an `overflow: auto` on two rows columns that their rows exactly
+  fill, `text-overflow: clip`, `display: block`), vector art converted to
+  fractions of the same box, Player Setup's new tall arrangement, and tall
+  font sizes of newly fixed furniture that differ from the old rounded
+  constants by less than 0.0001 dp. `fit_narrow` now carries a binding on a
+  part's `top` over to its centred offset.
+
+The native groups check each page at 100, 150 and 200 % on 16:9, 4:3 and
+the 0.78 and 9:16 portrait views (`CheckTextScaleCase`): chains of parts that
+must stand one under another without overlapping, parts that must stay
+inside their row or dialog, essential controls and every shown text outside
+a scrolling body on the screen, furniture at one size (its authored size in
+landscape), and every node back in place at 100 %. Credits' lines also stay
+between the title and the prompt bar and grow by no more than the text.
+Engine captures on OpenGL at 200 %, 16:9 and 9:16, are listed in the
+release-completion record.
+
 ## Menu levels in tall views (31 October 2026)
 
 In a portrait or rotated window the menu levels shrank the 4:3 composition

@@ -1451,6 +1451,132 @@ def value_row(doc: Document, ident: str, label_key: str | None, kind: str, width
     return row
 
 
+def stack_row(doc: Document, row: dict, width: float, value_x: float, row_h: float) -> None:
+    """Section 2's reflow of a setting row (value_row, match_number_row or
+    create_server.text_row) in a column that cannot widen: above 100 % text
+    the row grows with the text, its label over its value, each line half
+    the 100 % row's height times the text size. The label runs across the
+    row on the lines the running language needs (one, or two where a long
+    translation needs them); the value, the check box, the slider or the
+    field starts at the label's edge on the line under it and runs to the
+    row's end, a choice's value ending in an ellipsis past it; a field's
+    validation line stays under the row. The check box, chevron and slider
+    track are furniture and keep their size. A choice's options grow with
+    the text. Every binding gives the authored value at 100 %
+    (check_text_bindings); generation fails where a label in a shipped
+    language needs more than two lines at 200 %."""
+    b.text_source(doc)
+    TEXT, LARGER = b.TEXT, b.LARGER
+    ident = row["id"]
+    nodes = {node["id"]: node for node in b.walk_nodes(row)}
+    role = row["control"]["role"]
+
+    def larger(node: str, key: str, grown, authored=None) -> None:
+        if authored is None:
+            authored = nodes[node]["properties"][key]["value"]
+        doc.bind(f"text.{node}.{key}", node, key, {"op": "select", "args": [LARGER, grown, authored]})
+    half = {"op": "*", "args": [row_h / 2, TEXT]}
+    lead = half    # the value's line: under the label's
+    if f"{ident}-head" in nodes:
+        caption = nodes[f"{ident}-label"]["properties"]
+        face, size = caption["font-family"]["value"], caption["font-size"]["value"]
+        counts = b.wrapped_lines((row["control"]["label"],), face, size, width - 33)
+        for language, found in counts.items():
+            if found[2] > 2:
+                raise SystemExit(f"{ident}'s label in {language} needs {found[2]} lines of its row at 200 % text")
+        if any(found[scale] > 1 for found in counts.values() for scale in (1.5, 2)):
+            lines = b.text_buckets({scale: b.per_language(doc, {language: found[scale] for language, found in counts.items()})
+                                    for scale in (1.5, 2)})
+            lead = {"op": "*", "args": [half, lines]}
+            caption_node = nodes[f"{ident}-label"]
+            if caption["white-space"]["value"] == "nowrap":
+                larger(caption_node["id"], "white-space", "normal")
+        larger(f"{ident}-head", "width", width - 33)
+        larger(f"{ident}-head", "height", lead)
+        if caption["white-space"]["value"] == "nowrap":
+            larger(f"{ident}-label", "line-height", row_h / 2)
+    # A row that opens a dialog, or an entry dialog's lone field without a
+    # label, has no line of its own for the value: it grows with the text.
+    alone = role in ("text", "number") and f"{ident}-head" not in nodes
+    if alone:
+        lead, half = 0, b.text_times(row_h)
+    grown = b.text_times(row_h) if role == "button" or alone else b.text_sum(lead, half)
+
+    def middle_of_line(size: float):
+        """The top that centres `size` dp in the value's line."""
+        return b.text_sum(-size / 2, lead, {"op": "*", "args": [row_h / 4, TEXT]})
+    larger(ident, "height", grown)
+    rail = nodes[f"{ident}-focus"]
+    b.in_fractions(rail, rail["properties"]["width"]["value"], row_h)
+    larger(rail["id"], "height", grown)
+    if role == "button":
+        # A row that opens a dialog grows with the text, its label centred on
+        # one line or filling it with the two a long translation needs, and
+        # its chevron centred at the row's end.
+        caption = nodes[f"{ident}-label"]["properties"]
+        counts = b.wrapped_lines((row["control"]["label"],), caption["font-family"]["value"], caption["font-size"]["value"],
+                                 caption["width"]["value"])
+        for language, found in counts.items():
+            if found[2] > 2:
+                raise SystemExit(f"{ident}'s label in {language} needs {found[2]} lines of its row at 200 % text")
+        if any(found[scale] > 1 for found in counts.values() for scale in (1.5, 2)):
+            lines = b.text_buckets({scale: b.per_language(doc, {language: found[scale] for language, found in counts.items()})
+                                    for scale in (1.5, 2)})
+            larger(f"{ident}-label", "white-space", "normal")
+            larger(f"{ident}-label", "line-height", {"op": "/", "args": [row_h, lines]})
+        larger(f"{ident}-label", "height", grown)
+        larger(f"{ident}-chevron", "top", b.text_sum(-nodes[f"{ident}-chevron"]["properties"]["height"]["value"] / 2, half))
+    elif role == "choice":
+        value = nodes[f"{ident}-value"]
+        larger(value["id"], "left", 21)
+        larger(value["id"], "top", lead)
+        larger(value["id"], "height", half)
+        larger(value["id"], "line-height", row_h / 2)
+        larger(value["id"], "width", width - 21 - 26)
+        value["properties"]["text-overflow"] = keyword("clip")
+        larger(value["id"], "text-overflow", "ellipsis", "clip")
+        chevron = nodes[f"{ident}-chevron"]["properties"]
+        larger(f"{ident}-chevron", "top", middle_of_line(chevron["height"]["value"]))
+        for option in row["control"]["options"]:
+            doc.bind(f"text.{option['node']}.height", option["node"], "height", b.text_times(nodes[option["node"]]["properties"]["height"]["value"]))
+    elif role == "toggle":
+        for part in (f"{ident}-box", f"{ident}-checked"):
+            larger(part, "left", 21)
+            larger(part, "top", middle_of_line(nodes[part]["properties"]["height"]["value"]))
+    elif role == "slider":
+        track_node = nodes[f"{ident}-track"]["properties"]
+        track_w, track_h = track_node["width"]["value"], track_node["height"]["value"]
+        larger(f"{ident}-track", "left", 21)
+        larger(f"{ident}-track", "top", middle_of_line(track_h))
+        number_node = nodes[f"{ident}-value"]
+        larger(number_node["id"], "left", 21 + track_w + 8)
+        larger(number_node["id"], "top", lead)
+        larger(number_node["id"], "height", half)
+        larger(number_node["id"], "line-height", row_h / 2)
+        larger(number_node["id"], "width", b.text_times(number_node["properties"]["width"]["value"]))
+    else:
+        # A number or text field: its viewport and text fill the value's line
+        # but a 2 dp margin above and below; the runtime places the caret,
+        # selection and composition in it.
+        field = f"{ident}-viewport"
+        if alone:
+            # The field keeps its place and grows in it with the text.
+            for key in ("top", "height"):
+                doc.bind(f"text.{field}.{key}", field, key, b.text_times(nodes[field]["properties"][key]["value"]))
+            doc.bind(f"text.{ident}-text.height", f"{ident}-text", "height", b.text_times(nodes[f"{ident}-text"]["properties"]["height"]["value"]))
+        else:
+            larger(field, "left", 13)
+            larger(field, "width", width - 25)
+            larger(field, "top", b.text_sum(2, lead))
+            larger(field, "height", b.text_sum(-4, half))
+            larger(f"{ident}-text", "height", b.text_sum(-4, half))
+            larger(f"{ident}-text", "line-height", b.text_sum(row_h / 2, {"op": "/", "args": [-4, TEXT]}))
+    if f"{ident}-validation" in nodes:
+        message = nodes[f"{ident}-validation"]["properties"]
+        larger(f"{ident}-validation", "top", b.text_sum(1, grown))
+        doc.bind(f"text.{ident}-validation.height", f"{ident}-validation", "height", b.text_times(message["height"]["value"]))
+
+
 def vote_row(doc: Document, key: str, verb: str, label_key: str, control: tuple, width: float, value_x: float) -> dict:
     """One field of the drafted call, a setting row. A list's rows come from
     the game (the kick list leads with no one); the row shows where the

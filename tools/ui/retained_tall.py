@@ -36,6 +36,7 @@ class TallLayout:
         # until fits() lets a column that fits a shorter view take it.
         self.condition = {"op": "<", "args": [{"state": ASPECT_STATE}, TALL_ASPECT]}
         self.fitted: list = []
+        self.fitted_larger: list = []
         self.bindings = result.setdefault("bindings", [])
         self.nodes: dict = {}
 
@@ -58,12 +59,31 @@ class TallLayout:
                       if '"view.text"' in json.dumps(binding["value"])}
         self.text_sized = set(self.sized)
 
-    def fits(self, height: float) -> None:
+    def fits(self, height: float, larger: dict | None = None) -> None:
         """The arrangement needs a view `height` dp tall, bands included: it
         takes any portrait view that tall (one of 3:4 and taller in any case),
-        the least of what its parts need."""
+        the least of what its parts need. An arrangement whose parts grow with
+        the text gives `larger`, its height at 150 and 200 % text ({1.5: h,
+        2: h}): above 100 % it takes only a view that holds it at the running
+        size, and the landscape arrangement, which follows the text itself,
+        stands in the views between."""
         self.fitted.append(CANVAS_W / height)
-        self.condition["args"][1] = round(max(TALL_ASPECT, min(PORTRAIT_ASPECT, *self.fitted)), 4)
+        if larger:
+            for heights in larger.values():
+                if CANVAS_W / heights < TALL_ASPECT:
+                    raise SystemExit(f"a tall arrangement needs {heights:.0f} dp at a larger text size, more than a 3:4 view holds")
+            self.fitted_larger.append({scale: CANVAS_W / heights for scale, heights in larger.items()})
+
+        def least(values) -> float:
+            return round(max(TALL_ASPECT, min(PORTRAIT_ASPECT, *values)), 4)
+        threshold = least(self.fitted)
+        if self.fitted_larger:
+            at = {scale: least(self.fitted + [found[scale] for found in self.fitted_larger]) for scale in (1.5, 2)}
+            text = {"state": "view.text"}
+            self.result["state"]["view.text"] = {"type": "number", "initial": 1, "view": "text"}
+            threshold = {"op": "select", "args": [{"op": ">", "args": [text, 1.5]}, at[2],
+                                                  {"op": "select", "args": [{"op": ">", "args": [text, 1]}, at[1.5], threshold]}]}
+        self.condition["args"][1] = threshold
 
     def dp(self, ident: str, prop: str) -> float | None:
         found = self.nodes[ident].get("properties", {}).get(prop)
@@ -175,13 +195,29 @@ class TallLayout:
             if node.get("type") == "vector" and size[0] and size[1]:
                 _in_fractions(node, *size)
             for key, found in props.items():
-                if not isinstance(found, dict) or found.get("type") != "length" or found.get("unit") != "dp" or not found["value"]:
+                if not isinstance(found, dict) or found.get("type") != "length" or found.get("unit") != "dp":
+                    continue
+                if not found["value"] and (node["id"], key) not in self.sized:
                     continue
                 if root and keep_place and key in ("left", "top", "right", "bottom", "margin-top", "margin-left"):
                     continue
                 sized = self.sized.pop((node["id"], key), None)
                 if sized is not None:
-                    sized["value"] = {"op": "select", "args": [self.condition, {"op": "*", "args": [factor, sized["value"]]}, sized["value"]]}
+                    value = sized["value"]
+                    grown = {"op": "*", "args": [factor, value]}
+                    fixed = (isinstance(value, dict) and value.get("op") == "/" and isinstance(value["args"][0], (int, float))
+                             and value["args"][1] == {"state": "view.text"})
+                    if not fixed:
+                        try:
+                            # At 100 % the grown length is rounded as any other.
+                            from build_retained_screens import evaluate
+                            at_rest = evaluate(value, {"view.text": 1, ASPECT_STATE: 0.5625})
+                            if isinstance(at_rest, (int, float)) and not isinstance(at_rest, bool):
+                                grown = {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, grown,
+                                                                  round(at_rest * factor, 4)]}
+                        except KeyError:
+                            pass
+                    sized["value"] = {"op": "select", "args": [self.condition, grown, value]}
                     continue
                 if (node["id"], key) in self.owned:
                     continue

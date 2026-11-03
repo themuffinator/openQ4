@@ -89,6 +89,10 @@ struct ScreenHost final : Host {
 		return 100+materials.size();
 	}
 	std::uintptr_t MultiplyMaterial() override { return multiply; }
+	// A model preview (Player Setup's) renders into a stand-in picture.
+	bool RenderModelScene(std::uint64_t, const ModelScene&, int, int, double, std::string& image, std::string&) override {
+		image = "model-preview"; return true;
+	}
 	bool recordDraws = true;   // the pointer probe reads no submissions
 	void Draw(const std::vector<Vertex>& vertices, const std::vector<int>& indices, std::uintptr_t material) override {
 		Check(indices.size()%3 == 0,"triangle topology");
@@ -3762,6 +3766,147 @@ static void CheckListTextScale(ScreenHost& host, const char* path, const char* n
 	}
 }
 
+// A page at 100, 150 and 200 % text (section 2's reflow, LAY-004) in each of
+// a case's views: the shown parts of each chain stand one under the other
+// without overlapping (a chain may hold only above 100 %, or only in a
+// landscape or a tall view); each part a case puts inside another stays in
+// it; each named control stays on the screen, and so does every shown text
+// outside a scrolling body or clip; furniture (whose font lengths fixed_text
+// divides by the text size) keeps one size at every text size, its authored
+// size in a landscape view; and back at 100 % every node is where it was.
+// `extra` checks what else the page promises at each size.
+struct TextChain { std::vector<std::string> ids; float above = 0; int view = 0; };   // view: 0 any, 1 landscape, 2 tall
+struct TextScaleCase {
+	const char* path = nullptr; const char* name = nullptr;
+	StateValues states; std::vector<std::string> events;
+	std::vector<TextChain> chains;
+	std::vector<std::pair<std::string,std::string>> inside;
+	std::vector<std::string> controls;
+	// A view narrower than this times its height takes the tall arrangement,
+	// at 100, 150 and 200 % text.
+	std::vector<float> tallBelow = {.76f,.76f,.76f};
+	bool textsOnScreen = true;   // Credits' stock boxes run past the canvas; its own check places its lines
+	std::vector<std::pair<int,int>> sizes = {{1280,720},{960,720},{840,1080},{540,960}};
+};
+using TextScaleExtra = std::function<void(Runtime&,const Viewport&,float,bool)>;
+static void CheckTextScaleCase(ScreenHost& host, const TextScaleCase& c, const TextScaleExtra& extra = {}) {
+	const auto source = Read(c.path);
+	Document document; std::vector<Diagnostic> diagnostics;
+	Check(document.Load(source,diagnostics) && diagnostics.empty(),"a page validates for its text scale");
+	Runtime runtime(host);
+	Check(runtime.Initialize() && runtime.LoadDocument(source,c.name,diagnostics),"a page loads for its text scale");
+	std::string error; Runtime::EventEffects effects; double time = .1;
+	if (!c.states.empty()) Check(runtime.SetState(c.states,error,time),"the page's state is set");
+	for (const auto& event : c.events) {
+		Check(runtime.RunEvent(event,time,effects,error),"the page's events run");
+		Viewport settle; settle.canvasHeight = document.Model().canvasHeight; settle.width = 1280; settle.height = 720;
+		runtime.Frame(settle,time += 1);
+	}
+	std::set<std::string> fixed;
+	for (const auto& binding : document.Model().bindings)
+		if (binding.property == "font-size" && binding.id.starts_with("text.") && !binding.values.empty() && binding.values[0].op == "/")
+			fixed.insert(binding.node);
+	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a text-scale node is laid out"); return b; };
+	const auto hidden = [&](const Node& node) { const auto display = runtime.PresentedValue(node.id,"display"); return display && display->text == "none"; };
+	const auto scrolls = [&](const Node& node) {
+		const auto overflow = runtime.PresentedValue(node.id,"overflow"); return overflow && overflow->text != "visible";
+	};
+	const auto inside = [](const Bounds& a, const Bounds& b) {
+		return a.x >= b.x-.6f && a.y >= b.y-.6f && a.x+a.width <= b.x+b.width+.6f && a.y+a.height <= b.y+b.height+.6f;
+	};
+	// The shown nodes, and those of them in no scrolling body or clip.
+	const auto visible = [&](std::set<std::string>& open) {
+		std::set<std::string> shown;
+		std::vector<std::pair<const Node*,bool>> pending{{&document.Model().root,false}};
+		while (!pending.empty()) {
+			const auto [node, clipped] = pending.back(); pending.pop_back();
+			if (hidden(*node)) continue;
+			shown.insert(node->id);
+			if (!clipped) open.insert(node->id);
+			for (const auto& child : node->children) pending.push_back({&child,clipped || scrolls(*node)});
+		}
+		return shown;
+	};
+	std::map<std::string,float> furniture;
+	std::map<std::string,Bounds> rest;
+	const auto view = [&](int width, int height, float text) {
+		Viewport result; result.canvasHeight = document.Model().canvasHeight; result.canvasMinWidth = document.Model().canvasMinWidth;
+		result.width = width; result.height = height; result.textScale = text;
+		runtime.Frame(result,time += .01); runtime.Frame(result,time += 1);
+		return result;
+	};
+	for (const float text : {1.f,1.5f,2.f}) for (const auto& [width, height] : c.sizes) {
+		const auto at = view(width,height,text);
+		const bool tall = width < c.tallBelow[text > 1.5f ? 2 : text > 1 ? 1 : 0]*height;
+		std::set<std::string> open;
+		const auto shown = visible(open);
+		if (text <= 1) for (const auto& id : shown) { Bounds b; if (runtime.GetBounds(id,b)) rest[id+"@"+std::to_string(width)] = b; }
+		const Bounds screen{0,0,float(width),float(height)};
+		for (const auto& chain : c.chains) {
+			if (text <= chain.above || (chain.view == 1 && tall) || (chain.view == 2 && !tall)) continue;
+			const std::string* last = nullptr; Bounds before{};
+			for (const auto& id : chain.ids) {
+				if (!shown.contains(id)) continue;
+				const auto box = bounds(id);
+				if (last && box.y < before.y+before.height-.6f)
+					std::fprintf(stderr,"%s %.1f %dx%d %s at %.1f, above %s's foot %.1f\n",c.name,text,width,height,id.c_str(),box.y,last->c_str(),
+						before.y+before.height);
+				Check(!last || box.y >= before.y+before.height-.6f,"a chain's parts stand one under the other at every text size");
+				last = &id; before = box;
+			}
+		}
+		for (const auto& [child, container] : c.inside) {
+			if (!shown.contains(child) || !shown.contains(container)) continue;
+			const auto a = bounds(child), b = bounds(container);
+			if (!inside(a,b)) std::fprintf(stderr,"%s %.1f %dx%d %s %.1f,%.1f %.1fx%.1f outside %s %.1f,%.1f %.1fx%.1f\n",c.name,text,width,height,
+				child.c_str(),a.x,a.y,a.width,a.height,container.c_str(),b.x,b.y,b.width,b.height);
+			Check(inside(a,b),"a part stays inside its container at every text size");
+		}
+		for (const auto& id : c.controls) {
+			if (!shown.contains(id)) continue;
+			const auto box = bounds(id);
+			if (!inside(box,screen)) std::fprintf(stderr,"%s %.1f %dx%d control %s %.1f,%.1f %.1fx%.1f\n",c.name,text,width,height,id.c_str(),
+				box.x,box.y,box.width,box.height);
+			Check(inside(box,screen),"an essential control stays on the screen at every text size");
+		}
+		for (const auto& id : open) {
+			const auto* node = document.Model().FindNode(id);
+			if (!node || node->type != "text") continue;
+			const auto box = bounds(id);
+			if (!c.textsOnScreen && !fixed.contains(id)) continue;
+			if (!inside(box,screen)) std::fprintf(stderr,"%s %.1f %dx%d text %s %.1f,%.1f %.1fx%.1f\n",c.name,text,width,height,id.c_str(),
+				box.x,box.y,box.width,box.height);
+			Check(inside(box,screen),"each shown text stays on the screen at every text size");
+			if (!fixed.contains(id)) continue;
+			const auto font = runtime.PresentedValue(id,"font-size");
+			Check(font.has_value(),"a furniture text presents its size");
+			const float size = float(font->data[0])*text, stock = float(node->properties.at("font-size").data[0]);
+			const auto [found, added] = furniture.emplace(id+"@"+std::to_string(width),size);
+			if (!Near(found->second,size,.01f) || (!tall && !Near(size,stock,.01f)))
+				std::fprintf(stderr,"%s %.1f %dx%d furniture %s %.2f, before %.2f, authored %.2f\n",c.name,text,width,height,id.c_str(),size,
+					found->second,stock);
+			Check(Near(found->second,size,.01f),"furniture keeps one size at every text size");
+			Check(tall || Near(size,stock,.01f),"furniture keeps its authored size in a landscape view");
+		}
+		if (extra) extra(runtime,at,text,tall);
+	}
+	for (const auto& [width, height] : c.sizes) {
+		view(width,height,1);
+		std::set<std::string> open;
+		for (const auto& id : visible(open)) {
+			// The runtime places a field's caret, selection and composition.
+			if (id.ends_with("-caret") || id.ends_with("-selection") || id.ends_with("-composition")) continue;
+			Bounds b; const auto found = rest.find(id+"@"+std::to_string(width));
+			if (found == rest.end() || !runtime.GetBounds(id,b)) continue;
+			if (!Near(b.x,found->second.x,.01f) || !Near(b.y,found->second.y,.01f) || !Near(b.width,found->second.width,.01f) ||
+				!Near(b.height,found->second.height,.01f))
+				std::fprintf(stderr,"%s %dx%d %s moved at 100%%\n",c.name,width,height,id.c_str());
+			Check(Near(b.x,found->second.x,.01f) && Near(b.y,found->second.y,.01f) && Near(b.width,found->second.width,.01f) &&
+				Near(b.height,found->second.height,.01f),"back at 100 % text every node of the page lies where it did");
+		}
+	}
+}
+
 // Section 2's text-scale contract on a page-level menu (title, pauses,
 // SETTINGS, Single Player, Campaign, Multiplayer; build_retained_screens.py),
 // at 100, 150 and 200% text on 16:9 and 4:3 views and the tall 0.78, 3:4 and
@@ -5327,6 +5472,167 @@ static void CheckSubtitles(ScreenHost& host, const char* path) {
 
 #include "UiRetainedRosterChecks.inl"
 
+// Restart Level at larger text: the description grows under the plates in a
+// tall view and beside them otherwise, RESTART LEVEL under it, over the
+// prompt bar.
+static TextScaleCase RestartTextScale(const char* path, const char* name) {
+	return {path,name,{{"restart.skill",4.0}},{"onActivate"},
+		{{{"skill-4","restart-description","restart_go","restart_back"},0,2},{{"restart-description","restart_go","restart_back"},1}},
+		{},{"skill-0","skill-4","restart_go","restart_back"},{1.f,1.f,1.f}};
+}
+
+// The single-player pages' remaining text scale (LAY-004): Restart Level, the
+// campaign's difficulty and chapters, Credits and the Arena with its
+// ledger, reset question and entrance.
+static void CheckPagesTextScale(ScreenHost& host, char** argv) {
+	CheckTextScaleCase(host,RestartTextScale(argv[21],"guis/menu/restartlevel.q4ui"));
+	const std::vector<float> skillTall = {.886f,.7995f,.7653f};
+	CheckTextScaleCase(host,{argv[13],"guis/menu/campaign_skill.q4ui",{{"skill",1.0},{"turbo",true}},{"onActivate"},
+		{{{"back","description"},0,2},{{"description","prompts"},0,1}},{},{"skill0-label","start-label","chapters-plate-label","back-label"},
+		skillTall});
+	StateValues chapters{{"chapter.count",3.0},{"chapter.first",0.0},{"chapter.selected",0.0},{"chapter.open",true},
+		{"chapter.name",std::string("AIR DEFENSE BUNKER")},
+		{"chapter.detail",std::string("Starts from this level's autosave, with the arsenal and difficulty you reached it with.")}};
+	for (int row = 0; row < 3; ++row) {
+		chapters["chapter.row"+std::to_string(row)+".open"] = true;
+		chapters["chapter.row"+std::to_string(row)+".name"] = std::string("Air Defense Bunker");
+		chapters["chapter.row"+std::to_string(row)+".location"] = std::string("Reached");
+	}
+	CheckTextScaleCase(host,{argv[13],"guis/menu/campaign_skill.q4ui",chapters,{"onActivate","openChapters"},
+		{{{"chapter-shot-back","chapter-name","chapter-detail"}},{{"chapter-list","chapter_start-label"},1,1},
+		 {{"chapter-list","chapter_back-label"},1,1}},
+		{{"row-0-name","row-0"},{"row-0-location","row-0"}},{"chapter_start","chapter_back","row-0"},skillTall});
+	// Credits: each screen's lines stand between the title and the prompt bar
+	// and grow with the text, by no more than it.
+	{
+		const auto source = Read(argv[24]);
+		Document document; std::vector<Diagnostic> diagnostics;
+		Check(document.Load(source,diagnostics),"Credits validate for their text scale");
+		std::vector<std::string> lines;
+		std::vector<const Node*> pending{&document.Model().root};
+		while (!pending.empty()) {
+			const auto* node = pending.back(); pending.pop_back();
+			if (node->type == "text" && node->id.starts_with("screen")) lines.push_back(node->id);
+			for (const auto& child : node->children) pending.push_back(&child);
+		}
+		Check(!lines.empty(),"the credits' lines are found");
+		TextScaleCase credits{argv[24],"guis/menu/credits.q4ui",{},{},{},{},{"credits_back"},{.8481f,.8481f,.8481f}};
+		credits.textsOnScreen = false;
+		CheckTextScaleCase(host,credits,
+			[&](Runtime& runtime, const Viewport& view, float text, bool tall) {
+				if (tall) return;
+				Bounds title, bar; Check(runtime.GetBounds("credits-title",title) && runtime.GetBounds("prompts",bar),"Credits' chrome is laid out");
+				for (const auto& id : lines) {
+					Bounds box; Check(runtime.GetBounds(id,box),"a credits line is laid out");
+					if (box.y < title.y+title.height-.6f || box.y+box.height > bar.y+.6f)
+						std::fprintf(stderr,"credits %.1f %dx%d %s %.1f-%.1f\n",text,view.width,view.height,id.c_str(),box.y,box.y+box.height);
+					Check(box.y >= title.y+title.height-.6f && box.y+box.height <= bar.y+.6f,"a credits line stands between the title and the prompt bar");
+					const auto font = runtime.PresentedValue(id,"font-size");
+					const float stock = float(document.Model().FindNode(id)->properties.at("font-size").data[0]);
+					Check(font && float(font->data[0])*text >= stock-.01f && float(font->data[0])*text <= stock*text+.01f,
+						"a credits line grows with the text, by no more than it");
+				}
+			});
+	}
+	StateValues arena{{"arena_loaded",true},{"arena_canStart",true},{"arena_canReset",true},{"arena_difficulty",3.0},
+		{"arena_difficultyName",std::string("Hard")},{"arena_selectedTitle",std::string("The Edge")},
+		{"arena_selectedDescription",std::string("A first taste of the arena against three bots on a tight map with no cover.")},
+		{"arena_selectedMap",std::string("q4dm1")},{"arena_selectedGameType",std::string("Deathmatch")},
+		{"arena_selectedRoster",std::string("You against three bots")},{"arena_selectedLimits",std::string("10 frags, 10 minutes")},
+		{"arena_selectedSkill",std::string("Corporal")},{"arena_selectedBestVisible",true},{"arena_selectedHasBest",true},
+		{"arena_selectedBest",std::string("10 - 4")},{"arena_selectedTierName",std::string("Tier 1")},
+		{"arena_selectedTierDescription",std::string("The opening tier: three qualifiers and a boss on the smaller maps.")},
+		{"arena_progress",std::string("3 of 20 matches")},{"arenaCampaignProgress",3.0},{"arena_tier0_selected",true},
+		{"arena_match0_selected",true},{"arena_tier0_status",std::string("AVAILABLE")},{"arena_match0_status",std::string("AVAILABLE")}};
+	const std::vector<std::string> arenaControls{"tier-0","tier-4","match-0","match-3","arena_easier","arena_harder","arena_start",
+		"arena_back-label","arena_reset"};
+	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.q4ui",arena,{"onActivate"},
+		{{{"arena-shot-back","arena-match-title","arena-match-description","arena-map","arena-gametype","arena-roster","arena-limits",
+		   "arena-skill"}},{{"arena-skill","arena-difficulty-label"},0,1},{{"arena-difficulty-label","arena_easier","arena_start"}},
+		 {{"arena_start","arena_back"},0,1},{{"arena-tier-name","arena-tier-description","arena-tier-path","arena-tier-rule"}},
+		 {{"arena-progress","arena-progress-track","arena-complete","arena-reset-row"}}},
+		{},arenaControls});
+	StateValues ledger = arena;
+	for (const auto& [key, value] : StateValues{{"arena_result",1.0},{"arena_resultTitle",std::string("VICTORY")},
+		{"arena_resultMatchName",std::string("The Edge")},{"arena_resultMessage",std::string("You took the match with time to spare and three frags clear.")},
+		{"arena_resultHasScore",true},{"arena_resultScore",std::string("10 - 7")},{"arena_resultHasUnlock",true},
+		{"arena_resultUnlock",std::string("Qualifier 2")},{"arena_resultHasAwards",true},{"arena_resultAwardLine",std::string("Excellent, Impressive")},
+		{"arena_resultCanRetry",true}}) ledger[key] = value;
+	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.q4ui",ledger,{"onActivate","arenaResultReveal"},
+		{{{"result-title","result-match","result-message","result-score","result-unlock","result-awards","resultModal_no"}}},
+		{{"result-awards","resultModal-dialog"},{"result-title","resultModal-dialog"}},{"resultModal_yes","resultModal_no"}});
+	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.q4ui",arena,{"onActivate","arenaResetReveal"},
+		{{{"resetModal-body","resetModal_yes"}}},{{"resetModal-body","resetModal-dialog"}},{"resetModal_yes","resetModal_no"}});
+	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.q4ui",arena,{"onActivate","arenaMatchLaunch"},
+		{{{"launch-kicker","launch-title","launch-gametype","launch-map","launch-ready"}}},
+		{{"launch-title","launch-card"},{"launch-ready","launch-card"}},{"launch-card"}});
+}
+
+// The menus' remaining text scale: the title's MODS dialog and the pause's
+// OBJECTIVES page, with its objectives and empty.
+static void CheckMenusTextScale(ScreenHost& host, char** argv) {
+	StateValues mods{{"mods.count",3.0},{"mods.selected",0.0},{"mods.author",std::string("DarkMatter Productions")},
+		{"mods.date",std::string("11/03/2026")},{"mods.engine",std::string("openQ4 0.13")},{"mods.directory",std::string("baseoq4")}};
+	for (int row = 0; row < 3; ++row) {
+		mods["mods.row"+std::to_string(row)+".name"] = std::string("A modification");
+		mods["mods.row"+std::to_string(row)+".version"] = std::string("1.0");
+	}
+	CheckTextScaleCase(host,{argv[1],"guis/menu/title.q4ui",mods,{"open","modsModalShow"},
+		{{{"mods-list","mods-author","mods-date","mods-engine","mods-directory","modsModal_yes"}}},
+		{{"mods-row-0-name","mods-row-0"},{"mods-directory","modsModal-dialog"},{"mods-author-label","modsModal-dialog"}},
+		{"modsModal_yes","modsModal_no"},{1.f,1.f,1.f}});
+	StateValues objectives{{"pause_objective_count",2.0},{"pause_completed_count",2.0}};
+	for (int row = 0; row < 2; ++row) {
+		objectives["pause_objective_"+std::to_string(row)] = std::string("Reach the hangar and open the bay doors");
+		objectives["pause_objective_text_"+std::to_string(row)] =
+			std::string("The bay doors open from the control room above the hangar floor. Strogg forces hold the stairs.");
+		objectives["pause_completed_"+std::to_string(row)] = std::string("Find the medic");
+	}
+	CheckTextScaleCase(host,{argv[2],"guis/menu/pause.q4ui",objectives,{"open","objectivesShow"},
+		{{{"objectives-entry-0","objectives-entry-1","objectives-completed","objectives-serial"}}},
+		{{"objectives-entry-0-title","objectives-entry-0"},{"objectives-entry-0-text","objectives-entry-0"},{"objectives-done-0-title","objectives-done-0"}},
+		{"objectives-list","objectives_back"},{.827f,.827f,.827f}});
+	CheckTextScaleCase(host,{argv[2],"guis/menu/pause.q4ui",{},{"open","objectivesShow"},{},
+		{{"objectives-empty-text","objectives-empty"}},{"objectives-list","objectives_back"},{.827f,.827f,.827f}});
+}
+
+// The multiplayer pages' remaining text scale: Create Server's options and
+// its advanced dialog, Join Game's status, empty state and entry dialogs,
+// and Player Setup, whose value stands under its label above 100 %.
+static void CheckMultiplayerTextScale(ScreenHost& host, char** argv) {
+	StateValues create{{"create.map_count",3.0},{"create.map_first",0.0},{"create.map_selected",0.0},{"create.gametype",0.0}};
+	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.q4ui",create,{"onActivate"},
+		{{{"create-gametype-head","create-gametype-value"},1},{{"create-name-head","create-name-viewport"},1},
+		 {{"create-dedicated-head","create-dedicated-box"},1},{{"create-fraglimit-head","create-fraglimit-viewport"},1}},
+		{{"create-gametype-value","create-gametype"},{"create-gametype-chevron","create-gametype"},{"create-dedicated-box","create-dedicated"},
+		 {"create-fraglimit-viewport","create-fraglimit"},{"create-name-viewport","create-name"},{"create-name-head","create-name"}},
+		{"create_start","create_advanced","create_back","create-options"}});
+	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.q4ui",create,{"onActivate","advancedModalShow"},
+		{{{"advanced-rows","advancedModal_close"}},{{"create-rate-head","create-rate-value"},1}},
+		{{"create-rate-value","create-rate"},{"create-banlist-label","create-banlist"},{"create-banlist-chevron","create-banlist"},
+		 {"advanced-rows","advancedModal-dialog"},{"create-mapcycle-viewport","create-mapcycle"}},{"advancedModal_close"}});
+	StateValues join{{"join.count",0.0},{"join.listed",0.0},{"join.scanning",false},{"join.status",std::string("No servers found")}};
+	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.q4ui",join,{"onActivate"},
+		{{{"servers-list","join-gametype-value","join-status"},0,1},{{"join-empty-heading","join-empty","join_emptynew"}}},
+		{},{"join_refresh","join_newlist","join_server","join_back"}});
+	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.q4ui",join,{"onActivate","joinIpOpen"},
+		{{{"join-ip-rows","join-yourip-value","joinIpModal_yes"}}},
+		{{"join-address-viewport","join-address"},{"join-ip-rows","joinIpModal-dialog"},{"join-yourip-value","joinIpModal-dialog"}},
+		{"joinIpModal_yes","joinIpModal_no"}});
+	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.q4ui",join,{"onActivate","findOpen"},
+		{{{"join-find-rows","findModal_yes"}},{{"join-find-head","join-find-viewport"},1}},
+		{{"join-find-viewport","join-find"},{"join-find-head","join-find"},{"join-find-rows","findModal-dialog"}},{"findModal_yes","findModal_no"}});
+	StateValues setup{{"setup.model_count",2.0},{"setup.model_row",0.0},{"setup.model.0.name",std::string("Kane")},
+		{"setup.model.1.name",std::string("Voss")},{"setup.model_name",std::string("Kane")},{"setup.name",std::string("Player")},
+		{"setup.notice",std::string("Saved")},{"setup.rail",2.0}};
+	CheckTextScaleCase(host,{argv[26],"guis/menu/multiplayer.q4ui",setup,{"onActivate","setupOpen"},
+		{{{"setup-name-head","setup-name-viewport"},1},{{"setup-model-head","setup-model-value"},1},
+		 {{"setup-rotation-head","setup-rotation-track"},1},{{"setup-rail-label","setup-rail-0"},1},
+		 {{"setup-heading","setup-fields","setup-notice","setup-current-model","prompts"},0,2}},
+		{{"setup-name-viewport","setup-name"},{"setup-model-value","setup-model"},{"setup-rotation-track","setup-rotation"},
+		 {"setup-rail-6","setup-rail"},{"setup-rail-label","setup-rail"}},{"setup-fields"},{1.f,1.f,1.f}});
+}
+
 int main(int argc, char** argv) {
  if (argc == 5 && std::string(argv[1]) == "--rosters") {
      ScreenHost host;
@@ -6651,6 +6957,13 @@ int main(int argc, char** argv) {
 		CheckListTextScale(host,argv[22],"guis/menu/demos.q4ui",demos,"demo-list",{"demo-kind","demo-status","demo-detail"},
 			"demo-shot-back","demo_play-plate");
 	}
+	if (runs("pages")) CheckPagesTextScale(host,argv);
+	if (runs("strogg-pages")) {
+		const std::string path = StroggPage(argv[21]);
+		CheckTextScaleCase(host,RestartTextScale(path.c_str(),"guis/menu/restartlevel_strogg.q4ui"));
+	}
+	if (runs("menus")) CheckMenusTextScale(host,argv);
+	if (runs("mp-pages")) CheckMultiplayerTextScale(host,argv);
 	if (runs("menus")) CheckModsDialog(host,argv[1]);
 	if (runs("pages")) CheckRestartMenu(host,argv[23]);
 	if (runs("pages")) CheckCreditsPage(host,argv[24]);

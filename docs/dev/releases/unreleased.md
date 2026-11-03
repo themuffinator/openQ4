@@ -198,8 +198,14 @@ See [release status](../../user/release-status.md) and the
   stays intact. The lists of saves, demos, servers and maps now grow their
   rows with the text too, so names stay whole in their rows (a name too long
   for its column ends in "…"), and the selected save's or demo's details
-  stand one under another above a smaller picture. Player Setup, Create
-  Server's options and a few other pages still use their normal sizes.
+  stand one under another above a smaller picture. The remaining pages
+  follow too: in Create Server, Player Setup and the server search each
+  setting's value moves under its label so nothing is cut off, and the
+  difficulty pages, chapters, Mods list, objectives, server browser
+  details, Arena and Credits grow their text while their buttons stay put.
+- **Player Setup on tall screens.** On a portrait screen the player setup
+  fields now span the screen at a readable size with your character shown
+  large underneath, instead of everything squeezed into the top third.
 - **Menus on tall screens.** On a portrait or rotated screen, the main menu,
   the pause menu and the Settings, Single Player, Campaign and Multiplayer
   menus in the new interface now fill the height: their buttons are larger
