@@ -70,6 +70,9 @@ VOICE = re.compile(r'^SOUND_VOICE source=\d+ state=(\w+) routed=\d queued=(\d) s
 PROCESS = re.compile(r'^Process memory: private=(\d+) KiB resident=(\d+) KiB', re.M)
 STEP = re.compile(r'^SCENE_STEP (\S+) (\d+) (\S+)\s*$', re.M)
 MAP_LOAD = re.compile(r'^Map: (\S+)', re.M)
+LOAD_TIME = re.compile(r'^\s*(\d+) msec to load (\S+)\s*$', re.M)
+LOAD_PHASES = re.compile(r'^Map load phases: ([^\n]+) msec\s*$', re.M)
+MEDIA_PHASES = re.compile(r'^Map media phases: ([^\n]+) msec\s*$', re.M)
 ENTITY = re.compile(r'// entity \d+\n\{\n((?:"[^"\n]*" "[^"\n]*"\n)+)')
 FUNCTION = re.compile(r'\b(?:void|float|entity|vector|string|boolean)\s+(\w+)\s*\([^;{)]*\)\s*\{')
 # What makes a character speak in the stock and Awakening scripts: the actor speak
@@ -310,6 +313,9 @@ def launch(args, root, entries, walk=None, blocked_exits=None):
         'r_swapInterval': '1', 'in_mouse': '0', 'in_joystick': '0', 'in_joystickRumble': '0',
         's_noSound': '1' if getattr(args, 'silent', False) else '0', 's_muteUnfocused': '0', 'com_skipLogoVideos': '1', 'g_autoSkipCinematics': '0',
         's_numberOfSpeakers': '2', 's_openALHRTF': '0', 's_dialogueVolume': '1', 's_logSpeech': '1', 'ui_subtitles': '1',
+        's_asyncSampleDecode': '1' if args.decode_mode == 'worker' else '0',
+        's_decodeMemoryMB': str(args.decode_memory_mb), 's_audioMemoryMB': str(args.audio_memory_mb),
+        'com_showLevelLoadTimes': '1',
         'com_skipLoadingContinue': '1', 'com_maxfps': '60', 'ui_autoJoin': '0', 'ui_retained': '1', 'sys_lang': 'english',
         'g_autoExecAfterMapLoad': 'scene-0.cfg', 'g_autoExecAfterMapLoadDelayMs': '2000',
     }
@@ -366,6 +372,39 @@ def probe_state(body):
             'cues': [c.lower() for c in CUE.findall(body)],
             'routing_complete': bool(end) and int(end[1]) == len(channels) and not unattributed,
             'unattributed': unattributed}
+
+
+def load_timing(segment):
+    """Only a completed load with both phase reports is timing evidence.
+
+    Final sound-media time includes joining workers and uploads, not all audio
+    work (which overlaps gameInit); the sound-off comparison measures wall cost.
+    """
+    loads = list(LOAD_TIME.finditer(segment))
+    if len(loads) != 1:
+        return {}
+    phases = LOAD_PHASES.search(segment, loads[0].end())
+    media = MEDIA_PHASES.search(segment, loads[0].end())
+    if not phases or not media:
+        return {}
+    parse = lambda match: {key: int(value) for key, value in re.findall(r'(\w+)=(\d+)', match[1])}
+    load, finish = parse(phases), parse(media)
+    total = int(loads[0][1])
+    load_keys = {'renderWorld', 'gameInit', 'playerSpawn', 'cacheJoin', 'mediaFinish', 'settle', 'total'}
+    media_keys = {'render', 'sound', 'decl', 'bse', 'loadSize', 'ui', 'total'}
+    if not load_keys <= load.keys() or not media_keys <= finish.keys() or \
+            load['total'] != total or finish['total'] != load['mediaFinish']:
+        return {}
+    return {'map': loads[0][2], 'total_ms': total, 'sound_finalize_ms': finish['sound'],
+            'load_phases_ms': load, 'media_phases_ms': finish}
+
+
+def load_cost(loud, quiet):
+    """Signed differences: cache/scheduling noise is not clamped into a speedup."""
+    if not loud or not quiet or loud['map'] != quiet['map']:
+        return {}
+    return {'audio_load_ms': loud['total_ms'] - quiet['total_ms'],
+            'sound_finalize_ms': loud['sound_finalize_ms'], 'silent_load_ms': quiet['total_ms']}
 
 
 def audit(log, labels):
@@ -434,6 +473,7 @@ def audit(log, labels):
                           'streams_not_playing': sorted(sample_key(v[2]) for v in queued if v[1] == '1' and v[0] != 'playing')}
         scenes[name] = {
             'loaded': bool(marker),
+            'loading': load_timing(segment[:begin_at.start()]) if begin_at else {},
             'memory': memory,
             'speech_starts': len(speech),
             'dialogue_starts': sum(s['dialogue'] == '1' for s in speech),
@@ -482,7 +522,11 @@ def main():
     parser.add_argument('--step-msec', type=int, default=4000, help='Milliseconds between scene triggers')
     parser.add_argument('--tail', type=int, default=15, help='Seconds of probes after the last scene of a map')
     parser.add_argument('--silent-baseline', action='store_true',
-                        help='Replay the openings with s_noSound 1 and report what audio adds to process memory')
+                        help='Replay the openings with s_noSound 1 and report process-memory and load-time differences')
+    parser.add_argument('--decode-mode', choices=['worker', 'inline'], default='worker',
+                        help='Pin asynchronous or main-thread sample decoding for loading comparisons')
+    parser.add_argument('--decode-memory-mb', type=int, default=64, help='Pending decode budget (16-1024 MiB)')
+    parser.add_argument('--audio-memory-mb', type=int, default=256, help='Aggregate payload budget (32-2048 MiB)')
     parser.add_argument('--timeout', type=int, default=0)
     args = parser.parse_args()
     args.repeat = max(1, args.repeat)
@@ -495,6 +539,8 @@ def main():
         parser.error('--progress requires --walk')
     if args.seconds < 1 or args.interval < 1 or args.step_msec < 1 or args.tail < 0:
         parser.error('seconds, interval and step-msec must be positive; tail must be nonnegative')
+    if not 16 <= args.decode_memory_mb <= 1024 or not 32 <= args.audio_memory_mb <= 2048:
+        parser.error('decode-memory-mb must be 16-1024 and audio-memory-mb must be 32-2048')
     verify_runtime_is_current(ROOT / '.install')
     maps = [m.strip() for m in args.maps.split(',')] if args.maps else (AWAKENING_MAPS if args.awakening else STOCK_MAPS)
     entries = scene_entries(maps, args.repeat)
@@ -533,8 +579,9 @@ def main():
         'effects_continue_while_muted': all(s['effects_while_muted'] > 0 for s in scenes.values() if s['loaded']),
         'dialogue_audible_at_full': sum(s['dialogue_heard_at_full'] for s in scenes.values()) > 0,
         'cues_have_transcripts': all(not s['cues_without_transcript'] for s in scenes.values()),
-        # Every opening, and the level changes between them, fit the default budget.
+        # Every opening, and the level changes between them, fit the pinned budget.
         'residency_recorded': all(s['memory'] for s in scenes.values() if s['loaded']),
+        'loading_recorded': all(s['loading'] for s in scenes.values()),
         'no_audio_refusals': all(s['memory'].get('refused_total', 1) == 0 for s in scenes.values() if s['loaded']),
         # Observe throughout the scene, not only its final residency snapshot:
         # a progression step can legitimately stop the last music/ambience track.
@@ -555,6 +602,7 @@ def main():
         quiet_code, quiet_log, _, quiet_seconds = launch(argparse.Namespace(**vars(args), silent=True), quiet_root, entries)
         quiet = audit(quiet_log, labels)
         cost = {}
+        loading_cost = {}
         for name in labels:
             loud, still = scenes[name]['memory'], quiet[name]['memory']
             if 'reserved_kib' in loud and 'process_private_kib' in loud and 'process_private_kib' in still:
@@ -563,8 +611,13 @@ def main():
                               'beyond_payloads_kib': added - loud['reserved_kib'],
                               'audio_resident_kib': loud['process_resident_kib'] - still['process_resident_kib'],
                               'silent_private_kib': still['process_private_kib']}
+            timing = load_cost(scenes[name]['loading'], quiet[name]['loading'])
+            if timing:
+                loading_cost[name] = timing
         checks['silent_baseline_complete'] = quiet_code == 0 and 'SCENE_COMPLETE' in quiet_log and len(cost) == len(labels)
+        checks['silent_loading_recorded'] = len(loading_cost) == len(labels)
         total['process_cost'] = cost
+        total['loading_cost'] = loading_cost
         total['silent_run_seconds'] = quiet_seconds
         if cost:
             beyond = sorted(c['beyond_payloads_kib'] for c in cost.values())
@@ -600,6 +653,7 @@ def main():
     report = {
         'passed': all(checks.values()), 'checks': checks, 'totals': dict(total), 'scenes': scenes,
         'maps': maps, 'repeat': args.repeat, 'seconds_per_map': args.seconds, 'probe_interval_ms': args.interval, 'run_seconds': seconds,
+        'decode_mode': args.decode_mode, 'decode_memory_mb': args.decode_memory_mb, 'audio_memory_mb': args.audio_memory_mb,
         'walk': {level: [entity for _, entity in steps] for level, steps in walk.items()} if walk else None,
         'step_msec': args.step_msec if walk else None,
         'progress': args.progress, 'suppressed_level_exits': blocked_exits,

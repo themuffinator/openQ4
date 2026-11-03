@@ -6,6 +6,20 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Audio cancellation and memory pressure, 3 November 2026
+
+- **Discarding a level no longer waits for unused music or speech to finish
+  decoding.** Audio workers stop between codec blocks when cancelled; samples
+  still needed by the scene resume from the same position.
+- **Low-memory cleanup avoids allocating more sound buffers for samples it is
+  about to discard.** Active sounds, looping sounds and samples required by a
+  level load remain protected. No audio defaults or authored mix changed.
+- The audio scene audit now records load times and memory budgets for repeatable
+  loading comparisons. Real mobile low-memory notices, physical listening and
+  device recovery remain qualification gates in AUD-01 through AUD-07; these
+  changes do not close those gates.
+- Evidence: [audio cancellation and loading measurements](audio-voice-evidence.md#decode-cancellation-and-loading-measurements-3-november-2026).
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The

@@ -504,6 +504,32 @@ Every performance preset keeps room reverb on (`s_useEAXReverb 1`); see
 `Common_MigrateLegacyAudioDefaults` in `src/framework/Common.cpp` for the one-time step that
 restores it on profiles still on the minimum, lowpower or performance preset.
 
+### Decode cancellation and loading measurements (November 3)
+
+PCM and stream-envelope jobs now poll their job cancellation token before setup
+and between codec blocks. The worker retains its decoder cursor, compressed input
+and partial output until the main thread joins it. `CancelDecode` then discards
+them; `FinishDecode` resumes a retained job at that cursor after a global job
+cancellation. Neither path releases a reservation while a worker still owns it.
+The codec's setup and an individual block remain indivisible; this is bounded
+cooperative cancellation, not a hard real-time deadline.
+
+`TrimMemory` determines which samples the scene needs before joining anything.
+It cancels disposable jobs through `FreeData`, leaves active/looping and loading
+samples alone, and drops already-uploaded CPU copies. It no longer uploads all
+pending PCM in response to a low-memory notice. Admission reclamation and
+`EndLevelLoad` likewise discard unused earlier-level jobs before finalizing
+retained samples.
+
+`audio_scene_audit.py` pins `--decode-mode worker|inline`, `--decode-memory-mb`
+and `--audio-memory-mb`, records the existing map-load and media-phase timers,
+and adds per-map load-time differences to `--silent-baseline`. Sound finalization
+includes the main-thread join/upload/reverb work; decoding also overlaps game
+initialization, so this timer is not the total audio cost. Sound-on/off wall-time
+differences retain negative values and must be interpreted alongside cache and
+host-load variation. Repeat the same map set for warm-load comparisons; do not
+promote these desktop timings into a mobile loading-time budget.
+
 ## Deferred
 
 - **Audible distance units.** Current `DOOM_TO_METERS` and `METERS_TO_DOOM` are both

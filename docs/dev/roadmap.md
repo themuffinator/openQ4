@@ -2702,6 +2702,17 @@ Sources: [audio implementation and remaining limits](audio-modernization.md),
   real Android or iOS device remains open: the Android emulator set-up used for the port
   was removed with its worktree, and restoring it needs a download approved by the user.
   [Low-memory notice evidence](audio-voice-evidence.md#the-operating-systems-low-memory-notice).
+  November 3: running PCM and stream-envelope jobs now observe cancellation between
+  codec blocks instead of decoding the entire track before releasing it. A retained
+  cancelled job resumes at its cursor; discarded jobs keep reservations until joined.
+  Low-memory trims no longer finish/upload every pending sample, and level-end and
+  admission reclamation discard stale jobs before joining retained work. Real-worker
+  cancellation and production trim/reclaim/load-finalization tests cover both paths.
+  The scene audit now records map-load phases, sound finalization, decode mode and
+  byte budgets, with signed sound-on/off load-time comparisons. This supplies the
+  loading-performance measurement path; target-device budgets and real mobile
+  low-memory notices remain open.
+  [Cancellation and loading evidence](audio-voice-evidence.md#decode-cancellation-and-loading-measurements-3-november-2026).
 - [ ] **AUD-04 — P2, implementation and qualification: surround and mod reverb.**
   Resolve `SSF_CENTER`/VO placement on 5.1 with stereo/HRTF fallback and nonzero mod
   room-rolloff unit handling. Keep stock zero-rolloff behavior intact.

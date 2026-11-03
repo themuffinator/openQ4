@@ -1286,6 +1286,104 @@ No host input or microphone was used. Physical-device, mobile, macOS,
 independent-machine voice and VR subtitle gates remain open, as does missing
 transcript and full campaign coverage.
 
+## Decode cancellation and loading measurements, 3 November 2026
+
+AUD-03 still contained an implementation gap: `CancelDecode` cancelled the job
+list and waited, but a running PCM or stream-envelope decode never checked its
+token. The wait therefore scaled with the whole track. Production workers now
+check before codec setup and between blocks. An interrupted job retains its
+cursor, input and reservation until joined; finalizing a retained sample resumes
+it, while freeing it discards the partial data. Codec setup and one block remain
+indivisible, so this is not a hard real-time cancellation guarantee.
+
+The low-memory traversal previously finalized every decode, including OpenAL
+uploads, before deciding which samples to free. It now cancels disposable samples
+without uploading them and leaves active, looping, never-purge and loading
+samples protected. Admission reclamation and level finalization also discard
+stale jobs before joining retained work.
+
+`audio_decode_budget.py` now compiles the production worker, join, cancel, trim,
+reclaim and level-finalization functions. A real portable job worker pauses at a
+counted codec boundary; the test cancels it and checks that it stops after one
+block, keeps reservations until join and either frees everything once or resumes
+to the exact expected PCM/envelope. Pre-start cancellation and header corruption
+are separate cases. These checks pass with Windows Clang and Linux GCC under
+WSL, including `-Werror`. Separate platform scratch directories prevent a WSL
+test from replacing a Windows test executable. An initial Linux harness build
+overlapped a test-source edit and failed; that log remains separate from the
+completed rerun.
+
+`audio_scene_audit.py` now records complete, consistent map-load and media-phase
+reports before each scene. `--decode-mode worker|inline`, `--decode-memory-mb`
+and `--audio-memory-mb` pin the configuration. Its sound-disabled baseline also
+reports signed load-time differences. A negative difference is retained as
+cache/scheduling noise, not converted into a speedup. Sound finalization is the
+main-thread join/upload/reverb phase, not all audio work, which can overlap game
+initialization. Fourteen harness checks pass, including missing/inconsistent
+timers, map boundaries and mismatched baseline maps.
+
+Other completed checks in this round: actual Vorbis PCM/seek/loop/lengthless-stream
+tests; aggregate memory, stream budget and payload restore; voice capture consent
+and lifecycle, transport and protocol gates; subtitle selection/layout; Arena
+pause ownership; retail reverb and screen-shake contracts; 35,807 counted settings
+checks, 42,348 cumulative recovery checks and eight distance-harness checks.
+OpenAL loopback centre routing and mod room rolloff pass using the main checkout's
+existing provider (`c5b7aa0c5237c4d202f798fe7825f59af5bb4b9a1ac1e654e7011908843fbb83`).
+No physical microphone or host input was used.
+
+The Windows x64 debugoptimized client, dedicated server, SP/MP modules and OpenGL
+renderer build and stage successfully; all nine selected Meson sound, voice,
+subtitle, Arena and job-system tests pass. In stock gameplay,
+`audio_output_recovery_runtime.py` passes all 32 checks: output interruption,
+paused resume, both lengthless-stream fixtures, live stereo/surround/HRTF
+transitions, the SDL low-memory notice and replay of a purged sample. The trim
+reduces managed residency from 154,939 to 55,497 KiB while keeping 93 referenced
+samples. `audio_memory_runtime.py` passes all 13 checks, including continued
+active playback under deliberate exhaustion, retry after budget recovery and
+two restarts with identical 214,246 KiB reservations and no fallback beeps.
+The stock reference inventory again finds all 3,672 speech shaders and all
+3,495 scanned references covered, with no routing gaps; this is static coverage,
+not an ordered campaign playthrough.
+
+Two passes through `game/airdefense1`, `game/mcc_landing` and `game/network2`
+also pass in each decode mode with a 16 MiB pending-decode budget and a 256 MiB
+aggregate payload budget: 15 checks with workers and a sound-disabled comparison,
+13 with inline decoding. Each mode starts eight dialogue lines, preserves mute
+and transcript checks, plays streams on recycled voices and refuses no audio
+allocation. Per-map residency grows by at most 8 KiB between passes; stream
+reservations stay at 2,448, 2,448 and 9,792 KiB respectively. The managed-payload
+peak is 252,703 KiB with workers and 240,025 KiB inline.
+
+| Map | Worker load, passes 1 / 2 (ms) | Inline load, passes 1 / 2 (ms) | Sound disabled, passes 1 / 2 (ms) |
+| --- | ---: | ---: | ---: |
+| `game/airdefense1` | 7,803 / 5,076 | 8,798 / 5,915 | 4,749 / 4,071 |
+| `game/mcc_landing` | 8,959 / 4,652 | 5,776 / 5,576 | 4,137 / 3,535 |
+| `game/network2` | 3,512 / 3,168 | 4,578 / 3,006 | 3,332 / 2,499 |
+
+Sound finalization takes 3–37 ms across these runs. Other builds were active on
+the host, so these are successful measurements, not a controlled speed comparison
+or a device loading budget. The worker sound-on/off private-memory differences
+span 142,012–352,844 KiB, with up to 158,373 KiB beyond tracked payloads; silent
+process memory itself varies substantially. This run does not establish a new
+provider-memory bound. Opening probes do not qualify dialogue reached later
+through combat or player movement.
+
+The tested build is `908b2c012` plus this round's two sound-source changes, Windows
+x64 `debugoptimized`, with the OpenGL renderer and native tests enabled. Local
+evidence is retained under `.tmp/aud-roadmap/`: `evidence-manifest.json` records
+source, runtime and report hashes; `output-recovery/result.json`,
+`memory-pressure/result.json`, `scenes-worker/result.json` and
+`scenes-inline/result.json` retain configurations and results. Their engine logs,
+rendered WAV output and captures remain alongside them. Generated test binaries,
+fixtures and image caches are disposable and are removed after verification.
+
+This does not close the AUD checkboxes. AUD-01 still requires retail listening;
+AUD-02 physical endpoint/lifecycle and target-OS listening; AUD-03 mobile provider
+memory, device loading budgets and real low-memory notices; AUD-04 physical
+surround; AUD-05 physical capture/hotplug and independent-machine clocks;
+AUD-06 full gameplay-order dialogue/device coverage; and AUD-07 missing licensed
+transcripts, full gameplay-order coverage and physical stereo-HUD placement.
+
 ## Other verification and limitations
 
 - `sound_settings.py --no-mutations`: 35,807 checks pass.

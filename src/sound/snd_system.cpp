@@ -1111,8 +1111,10 @@ references is touched, and a freed sample reloads when a sound starts it again.
 */
 void idSoundSystemLocal::TrimMemory( const char* reason, int idleSeconds )
 {
-	// A decoding sample owns its buffers until it is joined.
-	FinishSampleDecodes( true );
+	// Decide what to keep before joining work. Finishing every pending decode here
+	// used to upload more PCM under memory pressure, even for samples about to be
+	// freed. FreeData cancels and joins its own worker; retained jobs keep ownership
+	// of their buffers and HasCpuCopy excludes unfinished decodes.
 	idList<const idSoundSample*> active;
 	for( int w = 0; w < soundWorlds.Num(); w++ )
 	{
@@ -1170,6 +1172,7 @@ void idSoundSystemLocal::TrimMemory( const char* reason, int idleSeconds )
 			case SoundTrimAction::Free:
 				freedBytes += sample->BufferSize();
 				sample->FreeData();
+				decodingSamples.Remove( sample );
 				freed++;
 				break;
 			case SoundTrimAction::ReleaseCopy:
@@ -1234,13 +1237,6 @@ void idSoundSystemLocal::EndLevelLoad( const char* mapName )
 	// game render world (and so its portal areas) exists.
 	reverb.LoadLevel( mapName, session != NULL ? session->rw : NULL );
 
-	// Upload what the job workers decoded during the load.
-	FinishSampleDecodes( true );
-	for( int i = 0; i < samples.Num(); i++ )
-	{
-		samples[i]->FinishDecode();
-	}
-
 	// Free the samples earlier levels loaded that this one did not reference.
 	int purged = 0;
 	int64 purgedBytes = 0;
@@ -1258,6 +1254,13 @@ void idSoundSystemLocal::EndLevelLoad( const char* mapName )
 	if( purged > 0 )
 	{
 		common->Printf( "%d sound samples from earlier levels freed (%.1f MB)\n", purged, purgedBytes / ( 1024.0 * 1024.0 ) );
+	}
+	// Finish only retained work. FreeData above cancels an old level's unfinished
+	// decode instead of decoding and uploading it just before throwing it away.
+	FinishSampleDecodes( true );
+	for( int i = 0; i < samples.Num(); i++ )
+	{
+		samples[i]->FinishDecode();
 	}
 /*
 	common->Printf( "----- idSoundSystemLocal::EndLevelLoad -----\n" );
