@@ -6,6 +6,22 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Fallback menu watchdog waits for a second frame, 3 November 2026
+
+- On a fresh profile the first-launch preset restarts the renderer during
+  initialization. The first frame afterwards draws the fallback loading screen
+  while it restores the retained menus' fonts and eight documents, which took
+  1.9 s on an idle machine and 5.8 s under load. The watchdog counted that
+  frame toward its 3 s and, past it, opened the stock main menu before a
+  startup `+devmap` could run. That loaded 65 decls late: the player models,
+  the Player Setup preview's media and the crosshairs. It was intermittent:
+  1 of 6 fresh probes on 10404e2c2. Reported by the general-fixes session.
+- `idSessionLocal::Draw` now starts the watchdog when the first fallback
+  frame ends, in both console-lock branches, so a pending command always gets
+  a frame. Four fresh-profile probes after the fix logged 0 late loads, and
+  `loading_wipe_capture_crop_contract.py`, `settings_menu_coverage.py` and
+  `ui_retained_gate.py` pass.
+
 ## General fixes round 2, 3 November 2026
 
 - Push Verification on dcb04ea9b failed on Linux x64, Linux ARM64 and macOS

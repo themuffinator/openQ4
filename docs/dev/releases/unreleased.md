@@ -368,7 +368,10 @@ See [release status](../../user/release-status.md) and the
 
 - A long multiplayer chat message with an icon in it no longer repeats the
   icon at the start of the next line when it wraps.
-
+- On a first launch that starts a map from the command line or a shortcut
+  (for example `+devmap`), the game goes straight to the map instead of
+  sometimes opening the main menu first. The menu used to win on a slow first
+  frame and loaded player models and crosshairs late.
 - Demos recorded on servers without cheats can be paused, slowed and sped up
   again, and the playback timeline follows the position. Playback took over
   the server's cheat setting, which locked those controls.
