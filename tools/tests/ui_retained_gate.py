@@ -617,7 +617,8 @@ public:
     }
     void HandleMainMenuCommands(const char* command) { played.push_back(command); }
     // LoadGame refuses a save with loadRefusal's reason, or loads it.
-    enum loadGameFailure_t { LOADGAME_FAILURE_NONE, LOADGAME_FAILURE_UNREADABLE, LOADGAME_FAILURE_DAMAGED, LOADGAME_FAILURE_MAP, LOADGAME_FAILURE_RESTORE };
+    enum loadGameFailure_t { LOADGAME_FAILURE_NONE, LOADGAME_FAILURE_UNREADABLE, LOADGAME_FAILURE_DAMAGED, LOADGAME_FAILURE_MAP, LOADGAME_FAILURE_PLATFORM,
+                             LOADGAME_FAILURE_RESTORE };
     loadGameFailure_t loadGameFailure = LOADGAME_FAILURE_NONE, loadRefusal = LOADGAME_FAILURE_NONE;
     bool LoadGame(const char* slot) { loadedGames.push_back(slot); loadGameFailure = loadRefusal; return loadRefusal == LOADGAME_FAILURE_NONE; }
     std::vector<std::string> deleted; bool deleteFails = false;
@@ -1078,6 +1079,8 @@ int main() {
         CHECK(page->state["load.error"] == "#str_231103");
         s.loadRefusal = idSessionLocal::LOADGAME_FAILURE_UNREADABLE; s.HandleRetainedSessionRequest(page, SaveRequest(s, page, "loadSave").c_str());
         CHECK(page->state["load.error"] == "#str_231104");
+        s.loadRefusal = idSessionLocal::LOADGAME_FAILURE_PLATFORM; s.HandleRetainedSessionRequest(page, SaveRequest(s, page, "loadSave").c_str());
+        CHECK(page->state["load.error"] == "#str_231192");  // another platform's build wrote it
         page->state["load.pick"] = "1"; s.HandleRetainedSessionRequest(page, SaveRequest(s, page, "loadSelect").c_str());
         CHECK(s.retainedLoadSelected == 1 && page->state["load.error"].empty());  // another choice clears the reason
         // DELETE GAME (the page asks first): the next save takes the deleted one's place.
