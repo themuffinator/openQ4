@@ -415,6 +415,12 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   the declared budget, or a reviewed support-scope limitation tied to retained
   reproduction evidence. Merely recording an exception does not qualify a failing
   configuration as supported.
+  Progress, 3 November: the [visible-window runner](vulkan-frame-pacing.md#visible-window-diagnostics-3-november-2026)
+  retains presentation/CPU/GPU phases, focus, competing clients and power state.
+  Six diagnostic repeats remain failed: foreground ownership was not observed,
+  one NVIDIA repeat exceeded the budget, and Intel lacks the timing extension.
+  A GPU-dependent first-run preset was also found and is now pinned. These
+  results do not replace the required foreground/direct/hybrid/power controls.
 - [x] **VK-03 — P1, implementation: finish bounded device admission and recovery.**
   Audit fixed-size instance/extension enumeration, optional extension truncation,
   the explicit-device index limit and retry after later resource/device creation
@@ -460,7 +466,9 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   GPU runs now cover 271 small-source versions and 181 padded-source versions,
   safe eviction at both limits and exact reload/restart recovery. Descriptor,
   uniform and pipeline exhaustion, broader authored lighting and mod content
-  remain open.
+  remain open. The integrated-build lighting repeat passes all 26 independent
+  controls per backend, but its strict full-frame comparison still fails five
+  shadow-boundary pixels across three cases; the image gate remains unchanged.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
@@ -501,6 +509,10 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   expose descriptor reuse/churn, mapped-ring uploads, target changes, rendering
   scopes, barriers and submissions alongside the existing memory/pipeline report.
   They introduce no GPU wait/query and do not establish production overlap.
+  Short diagnostic intervals kept heap/pipeline counts stable with negligible
+  descriptor churn. The linked profile records measured reasons to defer new
+  cache/warm-up, indirect/Hi-Z, parallel-recording and transfer mechanisms;
+  it does not promote an optimization or close the broader timing/soak gates.
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,
@@ -514,7 +526,7 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   as screenshots, hidden-window frames are readable whatever the surface allows,
   and stencil readbacks print their frame, age, view and target and are dropped
   after a failed submission. Progress, 3 November: the [paired capture sequence](vulkan-captures.md#cubemap-and-write-failure-qualification-3-november-2026)
-  passes 121 RGBA/cubemap comparisons at 4x MSAA within one display level,
+  passes 121 RGBA/cubemap comparisons at each of 4x and 8x MSAA within one display level,
   with exact per-backend resize/restart recovery. Failed filesystem writes now
   fail screenshots, stop incomplete cubemaps and prevent incomplete probe reloads.
   Arbitrary nested targets and the remaining debug/readback combinations stay

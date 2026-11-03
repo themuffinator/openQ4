@@ -45,8 +45,8 @@ See [player release status](../user/release-status.md).
   reports success. Cubemap capture stops at the failed face, and incomplete
   reflection probes are not reloaded.
 - Developer evidence: live shader-edit tests cover both the 256-version and
-  32 MiB limits with exact image recovery. The 4x MSAA capture suite passes
-  121 GL/Vulkan pairs, and the HDR post/cubemap suite passes 42, both within one
+  32 MiB limits with exact image recovery. The 4x and 8x MSAA capture suites each
+  pass 121 GL/Vulkan pairs, and the HDR post/cubemap suite passes 42, all within one
   display level. Native cache/compiler/device/report contracts pass. See
   [authored programs](vulkan-material-programs.md), [captures](vulkan-captures.md)
   and [HDR](vulkan-hdr.md) for scope and retained failing controls.
@@ -54,6 +54,10 @@ See [player release status](../user/release-status.md).
   collect the evidence needed for later Vulkan optimization and presentation
   qualification. They do not promote another driver/platform or claim a
   performance improvement. Open gates remain in [the roadmap](roadmap.md).
+  Current visible diagnostics retained a missed NVIDIA presentation budget,
+  unavailable Intel presentation timing and unsuccessful foreground checks;
+  these remain failures. The harness now pins one performance preset across
+  GPUs and verifies both its saved settings and CPU/GPU evidence identity.
 
 ## Saves tested between Windows and Linux, 3 November 2026
 

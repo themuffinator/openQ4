@@ -19,6 +19,7 @@ import subprocess
 import time
 
 import renderer_gameplay_benchmark as gameplay
+import renderer_budget_contract as timing_contract
 import renderer_validation_matrix as matrix
 import renderer_vulkan_qualification as qualification
 from mp_round_remote_smoke import verify_runtime_is_current
@@ -35,7 +36,9 @@ def foreground(pid):
     user.GetForegroundWindow.restype = ctypes.c_void_p
     user.GetWindowThreadProcessId.argtypes = (ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong))
     owner = ctypes.c_ulong()
-    user.GetWindowThreadProcessId(user.GetForegroundWindow(), ctypes.byref(owner))
+    window = user.GetForegroundWindow()
+    if not window or not user.GetWindowThreadProcessId(window, ctypes.byref(owner)):
+        return None
     return owner.value == pid
 
 
@@ -129,8 +132,20 @@ def analyze(text, focus, budget, competing=()):
     resources = dict(re.findall(r'(\w+)=(\d+)', resource_lines[-1])) if resource_lines else {}
     if resources.get('enabled') != '1' or int(resources.get('frames', '0')) == 0:
         failures.append('executor resource profile is missing or disabled')
+    timing, timing_failures = timing_contract.parse_timing_evidence([text])
+    failures.extend(timing_failures)
+    if timing:
+        measurement = timing['measurement']
+        if (measurement['map'], measurement['backend'], measurement['profile']) != ('game/airdefense1', 'vulkan', 'baseline'):
+            failures.append('CPU/GPU timing does not match the declared map/backend/profile')
+        if not measurement['gpu']['available'] or min(measurement[k]['samples'] for k in ('cpu', 'gpu')) < 120:
+            failures.append('CPU/GPU timing has unavailable or insufficient samples')
     return dict(status='pass' if not failures else 'fail', failures=failures, presentation=presentation,
                 executorResources=resources, engine=gameplay.extract_summary(text), foregroundSamples=len(focus),
+                foregroundObservations={name: sum(value is state for value in focus)
+                    for name, state in (('focused', True), ('unfocused', False), ('unavailable', None))},
+                timing=timing, memoryReports=[line for line in text.splitlines() if line.startswith('Vulkan memory:')],
+                pipelineReports=[line for line in text.splitlines() if line.startswith('Vulkan pipelines:')],
                 cameraEndpoints=poses)
 
 
@@ -151,7 +166,10 @@ def main():
         text = ('Renderer API: requested=vulkan active=vulkan\nVK_PACING_BEGIN\n' + pose + 'VK_PACING_END\n' + pose +
             'Presented frames vkpacing: frames=500 interval p50=8 p95=9 p99=10 max=12 ms; '
             'queue p50=1 p95=2 p99=3 max=4 ms; replaced=5 dropped=0\n'
-            'Vulkan executor resources: enabled=1 frames=500 imageHits=1000 imageUpdates=5\n')
+            'Vulkan executor resources: enabled=1 frames=500 imageHits=1000 imageUpdates=5\n'
+            'OPENQ4_FRAME_TIMING_V1 map=game/airdefense1 backend=vulkan profile=baseline '
+            'cpuSamples=256 cpuP50Us=3000 cpuP95Us=4000 cpuP99Us=5000 '
+            'gpuAvailable=1 gpuSamples=256 gpuP50Us=1000 gpuP95Us=1500 gpuP99Us=2000\n')
         assert analyze(text, [True] * 100, 28)['status'] == 'pass'
         assert analyze(text, [True] * 100, 9)['status'] == 'fail'
         assert analyze(text, [True] * 99 + [False], 28)['status'] == 'fail'
@@ -161,7 +179,11 @@ def main():
         assert analyze('', [True] * 100, 28)['status'] == 'fail'
         assert analyze(text, [True] * 100, 28, [{'pid': 1}])['status'] == 'fail'
         assert analyze(text.replace('10200', '10100'), [True] * 100, 28)['status'] == 'fail'
-        print('Visible presentation parser: 9 acceptance/refusal controls passed')
+        assert analyze(text.replace('profile=baseline', 'profile=modern'), [True] * 100, 28)['status'] == 'fail'
+        assert analyze(text.replace('gpuSamples=256', 'gpuSamples=119'), [True] * 100, 28)['status'] == 'fail'
+        assert analyze(text.replace('gpuAvailable=1 gpuSamples=256 gpuP50Us=1000 gpuP95Us=1500 gpuP99Us=2000',
+            'gpuAvailable=0 gpuSamples=0 gpuP50Us=-1 gpuP95Us=-1 gpuP99Us=-1'), [True] * 100, 28)['status'] == 'fail'
+        print('Visible presentation parser: 12 acceptance/refusal controls passed')
         return 0
     if args.basepath is None or args.output_dir is None:
         parser.error('--basepath and --output-dir are required for runtime tests')
@@ -174,7 +196,8 @@ def main():
         parser.error('evidence must be outside the runtime')
     verify_runtime_is_current(runtime)
     output.mkdir(parents=True, exist_ok=False)
-    sources = (Path(__file__), Path(gameplay.__file__), Path(matrix.__file__), Path(qualification.__file__))
+    sources = (Path(__file__), Path(gameplay.__file__), Path(matrix.__file__), Path(qualification.__file__),
+               Path(timing_contract.__file__))
     harnesses = {source.name: qualification.sha256_file(source) for source in sources}
     (output / 'harness').mkdir()
     for source in sources:
@@ -192,11 +215,13 @@ def main():
                 'r_vkResourceProfile 1', 'rendererVulkanMemoryInfo reset',
                 'r_rendererMetrics 1', 'r_rendererGpuTimers 1', 'framePacingReset', 'rendererPresentTiming reset',
                 'echo VK_PACING_BEGIN', 'viewpos', f'waitMsec {args.seconds * 1000}', 'echo VK_PACING_END', 'viewpos',
-                'rendererPresentTiming vkpacing', 'framePacingSnapshot vkpacing', 'rendererBenchmarkCapture',
+                'rendererPresentTiming vkpacing', 'framePacingSnapshot vkpacing',
+                'rendererBenchmarkCapture "logs/timing.csv"',
                 'r_rendererMetrics 0', 'rendererVulkanMemoryInfo', 'rendererDisplayProbe report',
                 'screenshot "screenshots/pacing.tga"', 'wait 5', 'quit']
             (game / 'vkpacing.cfg').write_text('\n'.join(script) + '\n')
-            cvars = dict(r_renderApi='vulkan', r_vkDevice=str(device), r_vkPresentTiming='1', r_vkValidation='0',
+            cvars = dict(com_performancePreset='balanced', r_rendererBenchmarkPreset='baseline',
+                r_renderApi='vulkan', r_vkDevice=str(device), r_vkPresentTiming='1', r_vkValidation='0',
                 r_hiddenWindow='0', r_fullscreen='0', r_borderless='0', r_borderlessDefaultMigrated='1',
                 r_mode='-1', r_customWidth='1280', r_customHeight='720', r_windowWidth='1280', r_windowHeight='720',
                 r_multiSamples='0', r_postAA='0', r_hdrToneMap='0', r_pbrMaterials='0', r_temporalAA='0',
@@ -236,8 +261,8 @@ def main():
                         if sampled:
                             focus.append(foreground(process.pid))
                             if time.monotonic() >= next_process_check:
-                                for game in other_games(process.pid):
-                                    competing[game['pid']] = game
+                                for competitor in other_games(process.pid):
+                                    competing[competitor['pid']] = competitor
                                 next_process_check = time.monotonic() + 1
                         if time.monotonic() - start > args.timeout:
                             timed_out = True
@@ -257,13 +282,19 @@ def main():
                     result['failures'].append('blank engine capture')
             except (OSError, ValueError) as error:
                 result['failures'].append('missing or invalid engine capture: ' + str(error))
+            trace = game / 'logs/timing.csv'
+            config = game / 'openQ4Config.cfg'
+            if not trace.is_file() or trace.stat().st_size == 0:
+                result['failures'].append('CPU/GPU phase trace was not written')
+            if not config.is_file() or 'seta com_performancePreset "balanced"' not in config.read_text(errors='replace'):
+                result['failures'].append('saved performance preset differs from the declared balanced profile')
             result.update(id=name, command=command, exitCode=code, timedOut=timed_out, powerBefore=initial_power,
                 powerAfter=power_state(), selectedDevice=qualification.device_identity('vulkan', qualification.parse_engine_log(text)),
                 engineVersion=qualification.parse_engine_log(text)['version'],
                 otherGameProcesses=list(competing.values()),
                 displayAdapterRoute='unverified', elapsedSeconds=time.monotonic() - start,
                 artifacts=[qualification.file_record(path, output) for path in
-                           (log, capture, save / 'process.log', save / 'command.json') if path.is_file()])
+                           (log, capture, trace, config, save / 'process.log', save / 'command.json') if path.is_file()])
             result['status'] = 'fail' if result['failures'] else 'pass'
             results.append(result)
             (save / 'result.json').write_text(json.dumps(result, indent=2) + '\n')

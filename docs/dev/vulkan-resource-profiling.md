@@ -33,6 +33,10 @@ It verifies the camera at both endpoints and samples for competing openQ4
 clients once a second; an observed competitor fails the pacing gate.
 It disables mouse/controller input and uses the engine's screenshot command.
 It defaults to three repeats, a 120 FPS cap and a 28 ms presented-p99 budget.
+It pins the balanced performance preset before applying the declared classic
+rendering overrides, checks the baseline CPU/GPU timing identity, and retains
+the saved configuration and per-frame phase CSV. CPU/GPU percentiles describe
+the last 256 retained samples; presented intervals cover the sampled 20 seconds.
 The report preserves the selected rendering GPU but labels the display-adapter
 route **unverified**: identifying a cross-adapter route still needs the separate
 queue trace described in [frame pacing](vulkan-frame-pacing.md).
@@ -49,3 +53,44 @@ timeouts and a missed budget fail the run. Non-Windows hosts currently lack
 the foreground observer and therefore cannot obtain a foreground qualification
 from this harness. A pass is scoped evidence, not support promotion or an
 input-to-photon measurement.
+
+## Initial resource measurements (3 November 2026)
+
+The clean `29e237378` build ran three 20-second intervals per adapter on AC.
+NVIDIA 591.74 and Intel 101.5590 kept their respective heap block/allocation
+counts unchanged between the initial and final snapshots. Every interval kept
+28 pipelines, with no creation after sampling started. Image descriptors had
+0–5 updates, zero retirements and 397–401 resident sets at the end. Each frame
+recorded one executor submission, four target changes, nine rendering scopes
+and 34 barrier calls, with about 4.6 MiB copied into mapped rings.
+
+These are diagnostic operation counts, not passing pacing evidence. Foreground
+ownership was never observed, another client overlapped two runs, and this first
+harness selected GPU-dependent first-run presets. The subsequent harness pins
+the preset. The original reports remain in `.tmp/vk-roadmap/presentation-ac/`;
+see [the presentation failures](vulkan-frame-pacing.md#visible-window-diagnostics-3-november-2026)
+before using any timing value.
+
+The corrected balanced-preset pair in `.tmp/vk-roadmap/presentation-balanced/`
+has the same per-frame submission/target/scope/barrier counts, five image
+descriptor updates per run, zero retirements and 401 resident sets. Both runs
+also retain their heap/allocation and 28-pipeline plateaus. This confirms the
+operation-count observation with the profile fixed; focus and presentation
+limitations still prevent performance qualification.
+
+Decisions for this workload:
+
+- Keep the descriptor and pipeline caches: the recorded steady intervals have
+  negligible descriptor churn and no pipeline churn. They do not justify a new
+  cache or broader pipeline warm-up; the earlier cold-cache decision remains.
+- Defer indirect drawing/Hi-Z and parallel recording until a dense or
+  recording-limited workload identifies their critical path. The large
+  presented-frame tail here is not explained by the short retained GPU timing
+  window. These measurements cannot show that either mechanism would fix it.
+- Defer transfer/upload overlap until an upload-heavy workload measures waits
+  and potential overlap. Mapped-ring byte counts alone establish neither a
+  transfer-queue bottleneck nor an overlap benefit.
+
+No optimization is promoted from these short intervals. Long-session plateaus,
+matching-output comparisons and improved frame-time tails remain required for
+any future resource/submission change under VK-06.

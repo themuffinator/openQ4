@@ -309,6 +309,16 @@ levels of the unchanged GL reference. Three point-stencil background pixels
 still fail, so the full lighting comparison remains failed overall. This
 follow-up does not extend authored-shader admission or weaken the image gate.
 
+The 3 November rerun on the integrated `29e237378` build and NVIDIA 591.74
+again passes all 26 independent controls on each backend, including exact
+reload/restart recovery and mapped-to-stencil equivalence on the authored
+receiver. The unchanged full-frame two-level gate fails three stencil pixels
+(maximum 30), one point-map pixel (maximum three), and one projected-map pixel
+(maximum four). These small background/shadow-boundary differences remain
+failures; the older mapped-shadow pass is not promoted to this driver/build.
+Reports, source/runtime hashes and engine captures are retained in
+`.tmp/vk-roadmap/lighting-gl/`, `lighting-vk/` and `lighting-comparison/`.
+
 Remaining work includes:
 
 - Extend source-selection qualification to additional retail/mod source pairs,

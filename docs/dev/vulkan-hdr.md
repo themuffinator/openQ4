@@ -804,6 +804,12 @@ the exact development-binary and harness hashes. This qualifies in-frame HDR
 engine cube captures; it does not admit arbitrary portal/nested/material graphs
 or change production PBR's display-referred contract.
 
+After integration with the MP/save changes, the clean `29e237378` runtime also
+passes all 41 Vulkan post/capture controls at 4x MSAA with validation enabled.
+The report and engine captures are retained in
+`.tmp/vk-roadmap/hdr-post-vk4-integrated/`. This is an independent Vulkan
+lifecycle repeat; the 42 paired comparisons above use the recorded 0x set.
+
 The staged stock-gameplay lifecycle runner also passes SP Air Defense 1 and
 MP Q4DM1 at 0x and 4x MSAA: all four runs exit cleanly, keep the runtime
 unchanged and retain eight valid engine captures each. They exercise HDR

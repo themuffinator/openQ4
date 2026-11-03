@@ -88,12 +88,14 @@ two-display-level GL/Vulkan limit. A directory at the first face's output path
 forces a write failure: both warnings must appear once, later faces must not
 be written, and the command must not report success.
 
-At 4x MSAA on the RTX 4060 Laptop GPU, both backends passed all independent
-checks. The 121 GL/Vulkan capture pairs differ by at most one display level.
+At both 4x and 8x MSAA on the RTX 4060 Laptop GPU, both backends passed all
+independent checks. Each set of 121 GL/Vulkan capture pairs differs by at most
+one display level.
 All thirty cubemap faces recover exactly within each backend. Vulkan validation
 reported no messages. Reports, harness snapshots, exact binary hashes and engine
 captures are retained under `.tmp/vk-roadmap/capture-gl4-rerun/`, `capture-vk4/`
-and `capture-comparison4/`. The first GL run had incorrectly unquoted hyphens
+and `capture-comparison4/`, with the 8x repeats in `capture-gl8/`, `capture-vk8/`
+and `capture-comparison8/`. The first GL run had incorrectly unquoted hyphens
 in the new command arguments and is retained as a failed harness run in
 `capture-gl4/`; no image threshold changed for the corrected rerun.
 
