@@ -98,6 +98,8 @@ MOD_SPIN = ((88.0, "joinModPrevious", "previous"), (266.0, "joinModNext", "next"
 SHOT = (240.0, 337.0, 116.0, 88.0)
 FAVORITE_TOP = 400.0                       # u: mp_b_browse_favsel
 FAVORITE_KEYS = ("#str_200292", "#str_200293")  # ADD TO FAVORITES, REMOVE FAVORITE
+SPECTATE_KEY = "#str_200195"               # SPECTATE, the stock label in every language
+STICK_GLYPH = 22.0                         # dp: a stick press's glyph past SPECTATE and the favorite toggle
 SOURCE = (324.0, 46.0)                     # u: mp_browse_source
 SOURCE_END = 613.0                         # u: where the stock LAN tag ends
 # The source tags: right-aligned at SOURCE_END, each as wide as its longest
@@ -693,6 +695,25 @@ def favorite_width() -> float:
     return float(max(JOIN[2], math.ceil((longest + 30) / U)))
 
 
+def spectate_width() -> float:
+    """SPECTATE's plate width (u), as the favorite toggle's: its label and the
+    plate's 30 dp, at least JOIN SERVER's width."""
+    longest = max(text_width("marine", text, 20) for text in table_text(SPECTATE_KEY).values())
+    return float(max(JOIN[2], math.ceil((longest + 30) / U)))
+
+
+def stick_glyph_on(doc: Document, plate: dict, width: float, side: str) -> None:
+    """The stick press that works a plate (section 13.5), 8 dp past its
+    trailing end and centred on its band, for a controller only: the
+    keyboard has no key for it and shows none. The bar has no room for the
+    prompt in any language, so the glyph sits on what the stick presses, as
+    the Menu and View glyphs do."""
+    ident = plate["id"]
+    plate["children"].append(group(f"{ident}-stick", {**absolute(left=width + 8, top=(45 - STICK_GLYPH) / 2, width=STICK_GLYPH,
+                                                                  height=STICK_GLYPH), "pointer-events": keyword("none")},
+                                    device_glyphs(doc, f"{ident}-stick", f"{side}-stick", [1, 1, 1, 0.85], STICK_GLYPH)))
+
+
 def clear_sort_width() -> float:
     """CLEAR SORTING's plate width (u): its label and the plate's 30 dp."""
     longest = max(text_width("marine", text, 20) for text in table_text("#str_200951").values())
@@ -865,7 +886,22 @@ def join_game_document() -> dict:
     doc.bind("join_favorite-label.text", "join_favorite-label", "text",
              {"op": "select", "args": [{"state": "join.favorite"}, FAVORITE_KEYS[1], FAVORITE_KEYS[0]]})
     doc.bind("join_favorite.enabled", "join_favorite", "enabled", {"op": ">=", "args": [{"state": "join.selected"}, 0]})
-    back = page_prompts(doc, "join_back", action="back", verbs=(VERB_JOIN,))
+    # SPECTATE between them, ending where they end (section 13.7's list
+    # pattern: Join, Spectate and Favorite): it joins the chosen server
+    # watching. A press of the left stick spectates and of the right one
+    # toggles the favorite, while a server is chosen and no dialog is open.
+    doc.session("joinSpectate", "joinSpectate")
+    spectate_w = spectate_width()
+    spectate = action_plate(doc, "join_spectate", SPECTATE_KEY, U * (JOIN[0] + JOIN[2] - spectate_w), U * (JOIN[1] + JOIN[3]),
+                            action="joinSpectate", width=U * spectate_w)
+    spectate["control"]["prompt"] = SPECTATE_KEY
+    doc.bind("join_spectate.enabled", "join_spectate", "enabled", {"op": ">=", "args": [{"state": "join.selected"}, 0]})
+    stick_glyph_on(doc, spectate, U * spectate_w, "left")
+    stick_glyph_on(doc, favorite, U * favorite_w, "right")
+    chosen = {"op": "&&", "args": [quiet, {"op": ">=", "args": [{"state": "join.selected"}, 0]}]}
+    doc.events["onLeftStick"] = [{"op": "if", "condition": chosen, "then": [{"op": "action", "action": "joinSpectate"}]}]
+    doc.events["onRightStick"] = [{"op": "if", "condition": chosen, "then": [{"op": "action", "action": "joinFavorite"}]}]
+    back = page_prompts(doc, "join_back", action="back", verbs=(VERB_JOIN, SPECTATE_KEY))
     detail = detail_card(doc)
     # Above 100 % text the servers' rows, the empty state's sentence, the
     # scan's status and the details card grow with it (section 2's reflow);
@@ -874,10 +910,10 @@ def join_game_document() -> dict:
     from build_retained_screens import fixed_text
     grow_empty_line(doc, empty, fixes)
     grow_card(doc, detail)
-    for node in [*parts, join, favorite]:
+    for node in [*parts, join, spectate, favorite]:
         if node["id"] not in ("servers-list", "join-status", "join-empty"):
             fixed_text(doc, node)
-    result = subpage_document(doc, "join", "#str_200002", "#str_200187", "join_newlist", [*parts, join, favorite, back, detail],
+    result = subpage_document(doc, "join", "#str_200002", "#str_200187", "join_newlist", [*parts, join, spectate, favorite, back, detail],
                               [join_ip_modal(doc), find_modal(doc)], stretch=("servers-list",))
     grow_status(doc, result)
     return tall_join_page(result)
@@ -1050,9 +1086,15 @@ def tall_join_foot(tall) -> None:
     if MARGIN + grown("join_server", "width") + 12 + grown("join_favorite", "width") > right:
         raise SystemExit("JOIN SERVER and ADD TO FAVORITES do not fit across a tall view's column")
     foot(("join_server",), (MARGIN, FOOT_BOTTOM))
-    foot(("join_favorite",), (MARGIN + grown("join_server", "width") + 12, FOOT_BOTTOM + (server_h - favorite_h) / 2))
+    beside = MARGIN + grown("join_server", "width") + 12
+    foot(("join_favorite",), (beside, FOOT_BOTTOM + (server_h - favorite_h) / 2))
+    # SPECTATE stands over the favorite toggle, a row of its own.
+    spectate_bottom = FOOT_BOTTOM + server_h + 4
+    if beside + grown("join_spectate", "width") > right:
+        raise SystemExit("SPECTATE does not fit over ADD TO FAVORITES in a tall view's column")
+    foot(("join_spectate",), (beside, spectate_bottom))
     actions = tuple(ident for ident, *_rest in reversed(LIST_ACTIONS))
-    actions_bottom = FOOT_BOTTOM + server_h + 14
+    actions_bottom = spectate_bottom + grown("join_spectate", "height") + 10
     foot(actions, (MARGIN, actions_bottom))
     actions_top = actions_bottom + (tall.dp(actions[-1], "bottom") + tall.dp(actions[-1], "height") - tall.dp(actions[0], "bottom")) * TALL_FOOT
     shot = ("join-shot-back", "join-shot", "join-shot-border")

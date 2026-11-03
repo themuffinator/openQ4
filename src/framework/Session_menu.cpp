@@ -9834,11 +9834,15 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 		BeginRetainedSubpage( gui, false, RETAINED_SUBPAGE_JOIN_GAME );
 		return;
 	}
-	if ( !idStr::Icmp( request, "joinServer" ) ) {
+	const bool spectate = !idStr::Icmp( request, "joinSpectate" );
+	if ( spectate || !idStr::Icmp( request, "joinServer" ) ) {
 		if ( gui->State().GetInt( "join.selected", "-1" ) < 0 || retainedJoinAddress.Length() == 0 ) {
 			return;
 		}
 		HandleMainMenuCommands( "play main_menu_selection" );
+		// SPECTATE joins the chosen server watching (the prompt bar's list
+		// pattern), and JOIN plays, whichever the last join chose.
+		cvarSystem->SetCVarString( "ui_spectate", spectate ? "Spectate" : "Play" );
 		// A join that fails or is aborted comes back to this list.
 		retainedJoinReturn = true;
 		idCmdArgs connectArgs;

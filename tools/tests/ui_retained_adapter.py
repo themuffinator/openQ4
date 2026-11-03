@@ -62,7 +62,7 @@ template<class T> T Min(T a,T b) { return (std::min)(a,b); }
 struct idVec2 { idVec2(float=0,float=0) {} } vec2_origin;
 enum { SE_KEY=1,SE_MOUSE,SE_CHAR,K_TAB=10,K_SHIFT,K_UPARROW,K_DOWNARROW,K_LEFTARROW,K_RIGHTARROW,
        K_ENTER,K_KP_ENTER,K_SPACE,K_ESCAPE,K_MOUSE1,K_MOUSE2,K_MOUSE3,K_MOUSE4,K_MOUSE5,K_MOUSE6,K_MOUSE7,K_MOUSE8,
-       K_JOY1,K_JOY2,K_JOY3,K_JOY4,K_JOY5,K_JOY6,K_JOY7,K_JOY8,K_JOY9,K_JOY10,K_JOY11,K_JOY12,K_JOY15,K_JOY16,
+       K_JOY1,K_JOY2,K_JOY3,K_JOY4,K_JOY5,K_JOY6,K_JOY7,K_JOY8,K_JOY9,K_JOY10,K_JOY11,K_JOY12,K_JOY13,K_JOY14,K_JOY15,K_JOY16,
        K_HOME,K_END,K_PGUP,K_PGDN,K_MWHEELUP,K_MWHEELDOWN,K_CTRL,K_ALT,K_RIGHT_ALT,K_BACKSPACE,K_DEL,K_INS,K_LAST_KEY=512 };
 struct idKeyInput {
     static inline bool shift=false,swapped=false;
@@ -2469,7 +2469,8 @@ static void CheckNumberDiagnosticBoundary() {
 // Q and E, and the shoulders, run the document's onTabPrevious and onTabNext
 // where it declares them, the triggers its onSectionPrevious and
 // onSectionNext, and the west and north face buttons its onSecondary and
-// onTertiary: once per press, never on a repeat, never with Ctrl or Alt,
+// onTertiary, and a press of the left or right stick its onLeftStick or
+// onRightStick: once per press, never on a repeat, never with Ctrl or Alt,
 // and never while a Number field is being edited. Without section events
 // the triggers are PageUp and PageDown, which page a list; on a focused
 // slider the right trigger raises the value (PageUp). The Menu button runs
@@ -2530,6 +2531,21 @@ static void CheckTabKeys() {
     pulse(K_JOY6);
     runtime.widgets.at("root").number->active=false;
     assert(faces().size()==3 && runtime.menu.empty());
+    // The stick presses do nothing where the document declares no event,
+    // and run its onLeftStick and onRightStick where it does.
+    const auto sticks=[&]{std::vector<std::string> found;for(const auto& name:eventHistory)
+        if(name=="onleftstick" || name=="onrightstick")found.push_back(name);return found;};
+    pulse(K_JOY13);pulse(K_JOY14);
+    assert(sticks().empty() && runtime.menu.empty());
+    eventPlans["onleftstick"]={};eventPlans["onrightstick"]={};
+    pulse(K_JOY13);pulse(K_JOY14);
+    assert(sticks()==std::vector<std::string>({"onleftstick","onrightstick"}) && faces().size()==3);
+    Key(gui,K_JOY13,true);Key(gui,K_JOY13,true);Key(gui,K_JOY13,false);
+    Key(gui,K_ALT,true);pulse(K_JOY14);Key(gui,K_ALT,false);
+    runtime.widgets.at("root").number->active=true;
+    pulse(K_JOY13);
+    runtime.widgets.at("root").number->active=false;
+    assert(sticks().size()==3 && runtime.menu.empty());
     // The Menu button is Back unless the document declares onMenuButton,
     // which it then runs once per press.
     pulse(K_JOY7);

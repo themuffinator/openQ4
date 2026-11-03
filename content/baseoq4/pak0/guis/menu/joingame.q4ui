@@ -754,6 +754,7 @@
   "joinNewList": {"operation": "session.menu", "arguments": {"command": "joinNewList"}},
   "joinSearchClear": {"operation": "session.menu", "arguments": {"command": "joinSearchClear"}},
   "joinFavorite": {"operation": "session.menu", "arguments": {"command": "joinFavorite"}},
+  "joinSpectate": {"operation": "session.menu", "arguments": {"command": "joinSpectate"}},
   "joinConnect": {"operation": "session.menu", "arguments": {"command": "joinConnect"}},
   "enter.join-address": {
    "input": "string",
@@ -1369,6 +1370,38 @@
    }
   ],
   "joinRowsReveal": [{"op": "playTimeline", "timeline": "rowReveal"}],
+  "onLeftStick": [
+   {
+    "op": "if",
+    "condition": {
+     "op": "&&",
+     "args": [
+      {
+       "op": "!",
+       "args": [{"op": "||", "args": [{"state": "joinIpModal.visible"}, {"state": "findModal.visible"}]}]
+      },
+      {"op": ">=", "args": [{"state": "join.selected"}, 0]}
+     ]
+    },
+    "then": [{"op": "action", "action": "joinSpectate"}]
+   }
+  ],
+  "onRightStick": [
+   {
+    "op": "if",
+    "condition": {
+     "op": "&&",
+     "args": [
+      {
+       "op": "!",
+       "args": [{"op": "||", "args": [{"state": "joinIpModal.visible"}, {"state": "findModal.visible"}]}]
+      },
+      {"op": ">=", "args": [{"state": "join.selected"}, 0]}
+     ]
+    },
+    "then": [{"op": "action", "action": "joinFavorite"}]
+   }
+  ],
   "onViewButton": [{"op": "setState", "values": {"join.detail.hidden": {"op": "!", "args": [{"state": "join.detail.hidden"}]}}}],
   "joinAddressEntered": [{"op": "action", "action": "joinConnect"}],
   "joinIpConnect": [
@@ -36050,6 +36083,72 @@
    "value": {"op": ">=", "args": [{"state": "join.selected"}, 0]}
   },
   {
+   "id": "join_spectate.enabled",
+   "node": "join_spectate",
+   "property": "enabled",
+   "value": {"op": ">=", "args": [{"state": "join.selected"}, 0]}
+  },
+  {
+   "id": "join_spectate-stick-xbox.display",
+   "node": "join_spectate-stick-xbox",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 1]}, "block", "none"]}
+  },
+  {
+   "id": "join_spectate-stick-playstation.display",
+   "node": "join_spectate-stick-playstation",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 2]}, "block", "none"]}
+  },
+  {
+   "id": "join_spectate-stick-nintendo.display",
+   "node": "join_spectate-stick-nintendo",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 3]}, "block", "none"]}
+  },
+  {
+   "id": "join_spectate-stick-steamdeck.display",
+   "node": "join_spectate-stick-steamdeck",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 4]}, "block", "none"]}
+  },
+  {
+   "id": "join_spectate-stick-generic.display",
+   "node": "join_spectate-stick-generic",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 5]}, "block", "none"]}
+  },
+  {
+   "id": "join_favorite-stick-xbox.display",
+   "node": "join_favorite-stick-xbox",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 1]}, "block", "none"]}
+  },
+  {
+   "id": "join_favorite-stick-playstation.display",
+   "node": "join_favorite-stick-playstation",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 2]}, "block", "none"]}
+  },
+  {
+   "id": "join_favorite-stick-nintendo.display",
+   "node": "join_favorite-stick-nintendo",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 3]}, "block", "none"]}
+  },
+  {
+   "id": "join_favorite-stick-steamdeck.display",
+   "node": "join_favorite-stick-steamdeck",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 4]}, "block", "none"]}
+  },
+  {
+   "id": "join_favorite-stick-generic.display",
+   "node": "join_favorite-stick-generic",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "prompt.glyphs"}, 5]}, "block", "none"]}
+  },
+  {
    "id": "prompt-231042-cap.display",
    "node": "prompt-231042-cap",
    "property": "display",
@@ -38123,6 +38222,32 @@
    }
   },
   {
+   "id": "text.join_spectate-label.font-size",
+   "node": "join_spectate-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "*", "args": [1.2, {"op": "/", "args": [20, {"state": "view.text"}]}]},
+     {"op": "/", "args": [20, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.join_spectate-label.line-height",
+   "node": "join_spectate-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "*", "args": [1.2, {"op": "/", "args": [45, {"state": "view.text"}]}]},
+     {"op": "/", "args": [45, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
    "id": "text.join_favorite-label.font-size",
    "node": "join_favorite-label",
    "property": "font-size",
@@ -39394,7 +39519,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     533.8,
+     587.8,
      {
       "op": "select",
       "args": [
@@ -39414,7 +39539,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     533.8,
+     587.8,
      {
       "op": "select",
       "args": [
@@ -39434,7 +39559,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     491.0,
+     545.0,
      {
       "op": "select",
       "args": [
@@ -39454,7 +39579,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     491.0,
+     545.0,
      {
       "op": "select",
       "args": [
@@ -39474,7 +39599,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     491.0,
+     545.0,
      {
       "op": "select",
       "args": [
@@ -39494,7 +39619,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     454.2,
+     508.2,
      {
       "op": "select",
       "args": [
@@ -39514,7 +39639,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     454.2,
+     508.2,
      {
       "op": "select",
       "args": [
@@ -39534,7 +39659,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     454.2,
+     508.2,
      {
       "op": "select",
       "args": [
@@ -64657,6 +64782,288 @@
    "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 54.0, 45]}
   },
   {
+   "id": "tall.join_favorite-stick.left",
+   "node": "join_favorite-stick",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 459.6, 383.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick.top",
+   "node": "join_favorite-stick",
+   "property": "top",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 13.8, 11.5]}
+  },
+  {
+   "id": "tall.join_favorite-stick.width",
+   "node": "join_favorite-stick",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick.height",
+   "node": "join_favorite-stick",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-xbox.width",
+   "node": "join_favorite-stick-xbox",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-xbox.height",
+   "node": "join_favorite-stick-xbox",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-playstation.width",
+   "node": "join_favorite-stick-playstation",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-playstation.height",
+   "node": "join_favorite-stick-playstation",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-nintendo.width",
+   "node": "join_favorite-stick-nintendo",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-nintendo.height",
+   "node": "join_favorite-stick-nintendo",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-steamdeck.width",
+   "node": "join_favorite-stick-steamdeck",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-steamdeck.height",
+   "node": "join_favorite-stick-steamdeck",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-generic.width",
+   "node": "join_favorite-stick-generic",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_favorite-stick-generic.height",
+   "node": "join_favorite-stick-generic",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate.left",
+   "node": "join_spectate",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 463.5, 577.5]}
+  },
+  {
+   "id": "tall.join_spectate.bottom",
+   "node": "join_spectate",
+   "property": "bottom",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 142.6, 124.5]}
+  },
+  {
+   "id": "tall.join_spectate.width",
+   "node": "join_spectate",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 414.0, 345.0]}
+  },
+  {
+   "id": "tall.join_spectate.height",
+   "node": "join_spectate",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 54.0, 45]}
+  },
+  {
+   "id": "tall.join_spectate-plate.width",
+   "node": "join_spectate-plate",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 414.0, 345.0]}
+  },
+  {
+   "id": "tall.join_spectate-plate.height",
+   "node": "join_spectate-plate",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 54.0, 45]}
+  },
+  {
+   "id": "tall.join_spectate-focus.width",
+   "node": "join_spectate-focus",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 414.0, 345.0]}
+  },
+  {
+   "id": "tall.join_spectate-focus.height",
+   "node": "join_spectate-focus",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 54.0, 45]}
+  },
+  {
+   "id": "tall.join_spectate-marker.left",
+   "node": "join_spectate-marker",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.8, 14]}
+  },
+  {
+   "id": "tall.join_spectate-marker.top",
+   "node": "join_spectate-marker",
+   "property": "top",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.8, 14]}
+  },
+  {
+   "id": "tall.join_spectate-marker.width",
+   "node": "join_spectate-marker",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 9.6, 8]}
+  },
+  {
+   "id": "tall.join_spectate-marker.height",
+   "node": "join_spectate-marker",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 9.6, 8]}
+  },
+  {
+   "id": "tall.join_spectate-marker-hot.left",
+   "node": "join_spectate-marker-hot",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.8, 14]}
+  },
+  {
+   "id": "tall.join_spectate-marker-hot.top",
+   "node": "join_spectate-marker-hot",
+   "property": "top",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 16.8, 14]}
+  },
+  {
+   "id": "tall.join_spectate-marker-hot.width",
+   "node": "join_spectate-marker-hot",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 9.6, 8]}
+  },
+  {
+   "id": "tall.join_spectate-marker-hot.height",
+   "node": "join_spectate-marker-hot",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 9.6, 8]}
+  },
+  {
+   "id": "tall.join_spectate-label.left",
+   "node": "join_spectate-label",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 31.2, 26]}
+  },
+  {
+   "id": "tall.join_spectate-label.width",
+   "node": "join_spectate-label",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 378.0, 315.0]}
+  },
+  {
+   "id": "tall.join_spectate-label.height",
+   "node": "join_spectate-label",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 54.0, 45]}
+  },
+  {
+   "id": "tall.join_spectate-stick.left",
+   "node": "join_spectate-stick",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 423.6, 353.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick.top",
+   "node": "join_spectate-stick",
+   "property": "top",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 13.8, 11.5]}
+  },
+  {
+   "id": "tall.join_spectate-stick.width",
+   "node": "join_spectate-stick",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick.height",
+   "node": "join_spectate-stick",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-xbox.width",
+   "node": "join_spectate-stick-xbox",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-xbox.height",
+   "node": "join_spectate-stick-xbox",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-playstation.width",
+   "node": "join_spectate-stick-playstation",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-playstation.height",
+   "node": "join_spectate-stick-playstation",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-nintendo.width",
+   "node": "join_spectate-stick-nintendo",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-nintendo.height",
+   "node": "join_spectate-stick-nintendo",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-steamdeck.width",
+   "node": "join_spectate-stick-steamdeck",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-steamdeck.height",
+   "node": "join_spectate-stick-steamdeck",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-generic.width",
+   "node": "join_spectate-stick-generic",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
+   "id": "tall.join_spectate-stick-generic.height",
+   "node": "join_spectate-stick-generic",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 26.4, 22.0]}
+  },
+  {
    "id": "tall.join_find.left",
    "node": "join_find",
    "property": "left",
@@ -64666,7 +65073,7 @@
    "id": "tall.join_find.bottom",
    "node": "join_find",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 152.6, 68.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 206.6, 68.0]}
   },
   {
    "id": "tall.join_find.width",
@@ -64780,7 +65187,7 @@
    "id": "tall.join_ip.bottom",
    "node": "join_ip",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 199.4, 107.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 253.4, 107.0]}
   },
   {
    "id": "tall.join_ip.width",
@@ -64894,7 +65301,7 @@
    "id": "tall.join_newlist.bottom",
    "node": "join_newlist",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 246.2, 146.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 300.2, 146.0]}
   },
   {
    "id": "tall.join_newlist.width",
@@ -65008,7 +65415,7 @@
    "id": "tall.join_refresh.bottom",
    "node": "join_refresh",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 293.0, 185.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 347.0, 185.0]}
   },
   {
    "id": "tall.join_refresh.width",
@@ -65122,7 +65529,7 @@
    "id": "tall.join-shot-back.bottom",
    "node": "join-shot-back",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 152.6, 82.5]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 206.6, 82.5]}
   },
   {
    "id": "tall.join-shot-back.width",
@@ -65146,7 +65553,7 @@
    "id": "tall.join-shot.bottom",
    "node": "join-shot",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 154.8091, 84.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 208.8091, 84.0]}
   },
   {
    "id": "tall.join-shot.width",
@@ -65170,7 +65577,7 @@
    "id": "tall.join-shot-border.bottom",
    "node": "join-shot-border",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 152.6, 82.5]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 206.6, 82.5]}
   },
   {
    "id": "tall.join-shot-border.width",
@@ -65188,7 +65595,7 @@
    "id": "tall.join-load-track.bottom",
    "node": "join-load-track",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 357.0, 229.5]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 411.0, 229.5]}
   },
   {
    "id": "tall.join-load-track.height",
@@ -65200,7 +65607,7 @@
    "id": "tall.join-load-fill.bottom",
    "node": "join-load-fill",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 357.0, 229.5]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 411.0, 229.5]}
   },
   {
    "id": "tall.join-load-fill.height",
@@ -65218,7 +65625,7 @@
    "id": "tall.join-load-notice.bottom",
    "node": "join-load-notice",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 355.2, 229.5]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 409.2, 229.5]}
   },
   {
    "id": "tall.join-load-notice.height",
@@ -65236,7 +65643,7 @@
    "id": "tall.join_clearsort.bottom",
    "node": "join_clearsort",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 392.2, 251.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 446.2, 251.0]}
   },
   {
    "id": "tall.join_clearsort.width",
@@ -65350,7 +65757,7 @@
    "id": "tall.join-status.bottom",
    "node": "join-status",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 404.8, 259.5]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 458.8, 259.5]}
   },
   {
    "id": "tall.join-status.font-size",
@@ -65608,7 +66015,7 @@
    "id": "tall.join_search.bottom",
    "node": "join_search",
    "property": "bottom",
-   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 491.0, 261.0]}
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 545.0, 261.0]}
   },
   {
    "id": "tall.join_search.width",
@@ -89894,6 +90301,286 @@
     },
     {
      "node": "join_favorite-label",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "join_spectate.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "join_spectate-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.4}},
+      {"atMs": 300, "value": {"type": "number", "value": 0.4}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.4}},
+      {"atMs": 300, "value": {"type": "number", "value": 0.4}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker-hot",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "join_spectate-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.8]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.8]}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "join_spectate.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "join_spectate-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker-hot",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "join_spectate-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "join_spectate.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "join_spectate-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker-hot",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "join_spectate-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "join_spectate.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "join_spectate-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker-hot",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "join_spectate-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "join_spectate.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "join_spectate-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.4}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0.4}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.4}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0.4}}
+     ]
+    },
+    {
+     "node": "join_spectate-marker-hot",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "join_spectate-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.4]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.4]}}
+     ]
+    },
+    {
+     "node": "join_spectate-label",
      "property": "transform",
      "keys": [
       {
@@ -145776,6 +146463,1049 @@
         }
        },
        {
+        "id": "join_spectate",
+        "type": "group",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 577.5, "unit": "dp"},
+         "width": {"type": "length", "value": 345.0, "unit": "dp"},
+         "height": {"type": "length", "value": 45, "unit": "dp"},
+         "bottom": {"type": "length", "value": 124.5, "unit": "dp"}
+        },
+        "children": [
+         {
+          "id": "join_spectate-plate",
+          "type": "vector",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 0, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "width": {"type": "length", "value": 345.0, "unit": "dp"},
+           "height": {"type": "length", "value": 45, "unit": "dp"},
+           "opacity": {"type": "number", "value": 0.4}
+          },
+          "paths": [
+           {
+            "id": "fill",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.111111}]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.111111}]]},
+             {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.888889}]]},
+             {"id": "p3", "op": "line", "points": [[{"fraction": 0.057971}, {"fraction": 0.888889}]]},
+             {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.444444}]]},
+             {"id": "close", "op": "close"}
+            ],
+            "fill": {
+             "type": "linear",
+             "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+             "to": [{"fraction": 1.0}, {"fraction": 0.0}],
+             "stops": [
+              {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
+              {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
+              {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0]}}
+             ]
+            }
+           },
+           {
+            "id": "rail",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[{"fraction": 0.002174}, {"fraction": 0.111111}]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 0.002174}, {"fraction": 0.444444}]]},
+             {"id": "p2", "op": "line", "points": [[{"fraction": 0.057971}, {"fraction": 0.872222}]]},
+             {"id": "p3", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.872222}]]}
+            ],
+            "stroke": {
+             "paint": {
+              "type": "linear",
+              "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+              "to": [{"fraction": 1.0}, {"fraction": 0.0}],
+              "stops": [
+               {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
+               {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
+               {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0]}}
+              ]
+             },
+             "widthDp": 1.5,
+             "minimumPixels": 1,
+             "join": "miter",
+             "cap": "butt"
+            }
+           }
+          ]
+         },
+         {
+          "id": "join_spectate-focus",
+          "type": "vector",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 0, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "width": {"type": "length", "value": 345.0, "unit": "dp"},
+           "height": {"type": "length", "value": 45, "unit": "dp"},
+           "opacity": {"type": "number", "value": 0}
+          },
+          "paths": [
+           {
+            "id": "inset",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[{"fraction": 0.010145}, {"fraction": 0.177778}]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 0.010145}, {"fraction": 0.477778}]]},
+             {"id": "p2", "op": "line", "points": [[{"fraction": 0.062319}, {"fraction": 0.811111}]]},
+             {"id": "p3", "op": "line", "points": [[{"fraction": 0.942029}, {"fraction": 0.811111}]]}
+            ],
+            "stroke": {
+             "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+             "widthDp": 1.2,
+             "minimumPixels": 1,
+             "join": "miter",
+             "cap": "butt"
+            }
+           }
+          ]
+         },
+         {
+          "id": "join_spectate-marker",
+          "type": "vector",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 14, "unit": "dp"},
+           "top": {"type": "length", "value": 14, "unit": "dp"},
+           "width": {"type": "length", "value": 8, "unit": "dp"},
+           "height": {"type": "length", "value": 8, "unit": "dp"},
+           "opacity": {"type": "number", "value": 0.4}
+          },
+          "paths": [
+           {
+            "id": "mark",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.0}]]},
+             {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 1.0}]]},
+             {"id": "close", "op": "close"}
+            ],
+            "fill": {"type": "solid", "color": {"type": "color", "value": [0.5647, 0.6039, 0.2863, 1.0]}}
+           }
+          ]
+         },
+         {
+          "id": "join_spectate-marker-hot",
+          "type": "vector",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 14, "unit": "dp"},
+           "top": {"type": "length", "value": 14, "unit": "dp"},
+           "width": {"type": "length", "value": 8, "unit": "dp"},
+           "height": {"type": "length", "value": 8, "unit": "dp"},
+           "opacity": {"type": "number", "value": 0}
+          },
+          "paths": [
+           {
+            "id": "mark",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.0}]]},
+             {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 1.0}]]},
+             {"id": "close", "op": "close"}
+            ],
+            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+           }
+          ]
+         },
+         {
+          "id": "join_spectate-label",
+          "type": "text",
+          "properties": {
+           "text": {"type": "text", "value": "#str_200195"},
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 26, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "width": {"type": "length", "value": 315.0, "unit": "dp"},
+           "height": {"type": "length", "value": 45, "unit": "dp"},
+           "font-family": {"type": "font", "value": "marine"},
+           "font-size": {"type": "length", "value": 20, "unit": "dp"},
+           "line-height": {"type": "length", "value": 45, "unit": "dp"},
+           "color": {"type": "color", "value": [1, 1, 1, 0.8]},
+           "white-space": {"type": "keyword", "value": "nowrap"},
+           "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+          }
+         },
+         {
+          "id": "join_spectate-stick",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 353.0, "unit": "dp"},
+           "top": {"type": "length", "value": 11.5, "unit": "dp"},
+           "width": {"type": "length", "value": 22.0, "unit": "dp"},
+           "height": {"type": "length", "value": 22.0, "unit": "dp"},
+           "pointer-events": {"type": "keyword", "value": "none"}
+          },
+          "children": [
+           {
+            "id": "join_spectate-stick-xbox",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.872727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.872727}, {"fraction": 0.705864}],
+                 [{"fraction": 0.705864}, {"fraction": 0.872727}],
+                 [{"fraction": 0.5}, {"fraction": 0.872727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.294136}, {"fraction": 0.872727}],
+                 [{"fraction": 0.127273}, {"fraction": 0.705864}],
+                 [{"fraction": 0.127273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.127273}, {"fraction": 0.294136}],
+                 [{"fraction": 0.294136}, {"fraction": 0.127273}],
+                 [{"fraction": 0.5}, {"fraction": 0.127273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.705864}, {"fraction": 0.127273}],
+                 [{"fraction": 0.872727}, {"fraction": 0.294136}],
+                 [{"fraction": 0.872727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.7025}, {"fraction": 0.395}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.6695}, {"fraction": 0.344}],
+                 [{"fraction": 0.5375}, {"fraction": 0.35}],
+                 [{"fraction": 0.5375}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.5375}, {"fraction": 0.485}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.5705}, {"fraction": 0.656}],
+                 [{"fraction": 0.5375}, {"fraction": 0.605}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "join_spectate-stick-playstation",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.872727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.872727}, {"fraction": 0.705864}],
+                 [{"fraction": 0.705864}, {"fraction": 0.872727}],
+                 [{"fraction": 0.5}, {"fraction": 0.872727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.294136}, {"fraction": 0.872727}],
+                 [{"fraction": 0.127273}, {"fraction": 0.705864}],
+                 [{"fraction": 0.127273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.127273}, {"fraction": 0.294136}],
+                 [{"fraction": 0.294136}, {"fraction": 0.127273}],
+                 [{"fraction": 0.5}, {"fraction": 0.127273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.705864}, {"fraction": 0.127273}],
+                 [{"fraction": 0.872727}, {"fraction": 0.294136}],
+                 [{"fraction": 0.872727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.5375}, {"fraction": 0.38}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.587}, {"fraction": 0.335}],
+                 [{"fraction": 0.7025}, {"fraction": 0.35}],
+                 [{"fraction": 0.7025}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.485}],
+                 [{"fraction": 0.6365}, {"fraction": 0.5}],
+                 [{"fraction": 0.595273}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "c", "op": "move", "points": [[{"fraction": 0.595273}, {"fraction": 0.5}]]},
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.653}, {"fraction": 0.5}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "e",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.587}, {"fraction": 0.665}],
+                 [{"fraction": 0.5375}, {"fraction": 0.62}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "join_spectate-stick-nintendo",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.872727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.872727}, {"fraction": 0.705864}],
+                 [{"fraction": 0.705864}, {"fraction": 0.872727}],
+                 [{"fraction": 0.5}, {"fraction": 0.872727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.294136}, {"fraction": 0.872727}],
+                 [{"fraction": 0.127273}, {"fraction": 0.705864}],
+                 [{"fraction": 0.127273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.127273}, {"fraction": 0.294136}],
+                 [{"fraction": 0.294136}, {"fraction": 0.127273}],
+                 [{"fraction": 0.5}, {"fraction": 0.127273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.705864}, {"fraction": 0.127273}],
+                 [{"fraction": 0.872727}, {"fraction": 0.294136}],
+                 [{"fraction": 0.872727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.7025}, {"fraction": 0.395}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.6695}, {"fraction": 0.344}],
+                 [{"fraction": 0.5375}, {"fraction": 0.35}],
+                 [{"fraction": 0.5375}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.5375}, {"fraction": 0.485}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.5705}, {"fraction": 0.656}],
+                 [{"fraction": 0.5375}, {"fraction": 0.605}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "join_spectate-stick-steamdeck",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.845455}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.845455}, {"fraction": 0.690773}],
+                 [{"fraction": 0.690773}, {"fraction": 0.845455}],
+                 [{"fraction": 0.5}, {"fraction": 0.845455}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.309227}, {"fraction": 0.845455}],
+                 [{"fraction": 0.154545}, {"fraction": 0.690773}],
+                 [{"fraction": 0.154545}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.154545}, {"fraction": 0.309227}],
+                 [{"fraction": 0.309227}, {"fraction": 0.154545}],
+                 [{"fraction": 0.5}, {"fraction": 0.154545}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.690773}, {"fraction": 0.154545}],
+                 [{"fraction": 0.845455}, {"fraction": 0.309227}],
+                 [{"fraction": 0.845455}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.5375}, {"fraction": 0.38}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.587}, {"fraction": 0.335}],
+                 [{"fraction": 0.7025}, {"fraction": 0.35}],
+                 [{"fraction": 0.7025}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.485}],
+                 [{"fraction": 0.6365}, {"fraction": 0.5}],
+                 [{"fraction": 0.595273}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "c", "op": "move", "points": [[{"fraction": 0.595273}, {"fraction": 0.5}]]},
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.653}, {"fraction": 0.5}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "e",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.587}, {"fraction": 0.665}],
+                 [{"fraction": 0.5375}, {"fraction": 0.62}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "join_spectate-stick-generic",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.845455}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.845455}, {"fraction": 0.690773}],
+                 [{"fraction": 0.690773}, {"fraction": 0.845455}],
+                 [{"fraction": 0.5}, {"fraction": 0.845455}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.309227}, {"fraction": 0.845455}],
+                 [{"fraction": 0.154545}, {"fraction": 0.690773}],
+                 [{"fraction": 0.154545}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.154545}, {"fraction": 0.309227}],
+                 [{"fraction": 0.309227}, {"fraction": 0.154545}],
+                 [{"fraction": 0.5}, {"fraction": 0.154545}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.690773}, {"fraction": 0.154545}],
+                 [{"fraction": 0.845455}, {"fraction": 0.309227}],
+                 [{"fraction": 0.845455}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.5375}, {"fraction": 0.38}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.587}, {"fraction": 0.335}],
+                 [{"fraction": 0.7025}, {"fraction": 0.35}],
+                 [{"fraction": 0.7025}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.485}],
+                 [{"fraction": 0.6365}, {"fraction": 0.5}],
+                 [{"fraction": 0.595273}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "c", "op": "move", "points": [[{"fraction": 0.595273}, {"fraction": 0.5}]]},
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.653}, {"fraction": 0.5}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "e",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.587}, {"fraction": 0.665}],
+                 [{"fraction": 0.5375}, {"fraction": 0.62}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           }
+          ]
+         }
+        ],
+        "control": {
+         "role": "button",
+         "label": "#str_200195",
+         "states": {
+          "default": "join_spectate.default",
+          "hover": "join_spectate.hover",
+          "focus": "join_spectate.focus",
+          "pressed": "join_spectate.pressed",
+          "disabled": "join_spectate.disabled"
+         },
+         "action": "joinSpectate",
+         "prompt": "#str_200195"
+        }
+       },
+       {
         "id": "join_favorite",
         "type": "group",
         "properties": {
@@ -145941,6 +147671,927 @@
            "white-space": {"type": "keyword", "value": "nowrap"},
            "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
           }
+         },
+         {
+          "id": "join_favorite-stick",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 383.0, "unit": "dp"},
+           "top": {"type": "length", "value": 11.5, "unit": "dp"},
+           "width": {"type": "length", "value": 22.0, "unit": "dp"},
+           "height": {"type": "length", "value": 22.0, "unit": "dp"},
+           "pointer-events": {"type": "keyword", "value": "none"}
+          },
+          "children": [
+           {
+            "id": "join_favorite-stick-xbox",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.872727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.872727}, {"fraction": 0.705864}],
+                 [{"fraction": 0.705864}, {"fraction": 0.872727}],
+                 [{"fraction": 0.5}, {"fraction": 0.872727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.294136}, {"fraction": 0.872727}],
+                 [{"fraction": 0.127273}, {"fraction": 0.705864}],
+                 [{"fraction": 0.127273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.127273}, {"fraction": 0.294136}],
+                 [{"fraction": 0.294136}, {"fraction": 0.127273}],
+                 [{"fraction": 0.5}, {"fraction": 0.127273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.705864}, {"fraction": 0.127273}],
+                 [{"fraction": 0.872727}, {"fraction": 0.294136}],
+                 [{"fraction": 0.872727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "s", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "t", "op": "line", "points": [[{"fraction": 0.38}, {"fraction": 0.35}]]},
+               {
+                "id": "u",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.437773}, {"fraction": 0.35}],
+                 [{"fraction": 0.437773}, {"fraction": 0.5}],
+                 [{"fraction": 0.38}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "v", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.5}]]},
+               {"id": "w", "op": "move", "points": [[{"fraction": 0.371727}, {"fraction": 0.5}]]},
+               {"id": "x", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.7025}, {"fraction": 0.395}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.6695}, {"fraction": 0.344}],
+                 [{"fraction": 0.5375}, {"fraction": 0.35}],
+                 [{"fraction": 0.5375}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.5375}, {"fraction": 0.485}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.5705}, {"fraction": 0.656}],
+                 [{"fraction": 0.5375}, {"fraction": 0.605}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "join_favorite-stick-playstation",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.872727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.872727}, {"fraction": 0.705864}],
+                 [{"fraction": 0.705864}, {"fraction": 0.872727}],
+                 [{"fraction": 0.5}, {"fraction": 0.872727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.294136}, {"fraction": 0.872727}],
+                 [{"fraction": 0.127273}, {"fraction": 0.705864}],
+                 [{"fraction": 0.127273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.127273}, {"fraction": 0.294136}],
+                 [{"fraction": 0.294136}, {"fraction": 0.127273}],
+                 [{"fraction": 0.5}, {"fraction": 0.127273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.705864}, {"fraction": 0.127273}],
+                 [{"fraction": 0.872727}, {"fraction": 0.294136}],
+                 [{"fraction": 0.872727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "s", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "t", "op": "line", "points": [[{"fraction": 0.38}, {"fraction": 0.35}]]},
+               {
+                "id": "u",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.437773}, {"fraction": 0.35}],
+                 [{"fraction": 0.437773}, {"fraction": 0.5}],
+                 [{"fraction": 0.38}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "v", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.5}]]},
+               {"id": "w", "op": "move", "points": [[{"fraction": 0.371727}, {"fraction": 0.5}]]},
+               {"id": "x", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.5375}, {"fraction": 0.38}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.587}, {"fraction": 0.335}],
+                 [{"fraction": 0.7025}, {"fraction": 0.35}],
+                 [{"fraction": 0.7025}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.485}],
+                 [{"fraction": 0.6365}, {"fraction": 0.5}],
+                 [{"fraction": 0.595273}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "c", "op": "move", "points": [[{"fraction": 0.595273}, {"fraction": 0.5}]]},
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.653}, {"fraction": 0.5}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "e",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.587}, {"fraction": 0.665}],
+                 [{"fraction": 0.5375}, {"fraction": 0.62}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "join_favorite-stick-nintendo",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.872727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.872727}, {"fraction": 0.705864}],
+                 [{"fraction": 0.705864}, {"fraction": 0.872727}],
+                 [{"fraction": 0.5}, {"fraction": 0.872727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.294136}, {"fraction": 0.872727}],
+                 [{"fraction": 0.127273}, {"fraction": 0.705864}],
+                 [{"fraction": 0.127273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.127273}, {"fraction": 0.294136}],
+                 [{"fraction": 0.294136}, {"fraction": 0.127273}],
+                 [{"fraction": 0.5}, {"fraction": 0.127273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.705864}, {"fraction": 0.127273}],
+                 [{"fraction": 0.872727}, {"fraction": 0.294136}],
+                 [{"fraction": 0.872727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "s", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "t", "op": "line", "points": [[{"fraction": 0.38}, {"fraction": 0.35}]]},
+               {
+                "id": "u",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.437773}, {"fraction": 0.35}],
+                 [{"fraction": 0.437773}, {"fraction": 0.5}],
+                 [{"fraction": 0.38}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "v", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.5}]]},
+               {"id": "w", "op": "move", "points": [[{"fraction": 0.371727}, {"fraction": 0.5}]]},
+               {"id": "x", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.7025}, {"fraction": 0.395}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.6695}, {"fraction": 0.344}],
+                 [{"fraction": 0.5375}, {"fraction": 0.35}],
+                 [{"fraction": 0.5375}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.5375}, {"fraction": 0.485}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.5705}, {"fraction": 0.656}],
+                 [{"fraction": 0.5375}, {"fraction": 0.605}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "join_favorite-stick-steamdeck",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.845455}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.845455}, {"fraction": 0.690773}],
+                 [{"fraction": 0.690773}, {"fraction": 0.845455}],
+                 [{"fraction": 0.5}, {"fraction": 0.845455}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.309227}, {"fraction": 0.845455}],
+                 [{"fraction": 0.154545}, {"fraction": 0.690773}],
+                 [{"fraction": 0.154545}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.154545}, {"fraction": 0.309227}],
+                 [{"fraction": 0.309227}, {"fraction": 0.154545}],
+                 [{"fraction": 0.5}, {"fraction": 0.154545}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.690773}, {"fraction": 0.154545}],
+                 [{"fraction": 0.845455}, {"fraction": 0.309227}],
+                 [{"fraction": 0.845455}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "s", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "t", "op": "line", "points": [[{"fraction": 0.38}, {"fraction": 0.35}]]},
+               {
+                "id": "u",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.437773}, {"fraction": 0.35}],
+                 [{"fraction": 0.437773}, {"fraction": 0.5}],
+                 [{"fraction": 0.38}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "v", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.5}]]},
+               {"id": "w", "op": "move", "points": [[{"fraction": 0.371727}, {"fraction": 0.5}]]},
+               {"id": "x", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.5375}, {"fraction": 0.38}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.587}, {"fraction": 0.335}],
+                 [{"fraction": 0.7025}, {"fraction": 0.35}],
+                 [{"fraction": 0.7025}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.485}],
+                 [{"fraction": 0.6365}, {"fraction": 0.5}],
+                 [{"fraction": 0.595273}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "c", "op": "move", "points": [[{"fraction": 0.595273}, {"fraction": 0.5}]]},
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.653}, {"fraction": 0.5}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "e",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.587}, {"fraction": 0.665}],
+                 [{"fraction": 0.5375}, {"fraction": 0.62}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "join_favorite-stick-generic",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "none"},
+             "width": {"type": "length", "value": 22.0, "unit": "dp"},
+             "height": {"type": "length", "value": 22.0, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "rim",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.972727}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.972727}, {"fraction": 0.761091}],
+                 [{"fraction": 0.761091}, {"fraction": 0.972727}],
+                 [{"fraction": 0.5}, {"fraction": 0.972727}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.238909}, {"fraction": 0.972727}],
+                 [{"fraction": 0.027273}, {"fraction": 0.761091}],
+                 [{"fraction": 0.027273}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.027273}, {"fraction": 0.238909}],
+                 [{"fraction": 0.238909}, {"fraction": 0.027273}],
+                 [{"fraction": 0.5}, {"fraction": 0.027273}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.761091}, {"fraction": 0.027273}],
+                 [{"fraction": 0.972727}, {"fraction": 0.238909}],
+                 [{"fraction": 0.972727}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "cap",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.845455}, {"fraction": 0.5}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.845455}, {"fraction": 0.690773}],
+                 [{"fraction": 0.690773}, {"fraction": 0.845455}],
+                 [{"fraction": 0.5}, {"fraction": 0.845455}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.309227}, {"fraction": 0.845455}],
+                 [{"fraction": 0.154545}, {"fraction": 0.690773}],
+                 [{"fraction": 0.154545}, {"fraction": 0.5}]
+                ]
+               },
+               {
+                "id": "c",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.154545}, {"fraction": 0.309227}],
+                 [{"fraction": 0.309227}, {"fraction": 0.154545}],
+                 [{"fraction": 0.5}, {"fraction": 0.154545}]
+                ]
+               },
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.690773}, {"fraction": 0.154545}],
+                 [{"fraction": 0.845455}, {"fraction": 0.309227}],
+                 [{"fraction": 0.845455}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "z", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-0",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.2975}, {"fraction": 0.65}]]},
+               {"id": "s", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.35}]]},
+               {"id": "t", "op": "line", "points": [[{"fraction": 0.38}, {"fraction": 0.35}]]},
+               {
+                "id": "u",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.437773}, {"fraction": 0.35}],
+                 [{"fraction": 0.437773}, {"fraction": 0.5}],
+                 [{"fraction": 0.38}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "v", "op": "line", "points": [[{"fraction": 0.2975}, {"fraction": 0.5}]]},
+               {"id": "w", "op": "move", "points": [[{"fraction": 0.371727}, {"fraction": 0.5}]]},
+               {"id": "x", "op": "line", "points": [[{"fraction": 0.4625}, {"fraction": 0.65}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             },
+             {
+              "id": "label-1",
+              "commands": [
+               {"id": "m", "op": "move", "points": [[{"fraction": 0.5375}, {"fraction": 0.38}]]},
+               {
+                "id": "a",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.587}, {"fraction": 0.335}],
+                 [{"fraction": 0.7025}, {"fraction": 0.35}],
+                 [{"fraction": 0.7025}, {"fraction": 0.425}]
+                ]
+               },
+               {
+                "id": "b",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.485}],
+                 [{"fraction": 0.6365}, {"fraction": 0.5}],
+                 [{"fraction": 0.595273}, {"fraction": 0.5}]
+                ]
+               },
+               {"id": "c", "op": "move", "points": [[{"fraction": 0.595273}, {"fraction": 0.5}]]},
+               {
+                "id": "d",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.653}, {"fraction": 0.5}],
+                 [{"fraction": 0.7025}, {"fraction": 0.515}],
+                 [{"fraction": 0.7025}, {"fraction": 0.575}]
+                ]
+               },
+               {
+                "id": "e",
+                "op": "cubic",
+                "points": [
+                 [{"fraction": 0.7025}, {"fraction": 0.65}],
+                 [{"fraction": 0.587}, {"fraction": 0.665}],
+                 [{"fraction": 0.5375}, {"fraction": 0.62}]
+                ]
+               }
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+               "widthDp": 1.3,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           }
+          ]
          }
         ],
         "control": {

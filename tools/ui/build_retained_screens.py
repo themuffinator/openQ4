@@ -1711,6 +1711,15 @@ TRIGGER_LABELS = {
     "nintendo": {"left": "ZL", "right": "ZR"},
     "steamdeck": {"left": "L2", "right": "R2"},
 }
+# The label each family prints for a press of its sticks, as the HUD's
+# prompts name them (UserInterfaceRetained.cpp's glyph table).
+STICK_LABELS = {
+    "xbox": {"left": "LS", "right": "RS"},
+    "playstation": {"left": "L3", "right": "R3"},
+    "nintendo": {"left": "LS", "right": "RS"},
+    "steamdeck": {"left": "L3", "right": "R3"},
+    "generic": {"left": "L3", "right": "R3"},
+}
 # A prompt's key and the button that does the same in menus: Enter is
 # Accept (south), Escape is Back (east), and the cards' Q and E are the
 # previous and next tab (the shoulders).
@@ -1801,8 +1810,8 @@ def face_glyph(ident: str, family: str, position: str, tint: list, size: float =
 
 
 def small_letters(prefix: str, text: str, left: float, top: float, height: float, ink: list, width: float) -> list:
-    """Shoulder and trigger labels (L, R, B, T, Z, 1 and 2) drawn as strokes, `height` dp tall from
-    (`left`, `top`), each glyph 0.55 of its height wide and 0.25 apart."""
+    """Shoulder, trigger and stick labels (L, R, B, S, T, Z, 1, 2 and 3) drawn as strokes, `height` dp tall
+    from (`left`, `top`), each glyph 0.55 of its height wide and 0.25 apart."""
     line = stroke(solid(ink), width, minimum=1)
     glyph_w, gap = height * 0.55, height * 0.25
     paths = []
@@ -1822,6 +1831,28 @@ def small_letters(prefix: str, text: str, left: float, top: float, height: float
                                                        point(right, top + height * 0.3)]},
                 {"id": "b", "op": "line", "points": [point(x, bottom)]},
                 {"id": "c", "op": "line", "points": [point(right, bottom)]}], "stroke": line})
+        elif char == "3":
+            # Two bowls opening to the leading side, meeting at the middle.
+            paths.append({"id": name, "commands": [
+                {"id": "m", "op": "move", "points": [point(x, top + height * 0.1)]},
+                {"id": "a", "op": "cubic", "points": [point(x + glyph_w * 0.3, top - height * 0.05), point(right, top),
+                                                       point(right, top + height * 0.25)]},
+                {"id": "b", "op": "cubic", "points": [point(right, middle - height * 0.05), point(x + glyph_w * 0.6, middle),
+                                                       point(x + glyph_w * 0.35, middle)]},
+                {"id": "c", "op": "move", "points": [point(x + glyph_w * 0.35, middle)]},
+                {"id": "d", "op": "cubic", "points": [point(x + glyph_w * 0.7, middle), point(right, middle + height * 0.05),
+                                                       point(right, bottom - height * 0.25)]},
+                {"id": "e", "op": "cubic", "points": [point(right, bottom), point(x + glyph_w * 0.3, bottom + height * 0.05),
+                                                       point(x, bottom - height * 0.1)]}], "stroke": line})
+        elif char == "S":
+            paths.append({"id": name, "commands": [
+                {"id": "m", "op": "move", "points": [point(right, top + height * 0.15)]},
+                {"id": "a", "op": "cubic", "points": [point(right - glyph_w * 0.2, top - height * 0.02), point(x, top),
+                                                       point(x, top + height * 0.25)]},
+                {"id": "b", "op": "cubic", "points": [point(x, middle - height * 0.05), point(right, middle + height * 0.05),
+                                                       point(right, bottom - height * 0.25)]},
+                {"id": "c", "op": "cubic", "points": [point(right, bottom), point(x + glyph_w * 0.2, bottom + height * 0.02),
+                                                       point(x, bottom - height * 0.15)]}], "stroke": line})
         elif char == "T":
             paths.append(path(f"{name}-bar", [(x, top), (right, top)], closed=False, stroke=line))
             paths.append(path(name, [(x + glyph_w * 0.5, top), (x + glyph_w * 0.5, bottom)], closed=False, stroke=line))
@@ -1926,6 +1957,29 @@ def trigger_glyph(ident: str, family: str, side: str, tint: list, width: float =
                           "height": length(height)}, paths)
 
 
+def stick_glyph(ident: str, family: str, side: str, tint: list, size: float = 22) -> dict:
+    """A press of one controller family's stick (`side` "left" or "right"):
+    the stick's cap seen from above as a circle with its press label (LS and
+    RS, or L3 and R3). Xbox, PlayStation and Nintendo print the label on a
+    filled cap, Steam Deck and a generic controller in an outlined one, the
+    cap's rim doubled so it reads as a stick rather than a face button."""
+    scale = size / 22
+    letters_h = 6.6 * scale
+    text = STICK_LABELS[family][side]
+    text_w = len(text) * letters_h * 0.55 + (len(text) - 1) * letters_h * 0.25
+    left, top = (size - text_w) / 2, (size - letters_h) / 2
+    outlined = family in ("steamdeck", "generic")
+    rim = circle_path("rim", 11 * scale, 11 * scale, 10.4 * scale, line=stroke(solid(tint), 1.1 * scale, minimum=1))
+    if outlined:
+        paths = [rim, circle_path("cap", 11 * scale, 11 * scale, 7.6 * scale, line=stroke(solid(tint), 1.3 * scale, minimum=1))]
+        paths += small_letters("label", text, left, top, letters_h, tint, 1.3 * scale)
+    else:
+        paths = [rim, circle_path("cap", 11 * scale, 11 * scale, 8.2 * scale, fill=solid(tint))]
+        paths += small_letters("label", text, left, top, letters_h, GLYPH_INK, 1.3 * scale)
+    return vector(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(size),
+                          "height": length(size)}, paths)
+
+
 def glyph_pill(scale: float, tint: list, fill: bool) -> dict:
     """The upright pill of a glyph's 22 dp box at `scale`: PlayStation's
     Options and Create buttons filled, a generic controller's outlined."""
@@ -2016,8 +2070,8 @@ def view_glyph(ident: str, family: str, tint: list, size: float = 22) -> dict:
 def device_glyphs(doc: Document, ident: str, position: str, tint: list, size: float = 22,
                   width: float | None = None) -> list:
     """Each controller family's button at `position` (a face position, the
-    "left" or "right" shoulder, the "left-trigger" or "right-trigger", "menu"
-    or "view"),
+    "left" or "right" shoulder, the "left-trigger" or "right-trigger", the
+    "left-stick" or "right-stick" press, "menu" or "view"),
     each shown only while prompt.glyphs names its family. A shoulder or a
     trigger is `width` dp wide (default `size`). An
     Accept or Back prompt (south or east) also carries each family's button
@@ -2039,6 +2093,8 @@ def device_glyphs(doc: Document, ident: str, position: str, tint: list, size: fl
                 node = shoulder_glyph(node_id, family, spot, tint, width or size, size)
             elif spot in ("left-trigger", "right-trigger"):
                 node = trigger_glyph(node_id, family, spot.split("-")[0], tint, width or size, size)
+            elif spot in ("left-stick", "right-stick"):
+                node = stick_glyph(node_id, family, spot.split("-")[0], tint, size)
             elif spot == "menu":
                 node = menu_glyph(node_id, family, tint, size)
             elif spot == "view":

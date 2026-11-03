@@ -230,7 +230,7 @@ bool SessionMenuCommand(const std::string& command) {
         "multiplayerJoin","multiplayerCreate","multiplayerDemos","multiplayerSetup","multiplayerBack","playerSetupClose",
         "createBack","createMap","createStart","createName","createMapCycle","createPassword","createRconPassword",
         "createMapsNewer","createMapsOlder","createBanList","createBanPick","createBanRemove",
-        "joinBack","joinPick","joinServer","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet",
+        "joinBack","joinPick","joinServer","joinSpectate","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet",
         "joinSourceLan","joinClearSort","joinSortFavorite","joinSortLocked","joinSortName","joinSortPing","joinSortPlayers",
         "joinSortGameType","joinSortMap","joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext",
         "joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters",
@@ -1057,13 +1057,15 @@ struct idUserInterfaceRetained::Impl {
 	// face button runs its secondary action (reset, remove, refresh) where it
 	// declares onSecondary, and north its tertiary one (details, search, sort,
 	// filters) where it declares onTertiary, the Menu button its
-	// onMenuButton and the View button its onViewButton (section 13.5). A field being
-	// edited keeps its keys, and Ctrl or Alt leave them to shortcuts.
+	// onMenuButton and the View button its onViewButton (section 13.5), and a
+	// press of the left or right stick its onLeftStick or onRightStick (Join
+	// Game's SPECTATE and FAVORITE). A field being edited keeps its keys, and
+	// Ctrl or Alt leave them to shortcuts.
 	bool TabKey(int key, const openq4::KeyEventMetadata* metadata) {
 		const char* name = key == 'q' || key == K_JOY1 ? "onTabPrevious" : key == 'e' || key == K_JOY2 ? "onTabNext" :
 			key == K_JOY16 ? "onSectionPrevious" : key == K_JOY15 ? "onSectionNext" :
 			key == K_JOY6 ? "onSecondary" : key == K_JOY5 ? "onTertiary" : key == K_JOY7 ? "onMenuButton" :
-			key == K_JOY8 ? "onViewButton" : nullptr;
+			key == K_JOY8 ? "onViewButton" : key == K_JOY13 ? "onLeftStick" : key == K_JOY14 ? "onRightStick" : nullptr;
 		if (!name || !RuntimeView()->HasEvent(name)) return false;
 		const bool control = metadata ? metadata->control : held.contains(K_CTRL) || idKeyInput::IsDown(K_CTRL);
 		const bool alt = metadata ? metadata->alt : held.contains(K_ALT) || held.contains(K_RIGHT_ALT) || idKeyInput::IsDown(K_ALT) || idKeyInput::IsDown(K_RIGHT_ALT);

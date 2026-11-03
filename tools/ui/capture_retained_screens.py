@@ -1000,6 +1000,20 @@ SCENARIOS = {
             f'screenshot "screenshots/join-view-{name}.tga"')],
         *prompt_style(0),
     ]),
+    # SPECTATE between JOIN SERVER and the favorite toggle, and each
+    # controller family's stick presses past them (section 13.5: the left
+    # stick spectates, the right one toggles the favorite); the keyboard
+    # shows none. No scan is needed: the glyphs stand with the plates.
+    'join-stick-glyphs': (None, [
+        'waitMsec 7000',
+        'openq4_retainedGui focus nav_multiplayer', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 2500', 'openq4_retainedGui focus join', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 2700', 'openq4_retainedGui inspect "join_spectate"',
+        *[step for style, name in PROMPT_STYLES for step in (
+            *prompt_style(style), 'waitMsec 500', 'openq4_retainedGui inspect "join_spectate-stick"',
+            f'screenshot "screenshots/join-sticks-{name}.tga"')],
+        *prompt_style(0),
+    ]),
     'joingame': (None, [
         # A fresh build's first start can run past the usual wait; the title
         # refuses focus until it has arrived.

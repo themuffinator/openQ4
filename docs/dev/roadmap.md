@@ -1043,7 +1043,12 @@ archived provenance; new scheduling belongs here.
   [NEW GAME and CHAPTERS as its fourth-level children](ui/retained-screens.md#chapters-as-a-level-of-its-own-3-november-2026)
   (`FLOW-050`): CHAPTERS is a page of its own through the same helper, and
   the difficulty page keeps only the difficulty, Turbo and START GAME. The
-  classic campaign page is unchanged.
+  classic campaign page is unchanged. Join Game gained
+  [SPECTATE](ui/retained-screens.md#spectate-on-join-game-3-november-2026)
+  beside JOIN SERVER and the favorite toggle; a press of the left stick
+  spectates and of the right one toggles the favorite, their glyphs on the
+  plates since the prompt bar has no room for them (`FLOW-050`, `INP-011`).
+  Join Game's docked detail column for expanded layouts remains.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

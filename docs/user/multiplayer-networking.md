@@ -26,8 +26,9 @@ This guide covers openQ4 multiplayer networking behavior and the cvars used to t
 Open **Multiplayer > Join Game**, then choose **Internet** or **LAN**. The
 list shows the server name, ping, player count, game type and map, with the
 stock icons for favorites, passwords, dedicated servers and Q4TV repeaters.
-Select a row to see its map preview, then choose **Join Server**. Passworded
-servers use the existing password prompt.
+Select a row to see its map preview, then choose **Join Server** to play, or
+in the new menus **Spectate** to join it watching. Passworded servers use the
+existing password prompt.
 
 Choose a column heading to sort, and **Clear Sorting** to list servers in the
 order they answered. **Mod** shows one mod's servers; the `gui_filter_*`
@@ -41,7 +42,10 @@ show the connection's quality: four up to 60 ms, three to 120 ms, two to
 200 ms and one above, turning amber at two bars and red at one. Point at a server, or
 move to it with the keyboard or a controller, to see its address, players
 and settings in a card beside it. With a controller, the left face button
-refreshes the list and the top one sorts it by the next column.
+refreshes the list and the top one sorts it by the next column; pressing the
+left stick spectates the selected server and pressing the right stick adds
+it to or removes it from your favorites, as the stick symbols beside
+**Spectate** and the favorite control show.
 
 **Join IP Address** connects to an address you type, in any form the direct
 connections below accept, and shows your own IP address to pass on to

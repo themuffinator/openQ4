@@ -6,6 +6,24 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Spectate on Join Game, 3 November 2026
+
+- Section 13.7's list pattern names Join, Spectate and Favorite. The prompt
+  bar's raised section has 214 dp before BACK, but the three prompts need
+  about 335 dp (English) to 390 dp (German, Spanish). So SPECTATE became a
+  plate (`join_spectate`, stock `#str_200195`) between JOIN SERVER and the
+  favorite toggle, with its Accept verb in the bar. `joinSpectate` connects
+  as JOIN SERVER does with `ui_spectate` Spectate, and JOIN SERVER now sets
+  Play.
+- A press of the left or right stick runs a document's `onLeftStick` or
+  `onRightStick` (`K_JOY13`, `K_JOY14`). Join Game spectates and toggles the
+  favorite with them. `stick_glyph` draws each family's LS/RS or L3/R3 8 dp
+  past the plates, for a controller only. In tall views SPECTATE stands
+  over the favorite toggle.
+- `ui_retained_adapter.py`, `ui_retained_gate.py`, the mp-pages native test
+  and the `join-stick-glyphs` OpenGL capture pass. Connecting to a real
+  server as a spectator was not exercised: no server was running for it.
+
 ## Campaign's NEW GAME and CHAPTERS, 3 November 2026
 
 - Visual specification section 13.7 gives Campaign a campaign choice, then

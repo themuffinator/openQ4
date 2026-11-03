@@ -233,6 +233,11 @@ See [release status](../../user/release-status.md) and the
   Credits and Exit. Player Setup, also on the Multiplayer menu, edits your
   name, clan tag, model and rail colour in place beside a turning preview of
   your player, and each change applies at once.
+- **Spectate from the server list.** In the new interface, Join Game has a
+  **Spectate** button under Join Server that joins the selected server as a
+  spectator. With a controller, press the left stick to spectate and the
+  right stick to add or remove the server from your favorites; the stick
+  symbols show beside the two buttons.
 - **Campaign: New Game and Chapters.** In the new interface, Single Player →
   Campaign now has you choose Quake 4 or The Awakening (the one you are
   playing is already chosen), then **New Game** for the difficulty and Turbo

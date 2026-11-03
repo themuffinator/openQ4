@@ -2092,8 +2092,16 @@ int main() {
         join->state["join.pick"] = "5"; s.HandleRetainedSessionRequest(join, "joinPick"); CHECK(join->state["join.selected"] == "69");
         // JOIN SERVER connects to the chosen server by the address the session
         // kept, never the page's.
+        cvarSystemObject.strings["ui_spectate"] = "Spectate";
         join->state["join.row5.name"] = "forged"; s.HandleRetainedSessionRequest(join, "joinServer");
         CHECK(commands.buffered.size() == buffered + 3 && commands.buffered.back() == "connect 10.0.1.69:28004");
+        // JOIN plays, whatever the last join chose; SPECTATE connects the same
+        // way, watching (ui_spectate, the player's userinfo).
+        CHECK(std::string(cvarSystemObject.GetCVarString("ui_spectate")) == "Play");
+        s.HandleRetainedSessionRequest(join, "joinSpectate");
+        const size_t joined = commands.buffered.size();
+        CHECK(joined == buffered + 4 && commands.buffered.back() == "connect 10.0.1.69:28004" &&
+              std::string(cvarSystemObject.GetCVarString("ui_spectate")) == "Spectate");
         // A join that fails or is aborted comes back to this list: when the
         // menu next rests at home, Join Game presents instead of the title,
         // once. A join that loads its map forgets the list.
@@ -2107,7 +2115,8 @@ int main() {
         s.HandleRetainedSessionRequest(join, "joinBack");
         CHECK(s.retainedSubpageFrom == join && join->named.back() == "subpageLeave" && !s.retainedSubpageDeeper &&
               s.retainedSubpageUntil == commonObject.time + 300);
-        s.HandleRetainedSessionRequest(join, "joinServer"); CHECK(commands.buffered.size() == buffered + 3);  // nothing else meanwhile
+        s.HandleRetainedSessionRequest(join, "joinServer"); s.HandleRetainedSessionRequest(join, "joinSpectate");
+        CHECK(commands.buffered.size() == joined);  // nothing else meanwhile
         commonObject.time += 300; s.UpdateRetainedSubpage();
         CHECK(s.guiActive == page && page->state["from_join"] == "1" && page->state["from_create"] == "0" && page->named.back() == "subpageReturn");
         changes = join->stateChanges; ++scan.revision; s.UpdateRetainedJoinGame(); CHECK(join->stateChanges == changes);

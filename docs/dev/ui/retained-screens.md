@@ -1435,6 +1435,39 @@ there only `ui_retainedMultiplayer 1` offers the page.
   climbs back; `createserverstart` chooses Team DM and starts a listen server
   on the loopback, following the reloaded module.
 
+## Spectate on Join Game (3 November 2026)
+
+Section 13.7's list pattern puts Join, Spectate and Favorite in the prompt
+bar. The bar's raised section leaves 214 dp before BACK, while the three
+prompts need about 335 dp in English and 390 in German and Spanish, so, as
+the Menu and View glyphs already do, the actions stay on the plates and the
+glyphs sit on what the buttons press (FLOW-050, INP-011):
+
+- **SPECTATE** (`join_spectate`, the stock `#str_200195` in every language)
+  stands between JOIN SERVER and the favorite toggle, ending where they end,
+  in the 44.5 dp between them, and is enabled while a server is chosen. Its
+  Accept verb is SPECTATE (`check_page_prompts` fits it in every language).
+  `joinSpectate` connects to the chosen server as JOIN SERVER does, with the
+  player's `ui_spectate` userinfo set to Spectate; JOIN SERVER sets it back
+  to Play, so one watched join does not make the next one watch.
+- **The stick presses.** A press of the left stick runs a document's
+  `onLeftStick` and of the right stick its `onRightStick` (the adapter's
+  `TabKey`, with the face buttons' rules: once per press, never with Ctrl or
+  Alt or while a field is edited). Join Game spectates on the left stick and
+  toggles the favorite on the right, while a server is chosen and no dialog
+  is open. Each plate shows its stick 8 dp past its trailing end for a
+  controller (`stick_glyph`: LS and RS for Xbox and Nintendo, L3 and R3 for
+  PlayStation, Steam Deck and generic controllers, a cap seen from above
+  with a doubled rim); the keyboard has no key for them and shows none.
+- **Tall views** stand SPECTATE in a row of its own over the favorite toggle,
+  aligned with it, and the list's actions move up by that row.
+
+`ui_retained_adapter.py` presses both sticks (declared or not, repeated,
+with Alt, while editing), `ui_retained_gate.py` follows SPECTATE's connect
+and `ui_spectate` beside JOIN SERVER's, the mp-pages native test checks the
+plate's place, the glyphs per family and the events, and the
+`join-stick-glyphs` capture forces each family through Prompt Style.
+
 ## Chapters as a level of its own (3 November 2026)
 
 Section 13.7's menu levels give Campaign a campaign choice and then two
@@ -3736,9 +3769,10 @@ what remains across every retained menu.
   CHAPTERS use the fourth level, and Arena, and Multiplayer's Create Server,
   Join Game and Demos; Player Setup edits in place on the Multiplayer page.
   The retained Join Game shows a server's players and rules in the stock
-  tooltip's card rather than a docked detail column, and has no prompt bar
-  yet (Join, Spectate and Favorite). No section summarizes itself with a
-  levelshot, and the classic campaign page keeps CHAPTERS on it. The
+  tooltip's card rather than a docked detail column, and its SPECTATE and
+  favorite toggle carry their stick presses on the plates, since the prompt
+  bar has no room for them. No section summarizes itself with a levelshot,
+  and the classic campaign page keeps CHAPTERS on it. The
   Single Player page keeps the home navigation plates and the
   BACK row instead of the section layout (navigation from 14 u, content from
   228 u) and the Back action in the bottom band; Classic is not built. A

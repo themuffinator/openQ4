@@ -264,7 +264,7 @@ static const std::set<std::string> SessionCommands = {"continue","singlePlayer",
 	"multiplayerJoin","multiplayerCreate","multiplayerDemos","multiplayerSetup","multiplayerBack","playerSetupClose",
 	"createBack","createMap","createStart","createName","createMapCycle","createPassword","createRconPassword","createMapsNewer",
 	"createMapsOlder","createBanList","createBanPick","createBanRemove",
-	"joinBack","joinPick","joinServer","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet","joinSourceLan",
+	"joinBack","joinPick","joinServer","joinSpectate","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet","joinSourceLan",
 	"joinClearSort","joinSortFavorite","joinSortLocked","joinSortName","joinSortPing","joinSortPlayers","joinSortGameType","joinSortMap",
 	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults","joinConnect","joinSearch","joinSearchClear","joinSortNext",
 	"mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction","mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction",
@@ -3204,7 +3204,7 @@ static void CheckJoinGamePage(ScreenHost& host, const char* path) {
 	Check(diagnostics.empty() && document.Model().id == "openq4.joingame" && document.Model().canvasHeight == 720,"the Join Game page validates");
 	CheckSessionActions(document);
 	const std::pair<const char*,const char*> menu[] = {{"back","joinBack"},{"joinPick","joinPick"},{"joinServer","joinServer"},
-		{"joinClearSort","joinClearSort"},{"serversNewer","joinNewer"},{"serversOlder","joinOlder"},{"joinRefresh","joinRefresh"},
+		{"joinSpectate","joinSpectate"},{"joinClearSort","joinClearSort"},{"serversNewer","joinNewer"},{"serversOlder","joinOlder"},{"joinRefresh","joinRefresh"},
 		{"joinNewList","joinNewList"},{"joinSourceInternet","joinSourceInternet"},{"joinSourceLan","joinSourceLan"},
 		{"joinSortFavorite","joinSortFavorite"},{"joinSortLocked","joinSortLocked"},{"joinSortName","joinSortName"},
 		{"joinSortPing","joinSortPing"},{"joinSortPlayers","joinSortPlayers"},{"joinSortGameType","joinSortGameType"},
@@ -3250,6 +3250,11 @@ static void CheckJoinGamePage(ScreenHost& host, const char* path) {
 		"the favorite toggle ends with JOIN SERVER and clears the levelshot frame");
 	Check(Near(join.x,x0+385*u,1) && Near(join.y,330*u,1) && Near(status.x,x0+41*u,1) && Near(status.y,291*u,1),
 		"JOIN SERVER and the status line stand where the stock page's do");
+	// SPECTATE between JOIN SERVER and the favorite toggle, ending where they
+	// end (section 13.7's list pattern: Join, Spectate and Favorite).
+	const auto spectate = bounds("join_spectate");
+	Check(Near(spectate.x+spectate.width,x0+615*u,1) && spectate.y >= join.y+join.height-1 && spectate.y+spectate.height <= favorite.y+1 &&
+		text("join_spectate-label","text") == "#str_200195","SPECTATE stands between JOIN SERVER and the favorite toggle");
 	// The list's four actions down the leading column on a 26 u pitch, each as
 	// wide as the longest label of any (FIND PLAYER/CLAN's Italian).
 	const auto refresh = bounds("join_refresh"), joinIp = bounds("join_ip"), find = bounds("join_find");
@@ -3436,9 +3441,25 @@ static void CheckJoinGamePage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,0.929);
 	Check(text("join-detail-view-steamdeck","display") == "block" && text("join-detail-view-xbox","display") == "none",
 		"each family draws its own");
+	// SPECTATE and the favorite toggle name their stick presses 8 dp past
+	// their ends, centred on their bands, for a controller only.
+	{
+		const auto plate = bounds("join_spectate"), toggle = bounds("join_favorite");
+		const auto left = bounds("join_spectate-stick-steamdeck"), right = bounds("join_favorite-stick-steamdeck");
+		Check(text("join_spectate-stick-steamdeck","display") == "block" && text("join_favorite-stick-steamdeck","display") == "block" &&
+			text("join_spectate-stick-xbox","display") == "none" && Near(left.x,plate.x+plate.width+8*u/1.5f,1) &&
+			Near(right.x,toggle.x+toggle.width+8*u/1.5f,1) && Near(left.y+left.height/2,plate.y+plate.height/2,1) &&
+			Near(left.width,22*u/1.5f,1) && right.x+right.width <= viewport.width,"each stick press stands past its plate");
+	}
+	Check(runtime.SetState({{"prompt.glyphs",2.0}},error,0.9291),"a PlayStation controller");
+	runtime.Frame(viewport,0.9292);
+	Check(text("join_spectate-stick-playstation","display") == "block" && text("join_favorite-stick-playstation","display") == "block" &&
+		text("join_spectate-stick-steamdeck","display") == "none","its family's L3 and R3");
 	Check(runtime.SetState({{"prompt.glyphs",0.0}},error,0.9295),"the keyboard again");
 	runtime.Frame(viewport,0.9297);
 	Check(text("join-detail-view-steamdeck","display") == "none","and the keyboard none");
+	Check(text("join_spectate-stick-playstation","display") == "none" && text("join_favorite-stick-xbox","display") == "none",
+		"no stick press for the keyboard");
 	Check(runtime.SetState({{"join.detail.row",2.0}},error,0.93),"a stale description");
 	runtime.Frame(viewport,0.931);
 	Check(text("join-detail","display") == "none","describing another row hides it");
@@ -3521,6 +3542,19 @@ static void CheckJoinGamePage(ScreenHost& host, const char* path) {
 		"west asks for the list again");
 	Check(runtime.RunEvent("onTertiary",1.474,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "joinSortNext",
 		"north asks for the next column's sort");
+	// A press of the left stick spectates the chosen server and of the right
+	// one toggles its favorite; with no server chosen neither asks anything.
+	{
+		StateValue before; Check(runtime.GetStateValue("join.selected",before),"the chosen server reads back");
+		Check(runtime.SetState({{"join.selected",-1.0}},error,1.4741) && runtime.RunEvent("onLeftStick",1.4742,effects,error) &&
+			effects.actions.empty() && runtime.RunEvent("onRightStick",1.4743,effects,error) && effects.actions.empty(),
+			"no server, no spectating and no favorite");
+		Check(runtime.SetState({{"join.selected",0.0}},error,1.4744) && runtime.RunEvent("onLeftStick",1.4745,effects,error) &&
+			effects.actions.size() == 1 && effects.actions[0].action == "joinSpectate","the left stick spectates the chosen server");
+		Check(runtime.RunEvent("onRightStick",1.4746,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "joinFavorite",
+			"the right stick toggles its favorite");
+		Check(runtime.SetState({{"join.selected",before}},error,1.4747),"the chosen server restores");
+	}
 	// JOIN IP ADDRESS: the dialog opens on the address field; CONNECT applies
 	// once there is an address and asks the session; a refusal shows its
 	// reason; this machine's address shows; Back returns to the plate.
@@ -3528,6 +3562,8 @@ static void CheckJoinGamePage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,1.75);
 	Check(runtime.RunEvent("onSecondary",1.76,effects,error) && effects.actions.empty() &&
 		runtime.RunEvent("onTertiary",1.77,effects,error) && effects.actions.empty(),"neither refreshes nor sorts under the dialog");
+	Check(runtime.RunEvent("onLeftStick",1.771,effects,error) && effects.actions.empty() &&
+		runtime.RunEvent("onRightStick",1.772,effects,error) && effects.actions.empty(),"nor spectates or marks a favorite");
 	Check(text("joinIpModal","display") == "block" && runtime.FocusedControl() == "join-address" &&
 		runtime.GetControlState("joinIpModal_yes") == ControlState::Disabled && text("joinIpModal_yes-label","text") == "#str_200171" &&
 		text("join-yourip","text") == "#str_200180","the dialog opens on the address field, with nothing to connect to yet");
