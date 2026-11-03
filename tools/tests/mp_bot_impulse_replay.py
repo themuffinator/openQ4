@@ -2,7 +2,7 @@
 """Classify multiplayer bot world deaths under the impulse-exclusion policy.
 
 The MP-02 traversal gate counts navigation and control deaths. A world death
-is excluded as impulse-caused only when BOTH hold:
+is excluded as impulse-caused only when all three conditions hold:
 
 1. A logged enemy impulse precedes it: a `BOT_IMPULSE` line (bot_debug 2) for
    the victim, from another client that was its enemy (any other client in a
@@ -235,7 +235,7 @@ def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[
             continue
         body = sample[starts[0].end():ends[0].start()]
         armed = len(re.findall(r"^BOT_(?:AIR|MOVE)_PROBE client=1 ", body, re.M)) == 1
-        died = re.search(rf"^{re.escape(bot)} (?:was killed by world|died)$", body, re.M) is not None
+        died = any(match.group(1) == bot for match in WORLD_DEATH.finditer(body))
         grounded = re.search(r"^BOT_PROBE_GROUNDED client=1 .* health=(\d+)$", body, re.M)
         terminal = re.findall(r"^MP_PHYSICS slot=1 grounded=([01]) health=(-?\d+) velocity=.*$", body, re.M)
         final_grounded = bool(terminal and terminal[-1][0] == "1")

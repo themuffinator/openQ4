@@ -186,6 +186,11 @@ def main() -> None:
                         terminal + "MP_PHYSICS slot=1 grounded=0 health=90 velocity=0 0 -300\n"):
         rows = {o["name"]: o for o in policy.assess_trials(sample.replace(terminal, replacement), trials)}
         check(not rows["air04"]["survived"], "an earlier touchdown cannot replace a live grounded final state")
+    for obituary in ("drowned", "dissolved in slime", "burned in lava"):
+        rows = {o["name"]: o for o in policy.assess_trials(
+            sample.replace(terminal, f"Rhodes {obituary}\n" + terminal), trials)}
+        check(rows["air04"]["died"] and not rows["air04"]["survived"],
+              "a respawn after a liquid death cannot masquerade as recovery")
     summary = policy.summarise([policy.decide(candidate, outcomes(), True),
                                 policy.decide(candidate, outcomes(survivor="air00"), True)])
     check(summary["navigation_world_deaths"] == 1 and summary["excluded_impulse_deaths"] == 1,
