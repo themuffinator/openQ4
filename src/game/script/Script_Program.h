@@ -548,6 +548,11 @@ private:
 	mutable bool saveChecksumValid;
 	mutable int saveChecksum;
 	int GetSaveChecksum( void ) const;
+	// Pointer-typed stack locals by function index and offset, rebuilt
+	// whenever the definitions change (ZeroPointerLocals).
+	mutable bool pointerLocalsValid;
+	mutable idList<int> pointerLocalFunctions;
+	mutable idList<int> pointerLocalOffsets;
 	statement_t &GetMutableStatement( int index );
 
 	idStrList									fileList;
@@ -620,6 +625,7 @@ public:
 	function_t									&AllocFunction( idVarDef *def );
 	function_t									*GetFunction( int index );
 	int											GetFunctionIndex( const function_t *func );
+	void										ZeroPointerLocals( byte *stack, int stackUsed, const function_t *func, int stackBase ) const;
 	int											NumFunctions( void ) { return functions.Num(); }
 
 	void										SetEntity( const char *name, idEntity *ent );

@@ -108,13 +108,16 @@ static void GameBustOut_ValidateEntityIndex( const char *fieldName, int index, i
 	}
 }
 
-static void GameBustOut_ReadSaveBlock( idFile *savefile, void *data, const int size, const char *fieldName ) {
-	OpenQ4_ReadSaveGameBytes( savefile, data, size, "idGameBustOutWindow::ReadFromSaveGame", fieldName );
+// Raw copies of these fields wrote exactly the bytes the typed GUI encoders
+// write on every supported target (roadmap Q4-06).
+template< class type >
+static void GameBustOut_ReadSaveField( idFile *savefile, type &value, const char *fieldName ) {
+	OpenQ4_ReadSaveGameField( savefile, value, "idGameBustOutWindow::ReadFromSaveGame", fieldName );
 }
 
 template< class type >
-static void GameBustOut_ReadSaveField( idFile *savefile, type &value, const char *fieldName ) {
-	GameBustOut_ReadSaveBlock( savefile, &value, sizeof( value ), fieldName );
+static void GameBustOut_WriteSaveField( idFile *savefile, const type &value, const char *fieldName ) {
+	OpenQ4_WriteSaveGameField( savefile, value, "idGameBustOutWindow::WriteToSaveGame", fieldName );
 }
 
 static powerupType_t GameBustOut_ReadSavePowerup( idFile *savefile, const char *fieldName, int saveVersion ) {
@@ -158,20 +161,20 @@ BOEntity::WriteToSaveGame
 */
 void BOEntity::WriteToSaveGame( idFile *savefile ) {
 
-	savefile->Write( &visible, sizeof(visible) );
+	GameBustOut_WriteSaveField( savefile, visible, "visible" );
 
 	game->WriteSaveGameString( materialName, savefile );
 
-	savefile->Write( &width, sizeof(width) );
-	savefile->Write( &height, sizeof(height) );
+	GameBustOut_WriteSaveField( savefile, width, "width" );
+	GameBustOut_WriteSaveField( savefile, height, "height" );
 
-	savefile->Write( &color, sizeof(color) );
-	savefile->Write( &position, sizeof(position) );
-	savefile->Write( &velocity, sizeof(velocity) );
+	GameBustOut_WriteSaveField( savefile, color, "color" );
+	GameBustOut_WriteSaveField( savefile, position, "position" );
+	GameBustOut_WriteSaveField( savefile, velocity, "velocity" );
 
 	GameBustOut_WriteSaveInt( savefile, static_cast<int>( powerup ) );
-	savefile->Write( &removed, sizeof(removed) );
-	savefile->Write( &fadeOut, sizeof(fadeOut) );
+	GameBustOut_WriteSaveField( savefile, removed, "removed" );
+	GameBustOut_WriteSaveField( savefile, fadeOut, "fadeOut" );
 }
 
 /*
@@ -316,13 +319,13 @@ BOBrick::WriteToSaveGame
 ======================
 */
 void BOBrick::WriteToSaveGame( idFile *savefile ) {
-	savefile->Write( &x, sizeof(x) );
-	savefile->Write( &y, sizeof(y) );
-	savefile->Write( &width, sizeof(width) );
-	savefile->Write( &height, sizeof(height) );
+	GameBustOut_WriteSaveField( savefile, x, "x" );
+	GameBustOut_WriteSaveField( savefile, y, "y" );
+	GameBustOut_WriteSaveField( savefile, width, "width" );
+	GameBustOut_WriteSaveField( savefile, height, "height" );
 
 	GameBustOut_WriteSaveInt( savefile, static_cast<int>( powerup ) );
-	savefile->Write( &isBroken, sizeof(isBroken) );
+	GameBustOut_WriteSaveField( savefile, isBroken, "isBroken" );
 
 	int index = ent->game->entities.FindIndex( ent );
 	GameBustOut_WriteSaveInt( savefile, index );
@@ -526,8 +529,8 @@ void idGameBustOutWindow::WriteToSaveGame( idFile *savefile ) {
 	GameBustOut_WriteSaveInt( savefile, GAME_BUSTOUT_SAVE_MAGIC );
 	GameBustOut_WriteSaveInt( savefile, GAME_BUSTOUT_SAVE_VERSION );
 
-	savefile->Write( &timeSlice, sizeof(timeSlice) );
-	savefile->Write( &gameOver, sizeof(gameOver) );
+	GameBustOut_WriteSaveField( savefile, timeSlice, "timeSlice" );
+	GameBustOut_WriteSaveField( savefile, gameOver, "gameOver" );
 	GameBustOut_WriteSaveInt( savefile, numLevels );
 
 	// Board Data is loaded when GUI is loaded, don't need to save
@@ -535,17 +538,17 @@ void idGameBustOutWindow::WriteToSaveGame( idFile *savefile ) {
 	GameBustOut_WriteSaveInt( savefile, numBricks );
 	GameBustOut_WriteSaveInt( savefile, currentLevel );
 
-	savefile->Write( &updateScore, sizeof(updateScore) );
+	GameBustOut_WriteSaveField( savefile, updateScore, "updateScore" );
 	GameBustOut_WriteSaveInt( savefile, gameScore );
 	GameBustOut_WriteSaveInt( savefile, nextBallScore );
 
 	GameBustOut_WriteSaveInt( savefile, bigPaddleTime );
-	savefile->Write( &paddleVelocity, sizeof(paddleVelocity) );
+	GameBustOut_WriteSaveField( savefile, paddleVelocity, "paddleVelocity" );
 
-	savefile->Write( &ballSpeed, sizeof(ballSpeed) );
+	GameBustOut_WriteSaveField( savefile, ballSpeed, "ballSpeed" );
 	GameBustOut_WriteSaveInt( savefile, ballsRemaining );
 	GameBustOut_WriteSaveInt( savefile, ballsInPlay );
-	savefile->Write( &ballHitCeiling, sizeof(ballHitCeiling) );
+	GameBustOut_WriteSaveField( savefile, ballHitCeiling, "ballHitCeiling" );
 
 	// Write Entities
 	int i;

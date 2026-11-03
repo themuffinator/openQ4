@@ -62,7 +62,8 @@ GAME: dict[str, dict[str, list[str]]] = {
         "legacy-reader": [R("&saved,sizeof(saved)")],
     },
     "physics/Clip.cpp": {"aggregate": [W("&entry->trm,sizeof(entry->trm)"), R("&entry->trm,sizeof(entry->trm)")]},
-    "script/Script_Interpreter.cpp": {"script-storage": [W("&localstack,localstackUsed"), R("localstack,localstackUsed")]},
+    # Written from a copy whose address temporaries are zeroed (ZeroPointerLocals).
+    "script/Script_Interpreter.cpp": {"script-storage": [W("savedStack,localstackUsed"), R("localstack,localstackUsed")]},
     "script/Script_Program.cpp": {
         "script-storage": [W("data,savedSize"), R("data,savedSize"),
                            "savefile->WriteByte(variables[", "savefile->WriteByte(variables[",
@@ -119,10 +120,6 @@ FLAG_LISTS = [
 ]
 
 
-def minigame(names: list[str], extra: list[str] | None = None) -> list[str]:
-    return [W(f"&{name},sizeof({name})") for name in names] + (extra or [])
-
-
 UI: dict[str, dict[str, list[str]]] = {
     # Window layout fields go through the typed OpenQ4_*SaveGameField overloads
     # (same bytes as the raw copy); only the transition interpolator is raw.
@@ -152,25 +149,11 @@ UI: dict[str, dict[str, list[str]]] = {
     },
     "UserInterface.cpp": {"bytes": [W("string.c_str(),len"), R("buffer,len")]},
     "RegExp.cpp": {"bytes": [W("buffer,len"), R("buffer,len")]},
-    # Doom 3 PDA minigames: every field is a float, int, bool or float vector.
-    "GameBearShootWindow.cpp": {"le-scalars": minigame(
-        ["width", "height", "visible", "entColor", "position", "rotation", "rotationSpeed", "velocity", "fadeIn",
-         "fadeOut", "timeSlice", "timeRemaining", "gameOver", "updateScore", "bearHitTarget", "bearScale",
-         "bearIsShrinking", "turretAngle", "turretForce", "windForce"],
-        [R("&value,sizeof(value)"),
-         'OpenQ4_ReadSaveGameBytes(savefile,data,size,"idGameBearShootWindow::ReadFromSaveGame",fieldName)'])},
-    "GameBustOutWindow.cpp": {"le-scalars": minigame(
-        ["visible", "width", "height", "color", "position", "velocity", "removed", "fadeOut", "x", "y", "width",
-         "height", "isBroken", "timeSlice", "gameOver", "updateScore", "paddleVelocity", "ballSpeed",
-         "ballHitCeiling"],
-        [R("&value,sizeof(value)"),
-         'OpenQ4_ReadSaveGameBytes(savefile,data,size,"idGameBustOutWindow::ReadFromSaveGame",fieldName)'])},
-    "GameSSDWindow.cpp": {"le-scalars": minigame(
-        ["beginColor", "beginPosition", "crosshairHeight", "crosshairWidth", "destroyed", "dir", "endColor",
-         "endPosition", "endPosition", "finalSize", "followBuddy", "foreColor", "hitRadius", "inUse", "killBuddy",
-         "matColor", "noHit", "noPlayerDamage", "position", "radius", "rotation", "rotationSpeed", "screenBounds",
-         "size", "speed", "speed", "textScale"],
-        [R("&value,sizeof(value)")] * 3 + [R("data,size")] * 2)},
+    # Doom 3 PDA minigames write typed fields (same bytes); these reads decode
+    # their unversioned legacy format only.
+    "GameBearShootWindow.cpp": {"legacy-reader": [R("&value,sizeof(value)")]},
+    "GameBustOutWindow.cpp": {"legacy-reader": [R("&value,sizeof(value)")]},
+    "GameSSDWindow.cpp": {"legacy-reader": [R("&value,sizeof(value)")] * 3 + [R("data,size")]},
 }
 
 

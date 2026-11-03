@@ -210,18 +210,16 @@ static bool GameSSD_ReadSaveBool( idFile *savefile, const char *fieldName ) {
 	return value;
 }
 
-static void GameSSD_ReadSaveBlock( idFile *savefile, void *data, const int size, const char *fieldName ) {
-	const int offset = savefile->Tell();
-	const int bytesRead = savefile->Read( data, size );
-	if ( bytesRead != size ) {
-		common->Error( "idGameSSDWindow::ReadFromSaveGame: truncated %s at offset %d (read %d of %d)",
-			fieldName ? fieldName : "block", offset, bytesRead, size );
-	}
+// Raw copies of these fields wrote exactly the bytes the typed GUI encoders
+// write on every supported target (roadmap Q4-06).
+template< class type >
+static void GameSSD_ReadSaveField( idFile *savefile, type &value, const char *fieldName ) {
+	OpenQ4_ReadSaveGameField( savefile, value, "idGameSSDWindow::ReadFromSaveGame", fieldName );
 }
 
 template< class type >
-static void GameSSD_ReadSaveField( idFile *savefile, type &value, const char *fieldName ) {
-	GameSSD_ReadSaveBlock( savefile, &value, sizeof( value ), fieldName );
+static void GameSSD_WriteSaveField( idFile *savefile, const type &value, const char *fieldName ) {
+	OpenQ4_WriteSaveGameField( savefile, value, "idGameSSDWindow::WriteToSaveGame", fieldName );
 }
 
 static int GameSSD_ReadSaveVersion( idFile *savefile ) {
@@ -419,8 +417,8 @@ SSDCrossHair::~SSDCrossHair() {
 void SSDCrossHair::WriteToSaveGame( idFile *savefile ) {
 	
 	GameSSD_WriteSaveInt( savefile, currentCrosshair );
-	savefile->Write(&crosshairWidth, sizeof(crosshairWidth));
-	savefile->Write(&crosshairHeight, sizeof(crosshairHeight));
+	GameSSD_WriteSaveField( savefile, crosshairWidth, "crosshairWidth" );
+	GameSSD_WriteSaveField( savefile, crosshairHeight, "crosshairHeight" );
 
 }
 
@@ -473,27 +471,27 @@ void SSDEntity::WriteToSaveGame( idFile *savefile ) {
 	
 	GameSSD_WriteSaveInt( savefile, type );
 	game->WriteSaveGameString(materialName, savefile);
-	savefile->Write(&position, sizeof(position));
-	savefile->Write(&size, sizeof(size));
-	savefile->Write(&radius, sizeof(radius));
-	savefile->Write(&hitRadius, sizeof(hitRadius));
-	savefile->Write(&rotation, sizeof(rotation));
+	GameSSD_WriteSaveField( savefile, position, "position" );
+	GameSSD_WriteSaveField( savefile, size, "size" );
+	GameSSD_WriteSaveField( savefile, radius, "radius" );
+	GameSSD_WriteSaveField( savefile, hitRadius, "hitRadius" );
+	GameSSD_WriteSaveField( savefile, rotation, "rotation" );
 
-	savefile->Write(&matColor, sizeof(matColor));
+	GameSSD_WriteSaveField( savefile, matColor, "matColor" );
 	
 	game->WriteSaveGameString(text, savefile);
-	savefile->Write(&textScale, sizeof(textScale));
-	savefile->Write(&foreColor, sizeof(foreColor));
+	GameSSD_WriteSaveField( savefile, textScale, "textScale" );
+	GameSSD_WriteSaveField( savefile, foreColor, "foreColor" );
 	
 	GameSSD_WriteSaveInt( savefile, currentTime );
 	GameSSD_WriteSaveInt( savefile, lastUpdate );
 	GameSSD_WriteSaveInt( savefile, elapsed );
 
-	savefile->Write(&destroyed, sizeof(destroyed));
-	savefile->Write(&noHit, sizeof(noHit));
-	savefile->Write(&noPlayerDamage, sizeof(noPlayerDamage));
+	GameSSD_WriteSaveField( savefile, destroyed, "destroyed" );
+	GameSSD_WriteSaveField( savefile, noHit, "noHit" );
+	GameSSD_WriteSaveField( savefile, noPlayerDamage, "noPlayerDamage" );
 
-	savefile->Write(&inUse, sizeof(inUse));
+	GameSSD_WriteSaveField( savefile, inUse, "inUse" );
 
 }
 
@@ -710,8 +708,8 @@ SSDMover::~SSDMover() {
 void SSDMover::WriteToSaveGame( idFile *savefile ) {
 	SSDEntity::WriteToSaveGame(savefile);
 	
-	savefile->Write(&speed, sizeof(speed));
-	savefile->Write(&rotationSpeed, sizeof(rotationSpeed));
+	GameSSD_WriteSaveField( savefile, speed, "speed" );
+	GameSSD_WriteSaveField( savefile, rotationSpeed, "rotationSpeed" );
 }
 
 void SSDMover::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
@@ -980,7 +978,7 @@ SSDExplosion::~SSDExplosion() {
 void SSDExplosion::WriteToSaveGame( idFile *savefile ) {
 	SSDEntity::WriteToSaveGame(savefile);
 
-	savefile->Write(&finalSize, sizeof(finalSize));
+	GameSSD_WriteSaveField( savefile, finalSize, "finalSize" );
 	GameSSD_WriteSaveInt( savefile, length );
 	GameSSD_WriteSaveInt( savefile, beginTime );
 	GameSSD_WriteSaveInt( savefile, endTime );
@@ -990,8 +988,8 @@ void SSDExplosion::WriteToSaveGame( idFile *savefile ) {
 	GameSSD_WriteSaveInt( savefile, buddy->type );
 	GameSSD_WriteSaveInt( savefile, buddy->id );
 
-	savefile->Write(&killBuddy, sizeof(killBuddy));
-	savefile->Write(&followBuddy, sizeof(followBuddy));
+	GameSSD_WriteSaveField( savefile, killBuddy, "killBuddy" );
+	GameSSD_WriteSaveField( savefile, followBuddy, "followBuddy" );
 }
 
 void SSDExplosion::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
@@ -1150,11 +1148,11 @@ void SSDPoints::WriteToSaveGame( idFile *savefile ) {
 	GameSSD_WriteSaveInt( savefile, beginTime );
 	GameSSD_WriteSaveInt( savefile, endTime );
 
-	savefile->Write(&beginPosition, sizeof(beginPosition));
-	savefile->Write(&endPosition, sizeof(endPosition));
+	GameSSD_WriteSaveField( savefile, beginPosition, "beginPosition" );
+	GameSSD_WriteSaveField( savefile, endPosition, "endPosition" );
 
-	savefile->Write(&beginColor, sizeof(beginColor));
-	savefile->Write(&endColor, sizeof(endColor));
+	GameSSD_WriteSaveField( savefile, beginColor, "beginColor" );
+	GameSSD_WriteSaveField( savefile, endColor, "endColor" );
 	
 }
 
@@ -1303,12 +1301,12 @@ SSDProjectile::~SSDProjectile() {
 void SSDProjectile::WriteToSaveGame( idFile *savefile ) {
 	SSDEntity::WriteToSaveGame(savefile);
 
-	savefile->Write(&dir, sizeof(dir));
-	savefile->Write(&speed, sizeof(speed));
+	GameSSD_WriteSaveField( savefile, dir, "dir" );
+	GameSSD_WriteSaveField( savefile, speed, "speed" );
 	GameSSD_WriteSaveInt( savefile, beginTime );
 	GameSSD_WriteSaveInt( savefile, endTime );
 
-	savefile->Write(&endPosition, sizeof(endPosition));
+	GameSSD_WriteSaveField( savefile, endPosition, "endPosition" );
 }
 
 void SSDProjectile::ReadFromSaveGame( idFile *savefile,  idGameSSDWindow* _game  ) {
@@ -1648,7 +1646,7 @@ void idGameSSDWindow::WriteToSaveGame( idFile *savefile ) {
 	refreshGuiData.WriteToSaveGame(savefile);
 
 	crosshair.WriteToSaveGame(savefile);
-	savefile->Write(&screenBounds, sizeof(screenBounds));
+	GameSSD_WriteSaveField( savefile, screenBounds, "screenBounds" );
 
 	GameSSD_WriteSaveInt( savefile, levelCount );
 	for(int i = 0; i < levelCount; i++) {

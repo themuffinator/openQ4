@@ -111,13 +111,16 @@ static void GameBearShoot_ValidateEntityIndex( const char *fieldName, int index,
 	}
 }
 
-static void GameBearShoot_ReadSaveBlock( idFile *savefile, void *data, const int size, const char *fieldName ) {
-	OpenQ4_ReadSaveGameBytes( savefile, data, size, "idGameBearShootWindow::ReadFromSaveGame", fieldName );
+// Raw copies of these fields wrote exactly the bytes the typed GUI encoders
+// write on every supported target (roadmap Q4-06).
+template< class type >
+static void GameBearShoot_ReadSaveField( idFile *savefile, type &value, const char *fieldName ) {
+	OpenQ4_ReadSaveGameField( savefile, value, "idGameBearShootWindow::ReadFromSaveGame", fieldName );
 }
 
 template< class type >
-static void GameBearShoot_ReadSaveField( idFile *savefile, type &value, const char *fieldName ) {
-	GameBearShoot_ReadSaveBlock( savefile, &value, sizeof( value ), fieldName );
+static void GameBearShoot_WriteSaveField( idFile *savefile, const type &value, const char *fieldName ) {
+	OpenQ4_WriteSaveGameField( savefile, value, "idGameBearShootWindow::WriteToSaveGame", fieldName );
 }
 
 /*
@@ -154,18 +157,18 @@ void BSEntity::WriteToSaveGame( idFile *savefile ) {
 
 	game->WriteSaveGameString( materialName, savefile );
 
-	savefile->Write( &width, sizeof(width) );
-	savefile->Write( &height, sizeof(height) );
-	savefile->Write( &visible, sizeof(visible) );
+	GameBearShoot_WriteSaveField( savefile, width, "width" );
+	GameBearShoot_WriteSaveField( savefile, height, "height" );
+	GameBearShoot_WriteSaveField( savefile, visible, "visible" );
 
-	savefile->Write( &entColor, sizeof(entColor) );
-	savefile->Write( &position, sizeof(position) );
-	savefile->Write( &rotation, sizeof(rotation) );
-	savefile->Write( &rotationSpeed, sizeof(rotationSpeed) );
-	savefile->Write( &velocity, sizeof(velocity) );
+	GameBearShoot_WriteSaveField( savefile, entColor, "entColor" );
+	GameBearShoot_WriteSaveField( savefile, position, "position" );
+	GameBearShoot_WriteSaveField( savefile, rotation, "rotation" );
+	GameBearShoot_WriteSaveField( savefile, rotationSpeed, "rotationSpeed" );
+	GameBearShoot_WriteSaveField( savefile, velocity, "velocity" );
 
-	savefile->Write( &fadeIn, sizeof(fadeIn) );
-	savefile->Write( &fadeOut, sizeof(fadeOut) );
+	GameBearShoot_WriteSaveField( savefile, fadeIn, "fadeIn" );
+	GameBearShoot_WriteSaveField( savefile, fadeOut, "fadeOut" );
 }
 
 /*
@@ -305,23 +308,23 @@ void idGameBearShootWindow::WriteToSaveGame( idFile *savefile ) {
 	GameBearShoot_WriteSaveInt( savefile, GAME_BEARSHOOT_SAVE_MAGIC );
 	GameBearShoot_WriteSaveInt( savefile, GAME_BEARSHOOT_SAVE_VERSION );
 
-	savefile->Write( &timeSlice, sizeof(timeSlice) );
-	savefile->Write( &timeRemaining, sizeof(timeRemaining) );
-	savefile->Write( &gameOver, sizeof(gameOver) );
+	GameBearShoot_WriteSaveField( savefile, timeSlice, "timeSlice" );
+	GameBearShoot_WriteSaveField( savefile, timeRemaining, "timeRemaining" );
+	GameBearShoot_WriteSaveField( savefile, gameOver, "gameOver" );
 
 	GameBearShoot_WriteSaveInt( savefile, currentLevel );
 	GameBearShoot_WriteSaveInt( savefile, goalsHit );
-	savefile->Write( &updateScore, sizeof(updateScore) );
-	savefile->Write( &bearHitTarget, sizeof(bearHitTarget) );
+	GameBearShoot_WriteSaveField( savefile, updateScore, "updateScore" );
+	GameBearShoot_WriteSaveField( savefile, bearHitTarget, "bearHitTarget" );
 
-	savefile->Write( &bearScale, sizeof(bearScale) );
-	savefile->Write( &bearIsShrinking, sizeof(bearIsShrinking) );
+	GameBearShoot_WriteSaveField( savefile, bearScale, "bearScale" );
+	GameBearShoot_WriteSaveField( savefile, bearIsShrinking, "bearIsShrinking" );
 	GameBearShoot_WriteSaveInt( savefile, bearShrinkStartTime );
 
-	savefile->Write( &turretAngle, sizeof(turretAngle) );
-	savefile->Write( &turretForce, sizeof(turretForce) );
+	GameBearShoot_WriteSaveField( savefile, turretAngle, "turretAngle" );
+	GameBearShoot_WriteSaveField( savefile, turretForce, "turretForce" );
 
-	savefile->Write( &windForce, sizeof(windForce) );
+	GameBearShoot_WriteSaveField( savefile, windForce, "windForce" );
 	GameBearShoot_WriteSaveInt( savefile, windUpdateTime );
 
 	int numberOfEnts = entities.Num();

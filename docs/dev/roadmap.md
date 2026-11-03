@@ -1705,9 +1705,16 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      masks gave way to the packed bits saves already hold. Each list must
      follow its declaration (`savegame_raw_inventory.py`), and the codec is
      checked against each compiler's raw layout. Direct raw writes fell from
-     23 to 7 per game tree. Still to do in this stage:
-     - zeroing the script's pointer slots;
-     - the PDA minigame fields.
+     23 to 7 per game tree.
+     Third slice, 3 November: the PDA minigame fields go through the typed GUI
+     encoders, again with unchanged bytes. The script stack is now written with
+     its address temporaries zeroed (`idProgram::ZeroPointerLocals`): those
+     slots held stale raw pointers that nothing reads after a load. A store
+     through a restored slot is now skipped rather than written through
+     another process's address. `save_codec.py` also passes, with every
+     mutation caught, as aarch64 Linux under qemu. That covers stage 2's
+     locally reachable gate. The macOS arm64 run and the CI runs follow once
+     the change is pushed.
 
      Trace models, joint modifiers, path targets and the GUI interpolator
      change bytes, so they move to stage 3 with payload version 5.

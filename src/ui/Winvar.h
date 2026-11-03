@@ -205,9 +205,31 @@ static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, unsigned char
 	return OpenQ4_CheckSaveGameField( savefile->WriteUnsignedChar( value ), 1, offset, true, context, fieldName );
 }
 
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, bool value, const char *context, const char *fieldName ) {
+	return OpenQ4_WriteSaveGameBool( savefile, value, context, fieldName );
+}
+
 static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const idVec2 &value, const char *context, const char *fieldName ) {
 	return OpenQ4_WriteSaveGameField( savefile, value.x, context, fieldName ) &&
 		OpenQ4_WriteSaveGameField( savefile, value.y, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const idVec3 &value, const char *context, const char *fieldName ) {
+	return OpenQ4_WriteSaveGameField( savefile, value.x, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.y, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.z, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const idVec4 &value, const char *context, const char *fieldName ) {
+	return OpenQ4_WriteSaveGameField( savefile, value.x, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.y, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.z, context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value.w, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const idBounds &value, const char *context, const char *fieldName ) {
+	return OpenQ4_WriteSaveGameField( savefile, value[ 0 ], context, fieldName ) &&
+		OpenQ4_WriteSaveGameField( savefile, value[ 1 ], context, fieldName );
 }
 
 static ID_INLINE bool OpenQ4_WriteSaveGameField( idFile *savefile, const idRectangle &value, const char *context, const char *fieldName ) {
@@ -248,9 +270,31 @@ static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, unsigned char 
 	return OpenQ4_CheckSaveGameField( savefile->ReadUnsignedChar( value ), 1, offset, false, context, fieldName );
 }
 
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, bool &value, const char *context, const char *fieldName ) {
+	return OpenQ4_ReadSaveGameBool( savefile, value, context, fieldName );
+}
+
 static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idVec2 &value, const char *context, const char *fieldName ) {
 	return OpenQ4_ReadSaveGameField( savefile, value.x, context, fieldName ) &&
 		OpenQ4_ReadSaveGameField( savefile, value.y, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idVec3 &value, const char *context, const char *fieldName ) {
+	return OpenQ4_ReadSaveGameField( savefile, value.x, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.y, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.z, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idVec4 &value, const char *context, const char *fieldName ) {
+	return OpenQ4_ReadSaveGameField( savefile, value.x, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.y, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.z, context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value.w, context, fieldName );
+}
+
+static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idBounds &value, const char *context, const char *fieldName ) {
+	return OpenQ4_ReadSaveGameField( savefile, value[ 0 ], context, fieldName ) &&
+		OpenQ4_ReadSaveGameField( savefile, value[ 1 ], context, fieldName );
 }
 
 static ID_INLINE bool OpenQ4_ReadSaveGameField( idFile *savefile, idRectangle &value, const char *context, const char *fieldName ) {
