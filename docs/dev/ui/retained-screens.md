@@ -2388,10 +2388,13 @@ leaves the screen.
   levelshot, which gives them its room from its foot (and gives way, with
   its best-result badge, where too little is left); DIFFICULTY, its steps
   and START MATCH move down only as far as the lines still need. The
-  briefing grows down the matches' column, its static rule giving way where
-  it would cross the bottom band (the path above it says the same); the
-  progress grows under the ladder. The entrance card grows as one, up to
-  1.25 times, which the canvas holds.
+  match's and the tier's descriptions keep the three lines the stock boxes
+  give them, so at 200 % a long one shows less of itself than at 100 %
+  (a known limit: the column has no room for more). The briefing grows down
+  the matches' column, its static rule giving way where it would cross the
+  bottom band (the path above it says the same); the progress line wraps
+  onto a second line under the ladder so that its count stays whole. The
+  entrance card grows as one, up to 1.25 times, which the canvas holds.
 - **Tall views.** Restart Level, the campaign's difficulty and its chapters
   follow the text in their tall column too, and take it only in a portrait
   view that holds it at the running size (`TallLayout.fits` now takes the
