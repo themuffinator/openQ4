@@ -211,6 +211,25 @@ def validate_hit_is_resolved_in_the_present() -> None:
     ):
         require_before(hitscan, "ResolveMPLagCompensationHit(", consumer, label)
 
+    require_before(hitscan, "const idVec3 traceCollisionPoint = collisionPoint;",
+                   "ResolveMPLagCompensationHit(", "historical ray saved before impact translation")
+    penetration = function_body(hitscan,
+        "if ( ent->IsType ( idActor::GetClassType() ) && penetrate > 0.0f )", "rail penetration")
+    require(penetration, "start = traceCollisionPoint;", "rail penetration stays on the traced ray")
+
+    gauntlet = function_body(read(GAME_LIBS_ROOT, "src/mpgame/weapon/WeaponGauntlet.cpp"),
+                            "void rvWeaponGauntlet::Attack", "gauntlet attack")
+    require_before(gauntlet, "ResolveMPLagCompensationHit(", "EndMPLagCompensation(", "gauntlet impact translation")
+    require_before(gauntlet, "EndMPLagCompensation(", "gameLocal.PlayEffect (", "gauntlet world restored before effects")
+    require_before(gauntlet, "EndMPLagCompensation(", "ent->Damage (", "gauntlet world restored before damage")
+    lightning = function_body(read(GAME_LIBS_ROOT, "src/mpgame/weapon/WeaponLightningGun.cpp"),
+                             "void rvWeaponLightningGun::Think", "lightning think")
+    require_before(lightning, "UpdateChainLightning();", "MPLagCompensationOffset(", "chain selection stays historical")
+    require_before(lightning, "MPLagCompensationOffset(", "ResolveMPLagCompensationHit(", "translate paths before consuming entries")
+    require_before(lightning, "ResolveMPLagCompensationHit(", "EndMPLagCompensation(", "lightning trace translation")
+    require_before(lightning, "EndMPLagCompensation(", "UpdateEffects( origin );", "lightning world restored before effects")
+    require_before(lightning, "EndMPLagCompensation(", "Attack ( currentPath.target", "lightning world restored before damage")
+
 
 def validate_invalidation() -> None:
     label = "MP lag compensation history invalidation"

@@ -656,6 +656,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "bse_retail_parity.py",
         root / "tools" / "tests" / "mp_lag_compensation_contract.py",
         root / "tools" / "tests" / "mp_lag_compensation_state.py",
+        root / "tools" / "tests" / "network_fragment_state.py",
+        root / "tools" / "tests" / "mp_match_artifact_io_state.py",
         root / "tools" / "tests" / "mp_client_prediction_state.py",
         root / "tools" / "tests" / "mp_runtime_freshness.py",
         root / "tools" / "tests" / "mp_weapon_switch_contract.py",

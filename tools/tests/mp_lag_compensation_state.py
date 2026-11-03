@@ -39,6 +39,7 @@ FUNCTIONS = (
     "bool idGameLocal::BeginMPLagCompensation(",
     "void idGameLocal::EndMPLagCompensation(",
     "bool idGameLocal::ResolveMPLagCompensationHit(",
+    "idVec3 idGameLocal::MPLagCompensationOffset(",
 )
 
 STRUCTS = (
@@ -88,11 +89,23 @@ def block(source: str, signature: str) -> str:
     return source[start:end]
 
 
-def build_fixture(game_local: str, header: str) -> str:
+def build_fixture(game_local: str, header: str, gauntlet: str | None = None,
+                  lightning: str | None = None) -> str:
     structs = "\n".join(block(header, signature) + ";" for signature in STRUCTS)
     bodies = "\n".join(block(game_local, signature) for signature in FUNCTIONS)
     harness = (ROOT / "tools/tests/native/MpLagCompensationFixture.cpp").read_text(encoding="utf-8")
-    return harness.replace("// PRODUCTION_STRUCTS", structs).replace("// PRODUCTION_FUNCTIONS", bodies)
+    if gauntlet is None:
+        gauntlet = (ROOT / "src/mpgame/weapon/WeaponGauntlet.cpp").read_text(encoding="utf-8")
+    if lightning is None:
+        lightning = (ROOT / "src/mpgame/weapon/WeaponLightningGun.cpp").read_text(encoding="utf-8")
+    hitscan = block(game_local, "idEntity* idGameLocal::HitScan(")
+    resolution = hitscan[hitscan.index("collisionPoint = tr.c.point"):hitscan.index("// computing the collisionArea")]
+    penetration = block(hitscan, "if ( ent->IsType ( idActor::GetClassType() ) && penetrate > 0.0f )")
+    return (harness.replace("// PRODUCTION_STRUCTS", structs).replace("// PRODUCTION_FUNCTIONS", bodies)
+            .replace("// PRODUCTION_GAUNTLET_RESOLVE", block(gauntlet, "if ( lagCompApplied )"))
+            .replace("// PRODUCTION_LIGHTNING_RESOLVE", block(lightning, "if ( lagCompApplied )"))
+            .replace("// PRODUCTION_HITSCAN_RESOLVE", resolution)
+            .replace("// PRODUCTION_HITSCAN_PENETRATE", penetration))
 
 
 def compile_and_run(source: str, directory: Path, name: str, compiler: str) -> subprocess.CompletedProcess:
@@ -131,7 +144,28 @@ def main() -> None:
             if control.returncode == 0:
                 raise SystemExit(f"mp_lag_compensation_state: control did not fail: {label}")
 
-    print(f"mp_lag_compensation_state: ok ({len(MUTATIONS)} single-reversal controls fail)")
+        # Execute the real weapon resolution blocks too: restoring physics alone
+        # does not put an impact/beam in the present or keep a rail ray straight.
+        gauntlet = (ROOT / "src/mpgame/weapon/WeaponGauntlet.cpp").read_text(encoding="utf-8")
+        lightning = (ROOT / "src/mpgame/weapon/WeaponLightningGun.cpp").read_text(encoding="utf-8")
+        old_restore = "if ( lagCompApplied ) { gameLocal.EndMPLagCompensation( lagCompRestore, lagCompRestoreCount ); }"
+        controls = (
+            ("gauntlet impact left in the past", game_local,
+             gauntlet.replace(block(gauntlet, "if ( lagCompApplied )"), old_restore, 1), lightning),
+            ("lightning endpoints left in the past", game_local, gauntlet,
+             lightning.replace(block(lightning, "if ( lagCompApplied )"), old_restore, 1)),
+            ("rail continuation moved with the impact",
+             game_local.replace("start = traceCollisionPoint;", "start = collisionPoint;"), gauntlet, lightning),
+            ("chain endpoints not translated", game_local.replace(
+                "return restoreState[ i ].originalOrigin - restoreState[ i ].rewoundOrigin;", "return vec3_origin;"),
+             gauntlet, lightning),
+        )
+        for index, (label, local, melee, beam) in enumerate(controls):
+            control = compile_and_run(build_fixture(local, header, melee, beam), path, f"weapon{index}", compiler)
+            if control.returncode == 0:
+                raise SystemExit(f"mp_lag_compensation_state: control did not fail: {label}")
+
+    print(f"mp_lag_compensation_state: ok ({len(MUTATIONS) + len(controls)} single-reversal controls fail)")
 
 
 if __name__ == "__main__":

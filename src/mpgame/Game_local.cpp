@@ -9898,6 +9898,17 @@ void idGameLocal::EndMPLagCompensation( mpLagCompRestore_t restoreState[MAX_CLIE
 	}
 }
 
+// Read the translation without consuming the entry: lightning must translate
+// all of its selected endpoints before any target is restored.
+idVec3 idGameLocal::MPLagCompensationOffset( const idEntity *hit, const mpLagCompRestore_t restoreState[MAX_CLIENTS], int restoreCount ) const {
+	for ( int i = 0; hit && i < restoreCount; i++ ) {
+		if ( restoreState[ i ].player == hit ) {
+			return restoreState[ i ].originalOrigin - restoreState[ i ].rewoundOrigin;
+		}
+	}
+	return vec3_origin;
+}
+
 /*
 ================
 idGameLocal::ResolveMPLagCompensationHit
@@ -10116,6 +10127,9 @@ idEntity* idGameLocal::HitScan(
 
 			collisionPoint = tr.c.point - ( tr.c.normal * tr.c.point - tr.c.dist ) * tr.c.normal;
 			ent			   = entities[ tr.c.entityNum ];
+			// Penetration continues along the historical ray. Moving the impact for
+			// damage/effects must not bend a rail shot toward the target's current pose.
+			const idVec3 traceCollisionPoint = collisionPoint;
 
 			// The trace resolved against the rewound world; everything below acts in the
 			// present.  Put this target back before any of it runs, and carry the hit point
@@ -10133,7 +10147,7 @@ idEntity* idGameLocal::HitScan(
 				}
 			}
 			actualHitEnt   = NULL;
-			start		   = collisionPoint;
+			start		   = traceCollisionPoint;
 
 			// Keep tracing if we hit a liquid
 // openQ4 BEGIN
@@ -10260,7 +10274,7 @@ idEntity* idGameLocal::HitScan(
 
 			// Pass through actors
 			if ( ent->IsType ( idActor::GetClassType() ) && penetrate > 0.0f ) {			
-				start = collisionPoint;
+				start = traceCollisionPoint;
 				additionalIgnore = ent;
 				damageScale *= penetrate;
 				continue;

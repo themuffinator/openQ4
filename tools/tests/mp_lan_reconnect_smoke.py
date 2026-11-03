@@ -82,6 +82,8 @@ def main() -> int:
     parser.add_argument("--client-port", type=int, default=28991)
     parser.add_argument("--timeout", type=int, default=120, help="maximum seconds for any one step")
     parser.add_argument("--startup-timeout", type=int, default=300)
+    parser.add_argument("--impaired", action="store_true",
+                        help="seeded 30 ms delay, 0-60 ms jitter, 3%% loss and 20%% duplication on each peer")
     args = parser.parse_args()
     default = {"ipv4": "127.0.0.1", "ipv6-loopback": "::1"}.get(args.family)
     address = ipaddress.ip_address(args.address or default or "::")
@@ -136,6 +138,12 @@ def main() -> int:
         "net_LANServer": "1", "net_clientDownload": "0",
         "win_allowMultipleInstances" if os.name == "nt" else "sys_allowMultipleInstances": "1", **family,
     }
+    impairment = {"net_forceLatency": "30", "net_forceJitter": "60", "net_forceDrop": "3",
+                  "net_forceDuplicate": "20", "net_forceSeed": "40708"} if args.impaired else {}
+    report["impairment"] = impairment
+    common.update(impairment)
+    if args.impaired:
+        common["net_channelShowPackets"] = "1"
     processes, streams = {}, []
     sequence = 0
     loops = {"client": games["client"] / "lan_c0.cfg"}
@@ -146,6 +154,8 @@ def main() -> int:
     write_script(games["server"] / "lan_server_start.cfg", ["echo LAN_SERVER_READY", "exec lan_server_pump.cfg"])
 
     def launch(role: str, cvars: dict[str, str], tail: list[str]) -> None:
+        if len(cvars) + 1 > 64:
+            raise RuntimeError("launch exceeds the engine's startup command capacity")
         executable = paths["dedicated"] if role == "server" else paths["engine"]
         command = [str(executable)] + [part for key, value in cvars.items() for part in ("+set", key, value)] + tail
         report["commands"][role] = command
@@ -299,6 +309,13 @@ def main() -> int:
         for stream in streams:
             stream.close()
     report["elapsed_seconds"] = round(time.monotonic() - started, 2)
+    if args.impaired:
+        report["received_fragments"] = {role: len(re.findall(r"recv .*fragment =", read_log(path)))
+                                        for role, path in logs.items()}
+        if not report["received_fragments"].get("client", 0):
+            report["failures"].append("impaired run did not exercise received fragments")
+    if {key: digest(path) for key, path in paths.items()} != report["runtime_sha256"]:
+        report["failures"].append("runtime changed during qualification")
     report["status"] = "fail" if report["failures"] else "pass"
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({key: report[key] for key in ("status", "family", "server_endpoint", "discovery", "joins",

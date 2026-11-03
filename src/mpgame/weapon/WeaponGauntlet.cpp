@@ -231,6 +231,9 @@ void rvWeaponGauntlet::Attack ( void ) {
 // RAVEN END
 
 	if ( lagCompApplied ) {
+		if ( tr.fraction < 1.0f ) {
+			gameLocal.ResolveMPLagCompensationHit( gameLocal.entities[tr.c.entityNum], lagCompRestore, lagCompRestoreCount, tr, NULL );
+		}
 		gameLocal.EndMPLagCompensation( lagCompRestore, lagCompRestoreCount );
 	}
 

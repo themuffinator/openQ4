@@ -1448,6 +1448,7 @@ public:
 	bool					BeginMPLagCompensation( const idPlayer *shooter, mpLagCompRestore_t restoreState[MAX_CLIENTS], int &restoreCount );
 	void					EndMPLagCompensation( mpLagCompRestore_t restoreState[MAX_CLIENTS], int restoreCount );
 	bool					ResolveMPLagCompensationHit( const idEntity *hit, mpLagCompRestore_t restoreState[MAX_CLIENTS], int &restoreCount, trace_t &tr, idVec3 *extraPoint );
+	idVec3					MPLagCompensationOffset( const idEntity *hit, const mpLagCompRestore_t restoreState[MAX_CLIENTS], int restoreCount ) const;
 	int						AdvertisedRemoteExtrapolationTics( int clientNum ) const;
 	int						RemoteExtrapolationMS( int clientNum, int leadMS ) const;
 	void					UpdateAdvertisedRemoteExtrapolation( void );
