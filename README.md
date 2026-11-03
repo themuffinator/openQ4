@@ -1,5 +1,8 @@
 <a id="top"></a>
 
+> [!IMPORTANT]
+> **Calling all vibe masters.** openQ4 got this far on sharp prompts, stubborn validation runs and a healthy disregard for sleep, but the Strogg aren't beaten yet. The remaining work is mapped out in the [development roadmap](docs/dev/roadmap.md), and we'd welcome more hands (and more agents) to help bring it home. Before you unleash your favourite model, check in on the **#openq4** channel of the [DarkMatter Discord](https://discord.gg/T32mFejwR4): we'll point you at the work that needs you most and keep everyone's agents from fragging each other over the same roadmap item. Then brief your model with [AGENTS.md](AGENTS.md) and open a pull request. Reviews are human, standards are high, and the snacks are strictly virtual.
+
 <div align="center">
 
 <img src="assets/docs/img/banner.png" alt="openQ4 banner">
