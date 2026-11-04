@@ -503,7 +503,7 @@ static bool BotCombatSplashThrowsShooter( idPlayer *shooter, idEntity *splashIgn
 		const idVec3 &impact, const botCombatShotModel_t &model, float impactTime ) {
 	if ( !shooter || !shooter->GetPhysics() || !navMesh.IsValid() ||
 		model.splashRadius <= 0.0f || model.selfKnockback <= 0.0f ||
-		model.attackerScale <= 0.0f || model.selfPushScale <= 0.0f ) {
+		model.attackerScale <= 0.0f ) {
 		return false;
 	}
 	const float leadTime = Max( 0.0f, impactTime );
@@ -524,13 +524,12 @@ static bool BotCombatSplashThrowsShooter( idPlayer *shooter, idEntity *splashIgn
 	}
 	idVec3 direction = ( origin + idVec3( 0.0f, 0.0f, 31.875f ) ) - impact;
 	direction.z += 24.0f;
-	if ( direction.Normalize() <= 0.0f ) {
-		return false;
-	}
+	direction.Normalize();
 	const idVec3 kick = direction * ( g_knockback.GetFloat() * (float)knockback * model.selfPushScale / 200.0f );
 	// An affordable health trade can still throw the shooter into the void.
 	// Prove the grounded slide as well as the flight; ordinary stopping friction
-	// is unavailable during the new knockback interval.
+	// is unavailable during the new knockback interval, even when the authored
+	// push scale or direction is zero (Damage still starts the timer).
 	return !navMesh.KnockSlideLandingSafe( origin, velocity + kick,
 		idMath::ClampInt( 50, 200, knockback * 2 ), idMath::INFINITY );
 }

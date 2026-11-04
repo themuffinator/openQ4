@@ -5,6 +5,88 @@ authoring or compile step. Bots arrive with a name, a way of playing and
 something to say about it. This describes their behaviour, validation and
 current limits.
 
+## Moving crusher and self-blast safety, 4 November 2026
+
+The renewed four-map audit on the earlier recovery build (`5efd1987e`) completes
+with unchanged runtime hashes. All runs use six skill-4 bots and a 300-second
+script, including warmup in the strict zero-world-death gate:
+
+| Map | Observed simulation | Combat kills | Traversals | Stuck | World deaths |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| q4dm8 | 284.528 s | 106 | 177 | 1 | 6 |
+| q4ctf3 | 284.512 s | 35 | 122 | 6 | 0 |
+| q4ctf5 | 284.480 s | 79 | 195 | 3 | 4 |
+| q4dz3 | 284.432 s | 66 | 104 | 4 | 0 |
+
+There are no traversal timeouts or goal give-ups. DM8 also has one no-route
+event. CTF3/DZ3 pass the selected death/duration gates; their stalls remain
+visible. DM8/CTF5 fail until a complete causal proof supports an exclusion.
+Reports are `.tmp/mp-roadmap/bots-*-recovery/report.json`. These shared-host
+runs do not qualify timing. Causal replays use independent, hash-verified copies
+of these exact binaries in `.tmp/runtime/candidate/`, with a recorded freshness
+override solely for the earlier match. New staged builds cannot replace that
+evidence.
+
+The complete assessment in `recovery-classification/classification.json`
+retains two navigation/control deaths and four excluded impulses on DM8, and
+two navigation/control deaths and two excluded impulses on CTF5. Besides the
+self-blast and crusher cases below, DM8 Voss has a recoverable earlier state
+followed by several later hits; its isolated controller remains alive but
+airborne at the endpoint. CTF5 Voss fails the no-hit counterfactual proof.
+Neither is a proven exclusion, and neither isolated result establishes the
+full match's later cause. The original reports remain failures.
+
+One CTF5 death occurs at `(834, 321, 604)` under `func_door_1`'s crusher.
+The stock map binds a 1000-damage trigger to this translating door, initially
+disabled and enabled when it moves. The graph priced only its initial bounds,
+so the future crush floor remained usable. A deadly trigger on an unbound
+binary mover now reserves its entire translation envelope, even if initially
+off. Endpoint bounds use the current world-space offset, so gathering during
+motion or after endpoint reversal produces the same result. Arbitrary moving
+parents, parent-bound movers and disabled static volumes keep their existing
+unmodelled/priced policy; this does not introduce general moving-platform AI.
+
+The production mover/gathering/floor fixture passes on Windows and Linux x64
+with Clang ASan/UBSan, including four rejected reversions. In the actual CTF5
+map, both hull and support probes at `(834, 321, 544.25)` change from accepted
+to refused. The safe walkway at `(518, 670, -183.75)` remains accepted, and the
+fixed recovery control lands alive. Before/after reports are
+`.tmp/mp-roadmap/crusher-baseline/` and `crusher-fixed/`; the latter uses
+`1c07ac4a9`, client `9c40f14e95bc7ed123a2cf040c0b16621204a3f16bce58f82719ed60dd350750`
+and MP module `74ffb9af96da668ab21cec99ebe60b886ea2dec4ae5e19838b9ddd219f6ef73e`.
+
+DM8 Sledge's retained failure includes its own rocket splash after a survivable
+enemy machinegun hit. Such a death cannot receive an enemy-impulse exclusion.
+The firing guard checked the health trade but did not check the shooter's own
+post-blast trajectory. It now predicts self knockback, including multiplayer
+mode, falloff, damage-power/self-damage scaling, integer truncation, self push
+scale and the friction-free timer, then requires a supported slide/flight.
+Cover, an out-of-range blast and a proven landing still permit the shot.
+Even a zero push retains the ground-friction interval started by player physics.
+The decision fixture rejects removal of either self scale or the timer.
+This fixes a demonstrated policy gap; the recorded firing frame was not
+captured, so it does not prove that this guard alone would prevent that exact
+match's later self-blast. It also does not model future changes in player input
+or claim that every affordable landing has affordable fall damage.
+
+The integrated `ee6207834` build passes all ten recovery outcomes in
+`.tmp/mp-roadmap/air-current/report.json`, preserving the explicit settled-input
+and resumed-navigation criteria above. Both map processes exit cleanly and all
+runtime hashes remain unchanged: client
+`225b9fa9b01e21503e8982e05d20a5f90027fb2a3daa9719f3d6a1031847f3cf`,
+MP module `2ce84809568486fdddf93b21dd1a61bdd92c98a7652b0c7f8d1338b984a9be55`.
+The self-knockback decision controls pass on Windows and Linux with ASan/UBSan;
+the current decision, geometry and hazard suites reject 23 total reversions.
+The prior integrated crusher build also passes three pure IPv6 reconnects under
+seeded delay, jitter, loss and duplication (`lan-crusher-integrated/report.json`).
+This covers the merge with the latest save/restore changes, without qualifying
+remote weapon presentation or promoting prediction/rewind defaults.
+
+A subsequent zero-push regression retains the knockback friction interval even
+when the authored push scale or blast direction is zero. It adds one reversed
+control to the decision fixture; those exceptional branches need a trajectory
+proof too, because `idPlayer::Damage` still starts the timer.
+
 ## Terminal-state long-match audit, 4 November 2026
 
 Fresh five-minute, six-bot, skill-4 matches on `6357fd37e` retain strict

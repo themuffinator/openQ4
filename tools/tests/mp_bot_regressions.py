@@ -128,6 +128,8 @@ def main() -> None:
              "(float)knockback / 200.0f"),
             ("self splash knockback timer", "idMath::ClampInt( 50, 200, knockback * 2 ), idMath::INFINITY",
              "200, idMath::INFINITY"),
+            ("zero-push friction interval", "model.attackerScale <= 0.0f )",
+             "model.attackerScale <= 0.0f || model.selfPushScale <= 0.0f )"),
         ):
             assert harness.count(anchor) == 1
             cpp.write_text(harness.replace(anchor, replacement), encoding="utf-8")

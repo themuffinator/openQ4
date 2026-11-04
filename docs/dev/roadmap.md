@@ -2201,6 +2201,13 @@ claim peer combinations that have not been tested.
   completed traversals. Their strict original report remains preserved; neither
   positive-only criterion weakens death exclusions. The second CTF5 departure,
   current long-match/catalog safety and controlled timing still need closure.
+  The subsequent [four-map audit](mp-bots.md#moving-crusher-and-self-blast-safety-4-november-2026)
+  passes the death gate on CTF3/DZ3 and retains six DM8/four CTF5 world deaths.
+  It exposes two further gaps: the graph approved the future floor of CTF5's
+  moving crusher, and self-splash health trades omitted the shooter's trajectory.
+  The crusher's full travel envelope is now refused, with native reversal tests
+  and before/after stock-map probes; self-splash checks the knockback slide/flight.
+  New causal and long-match evidence is still required before closing MP-02.
   Follow-through, 3 November: [knockback slide and replay corrections](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026)
   fix two isolated DM8 failures: route steering spoiled a survivable ground
   slide, and full reverse commands oscillated on a landing rim. Exact-origin
