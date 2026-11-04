@@ -632,6 +632,8 @@ bool rvSegment::UpdateParticles(rvBSE* effect, float time) {
 		UpdateSimpleParticles(time);
 	}
 
+	rvBSEManagerLocal::AddPerfCounter(PERF_NUM_PARTICLES, mActiveCount);
+	rvBSEManagerLocal::AddPerfCounter(PERF_NUM_SEGMENTS);
 	return mUsedHead != NULL;
 }
 

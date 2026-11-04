@@ -3013,10 +3013,11 @@ void idRenderSystemLocal::TakeScreenshot( int width, int height, const char *fil
 	}
 
 	// _D3XP adds viewnote screenie save to cdpath
-	if ( strstr( fileName, "viewnote" ) ) {
-		fileSystem->WriteFile( fileName, buffer, c, "fs_cdpath" );
-	} else {
-		fileSystem->WriteFile( fileName, buffer, c );
+	const int written = fileSystem->WriteFile( fileName, buffer, c,
+		strstr( fileName, "viewnote" ) ? "fs_cdpath" : "fs_savepath" );
+	if ( written != c ) {
+		r_screenshotCaptureFailed = true;
+		common->Warning( "TakeScreenshot: could not write %s", fileName );
 	}
 
 	R_StaticFree( buffer );
@@ -4158,6 +4159,10 @@ void R_EnvShot_f( const idCmdArgs &args ) {
 		fullname += baseName;
 		fullname += extensions[i];
 		tr.TakeScreenshot( size, size, fullname, blends, &ref );
+		if ( r_screenshotCaptureFailed ) {
+			common->Warning( "envshot: capture failed for %s; cubemap is incomplete", fullname.c_str() );
+			return;
+		}
 	}
 
 	common->Printf( "Wrote %s, etc\n", fullname.c_str() );
@@ -4289,6 +4294,7 @@ static void R_BakeReflectionProbes_f( const idCmdArgs &args ) {
 		ref.width = SCREEN_WIDTH;
 		ref.height = SCREEN_HEIGHT;
 		ref.vieworg = light->globalLightOrigin;
+		bool captured = true;
 		for ( int face = 0; face < 6; ++face ) {
 			ref.viewaxis = faceAxes[face] * light->parms.axis;
 			tr.TakeScreenshot( size, size, va( "%s%s", info.cubeImage->GetName(), suffixes[face] ), blends, &ref );
@@ -4298,6 +4304,14 @@ static void R_BakeReflectionProbes_f( const idCmdArgs &args ) {
 			R_ToggleSmpFrame();
 			vertexCache.EndFrame();
 			R_RendererUpload_EndFrame();
+			if ( r_screenshotCaptureFailed ) {
+				captured = false;
+				break;
+			}
+		}
+		if ( !captured ) {
+			common->Warning( "bakeReflectionProbes: %s capture is incomplete; probe was not reloaded", material );
+			continue;
 		}
 		const idStr firstFace = va( "%s%s", info.cubeImage->GetName(), suffixes[0] );
 		if ( !R_SavedFileLoads( firstFace ) ) {

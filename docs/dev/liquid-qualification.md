@@ -1,5 +1,20 @@
 # Liquid navigation qualification
 
+## Current MP regression run, 3 November 2026
+
+The staged MP roadmap build passes `mp_liquid_air_smoke.py --renderer gl`
+in `.tmp/mp-roadmap/liquid/`. A remote spectator receives changing air values,
+the sound-world diagnostic changes its underwater state, and four paused demo
+seeks restore air and the followed HUD to 100, 56, 100 and 56. The engine's
+submerged render-target capture was inspected: the underwater view and the
+AIR gauge (75 at capture time) are visible. Both processes exit cleanly and
+runtime hashes stay unchanged. The tested client SHA-256 starts
+`241211745bb14c70`; the report retains full identities.
+
+This is regression evidence for implemented replication/replay and the
+underwater HUD. It does not qualify player-controlled swimming, audible muffle,
+or the outstanding splash/wade presentation; those gates remain open.
+
 MP-06 in the [roadmap](roadmap.md) owns delivery scope. This records what the
 compiler and gameplay checks establish; the archived liquid plan preserves
 implementation history.

@@ -1549,10 +1549,11 @@ void R_ReloadGLSLPrograms_f( const idCmdArgs &args ) {
 }
 
 void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
-	(void)args;
+	const bool detailed = args.Argc() < 2 || idStr::Icmp( args.Argv( 1 ), "summary" ) != 0;
 	common->Printf( "Vulkan material programs: %d of %d registered (r_vkARBTranslation %d)\n", vkNumMaterialPrograms,
 			VK_MAX_MATERIAL_PROGRAMS, cvarSystem->GetCVarInteger( "r_vkARBTranslation" ) );
-	VK_MaterialPrograms_Report();
+	VK_MaterialPrograms_Report( detailed );
+	if ( !detailed ) { return; }
 	// "translatable" means the program translates on its own; whether its
 	// pair compiles and draws is in the version list above.
 	for ( int i = 0; i < vkNumMaterialPrograms; i++ ) {
@@ -1744,8 +1745,10 @@ void R_RenderGraphResources_PrintGfxInfo( void ) {
 }
 
 void R_RendererVulkanMemoryInfo_f( const idCmdArgs &args ) {
-	(void)args;
+	R_RenderThread_Sync( "resource profile" );
 	VK_Device_PrintMemoryInfo();
+	VK_Device_PrintPipelineInfo();
+	VK_Exec_PrintResourceInfo( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "reset" ) == 0 );
 }
 
 void R_RenderGraphResources_DumpLatest( void ) {

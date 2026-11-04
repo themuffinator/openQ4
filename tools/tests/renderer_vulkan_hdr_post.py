@@ -80,6 +80,8 @@ def configure(manifest, samples):
         'r_customWidth 1280', 'r_customHeight 800', 'r_windowWidth 1280', 'r_windowHeight 800',
         'vid_restart partial', 'wait 90'], reference='fault-baseline', pair=False)
     add('capture-stability', combined, reference='fault-baseline')
+    add('cube-capture-restored', combined, commands=['envshot "linear-post-cube" 256 1', 'wait 60'],
+        reference='fault-baseline')
     return profile
 
 
@@ -216,6 +218,20 @@ def qualify(report, profile, backend, samples):
                         valid = np.array_equal(np.asarray(raw.convert('RGB')), images[row['case']])
             if not valid:
                 failures.append(case + ': auxiliary capture/lifecycle contract failed')
+    if 'linear-post-cube-capture-restored' in images:
+        row = next(row for row in report['results'] if row['case'] == 'linear-post-cube-capture-restored')
+        directory = Path(row['screenshot']).parent.parent / 'env'
+        faces = {}
+        for face in ('px', 'nx', 'py', 'ny', 'pz', 'nz'):
+            path = directory / ('linear-post-cube_' + face + '.tga')
+            try:
+                with Image.open(path) as image:
+                    if image.size != (256, 256):
+                        failures.append('HDR cubemap ' + face + ': incorrect extent')
+                    faces[face] = dict(path=str(path), sha256=lab.digest(path))
+            except (OSError, ValueError) as error:
+                failures.append('HDR cubemap ' + face + ': ' + str(error))
+        checks['cube-captures'] = faces
     return dict(status='fail' if failures else 'pass', checks=checks, failures=failures)
 
 

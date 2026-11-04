@@ -348,7 +348,7 @@ void idClipModel::RestoreTraceModels( idRestoreGame *savefile ) {
 		return;
 	}
 	for ( i = 0; i < num; i++ ) {
-		trmCache_t *entry = new trmCache_t;
+		std::unique_ptr<trmCache_t> entry( new trmCache_t );
 
 		if ( savefile->GetOpenQ4SaveGameCompatibilityVersion() >= OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION ) {
 			savefile->ReadTraceModel( entry->trm );
@@ -356,7 +356,6 @@ void idClipModel::RestoreTraceModels( idRestoreGame *savefile ) {
 			savefile->Read( &entry->trm, sizeof( entry->trm ) );
 		}
 		if ( !SaveGameTraceModelBoundsCheck( entry->trm ) ) {
-			delete entry;
 			savefile->Error( "idClipModel::RestoreTraceModels: invalid trace model %d", i );
 			return;
 		}
@@ -369,9 +368,10 @@ void idClipModel::RestoreTraceModels( idRestoreGame *savefile ) {
 		entry->refCount = 0;
 		entry->collisionModel = NULL;
 
-		traceModelCache.Append( entry );
-		if ( entry->hash != 0xffffffff ) {
-			traceModelHash.Add( GetTraceModelHashKey( entry->trm ), i );
+		traceModelCache.Append( entry.get() );
+		trmCache_t *restored = entry.release();
+		if ( restored->hash != 0xffffffff ) {
+			traceModelHash.Add( GetTraceModelHashKey( restored->trm ), i );
 		}
 	}
 

@@ -272,6 +272,12 @@ if get_option('build_native_tests')
   test('openq4-objective-marker-layout', objective_marker_layout_test, timeout: 30)
   test('openq4-vulkan-material-sources', py,
     args: [files('tools/build/vulkan_material_sources.py'), '--check'], timeout: 30)
+  test('openq4-vulkan-qualification-report', py,
+    args: [files('tools/tests/renderer_vulkan_qualification.py'), 'self-test'], timeout: 30)
+  test('openq4-vulkan-presentation-report', py,
+    args: [files('tools/tests/renderer_vulkan_presentation.py'), '--self-test'], timeout: 30)
+  test('openq4-vulkan-material-cache', py,
+    args: [files('tools/tests/renderer_vulkan_material_cache.py')], timeout: 60)
   openq4_editor_document_test = executable(
     'openq4-editor-document-test',
     files(
@@ -516,6 +522,20 @@ if get_option('build_native_tests')
   test('openq4-restore-recovery', restore_recovery_test, timeout: 30)
 
   foreach game_mode : ['game', 'mpgame']
+    restore_resources_source = custom_target(
+      'openq4-restore-resources-' + game_mode + '-source',
+      input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp',
+                   'src' / game_mode / 'Player.cpp', 'src' / game_mode / 'physics' / 'Clip.cpp',
+                   'src' / game_mode / 'physics' / 'Physics_StaticMulti.cpp',
+                   'src' / game_mode / 'physics' / 'Physics_Particle.cpp'),
+      output: 'RestoreResources-' + game_mode + '.cpp',
+      command: [py, files('tools/tests/savegame_restore_resources.py'), '--generate-native', game_mode, '@OUTPUT@'],
+    )
+    restore_resources_test = executable(
+      'openq4-restore-resources-' + game_mode, restore_resources_source,
+      cpp_args: ['-UNDEBUG'], install: false,
+    )
+    test('openq4-restore-resources-' + game_mode, restore_resources_test, timeout: 30)
     restore_identity_source = custom_target(
       'openq4-restore-identity-' + game_mode + '-source',
       input: files('src' / game_mode / 'Entity.cpp', 'src' / game_mode / 'client' / 'ClientEntity.cpp',

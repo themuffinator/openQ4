@@ -55,6 +55,8 @@ struct Cvar {
     bool IsModified(){return modified;} void ClearModified(){modified=false;}
     int GetInteger()const{return value;} bool GetBool()const{return value!=0;}
 } r_swapInterval,r_rendererMetrics,r_hiddenWindow;
+static Cvar r_vkResourceProfile{false,0};
+static struct { unsigned long long frames=0, barriers=0, submissions=0; } vkResourceProfile;
 enum {RENDERER_WAIT_FRAME_FENCE,RENDERER_WAIT_SWAPCHAIN_IMAGE,RENDERER_PRESENT_WINDOW_STATE,RENDERER_PRESENT_CONTEXT,RENDERER_PRESENT_SWAP};
 static unsigned long long R_RendererMetrics_CpuClock(){return 0;}
 static void R_RenderThread_Sync(const char*){} // no render thread in this harness
@@ -71,7 +73,10 @@ static int recreateCalls=0,submitCalls=0,presentCalls=0,acquireCalls=0,waitCalls
 static bool withheldOkay=true;
 static uint32_t submittedWaits=0,submittedSignals=0;
 struct Common { template<class... T> void Warning(const char*,T...){} template<class... T> void Printf(const char*,T...){} } commonObject,*common=&commonObject;
-struct { int frameCount=1; } tr;
+struct { int frameCount=1; bool takingScreenshot=false; } tr;
+struct viewDef_t { struct { int x1=0,y1=0,x2=255,y2=255; } viewport; };
+static bool hdrSceneRequested=false;
+static bool VK_PostProcess_HDRSceneRequested(){return hdrSceneRequested;}
 constexpr int VK_FRAMES_IN_FLIGHT=2;
 struct Context {
     bool initialized=true,presentationBlocked=false,uploadBatchOpen=false,uploadBatchInFlight=false;
@@ -249,6 +254,28 @@ static void stopped(){
     const auto after=snapshot();assert(after.presentedSequence==before.presentedSequence && !after.available);
 }
 int main(){
+    viewDef_t capture;
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    tr.takingScreenshot=true;
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    hdrSceneRequested=true;
+    assert(VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(nullptr));
+    capture.viewport={0,0,1279,719};
+    assert(VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    capture.viewport.x2=1280;
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    capture.viewport={0,0,255,720};
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    capture.viewport={-1,0,255,255};
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    capture.viewport={0,-1,255,255};
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    capture.viewport={5,0,4,255};
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    capture.viewport={0,5,255,4};
+    assert(!VK_TemporalPresentation_HDRCaptureInFrame(&capture));
+    tr.takingScreenshot=hdrSceneRequested=false;
     static_assert(std::is_standard_layout_v<renderDisplayPresentation_t> && std::is_trivially_copyable_v<renderDisplayPresentation_t>);
     auto s=snapshot();assert(!s.available && s.generation==0);
     R_GetDisplayPresentation(nullptr);
@@ -432,6 +459,7 @@ def main():
     source += method(device, "void VK_Device_FlushUploadBatch( void )")
     source += method(gui, "bool VK_GuiExecutor_BeginFrame( void )")
     source += method(gui, "static bool VK_GuiExecutor_SubmitFrame( bool present )")
+    source += method(gui, "static bool VK_TemporalPresentation_HDRCaptureInFrame( const viewDef_t *view )")
     source += GL_SUPPORT
     for signature in ("static int SDL3_RequestedSwapInterval()", "static void SDL3_RecordDisplayParameters()", "static bool SDL3_ApplyRequestedScreenParms(const renderWindowParms_t& parms)", "static bool SDL3_ApplyStrictSwapInterval()", "void GLimp_SwapBuffers(void)"):
         source += method(gl, signature)

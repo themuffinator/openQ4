@@ -196,9 +196,9 @@ void rvPhysics_Particle::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool ( allowBounce );
 
 	idBounds bounds;					// cnicholson: Added unrestored var
-	delete clipModel;
+	// The complete clip model follows below. These legacy bounds still occupy
+	// bytes in the payload, but constructing a temporary model leaked it.
 	savefile->ReadBounds ( bounds );
-	clipModel = new idClipModel ( idTraceModel ( bounds ) );
 
 	savefile->ReadBool( dropToFloor );
 	savefile->ReadBool( testSolid );

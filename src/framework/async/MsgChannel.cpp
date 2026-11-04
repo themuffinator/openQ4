@@ -115,6 +115,8 @@ void idMsgChannel::Init( const netadr_t adr, const int id ) {
 	unsentFragmentStart = 0;
 	fragmentSequence = 0;
 	fragmentLength = 0;
+	fragmentExpectedLength = -1;
+	fragmentReceived = 0;
 	reliableSend.Init( 1 );
 	reliableReceive.Init( 0 );
 }
@@ -472,6 +474,12 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 		return false;
 	}
 
+	// An older message must not overwrite the assembly buffer of a newer one,
+	// whether the delayed packet is fragmented or carries its entire payload.
+	if ( sequence < fragmentSequence ) {
+		return false;
+	}
+
 	//
 	// dropped packets don't keep this message from being used
 	//
@@ -487,7 +495,8 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 	// if the message is fragmented
 	//
 	if ( fragmented ) {
-		if ( fragStart < 0 || fragLength < 0 || fragLength > msg.GetRemaingData() || fragStart + fragLength > (int)sizeof( fragmentBuffer ) ) {
+		const int fragmentSize = Net_FragmentSize( remoteAddress );
+		if ( fragStart < 0 || fragLength < 0 || fragLength > Net_FragmentSize( remoteAddress ) || fragLength > msg.GetRemaingData() || fragStart + fragLength > (int)sizeof( fragmentBuffer ) || fragStart % fragmentSize != 0 || fragStart / fragmentSize >= 32 ) {
 			if ( net_channelShowDrop.GetBool() || net_channelShowPackets.GetBool() ) {
 				common->Printf( "%s: illegal fragment range\n", Sys_NetAdrToString( remoteAddress ) );
 			}
@@ -499,36 +508,38 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 		if ( sequence != fragmentSequence ) {
 			fragmentSequence = sequence;
 			fragmentLength = 0;
+			fragmentExpectedLength = -1;
+			fragmentReceived = 0;
 		}
 
-		// if we missed a fragment, dump the message
-		if ( fragStart != fragmentLength ) {
-			if ( net_channelShowDrop.GetBool() || net_channelShowPackets.GetBool() ) {
-				common->Printf( "%s: dropped a message fragment at seq %d\n", Sys_NetAdrToString( remoteAddress ), sequence );
-			}
-			// we can still keep the part that we have so far,
-			// so we don't need to clear fragmentLength
-			UpdatePacketLoss( time, 0, 1 );
+		const unsigned int fragmentBit = 1u << ( fragStart / fragmentSize );
+		if ( fragmentReceived & fragmentBit ) {
+			// A duplicate cannot count twice or overwrite an accepted fragment.
 			return false;
 		}
 
-		// copy the fragment to the fragment buffer
-		if ( fragLength < 0 || fragLength > msg.GetRemaingData() || fragmentLength + fragLength > sizeof( fragmentBuffer ) ) {
-			if ( net_channelShowDrop.GetBool() || net_channelShowPackets.GetBool() ) {
-				common->Printf( "%s: illegal fragment length\n", Sys_NetAdrToString( remoteAddress ) );
-			}
-			UpdatePacketLoss( time, 0, 1 );
+		const int fragmentEnd = fragStart + fragLength;
+		if ( fragmentExpectedLength >= 0 && fragmentEnd > fragmentExpectedLength ) {
 			return false;
 		}
+		if ( fragLength < fragmentSize ) {
+			// The final fragment may arrive first, including an empty terminator.
+			// Refuse a conflicting second end or an end before buffered data.
+			if ( fragmentExpectedLength >= 0 || ( fragmentReceived & ~( fragmentBit | ( fragmentBit - 1u ) ) ) != 0 ) {
+				return false;
+			}
+			fragmentExpectedLength = fragmentEnd;
+		}
 
-		memcpy( fragmentBuffer + fragmentLength, msg.GetData() + msg.GetReadCount(), fragLength );
-
+		memcpy( fragmentBuffer + fragStart, msg.GetData() + msg.GetReadCount(), fragLength );
+		fragmentReceived |= fragmentBit;
 		fragmentLength += fragLength;
-
 		UpdatePacketLoss( time, 1, 0 );
 
-		// if this wasn't the last fragment, don't process anything
-		if ( fragLength == Net_FragmentSize( remoteAddress ) ) {
+		// All non-final fragments have the family's fixed size and distinct,
+		// aligned offsets. Their byte sum reaches the final length only when
+		// every preceding fragment arrived, in any order and without duplicates.
+		if ( fragmentExpectedLength < 0 || fragmentLength != fragmentExpectedLength ) {
 			return false;
 		}
 

@@ -546,6 +546,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "savegame_restore_bindings.py",
         root / "tools" / "tests" / "savegame_restore_classes.py",
         root / "tools" / "tests" / "savegame_restore_cleanup.py",
+        root / "tools" / "tests" / "savegame_restore_resources.py",
         root / "tools" / "tests" / "savegame_restore_gui.py",
         root / "tools" / "tests" / "savegame_restore_identity.py",
         root / "tools" / "tests" / "savegame_restore_movers.py",
@@ -656,6 +657,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "bse_retail_parity.py",
         root / "tools" / "tests" / "mp_lag_compensation_contract.py",
         root / "tools" / "tests" / "mp_lag_compensation_state.py",
+        root / "tools" / "tests" / "network_fragment_state.py",
+        root / "tools" / "tests" / "mp_match_artifact_io_state.py",
         root / "tools" / "tests" / "mp_client_prediction_state.py",
         root / "tools" / "tests" / "mp_runtime_freshness.py",
         root / "tools" / "tests" / "mp_weapon_switch_contract.py",
@@ -895,6 +898,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'vk_display_color_mapping_capture.py', ['--self-test']),
         (root / "tools" / "tests" / 'savegame_restore_matrix.py', ['--self-test']),
         (root / "tools" / "tests" / 'savegame_cross_load.py', ['--self-test']),
+        (root / "tools" / "tests" / 'bse_lifecycle_runtime.py', ['--self-test']),
     ]
     failures: list[str] = []
     checks: list[tuple[Path, list[str]]] = []

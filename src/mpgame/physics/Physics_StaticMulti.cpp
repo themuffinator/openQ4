@@ -101,8 +101,10 @@ void idPhysics_StaticMulti::Restore( idRestoreGame *savefile ) {
 	if ( num < 0 || num > MAX_SAVEGAME_STATIC_MULTI_CLIP_MODELS ) {
 		savefile->Error( "idPhysics_StaticMulti::Restore: invalid clip model count %d", num );
 	}
-	clipModels.SetNum( num );
+	clipModels.DeleteContents( true );
 	for ( i = 0; i < num; i++ ) {
+		// Own each completed entry, and never expose unset pointers to teardown.
+		clipModels.Append( NULL );
 		savefile->ReadClipModel( clipModels[i] );
 	}
 

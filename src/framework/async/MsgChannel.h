@@ -157,6 +157,8 @@ private:
 	// incoming fragment assembly buffer
 	int				fragmentSequence;
 	int				fragmentLength;
+	int				fragmentExpectedLength;	// -1 until the final fragment arrives
+	unsigned int	fragmentReceived;		// one bit per aligned fragment (at most 16 KiB)
 	byte			fragmentBuffer[MAX_MESSAGE_SIZE];
 
 	// reliable messages

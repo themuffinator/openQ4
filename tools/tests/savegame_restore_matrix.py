@@ -71,15 +71,32 @@ def read_stamp(data: bytes) -> dict[str, Any]:
     offset = data.find(PAYLOAD_MAGIC)
     if offset < 0 or offset + 16 > len(data):
         return {}
-    version, build = struct.unpack_from("<ii", data, offset + 4)
-    cursor = offset + 12
-    (length,) = struct.unpack_from("<i", data, cursor)
-    source = data[cursor + 4 : cursor + 4 + length].decode("latin-1")
-    cursor += 4 + length
-    (file_count,) = struct.unpack_from("<i", data, cursor)
-    cursor += 4
-    (length,) = struct.unpack_from("<i", data, cursor)
-    abi = data[cursor + 4 : cursor + 4 + length].decode("latin-1")
+    cursor = offset + 4
+
+    def integer() -> int:
+        nonlocal cursor
+        if cursor + 4 > len(data):
+            raise ValueError("truncated stamp")
+        value = struct.unpack_from("<i", data, cursor)[0]
+        cursor += 4
+        return value
+
+    def string() -> str:
+        nonlocal cursor
+        length = integer()
+        if not 0 <= length <= 4096 or cursor + length > len(data):
+            raise ValueError("invalid stamp string")
+        value = data[cursor:cursor + length].decode("latin-1")
+        cursor += length
+        return value
+
+    try:
+        version, build = integer(), integer()
+        source, file_count = string(), integer()
+        # v2 goes straight to the object table: its count is not an ABI length.
+        abi = string() if version >= 3 else ""
+    except ValueError:
+        return {}
     return {
         "payloadOffset": offset,
         "version": version,
@@ -353,6 +370,20 @@ def self_test() -> int:
             and outside.read_bytes() == b"input"
         )
 
+    def string(value: bytes) -> bytes:
+        return struct.pack("<i", len(value)) + value
+
+    for version in (2, 3, 4, 5):
+        abi = b"le64-portable1" if version == 5 else b"windows-msvcabi-x64-le-raw1"
+        header = PAYLOAD_MAGIC + struct.pack("<ii", version, 1) + string(b"snapshot") + struct.pack("<i", 437)
+        if version >= 3:
+            header += string(abi)
+        stamp = read_stamp(header + struct.pack("<i", 8192) + b"object table")
+        checks[f"v{version} stamp stops before the object table"] = stamp.get("wireAbi") == (
+            abi.decode("ascii") if version >= 3 else "")
+        checks[f"v{version} truncated stamp is refused"] = read_stamp(header[:-1]) == {}
+    checks["unbounded stamp string is refused"] = read_stamp(
+        PAYLOAD_MAGIC + struct.pack("<iii", 5, 1, 0x7fffffff)) == {}
     failed = [name for name, ok in checks.items() if not ok]
     for name, ok in checks.items():
         print(f"{'PASS' if ok else 'FAIL'} {name}")

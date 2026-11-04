@@ -13,6 +13,7 @@
 #include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 #include <string.h>
 
 #ifndef NULL
@@ -36,6 +37,9 @@ struct idVec3 {
 	idVec3( float ax, float ay, float az ) : x( ax ), y( ay ), z( az ) {}
 	idVec3 operator+( const idVec3 &o ) const { return idVec3( x + o.x, y + o.y, z + o.z ); }
 	idVec3 operator-( const idVec3 &o ) const { return idVec3( x - o.x, y - o.y, z - o.z ); }
+	idVec3 operator*( float scale ) const { return idVec3( x * scale, y * scale, z * scale ); }
+	friend idVec3 operator*( float scale, const idVec3 &v ) { return v * scale; }
+	void Normalize() { const float length = std::sqrt( *this * *this ); if ( length > 0 ) { *this = *this * ( 1.0f / length ); } }
 	float operator*( const idVec3 &o ) const { return x * o.x + y * o.y + z * o.z; }
 	idVec3 &operator+=( const idVec3 &o ) { x += o.x; y += o.y; z += o.z; return *this; }
 	bool Near( const idVec3 &o, float epsilon = 0.001f ) const {
@@ -52,12 +56,14 @@ static const idVec3 vec3_origin;
 static const idMat3 mat3_identity;
 
 struct contactInfo_t {
+	int entityNum = 0;
 	idVec3 point;
 	idVec3 normal;
 	float dist = 0.0f;
 };
 
 struct trace_t {
+	float fraction = 0.5f;
 	contactInfo_t c;
 	idVec3 endpos;
 };
@@ -74,6 +80,10 @@ public:
 
 struct idTypeInfo { int id; };
 
+struct idActor {
+	static const idTypeInfo &GetClassType() { static idTypeInfo type = { 2 }; return type; }
+};
+
 class idEntity {
 public:
 	virtual ~idEntity() {}
@@ -86,7 +96,7 @@ public:
 class idPlayer : public idEntity {
 public:
 	static const idTypeInfo &GetClassType() { static idTypeInfo type = { 1 }; return type; }
-	bool IsType( const idTypeInfo &type ) const override { return type.id == GetClassType().id; }
+	bool IsType( const idTypeInfo &type ) const override { return type.id == GetClassType().id || type.id == idActor::GetClassType().id; }
 	int GetInstance() const { return instance; }
 	bool spectating = false;
 	int health = 100;
@@ -169,6 +179,19 @@ public:
 	bool BeginMPLagCompensation( const idPlayer *shooter, mpLagCompRestore_t restoreState[MAX_CLIENTS], int &restoreCount );
 	void EndMPLagCompensation( mpLagCompRestore_t restoreState[MAX_CLIENTS], int restoreCount );
 	bool ResolveMPLagCompensationHit( const idEntity *hit, mpLagCompRestore_t restoreState[MAX_CLIENTS], int &restoreCount, trace_t &tr, idVec3 *extraPoint );
+	idVec3 MPLagCompensationOffset( const idEntity *hit, const mpLagCompRestore_t restoreState[MAX_CLIENTS], int restoreCount ) const;
+	void ResolvePenetratingShot( trace_t &tr, mpLagCompRestore_t *lagCompRestore, int &lagCompRestoreCount, idVec3 &start, idVec3 &collisionPoint ) {
+		const bool lagCompApplied = lagCompRestoreCount > 0;
+		idEntity *ent;
+		const float penetrate = 0.5f;
+		float damageScale = 1.0f;
+		idEntity *additionalIgnore = nullptr;
+		// PRODUCTION_HITSCAN_RESOLVE
+		for ( int once = 0; once < 1; once++ ) {
+			// PRODUCTION_HITSCAN_PENETRATE
+		}
+		if ( damageScale != 0.5f || additionalIgnore != ent ) { std::abort(); }
+	}
 	int AdvertisedRemoteExtrapolationTics( int clientNum ) const;
 	int RemoteExtrapolationMS( int clientNum, int leadMS ) const;
 	void UpdateAdvertisedRemoteExtrapolation( void );
@@ -408,6 +431,82 @@ static void TestBracket() {
 	Expect( !world.game.BeginMPLagCompensation( &world.shooter, restore, count ) && count == 0, "no lead, no bracket" );
 }
 
+struct LightningPath {
+	idEntity *target = nullptr;
+	idVec3 origin, normal;
+};
+
+struct LightningPaths : std::vector<LightningPath> {
+	int Num() const { return static_cast<int>( size() ); }
+};
+
+static void ResolveGauntlet( idGameLocal &gameLocal, trace_t &tr,
+		idGameLocal::mpLagCompRestore_t *lagCompRestore, int &lagCompRestoreCount ) {
+	const bool lagCompApplied = lagCompRestoreCount > 0;
+	// PRODUCTION_GAUNTLET_RESOLVE
+}
+
+static void ResolveLightning( idGameLocal &gameLocal, trace_t &tr, LightningPath &currentPath,
+		LightningPaths &chainLightning, idGameLocal::mpLagCompRestore_t *lagCompRestore, int &lagCompRestoreCount ) {
+	const bool lagCompApplied = lagCompRestoreCount > 0;
+	// PRODUCTION_LIGHTNING_RESOLVE
+}
+
+static void TestWeaponGeometry() {
+	World world;
+	world.Frames( 40 );
+	world.Connection( 100, 90, nullptr );
+	const idVec3 present = world.target.playerPhysics.origin;
+	const idVec3 bystanderPresent = world.bystander.playerPhysics.origin;
+	idGameLocal::mpLagCompRestore_t restore[MAX_CLIENTS];
+	int count = 0;
+	const idVec3 contact( 0, 0, 32 );
+
+	world.game.BeginMPLagCompensation( &world.shooter, restore, count );
+	trace_t tr;
+	tr.c.entityNum = world.target.entityNumber;
+	tr.c.point = tr.endpos = world.target.playerPhysics.origin + contact;
+	tr.c.normal = idVec3( 0, 0, 1 );
+	tr.c.dist = 32;
+	ResolveGauntlet( world.game, tr, restore, count );
+	Expect( tr.endpos.Near( present + contact ), "gauntlet effect attaches to the present target" );
+	Expect( tr.c.point.Near( tr.endpos ), "gauntlet contact is translated too" );
+	Expect( world.target.playerPhysics.origin.Near( present ) && world.bystander.playerPhysics.origin.Near( bystanderPresent ), "gauntlet restores the whole world before damage/effects" );
+
+	world.game.BeginMPLagCompensation( &world.shooter, restore, count );
+	LightningPath primary;
+	primary.target = &world.target;
+	primary.origin = tr.c.point = tr.endpos = world.target.playerPhysics.origin + contact;
+	LightningPaths paths;
+	paths.push_back( { &world.bystander, world.bystander.playerPhysics.origin + contact, vec3_origin } );
+	// Even repeated references must all be translated before restore entries are consumed.
+	paths.push_back( { &world.target, world.target.playerPhysics.origin + contact, vec3_origin } );
+	ResolveLightning( world.game, tr, primary, paths, restore, count );
+	Expect( primary.origin.Near( present + contact ) && tr.endpos.Near( primary.origin ), "lightning beam and damage direction use the present endpoint" );
+	Expect( paths[0].origin.Near( bystanderPresent + contact ) && paths[1].origin.Near( present + contact ), "all lightning chain endpoints follow their own target" );
+	idVec3 direction = bystanderPresent - present;
+	direction.Normalize();
+	Expect( paths[0].normal.Near( direction ) && paths[1].normal.Near( direction * -1 ), "chain knockback directions are rebuilt from present endpoints" );
+	Expect( world.target.playerPhysics.origin.Near( present ) && world.bystander.playerPhysics.origin.Near( bystanderPresent ), "lightning restores the whole world before damage/effects" );
+
+	world.game.BeginMPLagCompensation( &world.shooter, restore, count );
+	tr.c.point = tr.endpos = world.target.playerPhysics.origin + contact;
+	const idVec3 historicalHit = tr.c.point;
+	idVec3 continuation, effect;
+	world.game.ResolvePenetratingShot( tr, restore, count, continuation, effect );
+	Expect( effect.Near( present + contact ), "rail damage/effect point follows the present target" );
+	Expect( continuation.Near( historicalHit ), "rail penetration stays on the historical ray" );
+	world.game.EndMPLagCompensation( restore, count );
+
+	// Misses must not interpret the trace's placeholder entity as a hit.
+	world.game.BeginMPLagCompensation( &world.shooter, restore, count );
+	tr.fraction = 1.0f;
+	tr.endpos = idVec3( 900, 400, 100 );
+	ResolveGauntlet( world.game, tr, restore, count );
+	Expect( tr.endpos.Near( idVec3( 900, 400, 100 ) ), "a gauntlet miss keeps its traced endpoint" );
+	Expect( world.bystander.playerPhysics.origin.Near( bystanderPresent ), "a miss still restores all players" );
+}
+
 static void TestTargets() {
 	World world;
 	world.Frames( 40 );
@@ -504,6 +603,7 @@ int main() {
 	TestEstimate();
 	TestAdvertisement();
 	TestBracket();
+	TestWeaponGeometry();
 	TestTargets();
 	TestHistory();
 	if ( failures != 0 ) {

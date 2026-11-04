@@ -5,8 +5,9 @@ stages and for authored ARB assembly material stages, which are translated to
 GLSL. Unknown program names now load and compile their actual source
 pair. Stock-name overrides also use their actual source; an embedded stock
 implementation requires a reviewed source fingerprint or a canonical name with
-no source files. Vulkan remains experimental; the remaining work below covers
-broader language and state coverage.
+no source files. Windows x64 NVIDIA/Intel support is qualified; the remaining
+work below covers broader language and state coverage, including authored mod
+content. Other hardware/platform qualification remains under VK-01.
 
 ## Compiler contract
 
@@ -79,8 +80,9 @@ values and image selection remain per draw. `reloadGLSLprograms` invalidates the
 authored source lookup on both backends; `reloadARBprograms` also performs this
 GLSL reload. Vulkan reuses unchanged valid or invalid source pairs before
 checking its version limit. Changed
-versions stay alive until device shutdown so recorded draws cannot reference a
-destroyed module or a reused pipeline identity.
+versions stay alive while current or referenced by a frame in flight. A stale,
+retired version may be evicted at either the version or compiler-storage limit;
+its shader modules and pipelines are released before the slot is reused.
 
 Native stock selection uses `material_program_sources.json` and the generated
 `vk_MaterialSourceSignatures.h`. Both source files must match one reviewed pair;
@@ -108,8 +110,8 @@ with the device, after the executor destroys its pipelines. GL handle fields
 are never used to store Vulkan handles.
 
 Limits are explicit: 256 retained program versions, 32 MiB of retained compiler
-source/module data, 2,048 authored draws per frame slot, and the executor's
-shared 128-entry material pipeline cache. Allocation, type and unsupported
+source/module data, 8,192 authored draws per frame slot, and the executor's
+shared 512-entry material pipeline cache. Allocation, type and unsupported
 binding failures diagnose and skip the affected stage. Exhaustion/recovery
 drills are still required; these bounds are not a performance claim.
 
@@ -307,6 +309,16 @@ levels of the unchanged GL reference. Three point-stencil background pixels
 still fail, so the full lighting comparison remains failed overall. This
 follow-up does not extend authored-shader admission or weaken the image gate.
 
+The 3 November rerun on the integrated `29e237378` build and NVIDIA 591.74
+again passes all 26 independent controls on each backend, including exact
+reload/restart recovery and mapped-to-stencil equivalence on the authored
+receiver. The unchanged full-frame two-level gate fails three stencil pixels
+(maximum 30), one point-map pixel (maximum three), and one projected-map pixel
+(maximum four). These small background/shadow-boundary differences remain
+failures; the older mapped-shadow pass is not promoted to this driver/build.
+Reports, source/runtime hashes and engine captures are retained in
+`.tmp/vk-roadmap/lighting-gl/`, `lighting-vk/` and `lighting-comparison/`.
+
 Remaining work includes:
 
 - Extend source-selection qualification to additional retail/mod source pairs,
@@ -408,6 +420,43 @@ Not covered: eviction at 256 versions and the other capacity limits, which
 these suites do not reach; the authored-lighting laboratory
 (`renderer_vulkan_material_lighting.py`), whose strict full-frame gate still
 fails on three point-stencil background pixels; and a mod-content corpus.
+
+## Compiler-storage recovery (3 November 2026, VK-04)
+
+Repeated edits to a large shader could exhaust retained compiler storage before
+reaching 256 versions. The old allocator reclaimed versions only at the version
+limit, so further edits were rejected even though obsolete, retired sources
+occupied most of the byte budget. Both GLSL and translated ARB now reclaim those
+versions before compilation and before retaining its result. Current versions
+and versions still referenced by frames in flight remain protected. Empty slots
+are reused, and the report counts live versions rather than empty slots.
+
+`reportShaderPrograms summary` prints the bounded totals without listing every
+version. The original detailed report remains the default. The production-policy
+test `renderer_vulkan_material_cache.py` exercises both budgets, exact-fit and
+oversize requests, current/in-flight protection and reuse of reclaimed slots.
+`renderer_vulkan_material_capacity.py` drives actual source edits, reloads and
+draws under validation, using engine captures to require unchanged output and
+restart recovery. Its small-source run reaches 256 versions; its padded-source
+run reaches the byte budget first. These are separate from descriptor, uniform
+and pipeline exhaustion qualification.
+
+The RTX 4060 Laptop GPU passed both runs with validation enabled:
+
+| Source-edit workload | Drawn versions | Peak live versions | Evictions | Peak retained bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Small sources, 270 edits | 271 | 256 | 15 | 3,825,067 |
+| 192 KiB padding, 180 edits | 181 | 158 | 23 | 33,424,823 |
+
+All five captures in each run (initial, stressed, reloaded, partial restart,
+full restart) match exactly; no version is invalid and no validation message
+is logged. The old-renderer control reached 158 valid versions, then rejected
+92 edits for storage exhaustion without evicting anything. That control timed
+out after 250 edits, so it is a defect reproduction, not a completed suite.
+The tested binaries, commands, source-edit ledger, harness snapshots, captures
+and reports are retained in `.tmp/vk-roadmap/capacity-candidate-versions/`,
+`capacity-candidate-storage/` and `capacity-storage/`. These development builds
+carry a dirty `g908b2c01` version; the reports bind the exact runtime hashes.
 
 ## Dependency provenance
 

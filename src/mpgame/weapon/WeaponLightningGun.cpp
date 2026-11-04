@@ -347,6 +347,19 @@ void rvWeaponLightningGun::Think ( void ) {
 	UpdateChainLightning();
 
 	if ( lagCompApplied ) {
+		// Selection belongs to the rewound world; endpoints and knockback belong
+		// to the present. Translate every path before consuming any restore entry,
+		// since a chain can refer to the same target as another path.
+		currentPath.origin += gameLocal.MPLagCompensationOffset( currentPath.target, lagCompRestore, lagCompRestoreCount );
+		for ( int i = 0; i < chainLightning.Num(); i++ ) {
+			chainLightning[ i ].origin += gameLocal.MPLagCompensationOffset( chainLightning[ i ].target, lagCompRestore, lagCompRestoreCount );
+			const idVec3 &parentOrigin = i > 0 ? chainLightning[ i - 1 ].origin : currentPath.origin;
+			chainLightning[ i ].normal = chainLightning[ i ].origin - parentOrigin;
+			chainLightning[ i ].normal.Normalize();
+		}
+		if ( tr.fraction < 1.0f ) {
+			gameLocal.ResolveMPLagCompensationHit( currentPath.target, lagCompRestore, lagCompRestoreCount, tr, NULL );
+		}
 		gameLocal.EndMPLagCompensation( lagCompRestore, lagCompRestoreCount );
 	}
 	

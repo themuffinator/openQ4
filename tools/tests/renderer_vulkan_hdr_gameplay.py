@@ -164,6 +164,7 @@ def run_case(runtime: Path, output: Path, basepath: Path, mode: str, samples: in
         "r_windowWidth": "1280", "r_windowHeight": "720", "r_customWidth": "1280", "r_customHeight": "720",
         "r_multiSamples": str(samples), "r_swapInterval": "0", "com_maxFps": "240",
         "r_hdrToneMap": "1", "r_hdrSceneTarget": "1", "r_hdrAutoExposure": "1", "r_hdrAutoExposureAsync": "1",
+        "r_bloom": "0",  # keep the disabled-HDR control independent of the first-run preset
         "com_skipLoadingContinue": "1", "g_autoSkipCinematics": "1",
         "g_autoExecAfterMapLoad": script, "g_autoExecAfterMapLoadDelayMs": "1000",
         "si_gameType": "singleplayer" if mode == "sp" else "DM", "net_serverDedicated": "0",

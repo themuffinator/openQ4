@@ -402,6 +402,10 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   device/surface loss, resize, captures, long sessions and final-package budgets.
   Software Vulkan CI remains useful regression evidence but cannot promote a
   physical platform or change `best` by itself.
+  Progress, 3 November: the [qualification runner contract](vulkan-support-evidence.md)
+  now records hidden/offscreen versus synchronous-benchmark scope explicitly and
+  refuses configuration overrides of its window/input/filesystem invariants.
+  Physical AMD, Linux and Apple hardware results are still required.
 - [ ] **VK-02 — P1, investigation and qualification: visible presentation pacing.**
   Reproduce the hybrid-adapter/power-state conditions using current foreground
   windowed workloads and unchanged budgets. Separate host scheduling, fence waits,
@@ -411,6 +415,12 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   the declared budget, or a reviewed support-scope limitation tied to retained
   reproduction evidence. Merely recording an exception does not qualify a failing
   configuration as supported.
+  Progress, 3 November: the [visible-window runner](vulkan-frame-pacing.md#visible-window-diagnostics-3-november-2026)
+  retains presentation/CPU/GPU phases, focus, competing clients and power state.
+  Six diagnostic repeats remain failed: foreground ownership was not observed,
+  one NVIDIA repeat exceeded the budget, and Intel lacks the timing extension.
+  A GPU-dependent first-run preset was also found and is now pinned. These
+  results do not replace the required foreground/direct/hybrid/power controls.
 - [x] **VK-03 — P1, implementation: finish bounded device admission and recovery.**
   Audit fixed-size instance/extension enumeration, optional extension truncation,
   the explicit-device index limit and retry after later resource/device creation
@@ -450,7 +460,15 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   pass on a clean build of that commit: authored GLSL (20 controls), live reload
   and repair (16) and translated ARB (15), each within one display level of
   OpenGL with exact recovery images and no validation messages. Capacity and
-  eviction limits, the authored-lighting laboratory and mod content remain open.
+  eviction limits, the authored-lighting laboratory and mod content remained open
+  at that checkpoint. Progress, 3 November: [compiler-storage recovery](vulkan-material-programs.md#compiler-storage-recovery-3-november-2026-vk-04)
+  fixes rejection of large-source edits before the version table fills. Validated
+  GPU runs now cover 271 small-source versions and 181 padded-source versions,
+  safe eviction at both limits and exact reload/restart recovery. Descriptor,
+  uniform and pipeline exhaustion, broader authored lighting and mod content
+  remain open. The integrated-build lighting repeat passes all 26 independent
+  controls per backend, but its strict full-frame comparison still fails five
+  shadow-boundary pixels across three cases; the image gate remains unchanged.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
@@ -463,6 +481,12 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   combine. `rendererVulkanHDRInfo` reports the main view's outcome and per-map
   admission counts. The GPU self-tests pass under validation. No declined
   combination was admitted; classic ambient blends were shown unsafe to admit.
+  Progress, 3 November: [in-frame HDR cubemap capture](vulkan-hdr.md#hdr-cubemap-capture-3-november-2026-vk-05vk-07)
+  now uses the existing float scene target without stretching the capture's
+  viewport. This fixes a reproduced 81-level cube-face difference; all 42
+  paired post/cubemap controls pass within one level, with exact main-view
+  recovery. Complete-view material admission remains required. Tiled/out-of-frame
+  captures and arbitrary portal/nested/material combinations remain open.
 - [ ] **VK-06 — P2, measured optimization: submission and resource lifetime.**
   Profile descriptor/pipeline churn, barriers, command recording, uploads and
   attachment reuse before changing them. Preserve GUI/transparency/post order,
@@ -481,6 +505,14 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   first-encounter hitch exceeds that. The cache keeps one blob for the last
   device; switching adapters (including the new automatic retry) discards it.
   Indirect/Hi-Z, parallel recording and upload overlap still need their profile.
+  Progress, 3 November: [opt-in executor counters](vulkan-resource-profiling.md)
+  expose descriptor reuse/churn, mapped-ring uploads, target changes, rendering
+  scopes, barriers and submissions alongside the existing memory/pipeline report.
+  They introduce no GPU wait/query and do not establish production overlap.
+  Short diagnostic intervals kept heap/pipeline counts stable with negligible
+  descriptor churn. The linked profile records measured reasons to defer new
+  cache/warm-up, indirect/Hi-Z, parallel-recording and transfer mechanisms;
+  it does not promote an optimization or close the broader timing/soak gates.
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,
@@ -493,8 +525,12 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   frame or a skewed, resized rectangle as success, failed captures are not saved
   as screenshots, hidden-window frames are readable whatever the surface allows,
   and stencil readbacks print their frame, age, view and target and are dropped
-  after a failed submission. GL-contract comparisons for cubemaps, nested
-  targets, MSAA and capture-time resize/restart remain open.
+  after a failed submission. Progress, 3 November: the [paired capture sequence](vulkan-captures.md#cubemap-and-write-failure-qualification-3-november-2026)
+  passes 121 RGBA/cubemap comparisons at each of 4x and 8x MSAA within one display level,
+  with exact per-backend resize/restart recovery. Failed filesystem writes now
+  fail screenshots, stop incomplete cubemaps and prevent incomplete probe reloads.
+  Arbitrary nested targets and the remaining debug/readback combinations stay
+  open; this fixture does not qualify all of VK-07.
 
 ## Modern rendering engine
 
@@ -1655,6 +1691,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   evidence only. The particle and trace counters stay at 0, firing did not raise
   the active count measurably, and BSE prints no counters during render-demo
   playback. Per-effect behaviour and retail comparison remain open.
+  Later on 3 November: the zero counters were traced to missing instrumentation.
+  Particle units, collision queries and serviced segments now update
+  `bse_speeds`; unmeasured texel coverage is no longer printed as zero.
+  The [stock spark lifecycle probe](retail-baseline-ledger.md#effect-lifecycle-telemetry-3-november-2026)
+  passes start, stop, restart, owner deletion and saved-loop restoration on both
+  OpenGL and Vulkan, including nonzero particle/trace activity and quiet frames
+  after stop/delete. Immediate resaves contain no unresolved references. This is
+  scoped lifecycle evidence, not visual/audio parity or the whole list above.
 - [ ] **Q4-04 — P1, qualification: Awakening campaign closure.** Play all thirteen
   maps and restore saves during unique weapon/status/vehicle/boss states; qualify
   freeze persistence, damage gates, animation speed, and turret effects. Recheck
@@ -1760,9 +1804,17 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   client-entity bindings, influence-target entity numbers, burning-joint counts
   and unregistered objects' numbers are checked. Valid saves are unaffected:
   all 11 release fixtures (0.9 to 0.13) restore, and the campaign chain passes
-  on OpenGL. Still open: leaks on refused loads, and a pre-existing defect
-  where a [save made before the first frame after a load](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
-  writes NULL references.
+  on OpenGL. Later on 3 November, the identified
+  [restore allocation leaks](savegame-reliability.md#allocations-during-interrupted-restores)
+  and the [immediate-resave defect](savegame-reliability.md#saving-before-the-first-frame-after-a-load)
+  were fixed in both libraries without changing save bytes. Embedded physics
+  fixups complete inside the restore transaction instead of putting unsaveable
+  targets on the event queue. Dictionaries and trace records have scoped owners,
+  clip-model replacement is transactional, and partially read clip-model lists
+  are safe to destroy. Native read-failure and mutation controls pass on Windows
+  and Linux; all 50 Windows save/restore tests pass. On OpenGL and Vulkan the
+  immediate resave now reloads into gameplay with zero unresolved references.
+  Broader owning-graph/partial-constructor and platform qualification remains open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.
@@ -1952,10 +2004,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   waits on their copy of `mon4.gui` or a window-by-window comparison of the
   attachment. The cited `.tmp/stage-two/` evidence directories are gone from the
   checkout; their recorded hashes remain.
+  Later on 3 November: the historical-matrix stamp parser was corrected for v2,
+  which has no wire-ABI string. It had reported object-table bytes as an ABI.
+  Bounded v2–v5 parser fixtures now run with its existing CI self-test; this is a
+  reporting correction, not a change to historical save admission.
 - [ ] **Q4-08 — P2, investigation and qualification: save cost and durability.**
   Measure large-save CRC/sync time and fault behavior across target filesystems.
-  Directory metadata is not synced and full power-loss atomicity is not established.
-  Define any stronger durability guarantee before implementing it; qualify partial
+  Directory synchronization is implemented as recorded below; actual power-cut
+  behavior and the remaining filesystems still need qualification. Qualify partial
   writes, replace failures, process interruption and preservation of the last valid
   save independently from object-restore recovery in Q4-05.
   Progress, 2 November: the [guarantee](savegame-reliability.md#durability-guarantee)
@@ -2114,6 +2170,12 @@ claim peer combinations that have not been tested.
   ([evidence and limits](competitive-match-reference-audit.md#live-closure-scenarios-2026-11-03)).
   Physical keyboard/controller workflows, side ballots, the post-commit
   map-load limit and the rest of the release order remain open.
+  Follow-through, 3 November: the [artifact adapter fault-injection fixture](competitive-match-reference-audit.md#artifact-adapter-failure-boundaries-3-november-2026)
+  executes all three production writers at every short-write failure boundary
+  of a 257-byte payload, their capacity edges, failed sync/open/promotion/cleanup
+  and invalid input. Twelve reversal controls fail. This qualifies adapter
+  handling, not physical disk exhaustion, power loss or process interruption;
+  the live and physical-workflow gates remain open.
 - [ ] **MP-02 — P1, qualification and targeted fixes: bot traversal safety.** Rerun
   staged q4dm8/q4ctf3/q4ctf5/q4dz3 after the exact-state jump/unroutable-pad fixes,
   then the complete declared-map sweep including warmup (currently 33 variants).
@@ -2407,6 +2469,11 @@ claim peer combinations that have not been tested.
   at the boundary ([evidence](liquid-qualification.md#projectile-liquid-crossings-3-november-2026)).
   Remaining: player-controlled swimming (real input only), and splash, bubble
   and wade presentation checked by eye.
+  Follow-through, 3 November: the [current GL regression](liquid-qualification.md#current-mp-regression-run-3-november-2026)
+  passes remote air replication and four paused MVD seeks with matching air/HUD
+  values of 100, 56, 100 and 56. The engine capture shows the underwater view
+  and AIR gauge. This does not close physical swimming or the remaining effects
+  presentation checks.
 - [ ] **MP-07 — P1, implementation and qualification: coupled prediction and
   rewind.** In `src/mpgame/gamesys/SysCvar.cpp` both enhanced prediction and lag
   compensation default off. Preserve the coupled displayed-pose-age and rewind
@@ -2481,6 +2548,13 @@ claim peer combinations that have not been tested.
   prerequisite as the rewind path, so positive bias cannot report a fictitious
   rewind for a bot, listen host or unmeasured slot. The state and wiring checks
   pass; enhanced prediction and compensation remain off by default.
+  Progress, 3 November: [weapon geometry fixtures](mp-network-qualification.md#weapon-hit-geometry-and-fragment-ordering-3-november-2026)
+  found and fixed stale gauntlet/lightning effect endpoints and a penetrating
+  rail ray shifted by impact translation. Contacts and chain directions now
+  follow present targets, while rail continuation retains the historical ray.
+  The executable state fixture includes the production weapon resolution blocks
+  and rejects nine reversals. Remote weapon-play and same-fire-frame visual
+  qualification remain open, and defaults are unchanged.
 - [ ] **MP-08 — P1, qualification and decision: network and content interoperability.**
   Qualify real cross-platform/architecture peers over IPv4 and IPv6, fragmentation/
   MTU/rate limits, congestion, high player counts, discovery and reconnect. Preserve
@@ -2557,6 +2631,20 @@ claim peer combinations that have not been tested.
   cryptographic module verification or anti-cheat. Real WAN, cross-machine and
   other-architecture peers, real multi-record DNS and the retail client binary
   itself remain open; the user deferred the peer gates on 28 October.
+  Follow-through, 3 November: [fragment assembly qualification](mp-network-qualification.md#weapon-hit-geometry-and-fragment-ordering-3-november-2026)
+  fixes delayed older packets discarding a newer message prefix, refuses
+  fragments larger than the family's limit, and assembles aligned fragments in
+  any order with bounded storage. The impaired IPv6 run exposed a reliable-queue
+  overflow when same-message reordering discarded fragments; its failed report
+  is retained. Production send/reassembly fixtures
+  cover both families through 16 KiB, interleaving, missing/out-of-order packets,
+  duplicates, exact-multiple terminators and malformed headers, with eight failing
+  reversal controls. This does not qualify physical path MTUs or deferred peers.
+  The final staged Windows build passes three pure joins each on IPv4 and IPv6
+  loopback under seeded delay/jitter/loss/duplication (221 and 275 received client
+  fragments), with unchanged runtime hashes and clean exits. The 59 broader
+  match/network contracts pass. Real WAN, physical MTU and architecture gates
+  retain their previous scope and deferrals.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,

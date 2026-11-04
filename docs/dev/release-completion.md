@@ -18,6 +18,59 @@ See [player release status](../user/release-status.md).
 - The remaining vote-request and Match Control identity work stays open under
   UI-03. See [the implementation contract](ui/player-identity.md#mute-vote-and-admin-targets-3-november-2026).
 
+## Immediate resaves and interrupted loads, 3 November 2026
+
+- **Saving immediately after loading now produces a loadable save.** This also
+  protects a checkpoint queued behind a load. Previously, saving before gameplay
+  resumed could leave the new slot unable to load. Already-damaged slots are not
+  repaired; load a healthy slot and save again.
+- **Interrupted loads clean up more reliably.** Partially read inventory items,
+  collision models and collision-cache records are released, and an unfinished
+  list of collision models no longer exposes unset pointers during cleanup.
+- The save format and existing compatibility readers are unchanged. The new
+  failure-path tests pass for both game libraries on Windows and Linux, including
+  deliberate regressions. All 50 focused Windows save/restore tests pass, and
+  immediate resaves reload into gameplay on OpenGL and Vulkan. See
+  [save reliability](savegame-reliability.md#saving-before-the-first-frame-after-a-load).
+
+## Effect diagnostics, 3 November 2026
+
+- Effect diagnostics now report particle activity and collision queries instead
+  of constant zeros. A new stock-effect probe passes start, stop, restart, owner
+  deletion and save restoration on OpenGL and Vulkan. This improves diagnostics
+  and lifecycle evidence; it does not establish complete retail effect parity.
+- The historical save matrix also reports v2 save metadata correctly, and all
+  11 existing 0.9–0.13 release fixtures restore with their inputs unchanged.
+  The engine's save readers have not changed.
+
+## Vulkan shader editing and engine captures, 3 November 2026
+
+- **Long shader-editing sessions keep working.** Vulkan now reclaims obsolete
+  compiled sources when their storage fills, avoiding missing material stages
+  after repeated edits to large shaders. Programs still used by the current
+  frame remain protected.
+- **HDR cubemap captures preserve the intended brightness.** In-frame engine
+  captures now use the same floating-point scene target as an ordinary HDR
+  view, with correct viewport size and main-view recovery. This extends the
+  internal linear-HDR laboratory; it does not add HDR monitor output.
+- **Failed captures report failure.** An incomplete screenshot write no longer
+  reports success. Cubemap capture stops at the failed face, and incomplete
+  reflection probes are not reloaded.
+- Developer evidence: live shader-edit tests cover both the 256-version and
+  32 MiB limits with exact image recovery. The 4x and 8x MSAA capture suites each
+  pass 121 GL/Vulkan pairs, and the HDR post/cubemap suite passes 42, all within one
+  display level. Native cache/compiler/device/report contracts pass. See
+  [authored programs](vulkan-material-programs.md), [captures](vulkan-captures.md)
+  and [HDR](vulkan-hdr.md) for scope and retained failing controls.
+- Opt-in resource counters and a visible, input-disabled pacing harness now
+  collect the evidence needed for later Vulkan optimization and presentation
+  qualification. They do not promote another driver/platform or claim a
+  performance improvement. Open gates remain in [the roadmap](roadmap.md).
+  Current visible diagnostics retained a missed NVIDIA presentation budget,
+  unavailable Intel presentation timing and unsuccessful foreground checks;
+  these remain failures. The harness now pins one performance preset across
+  GPUs and verifies both its saved settings and CPU/GPU evidence identity.
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The
@@ -96,6 +149,24 @@ See [player release status](../user/release-status.md).
   levels are not mounted until choosing it reloads the engine. QUAKE 4, THE
   AWAKENING, LOAD DEFAULTS and BACK keep their page's description. The gate,
   the 170 UI native tests and the extended `summaries` capture pass.
+
+## Multiplayer weapon and packet fixes, 3 November 2026
+
+- With optional lag compensation enabled, gauntlet and lightning impacts now
+  follow the target's current position. Lightning chain directions follow those
+  same positions, and penetrating rail shots retain their original trace line.
+  Prediction and lag compensation remain off by default.
+- Delayed packets from an older network message no longer discard a newer
+  message in progress. Fragments can also arrive in any order within one message,
+  reducing failed snapshot delivery on jittery links. Oversized fragments are
+  refused consistently over IPv4 and IPv6, without changing the protocol or the
+  supported peer combinations. The final build passes three pure joins over each
+  loopback family with simulated delay, jitter, loss and duplication.
+- Executable production-code tests cover the weapon geometry, fragment ordering
+  and competitive artifact writers' short-write/capacity/failure handling.
+  See [network qualification](mp-network-qualification.md#weapon-hit-geometry-and-fragment-ordering-3-november-2026)
+  and the [competitive audit](competitive-match-reference-audit.md#artifact-adapter-failure-boundaries-3-november-2026)
+  for their evidence scope and remaining live/physical checks.
 
 ## Network interoperability checks, 3 November 2026
 
