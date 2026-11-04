@@ -246,6 +246,7 @@ void landing() {
 }
 
 void evacuate() {
+    entity harnessFill;
     mark("evacuate");
     prepareMarine($m04_trench_unit1_seq_1_tak);
     prepareMarine($m04_trench_unit1_seq_1_navajas);
@@ -282,6 +283,17 @@ void evacuate() {
         $m04_trench_unit1_seq_1_ctg_3.getOrigin() - $m04_trench_unit1_seq_1_cam_3.getOrigin()));
     $m04_trench_unit1_seq_1_cam_3.setFOV(85);
     sys.trigger($m04_trench_unit1_seq_1_cam_3);
+
+    // The emergency key is behind Tak once he turns toward Dekard. Supply
+    // reflected cabin-strip light from the seat side for the repair close-up;
+    // keep the authored head, normal maps and earlier zipline lighting intact.
+    sys.setSpawnArg("name", "oq4_m01_harness_fill");
+    sys.setSpawnArg("cinematic", "1");
+    sys.setSpawnArg("noshadows", "1");
+    sys.setSpawnArg("_color", "0.30 0.27 0.24");
+    sys.setSpawnArg("light_radius", "110 100 100");
+    sys.setSpawnVector("origin", '140 536 320');
+    harnessFill = sys.spawn("light");
     thread cutHarnesses();
     radioChatterPlayWait($uni_radiochatter, "vo_vansen_stablelz");
     thread column();
@@ -312,6 +324,7 @@ void evacuate() {
     aiScriptedFaceWait($m04_trench_unit1_seq_1_tak, $m04_trench_unit1_seq_1_rap_node, 1);
     aiScriptedAnimLoop($m04_trench_unit1_seq_1_tak, "st_dropship_stand", 8);
     descend($m04_trench_unit1_seq_1_tak, 1);
+    harnessFill.remove();
 
     cues.fadeSound(SND_CHANNEL_ANY, -40, 2);
     $intro_sound_player2.fadeSound(SND_CHANNEL_ANY, -40, 2);

@@ -31,6 +31,9 @@ See [player release status](../user/release-status.md).
 
 ## Awakening opening missions, 4 November 2026
 
+- Tak's face retains natural skin tone and detail while freeing the player
+  from the dropship harness in M01. A local cabin fill light covers that repair
+  sequence and is removed before gameplay; his model and textures are unchanged.
 - Freezing a fire vent now clears its invisible collision and fully extinguishes
   its light. Players and squadmates can cross active flames while receiving
   their normal damage; quenched vents also restore correctly from saves.
