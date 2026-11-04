@@ -5,6 +5,76 @@ authoring or compile step. Bots arrive with a name, a way of playing and
 something to say about it. This describes their behaviour, validation and
 current limits.
 
+## Complete catalog and renewed long matches, 4 November 2026
+
+The `ee6207834` build completes all 33 declared map variants against the installed
+`pak019.pk4` catalog (`26d64afeaa9df4716310a36c50ffe47e09fcf3a024bf2be6184e1e410b511d41`).
+Each run has six skill-4 bots, a 60-second script and at least 52.960 observed
+simulation seconds. Together they record 447 combat kills, 728 traversals,
+156 stuck events, four goal give-ups, three no-route events and no traversal
+timeouts. Runtime hashes stay unchanged. DM5's single world death passes the
+strict terminal-state enemy-impulse proof; every post-hit input dies and all
+three no-hit controls survive. Thus all 33 pass the derived death/duration gate,
+while the original DM5 report remains a failure. The raw reports, catalog/hash
+manifest and derived assessment are `.tmp/mp-roadmap/catalog-current-staged/`;
+the causal proof is `catalog-dm5-classification/classification.json`.
+
+This is a functional sweep on a shared host, not controlled timing or a blanket
+bot-quality pass. CTF6 contributes 80 of the stalls and no combat kills. An
+isolated walking probe and a six-bot repeat on the subsequent `054fbeb7b` build
+confirm a stalled approach near `(-735, 2576, 0)`: the route uses a rim node
+whose broad landing support fails the edge guard. The earlier brake oscillated
+there; proportional braking settles without finding the supported parallel
+line. Both runtime probes and their surface verdicts are retained in
+`ctf6-probe/` and `ctf6-probe-baseline/`. The baseline lacks terminal-physics
+reporting, so its movement observation is not a survival or death-exclusion
+qualification.
+
+The targeted `80ff1d253` correction lets a slow, grounded bot creep onto a
+supported parallel line instead of braking indefinitely. Four sideways headings
+are tested against continuous landing support, collision/footing clearance and
+unplanned transport volumes; active knockback and faster drift retain braking.
+The original CTF6 probe now reduces its distance to the walking corner from
+27.998 to 13.236 units and finishes alive and grounded, with unchanged runtime
+hashes (`ctf6-probe-fixed/movement-assessment.json`). The production decision
+fixture passes on Windows and under Linux ASan/UBSan and rejects four additional
+reversions. Together the decision, geometry and hazard fixtures reject 28
+reversions. This isolated movement proof does not replace the broader death
+or timing gates. A 120-second six-bot CTF6 repeat records 110.768 observed
+seconds, 11 combat kills, 52 traversals and no world deaths, no-route events,
+goal give-ups or traversal timeouts; 26 stuck events remain. All ten DM8/CTF5
+positive recovery outcomes also pass their unchanged criteria. Reports are
+`ctf6-rim-fixed/report.json` and `air-rim-fixed/report.json`, with client
+`6c22b97c3151f7b3c6b65f8ab8e68060cdff70187f457bfbcee395d90c5e9b28`
+and MP module `6733e377f6509c1edcc8dd77ed896687bd077c050f29b9cf41e866459edf9d92`.
+The complete catalog and long-match evidence below predates this final targeted
+correction; it is not silently relabelled as a sweep of the newer build.
+
+The same `ee6207834` binaries also complete all four five-minute audits:
+
+| Map | Observed simulation | Combat kills | Traversals | Stuck | World deaths | Excluded impulses | Unexcluded deaths |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| q4dm8 | 284.288 s | 102 | 158 | 1 | 3 | 2 | 1 |
+| q4ctf3 | 285.200 s | 43 | 119 | 0 | 0 | 0 | 0 |
+| q4ctf5 | 284.304 s | 75 | 207 | 7 | 5 | 4 | 1 |
+| q4dz3 | 285.120 s | 57 | 90 | 2 | 0 | 0 | 0 |
+
+There are no warmup world deaths, traversal timeouts, goal give-ups or no-route
+events. The complete causal assessment is `current-classification/classification.json`;
+`long-match-current-assessment.json` binds it to the unchanged raw reports.
+DM8 Strauss's low-health machinegun pose has surviving fixed inputs; its
+controller later has 47 health but is airborne at the endpoint. CTF5 Strauss's
+rail-hit replay has both a surviving fixed input and a surviving controller.
+Neither isolated replay reproduces the full match's later death or supplies
+an exclusion. These two unexcluded deaths keep the long-match gate open.
+Positive recovery rules have not been substituted for the stricter causal
+policy. No prediction/rewind default changes accompany this work.
+
+The main checkout's `054fbeb7b` build passes three pure IPv4 joins/reconnects
+under seeded delay, jitter, loss and duplication, receiving 244 fragments with
+clean client/server exits (`.tmp/mp-roadmap/lan-landed/report.json`). Its stage
+and hashes are recorded separately from the catalog's pinned runtime.
+
 ## Moving crusher and self-blast safety, 4 November 2026
 
 The renewed four-map audit on the earlier recovery build (`5efd1987e`) completes
@@ -46,8 +116,8 @@ motion or after endpoint reversal produces the same result. Arbitrary moving
 parents, parent-bound movers and disabled static volumes keep their existing
 unmodelled/priced policy; this does not introduce general moving-platform AI.
 
-The production mover/gathering/floor fixture passes on Windows and Linux x64
-with Clang ASan/UBSan, including four rejected reversions. In the actual CTF5
+The production mover/gathering/floor fixture passes on Windows and under Clang
+ASan/UBSan on Linux x64, including four rejected reversions. In the actual CTF5
 map, both hull and support probes at `(834, 321, 544.25)` change from accepted
 to refused. The safe walkway at `(518, 670, -183.75)` remains accepted, and the
 fixed recovery control lands alive. Before/after reports are

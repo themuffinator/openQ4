@@ -2207,7 +2207,16 @@ claim peer combinations that have not been tested.
   moving crusher, and self-splash health trades omitted the shooter's trajectory.
   The crusher's full travel envelope is now refused, with native reversal tests
   and before/after stock-map probes; self-splash checks the knockback slide/flight.
-  New causal and long-match evidence is still required before closing MP-02.
+  The [renewed catalog and four-map assessment](mp-bots.md#complete-catalog-and-renewed-long-matches-4-november-2026)
+  on `ee6207834` qualifies all 33 catalog variants' death/duration gates with one
+  strictly proven impulse exclusion. Its 156 stalls include 80 on CTF6, which
+  prompted a targeted walking-rim correction: stopped bots can creep onto
+  continuously supported ground. Its original pose and ten recovery cases pass;
+  a two-minute CTF6 repeat has 11 kills, 52 traversals and no world deaths, with
+  26 stalls still recorded. The four earlier long matches retain
+  one unexcluded DM8 death and one unexcluded CTF5 death after complete causal
+  replays; their full later departures remain unisolated. Shared-host runs do
+  not qualify controlled timing. MP-02 remains open.
   Follow-through, 3 November: [knockback slide and replay corrections](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026)
   fix two isolated DM8 failures: route steering spoiled a survivable ground
   slide, and full reverse commands oscillated on a landing rim. Exact-origin

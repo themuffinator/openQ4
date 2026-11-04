@@ -13,6 +13,9 @@ See [player release status](../user/release-status.md).
   boosts so its commands match the predicted trajectory.
 - Bots avoid the area swept by a lethal moving crusher and check whether their
   own splash weapon would throw them off supported ground before firing.
+- Bots stopped beside a narrow walking rim can slowly move onto supported
+  ground, resolving the reproduced CTF6 approach stall without restoring the
+  old brake oscillation.
 - Two additional recorded DM8/CTF5 poses now recover in isolated gameplay.
   Windows/Linux regression controls pass; long-match safety remains under
   qualification. See [evidence and limits](mp-bots.md#earlier-knockback-control-and-marginal-landings-4-november-2026).
