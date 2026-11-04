@@ -7,8 +7,11 @@
 
 static const char * const awakeningM08Source = "maps/game/m08_cryofac.script";
 static const char * const awakeningM08Version1 = "maps/game/m08_cryofac.openq4-v1.script";
+static const char * const awakeningM08Version2 = "maps/game/m08_cryofac.openq4-v2.script";
 static const char * const awakeningM09Source = "scripts/maps/m09_valkaryne.script";
 static const char * const awakeningM09Version1 = "maps/game/m09_valkaryne.openq4-v1.script";
+static const char * const awakeningM09Version2 = "maps/game/m09_valkaryne.openq4-v2.script";
+static const char * const awakeningM09Version3 = "maps/game/m09_valkaryne.openq4-v3.script";
 static idCVar g_awakeningLateMissions( "g_awakeningLateMissions", "1", CVAR_GAME | CVAR_BOOL,
 	"Use openQ4 M08/M09 mission corrections on fresh starts; saves retain their selected revision" );
 
@@ -38,11 +41,57 @@ static bool Awakening_ApplyCorrections( idStr &source, const awakeningCorrection
 	return true;
 }
 
+// The recovered cold-breath placements are actor-relative offsets, not joint
+// offsets: "legs_channel" names an animation channel, never a model joint.
+// Read the user's placements rather than bundling the recovered script/table.
+static bool Awakening_CorrectColdBreath( idStr &source ) {
+	const char *header = "void coldInHere()\n{";
+	const int start = source.Find( header );
+	if ( start < 0 || source.Find( header, true, start + 1 ) >= 0 ) { return false; }
+	const int end = source.Find( "}", true, start );
+	if ( end < 0 ) { return false; }
+	idStr body = source.Mid( start + idStr::Length( header ), end - start - idStr::Length( header ) );
+	idLexer lexer( body.c_str(), body.Length(), "Awakening cold breath", LEXFL_NOERRORS | LEXFL_NOWARNINGS | LEXFL_ALLOWMULTICHARLITERALS );
+	idStr replacement = "void openq4_attachBreath( entity effect, entity actor, vector offset ) {\n"
+		"\tif ( !effect ) { return; }\n"
+		"\tif ( !actor ) { effect.remove(); return; }\n"
+		"\teffect.bind( actor );\n\teffect.setOrigin( offset );\n}\n\nvoid coldInHere()\n{\n";
+	idToken token, effect, actor, repeated, offset;
+	int count = 0;
+	while ( lexer.ReadToken( &token ) ) {
+		if ( token != "$" || !lexer.ReadToken( &effect ) || effect.type != TT_NAME || effect.Icmpn( "cold_breath_", 12 ) ||
+			!lexer.ExpectTokenString( "." ) || !lexer.ExpectTokenString( "bindToJoint" ) || !lexer.ExpectTokenString( "(" ) ||
+			!lexer.ExpectTokenString( "$" ) || !lexer.ReadToken( &actor ) || actor.type != TT_NAME ||
+			!lexer.ExpectTokenString( "," ) || !lexer.ExpectTokenString( "legs_channel" ) || !lexer.ExpectTokenString( "," ) ||
+			!lexer.ExpectTokenString( "1" ) || !lexer.ExpectTokenString( ")" ) || !lexer.ExpectTokenString( ";" ) ||
+			!lexer.ExpectTokenString( "$" ) || !lexer.ReadToken( &repeated ) || repeated != effect ||
+			!lexer.ExpectTokenString( "." ) || !lexer.ExpectTokenString( "setOrigin" ) || !lexer.ExpectTokenString( "(" ) ||
+			!lexer.ReadToken( &offset ) || offset.type != TT_LITERAL ||
+			!lexer.ExpectTokenString( ")" ) || !lexer.ExpectTokenString( ";" ) ) { return false; }
+		// Only a vector literal is admitted into the generated call.
+		idLexer vectorLexer( offset.c_str(), offset.Length(), "breath offset", LEXFL_NOERRORS | LEXFL_NOWARNINGS );
+		for ( int component = 0; component < 3; ++component ) {
+			if ( !vectorLexer.ReadToken( &token ) ) { return false; }
+			if ( token == "-" && !vectorLexer.ReadToken( &token ) ) { return false; }
+			if ( token.type != TT_NUMBER ) { return false; }
+		}
+		if ( vectorLexer.ReadToken( &token ) || vectorLexer.HadError() ) { return false; }
+		replacement += va( "\topenq4_attachBreath( sys.getEntity( \"%s\" ), sys.getEntity( \"%s\" ), '%s' );\n", effect.c_str(), actor.c_str(), offset.c_str() );
+		++count;
+	}
+	if ( count != 36 || lexer.HadError() ) { return false; }
+	replacement += "}";
+	source.Replace( source.Mid( start, end - start + 1 ), replacement );
+	return true;
+}
+
 static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source ) {
 	idStr path = filename;
 	path.BackSlashesToSlashes();
-	const bool cryo = path.Icmp( awakeningM08Version1 ) == 0;
-	if ( !Awakening_LateCampaignActive() || ( !cryo && path.Icmp( awakeningM09Version1 ) != 0 ) ) {
+	const bool cryo = path.Icmp( awakeningM08Version1 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
+	const bool version3 = path.Icmp( awakeningM09Version3 ) == 0;
+	const bool version2 = version3 || path.Icmp( awakeningM09Version2 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
+	if ( !Awakening_LateCampaignActive() || ( !cryo && !version2 && path.Icmp( awakeningM09Version1 ) != 0 ) ) {
 		return false;
 	}
 	char *installed = NULL;
@@ -136,6 +185,66 @@ static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source
 	} else if ( !Awakening_ApplyCorrections( source, finaleEdits, sizeof( finaleEdits ) / sizeof( finaleEdits[0] ) ) ) {
 		return false;
 	}
+	if ( version2 ) {
+		if ( cryo ) {
+			static const awakeningCorrection_t secondCryoEdits[] = {
+				// The 32-unit arrival tolerance leaves both marines in the
+				// entrance throat; their two hulls can close the player's gap.
+				{ "aiScriptedMove( $tak, $tak_intropos_4, 32, 1 );",
+				  "aiScriptedMove( $tak, $tak_intropos_4, 8, 1 );", 1 },
+				{ "aiScriptedMove( $navajas, $navajas_intropos_4, 32, 1 );",
+				  "aiScriptedMove( $navajas, $navajas_intropos_4, 8, 1 );", 1 },
+				// CoreMonitor is after the lift descent. Position 3 is back
+				// upstairs; position 28 pairs with Tak at this console.
+				{ "aiScriptedMove( $navajas, $navajas_pos_3, 8, 0 );",
+				  "aiScriptedMove( $navajas, $navajas_pos_28, 8, 0 );", 1 },
+			};
+			if ( !Awakening_ApplyCorrections( source, secondCryoEdits, sizeof( secondCryoEdits ) / sizeof( secondCryoEdits[0] ) ) ) { return false; }
+		} else {
+			static const awakeningCorrection_t secondFinaleEdits[] = {
+				// These optional effects/sounds were removed from the recovered
+				// map. Do not terminate the fog/glass threads or warn during
+				// successful extraction, but preserve them if supplied.
+				{ "sys.trigger( $steam05_freeze04 );", "if ( $steam05_freeze04 ) { sys.trigger( $steam05_freeze04 ); }", 1 },
+				{ "sys.trigger( $broken_glass_steam01 );", "if ( $broken_glass_steam01 ) { sys.trigger( $broken_glass_steam01 ); }", 1 },
+				{ "$ent_amb6.remove();", "if ( $ent_amb6 ) { $ent_amb6.remove(); }", 1 },
+				{ "$ent_amb7.remove();", "if ( $ent_amb7 ) { $ent_amb7.remove(); }", 1 },
+			};
+			if ( !Awakening_ApplyCorrections( source, secondFinaleEdits, sizeof( secondFinaleEdits ) / sizeof( secondFinaleEdits[0] ) ) ) { return false; }
+			if ( !Awakening_CorrectColdBreath( source ) ) { source.Clear(); return false; }
+			source.Replace( "namespace oq4_m09_v1", "namespace oq4_m09_v2" );
+		}
+	}
+	if ( version3 ) {
+		static const awakeningCorrection_t thirdFinaleEdits[] = {
+			// The bomb is ready at this warning. The ensuing scripted death must
+			// not leave "protect Navajas while he plants the bomb" active for
+			// the rest of the mission. Capture the authored/localized title
+			// before collecting the objective removes its source entity.
+			{ "void animateNavajas()\n{",
+			  "float openq4_escortComplete = 0;\nstring openq4_escortTitle;\n"
+			  "void openq4_completeEscort() {\n"
+			  "\tentity completion;\n"
+			  "\tif ( openq4_escortComplete || openq4_escortTitle == \"\" ) { return; }\n"
+			  "\tsys.setSpawnArg( \"objectivetitle\", openq4_escortTitle );\n"
+			  "\tsys.setSpawnArg( \"inv_objective\", \"1\" );\n"
+			  "\tcompletion = sys.spawn( \"item_objectivecomplete\" );\n"
+			  "\tif ( !completion ) { return; }\n"
+			  "\tcompletion.setKey( \"objEnabled\", \"1\" );\n"
+			  "\tsys.trigger( completion );\n\topenq4_escortComplete = 1;\n"
+			  "}\n\nvoid animateNavajas()\n{", 1 },
+			{ "void main()\n{", "void main()\n{\n\topenq4_escortTitle = $obj_project_navajas.getKey( \"objectivetitle\" );", 1 },
+			{ "thread navaSpeaks08();", "thread navaSpeaks08();\n\topenq4_completeEscort();", 1 },
+			// The approach trigger starts the collapse before the player can
+			// cross: deleting this 128-unit stair section leaves a 64-unit rise
+			// beyond the 48-unit jump. The existing far-landing trigger is the
+			// clearance signal, so collapse behind the player instead.
+			{ "void stairsBreak()\n{", "void stairsBreak()\n{\n"
+			  "\twhile ( sys.getEntity( \"trigger_once_25\" ) ) { sys.wait( 0.1 ); }", 1 },
+		};
+		if ( !Awakening_ApplyCorrections( source, thirdFinaleEdits, sizeof( thirdFinaleEdits ) / sizeof( thirdFinaleEdits[0] ) ) ) { return false; }
+		source.Replace( "namespace oq4_m09_v2", "namespace oq4_m09_v3" );
+	}
 	return true;
 }
 
@@ -144,9 +253,9 @@ static const char *Awakening_LateMissionScriptName( const char *filename ) {
 	path.BackSlashesToSlashes();
 	if ( g_awakeningLateMissions.GetBool() && Awakening_LateCampaignActive() && path.Icmp( awakeningM08Source ) == 0 ) {
 		idStr source;
-		if ( Awakening_LoadLateMissionScript( awakeningM08Version1, source ) ) {
-			gameLocal.Printf( "Awakening M08: mission corrections v1 enabled\n" );
-			return awakeningM08Version1;
+		if ( Awakening_LoadLateMissionScript( awakeningM08Version2, source ) ) {
+			gameLocal.Printf( "Awakening M08: mission corrections v2 enabled\n" );
+			return awakeningM08Version2;
 		}
 		gameLocal.Warning( "Awakening M08: unrecognized script; keeping installed mission behaviour" );
 	}
@@ -157,6 +266,7 @@ void Awakening_PrepareLateMission( idDict &worldArgs ) {
 	idStr map = gameLocal.GetMapName();
 	map.BackSlashesToSlashes();
 	map.StripFileExtension();
+
 	if ( !g_awakeningLateMissions.GetBool() || !Awakening_LateCampaignActive() || map.Icmp( "maps/game/m09_valkaryne" ) != 0 ||
 		idStr::Icmp( worldArgs.GetString( "call" ), "map_m09::main" ) != 0 ) {
 		return;
@@ -164,13 +274,13 @@ void Awakening_PrepareLateMission( idDict &worldArgs ) {
 	// A custom sidecar owns the map; do not layer our revision over it.
 	if ( fileSystem->ReadFile( "maps/game/m09_valkaryne.script", NULL, NULL ) > 0 ) { return; }
 	idStr source;
-	if ( !Awakening_LoadLateMissionScript( awakeningM09Version1, source ) ) {
+	if ( !Awakening_LoadLateMissionScript( awakeningM09Version3, source ) ) {
 		gameLocal.Warning( "Awakening M09: unrecognized script; keeping installed mission behaviour" );
 		return;
 	}
-	gameLocal.program.CompileFile( awakeningM09Version1 );
-	worldArgs.Set( "call", "oq4_m09_v1::main" );
-	gameLocal.Printf( "Awakening M09: mission corrections v1 enabled\n" );
+	gameLocal.program.CompileFile( awakeningM09Version3 );
+	worldArgs.Set( "call", "oq4_m09_v3::main" );
+	gameLocal.Printf( "Awakening M09: mission corrections v3 enabled\n" );
 }
 
 void Awakening_DirectLateMissionEntity( idDict &args ) {
@@ -178,12 +288,59 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 	idStr map = gameLocal.GetMapName();
 	map.BackSlashesToSlashes();
 	map.StripFileExtension();
-	if ( map.Icmp( "maps/game/m09_valkaryne" ) == 0 &&
-		gameLocal.program.FindFunction( "oq4_m09_v1::main" ) != NULL ) {
+	const function_t *main = gameLocal.program.FindFunction( "main" );
+	idStr cryoProgram = main ? gameLocal.program.GetFilename( main->filenum ) : "";
+	cryoProgram.BackSlashesToSlashes();
+	const bool correctedCryo = map.Icmp( "maps/game/m08_cryofac" ) == 0 &&
+		( cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 );
+	const char *finaleNamespace = gameLocal.program.FindFunction( "oq4_m09_v3::main" ) ? "oq4_m09_v3::" :
+		gameLocal.program.FindFunction( "oq4_m09_v2::main" ) ? "oq4_m09_v2::" : "oq4_m09_v1::";
+	const bool correctedFinale = map.Icmp( "maps/game/m09_valkaryne" ) == 0 &&
+		gameLocal.program.FindFunction( va( "%smain", finaleNamespace ) ) != NULL;
+	// These callbacks belong to encounters removed from the recovered maps.
+	// Keep the trigger's surviving target chain (including escape frost and
+	// taunt audio), but do not dispatch a nonexistent function. Never strip a
+	// mapper's replacement implementation or affect the uncorrected baseline.
+	if ( g_awakeningLateMissions.GetBool() && ( correctedCryo || correctedFinale ) ) {
+		struct obsoleteCallback_t { const char *map; const char *entity; const char *key; const char *function; };
+		static const obsoleteCallback_t obsolete[] = {
+			{ "maps/game/m08_cryofac", "trigger_once_46", "call", "ValkaryneEscape" },
+			{ "maps/game/m08_cryofac", "trigger_once_64", "call", "VO_9_5_1" },
+			{ "maps/game/m08_cryofac", "trigger_relay_76", "call", "RemoveDoorIce3" },
+			{ "maps/game/m08_cryofac", "lab1_scientist_1", "script_death", "FirstLabCleared" },
+			{ "maps/game/m08_cryofac", "lab1_scientist_2", "script_death", "FirstLabCleared" },
+			{ "maps/game/m09_valkaryne", "trigger_once_70", "call", "map_m09::spawnTactical02" },
+			{ "maps/game/m09_valkaryne", "trigger_once_96", "call", "map_m09::spawnTrashCan01" },
+		};
+		for ( int i = 0; i < sizeof( obsolete ) / sizeof( obsolete[0] ); ++i ) {
+			const obsoleteCallback_t &entry = obsolete[i];
+			idStr correctedFunction = entry.function;
+			if ( correctedFinale && correctedFunction.Icmpn( "map_m09::", 9 ) == 0 ) {
+				correctedFunction = va( "%s%s", finaleNamespace, entry.function + 9 );
+			}
+			if ( map.Icmp( entry.map ) == 0 && !idStr::Icmp( args.GetString( "name" ), entry.entity ) &&
+				!idStr::Icmp( args.GetString( entry.key ), entry.function ) && !gameLocal.program.FindFunction( entry.function ) &&
+				!gameLocal.program.FindFunction( correctedFunction ) ) {
+				args.Delete( entry.key );
+			}
+		}
+	}
+	if ( correctedFinale ) {
+		if ( gameLocal.program.FindFunction( "oq4_m09_v3::main" ) != NULL &&
+			!idStr::Icmp( args.GetString( "name" ), "trigger_once_15" ) ) {
+			// Both surviving actors lost their old leading underscore in the
+			// recovered map; the trigger still points at the obsolete names.
+			if ( !idStr::Icmp( args.GetString( "target" ), "_monster_iron_maiden_5" ) ) {
+				args.Set( "target", "monster_iron_maiden_5" );
+			}
+			if ( !idStr::Icmp( args.GetString( "target2" ), "_env_wall_casket_5" ) ) {
+				args.Set( "target2", "env_wall_casket_5" );
+			}
+		}
 		for ( int i = 0; i < args.GetNumKeyVals(); ++i ) {
 			const idKeyValue *kv = args.GetKeyVal( i );
 			if ( kv->GetKey().Icmpn( "call", 4 ) == 0 && kv->GetValue().Icmpn( "map_m09::", 9 ) == 0 ) {
-				idStr replacement = "oq4_m09_v1::";
+				idStr replacement = finaleNamespace;
 				replacement += kv->GetValue().c_str() + 9;
 				if ( gameLocal.program.FindFunction( replacement ) != NULL ) {
 					args.Set( kv->GetKey(), replacement );
@@ -191,10 +348,10 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 			}
 		}
 		if ( !idStr::Icmp( args.GetString( "requestDocking" ), "valkaryne_dock" ) ) {
-			args.Set( "requestDocking", "oq4_m09_v1::valkaryne_dock" );
+			args.Set( "requestDocking", va( "%svalkaryne_dock", finaleNamespace ) );
 		}
 	}
-	if ( g_awakeningLateMissions.GetBool() && map.Icmp( "maps/game/m08_cryofac" ) == 0 &&
+	if ( g_awakeningLateMissions.GetBool() && correctedCryo &&
 		!idStr::Icmp( args.GetString( "name" ), "trigger_once_85" ) &&
 		!idStr::Icmp( args.GetString( "call" ), "FlashLightsOut" ) &&
 		gameLocal.program.FindFunction( "FlashLightsOff" ) != NULL ) {

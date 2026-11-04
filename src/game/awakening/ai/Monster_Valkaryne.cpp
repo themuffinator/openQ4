@@ -145,6 +145,14 @@ void riMonsterValkaryne::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( docked );
 	savefile->ReadBool( undockRequested );
 	savefile->ReadInt( nextTurnTime );
+	if ( docked ) {
+		// Older saves may have been made before docking suspended gravity.
+		if ( !spawnArgs.FindKey( "openq4_dockedPreviousNoGravity" ) ) {
+			spawnArgs.SetBool( "openq4_dockedPreviousNoGravity", move.fl.noGravity );
+		}
+		move.fl.noGravity = true;
+		physicsObj.SetLinearVelocity( vec3_origin );
+	}
 }
 
 /*
@@ -155,6 +163,19 @@ riMonsterValkaryne::SetDocked
 void riMonsterValkaryne::SetDocked( bool dock ) {
 	if ( DebugActions() ) {
 		gameLocal.Printf( "%d %s: %s\n", gameLocal.time, name.c_str(), dock ? "docked" : "undocked" );
+	}
+	// CanMove suppresses navigation, but the monster physics still applies
+	// gravity. The descent's scripted perches are attachment points, including
+	// one above open space: a plugged-in Valkaryne must remain at that point.
+	// Keep the previous policy in saved spawn args without changing the save
+	// layout, and restore it when the mobile phase starts.
+	if ( dock && !docked ) {
+		spawnArgs.SetBool( "openq4_dockedPreviousNoGravity", move.fl.noGravity );
+		move.fl.noGravity = true;
+		physicsObj.SetLinearVelocity( vec3_origin );
+	} else if ( !dock && docked ) {
+		move.fl.noGravity = spawnArgs.GetBool( "openq4_dockedPreviousNoGravity", "0" );
+		spawnArgs.Delete( "openq4_dockedPreviousNoGravity" );
 	}
 	docked = dock;
 	actionPluginAttackBig.fl.disabled = !dock;
@@ -383,6 +404,14 @@ stateResult_t riMonsterValkaryne::State_Torso_PluginAttackBig( const stateParms_
 		case STAGE_INIT:
 			OverrideAnim( ANIMCHANNEL_LEGS );
 			PlayAnim( ANIMCHANNEL_TORSO, "plugin_range_attack_big", parms.blendFrames );
+			// Commit the beam to the position telegraphed by its windup. The
+			// recovered clip locks at frame 70 and fires at 96 at double rate:
+			// only about half a second to escape its wide spread. At the
+			// campaign's run speed that makes the exposed descent pipes lethal
+			// even while running. Keep the damage and burst, but give the whole
+			// windup to move out of the aimed area. This flag and the recorded
+			// enemy positions already survive saves and reset when actions end.
+			enemy.fl.lockOrigin = true;
 			return SRESULT_STAGE( STAGE_WAIT );
 
 		case STAGE_WAIT:

@@ -2162,6 +2162,7 @@ static void Cmd_TestFlashlight_f( const idCmdArgs &args ) {
 	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
+
 	if ( args.Argc() != 2 || ( idStr::Cmp( args.Argv( 1 ), "0" ) != 0 && idStr::Cmp( args.Argv( 1 ), "1" ) != 0 ) ) {
 		gameLocal.Printf( "usage: testFlashlight <0 = off, 1 = on> (current weapon)\n" );
 		return;
@@ -2176,6 +2177,64 @@ static void Cmd_TestFlashlight_f( const idCmdArgs &args ) {
 static void Cmd_TestMission_f( const idCmdArgs &args ) {
 	idPlayer *player = gameLocal.GetLocalPlayer();
 	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	if ( args.Argc() == 4 && !idStr::Icmp( args.Argv( 1 ), "dispatch" ) ) {
+		// A file-driven controller can observe an acknowledgement after the
+		// next poll has already queued the same file. Consume the sequence
+		// before inserting commands, including across in-process save loads.
+		static int lastSequence = 0;
+		const int sequence = atoi( args.Argv( 2 ) );
+		if ( sequence > lastSequence ) {
+			lastSequence = sequence;
+			idCmdArgs command;
+			command.AppendArg( "exec" );
+			command.AppendArg( args.Argv( 3 ) );
+			cmdSystem->BufferCommandArgs( CMD_EXEC_NOW, command );
+		}
+		return;
+	}
+	if ( args.Argc() == 2 && !idStr::Icmp( args.Argv( 1 ), "enemies" ) ) {
+		for ( int i = 0; i < gameLocal.num_entities; ++i ) {
+			idEntity *ent = gameLocal.entities[i];
+			if ( !ent || !ent->IsType( idAI::Type ) || ent->IsHidden() || ent->health <= 0 ||
+				static_cast<idAI *>( ent )->team == player->team ) { continue; }
+			const idVec3 center = ent->GetPhysics()->GetAbsBounds().GetCenter();
+			const float distance = ( center - player->GetEyePosition() ).Length();
+			if ( distance > 2000.0f ) { continue; }
+			trace_t trace;
+			gameLocal.TracePoint( player, trace, player->GetEyePosition(), center, MASK_SHOT_RENDERMODEL, player );
+			const bool bodyVisible = trace.fraction == 1.0f || trace.c.entityNum == ent->entityNumber;
+			gameLocal.TracePoint( player, trace, player->GetEyePosition(), static_cast<idAI *>( ent )->GetEyePosition(), MASK_SHOT_RENDERMODEL, player );
+			const bool eyeVisible = trace.fraction == 1.0f || trace.c.entityNum == ent->entityNumber;
+			gameLocal.Printf( "testMissionEnemy: name=%s health=%d distance=%.1f visible=%d origin=(%s) def=%s aimEye=%d\n",
+				ent->name.c_str(), ent->health, distance, bodyVisible || eyeVisible,
+				ent->GetPhysics()->GetOrigin().ToString(), ent->GetEntityDefName(), !bodyVisible && eyeVisible );
+		}
+		return;
+	}
+	if ( args.Argc() == 3 && !idStr::Icmp( args.Argv( 1 ), "trace" ) ) {
+		idEntity *goal = gameLocal.FindEntity( args.Argv( 2 ) );
+		if ( !goal ) { gameLocal.Printf( "testMissionTrace: missing goal\n" ); return; }
+		for ( int probe = 0; probe < 3; ++probe ) {
+			idVec3 start = player->GetPhysics()->GetOrigin() + idVec3( 0, 0, 1 );
+			idVec3 end = goal->GetPhysics()->GetOrigin();
+			end.z = start.z;
+			trace_t trace;
+			if ( probe == 1 ) {
+				start = player->GetEyePosition();
+				end.z = start.z;
+				gameLocal.TracePoint( player, trace, start, end, MASK_PLAYERSOLID, player );
+			} else {
+				if ( probe == 2 ) { end = start + idVec3( 0, 0, 64 ); }
+				gameLocal.Translation( player, trace, start, end, player->GetPhysics()->GetClipModel(),
+					player->GetPhysics()->GetAxis(), player->GetPhysics()->GetClipMask(), player );
+			}
+			idEntity *hit = trace.fraction < 1.0f ? gameLocal.entities[trace.c.entityNum] : NULL;
+			gameLocal.Printf( "testMissionTrace: probe=%s hit=%s fraction=%.3f point=(%s) material=%s\n",
+				probe == 0 ? "hull" : probe == 1 ? "eye" : "ceiling", hit ? hit->name.c_str() : "none",
+				trace.fraction, trace.endpos.ToString(), hit && trace.c.material ? trace.c.material->GetName() : "none" );
+		}
 		return;
 	}
 	if ( ( args.Argc() == 3 || args.Argc() == 4 ) && idStr::Icmp( args.Argv( 1 ), "path" ) == 0 ) {
@@ -2227,7 +2286,7 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 		return;
 	}
 	if ( args.Argc() != 2 ) {
-		gameLocal.Printf( "usage: testMission <entity> | call <function> | path [actor] <entity>\n" );
+		gameLocal.Printf( "usage: testMission <entity> | call <function> | path [actor] <entity> | trace <entity> | enemies | dispatch <sequence> <cfg>\n" );
 		return;
 	}
 	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
@@ -2257,14 +2316,24 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 				ent->GetRenderEntity()->hModel != NULL && ent->GetModelDefHandle() == -1 );
 		}
 	}
-	if ( ent->IsType( idPlayer::GetClassType() ) ) {
-		gameLocal.Printf( "testMissionPlayer: name=%s armor=%d\n", ent->name.c_str(),
-			static_cast<idPlayer *>( ent )->inventory.armor );
-	}
 	if ( ent->GetRenderEntity()->gui[0] ) {
 		gameLocal.Printf( "testMissionGui: name=%s interactive=%d target=%s source=%s\n", ent->name.c_str(),
 			ent->GetRenderEntity()->gui[0]->IsInteractive(), ent->spawnArgs.GetString( "target", "none" ),
 			ent->GetRenderEntity()->gui[0]->Name() );
+	}
+	if ( ent == player ) {
+		gameLocal.Printf( "testMissionPlayer: name=%s armor=%d time=%d weapon=%d weapons=%d\n", player->name.c_str(),
+			player->inventory.armor, gameLocal.time, player->GetCurrentWeapon(), player->inventory.weapons );
+		if ( player->weapon ) {
+			const rvWeapon *weapon = player->weapon;
+			gameLocal.Printf( "testMissionWeapon: clip=%d capacity=%d available=%d ammoType=%d required=%d ready=%d reloading=%d disabled=%d attack=%d reload=%d\n",
+				weapon->AmmoInClip(), weapon->ClipSize(), weapon->AmmoAvailable(), weapon->GetAmmoType(), weapon->AmmoRequired(),
+				weapon->IsReady(), weapon->IsReloading(), weapon->wfl.disabled, weapon->wsfl.attack, weapon->wsfl.reload );
+		}
+		for ( int i = 0; i < MAX_AMMO; ++i ) {
+			const char *ammoName = rvWeapon::GetAmmoNameForIndex( i );
+			if ( ammoName ) { gameLocal.Printf( "testMissionAmmo: type=%s amount=%d\n", ammoName, player->inventory.ammo[i] ); }
+		}
 	}
 	if ( ent->GetAnimator() ) {
 		const idAnimBlend *torso = ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_TORSO );

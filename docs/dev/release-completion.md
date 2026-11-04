@@ -218,6 +218,21 @@ See [player release status](../user/release-status.md).
 
 ## Awakening Cryofac and finale corrections, 4 November 2026
 
+- The squad clears the thawed entrance more reliably, and Navajas stays on the
+  correct floor during the lower-console scene. The finale's cold-breath effects
+  now attach to surviving actors without aborting setup on removed characters.
+  Restart M08 to adopt its revision 2 corrections, and M09 for revision 3;
+  earlier saves retain their original script behavior.
+- M09 now completes Navajas's escort objective after the bomb is ready, activates
+  the second shaft's intended Iron Maiden encounter, and keeps the cave stairs
+  intact until the player reaches the far landing. The docked Valkaryne stays
+  on its scripted perches instead of falling into the shaft.
+- Melee attacks now apply AI defender modifiers only to AI targets, avoiding
+  an invalid state read when monsters strike the player.
+- Docked beam attacks commit their aim when the windup begins, giving the
+  player time to move out of the blast area on the descent pipes. Standing in
+  the aimed area still receives the original damage.
+
 - Cryofac's cooling control accepts a single shutdown request, including an
   early press, and repeated presses cannot turn the cold damage back on.
   Navajas receives his intended movement commands, the flashlight trigger

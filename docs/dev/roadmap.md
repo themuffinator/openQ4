@@ -2290,7 +2290,27 @@ Completion substeps must keep three forms of evidence distinct:
 
   M08/M09 scrutiny, 4 November: versioned mission corrections address the
   cooling-button race/re-entry, squad and cinematic handoffs, repair loops,
-  light-taunt ranges and the finale's intro/docking boundary. Original script
+  light-taunt ranges and the finale's intro/docking boundary. Revision 2 also
+  clears the first-thaw squad bottleneck, corrects Navajas's lower-console
+  destination, completes cold-breath setup and prunes exact abandoned callbacks.
+  Physical traversal now completes M08 and preserves its inventory through the
+  natural M09 handoff; the one-time developer loadout at M08 entry still limits
+  campaign balance claims. Second-shaft descent and the following cave tank
+  now have physical-route evidence. M09 v3 repairs escort completion, the
+  second-shaft Maiden targets and premature stair collapse; docked Valkaryne
+  physics preserves its perches. The fresh v3 descent exposed a late beam aim
+  lock; committing aim at windup start preserves damage while making the pipe
+  crossing evasive. Moving and restored-windup controls survive; a standing
+  control dies. Both lower-shaft enemies are now defeated, and natural recovery
+  yields 77 HP/50 armour. Fresh/restored stair clearance passes. The physical
+  route now clears the factory, both boss phases and timed extraction, boarding
+  with 16 HP and reaching the ending after restoring that checkpoint. The shared
+  melee path also guards AI-only defender state when attacking the player.
+  These checkpointed runs retain the M08 developer-loadout limitation; they do
+  not qualify uninterrupted campaign balance. Missing optional blast-door
+  panels remain a documented recovered-content gap. Testing ended at the
+  user's request after extraction succeeded.
+  Original script
   programs remain available to older saves. See the
   [late-mission audit and runtime limits](awakening-missions.md#m08-cryofac-and-m09-valkaryne--4-november-2026).
   Normal combat, complete traversal and timed extraction remain qualification
