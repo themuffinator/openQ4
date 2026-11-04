@@ -412,6 +412,9 @@ public:
 	void					SetBlocked( bool b );
 	bool					IsBlocked( void );
 	idEntity *				GetActivator( void ) const;
+	// World-space envelope of an attached volume over this linear move.
+	// A bound mover's endpoints are local; those need a separate parent proof.
+	bool					GetTranslationBounds( const idBounds &worldBounds, idBounds &swept ) const;
 
 	virtual void			WriteToSnapshot( idBitMsgDelta &msg ) const;
 	virtual void			ReadFromSnapshot( const idBitMsgDelta &msg );

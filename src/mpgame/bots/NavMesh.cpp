@@ -1382,9 +1382,10 @@ A trigger_hurt is not solid, so the generator's collision probes walk straight
 into it: stock maps put 1000-damage and gib volumes at the bottom of their
 pits, and without this the graph happily lays floor there and routes, roams and
 recovers bots into them.  A volume that kills on one touch refuses ground
-outright, like lava.  A survivable pain volume, one that starts switched off,
-or one riding a mover (it is somewhere else by the time anyone arrives) only
-makes the ground it covers expensive.
+outright, like lava. A deadly volume on a translating binary mover reserves
+its whole travel envelope even when initially off: q4ctf5 switches its bound
+crusher on as the door moves. Other switched-off or unmodelled moving volumes
+and survivable pain only make their initial ground expensive.
 ================
 */
 void rvNavMesh::GatherHazards( void ) {
@@ -1410,7 +1411,12 @@ void rvNavMesh::GatherHazards( void ) {
 		const float delay = Max( 0.05f, ent->spawnArgs.GetFloat( "delay", "1.0" ) );
 		const bool deadly = gibs || damage >= NAV_LETHAL_HURT_DAMAGE ||
 							damage / delay >= NAV_LETHAL_HURT_RATE;
-		hazard.lethal = deadly && ent->spawnArgs.GetBool( "on", "1" ) && !ent->IsBound();
+		bool swept = false;
+		idEntity *master = ent->GetBindMaster();
+		if ( deadly && master && master->IsType( idMover_Binary::GetClassType() ) ) {
+			swept = static_cast<idMover_Binary *>( master )->GetTranslationBounds( hazard.bounds, hazard.bounds );
+		}
+		hazard.lethal = deadly && ( swept || ( ent->spawnArgs.GetBool( "on", "1" ) && !ent->IsBound() ) );
 		hazards.Append( hazard );
 	}
 

@@ -4069,6 +4069,27 @@ bool idMover_Binary::IsBlocked( void ) {
 
 /*
 ================
+idMover_Binary::GetTranslationBounds
+================
+*/
+bool idMover_Binary::GetTranslationBounds( const idBounds &worldBounds, idBounds &swept ) const {
+	if ( IsBound() || !GetPhysics() || worldBounds.IsCleared() ) {
+		return false;
+	}
+	// pos1/pos2 are world positions for an unbound binary mover. Its axis
+	// stays fixed throughout the translation, including a reversed/start-open
+	// move. Form both endpoints before writing swept, which may alias input.
+	idBounds first = worldBounds;
+	idBounds last = worldBounds;
+	first.TranslateSelf( pos1 - GetPhysics()->GetOrigin() );
+	last.TranslateSelf( pos2 - GetPhysics()->GetOrigin() );
+	swept = first;
+	swept.AddBounds( last );
+	return true;
+}
+
+/*
+================
 idMover_Binary::GetActivator
 ================
 */

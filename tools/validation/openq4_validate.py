@@ -653,6 +653,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "mp_bot_intelligence.py",
         root / "tools" / "tests" / "mp_bot_navigation.py",
         root / "tools" / "tests" / "mp_bot_jump_trajectories.py",
+        root / "tools" / "tests" / "mp_bot_hazards.py",
         root / "tools" / "tests" / "mp_bot_server_menu.py",
         root / "tools" / "tests" / "mp_client_combat_effects.py",
         root / "tools" / "tests" / "bse_retail_parity.py",
