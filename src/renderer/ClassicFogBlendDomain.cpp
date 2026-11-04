@@ -326,7 +326,7 @@ static bool ValidateReceiverDeformContract( const drawSurf_t *drawSurf,
 		return false;
 	}
 	const std::uint64_t frameToken =
-		R_ClassicDeformDomain_CurrentFrameToken();
+		R_ClassicDeformDomain_BackEndFrameToken();
 	if ( !packet.hasClassicDeformRecord
 			|| packet.classicDeformRecord == NULL
 			|| packet.geometryRecord == NULL
@@ -341,7 +341,7 @@ static bool ValidateReceiverDeformContract( const drawSurf_t *drawSurf,
 			|| record.outcome != CLASSIC_DEFORM_OUTCOME_NOT_APPLICABLE
 			|| !R_ClassicDeformDomain_ValidateRecordForFrame( record,
 				frameToken )
-			|| !R_ClassicDeformDomain_RecordMatchesDrawSurf( record, drawSurf ) ) {
+			|| !R_ClassicDeformDomain_RecordMatchesDrawSurf( record, drawSurf, frameToken ) ) {
 		return false;
 	}
 	role = record.role;

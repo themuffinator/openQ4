@@ -35,6 +35,26 @@ idCVar r_vkRenderThread( "r_vkRenderThread", "0", CVAR_RENDERER | CVAR_BOOL,
 	"1 records and presents each frame on a render thread while the main thread "
 	"runs the next game tic (prototype; see REN-07). 0 runs the backend inline." );
 
+// The worker must unwind before any common error path can tear down the
+// renderer. Keep fatality in the receipt so main-thread retirement does not
+// silently turn an invariant violation into a recoverable game drop.
+class renderThreadException_t : public idException {
+public:
+	renderThreadException_t( const char *message, bool isFatal ) : idException( message ), fatal( isFatal ) {}
+	bool fatal;
+};
+
+void R_RenderThread_Error( const char *message, bool fatal ) {
+	if ( R_RenderThread_OnRenderThread() ) {
+		throw renderThreadException_t( message, fatal );
+	}
+	if ( fatal ) {
+		common->FatalError( "%s", message );
+	} else {
+		common->Error( "%s", message );
+	}
+}
+
 static std::thread					rt_thread;
 static std::thread::id				rt_threadId;
 static std::mutex					rt_mutex;
@@ -44,6 +64,7 @@ static const emptyCommand_t *		rt_commands = NULL;	// owned by the render thread
 static bool							rt_busy = false;
 static bool							rt_quit = false;
 static bool							rt_failed = false;
+static bool							rt_fatal = false;
 static char							rt_failure[1024];
 static int							rt_backEndMsec = 0;
 // A frame stays owned until the main thread retires it, even when the worker
@@ -77,9 +98,14 @@ static void R_RenderThread_Main( void ) {
 		}
 
 		bool failed = false;
+		bool fatal = false;
 		const int start = Sys_Milliseconds();
 		try {
 			RB_ExecuteBackEndCommands( cmds );
+		} catch ( const renderThreadException_t &ex ) {
+			failed = true;
+			fatal = ex.fatal;
+			idStr::Copynz( rt_failure, ex.error, sizeof( rt_failure ) );
 		} catch ( idException &ex ) {
 			// common->Error queued its message for the main thread and unwound
 			// this thread only; R_RenderThread_Sync re-raises it there
@@ -93,6 +119,7 @@ static void R_RenderThread_Main( void ) {
 			rt_commands = NULL;
 			rt_busy = false;
 			rt_failed = rt_failed || failed;
+			rt_fatal = rt_fatal || fatal;
 			rt_backEndMsec = elapsed;
 		}
 		rt_done.notify_all();
@@ -187,6 +214,7 @@ void R_RenderThread_Sync( const char *reason ) {
 	}
 	const unsigned long long waitStart = R_RendererMetrics_CpuClock();
 	bool failed;
+	bool fatal;
 	char failure[sizeof( rt_failure )];
 	int backEndMsec;
 	{
@@ -196,7 +224,8 @@ void R_RenderThread_Sync( const char *reason ) {
 		}
 		rt_done.wait( lock, [] { return !rt_busy; } );
 		failed = rt_failed;
-		rt_failed = false;
+		fatal = rt_fatal;
+		rt_failed = rt_fatal = false;
 		idStr::Copynz( failure, rt_failure, sizeof( failure ) );
 		backEndMsec = rt_backEndMsec;
 	}
@@ -213,6 +242,9 @@ void R_RenderThread_Sync( const char *reason ) {
 	tr.CompleteBackEndFrame();
 	VK_Backend_CompleteThreadedFrame();
 
+	if ( fatal ) {
+		common->FatalError( "render thread: %s", failure );
+	}
 	if ( failed ) {
 		common->Error( "render thread: %s", failure );
 	}
@@ -228,7 +260,7 @@ and frame memory may be torn down afterwards.
 */
 void R_RenderThread_Shutdown( void ) {
 	if ( R_RenderThread_OnRenderThread() ) {
-		// a fatal error raised by the backend; the process is exiting
+		// Only the main thread owns thread lifetime; never join ourselves.
 		return;
 	}
 	R_RenderThread_Sync( "shutdown" );

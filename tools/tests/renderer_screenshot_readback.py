@@ -70,7 +70,7 @@ def test_capture_defers_only_the_window_present() -> None:
             "RB_ApplyCRTToBackBuffer();",
             "RB_ApplyColorMappingsToBackBuffer();",
             "if ( !r_frontBuffer.GetBool() && !tr.takingScreenshot )",
-            "GLimp_SwapBuffers();",
+            "R_SwapBuffersWithInputTiming();",
         ),
         "RB_SwapBuffers screenshot presentation gate",
     )

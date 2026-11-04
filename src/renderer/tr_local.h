@@ -526,6 +526,18 @@ typedef struct {
 	viewDef_t	*viewDef;
 } drawSurfsCommand_t;
 
+// Controller values belong to the submitted view, not the next game tic.
+typedef struct {
+	int enabled;
+	float parms[ SPECIAL_EFFECT_MAX ][ MAX_ENTITY_SHADER_PARMS ];
+} specialEffectsState_t;
+
+typedef struct {
+	renderCommand_t commandId, *next;
+	viewDef_t *viewDef;
+	specialEffectsState_t effects;
+} drawSpecialEffectsCommand_t;
+
 // openQ4 VR: from here on the frame's default target ("the back buffer") is
 // eye 0/1, or the virtual screen for -1, at width x height.
 typedef struct {
@@ -677,6 +689,8 @@ void *R_GetCommandBuffer( int bytes );
 	thread, so these are no-ops there.
 */
 #if defined( OPENQ4_RENDERER_VK_MODULE )
+// Backend failures retire on the main thread before common error/teardown.
+void	R_RenderThread_Error( const char *message, bool fatal = false );
 void	R_RenderThread_Init( void );
 bool	R_RenderThread_Begin( const emptyCommand_t *cmds );
 void	R_RenderThread_Sync( const char *reason );
@@ -2501,6 +2515,7 @@ void RB_InvalidateTemporalDepthStamp( idRenderTexture *target );
 void RB_StampTemporalDepthResolved( idRenderTexture *target,
 	int frameNumber, unsigned int historyGeneration );
 
+void RB_BeginCommandFrame( const emptyCommand_t *cmds );
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds );
 
 

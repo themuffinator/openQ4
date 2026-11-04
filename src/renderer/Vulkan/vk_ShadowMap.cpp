@@ -290,7 +290,7 @@ static vkShadowMapState_t vkShadow;
 // alone must not admit diagnostics or sampling of those recycled light records.
 static bool VK_ShadowMap_ViewPrepared( const viewDef_t *viewDef ) {
 	return viewDef != NULL && vkShadow.preparedView == viewDef
-		&& vkShadow.preparedFrame == tr.frameCount;
+		&& vkShadow.preparedFrame == backEnd.frameCount;
 }
 
 // One sealed caster record may feed both LOCAL and GLOBAL ownership maps, so
@@ -1599,8 +1599,8 @@ static bool VK_ShadowMap_StaticCacheable(
 			|| vLight->globalTranslucentShadowMapCasters != NULL
 			|| vLight->localTranslucentShadowMapCasters != NULL ) {
 		if ( history != NULL && haveDynamicCasters ) {
-			history->lastDynamicFrame = tr.frameCount;
-			history->lastTouchedFrame = tr.frameCount;
+			history->lastDynamicFrame = backEnd.frameCount;
+			history->lastTouchedFrame = backEnd.frameCount;
 			if ( dynamicsDefeatCache ) {
 				VK_ShadowMap_InvalidateLightCaches(
 						renderWorld, lightIndex );
@@ -1630,11 +1630,11 @@ static bool VK_ShadowMap_StaticCacheable(
 	}
 
 	if ( history != NULL ) {
-		history->lastTouchedFrame = tr.frameCount;
+		history->lastTouchedFrame = backEnd.frameCount;
 		// Only the point path bakes dynamics into the cached content, so only
 		// it must wait out the hysteresis after they disappear.
 		if ( pointLight
-				&& tr.frameCount - history->lastDynamicFrame
+				&& backEnd.frameCount - history->lastDynamicFrame
 					< Max( 0,
 							r_shadowMapStaticHysteresisFrames.GetInteger() ) ) {
 			return false;
@@ -1687,7 +1687,7 @@ static void VK_ShadowMap_BeginCacheView( const viewDef_t *viewDef ) {
 		if ( i >= projectedLimit
 				|| projected.generation != tr.videoRestartCount
 				|| ( projected.valid
-					&& tr.frameCount - projected.lastUsedFrame
+					&& backEnd.frameCount - projected.lastUsedFrame
 						> residentFrames ) ) {
 			VK_ShadowMap_ClearProjectedEntryMetadata( projected );
 		}
@@ -1697,7 +1697,7 @@ static void VK_ShadowMap_BeginCacheView( const viewDef_t *viewDef ) {
 		if ( i >= pointLimit
 				|| point.generation != tr.videoRestartCount
 				|| ( point.valid
-					&& tr.frameCount - point.lastUsedFrame
+					&& backEnd.frameCount - point.lastUsedFrame
 						> residentFrames ) ) {
 			VK_ShadowMap_ClearPointEntryMetadata( point );
 		}
@@ -1793,7 +1793,7 @@ static int VK_ShadowMap_FindProjectedCacheEntry(
 				&& entry.blockSize == blockSize
 				&& entry.image != VK_NULL_HANDLE
 				&& entry.layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
-			entry.lastUsedFrame = tr.frameCount;
+			entry.lastUsedFrame = backEnd.frameCount;
 			entry.reserved = true;
 			return i;
 		}
@@ -1818,7 +1818,7 @@ static int VK_ShadowMap_FindPointCacheEntry(
 				&& entry.cube.image != VK_NULL_HANDLE
 				&& entry.cube.layout
 					== VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ) {
-			entry.lastUsedFrame = tr.frameCount;
+			entry.lastUsedFrame = backEnd.frameCount;
 			entry.reserved = true;
 			return i;
 		}
@@ -1955,7 +1955,7 @@ static bool VK_ShadowMap_StaticCacheableReadOnly(
 	const vkShadowLightHistory_t *history =
 			VK_ShadowMap_FindLightHistoryConst( renderWorld, lightIndex );
 	if ( history != NULL && pointLight
-			&& tr.frameCount - history->lastDynamicFrame
+			&& backEnd.frameCount - history->lastDynamicFrame
 				< Max( 0,
 						r_shadowMapStaticHysteresisFrames.GetInteger() ) ) {
 		return false;
@@ -2665,7 +2665,7 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 	}
 	const int interval =
 			Max( 1, r_shadowMapReportInterval.GetInteger() );
-	if ( tr.frameCount % interval != 0 ) {
+	if ( backEnd.frameCount % interval != 0 ) {
 		return;
 	}
 	int projectedSlots = 0;
@@ -2899,7 +2899,7 @@ static bool VK_ShadowMap_EstimateUpdateCost( const viewLight_t *vLight,
 	}
 
 	staleness = newestUpdatedFrame < 0 ? 64
-			: idMath::ClampInt( 0, 64, tr.frameCount - newestUpdatedFrame );
+			: idMath::ClampInt( 0, 64, backEnd.frameCount - newestUpdatedFrame );
 	return cost > 0;
 }
 
@@ -3003,7 +3003,7 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 		const bool stencilFallbackAvailable ) {
 	vkShadow.numLights = 0;
 	vkShadow.preparedView = viewDef;
-	vkShadow.preparedFrame = tr.frameCount;
+	vkShadow.preparedFrame = backEnd.frameCount;
 	vkShadow.nextTileX = 0;
 	vkShadow.nextTileY = 0;
 	vkShadow.nextTileRowHeight = 0;
@@ -3328,7 +3328,7 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 }
 
 const vkShadowLightState_t *VK_ShadowMap_LightState( const viewLight_t *vLight ) {
-	if ( vkShadow.preparedFrame != tr.frameCount ) {
+	if ( vkShadow.preparedFrame != backEnd.frameCount ) {
 		return NULL;
 	}
 	for ( int i = 0 ; i < vkShadow.numLights ; i++ ) {
@@ -4875,8 +4875,8 @@ static void VK_ShadowMap_FinalizeCachePasses(
 								light.vLight, receiverPass );
 				cache.signature = pass.cacheSignature;
 				cache.size = light.tileSize;
-				cache.lastUsedFrame = tr.frameCount;
-				cache.lastUpdatedFrame = tr.frameCount;
+				cache.lastUsedFrame = backEnd.frameCount;
+				cache.lastUpdatedFrame = backEnd.frameCount;
 				cache.pointFar = light.pointFar;
 				for ( int originIndex = 0 ; originIndex < 3 ;
 						originIndex++ ) {
@@ -4909,8 +4909,8 @@ static void VK_ShadowMap_FinalizeCachePasses(
 				cache.tileSize = light.tileSize;
 				cache.blockSize =
 						VK_ShadowMap_ProjectedBlockSize( light );
-				cache.lastUsedFrame = tr.frameCount;
-				cache.lastUpdatedFrame = tr.frameCount;
+				cache.lastUsedFrame = backEnd.frameCount;
+				cache.lastUpdatedFrame = backEnd.frameCount;
 				cache.projectedState = light.projectedState;
 			}
 		}
@@ -6309,8 +6309,8 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 						VK_SHADOW_RECEIVER_GLOBAL );
 				}
 				if ( classicPointState == NULL ) {
-					common->FatalError(
-						"Vulkan: sealed point shadow state was lost after preflight" );
+					R_RenderThread_Error(
+						"Vulkan: sealed point shadow state was lost after preflight", true );
 				}
 			}
 			// near/far + the analytic face projection in the shared
@@ -6536,8 +6536,8 @@ void VK_ShadowMap_CommitClassicInteractionView(
 	// walk with the sealed caster/alpha plans above.
 	const bool committed = VK_ShadowMap_RenderAtlas( view->viewDef );
 	if ( !committed ) {
-		common->FatalError(
-			"Vulkan: preflighted classic shadow transaction could not commit" );
+		R_RenderThread_Error(
+			"Vulkan: preflighted classic shadow transaction could not commit", true );
 	}
 	vkClassicShadowTransaction.active = false;
 	vkClassicShadowTransaction.ready = false;

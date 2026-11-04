@@ -486,7 +486,7 @@ static bool ValidateDeformContract( const drawSurf_t *drawSurf,
 		return false;
 	}
 	const std::uint64_t frameToken =
-		R_ClassicDeformDomain_CurrentFrameToken();
+		R_ClassicDeformDomain_BackEndFrameToken();
 	const classicDeformRecord_t *packetRecord = packet != NULL
 		? packet->classicDeformRecord : NULL;
 	const classicDeformRecord_t &record =
@@ -496,7 +496,7 @@ static bool ValidateDeformContract( const drawSurf_t *drawSurf,
 	if ( record.role != expectedRole
 			|| !R_ClassicDeformDomain_ValidateRecordForFrame( record,
 				frameToken )
-			|| !R_ClassicDeformDomain_RecordMatchesDrawSurf( record, drawSurf ) ) {
+			|| !R_ClassicDeformDomain_RecordMatchesDrawSurf( record, drawSurf, frameToken ) ) {
 		return false;
 	}
 	if ( expectedRole == CLASSIC_DEFORM_ROLE_FINALIZED_DRAW ) {

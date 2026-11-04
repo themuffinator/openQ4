@@ -734,3 +734,61 @@ bootstrap tier as `NullRenderer` after a restart even while native Vulkan
 rendering is active. The engine screenshots and successful presentation
 receipts verify that the world still renders; that tier label is not used as
 proof of renderer or pacing qualification.
+
+### Submitted-frame ownership, 4 November 2026
+
+`RC_DRAW_SPECIAL_EFFECTS` carries the admitted mask and all controller
+parameters. Both backend adapters and reconstructed scene packets consume the
+queued values, including `r_forceSpecialEffects`; a later controller reset or
+edit cannot replace them. Only first-use image creation and resource teardown
+retain the controller's worker synchronization.
+
+Command preflight now latches the first `RC_SET_BUFFER` frame number before
+building backend resources. A mid-frame flush without that command retains the
+current backend identity. Vulkan shadow-cache stamps, prepared light tables,
+GPU timing/readbacks and query retirement, classic deformation validation and
+clustered generations use the submitted frame. Front-end deformation capture
+still uses the front-end token; explicit tokens cross the boundary without
+revalidating against mutable front-end state.
+
+The two interaction failures and two shadow invariant failures use a worker
+exception receipt. Main-thread collection retires once before dispatching the
+original recoverable/fatal error. Native tests execute the actual worker through
+1,009 handoffs, including both severities and a successful frame afterwards.
+Fatal teardown is replaced by a throwing test boundary; the test asserts that
+no common error or teardown starts on the worker.
+
+Eleven focused Meson tests pass, including production enqueue/GL/Vulkan effect
+consumption across later edits, submitted shadow records and query ages with
+the front-end counter far ahead, and the existing clock/pacing/latency coverage.
+The corrected screenshot/native-UI fixtures and CI test discovery pass locally.
+Build, test and runtime evidence is retained under `.tmp/high-refresh-next/`.
+
+Windowed stock-asset gameplay passed on the staged Windows x64 build: Vulkan
+SP `game/airdefense1`, Vulkan MP `mp/q4dm1` listen host/client and an OpenGL SP
+control. Each role passed all eight classic-domain self-tests, exercised forced
+blur and Alpha Labs enable/disable, and recorded five successful latency-flash
+receipts plus 128 samples with zero gameplay executed during drawing. Vulkan
+also cycled the cap matrix, surface recovery, `vid_restart` and worker toggles;
+its last submitted/completed checkpoints were 1,734/1,734 (SP), 1,254/1,254
+(host) and 1,350/1,350 (client). Shadow GPU queries resolved without dropped
+spans in the inspected MP logs. Engine captures of blur and the final world/HUD
+were inspected; no OS capture or device-input injection was used. A separate
+OpenGL gameplay run passed the updated scene-packet, render-graph/resource,
+modern draw-plan and executor self-tests (including their shader, pixel-transfer,
+probe-atlas and submit-plan subtests).
+
+These shared-domain probes can fall back on scene-packet capacity in the SP
+scene; they do not qualify full shared ownership. The earlier Vulkan
+`NullRenderer` bootstrap label also remains. Unrelated failures in the earlier
+PR CI were the stale generated Demos page, an image-policy mutation fixture
+whose source needle no longer matches, and a macOS MVD navigation negative
+control that did not fail. Their test/production inputs are unchanged by this
+PR. The registration and swap-wrapper fixture failures introduced by this PR
+are fixed and pass locally.
+
+This closes the audited backend error item and part of frame identity, not the
+full stage-2 ownership list. Frame arenas, vertex caches, dynamic snapshots,
+world snapshots, scene packets, temporal state, shared counters and lazy backend
+resources still prevent front-end overlap. Physical qualification and the
+native-resolution Quality floor remain open.

@@ -6,6 +6,27 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## High-refresh frame ownership, 4 November 2026
+
+- **Blur and other controller-driven effects keep the settings of the frame
+  being drawn.** The experimental Vulkan render thread no longer waits merely
+  because the next game tic changes an effect setting. OpenGL consumes the same
+  command snapshots, including forced-effect settings.
+- **Rendering diagnostics and shadow caches keep the submitted frame's
+  identity.** Advancing the front end cannot prematurely age Vulkan timing
+  queries or invalidate a submitted classic deformation record.
+- **Vulkan recording failures return to the main thread safely.** Fatal shadow
+  invariants retain their severity after frame retirement instead of starting
+  renderer teardown on the worker.
+- Validation includes eleven focused native/Meson checks and production-method
+  coverage for queued effect changes, submitted-frame query ages and failure
+  severity. Windowed Vulkan SP/MP host/client and OpenGL SP gameplay passed,
+  including effect toggles, eight classic-domain self-tests per role and engine
+  screenshot review. See [submission evidence](presentation-owners.md#submitted-frame-ownership-4-november-2026).
+- `r_vkRenderThread` and `in_presentationView` remain opt-in. Front-end overlap,
+  the Quality every-frame budget and physical display/latency qualification
+  remain open under HF-07/HF-08 and REN-07. These are unreleased source changes.
+
 ## High-refresh render-thread reliability, 3 November 2026
 
 - **The experimental Vulkan render thread retires every completed frame.**

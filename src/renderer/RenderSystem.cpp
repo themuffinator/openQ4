@@ -311,6 +311,19 @@ static void R_PerformanceCounters( void ) {
 
 
 
+// Preflight runs before the command loop reaches RC_SET_BUFFER. Latch its
+// identity first so backend caches and GPU receipts never observe the next
+// front-end frame. A mid-frame flush without SET_BUFFER retains this identity.
+void RB_BeginCommandFrame( const emptyCommand_t *cmds ) {
+	for ( const emptyCommand_t *cmd = cmds; cmd != NULL;
+			cmd = reinterpret_cast<const emptyCommand_t *>( cmd->next ) ) {
+		if ( cmd->commandId == RC_SET_BUFFER ) {
+			backEnd.frameCount = reinterpret_cast<const setBufferCommand_t *>( cmd )->frameCount;
+			return;
+		}
+	}
+}
+
 /*
 ====================
 R_IssueRenderCommands
@@ -549,7 +562,7 @@ R_AddSpecialEffects
 =============
 */
 void R_AddSpecialEffects( viewDef_t *parms ) {
-	drawSurfsCommand_t *cmd;
+	drawSpecialEffectsCommand_t *cmd;
 	int activeMask;
 
 	if ( parms == NULL ) {
@@ -577,7 +590,7 @@ void R_AddSpecialEffects( viewDef_t *parms ) {
 	}
 
 	if ( ( parms->renderFlags & RF_DEFER_COMMAND_SUBMIT ) != 0 ) {
-		cmd = (drawSurfsCommand_t *)R_GetCommandBufferDeferred(
+		cmd = (drawSpecialEffectsCommand_t *)R_GetCommandBufferDeferred(
 				sizeof( *cmd ) );
 	} else {
 		// Keep this controller command on the same side of the deferred-view
@@ -585,10 +598,12 @@ void R_AddSpecialEffects( viewDef_t *parms ) {
 		// portal-sky/subview draw can land between the special command and the
 		// primary view it captures.
 		R_SubmitDeferredCommands();
-		cmd = (drawSurfsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
+		cmd = (drawSpecialEffectsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
 	}
 	cmd->commandId = RC_DRAW_SPECIAL_EFFECTS;
 	cmd->viewDef = parms;
+	cmd->effects.enabled = activeMask & ( SPECIAL_EFFECT_BLUR | SPECIAL_EFFECT_AL );
+	memcpy( cmd->effects.parms, tr.specialEffectParms, sizeof( cmd->effects.parms ) );
 	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
 		R_ScenePackets_AddSpecialEffects( parms, activeMask );
 	}
@@ -708,10 +723,7 @@ void idRenderSystemLocal::SetSpecialEffect( ESpecialEffectType Which, bool Enabl
 	if ( Which <= SPECIAL_EFFECT_NONE || Which >= SPECIAL_EFFECT_MAX ) {
 		return;
 	}
-	// the backend reads these live while it records the frame
-	if ( ( ( specialEffectsEnabled & Which ) != 0 ) != Enabled ) {
-		R_RenderThread_Sync( "special effect" );
-	}
+	// Values are copied into RC_DRAW_SPECIAL_EFFECTS at view submission.
 
 	if ( Enabled ) {
 		specialEffectsEnabled |= Which;
@@ -721,6 +733,7 @@ void idRenderSystemLocal::SetSpecialEffect( ESpecialEffectType Which, bool Enabl
 		// command without attempting an image load during command recording.
 		if ( Which == SPECIAL_EFFECT_AL && specialALLightImage == NULL
 				&& globalImages != NULL ) {
+			R_RenderThread_Sync( "special effect image" );
 			specialALLightImage = globalImages->ImageFromFile(
 					"gfx/lights/round.tga", TF_LINEAR, TR_CLAMP, TD_DEFAULT );
 		}
@@ -741,10 +754,6 @@ void idRenderSystemLocal::SetSpecialEffectParm( ESpecialEffectType Which, int Pa
 	if ( Parm < 0 || Parm >= MAX_ENTITY_SHADER_PARMS ) {
 		return;
 	}
-	if ( specialEffectParms[ Which ][ Parm ] != Value ) {
-		R_RenderThread_Sync( "special effect" );
-	}
-
 	specialEffectParms[ Which ][ Parm ] = Value;
 }
 

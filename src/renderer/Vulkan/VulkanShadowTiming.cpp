@@ -177,7 +177,7 @@ void VK_ShadowGpuTiming_BeginView( int frameSlot ) {
 		for ( int i = 0 ; i < VK_SHADOW_TIMING_RING_SPANS ; i++ ) {
 			vkShadowTimingSpan_t &span = vkShadowTimingSpans[ i ];
 			if ( span.claimed
-					&& tr.frameCount - span.frameNumber
+					&& backEnd.frameCount - span.frameNumber
 						> VK_FRAMES_IN_FLIGHT ) {
 				VK_ShadowGpuTiming_ReleaseSpan( span );
 			}
@@ -195,7 +195,7 @@ void VK_ShadowGpuTiming_BeginView( int frameSlot ) {
 			// a phase. It holds two queries and will never resolve, so reclaim
 			// it once the command buffer that wrote its begin has retired.
 			if ( !span.open
-					|| tr.frameCount - span.frameNumber
+					|| backEnd.frameCount - span.frameNumber
 						> VK_FRAMES_IN_FLIGHT ) {
 				if ( span.open ) {
 					vkShadowTimingReport.dropped++;
@@ -207,11 +207,11 @@ void VK_ShadowGpuTiming_BeginView( int frameSlot ) {
 		// A span recorded this frame has not been submitted yet, so a
 		// synchronized read of it would wait forever. Only ever resolve spans
 		// from an earlier frame.
-		if ( span.frameNumber >= tr.frameCount ) {
+		if ( span.frameNumber >= backEnd.frameCount ) {
 			vkShadowTimingReport.pending++;
 			continue;
 		}
-		const int age = tr.frameCount - span.frameNumber;
+		const int age = backEnd.frameCount - span.frameNumber;
 		if ( age > VK_SHADOW_TIMING_MAX_SPAN_AGE_FRAMES ) {
 			// Its submission never happened. Reclaim the queries rather than
 			// waiting on a result that will not arrive.
@@ -242,7 +242,7 @@ static int VK_ShadowGpuTiming_ClaimSpan( const vkShadowTimingPhase_t phase ) {
 		span.open = true;
 		span.pending = false;
 		span.phase = phase;
-		span.frameNumber = tr.frameCount;
+		span.frameNumber = backEnd.frameCount;
 		return index;
 	}
 	return -1;
@@ -316,7 +316,7 @@ static void VK_ShadowGpuTiming_ReleaseFrameSpans( const int frameNumber ) {
 }
 
 void VK_ShadowGpuTiming_AbandonView( void ) {
-	VK_ShadowGpuTiming_ReleaseFrameSpans( tr.frameCount );
+	VK_ShadowGpuTiming_ReleaseFrameSpans( backEnd.frameCount );
 }
 
 

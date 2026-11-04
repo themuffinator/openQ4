@@ -114,7 +114,7 @@ static const classicSubviewDomainView_t *VK_ClassicSubview_Preflight(
 void VK_GuiExecutor_SetClearColor( const float color[ 4 ] );
 void VK_GuiExecutor_Draw2DView( const viewDef_t *viewDef );
 void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef );
-void VK_GuiExecutor_PrepareSpecialEffects( const viewDef_t *viewDef );
+void VK_GuiExecutor_PrepareSpecialEffects( const drawSpecialEffectsCommand_t *cmd );
 bool VK_GuiExecutor_SpecialEffectsAwaitResolve(
 		idRenderTexture *sourceRenderTexture );
 void VK_GuiExecutor_DrawResolvedSpecialEffects(
@@ -645,6 +645,7 @@ views arrive with Phase E; RC_SWAP_BUFFERS closes and presents the frame.
 ====================
 */
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
+	RB_BeginCommandFrame( cmds );
 	if ( !glConfig.isInitialized ) {
 		return;
 	}
@@ -788,8 +789,8 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 				break;
 			}
 			case RC_DRAW_SPECIAL_EFFECTS: {
-				const drawSurfsCommand_t *cmd = (const drawSurfsCommand_t *)cmds;
-				VK_GuiExecutor_PrepareSpecialEffects( cmd->viewDef );
+				const drawSpecialEffectsCommand_t *cmd = (const drawSpecialEffectsCommand_t *)cmds;
+				VK_GuiExecutor_PrepareSpecialEffects( cmd );
 				break;
 			}
 			case RC_CLEAR_RENDERTARGET: {

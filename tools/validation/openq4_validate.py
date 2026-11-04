@@ -583,6 +583,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "renderer_render_thread_contract.py",
         root / "tools" / "tests" / "renderer_render_thread_runtime.py",
         root / "tools" / "tests" / "renderer_input_latency.py",
+        root / "tools" / "tests" / "renderer_special_effect_snapshot.py",
+        root / "tools" / "tests" / "renderer_frame_identity.py",
         root / "tools" / "tests" / "presentation_reference_suite_test.py",
         root / "tools" / "tests" / "hdr_postprocess_math.py",
         root / "tools" / "tests" / "idstr_input_safety.py",

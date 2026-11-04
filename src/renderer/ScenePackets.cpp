@@ -138,18 +138,6 @@ static bool R_ScenePackets_IsRenderDemoPlaybackView( const viewDef_t *viewDef ) 
 		&& session->rw == viewDef->renderWorld;
 }
 
-// A command-stream reconstruction has no controller payload. Reproduce the
-// exact admission mask at the point the backend consumes the command so a
-// backend-derived packet retains the same special-frame provenance as the
-// front-end packet.
-static int R_ScenePackets_ActiveSpecialEffectsMask( void ) {
-	int activeMask = tr.specialEffectsEnabled;
-	if ( r_forceSpecialEffects.GetInteger() > 0 ) {
-		activeMask = r_forceSpecialEffects.GetInteger();
-	}
-	return activeMask & ( SPECIAL_EFFECT_BLUR | SPECIAL_EFFECT_AL );
-}
-
 static bool R_ScenePackets_ModernPipelineRequested( void ) {
 	const bool modernVisibleRequested = r_rendererModernVisible.GetBool() || RendererBootstrap_ShouldAutoPromoteModernVisible();
 	const bool advancedLightingLeafRequested = r_rendererModernQuality.GetBool()
@@ -1195,8 +1183,9 @@ bool idScenePacketFrame::AddDrawPacket( const drawSurf_t *drawSurf,
 		materialRecordIndex >= 0 ? &materialRecords[materialRecordIndex] : NULL;
 	const scenePacketCategory_t packetCategory = R_ScenePackets_CategoryForDrawSurf( activeScene >= 0 ? scenes[activeScene].viewDef : NULL, drawSurf, category, cachedMaterialRecord );
 	classicDeformRecord_t classicDeform;
-	const std::uint64_t deformFrameToken =
-		R_ClassicDeformDomain_CurrentFrameToken();
+	const std::uint64_t deformFrameToken = stats.backendDerived
+		? R_ClassicDeformDomain_BackEndFrameToken()
+		: R_ClassicDeformDomain_CurrentFrameToken();
 	if ( deformRole == CLASSIC_DEFORM_ROLE_UNKNOWN ) {
 		deformRole = R_ScenePackets_ClassicDeformRoleForPass( category );
 	}
@@ -2664,9 +2653,9 @@ void R_ScenePackets_BuildLegacyCommandStream( const emptyCommand_t *cmds, idScen
 			R_ScenePackets_AddDrawView( packetFrame, lastDrawView, true );
 			break;
 		case RC_DRAW_SPECIAL_EFFECTS:
-			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_SPECIAL_EFFECTS, reinterpret_cast<const drawSurfsCommand_t *>( cmd )->viewDef, true );
+			R_ScenePackets_AddCommandPass( packetFrame, RENDER_PASS_SPECIAL_EFFECTS, reinterpret_cast<const drawSpecialEffectsCommand_t *>( cmd )->viewDef, true );
 			packetFrame.SetLastSceneSpecialEffectsMask(
-				R_ScenePackets_ActiveSpecialEffectsMask() );
+				reinterpret_cast<const drawSpecialEffectsCommand_t *>( cmd )->effects.enabled );
 			lastDrawView = NULL;
 			break;
 		case RC_SET_RENDERTEXTURE:
@@ -2869,7 +2858,7 @@ bool RendererScenePacket_RunSelfTest( void ) {
 	memset( &drawCmd, 0, sizeof( drawCmd ) );
 	drawCmd.commandId = RC_DRAW_VIEW;
 	drawCmd.viewDef = &worldView;
-	drawSurfsCommand_t fxCmd;
+	drawSpecialEffectsCommand_t fxCmd;
 	memset( &fxCmd, 0, sizeof( fxCmd ) );
 	fxCmd.commandId = RC_DRAW_SPECIAL_EFFECTS;
 	fxCmd.viewDef = &worldView;

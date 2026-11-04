@@ -48,12 +48,23 @@ struct idStrList : idList<idStr> {
 };
 struct idCmdArgs { int Argc()const{return 0;} const char* Argv(int)const{return "";} };
 struct idException { char error[1024]; explicit idException(const char* s){idStr::Copynz(error,s,sizeof(error));} };
+static std::thread::id mainId=std::this_thread::get_id();
+static int drops=0,fatals=0;
+bool R_RenderThread_InFlight();
+void R_RenderThread_Error(const char*,bool fatal=false);
 struct Common {
     template<class... T> void Printf(const char*,T...){}
-    void Error(const char*,const char* message){throw idException(message);}
+    void Error(const char*,const char* message){
+        assert(std::this_thread::get_id()==mainId && !R_RenderThread_InFlight());
+        ++drops;throw idException(message);
+    }
+    void FatalError(const char*,const char* message){
+        assert(std::this_thread::get_id()==mainId && !R_RenderThread_InFlight());
+        ++fatals;throw idException(message);
+    }
 } commonStorage, *common=&commonStorage;
 struct Cmd { void AddCommand(const char*,void(*)(const idCmdArgs&),int,const char*){} } cmdStorage,*cmdSystem=&cmdStorage;
-struct emptyCommand_t { int serial; bool fail; };
+struct emptyCommand_t { int serial; int fail; };
 static bool qualifies=true;
 static bool R_RenderThread_FrameQualifies(){return qualifies;}
 static unsigned long long R_RendererMetrics_CpuClock(){
@@ -67,7 +78,6 @@ void VK_Backend_CompleteThreadedFrame(){++recovered;}
 bool R_RenderThread_InFlight();
 bool R_RenderThread_OnRenderThread();
 void R_RenderThread_Sync(const char*);
-static std::thread::id mainId=std::this_thread::get_id();
 struct RenderSystem {
     void CompleteBackEndFrame(){
         assert(std::this_thread::get_id()==mainId);
@@ -90,7 +100,8 @@ void RB_ExecuteBackEndCommands(const emptyCommand_t* cmd){
         backendWake.wait(lock,[]{return backendReleased;});
     }
     assert(cmd->serial==++executed);
-    if(cmd->fail)throw idException("backend failed before sync");
+    if(cmd->fail==1)throw idException("backend failed before sync");
+    if(cmd->fail>=2)R_RenderThread_Error("recording invariant",cmd->fail==3);
 }
 '''
 
@@ -203,7 +214,26 @@ int main(){
     RB_ClearDebugText(150);
     assert(completed==1006 && !R_RenderThread_InFlight() && rb_numDebugText==1);
     RB_ClearDebugText(200);assert(rb_numDebugText==0);
-    R_RenderThread_Shutdown();
+    for(int kind=2;kind<=3;++kind){
+        cmd={1005+kind,kind};assert(R_RenderThread_Begin(&cmd));WorkerFinished();
+        const int beforeDrops=drops,beforeFatals=fatals;
+        bool receipt=false;
+        try { R_RenderThread_Sync("failed recording"); } catch(const idException& e){
+            receipt=std::strcmp(e.error,"recording invariant")==0;
+        }
+        assert(receipt && completed==cmd.serial && !R_RenderThread_InFlight());
+        assert(drops==beforeDrops+(kind==2) && fatals==beforeFatals+(kind==3));
+        R_RenderThread_Sync("failure receipt consumed exactly once");
+    }
+    cmd={1009,0};assert(R_RenderThread_Begin(&cmd));WorkerFinished();
+    R_RenderThread_Shutdown();assert(completed==1009 && !rt_thread.joinable());
+    // Inline rendering uses the same severity without creating a worker receipt.
+    for(bool fatal : {false,true}){
+        const int before=fatal?fatals:drops;
+        try { R_RenderThread_Error("inline invariant",fatal); assert(false); }
+        catch(const idException& e){assert(std::strcmp(e.error,"inline invariant")==0);}
+        assert((fatal?fatals:drops)==before+1);
+    }
 }
 '''
 
@@ -228,7 +258,7 @@ def main():
         exe = temp / ("handoff.exe" if os.name == "nt" else "handoff")
         subprocess.run([compiler, "-std=c++20", "-pthread", str(cpp), "-o", str(exe)], check=True)
         subprocess.run([str(exe)], check=True, timeout=30)
-    print("Render-thread handoff: fast/slow frames, exactly-once retirement, errors, disable, shutdown, restart and world teardown passed")
+    print("Render-thread handoff: fast/slow frames, exactly-once retirement, recoverable/fatal errors, disable, shutdown, restart and world teardown passed")
 
 
 if __name__ == "__main__":

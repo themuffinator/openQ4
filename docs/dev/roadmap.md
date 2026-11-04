@@ -332,8 +332,21 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   and acquire/present recovery. Windowed Vulkan SP/MP host/client and OpenGL SP
   checks pass with five successful flash receipts per role and no gameplay in
   sampled draws; see [lifetime evidence](presentation-owners.md#threaded-lifetime-validation-3-november-2026).
-  These are correctness prerequisites; stage 2,
-  the every-frame Quality floor and physical reference qualification remain open.
+  Progress, 4 November: special-effect commands now snapshot their enable mask
+  and parameters, including forced effects, for both GL and Vulkan. Changing
+  controller values during the next game tic no longer waits for the worker;
+  resource creation and teardown still synchronize. Backend preflight latches
+  the command's frame number before preparing resources. Vulkan shadow-cache
+  stamps, GPU/query/readback ages, classic deformation validation and clustered
+  generations use that submitted frame, independently of the front-end counter.
+  The four Vulkan interaction/shadow failure paths now unwind recording and
+  deliver recoverable/fatal receipts after main-thread retirement. Executable
+  tests cover queued views across edits/reset, an advanced front-end counter,
+  current-frame queries that must not retire, and fatality preservation. Test
+  registration and the earlier swap-wrapper test fixtures are repaired too.
+  See [submission evidence](presentation-owners.md#submitted-frame-ownership-4-november-2026).
+  These are correctness prerequisites; front-end overlap, the every-frame
+  Quality floor and physical reference qualification remain open.
   Progress: targets, budgets and the measurement procedure are declared in the
   [presentation owners contract](presentation-owners.md), with
   `presentation_look_runtime.py` for engine-side latency and smoothness; its
@@ -849,13 +862,18 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
          `FreeLightDef`'s `referencedFrameNum == tr.frameCount` test must also
          cover the frame in flight. Entity, decal and effect-model frees defer
          per frame.
-      5. **Frame identity.** The backend stamps and ages by `tr.frameCount`:
-         shadow caches and `VK_ShadowMap_LightState`, GPU timing, readbacks and
-         clustered generations. The classic domains validate front-end tokens
-         against `tr.frameCount + 1`. All of them must use the command's
-         `backEnd.frameCount`. `tr.primaryView`, `tr.specialEffects*`,
-         `tr.takingScreenshot` and `glConfig` are read live and need per-frame
-         copies.
+      5. **Frame identity — partially implemented, 4 November.** Both backends
+         latch `RC_SET_BUFFER` before preflight; partial command flushes retain
+         that identity. Vulkan shadow caches and `VK_ShadowMap_LightState`, GPU
+         timing/query retirement, readbacks and clustered generations now use
+         `backEnd.frameCount`. Classic domains validate deformation records
+         against the backend token; packet reconstruction selects the matching
+         front-end/backend token explicitly. `RC_DRAW_SPECIAL_EFFECTS` owns its
+         mask and parameters through GL/Vulkan consumption, removing the
+         controller setters' per-tic waits. `tr.primaryView`,
+         `tr.takingScreenshot` and `glConfig` still need per-frame copies;
+         effect resource lifetime and the Alpha Labs live-light walk remain
+         guarded. This does not yet permit overlapping front ends.
       6. **Scene packets.** There is one global front-end packet frame, cleared
          by `BeginFrame`, with shared lookup-slot tables. It needs one frame per
          frame in flight.
@@ -874,9 +892,14 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
          availability and area images, and `SetSamplerState` on shared images
          all run there. Move them to the front end, or to the main thread at
          hand-off.
-      10. **Errors.** Remove the `common->Error` and `FatalError` paths that
-          tear the renderer down from inside the backend: two in
-          `vk_Interactions.cpp`, two in `vk_ShadowMap.cpp`.
+      10. **Errors — implemented, 4 November.** The two interaction failures
+          and two fatal shadow invariants now use `R_RenderThread_Error`.
+          A worker unwinds into a failure receipt; the main thread releases
+          ownership, retires the frame, then raises the original severity.
+          Inline execution preserves ordinary/fatal behavior. The production
+          worker test covers both severities, exactly-once collection and a
+          subsequent successful frame (fatal teardown is a controlled test
+          boundary).
 - [ ] **REN-08 — P1, qualification and targeted implementation: complete post-
   processing combinations.** Qualify motion blur independently of TAA: it has its
   own history, limited rigid-opaque object vectors and subview/time-gap resets;

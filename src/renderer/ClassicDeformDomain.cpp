@@ -489,6 +489,11 @@ std::uint64_t R_ClassicDeformDomain_CurrentFrameToken( void ) {
 		static_cast<std::uint32_t>( tr.frameCount ) ) + 1ull;
 }
 
+std::uint64_t R_ClassicDeformDomain_BackEndFrameToken( void ) {
+	return static_cast<std::uint64_t>(
+		static_cast<std::uint32_t>( backEnd.frameCount ) ) + 1ull;
+}
+
 void R_ClassicDeformDomain_BeginDrawSurf( drawSurf_t *drawSurf ) {
 	if ( drawSurf == NULL ) {
 		return;
@@ -577,7 +582,7 @@ void R_ClassicDeformDomain_SnapshotDrawSurf( const drawSurf_t *drawSurf,
 				== CLASSIC_DEFORM_ROLE_FINALIZED_DRAW
 			&& drawSurf->classicDeform.frameToken == frameToken
 			&& R_ClassicDeformDomain_RecordMatchesDrawSurf(
-				drawSurf->classicDeform, drawSurf ) ) {
+				drawSurf->classicDeform, drawSurf, frameToken ) ) {
 		record = drawSurf->classicDeform;
 		return;
 	}
@@ -640,10 +645,9 @@ bool R_ClassicDeformDomain_ValidateRecordForFrame(
 }
 
 bool R_ClassicDeformDomain_RecordMatchesDrawSurf(
-		const classicDeformRecord_t &record, const drawSurf_t *drawSurf ) {
+		const classicDeformRecord_t &record, const drawSurf_t *drawSurf, std::uint64_t frameToken ) {
 	if ( drawSurf == NULL
-			|| !R_ClassicDeformDomain_ValidateRecordForFrame( record,
-				R_ClassicDeformDomain_CurrentFrameToken() )
+			|| !R_ClassicDeformDomain_ValidateRecordForFrame( record, frameToken )
 			|| record.resultMaterial != drawSurf->material ) {
 		return false;
 	}

@@ -98,7 +98,7 @@ def validate_sealed_domain() -> None:
     ):
         require(demo_classifier, token, "exact render-demo provenance")
     require(packets, "SetLastSceneSpecialEffectsMask(", "special-effects source capture")
-    require(packets, "R_ScenePackets_ActiveSpecialEffectsMask", "backend packet reconstruction")
+    require(packets, "reinterpret_cast<const drawSpecialEffectsCommand_t *>( cmd )->effects.enabled", "backend packet reconstruction")
     require(packets_header, "bool\t\t\t\t\trenderDemoPlayback;", "render-demo packet state")
     require(packets_header, "void SetLastSceneSpecialEffectsMask", "packet mutation API")
 
