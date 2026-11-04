@@ -2,12 +2,108 @@
 
 > **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.13.2 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
-Updated 23 October 2026. Stage-one implementation and tested source:
-`7674acef91c2653e8c6153ae11e7b158c05e52ff`. The
-[baseline evidence record](baseline-evidence.md) binds current native tests,
-windowed gameplay and original-content controls to their exact source, binaries
-and assets. Historical findings retain their original evidence scope; source-only
-risks and remaining device/performance qualification are identified separately.
+Updated 4 November 2026. The progress review below uses the integrated source and
+recorded evidence through `c09500893cea22bd7becd7a1b6ece5439c408cde`;
+uncommitted changes and work on other branches are not credited. This documentation
+review did not rerun gameplay or qualify a new package. Each evidence entry retains
+its own tested source, binaries, assets and limitations. The earlier stage-one
+baseline is `7674acef91c2653e8c6153ae11e7b158c05e52ff`, recorded in
+[baseline evidence](baseline-evidence.md); it is not the revision of every later test.
+
+## Progress overview
+
+**Implementation is substantially ahead of formal acceptance.** High refresh,
+multiplayer and audio are furthest along among the unfinished workstreams. Full
+campaign progression, physical-device qualification, rendering performance and the
+UI toolkit/editor/corpus remain major completion gates.
+
+| Progress measure, 4 November 2026 | Current result | Meaning |
+| --- | --- | --- |
+| Formally closed roadmap tasks | **15 / 115 (13.0%)** | **100 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-08, not partial substeps. |
+| Estimated category progress | **18 categories: 1 at 100%, 15 partial, 2 at 0%** | Includes one paused category (map tools); the detailed estimates follow. |
+| UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
+| UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
+| Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
+| Release acceptance | **0 / 4 REL tasks closed** | Current-source progress is unreleased; 0.13.2 remains the available release under the recorded release-status policy. |
+
+### Category completion estimates
+
+These are engineering judgments of progress toward each category's stated scope,
+including implementation, integration and qualification. They are **not measured
+fractions of effort, support certifications or release-readiness percentages**.
+Allow roughly **±10 percentage points** for partial categories. A 0% means no
+implementation/baseline acceptance is credited beyond the proposed scope; 100%
+means the bounded category gates are closed, not that maintenance ends.
+
+Credit working production paths and scoped behavioral evidence; retain substantial
+remaining work for missing semantics, end-to-end play, physical devices, performance
+and final-package acceptance. Do not average these percentages into a project total:
+categories differ greatly in size, overlap through dependencies and include optional
+work. Optional P3 scope remains labelled in its task; the nine OPT decisions have no
+accepted implementation denominator and are excluded. The task closure column is
+exact; the estimate column is deliberately approximate.
+
+| Category / task family | Estimated completion | Tasks closed | Principal remaining work |
+| --- | ---: | ---: | --- |
+| [Governance and baseline evidence](#governance-and-baseline-evidence) — GOV | **100%** | 3 / 3 | Maintain evidence/default alignment as later changes land. |
+| [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
+| [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
+| [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
+| [Virtual reality](#virtual-reality) — VR | **35%** | 1 / 6 | Vulkan/EGL/Quest integration, floor calibration and real-headset gameplay. |
+| [Android and mobile rendering](#android-and-mobile-rendering) — AND | **55%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, editable layouts and Quest. |
+| [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
+| [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
+| [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 8 | Full playthroughs, effect parity, broader restore graphs and platform/save evidence. |
+| [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **0%** | 0 / 6 | Measured baseline, enhanced solvers, behavior preservation and integration. |
+| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 2 / 9 | Bot safety/timing, human play, physical workflows and deferred peer qualification. |
+| [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
+| [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
+| [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
+| [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
+| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **45%** | 0 / 6 | Final-package lifecycle, measured loading/background work, parser and compiler coverage. |
+| [Developer map tools](#tool-completion-checkpoints) — TOOL | **20%** | 0 / 4 | Paused: production geometry authoring, build/play integration and reliability. |
+| [Release qualification](#release-qualification-and-completion-rules) — REL | **35%** | 0 / 4 | Exact package matrix, human/device evidence, lifecycle and promotion records. |
+| [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
+
+### Reading and maintaining completion checkpoints
+
+Every category below has a current breakdown by its existing task IDs. **Closed**
+means that task's selected acceptance scope is closed; **partial** means useful
+implementation or evidence exists but its full gate remains open; **not started**,
+**decision pending** and **paused** distinguish the other states. A row's
+remaining column supplies the next completion substeps, not a new parallel backlog.
+The detailed task retains its full conditions and evidence links.
+
+- Update a checkpoint, its estimate, the dashboard counts and relevant evidence
+  together. Do not close a task merely to align it with its estimated percentage.
+- Dated progress paragraphs are historical checkpoints. A later result supersedes
+  an earlier remaining-work statement only for the same behavior and configuration;
+  failed runs, unsupported cases and untested platforms remain evidence.
+- A test harness, synthetic device or map-start probe earns only its demonstrated
+  scope. It cannot substitute for physical interaction, sustained performance or
+  an ordered playthrough. A code fix still needs its applicable acceptance tests.
+- Preserve deliberate scope boundaries: MP-05's selected demo scope, VR-06's active
+  GL lifecycle scope, optional Q4-06/VR-05/PKG-06/IOS-06 work, the map-editor pause
+  and the deferred real-WAN/cross-architecture MP peer gates.
+
+### Status reconciliation in this review
+
+- **Player Setup:** implemented in the Multiplayer page, with 2 November effect/
+  readback evidence and 3 November scale/tall-layout work. Earlier statements that
+  the page is missing are historical; full UI/editor/device acceptance remains.
+- **Liquids:** the AAS water-jump flag defect is fixed and generated swim/water-jump
+  links are checked. Static liquids, player/bot swimming and replicated air are
+  selected scope; swimming monsters, new animations and moving volumes are deferred.
+- **Compiled geometry:** CORE-05 now reflects the repaired `hub2` sliver explosion
+  and silhouette scratch, with compile/load/save evidence. The independently
+  reported `airdefense1` compiler stop still needs its exact inputs/reproduction.
+- **Saves:** v5 portable encoding and Windows/Linux cross-loads exist; legacy readers,
+  Apple/ARM64 qualification and historical-mod failures keep their separate gates.
+- **Evidence limits:** the UI register remains wholly unaccepted at product level;
+  Q4-07 records missing historical `.tmp/stage-two/` artifacts. Their recorded hashes
+  preserve provenance but do not make absent artifacts independently reviewable.
+
+## Planning authority
 
 This is the single active development plan for openQ4. It consolidates the
 outstanding implementation, integration, compatibility and release qualification
@@ -45,6 +141,9 @@ future work and decisions are coordinated here.
   accountable workstream, exact source entry points, a failing/reproduction case
   where applicable, regression checks and the evidence required for its exit.
   Existing source-token checks establish contracts, not behavior or timing.
+- Keep the progress overview and category checkpoints synchronized with accepted
+  evidence. Historical test counts and dated results describe their original build,
+  not an assertion that the same suite or package has just been rerun.
 - Keep completed release material in [release completion](release-completion.md)
   and polished player notes in `releases/`. Those are release records, not a
   second development backlog. Keep the [capability matrix](engine-capability-matrix.md)
@@ -56,7 +155,8 @@ future work and decisions are coordinated here.
 
 ## Report and contribution traceability
 
-Reviewed 31 October 2026. These links connect the reports and contributions
+Locally reconciled 4 November 2026 against the evidence recorded below; this is not
+a fresh GitHub status check. These links connect the reports and contributions
 to the existing workstreams; they do not create separate schedules or promise a
 release. GitHub remains the source for subsequent discussion and PR/check state.
 
@@ -65,7 +165,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | [#168: disappearing menu text after preset changes](https://github.com/themuffinator/openQ4/issues/168) | UI-01/UI-07, REN-04: the earlier glyph reload fix is partial evidence; qualify current GL/Vulkan preset changes and seek confirmation of the intermittent symptom. The verified 31 October replacement package (`f0a86b0ec`, #205) was offered for the retest. |
 | [#169: resolution scaling affects menus](https://github.com/themuffinator/openQ4/issues/169) | REN-04/UI-07: the contributor's 22 October Linux/OpenGL retest preserves menu sharpness in mode 1. Since 31 October legacy mode 0 crops only the full-display world render instead of the whole frame. At 25% on Windows x64, GL and Vulkan, the retained and stock title menus, the SP pause menu and the SP/MP HUD now match their native-resolution captures, including after `vid_restart`; MP keeps the world-in-corner fill-rate view. Await the reporter's confirmation; Linux, macOS and window resizing were not rechecked. |
 | [#170: weapon effects, sound and reload animation](https://github.com/themuffinator/openQ4/issues/170) | Q4-03/AUD-01/HF-04: preserve the merged BSE sound-diversity fix; identify and qualify each remaining weapon/effect/animation symptom separately. The 26 October package could not save; the verified 31 October replacement (`f0a86b0ec`, #205) was offered for the retest. |
-| [#181: rebuilt hub2 cannot load](https://github.com/themuffinator/openQ4/issues/181) | CORE-05: the compiler allocation crash was fixed by #182. The oversized surface came from zero-area slivers: T-junction repair kept splitting them after the map's 345 pipe patches moved to explicit 10×10 subdivision, leaving 12,302,653 of 12,601,692 triangles (97.6%) collinear. Since 31 October repair leaves slivers unsplit. The reporter's map compiles in about two minutes to 298,438 triangles (largest surface 153,000 indexes), loads into single-player gameplay and saves; stock `hub2` loses 55 slivers and two near-slivers. Since 1 November the renderer sizes its silhouette edge scratch to each surface instead of stopping at 65,536 edges, so the map's 78,794-edge pipe surface keeps every edge and loads without `MAX_SIL_EDGES` warnings (previously 25,951); no stock content reached the limit. Remaining: the reporter's retest once a build with both fixes is available. See [dmap compilation](dmap-compilation.md#sliver-multiplication-in-t-junction-repair-31-october-2026) and [silhouette edges](dmap-compilation.md#silhouette-edges-on-large-surfaces-1-november-2026). |
+| [#181: rebuilt hub2 cannot load](https://github.com/themuffinator/openQ4/issues/181) | CORE-05: the compiler allocation crash was fixed by #182. The oversized surface came from zero-area slivers: T-junction repair kept splitting them after the map's 345 pipe patches moved to explicit 10×10 subdivision, leaving 12,302,653 of 12,601,692 triangles (97.6%) collinear. Since 31 October repair leaves slivers unsplit. The reporter's map compiles in about two minutes to 298,438 triangles (largest surface 153,000 indexes), loads into single-player gameplay and saves; stock `hub2` loses 55 slivers and two near-slivers. Since 1 November the renderer sizes its silhouette edge scratch to each surface instead of stopping at 65,536 edges, so the map's 78,794-edge pipe surface keeps every edge and loads without `MAX_SIL_EDGES` warnings (previously 25,951); no stock content reached the limit. The 4 November traceability update for #209 records the #181 reporter's confirmation that the rebuild succeeds; broader compiler acceptance remains CORE-05. See [dmap compilation](dmap-compilation.md#sliver-multiplication-in-t-junction-repair-31-october-2026) and [silhouette edges](dmap-compilation.md#silhouette-edges-on-large-surfaces-1-november-2026). |
 | [#183: machinegun transparency](https://github.com/themuffinator/openQ4/issues/183) | Q4-01/VK-04/REN-08: closed on 28 October after the reporter confirmed the `2126a232` scope corrections on both GL/Vulkan, in separate and normal installations. This is a development fix, not a new release. The test package's separate save failure (#205) was fixed by #203; the replacement package and instructions were posted here on 31 October. |
 | [#184: Tech Li at the hangar1 lift](https://github.com/themuffinator/openQ4/issues/184) | Q4-02: the supplied save identifies the Turbo/scripted-mover timing race; #198's fix landed on main in `2677fb87b` (29 October). The fresh stock boarding/lift/exit sequence passes on OpenGL and Vulkan on 4 November, and removing the mover exemption reproduces the stall. #189 is separate unreachable-patient recovery. The fix does not repair already-stuck saves, which still need a pre-lift save. |
 | [#185: GOG offline installation on macOS](https://github.com/themuffinator/openQ4/issues/185) | PLAT-04/REL-01: provide extraction/path guidance and qualify the reporter's installer/package combination; do not imply that openQ4 imports Windows installers. |
@@ -97,9 +197,9 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | Modern rendering | Native GL/Vulkan PBR is default-on for authored PBR materials; stock materials stay classic. Shared classic rendering domains exist but remain default-off. Aggregate modern-visible lighting still has `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; these are different promotion decisions. |
 | Temporal rendering | Automatic TAAU supports subnative bilinear/bicubic scaling and dynamic resolution on eligible desktop GL/Vulkan paths; crop/nearest modes and VR are excluded. Rigid, skinned and first-person weapon motion vectors and reactive effect coverage exist. Dynamic resolution and GPU skinning remain opt-in. GLES has no temporal resolve. |
 | VR | The active source implements OpenGL PC OpenXR, stereo, tracked input, room scale, crouch, two-handed aiming, haptics, comfort controls and vehicle views. Vulkan/EGL/Quest work is recoverable from archived history, not active implementation. Real-headset qualification remains open. |
-| Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Device qualification and integration of archived onboarding/touch/lifecycle work remain open. |
+| Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Onboarding/import/export, touch and several lifecycle repairs are integrated with scoped S25/emulator evidence. Remaining host/layout work and physical device/lifecycle breadth stay open under AND-01 through AND-05. |
 | UI | Many retained screens and HUDs now run by default. The register preserves 352 rows, 312 active requirements and 40 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
-| Retail and Awakening | Canonical SP/MP sources and BSE are in-tree. Awakening is additive SP content under `q4xbase`, not a separate multiplayer module. Retail decl and BSE audits have already resolved extensive earlier gaps. |
+| Retail and Awakening | Canonical SP/MP sources and BSE are in-tree. Awakening is additive SP content under `q4xbase`, not a separate multiplayer module. Retail decl/BSE audits, stock transition chains and selected Awakening-state probes have scoped evidence; full playthroughs remain open. Saves now write portable v5 with Windows/Linux cross-load evidence while retaining legacy readers; other target qualification remains Q4-06/Q4-07. |
 | Multiplayer | Dual-stack networking, pure asset checks and bounded rcon2 exist. Actual MP defaults are `net_mpLagCompensation 0` and `net_mpPredictMode 0`. Clients advertise bounded remote extrapolation, and server rewind subtracts it from the displayed pose age; the coupled implementation and remaining peer qualification are recorded under MP-07. Retail 2.85 interoperability is outside the current openQ4 2.41 protocol contract. |
 | Platforms | Windows x64 and Linux x64/Steam Deck are first-class platform targets; macOS arm64 and Linux ARM64 are previews; Windows ARM64 and Android are experimental. iOS, iPadOS and visionOS run only in an external port pinned to withdrawn `v0.14.000`; integration is IOS-01 through IOS-06. Renderer tiers are separate from platform tiers. |
 | Foundations and tools | The bounded job service, worker DDS prefetch, generated-cache experiments, native dmap/AAS commands, save-format compatibility readers and experimental map workspace already exist. Their remaining scope is defined below. |
@@ -109,8 +209,8 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | Stage | Work to conduct | Exit condition |
 | --- | --- | --- |
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
-| 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07, MP-01 through MP-08, AUD-01; selected VR-01/VR-06 and AND-01/AND-03 scope | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
-| 3. Improve motion and rendering | HF-03 through HF-08, VK-01 through VK-07, REN-01 through REN-08 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
+| 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
+| 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope and REN-01 through REN-08 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
 | 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
 | 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
@@ -137,6 +237,20 @@ to a final project-wide phase. Important dependencies are:
 | Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
 
 ## Governance and baseline evidence
+
+### GOV completion checkpoints
+
+**Estimate: 100%; 3/3 tasks closed.** This closes the defined baseline exercise.
+Later changes still need their own evidence; it does not certify all current
+packages or turn historical suite counts into current results.
+
+| Task / state | Completed points and evidence | Remaining subpoints / maintenance boundary |
+| --- | --- | --- |
+| GOV-01 — Closed | Source/default ownership reconciled; capability, platform and audio/network claims aligned at the baseline. | Reconcile new defaults and scope changes before promotion; retain unsupported cases explicitly. |
+| GOV-02 — Closed | 83 historical entries mapped; 74 relevant contracts/fixtures recovered; native clock/platform probes registered in Meson and CI. | Keep discovery and CI execution intact as tests evolve; later full-suite runs retain their own build identity. |
+| GOV-03 — Closed | Workload identity, binary/asset hashes, timing policy, failures and original-content controls recorded. | Bind every new performance/support claim to its actual workload; restore missing artifacts or rerun before reusing evidence. |
+
+### GOV task evidence and acceptance
 
 - [x] **GOV-01 — P0, qualification: reconcile current scope and defaults.** Audit
   current source, capability/support claims and remaining historical findings.
@@ -184,6 +298,25 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
 `src/game/Game_local.cpp`, `src/framework/async/AsyncServer.cpp` and
 `src/framework/UsercmdGen.cpp`.
 
+### HF completion checkpoints
+
+**Estimate: 80%; 6/8 tasks closed.** Presentation implementation is mature within
+its declared exclusions. The remaining work includes a failing performance target,
+not merely paperwork or a final screenshot.
+
+| Task / state | Completed points and evidence | Remaining subpoints / closure boundary |
+| --- | --- | --- |
+| HF-01 — Closed | Clock ownership specified; million-tick scheduling and deterministic state/event fixtures pass. | Keep simulation and presentation clocks separate; physical pacing belongs to HF-07. |
+| HF-02 — Closed | Shared high-resolution fractional phase; frozen scene samples; SP/MP runtime and reset coverage. | Preserve integer API boundaries and XR host/display clock distinction. |
+| HF-03 — Closed | Opt-in late look consumes input once; production/native and live SP evidence establishes the scoped implementation. | Default stays off; remote-play and physical checks are tracked by HF-08. |
+| HF-04 — Closed | View lights, debris/trails and active ragdoll draw ownership implemented; other categories have explicit dispositions. | Keep authoritative events unchanged; human motion review remains HF-08. |
+| HF-05 — Closed | Alternate/spectator cameras interpolate with cut/reset rules; vehicle and remote-body policies documented. | Playing clients' remote bodies remain on the tick; do not silently broaden this closure. |
+| HF-06 — Closed | Cross-system probes cover exactly-once gameplay, TAA, shadows, save/load, restart, demos, AVI and simulated stereo. | Physical motion/headset review remains HF-08/VR-02. |
+| HF-07 — Partial | Cap/policy matrix, precise wait, pacing histograms, present timing, reference runner and CPU attribution exist. | Meet the Quality every-frame floor and declared 240 Hz budgets; run foreground reference, VSync/VRR and physical display checks. 360 Hz remains experimental. |
+| HF-08 — Partial | Loopback host/client, zoom, lift, loss/jitter, rapid-turn and cockpit probes pass; sensor/review tooling exists. | Measure click-to-photon latency; review cuts, weapons/TAA, debris and ragdolls in motion; retain vehicle late-look exclusion. |
+
+### HF task evidence and acceptance
+
 - [x] **HF-01 — P0, decision and qualification: specify clock ownership.** Preserve
   exact scheduling versus the current 16 ms game/snapshot clock unless a separate
   gameplay-timing project is accepted. Specify wall, usercmd, game, prediction,
@@ -192,7 +325,8 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   event ordering and unchanged gameplay across presentation caps. Completed:
   [clock ownership contract](presentation-clock.md), one-million-tick production
   scheduler/SP/MP/network agreement and deterministic event/state fixtures across
-  presentation caps. Full game replay and physical pacing remain HF-06/HF-07.
+  presentation caps. Cross-system qualification subsequently closed under HF-06;
+  reference pacing and physical review remain HF-07/HF-08.
 - [x] **HF-02 — P1, implementation: improve fractional presentation precision.**
   Replace or justify millisecond-quantized draw-phase sampling using one
   high-resolution monotonic tick-phase source and one frozen scene sample. Keep
@@ -397,6 +531,24 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
 [authored programs](vulkan-material-programs.md), [HDR](vulkan-hdr.md), and
 [point-shadow evidence](vulkan-point-shadow-parity.md).
 
+### VK completion checkpoints
+
+**Estimate: 70%; 1/7 tasks closed.** Windows NVIDIA/Intel qualification and bounded
+laboratory results earn implementation credit. Failed strict image/pacing checks
+and untested drivers remain open, with no tolerance or support-tier change.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions and exact-package budgets. |
+| VK-02 — Partial | Host/GPU/presentation diagnostics and controlled preset selection exist; six failed diagnostic repeats retained. | Obtain foreground/direct/hybrid/power controls; meet repeated visible pacing budgets or approve an evidence-backed scope limitation. |
+| VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
+| VK-04 — Partial | Authored GLSL/ARB, reload repair, fallback policy and small/padded-source version eviction tested; integrated lighting controls pass. | Fix/resolve the unchanged strict five-pixel image failure; cover descriptor/uniform/pipeline exhaustion, broader authored lighting and mod content. |
+| VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
+| VK-06 — Partial | Resource counters and workload profiles exist; several proposed mechanisms have measured deferral reasons. | Demonstrate improved tails and bounded caches in matched runs/soaks; preserve ordering and restart lifetimes before promoting any optimization. |
+| VK-07 — Partial | Readback inventory, failed-write handling and 4x/8x MSAA resize/restart/cubemap comparisons pass. | Remaining debug/depth/stencil/nested-target combinations; frame identity and bounded deferred resources across the broader matrix. |
+
+### VK task evidence and acceptance
+
 - [ ] **VK-01 — P1, qualification: extend the supported driver/platform matrix.**
   Preserve Windows x64 NVIDIA/Intel support and qualify AMD, physical Linux GPUs
   and MoltenVK on real Apple hardware separately. Cover stock SP/MP, restarts,
@@ -540,6 +692,26 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
 [capability matrix](engine-capability-matrix.md), [GPU skinning](gpu-skinning-modernization.md),
 [PBR production evidence](archive/2026-10-18/plans/2026-10-04-pbr-production-readiness.md) and
 [shadow production audit](shadowmapping-final-audit-2026-09-05.md).
+
+### REN completion checkpoints
+
+**Estimate: 50%; 0/8 tasks closed.** PBR, temporal features and shared rendering
+domains already exist. Aggregate modern lighting still has
+`MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; neither feature presence nor domain
+diagnostics establish whole-frame ownership or production performance.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| REN-01 — Partial | Shared classic GUI/world/interaction/fog/deform/subview/post domains have scoped implementations and contracts. | Qualify each on fresh GL/Vulkan packages: executed ownership, matching appearance, zero-commit rollback, human review and platform breadth. |
+| REN-02 — Partial | Shared material/light contracts and corridors provide foundations. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
+| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. | Continuous-motion scenes, dynamic/cutout/custom receivers, static/live composition, bounded resources and safe retained-light fallback. |
+| REN-04 — Partial | Rigid/skinned/weapon vectors, reactive coverage, TAAU and opt-in dynamic resolution exist. | Disocclusion, failed presents, cuts, multiple views, stale timing and scale recovery; native UI isolation and immediate fallback. |
+| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. | Residual Intel/software-renderer differences, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
+| REN-06 — Partial | Probe capture/grid infrastructure and default-off froxel/SSR/SSGI leaves exist. | Source admission/storage/size limits, provenance, reload/atlas exhaustion, cold-miss budgets and combined effects with exact master-off rollback. |
+| REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
+| REN-08 — Partial | Motion blur and desktop post-processing paths exist. | Motion blur independently of TAA; skinned/weapon vectors, subviews, time gaps and HDR/bloom/SSAO/scaling combinations on each backend. |
+
+### REN task evidence and acceptance
 
 - [ ] **REN-01 — P1, qualification: promote shared classic domains individually.**
   Finish fresh-package GL/Vulkan acceptance for root GUI, in-world GUI, ambient,
@@ -900,6 +1072,23 @@ Sources: [OpenXR implementation history](archive/2026-10-18/plans/2026-10-02-ope
 [player guide](../user/vr.md) and current
 `src/sys/openxr/OpenXRSystem.cpp`.
 
+### VR completion checkpoints
+
+**Estimate: 35%; 1/6 tasks closed.** Credit the active desktop OpenGL path and
+its fault handling. Archived backends and synthetic stereo results do not qualify
+a headset, its comfort, or standalone Quest.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| VR-01 — Partial | Archived-change inventory and recovery/dependency review complete. | Integrate selected Vulkan/EGL/Quest/world-GUI changes against current APIs; test GPU ownership, restart/loss and headset submission without desktop presentation. |
+| VR-02 — Partial | Active GL stereo, tracking/input, room scale, aiming, haptics and comfort controls provide the testable implementation. | Real-headset combat, refresh/latency, controls, collision, vehicles, HUD/world-GUI readability and recovery. |
+| VR-03 — Not started | Existing room-scale/crouch behavior is a foundation, not a completed space-calibration contract. | Define LOCAL/STAGE/floor fallback, recenter and seated/standing transitions; verify body alignment without double movement. |
+| VR-04 — Not started | No accepted hardware stereo-cost baseline closes this task. | Profile both-eye CPU/GPU tails; share view-independent work while preserving per-eye culling and exactly-once effects. |
+| VR-05 — Decision pending; optional P3 | Temporal features remain excluded in VR. | Select per-eye history/reset/scale and interaction scope; design, implement and qualify only that approved scope. |
+| VR-06 — Closed | Active GL teardown/ownership repair passes native failure cases and simulated-runtime SP/MP gameplay. | Carry guarantees into VR-01 backends; physical controller/headset validation remains VR-02. |
+
+### VR task evidence and acceptance
+
 - [ ] **VR-01 — P1, integration: review recoverable Vulkan/EGL/Quest changes.**
   Review `archive/worktree-wtq-quest-vr`, especially `0d83c14c4` (Vulkan),
   `f98a1d247` (headset rendering without desktop presentation), `4b5e0c4f9`
@@ -956,6 +1145,22 @@ Sources: [OpenXR implementation history](archive/2026-10-18/plans/2026-10-02-ope
 Sources: [Android build and packaging](android-build.md),
 [port integration and credits](android-gles-integration.md),
 [standalone host](../../mobile/android/README.md).
+
+### AND completion checkpoints
+
+**Estimate: 55%; 0/5 tasks closed.** Onboarding, touch and several lifecycle
+repairs are already integrated; they are not all still archived. S25 and emulator
+checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| AND-01 — Partial | Phone/emulator scope, startup ownership, UI-thread binding, background handling, Back/cutouts and touch controls repaired; S25 save/touch/audio checks exist. | Remaining host/input recovery, editable/portrait layouts, suspend/process death/network resume and Quest-specific flavor verification. |
+| AND-02 — Partial | GLES3 build/package infrastructure and narrow S25/emulator gameplay evidence exist. | Physical Adreno/Mali and API breadth; SP/MP transitions, device input/audio, thermal/storage/aggregate memory and sustained performance. |
+| AND-03 — Partial | Verified package repair/import, localized setup, settings return, control/interface setup and save/log export implemented; scoped device round trips pass. | Release-signing continuity; cloud/removable providers; interrupted-process recovery; physical setup/accessibility and upgrade matrix. |
+| AND-04 — Partial | Touch presets, UI/text sizing, retained safe areas and HUD safe-area positioning exist. | Device-based presets and GLES limits; keyboard/touch targets, full overlay editing, cutouts/gesture bars/folds/multi-window qualification. |
+| AND-05 — Not integrated | Quest recovery sources are identified under VR-01/AND-01. | Dedicated verified flavor, installation/assets, stereo/controller UI, comfort/session recovery and sustained thermal/refresh budgets; distribution decision. |
+
+### AND task evidence and acceptance
 
 - [ ] **AND-01 — P1, integration: recover onboarding, controls and lifecycle work.**
   Review archived Android changes for touch controls (`486ecf735`), diagnostics/
@@ -1151,6 +1356,23 @@ the platform layer, game-library changes land in `src/game` and `src/mpgame`,
 displayed text goes through the language tables, and the port's author is
 credited in `AGENTS.md`, `README.md` and the release notes when code lands.
 
+### IOS completion checkpoints
+
+**Estimate: 5%; 0/6 tasks closed.** This credits the identified external port and
+initial integration analysis only. No external build or user report is accepted
+as evidence for an integrated openQ4 Apple-mobile package.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| IOS-01 — Partial decision work | Upstream pin, patch counts, shell/build structure and static-module constraints identified. | Consult the author; classify every patch/file; settle Meson/Xcode split, layout, static modules and distribution. |
+| IOS-02 — Not started | Shared-fix candidates identified in the external port. | Rebase/integrate individually; test Windows/Linux/macOS/Android regressions; reconcile touch and saves with canonical implementations. |
+| IOS-03 — Not started | External iPhone/iPad implementation available for reference. | Static device/simulator builds, shell/data import, lifecycle/audio, retained UI, twelve-language localization and measured presets. |
+| IOS-04 — Not started | External visionOS window/stereo implementation available for reference. | Integrate shared stereo rendering, ornament/controller controls and declared interaction limits. |
+| IOS-05 — Not started | No integrated-build physical-device evidence. | iPhone/iPad/Vision Pro campaigns, saves/portable cross-loads, MP, input/audio, thermal/memory and comfort; exact contributor build identities. |
+| IOS-06 — Not started; optional P3 | No integrated release package. | Distribution decision, signing/IPA workflow, licensing, installation guides and evidence-earned support tier. |
+
+### IOS task evidence and acceptance
+
 - [ ] **IOS-01 — P2, decision and integration plan: adopt the port.** Contact the
   port's author and agree how they take part. Inventory every overlay patch,
   shell file and build script, and class each one:
@@ -1244,10 +1466,49 @@ Archiving their original plans does not remove requirements,
 renumber IDs or accept a GUI. Stable `product:`/`original:` references retain their
 archived provenance; new scheduling belongs here.
 
+### UI completion checkpoints
+
+**Estimate: 30%; 1/11 tasks closed.** The full product denominator includes
+runtime/toolkit, editor, artwork, source-bound migration and platform acceptance,
+not just the visible menu pages. The current [register](ui/product-requirements.json)
+has **117 partial and 195 pending active requirements**, with none verified;
+the [manifest](ui/migration-manifest.json) has **358 pending variants** and all
+seven final gates remain pending.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| UI-01 — Partial | Settings hub, GAME/CONTROLS/AUDIO, Load Defaults, opt-in DISPLAY and Player Setup exist; current scaling/tall layouts and effect/readback increments recorded. | Complete settings transactions/failure/restart/capability matrix; real-font/state coverage; production SYSTEM editor round trip and device/platform acceptance. |
+| UI-02 — Partial | Binding capture, contextual prompts, controller navigation, touch scrolling and right-stick detail/preview handling exist. | Production native IME wiring, shaping/fallback/graphemes, accessibility exposure; physical controller families, composition/focus/hotplug and locale/layout matrix. |
+| UI-03 — Partial | Roster scrolling/identity guards, save-browser/details, Strogg confirmations, server focus/empty states and objective markers have scoped evidence. | Tourney/watch and Match Control flows, catalogs beyond 128, remaining target-identity/role operations, handoffs and actual task/failure completion. |
+| UI-04 — Partial | Retained menus/HUDs and specific implant/vehicle/cinematic surfaces have implementation or captures. | Accept every required source/include variant's behavior and artwork; world terminals, script/timeline provenance, per-instance state and exactly-once commands. |
+| UI-05 — Partial | Awakening scope clauses reconciled; fresh-profile hit-feedback defaults repaired without overwriting opt-ins. | Remaining artwork/default-policy exceptions, vector fidelity, motion and visual review; approve exceptions explicitly. |
+| UI-06 — Partial | DocumentEdit/history/prepared-view foundations exist. | Production editor shell, hierarchy/properties/layout, vectors/masks, components, timelines/bindings, localization and recovery; real SYSTEM round trip for GATE-003/004. |
+| UI-07 — Partial | Scoped runtime measurements, preset/device layout checks and loading repaint/mesh optimizations exist. | Title/System CPU budget failures, GPU cost, idle-machine/GLES checks, cold/long-document cases and 1,000-cycle resource qualification. |
+| UI-08 — Partial prerequisites only | Working routes and refreshed inventory provide cutover inputs. | All seven gates; accepted behavior/artwork/editor/performance across required platforms; external-mod legacy policy and dedicated packaging. |
+| UI-09 — Partial | Retained adapter/control foundations, generated images, stale-action guards and typed animated model scenes exist. | Complete controls/components and public adapter semantics, text queries/bindings, world output/input, timers/instances and save/restart integration. |
+| UI-10 — Closed | Effective retail/base/Awakening inventory refreshed to 358 bound variants; stale acceptance invalidated with positive/negative controls. | Maintain the denominator after source/include changes; inventory closure does not accept a GUI. |
+| UI-11 — Partial | Separate acceptance transition implemented and hardened; 24 fixtures cover artifact/review/path failures. | Separate review of changed tooling; commit/review current per-requirement and per-resource behavior/artwork evidence before accepting anything. |
+
+Completion must advance through the existing dependencies:
+
+1. **Finish the production vertical slice (UI-01/UI-06/UI-07/UI-09).**
+   - Edit, undo, save, recover and reopen SYSTEM and a component/transition.
+   - Run the packaged result in SP/MP and judge architecture and measured cost.
+2. **Complete and accept the wider product (UI-02 through UI-05/UI-09).**
+   - Prove toolkit semantics and input/accessibility before bulk corpus acceptance.
+   - Bind each migrated resource to current sources and behavior/artwork evidence.
+3. **Approve acceptance and cutover (UI-11/UI-08).**
+   - Review the transition tooling separately; reject stale or incomplete evidence.
+   - Close the seven gates and explicit legacy-mod/platform policies together.
+
+### UI task evidence and acceptance
+
 - [ ] **UI-01 — P1, implementation: complete production settings and essential
-  pages.** Finish GAME, CONTROLS, AUDIO, Load Defaults and Player Setup; complete
-  preset and mixed-effect transactions before SYSTEM leaves its current opt-in
-  scope. Demonstrate real effect/readback, persistence, cancel/revert, failed Apply,
+  pages.** GAME, CONTROLS, AUDIO, Load Defaults and Player Setup are implemented
+  in the retained interface, with the bounded evidence below. Finish their full
+  transaction and qualification scope; complete preset and mixed-effect
+  transactions before SYSTEM leaves its current opt-in scope. Demonstrate real
+  effect/readback, persistence, cancel/revert, failed Apply,
   interrupted writes, restart, device/capability changes and stale-owner rejection
   in SP/MP. Localize every display string and preserve current working pages.
   Progress, 23 October: [external settings refresh](ui/external-settings-refresh.md)
@@ -1267,19 +1528,22 @@ archived provenance; new scheduling belongs here.
   the [SETTINGS page](ui/retained-screens.md#the-settings-page-26-october-2026)
   replaces the settings screen's level from the title and the pause, with
   Load Defaults' question; DISPLAY still opens the stock panel unless the
-  SYSTEM page is on. Player Setup remains.
+  SYSTEM page is on. Player Setup remained at this checkpoint; its later
+  implementation/readback and layout evidence is recorded below.
   Progress, 28 October: the SETTINGS hub and Load Defaults work stranded in
   the earlier UI worktree is integrated in the main checkout. SETTINGS from
   the Strogg pause now opens the hub rather than its Load Game document;
   returning preserves the correct pause family. Native navigation/fallback
   coverage and current windowed engine captures qualify this bounded change;
-  Player Setup, the SYSTEM/editor round trip and broader acceptance remain open.
+  The SYSTEM/editor round trip and broader acceptance remain open; Player Setup's
+  later implementation and bounded verification are recorded below.
   Later that day, the [model-scene foundation](ui/document-format.md#model-scenes)
   adds the real animated renderDef host needed by Player Setup: typed root/head/
   weapon scenes, per-part skins and bounded native targets. Native suites and
   GL/Vulkan gameplay pose captures pass, including Vulkan resource resets;
   late fixture precache warnings and broader lifecycle/visual gates remain.
-  Player Setup itself is still outstanding.
+  This foundation did not itself deliver Player Setup; the later page and its
+  bounded verification are recorded below.
   Progress, 31 October: CONTROLS, GAME OPTIONS and AUDIO are now
   [sub-pages of the SETTINGS page](ui/retained-screens.md#the-settings-sub-pages-31-october-2026)
   in the main menu's construction (visual specification 1.29, `FLOW-068`),
@@ -1297,8 +1561,9 @@ archived provenance; new scheduling belongs here.
   The menu levels (title, pauses, SETTINGS, Single Player, Campaign and
   Multiplayer) then met the
   [text-scale contract](ui/retained-screens.md#menu-levels-follow-the-text-size-31-october-2026)
-  too (visual specification 1.32, `LAY-004`); Player Setup, the Mods dialog,
-  the Objectives page and the list and form pages still keep their 100 % rows.
+  too (visual specification 1.32, `LAY-004`); at that checkpoint Player Setup,
+  the Mods dialog, Objectives and the list/form pages still kept their 100 %
+  rows. The 2-3 November increments below extend their scaling.
   In views of 3:4 and taller the same menu levels now
   [stand in one column](ui/retained-screens.md#menu-levels-in-tall-views-31-october-2026)
   that uses the height (visual specification 1.33, `LAY-021`), and so do
@@ -1321,7 +1586,8 @@ archived provenance; new scheduling belongs here.
   Progress, 2 November: Player Setup has
   [edited in place](ui/retained-screens.md#player-setup-edits-in-place-2-november-2026)
   on the Multiplayer page since 28 October; an engine capture now confirms
-  each change applies and reads back. Its text size and tall views remain.
+  each change applies and reads back. Text size and tall views remained at that
+  checkpoint and gained implementation in the 3 November increment below.
   The Multiplayer page also gained DEMOS, which opens the
   [Demos page as a sub-page](ui/retained-screens.md#demos-as-a-multiplayer-sub-page-2-november-2026)
   (`FLOW-050`); the title's plinth keeps MODS, UPDATES, CREDITS and EXIT.
@@ -1629,6 +1895,36 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
 [save compatibility policy](savegame-compatibility-policy.md),
 [retail asset baseline](stock-asset-baseline.md).
 
+### Q4 completion checkpoints
+
+**Estimate: 75%; 1/8 tasks closed.** Campaign entry/transition and targeted-state
+probes are useful but do not establish full playthroughs. Portable v5 saves now
+exist; their optional scope and platform gates remain separate from restoring
+historical saves and recovering safely from damage.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| Q4-01 — Closed | Retail gap ledger, 165-path overlay audit and original-content SP/MP/render controls recorded. | Keep new reports classified; broader progression/effect/network acceptance belongs to its owning tasks. |
+| Q4-02 — Partial | All 31 stock stage transitions with start-of-map save/load pass GL/Vulkan; fresh Turbo hangar lift progression passes with failing old-behavior control. | Ordered gameplay between triggers: AI, set pieces, bosses, vehicles, cinematics/terminals and checkpoints on supported paths. Already-stuck lift saves remain limited. |
+| Q4-03 — Partial | Retail normal/tangent and initial-light questions settled; telemetry repaired; stock spark stop/restart/delete/save lifecycle passes both APIs. | Per-effect visual/audio parity, collision/child effects/trails, subviews, high refresh and full save/demo lifecycle. |
+| Q4-04 — Partial | Thirteen-map integration; targeted freeze, speeder, boss, corpse-pin, isolation and occupied turret/walker save checks; bounded M01/M02 repairs recorded. | All thirteen ordered playthroughs; complete boss kills, walker repair/unlock/demolition, squad/extraction routes, sustained turret effects and actual Awakening-to-Arena switch. |
+| Q4-05 — Partial | Recovery UI and object/handle/reference/animation/AF/event cleanup hardened; corruption/reload and historical-save regressions pass scoped tests. | Broader owning graphs and interruption boundaries across target platforms; maintain valid saves and explicit refusal without inventing header-only recovery. |
+| Q4-06 — Partial; optional P3 | Raw inventory and field codecs restored; v5 portable stamp/encoding implemented; Windows/Linux bidirectional stock/Awakening cross-loads pass. | Confirm outstanding CI/Apple codec runs; macOS and another ARM64 runtime cross-load/resave directions; publish player migration guidance with accepted scope. |
+| Q4-07 — Partial | Original-writer Windows corpus substantially qualified; v2 stamp reporting repaired; exact HiDef fixture investigated. | Resolve #123 against the reporter's actual GUI/content; other ABIs; recover/reproduce absent stage-two artifacts before claiming independently reviewable acceptance. |
+| Q4-08 — Partial | Durable commit/recovery implemented; 56 process-interruption points, locked-file failure and NTFS/ext4/WSL 9p checks recorded. | APFS result, removable/network filesystems and actual power-cut behavior; retain measured CRC/sync costs and last-valid-save preservation. |
+
+Completion substeps must keep three forms of evidence distinct:
+
+1. **Campaign behavior:** ordered progression and actual combat, then targeted
+   saves in unique states and campaign/mode isolation. Map loading is only entry.
+2. **Save correctness:** original writers and corruption/recovery graphs, then
+   portable cross-platform round trips; restamped fixtures are not original writers.
+3. **Parity and durability:** matched render-target/audio comparisons and physical
+   filesystem/device tests. A successful scripted trigger or process kill does not
+   prove a full scene or power-loss outcome.
+
+### Q4 task evidence and acceptance
+
 - [x] **Q4-01 — P0, investigation and qualification: current retail gap ledger.**
   Inventory and reproduce compatibility reports against current binaries and
   installed base PK4s. Distinguish engine defects, absent media, authored-content
@@ -1788,13 +2084,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
      remain wider campaign qualification. Candidate release notes are updated.
 
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
-  approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
-  object-restore failure after map teardown; evaluate staged-world rollback versus
-  explicit recovery behavior. For unrecognized unstamped/build-1 payloads, assess
-  restart at saved level with header loadout rather than guessing the payload;
-  recognized build-1 releases already have compatibility readers. Require
-  interruption/corruption fixtures and no destruction of valid existing saves.
-  Current partial repair preserves live entity identities when rejecting invalid
+  approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
+  checks. Explicit recovery after semantic object-restore failure is implemented
+  below; broader graph/platform qualification remains. Unknown unstamped/build-1
+  payloads fail preflight rather than being guessed; automatic header-only restart
+  is intentionally excluded, while recognized build-1 releases retain their
+  compatibility readers. Require interruption/corruption fixtures and no destruction
+  of valid existing saves. Current partial repair preserves live entity identities
+  when rejecting invalid
   saved numbers, duplicate master-table entries and interrupted registrations;
   see [restore identity evidence](savegame-reliability.md#restore-identity-and-partial-registration).
   [Factory-object lifetime tracking](savegame-reliability.md#ownership-during-an-interrupted-restore)
@@ -2147,6 +2444,23 @@ is also cheaper to run. Every item honors three product rules:
    resolution. Scripted set pieces, progression and authored AF/entity defs keep
    working unmodified with stock assets.
 
+### PHYS completion checkpoints
+
+**Estimate: 0%; 0/6 tasks closed.** The legacy physics engine, recent AF restore
+hardening and presentation interpolation are not implementation of the proposed
+enhanced solver. The product rules below are requirements, not current features.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| PHYS-01 — Not started | Proposed workloads and preservation rules specified. | Record legacy CPU distributions, defect reproductions and impulse envelope; set budgets/tolerances and the CVar/localized UI contract. |
+| PHYS-02 — Not started | Legacy rigid-body code available as baseline. | Semi-implicit integration, persistent contacts/warm starting, friction, island sleeping and selective swept collision; prove budgets and stable energy. |
+| PHYS-03 — Not started | Legacy AF code/stock definitions available as baseline. | Warm-started constraint solver, stable limits/penetration recovery, authored self-collision/sleeping and animation-velocity handoff. |
+| PHYS-04 — Not started | No accepted enhanced-mode behavior envelope or runtime evidence. | Executable impulse guards and telemetry; light/heavy hit tests; stock/Awakening actors, moveables and scripted progression without behavior breakage. |
+| PHYS-05 — Not started | Existing save/network/demo/presentation contracts constrain integration. | Cross-mode saves, server-authoritative mode, demo parity, transient/versioned state and dedicated-safe interpolation. |
+| PHYS-06 — Not started | Default remains legacy; no promotion evidence. | Windows/Linux and one ARM64 matched workloads, worst-frame/visual acceptance, explicit default decision and upgrade-preserved fallback. |
+
+### PHYS task evidence and acceptance
+
 - [ ] **PHYS-01 — P2, investigation and decision: legacy baseline and enhanced
   contract.** Measure legacy rigid-body and AF costs (`af_showTimings`,
   `rb_showTimings`, the CPU sampler) on fixed workloads: a combat-heavy SP scene
@@ -2225,6 +2539,36 @@ cross-architecture peer qualification for now. MP-07/MP-08 retain those gates fo
 future support qualification; local implementation, simulation and current-host
 checks continue. This deferral does not promote prediction/rewind defaults or
 claim peer combinations that have not been tested.
+
+### MP completion checkpoints
+
+**Estimate: 80%; 2/9 tasks closed.** Most systems work and have substantial local
+evidence. Bot safety still has unexcluded failures; simulated networking does not
+close physical peers. The 28 October WAN/cross-architecture deferral remains in
+effect and does not promote prediction/rewind defaults.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| MP-01 — Partial | Roster/identity/vote fixes; eight live edge scenarios, failed-map retry and writer fault controls pass scoped checks. | Physical keyboard/controller flows, side-ballot scope, post-commit map-load limit and full release-order/failure coverage. |
+| MP-02 — Partial | Repeated causal replays and navigation repairs; 33-variant death/duration sweep before final rim change; one isolated CTF3 timing reference passes. | Final-change catalog repeat, unexcluded DM8/CTF5/CTF3 departures, stalls, long-match safety and timing across maps/platforms. A timing pass is not a safety pass. |
+| MP-03 — Closed | Trench jumps and debug-pool defects fixed; route-cost, collision, graph/cache and ladder/lift subjects have recorded dispositions. | Custom lifts remain unsupported; long-match safety/timing remains MP-02, not an unclosed implementation under MP-03. |
+| MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return; retain failure-path and UI/audio dependencies. |
+| MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
+| MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked. | Real player swimming and by-eye splash/bubble/wade review. Swimming monsters, new animations and moving volumes remain deferred. |
+| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; defaults remain off. | Remote weapon-play/same-fire-frame visuals and remaining peer transitions; real WAN and default promotion only when selected and qualified. |
+| MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. | Physical MTU/multi-record DNS, cross-machine load and deferred WAN/other-architecture peers; actual retail-binary rejection check without claiming interoperability. |
+| MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness; retune from that evidence. |
+
+Completion substeps:
+
+- **Safety and skill:** isolate remaining world deaths, rerun the final catalog and
+  long matches, then qualify controlled timing and human combat separately.
+- **Player workflows:** exercise real match/Arena/liquid controls and visual/audio
+  outcomes, including interruption and slot reuse, rather than only command paths.
+- **Peer breadth:** retain current local results; reopen deferred WAN/architecture
+  qualification only within selected scope and preserve explicit unsupported cases.
+
+### MP task evidence and acceptance
 
 - [ ] **MP-01 — P1, qualification: competitive framework release closure.** Exercise
   roster invitations/substitution/bench/disconnect, replacement identity and slot
@@ -2550,10 +2894,12 @@ claim peer combinations that have not been tested.
   Vulkan, Linux and macOS playback of 1.3 recordings were not run.
 - [ ] **MP-06 — P2, implementation and qualification: liquid extensions.** Verify
   splash/bubble/wade effects, underwater view/muffle, projectiles, buoyancy and bot
-  behavior. The current AAS compiler already emits water/swim/waterjump data;
-  validate its end-to-end consumers before proposing new generation. AI swimming,
-  authored swim animation, moving volumes and air-HUD replication need explicit
-  content/gameplay scope. Preserve mapper guidance against duplicate hurt damage.
+  behavior within the selected static-liquid scope. The AAS liquid flag was repaired
+  on 28 October and actual compiler output now includes checked swim/water-jump
+  links; the earlier assumption that water-jump generation already worked was
+  disproved. Player/bot swimming and replicated air are selected; swimming monsters,
+  authored swim animations and moving volumes are deferred as recorded below.
+  Preserve mapper guidance against duplicate hurt damage.
   Scope decision, 28 October: the user selected completion of static liquids,
   player/bot swimming and replicated air readouts. Swimming monsters, new swim
   animations and moving liquid volumes are deferred; they do not block this
@@ -2568,7 +2914,9 @@ claim peer combinations that have not been tested.
   water above it. Swimming bots now dive for an underwater route corner while
   they have more than half their air; the rerun records no stuck reports and
   28 completed traversals instead of 8 ([details](mp-bots.md#team-knock-guard-and-trench-rims-23-october-2026)).
-  Bot swimming, ragdoll buoyancy and an air HUD remain scope decisions.
+  At that checkpoint bot swimming, ragdoll buoyancy and an air HUD remained scope
+  questions. The later selection admits player/bot swimming and replicated air;
+  this older note does not reopen those decisions or establish new buoyancy scope.
   Progress, 28 October: the AAS compiler now sets `AREA_LIQUID` from the emitted
   water contents. Swim links already used contents, while the water-jump builder
   required the missing flag. An executable production-area fixture covers wet/dry,
@@ -2801,6 +3149,25 @@ claim peer combinations that have not been tested.
 Sources: [audio implementation and remaining limits](audio-modernization.md),
 [retail reverb](retail-audio-reverb.md), [networking guide](../user/multiplayer-networking.md).
 
+### AUD completion checkpoints
+
+**Estimate: 80%; 0/7 tasks closed.** Open checkboxes here predominantly reflect
+qualification debt rather than missing core implementations. However, mobile
+memory bounds and full subtitle coverage are substantive outstanding scope, not
+automatically satisfied by a listening pass.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| AUD-01 — Partial | 54 emitter/OpenAL distance measurements validate current map-unit curves; no speculative unit conversion needed. | Human retail comparison on real speakers/headphones. |
+| AUD-02 — Partial | Simulated endpoint recovery, scene-clock save/load repair, Linux checks and repeated-map audio residency evidence exist. | Physical endpoint loss/hotplug, audible pause/cinematics, long sessions and target-OS breadth including macOS. |
+| AUD-03 — Partial | Aggregate payload budgets/backpressure, bounded compressed streaming, recycled-source fix and exactly-once low-memory trim implemented; Windows/Linux measurements recorded. | Real mobile OS low-memory callbacks, device/provider process-memory budgets, thermal/loading/cancellation behavior and device breadth. |
+| AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio. | Physical surround outputs and real endpoint/layout transitions; preserve positional mix and stock zero-rolloff behavior. |
+| AUD-05 — Partial | Consent/PTT/capture pipeline, codec/transport/moderation and bounded playback pass multi-process Windows/Linux and clock/loss tests. | Physical microphone/capture hotplug, independent-machine clocks and OS/device breadth. Existing 1:59:29 run is not a two-hour pass; cancelled rerun is not silently reinstated. |
+| AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit and extensive scripted-scene mute/save checks exist. | Ordered movement/combat-dependent scenes and physical listening/device checks; retain effects/music separation. |
+| AUD-07 — Partial | Playback-driven captions, fallback/mapping policy, portrait overlap and real save/load checks implemented. | Missing transcripts remain explicit; full gameplay-order/locale corpus and physical stereo-HUD readability. Available mappings do not mean every line is captioned. |
+
+### AUD task evidence and acceptance
+
 - [ ] **AUD-01 — P1, investigation and qualification: retail distance semantics.**
   Audit listener/source radius and authored range units against retail audible
   fixtures and distance curves before changing attenuation defaults. Both
@@ -2862,14 +3229,14 @@ Sources: [audio implementation and remaining limits](audio-modernization.md),
   holds through each pause). Hearing it on Linux remains a listening check.
   [Linux evidence](audio-voice-evidence.md#saves-on-linux).
 - [ ] **AUD-03 — P2, implementation and qualification: bounded decode and compressed
-  streaming.** Current decode admission bounds job count, while each job can
-  allocate a complete PCM sample. Measure compressed input, pending decoded PCM,
-  retained CPU data and uploaded OpenAL buffers together; set byte budgets and
-  backpressure where needed, including Android low-memory/map-cancel cases.
-  Add bounded streaming for music/VO with correct leadin/loop, seek/save restore,
-  pause/time scale and underrun behavior. Existing queued PCM and decode jobs do
-  not by themselves establish compressed streaming. Android's required memory
-  bound can ship before optional streaming completion; keep those exits separate.
+  streaming.** Byte-budget admission, backpressure and bounded compressed streaming
+  are implemented as recorded below, replacing the earlier job-count-only bound.
+  Qualify compressed input, pending/retained PCM, uploaded OpenAL buffers and
+  provider/process overhead together on remaining devices, including Android
+  low-memory/map-cancel cases. Preserve leadin/loop, seek/save restore, pause/time
+  scale, underrun and cancellation behavior. Desktop/synthetic notice tests do
+  not qualify mobile memory pressure. Android's required memory bound keeps its
+  own exit rather than depending on unrelated optional streaming expansion.
   October 21: compressed input, fixed decoder arenas and pending Vorbis PCM
   have a 64 MiB admission budget with backpressure and cancellation accounting.
   Ogg tracks above 512 KiB decoded size now stream from the VFS/PK4 through
@@ -3120,6 +3487,22 @@ Sources: [platform support](platform-support.md), [Deck QA](steam-deck-qa.md),
 [macOS policy](macos-support-matrix-policy.md), [macOS evidence](macos-signoff-evidence.md),
 [content pack distribution](content-pack-distribution.md).
 
+### PLAT completion checkpoints
+
+**Estimate: 55%; 0/5 tasks closed.** Existing build/package work and supported
+desktop paths earn credit. Hosted CI, software graphics and community reports
+remain narrower than final-package physical-device signoff.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| PLAT-01 — Partial | Linux x64/Deck platform implementation, hosted compositor paths and scoped stock/runtime evidence exist. | Physical GNOME/KWin/wlroots, Deck LCD/OLED and game/desktop modes; input/audio hotplug, suspend, displays and reported pacing. |
+| PLAT-02 — Partial | Linux ARM64 builds, packages and assetless client/dedicated CI exist. | Physical desktop-GL hardware SP/save/MP, audible sound, input/display recovery and accepted archive-bound signoff. |
+| PLAT-03 — Partial | Windows ARM64 native build/stage and assetless dedicated startup exist. | Automated client/renderer/audio startup first; then hardware SP/MP/save/controllers and package checks. |
+| PLAT-04 — Partial | macOS arm64 bundle/build/provider work, hosted startup and community gameplay reports exist. | Floor/current OS, both package variants, Finder/DMG/copied app, signing/Gatekeeper, symbols and physical display/input/audio/gameplay matrix. |
+| PLAT-05 — Partial | Apple renderer/backend policies and compatibility repairs documented. | Current hardware reproduction of rendering/context/MSAA/VBO/module behavior; MoltenVK separately; explicit package/architecture/backend decisions. |
+
+### PLAT task evidence and acceptance
+
 - [ ] **PLAT-01 — P1, qualification: Linux x64 and Steam Deck hardware breadth.**
   Broaden physical GNOME/KWin/wlroots/SteamOS, Wayland/XWayland, audio/input hotplug,
   suspend/resume, HiDPI/display and package coverage. Execute the Deck hardware
@@ -3151,6 +3534,24 @@ Sources: [platform support](platform-support.md), [Deck QA](steam-deck-qa.md),
   Intel/universal2/Rosetta publication, removing the Metal-bridge package, native
   Metal and retiring comparison backends require explicit policy and evidence
   decisions; an old plan is not authorization to change the current release matrix.
+
+### PKG completion checkpoints
+
+**Estimate: 10%; 0/6 tasks closed.** Credit the distribution measurements, design
+and existing deterministic pack foundation. Existing full-release packaging is not
+completion of the proposed smaller-update delivery system.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| PKG-01 — Partial analysis | Archive size/change-rate audit and current verifier constraints documented. | Update archives, separate Windows symbols, localized pack-status diagnostics; prove old-full plus update equals new-full and common bulk bytes across platforms. |
+| PKG-02 — Not started | Proposed pack allocation and dependency on PKG-01 specified. | Generated shared pack table; build/reuse by source digest; pure/client-only handling; retire old pack; verify consecutive candidates and dedicated/client behavior. |
+| PKG-03 — Partial analysis | Redundant light-grid atlases and loadscreen TGA/DDS cost measured. | Every-map packed-lighting load test, `waste` pack, renderer/texture-quality loadscreen tests and approved visual format before removal. |
+| PKG-04 — Not started | Numbered-pack precedence and overlay size/generation constraints documented. | Build/verify changed-file overlays, enforce budget and generation folding; demonstrate a one-file fix below 5 MB. |
+| PKG-05 — Not started | Candidate AppImage/installer channels identified. | zsync metadata/assets, digest-pinned selective Windows downloads and measured update traffic; optional itch.io decision. |
+| PKG-06 — Decision pending; optional P3 | HTTPS/updater/signing/storage constraints identified. | Decide secure manifest/atomic replacement/elevation, macOS/Android delivery and bulk-source storage after PKG-01 through PKG-05. |
+
+### PKG task evidence and acceptance
+
 - [ ] **PKG-01 — P1, implementation: update archives and content-pack status.**
   Every package carries the whole `pak1.pk4` (798 MB on main, 88% of the 0.13.2
   Windows zip), although its sources changed in only 6 of the last 15 release
@@ -3241,6 +3642,23 @@ Every item honors five product rules:
    language table, and new menus and rows follow the
    [UI visual design](ui-visual-design.md) in the retained interface, while the
    stock interface keeps working without them.
+
+### STEAM completion checkpoints
+
+**Estimate: 0%; 0/6 tasks closed.** Steam install discovery and the Deck launcher
+already exist but are not a Steamworks integration. No bridge implementation is
+credited before STEAM-01's decisions.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| STEAM-01 — Decision pending | Identity/licence/distribution questions and feature dependencies specified. | Record permitted app identity, proprietary API boundary and redistribution/platform policy before code lands. |
+| STEAM-02 — Not started | Backend-neutral/no-op design requirement specified. | Optional runtime service, initialization/callback/overlay lifecycle, identity and no-Steam parity on supported renderers. |
+| STEAM-03 — Not started | Presence states and privacy boundary specified. | Localized state-driven presence, safe joinable-server metadata and friends-list verification on required systems. |
+| STEAM-04 — Not started | Existing MP join/rejection flow is the integration target. | Cold/running joins, invites, save confirmation and friends UI; distinct-network success/failure cases and private-password handling. |
+| STEAM-05 — Not started | Keyboard, engine-screenshot and recording-marker scope specified. | Connect supported SDL/Steam routes, all text fields, screenshot library tagging and bounded timeline markers; Deck game/desktop verification. |
+| STEAM-06 — Not started | Lifecycle/platform matrix specified. | Steam absent/offline/restart, launch origins, renderer/mode/save/demo transitions and long sessions; exact packages, documentation and support promotion. |
+
+### STEAM task evidence and acceptance
 
 - [ ] **STEAM-01 — P2, decision: identity, licensing and distribution.** Settle
   three questions before any code lands. (a) **App identity:** what Steam sees
@@ -3337,6 +3755,23 @@ reference. TOOL-01 through TOOL-04 preserve the outstanding scope; this planning
 consolidation does not resume it. Compiler/runtime compatibility fixes and the UI
 visual editor have their own active items.
 
+### CORE completion checkpoints
+
+**Estimate: 45%; 0/6 tasks closed.** Job/loading foundations and targeted safety
+repairs exist. The old `hub2` failure is repaired, while broader compiler/runtime
+qualification remains; the map-editor pause does not pause these engine fixes.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| CORE-01 — Partial | Job/runtime foundations plus GUI precache, expression-storage, coordinates and hit-map ownership fixes exist. | Refit/rerun the relevant map tours on final packages; job on/off, cancellation, budgets and dedicated shutdown on required platforms. |
+| CORE-02 — Partial | Worker DDS reading and opt-in cache experiments exist. | Cold/warm and sync/rewrite profiles; corrupt-cache fallback, bounded memory and cancel/restart/disconnect before promotion. |
+| CORE-03 — Partial foundations | Bounded jobs and audio decode/streaming offer existing scheduling infrastructure. | Profile justified decode/transcode/upload work; immutable handoff, backpressure, cancellation and main-thread adoption without unsafe shared callbacks/parsers. |
+| CORE-04 — Partial | Strict-string compliance and substantial parser/network/archive/restore hardening are implemented. | Broader sanitizer gameplay/fuzzing; reproduce current dependency/header warnings; handle actual remaining parser and missing-image diagnostics individually. |
+| CORE-05 — Partial | `hub2` sliver explosion and silhouette truncation repaired; compile/load/save and edge-builder regression evidence exist. | Broader rendering/collision/AI and memory qualification; independently reproduce #209 using exact map/assets; retain genuine compiler diagnostics. |
+| CORE-06 — Partial | Path/swim/water-jump generation exists, including MP-06's corrected liquid flag and output check. | Cover/lean/corner/pinch/vantage generation or an explicit rebuilt-map limitation; actual AI consumers and malformed/absent data. |
+
+### CORE task evidence and acceptance
+
 - [ ] **CORE-01 — P1, qualification: foundation final-package evidence.** Repeat
   job on/off, renderer-budget, retail baseline, map-cycle/cancellation and
   deterministic dedicated shutdown checks on clean committed final packages and
@@ -3375,12 +3810,21 @@ visual editor have their own active items.
   an obsolete warning. Recheck lazy pre-cache/missing-retail-image diagnostics
   separately.
 - [ ] **CORE-05 — P1, implementation and qualification: safe compiled geometry.**
-  Resolve `hub2`'s generated 36,635,340-index runtime surface against the current
-  16,777,216-index limit through safe partitioning or representation changes; do
-  not simply raise safety bounds. Address `MAX_SIL_EDGES` and remaining compiler
-  diagnostics individually. Gate on successful compile, runtime load, rendering,
-  collision and AI behavior with bounded memory. Reproduce the historical `hub2`
-  failure with the current compiler before selecting a representation change.
+  The historical `hub2` 36,635,340-index failure is repaired, not an outstanding
+  request to raise the 16,777,216-index safety bound or redesign the surface format.
+  [T-junction sliver repair](dmap-compilation.md#sliver-multiplication-in-t-junction-repair-31-october-2026)
+  reduced the supplied map to 298,438 triangles with a 153,000-index largest
+  surface on the recorded Windows build. The compile produces collision and
+  navigation data, loads into SP gameplay and saves. Optimizer zero-area rejection
+  has separate Windows/Linux evidence. The
+  [silhouette scratch repair](dmap-compilation.md#silhouette-edges-on-large-surfaces-1-november-2026)
+  preserves all 78,794 edges in the large pipe surface, removes the previous
+  `MAX_SIL_EDGES` warnings and retains small-surface behavior. Production fixtures
+  and runtime stencil views are recorded; the traceability table records the
+  reporter's successful rebuild confirmation.
+  Remaining: complete bounded-memory rendering, collision and actual AI behavior
+  qualification, and investigate other diagnostics individually. Successful AAS
+  generation and map entry alone do not prove navigation or whole-map parity.
   Track #209's separate `airdefense1` compile against its exact map and asset
   inputs once supplied; the log ending in global T-junction repair alone does
   not identify a crash or establish a regression in the earlier `hub2` fixes.
@@ -3389,6 +3833,23 @@ visual editor have their own active items.
   rebuilt-map limitation; path/swim compilation already exists. Test stock/custom
   rebuilt data and actual AI consumers, including malformed or absent tactical
   data. These compiler gaps remain independent of the map-editor pause.
+
+### TOOL completion checkpoints
+
+**Estimate: 20%; 0/4 tasks closed; broader implementation paused.** Existing
+transactional document/persistence and experimental source-view work is retained.
+These substeps describe the remaining scope and do not authorize resuming it.
+The UI visual editor is a separate active UI-06 obligation.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints when resumed |
+| --- | --- | --- |
+| TOOL-01 — Partial; paused | Document service, source preview, entity/property browser and basic graphical workspace exist. | Docking, orthographic/persistent views, richer previews, typed properties/diagnostics and localized high-DPI/input/backend qualification. |
+| TOOL-02 — Partial foundations; paused | Lossless source retention, point-entity edits, undo and atomic/conflict-aware persistence exist. | Brush/patch geometry adapters, transforms/snapping/texture lock, per-gesture undo, layers/groups/prefabs/reference repair and bounded asynchronous indexing. |
+| TOOL-03 — Not integrated; paused | Native dmap/AAS commands exist separately from the workspace. | Build progress/cancel/linked diagnostics, preserved old output, isolated play sandbox and editor restoration; stock/custom round trips and rebuilt AI. |
+| TOOL-04 — Partial foundations; paused | Document save/conflict/recovery rules have scoped evidence. | Full authoring I/O failure, external edits, repeated undo, restart/render-switch/platform tests and latency budgets; reproduce disappearing workspace labels. |
+
+### TOOL task evidence and acceptance
+
 - [ ] **TOOL-01 — P2, implementation: complete the map workspace.** Build on the
   existing transactional document service and source preview. Add docking,
   orthographic views/camera persistence, richer entity/model previews, typed
@@ -3418,6 +3879,28 @@ These preserve uncompleted ambitions from old plans without presenting them as
 promised features or retail compatibility defects. Promote a decision into a
 workstream with scope, dependencies and acceptance before implementation.
 
+### OPT decision checkpoints
+
+**Not scored: nine deferred decisions.** Existing experiments or related systems
+do not establish an accepted delivery scope for these ambitions. To advance one:
+
+1. **Establish the need and boundaries.**
+   - OPT-01/OPT-02/OPT-03 need authoritative-clock or measured rendering workloads,
+     target hardware and rollback constraints; more FPS alone does not justify a
+     simulation change or GPU feature.
+   - OPT-04/OPT-09 need capacity, privacy, security and service-identity decisions
+     before broadcast, competitive services or further Steam services are promised.
+2. **Define the complete product work.**
+   - OPT-05 needs objectives/scoring, networking, bots and UI together; exposing a
+     gametype name is not implementation.
+   - OPT-06 needs a separate Awakening content project; unreachable weapons/content
+     are not a defect in the accepted integrated campaign scope.
+   - OPT-07 follows retail audio qualification and requires an authored-mix policy.
+   - OPT-08 needs a concrete benefit, maintenance decision and source/licence review.
+3. **Select and track an increment.** Record dependencies, exclusions, implementation
+   and acceptance under a stable work item in this roadmap before assigning a
+   completion estimate. Until then, no OPT item blocks an unrelated supported release.
+
 | ID | Deferred scope and prerequisites |
 | --- | --- |
 | OPT-01 | Higher authoritative simulation rates: separate physics/script/prediction/demo/content design after HF-01 through HF-07; do not change tick rate to claim higher FPS. |
@@ -3431,6 +3914,32 @@ workstream with scope, dependencies and acceptance before implementation.
 | OPT-09 | Further Steam services beyond STEAM-02 through STEAM-05: lobbies and matchmaking, Steam relay/NAT traversal, Workshop mod distribution, Steam Cloud saves, achievements and stats, and Steam avatars in scoreboards (which needs a Steam ID exchange and its own privacy design). Each depends on the STEAM-01 app identity, and several need app-owner configuration. |
 
 ## Release qualification and completion rules
+
+### REL completion checkpoints
+
+**Estimate: 35%; 0/4 tasks closed.** Existing validators, release-status policy and
+scoped staged-runtime tests are foundations. Tests on different revisions do not
+combine into an accepted final package, and this documentation update promotes no
+release or support tier.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| REL-01 — Partial | Meson/staging, package validators and scoped SP/MP/dedicated tests exist; complete-history build stamping repaired. | One exact candidate matrix across selected platforms/roles; stock assets, transitions, save/demo and clean-install/upgrade/config preservation. |
+| REL-02 — Partial | Engine-capture and diagnostic infrastructure, scoped visual/audio evidence and human-review procedures exist. | Matched visual acceptance, actual motion/latency, audible sound, accessibility and VR comfort on physical devices with required permissions. |
+| REL-03 — Partial | Many targeted lifecycle/failure fixtures and runtime fixes exist. | Coherent final-candidate cold/warm/long-session, asset/cache/network/save/device/surface/suspend/shutdown matrix with bounded resources and safe recovery. |
+| REL-04 — Partial | Withdrawal policy, release-status page, curated unreleased material and support/promotion validators exist. | Reconcile the accepted candidate's roadmap/registers/matrices/notes; exclusions, migration guidance, signing/symbol/licence/package checks and promotion decision. |
+
+Completion order for the selected release:
+
+1. Freeze the intended supported subset, exclusions, source and package identities.
+2. Run functional and lifecycle checks on those packages, retaining failures and
+   rerunning affected configurations after fixes/restaging.
+3. Obtain the physical/human evidence required by that subset; do not infer it from
+   synthetic tests, hidden runs or unrelated historical packages.
+4. Update acceptance/support records and player release notes together; promote only
+   the proven subset. Optional/deferred features do not block unrelated support.
+
+### REL task evidence and acceptance
 
 - [ ] **REL-01 — P1, qualification: exact final-package matrix.** Build with
   project Meson wrappers/presets and restage current engine/renderer/game modules
