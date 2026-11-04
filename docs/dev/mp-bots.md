@@ -502,6 +502,20 @@ measurements cover six skill-4 bots on CTF3, Windows x64/OpenGL and the
 maps/platforms. Earlier open-MP-02 statements in this investigation record
 describe historical stages, superseded by this accepted closeout.
 
+Evidence preservation, 4 November 2026: before removing the merged `04c0`
+worktree, its useful local evidence was archived in the main checkout at
+`.tmp/worktree-evidence/mp02-04c0-2026-11-04/evidence.zip`. The archive retains
+10,906 files, including original failed reports, replay/configuration data,
+build records and all 24 files of the qualified runtime. Every archived file
+was read back and matched against its source SHA-256; `manifest.json` records
+the paths and hashes, and `verification.json` records the successful check.
+The archive SHA-256 is
+`bd7202aa49516c1e306ecffeca730d182f905154188e265d27df73c9492f048f`.
+Generated runtime caches and disposable build/dependency outputs are excluded
+and inventoried separately. Extract the archive into a project-local evidence
+directory to restore its worktree-relative paths; absolute paths inside the
+original reports remain historical provenance.
+
 An unrelated Vulkan shadow-resource fallback warning was observed during
 earlier diagnostics. The final safety sweeps and this timing attempt use
 OpenGL and do not establish Vulkan rendering qualification.
