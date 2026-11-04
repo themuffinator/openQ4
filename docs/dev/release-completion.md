@@ -7,9 +7,14 @@ work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
+
+The latest safety build passes all four long-match and all 33 map-catalog
+death/duration checks, with zero navigation falls after strict enemy-impulse
+assessment. The targeted recovery and pad-traffic checks also pass. Controlled
+timing remains a separate qualification; see the [current evidence](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026).
+
 - Bots can recover when a ramp carries them into the air after they reach a
-  walking waypoint or pass beside a jump pad. The reproduced departure and
-  renewed safety gates are under qualification.
+  walking waypoint or pass beside a jump pad.
 - Bots check their remaining momentum before hopping up an ordinary ledge,
   preventing a pending climb attempt from jumping back off a recovered walkway.
   The reproduced CTF5 fall now survives; wider safety gates are under qualification.
