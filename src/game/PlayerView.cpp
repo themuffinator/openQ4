@@ -9,6 +9,7 @@
 #include "Game_local.h"
 #include "gamesys/RetainedViewEffects.inl"
 #include "gamesys/Subtitles.inl"
+#include "awakening/M01Feedback.inl"
 
 #if defined(_XENON) && (defined(_PROFILE) || defined(_DEBUG))
 #include "../sys/xenon/ProfilingSupport.h"
@@ -1187,6 +1188,7 @@ void idPlayerView::RenderPlayerView( idUserInterface *hud, bool menuPaused ) {
 
 		if ( camera ) {
 			camera->GetViewParms( mutableView );
+			Awakening_M01CameraFeedback( mutableView );
 		} else {
 			gameLocal.CalcFov( player->CalcFov( true ), mutableView->fov_x, mutableView->fov_y );
 		}

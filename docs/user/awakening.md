@@ -16,8 +16,9 @@ direction pass on the unfinished opening. To install the content and choose the 
 
 ## At a glance
 
-- All 13 campaign maps load, play through and save, from the trenches of
-  Stranarus to the Valkaryne's lair.
+- All 13 campaign maps load and have gameplay/save probes, from the trenches of
+  Stranarus to the Valkaryne's lair. Complete playthrough qualification remains
+  in progress.
 - Every new monster, weapon and vehicle is rebuilt in openQ4's game code: the
   Pain Lord, the Valkaryne, the Tank, the Retch and the walker; the goob,
   freeze and spike guns; the speeder bike and the dropship and MCC cannons.
@@ -75,7 +76,7 @@ What openQ4 changed so the expansion's content loads at all:
 | Pain Lord | m05 | A boss who works a marine-processing machine. Two half-processed marines on his back shield him; he is stunned at two thirds and one third of his health, and enraged when the marines are torn off. If he finishes his third processing, Strauss dies and the mission fails. |
 | Valkaryne | m08 (set piece), m09 | Docked on her platform she is untouchable and fires death-ray volleys; on foot she uses her railguns, grenades, rockets and claws. |
 | Goob gun | m02 on | Its globs burn what they hit, and burst into six smaller globs. Its flamethrower mod adds a short-range alternate fire. |
-| Freeze gun | player arsenal | Chills enemies until they slow, freezes them solid as they die, and shatters them. Its ammo regenerates. |
+| Freeze gun | player arsenal | Chills enemies until they slow, freezes them solid as they die, and shatters them. Ammo regeneration requires the regeneration powerup. |
 | Spike gun | player arsenal | Spikes stick where they land, stay in the enemies they kill and pin the bodies to the wall behind. Its scope mod fires explosive spikes. |
 | Turrets | m01, m01 part 2, m04, m05 | Tighten their aim the longer they fire, pause before re-firing, and security cameras sweep. |
 | Speeder bike | m06 invasion, the three m07 races | Hover bike with a gun and a crouch-activated boost. |
@@ -130,6 +131,15 @@ alpha's own code:
 The alpha's own code or content kept these from working as designed. openQ4
 fixes them:
 
+- **Fire passages (m01, m02).** Freezing a vent clears its invisible collision
+  and puts its light out fully. Burning vents allow passage while inflicting
+  their authored touch damage. Saves restore the correct collision state.
+- **Trianfac's generator defence (m02).** Repair bots attach to their own
+  stations, and Tak waits for all six to be destroyed before completing the
+  sabotage. The destroy-generator objective appears before the explosion and
+  completes afterwards. The extraction dropship finishes landing before it
+  idles, and defeating the Tank completes the Nexus objective. Restart m02 to
+  adopt these script corrections; existing saves retain their original scripts.
 - **The Valkaryne finale (m09).** Her docking script was never run, so she
   never took her platform: she wandered harmlessly and could be killed before
   the Makron sphere, skipping the fight built around it. She now docks behind

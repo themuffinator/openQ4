@@ -186,6 +186,8 @@ idCVar ui_hudWeaponStrip("ui_hudWeaponStrip","1",CVAR_GUI|CVAR_BOOL|CVAR_ARCHIVE
 // afterimage.
 idCVar ui_reducedFlashing("ui_reducedFlashing","0",CVAR_GUI|CVAR_BOOL|CVAR_ARCHIVE,
 	"reduce flashing: cap hit indicators at 0.40, dim full-screen white flashes and drop the death afterimage");
+idCVar ui_cinematicShake("ui_cinematicShake","1",CVAR_GUI|CVAR_FLOAT|CVAR_ARCHIVE,
+	"added cinematic camera movement: 0 disables, 1 full; disabled in VR",0.0f,1.0f);
 
 bool idRetainedHud::UsesClassicCanvas(const char* source) {
 	if (ui_hudLayout.GetInteger()!=0 || !cvarSystem->GetCVarBool("ui_retained") ||

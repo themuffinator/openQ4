@@ -370,3 +370,68 @@ This qualifies this fresh lift sequence. It does not repair an already-stuck
 save, qualify the rest of Hangar Perimeter, or substitute for the full Q4-02
 campaign playthroughs. Console-injected diagnostics are deliberately not saved,
 because the developer console's script source cannot be recompiled on load.
+
+## Awakening vehicle saves and HUD fractions, 4 November 2026
+
+Q4-04 now has a repeatable probe for the authored prison chaingun
+(`vehicle_q4x_turret_chaingun_4`, `game/m04_prison`) and trench walker
+(`m04_maint_tunnel_unit1_uni_vehicle_walker_player`,
+`game/m01_stranarus_trench2`). `tools/tests/awakening_vehicle_runtime.py`
+teleports to each original map entity and invokes its stock activation path.
+The walker's own enter script starts its locked repair sequence. The probe
+uses hidden, windowed SP with sound and device input disabled. It does not
+compile console scripts or replace map assets.
+
+The first OpenGL run reproduced a HUD defect: the invulnerable turret has
+zero health capacity, and these vehicles have no shield capacity. Both HUD
+fractions divided by zero. Saving the turret printed non-finite rectangle
+warnings for `p_flatbed_val` and `flatbed_val`. The old save writer sanitized
+these rectangles, but that did not fix the invalid live HUD values. Both game
+libraries now show full health for invulnerable vehicles and no shield for
+vehicles without shields; normal fractions are preserved and bounded to the
+meter. The save layout is unchanged.
+
+Each vehicle runs in three fresh processes: enter/fire/save, load/fire/resave,
+then reload/exit. Time is stopped for the saved and initial restored samples,
+so position, class, health, HUD fractions, seat ownership and lock flags can
+be compared before simulation advances. The SP-only `testVehicle` diagnostic
+reports these fields and permits one shot or a normal lock-respecting exit
+only from the local player's occupied seat. The original weapon projectile
+and effect path runs, with engine `screenshot` captures after firing and exit.
+
+All six legs pass on Windows x64 with each renderer, OpenGL and Vulkan.
+Both vehicles restore occupied with health/shield fractions `1`/`0`, fire before and after
+restore, and preserve their pose within 0.01 units. The turret exits; the
+walker remains occupied because its repair script still locks it. All four
+written saves per renderer use v5 `le64-portable1`; input saves remain
+byte-identical, and there are no restore errors, unresolved references or
+non-finite warnings.
+The package and harness hashes are recorded alongside the reports.
+
+The native `vehicle_hud.py` fixture executes each game library's production
+HUD function, covering invulnerable/unshielded, damaged, depleted, overkill,
+overcharge and nonpositive-capacity cases. Both modules pass on Windows and
+Linux, with six deliberate regressions rejected on each platform. The focused
+Windows Meson suite passes all 56 HUD/save/restore tests. The runtime parser's
+self-test runs in CI, including missing/duplicate markers and invalid HUD
+values. Initial harness failures (Windows path separators in the package
+lookup and an SP-only speedometer assertion applied to MP) were corrected
+before qualification; they were not product failures.
+
+Run with `--retail`, `--awakening-root`, a new project-local `--output`, and
+`--renderer gl|vulkan`; optional `--cache` reuses a project-local generated
+asset cache. The harness requires freshly staged executable/game modules and
+checks that the runtime identities stay unchanged. Evidence is under
+`.tmp/q4-vehicles/`: `gl/` retains the original HUD warnings, `fixed-gl/`
+and `fixed-vk/` contain the corrected runs, and `evidence.json` indexes the results.
+
+This qualifies authored activation, occupied saves, single shots and the
+current exit lock. It does not qualify natural approach/use interaction,
+walker repair completion, unbinding, later unlock or traversal, sustained
+turret bursts/smoke, sound, retail visual parity or a complete playthrough.
+Q4-04 stays open. Missing-media warnings from the installed Awakening alpha
+content are retained separately from the corrected non-finite HUD warnings.
+Other retained warnings include duplicate materials, malformed
+`sound/m03_airassault.sndshd`, invalid trench `aas96` navigation data and an
+unresolved trench turret script function. These remain outside this bounded
+vehicle qualification; the run is not a clean-content or full-progression pass.

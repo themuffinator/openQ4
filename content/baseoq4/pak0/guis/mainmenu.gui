@@ -16680,6 +16680,8 @@ windowDef Desktop
 			set "set_game_consoleaccess_hover::visible" "1" ;
 			set "set_game_autoskipcinematics::visible" "1" ;
 			set "set_game_autoskipcinematics_hover::visible" "1" ;
+			set "set_game_cinematicshake::visible" "1" ;
+			set "set_game_cinematicshake_hover::visible" "1" ;
 			set "set_game_viewweapon::visible" "1" ;
 			set "set_game_cl_gunfov::visible" "1" ;
 			set "set_game_cl_gunfov_hover::visible" "1" ;
@@ -16926,6 +16928,8 @@ windowDef Desktop
 			set "set_game_consoleaccess_hover::visible" "0" ;
 			set "set_game_autoskipcinematics::visible" "0" ;
 			set "set_game_autoskipcinematics_hover::visible" "0" ;
+			set "set_game_cinematicshake::visible" "0" ;
+			set "set_game_cinematicshake_hover::visible" "0" ;
 			set "set_game_viewweapon::visible" "0" ;
 			set "set_game_cl_gunfov::visible" "0" ;
 			set "set_game_cl_gunfov_hover::visible" "0" ;

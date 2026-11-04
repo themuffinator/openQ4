@@ -628,6 +628,7 @@ jobs:
             tools/tests/savegame_cross_load.py \
             tools/tests/bse_lifecycle_runtime.py \
             tools/tests/turbo_lift_runtime.py \
+            tools/tests/awakening_vehicle_runtime.py \
             tools/tests/vk_temporal_resolve_shader_pin.py \
             tools/tests/vscode_fast_build.py
           bash -n tools/build/meson_setup.sh
@@ -1066,6 +1067,7 @@ jobs:
           python tools/tests/savegame_cross_load.py --self-test
           python tools/tests/bse_lifecycle_runtime.py --self-test
           python tools/tests/turbo_lift_runtime.py --self-test
+          python tools/tests/awakening_vehicle_runtime.py --self-test
           python tools/tests/vk_temporal_resolve_shader_pin.py
           python tools/tests/vscode_fast_build.py
           OPENQ4_CHECKS

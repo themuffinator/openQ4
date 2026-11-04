@@ -9,6 +9,7 @@ Event are used for scheduling tasks and for linking script commands.
 #pragma hdrstop
 
 #include "../Game_local.h"
+#include <memory>
 
 #define MAX_EVENTSPERFRAME			8192		// Upped from 4096
 //#define CREATE_EVENT_CODE
@@ -988,6 +989,7 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 	int		argsize;
 	idStr	name;
 	idEvent	*event;
+	int		previousTime = 0;
 
 	savefile->ReadInt( num );
 	if ( num < 0 || num > MAX_EVENTS ) {
@@ -1004,6 +1006,12 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 		event->eventNode.AddToEnd( EventQueue );
 
 		savefile->ReadInt( event->time );
+		// ServiceEvents stops at the first future event, so preserve the
+		// chronological queue invariant maintained by Schedule.
+		if ( i > 0 && event->time < previousTime ) {
+			savefile->Error( "idEvent::Restore: event %d is out of order (%d after %d)", i, event->time, previousTime );
+		}
+		previousTime = event->time;
 
 		// read the event name
 		savefile->ReadString( name );
@@ -1022,6 +1030,9 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 		savefile->ReadObject( event->object, *event->typeinfo, event->eventdef->GetName() );
 		if ( event->object == NULL ) {
 			savefile->Error( "idEvent::Restore: event '%s' has a NULL target object", event->eventdef->GetName() );
+		}
+		if ( !event->object->RespondsTo( *event->eventdef ) ) {
+			savefile->Error( "idEvent::Restore: target class '%s' does not support event '%s'", event->typeinfo->classname, event->eventdef->GetName() );
 		}
 
 		// read the args
@@ -1059,21 +1070,23 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 				savefile->Error( "idEvent::Restore: event data is too large (%zu bytes) on event '%s'", eventArgSize, event->eventdef->GetName() );
 				throw idAllocError( "restored legacy idEvent data exceeds the 32-bit heap limit" );
 			}
-			byte *legacyData = static_cast<byte *>( Mem_Alloc( static_cast<size_t>( argsize ), MA_EVENT ) );
+			// Queue cleanup owns event->data. The legacy conversion buffer must
+			// also unwind if reading or allocating the final arguments fails.
+			const auto freeLegacyData = []( byte *data ) { Mem_Free( data ); };
+			std::unique_ptr<byte, decltype( freeLegacyData )> legacyData(
+				static_cast<byte *>( Mem_Alloc( static_cast<size_t>( argsize ), MA_EVENT ) ), freeLegacyData );
 			if ( legacyData == NULL ) {
 				savefile->Error( "idEvent::Restore: failed to allocate %d bytes for legacy event '%s'", argsize, event->eventdef->GetName() );
 				throw idAllocError( "legacy idEvent data allocation failed" );
 			}
-			savefile->Read( legacyData, argsize );
+			savefile->Read( legacyData.get(), argsize );
 			event->data = eventDataAllocator.Alloc( static_cast<int>( eventArgSize ) );
 			if ( event->data == NULL ) {
-				Mem_Free( legacyData );
 				savefile->Error( "idEvent::Restore: failed to allocate %zu bytes on legacy event '%s'", eventArgSize, event->eventdef->GetName() );
 				throw idAllocError( "restored legacy idEvent data allocation failed" );
 			}
 			memset( event->data, 0, eventArgSize );
-			idEvent_ConvertLegacyRawArgs( event->eventdef, event->data, legacyData, legacyOffsets );
-			Mem_Free( legacyData );
+			idEvent_ConvertLegacyRawArgs( event->eventdef, event->data, legacyData.get(), legacyOffsets );
 		} else {
 			event->data = NULL;
 		}

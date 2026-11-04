@@ -78,18 +78,25 @@ void idAnimState::Save( idSaveGame *savefile ) const {
 idAnimState::Restore
 =====================
 */
-void idAnimState::Restore( idRestoreGame *savefile ) {
+void idAnimState::Restore( idRestoreGame *savefile, idEntity *owner ) {
+	// These are embedded actor states. Saved references must not redirect their
+	// animator or state callbacks to another (possibly already deleted) object.
+	self = owner;
+	animator = owner ? owner->GetAnimator() : NULL;
+	if ( animator == NULL ) {
+		savefile->Error( "idAnimState::Restore: missing owner animator" );
+	}
 
 	savefile->ReadBool( idleAnim );
 	savefile->ReadInt( animBlendFrames );
 	savefile->ReadInt( lastAnimBlendFrames );
 
-	savefile->ReadObject( self );
-
-	idEntity *animowner;
-	savefile->ReadObject( animowner );
-	if ( animowner ) {
-		animator = animowner->GetAnimator();
+	idEntity *savedSelf = NULL;
+	idEntity *savedAnimatorOwner = NULL;
+	savefile->ReadObject( savedSelf );
+	savefile->ReadObject( savedAnimatorOwner );
+	if ( savedSelf != owner || savedAnimatorOwner != owner ) {
+		savefile->Error( "idAnimState::Restore: inconsistent owner references" );
 	}
 
 	savefile->ReadInt( channel );
@@ -973,7 +980,7 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadJoint( neckJoint );
 	savefile->ReadJoint( headJoint );
 
-	walkIK.Restore( savefile );
+	walkIK.Restore( savefile, this );
 
 	savefile->ReadString( animPrefix );
 	savefile->ReadString( painType );
@@ -984,9 +991,9 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( blink_min );
 	savefile->ReadInt( blink_max );
 
-	headAnim.Restore( savefile );
-	torsoAnim.Restore( savefile );
-	legsAnim.Restore( savefile );
+	headAnim.Restore( savefile, this );
+	torsoAnim.Restore( savefile, this );
+	legsAnim.Restore( savefile, this );
 
 	stateThread.Restore( savefile, this );
 

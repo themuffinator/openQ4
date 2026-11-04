@@ -53,31 +53,41 @@ void idIK::Save( idSaveGame *savefile ) const {
 idIK::Restore
 ================
 */
-void idIK::Restore( idRestoreGame *savefile ) {
+void idIK::Restore( idRestoreGame *savefile, idEntity *owner ) {
 	idStr anim;
+	idEntity *savedSelf = NULL;
+	bool restoredInitialized, restoredActive;
 
-	savefile->ReadBool( initialized );
-	savefile->ReadBool( ik_activate );
-	savefile->ReadObject( self );
+	// Publish only the containing entity, and only after validating resources.
+	// An interrupted read must leave this component safe to clear and destroy.
+	self = NULL;
+	animator = NULL;
+	modifiedAnim = 0;
+	initialized = false;
+	ik_activate = false;
+	savefile->ReadBool( restoredInitialized );
+	savefile->ReadBool( restoredActive );
+	savefile->ReadObject( savedSelf );
 	savefile->ReadString( anim );
-	//savefile->ReadInt( modifiedAnim );	// This is defined below
 	savefile->ReadVec3( modelOffset );
 
-	if ( self ) {
-		animator = self->GetAnimator();
-		if ( animator == NULL || animator->ModelDef() == NULL ) {
-			gameLocal.Warning( "idIK::Restore: IK for entity '%s' at (%s) has no model set.",
-								self->name.c_str(), self->GetPhysics()->GetOrigin().ToString(0) );
-		}
-		modifiedAnim = animator->GetAnim( anim );
-		if ( modifiedAnim == 0 ) {
-			gameLocal.Warning( "idIK::Restore: IK for entity '%s' at (%s) has no modified animation.",
-									self->name.c_str(), self->GetPhysics()->GetOrigin().ToString(0) );
-		}
-	} else {
-		animator = NULL;
-		modifiedAnim = 0;
+	if ( owner == NULL || ( savedSelf != NULL && savedSelf != owner ) ) {
+		savefile->Error( "idIK::Restore: inconsistent owner reference" );
 	}
+	idAnimator *restoredAnimator = savedSelf ? owner->GetAnimator() : NULL;
+	int restoredAnim = restoredAnimator ? restoredAnimator->GetAnim( anim ) : 0;
+	if ( ( restoredInitialized || restoredActive ) &&
+		( restoredAnimator == NULL || restoredAnimator->ModelDef() == NULL ||
+		  restoredAnimator->ModelHandle() == NULL || restoredAnim == 0 ) ) {
+		savefile->Error( "idIK::Restore: active IK has no owner, model or animation" );
+	}
+	// Uninitialized IK can legitimately have no model/animation (Init failed),
+	// or no owner at all (Init was never called).
+	self = savedSelf ? owner : NULL;
+	animator = restoredAnimator;
+	modifiedAnim = restoredAnim;
+	initialized = restoredInitialized;
+	ik_activate = restoredActive;
 }
 
 /*
@@ -319,10 +329,10 @@ void idIK_Walk::Save( idSaveGame *savefile ) const {
 idIK_Walk::Restore
 ================
 */
-void idIK_Walk::Restore( idRestoreGame *savefile ) {
+void idIK_Walk::Restore( idRestoreGame *savefile, idEntity *owner ) {
 	int i;
 
-	idIK::Restore( savefile );
+	idIK::Restore( savefile, owner );
 
 	savefile->ReadClipModel( footModel );
 
@@ -886,10 +896,10 @@ void idIK_Reach::Save( idSaveGame *savefile ) const {
 idIK_Reach::Restore
 ================
 */
-void idIK_Reach::Restore( idRestoreGame *savefile ) {
+void idIK_Reach::Restore( idRestoreGame *savefile, idEntity *owner ) {
 	int i;
 
-	idIK::Restore( savefile );
+	idIK::Restore( savefile, owner );
 
 	savefile->ReadInt( numArms );
 	if ( numArms < 0 || numArms > MAX_ARMS ) {

@@ -7895,6 +7895,19 @@ void SaveGame_f( const idCmdArgs &args ) {
 	sessLocal.SaveGame( Session_CommandSaveGameName( args ), Session_CommandSaveGameType( args ) );
 }
 
+// Exercise the existing autosave serializer at a suspended cinematic beat.
+// Normal player saves still obey the cinematic restriction in SaveGame().
+#ifndef ID_DEDICATED
+static void TestAutoSave_f( const idCmdArgs &args ) {
+	if ( args.Argc() != 2 || !cvarSystem->GetCVarBool( "developer" ) ) {
+		common->Printf( "testAutoSave <slot> requires developer 1\n" );
+		return;
+	}
+	const bool saved = sessLocal.SaveGame( args.Argv( 1 ), ST_AUTO );
+	common->Printf( "TEST_AUTOSAVE slot=%s saved=%d\n", args.Argv( 1 ), saved ? 1 : 0 );
+}
+#endif
+
 /*
 ===============
 TakeViewNotes_f
@@ -10400,6 +10413,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "openq4_guiAction", Session_OpenQ4GuiAction_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "runs a classic GUI window's onAction, or onBackAction with back, as a click would, for engine-scripted validation" );
 	cmdSystem->AddCommand( "openq4_browser", Session_OpenQ4Browser_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "reports and exercises main-menu server-browser operations for engine-scripted validation" );
 	cmdSystem->AddCommand( "saveGame", SaveGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "saves a game" );
+	cmdSystem->AddCommand( "testAutoSave", TestAutoSave_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "writes a named autosave for developer lifecycle validation" );
 	cmdSystem->AddCommand( "loadGame", LoadGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "loads a game", idCmdSystem::ArgCompletion_SaveGame );
 #endif
 

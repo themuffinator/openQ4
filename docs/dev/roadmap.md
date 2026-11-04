@@ -81,6 +81,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | [#201: Windows ARM64 harness cleanup PR](https://github.com/themuffinator/openQ4/pull/201) | GOV-02/CORE-04: closed on 31 October as superseded by `9fe6f4d89`, which retries short-lived Windows executable locks during fixture cleanup. Main's Windows ARM64 push verification at `b9c663758` passed `openq4-imported-game-regressions` and all 305 native tests. |
 | [#203: complete push-payload history](https://github.com/themuffinator/openQ4/pull/203) / [#205: packaged saves rejected as build 1](https://github.com/themuffinator/openQ4/issues/205) | REL-01/Q4-05/GOV-02: source review approved at `e178a61b`; the exact build-history regression and all three shallow-checkout negative controls pass on Windows. Main's payloads at `b9c663758` passed CI but still used a single-commit checkout, so they also report build 1 (the real count is 1905). #203 merged on 31 October in `18117f896`. #205 closed on 31 October: the Windows x64 payload from push verification at `f0a86b0ec` (artifact 13033914500) reports build 1920. In SP on `game/airdefense1`, its save committed with header build 1920, format 4, and loaded back into gameplay in a fresh profile. The replacement was linked from #168, #170, #183, #184 and #192. The Linux, macOS and Windows ARM64 payloads were not loaded. |
 | [#204: missing music in signed macOS 0.14.000](https://github.com/themuffinator/openQ4/issues/204) | PLAT-04/AUD-01: the report uses MacSourcePorts' signed build of withdrawn 0.14.0. The reporter recalls music and console ambience also missing in 0.13.2; their log has been requested. Their Hannibal opaque-window report matches the portal fade-distance fix `d361e62ea`, and the briefing-hologram decal report is to be filed separately. Signing does not establish a later engine revision. Preserve saves and package separation in any comparison; 0.13.2 cannot read format-4 saves. |
+| [#209: airdefense1 compilation stops](https://github.com/themuffinator/openQ4/issues/209) | CORE-05: reviewed 4 November. The supplied log confirms `3ea033f7`, which includes the earlier `hub2` compiler fixes. Shadow building finishes in 254.7 seconds and per-area optimization completes; the log ends during `FixGlobalTjunctions`, with static-model material loads and no fatal error, `.proc` write or normal completion. The exact source map, modified-asset identity, crash-versus-hang/interruption details and any crash reports have been requested. No independent reproduction or fix is established. Keep open and separate from #181, whose reporter has [confirmed the `hub2` rebuild succeeds](https://github.com/themuffinator/openQ4/issues/181#issuecomment-6572457735). |
 | [rebelancap/openQ4-ios: iPhone, iPad and Apple Vision Pro port](https://github.com/rebelancap/openQ4-ios) | IOS-01 through IOS-06: a tested external port (v1.1.0), pinned to withdrawn `v0.14.000` as patches over a pristine upstream; porting from it is preferred. Integrate shared fixes on main first, then the Apple targets, crediting its author. Its user reports do not qualify the integrated build. |
 | [26 October main verification](https://github.com/themuffinator/openQ4/actions/runs/40277373140) | GOV-02/CORE-04/PLAT-04: Windows x64, Linux x64/ARM64 and three macOS jobs passed. Windows ARM64 has the failures above; macOS Intel Metal timed out in renderer-foundation self-tests. The Windows payload subsequently proved unable to save because its shallow checkout produced build 1 (#205). Preserve those failures; passing CI did not qualify packaged save/load or the failed targets. |
 | [29 October main verification](https://github.com/themuffinator/openQ4/actions/runs/40951670759) | GOV-02/CORE-04/PLAT-04: all eight push-verification jobs passed at `b9c663758`, including Windows ARM64 (305/305 native tests) and the Intel macOS OpenGL route. Its payloads still report build 1 (#205), so this run does not qualify packaged save/load. |
@@ -1759,10 +1760,55 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
     in the same process, and in fresh base and multiplayer launches, there is
     no `q4xbase` path and no expansion definition.
 
-  Not reached: the turret and the walker. Neither took the in-game entry at
-  the positions tried, presumably locked or hidden until their sequences.
+  Progress, 4 November: the authored prison chaingun and trench walker now
+  have repeatable entry through their stock activation path, without input or
+  injected scripts. Both pass occupied save/load/resave/reload and a real
+  diagnostic shot before and after restore on OpenGL and Vulkan. Seat ownership,
+  pose, lock and HUD values survive each fresh process. The turret exits normally;
+  the walker keeps the repair sequence's authored exit lock. The probe exposed
+  division by zero in invulnerable/unshielded vehicle HUDs, now fixed in both
+  game libraries. See [vehicle evidence and limits](retail-baseline-ledger.md#awakening-vehicle-saves-and-hud-fractions-4-november-2026).
+  Walker repair completion, unlock and traversal, sustained turret bursts and
+  visual/audio parity remain open; this checks one shot and its engine capture.
   Arena was covered only as `game_mp` on `baseoq4`, not as a switch from the
   Awakening menu. Full playthroughs remain.
+  M01/M02 scrutiny, 4 November: fire volumes now use projectile/touch collision
+  while burning and clear it when quenched, including on restore; final freeze
+  hits fully dim their lights. M02's repair-bot attachment, generator defence
+  gate, objective timing and animation sequencing are corrected under a separate
+  saved script identity. Original M02 saves retain the installed program.
+  See [mission intent, findings and bounded runtime evidence](awakening-missions.md).
+  End-to-end squad routing, walker demolition/traversal and Tank/extraction
+  qualification remain part of this gate.
+
+  **M01 interior dramatic-feedback pass (implemented, 4 November).** Revision 3
+  preserves Tak's repair face fill, exact dialogue sequence and 132.912-second
+  interior timing. Fresh starts add ducked cabin/wind/rattle layers, positional
+  foley, synchronized impact tiers, bounded camera response, damage lighting,
+  joint-following tool effects and a completed descent sound transition.
+  Original/v2 scripts remain immutable for saves. The localized shake control,
+  reduced-flashing treatment and VR motion suppression are implemented.
+  The [dropship audit and beat acceptance](m01-interior-feedback-audit.md#implemented-revision-3-4-november-2026)
+  records the ordered plan's delivered scope and limits:
+
+  1. **Audio continuity — implemented and checked.** Full production stereo/HRTF
+     recordings trace ownership, ducking and natural score expiry. The user
+     auditioned the repair passage and confirmed clear dialogue.
+  2. **Coupled impact response — implemented and checked.** Three finite tiers
+     compose once after camera sampling; no translation or accumulated offset.
+     Shake-off and the VR setting yield zero added motion.
+  3. **Damage and close action — implemented and reviewed.** Damage carries across
+     sets; tool audio/glow/emission follow both repair intervals. Face lighting
+     and squad sightlines remain readable; sparks stay small and mostly below
+     the close-up crop.
+  4. **Scene qualification — passed within documented scope.** Full GL/Vulkan
+     playbacks reach gameplay with identical beat times. Eight phase saves and
+     eight fresh-process skip cases pass, as do old-revision restore/resave,
+     normal-time repair at a 144 FPS cap, reduced flashing, pause-clock tests
+     and the settings control. Concurrent games prevent isolated performance
+     qualification; physical speaker/headphone comparisons and headset comfort
+     remain wider campaign qualification. Candidate release notes are updated.
+
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus
@@ -1851,6 +1897,36 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   pass. CRC-valid OpenGL/Vulkan interruption probes return to recovery and reload
   the healthy save, and all 11 existing 0.9–0.13 fixtures restore with their input
   files unchanged. Broader owning graphs and other platforms remain open.
+  Further progress, 4 November: [actor animation and IK ownership, plus
+  interrupted state-call allocations](savegame-reliability.md#actor-animation-ownership-and-interrupted-state-calls)
+  now reject inconsistent owners and missing active resources without publishing
+  unsafe state. Inactive IK and saved layouts are preserved. Both libraries pass
+  Windows/Linux field-failure fixtures and 18 negative controls per platform;
+  the focused Windows suite passes 54/54. Eight CRC-valid corruption cases per
+  renderer recover to Load Game on OpenGL/Vulkan and reload a healthy save.
+  All 11 existing 0.9–0.13 release fixtures also restore and run gameplay on
+  OpenGL. Every input save remains unchanged.
+  Broader owning graphs and other platforms remain open.
+  Articulated-figure follow-up, 4 November: [required reconstruction and saved
+  structure](savegame-reliability.md#articulated-figure-reconstruction-and-saved-structure)
+  now validate figure ownership, loaded/active state, body/joint names and joint
+  types in both libraries. Missing required AF resources enter recovery;
+  optional inactive setup failures remain valid. Windows/Linux fixtures reject
+  16 deliberate regressions per platform; the focused Windows suite passes 58/58.
+  Seven CRC-valid damaged-ragdoll cases per renderer recover and permit a healthy
+  reload on OpenGL/Vulkan. Healthy body poses survive frozen restore, the resave
+  reloads, and all 11 existing 0.9–0.13 fixtures still restore into gameplay.
+  This closes the identified AF boundaries, not the broader graph/platform gate.
+  Event-queue follow-up, 4 November: [queued callbacks and legacy argument
+  ownership](savegame-reliability.md#event-queues-and-interrupted-legacy-arguments)
+  now reject unsupported target callbacks and descending event times, and free
+  temporary legacy buffers after interrupted reads. Both game libraries pass
+  Windows/Linux read/allocation-failure fixtures and eight negative controls per
+  platform; the focused Windows suite passes 60/60. Save layouts are unchanged.
+  Seven CRC-valid damaged-event cases per renderer recover to Load Game and
+  reload the healthy save on OpenGL/Vulkan, with all input files unchanged.
+  All 11 existing 0.9–0.13 fixtures still restore into gameplay. Broader owning
+  graphs and other target platforms remain open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.
@@ -3327,6 +3403,9 @@ visual editor have their own active items.
   diagnostics individually. Gate on successful compile, runtime load, rendering,
   collision and AI behavior with bounded memory. Reproduce the historical `hub2`
   failure with the current compiler before selecting a representation change.
+  Track #209's separate `airdefense1` compile against its exact map and asset
+  inputs once supplied; the log ending in global T-junction repair alone does
+  not identify a crash or establish a regression in the earlier `hub2` fixes.
 - [ ] **CORE-06 — P2, implementation and qualification: AAS tactical generation.**
   Complete cover/lean/corner/pinch/vantage generation or retain an explicit
   rebuilt-map limitation; path/swim compilation already exists. Test stock/custom

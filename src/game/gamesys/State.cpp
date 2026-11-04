@@ -405,7 +405,6 @@ rvStateThread::Restore
 void rvStateThread::Restore( idRestoreGame *saveFile, idClass* owner ) {
 	int numStates;
 	int packedFlags;
-	stateCall_t* call = NULL;
 
 	saveFile->ReadString( name );
 
@@ -428,13 +427,13 @@ void rvStateThread::Restore( idRestoreGame *saveFile, idClass* owner ) {
 		saveFile->Error( "rvStateThread::Restore: invalid active state count %d", numStates );
 	}
 	for( ; numStates > 0; numStates-- ) {
-		call = new stateCall_t;
-		assert( call );
-
+		// Keep an interrupted/unknown state owned until it joins the thread.
+		std::unique_ptr<stateCall_t> call( new stateCall_t );
 		call->Restore( saveFile, owner );
 
-		call->node.SetOwner ( call );
+		call->node.SetOwner ( call.get() );
 		call->node.AddToEnd ( states );
+		call.release();
 	}
 
 	saveFile->ReadInt( numStates );
@@ -442,12 +441,12 @@ void rvStateThread::Restore( idRestoreGame *saveFile, idClass* owner ) {
 		saveFile->Error( "rvStateThread::Restore: invalid interrupted state count %d", numStates );
 	}
 	for( ; numStates > 0; numStates-- ) {
-		call = new stateCall_t;
-		assert( call );
-
+		// Keep an interrupted/unknown state owned until it joins the thread.
+		std::unique_ptr<stateCall_t> call( new stateCall_t );
 		call->Restore( saveFile, owner );
 
-		call->node.SetOwner ( call );
+		call->node.SetOwner ( call.get() );
 		call->node.AddToEnd ( interrupted );
+		call.release();
 	}
 }

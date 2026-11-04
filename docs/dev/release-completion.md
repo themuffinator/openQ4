@@ -37,6 +37,78 @@ See [player release status](../user/release-status.md).
   routes and other power states remain unqualified. The tool is not bundled
   with the engine, and normal rendering/input behavior is unchanged.
 
+## Damaged queued events recover safely, 4 November 2026
+
+- Saves with unsupported queued callbacks or out-of-order event times now
+  return to Load Game instead of silently dropping or delaying actions.
+  Interrupted reads of legacy event arguments also release their temporary
+  memory. Healthy saves retain their existing format and compatibility readers.
+- Both game libraries pass Windows/Linux failure and regression controls; the
+  focused Windows suite passes 60 checks. Seven damaged-save cases recover and
+  allow a healthy reload on each of OpenGL and Vulkan; all 11 existing historical
+  fixtures still restore into gameplay.
+  See [scope and evidence](savegame-reliability.md#event-queues-and-interrupted-legacy-arguments).
+
+## Damaged ragdoll saves recover safely, 4 November 2026
+
+- Saves with inconsistent ragdoll owners, missing required definitions or
+  mismatched bodies/joints now return to Load Game instead of risking an
+  assertion or applying a pose to the wrong part. Legitimate inactive figures
+  and the existing save format are preserved.
+- Both game libraries pass Windows/Linux regression controls and the focused
+  Windows suite passes 58 checks. Seven damaged-save cases recover on each of
+  OpenGL and Vulkan, healthy ragdolls survive resave/reload, and all 11 existing
+  0.9–0.13 fixtures still load. See [scope and evidence](savegame-reliability.md#articulated-figure-reconstruction-and-saved-structure).
+
+## Awakening opening missions, 4 November 2026
+
+- M01's dropship now builds from engine rumble into coordinated impacts,
+  emergency light dips, hull strain, wind and local harness/rope/welding sounds.
+  Environmental layers duck under dialogue, and Tak's improved repair lighting
+  is preserved. Cinematic shake has an amount/off control; reduced flashing
+  keeps stable lighting and non-flashing feedback. Restart M01 for the new
+  sequence; older saves retain their original scene revision.
+- The complete scene passes OpenGL/Vulkan playback, eight phase save/load and
+  eight skip checks. The repair mix was auditioned and confirmed clear; see
+  [tested scope and remaining device/performance limits](m01-interior-feedback-audit.md#implemented-revision-3-4-november-2026).
+- Tak's face retains natural skin tone and detail while freeing the player
+  from the dropship harness in M01. A local cabin fill light covers that repair
+  sequence and is removed before gameplay; his model and textures are unchanged.
+- Freezing a fire vent now clears its invisible collision and fully extinguishes
+  its light. Players and squadmates can cross active flames while receiving
+  their normal damage; quenched vents also restore correctly from saves.
+- Trianfac's repair bots use their own stations, and the generator sabotage
+  waits for all six bots to be destroyed. The generator objective appears before
+  the encounter and completes after the explosion. The Tank victory completes
+  the Nexus objective, and the extraction dropship finishes landing before
+  starting its idle animation.
+- Restart m02 to adopt its script corrections. Earlier saves keep their original
+  script program; corrected saves retain a separate source identity.
+- [Mission audit and validation](awakening-missions.md) records the designer
+  intent, confirmed fixes and remaining Q4-04 qualification. These focused
+  encounter checks do not establish complete mission playthroughs.
+
+## Vehicle health and shield meters, 4 November 2026
+
+- Invulnerable turrets now show a full health meter, and vehicles without shields
+  show an empty shield meter. This prevents invalid HUD geometry and warnings
+  when saving from these vehicles. Damaged meters retain their normal fractions.
+- The Awakening prison turret and trench walker pass occupied save/load/resave/
+  reload checks on OpenGL and Vulkan, including firing after a load and respecting
+  the walker's repair lock. This does not qualify the complete repair sequence or
+  campaign. See [vehicle evidence and limits](retail-baseline-ledger.md#awakening-vehicle-saves-and-hud-fractions-4-november-2026).
+
+## Damaged actor saves recover safely, 4 November 2026
+
+- Loading a save with inconsistent actor animation or IK data now returns to
+  Load Game instead of risking a crash or using another actor's animation state.
+  A failed load also releases partially restored state callbacks.
+- Healthy saves keep their existing format and compatibility readers. Both game
+  libraries pass the new Windows/Linux failure tests; the focused Windows suite
+  passes 54 checks. Eight damaged-save cases recover and allow a healthy reload
+  on OpenGL and Vulkan, and all 11 existing 0.9–0.13 release fixtures still load
+  into gameplay. See [scope and evidence](savegame-reliability.md#actor-animation-ownership-and-interrupted-state-calls).
+
 ## Multiplayer bot recovery follow-up, 4 November 2026
 
 - Bots can steer a dangerous knockback slide before leaving the floor and

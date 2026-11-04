@@ -1,0 +1,342 @@
+// openQ4's dropship direction for the installed Awakening m01 scene.
+// Original orchestration, using existing entity/VO/animation interfaces.
+// Loaded as a map script; all threads, actors and cue state use normal saves.
+#include "scripts/doom_defs.script"
+
+namespace oq4_m01 {
+
+entity cues;
+entity breachLight;
+float weldStarted;
+float repairDone;
+float columnDone;
+float mitchellDone;
+
+void mark(string beat) {
+    sys.println("oq4_m01: " + beat + " @ " + sys.getTime());
+}
+
+void until(float deadline) {
+    if (sys.getTime() < deadline) {
+        sys.wait(deadline - sys.getTime());
+    }
+}
+
+void sparks(vector position) {
+    if (sys.getcvar("ui_reducedFlashing") != "1") {
+        sys.playWorldEffect("effects/hal9000/dropship_invasion_sparks", position, '0 0 0');
+    }
+}
+
+void seated(entity marine) {
+    aiScriptedAnimLoop(marine, "st_dropship_chair", 8);
+}
+
+void rocked(entity marine) {
+    aiScriptedAnimLoop(marine, "st_dropship_chair_rocked", 4);
+}
+
+void cabinSit() {
+    $intro_unit1_seq_6_drop_ship_not_damaged.playAnim(ANIMCHANNEL_ALL, "markswell_sits");
+    aiScriptedAnimWait($intro_unit1_seq_6_markswell, "st_markswell_sits", 8, 0);
+    $intro_unit1_seq_6_markswell.hide();
+    sys.trigger($intro_unit1_seq_6_markswell_sitting);
+    seated($intro_unit1_seq_6_markswell_sitting);
+}
+
+void cabin() {
+    mark("cabin");
+    cues = sys.spawn("oq4_m01_cues");
+    sys.trigger($intro_unit1_seq_6_cam_1);
+    sys.waitFrame();
+    cues.startSoundShader("oq4_m01_cabin", 1);
+    $intro_sound_player2.fadeSound(SND_CHANNEL_ANY, -8, 1);
+    sys.fadeIn('0 0 0', 1);
+    radioChatterPlayWait($uni_radiochatter, "vo_goc_falconatlaswlk");
+    // The acknowledgement covers Markswell's entrance, keeping the briefing moving.
+    sys.trigger($intro_unit1_seq_6_cam_2);
+    sys.trigger($intro_unit1_seq_6_markswell);
+    sys.trigger($intro_unit1_seq_6_drop_ship_not_damaged);
+    aiScriptedAnim($intro_unit1_seq_6_markswell, "st_markswell_enters", 8, 1);
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_rogerthtp");
+    aiSpeak($intro_unit1_seq_6_markswell, "lipsync_marks_oklisten");
+    aiScriptedAnimWait($intro_unit1_seq_6_markswell, "st_markswell_talks", 8, 1);
+
+    mark("incoming");
+    cues.startSoundShader("oq4_m01_hit", 3);
+    float sitThread = thread cabinSit();
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_everseat");
+    sys.trigger($intro_unit1_seq_6_cam_3);
+    aiSpeakWait($intro_unit1_seq_6_atkins, "lipsync_atkins_minres");
+    sys.waitForThread(sitThread);
+    $intro_unit1_seq_6_drop_ship_not_damaged_markswell_sitting.show();
+    $intro_unit1_seq_6_drop_ship_not_damaged.remove();
+    $intro_unit1_seq_6_markswell.remove();
+
+    // A single, readable loss of normal lighting. No repeated black/white flashes.
+    cues.startSoundShader("oq4_m01_hit", 3);
+    cues.startSoundShader("oq4_m01_alarm", 4);
+    rocked($intro_unit1_seq_6_tak);
+    rocked($intro_unit1_seq_6_navajas);
+    rocked($intro_unit1_seq_6_dekard);
+    rocked($intro_unit1_seq_6_markswell_sitting);
+    $intro_unit1_seq_6_drop_ship_lighting_nominal_1.fadeOutLight(0.4);
+    $intro_unit1_seq_6_drop_ship_lighting_nominal_2.fadeOutLight(0.4);
+    sys.trigger($intro_unit1_seq_6_drop_ship_lighting_emergency_lights_fade_in);
+    sys.trigger($intro_unit1_seq_6_cam_5);
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_gochvyaa");
+    radioChatterPlayWait($uni_radiochatter, "vo_goc_conffalc");
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_wehit");
+
+    mark("breach");
+    cues.stopSound(4, 0);
+    cues.startSoundShader("oq4_m01_breach", 3);
+    cues.startSoundShader("oq4_m01_engine_fail", 5);
+    cues.startSoundShader("oq4_m01_wind", 2);
+    cues.fadeSound(1, -5, 0.5);
+    $intro_sound_player2.fadeSound(SND_CHANNEL_ANY, -15, 0.4);
+    $intro_unit1_seq_6_drop_ship_not_damaged_markswell_sitting.remove();
+    $intro_unit1_seq_6_drop_ship_damaged.show();
+    sys.trigger($intro_unit1_seq_6_drop_ship_damaged);
+    sparks('268 2920 -1090');
+
+    // Cold daylight enters through the breach; red cabin light still models faces.
+    sys.setSpawnArg("name", "oq4_m01_breach_light");
+    sys.setSpawnArg("cinematic", "1");
+    sys.setSpawnArg("noshadows", "1");
+    sys.setSpawnArg("_color", "0.23 0.30 0.36");
+    sys.setSpawnArg("light_radius", "140 110 100");
+    sys.setSpawnVector("origin", '270 2932 -1100');
+    breachLight = sys.spawn("light");
+
+    // Extend the hanging portion of Atkins' clip to contain his warning.
+    // setAnimRate is an absolute multiplier applied to subsequently started clips.
+    $intro_unit1_seq_6_atkins.setAnimRate(0.55);
+    $intro_unit1_seq_6_darnell.setAnimRate(0.55);
+    aiScriptedAnim($intro_unit1_seq_6_townsend, "st_townsend_fall", 2, 0);
+    aiScriptedAnim($intro_unit1_seq_6_atkins, "st_atkins_fall", 2, 0);
+    aiScriptedAnim($intro_unit1_seq_6_darnell, "st_darnell_reach", 2, 0);
+    aiScriptedAnim($intro_unit1_seq_6_mitchell, "st_mitchel_hold", 2, 0);
+    aiSpeak($intro_unit1_seq_6_townsend, "lipsync_towns_arrgg");
+    sys.wait(0.65);
+    // Across-aisle composition holds Darnell reaching and Atkins losing his grip.
+    // Extra headroom accommodates the lifted chair throughout the fall.
+    $intro_unit1_seq_6_cam_6.setFOV(95);
+    $intro_unit1_seq_6_cam_6.setOrigin('338 2880 -1090');
+    $intro_unit1_seq_6_ctg_6.setOrigin('284 2880 -1095');
+    // Map target_null aiming is evaluated at spawn, so refresh the view axis too.
+    $intro_unit1_seq_6_cam_6.setAngles(sys.VecToAngles(
+        $intro_unit1_seq_6_ctg_6.getOrigin() - $intro_unit1_seq_6_cam_6.getOrigin()));
+    sys.trigger($intro_unit1_seq_6_cam_6);
+    aiSpeakWait($intro_unit1_seq_6_darnell, "lipsync_darn_holdonman");
+    aiSpeakWait($intro_unit1_seq_6_mitchell, "lipsync_mitch_grabhand");
+    mark("rescue_warning");
+    aiSpeakWait($intro_unit1_seq_6_atkins, "lipsync_atkins_icanthold");
+    aiSpeakWait($intro_unit1_seq_6_atkins, "lipsync_atkins_die");
+    $intro_unit1_seq_6_atkins.remove();
+    $intro_unit1_seq_6_townsend.remove();
+    mark("rescue_failed");
+    $intro_unit1_seq_6_darnell.setAnimRate(1);
+    rocked($intro_unit1_seq_6_darnell);
+    rocked($intro_unit1_seq_6_mitchell);
+    aiSpeakWait($intro_unit1_seq_6_darnell, "lipsync_darn_shit");
+    sys.wait(0.55);
+
+    // Give the lost seats a beat, then return command of the scene to Markswell.
+    sys.trigger($intro_unit1_seq_6_cam_10);
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_gochithard");
+    sys.trigger($intro_unit1_seq_6_cam_11);
+    aiSpeakWait($intro_unit1_seq_6_markswell_sitting, "lipsync_marks_evholdvans");
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_rgrltst20");
+    aiSpeakWait($intro_unit1_seq_6_markswell_sitting, "lipsync_marks_understdt");
+    sys.trigger($m04_trench_unit1_main);
+}
+
+void prepareMarine(entity marine) {
+    sys.trigger(marine);
+    marine.hideSurface("models/weapons/mp_guns/w_mg_lo");
+    rocked(marine);
+}
+
+void ready(entity marine) {
+    cues.startSoundShader("oq4_m01_harness", 6);
+    aiScriptedAnimWait(marine, "st_chair_to_idle", 8, 1);
+    aiScriptedFaceWait(marine, $m04_trench_unit1_seq_1_rap_node, 1);
+    aiScriptedAnimLoop(marine, "st_dropship_stand", 8);
+}
+
+void descend(entity marine, float steps) {
+    while (steps > 0) {
+        aiScriptedAnimWait(marine, "st_dropship_walk", 8, 1);
+        steps -= 1;
+    }
+    aiScriptedAnimWait(marine, "st_repelling", 8, 1);
+    marine.remove();
+}
+
+void rigLine() {
+    sys.trigger($m04_trench_unit1_seq_1_zipline_model_1);
+    aiScriptedAnimWait($m04_trench_unit1_seq_1_tak, "st_tak_zipline_start", 8, 1);
+    aiScriptedAnimLoop($m04_trench_unit1_seq_1_tak, "st_tak_zipline", 8);
+}
+
+void column() {
+    ready($m04_trench_unit1_seq_1_navajas);
+    float marksReady = thread ready($m04_trench_unit1_seq_1_markswell);
+    descend($m04_trench_unit1_seq_1_navajas, 1);
+    sys.waitForThread(marksReady);
+    descend($m04_trench_unit1_seq_1_markswell, 3);
+    columnDone = 1;
+    mark("column_clear");
+}
+
+void cutHarnesses() {
+    aiScriptedFaceWait($m04_trench_unit1_seq_1_tak, $m04_trench_unit1_seq_1_tak_weld_face_1, 1);
+    aiScriptedAnimWait($m04_trench_unit1_seq_1_tak, "st_tak_weld_walk", 8, 1);
+    // Keep the authored repair continuous through the last marine's departure.
+    $m04_trench_unit1_seq_1_tak.setAnimRate(0.85);
+    aiScriptedAnim($m04_trench_unit1_seq_1_tak, "st_tak_weld", 8, 0);
+    weldStarted = sys.getTime();
+    mark("repair_started");
+    sys.wait(2.35);
+    cues.startSoundShader("oq4_m01_weld", 7);
+    sparks('183 514 285');
+    sys.wait(2.95);
+    cues.stopSound(7, 0);
+    aiSpeakWait($m04_trench_unit1_seq_1_tak, "lipsync_tak_okmitchout");
+    // The fixed weld clip turns from Mitchell to Dekard. Keep it running while
+    // Mitchell joins the column; do not restart or loop the entire performance.
+    until(weldStarted + 15.3);
+    cues.startSoundShader("oq4_m01_weld", 7);
+    sparks('158 539 285');
+    until(weldStarted + 26);
+    cues.stopSound(7, 0);
+    $m04_trench_unit1_seq_1_tak.setAnimRate(1);
+    repairDone = 1;
+    mark("repair_complete");
+}
+
+void mitchellExit() {
+    while (weldStarted == 0) { sys.waitFrame(); }
+    until(weldStarted + 7.65);
+    while (!columnDone) { sys.waitFrame(); }
+    ready($m04_trench_unit1_seq_1_mitchell);
+    descend($m04_trench_unit1_seq_1_mitchell, 1);
+    mitchellDone = 1;
+}
+
+void landing() {
+    // Preserve the map's gameplay handoff and encounter dependencies.
+    sys.trigger($tak);
+    sys.trigger($darnell);
+    sys.trigger($m04_trench_unit1_seq_2_atlas_guy_1);
+    sys.trigger($m04_trench_unit1_seq_2_atlas_guy_2);
+    sys.trigger($m04_trench_unit1_seq_2_atlas_guy_3);
+    sys.trigger($m04_trench_unit1_seq_2_atlas_guy_4);
+    sys.trigger($m04_intro_unit1_seq_1_main_trigger_tely);
+    sys.trigger($m04_trench_unit1_seq1_enable_weapons);
+    sys.trigger($main_player_equip);
+    sys.trigger($m04_trench_unit1_harvester_1);
+    sys.trigger($m04_trench_unit1_beach_turret_1);
+    sys.trigger($m04_trench_unit1_beach_turret_2);
+    sys.trigger($m04_trench_unit1_beach_turret_3);
+    sys.trigger($m04_trench_unit1_upper_level_team_spawner);
+    sys.trigger($m04_trench_unit1_upper_level_team_walker_spawner);
+    mark("landing");
+}
+
+void evacuate() {
+    entity harnessFill;
+    mark("evacuate");
+    prepareMarine($m04_trench_unit1_seq_1_tak);
+    prepareMarine($m04_trench_unit1_seq_1_navajas);
+    prepareMarine($m04_trench_unit1_seq_1_mitchell);
+    prepareMarine($m04_trench_unit1_seq_1_darnell);
+    prepareMarine($m04_trench_unit1_seq_1_markswell);
+    prepareMarine($m04_trench_unit1_seq_1_dekard);
+    sys.trigger($m04_trench_unit1_seq_1_cam_1);
+    sys.waitFrame();
+    if (breachLight) { breachLight.remove(); }
+
+    aiSpeakWait($m04_trench_unit1_seq_1_tak, "lipsync_tak_yessir1");
+    float rigThread = thread rigLine();
+    aiSpeakWait($m04_trench_unit1_seq_1_markswell, "lipsync_marks_everbdyup");
+    float darnellReady = thread ready($m04_trench_unit1_seq_1_darnell);
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_falconweimm");
+    sys.waitForThread(rigThread);
+    sys.trigger($m04_trench_unit1_seq_1_cam_2);
+    aiSpeakWait($m04_trench_unit1_seq_1_tak, "lipsync_tak_linesec");
+    $m04_trench_unit1_seq_1_zipline_model_1.remove();
+    $m04_trench_unit1_seq_1_zipline_model_2.show();
+    sys.trigger($m04_trench_unit1_seq_1_zipline_model_2);
+    aiScriptedAnimWait($m04_trench_unit1_seq_1_tak, "st_tak_zipline_end", 8, 1);
+    sys.waitForThread(darnellReady);
+    thread descend($m04_trench_unit1_seq_1_darnell, 0);
+    aiSpeakWait($m04_trench_unit1_seq_1_mitchell, "lipsync_mitch_ltshldjam");
+    aiSpeakWait($m04_trench_unit1_seq_1_markswell, "lipsync_marks_takcutem");
+
+    // Look from Dekard's seat during the repair, with room above the workers.
+    $m04_trench_unit1_seq_1_dekard.remove();
+    $m04_trench_unit1_seq_1_cam_3.setOrigin('150 550 301');
+    $m04_trench_unit1_seq_1_ctg_3.setOrigin('184 514 295');
+    $m04_trench_unit1_seq_1_cam_3.setAngles(sys.VecToAngles(
+        $m04_trench_unit1_seq_1_ctg_3.getOrigin() - $m04_trench_unit1_seq_1_cam_3.getOrigin()));
+    $m04_trench_unit1_seq_1_cam_3.setFOV(85);
+    sys.trigger($m04_trench_unit1_seq_1_cam_3);
+
+    // The emergency key is behind Tak once he turns toward Dekard. Supply
+    // reflected cabin-strip light from the seat side for the repair close-up;
+    // keep the authored head, normal maps and earlier zipline lighting intact.
+    sys.setSpawnArg("name", "oq4_m01_harness_fill");
+    sys.setSpawnArg("cinematic", "1");
+    sys.setSpawnArg("noshadows", "1");
+    sys.setSpawnArg("_color", "0.30 0.27 0.24");
+    sys.setSpawnArg("light_radius", "110 100 100");
+    sys.setSpawnVector("origin", '140 536 320');
+    harnessFill = sys.spawn("light");
+    thread cutHarnesses();
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_stablelz");
+    thread column();
+    aiSpeakWait($m04_trench_unit1_seq_1_markswell, "lipsync_marks_hrdlady");
+    aiSpeakWait($m04_trench_unit1_seq_1_navajas, "lipsync_nava_seegrn");
+    thread mitchellExit();
+    while (weldStarted == 0) { sys.waitFrame(); }
+    while (!columnDone) { sys.waitFrame(); }
+
+    // Start the escape camera after the column clears the aisle. Its first
+    // ~16 seconds stay seated, covering the final repair before following Tak.
+    sys.trigger($cin_stranarus_trench_intro_cam_1);
+    float povStarted = sys.getTime();
+    mark("dekard_pov");
+    aiSpeakWait($m04_trench_unit1_seq_1_tak, "lipsync_tak_outsecsarge");
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_cntholdpos");
+    cues.startSoundShader("oq4_m01_hit", 3);
+    sys.wait(1);
+    aiSpeakWait($m04_trench_unit1_seq_1_tak, "lipsync_tak_almostth");
+    sys.wait(2);
+    cues.startSoundShader("oq4_m01_engine_fail", 5);
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_stbeng10");
+    sys.wait(1);
+    radioChatterPlayWait($uni_radiochatter, "vo_vansen_weouttime");
+    while (!repairDone || !mitchellDone) { sys.waitFrame(); }
+    aiSpeakWait($m04_trench_unit1_seq_1_tak, "lipsync_tak_gotitdek");
+    cues.startSoundShader("oq4_m01_harness", 6);
+    aiScriptedFaceWait($m04_trench_unit1_seq_1_tak, $m04_trench_unit1_seq_1_rap_node, 1);
+    aiScriptedAnimLoop($m04_trench_unit1_seq_1_tak, "st_dropship_stand", 8);
+    descend($m04_trench_unit1_seq_1_tak, 1);
+    harnessFill.remove();
+
+    cues.fadeSound(SND_CHANNEL_ANY, -40, 2);
+    $intro_sound_player2.fadeSound(SND_CHANNEL_ANY, -40, 2);
+    until(povStarted + 26.2);
+    landing();
+    until(povStarted + 28);
+    cues.stopSound(SND_CHANNEL_ANY, 0);
+    cues.remove();
+    $intro_sound_player2.stopSound(SND_CHANNEL_ANY, 0);
+    mark("handoff_complete");
+    $m04_trench_unit1_seq_1_human_jet_1_anc.startSpline($m04_trench_unit1_seq_1_human_jet_1_anc_spline);
+    aiSpeakWait($darnell, "lipsync_darn_dekoverhr");
+    $m04_trench_unit1_seq_1_human_jet_2_anc.startSpline($m04_trench_unit1_seq_1_human_jet_2_anc_spline);
+}
+}

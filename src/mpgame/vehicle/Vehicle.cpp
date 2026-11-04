@@ -1330,10 +1330,13 @@ void rvVehicle::UpdateHUD ( int position, idUserInterface* gui ) {
 		gui->State()->SetInt ( "vehicle_god", 0 );
 	}
 */
-	gui->SetStateFloat( "vehicle_health", health / spawnArgs.GetFloat( "health", "1" ) );
+	// Zero-health vehicles are invulnerable (including Awakening turrets).
+	// A missing shield is empty. Neither may feed 0/0 into GUI expressions.
+	const float maxHealth = spawnArgs.GetFloat( "health", "1" );
+	gui->SetStateFloat( "vehicle_health", maxHealth > 0.0f ? idMath::ClampFloat( 0.0f, 1.0f, health / maxHealth ) : 1.0f );
 	gui->SetStateInt ( "vehicle_armor",  0 );
 	gui->SetStateInt ( "vehicle_position", position );
-	gui->SetStateFloat ( "vehicle_shield", (float)shieldHealth.GetCurrentValue(gameLocal.time) / (float)shieldMaxHealth );
+	gui->SetStateFloat ( "vehicle_shield", shieldMaxHealth > 0 ? idMath::ClampFloat( 0.0f, 1.0f, (float)shieldHealth.GetCurrentValue(gameLocal.time) / (float)shieldMaxHealth ) : 0.0f );
 	gui->SetStateInt ( "vehicle_haz", hazardWarningTime != 0 );
 	gui->SetStateInt ( "vehicle_locked", IsLocked ( ) );
 	
