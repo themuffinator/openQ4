@@ -45,22 +45,28 @@ def compound(ident, contours, tint, blend=None):
 
 
 def measured(ident, tint, blend=None):
-    tokens = re.findall(r'[MZ]|-?\d+(?:\.\d+)?', PATHS[ident])
-    commands, index, start = [], 0, False
+    # The atlas uses source-unit SVG moves, lines and Bezier curves. Preserve
+    # curves as curves: pixel-staircase outlines do not become smooth merely
+    # because the renderer antialiases each of their tiny straight segments.
+    tokens = re.findall(r'[MLCQZ]|-?\d+(?:\.\d+)?', PATHS[ident])
+    commands, index, operation = [], 0, None
+    operations = {'M': ('move', 1), 'L': ('line', 1), 'C': ('cubic', 3), 'Q': ('quadratic', 2)}
     while index < len(tokens):
         token = tokens[index]
-        if token == 'M':
-            start = True
+        if token in operations:
+            operation = token
             index += 1
             continue
         if token == 'Z':
             commands.append({'id': f'p{len(commands)}', 'op': 'close'})
             index += 1
             continue
-        commands.append({'id': f'p{len(commands)}', 'op': 'move' if start else 'line',
-                         'points': [[U*float(token), U*float(tokens[index+1])]]})
-        start = False
-        index += 2
+        op, count = operations[operation]
+        points = [[U*float(tokens[index+2*i]), U*float(tokens[index+2*i+1])] for i in range(count)]
+        commands.append({'id': f'p{len(commands)}', 'op': op, 'points': points})
+        if operation == 'M':
+            operation = 'L'
+        index += 2*count
     return compound(ident, [commands], tint, blend)
 
 

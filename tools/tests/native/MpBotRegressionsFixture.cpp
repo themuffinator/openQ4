@@ -36,6 +36,7 @@ struct idVec3 {
     idVec3(float a,float b,float c):x(a),y(b),z(c) {}
     void Set(float a,float b,float c) { x=a; y=b; z=c; }
     idVec3 operator+(const idVec3& b) const { return {x+b.x,y+b.y,z+b.z}; }
+    idVec3& operator+=(const idVec3& b) { x+=b.x; y+=b.y; z+=b.z; return *this; }
     idVec3 operator-(const idVec3& b) const { return {x-b.x,y-b.y,z-b.z}; }
     idVec3 operator-() const { return {-x,-y,-z}; }
     idVec3 operator*(float f) const { return {x*f,y*f,z*f}; }
@@ -62,6 +63,9 @@ struct idAngles {
 struct idBounds {
     idVec3 center;
     float radius=1;
+    idBounds() = default;
+    idBounds(idVec3 c,float r):center(c),radius(r) {}
+    idBounds(idVec3 lo,idVec3 hi):center((lo+hi)*.5f),radius((hi-lo).Length()*.5f) {}
     idVec3 operator[](int i) const { const float r=i?radius:-radius; return center+idVec3(r,r,r); }
     idVec3 GetCenter() const { return center; }
     float GetRadius() const { return radius; }
@@ -347,12 +351,21 @@ struct rvFreezeTagGameState : rvGameState {
     static int GetClassType() { return 1; }
     bool CanReachToThaw(idPlayer*,idPlayer*,int) { return true; }
 };
+struct trace_t { float fraction=1; idVec3 endpos; struct { idVec3 normal{0,0,1}; } c; };
+const int MASK_PLAYERSOLID=1;
+idVec3 lastEdgeProbe;
 struct idGameLocal {
     int time=1000,numClients=0,framenum=0;
     int GetMSec() const { return 16; }
     Args serverInfo;
     struct { rvGameState* GetGameState() { return nullptr; } } mpGame;
     idVec3 GetCurrentGravity(const idPlayer*) const { return {0,0,-800}; }
+    float edgeFloor=0;
+    void TraceBounds(idPlayer*,trace_t& trace,const idVec3& start,const idVec3&,const idBounds&,int,idPlayer*) {
+        lastEdgeProbe=start-idVec3(0,0,8);
+        trace.fraction=start.x>0 ? 1.0f : .5f;
+        trace.endpos={start.x,start.y,edgeFloor};
+    }
     idEntity* entities[64]={};
     idEntity* world=nullptr;
     std::map<std::string,idDict> damageDefs;
@@ -419,6 +432,11 @@ struct rvBotManager {
 struct botItemCandidate_t { idItem* item; float utility,score; };
 struct botItemOption_t { idItem* item; float utility; int pendingMsec; int node; };
 struct rvBot {
+    bool probeAirActive=false;
+    idVec3 probeAirDirection;
+    void ProbeAirControl(idPlayer*,usercmd_t&);
+    void OnKnockback(const idVec3&);
+    void RefreshKnockbackMove(usercmd_t&);
     idPlayer* GetPlayer() const { return gameLocal.GetClientByNum(clientNum); }
     idStr name="bot";
     int clientNum=0,pathCorner=0,pathTime=0,goalType=BOTGOAL_ROAM,goalGiveUpTime=0;
@@ -537,8 +555,6 @@ bool BotCombatSplashThreatensPlayer(idPlayer* p,idEntity*,idVec3 impact,float ra
 // A deterministic cliff at x=0. Actual hull/support geometry is exercised by
 // MpBotJumpTrajectoriesFixture; here we verify every recovery command asks the
 // production edge guard, including the nearest-node and wander branches.
-idVec3 lastEdgeProbe;
-bool BotDeadlyDropAt(idPlayer*,const idVec3& point) { lastEdgeProbe=point; return point.x>0; }
 // The floor/trace half of a step's safety is MpBotJumpTrajectoriesFixture's;
 // here a sidestep is safe unless the test says otherwise.
 bool moveDirectionSafe=true;
@@ -946,6 +962,11 @@ void TestPadReservation() {
     // Whoever came within reach first keeps the corridor.
     botA.padApproachSince=gameLocal.time; botB.padApproachSince=gameLocal.time-500;
     CHECK(botA.HoldForPad(&a,moveA) && !botB.HoldForPad(&b,moveB));
+    // A slow climb hop has not launched yet. Its fresh approach still owns
+    // the corridor even though the velocity-based flyer check cannot see it.
+    b.pfl.onGround=false; b.physics.velocity={0,-40,180};
+    CHECK(botA.HoldForPad(&a,moveA) && !botB.HoldForPad(&b,moveB));
+    b.pfl.onGround=true; b.physics.velocity={};
     // An approach the owner stopped confirming lapses; it cannot hold the
     // corridor after its bot died or changed route.
     botB.padApproachTime=gameLocal.time-BOT_PAD_APPROACH_STALE_MSEC-1;
@@ -1012,6 +1033,46 @@ void TestTransportGuard() {
     std::puts("Transport guard: momentum short of an unplanned pad brakes, a wish slides square or stops, never reverses inward; planned pad and flights untouched: PASS");
 }
 void TestAirRecovery() {
+    // The real hit handler must admit weak impulses. Waiting until the nail
+    // thrown WALK is descending loses CTF3's last reachable ledge.
+    Reset(); idPlayer weak; gameLocal.entities[0]=&weak;
+    weak.pfl.onGround=false; weak.physics.velocity={122,367,105};
+    rvBot tapped; tapped.path.Append({2971,3232,-256}); tapped.path.Append({3108,3108,-256});
+    tapped.OnKnockback({}); CHECK(tapped.knockbackTime==0);
+    tapped.OnKnockback({-49.744f,57.825f,105.27f});
+    CHECK(tapped.knockbackTime==gameLocal.time);
+    usercmd_t stale; stale.forwardmove=127; stale.upmove=127; stale.buttons=BUTTON_ATTACK;
+    tapped.RefreshKnockbackMove(stale);
+    CHECK(tapped.airRecovering && stale.forwardmove<0 && stale.upmove==0);
+    CHECK((stale.buttons & BUTTON_ATTACK)!=0); // refresh does not regenerate weapon/view input
+    // A small hit leaves only two health during DM8's committed jump. Its
+    // coast is affordable, but the old lower landing is not. Own that coast.
+    rvBot jumper; jumper.path.Append({-76,891,617}); jumper.path.Append({-44,868,328},NAVTRAVEL_JUMP);
+    jumper.pathCorner=1; jumper.traversalStarted=true;
+    weak.health=2; weak.physics.velocity={25,31,251};
+    jumper.OnKnockback({1.514f,34.961f,-0.643f});
+    airChoiceSet=true; airChoice={}; airLandingUnsafe=false;
+    stale.forwardmove=127; jumper.RefreshKnockbackMove(stale);
+    CHECK(jumper.airRecovering && jumper.path.IsEmpty() && stale.forwardmove==0 && stale.rightmove==0);
+    // CTF5's pad command was generated before an entity applied the rail.
+    // Refresh replaces that obsolete input before the player's physics step;
+    // a still-safe pad coast keeps its command and route.
+    rvBot pad; pad.path.Append({569,-143,-184}); pad.path.Append({580,884,-184},NAVTRAVEL_JUMPPAD);
+    pad.pathCorner=1; pad.traversalStarted=true; pad.traversalStartTime=gameLocal.time-336;
+    weak.health=10; weak.physics.velocity={19.531f,146.841f,299.182f};
+    pad.OnKnockback({19.531f,-499.058f,-23.655f});
+    stale.forwardmove=71; pad.RefreshKnockbackMove(stale);
+    CHECK(!pad.airRecovering && stale.forwardmove==71 && pad.path.Num()==2);
+    airLandingUnsafe=true; airChoice={0,-1,0}; pad.RefreshKnockbackMove(stale);
+    CHECK(pad.airRecovering && stale.forwardmove==0 && stale.rightmove>0 && pad.path.IsEmpty());
+    airChoice={1,0,0}; pad.airRecoverPlanTime=gameLocal.time; pad.OnKnockback({1,0,0});
+    pad.RefreshKnockbackMove(stale);
+    CHECK(stale.forwardmove>0 && stale.rightmove==0); // a second hit replans without the periodic delay
+    // The hook is for a hit after this frame's bot command generation only.
+    rvBot quiet; stale.forwardmove=127; quiet.RefreshKnockbackMove(stale);
+    CHECK(stale.forwardmove==127 && !quiet.airRecovering);
+    quiet.OnKnockback({1,0,0}); gameLocal.time+=16; quiet.RefreshKnockbackMove(stale);
+    CHECK(stale.forwardmove==127 && !quiet.airRecovering);
     // q4ctf5: a rocket's splash threw a walking bot off the south walkway;
     // its replay lands again with full air input against the throw.
     Reset(); idPlayer self; self.pfl.onGround=false; self.physics.velocity={300,0,180};
@@ -1070,7 +1131,9 @@ void TestAirRecovery() {
     gameLocal.time+=BOT_AIR_RECOVER_RUNOUT_MSEC+1; cmd={};
     CHECK(!bot.RecoverInAir(&self,cmd) && !bot.airRecovering && cmd.rightmove==0);
     rvBot slow; slow.airRecovering=true; self.physics.velocity={0,-40,0};
-    CHECK(!slow.RecoverInAir(&self,cmd) && !slow.airRecovering);
+    cmd={}; CHECK(slow.RecoverInAir(&self,cmd) && slow.airRecovering && cmd.rightmove<0);
+    self.physics.velocity={0,-10,0}; cmd={};
+    CHECK(!slow.RecoverInAir(&self,cmd) && !slow.airRecovering && cmd.rightmove==0);
     rvBot rim; rim.airRecovering=true; self.physics.velocity={200,-400,0};
     navMesh.continuationClear=false; navMesh.recoveryStepClear=true; cmd={};
     CHECK(rim.RecoverInAir(&self,cmd) && cmd.forwardmove>0 && cmd.rightmove>0);
@@ -1230,6 +1293,24 @@ void TestMoveProjection() {
         CHECK(recoverySpeed<=320.01f && recoverySpeed>316); bot.airRecovering=false;
     }
     std::puts("Movement projection: production ApplyMove/CmdScale preserves full and partial world speed at yaw0/45/90: PASS");
+}
+void TestActualFloorHealth() {
+    Reset(); idPlayer self;
+    self.spawnArgs.Set("soft_fall_delta","40"); self.spawnArgs.Set("hard_fall_delta","60");
+    self.spawnArgs.Set("fatal_fall_delta","0");
+    gameLocal.damageDefs["damage_softfall"].Set("damage","5");
+    gameLocal.damageDefs["damage_hardfall"].Set("damage","10");
+    self.physics.origin={-206,-819,256.25f}; self.inventory.armor=100; self.health=3;
+    gameLocal.edgeFloor=-127.75f; navMesh.landingImpact=61.44f;
+    CHECK(BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    CHECK(navMesh.lastLandingFrom.Compare(self.physics.origin));
+    self.health=4; CHECK(!BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    self.health=3; navMesh.landingImpact=58.88f; gameLocal.edgeFloor=-111.75f;
+    CHECK(!BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    self.inventory.armor=0; CHECK(BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    self.pfl.noFallingDamage=true; CHECK(!BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    CHECK(BotDeadlyDropAt(&self,{1,0,256.25f})); // disabling damage does not waive voids
+    std::puts("Actual floor: armour and current health distinguish a raised landing from its lower neighbour: PASS");
 }
 void TestLandingHealth() {
     Reset(); idPlayer self; idItem goal;
@@ -1407,6 +1488,43 @@ void TestJumpEntry() {
     std::puts("Jump entry: exact live position/momentum, same launch steering, settled recenter, fresh-press cost bound and timeout: PASS");
 }
 
+void TestGroundBraking() {
+    for(bool probe:{true,false}) for(float yaw:{0.0f,45.0f,90.0f})
+    for(float initial:{14.0f,35.6f,72.4f,160.0f,320.0f,600.0f}) {
+        Reset(); idPlayer self; gameLocal.entities[0]=&self;
+        self.pfl.onGround=true; self.physics.velocity={initial,0,0};
+        rvBot bot; bot.aimAngles.yaw=yaw; bot.airRecovering=true;
+        navMesh.continuationClear=true;
+        for(int frame=0;frame<120;frame++) {
+            usercmd_t cmd{};
+            if(probe) bot.ProbeAirControl(&self,cmd); else bot.RecoverInAir(&self,cmd);
+            idVec3 forward,right; bot.aimAngles.ToVectors(&forward,&right,nullptr);
+            idVec3 wish=forward*float(cmd.forwardmove)+right*float(cmd.rightmove);
+            const float wishSpeed=wish.Normalize()*self.physics.CmdScale(cmd,false);
+            // Flat MP ground: independent friction/acceleration integration
+            // exposes reversal and cumulative drift, rather than just checking
+            // that the command points against the current velocity.
+            const idVec3 before=self.physics.velocity;
+            const float speed=before.Length();
+            if(speed>0) self.physics.velocity*=Max(0.0f,speed-Max(speed,100.0f)*6.0f*0.016f)/speed;
+            const float add=wishSpeed-self.physics.velocity*wish;
+            if(add>0) self.physics.velocity+=wish*Min(add,15.0f*0.016f*wishSpeed);
+            CHECK(self.physics.velocity*before>=-0.01f);
+            CHECK(self.physics.velocity.Length()<=speed+0.01f);
+            self.physics.origin+=self.physics.velocity*0.016f;
+            gameLocal.time+=16;
+        }
+        CHECK(self.physics.velocity.Length()<0.01f);
+        CHECK(self.physics.origin.Length()<100.0f);
+    }
+    Reset(); idPlayer self; gameLocal.entities[0]=&self;
+    rvBot bot; self.pfl.onGround=false; bot.probeAirDirection={1,0,0};
+    usercmd_t cmd{}; bot.ProbeAirControl(&self,cmd); CHECK(cmd.forwardmove==127);
+    self.pfl.onGround=true; self.physics.velocity={35,0,0}; self.physics.knockback=50;
+    cmd={}; bot.ProbeAirControl(&self,cmd); CHECK(cmd.forwardmove==-127);
+    std::puts("Ground braking: probe and recovery settle without reversal or drift; air/knock input retained: PASS");
+}
+
 void TestDodgeOwnership() {
     Reset(); idPlayer self; gameLocal.entities[0]=&self;
     rvBot bot; bot.path.Append({500,0,0}); usercmd_t cmd;
@@ -1528,6 +1646,27 @@ void TestRecoveryEdge() {
     CHECK(cmd.forwardmove>0); // ground guard cannot take over an airborne recovery
     std::puts("Recovery edge: nearest-node and wander commands brake before void; rescue toward support and broad floor remain usable: PASS");
 }
+void TestRecoveryTransport() {
+    Reset(); idPlayer self; gameLocal.entities[0]=&self;
+    moveDirectionSafe=false;
+    rvBot bot; bot.recoverSearchTime=gameLocal.time; bot.recoverValid=true;
+    bot.recoverTarget={100,0,0}; self.physics.origin={-200,0,0};
+    navMesh.volumesAhead={{9,-190}};
+    usercmd_t cmd; CHECK(bot.RecoverToNavMesh(&self,cmd));
+    CHECK(cmd.forwardmove==0 && cmd.rightmove==0 && cmd.upmove==0);
+    // The same guard must cover a wandering bot without a nearest node.
+    bot.recoverValid=false; bot.recoverWanderUntil=gameLocal.time+1000; bot.recoverWanderYaw=0;
+    cmd={}; CHECK(!bot.RecoverToNavMesh(&self,cmd));
+    CHECK(cmd.forwardmove==0 && cmd.rightmove==0 && cmd.upmove==0);
+    navMesh.volumesAhead.clear(); cmd={}; bot.RecoverToNavMesh(&self,cmd);
+    CHECK(cmd.forwardmove>0); // ordinary supported wandering still moves
+    // Nor may the supported-rim override reintroduce an unplanned volume.
+    bot.recoverValid=true; bot.recoverTarget={-28,63,0}; self.physics.origin={16,0,0};
+    navMesh.recoveryStepClear=true; navMesh.volumesAhead={{9,-100}};
+    cmd={}; CHECK(bot.RecoverToNavMesh(&self,cmd));
+    CHECK(cmd.forwardmove==0 && cmd.rightmove==0 && cmd.upmove==0);
+    std::puts("Off-route recovery: nearest-node, wander and supported-rim commands stop before unplanned transport: PASS");
+}
 void TestRimSteering() {
     Reset(); idPlayer self; self.physics.origin={-8,0,0};
     navMesh.directionalContinuation=true;
@@ -1558,6 +1697,19 @@ void TestSelfKnockback() {
     CHECK(navMesh.lastSlideKnock==80 && navMesh.lastSlideVelocity.Compare({10,0,400}));
     navMesh.slideCoastSafe=true;
     CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    self.pfl.onGround=false;
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    // Linear projection may move the predicted hull out of the blast even
+    // though a touchdown will stop it there. The current hull still matters.
+    self.physics.velocity={1000,0,-100};
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{},model,0.5f));
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{500,0,-50},model,0.5f));
+    // The far shot remains available in flight; this is a self-blast guard.
+    CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{-500,0,0},model,0.5f));
+    model.selfKnockback=0.1f;
+    CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    model={};
+    self.physics.velocity={10,0,0}; self.pfl.onGround=true;
     navMesh.slideCoastSafe=false; model.attackerScale=0.25f; model.selfPushScale=3;
     CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
     CHECK(navMesh.lastSlideKnock==50 && navMesh.lastSlideVelocity.Compare({10,0,300}));
@@ -1598,9 +1750,12 @@ int main(int argc,char** argv) {
     if(argc==1 || !std::strcmp(argv[1],"pads")) TestUnexpectedPad();
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestAirRecovery();
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestLandingHealth();
+    if(argc==1 || !std::strcmp(argv[1],"landings")) TestActualFloorHealth();
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestDropHandoff();
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestJumpEntry();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestMoveProjection();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestDodgeOwnership();
+    if(argc==1 || !std::strcmp(argv[1],"movement")) TestGroundBraking();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestRecoveryEdge();
+    if(argc==1 || !std::strcmp(argv[1],"movement")) TestRecoveryTransport();
 }

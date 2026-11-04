@@ -68,7 +68,13 @@ public:
 	void					SetMovementType( const pmtype_t type );
 	void					SetPlayerInput( const usercmd_t &cmd, const idAngles &newViewAngles );
 	void					SetKnockBack( const int knockBackTime );
+	// Isolated diagnostic replay: replace inherited movement timers exactly.
+	void					RestoreKnockBack( const int knockBackTime );
 	int						GetKnockBack( void ) const;
+	float					GetMoveSpeed( void ) const;
+	// Shared with the bot trajectory proof; uses the same slide cvars.
+	// forceLength: 0 uses cvars, 1 maintains speed, 2 maintains horizontal speed.
+	static idVec3			AdjustVertically( const idVec3 &normal, const idVec3 &in, int forceLength = 0 );
 	void					SetDebugLevel( bool set );
 							// feed back from last physics frame
 	waterLevel_t			GetWaterLevel( void ) const;
@@ -182,12 +188,6 @@ private:
 	void					SetWaterLevel( void );
 	void					DropTimers( void );
 	void					MovePlayer( int msec );
-
-	// forceLength:
-	// 0 => use the pm_slideVelocity / pm_powerSlide settings
-	// 1 => maintain velocity
-	// 2 => maintain horizontal velocity
-	idVec3					AdjustVertically( const idVec3 &normal, const idVec3 &in, int forceLength = 0 ) const;
 
 	float					Pm_Accelerate( void );
 	float					Pm_AirAccelerate( void );

@@ -5,6 +5,426 @@ authoring or compile step. Bots arrive with a name, a way of playing and
 something to say about it. This describes their behaviour, validation and
 current limits.
 
+## Exact armour and timer qualification, 4 November 2026
+
+The causal harness previously restored health and knockback but left armour at
+spawn defaults. Earlier impulse exclusions below are historical assessments,
+not final MP-02 qualification: missing armour could make a recoverable landing
+appear fatal. Policy version 2 requires logged post-hit armour and armour saved
+by the hit, restores both post-hit and counterfactual inventories, and fails
+closed for missing or out-of-range state. Same-frame shotgun grouping also
+requires armour continuity. Raw reports and earlier assessments remain intact.
+
+`bot_probeHealth client health [knockbackMsec [kickX kickY kickZ [armor]]]`
+restores an optional exact armour value. `BOT_IMPULSE` records `armor` after the
+hit and `armorSave`. It also records the actual knockback interval after
+`SetKnockBack` and `preKnock`: an existing movement timer can refuse a hit's
+requested interval. Counterfactuals preserve the earlier knock, and shotgun
+groups preserve the first pellet's prior timer. Probes replace inherited timers
+explicitly, including zero, so a neutral setup's landing cannot silently refuse
+the recorded interval. Older logs cannot qualify version-2 exclusions.
+
+The `a3172f89a` pad-catch correction passes both recorded DM8 hit poses and the
+CTF5 diagonal-pad hit replay, all alive and grounded at the strict terminal
+check. The DM8 rocket slide remains recoverable by fixed steering but its
+controller fails. Ground-slide traces reveal a one-frame timer mismatch:
+player physics drops knockback timers before movement, while prediction waited
+until the next frame to restore friction and ground acceleration. The predictor
+now uses the same expiration frame. Synthetic rim tests compare the expiring
+timer with an extra knockback frame. On `0d587c92a` the controller recovers to
+the upper platform and ends alive/grounded at 67 health; the fixed southwest
+control still survives at 62 health. Evidence is `rocket-armor-timer/`.
+
+The `c65041464` catalog completes all 33 variants (at least 47.376 observed
+seconds), with 448 combat kills, 618 traversals and four raw world deaths.
+Besides the corrected CTF5 pad catch, it exposes a low-health CTF7 drop after
+recovery from a rail hit. Both isolated drop poses reproduce the three-damage
+fatal fall at three health and 100 armour (`ctf7drop-armor-timer/`). The route
+targets the raised floor at -111.75, but momentum takes the bot onto the lower
+neighbour near -127.75. That 384-unit fall exceeds its hard-fall budget. The
+general edge guard previously accepted any supported floor within its fixed
+depth and therefore skipped the live drop proof. It now also prices the actual
+sampled floor with current health and armour. The existing full/careful drop
+proof may then earn a safe departure; otherwise the bot brakes. Native controls
+retain affordable floors, armour effects and disabled falling damage without
+waiving voids. On `dc89724d1`, both drop poses land on the raised floor with two
+health and finish alive/grounded (the later pose collects health afterwards).
+Evidence is `ctf7drop-floor/`; `hit-floor/` expands the positive suite to eight
+cases. Final qualification will use the corrected timer-replay implementation.
+Final-build long matches, catalog and controlled timing remain open.
+
+The `9a70f7b68` stage passes all eight hit/drop recovery cases and all ten
+established air-recovery outcomes (`hit-state/`, `air-state/`), with unchanged
+runtime hashes. Windows and Linux ASan/UBSan fixtures reject 45 restored bugs:
+22 decision, 19 geometry/timer and four hazard reversions. Policy and navigation/
+combat source checks pass. The renewed `long-state/` sweep completes all four
+maps. CTF3 finishes with 270.272 observed seconds, 33 kills and zero world deaths;
+DeadZone records 281.552 seconds, 65 kills and no world deaths. CTF5 retains
+seven world deaths in 280.048 seconds, with 79 kills; all seven pass the exact-state
+causal exclusion.
+DM8's raw report fails with eight world deaths and only 238.368 observed seconds
+against the required 270, with 80 kills. Seven deaths pass the causal exclusion;
+one remains recoverable. Duration remains an independent failure regardless
+of those outcomes. Shared-host timing is not
+qualified (DM8 mean think 2.747 ms; worst-window p95 28.75 ms).
+Together the matches record 505 completed traversals, four stuck events and no
+traversal timeouts, goal give-ups or no-route events. The `long-state/assessment.json`
+therefore remains failed: 15 raw deaths, 14 excluded impulses and one navigation
+death. It rechecks each stored exclusion against the current policy, including
+the requirement that the controller trial itself armed and died. A missing or
+unresolved controller now fails closed, even if all fixed-input trials died.
+
+The identical-stage `catalog-state/` sweep finishes all 33 variants, with 421
+kills, 619 completed traversals and two CTF5 world deaths. Both pass the exact-state
+causal exclusion; no navigation deaths remain in that sweep. Four runs miss the minimum
+40 simulated seconds: DM11 (37.296), DM10 (32.880), CTF8 (25.520) and Tourney1
+(22.768). Those raw duration failures are retained; shared-host contention does
+not waive the required exposure.
+
+The remaining DM8 death is Strauss's rocket hit at 115744, with 12 health and
+no armour. `strauss-state/` reproduces the controller's fatal slide after touching
+the raised ledge, while west-northwest input stops alive at 12 health.
+`strauss-floor/` confirms that this landing rests on the hull edge and lacks
+broad route support. Recovery now considers a separate flat-floor braking
+continuation: complete the collision frame, retain a shared floor patch and
+actual contacts through braking, and reject slippery floors, hazards, transport
+volumes and gaps. It prefers that surviving stop over an unproven first touch;
+voluntary traversal support remains unchanged. A native geometry case separates
+the two headings, and the positive hit suite includes the recorded state.
+Runtime qualification of this further correction remains open.
+
+On `189c4b4a9`, `strauss-runout/` records the controller stopping at
+68.50 -1037.88 352.25 with 12 health, then completing a drop, teleport and jump
+without dying. Its six-second strict terminal check remains unresolved because
+normal navigation has put it in the air again (59 health). The fixed heading
+still finishes alive and grounded at 12 health. The positive recovery case uses
+the existing 12-second/resumed-navigation check; the six-second causal gate and
+raw result are unchanged. The geometry suite rejects 23 reversions on Windows
+and Linux ASan/UBSan, four more than the earlier stage. `hit-runout/` passes all
+nine positive hit/drop cases and `air-runout/` passes all ten established outcomes,
+including the deliberate fatal-fall control. The Strauss positive case remains
+alive at 59 health and qualifies by completed navigation after recovery; its
+strict terminal-grounded result is still false. All tested runtime hashes remain
+unchanged. The renewed `long-runout/` sweep records 340.560–342.240 simulated
+seconds on each map, 337 combat kills and 633 completed traversals. DeadZone has
+zero world deaths; DM8 has five and CTF5 six under causal review. CTF3 has two
+navigation deaths: every tested input survives Kane's last recorded hit, while
+Cortez has no recent impulse. The original duration failure is resolved on this
+stage, but the navigation gate remains failed. Its complete initial causal
+assessment (`long-runout/assessment.json`) excludes eight of 13 deaths and
+retains five. An additional CTF5 counterfactual restores the recorded walking
+corner at the same pre-hit pose, health, armour and timer on the archived
+`189c4b4a9` runtime. It finishes alive and grounded at six seconds, while all
+17 fixed post-hit inputs and the controller died. The existing policy therefore
+excludes that rocket death (`ctf5-runout-route-counterfactual/`);
+`long-runout/assessment-route.json` retains four navigation deaths. The original
+assessment is preserved. This is an additional causal proof, not a bot change.
+
+All three `ctf3pad-runout/` isolated launch/coast controls land alive, including
+Cortez's rounded launch pose. The original match instead launches Strauss from
+the same pad 192 ms later. `bot_probePad` now accepts optional `entryX entryY entryZ`
+after `padName` to reproduce a walking approach. `bot_probePadTraffic` uses the
+same arguments but requires exactly two bots and a separate local observer;
+its bots become untargetable so weapon impulses cannot obscure physical traffic.
+Both retain local cheat-server, live-bot, instance and proven-pad restrictions.
+At debug level 3 or higher, `BOT_PLAYER_CONTACT` records player collision traces
+without changing their physics. These diagnostics support the next reproduction;
+they do not classify a death as unavoidable.
+
+The two-bot reconstruction on `893fe4f13` reproduces that fall at
+3248 3220 -461 (`pad-traffic-diagnostic/`). The older approach is making a slow
+climb hop when the follower's grounded-only reservation check stops seeing it.
+The follower launches first, collides twice with the hopping bot and loses
+horizontal velocity; the first bot launches 176 ms later and completes the pad.
+Fresh approaches now retain their reservation while airborne, using the existing
+stale timeout and route release. The native decision case fails before this
+change and passes afterwards; restoring the grounded-only check fails again.
+`mp_bot_pad_traffic_replay.py` preserves the two-bot reproduction as a positive
+runtime regression. On `04e637ae0`, both bots complete the pad in priority order,
+without colliding during its approach/flight, and remain alive throughout the
+12-second observation (`traffic-hop-staged/`). Ordinary contacts after both
+flights finish remain reported. The first draft of that harness wrongly rejected
+those later contacts; its failed `traffic-hop/` report is preserved. The unfixed
+`traffic-before/` still fails the corrected check with five pad contacts and a
+world death. All 23 decision reversal controls pass on Windows and Linux
+ASan/UBSan; the geometry and hazard functions are unchanged from `189c4b4a9`.
+Kane's other CTF3 departure remains unresolved; the initial isolated walking
+approach survives and is not evidence that the original match was safe.
+The later sampled grounded pose and an early-hop reconstruction also survive
+(`pad-kane-entry-entry/`, `pad-kane-hop-hop/`). Both remaining DM8 hit poses,
+including the rocket's first recovery frame, survive 12-second isolated checks
+on this stage (`departures-dm8-hop64/`). Their original full-match departures
+remain unisolated. A diagnostic script that exceeded the engine's 64 KiB command
+buffer is retained as failed evidence; the replay launcher now rejects oversized
+scripts before starting a game, without shortening their observation windows.
+
+The `04e637ae0` staged `long-hop/` repeat passes CTF3 directly: 386.640 observed
+seconds, 58 kills and 116 completed traversals, with zero world deaths. A separate
+CTF3 diagnostic run records 298.896 seconds, 47 kills and 91 traversals with zero
+deaths. DM8 records 369.744 seconds, 139 kills, 169 traversals and six deaths.
+All six pass the unchanged causal policy: Sledge's pre-hit controller needs an
+additional 12-second observation to finish grounded, at 100 health. Its earlier
+six-second terminal-air result remains unresolved and preserved. CTF5 has seven
+deaths in 192.752 seconds; DeadZone has no
+deaths in 253.216 seconds. Both miss the required 270 seconds and remain failed.
+The complete initial assessment excludes 11 of 13 deaths and retains two CTF5
+navigation failures (`long-hop/assessment.json`). One is a recoverable rocket
+hit whose chosen heading glances off a ramp and leaves the walkway; its
+controller also dies in the isolated `current-failures-hop/` reconstruction.
+The other follows an unplanned pad-chain entry at nine health. Two isolated
+walking approaches stop safely, so its full-match entry remains unresolved.
+
+The same stage passes all nine positive hit/drop cases and ten established
+air-recovery outcomes (`hit-hop/`, `air-hop/`). A stationary player hull near the
+recorded DM8 rocket trajectory reproduces its older fall (`body-hop-static/`):
+the diagonal body collision removes the safe coasting trajectory. The identical
+hit without that body survives. This establishes a physical-traffic failure
+mode, not an exact replay of the original moving player or a causal exclusion.
+The later machine-gun fall still survives the stationary-body reconstruction.
+
+The audit now optionally extends its observation until the logged server clock
+meets `--min-sim-seconds`, within the existing hard timeout. Missing logs, partial
+lines and clock resets cannot supply elapsed simulation time. The default fixed
+window and final duration/death criteria remain unchanged; Windows/Linux clock
+controls and a stock-map pilot pass. `long-hop-duration/` repeats CTF5 and
+DeadZone for 277.984 and 278.080 observed seconds, respectively. CTF5 records
+82 kills, 188 traversals and five deaths; four pass causal exclusion. Kane's
+remaining case fails closed because fixed input `air04` is still alive and
+airborne at six seconds, while the other post-hit inputs and controller die.
+DeadZone records 55 kills, 78 traversals and no world deaths. The combined
+same-runtime four-map assessment records 334 kills, 551 traversals, 11 raw
+deaths, ten exclusions and that unresolved case (`long-hop-combined/`). It does
+not erase the earlier short runs or the two CTF5 failures in `long-hop/`.
+
+The complete `catalog-hop/` sweep reaches all 33 variants with at least 97.216
+observed seconds each, 915 kills and 1,283 traversals. DM8's one death and CTF5's
+two pass strict causal exclusion. DM6's one death after a shotgun hit still
+needs replay, so `catalog-hop/assessment.json` remains failed. The sweep also
+retains 125 stuck events, five goal give-ups and one traversal timeout (DM6).
+Remaining failure fixes and controlled timing are still required. Shared-host
+frame-trace runs do not establish performance budgets.
+
+The CTF5 ramp reconstruction records a world collision at
+`539.182 777.780 -180.667`, normal `0 0.519 0.855`. Player physics redirects
+the descending bot upward; its hull then loses contact. The predictor had
+required end-of-step grounding only when the apparent impact exceeded the
+health budget. It now completes the clipped collision frame for affordable
+touches too, continuing the flight when actual ground contacts are absent.
+The new native case fails before this change and passes afterwards, with all
+24 geometry reversions rejected on Windows and Linux ASan/UBSan. The recorded
+hit joins the positive suite as `rocket_ramp_glance`. On the `5a2f78a3d` candidate,
+the controller survives twelve seconds and finishes grounded at 100 health
+(`current-failures-ground/`), where the prior stage died.
+
+The outstanding `04e637ae0` classifications are now complete. Extending Kane's
+identical `air04` input to twelve seconds records its world death; its apparent
+six-second survival was still a fall. The unchanged policy therefore excludes
+that impulse (`ctf5-hop-air04-extended/`). The derived four-map assessment
+`long-hop-combined-extended/` passes with 334 kills, 551 traversals and eleven
+strict exclusions. The DM6 shotgun death also passes exact-state replay,
+so `catalog-hop/assessment-dm6.json` passes all 33 death/duration gates with
+915 kills, 1,283 traversals and four exclusions. Earlier failed assessments,
+short runs and the two separate CTF5 failures remain preserved. These results
+qualify the archived stage, not the subsequent corrections or timing.
+
+### Live recovery around pads and players
+
+The remaining CTF5 unplanned entry was preceded by an exhausted route. Its
+initial no-route guard checked momentum before recovery chose a new command;
+nearest-node recovery and wandering then applied only the edge guard. The
+normal WALK probes therefore exercised the wrong movement path. The new local
+cheat `bot_probeRecover` supplies a bounded nearest-node answer while running
+normal off-route movement and physics. Two westward reconstructions at nine
+health enter the unplanned pad and die (`unplanned-pad-before/`). Applying the
+transport guard after recovery's final command, including a supported-rim
+crawl, keeps all four nearby approaches alive and grounded at nine health for
+twelve seconds (`unplanned-pad-guarded/`). The node targets are diagnostic
+reconstructions, not an exact snapshot of the original match. Native tests
+reject the old node and wander paths; all 25 decision reversions pass on
+Windows and Linux ASan/UBSan.
+
+The DM8 stationary-body envelope has three surviving headings among sixteen,
+while its controller and no-input trial die (`body-hop-envelope/`). Navmesh
+generation correctly excludes players from architecture, but live airborne
+recovery reused that exclusion and forecast a coast through another player.
+Recovery now additionally sweeps the current live hulls in the same instance,
+excluding itself, spectators, dead players and non-solid clips. World collision
+and the existing affordable-floor proof still apply. This is a current-position
+forecast refreshed by replanning, not a prediction of another player's future
+commands. The rocket collision now survives at 66 health, and the later falling
+body-contact probe at 31 health, both grounded after twelve seconds
+(`body-predicted/`); `body-ground/` preserves the prior controller failure.
+Both become positive regressions alongside the four off-route cases. The
+original moving-player departures and Kane's older CTF3 missed-pad departure
+are not claimed as exact reproductions. Final-build long matches, all 33 map
+variants and controlled timing remain required.
+
+### Wall-arrested landings and settled braking, 4 November 2026
+
+The `5bd8dff11` four-map repeat meets every duration gate (274.560–275.888
+simulated seconds), with 273 kills, 515 traversals and eleven raw world deaths.
+Exact-state replay leaves two unresolved deaths: Kane's CTF5 wall landing and
+a DM8 enemy-rocket/self-splash sequence. The 33-variant catalog retains 439
+kills, 602 traversals and three raw deaths, all classified as enemy impulses.
+The reports remain in `.tmp/mp02-falls/long-guard-standard/` and
+`catalog-guard/`; `assessment-ordered.json` preserves the derived assessments.
+These are historical stage results, not qualification of the following fix.
+
+Equal-strength machine-gun hits were ordered by rounding noise in their logged
+vectors, sometimes choosing an older surviving pose before the actual fatal
+hit. Earlier candidates now compare magnitude to two decimals and then recency.
+Stronger hits still come first; only a complete all-dead envelope advances the
+search, and any survivor or incomplete trial still stops it. The bounded search
+and policy-2 causal requirements are unchanged.
+
+The CTF5 controller rejected a coast whose landing runout was safely arrested
+by a wall, then braked in air and fell short of the walkway. Emergency recovery
+now admits one vertical wall collision with supported movement on both sides
+of the contact and a clear, grounded clipped remainder. A corner, lost support,
+hazard or unplanned transport still rejects it. This does not admit voluntary
+routes. The recorded pose now reaches the walkway alive at 45 health and stops
+before normal navigation resumes (`guard-failure-coast-wall-brake/`).
+
+The fixed-input replay also exposed a separate ground brake oscillation:
+full reverse acceleration alternated between 14 and -72.4 units/second and
+walked an initially safe landing off the ledge after ten seconds. Both replay
+and production recovery now scale the final brake to the remaining speed after
+friction. Production runout continues to ten units/second, matching the proof's
+final friction-only coast. Native controls integrate the actual generated
+commands at several speeds and view angles, rejecting reversal and cumulative
+drift; wall controls retain a slide-off-the-wall negative case.
+
+The positive hit suite adds the recorded controller and fixed-coast poses,
+both observed for twelve seconds. The controller must already be alive,
+grounded and stopped before its diagnostic input is released at two seconds,
+then remain alive and grounded. Causal replay never uses this release. Earlier
+fixed-input deaths may include the old brake artifact, so fresh long-match and
+complete-catalog runs on the corrected stage are required. The DM8 duel's
+original firing decision is not recorded; its self-splash is neither waived
+as an enemy impulse nor claimed fixed from the isolated post-hit failure.
+
+The corrected stop also changes subsequent roaming in the existing DM8 player
+deflection case. `hit-wall/` preserves its strict terminal-air result: it first
+lands alive, then completes a pad, jump and drop without dying. This positive
+case now uses the established requirement of at least two completed traversals
+after recovery when normal navigation has resumed. The original strict outcome
+remains in every report; death-exclusion criteria are unaffected.
+
+The committed `51517896f` build passes the 27 decision and 24 geometry reversal
+controls on Windows and Linux ASan/UBSan, plus navigation, combat, causal-policy,
+audit-clock and repository-path checks. All eighteen hit cases, ten recovery
+cases and the two-bot pad-traffic check pass on that same committed stage
+(`hit-wall-final/`, `air-wall-final/`, `traffic-wall-final/`). Both new wall cases finish grounded at
+45 health after twelve seconds, including rest before controller release.
+`guard-failure-selfblast-wall-envelope-sampled/` tests all sixteen fixed headings
+and no input for twelve seconds on the committed stage; all seventeen die.
+The same source's controller and brake also die in
+`guard-failure-selfblast-wall-settle/`. This establishes no surviving tested
+post-blast input, not a causal exclusion: the bot's already-fired projectile
+is not recreated in the enemy-hit counterfactual. The final runtime is preserved
+by `runtime-wall.json` and its hash-checked delta archive.
+
+The complete `catalog-wall/assessment.json` passes all 33 variants with 471
+kills, 616 traversals and two strict impulse exclusions. `long-wall/assessment.json`
+meets all four duration gates (276.720–284.560 simulated seconds), with 293
+kills, 469 traversals, four exclusions and one recoverable CTF5 death. Sledge's
+nine-health descent at 118512 ms has five surviving fixed headings, while its
+controller dies. `guard-failure-pad-descent-wall-diagnostic/` reproduces that
+failure and a surviving westward input. The forecast rejects every steered
+approach to the catch pad, then chooses a coast whose landing costs too much
+health. The next correction forecasts the adjustment before the catch followed
+by the normal coast that owns the bot's movement after launch. Its whole
+continuation must still be affordable and supported; disabled/unknown pads,
+teleporters, initial-pad poses and a second distinct pad remain unproven.
+Native controls require the approach and reject continuing that input after
+launch. All 26 geometry reversions pass on Windows and Linux ASan/UBSan.
+`guard-failure-pad-descent-pad-catch/` now lands its controller alive at four
+health, then completes a further pad and drop without dying. The terminal
+sample is airborne in another route, and remains a strict terminal failure;
+the new positive regression uses the existing two-completed-traversals
+criterion. The fixed westward control remains grounded at four health.
+Renewed full-runtime qualification of this further correction is required.
+
+The verified fixes through `51517896f` are merged into the main checkout by
+`79df4b6bc`; its integration build and staging pass. That merge does not close
+MP-02 or qualify the subsequent pad-approach correction.
+
+## Hit-to-movement handoff, 4 November 2026
+
+The three remaining long-match falls expose two timing gaps. DM8 Strauss's
+machine-gun hit leaves two health during a committed jump; the 35-unit kick
+was below the recovery threshold, and its old lower landing was now lethal.
+CTF3 Sledge's roughly 130-unit nail impulse also missed that threshold; by
+the first descending WALK recovery, the reachable ledge had been lost.
+CTF5 Strauss's rail hit lands after bot command generation but before player
+physics. One more frame of the pad command advances it beyond the recoverable
+hit pose. Replays from the next logged pose reproduce that failure; debug
+command traces show full movement speed and later oscillating fallback input,
+not a speed or view-angle mismatch.
+
+Every nonzero kick now invalidates the recovery plan. A hit during a jump or
+drop protects an affordable coast rather than continuing an obsolete takeoff
+proof. Player Think also refreshes recovery movement after copying its command,
+so an earlier entity's hit can change this frame's movement before physics.
+Safe pad flights retain their controller. The refresh leaves view and weapon
+input intact, and its CPU cost joins the same frame's bot profiling sample.
+
+`bot_probeHealth client health [knockbackMsec [kickX kickY kickZ]]` can now
+replay the real hit handler. The optional kick is already included in the
+following probe's velocity; it is never added twice. The isolated local cheat
+server restrictions remain. `mp_bot_hit_recovery_replay.py` exercises the three
+recorded states, including natural walking and the committed jump; these are
+positive recovery checks, not complete match snapshots or causal exclusions.
+Native decision tests reject restored weak-hit thresholds, delayed command
+refresh and continued jump ownership. Runtime qualification is in progress
+under `.tmp/mp02-falls/`; the prior failed reports remain unchanged.
+
+On `84dde9c6d`, all three hit replays and the ten existing recovery cases pass.
+The DM8 and CTF5 hit cases use a 12-second positive observation because normal
+navigation resumes after recovery; both finish alive/grounded and complete two
+subsequent traversals. Their original six-second reports remain failed terminal
+checks. Causal envelopes still use six seconds and their unchanged strict
+terminal-state rule. Windows and Linux ASan/UBSan decision, geometry and hazard
+fixtures reject 31 reversions.
+
+The four renewed long runs retain 283.872–284.912 seconds of simulation each,
+with 104/48/78/69 combat kills on DM8/CTF3/CTF5/DZ3. CTF3 and DZ3 have no world
+deaths. Both CTF5 deaths pass the strict enemy-impulse exclusion. DM8 has five
+world deaths, three excluded and two still recoverable: a self-rocket after a
+high ledge jump and a low-health pad descent. Reports and classifications are
+`long-final/`, `long-final-classification/` and `long-ctf5-classification/`.
+
+The next correction refuses exposed self-blasts during an airborne flight,
+while retaining distant splash shots. It also preserves descent in the splash
+landing predictor until actual floor contact. The low-health DM8 descent reveals
+a separate collision distinction: a bevel sweep clips downward velocity before
+the player registers ground contact. CrashLand therefore does not charge the
+first collision's impact. Recovery now follows the remaining single-plane step
+with the player's own velocity-clipping function and checks actual end-of-step
+contacts before deferring impact cost; ordinary grounded impacts retain their
+health limit. Targeted and broader runtime qualification of these corrections
+is still required.
+
+The subsequent `c65041464` stage passes the four hit replays (including the
+seven-health descent) and all ten established recovery cases. Each new hit case
+finishes alive and grounded. The contact proof and airborne self-blast controls
+bring the Windows/Linux native suite to 36 rejected reversions. The renewed
+long runs finish with 280.144–283.984 observed seconds: CTF3 and DZ3 have no
+world deaths, and all three CTF5 deaths pass the unchanged impulse exclusion.
+DM8 has four deaths: two strictly excluded impulses and two recoverable failures.
+One rocket-driven ground slide needs earlier steering. Its first machine-gun hit in
+Voss's last fall independently reproduces a controller failure: coasting from
+`(-444.388, 53.313, 982.004)` catches another pad and lands alive on the upper
+platform, whereas braking falls into the void. The new bounded coast proof
+follows one registered, active pad catch and its repeated velocity pushes all
+the way to an affordable supported landing with stopping room. Initial contact,
+steered catches, teleporters, unknown destinations and a second different pad
+remain unproven. Runtime qualification of this additional correction is pending.
+The later hit in that same pad flight also has surviving coast controls; the
+earlier pose isolates where the controller first spoils the reachable catch.
+`bot_debug 4` now records a refused ground-slide proof's exact position,
+velocity and collision normal to distinguish its ground and air phases.
+
 ## Complete catalog and renewed long matches, 4 November 2026
 
 The `ee6207834` build completes all 33 declared map variants against the installed
@@ -3087,7 +3507,9 @@ position, velocity and game time so a fall can be traced to the preceding
 input or hit. `bot_debug 3` adds edge-braking origins, lookahead positions, floor
 contacts and rejection reasons, plus exact accepted takeoffs and traversal-frame
 commands. `bot_debug 4` additionally logs each live predicted jump frame and
-ordinary walking frames and dodge landing decisions. `bot_probeMove` accepts the same coordinates as
+ordinary walking frames, dodge landing decisions and airborne proof rejection
+reasons. `bot_debug 5` adds each predicted airborne collision plane.
+`bot_probeMove` accepts the same coordinates as
 `bot_probeJump` but installs an ordinary walking leg for isolated impulse
 investigations, under the same local-server restrictions;
 `navmesh probe` reports the full-hull and support-

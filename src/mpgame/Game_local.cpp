@@ -4619,6 +4619,7 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		// openQ4: snapshot the players after they have moved this frame so hitscan lag
 		// compensation has a position history to rewind through.
 		CaptureMPLagCompensationFrame();
+		botManager.FinishFrameProfile();
 
 		// free the player pvs
 		FreePlayerPVS();

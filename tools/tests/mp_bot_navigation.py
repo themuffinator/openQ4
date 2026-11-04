@@ -119,6 +119,14 @@ def validate_game_wiring() -> None:
     )
     run_frame = game_local[game_local.index("gameReturn_t idGameLocal::RunFrame") :][:6000]
     require_order(run_frame, "botManager.Think();", "SetupPlayerPVS();", "idGameLocal::RunFrame")
+    player = read(mp / "Player.cpp")
+    player_think = player[player.index("void idPlayer::Think( void )"):player.index("void idPlayer::ThinkMatchPaused(")]
+    require_order(player_think, "usercmd = gameLocal.usercmds[", "botManager.RefreshKnockbackMove( this, usercmd );",
+                  "player refreshes hits after copying the bot command")
+    require_order(player_think, "botManager.RefreshKnockbackMove( this, usercmd );", "Move();",
+                  "same-frame knock recovery precedes physics")
+    require_order(game_local, "CaptureMPLagCompensationFrame();", "botManager.FinishFrameProfile();",
+                  "bot profile includes movement refreshes after player physics")
 
     # The slot is claimed before the player entity is created, because
     # idPlayer::Spawn reads the user info.
@@ -181,6 +189,7 @@ def validate_game_wiring() -> None:
     )
 
     bot = read(mp / "bots" / "Bot.cpp")
+    require(bot, "profileFrameTicks += idLib::sys->GetClockTicks() - start;", "same-frame recovery CPU is measured")
 
     # Without ui_autoJoin a spawning idPlayer parks itself in the join menu.
     for key in ('"ui_autoJoin"', '"ui_spectate"', '"ui_ready"', '"ui_name"'):
@@ -299,7 +308,7 @@ def validate_game_wiring() -> None:
     require(movement, "if ( holdForPad && self->pfl.onGround ) {", "rvBot::UpdateMovement held approach edge guard")
     require(movement, "( hasMoveDir || transportBrake || heldEdgeBrake )", "rvBot::UpdateMovement applies the held edge brake")
     # A shotgun's pellets are one throw: a frame's kicks are summed.
-    require(bot, "bot.knockbackFrameKick += kick;", "rvBotManager::OnPlayerKnockback pellet sum")
+    require(bot, "knockbackFrameKick += kick;", "rvBot::OnKnockback pellet sum")
     # Momentum never carries a grounded bot into a pad or teleporter its route
     # did not choose, on a route or off one (q4ctf5's unplanned pad entries).
     require(movement, "BotBrakeForTransport( self, moveDir, BotPlannedTransport( path, pathCorner ) )",

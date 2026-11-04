@@ -1,12 +1,62 @@
 #!/usr/bin/env python3
-"""Compile the production scope router against counted UI/VFS doubles."""
+"""Check smooth scope contours and the production scope router."""
 from pathlib import Path
+import math
 import shutil
 import subprocess
 import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def check_contours():
+    """Sample authored curves independently of the renderer's tessellator.
+
+    Exact antialiasing cannot repair a staircase baked into a circular path.
+    Bound the radial error while retaining the deliberate inner-ring notches.
+    """
+    sys.path.insert(0, str(ROOT / 'tools/ui'))
+    import build_retained_scopes as scopes
+
+    def samples(name):
+        contours = []
+        for command in scopes.measured(name, [0, 0, 0, 1])['commands']:
+            points = [tuple(v / scopes.U for v in point) for point in command.get('points', [])]
+            op = command['op']
+            if op == 'move':
+                contours.append([points[0]])
+            elif op == 'line':
+                contours[-1].append(points[0])
+            elif op == 'cubic':
+                start = contours[-1][-1]
+                a, b, end = points
+                for step in range(1, 33):
+                    t = step / 32
+                    contours[-1].append(tuple((1-t)**3*start[i] + 3*(1-t)**2*t*a[i] +
+                                             3*(1-t)*t*t*b[i] + t**3*end[i] for i in (0, 1)))
+            elif op != 'close':
+                raise AssertionError(f'unexpected contour operation: {op}')
+        return contours
+
+    outer, inner = samples('nail_ring2')
+    radius = lambda p: math.hypot(p[0]-320, p[1]-241)
+    assert max(abs(radius(p)-252) for p in outer) < .1, 'nail ring contains geometric teeth'
+    assert min(map(radius, inner)) >= 224.99 and max(map(radius, inner)) <= 242.1
+    for degrees, expected in ((0, 225), (45, 242), (90, 225), (135, 242),
+                              (180, 225), (225, 242), (270, 225), (315, 242)):
+        angle = math.radians(degrees)
+        point = min(inner, key=lambda p: abs(math.remainder(math.atan2(p[1]-241, p[0]-320)-angle, math.tau)))
+        assert abs(radius(point)-expected) < .1, 'lost an intentional ring notch'
+    hooks = samples('nail_hook')
+    assert len(hooks) == 4
+    for contour, (sx, sy) in zip(hooks, ((1, 1), (-1, 1), (1, -1), (-1, -1))):
+        assert len(contour) == len(hooks[0])
+        for (x, y), (a, b) in zip(hooks[0], contour):
+            assert abs(a-(320+sx*(x-320))) < 1e-6 and abs(b-(240+sy*(y-240))) < 1e-6
+    print('scope contours: smooth circular boundary, retained notches and symmetric hooks passed')
+
+
 SUPPORT = r'''
 #include <algorithm>
 #include <cassert>
@@ -84,6 +134,7 @@ int main(){
 '''
 
 def main():
+    check_contours()
     subprocess.run([sys.executable, str(ROOT/'tools/ui/build_retained_scopes.py'), '--check'], cwd=ROOT, check=True)
     compiler=next((shutil.which(n) for n in ('clang++','g++','c++') if shutil.which(n)),None)
     if not compiler:

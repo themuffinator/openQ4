@@ -22,6 +22,7 @@
 #define __GAME_MP_NAVMESH_H__
 
 class idEntity;
+class idPlayer;
 
 //----------------------------------------------------------------
 // How a link between two nodes has to be travelled.  The bot's movement code
@@ -331,9 +332,14 @@ public:
 	// landedSupported, when given, reports a supported, affordable landing
 	// even when it leaves no room to stop. touchedAffordable reports only a
 	// physical, affordable non-transport touchdown; it does not certify support.
+	// brakedAffordable is recovery-only: the hull retains floor contact through
+	// the landing frame and braking, even where broad route support is absent.
 	bool					AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocity, const idVec3 &wish,
 											 float maxImpactDelta, idVec3 *touchdown = NULL,
-											 bool *landedSupported = NULL, bool *touchedAffordable = NULL ) const;
+											 bool *landedSupported = NULL, bool *touchedAffordable = NULL,
+											 bool *brakedAffordable = NULL, int knockMsec = 0, const idPlayer *self = NULL ) const;
+	bool					RecoveryBrakeClear( const trace_t &impact, const idVec3 &velocity,
+											 float remainingSeconds, int knockMsec ) const;
 	bool					KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &velocity,
 											 int knockMsec, float maxImpactDelta, const idVec3 &wish = vec3_origin ) const;
 	// Diagnostics: would a route leg between these points be accepted as a

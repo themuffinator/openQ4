@@ -11,7 +11,7 @@ is excluded as impulse-caused only when all three conditions hold:
    before the death and with no other world death of the victim in between.
 2. An isolated replay of the post-impulse state proves the fall unrecoverable
    with the game's existing physics: one bot, no enemies, teleported to the
-   logged origin with the logged post-impulse velocity, remaining health and
+   logged origin with the logged post-impulse velocity, remaining health, armour and
    knockback time (`bot_probeHealth`), then every one of
    AIR_HEADINGS fixed full air-input directions plus no input (`bot_probeAir`)
    and the bot's own controller (`bot_probeMove` back toward where it was hit)
@@ -20,7 +20,7 @@ is excluded as impulse-caused only when all three conditions hold:
    failure. A trial that fails to arm, or a session that does not complete,
    leaves the death a navigation failure too (fail closed).
 3. The impulse makes the difference: the same moment without it (the logged
-   velocity minus its kick, at the health before the hit) lands in at least
+   velocity minus its kick, at the health and armour before the hit) lands in at least
    one of three counterfactual trials. Otherwise the bot was already lost.
 
 Everything else - no impulse, a self/team/world impulse, an impulse outside
@@ -50,6 +50,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 IMPULSE_WINDOW_MSEC = 6000
 AIR_HEADINGS = 16
+POLICY_VERSION = 2  # exact post/pre-hit armour and actual knockback timers required
 TRIAL_OBSERVE_MSEC = 6000
 TRIAL_RESPAWN_MSEC = 3000  # each trial gets a freshly added bot
 TRIAL_REMOVE_MSEC = 2500   # the removed client takes a moment to leave its slot
@@ -57,7 +58,8 @@ FREE_FOR_ALL_MODES = {"DM", "TOURNEY"}  # every other mode has teams; unknown me
 
 IMPULSE = re.compile(
     r"^BOT_IMPULSE client=(\d+) time=(-?\d+) attacker=(-?\d+) damage=(-?\d+) origin=(\S+) (\S+) (\S+) "
-    r"kick=(\S+) (\S+) (\S+) velocity=(\S+) (\S+) (\S+) def=(\S+)(?: health=(-?\d+))?(?: knock=(\d+))?", re.M)
+    r"kick=(\S+) (\S+) (\S+) velocity=(\S+) (\S+) (\S+) def=(\S+)(?: health=(-?\d+))?(?: knock=(\d+))?"
+    r"(?: armor=(-?\d+))?(?: armorSave=(-?\d+))?(?: preKnock=(\d+))?", re.M)
 WORLD_DEATH = re.compile(r"^(\S+) (?:was killed by world|died|drowned|dissolved in slime|burned in lava)$", re.M)
 WORLD_HIT = re.compile(r"^bot (\S+): hit by world for \d+ at (\S+) (\S+) (\S+) .*\(time (\d+)\)$", re.M)
 # `botlist` rows: client, name, character, style, skill, then (since the combat
@@ -137,7 +139,10 @@ def classify(clean: str, names: set[str], gametype: str, window_msec: int = IMPU
                  "kick": [float(m.group(i)) for i in (8, 9, 10)],
                  "velocity": [float(m.group(i)) for i in (11, 12, 13)], "def": m.group(14),
                  "health": int(m.group(15)) if m.group(15) else None,
-                 "knock_msec": int(m.group(16)) if m.group(16) else None, "offset": m.start()}
+                 "knock_msec": int(m.group(16)) if m.group(16) else None,
+                 "armor": int(m.group(17)) if m.group(17) else None,
+                 "armor_save": int(m.group(18)) if m.group(18) else None,
+                 "pre_knock_msec": int(m.group(19)) if m.group(19) else None, "offset": m.start()}
                 for m in IMPULSE.finditer(clean)]
     # One shotgun shot applies several pellets before physics advances. Replay
     # its complete kick, not every intermediate pellet as a separate cause.
@@ -152,11 +157,17 @@ def classify(clean: str, names: set[str], gametype: str, window_msec: int = IMPU
                          ("client", "time", "attacker", "origin", "def", "knock_msec")) and
                      previous["health"] is not None and impulse["health"] is not None and
                      previous["health"] - impulse["damage"] == impulse["health"] and
+                     previous["armor"] is not None and impulse["armor"] is not None and
+                     previous["armor_save"] is not None and impulse["armor_save"] is not None and
+                     previous["armor"] - impulse["armor_save"] == impulse["armor"] and
+                     previous["knock_msec"] == impulse["pre_knock_msec"] and
                      all(abs(previous["velocity"][axis] + impulse["kick"][axis] - impulse["velocity"][axis]) < 0.01
                          for axis in range(3)))
         if same_shot:
             pellets = previous.get("pellets", [{k: v for k, v in previous.items() if k != "offset"}])
             grouped[-1] = {**impulse, "damage": previous["damage"] + impulse["damage"],
+                           "armor_save": previous["armor_save"] + impulse["armor_save"],
+                           "pre_knock_msec": previous["pre_knock_msec"],
                            "kick": [previous["kick"][axis] + impulse["kick"][axis] for axis in range(3)],
                            "pellets": pellets + [{k: v for k, v in impulse.items() if k != "offset"}]}
         else:
@@ -203,6 +214,16 @@ def classify(clean: str, names: set[str], gametype: str, window_msec: int = IMPU
     return results
 
 
+def replay_state_complete(impulse: dict) -> bool:
+    """Never qualify a fall using spawn defaults or a rejected probe setup."""
+    limits = {"health": (1, 1000), "knock_msec": (0, 1000), "armor": (0, 1000),
+              "damage": (0, 1000), "armor_save": (0, 1000), "pre_knock_msec": (0, 1000)}
+    if not all(isinstance(impulse.get(key), int) and lo <= impulse[key] <= hi
+               for key, (lo, hi) in limits.items()):
+        return False
+    return impulse["health"] + impulse["damage"] <= 1000 and impulse["armor"] + impulse["armor_save"] <= 1000
+
+
 def trials_for(impulse: dict) -> list[dict]:
     """The decisive fixed-input trials and the informative controller trial."""
     ox, oy, oz = impulse["origin"]
@@ -219,10 +240,10 @@ def trials_for(impulse: dict) -> list[dict]:
     # Fall damage is survived or not at the health the hit left, and the
     # knockback time takes ground friction and control away as it did.
     health = impulse.get("health")
-    if health is not None and health >= 1:
-        knock = impulse.get("knock_msec")
+    if replay_state_complete(impulse):
+        knock, armor = impulse["knock_msec"], impulse["armor"]
         for trial in trials:
-            trial["setup"] = [f"bot_probeHealth 1 {health}" + (f" {knock}" if knock else "")]
+            trial["setup"] = [f"bot_probeHealth 1 {health} {knock} 0 0 0 {armor}"]
     # The counterfactual: the same moment without the impulse. A bot already
     # falling into nothing before a machine gun's tap was not thrown by it.
     kick = impulse.get("kick")
@@ -238,8 +259,8 @@ def trials_for(impulse: dict) -> list[dict]:
         ]
         for trial in counterfactual:
             trial.update(decisive=False, counterfactual=True)
-            if health is not None and health >= 1:
-                trial["setup"] = [f"bot_probeHealth 1 {health + max(0, impulse.get('damage', 0))}"]
+            if replay_state_complete(impulse):
+                trial["setup"] = [f"bot_probeHealth 1 {health + impulse['damage']} {impulse['pre_knock_msec']} 0 0 0 {armor + impulse['armor_save']}"]
         trials += counterfactual
     return trials
 
@@ -257,7 +278,13 @@ def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[
                              "reason": "trial markers missing"})
             continue
         body = sample[starts[0].end():ends[0].start()]
-        armed = len(re.findall(r"^BOT_(?:AIR|MOVE)_PROBE client=1 ", body, re.M)) == 1
+        # Traversal regressions can name their exact marker. Causal impulse
+        # envelopes retain the original AIR/MOVE restriction by default.
+        marker = trial.get("probe_type")
+        if marker is not None and marker not in ("AIR", "MOVE", "JUMP", "DROP", "PAD", "DODGE"):
+            raise ValueError(f"unknown traversal probe marker: {marker}")
+        probes = re.findall(r"^BOT_(AIR|MOVE|JUMP|DROP|PAD|DODGE)_PROBE client=1 ", body, re.M)
+        armed = len(probes) == 1 and probes[0] in ((marker,) if marker else ("AIR", "MOVE"))
         died = any(match.group(1) == bot for match in WORLD_DEATH.finditer(body))
         grounded = re.search(r"^BOT_PROBE_GROUNDED client=1 .* health=(\d+)$", body, re.M)
         terminal = re.findall(r"^MP_PHYSICS slot=1 grounded=([01]) health=(-?\d+) velocity=.*$", body, re.M)
@@ -283,10 +310,13 @@ def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[
 
 
 def decide(candidate: dict, outcomes: list[dict] | None, session_ok: bool) -> dict:
-    """Exclude only a candidate whose every decisive trial armed and died."""
+    """Exclude only when every post-hit trial, including the controller, died."""
     decided = dict(candidate)
     decided["replay"] = outcomes
     if candidate.get("status") != "impulse-candidate":
+        return decided
+    if not replay_state_complete(candidate["impulse"]):
+        decided.update(status="navigation", reason="health, armour or knockback replay state missing or out of range (fail closed)")
         return decided
     if not session_ok or not outcomes:
         decided.update(status="navigation", reason="impulse replay did not complete (fail closed)")
@@ -302,6 +332,10 @@ def decide(candidate: dict, outcomes: list[dict] | None, session_ok: bool) -> di
         return decided
     if not all(o["died"] for o in decisive):
         decided.update(status="navigation", reason="a decisive trial neither survived nor died (fail closed)")
+        return decided
+    controller = [o for o in outcomes if o["name"] == "controller"]
+    if len(controller) != 1 or not controller[0]["armed"] or not controller[0]["died"]:
+        decided.update(status="navigation", reason="controller replay missing, unarmed or unresolved (fail closed)")
         return decided
     # The impulse has to make the difference: the same moment without it
     # must be survivable, or the bot was already lost to navigation.
@@ -320,7 +354,7 @@ def decide(candidate: dict, outcomes: list[dict] | None, session_ok: bool) -> di
 def summarise(decided: list[dict]) -> dict:
     navigation = [d for d in decided if d["status"] != "excluded-impulse"]
     excluded = [d for d in decided if d["status"] == "excluded-impulse"]
-    return {"world_deaths": len(decided), "navigation_world_deaths": len(navigation),
+    return {"policy_version": POLICY_VERSION, "world_deaths": len(decided), "navigation_world_deaths": len(navigation),
             "excluded_impulse_deaths": len(excluded), "deaths": decided}
 
 
@@ -331,10 +365,13 @@ def replay_chain(candidate: dict, run) -> dict:
     fallback. Every attempted cause still needs the unchanged exclusion proof.
     After that gate, test the strongest earlier kicks first: a stream of taps
     during an already-lost rocket flight must not consume the whole search.
+    Logged vectors have three decimal places. Group their sub-centimetre
+    magnitude noise so equal-strength hits retain reverse chronological order.
     """
     attempts = []
     earlier = sorted(candidate.get("earlier_candidates", []), key=lambda row:
-        (sum(component * component for component in row["impulse"]["kick"]), row["impulse"]["time"]),
+        (round(math.sqrt(sum(component * component for component in row["impulse"]["kick"])), 2),
+         row["impulse"]["time"]),
         reverse=True)
     choices = [candidate] + [{**candidate, **row} for row in earlier[:8]]
     for attempt, choice in enumerate(choices):
@@ -378,17 +415,29 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
                    neutral, "waitMsec 64", f"echo MP_BOT_TRIAL_BEGIN {trial['name']}",
                    *trial.get("setup", []), trial["command"], "set bot_pause 0"]
         release = trial.get("release_input_after_msec")
+        observe = trial.get("observe_msec", TRIAL_OBSERVE_MSEC)
+        if not isinstance(observe, int) or not TRIAL_OBSERVE_MSEC <= observe <= 30000:
+            raise ValueError("observation may extend, never shorten, the six-second terminal check")
         if release is not None:
-            if not 0 < release < TRIAL_OBSERVE_MSEC:
+            if not 0 < release < observe:
                 raise ValueError("input release must be inside the observation window")
             # This optional isolated-recovery mode stops issuing commands after
             # the controller has settled. World/player physics keeps running;
             # assessment requires rest BEFORE release as well as final survival.
             script += [f"waitMsec {release}", "openq4_reportMPState",
                        f"echo MP_BOT_RELEASE_INPUT {trial['name']}", "set bot_pause 1",
-                       f"waitMsec {TRIAL_OBSERVE_MSEC - release}"]
+                       f"waitMsec {observe - release}"]
         else:
-            script += [f"waitMsec {TRIAL_OBSERVE_MSEC}"]
+            sample = trial.get("sample_msec", observe)
+            if not isinstance(sample, int) or not 16 <= sample <= observe:
+                raise ValueError("physics sample interval must be between 16 ms and the observation length")
+            remaining = observe
+            while remaining > 0:
+                step = min(sample, remaining)
+                script += [f"waitMsec {step}"]
+                remaining -= step
+                if remaining:
+                    script += ["openq4_reportMPState"]
         script += ["openq4_reportMPState",
                    f"echo MP_BOT_TRIAL_END {trial['name']}",
                    # A bot that died, or walked off later, would refuse or
@@ -396,7 +445,13 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
                    # The removed client takes a moment to leave its slot.
                    "removebot Rhodes", f"waitMsec {TRIAL_REMOVE_MSEC}", "addbot Rhodes 4 exact", f"waitMsec {TRIAL_RESPAWN_MSEC}"]
     script += ["echo MP_BOT_REPLAY_END", "quit"]
-    (game / "impulse_replay.cfg").write_text("\n".join(script) + "\n", encoding="utf-8")
+    config = "\n".join(script) + "\n"
+    # CmdSystem's text buffer is 64 KiB, including commands already queued
+    # around exec. Dense extended probes must split trials or sample less
+    # often; silently dropping the script leaves a hidden server running.
+    if len(config.encode("utf-8")) >= 60 * 1024:
+        raise ValueError("replay script exceeds the command-buffer budget; split trials or increase sample_msec")
+    (game / "impulse_replay.cfg").write_text(config, encoding="utf-8")
     cvars = {
         "win_allowMultipleInstances" if os.name == "nt" else "sys_allowMultipleInstances": "1",
         "sys_consoleWindow": "0", "in_tty": "0", "in_mouse": "0", "in_joystick": "0",
@@ -465,6 +520,8 @@ def classify_log(clean: str, names: set[str], gametype: str, map_name: str, runt
             decided.append(decide(candidate, None, False))
             continue
         def run(choice, attempt):
+            if not replay_state_complete(choice["impulse"]):
+                return decide(choice, None, False)
             trials = trials_for(choice["impulse"])
             folder = output / f"replay-{index:02d}-{candidate['victim']}-cause{attempt}"
             per_trial = TRIAL_OBSERVE_MSEC + TRIAL_REMOVE_MSEC + TRIAL_RESPAWN_MSEC + 200

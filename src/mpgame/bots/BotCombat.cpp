@@ -508,6 +508,19 @@ static bool BotCombatSplashThrowsShooter( idPlayer *shooter, idEntity *splashIgn
 	}
 	const float leadTime = Max( 0.0f, impactTime );
 	const idVec3 velocity = shooter->GetPhysics()->GetLinearVelocity();
+	// A voluntary flight is proven for its held movement, not an additional
+	// self-blast. In particular a rocket fired just before a narrow touchdown
+	// can arrive after it and throw the shooter straight back off the ledge.
+	// Check the present hull as well as the projected one: a linear projection
+	// does not know where a jump will collide/land during the projectile flight.
+	const float presentDistance = shooter->GetPhysics()->GetAbsBounds().ShortestDistance( impact );
+	const int presentKnockback = (int)( model.selfKnockback * model.power *
+		Max( 0.0f, 1.0f - presentDistance / model.splashRadius ) * model.attackerScale );
+	if ( !shooter->pfl.onGround && model.selfPushScale > 0.0f &&
+		 presentKnockback > 0 &&
+		 BotCombatPredictedBoundsExposed( shooter, splashIgnore, impact, 0.0f ) ) {
+		return true;
+	}
 	const idVec3 origin = shooter->GetPhysics()->GetOrigin() + velocity * leadTime;
 	const idBounds predicted = shooter->GetPhysics()->GetAbsBounds() + velocity * leadTime;
 	const float distance = predicted.ShortestDistance( impact );
@@ -521,6 +534,9 @@ static bool BotCombatSplashThrowsShooter( idPlayer *shooter, idEntity *splashIgn
 		( 1.0f - distance / model.splashRadius ) * model.attackerScale );
 	if ( knockback <= 0 ) {
 		return false;
+	}
+	if ( !shooter->pfl.onGround && model.selfPushScale > 0.0f ) {
+		return true;
 	}
 	idVec3 direction = ( origin + idVec3( 0.0f, 0.0f, 31.875f ) ) - impact;
 	direction.z += 24.0f;
