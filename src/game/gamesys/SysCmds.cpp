@@ -2160,6 +2160,7 @@ static void Cmd_TestFlashlight_f( const idCmdArgs &args ) {
 	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
+
 	if ( args.Argc() != 2 || ( idStr::Cmp( args.Argv( 1 ), "0" ) != 0 && idStr::Cmp( args.Argv( 1 ), "1" ) != 0 ) ) {
 		gameLocal.Printf( "usage: testFlashlight <0 = off, 1 = on> (current weapon)\n" );
 		return;
@@ -2176,6 +2177,101 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
+	if ( args.Argc() == 4 && !idStr::Icmp( args.Argv( 1 ), "dispatch" ) ) {
+		// A file-driven controller can observe an acknowledgement after the
+		// next poll has already queued the same file. Consume the sequence
+		// before inserting commands, including across in-process save loads.
+		static int lastSequence = 0;
+		const int sequence = atoi( args.Argv( 2 ) );
+		if ( sequence > lastSequence ) {
+			lastSequence = sequence;
+			idCmdArgs command;
+			command.AppendArg( "exec" );
+			command.AppendArg( args.Argv( 3 ) );
+			cmdSystem->BufferCommandArgs( CMD_EXEC_NOW, command );
+		}
+		return;
+	}
+	if ( args.Argc() == 2 && !idStr::Icmp( args.Argv( 1 ), "enemies" ) ) {
+		for ( int i = 0; i < gameLocal.num_entities; ++i ) {
+			idEntity *ent = gameLocal.entities[i];
+			if ( !ent || !ent->IsType( idAI::Type ) || ent->IsHidden() || ent->health <= 0 ||
+				static_cast<idAI *>( ent )->team == player->team ) { continue; }
+			const idVec3 center = ent->GetPhysics()->GetAbsBounds().GetCenter();
+			const float distance = ( center - player->GetEyePosition() ).Length();
+			if ( distance > 2000.0f ) { continue; }
+			trace_t trace;
+			gameLocal.TracePoint( player, trace, player->GetEyePosition(), center, MASK_SHOT_RENDERMODEL, player );
+			const bool bodyVisible = trace.fraction == 1.0f || trace.c.entityNum == ent->entityNumber;
+			gameLocal.TracePoint( player, trace, player->GetEyePosition(), static_cast<idAI *>( ent )->GetEyePosition(), MASK_SHOT_RENDERMODEL, player );
+			const bool eyeVisible = trace.fraction == 1.0f || trace.c.entityNum == ent->entityNumber;
+			gameLocal.Printf( "testMissionEnemy: name=%s health=%d distance=%.1f visible=%d origin=(%s) def=%s aimEye=%d\n",
+				ent->name.c_str(), ent->health, distance, bodyVisible || eyeVisible,
+				ent->GetPhysics()->GetOrigin().ToString(), ent->GetEntityDefName(), !bodyVisible && eyeVisible );
+		}
+		return;
+	}
+	if ( args.Argc() == 3 && !idStr::Icmp( args.Argv( 1 ), "trace" ) ) {
+		idEntity *goal = gameLocal.FindEntity( args.Argv( 2 ) );
+		if ( !goal ) { gameLocal.Printf( "testMissionTrace: missing goal\n" ); return; }
+		for ( int probe = 0; probe < 3; ++probe ) {
+			idVec3 start = player->GetPhysics()->GetOrigin() + idVec3( 0, 0, 1 );
+			idVec3 end = goal->GetPhysics()->GetOrigin();
+			end.z = start.z;
+			trace_t trace;
+			if ( probe == 1 ) {
+				start = player->GetEyePosition();
+				end.z = start.z;
+				gameLocal.TracePoint( player, trace, start, end, MASK_PLAYERSOLID, player );
+			} else {
+				if ( probe == 2 ) { end = start + idVec3( 0, 0, 64 ); }
+				gameLocal.Translation( player, trace, start, end, player->GetPhysics()->GetClipModel(),
+					player->GetPhysics()->GetAxis(), player->GetPhysics()->GetClipMask(), player );
+			}
+			idEntity *hit = trace.fraction < 1.0f ? gameLocal.entities[trace.c.entityNum] : NULL;
+			gameLocal.Printf( "testMissionTrace: probe=%s hit=%s fraction=%.3f point=(%s) material=%s\n",
+				probe == 0 ? "hull" : probe == 1 ? "eye" : "ceiling", hit ? hit->name.c_str() : "none",
+				trace.fraction, trace.endpos.ToString(), hit && trace.c.material ? trace.c.material->GetName() : "none" );
+		}
+		return;
+	}
+	if ( ( args.Argc() == 3 || args.Argc() == 4 ) && idStr::Icmp( args.Argv( 1 ), "path" ) == 0 ) {
+		idEntity *traveller = args.Argc() == 4 ? gameLocal.FindEntity( args.Argv( 2 ) ) : player;
+		idEntity *goalEntity = gameLocal.FindEntity( args.Argv( args.Argc() - 1 ) );
+		idAAS *aas = traveller != NULL && traveller->IsType( idAI::Type ) ? static_cast<idAI *>( traveller )->aas : gameLocal.GetAAS( "aas32" );
+		if ( traveller == NULL || goalEntity == NULL || aas == NULL || aas->GetSettings() == NULL ) {
+			gameLocal.Printf( "testMissionPath: unavailable\n" );
+			return;
+		}
+		const idVec3 origin = traveller->GetPhysics()->GetOrigin();
+		idVec3 goal = goalEntity->GetPhysics()->GetOrigin();
+		const idBounds search( idVec3( -32, -32, -128 ), idVec3( 32, 32, 64 ) );
+		const int from = aas->PointReachableAreaNum( origin, search, AREA_REACHABLE_WALK );
+		const int to = aas->PointReachableAreaNum( goal, search, AREA_REACHABLE_WALK );
+		aasPath_t path;
+		if ( from == 0 || to == 0 ) {
+			gameLocal.Printf( "testMissionPath: unreachable from=%d to=%d\n", from, to );
+			return;
+		}
+		aas->PushPointIntoAreaNum( to, goal );
+		if ( !aas->WalkPathToGoal( path, from, origin, to, goal, TFL_WALK | TFL_AIR | TFL_WALKOFFLEDGE ) ) {
+			gameLocal.Printf( "testMissionPath: blocked from=%d to=%d\n", from, to );
+			return;
+		}
+		// Reporting only: the external test driver decides whether to apply
+		// authorized game input. Never teleport or move actors to pass a route.
+		gameLocal.Printf( "testMissionPath: goal=%s next=(%s) distance=%.2f\n",
+			goalEntity->name.c_str(), path.moveGoal.ToString(), ( goal - origin ).Length() );
+		trace_t trace;
+		gameLocal.Translation( traveller, trace, origin, path.moveGoal, traveller->GetPhysics()->GetClipModel(),
+			traveller->GetPhysics()->GetAxis(), traveller->GetPhysics()->GetClipMask(), traveller );
+		if ( trace.fraction < 1.0f ) {
+			idEntity *obstacle = gameLocal.entities[trace.c.entityNum];
+			gameLocal.Printf( "testMissionObstacle: name=%s fraction=%.3f point=(%s)\n",
+				obstacle ? obstacle->name.c_str() : "none", trace.fraction, trace.endpos.ToString() );
+		}
+		return;
+	}
 	if ( args.Argc() == 3 && idStr::Icmp( args.Argv( 1 ), "call" ) == 0 ) {
 		const function_t *func = gameLocal.program.FindFunction( args.Argv( 2 ) );
 		if ( func == NULL || func->eventdef != NULL || func->type->NumParameters() != 0 ) {
@@ -2188,7 +2284,7 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 		return;
 	}
 	if ( args.Argc() != 2 ) {
-		gameLocal.Printf( "usage: testMission <entity> | call <function>\n" );
+		gameLocal.Printf( "usage: testMission <entity> | call <function> | path [actor] <entity> | trace <entity> | enemies | dispatch <sequence> <cfg>\n" );
 		return;
 	}
 	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
@@ -2199,6 +2295,20 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 	gameLocal.Printf( "testMission: name=%s health=%d hidden=%d contents=%d origin=(%s) bind=%s\n",
 		ent->name.c_str(), ent->health, ent->IsHidden(), ent->GetPhysics()->GetContents(),
 		ent->GetPhysics()->GetOrigin().ToString(), ent->GetBindMaster() ? ent->GetBindMaster()->name.c_str() : "none" );
+	if ( ent == player ) {
+		gameLocal.Printf( "testMissionPlayer: time=%d armor=%d weapon=%d weapons=%d\n", gameLocal.time,
+			player->inventory.armor, player->GetCurrentWeapon(), player->inventory.weapons );
+		if ( player->weapon ) {
+			const rvWeapon *weapon = player->weapon;
+			gameLocal.Printf( "testMissionWeapon: clip=%d capacity=%d available=%d ammoType=%d required=%d ready=%d reloading=%d disabled=%d attack=%d reload=%d\n",
+				weapon->AmmoInClip(), weapon->ClipSize(), weapon->AmmoAvailable(), weapon->GetAmmoType(), weapon->AmmoRequired(),
+				weapon->IsReady(), weapon->IsReloading(), weapon->wfl.disabled, weapon->wsfl.attack, weapon->wsfl.reload );
+		}
+		for ( int i = 0; i < MAX_AMMO; ++i ) {
+			const char *ammoName = rvWeapon::GetAmmoNameForIndex( i );
+			if ( ammoName ) { gameLocal.Printf( "testMissionAmmo: type=%s amount=%d\n", ammoName, player->inventory.ammo[i] ); }
+		}
+	}
 	if ( ent->GetAnimator() ) {
 		const idAnimBlend *torso = ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_TORSO );
 		gameLocal.Printf( "testMissionAnim: name=%s anim=%s torso=%s time=%d start=%d end=%d\n", ent->name.c_str(),

@@ -3430,7 +3430,6 @@ bool idAI::AttackMelee ( const char *attackName, const idDict* meleeDict ) {
 	float damageScale = spawnArgs.GetFloat( "damageScale", "1" ) * enemyEnt->spawnArgs.GetFloat ( "selfMeleeDamageScale", "1" );
 
 	//if attacker is a melee superhero, damageScale is way increased
-	idAI* enemyAI = static_cast<idAI*>(enemyEnt);
 	if( aifl.meleeSuperhero)	{
 		if( damageScale >=1 )	{
 			damageScale *= 6;
@@ -3440,7 +3439,7 @@ bool idAI::AttackMelee ( const char *attackName, const idDict* meleeDict ) {
 	}
 	
 	//if the defender is a melee superhero, damageScale is way decreased
-	if( enemyAI->aifl.meleeSuperhero)	{
+	if ( enemyEnt->IsType( idAI::Type ) && static_cast<idAI*>( enemyEnt )->aifl.meleeSuperhero )	{
 		damageScale = 0.5f;
 	}
 

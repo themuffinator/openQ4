@@ -21,6 +21,8 @@
 // The image an objective's screenshot names (Game_local.cpp).
 idStr Game_RetainedObjectiveShot( const char *shot );
 
+static void ResetOpenQ4TestInput( void );
+
 // RAVEN BEGIN
 // nrausch: support for turning the weapon change ui on and off
 #ifdef _XENON
@@ -1750,6 +1752,9 @@ idPlayer::Init
 */
 void idPlayer::Init( void ) {
 	const char			*value;
+	if ( entityNumber == gameLocal.localClientNum ) {
+		ResetOpenQ4TestInput();
+	}
 	
 	noclip					= false;
 	godmode					= false;
@@ -2728,6 +2733,9 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 
  	usercmd.flags = 0;
  	oldFlags = 0;
+	if ( entityNumber == gameLocal.localClientNum ) {
+		ResetOpenQ4TestInput();
+	}
 
 	savefile->ReadInt( lastHitTime );
 	int foo;
@@ -11094,6 +11102,8 @@ static struct {
 	signed char	rightmove;
 	signed char	upmove;
 	idStr		aimEntity;
+	idStr		aimJoint;
+	bool		aimEye;
 	float		yawRate;		// degrees a second added to the usercmd's angles
 	float		pitchRate;
 	float		yawOffset;		// what has been added so far
@@ -11104,12 +11114,21 @@ static struct {
 								// flipped, so the next real usercmd is not another impulse
 } openq4TestInput;
 
+// Test input is session-local, never savegame state. In particular, retaining
+// its impulse XOR across Restore's flag reset would replay the raw impulse
+// (usually weapon 0), and could swallow the next requested weapon selection.
+static void ResetOpenQ4TestInput( void ) {
+	openq4TestInput.startTime = openq4TestInput.endTime = 0;
+	openq4TestInput.impulsePending = false;
+	openq4TestInput.impulseFlip = 0;
+}
+
 /*
 ==================
 Cmd_OpenQ4TestInput_f
 
 openq4_testInput <msec> [attack] [zoom] [run] [scores] [crouch] [jump]
-	[forward|back|right|left <0-127>] [aim <entity>] [yaw|pitch <degrees a second>]
+	[forward|back|right|left <0-127>] [aim|aimEye <entity>] [joint <joint>] [yaw|pitch <degrees a second>]
 	[impulse <n>]
 
 yaw and pitch turn the usercmd's angles, as a mouse would, so vehicle turrets
@@ -11120,7 +11139,7 @@ openq4_testInput 0 releases everything.
 */
 void Cmd_OpenQ4TestInput_f( const idCmdArgs &args ) {
 	if ( gameLocal.GetLocalPlayer() == NULL || !gameLocal.CheatsOk( false ) || args.Argc() < 2 ) {
-		gameLocal.Printf( "usage: openq4_testInput <msec> [attack] [zoom] [run] [scores] [crouch] [jump] [forward|back|right|left <0-127>] [aim <entity>] [yaw|pitch <deg/s>] [impulse <n>]\n" );
+		gameLocal.Printf( "usage: openq4_testInput <msec> [attack] [zoom] [run] [scores] [crouch] [jump] [forward|back|right|left <0-127>] [aim|aimEye <entity>] [joint <joint>] [yaw|pitch <deg/s>] [impulse <n>]\n" );
 		return;
 	}
 
@@ -11131,6 +11150,8 @@ void Cmd_OpenQ4TestInput_f( const idCmdArgs &args ) {
 	openq4TestInput.rightmove = 0;
 	openq4TestInput.upmove = 0;
 	openq4TestInput.aimEntity.Clear();
+	openq4TestInput.aimJoint.Clear();
+	openq4TestInput.aimEye = false;
 	openq4TestInput.yawRate = 0.0f;
 	openq4TestInput.pitchRate = 0.0f;
 	openq4TestInput.yawOffset = 0.0f;
@@ -11165,8 +11186,12 @@ void Cmd_OpenQ4TestInput_f( const idCmdArgs &args ) {
 		} else if ( !idStr::Icmp( arg, "left" ) ) {
 			openq4TestInput.rightmove = -amount;
 			i++;
-		} else if ( !idStr::Icmp( arg, "aim" ) ) {
+		} else if ( !idStr::Icmp( arg, "aim" ) || !idStr::Icmp( arg, "aimEye" ) ) {
 			openq4TestInput.aimEntity = value;
+			openq4TestInput.aimEye = !idStr::Icmp( arg, "aimEye" );
+			i++;
+		} else if ( !idStr::Icmp( arg, "joint" ) ) {
+			openq4TestInput.aimJoint = value;
 			i++;
 		} else if ( !idStr::Icmp( arg, "yaw" ) ) {
 			openq4TestInput.yawRate = atof( value );
@@ -11250,7 +11275,16 @@ void idPlayer::ApplyTestInput( void ) {
 	if ( openq4TestInput.aimEntity.Length() ) {
 		idEntity *target = gameLocal.FindEntity( openq4TestInput.aimEntity );
 		if ( target != NULL ) {
-			idVec3 dir = target->GetPhysics()->GetAbsBounds().GetCenter() - GetEyePosition();
+			idVec3 point = openq4TestInput.aimEye && target->IsType( idActor::Type ) ?
+				static_cast<idActor *>( target )->GetEyePosition() : target->GetPhysics()->GetAbsBounds().GetCenter();
+			if ( openq4TestInput.aimJoint.Length() && target->IsType( idAnimatedEntity::Type ) && target->GetAnimator() ) {
+				const jointHandle_t joint = target->GetAnimator()->GetJointHandle( openq4TestInput.aimJoint );
+				idMat3 axis;
+				if ( joint != INVALID_JOINT ) {
+					static_cast<idAnimatedEntity *>( target )->GetJointWorldTransform( joint, gameLocal.time, point, axis );
+				}
+			}
+			idVec3 dir = point - GetEyePosition();
 			if ( dir.Normalize() > 0.0f ) {
 				SetViewAngles( dir.ToAngles() );
 			}
