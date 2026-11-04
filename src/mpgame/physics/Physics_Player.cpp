@@ -284,6 +284,12 @@ bool idPhysics_Player::SlideMove( bool gravity, bool stepUp, bool stepDown, bool
 		if ( trace.fraction >= 1.0f ) {
 			break;
 		}
+		if ( bot_debug.GetInteger() >= 4 && self && botManager.IsBot( self->entityNumber ) ) {
+			gameLocal.Printf( "BOT_PHYSICS_CONTACT client=%d time=%d other=%d origin=%s velocity=%s normal=%.3f %.3f %.3f fraction=%.4f ground=%d walking=%d bump=%d\n",
+				self->entityNumber, gameLocal.time, trace.c.entityNum, current.origin.ToString( 3 ),
+				current.velocity.ToString( 3 ), trace.c.normal.x, trace.c.normal.y, trace.c.normal.z,
+				trace.fraction, groundPlane ? 1 : 0, walking ? 1 : 0, bumpcount );
+		}
 		if ( bot_debug.GetInteger() >= 3 && self && botManager.IsBot( self->entityNumber ) &&
 			 trace.c.entityNum >= 0 && trace.c.entityNum < MAX_GENTITIES ) {
 			idEntity *other = gameLocal.entities[trace.c.entityNum];
