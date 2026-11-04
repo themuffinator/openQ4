@@ -23,6 +23,7 @@ import renderer_budget_contract as timing_contract
 import renderer_validation_matrix as matrix
 import renderer_vulkan_qualification as qualification
 import renderer_foreground_observer as foreground_observer
+import renderer_presentmon as presentmon
 from mp_round_remote_smoke import verify_runtime_is_current
 
 PRESENTED = re.compile(r'Presented frames vkpacing: frames=(\d+) interval '
@@ -42,8 +43,8 @@ def power_state():
     return {name: getattr(status, name) for name, _ in status._fields_}
 
 
-def other_games(own_pid):
-    """Observe competing openQ4 clients without controlling their processes."""
+def competing_workloads(own_pid):
+    """Observe game and build contention without controlling other processes."""
     if os.name != 'nt':
         return []
     from ctypes import wintypes
@@ -68,7 +69,10 @@ def other_games(own_pid):
         if not more:
             raise OSError('cannot enumerate concurrent game processes')
         while more:
-            if entry.pid != own_pid and entry.name.lower().startswith('openq4-client'):
+            name = entry.name.lower()
+            game = name.startswith(('openq4-client', 'openq4-ded'))
+            build = name in {'ninja.exe', 'msbuild.exe', 'cl.exe', 'link.exe', 'clang-cl.exe', 'clang++.exe'}
+            if entry.pid != own_pid and (game or build):
                 found.append(dict(pid=entry.pid, name=entry.name))
             more = kernel.Process32NextW(handle, ctypes.byref(entry))
     finally:
@@ -76,7 +80,7 @@ def other_games(own_pid):
     return found
 
 
-def analyze(text, focus, budget, competing=(), focus_events=()):
+def analyze(text, focus, budget, competing=(), focus_events=(), require_presented=True):
     failures = []
     match = PRESENTED.search(text)
     presentation = None
@@ -89,14 +93,14 @@ def analyze(text, focus, budget, competing=(), focus_events=()):
             failures.append('too few presented samples or timing samples were dropped')
         if presentation['interval']['p99'] > budget:
             failures.append('presented p99 exceeds the declared budget')
-    else:
+    elif require_presented:
         failures.append('presented timing unavailable or missing')
     if len(focus) < 10 or any(value is not True for value in focus):
         failures.append('foreground ownership was not continuously observed during sampling')
     if any(event['focused'] is not True for event in focus_events):
         failures.append('a foreground event interrupted the sampling interval')
     if competing:
-        failures.append('other openQ4 clients were observed during sampling')
+        failures.append('other openQ4 or compiler/build workloads were observed during sampling')
     if 'hidden window renders offscreen' in text:
         failures.append('offscreen rendering cannot qualify presentation')
     for marker in ('VK_PACING_BEGIN', 'VK_PACING_END'):
@@ -157,13 +161,13 @@ def await_idle(seconds, timeout):
     seen = {}
     while True:
         now = time.monotonic()
-        competitors = other_games(0)
+        competitors = competing_workloads(0)
         for item in competitors:
             seen[item['pid']] = item
         if readiness.update(now, True, competitors):
-            return dict(quietSeconds=seconds, waitedSeconds=now - start, priorClients=list(seen.values()))
+            return dict(quietSeconds=seconds, waitedSeconds=now - start, priorProcesses=list(seen.values()))
         if now - start >= timeout:
-            raise TimeoutError('other openQ4 clients did not leave a quiet prelaunch interval')
+            raise TimeoutError('competing workloads did not leave a quiet prelaunch interval')
         time.sleep(0.25)
 
 
@@ -183,6 +187,9 @@ def main():
     parser.add_argument('--idle-timeout', type=float, default=600)
     parser.add_argument('--request-focus', action='store_true',
                         help='explicitly request focus through the engine; caller must have permission')
+    parser.add_argument('--presentmon', type=Path, help='optional portable PresentMon 2.6 console executable')
+    parser.add_argument('--timing-source', choices=('engine', 'presentmon'), default='engine',
+                        help='required presentation source; available engine timing must also pass')
     args = parser.parse_args()
     if args.self_test:
         pose = 'origin: (10200 -6800 40) angles: (0 170 0)\n'
@@ -194,6 +201,10 @@ def main():
             'cpuSamples=256 cpuP50Us=3000 cpuP95Us=4000 cpuP99Us=5000 '
             'gpuAvailable=1 gpuSamples=256 gpuP50Us=1000 gpuP95Us=1500 gpuP99Us=2000\n')
         assert analyze(text, [True] * 100, 28)['status'] == 'pass'
+        without_present = PRESENTED.sub('', text)
+        assert analyze(without_present, [True] * 100, 28, require_presented=False)['status'] == 'pass'
+        assert analyze(without_present, [False] * 100, 28, require_presented=False)['status'] == 'fail'
+        assert analyze(text, [True] * 100, 9, require_presented=False)['status'] == 'fail'
         assert analyze(text, [True] * 100, 9)['status'] == 'fail'
         assert analyze(text, [True] * 99 + [False], 28)['status'] == 'fail'
         assert analyze(text, [None] * 100, 28)['status'] == 'fail'
@@ -217,6 +228,7 @@ def main():
         events = [dict(time=1, focused=False), dict(time=3, focused=True), dict(time=5, focused=False)]
         assert foreground_observer.interval_events(events, 2, 4) == [events[1]]
         assert foreground_observer.interval_events(events, None, 4) == []
+        presentmon.self_test()
         identity = foreground_observer.ForegroundObserver.__new__(foreground_observer.ForegroundObserver)
         identity.pid, identity.window = 42, None
         identity.owner = lambda window: {10: 42, 11: 42, 12: 99}.get(window)
@@ -241,6 +253,12 @@ def main():
         parser.error('device indices must be -1 or 0 through 255')
     if os.name != 'nt':
         parser.error('foreground qualification currently requires the Windows event observer')
+    if args.timing_source == 'presentmon' and args.presentmon is None:
+        parser.error('--timing-source presentmon requires --presentmon')
+    if args.presentmon is not None:
+        args.presentmon = args.presentmon.resolve()
+        if not args.presentmon.is_file():
+            parser.error('--presentmon must name an existing portable console executable')
     if any(not math.isfinite(value) or value <= 0 for value in (args.ready_seconds, args.idle_seconds, args.idle_timeout)):
         parser.error('positive foreground/idle intervals are required')
     runtime, output = args.runtime_dir.resolve(), args.output_dir.resolve()
@@ -249,12 +267,13 @@ def main():
     verify_runtime_is_current(runtime)
     output.mkdir(parents=True, exist_ok=False)
     sources = (Path(__file__), Path(gameplay.__file__), Path(matrix.__file__), Path(qualification.__file__),
-               Path(timing_contract.__file__), Path(foreground_observer.__file__))
+               Path(timing_contract.__file__), Path(foreground_observer.__file__), Path(presentmon.__file__))
     harnesses = {source.name: qualification.sha256_file(source) for source in sources}
     (output / 'harness').mkdir()
     for source in sources:
         shutil.copy2(source, output / 'harness' / source.name)
     before = qualification.runtime_inventory(runtime)
+    presentmon_hash = qualification.sha256_file(args.presentmon) if args.presentmon else None
     results = []
     for device in args.devices:
         for repeat in range(args.repeats):
@@ -304,6 +323,7 @@ def main():
             initial_power = power_state()
             offset, pending = 0, ''
             ready, released, sample_end = False, None, None
+            trace, qpc_begin, qpc_end = None, None, None
             readiness = foreground_observer.Readiness(args.ready_seconds)
             observer, observer_errors, observations, gate_observations = None, [], [], []
             previous_event_count, active_competitors = 0, []
@@ -311,6 +331,8 @@ def main():
                 process = subprocess.Popen(command, cwd=runtime, stdout=stream, stderr=subprocess.STDOUT)
                 try:
                     observer = foreground_observer.ForegroundObserver(process.pid)
+                    if args.presentmon:
+                        trace = presentmon.Capture(args.presentmon, process.pid, save, args.timeout)
                     while process.poll() is None:
                         observer.pump()
                         now = time.monotonic()
@@ -331,18 +353,23 @@ def main():
                                 if line == 'VK_PACING_END':
                                     sampled = False
                                     sample_end = now
+                                    if trace:
+                                        qpc_end = presentmon.qpc_milliseconds()
                         focused = observer.foreground()
                         if now >= next_process_check:
-                            active_competitors = other_games(process.pid)
+                            active_competitors = competing_workloads(process.pid)
                             next_process_check = now + 1
                         if ready and released is None:
                             interrupted = any(event['focused'] is not True for event in observer.events[previous_event_count:])
                             gate_observations.append(dict(seconds=now-start, focused=focused,
                                                           competitors=len(active_competitors), interrupted=interrupted))
-                            if readiness.update(now, focused, active_competitors, interrupted):
+                            trace_ready = trace.ready() if trace else True
+                            if readiness.update(now, focused if trace_ready else None, active_competitors, interrupted):
                                 # Observe from gate release, slightly before the
                                 # reset/begin commands, to fail conservatively.
                                 released = now
+                                if trace:
+                                    qpc_begin = presentmon.qpc_milliseconds()
                                 replace_gate(game / 'vkpacing_gate.cfg', 'exec vkpacing_sample.cfg\n')
                         previous_event_count = len(observer.events)
                         if sampled:
@@ -366,9 +393,20 @@ def main():
                     if process.poll() is None:
                         process.kill()
                     code = process.wait()
+                    if trace:
+                        try:
+                            trace.close()
+                        except Exception as error:
+                            observer_errors.append('PresentMon shutdown: ' + str(error))
             text = qualification.strip_colors(log.read_text(errors='replace')) if log.is_file() else ''
             focus_events = foreground_observer.interval_events(observer.events if observer else [], released, sample_end)
-            result = analyze(text, focus, args.p99_budget_ms, competing, focus_events)
+            result = analyze(text, focus, args.p99_budget_ms, competing, focus_events,
+                             require_presented=args.timing_source == 'engine')
+            if trace:
+                result['etwPresentation'] = trace.analyze(process.pid, qpc_begin, qpc_end, args.p99_budget_ms)
+                result['failures'].extend('ETW: ' + failure for failure in result['etwPresentation']['failures'])
+            elif args.presentmon:
+                result['failures'].append('PresentMon capture was not started')
             if observer is None or observer.overflow or observer.errors or observer_errors:
                 result['failures'].append('foreground event observation failed or overflowed')
             if released is None:
@@ -387,9 +425,9 @@ def main():
                     result['failures'].append('blank engine capture')
             except (OSError, ValueError) as error:
                 result['failures'].append('missing or invalid engine capture: ' + str(error))
-            trace = game / 'logs/timing.csv'
+            phase_trace = game / 'logs/timing.csv'
             config = game / 'openQ4Config.cfg'
-            if not trace.is_file() or trace.stat().st_size == 0:
+            if not phase_trace.is_file() or phase_trace.stat().st_size == 0:
                 result['failures'].append('CPU/GPU phase trace was not written')
             if not config.is_file() or 'seta com_performancePreset "balanced"' not in config.read_text(errors='replace'):
                 result['failures'].append('saved performance preset differs from the declared balanced profile')
@@ -397,21 +435,25 @@ def main():
                 powerAfter=power_state(), selectedDevice=qualification.device_identity('vulkan', qualification.parse_engine_log(text)),
                 engineVersion=qualification.parse_engine_log(text)['version'],
                 readinessReleased=released is not None, foregroundEventCount=len(focus_events), prelaunchIdle=idle,
-                otherGameProcesses=list(competing.values()),
+                competingProcesses=list(competing.values()),
                 displayAdapterRoute='unverified', elapsedSeconds=time.monotonic() - start,
                 artifacts=[qualification.file_record(path, output) for path in
-                           (log, capture, trace, config, observation_path, game / 'vkpacing.cfg',
-                            game / 'vkpacing_sample.cfg', save / 'process.log', save / 'command.json') if path.is_file()])
+                           (log, capture, phase_trace, config, observation_path, game / 'vkpacing.cfg',
+                            game / 'vkpacing_sample.cfg', save / 'process.log', save / 'command.json',
+                            save / 'presentmon.csv', save / 'presentmon.log') if path.is_file()])
             result['status'] = 'fail' if result['failures'] else 'pass'
             results.append(result)
             (save / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             print(name + ': ' + result['status'], flush=True)
     unchanged = before == qualification.runtime_inventory(runtime)
     harnesses_unchanged = harnesses == {source.name: qualification.sha256_file(source) for source in sources}
+    tool_unchanged = presentmon_hash == (qualification.sha256_file(args.presentmon) if args.presentmon else None)
     report = dict(kind='vulkan-visible-presentation', runtimeUnchanged=unchanged, runtime=before,
         harnessSources=harnesses, harnessUnchanged=harnesses_unchanged, p99BudgetMs=args.p99_budget_ms,
-        supportPromotion=False, results=results,
-        status='pass' if unchanged and harnesses_unchanged and all(result['status'] == 'pass' for result in results) else 'fail')
+        timingSource=args.timing_source,
+        presentmonTool=dict(path=str(args.presentmon), sha256=presentmon_hash) if args.presentmon else None,
+        toolUnchanged=tool_unchanged, supportPromotion=False, results=results,
+        status='pass' if unchanged and harnesses_unchanged and tool_unchanged and all(result['status'] == 'pass' for result in results) else 'fail')
     (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     return int(report['status'] != 'pass')
 

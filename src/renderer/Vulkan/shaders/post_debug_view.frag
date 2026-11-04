@@ -5,11 +5,10 @@
 // RB_ShowDepthBuffer); Vulkan does the same mapping in one full-screen pass.
 //
 // Intensity: the brightest channel j (0-255) shades from red at 0 through
-// green at 128 to blue at 255, exactly RB_ShowIntensity's ramp. Depth:
-// OpenGL writes raw float bits as colour bytes there (its conversion loop is
-// compiled out), which draws noise; this shows the depth value as grey, the
-// conversion that loop meant to do. fragUV is OpenGL's texture coordinate;
-// see post_ssao.frag.
+// green at 128 to blue at 255, exactly RB_ShowIntensity's byte ramp (black
+// wraps to zero). Depth is clamped to [0,1] and shown as grey, matching
+// RB_ShowDepthBuffer's float-to-byte conversion. fragUV is OpenGL's texture
+// coordinate; see post_ssao.frag.
 
 layout(set = 0, binding = 0) uniform sampler2D Source;
 

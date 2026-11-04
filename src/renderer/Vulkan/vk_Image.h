@@ -73,6 +73,7 @@ struct vkRenderTargetAttachments_t {
 };
 
 vkImageEntry_t *VK_Image_GetEntry( unsigned int texnum );
+int VK_Image_GetResidentCount( void );
 bool VK_Image_UseExplicitMipChain( unsigned int texnum );
 VkImageView VK_Image_GetAttachmentView( vkImageEntry_t *entry, int cubeFace );
 // Does not call EnsureDeviceHandle: the backend uses this to initialize it.

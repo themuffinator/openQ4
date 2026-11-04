@@ -270,6 +270,11 @@ public:
 	void		SetTexParameters();	// update aniso and trilinear
 
 	bool		IsLoaded() const { return texnum != TEXTURE_NOT_LOADED; }
+	// A reload must not resurrect file images purged with an earlier map.
+	// Active level/UI references also cover startup before a device exists.
+	bool IsReloadReferenced() const {
+		return IsLoaded() || !IsFileBacked() || referencedOutsideLevelLoad || levelLoadReferenced;
+	}
 	// Explicit diagnostic readback of mip zero. Only single-sample RGBA8 2D
 	// images are accepted; rows are bottom-up, with no filtering or color transfer.
 	bool		ReadPixelsRGBA8( idList<byte> &pixels );

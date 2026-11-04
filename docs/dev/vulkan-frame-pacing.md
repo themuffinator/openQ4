@@ -345,9 +345,10 @@ states and suitable presentation tracing on Intel remain open under VK-02.
 
 ### Foreground readiness and event observation (4 November 2026)
 
-The runner now waits for fifteen seconds without another openQ4 client before
-launch, then holds an engine command-file gate until the actual game window has
-owned foreground focus for three uninterrupted seconds. `windowFocusTest report`
+The runner now waits for fifteen seconds without another openQ4 client,
+dedicated server or known compiler/build process before launch, then holds an
+engine command-file gate until the actual game window has owned foreground
+focus for three uninterrupted seconds. `windowFocusTest report`
 identifies that window without changing focus. An explicitly authorized run may
 use `--request-focus` to invoke `windowFocusTest` instead: this cheat-gated
 development command requests focus once through SDL for an existing visible,
@@ -368,6 +369,80 @@ interruptions, same-process wrong windows, missing observations and interrupted
 readiness. These controls improve the fixture; they are not presentation results.
 An idle interval also does not replace waiting for an active MP test suite to
 finish before beginning a qualification run.
+
+The optional `--presentmon <console-executable>` collects a separate ETW display
+trace through Intel's portable [PresentMon console](https://github.com/GameTechDev/PresentMon/blob/v2.6.0/README-ConsoleApplication.md).
+The runner uses its v2 metric schema, disables input tracking, and never installs
+a service, injects code, registers a hotkey or replaces an existing trace session.
+The executable hash, command and raw CSV/log are retained. The tester supplies the
+tool; it is not part of the engine or release package. The local 2.6.0 executable
+has a valid signature and matches its published release SHA-256
+`b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af`.
+
+`--timing-source presentmon` permits a missing Vulkan present-wait report, but
+requires ETW display timing to meet the same 28 ms p99 budget. Available engine
+timing must still pass its existing gate. Displayed durations use nearest-rank
+percentiles and only complete intervals within the QPC-stamped foreground
+window. At least 120 displayed frames, a single PresentMon stream key, 95% interval coverage,
+continuous display intervals and zero reported event/buffer/present loss are
+required. Non-displayed presents are recorded separately from lost trace data.
+The raw hybrid-present indicator is retained; selected GPU identity alone still
+does not establish a direct display route. Permission/startup and synthetic
+parser controls do not qualify runtime presentation.
+
+### Coordinated foreground repeats (4 November 2026)
+
+The user-approved quiet window followed a completed MP test batch and held new
+game launches/builds in the active Awakening chats. It began at 13:17:40 UTC and
+was released at 13:27:12 UTC. The clean `3866569f` package ran the fixed
+airdefense1 camera at 1280×720, balanced/baseline, a 120 fps cap, swap interval 0
+and no MSAA or post AA. All six sampled intervals retained the exact game
+window's foreground ownership, with no intervening focus events, observer
+errors or competing game/build processes. AC power and the reported power state
+were unchanged. Mouse/controller input remained disabled.
+
+| Rendering adapter / repeat | ETW displayed p99 (ms) | Engine presented p99 (ms) | ETW maximum (ms) |
+| --- | ---: | ---: | ---: |
+| NVIDIA RTX 4060 Laptop, probe (reanalysed) | 11.7779 | 11.878 | 22.0940 |
+| NVIDIA, fresh repeat 1 | 11.8475 | 11.709 | 27.5162 |
+| NVIDIA, fresh repeat 2 | 11.2839 | 11.421 | 33.7555 |
+| Intel Iris Xe, repeat 1 | 20.8023 | unavailable | 50.0175 |
+| Intel, repeat 2 | 20.8484 | unavailable | 45.8209 |
+| Intel, repeat 3 | 20.8631 | unavailable | 45.7961 |
+
+Every p99 meets the unchanged 28 ms budget; the individual maximum intervals
+above are retained and are not claimed to meet a maximum-frame-time budget.
+Each trace has 54–55 loss-status observations with zero lost events, buffers or
+pending presents and more than 99.8% display-interval coverage. The three Intel
+runs contain 1,940/1,742/1,679 displayed frames and 476/651/702 non-displayed
+submissions in the CPU-time window; these compositor dispositions are distinct
+from trace loss. The engine's independent 256-frame CPU/GPU timing windows are
+retained, rather than substituting ETW's less precise CPU estimates for Vulkan.
+
+The first probe initially failed the status-log gate because PresentMon redirects
+wide output as BOM-marked UTF-16. Strict BOM-aware decoding fixes that harness
+error; UTF-8/UTF-16 zero-loss and loss controls pass. Its original failed report
+is unchanged. A separate, hash-checked reanalysis of its original CSV/log finds
+55 zero-loss observations and passes; it is not a new measurement. The other
+five runs passed directly with the corrected decoder.
+
+NVIDIA reports `Hardware Composed: Independent Flip`; Intel reports
+`Composed: Copy with GPU GDI`, with an implicit zero stream key rather than an
+available swapchain address. The [PresentMon consumer](https://github.com/GameTechDev/PresentMon/blob/v2.6.0/PresentData/PresentMonTraceConsumer.cpp)
+tracks that GDI copy through the target window and DWM. These are process-scoped
+display measurements, not verification of a Vulkan swapchain address or physical
+adapter-to-panel route. The raw hybrid flag is zero in both sets and does not
+establish either route. Verified direct/hybrid routing, alternate power states,
+the earlier failure conditions and the broader workload/platform matrix remain
+open; VK-02 is not closed by these results.
+
+Evidence is under `.tmp/vk-roadmap/presentation-foreground-nov4-{probe,nvidia,intel}/`;
+the immutable-input reanalysis and its source snapshot are in
+`presentation-foreground-nov4-analysis/`. Runtime, harness and tool hashes were
+unchanged during each run. `runtime-3866569f.zip` retains every file from the
+measured staged package, verified against the runtime manifest before later
+renderer builds (SHA-256
+`9dbe39c11394dab0af08b10194d37a66f5592e9fbaac3d60374c70de071da45e`).
 
 ## Next work
 

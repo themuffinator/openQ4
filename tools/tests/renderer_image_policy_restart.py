@@ -67,6 +67,7 @@ struct idImage {
  uint64_t identity=R_ImagePolicyNewResourceIdentity();uint64_t GetImagePolicyIdentity()const{return identity;}
  idImageOpts opts;bool loaded=true,defaulted=false,file=true;uint64_t storage=1;
  bool IsLoaded()const{return loaded;}bool IsDefaulted()const{return defaulted;}bool IsFileBacked()const{return file;}
+ bool IsReloadReferenced()const{return loaded||!file;}
  uint64_t GetStorageGeneration()const{return storage;}const idImageOpts& GetOpts()const{return opts;}
  void Reload(bool){
   ++reloads;

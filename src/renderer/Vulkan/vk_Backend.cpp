@@ -1741,12 +1741,14 @@ void R_RenderGraphResources_Shutdown( void ) {
 // render-graph pool, so report those instead.
 void R_RenderGraphResources_PrintGfxInfo( void ) {
 	VK_Device_PrintMemoryInfo();
+	common->Printf( "Vulkan images: resident=%d capacity=%d\n", VK_Image_GetResidentCount(), VK_MAX_IMAGES );
 	VK_Device_PrintPipelineInfo();
 }
 
 void R_RendererVulkanMemoryInfo_f( const idCmdArgs &args ) {
 	R_RenderThread_Sync( "resource profile" );
 	VK_Device_PrintMemoryInfo();
+	common->Printf( "Vulkan images: resident=%d capacity=%d\n", VK_Image_GetResidentCount(), VK_MAX_IMAGES );
 	VK_Device_PrintPipelineInfo();
 	VK_Exec_PrintResourceInfo( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "reset" ) == 0 );
 }

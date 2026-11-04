@@ -570,6 +570,8 @@ jobs:
             tools/tests/openxr_vr_menu_smoke.py \
             tools/tests/openxr_vr_mp_smoke.py \
             tools/tests/renderer_display_presentation.py \
+            tools/tests/renderer_debug_readback.py \
+            tools/tests/renderer_image_residency.py \
             tools/tests/renderer_gl_display_policy.py \
             tools/tests/sdl3_strict_window.py \
             tools/tests/ui_capture_display_device.py \
@@ -1017,6 +1019,8 @@ jobs:
           python tools/tests/renderer_settings_reports.py
           python tools/tests/openxr_vr_contract.py
           python tools/tests/renderer_display_presentation.py
+          python tools/tests/renderer_debug_readback.py
+          python tools/tests/renderer_image_residency.py
           python tools/tests/renderer_gl_display_policy.py
           python tools/tests/sdl3_strict_window.py
           python tools/tests/ui_capture_display_device.py

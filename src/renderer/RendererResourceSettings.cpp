@@ -620,7 +620,11 @@ renderImageOperation_t::~renderImageOperation_t() {
     } catch (const std::bad_alloc&) { FailLocked("Image receipt storage allocation failed"); }
 }
 bool R_ImagePolicyShouldReload(const idImage* image) {
-    Attempt* a = Current(); if (!a) return true;
+    if (!image) return false;
+    // Legacy restarts and reloadImages have no checked residency snapshot.
+    // Keep old maps' purged file handles lazy rather than reloading the entire
+    // session's catalogue and exhausting Vulkan's bounded image table.
+    Attempt* a = Current(); if (!a) return image->IsReloadReferenced();
     const auto it = a->images.find(image);
     return it == a->images.end() || it->second.resident;
 }

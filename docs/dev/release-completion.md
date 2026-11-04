@@ -6,6 +6,18 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Renderer restart residency and debug views, 4 November 2026
+
+- Video restarts keep textures from old maps unloaded, avoiding a reproduced
+  Vulkan image-table overflow after touring several stock maps. Active textures
+  and checked graphics-settings recovery retain their reload behavior.
+- OpenGL depth and intensity views cover the whole scene at render scales above
+  100%; their previous window-sized readback left part of a larger target
+  unconverted. Stencil statistics now use the actual attachment dimensions.
+- Native regression controls pass. Corrected GPU map-tour and debug-view
+  qualification is in progress; see [resource evidence](vulkan-resource-profiling.md)
+  and [capture evidence](vulkan-captures.md).
+
 ## Vulkan foreground qualification tooling, 4 November 2026
 
 - Visible pacing tests now wait for an idle test environment and sustained focus
@@ -15,6 +27,12 @@ See [player release status](../user/release-status.md).
   the tester has permission. Normal startup and input behavior are unchanged.
   Native and parser controls pass; presentation results and remaining conditions
   are recorded in [the pacing evidence](vulkan-frame-pacing.md).
+- An optional external PresentMon trace can measure displayed-frame pacing on
+  drivers without Vulkan present-wait timing. Three foreground measurements per
+  local adapter meet the unchanged p99 budget on AC power. The original UTF-16
+  parser failure is preserved with its corrected reanalysis; physical display
+  routes and other power states remain unqualified. The tool is not bundled
+  with the engine, and normal rendering/input behavior is unchanged.
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
 

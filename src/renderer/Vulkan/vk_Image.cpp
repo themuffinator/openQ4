@@ -64,6 +64,15 @@ Image table
 */
 static vkImageEntry_t vkImages[ VK_MAX_IMAGES ];
 static unsigned int vkImageGenerationCounter = 1;
+static bool vkImageTableWarned = false;
+
+int VK_Image_GetResidentCount( void ) {
+	int count = 0;
+	for ( int i = 0; i < VK_MAX_IMAGES; ++i ) {
+		if ( vkImages[ i ].inUse ) { ++count; }
+	}
+	return count;
+}
 
 vkImageEntry_t *VK_Image_GetEntry( unsigned int texnum ) {
 	if ( texnum == 0xFFFFFFFFu /* TEXTURE_NOT_LOADED */ || texnum >= VK_MAX_IMAGES || !vkImages[ texnum ].inUse ) {
@@ -75,10 +84,14 @@ vkImageEntry_t *VK_Image_GetEntry( unsigned int texnum ) {
 static int VK_Image_AllocSlot( void ) {
 	for ( int i = 0; i < VK_MAX_IMAGES; i++ ) {
 		if ( !vkImages[ i ].inUse ) {
+			vkImageTableWarned = false;
 			return i;
 		}
 	}
-	common->Warning( "Vulkan: image table exhausted (%d)", VK_MAX_IMAGES );
+	if ( !vkImageTableWarned ) {
+		vkImageTableWarned = true;
+		common->Warning( "Vulkan: image table exhausted (%d)", VK_MAX_IMAGES );
+	}
 	return -1;
 }
 

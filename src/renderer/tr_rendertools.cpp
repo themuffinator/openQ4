@@ -33,6 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "LevelShotDepth.h"
 #include "Model_local.h"
 #include "simplex.h"	// line font definition
+#include <climits>
 
 #define MAX_DEBUG_LINES			16384
 
@@ -421,6 +422,55 @@ typedef struct debugResolveCopy_s {
 static debugResolveCopy_t	rb_debugResolveCopies[2];
 static int					rb_debugResolveWarned[3] = { -1, -1, -1 };	// per buffer: the context generation it last warned in
 
+struct debugReadbackArea_t {
+	GLuint framebuffer;
+	int targetWidth, targetHeight;
+	int x, y, width, height;
+};
+
+// Colour/depth tools redraw the active viewport. Stencil statistics describe
+// the complete attachment, as Vulkan's deferred readback does. Neither may
+// use the window extent for a scaled game target or a VR stand-in.
+static bool RB_GetDebugReadbackArea( bool viewport, debugReadbackArea_t &area ) {
+	GLint framebuffer = 0;
+	if ( glBindFramebuffer != NULL ) {
+		glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &framebuffer );
+	}
+	area.framebuffer = static_cast<GLuint>( framebuffer );
+	area.targetWidth = glConfig.vidWidth;
+	area.targetHeight = glConfig.vidHeight;
+	if ( framebuffer != 0 ) {
+		idRenderTexture *target = backEnd.renderTexture;
+		if ( target == NULL || target->GetDeviceHandle() != area.framebuffer ) {
+			target = R_GetDefaultRenderTarget();
+		}
+		if ( target == NULL || target->GetDeviceHandle() != area.framebuffer ) {
+			return false;
+		}
+		area.targetWidth = target->GetWidth();
+		area.targetHeight = target->GetHeight();
+	}
+	// All callers allocate at most four bytes per pixel through the renderer's
+	// signed-size allocator. Check before either multiplication or allocation.
+	if ( area.targetWidth <= 0 || area.targetHeight <= 0
+		|| area.targetWidth > INT_MAX / 4 / area.targetHeight ) {
+		return false;
+	}
+	area.x = area.y = 0;
+	area.width = area.targetWidth;
+	area.height = area.targetHeight;
+	if ( viewport ) {
+		GLint rectangle[4];
+		glGetIntegerv( GL_VIEWPORT, rectangle );
+		area.x = rectangle[0]; area.y = rectangle[1];
+		area.width = rectangle[2]; area.height = rectangle[3];
+	}
+	return area.x >= 0 && area.y >= 0 && area.width > 0 && area.height > 0
+		&& area.x <= area.targetWidth && area.y <= area.targetHeight
+		&& area.width <= area.targetWidth - area.x
+		&& area.height <= area.targetHeight - area.y;
+}
+
 // 0 color, 1 depth, 2 stencil
 static int RB_ReadbackBuffer( GLenum format ) {
 	if ( format == GL_DEPTH_COMPONENT ) {
@@ -551,12 +601,12 @@ static GLuint RB_ResolveForReadback( GLuint source, GLenum format, int width, in
 ===================
 RB_ReadFramebufferPixels
 
-glReadPixels of the screen-sized lower left corner of the framebuffer the view
-draws into, resolved first when that is multisampled. Returns false, after a
+glReadPixels of the validated rectangle in the framebuffer the view draws into,
+resolved at the attachment's full extent when multisampled. Returns false, after a
 one-time warning, when the resolve failed and there is nothing to read.
 ===================
 */
-static bool RB_ReadFramebufferPixels( GLenum format, GLenum type, void *pixels ) {
+static bool RB_ReadFramebufferPixels( const debugReadbackArea_t &area, GLenum format, GLenum type, void *pixels ) {
 	GLint readFramebuffer = 0;
 	GLint drawFramebuffer = 0;
 	GLint sampleBuffers = 0;
@@ -564,6 +614,9 @@ static bool RB_ReadFramebufferPixels( GLenum format, GLenum type, void *pixels )
 		glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &readFramebuffer );
 		glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer );
 		glGetIntegerv( GL_SAMPLE_BUFFERS, &sampleBuffers );		// the draw framebuffer's
+	}
+	if ( static_cast<GLuint>( drawFramebuffer ) != area.framebuffer ) {
+		return false;
 	}
 
 	// Read what the tools draw into. The default framebuffer reads back
@@ -573,7 +626,7 @@ static bool RB_ReadFramebufferPixels( GLenum format, GLenum type, void *pixels )
 	const bool resolve = ( source != 0 && sampleBuffers > 0 );
 	if ( resolve ) {
 		GL_CheckErrors();	// report what is pending, so an error below is the resolve's
-		source = RB_ResolveForReadback( source, format, glConfig.vidWidth, glConfig.vidHeight );
+		source = RB_ResolveForReadback( source, format, area.targetWidth, area.targetHeight );
 	}
 
 	const bool read = ( !resolve || source != 0 );
@@ -581,9 +634,11 @@ static bool RB_ReadFramebufferPixels( GLenum format, GLenum type, void *pixels )
 		if ( glBindFramebuffer != NULL ) {
 			glBindFramebuffer( GL_READ_FRAMEBUFFER, source );
 		}
+		GLint packAlignment = 4;
+		glGetIntegerv( GL_PACK_ALIGNMENT, &packAlignment );
 		glPixelStorei( GL_PACK_ALIGNMENT, 1 );	// stencil rows are not padded to 4 bytes
-		glReadPixels( 0, 0, glConfig.vidWidth, glConfig.vidHeight, format, type, pixels );
-		glPixelStorei( GL_PACK_ALIGNMENT, 4 );
+		glReadPixels( area.x, area.y, area.width, area.height, format, type, pixels );
+		glPixelStorei( GL_PACK_ALIGNMENT, packAlignment );
 	}
 	if ( glBindFramebuffer != NULL ) {
 		glBindFramebuffer( GL_READ_FRAMEBUFFER, static_cast<GLuint>( readFramebuffer ) );
@@ -612,17 +667,22 @@ void RB_ScanStencilBuffer( void ) {
 	int		counts[256];
 	int		i;
 	byte	*stencilReadback;
+	debugReadbackArea_t area;
+	if ( !RB_GetDebugReadbackArea( false, area ) ) {
+		common->Printf( "stencil values: the active framebuffer extent is unavailable\n" );
+		return;
+	}
 
 	memset( counts, 0, sizeof( counts ) );
 
-	stencilReadback = (byte *)R_StaticAlloc( glConfig.vidWidth * glConfig.vidHeight );
-	if ( !RB_ReadFramebufferPixels( GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, stencilReadback ) ) {
+	stencilReadback = (byte *)R_StaticAlloc( area.width * area.height );
+	if ( !RB_ReadFramebufferPixels( area, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, stencilReadback ) ) {
 		R_StaticFree( stencilReadback );
 		common->Printf( "stencil values: the stencil buffer could not be read back\n" );
 		return;
 	}
 
-	for ( i = 0; i < glConfig.vidWidth * glConfig.vidHeight; i++ ) {
+	for ( i = 0; i < area.width * area.height; i++ ) {
 		counts[ stencilReadback[i] ]++;
 	}
 
@@ -648,27 +708,31 @@ Print an overdraw count based on stencil index values
 */
 #if !defined( OPENQ4_RENDERER_VK_MODULE )	// Vulkan: Vulkan/vk_DebugTools.cpp
 void RB_CountStencilBuffer( void ) {
-	int		count;
+	double	count;
 	int		i;
 	byte	*stencilReadback;
+	debugReadbackArea_t area;
+	if ( !RB_GetDebugReadbackArea( false, area ) ) {
+		common->Printf( "overdraw: the active framebuffer extent is unavailable\n" );
+		return;
+	}
 
-
-	stencilReadback = (byte *)R_StaticAlloc( glConfig.vidWidth * glConfig.vidHeight );
-	if ( !RB_ReadFramebufferPixels( GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, stencilReadback ) ) {
+	stencilReadback = (byte *)R_StaticAlloc( area.width * area.height );
+	if ( !RB_ReadFramebufferPixels( area, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, stencilReadback ) ) {
 		R_StaticFree( stencilReadback );
 		common->Printf( "overdraw: the stencil buffer could not be read back\n" );
 		return;
 	}
 
 	count = 0;
-	for ( i = 0; i < glConfig.vidWidth * glConfig.vidHeight; i++ ) {
+	for ( i = 0; i < area.width * area.height; i++ ) {
 		count += stencilReadback[i];
 	}
 
 	R_StaticFree( stencilReadback );
 
 	// print some stats (not supposed to do from back end in SMP...)
-	common->Printf( "overdraw: %5.1f\n", (float)count/(glConfig.vidWidth * glConfig.vidHeight)  );
+	common->Printf( "overdraw: %5.1f\n", (float)( count / ( area.width * area.height ) ) );
 }
 #endif
 
@@ -1113,14 +1177,18 @@ void RB_ShowIntensity( void ) {
 	if ( !r_showIntensity.GetBool() ) {
 		return;
 	}
+	debugReadbackArea_t area;
+	if ( !RB_GetDebugReadbackArea( true, area ) ) {
+		return;
+	}
 
-	colorReadback = (byte *)R_StaticAlloc( glConfig.vidWidth * glConfig.vidHeight * 4 );
-	if ( !RB_ReadFramebufferPixels( GL_RGBA, GL_UNSIGNED_BYTE, colorReadback ) ) {
+	colorReadback = (byte *)R_StaticAlloc( area.width * area.height * 4 );
+	if ( !RB_ReadFramebufferPixels( area, GL_RGBA, GL_UNSIGNED_BYTE, colorReadback ) ) {
 		R_StaticFree( colorReadback );
 		return;
 	}
 
-	c = glConfig.vidWidth * glConfig.vidHeight * 4;
+	c = area.width * area.height * 4;
 	for ( i = 0; i < c ; i+=4 ) {
 		j = colorReadback[i];
 		if ( colorReadback[i+1] > j ) {
@@ -1153,7 +1221,7 @@ void RB_ShowIntensity( void ) {
 	RB_BindNullDebugImage();
 	glMatrixMode( GL_MODELVIEW );
 
-	glDrawPixels( glConfig.vidWidth, glConfig.vidHeight, GL_RGBA , GL_UNSIGNED_BYTE, colorReadback );
+	glDrawPixels( area.width, area.height, GL_RGBA , GL_UNSIGNED_BYTE, colorReadback );
 
 	R_StaticFree( colorReadback );
 }
@@ -1174,6 +1242,10 @@ void RB_ShowDepthBuffer( void ) {
 	if ( !r_showDepth.GetBool() ) {
 		return;
 	}
+	debugReadbackArea_t area;
+	if ( !RB_GetDebugReadbackArea( true, area ) ) {
+		return;
+	}
 
 	glPushMatrix();
 	glLoadIdentity();
@@ -1190,17 +1262,17 @@ void RB_ShowDepthBuffer( void ) {
 	glColor3f( 1, 1, 1 );
 	RB_BindNullDebugImage();
 
-	depthReadback = R_StaticAlloc( glConfig.vidWidth * glConfig.vidHeight*4 );
-	memset( depthReadback, 0, glConfig.vidWidth * glConfig.vidHeight*4 );
+	depthReadback = R_StaticAlloc( area.width * area.height*4 );
+	memset( depthReadback, 0, area.width * area.height*4 );
 
-	if ( !RB_ReadFramebufferPixels( GL_DEPTH_COMPONENT, GL_FLOAT, depthReadback ) ) {
+	if ( !RB_ReadFramebufferPixels( area, GL_DEPTH_COMPONENT, GL_FLOAT, depthReadback ) ) {
 		R_StaticFree( depthReadback );
 		return;
 	}
 
 	// each depth becomes a grey level, in place: the four bytes of float i
 	// turn into the RGBA of pixel i
-	for ( int i = 0 ; i < glConfig.vidWidth * glConfig.vidHeight ; i++ ) {
+	for ( int i = 0 ; i < area.width * area.height ; i++ ) {
 		const byte grey = idMath::Ftob( 255.0f * ((float *)depthReadback)[i] + 0.5f );
 		((byte *)depthReadback)[i*4+0] = grey;
 		((byte *)depthReadback)[i*4+1] = grey;
@@ -1208,7 +1280,7 @@ void RB_ShowDepthBuffer( void ) {
 		((byte *)depthReadback)[i*4+3] = 255;
 	}
 
-	glDrawPixels( glConfig.vidWidth, glConfig.vidHeight, GL_RGBA , GL_UNSIGNED_BYTE, depthReadback );
+	glDrawPixels( area.width, area.height, GL_RGBA , GL_UNSIGNED_BYTE, depthReadback );
 	R_StaticFree( depthReadback );
 }
 #endif

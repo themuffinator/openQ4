@@ -423,8 +423,15 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   results do not replace the required foreground/direct/hybrid/power controls.
   Progress, 4 November: readiness now requires an idle environment and sustained
   focus on the identified game window; foreground events also reject brief
-  interruptions between polls. The native and observer controls pass. An active
-  MP suite must finish before running the next visible qualification repeats.
+  interruptions between polls. The native and observer controls pass. A
+  [coordinated quiet window](vulkan-frame-pacing.md#coordinated-foreground-repeats-4-november-2026)
+  after a completed MP batch now supplies three foreground measurements per
+  adapter: NVIDIA ETW p99 11.28–11.85 ms and Intel 20.80–20.86 ms, all within
+  the unchanged 28 ms budget with zero trace loss and no observed contention.
+  The first NVIDIA probe is qualified by a separate immutable-input reanalysis
+  after fixing UTF-16 status-log decoding; its failed original is retained.
+  Intel's GDI stream has no available swapchain address. Physical display
+  routing, alternate power states and the broader matrix remain open.
 - [x] **VK-03 — P1, implementation: finish bounded device admission and recovery.**
   Audit fixed-size instance/extension enumeration, optional extension truncation,
   the explicit-device index limit and retry after later resource/device creation
@@ -517,6 +524,11 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   descriptor churn. The linked profile records measured reasons to defer new
   cache/warm-up, indirect/Hi-Z, parallel-recording and transfer mechanisms;
   it does not promote an optimization or close the broader timing/soak gates.
+  Progress, 4 November: a longer stock-map tour reproduced table exhaustion at
+  a video restart because old maps' purged images were reloaded. The
+  [residency correction](vulkan-resource-profiling.md#restart-residency-failure-4-november-2026)
+  keeps those handles lazy, preserves checked recovery and reports live image
+  slots. Native controls pass; corrected GPU tour qualification remains pending.
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,
@@ -535,6 +547,11 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   fail screenshots, stop incomplete cubemaps and prevent incomplete probe reloads.
   Arbitrary nested targets and the remaining debug/readback combinations stay
   open; this fixture does not qualify all of VK-07.
+  Progress, 4 November: [debug-view comparisons](vulkan-captures.md#debug-view-qualification-fixture-4-november-2026)
+  pass 25 pairs at each of 0x/4x/8x MSAA for 50–100% game-owned scene targets.
+  Larger-target probes exposed GL debug readbacks using window dimensions;
+  active-viewport/attachment sizing now corrects that path. Native extent,
+  MSAA and state-restoration controls pass; expanded GPU qualification is pending.
 
 ## Modern rendering engine
 

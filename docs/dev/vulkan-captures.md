@@ -65,10 +65,12 @@ contracts pass.
 
 ## Remaining scope
 
-GL debug readbacks cover the whole window from (0,0); Vulkan intensity and depth
-views cover the view viewport, so a cropped `r_screenFraction` view differs.
-Vulkan's overdraw denominator is the active target's extent. `glReadPixels`
-always reads the frame image, not a bound render target as GL does. Arbitrary
+GL and Vulkan intensity/depth tools now cover the active viewport, and stencil
+statistics use the attachment extent. Actual legacy cropped, offset and nested
+viewports still need separate GPU comparisons. Setting `r_resolutionScaleMode 0` alone
+does not exercise that path when the game owns a resampled scene target.
+Vulkan's general `glReadPixels` shim always reads the frame image, not a bound
+render target as GL does. Arbitrary
 nested views and the remaining debug-view combinations still need GL-contract
 comparisons; the bounded capture sequence below does not qualify them.
 
@@ -102,3 +104,37 @@ in the new command arguments and is retained as a failed harness run in
 The screenshot, display-presentation and PBR material contracts also pass.
 These results qualify this fixture and its tested boundaries, not every
 portal/nested-view, stencil interpretation or capture failure combination.
+
+## Debug-view qualification fixture (4 November 2026)
+
+`renderer_debug_capture.py` extends the same original laboratory with depth and
+intensity captures at 50%, 75%, 100%, 125%, 150% and 200% render scale, then image reload and partial
+and full video restarts. Reduced scales cover resampled game-owned scene targets
+with resolution modes 0 and 1; they do not cover the legacy cropped viewport.
+Each case records and verifies the latched scene/output extents, checks that
+reduced scale changes sampling, and requires both mode settings to retain the
+same resampled result. It checks grayscale depth, the inherited byte-domain
+intensity ramp (including its black wrap), exact recovery within each backend,
+and the existing two-display-level GL/Vulkan comparison. The scene is frozen,
+HUD and input are disabled, and all images come from engine screenshots. MSAA
+counts are separate runs. The balanced preset and retained UI are pinned before
+startup so GPU detection cannot insert an automatic preset restart. Runtime
+evidence is required before these controls can close a VK-07 debug-view gate.
+
+The initial balanced 25-case sequence (50–100%) passes on both backends at
+0x, 4x and 8x MSAA, with exact restart/reload recovery and at most one display
+level between paired images. A separate 12-case larger-target probe exposed
+five failing GL/Vulkan pairs: GL read and redrew only the window-sized corner
+of the larger scene attachment. At 150% and 200%, even the depth output was
+partly left in colour. The failed reports are retained under
+`.tmp/vk-roadmap/debug-superscale-{gl0,vk0}/` and
+`debug-superscale-before-comparison/`.
+
+GL debug colour/depth readbacks now use the validated active viewport, with
+allocation and draw dimensions matching that rectangle. MSAA resolves use the
+actual attachment extent, and stencil statistics use its complete extent.
+The helper preserves read/draw framebuffer bindings and pack alignment and
+refuses unknown targets, out-of-bounds rectangles and allocation-size overflow.
+Native controls execute the actual functions for window, scaled, offset and VR
+stand-in targets, MSAA success/failure and state restoration. The expanded
+34-case GPU sequence remains to be qualified on the corrected build.

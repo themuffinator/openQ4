@@ -94,3 +94,23 @@ Decisions for this workload:
 No optimization is promoted from these short intervals. Long-session plateaus,
 matching-output comparisons and improved frame-time tails remain required for
 any future resource/submission change under VK-06.
+
+## Restart residency failure (4 November 2026)
+
+A stock map tour on the clean `3866569f` build reproduced image-table exhaustion
+at the fifth map's video restart, after airdefense1, hangar1, convoy1 and hub1
+followed by medlabs. The restart reloaded file handles already purged from
+earlier maps; the 4096-entry table filled and logged 2,023 repeated warnings.
+The owned failing run was stopped and the queued Intel baseline was cancelled.
+Its raw logs, captures, configuration and unchanged runtime identity remain in
+`.tmp/vk-roadmap/soak-nov4/aborted-report.json`; this is failed, incomplete soak
+evidence.
+
+Ordinary reloads now leave purged, unreferenced file images lazy. Loaded images,
+active map/UI references and generated targets still reload. Checked settings
+recovery retains its explicit residency snapshot as the authority. Table-full
+warnings are limited to one per continuous exhaustion episode, and
+`rendererVulkanMemoryInfo` now includes the resident image count and capacity.
+Native controls cover a 12,000-handle catalogue with only 2,401 referenced
+images, checked-recovery selection, all 4096 slots and warning recovery after a
+slot becomes available. A corrected stock-map repeat is still required.
