@@ -39,6 +39,9 @@ See [player release status](../user/release-status.md).
 
 ## Smoother retained weapon scopes, 4 November 2026
 
+- The railgun aperture and nailgun hooks/ring now have smooth vector contours
+  instead of serrated outlines. The ring's intentional notches remain, along
+  with the scope performance improvements below.
 - Turning and tracking targets with the railgun and nailgun scopes no longer
   rebuild their moving decorations every frame. The machinegun compass benefits
   too, and the nailgun caches its glow while lock strength changes. Motion, lock

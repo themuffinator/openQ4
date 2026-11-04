@@ -2887,6 +2887,9 @@ the HUD, and the field of view changes over 100 ms.
 the aim point, and its outermost layer reaches the screen edges: the
 machinegun's veil, the railgun's haze or the nailgun's surround.
 Nothing stretches, and the marks are vector geometry at every resolution.
+Curved scope outlines use smooth arcs/Bezier curves, not stair steps traced
+around source texels. Preserve the rail aperture's shoulders and ring bite,
+the nailgun's sharp hook tips and the rotating ring's deliberate notches.
 Remastered applies a separable Gaussian soft focus outside every scope, with
 13.5 dp sigma and 0.86 saturation. A 38 u feather follows each aperture's
 circle or diamond, leaving the sight interior sharp and covering every outer

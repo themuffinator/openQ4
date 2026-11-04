@@ -59,6 +59,30 @@ logs are under `.tmp/scope-performance/` (`final-gl/report.json`,
 `final-vulkan/report.json`, `native-final.log`, `cpu-comparison.json`). Full
 GPU/platform/resource-cycle qualification remains open.
 
+### Smooth scope contours
+
+The 4 November scope contour follow-up replaces raster-sized staircase segments
+in `rail_ap`, `nail_hook` and `nail_ring2` with authored straight lines and cubic
+curves. These geometric teeth existed before the moving-mesh optimization and
+were visible even on the antialiased stationary aperture/hooks. The nail ring
+now has a circular 252 u outer boundary and 225/242 u inner arcs, preserving its
+four broad notched sectors and its measured (320,241) center. Hook tips and
+symmetry, the rail's rounded shoulders and ring bite, colors and animation
+bindings remain. The path reader preserves cubic/quadratic commands instead
+of flattening authored curves to source-resolution polygons.
+
+Contour tests bound the outer ring's radial error below 0.1 source unit and
+check inner notches and mirrored hooks; the old staircase fails that check.
+The native optics suite still bounds moving compilation at 1080p, 4K and
+portrait. Isolated 1080p scope CPU medians remain 0.024 ms (rail) and 0.040 ms
+(nail), with median zero path compilation/uploads. Both staged 1080p OpenGL
+and Vulkan gameplay probes pass, with unchanged runtime hashes, no retained
+warnings or geometry overflow, and engine screenshots confirming smooth
+moving and locked contours. Whole-game frame timings remain subject to other
+concurrent workloads and are not a controlled FPS comparison. Local evidence
+is in `.tmp/scope-contours/` (`optics.log`, `railgun-cpu.json`, `nailgun-cpu.json`,
+`final-gl/report.json` and `final-vulkan/report.json`).
+
 ## Original caching checkpoint
 
 8 September 2026. This checkpoint adds runtime CPU measurements and removes
