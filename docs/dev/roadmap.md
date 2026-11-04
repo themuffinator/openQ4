@@ -1761,6 +1761,9 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   occupied marine cover. Script checks now report failures in release builds.
   A third pass replaces M04's constant global siren and computer alarm loops
   with quieter, localized reminders, preserving console shutoff and old saves.
+  A fourth pass makes the security override one-time and prevents late camera
+  destruction from starting an early or duplicate turret-room door hack.
+  Fitted camera bounds remove the upper cell door overlap that blocked startup.
   Focused runtime and production-method probes cover these states; complete
   mission playthroughs and the other campaign acceptance gates remain open.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve

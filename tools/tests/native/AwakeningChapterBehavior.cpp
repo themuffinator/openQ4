@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <map>
 #include <string>
 #include <vector>
@@ -14,6 +15,10 @@ struct idMath {
 };
 struct idDict {
     std::map<std::string,float> numbers;
+    std::map<std::string,std::string> strings;
+    const char* GetString(const char* key) const {
+        auto i=strings.find(key);return i==strings.end()?"":i->second.c_str();
+    }
     idVec3 radius{320,320,320};
     int GetInt(const char* key,const char* fallback="0") const { return int(GetFloat(key,fallback)); }
     float GetFloat(const char* key,const char* fallback="0") const {
@@ -41,6 +46,7 @@ struct Targets : std::vector<EntityRef> {
     int Num() const { return int(size()); }
 };
 struct Game {
+    int time=100;
     std::map<std::string,idDict> damageDefs;
     int warnings=0;
     const idDict* FindEntityDefDict(const char* key,bool) {
@@ -71,6 +77,38 @@ struct riFireFX : idTrigger {
     void UpdateContents();
     void ShrinkTargetLights(int);
     void hit(const char* def) { Damage(nullptr,nullptr,{},def,1,-1); }
+};
+
+struct idStr { static int Icmp(const char* a,const char* b) { return std::strcmp(a,b); } };
+constexpr int ANIMCHANNEL_ALL=0,SRESULT_WAIT=1;
+using stateResult_t=int;
+struct stateParms_t {};
+struct idAnim {
+    std::string name;
+    const char* Name() const { return name.c_str(); }
+};
+struct AnimBlend {
+    idAnim anim;
+    const idAnim* Anim() const { return anim.name.empty()?nullptr:&anim; }
+};
+struct Animator {
+    AnimBlend blend;
+    int starts=0;
+    AnimBlend* CurrentAnim(int) { return &blend; }
+    int GetAnim(const char* name) const { return std::string(name)=="idle"?1:2; }
+    void CycleAnim(int,int anim,int,int) { blend.anim.name=anim==1?"idle":"scan"; ++starts; }
+};
+struct riMonsterTurret {
+    idDict spawnArgs;
+    struct { idEntity* ent=nullptr; } enemy;
+    bool visible=false;
+    int searches=0,faces=0,actions=0;
+    Animator animator;
+    void CheckForEnemy(bool) { ++searches; }
+    bool IsEnemyVisible() const { return enemy.ent && visible; }
+    void FaceEnemy() { ++faces; }
+    void UpdateAction() { ++actions; }
+    stateResult_t State_Combat(const stateParms_t&);
 };
 
 // @PRODUCTION_METHODS@
@@ -117,4 +155,32 @@ int main() {
     disabled.hit("missing");
     assert(gameLocal.warnings==1);
     std::puts("PASS: freeze filtering, fractional light dimming, shared lights, overkill, stages, one-shot targets, active/off/out collision");
+    riMonsterTurret camera;
+    camera.spawnArgs.strings["scanAnim"]="scan";
+    camera.enemy.ent=&light; // teammate supplied a distant, unseen target before wakeup
+    assert(camera.State_Combat({})==SRESULT_WAIT);
+    assert(camera.animator.blend.anim.name=="scan" && camera.faces==0 && camera.actions==0);
+    for(int i=0;i<100;++i) camera.State_Combat({});
+    assert(camera.animator.starts==1); // the sweep must be allowed to advance
+    camera.visible=true;
+    camera.State_Combat({});
+    assert(camera.animator.blend.anim.name=="idle" && camera.faces==1 && camera.actions==1);
+    camera.State_Combat({});
+    assert(camera.animator.starts==2);
+    camera.visible=false;
+    camera.State_Combat({});
+    assert(camera.animator.blend.anim.name=="scan" && camera.faces==2);
+    camera.enemy.ent=nullptr;
+    camera.State_Combat({});
+    assert(camera.searches==1 && camera.animator.starts==3);
+    riMonsterTurret visibleOnWake;
+    visibleOnWake.spawnArgs.strings["scanAnim"]="scan";
+    visibleOnWake.enemy.ent=&light; visibleOnWake.visible=true;
+    visibleOnWake.State_Combat({});
+    assert(visibleOnWake.animator.blend.anim.name=="idle");
+    riMonsterTurret combatTurret; // no scanAnim: retain the normal turret path
+    combatTurret.State_Combat({});
+    assert(combatTurret.searches==1 && combatTurret.faces==1 && combatTurret.actions==1);
+    assert(combatTurret.animator.starts==0);
+    std::puts("PASS: camera wake pose, uninterrupted sweep, visible/occluded/lost target transitions, normal turret control");
 }

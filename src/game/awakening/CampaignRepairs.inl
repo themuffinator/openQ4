@@ -22,7 +22,10 @@ static int Awakening_PrepareCampaignRepairs( idMapFile *map ) {
 	const bool originalFunctions = chapter == 3 ?
 		gameLocal.program.FindFunction( "map_m03aa::engineFireOut" ) != NULL &&
 		gameLocal.program.FindFunction( "map_m03aa::dropshiphealthcheck" ) != NULL :
-		gameLocal.program.FindFunction( "cellblock1UpperSpawnMove" ) != NULL;
+		gameLocal.program.FindFunction( "cellblock1UpperSpawnMove" ) != NULL &&
+		gameLocal.program.FindFunction( "unlockSecRoomDoors" ) != NULL &&
+		gameLocal.program.FindFunction( "squadTopLoop7Pos" ) != NULL &&
+		gameLocal.program.FindFunction( "cellblock3_prisoners" ) != NULL;
 	bool anchorA = false, anchorB = false;
 	for ( int i = 1; i < map->GetNumEntities(); ++i ) {
 		const idDict &args = map->GetEntity( i )->epairs;
@@ -39,7 +42,7 @@ static int Awakening_PrepareCampaignRepairs( idMapFile *map ) {
 		return 0;
 	}
 	const char *script = chapter == 3 ? "scripts/openq4/awakening/m03_airassault.script" :
-		"scripts/openq4/awakening/m04_prison_v2.script";
+		"scripts/openq4/awakening/m04_prison_v3.script";
 	if ( fileSystem->ReadFile( script, NULL, NULL ) <= 0 ) {
 		gameLocal.Warning( "Awakening m%02d repairs unavailable: missing %s", chapter, script );
 		return 0;
@@ -57,6 +60,14 @@ static void Awakening_RepairMapArgs( int chapter, idDict &args ) {
 		args.Set( "gui_Parm3", "oq4_m03::restartEngine" );
 	} else if ( chapter == 4 ) {
 		Awakening_RepairPrisonAlarm( args );
+		if ( !idStr::Icmp( name, "trigger_relay_15" ) &&
+			!idStr::Icmp( args.GetString( "call" ), "unlockSecRoomDoors" ) ) {
+			args.Set( "call", "oq4_m04_v3::unlockSecurity" );
+		}
+		if ( !idStr::Icmp( name, "trigger_once_155" ) &&
+			!idStr::Icmp( args.GetString( "call" ), "gruntAndGunnerAttack" ) ) {
+			args.Set( "call", "oq4_m04_v3::turretApproach" );
+		}
 		if ( !idStr::Icmp( name, "tunnel_bot" ) &&
 			!idStr::Icmp( args.GetString( "script_init" ), "tunnelReparBotWorking" ) ) {
 			args.Set( "script_init", "oq4_m04::tunnelRepair" );
@@ -66,6 +77,14 @@ static void Awakening_RepairMapArgs( int chapter, idDict &args ) {
 		if ( !idStr::Icmp( args.GetString( "classname" ), "env_q4x_prison_camera" ) &&
 			!idStr::Icmp( args.GetString( "script_init" ), "secCamStart" ) ) {
 			args.Delete( "script_init" );
+			if ( !args.FindKey( "mins" ) && !args.FindKey( "maxs" ) && !args.FindKey( "size" ) ) {
+				// The def's upright actor box reaches into the upper cell doors,
+				// keeping camera 8 in Wait_Activated. The hanging camera's idle/scan
+				// bounds span z=-35.16..3.80 and a horizontal radius below 31 units.
+				// Cover its complete sweep at any map yaw without changing its pose.
+				args.Set( "mins", "-32 -32 -36" );
+				args.Set( "maxs", "32 32 4" );
+			}
 		}
 		const bool upper = !idStr::Icmp( name, "target_null_41" ) || !idStr::Icmp( name, "target_null_42" );
 		const bool lower = !idStr::Icmp( name, "target_null_47" ) || !idStr::Icmp( name, "target_null_48" );

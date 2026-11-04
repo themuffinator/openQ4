@@ -83,6 +83,29 @@ encounter activation are part of that choreography, not decorative markers.
   every 19–29 seconds. They remain local machinery ambience rather than an
   additional level-wide security warning. These timings and levels are an
   editorial refinement inferred from the security sequence and dialogue.
+- The security override console now completes once and then becomes
+  noninteractive. Its reusable relay previously moved both shutters another
+  120 units and toggled the disabled alarm back on with every additional press.
+  Completion is claimed before deferred dialogue, so repeated activations
+  cannot race it. The completed GUI state and script flag serialize normally.
+- The turret-room approach chooses its camera branch once. Previously,
+  destroying camera 8 during the staggered grunt/gunner arrival also started
+  the bypass, allowing the door hack before the attackers died and starting
+  another copy when their death counter fired. Both paths now use the existing
+  one-shot hack relay; the ambush retains its authored timing and jump.
+  The separately appended `m04_prison_v3.script` preserves older helper files.
+- Prison cameras use collision bounds fitted to their hanging model and full
+  scan animation: a 32-unit horizontal half-width and z=-36..4, instead of the
+  inherited z=0..74 actor box. Camera 8's old box overlapped
+  `cellblk3_UPRspawndoor_4`, leaving it hidden, invulnerable and waiting to
+  activate. The repair preserves camera origins, viewing angles and health,
+  and respects explicit map bounds. `aiDumpState -v` now identifies solid
+  blockers when diagnosing a hidden AI that cannot wake.
+  A second startup fault left the camera without any animation when a
+  teammate supplied an unseen enemy before its first combat frame. It now
+  initializes its pose, sweeps while the target is occluded and uses the idle
+  tracking pose when the target becomes visible, without restarting the sweep
+  every frame. Combat turrets without `scanAnim` retain their original path.
 - The shared fire-volume repair from M01/M02 is retained. Directly quenching a
   large fire now skips creating an intermediate small-fire effect, stops the
   old stages and aims the new stage immediately as well as after deferred
@@ -202,6 +225,38 @@ offset is -10 while seated and returns to zero on exit. The engine screenshot
 also shows five loaded indicators, the selected launcher and a locked reticle.
 Gameplay/CI contracts and repository path checks pass. Full playthroughs,
 Linux/macOS runtime qualification and the other Q4-04 gates remain open.
+
+The fourth-pass Windows build/stage and gameplay, CI and path contracts pass.
+`awakening_prison_runtime.py` uses real map relays, normal damage and the
+authored death counter; no console script is compiled into its saves. Its
+OpenGL results under `.tmp/awakening-m03-m04/` are:
+
+| Evidence directory | Result |
+| --- | --- |
+| `round4-console-baseline/` | Previous binary reproduces 120 additional shutter units and a restarted alarm on the second activation. |
+| `round4-console-fixed/`, `round4-console-restore/` | Repeat use keeps both shutters stationary and the alarm off; completed GUI state survives a fresh-process restore. The real OpenAL mixer uses null output. |
+| `round4-camera-blocker/` | Diagnostic identifies the upper cell door preventing camera startup; not an acceptance run. |
+| `round4-original-qualified/` | Original installed encounter function, with the camera now functional, reproduces one premature hack and a second after the two deaths. |
+| `round4-early-qualified/` | Early camera destruction bypasses the ambush and starts one hack; the gunner stays hidden. |
+| `round4-late-qualified/`, `round4-alive-qualified/` | Camera wakes/scans; late destruction or leaving it alive keeps the hack gated on both deaths and starts it once. |
+| `round4-pending/`, `round4-pending-restore/` | Save during the initial delay, with the camera destroyed and both attackers still hidden; a new process resumes the ambush and waits for both deaths. |
+
+The engine capture in `round4-alive-qualified/` shows the hanging camera in
+gameplay. Rendering is skipped during most later sequence probes to reduce
+GPU contention, then enabled for the engine screenshot. Earlier diagnostics
+include an observer inside the ambush trigger and a helper compilation error;
+their failure reports are retained and are not acceptance evidence.
+`round4-native/` compiles the actual camera state method and checks initial
+unseen/visible targets, an uninterrupted sweep, loss/reacquisition of visibility
+and the ordinary combat turret path. The existing fire-volume controls also
+pass. This remains focused encounter qualification, not a full playthrough or
+physical GUI interaction test.
+
+An unrelated existing multi-screen GUI setter issue was also observed:
+`Event_SetGuiParm` repeatedly prepends `gui_` while iterating screens, leaving
+redundant `gui_gui_noninteractive` spawn arguments. Each screen still receives
+the correct `noninteractive` state, so it does not invalidate the console fix.
+The shared setter cleanup remains outside this mission change.
 
 An unrelated developer-console compiler fault was reproduced while constructing
 that probe: an include inside a function reaches the file-boundary diagnostic

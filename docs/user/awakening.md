@@ -144,6 +144,11 @@ fixes them:
   The invalid starting goob-gun upgrade request is removed.
   Cellblock attackers switch to combat before reaching the marines' occupied
   cover positions.
+  The security override completes once, keeping the alarm off and shutters in
+  place. Destroying the turret-room camera during the ambush no longer starts
+  the door hack early or twice.
+  The camera's collision box now fits its hanging model, letting it appear
+  and scan instead of remaining hidden against the cell door above it.
   Start m03/m04 afresh to receive these mission callback corrections; existing
   saves retain the mission threads with which they were created.
   The prison's security alarm now gives quieter, local warning pulses with

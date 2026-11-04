@@ -28,6 +28,11 @@ See [player release status](../user/release-status.md).
 - Start M03 and M04 afresh to receive their mission callback corrections.
   Older saves retain their original mission threads. See the
   [review and qualification limits](awakening-missions.md#m03-and-m04-review-4-november-2026).
+- The prison security override completes once: repeated use cannot restart
+  the alarm or lift the shutters farther. Destroying the turret-room camera
+  after the ambush starts no longer starts an early or duplicate door hack.
+  Cameras also fit their hanging models, allowing the blocked turret-room
+  camera to appear, scan and take damage as intended.
 
 ## Damaged queued events recover safely, 4 November 2026
 
