@@ -7,11 +7,13 @@
 
 static const char * const awakeningM02Source = "maps/game/m02_trianfac.script";
 static const char * const awakeningM02Version1 = "maps/game/m02_trianfac.openq4-v1.script";
+static const char * const awakeningM02Version2 = "maps/game/m02_trianfac.openq4-v2.script";
 
 bool Awakening_LoadMissionScript( const char *filename, idStr &source ) {
 	idStr normalizedName = filename;
 	normalizedName.BackSlashesToSlashes();
-	if ( normalizedName.Icmp( awakeningM02Version1 ) != 0 || gameLocal.isMultiplayer ||
+	const bool version2 = normalizedName.Icmp( awakeningM02Version2 ) == 0;
+	if ( ( !version2 && normalizedName.Icmp( awakeningM02Version1 ) != 0 ) || gameLocal.isMultiplayer ||
 		idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
 		return false;
 	}
@@ -51,11 +53,17 @@ bool Awakening_LoadMissionScript( const char *filename, idStr &source ) {
 		{ "void BossKilled()\n{",
 		  "void BossKilled()\n{\n\tsys.trigger( $item_objectivecomplete_6 );" },
 		{ "if ( uplink_room_cleared >= 4 )", "if ( uplink_room_cleared == 4 )" },
+		// v2: the extraction scene spawns a separate Darnell beside the cargo.
+		// The original squad actor remains on the lower floor.
+		{ "$darnell.setMoveSpeed( AIMOVESPEED_RUN );", "$darnell_ending.setMoveSpeed( AIMOVESPEED_RUN );" },
+		{ "aiScriptedMove( $darnell, $darnell_ending_pos_2, 5, 0 );",
+		  "aiScriptedMove( $darnell_ending, $darnell_ending_pos_2, 5, 0 );" },
 	};
 	// Refuse partial correction of a mapper's revision. Old source remains a
 	// valid fallback on fresh starts; a v1 save must fail rather than reinterpret
 	// its suspended threads with a different program.
-	for ( int i = 0; i < sizeof( corrections ) / sizeof( corrections[0] ); ++i ) {
+	const int count = sizeof( corrections ) / sizeof( corrections[0] ) - ( version2 ? 0 : 2 );
+	for ( int i = 0; i < count; ++i ) {
 		const int first = source.Find( corrections[i].before );
 		if ( first < 0 || source.Find( corrections[i].before, true, first + 1 ) >= 0 ) {
 			source.Clear();
@@ -72,9 +80,9 @@ const char *Awakening_MissionScriptName( const char *filename ) {
 	if ( !gameLocal.isMultiplayer && idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
 		normalizedName.Icmp( awakeningM02Source ) == 0 ) {
 		idStr source;
-		if ( Awakening_LoadMissionScript( awakeningM02Version1, source ) ) {
-			gameLocal.Printf( "Awakening M02: mission corrections v1 enabled\n" );
-			return awakeningM02Version1;
+		if ( Awakening_LoadMissionScript( awakeningM02Version2, source ) ) {
+			gameLocal.Printf( "Awakening M02: mission corrections v2 enabled\n" );
+			return awakeningM02Version2;
 		}
 		gameLocal.Warning( "Awakening M02: unrecognized script; keeping installed mission behaviour" );
 	}

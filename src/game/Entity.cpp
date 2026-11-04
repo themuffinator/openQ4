@@ -11,6 +11,32 @@
 #include "Trigger.h"
 // RAVEN END
 
+static void CorrectAwakeningMissionWaypoint( idEntity *ent ) {
+	if ( gameLocal.isMultiplayer ||
+		idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ||
+		idStr::Icmp( ent->spawnArgs.GetString( "classname" ), "target_null" ) != 0 ) {
+		return;
+	}
+	// The recovered M01 waiting point lines Navajas up with the opened north
+	// door leaf. Wait in the clear approach so the next move crosses the opening.
+	// Use existing spawn/restore callbacks: adding a new class restore layer
+	// would change the synchronization markers in legacy saves.
+	if ( gameLocal.mapFileNameStripped.Icmp( "m01_stranarus_trench2" ) == 0 &&
+		ent->name.Icmp( "m04_trench_unit2_navajas_node_seq_1" ) == 0 &&
+		ent->GetPhysics()->GetOrigin().Compare( idVec3( -1300, -3200, 230 ), 0.01f ) ) {
+		// Preserve a mapper's revised waypoint rather than overriding it.
+		ent->GetPhysics()->SetOrigin( idVec3( -1300, -3424, 230 ) );
+	}
+	// Darnell and Mitchell stand on either side of this M02 destination before
+	// lifting the door. Tak cannot fit between their collision bounds, so wait
+	// in front of them before playing his authored duck-under animation.
+	if ( gameLocal.mapFileNameStripped.Icmp( "m02_trianfac" ) == 0 &&
+		ent->name.Icmp( "tak_door_pos_before" ) == 0 &&
+		ent->GetPhysics()->GetOrigin().Compare( idVec3( 1713, -1686, 1248 ), 0.01f ) ) {
+		ent->GetPhysics()->SetOrigin( idVec3( 1713, -1648, 1248 ) );
+	}
+}
+
 /*
 ===============================================================================
 
@@ -683,6 +709,7 @@ void idEntity::Spawn( void ) {
 	fl.persistAcrossInstances = false;
 // bgeisler: added
 	fl.triggerAnim = spawnArgs.GetBool( "trigger_anim" );
+	CorrectAwakeningMissionWaypoint( this );
 
 	// precache decls
 	declManager->FindType( DECL_ENTITYDEF, "damage_crush", false, false );
@@ -1065,6 +1092,7 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 
 	savefile->ReadInt( instance );
 	savefile->ReadInt( clipWorld );
+	CorrectAwakeningMissionWaypoint( this );
 
 	// precache decls
 	declManager->FindType( DECL_ENTITYDEF, "damage_crush", false, false );
@@ -4962,6 +4990,29 @@ bool idEntity::HandleGuiCommands( idEntity *entityGui, const char *cmds ) {
 // For some reason the semi colon is used as a delimeter so we need the above code
 				rvScriptFuncUtility utility;
 				if( utility.Init(token2) > SFU_ERROR ) {
+					// The recovered M02 test GUI can replay the Tank introduction
+					// on another click, even after combat starts. Consume this one
+					// console and show its authored inactive counterpart. Existing
+					// post-introduction saves are recognized by the visible boss;
+					// no suspended script or save layout needs to change.
+					if ( !gameLocal.isMultiplayer &&
+						idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+						gameLocal.mapFileNameStripped.Icmp( "m02_trianfac" ) == 0 &&
+						entityGui->name.Icmp( "boss_screen_4_on_1" ) == 0 &&
+						token2.Icmp( "BringOnTheTank" ) == 0 ) {
+						idEntity *boss = gameLocal.FindEntity( "core_boss" );
+						const bool alreadyStarted = entityGui->spawnArgs.GetBool( "gui_noninteractive" ) ||
+							gameLocal.inCinematic || ( boss && !boss->IsHidden() );
+						entityGui->spawnArgs.SetBool( "gui_noninteractive", true );
+						UpdateGuiParms( entityGui->renderEntity.gui[0], &entityGui->spawnArgs );
+						if ( idEntity *inactive = gameLocal.FindEntity( "boss_screen_4_off" ) ) {
+							entityGui->Hide();
+							inactive->Show();
+						}
+						if ( alreadyStarted ) {
+							continue;
+						}
+					}
 					utility.InsertEntity( entityGui, 0 );
 					utility.CallFunc( &entityGui->spawnArgs );
 				}

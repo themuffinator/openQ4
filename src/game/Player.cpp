@@ -11243,19 +11243,30 @@ void idPlayer::ApplyTestInput( void ) {
 	if ( openq4TestInput.yawRate || openq4TestInput.pitchRate ) {
 		openq4TestInput.yawOffset += openq4TestInput.yawRate * MS2SEC( gameLocal.msec );
 		openq4TestInput.pitchOffset += openq4TestInput.pitchRate * MS2SEC( gameLocal.msec );
-		usercmd.angles[ YAW ] += ANGLE2SHORT( openq4TestInput.yawOffset );
-		usercmd.angles[ PITCH ] += ANGLE2SHORT( openq4TestInput.pitchOffset );
 	}
 
 	if ( openq4TestInput.aimEntity.Length() ) {
 		idEntity *target = gameLocal.FindEntity( openq4TestInput.aimEntity );
 		if ( target != NULL ) {
-			idVec3 dir = target->GetPhysics()->GetAbsBounds().GetCenter() - GetEyePosition();
+			rvVehiclePosition *seat = IsInVehicle() ? vehicleController.GetVehicle()->GetPosition( vehicleController.GetPosition() ) : NULL;
+			idVec3 dir = target->GetPhysics()->GetAbsBounds().GetCenter() - ( seat ? seat->GetEyeOrigin() : GetEyePosition() );
 			if ( dir.Normalize() > 0.0f ) {
-				SetViewAngles( dir.ToAngles() );
+				if ( seat ) {
+					// Turrets consume usercmd angle deltas, not the driver's view.
+					// Steer through their normal input, turn-rate and travel limits.
+					const idAngles desired = dir.ToAngles();
+					const idAngles current = seat->GetEyeAxis().ToAngles();
+					const float turn = 90.0f * MS2SEC( gameLocal.msec );
+					openq4TestInput.yawOffset += idMath::ClampFloat( -turn, turn, idMath::AngleDelta( desired.yaw, current.yaw ) );
+					openq4TestInput.pitchOffset += idMath::ClampFloat( -turn, turn, idMath::AngleDelta( desired.pitch, current.pitch ) );
+				} else {
+					SetViewAngles( dir.ToAngles() );
+				}
 			}
 		}
 	}
+	usercmd.angles[ YAW ] += ANGLE2SHORT( openq4TestInput.yawOffset );
+	usercmd.angles[ PITCH ] += ANGLE2SHORT( openq4TestInput.pitchOffset );
 }
 
 #include "gamesys/WeaponWheel.inl"

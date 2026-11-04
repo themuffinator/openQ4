@@ -35,6 +35,10 @@ def commands(args):
     lines = ['set g_autoExecAfterMapLoad ""', 'set g_stopTime 0', 'god', 'notarget']
     if args.case == 'legacy':
         return lines + ['wait 180', 'saveGame mission', 'wait 5']
+    if args.case == 'fire-effects':
+        fire = 'func_fire_volume_7' if args.map == 'm01' else 'func_fire_volume_1'
+        return lines + ['wait 120', f'testMission {fire}', 'screenshot screenshots/fire.tga',
+                        'saveGame mission', 'wait 5']
     if args.case == 'fire':
         fire = 'func_fire_volume_1'
         if not args.input:
@@ -63,6 +67,15 @@ def commands(args):
         lines += [f'damage proc_bot_{i} 10000' for i in range(1, 7)]
         lines += ['wait 3600', 'echo MISSION_REPAIR_CLEARED', 'testMission tak', 'listThreads',
                   'screenshot screenshots/repair.tga', 'saveGame mission', 'wait 5']
+    elif args.case == 'extraction':
+        if not args.input:
+            lines += ['testMission call PlaytestStartAfterPanel', 'wait 120',
+                      'testMission call BringOnTheTank', 'wait 4800',
+                      'testMission core_boss', 'saveGame tank_checkpoint', 'wait 5']
+        lines += ['damage core_boss 100000', 'wait 600', 'testMission darnell_ending',
+                  'screenshot screenshots/extraction_scene.tga', 'wait 1200', 'listThreads',
+                  'testMission dekard', 'testMission darnell',
+                  'screenshot screenshots/extraction.tga', 'saveGame mission', 'wait 5']
     elif args.case == 'landing':
         lines += ['testMission call LandDropShip', 'wait 2', 'testMission env_dropship_1',
                   'setviewpos 1576 2200 2100 270', 'wait 10', 'screenshot screenshots/landing.tga',
@@ -86,7 +99,7 @@ def commands(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--case', choices=('legacy', 'fire', 'repair', 'landing', 'walker', 'squad', 'objective', 'nexus'), required=True)
+    parser.add_argument('--case', choices=('legacy', 'fire', 'fire-effects', 'repair', 'landing', 'walker', 'squad', 'objective', 'nexus', 'extraction'), required=True)
     parser.add_argument('--map', choices=tuple(FIRE_MAPS), default='m02')
     parser.add_argument('--retail', type=Path, required=True)
     parser.add_argument('--awakening', type=Path, required=True)
@@ -96,6 +109,8 @@ def main():
     parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
     parser.add_argument('--timeout', type=int, default=240)
     args = parser.parse_args()
+    if args.case == 'fire-effects' and not args.input:
+        parser.error('fire-effects requires a burning-vent checkpoint via --input')
     exe = client_path(ROOT/'.install')
     verify_runtime_is_current(ROOT/'.install', exe.name)
     output = task_path(args.output)
@@ -152,12 +167,12 @@ def main():
     log = path.read_text(errors='replace') if path.exists() else ''
     if ERROR.search(log) or log.count('MISSION_PROBE_DONE') != 1 or process.returncode != 0:
         failures.append('runtime error, nonzero exit or missing completion')
-    if args.case != 'squad' and not (game/'savegames/mission.save').is_file():
+    if args.case not in ('squad', 'extraction') and not (game/'savegames/mission.save').is_file():
         failures.append('missing final save')
     if args.case == 'squad' and ("Can't save after failed mission" not in log
             or (game/'savegames/forbidden.save').exists()):
         failures.append('essential squadmate death did not fail mission and block saves')
-    if args.input and 'Game Map Init SaveGame' not in log:
+    if args.input and ('Game Map Init SaveGame' not in log or 'loadingSaveGame=0' in log.split('AutoExecAfterMapLoad:', 1)[0]):
         failures.append('save did not restore')
     if args.case == 'fire':
         rows = states(log, 'func_fire_volume_1')
@@ -170,11 +185,27 @@ def main():
         lights = re.findall(r'testMissionLight: name=light_4859 radius=\(([^)]+)\)', log)
         if not lights or any(abs(float(v)) > 0.01 for v in lights[-1].split()):
             failures.append('quenched fire left its light on')
+    if args.case == 'fire-effects':
+        fire = 'func_fire_volume_7' if args.map == 'm01' else 'func_fire_volume_1'
+        rows = states(log, fire)
+        effects = re.findall(r'testMissionEffect: name='+fire+r' effect=(\S+) loop=(\d) modelSuppressed=(\d)', log)
+        report['effects'] = effects
+        if not rows or rows[-1]['health'] <= 0:
+            failures.append('fixture does not contain a burning vent')
+        if len(effects) != 1 or effects[0][1:] != ('1', '0'):
+            failures.append('restored fire does not have exactly one unsuppressed loop')
     if args.case == 'landing':
         anims = re.findall(r'testMissionAnim: name=env_dropship_1 anim=(\S+)', log)
         report['animations'] = anims
         if anims != ['hangar_land', 'hangar_idle']:
             failures.append('landing did not finish before idle')
+    if args.case == 'extraction':
+        if 'CAMPAIGN_CHAPTER reached 4 game/M03_airassault' not in log:
+            failures.append('extraction did not transition to the next chapter')
+        if not (game/'savegames/Autosave_game_M03_airassault.save').is_file():
+            failures.append('next chapter autosave missing')
+        if re.search(r"scriptedMove: '(?:dekard|darnell(?:_ending)?)'.*(?:could not start|made no progress)", log):
+            failures.append('extraction actor route failed')
     if args.case == 'repair':
         before = log.split('MISSION_BOTS_ALIVE', 1)[-1].split('MISSION_REPAIR_CLEARED')[0]
         after = log.split('MISSION_REPAIR_CLEARED', 1)[-1]

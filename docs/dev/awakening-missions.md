@@ -47,6 +47,45 @@ be invented or re-enabled.
   resets, and the extraction dropship finishes `hangar_land` before entering
   `hangar_idle`. The download's fourth second-wave death starts its completion
   once rather than every time its counter is at least four.
+- **Restored fire effects:** client effects already survive saves. Starting a
+  new loop in the owner's restore accumulated flames on each load. Restore now
+  reconciles the completed client-entity graph, retaining one effect for the
+  saved stage and stopping duplicate or obsolete stage effects.
+- **M01 corpse saves:** the placed Strogg marine corpse requests the missing
+  `strogg_marine` articulated figure. Its default placeholder cannot round-trip
+  through strict AF restore. In `q4xbase`, that missing declaration now resolves
+  to the shipped `monster_strogg_marine` rig; valid custom declarations remain
+  untouched. Saves already containing the invalid placeholder remain invalid.
+- **M01 stair gate:** the Retch introduction reclosed an AI gate behind a
+  trailing Navajas, preventing his arrival at the walkers. Once released, this
+  specific gate stays open. Older saves reopen it after the one-shot arrival
+  trigger has been consumed.
+- **Walker restore:** the stop-animation name pointed into a temporary string
+  after loading. Both game libraries now own that string, with the same saved
+  representation.
+- **M01 courtyard route:** Navajas's waiting point led him into the opened
+  north door leaf on the way to the final regroup. The original point now
+  sits on the doorway centreline, on both spawn and restore. Revised mapper
+  coordinates are preserved; actors still traverse the route normally.
+- **M01 cinematic save identity:** changing the original cinematic program
+  for the harness fill light made earlier saves silently restart M01. The
+  earlier program is retained under its original filename, and fresh starts
+  use the separately named lighting revision. Restore probes reject a map
+  restart rather than counting it as a successful load.
+- **M02 extraction actor:** the final scene spawned `darnell_ending` but sent
+  the original downstairs Darnell to the extraction position. Version 2 moves
+  the extraction actor, allowing the authored scene to finish without that
+  unreachable move.
+- **M02 lift-door approach:** Tak's eight-unit arrival requirement placed him
+  between Darnell and Mitchell's collision bounds. He stopped 28 units short,
+  leaving the door-lifting script waiting. His original waiting point moves
+  38 units back into clear space on spawn and restore; the squad's positions
+  and authored door-lifting and duck-under animations remain in use.
+- **M02 boss console:** the reusable test GUI could restart the Tank introduction
+  when the player fired beside it after the handoff. Its first activation now
+  consumes the console and shows the authored inactive screen. A visible boss
+  also guards older post-introduction saves; neither their scripts nor their
+  save layout changes.
 
 ## Script identity and asset ownership
 
@@ -57,12 +96,23 @@ installed behaviour with a warning. The reviewed installed script has SHA-256
 `52f91083b62daf55c64cce1ced7b61a502b7748110a96b8a9ce3eccdd50746fa`.
 
 Fresh corrected maps compile as
-`maps/game/m02_trianfac.openq4-v1.script`. Saves record that virtual source name,
+`maps/game/m02_trianfac.openq4-v2.script`. Saves record that virtual source name,
 so restore reconstructs the same corrected program. Older saves still compile
 `maps/game/m02_trianfac.script` unchanged. Restart M02 to adopt its script
 corrections; do not reinterpret an old suspended script with new statements.
-Keep the v1 transformations stable after release; a later revision needs a new
-identity. No save payload layout changed.
+The v1 transformations remain unchanged for existing corrected saves. Version 2
+adds only the extraction-actor correction. No save payload layout changed.
+
+The authored M01 cinematic likewise keeps its original program as
+`scripts/openq4/awakening/m01_dropship.script`; the route-qualified lighting
+revision uses `m01_dropship-v2.script`. The separately qualified dramatic-feedback
+pass now selects v3 for fresh starts; see the [M01 audit](m01-interior-feedback-audit.md).
+The short-lived
+unversioned lighting snapshot (`42200dc6f`) did not distinguish its changed
+program in saves. M01 saves written with that snapshot can require restarting
+the map; they must not be treated as pre-lighting saves or silently accepted as
+successful restores. The pre-lighting and separately named revisions are the
+compatibility controls.
 
 Design and entity references are from Raven Software and Ritual Entertainment's
 Awakening alpha, recovered by Justin Marshall. See the existing
@@ -120,6 +170,109 @@ uncontrolled squad attacks killed the bots early, a preliminary geometric check
 omitted the AAS projection, and an initial squad check expected a redundant
 failure handler. Their replacements above are the acceptance evidence.
 
+## Follow-up route validation
+
+The follow-up uses `tools/tests/awakening_route_runtime.py` with explicitly
+authorized game-only input. Movement, aiming, firing, vehicle boarding/exit and
+GUI interaction use normal game input and collision. The hidden, windowed
+profiles disable host input. God mode and occasional ammunition refills exclude
+combat-balance claims. Checkpoint resumes exclude an uninterrupted-playthrough
+claim. Game time pauses between controller requests to prevent tool latency from
+consuming escort timeouts. Captures are engine screenshots with rendering enabled;
+simulation-only segments with `r_skipBackEnd 1` do not qualify appearance.
+
+- **M01 part 1:** `route-m01-rigfix`, `route-m01-follow`, `route-m01-building`
+  and `route-m01-exit` cover the unskipped insertion, squad doors, freeze-gun
+  handoff, fire passages and combat waves. Normal GUI interaction enters part 2
+  (`CAMPAIGN_CHAPTER reached 2`) and writes its autosave.
+- **M01 part 2:** `route-m01-defence` resumes the Retch checkpoint with the
+  repaired stair gate. Navajas reaches the walker bay. `route-m01-combat`
+  covers occupied repair defence, walker release and the first demolition.
+  `route-m01-traverse` checks restored walker steering/stopping and the second
+  defence. `route-m01-demolition` replays the second charge placement and retreat
+  with the player parked clear of Navajas's route. Both barriers are destroyed.
+- **M01 courtyard and transition:** `route-m01-courtyard-replay` restores the
+  second-demolition checkpoint, traverses the breach and kills all three turrets
+  through ordinary walker/squad fire. Navajas reaches the corrected regroup with
+  no movement timeout. The walker unlocks, normal jump input exits it, the squad
+  reaches the final door, and normal GUI interaction enters M02
+  (`CAMPAIGN_CHAPTER reached 3`) and writes its autosave.
+- **M02 entry and generators:** the same continuation covers the processor
+  consoles, Raven briefing and spike-gun handoff. `route-m02-generator` rides
+  the squad lift; `route-m02-defence` restores its arrival, completes the
+  natural generator ambush and Retch fight, and destroys the repair bots with
+  ordinary weapon/squad fire. The shutdown waits while bots remain alive, then
+  clears its objective and sends Markswell back on the lift. Tak proceeds
+  through the maintenance exit. A Retch corpse obstructed the narrow stairs;
+  normal jumps from clear ground passed it. Failed approaches that fell into
+  the lower pit were restored and replayed, not accepted as route completion.
+  All three corridor vents extinguish through freeze-gun fire and finish with
+  zero collision contents. Tak rejoins Darnell and Mitchell, and all three
+  reach the terminal room before the console sequence releases the defenders.
+- **M02 download and lift:** `route-m02-download` cold-restores a partial
+  defence with one replacement attacker dead and three still pending or alive.
+  Ordinary weapon/squad fire completes the waves, releases the exit and moves
+  the squad on. The following shaft encounters and door approach exposed Tak's
+  blocked waiting point. `route-m02-lift` restores that already-stalled save
+  with the correction: Tak reaches the console, normal crouch input crosses
+  the raised door, it closes behind the player, and the lift carries both
+  Tak and the player up 608 units. No actor was teleported or script callback
+  invoked by the controller to achieve this recovery.
+- **M02 Nexus, Tank and extraction:** `route-m02-lift` continues through the
+  upper squad route and defended Nexus to the normal console interaction.
+  `route-m02-extraction` resumes that checkpoint on the console fix, plays the
+  full introduction, and defeats the 1,700-health Tank with ordinary machinegun
+  fire aimed at its head. The normal death callback completes the objective,
+  plays the dropship landing before idle, brings the sample carriers and the
+  correct Darnell into the scene, then enters M03 (`CAMPAIGN_CHAPTER reached 4`)
+  and writes its autosave. Engine captures cover the extraction and transition.
+  Fresh and pre-fix post-introduction saves both pass the repeated-console
+  interaction control. No direct damage, actor relocation or scripted encounter
+  invocation is used in these accepted route journals.
+  `route-m02-victory-restore` cold-loads the naturally won boss checkpoint,
+  retains the consumed console and dead Tank, and completes extraction into
+  M03 with another autosave.
+- Failed navigation attempts remain in the journals: live enemies, the player,
+  rubble and console geometry obstructed some direct approaches. Those attempts
+  are not accepted as completed routes. Diagnostic actor moves or damage in
+  earlier investigation profiles are not the acceptance runs above.
+
+Additional focused controls, under `.tmp/awakening-m01-m02/`:
+
+| Evidence directory | Result and scope |
+| --- | --- |
+| `corpse-rig-restore` | A fresh M01 checkpoint using the real corpse rig restores and resaves. |
+| `fire-effects-repaired`, `fire-effects-repeat`, `fire-effects-m02-partial`, `fire-effects-final` | Burning and partly frozen checkpoints reconcile duplicate saved loops to one active stage effect, including repeated Vulkan restores. |
+| `fire-effects-versioned` | The pre-lighting M01 checkpoint restores and resaves on the versioned build; one flame loop remains, with no map restart. |
+| `cinematic-versioned` | Full unskipped M01 playback reaches handoff, saves and reloads the new cinematic program. Engine captures and beat timestamps are retained; no audio qualification is claimed. |
+| `v1-restore-after-v2` | Earlier corrected M02 bytecode still restores after adding the separately named v2 program. |
+| `extraction-complete`, `extraction-restored`, `extraction-final` | Focused v2 Tank-introduction/death/extraction chains reach M03 and its autosave. These invoke the encounter and apply diagnostic Tank damage; they do not qualify normal boss combat. |
+
+`fire-effects-integrated` preserves the negative control: it restored neither
+the earlier checkpoint nor its gameplay position, instead restarting M01 after
+the unversioned lighting script changed. The versioned run replaces that result.
+
+The route follow-up builds/stages the Windows client, dedicated server, both game
+libraries and both renderers. Eight SP/MP restore-AF, restore-class,
+restore-animation and vehicle-HUD checks pass; the final console change also
+passes both restore-class checks. Gameplay/CI contracts, Python syntax and the
+11,292-path portability check pass. `route-validation.json` indexes the accepted
+journals, runtime identities and M03 transitions; its bypass-command audit is
+empty for every accepted profile. The installed M02 script hash is unchanged.
+
+The final extraction uses the fixed `.tmp/runtime/awakening-missions` runtime
+because other chats continue to stage `.install`. Its executable hash is
+`19a9bf867118c8145903fa71302c3b4fe0f170b15ca6334cf5fd09c19d9eaf11`;
+matching game/content hashes are recorded in each profile's `binaries.json`.
+An earlier `.install` session exited unexpectedly while paused; that incomplete
+`route-m02-tank` run is retained and is not acceptance evidence.
+
+The broader full-build attempts have separate limitations: `console-build.log`
+records an unrelated UI fixture's missing `UI_WorldGuiInit` stub, and
+`completion-build.log` records a concurrent compiler-output permission collision
+on `Matrix.cpp.obj`. Neither is reported as a passing full-build result.
+The successful targeted runtime build and native checks are retained separately.
+
 ## Remaining alpha findings
 
 - The empty M01 mission-critical death callback is not, by itself, a missing
@@ -136,18 +289,19 @@ failure handler. Their replacements above are the acceptance evidence.
   runtime reports rather than hidden by the fixes.
 - Squad movement can still report unreachable goals or the existing scripted
   movement timeout. Focused positioning is not proof of a traversable full route.
-- Complete M01 walker defence/demolition/traversal, M02 squad routing, defended
-  download, Tank combat, extraction framing and mission-to-mission carryover
-  remain Q4-04 acceptance work until exercised end to end. The earlier guide's
-  assertion that all maps had been played through exceeded the evidence.
+- M01/M02 now have checkpointed route coverage through squad routing, both
+  walker demolition defences, generator/download defence, Tank combat and
+  extraction into M03. This does not qualify uninterrupted play, ammunition or
+  difficulty balance, audio, or other platforms. The earlier guide's assertion
+  that all thirteen maps had been played through exceeded the evidence.
+- The Tank's installed animation still requests `fx_rocket_flash` on the absent
+  `gunBarrelReal` joint. This presentation warning did not block the fight;
+  the audit does not invent an effect or alter the installed model.
 
 ## Workspace findings
 
-The worktree `E:/Repositories/openQ4/.claude/worktrees/ui-roadmap-work-aaa011`
-on `claude/ui-right-stick` was clean and fully merged at inspection (last commit
-3 November 2026), so it appears stale. Removing it is recommended after the
-user's required worktree approval. `E:/Repositories/openQ4-worktrees/e07a/openQ4`
-initially appeared stale at detached commit `908b2c012`, but the final check found
-active work on `codex/q4-legacy-event-data` with uncommitted changes; it is no
-longer a cleanup candidate. Other worktrees had unmerged work or active changes
-and were preserved.
+The user-approved completed `f744` worktree and its merged branch were removed.
+The previously noted `claude/ui-right-stick` worktree is also absent from the
+follow-up inventory. Other chats continue to use the listed project worktrees;
+none was removed by inference. Unrelated roadmap edits in the main checkout
+are preserved and excluded from this task's staged changes.
