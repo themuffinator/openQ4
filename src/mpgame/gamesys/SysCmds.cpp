@@ -3570,13 +3570,13 @@ void Cmd_BotProbeHealth_f( const idCmdArgs &args ) {
 	for ( int i = 1; i < args.Argc(); i++ ) {
 		numeric &= idStr::IsNumeric( args.Argv( i ) );
 	}
-	if ( ( args.Argc() != 3 && args.Argc() != 4 && args.Argc() != 7 ) || !numeric ) {
-		gameLocal.Printf( "usage: bot_probeHealth client health [knockbackMsec [kickX kickY kickZ]]\n" );
+	if ( ( args.Argc() != 3 && args.Argc() != 4 && args.Argc() != 7 && args.Argc() != 8 ) || !numeric ) {
+		gameLocal.Printf( "usage: bot_probeHealth client health [knockbackMsec [kickX kickY kickZ [armor]]]\n" );
 		return;
 	}
-	const idVec3 kick = args.Argc() == 7 ? idVec3( atof( args.Argv( 4 ) ), atof( args.Argv( 5 ) ), atof( args.Argv( 6 ) ) ) : vec3_origin;
+	const idVec3 kick = args.Argc() >= 7 ? idVec3( atof( args.Argv( 4 ) ), atof( args.Argv( 5 ) ), atof( args.Argv( 6 ) ) ) : vec3_origin;
 	if ( !botManager.SetProbeHealth( atoi( args.Argv( 1 ) ), atoi( args.Argv( 2 ) ),
-			args.Argc() >= 4 ? atoi( args.Argv( 3 ) ) : 0, kick ) ) {
+			args.Argc() >= 4 ? atoi( args.Argv( 3 ) ) : 0, kick, args.Argc() == 8 ? atoi( args.Argv( 7 ) ) : -1 ) ) {
 		gameLocal.Printf( "bot_probeHealth: requires an isolated local cheat server with one live bot, 1-1000 health and 0-1000 ms\n" );
 	}
 }

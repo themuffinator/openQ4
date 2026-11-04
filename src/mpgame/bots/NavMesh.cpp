@@ -1290,7 +1290,10 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 			 ( gameLocal.LiquidContentsAtPoint( position, NULL ) & MASK_WATER ) ) {
 			return reject( "ground", position, velocity, ground.c.normal );
 		}
-		if ( elapsed >= knockMsec ) {
+		// MovePlayer drops timers before WalkMove: the expiration frame
+		// already has friction and normal ground acceleration.
+		const bool knockActive = elapsed + 16 < knockMsec;
+		if ( !knockActive ) {
 			const idVec3 stop = position + velocity * ( dt + velocity.Length() / ( 20.0f * speed ) );
 			if ( TransportOnMove( position, stop, -1 ) < 0 && LandingContinuationClear( position, stop ) ) {
 				return true;
@@ -1303,7 +1306,7 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 		}
 		const float add = speed - velocity * wish;
 		if ( add > 0.0f ) {
-			velocity += wish * Min( add, ( elapsed < knockMsec ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );
+			velocity += wish * Min( add, ( knockActive ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );
 		}
 		trace_t across;
 		const idVec3 next = position + velocity * dt;

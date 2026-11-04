@@ -2191,6 +2191,13 @@ claim peer combinations that have not been tested.
   navigation/control failures and retain strict world-death gates. Qualify route
   generation/think budgets, objectives and real combat; source tests do not close
   the previously failing runtime safety sweep.
+  Current qualification correction: [exact armour and timer audit](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026)
+  finds that earlier causal replays omitted armour. Their exclusions below are
+  historical, not final safety evidence. Policy version 2 restores post-hit and
+  pre-hit armour and rejects incomplete logs. Both DM8 pad poses and the CTF5
+  pad catch now pass isolated recovery; the ground-slide timer is corrected.
+  Its runtime check, the CTF7 low-health drop, renewed final-build long/catalog
+  runs and controlled timing remain required.
   Follow-through, 4 November: the [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026)
   fixes all three previously recorded long-match hit states. The renewed
   `84dde9c6d` long runs pass CTF3/DZ3 directly and CTF5 after strict causal

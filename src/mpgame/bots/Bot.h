@@ -524,7 +524,7 @@ public:
 									const idVec3 *nextJump = NULL, bool naturalWalk = false );
 	// The health, and knockback time, the next traversal probe gives its bot;
 	// 0 for unchanged.
-	bool					SetProbeHealth( int clientNum, int health, int knockbackMsec = 0, const idVec3 &kick = vec3_origin );
+	bool					SetProbeHealth( int clientNum, int health, int knockbackMsec = 0, const idVec3 &kick = vec3_origin, int armor = -1 );
 
 	// Re-bind every live bot after the character roster has been reparsed.
 	// botreload must call this before the next frame runs, or every bot is
@@ -651,6 +651,7 @@ private:
 
 	int						probeHealth;			// pending bot_probeHealth value
 	int						probeKnockback;		// and its knockback milliseconds
+	int						probeArmor;			// optional exact armour; -1 preserves spawn inventory
 	idVec3					probeKick;			// already included in the probe velocity; reaction only
 	int						decisionFrame;			// gameLocal.framenum the count belongs to
 	int						decisionsThisFrame;

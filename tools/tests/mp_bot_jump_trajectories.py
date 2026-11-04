@@ -117,6 +117,7 @@ def main() -> None:
         assert result.returncode != 0, "rim-recovery rejection mutation escaped"
         print("Inward rim landing: old rejection mutation failed")
         for label, anchor, replacement in (
+            ("knockback expiry before movement", "elapsed + 16 < knockMsec", "elapsed < knockMsec"),
             ("collision without ground contact", "NavAgentHasGroundContacts( end, gravity ) ||", "true ||"),
             ("fatal grounded impact", "NavAgentHasGroundContacts( end, gravity ) ||", "false ||"),
             ("coasting pad catch", "if ( transport >= 0 ) {", "if ( false && transport >= 0 ) {"),
@@ -127,7 +128,7 @@ def main() -> None:
             ("descending splash momentum", "idVec3 velocity = velocityIn;\n\tconst float dt = NAV_PAD_STEP_SECONDS;",
              "idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );\n\tconst float dt = NAV_PAD_STEP_SECONDS;"),
             ("affordable last-resort contact", "*touchedAffordable = true;", "*touchedAffordable = false;"),
-            ("grounded steering", "velocity += wish * Min( add, ( elapsed < knockMsec ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );",
+            ("grounded steering", "velocity += wish * Min( add, ( knockActive ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );",
              "velocity += wish * 0.0f;"),
         ):
             assert fixture.count(anchor) == 1

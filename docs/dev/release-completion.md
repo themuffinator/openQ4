@@ -1028,6 +1028,13 @@ made them too large to load.
   Liquid-consumer and broader presentation qualification remain open.
 - MP-07: the server diagnostic applies the measured lead/RTT prerequisite before
   adding rewind bias. State/wiring checks pass; defaults remain off.
+- MP-02 qualification correction (4 November): prior causal replays omitted
+  armour and cannot qualify final safety exclusions. Version 2 logs and restores
+  post-hit/pre-hit armour and rejects incomplete state. Both recorded DM8 pad
+  catches and the CTF5 diagonal-pad recovery pass isolated runtime checks.
+  Ground-slide prediction now restores friction on the physics timer's expiry
+  frame. Its runtime check, the low-health CTF7 drop and renewed final-build
+  long/catalog/timing gates remain open; see [bot evidence](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026).
 - MP-02: bounded percentile profiling and explicit audit budgets are implemented.
   The five-minute DM8 audit retains a navigation death, a stuck event and a
   contested timing failure; it does not close the safety or performance gate.

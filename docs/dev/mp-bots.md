@@ -5,6 +5,35 @@ authoring or compile step. Bots arrive with a name, a way of playing and
 something to say about it. This describes their behaviour, validation and
 current limits.
 
+## Exact armour and timer qualification, 4 November 2026
+
+The causal harness previously restored health and knockback but left armour at
+spawn defaults. Earlier impulse exclusions below are historical assessments,
+not final MP-02 qualification: missing armour could make a recoverable landing
+appear fatal. Policy version 2 requires logged post-hit armour and armour saved
+by the hit, restores both post-hit and counterfactual inventories, and fails
+closed for missing or out-of-range state. Same-frame shotgun grouping also
+requires armour continuity. Raw reports and earlier assessments remain intact.
+
+`bot_probeHealth client health [knockbackMsec [kickX kickY kickZ [armor]]]`
+restores an optional exact armour value. `BOT_IMPULSE` records `armor` after the
+hit and `armorSave`; older logs cannot qualify version-2 exclusions.
+
+The `a3172f89a` pad-catch correction passes both recorded DM8 hit poses and the
+CTF5 diagonal-pad hit replay, all alive and grounded at the strict terminal
+check. The DM8 rocket slide remains recoverable by fixed steering but its
+controller fails. Ground-slide traces reveal a one-frame timer mismatch:
+player physics drops knockback timers before movement, while prediction waited
+until the next frame to restore friction and ground acceleration. The predictor
+now uses the same expiration frame. Synthetic rim tests compare the expiring
+timer with an extra knockback frame; runtime qualification is pending.
+
+The `c65041464` catalog completes all 33 variants (at least 47.376 observed
+seconds), with 448 combat kills, 618 traversals and four raw world deaths.
+Besides the corrected CTF5 pad catch, it exposes a low-health CTF7 drop after
+recovery from a rail hit. That drop still needs exact-armour investigation.
+Final-build long matches, catalog and controlled timing remain open.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's

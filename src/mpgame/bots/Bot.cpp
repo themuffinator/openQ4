@@ -7564,6 +7564,7 @@ rvBotManager::rvBotManager
 rvBotManager::rvBotManager( void ) {
 	probeHealth		= 0;
 	probeKnockback	= 0;
+	probeArmor		= -1;
 	probeKick.Zero();
 	navBuilt			= false;
 	navFailed			= false;
@@ -8785,6 +8786,10 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 		// under the knockback time it started: no ground friction, and only
 		// air acceleration even on the ground, as idPhysics_Player applies.
 		self->health = probeHealth;
+		if ( probeArmor >= 0 ) {
+			self->inventory.armor = probeArmor;
+		}
+		probeArmor = -1;
 		probeHealth = 0;
 		if ( probeKnockback > 0 ) {
 			static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->SetKnockBack( probeKnockback );
@@ -8808,15 +8813,16 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 rvBotManager::SetProbeHealth
 ================
 */
-bool rvBotManager::SetProbeHealth( int clientNum, int health, int knockbackMsec, const idVec3 &kick ) {
+bool rvBotManager::SetProbeHealth( int clientNum, int health, int knockbackMsec, const idVec3 &kick, int armor ) {
 	if ( !gameLocal.isServer || gameLocal.isClient || !gameLocal.GetLocalPlayer() || gameLocal.numClients != 2 ||
 		 NumBots() != 1 || !IsBot( clientNum ) || gameLocal.mpGame.IsManagedMatch() || !gameLocal.CheatsOk( false ) ||
-		 health < 1 || health > 1000 || knockbackMsec < 0 || knockbackMsec > 1000 ||
+		 health < 1 || health > 1000 || knockbackMsec < 0 || knockbackMsec > 1000 || armor < -1 || armor > 1000 ||
 		 !( kick.LengthSqr() <= Square( 10000.0f ) ) ) {
 		return false;
 	}
 	probeHealth = health;
 	probeKnockback = knockbackMsec;
+	probeArmor = armor;
 	probeKick = kick;
 	return true;
 }

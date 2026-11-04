@@ -744,6 +744,11 @@ int main() {
         // platform even when coasting would leave it over a void.
         solids.clear(); Platform(-1024,0,0);
         CHECK(nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0}));
+        // At this rim only the expiration frame's restored friction and
+        // ground acceleration retain support. One extra knock frame loses it.
+        CHECK(nav.KnockSlideLandingSafe({-136,0,0.25f},{700,0,0},200,inf,{-1,0,0}));
+        CHECK(!nav.KnockSlideLandingSafe({-136,0,0.25f},{700,0,0},216,inf,{-1,0,0}));
+        CHECK(!nav.KnockSlideLandingSafe({-132,0,0.25f},{700,0,0},200,inf,{-1,0,0}));
         CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{1,0,0}));
         floorMaterial.flags=SURF_SLICK;
         CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0})); floorMaterial.flags=0;
