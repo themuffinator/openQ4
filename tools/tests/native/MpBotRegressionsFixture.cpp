@@ -235,8 +235,14 @@ struct rvNavPath {
 struct Nav {
     bool slideCoastSafe=false;
     bool slideInputSafe=false;
-    bool KnockSlideLandingSafe(const idVec3&,const idVec3&,int,float,const idVec3& wish) const { return slideCoastSafe || (slideInputSafe && wish.x>0.70f && wish.x<0.71f && wish.y>0.70f); }
-    bool IsValid() const { return true; }
+    mutable idVec3 lastSlideOrigin,lastSlideVelocity;
+    mutable int slideChecks=0,lastSlideKnock=0;
+    bool valid=true;
+    bool KnockSlideLandingSafe(const idVec3& origin,const idVec3& velocity,int knock,float,const idVec3& wish=vec3_origin) const {
+        ++slideChecks; lastSlideOrigin=origin; lastSlideVelocity=velocity; lastSlideKnock=knock;
+        return slideCoastSafe || (slideInputSafe && wish.x>0.70f && wish.x<0.71f && wish.y>0.70f);
+    }
+    bool IsValid() const { return valid; }
     int probes=0,searches=0,fields=0,snaps=0,lastTargets=-1;
     bool roam=false,fieldLive=false;
     int transport=-1;
@@ -544,6 +550,12 @@ bool BotChooseAirInput(idPlayer* self,idVec3& wish) {
     wish=idVec3(-self->physics.velocity.x,-self->physics.velocity.y,0); wish.Normalize(); return true;
 }
 bool BotMoveDirectionSafe(idPlayer*,const idVec3&) { return moveDirectionSafe; }
+struct botCombatShotModel_t {
+    float splashRadius=128,selfKnockback=80,power=1,attackerScale=0.5f,selfPushScale=2;
+};
+struct { float GetFloat() const { return 1000; } } g_knockback;
+bool selfBlastExposed=true;
+bool BotCombatPredictedBoundsExposed(idPlayer*,idEntity*,const idVec3&,float) { return selfBlastExposed; }
 // PRODUCTION_FUNCTIONS
 // The manager publishes only an approach confirmed within the stale window.
 bool rvBotManager::PadApproachOf(int i,int& pad,int& since,idVec3& launch,idVec3& landing) const {
@@ -1513,7 +1525,32 @@ void TestRecoveryEdge() {
     CHECK(cmd.forwardmove>0); // ground guard cannot take over an airborne recovery
     std::puts("Recovery edge: nearest-node and wander commands brake before void; rescue toward support and broad floor remain usable: PASS");
 }
+void TestSelfKnockback() {
+    idPlayer self; self.physics.origin={}; self.physics.velocity={10,0,0};
+    botCombatShotModel_t model; navMesh={}; selfBlastExposed=true;
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    CHECK(navMesh.lastSlideKnock==80 && navMesh.lastSlideVelocity.Compare({10,0,400}));
+    navMesh.slideCoastSafe=true;
+    CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    navMesh.slideCoastSafe=false; model.attackerScale=0.25f; model.selfPushScale=3;
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    CHECK(navMesh.lastSlideKnock==50 && navMesh.lastSlideVelocity.Compare({10,0,300}));
+    model={}; self.physics.velocity={100,0,0};
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{50,0,0},model,0.5f));
+    CHECK(navMesh.lastSlideOrigin.Compare({50,0,0}) && navMesh.lastSlideVelocity.Compare({100,0,400}));
+    const int calls=navMesh.slideChecks;
+    CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{500,0,0},model,0));
+    selfBlastExposed=false; CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    selfBlastExposed=true; model.selfPushScale=0; CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    model={}; model.attackerScale=0; CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    model={}; model.selfKnockback=0.1f; CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    model={}; navMesh.valid=false; CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    CHECK(navMesh.slideChecks==calls);
+    navMesh={};
+    std::puts("Self splash: supported slide, exposure, future pose, exact push scaling and timer: PASS");
+}
 int main(int argc,char** argv) {
+    if(argc==1 || !std::strcmp(argv[1],"selfknock")) TestSelfKnockback();
     if(argc==1 || !std::strcmp(argv[1],"goals")) TestGoals();
     if(argc==1 || !std::strcmp(argv[1],"perception")) TestPerception();
     if(argc==1 || !std::strcmp(argv[1],"hearing")) TestHearing();

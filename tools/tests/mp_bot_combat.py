@@ -341,17 +341,22 @@ def validate_team_knockback_throw() -> None:
     model = function_body(combat, "static bool BotCombatCurrentShotModel(")
     require(model, 'splash->GetInt( "knockback_team", va( "%d", knockback ) )', context)
     require(model, "model.power = power;", context)
+    require(model, 'model.selfKnockback\t= gameLocal.IsTeamGame() ? model.teamKnockback : (float)Max( 0, knockback );', "self knockback mode")
+    require(model, 'splash->GetFloat( "attackerPushScale", "2" )', "self push scale")
 
     line_of_fire = function_body(combat, "bool BotCombatLineOfFireIsSafe(")
     require(line_of_fire, "BotCombatSplashThrowsTeamMate( shooter, splashIgnore, actualImpact, shotModel, impactTime )", context)
     # It runs after both team-damage branches, so it covers team damage on and off.
     require_before(line_of_fire, "BOTCOMBAT_TEAM_PUSH_RADIUS", "BotCombatSplashThrowsTeamMate(", context)
+    require_before(line_of_fire, "BotCombatSplashThrowsShooter( shooter, splashIgnore, actualImpact, shotModel, impactTime )",
+                   "const float selfDamage", "self trajectory before health-only splash trade")
 
     game = read("src/mpgame/Game_local.cpp")
     radius = function_body(game, "void idGameLocal::RadiusDamage(")
     require(radius, "idVec3( 0.0f, 0.0f, 31.875f )", "RadiusDamage push direction the bot predicts")
     require(radius, "dir[2] += 24;", "RadiusDamage push direction the bot predicts")
     require(radius, "damageScale = dmgPower * ( 1.0f - dist / radius );", "RadiusDamage falloff the bot predicts")
+    require(radius, "damageScale *= attackerDamageScale;", "RadiusDamage self falloff")
     player = read("src/mpgame/Player.cpp")
     require(player, 'damageDef->dict.GetInt( "knockback_team", va( "%d", knockback ), knockback );', "player team knockback")
     require(player, "kick *= g_knockback.GetFloat() * knockback * attackerPushScale / 200.0f;", "player knockback scale")

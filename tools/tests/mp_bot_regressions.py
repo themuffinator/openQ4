@@ -74,6 +74,7 @@ def main() -> None:
         "void rvBot::UpdateGoal(",
     ))
     bodies += function(combat, "bool BotCombatFindIncomingProjectileThreat(")
+    bodies += function(combat, "static bool BotCombatSplashThrowsShooter(")
     bodies += function(physics, "float idPhysics_Player::CmdScale(")
     bodies += "\n".join(function(network, signature) for signature in (
         "void idGameLocal::QueueUnreliableMessage(",
@@ -121,6 +122,12 @@ def main() -> None:
             ("early grounded steering", "!proven && i < 16", "!proven && i < 0"),
             ("low-speed edge brake", "moveDir *= Min( 1.0f, speed / Max( 1.0f, pm_speed.GetFloat() ) );",
              "moveDir *= 1.0f;"),
+            ("self splash damage scale", "( 1.0f - distance / model.splashRadius ) * model.attackerScale",
+             "( 1.0f - distance / model.splashRadius )"),
+            ("self splash push scale", "(float)knockback * model.selfPushScale / 200.0f",
+             "(float)knockback / 200.0f"),
+            ("self splash knockback timer", "idMath::ClampInt( 50, 200, knockback * 2 ), idMath::INFINITY",
+             "200, idMath::INFINITY"),
         ):
             assert harness.count(anchor) == 1
             cpp.write_text(harness.replace(anchor, replacement), encoding="utf-8")

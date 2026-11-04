@@ -56,6 +56,8 @@ struct botCombatShotModel_t {
 	float		 directDamage;		// def_damage on a direct hit
 	float		 power;				// the shooter's powerup scale on the blast
 	float		 teamKnockback;		// the splash's knockback_team, else knockback
+	float		 selfKnockback;		// ordinary or team-mode knockback, before self scaling
+	float		 selfPushScale;		// idPlayer::Damage's attackerPushScale
 
 	botCombatShotModel_t() :
 		projectileDef( NULL ),
@@ -70,7 +72,9 @@ struct botCombatShotModel_t {
 		attackerScale( 0.5f ),
 		directDamage( 0.0f ),
 		power( 1.0f ),
-		teamKnockback( 0.0f ) {
+		teamKnockback( 0.0f ),
+		selfKnockback( 0.0f ),
+		selfPushScale( 2.0f ) {
 	}
 };
 
@@ -203,6 +207,8 @@ static bool BotCombatCurrentShotModel( idPlayer *shooter, botCombatShotModel_t &
 		// idPlayer::Damage reads knockback_team in team games, falling back to knockback.
 		const int knockback = splash->GetInt( "knockback", "0" );
 		model.teamKnockback	= (float)Max( 0, splash->GetInt( "knockback_team", va( "%d", knockback ) ) );
+		model.selfKnockback	= gameLocal.IsTeamGame() ? model.teamKnockback : (float)Max( 0, knockback );
+		model.selfPushScale	= Max( 0.0f, splash->GetFloat( "attackerPushScale", "2" ) );
 	}
 
 	const char *directName = model.projectileDef->GetString( "def_damage", "" );
@@ -487,15 +493,56 @@ static bool BotCombatSplashThreatensTeamMate( idPlayer *shooter, idEntity *splas
 
 /*
 ================
+BotCombatSplashThrowsShooter
+
+Health-only splash trades miss the shooter's own knockback. Follow the exact
+self scaling and require supported ground after the slide/flight before firing.
+================
+*/
+static bool BotCombatSplashThrowsShooter( idPlayer *shooter, idEntity *splashIgnore,
+		const idVec3 &impact, const botCombatShotModel_t &model, float impactTime ) {
+	if ( !shooter || !shooter->GetPhysics() || !navMesh.IsValid() ||
+		model.splashRadius <= 0.0f || model.selfKnockback <= 0.0f ||
+		model.attackerScale <= 0.0f || model.selfPushScale <= 0.0f ) {
+		return false;
+	}
+	const float leadTime = Max( 0.0f, impactTime );
+	const idVec3 velocity = shooter->GetPhysics()->GetLinearVelocity();
+	const idVec3 origin = shooter->GetPhysics()->GetOrigin() + velocity * leadTime;
+	const idBounds predicted = shooter->GetPhysics()->GetAbsBounds() + velocity * leadTime;
+	const float distance = predicted.ShortestDistance( impact );
+	if ( distance >= model.splashRadius ||
+		!BotCombatPredictedBoundsExposed( shooter, splashIgnore, impact, leadTime ) ) {
+		return false;
+	}
+	// RadiusDamage scales self damage before Damage truncates knockback;
+	// attackerPushScale applies afterwards and does not lengthen the timer.
+	const int knockback = (int)( model.selfKnockback * model.power *
+		( 1.0f - distance / model.splashRadius ) * model.attackerScale );
+	if ( knockback <= 0 ) {
+		return false;
+	}
+	idVec3 direction = ( origin + idVec3( 0.0f, 0.0f, 31.875f ) ) - impact;
+	direction.z += 24.0f;
+	if ( direction.Normalize() <= 0.0f ) {
+		return false;
+	}
+	const idVec3 kick = direction * ( g_knockback.GetFloat() * (float)knockback * model.selfPushScale / 200.0f );
+	// An affordable health trade can still throw the shooter into the void.
+	// Prove the grounded slide as well as the flight; ordinary stopping friction
+	// is unavailable during the new knockback interval.
+	return !navMesh.KnockSlideLandingSafe( origin, velocity + kick,
+		idMath::ClampInt( 50, 200, knockback * 2 ), idMath::INFINITY );
+}
+
+/*
+================
 BotCombatSplashThrowsTeamMate
 
 Team damage on or off, RadiusDamage pushes every exposed hull in a blast and
-idPlayer::Damage applies knockback_team to a team-mate either way.  A rocket
-beside a team-mate on a walkway can throw them into the void: a q4ctf5 bot died
-to a team-mate's rocket that way.  Predict each team-mate's kick as the game
-will apply it - the falloff scale, the fudged multiplayer push direction and
-g_knockback - and refuse a blast that would leave one falling, with no input,
-onto ground that does not hold them.
+idPlayer::Damage applies knockback_team to a team-mate either way. A rocket
+beside a team-mate on a walkway can throw them into the void. Predict the
+falloff, multiplayer push direction and g_knockback, then require a landing.
 ================
 */
 static bool BotCombatSplashThrowsTeamMate( idPlayer *shooter, idEntity *splashIgnore,
@@ -881,6 +928,9 @@ bool BotCombatLineOfFireIsSafe( idPlayer *shooter, idPlayer *intendedFoe,
 	idEntity *splashIgnore = BotCombatSplashIgnore( hit, intendedFoe );
 	const bool impactKnown = hit != NULL || !sweepCapped;
 	if ( projectileShot && impactKnown && shotModel.splashRadius > 0.0f ) {
+		if ( BotCombatSplashThrowsShooter( shooter, splashIgnore, actualImpact, shotModel, impactTime ) ) {
+			return false;
+		}
 		const float selfDamage = BotCombatSplashDamageTo( shooter, shooter, splashIgnore,
 			actualImpact, shotModel, impactTime );
 		if ( selfDamage > 0.0f ) {
