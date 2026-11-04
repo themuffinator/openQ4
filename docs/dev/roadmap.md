@@ -2287,6 +2287,14 @@ Completion substeps must keep three forms of evidence distinct:
   aim cleanup, and completion of mover-waiting attack threads. Existing v1/v2 script
   programs remain unchanged for restore compatibility.
   Full driven traversal and race balance remain open under this item.
+
+  M08/M09 scrutiny, 4 November: versioned mission corrections address the
+  cooling-button race/re-entry, squad and cinematic handoffs, repair loops,
+  light-taunt ranges and the finale's intro/docking boundary. Original script
+  programs remain available to older saves. See the
+  [late-mission audit and runtime limits](awakening-missions.md#m08-cryofac-and-m09-valkaryne--4-november-2026).
+  Normal combat, complete traversal and timed extraction remain qualification
+  requirements; focused script callbacks do not close this work item.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented

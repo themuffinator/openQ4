@@ -36,6 +36,7 @@ void idWorldspawn::Spawn( void ) {
 
 	assert( gameLocal.world == NULL );
 	gameLocal.world = this;
+	Awakening_PrepareLateMission( spawnArgs );
 
 	// load script
 	scriptname = gameLocal.GetMapName();

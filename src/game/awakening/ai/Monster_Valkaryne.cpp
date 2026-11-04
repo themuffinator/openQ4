@@ -29,12 +29,14 @@
 	expansion's code parsed the key without calling it, so she never docked:
 	she walked about harmless and could be killed before the Makron sphere,
 	skipping the fight the script builds around the sphere (it undocks her when
-	the sphere dies). Here she asks for it the first time she has an enemy,
+	the sphere dies). On original-script saves she asks for it when she first has an enemy,
 	which the intro gives her with becomeAggressive() just as it starts the
 	sphere's shields. The key names the function without its map_m09
 	namespace, so a name that does not resolve is looked up as the one script
 	function of that name in any namespace. Whether she asked is kept in her
-	spawn args, which the savegame carries.
+	spawn args, which the savegame carries. Corrected fresh M09 maps start docking
+	during the intro and supply the versioned callback explicitly. Before phase
+	two she is immune even during the handoff to that script.
 
 ===============================================================================
 */
@@ -50,6 +52,7 @@ public:
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			AdjustHealthByDamage( int damage );
+	virtual bool			Pain( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
 
 protected:
 	virtual bool			CanMove( void ) const;
@@ -59,6 +62,7 @@ protected:
 private:
 	void					SetDocked( bool dock );
 	bool					RequestDocking( void );
+	bool					DamageProtected( void ) const;
 
 	rvAIAction				actionPluginAttackBig;
 	bool					docked;
@@ -203,13 +207,14 @@ Starts the "requestDocking" script, once; true when it did.
 */
 bool riMonsterValkaryne::RequestDocking( void ) {
 	const char *funcName = spawnArgs.GetString( "requestDocking" );
-	if ( !funcName[0] || spawnArgs.GetBool( "openq4_dockingRequested" ) ) {
+	if ( !funcName[0] || spawnArgs.GetBool( "openq4_dockingRequested" ) ||
+		spawnArgs.GetBool( "openq4_dockingComplete" ) ) {
 		return false;
 	}
 	spawnArgs.SetBool( "openq4_dockingRequested", true );
 
 	const function_t *func = FindScriptFunctionAnyNamespace( funcName );
-	if ( func == NULL ) {
+	if ( func == NULL || func->eventdef != NULL || func->type->NumParameters() != 0 ) {
 		gameLocal.Warning( "%s: no docking script '%s'", name.c_str(), funcName );
 		return false;
 	}
@@ -224,10 +229,25 @@ bool riMonsterValkaryne::RequestDocking( void ) {
 riMonsterValkaryne::AdjustHealthByDamage
 ================
 */
+bool riMonsterValkaryne::DamageProtected( void ) const {
+	// The finale must not be killed during its intro or the frame before its
+	// docking thread runs. Cinematic copies without a docking request retain
+	// their authored damage rules. Store the phase in already-serialized args.
+	const bool awaitingSphere = spawnArgs.GetString( "requestDocking" )[0] &&
+		!spawnArgs.GetBool( "openq4_dockingComplete" ) && actionRangedAttack.fl.disabled;
+	return docked || undockRequested || awaitingSphere;
+}
+
 void riMonsterValkaryne::AdjustHealthByDamage( int damage ) {
-	if ( !docked ) {
+	if ( !DamageProtected() ) {
 		health -= damage;
 	}
+}
+
+bool riMonsterValkaryne::Pain( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location ) {
+	// Health-only immunity still let shots interrupt every docked volley.
+	// The sphere's scripted pain animation remains under the map's control.
+	return !DamageProtected() && idAI::Pain( inflictor, attacker, damage, dir, location );
 }
 
 /*
@@ -290,6 +310,9 @@ riMonsterValkaryne::Event_Docked
 ================
 */
 void riMonsterValkaryne::Event_Docked( void ) {
+	if ( undockRequested || spawnArgs.GetBool( "openq4_dockingComplete" ) ) {
+		return;
+	}
 	SetDocked( true );
 }
 
@@ -299,6 +322,11 @@ riMonsterValkaryne::Event_Undock
 ================
 */
 void riMonsterValkaryne::Event_Undock( void ) {
+	if ( health <= 0 || spawnArgs.GetBool( "openq4_dockingComplete" ) ) {
+		return;
+	}
+	// An early sphere kill still consumes the one-time docking request.
+	spawnArgs.SetBool( "openq4_dockingRequested", true );
 	undockRequested = true;
 }
 
@@ -333,6 +361,7 @@ stateResult_t riMonsterValkaryne::State_Undock( const stateParms_t &parms ) {
 			if ( AnimDone( ANIMCHANNEL_TORSO, parms.blendFrames ) ) {
 				SetDocked( false );
 				undockRequested = false;
+				spawnArgs.SetBool( "openq4_dockingComplete", true );
 				return SRESULT_DONE;
 			}
 			return SRESULT_WAIT;

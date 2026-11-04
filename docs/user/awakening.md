@@ -65,6 +65,11 @@ What openQ4 changed so the expansion's content loads at all:
   quads the flare effect expects, which logged a warning hundreds of times a
   second; openQ4 now warns once per material.
 
+Cryofac and the finale also receive mission-script corrections: cooling controls
+cannot restart the cold damage when pressed repeatedly, squad and animation
+handoffs complete, and the Valkaryne's sphere phase starts during her intro.
+Restart m08 or m09 to use these changes; older saves keep their original scripts.
+
 ## What openQ4 rebuilt
 
 | Element | Where | What it does |
