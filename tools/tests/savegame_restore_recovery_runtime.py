@@ -114,7 +114,7 @@ def gui_fixtures(data):
     raise AssertionError('No framed, nonempty GUI record was found.')
 
 
-def damaged_fixtures(data, spawn_refs=False, threads=False, events=False):
+def damaged_fixtures(data, spawn_refs=False, threads=False, events=False, legacy_events=False):
     _, metadata = checksum_fixture(data)
     position = metadata['server_info_sync']
     sequence = 0
@@ -183,7 +183,7 @@ def damaged_fixtures(data, spawn_refs=False, threads=False, events=False):
     client_entities = table(capacity('CENTITYNUM_BITS'))
     first_free_offset = position
     assert 0 <= integer() < capacity('GENTITYNUM_BITS')
-    if spawn_refs or threads or events:
+    if spawn_refs or threads or events or legacy_events:
         assert 0 <= integer() <= 4096  # num_entities
         assert 0 < integer() <= metadata['objects']  # world
         for maximum in (4096, 8192, 4096, 4096):
@@ -230,11 +230,11 @@ def damaged_fixtures(data, spawn_refs=False, threads=False, events=False):
         original = integer()  # lastAIAlertActor
         skip(3*4)  # lastAIAlertEntity and both alert times
         dictionary()  # spawnArgs proves the next complete sync boundary
-        if events:
+        if events or legacy_events:
             skip(4*4+12)  # player PVS, connected areas and gravity
             boolean()  # influenceActive
             skip(4)  # nextGibTime
-            return event_fixtures(data, position)
+            return event_fixtures(data, position, legacy=legacy_events)
         parsed, _ = render_handle_fixture(data)
         entity = parsed['ForeignModelHandle'][1]
         assert entity['entity_class'] == 'func_static'
@@ -267,8 +267,8 @@ def damaged_fixtures(data, spawn_refs=False, threads=False, events=False):
     return fixtures, metadata
 
 
-def event_fixtures(data, offset):
-    """Decode the first two typed queue entries before mutating their fields."""
+def event_fixtures(data, offset, legacy=False):
+    """Decode typed queue entries before changing fields or appending a legacy record."""
     entries, metadata = class_table(data)
     classes = {entry['index']: entry['name'] for entry in entries}
     position = offset
@@ -299,7 +299,7 @@ def event_fixtures(data, offset):
     count = integer()
     assert 2 <= count <= 8192
     records = []
-    for _ in range(2):
+    for _ in range(count if legacy else 2):
         record = dict(time_offset=position, time=integer())
         record['name_start'], record['name_end'], record['name'] = string()
         record['type_start'], record['type_end'], record['type'] = string()
@@ -318,8 +318,12 @@ def event_fixtures(data, offset):
             elif argument == 's':
                 string()
             else:
-                raise AssertionError('Use a source with no trace arguments in its first two events.')
+                raise AssertionError('Use a source with no trace arguments in the decoded events.')
         records.append(record)
+    if legacy:
+        assert [r['time'] for r in records] == sorted(r['time'] for r in records)
+        assert records[-1]['time'] < 2147483000
+        return legacy_event_fixtures(data, offset, position, records, classes, metadata)
     first, second = records
     assert -2147483648 < first['time'] <= second['time']
     result = {}
@@ -356,6 +360,52 @@ def event_fixtures(data, offset):
     text('UnsupportedEvent', 'name', unsupported,
          "target class '%s' does not support event '%s'" % (first['type'], unsupported))
     metadata.update(event_count=count, first_events=records)
+    return result, metadata
+
+
+def legacy_event_fixtures(data, offset, end, records, classes, metadata):
+    """Synthetic raw-argument records inside a current Windows x64 container.
+
+    The native event test pins these sizes/offsets against the production trace
+    types. This exercises the legacy argument reader, not a historical writer.
+    """
+    assert re.search(r'#define\s+MAX_STRING_LEN\s+128', (ROOT/'src/game/script/Script_Program.h').read_text())
+    assert struct.unpack_from('<4sii', data, len(data)-36) == (b'OQ4F', 1, len(data)-36)
+    thread = next(index for index, name in classes.items() if name == 'idThread')
+    trigger = next(index for index, name in classes.items() if name == 'idTrigger_Multi')
+
+    def string(value):
+        value = value.encode('ascii')
+        return struct.pack('<i', len(value))+value
+
+    def append(event_name, target, raw, expected):
+        event = struct.pack('<i', 2147483000)+string(event_name)+string(classes[target])+struct.pack('<ii', target, len(raw))
+        changed = bytearray(data[:end]+event+raw+data[end:])
+        struct.pack_into('<i', changed, offset, len(records)+1)
+        struct.pack_into('<i', changed, len(changed)-28, len(changed)-36)  # embedded footer offset
+        struct.pack_into('<II', changed, len(changed)-8, len(changed)-16, zlib.crc32(changed[:-16]))
+        checksum_fixture(changed)
+        return bytes(changed), dict(event=event_name, target=target, target_class=classes[target],
+            record_offset=end, arguments_offset=end+len(event), expected=expected)
+
+    # Old trace bytes contain obsolete process addresses. Only presence matters.
+    trace = bytearray(128)
+    struct.pack_into('<f', trace, 0, 0.25)
+    struct.pack_into('<Q', trace, 56+40, 0x1234)  # contact material
+    struct.pack_into('<Q', trace, 56+64, 0x5678)  # contact material type
+    entity = bytes(8)  # an expired/NULL entity reference; the future event never runs
+    material = b'_default\0'.ljust(128, b'\0')
+    result = {
+        'LegacyString': append('print', thread, b'x'*128,
+                               "unterminated legacy string on arg 0 of event 'print'"),
+        'LegacyTraceFlag': append('<touch>', trigger, entity+b'\x02'+trace+material,
+                                  "invalid legacy trace flag on arg 1 of event '<touch>'"),
+        'LegacyMaterialName': append('<touch>', trigger, entity+b'\x01'+trace+b'x'*128,
+                                    "unterminated legacy trace material on arg 1 of event '<touch>'"),
+    }
+    metadata.update(event_count=len(records), legacy_trace_size=128, legacy_contact_offset=56,
+                    valid_material='_default', material_name_offset=result['LegacyMaterialName'][1]['arguments_offset']+8+1+128,
+                    scope='Synthetic legacy argument records in a current container, not original-writer evidence.')
     return result, metadata
 
 
@@ -1078,7 +1128,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--ui', choices=('retained', 'classic'), default='retained')
     parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
-    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics', 'animation', 'af', 'events'), default='registrations')
+    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics', 'animation', 'af', 'events', 'legacy-events'), default='registrations')
     parser.add_argument('--unavailable-pause-menu', action='store_true',
                         help='Also exercise optional retained-menu fallback during valid save loading.')
     parser.add_argument('--timeout', type=int, default=240)
@@ -1103,7 +1153,7 @@ def main():
                                                     physics=args.cases == 'physics')
                          if args.cases in ('render-handles', 'bindings', 'movers', 'physics')
                          else damaged_fixtures(original, spawn_refs=args.cases == 'spawn-refs', threads=args.cases == 'threads',
-                                               events=args.cases == 'events'))
+                                               events=args.cases == 'events', legacy_events=args.cases == 'legacy-events'))
     output.mkdir(parents=True, exist_ok=False)
     save = output/'save'
     # A separate test mod gives the local fault fixture precedence over staged

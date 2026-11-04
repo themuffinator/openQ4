@@ -66,7 +66,7 @@ static size_t idEvent_GetLegacyArgLayout( const idEventDef *eventdef, size_t off
 	return size;
 }
 
-static void idEvent_ConvertLegacyRawArgs( const idEventDef *eventdef, byte *dest, const byte *source,
+static void idEvent_ConvertLegacyRawArgs( idRestoreGame *savefile, const idEventDef *eventdef, byte *dest, const byte *source,
 		const size_t legacyOffsets[ D_EVENT_MAXARGS ] ) {
 	const char *formatspec = eventdef->GetArgFormat();
 
@@ -87,15 +87,33 @@ static void idEvent_ConvertLegacyRawArgs( const idEventDef *eventdef, byte *dest
 			copySize = E_EVENT_SIZEOF_VEC;
 			break;
 		case D_EVENT_STRING:
+			if ( memchr( sourcePtr, '\0', MAX_STRING_LEN ) == NULL ) {
+				savefile->Error( "idEvent::Restore: unterminated legacy string on arg %d of event '%s'", i, eventdef->GetName() );
+			}
 			copySize = MAX_STRING_LEN;
 			break;
 		case D_EVENT_TRACE: {
+			if ( *sourcePtr > 1 ) {
+				savefile->Error( "idEvent::Restore: invalid legacy trace flag on arg %d of event '%s'", i, eventdef->GetName() );
+			}
 			const bool hasTrace = *sourcePtr != 0;
 			*reinterpret_cast<bool *>( destPtr ) = hasTrace;
 			if ( hasTrace ) {
 				memcpy( destPtr + EVENT_TRACE_DATA_OFFSET, sourcePtr + sizeof( bool ), sizeof( trace_t ) );
 				memcpy( destPtr + EVENT_TRACE_MATERIAL_OFFSET,
 					sourcePtr + sizeof( bool ) + sizeof( trace_t ), MAX_STRING_LEN );
+				trace_t *trace = reinterpret_cast<trace_t *>( destPtr + EVENT_TRACE_DATA_OFFSET );
+				if ( trace->c.material != NULL ) {
+					const char *materialName = reinterpret_cast<const char *>( destPtr + EVENT_TRACE_MATERIAL_OFFSET );
+					if ( memchr( materialName, '\0', MAX_STRING_LEN ) == NULL ) {
+						savefile->Error( "idEvent::Restore: unterminated legacy trace material on arg %d of event '%s'", i, eventdef->GetName() );
+					}
+					// Repair the saved address before an immediate resave can use it.
+					trace->c.material = declManager->FindMaterial( materialName, true );
+				}
+				// The raw format saved no material-type name or hit-map coordinates.
+				// Its old address cannot survive a load; use the material's base type.
+				trace->c.materialType = trace->c.material != NULL ? trace->c.material->GetMaterialType() : NULL;
 			}
 			break;
 		}
@@ -1057,7 +1075,7 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 				throw idAllocError( "restored legacy idEvent data allocation failed" );
 			}
 			memset( event->data, 0, eventArgSize );
-			idEvent_ConvertLegacyRawArgs( event->eventdef, event->data, legacyData.get(), legacyOffsets );
+			idEvent_ConvertLegacyRawArgs( savefile, event->eventdef, event->data, legacyData.get(), legacyOffsets );
 		} else {
 			event->data = NULL;
 		}

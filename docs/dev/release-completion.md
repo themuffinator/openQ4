@@ -66,6 +66,19 @@ See [player release status](../user/release-status.md).
   lens edges retain antialiasing. Continuous-motion regression checks cover
   1080p, 4K and portrait layouts. See [measurements and validation](ui/runtime-performance.md#moving-weapon-scopes-4-november-2026).
 
+## Safer legacy save restoration, 4 November 2026
+
+- Older saves with queued collision events now restore their material references
+  before gameplay or an immediate resave. Damaged event strings and trace flags
+  return to Load Game instead of reaching callbacks with unsafe data.
+- No save migration is needed. The oldest raw trace format uses the material's
+  base surface type when it did not record a per-hit type; current saves retain
+  their separately saved type. See [scope and evidence](savegame-reliability.md#legacy-event-strings-and-trace-resources).
+- Both game libraries pass Windows/Linux regression controls and 60 focused
+  Windows checks. Damaged records recover on OpenGL/Vulkan, and a healthy legacy
+  trace can be resaved immediately and loaded again. All 11 existing historical
+  save fixtures still restore into gameplay.
+
 ## Damaged queued events recover safely, 4 November 2026
 
 - Saves with unsupported queued callbacks or out-of-order event times now

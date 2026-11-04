@@ -524,7 +524,7 @@ if get_option('build_native_tests')
   foreach game_mode : ['game', 'mpgame']
     restore_events_source = custom_target(
       'openq4-restore-events-' + game_mode + '-source',
-      input: files('src' / game_mode / 'gamesys' / 'Event.cpp', 'src/idlib/containers/LinkList.h'),
+      input: files('src' / game_mode / 'gamesys' / 'Event.cpp', 'src/idlib/containers/LinkList.h', 'src/cm/CollisionModel.h'),
       output: 'RestoreEvents-' + game_mode + '.cpp',
       command: [py, files('tools/tests/savegame_restore_events.py'), '--generate-native', game_mode, '@OUTPUT@'],
     )

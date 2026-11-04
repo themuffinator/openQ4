@@ -1168,6 +1168,68 @@ run and the inspected engine capture sheet. These checks cover the identified
 event-queue boundaries; Q4-05's broader owning-graph and platform qualification
 remains open.
 
+### Legacy event strings and trace resources
+
+A further 4 November Q4-05 audit found that raw event arguments could reach
+callbacks with unterminated strings. Their trace material names were also
+unbounded, and raw trace material/type pointers still referred to the writer's
+process. Dispatch repaired the material pointer only when the event ran; an
+immediate resave could dereference it first, and the material-type pointer
+was never repaired.
+
+Both game libraries now require a terminator within each used legacy string
+field and a trace-presence byte of zero or one. Present trace materials resolve
+by their bounded saved name during restore. The raw format contains no
+material-type name or hit-map coordinates, so its material type is rebuilt
+from the resolved material's base type, or cleared when there is no material.
+Current typed traces keep their separately saved material type. Empty strings,
+terminators in the last byte, absent traces and unused material-name bytes
+remain valid. The save writer and layouts are unchanged.
+
+The existing native event fixture now extracts the production contact/trace
+structures as well as the queue reader and conversion code. It checks empty,
+maximum-length and unterminated strings; absent/present/invalid trace flags;
+unused name bytes; stale material and type addresses; mixed arguments;
+interrupted reads and a throwing material lookup. Valid traces contain live
+resources before any event dispatch or immediate typed resave. Both libraries
+pass on Windows and Linux and reject **18 deliberate regressions per platform**.
+
+The runtime fixture generator adds `--cases legacy-events`. It decodes a
+healthy queue and appends a future legacy record, preserving the original
+world and event ordering. It updates the embedded footer offset, protected
+length and CRC. Three malformed records exercise string termination, trace
+flags and material-name termination. These are synthetic host-ABI legacy
+arguments in a current container, not new historical-writer evidence.
+
+The staged Windows x64 candidate passes **60/60 focused native tests** and all
+**three damaged-record cases on each of OpenGL and Vulkan**. Each case reaches
+the expected legacy decoder guard, returns to the retained Load Game page and
+permits a healthy reload in the same process. All input files remain unchanged.
+Engine captures show both recovery and restored Storage1 gameplay.
+
+A separate healthy synthetic trace retains obsolete material addresses but a
+valid saved name. It restores on OpenGL, immediately resaves while game time is
+frozen, then runs 180 game tics and saves again with no unresolved references.
+The frozen resave loads on Vulkan and repeats that sequence. Both frozen saves
+retain the input object table. Decoding their queued trace confirms the current
+typed argument encoding, fraction `0.25`, material `_default` and an empty
+serialized material-type name. The old pointer
+values cannot reach the typed writer. Whole-save byte equality is not claimed.
+
+All **11 existing 0.9–0.13 release fixtures** still restore and run gameplay on
+OpenGL, with their original files unchanged. This is regression coverage of
+the existing corpus, not new historical-writer evidence.
+
+The initial full build compiled successfully but its post-build stage lacked
+the OpenAL runtime in this worktree. An independent copy of the existing
+project DLL supplied that dependency; the subsequent build and staging passed.
+Existing Meson include-directory and runtime asset-precache warnings remain.
+Evidence is indexed by `.tmp/q4-legacy-events/evidence.json` in the validation
+worktree and archived under the same relative path in the main checkout.
+The index records runtime/source hashes, native controls, both recovery runs,
+the two healthy resave legs, decoded trace fields and the historical report.
+Broader owning-graph and target-platform qualification remains open under Q4-05.
+
 ### Saving before the first frame after a load
 
 Fixed 3 November (Q4-05), in both game libraries. `ReadStaticObject` queued
