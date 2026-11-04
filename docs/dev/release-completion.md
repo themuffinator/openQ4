@@ -274,55 +274,54 @@ See [player release status](../user/release-status.md).
 
 The latest safety build passes all four long-match and all 33 map-catalog
 death/duration checks, with zero navigation falls after strict enemy-impulse
-assessment. The targeted recovery and pad-traffic checks also pass. The timing
-repeat meets its numerical limits but remains unqualified because separate SP
-tests overlapped it; see the [current evidence](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026).
+assessment. The targeted recovery and pad-traffic checks also pass. MP-02 is
+closed at the project owner's direction with an accepted timing-contention
+caveat: the six-bot CTF3 Windows x64/OpenGL run meets its numerical limits,
+but separate SP tests overlapped it and no uncontended repeat was completed.
+Controlled timing remains unqualified, and the failed report is preserved;
+see the [closeout evidence](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026).
 
 - Bots can recover when a ramp carries them into the air after they reach a
   walking waypoint or pass beside a jump pad.
 - Bots check their remaining momentum before hopping up an ordinary ledge,
   preventing a pending climb attempt from jumping back off a recovered walkway.
-  The reproduced CTF5 fall now survives; wider safety gates are under qualification.
+  The reproduced CTF5 fall now survives.
 - Low-health bots can adjust their airborne approach to a catch pad when
   a straight coast would end in a fatal landing. The reproduced descent now
-  survives and resumes navigation; broader safety qualification continues.
+  survives and resumes navigation.
 - Recovery preserves a safe landing stopped by a wall and settles its final
-  braking without drifting back off a ledge. The reproduced CTF5 fall is fixed;
-  the broader long-match, map-catalog and timing gates remain under qualification.
+  braking without drifting back off a ledge. The reproduced CTF5 fall is fixed.
 - Bots returning to a route avoid unplanned jump pads, and airborne recovery
   accounts for nearby players that can deflect a safe landing. Reproduced falls
-  pass isolated checks; final long-match and map-catalog qualification continues.
+  pass isolated checks.
 
 - Bots keep their place in a jump-pad queue while hopping up its ramp, preventing
-  a following bot from launching into them. The reproduced CTF3 collision and
-  wider safety sweeps are under qualification.
+  a following bot from launching into them. The reproduced CTF3 collision
+  now survives.
 - Bots react to small hits that spoil a ledge approach or make a jump lethal,
   and can change a stale movement command before the next physics step after
-  a hit. The remaining long-match safety gates are being rerun; see the
+  a hit. See the
   [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026).
 - Bots avoid close self-blasts during flight and account for downward momentum
-  and glancing contacts when checking a recovery landing. These further
-  corrections are undergoing the renewed traversal-safety gates.
+  and glancing contacts when checking a recovery landing.
 - Recovery continues steering after a ramp throws a bot back into the air,
   instead of treating that brief contact as a safe landing. The reproduced
-  CTF5 rocket fall and wider safety sweeps are under qualification.
+  CTF5 rocket fall now survives.
 - Recovery can preserve a coast into a working jump pad when its complete
-  onward flight has a safe landing. The recorded catch and wider safety checks
-  are still under qualification.
+  onward flight has a safe landing. The recorded catch now survives.
 - Bots can steer a dangerous knockback slide before leaving the floor and
   brake after catching a narrow ledge. Recovery also accounts for movement
   boosts so its commands match the predicted trajectory.
 - Recovery distinguishes a narrow ledge where braking can stop the bot from
-  an edge it will slide off after touching down. The remaining recorded DM8
-  rocket case and renewed safety sweeps are under qualification.
+  an edge it will slide off after touching down. The recorded DM8 rocket
+  case now survives.
 - Bots avoid the area swept by a lethal moving crusher and check whether their
   own splash weapon would throw them off supported ground before firing.
 - Bots stopped beside a narrow walking rim can slowly move onto supported
   ground, resolving the reproduced CTF6 approach stall without restoring the
   old brake oscillation.
 - Two additional recorded DM8/CTF5 poses now recover in isolated gameplay.
-  Windows/Linux regression controls pass; long-match safety remains under
-  qualification. See [evidence and limits](mp-bots.md#earlier-knockback-control-and-marginal-landings-4-november-2026).
+  Windows/Linux regression controls pass. See [evidence and limits](mp-bots.md#earlier-knockback-control-and-marginal-landings-4-november-2026).
 
 ## Multiplayer bot knockback recovery, 3 November 2026
 
@@ -330,7 +329,8 @@ tests overlapped it; see the [current evidence](mp-bots.md#unpressed-ramp-flight
   hits that first slide them across the ground. Edge braking also settles
   low-speed movement instead of repeatedly reversing it on a narrow rim.
 - Two recorded DM8 failures now survive isolated gameplay replays. The wider
-  traversal-safety gate remains open; see [qualification and limits](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026).
+  traversal-safety gate was subsequently completed with the timing caveat
+  recorded in the 4 November follow-up above; see the [original qualification and limits](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026).
 
 ## Kick votes keep their selected player, 4 November 2026
 
