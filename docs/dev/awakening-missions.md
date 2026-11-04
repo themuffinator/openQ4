@@ -71,6 +71,18 @@ encounter activation are part of that choreography, not decorative markers.
 - M04 no longer requests the nonexistent `weaponmod_goobgun_burst` starting
   upgrade. The base weapon already provides burst fire; the later flamethrower
   upgrade is not granted in its place.
+- The security alarm's 1.5-second recording was both global and looping,
+  repeating at full gain throughout the prison. It now plays locally at
+  -12 dB, immediately on activation and then every 12–16 seconds. Its 96/1400
+  unit distance range keeps the alert around the security encounter. The
+  flashing lights and original objective/console callbacks remain intact.
+  A pulse finishes naturally when disabled; no new pulse starts afterward,
+  including when the console is used during a quiet interval.
+- Three computer alarms also looped four-second recordings continuously.
+  They now play the same installed samples at -18 dB within 360 units,
+  every 19–29 seconds. They remain local machinery ambience rather than an
+  additional level-wide security warning. These timings and levels are an
+  editorial refinement inferred from the security sequence and dialogue.
 - The shared fire-volume repair from M01/M02 is retained. Directly quenching a
   large fire now skips creating an intermediate small-fire effect, stops the
   old stages and aims the new stage immediately as well as after deferred
@@ -85,6 +97,15 @@ or modify recovered map/script files. Their helpers participate in the ordinary
 saved-script list. Start M03/M04 afresh to acquire the new callbacks and entity
 references; old saves retain their original mission threads. No save layout
 changes or expansion multiplayer module are introduced.
+
+Alarm pacing also applies when loading an existing M04 save. The migration
+matches the exact map, original console function, speaker names and shaders,
+and leaves custom pacing alone. It replaces the old emitter and preserves
+whether it was on or off. Revised saves keep the existing speaker timer,
+including its pending reminder during a quiet interval. No script statements
+or serialized fields are added for this change. Computer samples use implicit
+one-shot declarations: setting `s_looping 0` alone cannot clear a loop flag
+inside the original sound declaration.
 
 The review found unused M03 ammo-jam/rear-fire sequences and an abandoned M04
 ending cinematic with references to actors the map does not contain. These are
@@ -154,6 +175,33 @@ scripted movement failure or timeout is reported. Original scenario timing,
 actor health and marine routes are unchanged in production. The earlier
 `round2-rescue-*` diagnostics retain fixture failures and the unattended control;
 they are not acceptance runs.
+
+The third-pass Windows build and stage pass. `awakening_alarm_runtime.py`
+uses the real OpenAL mixer with its null output backend, never physical input
+or desktop capture. The accepted alarm results are:
+
+| Evidence directory | Result |
+| --- | --- |
+| `round3-alarm-baseline/` | Previous binary: actual global/looping flags and full gain; produces active/off regression saves. |
+| `round3-alarm-final/` | Fresh map: 1.5-second security pulses with silent gaps and reminders, all three quieter computer samples, console shutoff, and silence at the distant bridge. Normal wall occlusion is enabled. |
+| `round3-alarm-active/`, `round3-alarm-old-off/` | Old active and inactive saves migrate without losing their logical alert state. |
+| `round3-alarm-gap/`, `round3-alarm-new-off/` | Revised saves preserve a pending reminder through a quiet gap, and keep an inactive alarm off. |
+
+Each candidate run checks shutoff during a gap, restart, and the actual
+`unlockSecRoomDoors` callback during a pulse; no later reminder revives the
+disabled alert. These checks establish mixer gain, timing and state, not a
+headphone listening assessment. Early alarm probes contain diagnostic failures
+from declaration-name filtering, inaudible distant one-shots, and placing the
+listener inside console dressing. Their reports are not acceptance results;
+the saved gap/off checkpoints used by restore probes remain regression fixtures.
+
+`round3-lock-gl/` passes M03 acquisition, locked save/load, five/one-rocket
+volleys, empty-magazine rejection and lock clearing on the new build. A custom
+110-degree FOV remains 110 through entry, restore and exit; the existing script
+offset is -10 while seated and returns to zero on exit. The engine screenshot
+also shows five loaded indicators, the selected launcher and a locked reticle.
+Gameplay/CI contracts and repository path checks pass. Full playthroughs,
+Linux/macOS runtime qualification and the other Q4-04 gates remain open.
 
 An unrelated developer-console compiler fault was reproduced while constructing
 that probe: an include inside a function reaches the file-boundary diagnostic

@@ -21,6 +21,10 @@ See [player release status](../user/release-status.md).
   unsupported animation. The missing bridge ambush destination is restored.
   Reinforcements switch to combat before reaching occupied marine cover,
   avoiding a stalled approach during the cell evacuation.
+- The prison's constant alarm is now a quieter, localized warning with long
+  pauses. Nearby computer alarms also leave room for dialogue and combat cues.
+  The security console still stops the warning, and the improvement applies
+  to existing saves as well as new games.
 - Start M03 and M04 afresh to receive their mission callback corrections.
   Older saves retain their original mission threads. See the
   [review and qualification limits](awakening-missions.md#m03-and-m04-review-4-november-2026).

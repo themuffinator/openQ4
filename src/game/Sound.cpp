@@ -3,6 +3,7 @@
 
 
 #include "Game_local.h"
+#include "awakening/PrisonAlarms.h"
 
 /*
 ===============================================================================
@@ -70,6 +71,25 @@ void idSound::Restore( idRestoreGame *savefile ) {
 	savefile->ReadVec3( shakeTranslate );
 	savefile->ReadAngles( shakeRotate );
 	savefile->ReadInt( playingUntilTime );
+
+	// Old prison saves carry the global looping emitter. Migrate its args and
+	// emitter together, preserving whether the security console already silenced
+	// it. Revised saves retain their serialized timer (including quiet gaps).
+	if ( Awakening_RepairPrisonAlarm( spawnArgs ) ) {
+		idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
+		const bool wasOn = timerOn || ( emitter && emitter->CurrentlyPlaying() );
+		CancelEvents( &EV_Speaker_Timer );
+		FreeSoundEmitter( true );
+		gameEdit->ParseSpawnArgsToRefSound( &spawnArgs, &refSound );
+		refSound.listenerId = entityNumber + 1;
+		spawnArgs.GetFloat( "wait", "0", wait );
+		spawnArgs.GetFloat( "random", "0", random );
+		timerOn = false;
+		playingUntilTime = 0;
+		if ( wasOn ) {
+			PostEventMS( &EV_Speaker_On, 0 );
+		}
+	}
 }
 
 /*

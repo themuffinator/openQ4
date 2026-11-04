@@ -947,7 +947,8 @@ void riVCWPulseCannon::Select( bool select ) {
 	The rocket screen counts a five-rocket magazine: empty on firing
 	(rocketEmpty), one more rocket loaded every "loaddelay" seconds
 	(firstRocketLoaded ... fifthRocketLoaded), also while the pulse cannon is
-	selected. It is a display: the rate of fire is the weapon's "firedelay".
+	selected. A volley consumes the displayed charge; "firedelay" also limits
+	how soon the next nonempty volley can fire.
 
 ===============================================================================
 */

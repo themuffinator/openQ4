@@ -3,6 +3,8 @@
  * Only redirects identified alpha callbacks; installed maps remain untouched.
  */
 
+#include "PrisonAlarms.h"
+
 static int Awakening_PrepareCampaignRepairs( idMapFile *map ) {
 	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ) {
 		return 0;
@@ -54,6 +56,7 @@ static void Awakening_RepairMapArgs( int chapter, idDict &args ) {
 		!idStr::Icmp( args.GetString( "gui_Parm3" ), "map_m03aa::engineFireOut" ) ) {
 		args.Set( "gui_Parm3", "oq4_m03::restartEngine" );
 	} else if ( chapter == 4 ) {
+		Awakening_RepairPrisonAlarm( args );
 		if ( !idStr::Icmp( name, "tunnel_bot" ) &&
 			!idStr::Icmp( args.GetString( "script_init" ), "tunnelReparBotWorking" ) ) {
 			args.Set( "script_init", "oq4_m04::tunnelRepair" );

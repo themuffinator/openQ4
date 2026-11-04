@@ -146,6 +146,9 @@ fixes them:
   cover positions.
   Start m03/m04 afresh to receive these mission callback corrections; existing
   saves retain the mission threads with which they were created.
+  The prison's security alarm now gives quieter, local warning pulses with
+  pauses, and computer alarms are less intrusive. This audio improvement also
+  applies to existing saves; the security console still switches the alert off.
 
 - **Fire passages (m01, m02).** Freezing a vent clears its invisible collision
   and puts its light out fully. Burning vents allow passage while inflicting

@@ -64,6 +64,11 @@ for (pass = 0; pass < 20; pass++) {
 '''
 
 
+def fov_queries(phase):
+    return [f'echo Q4_FOV_{phase}', 'g_fov', 'listSpawnArgs player1', 'openq4_viewReport',
+            'echo Q4_FOV_END']
+
+
 def run(args, leg, save=None):
     home = args.output / leg
     game = home / 'q4xbase'
@@ -79,16 +84,18 @@ def run(args, leg, save=None):
                       'set oq4_lock_phase target', 'wait 5', 'echo Q4_ACQUIRING',
                       'testVehicle topgun', 'screenshot screenshots/acquiring.tga',
                       'wait 30', 'echo Q4_LOCKED', 'testVehicle topgun',
-                      'screenshot screenshots/locked.tga', 'set g_stopTime 1', 'saveGame lock', 'wait 3']
+                      'screenshot screenshots/locked.tga', *fov_queries('ENTRY'),
+                      'set g_stopTime 1', 'saveGame lock', 'wait 3']
         else:
-            lines += ['echo Q4_LOCK_RESTORED', 'testVehicle topgun',
+            lines += [*fov_queries('RESTORED'), 'echo Q4_LOCK_RESTORED', 'testVehicle topgun',
                       'screenshot screenshots/restored.tga', 'set g_stopTime 0',
                       'echo Q4_FULL_VOLLEY', 'testVehicle topgun fire', 'testVehicle topgun fire',
                       'wait 27', 'echo Q4_EMPTY_VOLLEY', 'testVehicle topgun fire',
                       'wait 13', 'echo Q4_PARTIAL_VOLLEY',
                       'testVehicle topgun', 'testVehicle topgun fire', 'remove oq4_lock_target',
                       'wait 30', 'echo Q4_LOCK_LOST', 'testVehicle topgun',
-                      'screenshot screenshots/lost.tga']
+                      'screenshot screenshots/lost.tga', 'testVehicle topgun exit',
+                      'wait 90', *fov_queries('EXIT')]
     else:
         cover = game/'scripts/openq4_probe_rescue.inc'
         cover.parent.mkdir(parents=True)
@@ -133,7 +140,7 @@ def run(args, leg, save=None):
         set=[('fs_awakeningpath',str(args.awakening_root)), ('fs_devpath',str(home)),
              ('fs_cachepath',str(args.cache)), ('com_gameMode','SP'), ('ui_autoJoin','0'),
              ('ui_retained','1'), ('ui_hudLayout','1'), ('g_autoSkipCinematics','0'),
-             ('g_debugVehicle','1'), ('sys_consoleWindow','0'), ('r_fullscreenDesktop','0'),
+             ('g_debugVehicle','1'), ('sys_consoleWindow','0'), ('r_fullscreenDesktop','0'), ('g_fov','110'),
              ('r_renderApi',args.renderer), ('com_fixedTic','4' if args.case=='rescue' else '1')])
     exe = ROOT/'.install/openQ4-client_x64.exe'
     command = launch_command(options, exe, home)
@@ -156,10 +163,16 @@ def run(args, leg, save=None):
                 break
         stop_process(process)
     log = logpath.read_text(errors='replace') if logpath.exists() else ''
+    log = re.sub(r'\^[0-9]', '', log)
     failures = re.findall(r'(?mi)^.*(?:ERROR:|Compile failed|script runtime error|Assertion failed|Unknown command).*$',log)
     if process.returncode != 0 or 'Q4_FOLLOWUP_DONE' not in log:
         failures.append(f'incomplete run / exit {process.returncode}')
     if args.case == 'lock':
+        for phase, offset in ((('RESTORED', '-10'), ('EXIT', '0')) if save else (('ENTRY', '-10'),)):
+            block = re.search(r'Q4_FOV_'+phase+r'\s*\n(.*?)Q4_FOV_END', log, re.S)
+            if not block or not re.search(r'"g_fov" is:"110"', block.group(1)) or not re.search(
+                    r'"openq4_scriptFovOffset"\s+"'+offset+r'(?:\.0*)?"', block.group(1)):
+                failures.append(f'{phase}: custom FOV or turret offset lost')
         for marker in (('Q4_LOCK_RESTORED','Q4_LOCK_LOST') if save else ('Q4_ACQUIRING','Q4_LOCKED')):
             if marker not in log:
                 failures.append('missing '+marker)
