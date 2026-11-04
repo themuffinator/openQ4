@@ -17,6 +17,36 @@ def audible(source=7, sample='sound/shared.wav'):
 
 
 class SceneAuditTest(unittest.TestCase):
+    @staticmethod
+    def timing(total=1234, sound=41, level='game/test'):
+        return (f'  {total} msec to load {level}\n'
+                f'Map load phases: renderWorld=20 gameInit=900 playerSpawn=1 cacheJoin=0 mediaFinish=50 settle=100 total={total} msec\n'
+                f'Map media phases: render=5 sound={sound} decl=1 bse=1 loadSize=1 ui=1 total=50 msec\n')
+
+    def test_loading_requires_complete_consistent_phase_evidence(self):
+        good = self.timing()
+        self.assertEqual(audit.load_timing(good)['sound_finalize_ms'], 41)
+        for invalid in ('', good.split('Map media')[0], good + good,
+                        good.replace('total=1234', 'total=1235'), good.replace('total=50', 'total=51'),
+                        good.replace('cacheJoin=0 ', ''), good.replace('bse=1 ', '')):
+            self.assertEqual(audit.load_timing(invalid), {})
+
+    def test_load_times_stay_with_their_map_and_exclude_gameplay_reloads(self):
+        log = (self.timing() + 'SCENE_BEGIN game/test\n' + self.timing(9999) + 'SCENE_END game/test\n' +
+               self.timing(500, level='game/next') + 'SCENE_BEGIN game/next\nSCENE_END game/next\n')
+        result = audit.audit(log, ['game/test', 'game/next', 'game/missing'])
+        self.assertEqual(result['game/test']['loading']['total_ms'], 1234)
+        self.assertEqual(result['game/next']['loading']['total_ms'], 500)
+        self.assertEqual(result['game/missing']['loading'], {})
+
+    def test_load_cost_preserves_noise_and_requires_matching_maps(self):
+        loud = audit.load_timing(self.timing(100))
+        quiet = audit.load_timing(self.timing(200))
+        self.assertEqual(audit.load_cost(loud, quiet)['audio_load_ms'], -100)
+        self.assertEqual(audit.load_cost(loud, {}), {})
+        quiet['map'] = 'game/different'
+        self.assertEqual(audit.load_cost(loud, quiet), {})
+
     def test_shared_sample_is_classified_per_current_source(self):
         state = audit.probe_state(audible(7) + audible(8) + channel(7) +
                                   channel(8, dialogue=0, shader='effect', transcript='undeclared') +

@@ -145,7 +145,9 @@ def main() -> None:
         summary = result.stdout.strip()
 
         for index, (label, header, original, mutated) in enumerate(MUTATIONS):
-            mirror = path / f"control{index}"
+            # Unix executables have no .exe suffix; keep the include overlay
+            # distinct from the control binary's path on every platform.
+            mirror = path / f"overlay{index}"
             for relative in (NAVIGATION, MARKERS, AUTOTRACK):
                 target = mirror / relative
                 target.parent.mkdir(parents=True, exist_ok=True)

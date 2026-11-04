@@ -278,6 +278,31 @@ See [player release status](../user/release-status.md).
   these remain failures. The harness now pins one performance preset across
   GPUs and verifies both its saved settings and CPU/GPU evidence identity.
 
+## Local microphone test isolation, 4 November 2026
+
+- **Microphone-test audio stays local when returning to push-to-talk.** Switching
+  modes discards buffered test audio and stops local playback, including when
+  push-to-talk was already held or the input cannot reopen.
+- **Voice capture drops stale fragments after a stall.** An incomplete frame
+  expires after 120 ms instead of joining later speech and being sent as fresh
+  audio. Capture permission and saved settings are unchanged.
+- Physical microphone and hotplug qualification remains open under AUD-05.
+  [Implementation and evidence](audio-voice-evidence.md#local-test-isolation-and-partial-capture-age-4-november-2026).
+
+## Audio cancellation and memory pressure, 3 November 2026
+
+- **Discarding a level no longer waits for unused music or speech to finish
+  decoding.** Audio workers stop between codec blocks when cancelled; samples
+  still needed by the scene resume from the same position.
+- **Low-memory cleanup avoids allocating more sound buffers for samples it is
+  about to discard.** Active sounds, looping sounds and samples required by a
+  level load remain protected. No audio defaults or authored mix changed.
+- The audio scene audit now records load times and memory budgets for repeatable
+  loading comparisons. Real mobile low-memory notices, physical listening and
+  device recovery remain qualification gates in AUD-01 through AUD-07; these
+  changes do not close those gates.
+- Evidence: [audio cancellation and loading measurements](audio-voice-evidence.md#decode-cancellation-and-loading-measurements-3-november-2026).
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The

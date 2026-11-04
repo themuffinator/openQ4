@@ -1534,6 +1534,11 @@ if build_engine or get_option('build_native_tests')
     retained_screens_groups = {'menus': 120, 'pause': 120, 'strogg-pause': 120, 'loading-hud': 120, 'pages': 120, 'strogg-pages': 120, 'mp-pages': 120, 'mp-card': 120,
       'mp-vote-match': 120, 'mp-admin': 120, 'mp-settings-welcome': 120, 'pointer-reach': 120, 'optics': 240}
     foreach group, timeout : retained_screens_groups
+      # Full page matrices exceed two minutes on hosted Windows runners and
+      # under ASan+UBSan. Keep every case, with the ordinary bound elsewhere.
+      if (host_machine.system() == 'windows' or get_option('b_sanitize') != 'none') and group in ['pages', 'mp-pages']
+        timeout = 300
+      endif
       test('openq4-ui-retained-screens-' + group, openq4_ui_retained_screens_test,
         args: retained_screens_documents + [group], timeout: timeout)
     endforeach

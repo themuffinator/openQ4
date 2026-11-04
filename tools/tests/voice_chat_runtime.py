@@ -102,12 +102,15 @@ def tone_peak(path):
 
 
 def main() -> int:
+    harness_sha256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--assets', type=Path, required=True)
     parser.add_argument('--output', type=Path, default=ROOT / '.tmp/audio/voice-peers')
     parser.add_argument('--port', type=int, default=28941)
     parser.add_argument('--timeout', type=int, default=360)
     parser.add_argument('--dedicated', action='store_true', help='use the staged dedicated server and three separate clients')
+    parser.add_argument('--dummy-capture', action='store_true',
+                        help='also test local capture with SDL dummy input (silence); never opens a microphone')
     parser.add_argument('--size', default='960x540', help='client window; software rendering (llvmpipe) keeps the 50 Hz '
                         'voice cadence only in a small one')
     parser.add_argument('--render-api', default='gl', help='client r_renderApi; vulkan renders hidden windows offscreen, '
@@ -125,18 +128,33 @@ def main() -> int:
     saves = {role: output / role for role in roles}
     games = {role: saves[role] / 'baseoq4' for role in roles}
     logs = {role: games[role] / 'logs/openq4.log' for role in roles}
-    polls = {role: games[role] / 'voice-poll.cfg' for role in roles}
+    polls = {role: games[role] / 'voice_poll.cfg' for role in roles}
     processes, streams, phases, checks, clock_drift = {}, [], {}, {}, {}
     proxy = LocalProxy(args.port + 10, args.port)
 
     def loop(path: Path) -> None:
-        write_script(path, ['waitMsec 250', 'openq4_reportMPState', 'exec "' + path.name + '"'])
+        write_script(path, ['// Waiting for the next harness phase.'])
+
+    def select_step(path: Path) -> str:
+        return f'set voiceHarnessStep "exec {path.name}"'
+
+    def start_script(path: Path) -> list[str]:
+        return [select_step(path), 'set voiceHarnessLoop "exec voice_driver.cfg"', 'exec "voice_driver.cfg"']
 
     for role in roles:
         games[role].mkdir(parents=True, exist_ok=True)
         logs[role].unlink(missing_ok=True)
         loop(polls[role])
-        write_script(games[role] / 'voice-start.cfg', ['exec "voice-poll.cfg"'])
+        (games[role] / 'voice_unavailable.cfg').unlink(missing_ok=True)
+        # Never replace the driver while it is being read. A transient failure
+        # to open a replaced phase file returns here and retries next tick;
+        # the former self-replacing loop permanently stopped on that failure.
+        # vstr appends here (it does not insert). Append both the phase and the
+        # next driver call in order, keeping only one iteration queued at a time.
+        # Underscores keep the unquoted filename inside each CVar one token.
+        write_script(games[role] / 'voice_driver.cfg', ['waitMsec 250', 'openq4_reportMPState',
+                                                       'vstr voiceHarnessStep', 'vstr voiceHarnessLoop'])
+        write_script(games[role] / 'voice_start.cfg', start_script(polls[role]))
         (saves[role] / 'alsoft.conf').write_text('[general]\ndrivers=wave\nchannels=stereo\nhrtf=false\n[wave]\nfile=' + str(saves[role] / 'mix.wav') + '\n')
 
     common = {
@@ -148,7 +166,7 @@ def main() -> int:
         's_volume': '.5', 's_musicVolume': '0', 's_voiceChatCapture': '0', 's_voiceChatSend': '1', 's_voiceChatReceive': '1',
         's_voiceChatEcho': '0', 's_voiceVolume': '1', 'logFile': '2', 'logFileName': 'logs/openq4.log', 'developer': '1',
         'g_voiceChatDebug': '3', 'ui_retained': '1', 'ui_autoJoin': '1', 'ui_spectate': 'Play', 'ui_ready': 'Ready',
-        'net_allowCheats': '1', 'com_skipLoadingContinue': '1', 'g_autoExecAfterMapLoad': 'voice-start.cfg',
+        'net_allowCheats': '1', 'com_skipLoadingContinue': '1', 'g_autoExecAfterMapLoad': 'voice_start.cfg',
         'g_autoExecAfterMapLoadDelayMs': '500', 'win_allowMultipleInstances' if os.name == 'nt' else 'sys_allowMultipleInstances': '1'
     }
 
@@ -168,6 +186,9 @@ def main() -> int:
         command += ['+spawnServer', 'mp/q4dm1'] if role == server_role else ['+connect', f'127.0.0.1:{args.port + (10 if role == "peer" else 0)}']
         (output / f'{role}-launch.json').write_text(json.dumps(command, indent=2))
         options = {'env': {**os.environ, 'ALSOFT_CONF': str(saves[role] / 'alsoft.conf'), 'ALSOFT_DRIVERS': 'wave'}}
+        if args.dummy_capture:
+            # A single explicit driver, with no physical-device fallback.
+            options['env'].update(SDL_AUDIO_DRIVER='dummy', SDL_AUDIODRIVER='dummy', SDL_AUDIO_DUMMY_TIMESCALE='1')
         if os.name == 'nt':
             startup = subprocess.STARTUPINFO()
             startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -192,12 +213,11 @@ def main() -> int:
 
     def phase(name, commands, active_msec=1700):
         for role in roles:
-            next_poll = games[role] / f'voice-wait-{name}.cfg'
+            next_poll = games[role] / f'voice_wait_{name}.cfg'
             loop(next_poll)
-            write_script(polls[role], [f'echo VOICE_BEGIN_{name}', 'listVoiceChat', *commands.get(role, []),
+            write_script(polls[role], [select_step(next_poll), f'echo VOICE_BEGIN_{name}', 'listVoiceChat', *commands.get(role, []),
                          f'waitMsec {active_msec}', f'echo VOICE_ACTIVE_{name}', 'listVoiceChat', 'testVoiceChat 0',
-                         'waitMsec 300', f'echo VOICE_END_{name}', 'listVoiceChat', f'echo VOICE_DONE_{name}',
-                         'exec "' + next_poll.name + '"'])
+                         'waitMsec 300', f'echo VOICE_END_{name}', 'listVoiceChat', f'echo VOICE_DONE_{name}'])
             polls[role] = next_poll
         current = wait_for(lambda logs: all(f'\nVOICE_DONE_{name}' in logs[role] for role in roles), name)
         data = {}
@@ -210,6 +230,8 @@ def main() -> int:
                 status = re.search(r'^VOICE_STATUS (.*)', section[1], re.M)
                 assert status, (role, name, stage)
                 values = {key: int(value) for key, value in re.findall(r'(\w+)=(\d+)', status[1])}
+                clock = re.search(r'^VOICE_CLOCK (.*)', section[1], re.M)
+                values['clock'] = {key: int(value) for key, value in re.findall(r'(\w+)=(\d+)', clock[1])} if clock else {}
                 playback = re.findall(r'^VOICE_PLAYBACK (.*)', section[1], re.M)
                 values['playback'] = [{key: float(value) for key, value in re.findall(r'(\w+)=(-?[\d.]+)', line)} for line in playback]
                 admission = re.findall(r'^VOICE_ADMISSION (.*)', section[1], re.M)
@@ -238,10 +260,41 @@ def main() -> int:
             wait_for(lambda logs: 'MP_STATE' in logs['server'], 'dedicated map')
         launch('host')
         wait_for(lambda logs: 'MP_PLAYER slot=0' in logs['host'], 'listen host gameplay')
+        # Negative control: force one failed exec, then publish its file. The
+        # immutable driver must recover without replaying any completed phase.
+        missing = games['host'] / 'voice_unavailable.cfg'
+        write_script(polls['host'], [select_step(missing)])
+        absent = wait_for(lambda logs: "couldn't exec voice_unavailable.cfg" in logs['host'], 'missing phase control')
+        boundary = len(absent['host'])
+        loop(missing)
+        polls['host'] = missing
+        wait_for(lambda logs: 'execing voice_unavailable.cfg' in logs['host'][boundary:], 'phase control recovery')
+        checks['control_read_recovery'] = True
         launch('peer')
         wait_for(lambda logs: re.search(r'MP_PLAYER slot=1 .*spectating=0 wantSpectate=0 ingame=1', logs['host']) is not None, 'peer gameplay')
         launch('spectator')
         wait_for(lambda logs: 'MP_PLAYER slot=2' in logs['host'] and 'MP_STATE' in logs['spectator'], 'spectator connection')
+        if args.dummy_capture:
+            denied = phase('CAPTURE_DENIED', {'host': ['set s_voiceChatTest 1']})
+            checks['capture_requires_consent'] = denied['host']['END']['capture_opens'] == 0 and denied['host']['END']['captured'] == 0
+            local = phase('CAPTURE_LOCAL', {'host': ['set s_voiceChatCapture 1', 'set s_voiceChatEcho 1', 'set s_voiceChatTest 1']})
+            checks['local_capture_plays'] = (local['host']['END']['recording'] == 1 and
+                                           local['host']['END']['captured'] - local['host']['BEGIN']['captured'] > 20 and delta(local, 'host') > 20)
+            off = phase('CAPTURE_OFF', {'host': ['set s_voiceChatTest 0']})
+            checks['local_capture_closes'] = (off['host']['END']['recording'] == 0 and
+                                             off['host']['END']['captured'] == off['host']['BEGIN']['captured'] and
+                                             not off['host']['END']['playback'])
+            again = phase('CAPTURE_AGAIN', {'host': ['set s_voiceChatTest 1']})
+            checks['local_capture_reopens'] = (again['host']['END']['capture_opens'] > off['host']['END']['capture_opens'] and delta(again, 'host') > 20)
+            revoked = phase('CAPTURE_REVOKED', {'host': ['set s_voiceChatCapture 0', 'set s_voiceChatEcho 0']})
+            checks['local_capture_revoked'] = (revoked['host']['END']['recording'] == 0 and revoked['host']['END']['status'] == 1 and
+                                              revoked['host']['END']['captured'] == revoked['host']['BEGIN']['captured'] and
+                                              not revoked['host']['END']['playback'])
+            checks['local_capture_never_sent'] = all(delta(data, role) == 0 for data in (denied, local, off, again, revoked) for role in ('peer', 'spectator'))
+            capture_log = read_log(logs['host']).split('VOICE_BEGIN_CAPTURE_DENIED', 1)[1].split('VOICE_DONE_CAPTURE_REVOKED', 1)[0]
+            checks['local_capture_never_sent'] &= 'VOICE_SEND ' not in capture_log and 'VOICE_FORWARD ' not in capture_log
+            checks['capture_dummy_driver'] = ('VOICE_CAPTURE_DRIVER dummy' in capture_log and
+                                              re.search(r'VOICE_CAPTURE_DRIVER (?!dummy)', capture_log) is None)
         both = phase('BOTH', {'host': ['testVoiceChat 3'], 'peer': ['testVoiceChat 3']})
         checks['both_directions'] = delta(both, 'host') > 20 and delta(both, 'peer') > 20
         muted = phase('MUTED', {'host': ['testVoiceChat 3'], 'peer': ['clientVoiceMute voice_host']})
@@ -275,8 +328,9 @@ def main() -> int:
 
         # Independent clocks: the peer's voice timestamps run 0.1% slow and then 0.1% fast
         # through 10 s of speech each, ten times a typical crystal's drift and half the
-        # admission's 2 ms/s slew. The host's baseline for the peer follows: up while the
-        # sender falls behind, straight down when it runs ahead, rejecting nothing.
+        # admission's 2 ms/s slew. Check the clock actually encoded by the sender,
+        # plus delivery/age/rejection bounds. Receiver baseline movement also
+        # contains network jitter and cannot establish the drift's sign alone.
         def admitted(data, stage):
             rows = [row for row in data['host'][stage]['admission'] if row.get('client') == 1]
             return rows[-1] if rows else {}
@@ -284,28 +338,39 @@ def main() -> int:
         def drift(name, rate):
             data = phase(name, {'peer': [f'set s_voiceTestClockRate {rate}', 'testVoiceChat 10']}, active_msec=10500)
             begin, end = admitted(data, 'BEGIN'), admitted(data, 'ACTIVE')
+            first, last = data['peer']['BEGIN']['clock'], data['peer']['ACTIVE']['clock']
+            source_elapsed = stamp_elapsed = shift = expected = None
+            if all('source_ms' in c and 'stamp_ms' in c for c in (first, last)):
+                source_elapsed = (last['source_ms'] - first['source_ms']) & 0xffffffff
+                stamp_elapsed = (last['stamp_ms'] - first['stamp_ms']) & 0xffffffff
+                shift = stamp_elapsed - source_elapsed
+                expected = source_elapsed * (rate - 1)
             return {'played': delta(data, 'host'),
                     'accepted': end.get('accepted', 0) - begin.get('accepted', 0),
                     'rejected': end.get('rejected', 0) - begin.get('rejected', 0),
                     'baseline_shift_ms': end.get('baseline_shift_ms', 0) - begin.get('baseline_shift_ms', 0),
-                    'max_added_ms': end.get('interval_max_added_ms')}
+                    'max_added_ms': end.get('interval_max_added_ms'),
+                    'source_elapsed_ms': source_elapsed, 'stamp_elapsed_ms': stamp_elapsed,
+                    'injected_shift_ms': shift, 'expected_shift_ms': expected,
+                    'clock_matches': source_elapsed is not None and 0 < source_elapsed < 60000 and abs(shift - expected) <= 2}
         drift_slow, drift_fast = drift('DRIFT_SLOW', 0.999), drift('DRIFT_FAST', 1.001)
         phase('DRIFT_END', {'peer': ['set s_voiceTestClockRate 1']})
         clock_drift['slow'], clock_drift['fast'] = drift_slow, drift_fast
         # At least 4 s of the 10 s spoken arrives even where slow clients emit one frame per
         # rendered frame (a dedicated server and three software-paced clients).
         checks['clock_drift_slow_sender'] = drift_slow['played'] > 200 and drift_slow['rejected'] <= drift_slow['accepted'] * .02 and \
-            drift_slow['baseline_shift_ms'] >= 5
+            drift_slow['clock_matches'] and drift_slow['injected_shift_ms'] <= -5 and drift_slow['max_added_ms'] <= 120
         checks['clock_drift_fast_sender'] = drift_fast['played'] > 200 and drift_fast['rejected'] <= drift_fast['accepted'] * .02 and \
-            drift_fast['baseline_shift_ms'] <= -5
+            drift_fast['clock_matches'] and drift_fast['injected_shift_ms'] >= 5 and drift_fast['max_added_ms'] <= 120
         # Scope both recipient mute and server moderation to this connection.
         phase('BEFORE_RECONNECT', server_commands(['serverVoiceMute 1 1'], {'host': ['clientVoiceMute voice_peer']}))
         before = {role: len(read_log(logs[role])) for role in roles}
-        next_poll = games['peer'] / 'voice-reconnected.cfg'
+        next_poll = games['peer'] / 'voice_reconnected.cfg'
         loop(next_poll)
-        write_script(games['peer'] / 'voice-start.cfg', ['exec "' + next_poll.name + '"'])
-        write_script(polls['peer'], ['disconnect', 'waitMsec 1200', 'set ui_name voice_returned',
-                     'set g_autoExecAfterMapLoad "voice-start.cfg"',
+        # The immutable driver survives disconnect/map loads. Advance its step
+        # before disconnecting, and do not start a second driver on the new map.
+        write_script(polls['peer'], [select_step(next_poll), 'set g_autoExecAfterMapLoad ""',
+                     'disconnect', 'waitMsec 1200', 'set ui_name voice_returned',
                      f'connect 127.0.0.1:{args.port + 10}'])
         polls['peer'] = next_poll
         wait_for(lambda logs: 'voice_returned' in logs[server_role][before[server_role]:] and
@@ -332,8 +397,13 @@ def main() -> int:
         checks['reconnect_identity'] = (delta(reconnected, 'host') > 20 and delta(reconnected, 'peer') > 20 and
                                         bool(old_generations) and bool(new_generations) and old_generations.isdisjoint(new_generations))
         checks['no_spectator_leak'] = all(delta(data, 'spectator') == 0 for data in phases.values())
-        checks['no_microphone'] = all(data[role]['END']['capture_opens'] == 0 for data in phases.values() for role in roles)
+        if args.dummy_capture:
+            checks['capture_only_on_dummy_host'] = all(data[role]['END']['capture_opens'] == 0 for data in phases.values() for role in roles if role != 'host')
+        else:
+            checks['no_microphone'] = all(data[role]['END']['capture_opens'] == 0 for data in phases.values() for role in roles)
         checks['bounded_playback'] = all(row['queued'] <= 4 for data in phases.values() for role in roles for row in data[role]['ACTIVE']['playback'])
+        checks['single_phase_execution'] = all(len(re.findall(rf'^VOICE_BEGIN_{name}[ \t]*$', read_log(logs[role]), re.M)) == 1
+                                               for role in roles for name in phases)
     except Exception as exc:
         error = str(exc)
         checks['complete'] = False
@@ -362,10 +432,11 @@ def main() -> int:
     report = {'passed': bool(phases) and all(checks.values()), 'checks': checks, 'error': error, 'phases': phases,
               'rendered_tone_peak': rendered_tone, 'clock_drift': clock_drift, 'proxy': {'packets': proxy.packets, 'dropped': proxy.dropped, 'maximum_pending': proxy.max_pending},
               'microphone': False, 'host_input': False, 'output': 'OpenAL wave',
+              'capture_driver': 'SDL dummy (silence)' if args.dummy_capture else None,
               'engine_sha256': hashlib.sha256(exe.read_bytes()).hexdigest(),
               'dedicated': args.dedicated, 'server_sha256': hashlib.sha256(server_exe.read_bytes()).hexdigest(),
               'game_sha256': hashlib.sha256((runtime / 'baseoq4/game-mp_x64.dll').read_bytes()).hexdigest() if os.name == 'nt' else None,
-              'harness_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
+              'harness_sha256': harness_sha256}
     (output / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps({'result': str(output / 'result.json'), 'checks': checks, 'error': error}, indent=2))
     return 0 if report['passed'] else 1

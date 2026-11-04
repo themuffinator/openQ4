@@ -3428,6 +3428,17 @@ automatically satisfied by a listening pass.
   real Android or iOS device remains open: the Android emulator set-up used for the port
   was removed with its worktree, and restoring it needs a download approved by the user.
   [Low-memory notice evidence](audio-voice-evidence.md#the-operating-systems-low-memory-notice).
+  November 3: running PCM and stream-envelope jobs now observe cancellation between
+  codec blocks instead of decoding the entire track before releasing it. A retained
+  cancelled job resumes at its cursor; discarded jobs keep reservations until joined.
+  Low-memory trims no longer finish/upload every pending sample, and level-end and
+  admission reclamation discard stale jobs before joining retained work. Real-worker
+  cancellation and production trim/reclaim/load-finalization tests cover both paths.
+  The scene audit now records map-load phases, sound finalization, decode mode and
+  byte budgets, with signed sound-on/off load-time comparisons. This supplies the
+  loading-performance measurement path; target-device budgets and real mobile
+  low-memory notices remain open.
+  [Cancellation and loading evidence](audio-voice-evidence.md#decode-cancellation-and-loading-measurements-3-november-2026).
 - [ ] **AUD-04 — P2, implementation and qualification: surround and mod reverb.**
   Resolve `SSF_CENTER`/VO placement on 5.1 with stereo/HRTF fallback and nonzero mod
   room-rolloff unit handling. Keep stock zero-rolloff behavior intact.
@@ -3501,6 +3512,19 @@ automatically satisfied by a listening pass.
   server; the baseline rose 8–9 ms and fell 7–10 ms over about 10 s each, rejecting
   nothing. Separate machines with their own clocks remain open.
   [Drift evidence](audio-voice-evidence.md#voice-clock-drift-between-real-peers).
+  November 4: switching between the local microphone test and push-to-talk now
+  closes the previous capture stream before reopening, discarding its resampler,
+  queued audio and partial frame. Buffered test audio can no longer become network
+  speech when push-to-talk is already held on test exit. Incomplete frames also
+  expire after 120 ms instead of gaining a fresh timestamp after a callback stall.
+  Production regressions cover both reproduced failures, reopening failure and
+  clock wrap; the peer harness adds an optional SDL dummy-input local-test pass.
+  Packet-clock diagnostics separate the injected sender drift from network jitter
+  while retaining delivery, rejection and added-latency checks.
+  Windows listen and dedicated peers each pass all 31 checks with dummy capture;
+  the native production capture regressions pass on Windows and Linux.
+  Physical microphones, hotplug, independent-machine clocks and target-OS breadth
+  remain open. [Capture evidence](audio-voice-evidence.md#local-test-isolation-and-partial-capture-age-4-november-2026).
 - [ ] **AUD-06 — P2, implementation and qualification: independent dialogue volume.**
   Address [#187](https://github.com/themuffinator/openQ4/issues/187) with a localized,
   persistent spoken-dialogue control in UI-01. Inventory actual dialogue routing

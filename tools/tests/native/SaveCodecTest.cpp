@@ -484,7 +484,7 @@ static void TestArrays() {
 	Golden( "arrays", writer, "02000000ffffffff00000000" "0000003f000000c0" "000020410000a0c10000f041" );
 }
 
-int main() {
+int main() try {
 #ifdef _MSC_VER
 	// Mutation controls deliberately abort. Keep the debug CRT on stderr so
 	// unattended runs cannot wait for a modal assertion/abort dialog.
@@ -507,4 +507,9 @@ int main() {
 	}
 	std::puts( "save codec: golden bytes, round trips and rejections passed" );
 	return 0;
+} catch ( const std::exception &error ) {
+	// A malformed codec mutation may throw before its golden-byte check.
+	// Report failure without an unhandled-exception dialog on Windows CI.
+	std::fprintf( stderr, "save codec: unexpected exception: %s\n", error.what() );
+	return 1;
 }
