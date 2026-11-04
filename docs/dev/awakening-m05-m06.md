@@ -86,6 +86,43 @@ the alpha. See [upstream credits](../../AGENTS.md#upstream-credits) and
   still write the original object-reference field, and restore reconstructs the
   generation from the already loaded entity table.
 
+### Third review: escort support and incomplete references
+
+The upper freight panel targeted a deleted `func_elevator_1`; the actual
+`elevA` is a script-controlled mover. Its gates, squad boarding waits and
+50-second ascent establish a one-way escape. The unused panel now matches the
+other noninteractive freight panels and has no obsolete target. No return trip
+or replacement elevator controller is introduced.
+
+Tak's post-rescue armor-repair stall reproduces from a v2 save. The player stays
+at `(1016, 2304, -511.75)`, while Tak turns around `(1149, 2360, -511.75)` and
+hits Strauss. Removing Strauss in a disposable diagnostic permits the approach
+and armor repair. Idle followers can now use the existing move-aside tactic
+when their medic leader physically encounters them. The request preserves
+scripted actions, existing movement, combat, tethers and disabled movement.
+The move-aside search also lacked its target-distance check: it reported success
+with Strauss's current origin as its destination. Candidate goals now require
+the requested separation from the avoided entity as well as a valid destination.
+The 15-second unreachable-patient watchdog remains in place. SP and MP share
+the AI correction; no actor is teleported, made nonsolid or healed remotely.
+
+Four M05 lights now select the installed `lights/p_light1xb` material when the
+old misspelling has no declaration. Four small MCC monitors select the existing
+Awakening ambient display when their old GUI is absent. Map media precaching
+uses the same corrections as spawning. Installation-provided replacements win.
+The tactical trooper's misspelled `a4x_tactical` specular texture uses its existing
+`q4x_tactical` counterpart; `downsize()` now reports a missing child correctly.
+The missing particle-fire image uses the corresponding retail `fire2a` image.
+Both image fallbacks retain separate generated cache identities and prefer an
+authored replacement. The machinegun Strogg skin uses the matching retail arm
+variant when its expansion-only material is absent.
+
+The command-room crash exposes its teleporter before a three-second activation
+delay. A fast core kill removed the spawner while the crash thread still planned
+to trigger it, terminating that thread with a missing-entity warning. Invasion
+v3 checks the destruction flag, surviving core/health and spawner before the late
+activation. The regression now treats missing script-event entities as failures.
+
 ## Save and campaign boundaries
 
 Fresh starts compile corrected copies of the installed scripts into private
@@ -96,8 +133,8 @@ The harvester's installed animation frame callback deliberately keeps its
 original `m06b::TURRET_DEAD` flag; the corrected encounter waits for that flag.
 
 Saved corrected programs recompile the same virtual version, regardless of the
-fresh-start toggle. Fresh starts now use v2; v1's correction arrays and generated
-script statements remain unchanged for saves from the first review. Unknown
+fresh-start toggle. Fresh starts use v2 for M05 and MCC arrival, and v3 for MCC invasion. The
+v1/v2 generated script statements remain unchanged for their existing saves. Unknown
 source anchors, a changed world callback, or a mapper's
 map sidecar leave the original mission in control. Missing source on a corrected
 save fails its load instead of substituting a different suspended program.
@@ -105,7 +142,10 @@ save fails its load instead of substituting a different suspended program.
 Restart these maps to adopt script changes. `g_awakeningM05M06 0` selects original
 scripts on a fresh start for comparison; it does not disable Pain Lord AI fixes.
 Retail and multiplayer receive no mission-script substitution. The payload
-format is unchanged.
+format is unchanged. The third review leaves both v1 and v2 script statements
+unchanged. AI improvements apply to existing saves; restart a map to adopt its
+corrected entity panels, lights and monitor assignments. Restart MCC invasion
+to adopt the v3 delayed-activation guard.
 
 ## Validation
 
@@ -177,18 +217,56 @@ The initial failure probe incorrectly treated registered threads as runnable.
 cancelled timed thread can remain registered until its queued wake-up, especially
 while the failed-save modal pauses gameplay. The test checks cancellation state.
 
+### Third review
+
+Evidence is under `.tmp/awakening-m05-m06-round3/`. The native regression
+`tools/tests/medic_yield_behavior.py` executes the matching production methods
+from SP and MP: 21 checks cover the follower eligibility guards, existing move
+preservation, target separation, boundary distance and destination rejection.
+Both ordinary CI workflows include the regression. Windows x64 build/staging,
+SP/MP restore-resource executables, gameplay/CI contracts, media-fallback
+contracts and repository path checks pass.
+
+| Probe | Evidence and observed outcome |
+| --- | --- |
+| Blocked medic approach | `medic-final/report.json`: restore the post-rescue v2 checkpoint with zero armor; Strauss yields, Tak reaches the player and repairs armor to 100 without a navigation watchdog warning. Strauss, Navajas and Darnell remain alive and visible. |
+| Mid-approach restore | `medic-restored/report.json`: restore the save made during the corrected approach in a fresh process; the same repair completes. |
+| Fresh M05 rescue/media | `boss-final/report.json`: the full boss/rescue probe passes; all freight panels are noninteractive with no obsolete target, all four lamps name the intended material, and repaired image references no longer default. |
+| Freight boarding/ascent | `freight-boarded-final/report.json`: resume the squad's completed boarding checkpoint, enter the platform, and reach the upper floor with the player and all four squad members. The panel remains noninteractive. |
+| Mid-ascent restore | `freight-restored-final/report.json`: resume the correctly boarded mid-ride checkpoint in a fresh process; the platform, player and all four squad members reach the upper floor and resave. |
+| Fresh MCC invasion, Vulkan | `mcc-v3-final/report.json`: all four monitors load the installed ambient GUI, repaired image references no longer default, and killing all three cores during the command-room activation delay finishes without a missing-entity event. Core/spawner removal, broken models and monitor/rotation shutdown pass. |
+| Delayed activation restore, OpenGL | `mcc-v3-restored/report.json`: restore the Vulkan checkpoint before delayed activation, destroy the cores, and resave after clean shutdown with no script-event error. |
+| Earlier MCC invasion save | `mcc-v2-restored/report.json`: the pre-existing v2 cannon checkpoint restores with its occupied, locked vehicle and writes another save using the final build. |
+
+The door bypass and all four boarding waits complete in the `freight` and
+`freight-final` exploratory logs. Those early probes exposed command-syntax and
+view-height mistakes in the harness, not a failed squad route. The final boarding
+probe uses an unobstructed player position and checks the player's origin as well
+as the platform and squad. The earlier embedded-player restore is excluded from
+qualification. The first `mcc-media` run also exposed a late-activation error
+missed by the older assertions; it is superseded by `mcc-v3-final`. The native yield search diagnostic likewise showed why requesting
+movement alone was insufficient: the old callback accepted its current position.
+
+Engine captures of the repaired medic approach and freight ride were inspected.
+`script-version-compat.log` compares the old and current production generators:
+all six v1/v2 virtual scripts are byte-for-byte identical, while invasion v3 adds
+the late-activation guard. `source-integrity.json` also confirms that all nine
+audited installed inputs remain unchanged. The probes use scripted entry
+points and checkpoints; they do not replace a complete player-driven traversal.
+
 ## Remaining limits
 
 The alpha still contains missing media and abandoned ancillary callbacks.
 M06's unused Tarrant routine references deleted actors;
 it is not on the active route and is not resurrected.
-The map audit also found orphan targets/binds, including M05's unused upper
-freight-lift call panel. The actual freight lift uses its scripted mover.
-Existing item-in-solid, missing animation,
-duplicate sound and shadow-map fallback diagnostics remain in the runtime logs.
-One stationary post-rescue probe also logged Tak abandoning a heal approach
-after 15 seconds without progress. Escort/medic navigation is not fully qualified
-by these encounter probes.
+Unused teleporter binds still name a deleted static parent; their current
+world placements and the tested core-destruction sequence work without it.
+Existing item-in-solid, missing animation, duplicate sound and shadow-map
+fallback diagnostics remain in the runtime logs. Two remaining missing-image
+references originate in retail files: `burn_misc_sm` in the failed-transfer eye
+material and `hurt03` in the GEV machinegun flesh-impact effect. Neither named
+image exists in the audited retail archives; this pass does not invent artwork
+or silently substitute a different decal.
 
 Generic mover damage ignores the console command's damage scale; the hull probes
 use three explicit retail telefrag-damage events and verify actual hull health.

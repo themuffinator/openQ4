@@ -1250,7 +1250,7 @@ bool idAI::MoveOutOfRange( idEntity *ent, float range, float minRange ) {
 	pos = LastKnownPosition ( ent );
 
 	// Find a goal out of range of where we are
-	rvAASFindGoalOutOfRange findGoal( this );
+	rvAASFindGoalOutOfRange findGoal( this, pos, range );
 	if ( !aas->FindNearestGoal( goal, PointReachableAreaNum( org ), org, pos, move.travelFlags, minRange, range, &obstacle, obstacles, findGoal ) ) {
 		return false;
 	}

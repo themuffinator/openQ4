@@ -1,5 +1,5 @@
 /* Independent corrections to user-supplied Awakening scripts. No recovered
- * script is bundled. Keep v1 stable: saves recompile these private namespaces.
+ * script is bundled. Keep v1/v2 stable: saves recompile these private namespaces.
  */
 struct awakeningMissionCorrection_t { const char *before; const char *after; };
 static idCVar g_awakeningM05M06( "g_awakeningM05M06", "1", CVAR_GAME | CVAR_BOOL,
@@ -174,11 +174,22 @@ static bool Awakening_CorrectTeleporterV2( idStr &source, const char *flag, cons
 	return Awakening_CorrectSource( source, rules, sizeof( rules ) / sizeof( rules[0] ) );
 }
 
+static const awakeningMissionCorrection_t awakeningInvasionV3[] = {
+	// The core can be destroyed during the crash sequence's three-second wait.
+	// Its monitor removes the spawner immediately; never activate it afterward.
+	{ "sys.trigger( $func_spawner_command_dropin );",
+	  "if ( !commTeleporterDestroyed && isValidEntity( $comm_tele_ball ) && isValidEntity( $func_spawner_command_dropin ) ) {\n"
+	  "\t\t\tif ( $comm_tele_ball.getHealth() > 1 ) { sys.trigger( $func_spawner_command_dropin ); }\n\t\t}" },
+};
+
 static bool Awakening_LoadM05M06Script( const char *filename, idStr &source ) {
 	idStr file = filename;
 	file.BackSlashesToSlashes();
-	const bool version2 = file.Find( ".openq4-v2.script", false ) >= 0;
-	if ( version2 ) {
+	const bool version3 = file.Icmp( "maps/game/m06_mcc_invasion.openq4-v3.script" ) == 0;
+	const bool version2 = version3 || file.Find( ".openq4-v2.script", false ) >= 0;
+	if ( version3 ) {
+		file.Replace( ".openq4-v3.script", ".openq4-v1.script" );
+	} else if ( version2 ) {
 		file.Replace( ".openq4-v2.script", ".openq4-v1.script" );
 	}
 	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
@@ -229,6 +240,10 @@ static bool Awakening_LoadM05M06Script( const char *filename, idStr &source ) {
 				"spinTeleBall", "rear_tele_ball", "rear_tele_broken", "func_spawner_enemy_light_3" ) ) ) {
 			return false;
 		}
+		if ( version3 && !Awakening_CorrectSource( source, awakeningInvasionV3,
+			sizeof( awakeningInvasionV3 ) / sizeof( awakeningInvasionV3[0] ) ) ) {
+			return false;
+		}
 		source.Replace( "namespace m06b", "namespace oq4_m06b" );
 		source.Replace( "\"m06b::", "\"oq4_m06b::" ); // thread names, not model flag
 		return true;
@@ -251,7 +266,8 @@ void Awakening_PrepareM05M06( idDict &worldArgs ) {
 	if ( fileSystem->ReadFile( map + ".script", NULL, NULL ) > 0 ) {
 		return;
 	}
-	idStr version = map + ".openq4-v2.script";
+	const int versionNumber = map.Icmp( "maps/game/m06_mcc_invasion" ) == 0 ? 3 : 2;
+	idStr version = map + va( ".openq4-v%d.script", versionNumber );
 	idStr source;
 	if ( !Awakening_LoadM05M06Script( version, source ) ) {
 		gameLocal.Warning( "Awakening mission corrections unavailable for %s; keeping installed scripts", map.c_str() );
@@ -259,7 +275,7 @@ void Awakening_PrepareM05M06( idDict &worldArgs ) {
 	}
 	gameLocal.program.CompileFile( version );
 	Awakening_CorrectM05M06Entity( worldArgs );
-	gameLocal.Printf( "Awakening mission corrections v2: %s\n", map.c_str() );
+	gameLocal.Printf( "Awakening mission corrections v%d: %s\n", versionNumber, map.c_str() );
 }
 
 void Awakening_CorrectM05M06Entity( idDict &args ) {
@@ -273,6 +289,31 @@ void Awakening_CorrectM05M06Entity( idDict &args ) {
 		idStr::Cmp( args.GetString( "classname" ), "light" ) == 0 &&
 		idStr::Cmp( args.GetString( "bind" ), "func_elevator_31" ) == 0 ) {
 		args.Set( "bind", "elevator2" );
+	}
+	// This one-way freight ride is controlled by the squad script, not a
+	// func_elevator. Match its other locked panels and discard the stale target.
+	if ( gameLocal.program.FindFunction( "oq4_m05::main" ) != NULL &&
+		idStr::Cmp( args.GetString( "name" ), "elevACall_2" ) == 0 &&
+		idStr::Cmp( args.GetString( "classname" ), "func_static" ) == 0 &&
+		idStr::Cmp( args.GetString( "gui" ), "guis/movers/strogg/call_lift.gui" ) == 0 &&
+		idStr::Cmp( args.GetString( "target" ), "func_elevator_1" ) == 0 ) {
+		args.Delete( "target" );
+		args.SetBool( "gui_noninteractive", true );
+	}
+	if ( gameLocal.program.FindFunction( "oq4_m05::main" ) != NULL &&
+		idStr::Cmp( args.GetString( "classname" ), "light" ) == 0 &&
+		idStr::Cmp( args.GetString( "texture" ), "lights/p_light1b" ) == 0 &&
+		declManager->FindMaterial( "lights/p_light1b", false ) == NULL &&
+		declManager->FindMaterial( "lights/p_light1xb", false ) != NULL ) {
+		args.Set( "texture", "lights/p_light1xb" );
+	}
+	if ( gameLocal.program.FindFunction( "oq4_m06b::main" ) != NULL &&
+		idStr::Cmp( args.GetString( "classname" ), "func_static" ) == 0 &&
+		idStr::Cmp( args.GetString( "model" ), "models/mapobjects/marine/equipment/monitors/mcc_monitor02_sm.lwo" ) == 0 &&
+		idStr::Cmp( args.GetString( "gui" ), "guis/monitors/marine/mcc1.gui" ) == 0 &&
+		fileSystem->ReadFile( "guis/monitors/marine/mcc1.gui", NULL, NULL ) < 0 &&
+		fileSystem->ReadFile( "guis/monitors/marine/mcc/q4x_ambient_mcc1.gui", NULL, NULL ) > 0 ) {
+		args.Set( "gui", "guis/monitors/marine/mcc/q4x_ambient_mcc1.gui" );
 	}
 	const char *prefixes[] = { "map_m05::", "painlord::", "m06::", "m06b::" };
 	const char *corrected[] = { "oq4_m05::", "oq4_m05_painlord::", "oq4_m06::", "oq4_m06b::" };

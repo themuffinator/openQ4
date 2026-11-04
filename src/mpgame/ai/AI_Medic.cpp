@@ -247,7 +247,7 @@ void rvAIMedic::GetDebugInfo( debugInfoProc_t proc, void* userData ) {
 	proc ( "rvAIMedic", "lastPatientCheckTime",va("%d",lastPatientCheckTime), userData );
 	proc ( "rvAIMedic", "healDebounceTime",	va("%d",healDebounceTime), userData );
 	proc ( "rvAIMedic", "healing",			healing?"true":"false", userData );
-	proc ( "rvAIMedic", "emergencyOverride",healing?"true":"false", userData );
+	proc ( "rvAIMedic", "emergencyOverride",emergencyOverride?"true":"false", userData );
 	//proc ( "rvAIMedic", "healedAmount",		va("%d",healedAmount), userData );
 	proc ( "rvAIMedic", "minHealValue",		va("%d",minHealValue), userData );
 	proc ( "rvAIMedic", "maxHealValue",		va("%d",maxHealValue), userData );
@@ -649,6 +649,12 @@ stateResult_t rvAIMedic::State_Medic ( const stateParms_t& parms ) {
 
 	switch ( parms.stage ) {
 		case STAGE_MOVE:
+			if ( !move.fl.done ) {
+				idEntity *blocker = physicsObj.GetSlideMoveEntity();
+				if ( blocker && blocker->IsType( idAI::GetClassType() ) ) {
+					static_cast<idAI *>( blocker )->RequestMoveAside( this );
+				}
+			}
 			// TakePatient makes the medic passive and blind to enemies, and this
 			// stage only ends on reaching the patient, so a patient it can see but
 			// never reach would hold it here for good. Give up once it stops closing

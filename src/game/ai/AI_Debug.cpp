@@ -155,6 +155,12 @@ void idAI::GetDebugInfo ( debugInfoProc_t proc, void* userData ) {
 	proc ( "idAI", "move.moveType",			va("%d", move.moveType), userData );
 	proc ( "idAI", "move.command",				aiMoveCommandString[move.moveCommand], userData );
 	proc ( "idAI", "move.status",				aiMoveStatusString[move.moveStatus], userData );
+	proc ( "idAI", "move.goalEntity", move.goalEntity.GetEntity() ? move.goalEntity->GetName() : "<none>", userData );
+	proc ( "idAI", "move.moveDest", move.moveDest.ToString(), userData );
+	proc ( "idAI", "move.seekPos", move.seekPos.ToString(), userData );
+	proc ( "idAI", "move.range", va( "%g", move.range ), userData );
+	proc ( "idAI", "move.obstacle", move.obstacle.GetEntity() ? move.obstacle->GetName() : "<none>", userData );
+	proc ( "idAI", "physics.slideEntity", physicsObj.GetSlideMoveEntity() ? physicsObj.GetSlideMoveEntity()->GetName() : "<none>", userData );
 	proc ( "idAI", "move.fl.allowDirectional",	move.fl.allowDirectional ? "true" : "false", userData );
 	proc ( "idAI", "move.direction_ideal",		aiMoveDirectionString[move.idealDirection ], userData );
 	proc ( "idAI", "move.direction_current",	aiMoveDirectionString[move.currentDirection ], userData );

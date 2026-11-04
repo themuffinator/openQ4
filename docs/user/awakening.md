@@ -161,8 +161,13 @@ fixes them:
   the escape begins. Destroyed escape teleporters stop their reinforcements and
   rotation, and repeated triggers cannot restart them. The service-lift lamp
   travels with its platform, and the rescue teleport clears its destination
-  before returning control. Restart these maps to use the corrected scripts; older
-  saves keep their original mission flow.
+  before returning control. Idle followers give Tak room to reach you for armor
+  repairs. The upper freight panel no longer presents a broken interaction;
+  several lights, MCC monitors and character/effect textures now use their
+  available assets. Fast command-room teleporter kills also cancel its delayed
+  activation. Restart these maps to adopt corrected scripts and entity
+  assignments; older saves keep their original mission flow and receive the
+  AI improvements.
 - **The Retch** asks for navigation data that two levels lack (Trianfac and
   Stranarus Trench part 2), so four of them could never move. They now walk.
 - **The goob gun's burning effect** shows from the first hit; the alpha looked

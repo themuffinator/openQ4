@@ -1707,7 +1707,10 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   processing window and cleanup, MCC arrival continuity, and cannon/fighter
   lifecycle are reviewed in the [mission audit](awakening-m05-m06.md). A second
   pass fixes normal callback cancellation, escape-teleporter shutdown/re-entry
-  and the service-lift lamp, with versioned scripts preserving v1 saves.
+  and the service-lift lamp, with versioned scripts preserving v1 saves. A third
+  pass addresses the blocked medic approach, unused freight panel and incomplete
+  media references, plus a delayed teleporter activation race in invasion v3;
+  v1/v2 script statements remain unchanged.
   Focused encounter and restore evidence belongs there; full traversal remains
   part of this gate.
   Progress, 2 November: freeze persistence passes one save/restore case. On

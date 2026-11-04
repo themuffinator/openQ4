@@ -110,7 +110,19 @@ bool idDeclSkin::Parse( const char *text, const int textLength, bool noCaching )
 			map.from = declManager->FindMaterial( token );
 		}
 
-		map.to = declManager->FindMaterial( token2 );
+		// The recovered machinegun skin names an unshipped arm variant. The
+		// matching retail variant uses the same mesh/UVs and burn effect.
+		// Never replace an authored declaration supplied by the installation.
+		map.to = NULL;
+		if ( idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+			idStr::Icmp( GetName(), "skins/monsters/q4x_strogg_marine/q4x_smv_machinegun" ) == 0 &&
+			token2.Icmp( "models/monsters/q4x_strogg_marine/q4x_smv_arms3_lo" ) == 0 &&
+			declManager->FindMaterial( token2, false ) == NULL ) {
+			map.to = declManager->FindMaterial( "models/monsters/strogg_marine/smv_arms3_lo", false );
+		}
+		if ( map.to == NULL ) {
+			map.to = declManager->FindMaterial( token2 );
+		}
 
 		mappings.Append( map );
 	}

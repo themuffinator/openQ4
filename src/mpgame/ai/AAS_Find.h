@@ -42,7 +42,7 @@ private:
 class rvAASFindGoalOutOfRange : public idAASCallback {
 public:
 	
-	rvAASFindGoalOutOfRange ( idAI* _owner );
+	rvAASFindGoalOutOfRange ( idAI* _owner, const idVec3& _avoidOrigin, float distance );
 
 protected:
 
@@ -51,6 +51,8 @@ protected:
 private:
 
 	idAI*			owner;
+	idVec3			avoidOrigin;
+	float			minimumDistanceSqr;
 };
 
 /*

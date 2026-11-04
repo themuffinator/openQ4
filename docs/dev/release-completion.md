@@ -23,7 +23,13 @@ See [player release status](../user/release-status.md).
 - Bullets left behind by departing fighters no longer retain deleted collision
   owners, fixing an active-cannon save warning and preventing later entities
   from inheriting an old bullet's collision exemption.
-- Restart M05/M06 to use corrected mission scripts. Earlier saves keep their
+- Idle squad followers give their medic leader room to reach the player. The
+  unused upper freight panel no longer offers a broken lift interaction, and
+  several missing light, monitor and character/effect texture references use
+  their installed counterparts. Fast command-room teleporter kills also prevent
+  its delayed activation from running after destruction.
+- Restart M05/M06 to use corrected mission scripts and entity assignments.
+  Earlier saves keep their
   original script flow. See [intent, changes and validation](awakening-m05-m06.md).
 
 ## Damaged queued events recover safely, 4 November 2026

@@ -2,6 +2,7 @@
 
 
 #include "Game_local.h"
+#include "awakening/MissionScripts.h"
 
 // RAVEN BEGIN
 #include "../bse/BSEInterface.h"
@@ -2729,7 +2730,9 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 		idMapEntity *mapEnt = mapFile->GetEntity( i );
 
 		if ( !InhibitEntitySpawn( mapEnt->epairs ) ) {
-			CacheDictionaryMedia( &mapEnt->epairs );
+			idDict mediaArgs = mapEnt->epairs;
+			Awakening_CorrectM05M06Entity( mediaArgs );
+			CacheDictionaryMedia( &mediaArgs );
 			const char *classname = mapEnt->epairs.GetString( "classname" );
 			if ( classname[0] != '\0' ) {
 				FindEntityDef( classname, false );
@@ -6882,7 +6885,6 @@ Parses textual entity definitions out of an entstring and spawns gentities.
 // RAVEN BEGIN
 // ddynerman: multiple game instances
 #include "awakening/M01Cinematic.inl"
-#include "awakening/MissionScripts.h"
 
 void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, unsigned short* entityNumOut, int* startSpawnCount ) {
 // RAVEN END
@@ -7047,7 +7049,9 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 			if ( profileMapSpawn ) {
 				mapMediaTimer.Start();
 			}
-			CacheDictionaryMedia( &mapEnt->epairs );
+			idDict mediaArgs = mapEnt->epairs;
+			Awakening_CorrectM05M06Entity( mediaArgs );
+			CacheDictionaryMedia( &mediaArgs );
 			if ( profileMapSpawn ) {
 				mapMediaTimer.Stop();
 			}

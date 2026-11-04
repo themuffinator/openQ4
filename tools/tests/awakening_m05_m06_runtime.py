@@ -22,14 +22,33 @@ from savegame_cross_load import CFG_REL, LOG_NAME, client_path, launch_command, 
 MAPS = {'boss':'m05_bio', 'arrival':'m06_mcc', 'defense':'m06_mcc_invasion',
         'failure':'m06_mcc_invasion', 'speeder':'m06_mcc_invasion', 'checkpoint':'m05_bio',
         'processing':'m05_bio', 'teleporters':'m06_mcc_invasion',
-        'combat-save':'m06_mcc_invasion', 'teleporter-state':'m06_mcc_invasion'}
+        'combat-save':'m06_mcc_invasion', 'teleporter-state':'m06_mcc_invasion',
+        'medic':'m05_bio', 'freight':'m05_bio', 'freight-board':'m05_bio', 'freight-ride':'m05_bio'}
 ERROR = re.compile(r'(?mi)^(?:\^\d)?(?:ERROR:|FATAL ERROR:)|could not restore saved state|'
-                   r'WriteObject FindIndex failed|Unknown command|unknown command|expected an existing zero-argument|screenshot: bad dimensions')
+                   r'WriteObject FindIndex failed|Unknown command|unknown command|expected an existing zero-argument|screenshot: bad dimensions|usage: setviewpos|Entity not found for event')
 
 def commands(case, restore):
     lines = ['set g_autoExecAfterMapLoad ""', 'set g_stopTime 0']
     if not restore:
         lines += ['god']
+    if case == 'medic':
+        return lines + ['testMission player1', 'wait 60', 'saveGame phase', 'wait 5',
+                        'wait 1200', 'echo M56_MEDIC_COMPLETE', 'testMission player1',
+                        'aiDumpState tak verbose', 'aiDumpState strauss verbose',
+                        'testMission strauss', 'testMission navajas', 'testMission darnell',
+                        'screenshot "screenshots/medic.tga"', 'saveGame mission', 'wait 5']
+    if case in ('freight', 'freight-board', 'freight-ride'):
+        if case == 'freight':
+            lines += ['testMission call oq4_m05::penisWaving', 'wait 7200']
+        if case in ('freight', 'freight-board'):
+            lines += ['echo M56_FREIGHT_BOARDING', 'testMission elevA',
+                      'aiDumpState tak verbose', 'aiDumpState strauss verbose', 'listThreads',
+                      'setviewpos 3080 1872 -440 180', 'wait 600',
+                      'saveGame phase', 'wait 5']
+        lines += ['wait 4800', 'echo M56_FREIGHT_TOP', 'testMission elevA']
+        for entity in ('player1', 'tak', 'strauss', 'navajas', 'darnell', 'elevACall_2'):
+            lines += ['testMission '+entity]
+        return lines + ['listThreads', 'screenshot "screenshots/freight.tga"', 'saveGame mission', 'wait 5']
     if case == 'checkpoint':
         return lines + ['wait 2400', 'testMission player1', 'saveGame mission', 'wait 5']
     if case == 'arrival':
@@ -41,7 +60,9 @@ def commands(case, restore):
         return lines + ['wait 120', 'testVehicle turret', 'saveGame mission', 'wait 5']
     if case in ('teleporters', 'teleporter-state'):
         if not restore:
-            lines += ['wait 120', 'testMission call oq4_m06b::setupRouteToHangar', 'wait 360',
+            lines += ['wait 120', 'testMission func_static_54157', 'testMission func_static_54159',
+                      'testMission func_static_54160', 'testMission func_static_54168',
+                      'testMission call oq4_m06b::setupRouteToHangar', 'wait 360',
                       'trigger trig_hall_teleporter', 'testMission call oq4_m06b::controlRoomCrash',
                       'wait 180', 'saveGame phase', 'wait 5']
         if case == 'teleporters':
@@ -59,14 +80,18 @@ def commands(case, restore):
                        'func_spawner_enemy_light_3', 'func_spawner_enemy_light_4', 'func_spawner_command_dropin',
                        'rear_tele_broken', 'rear_tele_broken_1', 'comm_tele_broken'):
             lines += ['testMission '+entity]
-        return lines + ['listThreads', 'saveGame mission', 'wait 5']
+        return lines + ['listThreads', 'setviewpos 240 -1880 155 25 270 0', 'wait 2',
+                        'screenshot "screenshots/mcc-monitors.tga"', 'saveGame mission', 'wait 5']
     if case == 'processing':
         return lines + ['wait 2400', 'trigger trigger_relay_1', 'wait 2',
                         'testMission call oq4_m05::prebossCinematic', 'wait 1800',
                         'wait 14400', 'testMission strauss', 'saveGame forbidden', 'wait 5', 'listThreads']
     if case == 'boss':
         if not restore:
-            lines += ['wait 2400', 'testMission light_8861', 'trigger trigger_relay_1', 'wait 2',
+            lines += ['wait 2400', 'testMission light_8861', 'testMission elevACall_1',
+                      'testMission elevACall_2', 'testMission elevAControls',
+                      'testMission light_8571', 'testMission light_8570',
+                      'testMission light_8569', 'testMission light_6180', 'trigger trigger_relay_1', 'wait 2',
                       'testMission call oq4_m05::prebossCinematic', 'wait 1800',
                       'damage theboss 10000 damage_moverCrush head', 'wait 120',
                       'echo M56_FIRST_STUN', 'testMission theboss',
@@ -123,6 +148,8 @@ def main():
     args=parser.parse_args()
     if args.baseline and (args.input or args.case!='checkpoint'):
         parser.error('--baseline is only for a fresh checkpoint')
+    if args.case in ('medic', 'freight', 'freight-board', 'freight-ride') and not args.input:
+        parser.error('medic/freight probes require a rescued-squad or lift checkpoint')
     if args.input and args.case == 'processing':
         parser.error('processing starts a fresh timed rescue')
     if args.case == 'teleporter-state' and not args.input:
@@ -166,7 +193,8 @@ def main():
     log=path.read_text(errors='replace') if path.exists() else ''
     if process.returncode!=0 or ERROR.search(log) or log.count('M56_DONE')!=1:
         failures.append('runtime error, exit status or missing completion marker')
-    if not args.input and not args.baseline and 'Awakening mission corrections v2:' not in log:failures.append('corrections not enabled')
+    version = 3 if MAPS[args.case] == 'm06_mcc_invasion' else 2
+    if not args.input and not args.baseline and f'Awakening mission corrections v{version}:' not in log:failures.append('corrections not enabled')
     if args.input and 'Game Map Init SaveGame' not in log:failures.append('input not restored')
     if args.case in ('failure', 'processing'):
         refused = "Can't save after failed mission" in log
@@ -178,6 +206,33 @@ def main():
     else:
         if not (game/'savegames/mission.save').is_file():failures.append('final save missing')
         if "Can't save after failed mission" in log:failures.append('unexpected mission failure')
+    if not args.input and args.case in ('boss', 'teleporters'):
+        for missing in ('downsize( models/monsters/a4x_tactical/q4x_tt_body_s, 1)',
+                        'gfx/effects/fire/p_fire2a',
+                        'models/monsters/q4x_strogg_marine/q4x_smv_arms3_lo', 'lights/p_light1b'):
+            if "Couldn't load image: "+missing in log:
+                failures.append('repaired media reference still defaults: '+missing)
+    if not args.input and args.case == 'teleporters':
+        for monitor in ('func_static_54157', 'func_static_54159', 'func_static_54160', 'func_static_54168'):
+            if not re.search(r'testMissionGui: name='+monitor+r' .*source=guis/monitors/marine/mcc/q4x_ambient_mcc1.gui', log):
+                failures.append('MCC monitor did not load its ambient display: '+monitor)
+        if "Couldn't load gui: 'guis/monitors/marine/mcc1.gui'" in log:
+            failures.append('missing MCC monitor GUI is still precached')
+    if args.case == 'medic':
+        after = log.split('M56_MEDIC_COMPLETE')[-1]
+        if not re.search(r'testMissionPlayer: name=player1 armor=100\b', after):
+            failures.append('Tak did not complete the armor repair')
+        if "medic 'tak' made no progress" in log:
+            failures.append('Tak still stalls on the heal approach')
+        for entity in ('strauss', 'navajas', 'darnell'):
+            if not re.search(r'testMission: name='+entity+r' health=300 hidden=0', after):
+                failures.append('squad member lost during repair: '+entity)
+    if args.case in ('freight', 'freight-board', 'freight-ride'):
+        after = log.split('M56_FREIGHT_TOP')[-1]
+        for entity in ('elevA', 'player1', 'tak', 'strauss', 'navajas', 'darnell'):
+            match = re.search(r'testMission: name='+entity+r' .*origin=\([^ ]+ [^ ]+ ([^ )]+)\)', after)
+            if not match or float(match[1]) < 3000:
+                failures.append('freight passenger/platform did not reach upper floor: '+entity)
     if args.case=='arrival' and 'testMission: missing=mitchell_intro' not in log:
         failures.append('Mitchell still appears after his death')
     if args.case == 'processing':
@@ -187,6 +242,13 @@ def main():
         corrected_boss = not args.input or 'm05_bio.openq4-v2.script' in log
         if corrected_boss and "telefragged 'dekard_boss_cinematic'" in log:
             failures.append('rescue teleport hit the cinematic stand-in')
+        if not args.input:
+            for lamp in ('light_8571', 'light_8570', 'light_8569', 'light_6180'):
+                if not re.search(r'testMissionLight: name='+lamp+r' .*material=lights/p_light1xb', log):
+                    failures.append('M05 lamp did not load its authored light image: '+lamp)
+            for panel in ('elevACall_1', 'elevACall_2', 'elevAControls'):
+                if 'testMissionGui: name='+panel+' interactive=0 target=none' not in log:
+                    failures.append('scripted freight panel is still interactive or has a stale target: '+panel)
         if not args.input and not re.search(r'testMission: name=light_8861 .*bind=elevator2',log):
             failures.append('service-lift lamp did not bind to its platform')
         if not args.input and 'testMissionObjective: Rescue Strauss' not in log.split('M56_FIRST_STUN')[-1].split('M56_SECOND_STUN')[0]:
@@ -236,10 +298,12 @@ def main():
         for entity in ('rear_tele_broken', 'rear_tele_broken_1', 'comm_tele_broken'):
             if not re.search(r'testMission: name='+entity+r' health=-?\d+ hidden=0',after):
                 failures.append('broken model missing: '+entity)
-        if re.search(r'oq4_m06b::(?:spin(?:Hall|Comm)?TeleBall|monitor(?:Hall|Comm)?TeleHealth) :',after):
-            failures.append('teleporter threads survived destruction')
+        if re.search(r'oq4_m06b::(?:spin(?:Hall|Comm)?TeleBall|monitor(?:Hall|Comm)?TeleHealth|controlRoomCrash) :',after):
+            failures.append('teleporter/crash threads survived destruction')
     if args.case=='speeder' and 'm07_race' not in log:failures.append('speeder did not reach race map')
-    capture = {'boss':'rescue', 'arrival':'arrival', 'defense':'escape', 'speeder':'race'}.get(args.case)
+    capture = {'boss':'rescue', 'arrival':'arrival', 'defense':'escape', 'speeder':'race',
+               'medic':'medic', 'freight':'freight', 'freight-board':'freight', 'freight-ride':'freight',
+               'teleporters':'mcc-monitors', 'teleporter-state':'mcc-monitors'}.get(args.case)
     if capture and not (game/'screenshots'/f'{capture}.tga').is_file():
         failures.append('engine screenshot missing')
     for relative,expected in identities.items():
