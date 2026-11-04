@@ -1752,6 +1752,37 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   See [mission intent, findings and bounded runtime evidence](awakening-missions.md).
   End-to-end squad routing, walker demolition/traversal and Tank/extraction
   qualification remain part of this gate.
+
+  **M01 interior dramatic-feedback pass (planned, 4 November).** The full
+  hangar-to-gameplay audit confirms working cabin/wind/welding output, but sparse
+  environmental layers, no added cinematic impact response and brief effects
+  during sustained actions. Preserve the Tak face-lighting correction and the
+  immutable scene-script/save revisions. Use the
+  [dropship audit and beat acceptance](m01-interior-feedback-audit.md) as supporting
+  evidence; the ordered work remains here:
+
+  1. **Audio baseline and continuity.** Trace cue/channel ownership and score
+     lifetime on the full entry path; isolate the direct-cabin diagnostic's early
+     emitter stop. Rebalance environmental detail, dialogue ducking and headroom;
+     retain deliberately quiet story beats. Confirm the mix by listening as well
+     as recording active voices and PCM.
+  2. **Coupled impact response.** Implement one scene-owned dispatch for sound,
+     bounded camera impulse, fixture response and effects, with light/heavy/breach
+     tiers. Compose the offset once after authored camera sampling, with explicit
+     shake amount/off and existing VR comfort behavior. Keep normal player and
+     unrelated cinematic paths unchanged.
+  3. **Damage progression and close action.** Carry damage state across interior
+     sets; add restrained hull strain, localized dust/sparks and motivated light
+     changes. Bind Tak's weld sound, emission and glow to tool contact, preserve
+     face readability, and align spatial harness/rail/rope/landing foley. Review
+     framing and the descent-to-world audio transition.
+  4. **Qualification and release evidence.** Run full GL/Vulkan entry plus phase
+     save/skip/restart, high-refresh and pause/resume cases; compare normal,
+     reduced-flashing and shake-off modes. Require synchronized cues, readable
+     faces/dialogue, bounded resource cost and complete effect/camera cleanup at
+     handoff. Audition headphone/speaker output, verify installed-asset-only
+     dependencies, and update candidate release notes with the tested result.
+
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus
