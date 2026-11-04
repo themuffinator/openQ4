@@ -42,6 +42,7 @@ def main() -> None:
         "bool rvNavMesh::KnockSlideLandingSafe(",
     ))
     physics = (ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8")
+    bodies = function(physics, "idVec3 idPhysics_Player::AdjustVertically(") + "\n" + bodies
     for name, value in (("PM_ACCELERATE_MP", 15.0), ("PM_FRICTION", 6.0), ("PM_STOPSPEED", 100.0)):
         assert float(re.search(rf"const float {name}\s*=\s*([\d.]+)f", physics)[1]) == value, name
     header = (ROOT / "src/mpgame/bots/NavMesh.h").read_text(encoding="utf-8")
@@ -75,10 +76,10 @@ def main() -> None:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
         subprocess.run(command, cwd=path, check=True)
         subprocess.run([str(exe)], cwd=path, check=True)
-        origin_anchor = "idVec3 position = origin;\n\tidVec3 velocity = velocityIn;"
+        origin_anchor = "idVec3 position = origin;\n\tidVec3 velocity = velocityIn;\n\tint unstuck = 0;"
         assert fixture.count(origin_anchor) == 1
         mutated = fixture.replace(origin_anchor,
-            "idVec3 position = origin + idVec3( 0.0f, 0.0f, NAV_GROUND_OFFSET );\n\tidVec3 velocity = velocityIn;")
+            "idVec3 position = origin + idVec3( 0.0f, 0.0f, NAV_GROUND_OFFSET );\n\tidVec3 velocity = velocityIn;\n\tint unstuck = 0;")
         cpp.write_text(mutated, encoding="utf-8")
         subprocess.run(command, cwd=path, check=True)
         result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
@@ -116,6 +117,10 @@ def main() -> None:
         assert result.returncode != 0, "rim-recovery rejection mutation escaped"
         print("Inward rim landing: old rejection mutation failed")
         for label, anchor, replacement in (
+            ("collision without ground contact", "NavAgentHasGroundContacts( end, gravity ) ||", "true ||"),
+            ("fatal grounded impact", "NavAgentHasGroundContacts( end, gravity ) ||", "false ||"),
+            ("descending splash momentum", "idVec3 velocity = velocityIn;\n\tconst float dt = NAV_PAD_STEP_SECONDS;",
+             "idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );\n\tconst float dt = NAV_PAD_STEP_SECONDS;"),
             ("affordable last-resort contact", "*touchedAffordable = true;", "*touchedAffordable = false;"),
             ("grounded steering", "velocity += wish * Min( add, ( elapsed < knockMsec ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );",
              "velocity += wish * 0.0f;"),

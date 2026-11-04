@@ -35,6 +35,32 @@ Native decision tests reject restored weak-hit thresholds, delayed command
 refresh and continued jump ownership. Runtime qualification is in progress
 under `.tmp/mp02-falls/`; the prior failed reports remain unchanged.
 
+On `84dde9c6d`, all three hit replays and the ten existing recovery cases pass.
+The DM8 and CTF5 hit cases use a 12-second positive observation because normal
+navigation resumes after recovery; both finish alive/grounded and complete two
+subsequent traversals. Their original six-second reports remain failed terminal
+checks. Causal envelopes still use six seconds and their unchanged strict
+terminal-state rule. Windows and Linux ASan/UBSan decision, geometry and hazard
+fixtures reject 31 reversions.
+
+The four renewed long runs retain 283.872–284.912 seconds of simulation each,
+with 104/48/78/69 combat kills on DM8/CTF3/CTF5/DZ3. CTF3 and DZ3 have no world
+deaths. Both CTF5 deaths pass the strict enemy-impulse exclusion. DM8 has five
+world deaths, three excluded and two still recoverable: a self-rocket after a
+high ledge jump and a low-health pad descent. Reports and classifications are
+`long-final/`, `long-final-classification/` and `long-ctf5-classification/`.
+
+The next correction refuses exposed self-blasts during an airborne flight,
+while retaining distant splash shots. It also preserves descent in the splash
+landing predictor until actual floor contact. The low-health DM8 descent reveals
+a separate collision distinction: a bevel sweep clips downward velocity before
+the player registers ground contact. CrashLand therefore does not charge the
+first collision's impact. Recovery now follows the remaining single-plane step
+with the player's own velocity-clipping function and checks actual end-of-step
+contacts before deferring impact cost; ordinary grounded impacts retain their
+health limit. Targeted and broader runtime qualification of these corrections
+is still required.
+
 ## Complete catalog and renewed long matches, 4 November 2026
 
 The `ee6207834` build completes all 33 declared map variants against the installed

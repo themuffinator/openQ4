@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay the three recoverable long-match hit states recorded on 4 November.
+"""Replay the four recoverable long-match hit states recorded on 4 November.
 
 These are positive recovery regressions, not full match snapshots or causal
 exclusions. The weak-hit cases enter through the real knockback handler instead
@@ -12,14 +12,20 @@ import json
 import os
 from pathlib import Path
 
-from mp_bot_impulse_replay import assess_trials, replay_identity, replay_session
+from mp_bot_impulse_replay import replay_identity, replay_session
+from mp_bot_air_recovery_replay import assess_recovery_trials
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES = {
     "dm8": ("DM", [{
         "name": "damaged_jump", "probe_type": "JUMP",
+        "observe_msec": 12000, "allow_resumed_navigation": True,
         "setup": ["bot_probeHealth 1 2 50 1.514 34.961 -0.643"],
         "command": "bot_probeJump 1 -75.655 891.068 616.708 24.985 30.71 250.885 -44 868 328.25",
+    }, {
+        "name": "bevel_descent",
+        "setup": ["bot_probeHealth 1 7 50 -16.301 -22.592 21.187"],
+        "command": "bot_probeMove 1 -170.137 169.962 860.787 273.625 226.057 -332.896 -170.137 169.962 860.787",
     }]),
     "ctf3": ("CTF", [{
         "name": "weak_nail_walk",
@@ -28,6 +34,7 @@ CASES = {
     }]),
     "ctf5": ("CTF", [{
         "name": "rail_flight",
+        "observe_msec": 12000, "allow_resumed_navigation": True,
         "setup": ["bot_probeHealth 1 10 200 19.531 -499.058 -23.655"],
         "command": "bot_probeWalk 1 568.824 74.316 -33.102 19.531 146.841 299.182 580 884 -183.75",
     }]),
@@ -51,13 +58,14 @@ def main() -> int:
     for name, (mode, cases) in CASES.items():
         if args.map not in ("all", name):
             continue
+        cases = [{**trial, "expect_survival": True} for trial in cases]
         done, log, code = replay_session(runtime, executable, args.basepath.resolve(), output / name,
                                         "mp/q4" + name, mode, cases, args.port, 180)
         complete = complete and done
         codes[name] = code
-        outcomes += [{**trial, "map": name} for trial in assess_trials(log, cases)]
+        outcomes += [{**trial, "map": name} for trial in assess_recovery_trials(log, cases)]
     unchanged = replay_identity(runtime, executable) == identity
-    passed = complete and unchanged and all(trial["survived"] for trial in outcomes)
+    passed = complete and unchanged and all(trial["armed"] and trial["recovery_passed"] for trial in outcomes)
     report = dict(passed=passed, complete=complete, exit_codes=codes, runtime_identity=identity,
                   runtime_unchanged=unchanged, trials=outcomes,
                   scope="Positive hit recovery only; no causal exclusions.")

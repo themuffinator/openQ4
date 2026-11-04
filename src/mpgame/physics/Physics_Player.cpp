@@ -158,7 +158,7 @@ idPhysics_Player::AdjustVertically
 given a walkable plane normal, adjust z to be in the plane without changing the horizontal direction
 ===============
 */
-idVec3 idPhysics_Player::AdjustVertically( const idVec3 &normal, const idVec3 &_in, int forceLength ) const {
+idVec3 idPhysics_Player::AdjustVertically( const idVec3 &normal, const idVec3 &_in, int forceLength ) {
 	idVec3 out;
 	idVec3 in = _in;
 

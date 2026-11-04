@@ -12,6 +12,9 @@ See [player release status](../user/release-status.md).
   and can change a stale movement command before the next physics step after
   a hit. The remaining long-match safety gates are being rerun; see the
   [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026).
+- Bots avoid close self-blasts during flight and account for downward momentum
+  and glancing contacts when checking a recovery landing. These further
+  corrections are undergoing the renewed traversal-safety gates.
 - Bots can steer a dangerous knockback slide before leaving the floor and
   brake after catching a narrow ledge. Recovery also accounts for movement
   boosts so its commands match the predicted trajectory.

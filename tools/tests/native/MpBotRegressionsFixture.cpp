@@ -1602,6 +1602,19 @@ void TestSelfKnockback() {
     CHECK(navMesh.lastSlideKnock==80 && navMesh.lastSlideVelocity.Compare({10,0,400}));
     navMesh.slideCoastSafe=true;
     CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    self.pfl.onGround=false;
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    // Linear projection may move the predicted hull out of the blast even
+    // though a touchdown will stop it there. The current hull still matters.
+    self.physics.velocity={1000,0,-100};
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{},model,0.5f));
+    CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{500,0,-50},model,0.5f));
+    // The far shot remains available in flight; this is a self-blast guard.
+    CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{-500,0,0},model,0.5f));
+    model.selfKnockback=0.1f;
+    CHECK(!BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
+    model={};
+    self.physics.velocity={10,0,0}; self.pfl.onGround=true;
     navMesh.slideCoastSafe=false; model.attackerScale=0.25f; model.selfPushScale=3;
     CHECK(BotCombatSplashThrowsShooter(&self,nullptr,{},model,0));
     CHECK(navMesh.lastSlideKnock==50 && navMesh.lastSlideVelocity.Compare({10,0,300}));

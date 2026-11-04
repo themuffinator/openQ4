@@ -344,6 +344,46 @@ static bool NavAgentTranslation( trace_t &trace, const idVec3 &start, const idVe
 	return NavTraceTranslation( trace, start, end, navAgentTrace, navAgentBounds );
 }
 
+// CrashLand requires actual upward-facing contacts at the end of the physics
+// step. A swept collision can stop descent outside that contact envelope.
+static bool NavAgentHasGroundContacts( const idVec3 &origin, const idVec3 &gravity ) {
+	idVec6 direction;
+	direction.SubVec3( 0 ) = gravity;
+	direction.SubVec3( 0 ).Normalize();
+	direction.SubVec3( 1 ).Zero();
+	contactInfo_t contacts[10];
+	const idClip *clipWorld = gameLocal.GetEntityClipWorld( NULL );
+	int count = collisionModelManager->Contacts( contacts, 10, origin, direction, CONTACT_EPSILON,
+		&navAgentTrace, mat3_identity, NAV_CLIP_MASK, clipWorld->GetWorldCollisionModel(), vec3_origin, mat3_identity );
+	for ( int i = 0; i < count; i++ ) {
+		if ( contacts[i].normal * -direction.SubVec3( 0 ) > 0.0f ) {
+			return true;
+		}
+	}
+	idBounds bounds = navAgentBounds;
+	bounds.TranslateSelf( origin );
+	bounds.ExpandSelf( CONTACT_EPSILON );
+	static idClipModel *touching[MAX_GENTITIES];
+	const int num = clipWorld->ClipModelsTouchingBounds( bounds, NAV_CLIP_MASK, touching, MAX_GENTITIES );
+	for ( int i = 0; i < num; i++ ) {
+		const idClipModel *touch = touching[i];
+		idEntity *ent = touch ? touch->GetEntity() : NULL;
+		if ( !ent || !touch->GetCollisionModel() ||
+			( touch->GetContents() & ( CONTENTS_BODY | CONTENTS_CORPSE ) ) ||
+			ent->IsType( idActor::GetClassType() ) || NavDoorIsWalkActivated( ent ) ) {
+			continue;
+		}
+		count = collisionModelManager->Contacts( contacts, 10, origin, direction, CONTACT_EPSILON,
+			&navAgentTrace, mat3_identity, NAV_CLIP_MASK, touch->GetCollisionModel(), touch->GetOrigin(), touch->GetAxis() );
+		for ( int j = 0; j < count; j++ ) {
+			if ( contacts[j].normal * -direction.SubVec3( 0 ) > 0.0f ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 // Keep ordinary route nodes away from a hull-only sliver of support. A route
 // along q4dz3's outer rim was supported only by the last two units of the
 // player's footprint; normal corner steering put the feet into the void.
@@ -1105,9 +1145,26 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			if ( touchdown ) {
 				*touchdown = trace.endpos;
 			}
-			if ( IsLethalFloor( trace.endpos ) ||
-				 NavLandingImpactDelta( trace, velocity + gravity * ( dt * trace.fraction ), gravity ) > maxImpactDelta ) {
+			if ( IsLethalFloor( trace.endpos ) ) {
 				return false;
+			}
+			if ( NavLandingImpactDelta( trace, velocity + gravity * ( dt * trace.fraction ), gravity ) > maxImpactDelta ) {
+				// SlideMove clips both its midpoint and end velocity, then
+				// CrashLand checks contacts at the final position. DM8's bevel
+				// can stop a fall a frame before those contacts exist. Continue
+				// that exact single-plane step; it is not yet an affordable
+				// landing, and another collision remains unproven here.
+				const idVec3 clipped = idPhysics_Player::AdjustVertically( trace.c.normal, velocity + gravity * ( dt * 0.5f ) );
+				trace_t remainder;
+				const idVec3 end = trace.endpos + clipped * ( dt * ( 1.0f - trace.fraction ) );
+				if ( !NavAgentTranslation( remainder, trace.endpos, end ) ||
+					 NavAgentHasGroundContacts( end, gravity ) ||
+					 TransportOnMove( trace.endpos, end, -1 ) >= 0 ) {
+					return false;
+				}
+				position = end;
+				velocity = idPhysics_Player::AdjustVertically( trace.c.normal, velocity + gravity * dt );
+				continue;
 			}
 			idVec3 flat( velocity.x, velocity.y, 0.0f );
 			const idVec3 stop = trace.endpos + flat * ( dt + flat.Length() / ( 20.0f * speed ) );
@@ -1161,7 +1218,7 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 		return AirInputLandingSafe( origin, velocityIn, wish, maxImpactDelta );
 	}
 	idVec3 position = origin;
-	idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );
+	idVec3 velocity = velocityIn;
 	const float dt = NAV_PAD_STEP_SECONDS;
 	const float speed = Max( 1.0f, pm_speed.GetFloat() );
 	const idVec3 groundProbe( 0.0f, 0.0f, 2.0f * CM_CLIP_EPSILON );
@@ -1170,6 +1227,10 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 		if ( NavAgentTranslation( ground, position, position - groundProbe ) ) {
 			return AirInputLandingSafe( position, velocity, wish, maxImpactDelta );
 		}
+		// A future splash can arrive while the shooter is already falling.
+		// Only actual floor contact cancels descent; flattening it before the
+		// probe invents airtime to reach a ledge (and reduces impact damage).
+		velocity.z = 0.0f;
 		if ( ground.c.normal.z < 0.999f || IsLethalFloor( ground.endpos ) ||
 			 ( ground.c.material && ( ground.c.material->GetSurfaceFlags() & SURF_SLICK ) ) ||
 			 ( gameLocal.LiquidContentsAtPoint( position, NULL ) & MASK_WATER ) ) {

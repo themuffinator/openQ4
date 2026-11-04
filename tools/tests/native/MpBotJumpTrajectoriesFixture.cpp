@@ -26,6 +26,8 @@ struct idMath {
     static float Fabs(float x) { return std::fabs(x); }
     static float Sqrt(float x) { return std::sqrt(x); }
     static float Ceil(float x) { return std::ceil(x); }
+    static float ACos(float x) { return std::acos(x); }
+    static double Pow64(double x,double y) { return std::pow(x,y); }
     static constexpr float FLOAT_EPSILON=1.192092896e-07f;
 };
 struct idVec3 {
@@ -69,6 +71,13 @@ struct idBounds {
 };
 struct CVar { float value; float GetFloat() const { return value; } int GetInteger() const { return int(value); } };
 CVar pm_stepsize{16},pm_jumpheight{48},pm_speed{320},pm_usecylinder{1},pm_frictionoverride{-1};
+CVar pm_slidevelocity{1},pm_powerslide{0.09f};
+const float OVERCLIP=1.001f;
+int missingGroundContacts=0;
+bool NavAgentHasGroundContacts(const idVec3&,const idVec3&) {
+    if(missingGroundContacts>0) { --missingGroundContacts; return false; }
+    return true;
+}
 CVar bot_debug{0};
 constexpr int MAX_GENTITIES=64, SURF_NODAMAGE=1, MASK_WATER=2, SURF_SLICK=4;
 struct idEntity {
@@ -229,6 +238,7 @@ static const char* NavWalkBlockedReason(const trace_t&,const trace_t&) { return 
 rvNavMesh navMesh;
 struct idPlayer {
     struct Physics {
+        static idVec3 AdjustVertically(const idVec3&,const idVec3&,int=0);
         idVec3 origin,velocity;
         const idVec3& GetOrigin() const { return origin; }
         const idVec3& GetLinearVelocity() const { return velocity; }
@@ -688,6 +698,25 @@ int main() {
         CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0})); floorMaterial.flags=0;
         pm_frictionoverride.value=2;
         CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0})); pm_frictionoverride.value=-1;
+        // The splash proof can start above the floor during a descending
+        // jump. It must not turn the existing fall into a fresh drop at rest.
+        solids.clear(); Platform(-1024,1024,0);
+        CHECK(!nav.KnockSlideLandingSafe({0,0,64},{0,0,-900},50,40));
+        CHECK(nav.KnockSlideLandingSafe({0,0,64},{0,0,-900},50,inf));
+        solids.clear(); Platform(128,1024,0);
+        CHECK(nav.KnockSlideLandingSafe({0,0,64},{500,0,0},50,inf));
+        CHECK(!nav.KnockSlideLandingSafe({0,0,64},{500,0,-900},50,inf));
+        // A sweep can clip velocity before the actor registers any ground
+        // contact. Only that missing end-of-step contact permits deferring
+        // CrashLand; an ordinary grounded impact keeps its full cost.
+        solids.clear(); Platform(-1024,1024,0);
+        CHECK(!nav.AirInputLandingSafe({0,0,64},{100,0,-900},{},40));
+        missingGroundContacts=1;
+        CHECK(nav.AirInputLandingSafe({0,0,64},{100,0,-900},{},40));
+        CHECK(missingGroundContacts==0);
+        transported=true; missingGroundContacts=1;
+        CHECK(!nav.AirInputLandingSafe({0,0,64},{100,0,-900},{},40));
+        transported=false; missingGroundContacts=0;
         // Involuntary recovery may aim for a physical hull contact when
         // every supported landing fails. It remains unsafe for route proof.
         solids.clear(); Platform(-1,0,0);

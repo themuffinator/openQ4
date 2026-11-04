@@ -384,17 +384,29 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
                    neutral, "waitMsec 64", f"echo MP_BOT_TRIAL_BEGIN {trial['name']}",
                    *trial.get("setup", []), trial["command"], "set bot_pause 0"]
         release = trial.get("release_input_after_msec")
+        observe = trial.get("observe_msec", TRIAL_OBSERVE_MSEC)
+        if not isinstance(observe, int) or not TRIAL_OBSERVE_MSEC <= observe <= 30000:
+            raise ValueError("observation may extend, never shorten, the six-second terminal check")
         if release is not None:
-            if not 0 < release < TRIAL_OBSERVE_MSEC:
+            if not 0 < release < observe:
                 raise ValueError("input release must be inside the observation window")
             # This optional isolated-recovery mode stops issuing commands after
             # the controller has settled. World/player physics keeps running;
             # assessment requires rest BEFORE release as well as final survival.
             script += [f"waitMsec {release}", "openq4_reportMPState",
                        f"echo MP_BOT_RELEASE_INPUT {trial['name']}", "set bot_pause 1",
-                       f"waitMsec {TRIAL_OBSERVE_MSEC - release}"]
+                       f"waitMsec {observe - release}"]
         else:
-            script += [f"waitMsec {TRIAL_OBSERVE_MSEC}"]
+            sample = trial.get("sample_msec", observe)
+            if not isinstance(sample, int) or not 16 <= sample <= observe:
+                raise ValueError("physics sample interval must be between 16 ms and the observation length")
+            remaining = observe
+            while remaining > 0:
+                step = min(sample, remaining)
+                script += [f"waitMsec {step}"]
+                remaining -= step
+                if remaining:
+                    script += ["openq4_reportMPState"]
         script += ["openq4_reportMPState",
                    f"echo MP_BOT_TRIAL_END {trial['name']}",
                    # A bot that died, or walked off later, would refuse or
