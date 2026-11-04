@@ -2268,13 +2268,20 @@ static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 	for ( int i = 0; i < MAX_RENDERENTITY_GUI; ++i ) {
 		idUserInterface *gui = vehicle->GetRenderEntity()->gui[i];
 		if ( gui ) {
-			idStr locked, guns, rockets;
+			idStr locked, guns, rockets, acquiring, loaded;
 			gui->GetPresentationValue( "LockStatusLT::visible", locked );
 			gui->GetPresentationValue( "active_guns::visible", guns );
 			gui->GetPresentationValue( "active_rockets::visible", rockets );
-			gameLocal.Printf( "testVehicleScreen: name=%s index=%d unique=%d heat=%g locked=%s guns=%s rockets=%s\n",
+			gui->GetPresentationValue( "LockStatusAT::visible", acquiring );
+			for ( const char *slot : { "first", "second", "third", "fourth", "fifth" } ) {
+				idStr visible;
+				if ( gui->GetPresentationValue( va( "%s_rocket_loaded::visible", slot ), visible ) ) {
+					loaded += visible;
+				}
+			}
+			gameLocal.Printf( "testVehicleScreen: name=%s index=%d unique=%d heat=%g locked=%s guns=%s rockets=%s acquiring=%s loaded=%s\n",
 				vehicle->name.c_str(), i, gui->IsUniqued(), gui->State().GetFloat( "HeatPercentage" ),
-				locked.c_str(), guns.c_str(), rockets.c_str() );
+				locked.c_str(), guns.c_str(), rockets.c_str(), acquiring.c_str(), loaded.c_str() );
 		}
 	}
 	for ( int i = 0; i < vehicle->GetNumPositions(); i++ ) {

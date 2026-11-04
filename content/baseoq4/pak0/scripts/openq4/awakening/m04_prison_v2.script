@@ -1,0 +1,14 @@
+// Keep the first helper's statement layout available to its existing saves.
+#include "scripts/openq4/awakening/m04_prison.script"
+
+namespace oq4_m04_v2 {
+	// These markers belong to the marine defenders. Stop on their approach,
+	// outside actor collision bounds, so reinforcements can leave scripted
+	// movement and fight instead of trying to occupy the same cover position.
+	void upperReinforcement( entity attacker ) {
+		aiScriptedMove( attacker, $CB1_upr_cvr_pos_1, 128, 1 );
+	}
+	void lowerReinforcement( entity attacker ) {
+		aiScriptedMove( attacker, $CB1_lwr_cvr_pos_1, 128, 1 );
+	}
+}

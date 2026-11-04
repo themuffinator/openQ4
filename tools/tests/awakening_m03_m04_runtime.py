@@ -43,14 +43,16 @@ void main() {
     $drop_ship.setHealth(9000);
     sys.sendNamedEvent(GUI_VEHICLEHUD, "ship_target_02_on");
     sys.wait(0.5);
-    sys.assert(map_m03aa::GUI_80 && map_m03aa::GUI_60 && map_m03aa::GUI_40);
+    if (!(map_m03aa::GUI_80 && map_m03aa::GUI_60 && map_m03aa::GUI_40)) {
+        sys.println("Q4_CHAPTER_FAILURE damage flags");
+    }
     sys.println("Q4_M03_DAMAGE");
     while (sys.getcvar("oq4_probe_phase") != "repair") { sys.waitFrame(); }
     map_m03aa::DSHEALTHADD = 3000;
     sys.wait(0.5);
-    sys.assert($drop_ship.getHealth() == 12000);
-    sys.assert(map_m03aa::DSHEALTHADD == 0);
-    sys.assert(!map_m03aa::GUI_40);
+    if ($drop_ship.getHealth() != 12000 || map_m03aa::DSHEALTHADD != 0 || map_m03aa::GUI_40) {
+        sys.println("Q4_CHAPTER_FAILURE hull repair");
+    }
     sys.println("Q4_M03_REPAIRED");
     while (sys.getcvar("oq4_probe_phase") != "engine") { sys.waitFrame(); }
     map_m03aa::EVENT_ENGINE = true;
@@ -62,11 +64,14 @@ void main() {
     sys.wait(0.1);
     thread oq4_m03::restartEngine();
     sys.waitForThread(job);
-    sys.assert(map_m03aa::EVENT_ENGINE && map_m03aa::ENGINE_STEP_2);
+    if (!(map_m03aa::EVENT_ENGINE && map_m03aa::ENGINE_STEP_2)) {
+        sys.println("Q4_CHAPTER_FAILURE engine step");
+    }
     thread oq4_m03::restartEngine();
     sys.wait(12);
-    sys.assert(!map_m03aa::EVENT_ENGINE && map_m03aa::ENGINE_FIRE_OUT);
-    sys.assert($drop_ship.getHealth() == 13000);
+    if (map_m03aa::EVENT_ENGINE || !map_m03aa::ENGINE_FIRE_OUT || $drop_ship.getHealth() != 13000) {
+        sys.println("Q4_CHAPTER_FAILURE engine completion");
+    }
     sys.println("Q4_M03_ENGINE_ONCE");
 }
 '''
@@ -124,7 +129,8 @@ def run(args, case, leg='write', source=None):
         lines += ['script "'+' '.join(M04.split())+'"',
                   'listSpawnArgs target_null_41', 'listSpawnArgs target_null_47',
                   'listSpawnArgs tunnel_bot', 'listSpawnArgs strogg_ctrlRm_jumper_1_pos_1',
-                  'script "sys.assert($gunner_3_toBridge == $strogg_ctrlRm_jumper_1_pos_1)"',
+                  'echo Q4_BRIDGE_ALIAS',
+                  'script "sys.println($gunner_3_toBridge == $strogg_ctrlRm_jumper_1_pos_1)"',
                   # The approach trigger removes the authored squad AAS barrier
                   # before the player can reach the bridge ambush trigger.
                   'trigger tunnel_bot', 'trigger trigger_once_35',
@@ -174,7 +180,7 @@ def run(args, case, leg='write', source=None):
                 break
         stop_process(process)
     log = logpath.read_text(errors='replace') if logpath.exists() else ''
-    failures = re.findall(r'(?mi)^.*(?:ERROR:|Compile failed|script runtime error|Assertion failed|Unknown command).*$', log)
+    failures = re.findall(r'(?mi)^.*(?:ERROR:|Compile failed|script runtime error|Assertion failed|Unknown command|Q4_CHAPTER_FAILURE).*$', log)
     if 'Q4_CHAPTER_CHECK_DONE' not in log or process.returncode != 0:
         failures.append(f'incomplete run / exit {process.returncode}')
     if case == 'm03':
@@ -189,7 +195,9 @@ def run(args, case, leg='write', source=None):
         if not re.search(r'testVehicle: name=topgun .*drivers=1 playerSeat=0', log):
             failures.append('not in top gun')
     else:
-        for marker in ('oq4_m04::upperReinforcement', 'oq4_m04::lowerReinforcement'):
+        if not re.search(r'Q4_BRIDGE_ALIAS\s+1(?:\.0*)?\s', log):
+            failures.append('bridge destination alias is missing')
+        for marker in ('oq4_m04_v2::upperReinforcement', 'oq4_m04_v2::lowerReinforcement'):
             if marker not in log:
                 failures.append('missing '+marker)
     if case == 'm03':
@@ -212,9 +220,9 @@ def run(args, case, leg='write', source=None):
     else:
         rows = re.findall(r'name=rvMonster\S+ def=monster_q4x_\S+ class=\S+ hidden=0 origin=\(([^)]+)\)', log)
         positions = [list(map(float,row.split())) for row in rows]
-        if not any(x>250 and -2850<y<-2600 and 400<z<430 for x,y,z in positions):
+        if not any((x-318)**2+(y+2766)**2 < 160**2 and 400<z<430 for x,y,z in positions):
             failures.append('upper reinforcement did not reach its landing')
-        if not any(x>250 and -2850<y<-2600 and 260<z<290 for x,y,z in positions):
+        if not any((x-402)**2+(y+2670)**2 < 160**2 and 260<z<290 for x,y,z in positions):
             failures.append('lower reinforcement did not reach its landing')
         if "scriptedMove: 'monster_gunner_3' could not start" in log:
             failures.append('bridge gunner route is unreachable')

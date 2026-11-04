@@ -37,7 +37,7 @@ static int Awakening_PrepareCampaignRepairs( idMapFile *map ) {
 		return 0;
 	}
 	const char *script = chapter == 3 ? "scripts/openq4/awakening/m03_airassault.script" :
-		"scripts/openq4/awakening/m04_prison.script";
+		"scripts/openq4/awakening/m04_prison_v2.script";
 	if ( fileSystem->ReadFile( script, NULL, NULL ) <= 0 ) {
 		gameLocal.Warning( "Awakening m%02d repairs unavailable: missing %s", chapter, script );
 		return 0;
@@ -68,7 +68,7 @@ static void Awakening_RepairMapArgs( int chapter, idDict &args ) {
 		const bool lower = !idStr::Icmp( name, "target_null_47" ) || !idStr::Icmp( name, "target_null_48" );
 		if ( ( upper || lower ) && !idStr::Icmp( args.GetString( "classname" ), "target_null" ) &&
 			!idStr::Icmp( args.GetString( "spawn_script_init" ), "cellblock1UpperSpawnMove" ) ) {
-			args.Set( "spawn_script_init", lower ? "oq4_m04::lowerReinforcement" : "oq4_m04::upperReinforcement" );
+			args.Set( "spawn_script_init", lower ? "oq4_m04_v2::lowerReinforcement" : "oq4_m04_v2::upperReinforcement" );
 		}
 		// Burst is the base weapon's attack, not a shipped upgrade. Do not invent
 		// an upgrade or grant the later flamethrower in its place.

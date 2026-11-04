@@ -1756,6 +1756,9 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   reticle coverage, ship-state routing, hull repair accounting and duplicate
   engine completion. Prison cellblock routing, maintenance-bot references,
   camera initialization and the missing bridge destination are corrected.
+  A second pass ties missile volleys to the displayed magazine, exercises
+  positive lock/restore transitions and separates reinforcement arrival from
+  occupied marine cover. Script checks now report failures in release builds.
   Focused runtime and production-method probes cover these states; complete
   mission playthroughs and the other campaign acceptance gates remain open.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve

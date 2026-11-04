@@ -31,6 +31,13 @@ encounter activation are part of that choreography, not decorative markers.
   member selects the on-foot interaction cursor. Default, acquiring/locked,
   friendly and out-of-range reticles have editable vector coverage; weapon
   targeting still supplies their colours and materials.
+- A follow-up review found that the five rocket indicators did not control
+  ammunition: a full charge fired one rocket, while an empty magazine could
+  fire after the shorter weapon cooldown. The launcher now fires the displayed
+  charge, from one to five rockets, refuses empty/acquiring shots, and catches
+  up reload timing after a long frame. The existing multi-shot spread and sound
+  support the charged-volley interpretation. This is inferred from the authored
+  magazine and weapon code, not a recovered design specification.
 - M03 damage, repair markers and directional warnings reach both turret HUDs
   and the player's HUD. Lasting damage/marker state is stored in the ordinary
   GUI dictionary, including for a view not drawn before saving. The on-foot
@@ -50,6 +57,11 @@ encounter activation are part of that choreography, not decorative markers.
   did not exist. The tunnel repair bot uses its own two workstations without
   stale `repbot_1` bindings. Camera initialization leaves idle/scanning to the
   camera's AI instead of calling an unsupported mover animation event.
+  With the real defenders present, the first repair could leave an attacker
+  trying to occupy their cover, unable to finish scripted movement or attack.
+  The second revision hands control back to combat AI 128 units from the marker.
+  A new `m04_prison_v2.script` retains the original helper unchanged for saves
+  that already reference it.
 - The delayed bridge gunner's missing script reference binds to the authored
   enemy staging point (`strogg_ctrlRm_jumper_1_pos_1`) on the upper bridge
   approach, retaining its original height and stopping before the drop. The
@@ -112,8 +124,50 @@ do not reposition the missing destination or the gunner in the test fixture.
 `awakening_chapter_behavior.py` compiles the production fire methods against
 counted doubles and covers freeze filtering, fractional/shared light dimming,
 overkill, stages, one-shot target activation and active/off/out contents.
-`awakening_status_behavior.py` also passes its 98 existing targeting/status
-checks. Q4-04 stays open for full playthroughs and the remaining campaign gates.
+`awakening_status_behavior.py` now passes 111 targeting/status/magazine checks.
+The follow-up harness `awakening_chapter_followup.py` adds positive acquisition,
+lock/save/load, full/partial volleys and an occupied cellblock evacuation.
+The core harness now emits explicit failures for script state checks: script
+`assert` is disabled in release builds and was insufficient evidence for exact
+repair totals and one-shot completion. Follow-up runtime results below supersede
+those earlier assertion-only claims. Q4-04 stays open for full playthroughs and
+the remaining campaign gates.
+
+The second-pass build passes the stronger core probe (`round2-core-gl/`) and
+the positive missile-lock probe on both renderers (`round2-lock-gl/`,
+`round2-lock-vulkan/`). Acquiring/locked/cleared screen values agree with the
+weapon; a full magazine and lock survive a fresh-process restore. The launcher
+fires five, rejects an empty shot 432 ms later despite its 400 ms cooldown, and
+fires one after 640 ms. The core probe explicitly verifies the 12,000/13,000
+hull totals, one engine repair reward, independent screens, heat/cooling, both
+reinforcement approaches, the maintenance bot and bridge gunner.
+
+The occupied rescue probe uses four normal simulation tics per rendered frame.
+It observes the initial fight, then periodically kills nearby attacking Strogg
+through the ordinary AI death event as a substitute for player covering fire.
+An unattended run left the medic blocked by fighting enemies; it does not prove
+a navigation defect or justify making the encounter complete without defence.
+This is a sequence/route check, not a combat-balance or full-playthrough claim.
+`round2-rescue-qualified/` passes: attackers leave scripted movement and fire,
+all six prisoner callbacks remove their actors, the final cell opens, and no
+scripted movement failure or timeout is reported. Original scenario timing,
+actor health and marine routes are unchanged in production. The earlier
+`round2-rescue-*` diagnostics retain fixture failures and the unattended control;
+they are not acceptance runs.
+
+An unrelated developer-console compiler fault was reproduced while constructing
+that probe: an include inside a function reaches the file-boundary diagnostic
+with an unnamed global scope, and `idVarDef::Name()` dereferences its null name
+instead of reporting the unsupported include. The helper now compiles at file
+scope. Crash dumps, logs and a symbolized stack are retained under
+`.tmp/awakening-m03-m04/round2-compiler-crash/`; this compiler robustness issue
+remains open and is not part of the campaign repairs.
+
+The final workspace check found `E:/Repositories/openQ4-worktrees/e931/openQ4`
+(detached at `85c61fe16`) clean and fully merged. Removal is suggested after the
+required user approval. The previously identified `claude/ui-right-stick`
+worktree disappeared from the final inventory; this task did not remove it.
+Missing alpha media remains an unrelated content limitation, as described above.
 
 ## Intended progression
 

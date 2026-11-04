@@ -1210,7 +1210,13 @@ riVCWMissileTurret::UpdateMagazine
 */
 void riVCWMissileTurret::UpdateMagazine( void ) {
 	if ( rocketsLoaded < MAGAZINE_SIZE && gameLocal.time >= nextLoadTime ) {
-		SetRocketsLoaded( rocketsLoaded + 1 );
+		// Loading follows game time, including a long frame or a restored timer.
+		// Do not turn a five-rocket magazine into five frames of extra waiting.
+		const int due = loadDelay > 0 ? 1 + ( gameLocal.time - nextLoadTime ) / loadDelay : MAGAZINE_SIZE;
+		const int added = idMath::ClampInt( 1, MAGAZINE_SIZE - rocketsLoaded, due );
+		const int scheduled = nextLoadTime + added * loadDelay;
+		SetRocketsLoaded( rocketsLoaded + added );
+		nextLoadTime = scheduled;
 	}
 }
 
@@ -1246,18 +1252,26 @@ riVCWMissileTurret::Fire
 ================
 */
 bool riVCWMissileTurret::Fire( void ) {
-	if ( lockState == LOCK_ACQUIRING ) {
+	if ( lockState == LOCK_ACQUIRING || rocketsLoaded <= 0 ) {
 		return false;
 	}
 
-	if ( count > 1 ) {
-		PlaySound( "snd_multiFire" );
-	} else {
-		PlaySound( jointIndex == 0 ? "snd_rightFire" : "snd_leftFire" );
-	}
+	// The five cockpit indicators are the charged volley, not a decorative
+	// reload animation. Launch exactly that many rockets, including a partial
+	// charge, and retain the authored base count outside this launch.
+	const int baseCount = count;
+	const int volley = idMath::ClampInt( 1, MAGAZINE_SIZE, rocketsLoaded );
+	const int firingJoint = jointIndex;
+	count = volley;
 	launchAxis = position->GetEyeAxis();
-	if ( !rvVehicleWeapon::Fire() ) {
+	const bool fired = rvVehicleWeapon::Fire();
+	count = baseCount;
+	if ( !fired ) {
 		return false;
+	}
+	PlaySound( volley > 1 ? "snd_multiFire" : firingJoint == 0 ? "snd_rightFire" : "snd_leftFire" );
+	if ( g_debugVehicle.GetInteger() ) {
+		gameLocal.Printf( "%d %s: fired %d loaded rockets\n", gameLocal.time, GetClassname(), volley );
 	}
 	SetRocketsLoaded( 0 );
 	return true;

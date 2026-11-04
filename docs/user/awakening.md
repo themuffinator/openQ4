@@ -136,10 +136,14 @@ fixes them:
   ship diagram agrees between guns and on foot. Repairs restore hull health
   and clear repaired sections; the engine repair completes once. Ship state
   survives switching guns and saving/loading.
+  Missile volleys fire the loaded charge shown on the cockpit display, from
+  one to five rockets; an empty magazine must reload before firing again.
 - **The prison (m04).** Reinforcements use the correct upper or lower
   cellblock landing, the maintenance bot uses its own workstations, and the
   bridge ambush has a valid destination. Camera scanning uses its existing AI.
   The invalid starting goob-gun upgrade request is removed.
+  Cellblock attackers switch to combat before reaching the marines' occupied
+  cover positions.
   Start m03/m04 afresh to receive these mission callback corrections; existing
   saves retain the mission threads with which they were created.
 
