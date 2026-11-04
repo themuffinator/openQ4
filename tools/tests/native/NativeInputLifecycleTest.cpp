@@ -63,6 +63,8 @@ struct idInternalCVar {
     void InternalSetString(const char*);void InternalServerSetString(const char*);void InternalSetBool(bool);void InternalSetInteger(int);void InternalSetFloat(float);
     bool GetBool()const{return integerValue!=0;}
 };
+// There is no renderer module in this input-publication fixture.
+void R_RendererModule_SyncConfiguration() {}
 #include "cvar_methods.inc"
 static idInternalCVar com_asyncInput;
 static bool consoleBlocked=false,previewOpen=false;

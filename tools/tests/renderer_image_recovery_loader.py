@@ -19,6 +19,8 @@ SUPPORT=r'''
 static int checks=0,ordinary=0,borrowed=0,allocations=0,uploads=0,errors=0,observed=0,loaded=0,destructors=0,generators=0;
 static bool allowed=true,mutationAllowed=true,uses=true,acceptObservation=true,failBorrow=false,throwBorrow=false,context=true;
 static int failUpload=-1;
+// This fixture has no renderer worker; worker retirement is tested separately.
+void R_RenderThread_Sync(const char*){}
 #define TEST(x) do{++checks;if(!(x))throw std::runtime_error(#x);}while(false)
 using textureType_t=int;using textureFormat_t=int;using textureColor_t=int;
 struct bimageFile_t{int textureType=1,format=7,colorFormat=0,width=8,height=8,numLevels=4;};

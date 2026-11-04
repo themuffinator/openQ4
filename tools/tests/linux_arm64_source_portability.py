@@ -1142,8 +1142,8 @@ def main() -> None:
     )
     reject(renderer_local, "int\t\tpoop;", "32-bit-only manual frame allocator padding")
     require(renderer_main, "buf = block->base + block->used;", "aligned frame allocation base")
-    if renderer_main.count("Mem_Alloc16( size + sizeof( *block ) )") != 2:
-        raise AssertionError("Frame allocator blocks must use exactly two aligned allocations")
+    require(renderer_main, "Mem_Alloc16( MEMORY_BLOCK_SIZE + sizeof( *block ) )", "aligned initial frame block")
+    require(renderer_main, "Mem_Alloc16( static_cast<size_t>( size ) + sizeof( *fresh ) )", "native-width aligned frame growth")
     require(renderer_main, "Mem_Free16( block );", "paired aligned frame block release")
     reject(renderer_main, "Mem_Alloc( size + sizeof( *block ) )", "unaligned frame block allocation")
     reject(renderer_main, "Mem_Free( block );", "mismatched frame block release")
@@ -1255,8 +1255,8 @@ def main() -> None:
     )
     require(
         bse_manager,
-        '"bse_active: %i particles: %i traces: %i texels: %g\\n"',
-        "type-correct BSE texel statistic format",
+        '"bse_active: %i particles: %i traces: %i segments: %i\\n"',
+        "integer BSE activity statistic format",
     )
     reject(
         bse_manager,
