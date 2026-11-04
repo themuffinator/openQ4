@@ -60,6 +60,16 @@ CASES = {
         "command": "bot_probeWalk 1 2971.629 3232.276 -255.75 122.007 367.183 105.27 3108 3108 -255.75",
     }]),
     "ctf5": ("CTF", [{
+        "name": "pending_climb", "observe_msec": 12000,
+        # One frame changes the fresh-jump pulse: the old controller jumps
+        # before its first grounded brake and falls off the CTF5 walkway.
+        "setup": ["waitMsec 1", "bot_probeHealth 1 33 0 0 0 0 0"],
+        "command": "bot_probeClimb 1 619.928 787.929 -182.842 348.87 -10.243 -92.217 556 764 -172.305",
+    }, {
+        "name": "pending_climb_braked", "observe_msec": 12000,
+        "setup": ["bot_probeHealth 1 33 0 0 0 0 0"],
+        "command": "bot_probeClimb 1 619.928 787.929 -182.842 348.87 -10.243 -92.217 556 764 -172.305",
+    }, {
         "name": "rail_flight",
         "observe_msec": 12000, "allow_resumed_navigation": True,
         "setup": ["bot_probeHealth 1 10 200 19.531 -499.058 -23.655"],

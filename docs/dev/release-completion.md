@@ -7,6 +7,9 @@ work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
+- Bots check their remaining momentum before hopping up an ordinary ledge,
+  preventing a pending climb attempt from jumping back off a recovered walkway.
+  The reproduced CTF5 fall now survives; wider safety gates are under qualification.
 - Low-health bots can adjust their airborne approach to a catch pad when
   a straight coast would end in a fatal landing. The reproduced descent now
   survives and resumes navigation; broader safety qualification continues.

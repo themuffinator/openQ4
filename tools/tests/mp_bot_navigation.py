@@ -274,7 +274,7 @@ def validate_game_wiring() -> None:
     require(movement, "BotMoveDirectionSafe", "rvBot::UpdateMovement safe combat steering")
     require_order(movement, "AlignJumpDropApproach( self, cmd )", "bool routing = AdvancePath( self );",
                   "jump/drop approach brakes before consuming the takeoff")
-    require_order(movement, "HandleJumpTakeoff( self, cmd )", "corner.travelType == NAVTRAVEL_JUMP || climbHop",
+    require_order(movement, "HandleJumpTakeoff( self, cmd )", "corner.travelType == NAVTRAVEL_JUMP || ( climbHop && steeringIntoVolume )",
                   "the exact-state jump gate owns grounded launch before generic press handling")
     require_order(movement, "GuardLandingContinuation( self, cmd )", "bool routing = AdvancePath( self );",
                   "actual landing continuation is checked before the flight releases control")
@@ -336,8 +336,10 @@ def validate_game_wiring() -> None:
             "rvBot::UpdateMovement climb hop rise or volume entry")
     require(movement, "climbHop = gameLocal.time - climbCheckTime >= BOT_CLIMB_HOP_MSEC",
             "rvBot::UpdateMovement climb hop window")
-    require(movement, "if ( corner.travelType == NAVTRAVEL_JUMP || climbHop )",
-            "rvBot::UpdateMovement climb hop ignores committed travel")
+    require(movement, "if ( corner.travelType == NAVTRAVEL_JUMP || ( climbHop && steeringIntoVolume ) )",
+            "rvBot::UpdateMovement preserves the planned volume-entry hop")
+    require(movement, "else if ( climbHop || ( !committedTravel && ( gameLocal.time < unstickUntil || wantDodgeJump ) ) )",
+            "rvBot::UpdateMovement proves ordinary climbs even on a committed approach")
     off_route = bot[bot.index("bool rvBot::OffRoute") :]
     off_route = off_route[: off_route.index("\n}\n") + 3]
     require(off_route, "self->pfl.onGround", "rvBot::OffRoute grounded only")

@@ -349,6 +349,41 @@ The verified fixes through `51517896f` are merged into the main checkout by
 `79df4b6bc`; its integration build and staging pass. That merge does not close
 MP-02 or qualify the subsequent pad-approach correction.
 
+### Pending climbing hops after recovery, 4 November 2026
+
+The `26f2bcd64` stage passes all nineteen positive hit cases, ten recovery
+cases and the two-bot pad-traffic check (`hit-pad/`, `air-pad/`, `traffic-pad/`).
+`catalog-pad/assessment.json` qualifies all 33 variants with 463 kills, 627
+traversals and one strictly excluded enemy impulse. `long-pad/assessment.json`
+meets all four duration gates (276.048–279.088 simulated seconds), with 285
+kills, 520 traversals, seven strict exclusions and one CTF5 navigation death.
+Runtime hashes and policy-2 parentage are checked by both derived assessments;
+the raw failures remain unchanged. The stage is preserved by `runtime-pad.json`
+and its delta archive. The source is merged into the main checkout by
+`1417cda59`; its build, staging and ten CTF5 positive replays pass.
+
+Rhodes's CTF5 rail hit at 116448 ms is recoverable in four fixed directions.
+Its isolated controller survives but ends airborne after picking up health,
+so it cannot exclude the original death at 121072 ms. The original bot lands
+at 117184 ms, then resumes its route. At 118272 ms a pending climb attempt
+jumps toward the western corner while carrying roughly 350 units/second
+eastward; the ensuing fall kills it without another impulse. Ordinary climbing
+hops bypass the momentum-aware proof and held input used by dodge hops.
+`bot_probeClimb` restores that pending window on an isolated local cheat server
+without forcing its jump input. The recorded pre-touch pose at 118256 ms
+reproduces the fall when the fresh jump pulse arrives before grounded braking
+(`guard-failure-climb-baseline-edge/`). The opposite input phase first brakes,
+then survives; both outcomes and the diagnostic-only runtime are preserved.
+These are isolated reconstructions, not full match snapshots or exclusions.
+Ordinary climbing attempts now use the existing momentum-aware dodge proof
+and hold the admitted input through the flight. Planned volume-entry hops keep
+their transport controller. `guard-failure-climb-fixed/` refuses the unsafe
+launch, brakes on the walkway and finishes alive and grounded after twelve
+seconds, as does its ordinary-walk control. The 27 production decision
+reversions pass on Windows and Linux ASan/UBSan. Both input phases enter the
+positive hit suite; full runtime qualification and controlled timing remain
+open.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's
@@ -1397,7 +1432,9 @@ A drop's landing can lie under the lip of its own ledge, so near a drop or a jum
 the bot walks the link's own direction until it actually leaves the ground.
 A bot that has pressed along its route for a quarter second without closing in
 on a walk corner more than a few units above it, or on the pad or teleporter
-volume it is stepping into, hops, on any leg. The navmesh steps onto a rise in
+volume it is stepping into, attempts a hop, on any leg. Ordinary climbs use
+the same momentum-aware landing proof and held input as dodge hops; planned
+volume entries retain their transport controller. The navmesh steps onto a rise in
 one 24-unit stride and the player in five-unit frames, so a bevelled lip - the
 sides of q4dm1's pad ramps - can pass the generator and still stop the feet, and
 the ramp can stand between a pad's entry node and its trigger; the generic
