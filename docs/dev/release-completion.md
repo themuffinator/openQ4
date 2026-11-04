@@ -6,6 +6,16 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Retained interface text queries, 4 November 2026
+
+- Interface authors can request localized key-binding labels and measure how
+  much plain text fits a retained label. Measurements follow its font, text
+  size and available width and preserve complete UTF-8 characters.
+- CONTROLS uses the shared binding-name path for its existing capture, clear
+  and rebind behavior. Install matching engine and menu content together.
+- This is a toolkit increment; full IME, complex-script shaping and the visual
+  editor remain in development. See [the text and binding contract](ui/bindings.md#public-key-binding-refresh-4-november-2026).
+
 ## Multiplayer menu player targets, 3 November 2026
 
 - Mute and unmute requests and the Admin menu's player actions stay attached

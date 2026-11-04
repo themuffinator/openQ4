@@ -12,7 +12,7 @@ the detailed acceptance requirements.
 ## State and binding schema
 
 Root `state` declares stable IDs with `type` (`number`, `boolean`, `string`),
-required `initial`, optional `cvar` and `extensions`. Numbers are finite within
+required `initial`, optional `cvar`, `view`, `keyBinding` and `extensions`. Numbers are finite within
 plus/minus 1e12. Strings are valid UTF-8 without NUL, up to 64 KiB. Authored
 string defaults are empty or localization keys; application updates can supply
 player names, chat and other dynamic data.
@@ -201,3 +201,70 @@ The game action/state bridge, legacy script lowering, remaining widgets,
 all-GUI vector reconstruction, localization/text backend, world instances/save
 restoration, complete editor and broader platform/performance qualification
 remain open. No migration manifest entry is accepted by this work.
+
+### Public key-binding refresh, 4 November 2026
+
+An application string can declare a `keyBinding` lookup:
+
+```json
+"forwardKeys": {"type":"string", "initial":"", "keyBinding":"_forward"}
+```
+
+The public GUI `SetKeyBindingNames()` call refreshes these declarations from
+the current key map. It lists every matching key with localized names and the
+language's list separator, capitalizes single-character key caps, and uses the
+localized empty-binding label when no key matches. The lookup can contain
+arguments, such as `savegame quick`; it never executes that string. Declarations
+must be nonempty, single-line UTF-8 without NUL, at most 1,024 bytes, and cannot
+also declare a CVar or view source.
+
+The values remain application-owned. Call `StateChanged()` to publish the batch,
+and refresh after rebinding or reopening. CONTROLS now uses this public path
+for all 49 rows. The session then replaces the row waiting for a key with its
+localized capture instruction before publishing. This preserves the existing
+capture, cancel, clear and two-key binding behavior without a second name-list
+implementation in the session. No physical-device qualification is implied.
+
+### Public text-fitting query, 4 November 2026
+
+`GetMaxTextIndex(nodeId, text, wrapInfo)` now measures plain UTF-8 against a
+visible canonical text node's last laid-out **content** width, resolved font,
+letter spacing and case transform. It shares the immutable scalar runs used by
+font submission, including the same final width rounding. The query does not
+advance presentation time, mutate the document or draw another frame.
+
+On overflow it returns true, with `maxIndex` as the number of original UTF-8
+bytes before the overflowing scalar and `lastWhitespace` as the byte index of
+the last fitting ASCII space. A first scalar wider than the whole field is
+returned intact so wrapping callers can progress. A fitting string returns
+false and clears `maxIndex` to -1; an empty string fits. Missing, hidden,
+non-text, legacy-text, invalid UTF-8, oversized or unavailable-font queries
+return false and preserve the caller's output. The limit is the shared 64 KiB
+text transport bound. These are scalar boundaries, not grapheme or shaping
+clusters; legacy escape/icon parsing, bidi and full text layout remain UI-02/
+UI-09 work.
+
+The read-only diagnostic `openq4_retainedGui textfit "node-id" "plain text"`
+reports availability, overflow and byte indices through this public API. Quote
+node IDs containing punctuation. `tools/ui/capture_text_queries.py` exercises
+the ordinary CONTROLS page in SP/MP gameplay, records binding/capture/clear
+readbacks and text queries, and captures its 100% and 200% arrangements through
+the engine. Text size can widen the column as well as its glyphs; its check uses
+the measured width ratio. Native tests separately hold width fixed to verify
+font scaling and cover UTF-8 boundaries, invalid requests and independent views.
+
+Windows x64 verification on 4 November passes the native retained runtime,
+CONTROLS, SETTINGS and MP settings/welcome suites; the compiled public adapter
+passes with all 20 deliberate regressions rejected. The generated-menu gate and
+player-identity/target regressions also pass. Windowed SP/OpenGL at 1280x720 in
+English and MP/Vulkan at 1920x1080 in French both enter gameplay, open CONTROLS,
+capture/rebind/clear a key, change text size and return to gameplay. All 14 final
+engine captures were visually reviewed, including readable accented labels and
+the 200% single-column arrangement. The exact binaries, source hashes, reports
+and capture review are retained locally in
+`.tmp/ui-roadmap-next/validation-evidence.json`; failed harness attempts remain
+separate from the final evidence.
+
+These runs have no retained-UI errors. Existing late-precache warnings remain
+(one in SP and 178 in MP, around player-preview assets). Physical input, live
+IME, shaping, other platforms and full toolkit/product acceptance are unqualified.

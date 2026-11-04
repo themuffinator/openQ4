@@ -3072,26 +3072,10 @@ void idSessionLocal::PublishRetainedControls( idUserInterface *gui ) {
 	if ( gui == NULL ) {
 		return;
 	}
-	for ( int row = 0; row < RETAINED_CONTROLS_ROWS; row++ ) {
-		idStr keys;
-		if ( row == retainedControlsCapture ) {
-			keys = common->GetLanguageDict()->GetString( "#str_07000" );
-		} else {
-			for ( int key = 0; key < K_LAST_KEY; key++ ) {
-				if ( idKeyInput::KeyIsBoundTo( key, RETAINED_CONTROLS_BINDINGS[ row ] ) ) {
-					// A letter or digit key shows as its cap does.
-					idStr name = idKeyInput::KeyNumToString( key, true );
-					if ( name.Length() == 1 ) {
-						name.ToUpper();
-					}
-					keys = Session_RetainedList( keys.c_str(), name.c_str() );
-				}
-			}
-			if ( keys.IsEmpty() ) {
-				keys = common->GetLanguageDict()->GetString( "#str_07133" );
-			}
-		}
-		gui->SetStateString( va( "controls.%d.keys", row ), keys.c_str() );
+	gui->SetKeyBindingNames();
+	if ( retainedControlsCapture >= 0 && retainedControlsCapture < RETAINED_CONTROLS_ROWS ) {
+		gui->SetStateString( va( "controls.%d.keys", retainedControlsCapture ),
+			common->GetLanguageDict()->GetString( "#str_07000" ) );
 	}
 	gui->SetStateInt( "controls.capture", retainedControlsCapture );
 	gui->StateChanged( common->GetPresentationTime() );

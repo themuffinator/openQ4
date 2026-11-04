@@ -4067,6 +4067,39 @@ bool Runtime::GetBounds(const std::string& id, Bounds& bounds) const {
 	bounds = {position.x,position.y,size.x,size.y};
 	return true;
 }
+bool Runtime::QueryTextFit(const std::string& id, std::string_view text, TextFit& result) const {
+	if (!impl->document || !impl->services || !impl->canonical || text.size() > TextInputMaxBytes) return false;
+	const auto* node = impl->canonical->Model().FindNode(id);
+	if (!node || node->type != "text" || node->legacyText) return false;
+	auto* element = impl->CanonicalElement(id);
+	if (!element || !element->IsVisible(true)) return false;
+	const float width = element->GetBox().GetSize(Rml::BoxArea::Content).x;
+	if (!std::isfinite(width) || width <= 0) return false;
+	const auto face = element->GetFontFaceHandle();
+	if (!face) return false;
+	// Retained canonical text is plain UTF-8. Case transforms in RmlUi are
+	// byte-preserving; leave all source offsets in the caller's string.
+	std::string displayed(text);
+	const auto& style = element->GetComputedValues();
+	if (style.text_transform() == Rml::Style::TextTransform::Uppercase) displayed = Rml::StringUtilities::ToUpper(displayed);
+	else if (style.text_transform() == Rml::Style::TextTransform::Lowercase) displayed = Rml::StringUtilities::ToLower(displayed);
+	if (displayed.size() != text.size()) return false;
+	const auto run = impl->services->fonts.QueryRun(face,displayed,style.letter_spacing());
+	if (!run || !run->monotonicLtr) return false;
+	TextFit candidate;
+	for (std::size_t i = 0; i < run->glyphs.size(); ++i) {
+		const auto& glyph = run->glyphs[i];
+		// Font submission rounds once at the end of each run, never per glyph.
+		if (std::round(run->carets[i+1].x) > width) {
+			candidate.overflow = true;
+			candidate.maxIndex = static_cast<int>(glyph.byteStart ? glyph.byteStart : glyph.byteEnd);
+			break;
+		}
+		if (glyph.codepoint == ' ') candidate.lastWhitespace = static_cast<int>(glyph.byteStart);
+	}
+	result = candidate;
+	return true;
+}
 bool Runtime::SetProperty(const std::string& id, const std::string& property, const std::string& value) {
     if(!Mutate())return false;
 

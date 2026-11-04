@@ -1372,8 +1372,27 @@ bool idUserInterfaceRetained::ApplyTextInput(const TextBrokerContext& expected,
 	return impl->RuntimeView()->ApplyNumberInput(target.control,{target.session,target.revision},
 		input,error,RetainedUI_PresentationTime());
 }
-bool idUserInterfaceRetained::GetMaxTextIndex(const char*, const char*, wrapInfo_t&) const { return false; }
-void idUserInterfaceRetained::SetKeyBindingNames() {}
+bool idUserInterfaceRetained::GetMaxTextIndex(const char* name, const char* text, wrapInfo_t& info) const {
+	if (!name || !*name || !text || !impl->Prepare()) return false;
+	TextFit fit;
+	if (!impl->RuntimeView()->QueryTextFit(name,text,fit)) return false;
+	info.maxIndex = fit.maxIndex; info.lastWhitespace = fit.lastWhitespace;
+	return fit.overflow;
+}
+void idUserInterfaceRetained::SetKeyBindingNames() {
+	if (!impl->Prepare()) return;
+	for (const auto& [name,declaration] : impl->document.Model().state) {
+		if (declaration.keyBinding.empty()) continue;
+		idStr names;
+		for (int key = 0; key < K_LAST_KEY; ++key) {
+			if (!idKeyInput::KeyIsBoundTo(key,declaration.keyBinding.c_str())) continue;
+			idStr label = idKeyInput::KeyNumToString(key,true);
+			if (label.Length() == 1) label.ToUpper();
+			names = names.IsEmpty() ? label : idStr(va(common->GetLanguageDict()->GetString("#str_231533"),names.c_str(),label.c_str()));
+		}
+		SetStateString(name.c_str(),names.IsEmpty() ? common->GetLanguageDict()->GetString("#str_07133") : names.c_str());
+	}
+}
 
 void idUserInterfaceRetained::SetCursor(float x, float y) {
 	Viewport viewport; RetainedUI_DefaultViewport(viewport);
@@ -1997,6 +2016,14 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 			owner.Name(),impl.RuntimeView()->FocusedControl().c_str(),static_cast<unsigned long long>(impl.RuntimeView()->StateRevision()),
 			impl.active ? 1 : 0,cvarSystem->GetCVarFloat("r_brightness"),cvarSystem->GetCVarBool("r_shadows") ? 1 : 0,
 			static_cast<unsigned long long>(impl.RuntimeView()->Statistics().activeContexts));
+		return true;
+	} else if (verb == "textfit" && args.Argc() == 4) {
+		const std::string id(args.Argv(2));
+		if (!impl.document.Model().FindNode(id)) return false;
+		wrapInfo_t fit; fit.maxIndex = fit.lastWhitespace = -2;
+		const bool overflow = owner.GetMaxTextIndex(id.c_str(),args.Argv(3),fit);
+		common->Printf("RETAINED_GUI_TEXT_FIT id=%s available=%d overflow=%d maxIndex=%d lastWhitespace=%d\n",
+			id.c_str(),fit.maxIndex != -2 ? 1 : 0,overflow ? 1 : 0,fit.maxIndex,fit.lastWhitespace);
 		return true;
 	} else if (verb == "inspect" && args.Argc() == 3) {
 		const std::string id(args.Argv(2));

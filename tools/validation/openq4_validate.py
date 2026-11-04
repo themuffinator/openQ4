@@ -874,6 +874,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'renderer_image_policy_boundaries.py', ['--mutations']),
         (root / "tools" / "tests" / 'renderer_image_policy_lifetimes.py', ['--mutations']),
         (root / "tools" / "tests" / 'renderer_image_policy_metadata.py', ['--mutations']),
+        (root / 'tools' / 'tests' / 'renderer_vulkan_material_cache.py', []),
+        (root / 'tools' / 'tests' / 'renderer_vulkan_presentation.py', ['--self-test']),
         (root / "tools" / "tests" / 'renderer_consumed_policy.py', ['--mutations']),
         (root / "tools" / "tests" / 'renderer_consumed_upload_batches.py', ['--mutations']),
         (root / "tools" / "tests" / 'renderer_upload_storage.py', ['--mutations']),

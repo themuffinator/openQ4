@@ -174,7 +174,7 @@ def main():
             ('depth-copy-metadata','Image_load.cpp','if ( ( !hasDepthStorage || opts.width != imageWidth || opts.height != imageHeight || IsFileBacked() ) && !R_ImagePolicyContentMutation() ) return false;','(void)0;'),
             ('sampler','Image_load.cpp','if ( !R_ImagePolicyContentMutation() ) return;\n\tfilter = tf;','filter = tf;'),
             ('resize-gl','OpenGL/gl_Image.cpp','if ( !R_ImagePolicyContentMutation() ) return;\n\topts.width = width;','opts.width = width;'),
-            ('resize-vk','Vulkan/vk_Image.cpp','if ( !R_ImagePolicyContentMutation() ) return;\n\topts.width = width;','opts.width = width;'),
+            ('resize-vk','Vulkan/vk_Image.cpp','if ( !R_ImagePolicyContentMutation() ) return;\n\tR_RenderThread_Sync( "image" );\n\topts.width = width;','R_RenderThread_Sync( "image" );\n\topts.width = width;'),
             ('persistent-options','Image_load.cpp','if ( ( filter != tf || repeat != tr || !( opts == imgOpts ) || defaulted || !imgOpts.isPersistant ) && !R_ImagePolicyContentMutation() ) return;','if ( !imgOpts.isPersistant && !R_ImagePolicyContentMutation() ) return;'),
         ]]
     out=Path(tempfile.mkdtemp(prefix='image-metadata-',dir=root/'.tmp'));env=dict(os.environ,TEMP=str(out),TMP=str(out),TMPDIR=str(out));compiler=args.compiler or next((p for n in ['clang++','g++','c++'] if(p:=shutil.which(n))),None);assert compiler

@@ -5293,7 +5293,6 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     assert re.findall(r'"([a-z]+)"', re.search(r'static const char \*const fields\[ RVF_COUNT \] = \{([^}]*)\};', admin_publisher).group(1)) == keys
     for constant, value in (('PLAYERS', retained_mp_admin.PLAYERS), ('BANS', 32), ('CONSOLE_LINES', retained_mp_admin.CONSOLE_LINES)):
         assert f'static const int RETAINED_ADMIN_{constant} = {value};' in header, constant
-    assert f'static const int RETAINED_MP_ADMIN_PLAYERS = {retained_mp_admin.PLAYERS};' in menu
     assert f'static const int RETAINED_MP_PASSWORD_BYTES = {retained_mp_admin.PASSWORD_BYTES};' in menu
     assert f'static const int RETAINED_MP_COMMAND_BYTES = {retained_mp_admin.COMMAND_BYTES};' in menu
     # The game: a client becomes an admin only by the server's answer, every
@@ -5545,6 +5544,9 @@ def main() -> int:
     session_bindings = re.findall(r'"([^"]+)"', re.search(r'RETAINED_CONTROLS_BINDINGS\[\] = \{([^}]*)\};', menu).group(1))
     assert list(retained_controls.BINDINGS) == stock_bindings == session_bindings and len(stock_bindings) == 49
     controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    assert [controls_document['state'][f'controls.{row}.keys']['keyBinding'] for row in range(49)] == session_bindings
+    controls_publish = function_body(menu, 'void idSessionLocal::PublishRetainedControls(')
+    assert controls_publish.index('gui->SetKeyBindingNames();') < controls_publish.index('retainedControlsCapture >= 0') < controls_publish.index('gui->StateChanged(')
     assert {name: action['arguments']['command'] for name, action in controls_document['actions'].items()} == \
         {'controlsBind': 'controlsBind', 'controlsClear': 'controlsClear', 'back': 'controlsBack'}
     controls_key = function_body(menu, 'bool idSessionLocal::RetainedControlsKey(')

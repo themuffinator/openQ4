@@ -43,6 +43,7 @@ struct idStr : std::string {
     bool IsEmpty() const { return empty(); }
     static int Cmp(const char* a,const char* b) { return std::string(a).compare(b); }
     static char ToUpper(char c) { return static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
+    void ToUpper() { for (auto& c:*this) c=ToUpper(c); }
     void StripLeading(char value) { erase(0,find_first_not_of(value)); }
     static int Icmpn(const char* a,const char* b,int length) { return Icmp(std::string(a,length).c_str(),std::string(b,length).c_str()); }
     static int Length(const char* value) { return static_cast<int>(std::char_traits<char>::length(value)); }
@@ -88,7 +89,7 @@ struct idMath {
     static float ClampFloat(float low,float high,float value) { return std::clamp(value,low,high); }
     static int ClampInt(int low,int high,int value) { return std::clamp(value,low,high); }
 };
-struct wrapInfo_t {};
+struct wrapInfo_t { int lastWhitespace=-1,maxIndex=-1; };
 struct idKeyValue {
     idStr key,value;
     const idStr& GetKey() const { return key; }

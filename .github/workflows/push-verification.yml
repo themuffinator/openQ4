@@ -521,7 +521,14 @@ jobs:
             tools/tests/ui_controller_menu_pump.py \
             tools/tests/ui_retained_gate.py \
             tools/tests/ui_player_identity.py \
+            tools/tests/mp_match_artifact_io_state.py \
+            tools/tests/network_fragment_state.py \
+            tools/tests/savegame_restore_resources.py \
+            tools/tests/renderer_vulkan_material_cache.py \
+            tools/tests/renderer_vulkan_presentation.py \
+            tools/tests/ui_player_targets.py \
             tools/ui/capture_player_identity.py \
+            tools/ui/capture_text_queries.py \
             tools/ui/capture_save_browser.py \
             tools/tests/ui_stock_level_load.py \
             tools/ui/build_retained_screens.py \
@@ -972,6 +979,12 @@ jobs:
           python tools/tests/ui_controller_menu_pump.py
           python tools/tests/ui_retained_gate.py
           python tools/tests/ui_player_identity.py
+          python tools/tests/mp_match_artifact_io_state.py
+          python tools/tests/network_fragment_state.py
+          python tools/tests/savegame_restore_resources.py
+          python tools/tests/renderer_vulkan_material_cache.py
+          python tools/tests/renderer_vulkan_presentation.py --self-test
+          python tools/tests/ui_player_targets.py
           python tools/tests/ui_stock_level_load.py
           python tools/tests/ui_retained_resource_lifecycle.py
           python tools/tests/ui_retained_adapter.py

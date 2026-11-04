@@ -39,6 +39,10 @@ struct StateDeclaration {
 	// the safe area's insets from the view's edges in dp, all refreshed as the
 	// runtime lays the document out.
 	std::string view;
+	// Application string refreshed by the public GUI SetKeyBindingNames call.
+	// This is a binding lookup, never a command to execute. Applications can
+	// temporarily replace it (for example, with the key-capture instruction).
+	std::string keyBinding;
 	bool HostSourced() const { return !cvar.empty() || !view.empty(); }
 };
 struct Expression {

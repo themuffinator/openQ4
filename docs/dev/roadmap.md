@@ -1560,8 +1560,8 @@ archived provenance; new scheduling belongs here.
   methods, material/movie/model/generated-image operations, world-surface output
   and input, gameplay timers, independent instances and save/restart continuity.
   Current code has six canonical control roles, five node kinds,
-  partial material-image operations, empty binding-name
-  updates/text-wrap queries and an explicit world-output rejection. Map each
+  partial material-image operations, bounded scalar text-fit queries and an
+  explicit world-output rejection. Map each
   limitation to required semantics and extend existing working facilities rather
   than rebuilding them. Test actual SP/MP engine callers, simultaneous HUD/menu/
   world/editor contexts, failed recreation, timer/presentation-clock separation,
@@ -1586,6 +1586,14 @@ archived provenance; new scheduling belongs here.
   retain the failed fixture views, renderer-demo refusal, diagnostic-preview
   canvas issue and unqualified native lifecycle/composition cases. This does
   not accept `INV-013` or either production model preview.
+  Progress, 4 November: [public binding names and text fitting](ui/bindings.md#public-key-binding-refresh-4-november-2026)
+  replace the two empty GUI adapter methods. CONTROLS declares its 49 binding
+  lookups and uses the public localized refresh, preserving capture overrides.
+  Text queries use the current content width and shared font runs, return whole
+  UTF-8 scalars and isolate each view's metrics. Native/adapter tests and windowed
+  SP/OpenGL English and MP/Vulkan French gameplay checks pass, with all 14 final
+  engine captures reviewed. Existing late-precache warnings remain. This does not complete shaping,
+  legacy text escapes, live IME, world output, the editor or toolkit acceptance.
 - [x] **UI-10 — P0, investigation and implementation: refresh effective scope and
   source inventory.** Completed [retail/base/Awakening inventory](ui/inventory-report.md):
   264/276/324 effective paths, 358 distinct source/include-bound variants, 18

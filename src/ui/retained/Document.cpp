@@ -385,7 +385,7 @@ private:
 		for (const auto& name : values.getMemberNames()) {
 			const auto p = "/state/"+PointerPart(name); const auto& v = values[name];
 			Require(Identifier(name),v,p,"Invalid state ID");
-			Fields(v,p,{"type","initial","cvar","view","extensions"});
+			Fields(v,p,{"type","initial","cvar","view","keyBinding","extensions"});
 			Require(v["type"].isString(),v,p+"/type","Expected a state type");
 			const auto type = v["type"].asString(); StateDeclaration declaration;
 			if (type == "number") declaration.initial = Numeric(v["initial"],p+"/initial",-1000000000000.0,1000000000000.0);
@@ -404,6 +404,18 @@ private:
 					"Expected the view source 'aspect', 'text', 'safeLeft', 'safeTop', 'safeRight' or 'safeBottom'");
 				Require(type == "number" && !v.isMember("cvar"),v,p,"A view source is a number state without a CVar source");
 				declaration.view = v["view"].asString();
+			}
+			if (v.isMember("keyBinding")) {
+				const auto& binding = v["keyBinding"];
+				Require(type == "string" && !v.isMember("cvar") && !v.isMember("view"),v,p,
+					"A key binding requires an application string state");
+				Require(binding.isString(),binding,p+"/keyBinding","Expected a key binding lookup string");
+				declaration.keyBinding = binding.asString();
+				Require(!declaration.keyBinding.empty() && declaration.keyBinding.size() <= 1024 &&
+					ValidStateValue(declaration.keyBinding) &&
+					declaration.keyBinding.find('\0') == std::string::npos &&
+					declaration.keyBinding.find_first_of("\r\n") == std::string::npos,binding,p+"/keyBinding",
+					"Expected a nonempty single-line key binding of at most 1024 bytes");
 			}
 			model.state.emplace(name,std::move(declaration));
 		}
