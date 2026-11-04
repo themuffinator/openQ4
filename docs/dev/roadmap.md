@@ -2917,6 +2917,11 @@ Completion substeps:
   in main at `26460c802`, whose build, stage and four CTF3 recovery cases pass.
   Controlled timing remains separate; source/runtime evidence is recorded in
   the [ramp-flight qualification](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026).
+  The renewed CTF3 timing attempt has zero world deaths and meets the selected
+  4 ms mean / 8 ms p95 / 1,000 ms generation limits (0.791 / 4.25 / 744 ms),
+  but mandatory contention detection fails because two separate SP processes
+  overlap it. MP-02 remains open for a quiet-host timing repeat; no criterion
+  is waived and the original failed report is preserved.
   The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.
