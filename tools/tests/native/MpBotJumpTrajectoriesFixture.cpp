@@ -821,6 +821,16 @@ int main() {
         transported=true; missingGroundContacts=1;
         CHECK(!nav.AirInputLandingSafe({0,0,64},{100,0,-900},{},40));
         transported=false; missingGroundContacts=0;
+        // An affordable swept touch is not a landing either. A sloped lip
+        // can redirect the flight without ever making ground contacts.
+        // Neither support nor the last-resort touch may approve that flight.
+        bool phantomSupport=false,phantomTouch=false,phantomBrake=false;
+        missingGroundContacts=1000;
+        CHECK(!nav.AirInputLandingSafe({0,0,64},{100,0,-100},{},inf,nullptr,
+              &phantomSupport,&phantomTouch,&phantomBrake));
+        CHECK(!phantomSupport && !phantomTouch && !phantomBrake);
+        missingGroundContacts=0;
+        CHECK(nav.AirInputLandingSafe({0,0,64},{100,0,-100},{},inf));
         // Involuntary recovery may aim for a physical hull contact when
         // every supported landing fails. It remains unsafe for route proof.
         solids.clear(); Platform(-1,0,0);

@@ -18,6 +18,9 @@ See [player release status](../user/release-status.md).
 - Bots avoid close self-blasts during flight and account for downward momentum
   and glancing contacts when checking a recovery landing. These further
   corrections are undergoing the renewed traversal-safety gates.
+- Recovery continues steering after a ramp throws a bot back into the air,
+  instead of treating that brief contact as a safe landing. The reproduced
+  CTF5 rocket fall and wider safety sweeps are under qualification.
 - Recovery can preserve a coast into a working jump pad when its complete
   onward flight has a safe landing. The recorded catch and wider safety checks
   are still under qualification.

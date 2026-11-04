@@ -2209,7 +2209,15 @@ claim peer combinations that have not been tested.
   further CTF3 deaths. One reproduces a pad collision when a climb hop loses
   its approach reservation; the reservation now survives that hop. The other
   departure, renewed final-build long/catalog runs and controlled timing remain
-  open. The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
+  open. The `04e637ae0` repeat qualifies CTF3 directly and all six DM8 deaths
+  under the exact-state impulse policy, but retains two CTF5 navigation deaths.
+  One reproduces a ramp contact falsely accepted as a landing; recovery now
+  requires actual grounding after the clipped collision frame. A second
+  low-health unplanned pad entry and older moving-player departures remain
+  unresolved. CTF5/DeadZone repeats clear their duration shortfalls without
+  waiving the original failed reports. The new ramp correction still needs
+  runtime, complete-catalog and controlled-timing qualification.
+  The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.
   Follow-through, 4 November: the [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026)

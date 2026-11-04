@@ -1197,23 +1197,25 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			if ( IsLethalFloor( trace.endpos ) ) {
 				return false;
 			}
-			if ( NavLandingImpactDelta( trace, velocity + gravity * ( dt * trace.fraction ), gravity ) > maxImpactDelta ) {
-				// SlideMove clips both its midpoint and end velocity, then
-				// CrashLand checks contacts at the final position. DM8's bevel
-				// can stop a fall a frame before those contacts exist. Continue
-				// that exact single-plane step; it is not yet an affordable
-				// landing, and another collision remains unproven here.
-				const idVec3 clipped = idPhysics_Player::AdjustVertically( trace.c.normal, velocity + gravity * ( dt * 0.5f ) );
-				trace_t remainder;
-				const idVec3 end = trace.endpos + clipped * ( dt * ( 1.0f - trace.fraction ) );
-				if ( !NavAgentTranslation( remainder, trace.endpos, end ) ||
-					 NavAgentHasGroundContacts( end, gravity ) ||
-					 TransportOnMove( trace.endpos, end, -1 ) >= 0 ) {
-					return false;
-				}
+			// SlideMove clips both its midpoint and end velocity, then
+			// CheckGround/CrashLand inspect contacts at the final position.
+			// An affordable ramp touch is not automatically a landing: CTF5's
+			// walkway bevel redirects the bot upward and back over the void.
+			// Continue that single-plane step until actual ground is reached.
+			const idVec3 clipped = idPhysics_Player::AdjustVertically( trace.c.normal, velocity + gravity * ( dt * 0.5f ) );
+			trace_t remainder;
+			const idVec3 end = trace.endpos + clipped * ( dt * ( 1.0f - trace.fraction ) );
+			if ( !NavAgentTranslation( remainder, trace.endpos, end ) ||
+				 TransportOnMove( trace.endpos, end, -1 ) >= 0 ) {
+				return false;	// another collision or launch is not a proven landing
+			}
+			if ( !NavAgentHasGroundContacts( end, gravity ) ) {
 				position = end;
 				velocity = idPhysics_Player::AdjustVertically( trace.c.normal, velocity + gravity * dt );
 				continue;
+			}
+			if ( NavLandingImpactDelta( trace, velocity + gravity * ( dt * trace.fraction ), gravity ) > maxImpactDelta ) {
+				return false;
 			}
 			idVec3 flat( velocity.x, velocity.y, 0.0f );
 			auto recoveryRunout = [&]() {

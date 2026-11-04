@@ -110,7 +110,15 @@ seconds on each map, 337 combat kills and 633 completed traversals. DeadZone has
 zero world deaths; DM8 has five and CTF5 six under causal review. CTF3 has two
 navigation deaths: every tested input survives Kane's last recorded hit, while
 Cortez has no recent impulse. The original duration failure is resolved on this
-stage, but the navigation gate remains failed.
+stage, but the navigation gate remains failed. Its complete initial causal
+assessment (`long-runout/assessment.json`) excludes eight of 13 deaths and
+retains five. An additional CTF5 counterfactual restores the recorded walking
+corner at the same pre-hit pose, health, armour and timer on the archived
+`189c4b4a9` runtime. It finishes alive and grounded at six seconds, while all
+17 fixed post-hit inputs and the controller died. The existing policy therefore
+excludes that rocket death (`ctf5-runout-route-counterfactual/`);
+`long-runout/assessment-route.json` retains four navigation deaths. The original
+assessment is preserved. This is an additional causal proof, not a bot change.
 
 All three `ctf3pad-runout/` isolated launch/coast controls land alive, including
 Cortez's rounded launch pose. The original match instead launches Strauss from
@@ -132,9 +140,70 @@ Fresh approaches now retain their reservation while airborne, using the existing
 stale timeout and route release. The native decision case fails before this
 change and passes afterwards; restoring the grounded-only check fails again.
 `mp_bot_pad_traffic_replay.py` preserves the two-bot reproduction as a positive
-runtime regression. Its fixed-build check and renewed safety gates are pending.
+runtime regression. On `04e637ae0`, both bots complete the pad in priority order,
+without colliding during its approach/flight, and remain alive throughout the
+12-second observation (`traffic-hop-staged/`). Ordinary contacts after both
+flights finish remain reported. The first draft of that harness wrongly rejected
+those later contacts; its failed `traffic-hop/` report is preserved. The unfixed
+`traffic-before/` still fails the corrected check with five pad contacts and a
+world death. All 23 decision reversal controls pass on Windows and Linux
+ASan/UBSan; the geometry and hazard functions are unchanged from `189c4b4a9`.
 Kane's other CTF3 departure remains unresolved; the initial isolated walking
 approach survives and is not evidence that the original match was safe.
+The later sampled grounded pose and an early-hop reconstruction also survive
+(`pad-kane-entry-entry/`, `pad-kane-hop-hop/`). Both remaining DM8 hit poses,
+including the rocket's first recovery frame, survive 12-second isolated checks
+on this stage (`departures-dm8-hop64/`). Their original full-match departures
+remain unisolated. A diagnostic script that exceeded the engine's 64 KiB command
+buffer is retained as failed evidence; the replay launcher now rejects oversized
+scripts before starting a game, without shortening their observation windows.
+
+The `04e637ae0` staged `long-hop/` repeat passes CTF3 directly: 386.640 observed
+seconds, 58 kills and 116 completed traversals, with zero world deaths. A separate
+CTF3 diagnostic run records 298.896 seconds, 47 kills and 91 traversals with zero
+deaths. DM8 records 369.744 seconds, 139 kills, 169 traversals and six deaths.
+All six pass the unchanged causal policy: Sledge's pre-hit controller needs an
+additional 12-second observation to finish grounded, at 100 health. Its earlier
+six-second terminal-air result remains unresolved and preserved. CTF5 has seven
+deaths in 192.752 seconds; DeadZone has no
+deaths in 253.216 seconds. Both miss the required 270 seconds and remain failed.
+The complete initial assessment excludes 11 of 13 deaths and retains two CTF5
+navigation failures (`long-hop/assessment.json`). One is a recoverable rocket
+hit whose chosen heading glances off a ramp and leaves the walkway; its
+controller also dies in the isolated `current-failures-hop/` reconstruction.
+The other follows an unplanned pad-chain entry at nine health. Two isolated
+walking approaches stop safely, so its full-match entry remains unresolved.
+
+The same stage passes all nine positive hit/drop cases and ten established
+air-recovery outcomes (`hit-hop/`, `air-hop/`). A stationary player hull near the
+recorded DM8 rocket trajectory reproduces its older fall (`body-hop-static/`):
+the diagonal body collision removes the safe coasting trajectory. The identical
+hit without that body survives. This establishes a physical-traffic failure
+mode, not an exact replay of the original moving player or a causal exclusion.
+The later machine-gun fall still survives the stationary-body reconstruction.
+
+The audit now optionally extends its observation until the logged server clock
+meets `--min-sim-seconds`, within the existing hard timeout. Missing logs, partial
+lines and clock resets cannot supply elapsed simulation time. The default fixed
+window and final duration/death criteria remain unchanged; Windows/Linux clock
+controls and a stock-map pilot pass. `long-hop-duration/` repeats CTF5 and
+DeadZone for 277.984 and 278.080 observed seconds, respectively. CTF5 records
+82 kills, 188 traversals and five deaths awaiting causal assessment; DeadZone
+records 55 kills, 78 traversals and no world deaths. The earlier short reports
+are retained. The frozen-stage full catalog and causal replays are continuing;
+remaining failure fixes and controlled timing are still required. Shared-host
+frame-trace runs do not establish performance budgets.
+
+The CTF5 ramp reconstruction records a world collision at
+`539.182 777.780 -180.667`, normal `0 0.519 0.855`. Player physics redirects
+the descending bot upward; its hull then loses contact. The predictor had
+required end-of-step grounding only when the apparent impact exceeded the
+health budget. It now completes the clipped collision frame for affordable
+touches too, continuing the flight when actual ground contacts are absent.
+The new native case fails before this change and passes afterwards, with all
+24 geometry reversions rejected on Windows. The recorded hit joins the
+positive suite as `rocket_ramp_glance`; runtime and Linux qualification of
+this further correction remain pending.
 
 ## Hit-to-movement handoff, 4 November 2026
 
