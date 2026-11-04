@@ -90,6 +90,12 @@ void Quake4_PostButton( int button, int down );
 // match touchscreemode_t in Clibs_OpenTouch/game_interface.h.
 int Quake4_GetScreenMode( void );
 
+// The fatal-error console owns the screen and takes no game input. While it is
+// up, any touch or key is a request to dismiss it, which ends the engine
+// process and returns the player to the host app.
+int Quake4_FatalConsoleActive( void );
+void Quake4_FatalConsoleDismiss( void );
+
 #ifdef __cplusplus
 }
 #endif

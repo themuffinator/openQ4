@@ -87,6 +87,28 @@ No physical Android device, full SigmaTouch host, or Apple hardware was exercise
 
 ## Other issues discovered
 
+### Branch consolidation, 4 November 2026
+
+The remaining `android-gles` history is integrated with the current engine.
+Emile Belanger's touch action routing, custom-key delivery, graphics-options
+control and fatal-console dismissal are retained. Fatal-console flags use
+atomic storage because the host input thread and console loop share them.
+The NDK header workaround is Android-only; synthetic SAF free-space handling
+is limited to the SigmaTouch host so standalone storage checks remain intact.
+
+Merge resolutions preserve the current Meson Android/SigmaTouch targets and
+in-tree SP/MP modules. The older parallel CMake build and companion-repository
+CI pins are superseded by those targets. Current pack generation and checksum
+validation remain authoritative; the old global runtime-pack bypass is not
+restored. Existing density-aware console sizing, keyboard shutdown and native
+window retirement supersede the older error-window implementation. The new
+graphics label uses `#str_43012`, avoiding the editor's `#str_42912`.
+
+The in-memory touch regression covers menu/game transitions, held releases,
+custom keys and fatal dismissal without controlling user input. Physical
+Android and licensed external-host validation remain required. Upstream
+attribution and host licensing limits remain in [the mobile guide](../../mobile/README.md).
+
 - **Fixed:** the pre-existing PBR material-resource self-test diagnostic had six source-alpha arguments but only five `%d` placeholders, allowing a later integer to be consumed as a `%s` pointer on the failure path. The formatting now matches its arguments.
 - **Dependency limitation (resolved 2 November 2026):** unmodified OpenAL Soft 1.25.2 fails to compile with NDK r27d's libc++ ranges implementation, so the tested Android baseline used unmodified OpenAL Soft 1.24.3. Android now builds with NDK r30 and the desktop release, 1.25.2.
 - **Existing diagnostics:** stock map starts still report non-precached declarations and MP stock-content/AAS warnings. The compiler also reports existing missing-return paths in `Polynomial.h`, mixed-case `declManager.h` includes, hidden overloads, float/enum comparisons and legacy class-memory operations; these are outside the port's runtime changes.

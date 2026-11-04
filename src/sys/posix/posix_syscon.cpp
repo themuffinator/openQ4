@@ -21,6 +21,7 @@ This file is part of the Doom 3 GPL Source Code. See docs/legal for details.
 #if defined( USE_SDL3 )
 #include <SDL3/SDL.h>
 #include <cmath>
+#include <atomic>
 
 // sdl3_backend.cpp; applies platform SDL hint defaults (including the macOS
 // Metal bridge render-driver selection) before the first SDL video use.
@@ -1764,6 +1765,42 @@ void Posix_ConsoleFrame( void ) {
 #endif
 }
 
+#if defined( __ANDROID__ )
+/*
+===============
+Posix_ConsoleFatalErrorActive
+
+True once the fatal-error console has taken the screen. Read from the touch
+overlay through Quake4_GetScreenMode, which runs on the host's UI thread, so
+this is written once and never cleared -- the process is on its way out.
+===============
+*/
+static std::atomic<bool> s_androidFatalConsoleActive(false);
+static std::atomic<bool> s_androidFatalDismissRequested(false);
+
+bool Posix_ConsoleFatalErrorActive( void ) {
+	return s_androidFatalConsoleActive;
+}
+
+/*
+===============
+Posix_ConsoleRequestFatalDismiss
+
+The fatal window's own close button is a desktop affordance: on a phone the
+only things the player has are the screen and the back key, and neither reaches
+this loop through SDL. The touch overlay feeds a ring buffer that only
+Sys_SDL_PumpEvents drains, and the fatal loop polls SDL directly instead, so
+without this the error window can only be left by killing the app.
+
+Called from the host input thread, so the loop below re-reads the flag rather
+than being signalled.
+===============
+*/
+void Posix_ConsoleRequestFatalDismiss( void ) {
+	s_androidFatalDismissRequested = true;
+}
+#endif
+
 void Posix_ConsoleFatalErrorWait( void ) {
 #ifdef ID_DEDICATED
 	// Headless servers already preserve fatal diagnostics on stderr, in the
@@ -1799,6 +1836,9 @@ void Posix_ConsoleFatalErrorWait( void ) {
 		return;
 	}
 
+#if defined( __ANDROID__ )
+	s_androidFatalConsoleActive = true;
+#endif
 	s_consoleWindow.forceFatalWindow = true;
 	// An earlier transient console-window failure must not permanently
 	// suppress the forced fatal-error window; give it one fresh attempt.
@@ -1813,7 +1853,13 @@ void Posix_ConsoleFatalErrorWait( void ) {
 		return;
 	}
 
-	while ( !s_consoleWindow.exitRequested ) {
+	while ( !s_consoleWindow.exitRequested
+#if defined( __ANDROID__ )
+			// A tap or the back key ends the wait; Posix_Exit below then takes
+			// the process down and the host activity comes back to the front.
+			&& !s_androidFatalDismissRequested
+#endif
+			) {
 		SDL_Event event;
 		while ( SDL_PollEvent( &event ) ) {
 			if ( event.type == SDL_EVENT_QUIT ) {

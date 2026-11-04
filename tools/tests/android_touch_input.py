@@ -34,8 +34,10 @@ def main() -> None:
     labels_start = layout_source.index("void TouchInterface::updateControlLabels()")
     labels = layout_source[labels_start : layout_source.index("\nvoid TouchInterface::newGLContext()", labels_start)]
     actions = sorted(set(re.findall(r"\bPORT_ACT_[A-Z0-9_]+\b", body)) - {"PORT_ACT_WEAP0", "PORT_ACT_WEAP10"})
+    actions = [a for a in actions if not a.startswith("PORT_ACT_CUSTOM_")] + [f"PORT_ACT_CUSTOM_{i}" for i in range(26)]
     declarations = "enum { " + ", ".join(actions) + ", PORT_ACT_WEAP0=200, PORT_ACT_WEAP10=210 };\n"
-    scancodes = sorted(set(re.findall(r"\bSDL_SCANCODE_[A-Z_]+\b", body)))
+    scancodes = sorted(set(re.findall(r"\bSDL_SCANCODE_[A-Z0-9_]+\b", body)))
+    scancodes = [s for s in scancodes if not s.startswith("SDL_SCANCODE_KP_")] + [f"SDL_SCANCODE_KP_{i}" for i in [1,2,3,4,5,6,7,8,9,0]]
     declarations += "enum { " + ", ".join(scancodes) + " };\n"
     harness = r'''
 #include <cassert>
@@ -52,7 +54,12 @@ static int axes[6], resets, mouseX, mouseY;
 static bool buttons[QUAKE4_BTN_COUNT];
 static std::vector<std::string> commands;
 static std::vector<int> impulses;
-extern "C" void Quake4_PostKey(int, int) {}
+static std::vector<int> keys;
+static int screenMode = TS_GAME;
+static bool fatalConsole, fatalDismissed;
+extern "C" void Quake4_PostKey(int key, int down) { if (down) keys.push_back(key); }
+extern "C" int Quake4_FatalConsoleActive() { return fatalConsole; }
+extern "C" void Quake4_FatalConsoleDismiss() { fatalDismissed = true; }
 extern "C" void Quake4_PostChar(int) {}
 extern "C" void Quake4_PostMouseDelta(int x, int y) { mouseX += x; mouseY += y; }
 extern "C" void Quake4_PostMouseButton(int, int) {}
@@ -60,10 +67,11 @@ extern "C" void Quake4_PostJoystickAxis(int axis, int value) { axes[axis] = valu
 extern "C" void Quake4_PostCommand(const char *command) { commands.emplace_back(command); }
 extern "C" void Quake4_TriggerImpulse(int impulse) { impulses.push_back(impulse); }
 extern "C" void Quake4_PostButton(int button, int down) { buttons[button] = down != 0; }
-extern "C" int Quake4_GetScreenMode() { return TS_CONSOLE; }
+extern "C" int Quake4_GetScreenMode() { return screenMode; }
 extern "C" void Quake4_ResetTouchState() { ++resets; memset(buttons, 0, sizeof(buttons)); }
 void PortableMoveFwd(float);
 void PortableMoveSide(float);
+touchscreemode_t PortableGetScreenMode();
 void MouseButton(int, int) {}
 struct TestDictionary {
     int lookups = 0;
@@ -195,6 +203,28 @@ int main() {
     PortableAction(1, PORT_ACT_JUMP);
     Quake4_DrainTouchInput();
     assert(buttons[QUAKE4_BTN_MOVE_UP]);
+    // Closing a menu must release held controls without starting new gameplay actions.
+    screenMode = TS_MENU;
+    PortableAction(0, PORT_ACT_JUMP);
+    PortableAction(1, PORT_ACT_ATTACK);
+    PortableAction(1, PORT_ACT_MENU_UP);
+    Quake4_DrainTouchInput();
+    assert(!buttons[QUAKE4_BTN_MOVE_UP] && !buttons[QUAKE4_BTN_ATTACK]);
+    assert(keys.back() == SDL_SCANCODE_UP);
+    const auto menuKeys = keys.size();
+    screenMode = TS_GAME;
+    PortableAction(1, PORT_ACT_MENU_UP);
+    PortableAction(1, PORT_ACT_CUSTOM_0);
+    PortableAction(1, PORT_ACT_CUSTOM_9);
+    Quake4_DrainTouchInput();
+    assert(keys.size() == menuKeys + 2);
+    assert(keys[menuKeys] == SDL_SCANCODE_KP_1 && keys.back() == SDL_SCANCODE_KP_0);
+    fatalConsole = true;
+    PortableAction(1, PORT_ACT_ATTACK);
+    Quake4_DrainTouchInput();
+    assert(fatalDismissed && !buttons[QUAKE4_BTN_ATTACK]);
+    fatalConsole = false;
+    screenMode = TS_CONSOLE;
     assert(PortableShowKeyboard());
     PortableSetAlwaysRun(true);
     Quake4_DrainTouchInput();

@@ -72,6 +72,7 @@ void TouchInterface::addGameControls(touchcontrols::TouchControls *tc)
     tc->addControl(new touchcontrols::Button("quick_load", touchcontrols::RectF(20, 0, 22, 2), "load", PORT_ACT_QUICKLOAD, false, false, "#str_43002"));
 
     tc->addControl(new touchcontrols::Button("keyboard", touchcontrols::RectF(8, 0, 10, 2), "keyboard", KEY_SHOW_KBRD, false, false, "#str_43003"));
+    tc->addControl(new touchcontrols::Button("gfx_options", touchcontrols::RectF(10, 0, 12, 2), "gfx_options", KEY_SHOW_ENGINE_OPTIONS, false, false, "#str_43012"));
     tc->addControl(new touchcontrols::Button("show_mouse", touchcontrols::RectF(4, 0, 6, 2), "left_mouse", KEY_USE_MOUSE, false, true, "#str_43004"));
     tc->addControl(new touchcontrols::Button("console", touchcontrols::RectF(6, 0, 8, 2), "tild", PORT_ACT_CONSOLE, false, true, "#str_43005"));
 

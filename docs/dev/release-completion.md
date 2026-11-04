@@ -6,6 +6,17 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Android host integration, 4 November 2026
+
+- SigmaTouch menu controls no longer start gameplay actions behind a menu, and
+  releasing a control during a screen transition clears its held state. Custom
+  buttons reach their assigned keys, and graphics options have a localized label.
+- A touch or Back action can dismiss the host's fatal-error screen. Standalone
+  Android keeps its existing storage checks and density-aware error display.
+- This reconciles the older Android branch with the current Meson build and
+  in-tree game modules. Device and external-host qualification remain open;
+  see [integration decisions](android-gles-integration.md#branch-consolidation-4-november-2026).
+
 ## Shader allocation failure recovery, 4 November 2026
 
 - A failed Vulkan shader descriptor allocation now returns the uniform memory

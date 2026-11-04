@@ -77,6 +77,13 @@ bool		Posix_ConsoleNeedsEventPump( void );
 bool		Posix_ConsoleProcessEvent( const void *eventData );
 void		Posix_ConsoleFrame( void );
 void		Posix_ConsoleFatalErrorWait( void );
+#if defined( __ANDROID__ )
+// True once the fatal-error console owns the screen; the touch overlay uses
+// this to fall back to its blank control set.
+bool		Posix_ConsoleFatalErrorActive( void );
+// Ends the fatal-error wait from the host input thread.
+void		Posix_ConsoleRequestFatalDismiss( void );
+#endif
 void		Posix_ShutdownConsole( void );
 void		Posix_Shutdown( void );
 
