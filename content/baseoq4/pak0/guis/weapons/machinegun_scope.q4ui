@@ -222,7 +222,8 @@
          {"id": "p3", "op": "line", "points": [[733.95, 366.9]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-1",
@@ -233,7 +234,8 @@
          {"id": "p3", "op": "line", "points": [[711.979, 463.557]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-2",
@@ -244,7 +246,8 @@
          {"id": "p3", "op": "line", "points": [[654.691, 544.449]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-3",
@@ -255,7 +258,8 @@
          {"id": "p3", "op": "line", "points": [[570.808, 597.26]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-4",
@@ -266,7 +270,8 @@
          {"id": "p3", "op": "line", "points": [[473.1, 613.95]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-5",
@@ -277,7 +282,8 @@
          {"id": "p3", "op": "line", "points": [[376.443, 591.979]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-6",
@@ -288,7 +294,8 @@
          {"id": "p3", "op": "line", "points": [[295.551, 534.691]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-7",
@@ -299,7 +306,8 @@
          {"id": "p3", "op": "line", "points": [[242.74, 450.808]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-8",
@@ -310,7 +318,8 @@
          {"id": "p3", "op": "line", "points": [[226.05, 353.1]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-9",
@@ -321,7 +330,8 @@
          {"id": "p3", "op": "line", "points": [[248.021, 256.443]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-10",
@@ -332,7 +342,8 @@
          {"id": "p3", "op": "line", "points": [[305.309, 175.551]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-11",
@@ -343,7 +354,8 @@
          {"id": "p3", "op": "line", "points": [[389.192, 122.74]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-12",
@@ -354,7 +366,8 @@
          {"id": "p3", "op": "line", "points": [[486.9, 106.05]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-13",
@@ -365,7 +378,8 @@
          {"id": "p3", "op": "line", "points": [[583.557, 128.021]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-14",
@@ -376,7 +390,8 @@
          {"id": "p3", "op": "line", "points": [[664.449, 185.309]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        },
        {
         "id": "dot-15",
@@ -387,7 +402,8 @@
          {"id": "p3", "op": "line", "points": [[717.26, 269.192]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.34]}},
+        "antialias": false
        }
       ]
      },

@@ -1801,6 +1801,40 @@ static void CheckScopes(ScreenHost& host, char** paths) {
 			Check(runtime.PresentedValue("readouts","opacity")->data[0] == 0 && runtime.PresentedValue("lock-arrow","opacity")->data[0] == 0,"release clears lock furniture");
 			Check(Near(float(runtime.PresentedValue("glow","opacity")->data[0]),.44f,.001f),"release restores the resting light");
 		}
+		// Continuous camera motion used to rebuild output-pixel coverage every
+		// frame. Exercise actual scope documents, including the idle rail sweep,
+		// changing lock opacity/yaw and lock/unlock line motion, at three DPIs.
+		Runtime::EventEffects effects;
+		if (runtime.HasEvent("onInit")) Check(runtime.RunEvent("onInit",5,effects,error),"scope idle motion starts");
+		host.recordDraws=false;
+		host.cacheLayers=true;
+		double now=5;
+		for (const auto size : {std::pair{1920,1080},std::pair{3840,2160},std::pair{720,1280}}) {
+			viewport.width=size.first; viewport.height=size.second;
+			runtime.Frame(viewport,now); // Resizing legitimately recompiles static coverage.
+			std::uint64_t compiled=0, uploads=0, cachedLayers=0;
+			for (int frame=1;frame<=240;++frame) {
+				now+=1.0/60;
+				Check(runtime.SetState({{"playerYaw",frame*.7}},error,now),"continuous scope yaw");
+				if (kind==2) {
+					Check(runtime.SetState({{"lockYaw",frame*1.3},{"lockStatus",.5+.5*std::sin(frame*.03)}},error,now),"continuous lock motion");
+					if (frame==30 || frame==120) Check(runtime.RunEvent(frame==30 ? "lockAquired" : "lockStop",now,effects,error),"lock furniture moves during camera motion");
+				}
+				++host.frame;
+				runtime.Frame(viewport,now);
+				compiled+=runtime.Statistics().vectorPathsCompiled;
+				uploads+=runtime.Statistics().vectorUploads;
+				cachedLayers+=runtime.Statistics().layerCacheHits;
+			}
+			std::fprintf(stderr,"Scope %d moving at %dx%d: %llu paths, %llu uploads / 240 frames\n",kind,size.first,size.second,
+				static_cast<unsigned long long>(compiled),static_cast<unsigned long long>(uploads));
+			// Growing/shrinking sweeps may cross cached scale tiers; rotations,
+			// translations and opacity must not cause compilation every frame.
+			Check(compiled<=24 && uploads<=32,"moving scopes retain geometry across frames");
+			if (kind==2 && size.first==1920) Check(cachedLayers>120,"nailgun glow reuses its large gradient layer as lock opacity changes");
+		}
+		host.recordDraws=true;
+		host.cacheLayers=false;
 	}
 	host.softFocus = false;
 }

@@ -1778,6 +1778,12 @@ Completion must advance through the existing dependencies:
   bounded-resource checks. Keep whole-frame and isolated UI measurements separate.
   Begin with the SYSTEM/editor vertical slice; do not defer architecture/cost
   decisions until all screens have been converted.
+  Progress, 4 November: [moving weapon scopes](ui/runtime-performance.md#moving-weapon-scopes-4-november-2026)
+  retain local meshes for their faint animated furniture. At 1080p the isolated
+  rail/nail scope CPU medians fall from 6.99/8.80 ms to 0.018/0.037 ms; continuous
+  yaw, sweep, lock/unlock and resize tests bound compilation through 4K and
+  portrait. Exact pixel-edge antialiasing remains on stationary reticles and
+  focus masks. Whole-product GPU, idle-machine and resource-cycle gates remain.
   Progress, 22 October: [current-build measurements](ui/runtime-performance.md#current-build-measurements-and-presetscale-reproduction-22-october-2026)
   record five 1,000-frame Vulkan samples each for title, System and SP pause.
   Title/System exceed the proposed 60 Hz CPU budget; GPU and resource-cycle

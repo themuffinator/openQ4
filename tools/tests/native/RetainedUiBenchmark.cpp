@@ -66,7 +66,7 @@ struct ScreenHost final : Host {
 // onInit, the open timeline, a four second settle, then timed 60 Hz frames on
 // its view-height canvas. With `event`, the event runs after the settle and
 // the timed frames show what it opens (first_ms is the frame that does).
-void Screen(const std::string& path, int frames, int width, int height, const std::string& event) {
+void Screen(const std::string& path, int frames, int width, int height, const std::string& event, bool scope = false) {
 	std::ifstream file(path,std::ios::binary);
 	if (!file) throw std::runtime_error("Cannot read screen document");
 	const std::string source{std::istreambuf_iterator<char>(file),{}};
@@ -88,6 +88,15 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 	if (!event.empty() && !runtime.RunEvent(event,start+4,effects,error)) throw std::runtime_error(event+": "+error);
 	std::vector<double> frame, update, render, compile, paths, uploads, draws, vertices, layers, elisions;
 	for (int i = 1; i <= frames; ++i) {
+		// Exercise the game-driven motion as well as authored idle timelines.
+		// A stationary nailgun compass otherwise hides its worst rendering cost.
+		if (scope) {
+			const double now=start+4+i/60.0;
+			if (!runtime.SetState({{"playerYaw",std::fmod(i*.7,360.0)}},error,now)) throw std::runtime_error(error);
+			if (model.Model().state.contains("lockYaw") &&
+				!runtime.SetState({{"lockYaw",std::fmod(i*1.3,360.0)},{"lockStatus",.5+.5*std::sin(i*.03)}},error,now))
+				throw std::runtime_error(error);
+		}
 		runtime.Frame(viewport,start+4+i/60.0);
 		const auto stats = runtime.Statistics();
 		frame.push_back(stats.frameMilliseconds); update.push_back(stats.updateMilliseconds); render.push_back(stats.renderMilliseconds);
@@ -198,14 +207,14 @@ int main(int argc, char** argv) {
 			Load(argv[2],repeats);
 			return 0;
 		}
-		if (argc >= 3 && std::string(argv[1]) == "--screen") {
-			if (argc > 7) throw std::runtime_error("usage: openq4-retained-ui-benchmark --screen <document.q4ui> [frames=120] [width=1280] [height=720] [event]");
+		if (argc >= 3 && (std::string(argv[1]) == "--screen" || std::string(argv[1]) == "--scope")) {
+			if (argc > 7) throw std::runtime_error("usage: openq4-retained-ui-benchmark --screen|--scope <document.q4ui> [frames=120] [width=1280] [height=720] [event]");
 			const int frames = argc > 3 ? std::stoi(argv[3]) : 120, width = argc > 4 ? std::stoi(argv[4]) : 1280, height = argc > 5 ? std::stoi(argv[5]) : 720;
 			if (frames < 2 || frames > 3600 || width < 64 || width > 8192 || height < 64 || height > 8192) throw std::runtime_error("Invalid screen frame count or size");
-			Screen(argv[2],frames,width,height,argc > 6 ? argv[6] : "");
+			Screen(argv[2],frames,width,height,argc > 6 ? argv[6] : "",std::string(argv[1]) == "--scope");
 			return 0;
 		}
-		if (argc < 2 || argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark <vector-smoke.q4ui> [density=1.25] [frames=60] | --screen <document.q4ui> [frames] [width] [height] [event] | --load <document.q4ui> [repeats]");
+		if (argc < 2 || argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark <vector-smoke.q4ui> [density=1.25] [frames=60] | --screen|--scope <document.q4ui> [frames] [width] [height] [event] | --load <document.q4ui> [repeats]");
 		Viewport viewport;
 		viewport.displayScale = argc > 2 ? std::stof(argv[2]) : 1.25f;
 		const int frames = argc > 3 ? std::stoi(argv[3]) : 60;

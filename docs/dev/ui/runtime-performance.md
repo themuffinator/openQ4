@@ -1,5 +1,66 @@
 # Retained UI measurements and vector caching
 
+## Moving weapon scopes, 4 November 2026
+
+The railgun split ring/diamond sweep and the nailgun yaw ring/lock arrow
+recompiled analytic output-pixel coverage on every rotation or scale change.
+The previous scope tests checked a single changed yaw, so they did not bound
+the sustained cost. The machinegun compass had the same problem at a smaller
+scale.
+
+The scope generator now marks only the moving furniture as `antialias: false`:
+compass dots/ring, rail split ring/sweep, nail lock arrow and spreading lines.
+These use the existing retained local-mesh path, with transforms applied at
+submission and bounded recompilation when a growing sweep needs a finer scale.
+This deliberately trades exact pixel-edge coverage on those low-contrast
+decorations for cached triangles. Stationary aiming marks, aperture edges,
+glow gradients and lens-focus masks retain analytic antialiasing; geometry,
+colors, timings, ammo and lock behavior are unchanged. No bitmap art is added.
+
+The engine also retains completed opacity layers for a single untextured mesh
+with at least 1,024 vertices. Previously this cache admitted compound plates
+only, repeatedly submitting the nailgun's large, unchanged gradient while its
+lock strength changed. The solid-coverage atlas cannot represent that gradient.
+The existing revision/clip keys, shared memory budget and eviction rules still
+apply, and small single meshes keep their direct/atlas path.
+
+The native benchmark's `--scope` mode continuously changes yaw, target bearing
+and acquisition strength as well as playing the authored idle timelines. At
+1920x1080, 180 measured frames after warmup, Windows x64 optimized build:
+
+| Scope | Before CPU p50 / p95 | After CPU p50 / p95 |
+| --- | --- | --- |
+| Machinegun | 0.766 / 1.420 ms | 0.009 / 0.020 ms |
+| Railgun | 6.986 / 10.522 ms | 0.018 / 0.023 ms |
+| Nailgun | 8.805 / 15.218 ms | 0.037 / 0.090 ms |
+
+These are isolated runtime CPU measurements with a counted host, not GPU time
+or whole-game FPS. Other jobs were active on the machine; this is regression
+evidence, not UI-07's idle-machine or 1,000-frame qualification.
+
+The production-document optics test now runs 240 moving frames at 1080p, 4K
+and portrait, including acquisition/release, resize and changing opacity. Each
+scope compiles at most 16 paths in an entire run (including scale-tier changes),
+instead of per frame. The gate rejects the previous documents: the machinegun
+alone compiles and uploads 3,840 paths in 240 frames. Existing geometry budgets,
+centering, ammo and lock-state assertions also pass.
+
+Reproduce with `openq4-retained-ui-benchmark --scope <scope.q4ui> 180 1920 1080`
+and the Meson `openq4-ui-retained-screens-optics` test. The windowed SP harness
+`tools/tests/ui_scope_performance.py` profiles each moving scope over
+`game/airdefense1`, captures through the engine `screenshot` command, and
+verifies the weapon-owned railgun scope selection. The motion profiles use
+`testGUI` overlays with semantic state changes, not synthesized aim input.
+Final 1080p OpenGL and Vulkan runs pass with unchanged runtime hashes, no
+retained warnings/errors or geometry-ring overflow, and inspected engine
+captures of moving scopes and lock readouts. The shared runtime's composition
+suite and scope routing/generation checks pass too. Local measurements and
+logs are under `.tmp/scope-performance/` (`final-gl/report.json`,
+`final-vulkan/report.json`, `native-final.log`, `cpu-comparison.json`). Full
+GPU/platform/resource-cycle qualification remains open.
+
+## Original caching checkpoint
+
 8 September 2026. This checkpoint adds runtime CPU measurements and removes
 redundant path compilation during fades and whole-pixel movement. It advances
 the [replacement plan](../archive/2026-10-18/plans/idtech5-ui.md); full performance qualification,

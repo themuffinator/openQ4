@@ -962,9 +962,13 @@ public:
 		// mask copies and composites for a small stationary HUD gauge.
 		std::vector<std::pair<std::uint64_t,std::uint64_t>> cacheKey;
 		const bool cacheText=opacitySource && textOpacity && maskFilters.empty();
-		// A compound vector plate (fill plus rail) needs isolated alpha at the
-		// overlap. Retain its completed target; single meshes prefer the atlas.
-		const bool cachePlate=maskFilters.empty() && layer.draws.size()>1;
+		// A compound plate needs isolated alpha at the overlap. Large single
+		// gradient meshes (the nailgun acquisition glow) also benefit: the solid
+		// coverage atlas cannot represent their varying colour, and an opacity
+		// change must not resubmit tens of thousands of unchanged vertices.
+		// Small single meshes still prefer direct drawing/the coverage atlas.
+		const bool cachePlate=maskFilters.empty() && (layer.draws.size()>1 ||
+			(layer.draws.size()==1 && layer.draws.front().Vertices().size()>=1024));
 		bool cacheable=host.CanCacheLayers() && layer.pending && !destination && (!maskFilters.empty() || cacheText || cachePlate) && LayerCacheLimit()>0;
 		const auto appendKey=[&](const std::vector<RecordedDraw>& draws) {
 			cacheKey.emplace_back(0,draws.size());
