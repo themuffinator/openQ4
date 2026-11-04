@@ -136,5 +136,27 @@ actual attachment extent, and stencil statistics use its complete extent.
 The helper preserves read/draw framebuffer bindings and pack alignment and
 refuses unknown targets, out-of-bounds rectangles and allocation-size overflow.
 Native controls execute the actual functions for window, scaled, offset and VR
-stand-in targets, MSAA success/failure and state restoration. The expanded
-34-case GPU sequence remains to be qualified on the corrected build.
+stand-in targets, MSAA success/failure and state restoration; they pass on
+Windows and Linux (WSL). The clean `da0080eb` build now passes the expanded
+34-case sequence on both backends with the RTX 4060 Laptop GPU:
+
+| MSAA | Independent cases per backend | Paired captures | Maximum display-level error |
+| --- | ---: | ---: | ---: |
+| 0x | 34 | 34 | 1 |
+| 4x | 34 | 34 | 1 |
+| 8x | 34 | 34 | 2 |
+
+All reload, partial-restart and full-restart images recover exactly within
+each backend. Vulkan validation reports no messages. The two-level full-frame
+limit is unchanged. Reports, harness snapshots and engine images are retained
+under `.tmp/vk-roadmap/debug-fixed-{gl0,vk0,gl4,vk4,gl8,vk8}/` and their three
+`debug-fixed-comparison*` directories. The exact tested package is retained in
+`runtime-da0080eb.zip`, SHA-256
+`daf52c9e2804fe3536233cf34ebdf6e33a7298b4804dcd2e182df0dc9d23467e`.
+These results qualify scaled game-owned targets from 50% through 200%; the
+cropped, offset and nested GPU cases in Remaining scope are still open.
+
+The earlier unpinned `debug-gl0-extents/` attempt remains failed: an automatic
+first-run preset restart emitted 65 uncached menu/model/crosshair warnings.
+Pinning the balanced preset removed those warnings from the controlled runs;
+it does not resolve that separate first-run initialization issue.

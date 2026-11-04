@@ -14,9 +14,11 @@ See [player release status](../user/release-status.md).
 - OpenGL depth and intensity views cover the whole scene at render scales above
   100%; their previous window-sized readback left part of a larger target
   unconverted. Stencil statistics now use the actual attachment dimensions.
-- Native regression controls pass. Corrected GPU map-tour and debug-view
-  qualification is in progress; see [resource evidence](vulkan-resource-profiling.md)
-  and [capture evidence](vulkan-captures.md).
+- Native regression controls pass on Windows and Linux. All 102 paired GL/Vulkan
+  debug captures pass from 50% through 200% scale at 0x/4x/8x MSAA, with exact
+  reload/restart recovery. The corrected GPU map-tour qualification is in
+  progress; see [resource evidence](vulkan-resource-profiling.md) and
+  [capture evidence](vulkan-captures.md).
 
 ## Vulkan foreground qualification tooling, 4 November 2026
 

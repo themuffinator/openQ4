@@ -551,7 +551,10 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   pass 25 pairs at each of 0x/4x/8x MSAA for 50–100% game-owned scene targets.
   Larger-target probes exposed GL debug readbacks using window dimensions;
   active-viewport/attachment sizing now corrects that path. Native extent,
-  MSAA and state-restoration controls pass; expanded GPU qualification is pending.
+  MSAA and state-restoration controls pass on Windows and Linux. The corrected
+  34-case sequence passes at each of 0x/4x/8x MSAA from 50% through 200% scale,
+  within the unchanged two-level full-frame limit and with exact reload/restart
+  recovery. Actual cropped, offset and nested GPU comparisons remain open.
 
 ## Modern rendering engine
 
