@@ -6,6 +6,17 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Local microphone test isolation, 4 November 2026
+
+- **Microphone-test audio stays local when returning to push-to-talk.** Switching
+  modes discards buffered test audio and stops local playback, including when
+  push-to-talk was already held or the input cannot reopen.
+- **Voice capture drops stale fragments after a stall.** An incomplete frame
+  expires after 120 ms instead of joining later speech and being sent as fresh
+  audio. Capture permission and saved settings are unchanged.
+- Physical microphone and hotplug qualification remains open under AUD-05.
+  [Implementation and evidence](audio-voice-evidence.md#local-test-isolation-and-partial-capture-age-4-november-2026).
+
 ## Audio cancellation and memory pressure, 3 November 2026
 
 - **Discarding a level no longer waits for unused music or speech to finish

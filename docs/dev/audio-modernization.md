@@ -530,6 +530,38 @@ differences retain negative values and must be interpreted alongside cache and
 host-load variation. Repeat the same map set for warm-load comparisons; do not
 promote these desktop timings into a mobile loading-time budget.
 
+### Local microphone test isolation and capture age (November 4)
+
+Changing between local testing and network capture destroys the old SDL stream
+before opening the new one. Destruction joins the callback, drops SDL's queued
+input/resampler state and clears the engine's capture ring and partial frame.
+The local playback channel stops at the same transition. This also holds when
+push-to-talk is already pressed on test exit or reopening fails: test audio never
+becomes an outgoing frame.
+
+While assembling a frame, `partial.time` records the first callback's time.
+If assembly takes more than the queue's 120 ms age limit, the partial frame is
+discarded before reading fresh samples. A completed frame retains the existing
+completion timestamp. Unsigned elapsed-time arithmetic handles clock wrap;
+several individually short callback gaps cannot keep an old partial frame alive.
+
+`voice_chat_runtime.py --dummy-capture` adds consent, local playback, closure,
+reopening, revocation and peer-isolation checks to the existing listen/dedicated
+voice run. SDL's explicitly selected dummy driver supplies silence, so this
+exercises real callbacks and OpenAL submission without opening a physical input.
+The production capture harness uses distinguishable PCM to prove that no old
+samples cross a mode transition or survive an expired partial frame. Neither
+test replaces physical microphone/hotplug or independent-clock qualification.
+
+`listVoiceChat` also reports `VOICE_CLOCK`: the source clock and packet timestamp
+of the most recently encoded frame. The peer audit checks the injected ±0.1%
+clock rate against those values, within 2 ms of integer rounding, while requiring
+continued delivery, at most 2% rejected frames and at most 120 ms added latency.
+Receiver baseline movement remains in the report, but its sign is not a clock
+test: varying network delay can exceed the 10 ms drift injected over ten seconds.
+This diagnostic observes the existing timestamp; it does not alter admission or
+the wire protocol.
+
 ## Deferred
 
 - **Audible distance units.** Current `DOOM_TO_METERS` and `METERS_TO_DOOM` are both

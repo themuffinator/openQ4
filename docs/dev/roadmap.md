@@ -2786,6 +2786,19 @@ Sources: [audio implementation and remaining limits](audio-modernization.md),
   server; the baseline rose 8–9 ms and fell 7–10 ms over about 10 s each, rejecting
   nothing. Separate machines with their own clocks remain open.
   [Drift evidence](audio-voice-evidence.md#voice-clock-drift-between-real-peers).
+  November 4: switching between the local microphone test and push-to-talk now
+  closes the previous capture stream before reopening, discarding its resampler,
+  queued audio and partial frame. Buffered test audio can no longer become network
+  speech when push-to-talk is already held on test exit. Incomplete frames also
+  expire after 120 ms instead of gaining a fresh timestamp after a callback stall.
+  Production regressions cover both reproduced failures, reopening failure and
+  clock wrap; the peer harness adds an optional SDL dummy-input local-test pass.
+  Packet-clock diagnostics separate the injected sender drift from network jitter
+  while retaining delivery, rejection and added-latency checks.
+  Windows listen and dedicated peers each pass all 31 checks with dummy capture;
+  the native production capture regressions pass on Windows and Linux.
+  Physical microphones, hotplug, independent-machine clocks and target-OS breadth
+  remain open. [Capture evidence](audio-voice-evidence.md#local-test-isolation-and-partial-capture-age-4-november-2026).
 - [ ] **AUD-06 — P2, implementation and qualification: independent dialogue volume.**
   Address [#187](https://github.com/themuffinator/openQ4/issues/187) with a localized,
   persistent spoken-dialogue control in UI-01. Inventory actual dialogue routing
