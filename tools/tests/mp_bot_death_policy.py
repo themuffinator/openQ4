@@ -134,6 +134,9 @@ def main() -> None:
           "a surviving fixed-input trial keeps the death a navigation failure")
     check(policy.decide(candidate, outcomes(survivor="controller"), True)["status"] == "navigation",
           "a surviving controller trial keeps the death a navigation failure")
+    for variant in (outcomes(missing="controller"), outcomes(unarmed="controller"), outcomes(airborne="controller")):
+        check(policy.decide(candidate, variant, True)["status"] == "navigation",
+              "an incomplete controller trial cannot qualify an impulse exclusion")
     check(policy.decide(candidate, outcomes(survivor="none"), True)["status"] == "navigation",
           "surviving with no input keeps the death a navigation failure")
     check(policy.decide(candidate, outcomes(unarmed="air11"), True)["status"] == "navigation",

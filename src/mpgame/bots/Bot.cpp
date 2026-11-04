@@ -4862,8 +4862,8 @@ BotChooseAirInput
 
 Keep a proven air input, otherwise try the eight braking-relative headings,
 the sixteen world headings used by the recovery audit, then none. Prefer an
-affordable landing with stopping room, then affordable supported ground. If
-none exists, retain an affordable physical touchdown as a last resort, then
+affordable landing with stopping room, then a proven hull-contact brake,
+then affordable supported ground. If none exists, retain an affordable physical touchdown as a last resort, then
 a supported floor with a live health pickup, before falling back to braking.
 This never approves a voluntary traversal.
 ================
@@ -4872,10 +4872,11 @@ static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 	const idVec3 origin = self->GetPhysics()->GetOrigin();
 	const idVec3 &velocity = self->GetPhysics()->GetLinearVelocity();
 	const float limit = BotMaxSafeFallDelta( self );
-	bool heldTouch = false;
+	const int knockMsec = static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->GetKnockBack();
+	bool heldTouch = false, heldBrake = false;
 	// Replanning must not replace a still-safe heading with a different one
 	// whose prediction starts from a slightly different point every 200 ms.
-	if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch ) ) {
+	if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec ) || heldBrake ) {
 		return true;
 	}
 	idVec3 brake( -velocity.x, -velocity.y, 0.0f );
@@ -4885,6 +4886,8 @@ static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 	static const float turns[8] = { 0.0f, 45.0f, -45.0f, 90.0f, -90.0f, 135.0f, -135.0f, 180.0f };
 	bool haveSupported = false;
 	idVec3 supported = brake;
+	bool haveBrake = false;
+	idVec3 brakeInput = brake;
 	idVec3 lastTouchdown;
 	bool haveLastResort = false;
 	if ( limit < idMath::INFINITY && wish.LengthSqr() > 0.0f ) {
@@ -4904,10 +4907,14 @@ static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 			const float angle = DEG2RAD( ( i - 8 ) * 22.5f );
 			candidate.Set( idMath::Cos( angle ), idMath::Sin( angle ), 0.0f );
 		}
-		bool landed = false, touched = false;
-		if ( navMesh.AirInputLandingSafe( origin, velocity, candidate, limit, NULL, &landed, &touched ) ) {
+		bool landed = false, touched = false, braked = false;
+		if ( navMesh.AirInputLandingSafe( origin, velocity, candidate, limit, NULL, &landed, &touched, &braked, knockMsec ) ) {
 			wish = candidate;
 			return true;
+		}
+		if ( braked && !haveBrake ) {
+			haveBrake = true;
+			brakeInput = candidate;
 		}
 		if ( touched && !haveTouch ) {
 			haveTouch = true;
@@ -4946,8 +4953,8 @@ static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 	// An involuntary fall with no supported solution still benefits from an
 	// affordable physical touchdown (a wall can catch a narrow hull ledge).
 	// This is a last resort, never proof for a voluntary route or an exclusion.
-	wish = haveSupported ? supported : ( haveTouch ? touchInput : ( haveLastResort ? lastResort : brake ) );
-	return haveSupported || haveTouch || haveLastResort;
+	wish = haveBrake ? brakeInput : ( haveSupported ? supported : ( haveTouch ? touchInput : ( haveLastResort ? lastResort : brake ) ) );
+	return haveBrake || haveSupported || haveTouch || haveLastResort;
 }
 
 /*

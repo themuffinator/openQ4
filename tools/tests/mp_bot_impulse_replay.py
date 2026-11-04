@@ -310,7 +310,7 @@ def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[
 
 
 def decide(candidate: dict, outcomes: list[dict] | None, session_ok: bool) -> dict:
-    """Exclude only a candidate whose every decisive trial armed and died."""
+    """Exclude only when every post-hit trial, including the controller, died."""
     decided = dict(candidate)
     decided["replay"] = outcomes
     if candidate.get("status") != "impulse-candidate":
@@ -332,6 +332,10 @@ def decide(candidate: dict, outcomes: list[dict] | None, session_ok: bool) -> di
         return decided
     if not all(o["died"] for o in decisive):
         decided.update(status="navigation", reason="a decisive trial neither survived nor died (fail closed)")
+        return decided
+    controller = [o for o in outcomes if o["name"] == "controller"]
+    if len(controller) != 1 or not controller[0]["armed"] or not controller[0]["died"]:
+        decided.update(status="navigation", reason="controller replay missing, unarmed or unresolved (fail closed)")
         return decided
     # The impulse has to make the difference: the same moment without it
     # must be survivable, or the bot was already lost to navigation.

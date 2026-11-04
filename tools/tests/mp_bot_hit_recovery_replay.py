@@ -34,6 +34,10 @@ CASES = {
         "name": "rocket_ground_slide",
         "setup": ["bot_probeHealth 1 67 200 510.996 195.932 -54.711"],
         "command": "bot_probeMove 1 828.721 -10.581 324.25 352.019 387.219 -54.711 828.721 -10.581 324.25",
+    }, {
+        "name": "rocket_rim_runout",
+        "setup": ["bot_probeHealth 1 12 154 170.551 -246.454 241.656 0"],
+        "command": "bot_probeMove 1 -24.912 -761.135 328.25 274.678 -581.521 241.656 -24.912 -761.135 328.25",
     }]),
     "ctf3": ("CTF", [{
         "name": "weak_nail_walk",

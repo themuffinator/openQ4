@@ -74,7 +74,9 @@ CVar pm_stepsize{16},pm_jumpheight{48},pm_speed{320},pm_usecylinder{1},pm_fricti
 CVar pm_slidevelocity{1},pm_powerslide{0.09f};
 const float OVERCLIP=1.001f;
 int missingGroundContacts=0;
-bool NavAgentHasGroundContacts(const idVec3&,const idVec3&) {
+float contactsAfterX=-1e30f;
+bool NavAgentHasGroundContacts(const idVec3& origin,const idVec3&) {
+    if(origin.x<contactsAfterX) return false;
     if(missingGroundContacts>0) { --missingGroundContacts; return false; }
     return true;
 }
@@ -239,7 +241,8 @@ public:
     bool DodgeJumpClear(const idVec3&,const idVec3&,const idVec3&,float,float=0) const;
     bool PadLanding(idEntity*,const idVec3&,const idVec3*,idVec3&,float* = nullptr,float* = nullptr) const;
     bool LandingSurvivable(const idVec3&,const navCorner_t&,float) const;
-    bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr,bool* = nullptr) const;
+    bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr,bool* = nullptr,bool* = nullptr,int = 0) const;
+    bool RecoveryBrakeClear(const trace_t&,const idVec3&,float,int) const;
     bool KnockSlideLandingSafe(const idVec3&,const idVec3&,int,float,const idVec3& = idVec3()) const;
     bool steeredPad=false;
     bool IsSteeredPadLanding(int,const idVec3&) const { return steeredPad; }
@@ -327,6 +330,40 @@ int main() {
     pm_usecylinder.value=4; agentHull=NavCreateAgentTrace(agentBounds);
     CHECK(agentHull.numVerts==8 && std::fabs(agentHull.verts[0].x-std::sqrt(128.0f))<0.001f);
     pm_usecylinder.value=1; agentHull=NavCreateAgentTrace(agentBounds); solids.clear();
+    // A DM8 rocket lands on a narrow raised lip. Broad route support fails
+    // for both headings, but only one can keep real hull contact while braking.
+    // Include the engine trace's quarter-unit floor separation in this
+    // fixture's exact separating-axis plane (which has no clip epsilon).
+    solids.push_back({{48,-1024,288},{64,1024,352.25f}});
+    const idVec3 rocketOrigin{-24.912f,-761.135f,328.25f};
+    const idVec3 rocketVelocity{274.678f,-581.521f,241.656f};
+    bool rimBraked=false;
+    CHECK(!nav.AirInputLandingSafe(rocketOrigin,rocketVelocity,{-0.9239f,0.3827f,0},100,
+          nullptr,nullptr,nullptr,&rimBraked,154) && rimBraked);
+    CHECK(!nav.AirInputLandingSafe(rocketOrigin,rocketVelocity,{-0.941f,0.337f,0},100,
+          nullptr,nullptr,nullptr,&rimBraked,154) && !rimBraked);
+    idPlayer rocket; rocket.physics.origin=rocketOrigin; rocket.physics.velocity=rocketVelocity;
+    rocket.physics.RestoreKnockBack(154);
+    idVec3 rocketWish;
+    CHECK(BotChooseAirInput(&rocket,rocketWish));
+    nav.AirInputLandingSafe(rocketOrigin,rocketVelocity,rocketWish,100,nullptr,nullptr,nullptr,&rimBraked,154);
+    CHECK(rimBraked);
+    // The recovery continuation fails closed on absent floor, slippery ground,
+    // pending knockback, hazards, transports and a missing landing contact.
+    solids.clear(); Platform(-256,0,0);
+    trace_t rimImpact; rimImpact.endpos={-4,0,0.25f}; rimImpact.c.normal={0,0,1};
+    CHECK(nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0));
+    CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0.016f,0));
+    CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,100));
+    floorMaterial.flags=SURF_SLICK; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); floorMaterial.flags=0;
+    lethal=true; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); lethal=false;
+    transported=true; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); transported=false;
+    missingGroundContacts=1; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); missingGroundContacts=0;
+    contactsAfterX=0; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); contactsAfterX=-1e30f;
+    // Endpoints on two islands cannot bridge an unsupported interval.
+    Platform(40,1024,0);
+    CHECK(!nav.RecoveryBrakeClear(rimImpact,{4000,0,0},0.016f,0));
+    solids.clear(); CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0));
     // A walk along q4dz3's rim was supported only by the outer two units of
     // the hull; the controller's small lateral error then lost the floor.
     Platform(12,128,0);

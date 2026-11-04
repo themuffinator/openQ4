@@ -21,6 +21,9 @@ See [player release status](../user/release-status.md).
 - Bots can steer a dangerous knockback slide before leaving the floor and
   brake after catching a narrow ledge. Recovery also accounts for movement
   boosts so its commands match the predicted trajectory.
+- Recovery distinguishes a narrow ledge where braking can stop the bot from
+  an edge it will slide off after touching down. The remaining recorded DM8
+  rocket case and renewed safety sweeps are under qualification.
 - Bots avoid the area swept by a lethal moving crusher and check whether their
   own splash weapon would throw them off supported ground before firing.
 - Bots stopped beside a narrow walking rim can slowly move onto supported

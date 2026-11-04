@@ -32,6 +32,7 @@ def main() -> None:
         "bool rvNavMesh::LandingContinuationClear(",
         "static bool NavRecoveryFootprintContains(",
         "static bool NavRecoverySharedSupport(",
+        "bool rvNavMesh::RecoveryBrakeClear(",
         "bool rvNavMesh::RecoveryStepClear(",
         "bool rvNavMesh::GapJumpClear(",
         "bool rvNavMesh::JumpTakeoffClear(",
@@ -90,8 +91,8 @@ def main() -> None:
         assert result.returncode != 0, "lifted air-recovery origin mutation escaped"
         print("Live air-recovery origin: artificial lift mutation rejected")
         mutated = fixture.replace(
-            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch ) )",
-            "if ( wish.LengthSqr() > 0.0f && navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch ) )")
+            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec ) || heldBrake )",
+            "if ( wish.LengthSqr() > 0.0f && ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec ) || heldBrake ) )")
         assert mutated != fixture
         cpp.write_text(mutated, encoding="utf-8")
         subprocess.run(command, cwd=path, check=True)
@@ -121,6 +122,11 @@ def main() -> None:
         assert result.returncode != 0, "rim-recovery rejection mutation escaped"
         print("Inward rim landing: old rejection mutation failed")
         for label, anchor, replacement in (
+            ("rim braking continuation", "*brakedAffordable = RecoveryBrakeClear( trace, flat, dt * ( 1.0f - trace.fraction ),",
+             "*brakedAffordable = false && RecoveryBrakeClear( trace, flat, dt * ( 1.0f - trace.fraction ),"),
+            ("landing frame remainder", "float seconds = remainingSeconds;", "float seconds = 0.0f;"),
+            ("continuous braking support", "!NavRecoverySharedSupport( position, next ) ||", "false ||"),
+            ("braking contact", "!NavAgentHasGroundContacts( next, gameLocal.GetGravity() )", "false"),
             ("exact replay timer", "current.movementFlags &= ~PMF_ALL_TIMES;", "return;"),
             ("zero replay timer", "if ( current.movementTime > 0 ) {", "if ( true ) {"),
             ("knockback expiry before movement", "elapsed + 16 < knockMsec", "elapsed < knockMsec"),

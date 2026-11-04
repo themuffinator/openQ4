@@ -1104,7 +1104,11 @@ falling after three seconds is a fall into nothing.
 ================
 */
 bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocityIn, const idVec3 &wishIn,
-									 float maxImpactDelta, idVec3 *touchdown, bool *landedSupported, bool *touchedAffordable ) const {
+									 float maxImpactDelta, idVec3 *touchdown, bool *landedSupported, bool *touchedAffordable,
+									 bool *brakedAffordable, int knockMsec ) const {
+	if ( brakedAffordable ) {
+		*brakedAffordable = false;
+	}
 	if ( landedSupported ) {
 		*landedSupported = false;
 	}
@@ -1212,12 +1216,19 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 				continue;
 			}
 			idVec3 flat( velocity.x, velocity.y, 0.0f );
+			auto recoveryRunout = [&]() {
+				if ( brakedAffordable ) {
+					*brakedAffordable = RecoveryBrakeClear( trace, flat, dt * ( 1.0f - trace.fraction ),
+						Max( 0, knockMsec - ( frame + 1 ) * 16 ) );
+				}
+				return false;
+			};
 			const idVec3 stop = trace.endpos + flat * ( dt + flat.Length() / ( 20.0f * speed ) );
 			// A landing whose runout reaches a pad or a teleporter is another
 			// throw: a q4ctf5 bot that survived a rail's kick slid onto
 			// func_jumppad_3 and was flown off the map.
 			if ( TransportOnMove( trace.endpos, stop, -1 ) >= 0 ) {
-				return false;
+				return recoveryRunout();
 			}
 			if ( touchedAffordable ) {
 				*touchedAffordable = true;
@@ -1225,12 +1236,12 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			idVec3 supportedOrigin = trace.endpos;
 			if ( !NavLandingSupported( supportedOrigin ) &&
 				 !RecoveryStepClear( trace.endpos, stop, &supportedOrigin ) ) {
-				return false;
+				return recoveryRunout();
 			}
 			if ( landedSupported ) {
 				*landedSupported = true;
 			}
-			return LandingContinuationClear( supportedOrigin, stop );
+			return LandingContinuationClear( supportedOrigin, stop ) || recoveryRunout();
 		}
 		if ( trace.fraction <= 0.0f ) {
 			// Resting against the wall it slid down: step off its plane, as
@@ -1407,6 +1418,63 @@ static bool NavRecoverySharedSupport( const idVec3 &from, const idVec3 &to ) {
 				return true;
 			}
 		}
+	}
+	return false;
+}
+
+// A narrow involuntary landing may have enough real hull contact to stop,
+// while failing the wider five-probe support required by voluntary routes.
+// Complete the airborne collision frame before applying any ground brake.
+// Then require a shared patch of flat floor under every segment, including
+// actual end contacts. A momentary edge touch is not a surviving runout.
+bool rvNavMesh::RecoveryBrakeClear( const trace_t &impact, const idVec3 &velocityIn,
+		float remainingSeconds, int knockMsec ) const {
+	if ( impact.c.normal.z < 0.999f || knockMsec < 0 || knockMsec > 1000 ||
+		 pm_frictionoverride.GetFloat() >= 0.0f ) {
+		return false;
+	}
+	idVec3 position = impact.endpos;
+	idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );
+	auto reject = [&]( const char *reason ) {
+		if ( bot_debug.GetInteger() >= 4 ) {
+			gameLocal.Printf( "BOT_BRAKE_PROOF time=%d reason=%s origin=%.3f %.3f %.3f at=%.3f %.3f %.3f velocity=%.3f %.3f knock=%d\n",
+				gameLocal.time, reason, impact.endpos.x, impact.endpos.y, impact.endpos.z,
+				position.x, position.y, position.z, velocity.x, velocity.y, knockMsec );
+		}
+		return false;
+	};
+	const float dt = NAV_PAD_STEP_SECONDS;
+	const idVec3 down( 0.0f, 0.0f, 2.0f * CM_CLIP_EPSILON );
+	// Leave room for command-byte rounding instead of assuming exact reverse.
+	const float acceleration = 15.0f * Max( 1.0f, pm_speed.GetFloat() ) * 0.99f;
+	for ( int frame = 0; frame < 128; frame++ ) {
+		trace_t ground;
+		if ( NavAgentTranslation( ground, position, position - down ) || ground.c.normal.z < 0.999f ||
+			 ( ground.c.material && ( ground.c.material->GetSurfaceFlags() & SURF_SLICK ) ) ||
+			 IsLethalFloor( position ) || ( gameLocal.LiquidContentsAtPoint( position, NULL ) & MASK_WATER ) ) {
+			return reject( "floor" );
+		}
+		float seconds = remainingSeconds;
+		if ( frame > 0 ) {
+			seconds = dt;
+			const float speed = velocity.Length();
+			if ( speed < 1.0f ) {
+				return NavAgentHasGroundContacts( position, gameLocal.GetGravity() );
+			}
+			knockMsec = Max( 0, knockMsec - 16 );
+			const float friction = knockMsec ? 0.0f : Max( speed, 100.0f ) * 6.0f * dt;
+			const float brake = knockMsec ? NAV_PAD_AIR_ACCELERATE * dt * Max( 1.0f, pm_speed.GetFloat() ) * 0.99f : acceleration * dt;
+			velocity *= Max( 0.0f, speed - friction - brake ) / speed;
+		}
+		const idVec3 next = position + velocity * seconds;
+		trace_t across;
+		if ( !NavAgentTranslation( across, position, next ) ||
+			 TransportOnMove( position, next, -1 ) >= 0 ||
+			 !NavRecoverySharedSupport( position, next ) ||
+			 !NavAgentHasGroundContacts( next, gameLocal.GetGravity() ) ) {
+			return reject( "runout" );
+		}
+		position = next;
 	}
 	return false;
 }

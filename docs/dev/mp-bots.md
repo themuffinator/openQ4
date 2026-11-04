@@ -53,6 +53,45 @@ Evidence is `ctf7drop-floor/`; `hit-floor/` expands the positive suite to eight
 cases. Final qualification will use the corrected timer-replay implementation.
 Final-build long matches, catalog and controlled timing remain open.
 
+The `9a70f7b68` stage passes all eight hit/drop recovery cases and all ten
+established air-recovery outcomes (`hit-state/`, `air-state/`), with unchanged
+runtime hashes. Windows and Linux ASan/UBSan fixtures reject 45 restored bugs:
+22 decision, 19 geometry/timer and four hazard reversions. Policy and navigation/
+combat source checks pass. The renewed `long-state/` sweep completes all four
+maps. CTF3 finishes with 270.272 observed seconds, 33 kills and zero world deaths;
+DeadZone records 281.552 seconds, 65 kills and no world deaths. CTF5 retains
+seven world deaths in 280.048 seconds, with 79 kills; all seven pass the exact-state
+causal exclusion.
+DM8's raw report fails with eight world deaths and only 238.368 observed seconds
+against the required 270, with 80 kills. Seven deaths pass the causal exclusion;
+one remains recoverable. Duration remains an independent failure regardless
+of those outcomes. Shared-host timing is not
+qualified (DM8 mean think 2.747 ms; worst-window p95 28.75 ms).
+Together the matches record 505 completed traversals, four stuck events and no
+traversal timeouts, goal give-ups or no-route events. The `long-state/assessment.json`
+therefore remains failed: 15 raw deaths, 14 excluded impulses and one navigation
+death. It rechecks each stored exclusion against the current policy, including
+the requirement that the controller trial itself armed and died. A missing or
+unresolved controller now fails closed, even if all fixed-input trials died.
+
+The identical-stage `catalog-state/` sweep finishes all 33 variants, with 421
+kills and two CTF5 world deaths under causal review. Four runs miss the minimum
+40 simulated seconds: DM11 (37.296), DM10 (32.880), CTF8 (25.520) and Tourney1
+(22.768). Those raw duration failures are retained; shared-host contention does
+not waive the required exposure.
+
+The remaining DM8 death is Strauss's rocket hit at 115744, with 12 health and
+no armour. `strauss-state/` reproduces the controller's fatal slide after touching
+the raised ledge, while west-northwest input stops alive at 12 health.
+`strauss-floor/` confirms that this landing rests on the hull edge and lacks
+broad route support. Recovery now considers a separate flat-floor braking
+continuation: complete the collision frame, retain a shared floor patch and
+actual contacts through braking, and reject slippery floors, hazards, transport
+volumes and gaps. It prefers that surviving stop over an unproven first touch;
+voluntary traversal support remains unchanged. A native geometry case separates
+the two headings, and the positive hit suite includes the recorded state.
+Runtime qualification of this further correction remains open.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's
