@@ -528,7 +528,11 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   a video restart because old maps' purged images were reloaded. The
   [residency correction](vulkan-resource-profiling.md#restart-residency-failure-4-november-2026)
   keeps those handles lazy, preserves checked recovery and reports live image
-  slots. Native controls pass; corrected GPU tour qualification remains pending.
+  slots. Native controls pass on Windows and Linux. Corrected two-cycle tours
+  complete all 16 map stops on both NVIDIA and Intel, peak at 2,372 of 4,096
+  image slots, and report no Vulkan/validation warnings. Same-map allocation
+  and process-memory growth remains recorded; these bounded tours do not
+  establish long-session plateaus or promote an optimization.
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,

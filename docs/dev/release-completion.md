@@ -16,9 +16,10 @@ See [player release status](../user/release-status.md).
   unconverted. Stencil statistics now use the actual attachment dimensions.
 - Native regression controls pass on Windows and Linux. All 102 paired GL/Vulkan
   debug captures pass from 50% through 200% scale at 0x/4x/8x MSAA, with exact
-  reload/restart recovery. The corrected GPU map-tour qualification is in
-  progress; see [resource evidence](vulkan-resource-profiling.md) and
-  [capture evidence](vulkan-captures.md).
+  reload/restart recovery. Both NVIDIA and Intel complete the corrected
+  16-stop map tour with a peak of 2,372 resident images and no Vulkan validation
+  messages. Stock-content warnings and memory growth remain recorded; see
+  [resource evidence](vulkan-resource-profiling.md) and [capture evidence](vulkan-captures.md).
 
 ## Vulkan foreground qualification tooling, 4 November 2026
 

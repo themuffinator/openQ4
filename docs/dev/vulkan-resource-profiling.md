@@ -113,4 +113,34 @@ warnings are limited to one per continuous exhaustion episode, and
 `rendererVulkanMemoryInfo` now includes the resident image count and capacity.
 Native controls cover a 12,000-handle catalogue with only 2,401 referenced
 images, checked-recovery selection, all 4096 slots and warning recovery after a
-slot becomes available. A corrected stock-map repeat is still required.
+slot becomes available. These controls pass on Windows and Linux (WSL). The
+existing checked-recovery mutation controls and all 533 metadata checks also
+pass on Windows.
+
+The corrected clean `da0080eb` package completes two cycles of all eight maps
+on each local adapter, with 600 frames per stop and the same fifth-map restart.
+Both runs produce all 16 drawn engine captures, all 32 labelled residency
+samples, zero Vulkan warnings and zero validation messages. The staged package
+hashes are unchanged after testing.
+
+| Adapter | Duration | Peak image slots | Largest same-map allocation growth | Largest same-map process-memory growth |
+| --- | ---: | ---: | ---: | ---: |
+| RTX 4060 Laptop, 591.74 | 690.5 s | 2,372 / 4,096 | 7.22% | 6.70% |
+| Iris Xe, 101.5590 | 699.8 s | 2,372 / 4,096 | 7.22% | 15.73% |
+
+The failing restart now changes medlabs residency from 2,370 to 2,369 instead
+of filling the table. Every map's counts match between adapters. Counts increase
+between the first and second visits (airdefense1: 2,023 to 2,170), so this does
+not establish a long-session resource plateau. The shorter stops target the
+reproduced restart defect; concurrent functional testing and the offscreen
+workload provide no pacing or optimization claim.
+
+The qualification report and hash-checked `residency-proof.json` are retained
+under `.tmp/vk-roadmap/residency-fixed-tour/`. Both runs pass the bounded tour
+checks and retain 117 stock-content warnings (47 unique, identical normalized
+digest). These include unknown look joints, invalid reverb areas, uncached
+declarations and script/entity warnings. The missing `textures/proto/cap_lg`
+image is also present in the retained failed baseline. No warnings were removed
+or converted into general clean-startup qualification. The exact measured
+package is `runtime-da0080eb.zip`, SHA-256
+`daf52c9e2804fe3536233cf34ebdf6e33a7298b4804dcd2e182df0dc9d23467e`.
