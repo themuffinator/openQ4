@@ -327,7 +327,7 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   swapchain recovery is deferred to the main thread. Input-to-swap timing uses
   the completed frame's successful swap receipt rather than the asynchronous
   `EndFrame` return. The reference suite now fails on failed/missing reports
-  and missing refresh coverage, and records `--render-thread 0|1`. Executable
+  and missing refresh coverage, and records `--render-thread 0|1|2`. Executable
   tests exercise fast/slow completion, errors, restart, delayed timing receipts
   and acquire/present recovery. Windowed Vulkan SP/MP host/client and OpenGL SP
   checks pass with five successful flash receipts per role and no gameplay in
@@ -345,8 +345,10 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
   current-frame queries that must not retire, and fatality preservation. Test
   registration and the earlier swap-wrapper test fixtures are repaired too.
   See [submission evidence](presentation-owners.md#submitted-frame-ownership-4-november-2026).
-  These are correctness prerequisites; front-end overlap, the every-frame
-  Quality floor and physical reference qualification remain open.
+  Full front-end overlap is now available experimentally with
+  `r_vkRenderThread 2`; REN-07 records the ownership implementation and remaining
+  qualification. The every-frame Quality floor and physical reference
+  qualification remain open. See [overlap evidence](presentation-owners.md#full-front-end-overlap-4-november-2026).
   Progress: targets, budgets and the measurement procedure are declared in the
   [presentation owners contract](presentation-owners.md), with
   `presentation_look_runtime.py` for engine-side latency and smoothness; its
@@ -799,7 +801,7 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
       against controlled workers/drivers. `renderThreadStats` drains the frame
       before reporting/resetting, reports `completed`, and counts waits only
       when the backend was still busy. The prototype remains opt-in; physical
-      Wayland/macOS testing and stage-2 overlap are still unqualified.
+      Wayland/macOS testing and stage-2 performance remain unqualified.
     - **Remaining stage 1 limits.** Lazy image loads on first bind run on the
       render thread and invalidate the consumed-policy observation epoch, which costs cache
       receipts, not correctness.
@@ -835,71 +837,68 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
       updates are candidates, not yet shown. Repeat the pairs on a quiet machine
       or the reference desktop before relying on the median gain. Stage 2 is the
       lever for the floor. `r_vkRenderThread` stays 0.
-    - **Stage 2: overlap the front end too. Required to lift the steady
-      floor.** The 3 November audit found these hazards, each with its fix:
-      1. **Frame memory and the command chain.** Double-buffer `frameData`, as
-         idTech 4's SMP frame did, each half with its own deferred tri-surf
-         list. Backend `R_FrameAlloc` calls (shadow-caster
-         `R_CreatePackedSurfaceFrameCaches`, debug tools) move to the front end.
-      2. **Vertex cache.** Temp data is double-buffered, but the frame-temp
-         headers and the deferred static-free list are not; both need one list
-         per frame. Backend `Alloc`, `AllocFrameTemp` and `Touch` (shadow-caster
-         `R_CreateAmbientCache`, debug tools) move to the front end.
-      3. **Dynamic models.** Cached snapshots are rebuilt in place: verts,
-         `ambientCache`, the GPU-skinning palette, tangents and previous
-         positions. The backend also repairs deferred GPU-skinned surfaces in
-         place. Draw surfaces need frame copies, as BSE submit triangles
-         already have, and the repair moves to the front end. MD5R packed
-         shadow skinning reads `skinToModelTransforms`, which the front end
-         rewrites.
-      4. **Render world.** The backend reads `viewEntity::entityDef->parms`
-         (post-process filters, motion-history keys, MP outlines, bright skins
-         and rimlight). It also reads `viewLight::lightDef`: `parms`,
-         `frustumTris`, `index`, and the classification and projected-shadow
-         helpers. All of these become frame snapshots in `viewEntity_t` and
-         `viewLight_t`. The backend writes `shadowMapStencilFallbackSticky`;
-         that becomes a per-frame result the front end reads a frame late.
-         `FreeLightDef`'s `referencedFrameNum == tr.frameCount` test must also
-         cover the frame in flight. Entity, decal and effect-model frees defer
-         per frame.
-      5. **Frame identity — partially implemented, 4 November.** Both backends
-         latch `RC_SET_BUFFER` before preflight; partial command flushes retain
-         that identity. Vulkan shadow caches and `VK_ShadowMap_LightState`, GPU
-         timing/query retirement, readbacks and clustered generations now use
-         `backEnd.frameCount`. Classic domains validate deformation records
-         against the backend token; packet reconstruction selects the matching
-         front-end/backend token explicitly. `RC_DRAW_SPECIAL_EFFECTS` owns its
-         mask and parameters through GL/Vulkan consumption, removing the
-         controller setters' per-tic waits. `tr.primaryView`,
-         `tr.takingScreenshot` and `glConfig` still need per-frame copies;
-         effect resource lifetime and the Alpha Labs live-light walk remain
-         guarded. This does not yet permit overlapping front ends.
-      6. **Scene packets.** There is one global front-end packet frame, cleared
-         by `BeginFrame`, with shared lookup-slot tables. It needs one frame per
-         frame in flight.
-      7. **Temporal presentation.** `BeginFrame` rewrites the frame state while
-         the backend checks `frameNumber == backEnd.frameCount`, and both
-         threads bump the history generation. It needs per-frame state, with
-         the generation handed back a frame late.
-      8. **Shared caches and counters.** The material-program `nativeFamilies`
-         map is written by both threads. GPU-skinning statistics, the deferred
-         skinning counter, the metrics accumulators and `backEnd.pc` are written
-         by both. The front end reads the shadow resources' known-good state and
-         the moment atlas's failure size, which the backend writes.
-      9. **Resource creation in the backend.** Cinematic decode, lazy
-         `ActuallyLoadImage`, first-use `ScratchImage` and
-         `CreateRenderTexture`, `R_ValidateGLSLProgram`, light-grid
-         availability and area images, and `SetSamplerState` on shared images
-         all run there. Move them to the front end, or to the main thread at
-         hand-off.
-      10. **Errors — implemented, 4 November.** The two interaction failures
-          and two fatal shadow invariants now use `R_RenderThread_Error`.
-          A worker unwinds into a failure receipt; the main thread releases
-          ownership, retires the frame, then raises the original severity.
-          Inline execution preserves ordinary/fatal behavior. The production
-          worker test covers both severities, exactly-once collection and a
-          subsequent successful frame (fatal teardown is a controlled test
-          boundary).
+    - **Stage 2 prototype implemented, 4 November: `r_vkRenderThread 2`.**
+      The next front end builds while Vulkan records/presents the previous
+      frame. A single consumer remains in flight; the normal join moves to the
+      next `EndFrame`, after GUI/VR command assembly. Default remains **0**.
+      This implements overlap, not the HF-07 every-frame Quality budget.
+      The 3 November ownership audit is addressed as follows:
+      1. **Frame memory and commands.** Two arenas retain separate command
+         chains. A thread-local submitted-frame selector keeps defensive backend
+         allocations out of the producer arena. Large/aligned allocations are
+         checked; deferred ambient/interaction triangles retire in a combined
+         reference-count prepass, including shutdown.
+      2. **Vertex cache.** Two temp-header and deferred-free lists follow the
+         frame slots. Geometry caches and complete CPU skinning fallback are
+         prepared before submission. Defensive backend allocations use only
+         the submitted arena, without touching producer cache lists.
+      3. **Dynamic models.** Submitted geometry, cache headers and CPU bytes,
+         palettes, MD5R transforms and previous positions are copied. The
+         initial implementation also copies static streams; reducing that cost
+         needs measured, explicitly retained immutable storage.
+      4. **Render world.** Submitted entity/light definitions are snapshots.
+         Main-thread updates apply immediately in mode 2; mode 1 keeps ordered
+         queued updates. Sticky shadow failures return through checked light
+         receipts at retirement. World/model teardown still joins first.
+      5. **Frame identity.** Special-effect commands, primary view, screenshot
+         state and Vulkan display configuration belong to the submitted frame.
+         Backend history, query ages, shadow caches and deformation hashes use
+         that frame/view. A mode transition with an unsnapshotted queued view
+         runs inline.
+      6. **Scene packets.** Two packet frames and per-thread lookup/history
+         tables prevent next-frame clearing from changing submitted packets.
+         Front-end history seals at handoff, once per frame.
+      7. **Temporal presentation.** Frame state and reset receipts are per-slot.
+         Backend invalidations return to main-thread history at retirement.
+      8. **Caches and counters.** Native material-family/diagnostic caches and
+         skinning statistics are synchronized; metrics retain separate frame
+         accumulators and actual worker-finish timestamps. Shadow readiness is
+         published atomically. Renderer CVar changes join before mutation via
+         renderer API 31; unchanged assignments do not wait.
+      9. **Resources.** Submitted materials' static images/programs and usable
+         light-grid areas prepare at handoff. Name-only image lookups lock the
+         registry; sampler mutation, material reload/teardown and device changes
+         retain barriers.
+         Backend scratch targets and cinematic work retain exclusive access
+         through those barriers; their first-use cost is still a profiling
+         target. Captures, loading, checked image policy, locked surfaces and
+         the Alpha Labs live-light path retain synchronous ownership.
+      10. **Errors.** Recoverable/fatal worker failures retire exactly once on
+          the main thread before the original severity is raised.
+
+      `rendererFrameOwnershipSelfTest` mutates source streams/definitions and
+      checks submitted copies, aliases and poisoned non-finalized records.
+      Native tests exercise concurrent arenas, cache-slot retirement, shared
+      triangle retirement, two negative controls and 1,011 worker handoffs.
+      `renderThreadStats` reports both front ends started while busy and front
+      ends completed before the backend. Windowed SP and MP host/client runs
+      show both forms of overlap; OpenGL remains an inline control. See
+      [ownership and validation evidence](presentation-owners.md#full-front-end-overlap-4-november-2026).
+
+      **Still open:** quiet paired mode 0/1/2 performance measurements, snapshot
+      cost reduction, physical display/input qualification and Wayland/macOS
+      runtime coverage. Do not promote the default or claim the Quality floor
+      from shared-machine functional tests.
 - [ ] **REN-08 — P1, qualification and targeted implementation: complete post-
   processing combinations.** Qualify motion blur independently of TAA: it has its
   own history, limited rigid-opaque object vectors and subview/time-gap resets;

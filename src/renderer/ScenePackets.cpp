@@ -6,13 +6,20 @@
 #include "RendererBootstrap.h"
 #include "MaterialResourceTable.h"
 
-static idScenePacketFrame rg_frontEndScenePacketFrame;
-static bool rg_frontEndScenePacketFrameOpen = false;
+static idScenePacketFrame rg_scenePacketFrames[2];
+static bool rg_scenePacketFramesOpen[2];
+static bool rg_scenePacketHistoryCommitted[2];
+static const viewDef_t *rg_scenePacketLastViews[2];
+static int R_ScenePackets_FrameSlot() {
+	const frameData_t *frame = R_BackEndFrameData();
+	return frame != NULL ? frame->slot : 0;
+}
+
 // The front end emits RC_COPY_RENDER immediately after a capture-backed
 // subview's RC_DRAW_VIEW. Preserve that producer while assembling packet data;
 // tr.viewDef has already been restored to the parent when CaptureRenderToImage
 // queues its copy command.
-static const viewDef_t *rg_frontEndLastDrawView = NULL;
+
 
 typedef struct scenePacketTemporalInstanceHistory_s {
 	unsigned long long viewIdentity;
@@ -22,9 +29,9 @@ typedef struct scenePacketTemporalInstanceHistory_s {
 	float modelMatrix[16];
 } scenePacketTemporalInstanceHistory_t;
 
-static idList<scenePacketTemporalInstanceHistory_t>
+static thread_local idList<scenePacketTemporalInstanceHistory_t>
 	rg_scenePacketTemporalInstanceHistory;
-static idList<scenePacketTemporalInstanceHistory_t>
+static thread_local idList<scenePacketTemporalInstanceHistory_t>
 	rg_scenePacketTemporalNextInstanceHistory;
 
 // Hash acceleration for the (viewIdentity, entityIndex) history lookups.
@@ -33,11 +40,11 @@ static idList<scenePacketTemporalInstanceHistory_t>
 // touched from the runtime Find/Store/Commit paths, never from
 // idScenePacketFrame::Clear(), preserving the static-constructor constraint
 // documented above the lookup-slot table.
-static idHashIndex rg_scenePacketTemporalHistoryLookupA;
-static idHashIndex rg_scenePacketTemporalHistoryLookupB;
-static idHashIndex *rg_scenePacketTemporalHistoryLookup =
+static thread_local idHashIndex rg_scenePacketTemporalHistoryLookupA;
+static thread_local idHashIndex rg_scenePacketTemporalHistoryLookupB;
+static thread_local idHashIndex *rg_scenePacketTemporalHistoryLookup =
 	&rg_scenePacketTemporalHistoryLookupA;
-static idHashIndex *rg_scenePacketTemporalNextHistoryLookup =
+static thread_local idHashIndex *rg_scenePacketTemporalNextHistoryLookup =
 	&rg_scenePacketTemporalHistoryLookupB;
 
 static int R_ScenePackets_TemporalHistoryLookupKey(
@@ -68,7 +75,7 @@ static bool R_ScenePackets_FindTemporalInstanceHistory(
 				|| entry.historyGeneration != historyGeneration ) {
 			continue;
 		}
-		const unsigned int age = static_cast<unsigned int>( tr.frameCount )
+		const unsigned int age = static_cast<unsigned int>( R_RenderThread_OnRenderThread() ? backEnd.frameCount : tr.frameCount )
 			- static_cast<unsigned int>( entry.frameNumber );
 		if ( age == 0u || age > 2u ) {
 			return false;
@@ -103,7 +110,7 @@ static void R_ScenePackets_StoreTemporalInstanceHistory(
 		rg_scenePacketTemporalNextInstanceHistory.Alloc();
 	entry.viewIdentity = record.temporalViewIdentity;
 	entry.historyGeneration = record.temporalHistoryGeneration;
-	entry.frameNumber = tr.frameCount;
+	entry.frameNumber = R_RenderThread_OnRenderThread() ? backEnd.frameCount : tr.frameCount;
 	entry.entityIndex = record.entityIndex;
 	memcpy( entry.modelMatrix, record.modelMatrix, sizeof( entry.modelMatrix ) );
 	rg_scenePacketTemporalNextHistoryLookup->Add( lookupKey,
@@ -222,12 +229,12 @@ bool R_ScenePackets_SidePipelineRequired( void ) {
 // dirty wipe keeps the hash resets on the capture path only.
 // SCENE_PACKET_LOOKUP_SLOTS must stay a power of two for the steal mask.
 static const int SCENE_PACKET_LOOKUP_SLOTS = 4;
-static const idScenePacketFrame *rg_scenePacketLookupOwner[SCENE_PACKET_LOOKUP_SLOTS];
-static bool rg_scenePacketLookupDirty[SCENE_PACKET_LOOKUP_SLOTS];
-static int rg_scenePacketLookupNextSteal;
-static idHashIndex rg_scenePacketMaterialLookup[SCENE_PACKET_LOOKUP_SLOTS];
-static idHashIndex rg_scenePacketGeometryLookup[SCENE_PACKET_LOOKUP_SLOTS];
-static idHashIndex rg_scenePacketInstanceLookup[SCENE_PACKET_LOOKUP_SLOTS];
+static thread_local const idScenePacketFrame *rg_scenePacketLookupOwner[SCENE_PACKET_LOOKUP_SLOTS];
+static thread_local bool rg_scenePacketLookupDirty[SCENE_PACKET_LOOKUP_SLOTS];
+static thread_local int rg_scenePacketLookupNextSteal;
+static thread_local idHashIndex rg_scenePacketMaterialLookup[SCENE_PACKET_LOOKUP_SLOTS];
+static thread_local idHashIndex rg_scenePacketGeometryLookup[SCENE_PACKET_LOOKUP_SLOTS];
+static thread_local idHashIndex rg_scenePacketInstanceLookup[SCENE_PACKET_LOOKUP_SLOTS];
 
 static int R_ScenePackets_PointerLookupKey( const void *pointer ) {
 	const size_t address = reinterpret_cast<size_t>( pointer );
@@ -1820,36 +1827,45 @@ const char *GeometryResourceFallbackReason_Name( geometryResourceFallbackReason_
 }
 
 static void R_ScenePackets_EnsureFrontEndFrame( void ) {
-	if ( !rg_frontEndScenePacketFrameOpen ) {
-		rg_frontEndScenePacketFrame.Clear();
-		rg_frontEndScenePacketFrameOpen = true;
-		rg_frontEndLastDrawView = NULL;
+	if ( !rg_scenePacketFramesOpen[R_ScenePackets_FrameSlot()] ) {
+		rg_scenePacketFrames[R_ScenePackets_FrameSlot()].Clear();
+		rg_scenePacketFramesOpen[R_ScenePackets_FrameSlot()] = true;
+		rg_scenePacketHistoryCommitted[R_ScenePackets_FrameSlot()] = false;
+		rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;
 		R_ClassicDeformDomain_BeginPacketFrame(
 			R_ClassicDeformDomain_CurrentFrameToken() );
 	}
-	rg_frontEndScenePacketFrame.MarkFrontEndDerived();
+	rg_scenePacketFrames[R_ScenePackets_FrameSlot()].MarkFrontEndDerived();
 }
 
 void R_ScenePackets_BeginFrame( void ) {
-	rg_frontEndScenePacketFrame.Clear();
-	rg_frontEndScenePacketFrame.MarkFrontEndDerived();
-	rg_frontEndScenePacketFrameOpen = true;
-	rg_frontEndLastDrawView = NULL;
+	rg_scenePacketFrames[R_ScenePackets_FrameSlot()].Clear();
+	rg_scenePacketFrames[R_ScenePackets_FrameSlot()].MarkFrontEndDerived();
+	rg_scenePacketFramesOpen[R_ScenePackets_FrameSlot()] = true;
+	rg_scenePacketHistoryCommitted[R_ScenePackets_FrameSlot()] = false;
+	rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;
 	R_ClassicDeformDomain_BeginPacketFrame(
 		R_ClassicDeformDomain_CurrentFrameToken() );
 }
 
+void R_ScenePackets_SealFrame( void ) {
+	const int slot = R_ScenePackets_FrameSlot();
+	if ( rg_scenePacketFramesOpen[slot] && !rg_scenePacketHistoryCommitted[slot] ) {
+		R_ScenePackets_CommitTemporalInstanceHistory( rg_scenePacketFrames[slot] );
+		rg_scenePacketHistoryCommitted[slot] = true;
+	}
+}
+
 void R_ScenePackets_EndFrame( void ) {
-	if ( !rg_frontEndScenePacketFrameOpen ) {
+	if ( !rg_scenePacketFramesOpen[R_ScenePackets_FrameSlot()] ) {
 		// Frame was never opened (capture off): last operation was already a
 		// Clear() from the constructor or a prior EndFrame, nothing to do.
 		return;
 	}
-	R_ScenePackets_CommitTemporalInstanceHistory(
-		rg_frontEndScenePacketFrame );
-	rg_frontEndScenePacketFrame.Clear();
-	rg_frontEndScenePacketFrameOpen = false;
-	rg_frontEndLastDrawView = NULL;
+	R_ScenePackets_SealFrame();
+	rg_scenePacketFrames[R_ScenePackets_FrameSlot()].Clear();
+	rg_scenePacketFramesOpen[R_ScenePackets_FrameSlot()] = false;
+	rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;
 }
 
 typedef bool (*scenePacketDrawSurfFilter_t)( const viewDef_t *viewDef, const drawSurf_t *drawSurf );
@@ -2550,56 +2566,56 @@ static void R_ScenePackets_AddCommandPass( idScenePacketFrame &packetFrame, rend
 
 void R_ScenePackets_AddRenderView( const viewDef_t *viewDef ) {
 	R_ScenePackets_EnsureFrontEndFrame();
-	R_ScenePackets_AddDrawView( rg_frontEndScenePacketFrame, viewDef, false );
-	rg_frontEndLastDrawView = viewDef;
+	R_ScenePackets_AddDrawView( rg_scenePacketFrames[R_ScenePackets_FrameSlot()], viewDef, false );
+	rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = viewDef;
 }
 
 void R_ScenePackets_AddSpecialEffects( const viewDef_t *viewDef,
 		int specialEffectsMask ) {
 	R_ScenePackets_EnsureFrontEndFrame();
-	R_ScenePackets_AddCommandPass( rg_frontEndScenePacketFrame, RENDER_PASS_SPECIAL_EFFECTS, viewDef, false );
-	rg_frontEndScenePacketFrame.SetLastSceneSpecialEffectsMask(
+	R_ScenePackets_AddCommandPass( rg_scenePacketFrames[R_ScenePackets_FrameSlot()], RENDER_PASS_SPECIAL_EFFECTS, viewDef, false );
+	rg_scenePacketFrames[R_ScenePackets_FrameSlot()].SetLastSceneSpecialEffectsMask(
 		specialEffectsMask );
-	rg_frontEndLastDrawView = NULL;
+	rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;
 }
 
 void R_ScenePackets_AddRenderTargetOp( void ) {
 	R_ScenePackets_EnsureFrontEndFrame();
-	R_ScenePackets_AddCommandPass( rg_frontEndScenePacketFrame, RENDER_PASS_AUTHORED_POST, NULL, false );
-	rg_frontEndLastDrawView = NULL;
+	R_ScenePackets_AddCommandPass( rg_scenePacketFrames[R_ScenePackets_FrameSlot()], RENDER_PASS_AUTHORED_POST, NULL, false );
+	rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;
 }
 
 void R_ScenePackets_AddCopyRender( idImage *image, int x, int y,
 		int width, int height, int cubeFace, bool copyDepth ) {
 	R_ScenePackets_EnsureFrontEndFrame();
-	R_ScenePackets_AddCommandPass( rg_frontEndScenePacketFrame, RENDER_PASS_AUTHORED_POST, NULL, false );
-	if ( rg_frontEndLastDrawView != NULL && rg_frontEndLastDrawView->isSubview ) {
-		rg_frontEndScenePacketFrame.AddSubviewCapture( rg_frontEndLastDrawView,
+	R_ScenePackets_AddCommandPass( rg_scenePacketFrames[R_ScenePackets_FrameSlot()], RENDER_PASS_AUTHORED_POST, NULL, false );
+	if ( rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] != NULL && rg_scenePacketLastViews[R_ScenePackets_FrameSlot()]->isSubview ) {
+		rg_scenePacketFrames[R_ScenePackets_FrameSlot()].AddSubviewCapture( rg_scenePacketLastViews[R_ScenePackets_FrameSlot()],
 			image, x, y, width, height, cubeFace, copyDepth );
 	}
 	// A capture can belong to exactly one immediately preceding subview draw.
-	rg_frontEndLastDrawView = NULL;
+	rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;
 }
 
 void R_ScenePackets_AddPresent( void ) {
 	R_ScenePackets_EnsureFrontEndFrame();
-	R_ScenePackets_AddCommandPass( rg_frontEndScenePacketFrame, RENDER_PASS_PRESENT, NULL, false );
-	rg_frontEndLastDrawView = NULL;
+	R_ScenePackets_AddCommandPass( rg_scenePacketFrames[R_ScenePackets_FrameSlot()], RENDER_PASS_PRESENT, NULL, false );
+	rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;
 }
 
 void R_ScenePackets_AddCommandOnly( void ) {
 	R_ScenePackets_EnsureFrontEndFrame();
-	rg_frontEndScenePacketFrame.AddCommandPacket();
-	rg_frontEndLastDrawView = NULL;
+	rg_scenePacketFrames[R_ScenePackets_FrameSlot()].AddCommandPacket();
+	rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;
 }
 
 const idScenePacketFrame &R_ScenePackets_FrontEndFrame( void ) {
-	return rg_frontEndScenePacketFrame;
+	return rg_scenePacketFrames[R_ScenePackets_FrameSlot()];
 }
 
 bool R_ScenePackets_FrontEndFrameAvailable( void ) {
-	const scenePacketFrameStats_t &stats = rg_frontEndScenePacketFrame.Stats();
-	return rg_frontEndScenePacketFrameOpen
+	const scenePacketFrameStats_t &stats = rg_scenePacketFrames[R_ScenePackets_FrameSlot()].Stats();
+	return rg_scenePacketFramesOpen[R_ScenePackets_FrameSlot()]
 		&& stats.frontEndDerived
 		&& ( stats.scenePackets > 0 || stats.passPackets > 0 || stats.drawPackets > 0 || stats.commandPackets > 0 );
 }
@@ -2609,7 +2625,7 @@ bool R_ScenePackets_BuildTemporalViewMotionPolicy( const viewDef_t *viewDef,
 		temporalViewMotionPolicy_t &policy, bool perPixelOwnership ) {
 	policy = TemporalHistoryCore_BeginViewMotionPolicy();
 	return R_ScenePackets_FrontEndFrameAvailable()
-		&& rg_frontEndScenePacketFrame.BuildTemporalViewMotionPolicy( viewDef,
+		&& rg_scenePacketFrames[R_ScenePackets_FrameSlot()].BuildTemporalViewMotionPolicy( viewDef,
 			backendExactMotionDomainMask, policy, perPixelOwnership );
 }
 

@@ -124,6 +124,7 @@ private:
 	void			ActuallyFree( vertCache_t *block );
 	void			ReclaimHeaderList( vertCache_t *list );
 	void			ReclaimAllHeaders();
+	void			RetireFrame( int slot );
 
 	static idCVar	r_showVertexCache;
 	static idCVar	r_vertexBufferMegs;
@@ -152,8 +153,8 @@ private:
 
 	vertCache_t		freeStaticHeaders;		// head of doubly linked list
 	vertCache_t		freeDynamicHeaders;		// head of doubly linked list
-	vertCache_t		dynamicHeaders;			// head of doubly linked list
-	vertCache_t		deferredFreeList;		// head of doubly linked list
+	vertCache_t		dynamicHeaders[NUM_VERTEX_FRAMES];			// head of doubly linked list
+	vertCache_t		deferredFreeList[NUM_VERTEX_FRAMES];		// head of doubly linked list
 	vertCache_t		staticHeaders;			// head of doubly linked list in MRU order,
 											// staticHeaders.next is most recently used
 

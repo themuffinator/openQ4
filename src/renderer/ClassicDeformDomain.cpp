@@ -12,7 +12,11 @@ namespace {
 const std::uint64_t HASH_OFFSET = 1469598103934665603ull;
 const std::uint64_t HASH_PRIME = 1099511628211ull;
 const std::uint32_t CONTRACT_HASH_VERSION = 1u;
-static classicDeformDomainStats_t packetStats;
+static classicDeformDomainStats_t packetStatsFrames[2];
+static classicDeformDomainStats_t &FramePacketStats() {
+	const frameData_t *frame = R_BackEndFrameData();
+	return packetStatsFrames[frame != NULL ? frame->slot : 0];
+}
 
 static void HashByte( std::uint64_t &hash, unsigned int value ) {
 	hash ^= value & 0xffu;
@@ -284,6 +288,7 @@ static bool EmptyOutputProvable( const classicDeformRecord_t &record ) {
 
 static std::uint64_t CaptureInputSemanticHash( const drawSurf_t *drawSurf ) {
 	std::uint64_t hash = HASH_OFFSET;
+	const viewDef_t *view = R_RenderThread_OnRenderThread() ? backEnd.viewDef : tr.viewDef;
 	if ( drawSurf != NULL && drawSurf->space != NULL ) {
 		for ( int i = 0; i < 16; ++i ) {
 			HashFloat( hash, drawSurf->space->modelMatrix[ i ] );
@@ -291,17 +296,17 @@ static std::uint64_t CaptureInputSemanticHash( const drawSurf_t *drawSurf ) {
 	} else {
 		HashByte( hash, 0u );
 	}
-	if ( tr.viewDef != NULL ) {
+	if ( view != NULL ) {
 		for ( int i = 0; i < 3; ++i ) {
-			HashFloat( hash, tr.viewDef->renderView.vieworg[ i ] );
+			HashFloat( hash, view->renderView.vieworg[ i ] );
 		}
 		for ( int axis = 0; axis < 3; ++axis ) {
 			for ( int component = 0; component < 3; ++component ) {
 				HashFloat( hash,
-					tr.viewDef->renderView.viewaxis[ axis ][ component ] );
+					view->renderView.viewaxis[ axis ][ component ] );
 			}
 		}
-		HashBool( hash, tr.viewDef->isMirror );
+		HashBool( hash, view->isMirror );
 	} else {
 		HashByte( hash, 0u );
 	}
@@ -695,62 +700,62 @@ bool R_ClassicDeformDomain_IsFailClosed(
 }
 
 void R_ClassicDeformDomain_BeginPacketFrame( std::uint64_t frameToken ) {
-	std::memset( &packetStats, 0, sizeof( packetStats ) );
-	packetStats.frameToken = frameToken != 0
+	std::memset( &FramePacketStats(), 0, sizeof( FramePacketStats() ) );
+	FramePacketStats().frameToken = frameToken != 0
 		? frameToken : R_ClassicDeformDomain_CurrentFrameToken();
 }
 
 void R_ClassicDeformDomain_RecordPacket(
 		const classicDeformRecord_t &record ) {
-	if ( packetStats.frameToken == 0
-			|| packetStats.frameToken != record.frameToken ) {
+	if ( FramePacketStats().frameToken == 0
+			|| FramePacketStats().frameToken != record.frameToken ) {
 		R_ClassicDeformDomain_BeginPacketFrame( record.frameToken );
 	}
-	packetStats.records++;
-	if ( packetStats.hash == 0 ) {
-		packetStats.hash = HASH_OFFSET;
+	FramePacketStats().records++;
+	if ( FramePacketStats().hash == 0 ) {
+		FramePacketStats().hash = HASH_OFFSET;
 	}
 	const bool valid = R_ClassicDeformDomain_ValidateRecordForFrame(
-		record, packetStats.frameToken );
-	HashBool( packetStats.hash, valid );
-	HashInt( packetStats.hash, record.role );
-	HashInt( packetStats.hash, record.outcome );
-	HashU64( packetStats.hash, record.semanticHash );
+		record, FramePacketStats().frameToken );
+	HashBool( FramePacketStats().hash, valid );
+	HashInt( FramePacketStats().hash, record.role );
+	HashInt( FramePacketStats().hash, record.outcome );
+	HashU64( FramePacketStats().hash, record.semanticHash );
 	if ( !valid ) {
-		packetStats.invalid++;
+		FramePacketStats().invalid++;
 		return;
 	}
 	switch ( record.outcome ) {
 	case CLASSIC_DEFORM_OUTCOME_NONE:
-		packetStats.none++;
+		FramePacketStats().none++;
 		break;
 	case CLASSIC_DEFORM_OUTCOME_NOT_APPLICABLE:
-		packetStats.notApplicable++;
+		FramePacketStats().notApplicable++;
 		break;
 	case CLASSIC_DEFORM_OUTCOME_COMPLETED:
-		packetStats.completed++;
+		FramePacketStats().completed++;
 		break;
 	case CLASSIC_DEFORM_OUTCOME_EMPTY:
-		packetStats.empty++;
+		FramePacketStats().empty++;
 		break;
 	case CLASSIC_DEFORM_OUTCOME_SKIPPED:
-		packetStats.skipped++;
+		FramePacketStats().skipped++;
 		break;
 	case CLASSIC_DEFORM_OUTCOME_FAILED:
-		packetStats.failed++;
+		FramePacketStats().failed++;
 		break;
 	case CLASSIC_DEFORM_OUTCOME_UNSUPPORTED:
-		packetStats.unsupported++;
+		FramePacketStats().unsupported++;
 		break;
 	case CLASSIC_DEFORM_OUTCOME_COUNT:
 	default:
-		packetStats.invalid++;
+		FramePacketStats().invalid++;
 		break;
 	}
 }
 
 const classicDeformDomainStats_t &R_ClassicDeformDomain_Stats( void ) {
-	return packetStats;
+	return FramePacketStats();
 }
 
 const char *ClassicDeformRole_Name( classicDeformRole_t role ) {
@@ -1032,4 +1037,12 @@ bool RendererClassicDeformDomain_RunSelfTest( void ) {
 	unsupported.valid = true;
 	return R_ClassicDeformDomain_ValidateRecord( unsupported )
 		&& R_ClassicDeformDomain_IsFailClosed( unsupported );
+}
+
+void R_ClassicDeformDomain_RebaseFrameCopy( classicDeformRecord_t &record,
+		const srfTriangles_t *source, const srfTriangles_t *result ) {
+	if ( !record.initialized || !record.valid ) return;
+	CaptureGeometryState( source, record.sourceGeometry );
+	CaptureGeometryState( result, record.resultGeometry );
+	SealRecord( record );
 }

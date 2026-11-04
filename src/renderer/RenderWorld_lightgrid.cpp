@@ -2694,6 +2694,9 @@ bool idRenderWorldLocal::EnsureLightGridAreaImages( int areaIndex ) {
 	}
 
 	LightGrid &lightGrid = portalAreas[areaIndex].lightGrid;
+	if ( R_RenderThread_OnRenderThread() && R_RenderThread_FrontEndMayOverlap() ) {
+		return lightGrid.irradianceImage != NULL && lightGrid.irradianceImage->IsLoaded() && !lightGrid.irradianceImage->IsDefaulted();
+	}
 	const int start = Sys_Milliseconds();
 	bool materializedPackedImage = false;
 
@@ -3093,6 +3096,9 @@ the light-grid indirect pass setup.
 ===================
 */
 bool idRenderWorldLocal::AnyLightGridAvailable() {
+	if ( R_RenderThread_OnRenderThread() && R_RenderThread_FrontEndMayOverlap() ) {
+		return backEnd.viewDef != NULL && backEnd.viewDef->renderWorld == this && backEnd.viewDef->lightGridAvailable;
+	}
 	if ( lightGridAvailabilityFrame == tr.frameCount ) {
 		return anyLightGridAvailable;
 	}

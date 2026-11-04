@@ -10,6 +10,7 @@
 #include "vk_MaterialPrograms.h"
 #include "vk_MaterialSourceSignatures.h"
 #include <map>
+#include <mutex>
 #include <memory>
 #include <set>
 #include <string>
@@ -51,8 +52,10 @@ std::vector<std::unique_ptr<Program>> programs;
 // re-read on every draw.
 std::map<std::string, int> currentPrograms;
 std::map<std::string, uint64_t> rejectedKeys;
+std::mutex nativeFamilyMutex;
 std::map<std::string, vkGLSLProgramFamily_t> nativeFamilies;
 std::map<std::string, bool> arbTranslatable;
+std::mutex diagnosticMutex;
 std::set<std::string> diagnostics;
 int suppressedDiagnostics = 0;
 int capacityRejections = 0;
@@ -91,6 +94,7 @@ const char *Kind( const Program &program ) { return program.arb ? "ARB" : "GLSL"
 
 // One line per distinct subject/reason pair until the next reload.
 bool Report( const std::string &subject, const std::string &reason ) {
+    std::lock_guard<std::mutex> lock( diagnosticMutex );
     const std::string key = subject + "\n" + reason;
     if ( diagnostics.count( key ) != 0 ) { return false; }
     if ( diagnostics.size() >= MaxDiagnostics ) {
@@ -405,6 +409,7 @@ VkDescriptorPool DrawPool( int slot ) {
 } // namespace
 
 vkGLSLProgramFamily_t VK_MaterialPrograms_NativeFamily( const char *program ) {
+    std::lock_guard<std::mutex> lock( nativeFamilyMutex );
     if ( program == NULL ) { return VK_GLSL_PROGRAM_FAMILY_UNKNOWN; }
     const auto cached = nativeFamilies.find( program );
     if ( cached != nativeFamilies.end() ) { return cached->second; }
@@ -473,6 +478,7 @@ bool VK_MaterialPrograms_ReportOnce( const char *subject, const char *reason ) {
 }
 
 void VK_MaterialPrograms_Reload() {
+    R_RenderThread_Sync( "material program reload" );
     currentPrograms.clear();
     rejectedKeys.clear();
     nativeFamilies.clear();

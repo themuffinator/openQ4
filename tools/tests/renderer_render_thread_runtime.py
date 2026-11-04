@@ -24,13 +24,31 @@ SUPPORT = r'''
 #include <string>
 #include <thread>
 #include <vector>
-enum { CVAR_RENDERER=1, CVAR_BOOL=2, CMD_FL_RENDERER=4 };
+enum { CVAR_RENDERER=1, CVAR_BOOL=2, CVAR_INTEGER=8, CMD_FL_RENDERER=4 };
 struct idCVar {
-    bool value=false;
-    idCVar(const char*,const char*,int,const char*){}
-    bool GetBool() const { return value; }
+    int value=0;
+    idCVar(const char*,const char*,int,const char*,int=0,int=0){}
+    bool GetBool() const { return value!=0; }
+    int GetInteger() const { return value; }
 };
 idCVar r_skipBackEnd("","",0,"");
+idCVar r_lockSurfaces("","",0,"");
+struct frameData_t { int slot=0; int payload=42; };
+static frameData_t arena[2];
+static frameData_t* frameData=&arena[0];
+static thread_local frameData_t* selectedFrame=nullptr;
+static void R_SetBackEndFrameData(frameData_t* frame){selectedFrame=frame;}
+static void R_CountFrameData(){}
+bool R_RenderThread_InFlight();
+static void R_FreeDeferredFrameSurfaces(){assert(!R_RenderThread_InFlight());}
+static void R_TemporalPresentation_SubmitFrame(){}
+static void R_RendererMetrics_MarkBackEndFinished(){}
+struct glconfig_t { int width=1280; };
+static thread_local glconfig_t glConfig;
+struct viewDef_t { int identity; };
+static viewDef_t primary{12},replacement{34};
+struct {int postProcessTexelSize=0,postProcessSourceColorSpace=0,postProcessSMAAQuality=0;} backEnd;
+
 struct idStr : std::string {
     using std::string::string;
     void Clear(){clear();}
@@ -79,6 +97,9 @@ bool R_RenderThread_InFlight();
 bool R_RenderThread_OnRenderThread();
 void R_RenderThread_Sync(const char*);
 struct RenderSystem {
+    viewDef_t* primaryView=&primary;
+    bool takingScreenshot=false;
+    int postProcessTexelSize=1,postProcessSourceColorSpace=2,postProcessSMAAQuality=3;
     void CompleteBackEndFrame(){
         assert(std::this_thread::get_id()==mainId);
         assert(!R_RenderThread_InFlight());
@@ -90,6 +111,9 @@ static std::mutex backendMutex;
 static std::condition_variable backendWake;
 static bool backendEntered=false,backendReleased=false;
 static std::atomic<int> executed{0};
+static bool verifyOverlap=false;
+viewDef_t* R_SubmittedPrimaryView();
+bool R_SubmittedTakingScreenshot();
 void RB_ExecuteBackEndCommands(const emptyCommand_t* cmd){
     assert(R_RenderThread_OnRenderThread());
     R_RenderThread_Sync("worker never waits on itself");
@@ -100,6 +124,11 @@ void RB_ExecuteBackEndCommands(const emptyCommand_t* cmd){
         backendWake.wait(lock,[]{return backendReleased;});
     }
     assert(cmd->serial==++executed);
+    if(verifyOverlap){
+        assert(selectedFrame==&arena[0] && selectedFrame->payload==42);
+        assert(glConfig.width==1280);
+        assert(R_SubmittedPrimaryView()==&primary && !R_SubmittedTakingScreenshot());
+    }
     if(cmd->fail==1)throw idException("backend failed before sync");
     if(cmd->fail>=2)R_RenderThread_Error("recording invariant",cmd->fail==3);
 }
@@ -227,6 +256,34 @@ int main(){
     }
     cmd={1009,0};assert(R_RenderThread_Begin(&cmd));WorkerFinished();
     R_RenderThread_Shutdown();assert(completed==1009 && !rt_thread.joinable());
+    // Hold the production consumer while the next producer changes its frame,
+    // display state and primary view. Front-end entries must return without
+    // waiting, while a resource barrier must still collect the old frame.
+    r_vkRenderThread.value=2;verifyOverlap=true;ResetBackend(false);
+    cmd={1010,0};assert(R_RenderThread_Begin(&cmd));
+    {
+        std::unique_lock<std::mutex> lock(backendMutex);
+        assert(backendWake.wait_for(lock,std::chrono::seconds(5),[]{return backendEntered;}));
+    }
+    R_RenderThread_SyncFrontEnd("frame");
+    frameData=&arena[1];frameData->payload=77;glConfig.width=1920;
+    tr.primaryView=&replacement;tr.takingScreenshot=true;
+    R_RenderThread_SyncFrontEnd("frame memory");
+    R_RenderThread_SyncFrontEnd("dynamic model");
+    assert(R_RenderThread_InFlight() && completed==1009 && rt_frontEndsOverlapped==1);
+    assert(R_SubmittedPrimaryView()==&replacement && R_SubmittedTakingScreenshot());
+    // Cvar changes affect future submissions, never ownership of this one.
+    r_vkRenderThread.value=0;
+    assert(R_RenderThread_FrontEndMayOverlap());
+    {std::lock_guard<std::mutex> lock(backendMutex);backendReleased=true;backendWake.notify_all();}
+    R_RenderThread_Sync("image mutation");
+    assert(completed==1010 && !R_RenderThread_FrontEndMayOverlap() && selectedFrame==nullptr);
+    R_RenderThread_Shutdown();
+    r_vkRenderThread.value=1;verifyOverlap=false;ResetBackend(true);
+    cmd={1011,0};assert(R_RenderThread_Begin(&cmd));WorkerFinished();
+    RGM_SyncConfiguration();
+    assert(completed==1011 && !R_RenderThread_InFlight());
+    R_RenderThread_Shutdown();
     // Inline rendering uses the same severity without creating a worker receipt.
     for(bool fatal : {false,true}){
         const int before=fatal?fatals:drops;
@@ -247,6 +304,8 @@ def main():
     source += WORLD_SUPPORT + function_body(world, "void idRenderWorldLocal::FreeDefs(")
     debug = (ROOT / "src/renderer/tr_rendertools.cpp").read_text(encoding="utf-8")
     source += function_body(debug, "void RB_ClearDebugText(")
+    module = (ROOT / "src/renderer/RendererGLModule.cpp").read_text(encoding="utf-8")
+    source += function_body(module, "static void RGM_SyncConfiguration(")
     compiler = next((p for name in ("clang++", "g++", "c++") if (p := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError("a C++ compiler is required")

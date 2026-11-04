@@ -709,6 +709,26 @@ seta r_msaaAlphaToCoverage 1
 vid_restart
 ```
 
+## Experimental Vulkan overlap
+
+Development builds provide three `r_vkRenderThread` modes:
+
+| Value | Behavior |
+| --- | --- |
+| `0` | Default: render on the main thread. |
+| `1` | Draw the previous frame while running the next game tic. |
+| `2` | Also prepare the next frame while drawing the previous one. |
+
+Use `r_vkRenderThread 2` in the console to try full overlap, and
+`r_vkRenderThread 0` to return to the default. `renderThreadStats` reports
+submitted/completed frames and how often front ends started or finished while
+the backend was busy. Captures and resource changes still wait when needed.
+
+Mode 2 is experimental: its geometry copies add CPU and memory cost, and a
+performance improvement has not been qualified. Install matching engine and
+renderer modules from the same build (renderer API 31). OpenGL remains
+synchronous. See the [qualification record](../dev/presentation-owners.md#full-front-end-overlap-4-november-2026).
+
 ## Troubleshooting
 
 - If a display change does not apply, run `vid_restart`.

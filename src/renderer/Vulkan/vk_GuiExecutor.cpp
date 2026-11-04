@@ -4829,7 +4829,7 @@ static const viewDef_t *VK_TemporalPresentation_RootForView(
 	}
 
 	if ( ( viewDef->renderFlags & RF_PORTAL_SKY ) != 0 ) {
-		const viewDef_t *rootView = tr.primaryView;
+		const viewDef_t *rootView = R_SubmittedPrimaryView();
 		return rootView != viewDef
 			&& VK_TemporalPresentation_IsMainSceneView( rootView )
 			&& VK_TemporalPresentation_ViewMatchesRoot( viewDef, rootView )
@@ -5175,7 +5175,7 @@ static void VK_TemporalPresentation_ObserveHistoryAndCapture( void ) {
 		vkExec.temporalDirectHistoryFrame = -1;
 		vkExec.temporalDepthStampValid = false;
 	}
-	if ( tr.takingScreenshot
+	if ( R_SubmittedTakingScreenshot()
 			&& vkExec.temporalCaptureInvalidatedFrame != backEnd.frameCount ) {
 		R_TemporalPresentation_MarkCurrentFrameCapture(
 			"Vulkan execution-time capture" );
@@ -5477,7 +5477,7 @@ static bool VK_TemporalPresentation_ResolvePendingSceneTemporal(
 		const viewDef_t *viewDef ) {
 	const temporalPresentationFrameState_t &presentation =
 		R_TemporalPresentation_GetFrameState();
-	const bool captureFrame = tr.takingScreenshot
+	const bool captureFrame = R_SubmittedTakingScreenshot()
 		|| presentation.captureFrozen || presentation.captureForcedNative
 		|| ( viewDef != NULL && viewDef->temporalCaptureFrame );
 	if ( viewDef == NULL || !presentation.temporalAARequested || captureFrame ) {
@@ -7242,12 +7242,12 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 	const int submittedSlot = vkExec.frameSlot;
 	// CaptureRenderToFile deliberately calls R_IssueRenderCommands with
-	// tr.takingScreenshot set so the GL backend leaves this crop in the back
+	// R_SubmittedTakingScreenshot() set so the GL backend leaves this crop in the back
 	// buffer for the real frame to replace. Presenting here exposes the
 	// save-preview crop (normally 320x240) for one frame. Submit it only for
 	// the synchronous readback, then resume recording against this acquired
 	// swapchain image for the actual frame.
-	const bool resumeAfterReadback = tr.takingScreenshot;
+	const bool resumeAfterReadback = R_SubmittedTakingScreenshot();
 	R_RendererMetrics_ResetGpuFrameTiming( "Vulkan synchronous screenshot readback" );
 	if ( !VK_GuiExecutor_SubmitFrame( !resumeAfterReadback ) ) {
 		// Submit may have succeeded before present failed; device loss also
@@ -9329,7 +9329,7 @@ static void VK_TemporalPresentation_InvalidateAcceptedNoWrite(
 	// is a successful current-frame resolve, not a temporal discontinuity; do
 	// not churn the shared history generation once per frame while a leaf is on.
 	if ( !command.presentation.temporalAARequested
-			|| command.captureFrame || tr.takingScreenshot
+			|| command.captureFrame || R_SubmittedTakingScreenshot()
 			|| command.historyGeneration
 				!= R_TemporalPresentation_HistoryGeneration() ) {
 		return;
@@ -9346,7 +9346,7 @@ static bool VK_TemporalPresentation_ResolveTargets(
 		*historyAdvanced = false;
 	}
 	resolveTemporalPresentationCommand_t command = sourceCommand;
-	if ( tr.takingScreenshot ) {
+	if ( R_SubmittedTakingScreenshot() ) {
 		command.captureFrame = true;
 		command.historyValid = false;
 	}
@@ -14989,6 +14989,7 @@ void R_BackendGpuSkinning_Shutdown( void ) {
 bool R_BackendGpuSkinning_PrepareAmbientCache( srfTriangles_t *tri,
 		bool needsLighting ) {
 	(void)needsLighting;
+	if ( R_RenderThread_OverlapRequested() ) return false;
 	if ( !vkExec.initialized ) {
 		return false;
 	}

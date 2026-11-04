@@ -8,13 +8,16 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <mutex>
 
 namespace {
+	std::recursive_mutex rg_gpuSkinningStatsMutex;
 	gpuSkinningStats_t rg_gpuSkinningStats;
 	uint32 rg_gpuSkinningGeneration = 1;
 	bool rg_gpuSkinningInitialized = false;
 
 	static ID_INLINE void R_GpuSkinning_SaturatingAdd( uint64 &value, uint64 amount ) {
+		std::lock_guard<std::recursive_mutex> lock( rg_gpuSkinningStatsMutex );
 		const uint64 maxValue = ~static_cast<uint64>( 0 );
 		value = amount > maxValue - value ? maxValue : value + amount;
 	}
@@ -378,7 +381,10 @@ void R_GpuSkinning_RecordBackendPrepared( int numVerts, int numJoints,
 }
 
 const gpuSkinningStats_t &R_GpuSkinning_GetStats( void ) {
-	return rg_gpuSkinningStats;
+	std::lock_guard<std::recursive_mutex> lock( rg_gpuSkinningStatsMutex );
+	static thread_local gpuSkinningStats_t snapshot;
+	snapshot = rg_gpuSkinningStats;
+	return snapshot;
 }
 
 void R_GpuSkinning_ContractInit( const renderBackendCaps_t &caps ) {
@@ -428,6 +434,7 @@ bool R_GpuSkinning_PrepareAmbientCache( srfTriangles_s *tri, bool needsLighting 
 }
 
 void R_GpuSkinning_PrintGfxInfo( void ) {
+	std::lock_guard<std::recursive_mutex> lock( rg_gpuSkinningStatsMutex );
 	common->Printf(
 		"GPU skinning: enabled=%d generation=%u packed=%llu exact=%llu attempts=%llu admitted=%llu prepared=%llu cpuSkinVerts=%llu cpuSkinUs=%llu positionOnlyVerts=%llu positionOnlyUs=%llu preparedVertices=%llu paletteUploads=%llu paletteJoints=%llu paletteBytes=%llu cumulative=1\n",
 		r_gpuSkinning.GetBool() ? 1 : 0, rg_gpuSkinningGeneration,

@@ -103,3 +103,5 @@ void R_RendererMetrics_RecordGpuFrameTimingUnavailable( void );
 void R_RendererMetrics_RecordGpuFrameTimingDropped( void );
 
 #endif /* !__RENDERER_METRICS_H__ */
+
+void R_RendererMetrics_MarkBackEndFinished( void );

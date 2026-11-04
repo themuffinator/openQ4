@@ -2,6 +2,8 @@
 //
 
 #include "tr_local.h"
+#include <mutex>
+static std::recursive_mutex rendererMetricsMutex;
 #include "RendererBenchmarks.h"
 #include "RendererMetrics.h"
 #include "RendererUpload.h"
@@ -684,7 +686,14 @@ typedef struct rendererGLStateCacheLatest_s {
 	glStateCacheStats_t stats;
 } rendererGLStateCacheLatest_t;
 
-static rendererMetricsFrame_t rg_rendererMetrics;
+static rendererMetricsFrame_t rg_rendererMetricFrames[2];
+static int R_RendererMetrics_FrameSlot() {
+	const frameData_t *frame = R_BackEndFrameData();
+	return frame != NULL ? frame->slot : 0;
+}
+static rendererMetricsFrame_t &R_RendererMetrics_CurrentFrame() {
+	return rg_rendererMetricFrames[R_RendererMetrics_FrameSlot()];
+}
 static int rg_rendererMetricsLastSummaryFrame = -1;
 static rendererGpuTimerFrame_t rg_gpuTimerFrames[4];
 static rendererGpuTimerLatest_t rg_gpuTimerLatest;
@@ -718,27 +727,36 @@ unsigned long long R_RendererMetrics_CpuClock( void ) {
 }
 
 void R_RendererMetrics_EndPresentPhase( rendererPresentCpuPhase_t phase, unsigned long long begin ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( begin == 0 || phase < 0 || phase >= RENDERER_PRESENT_CPU_PHASE_COUNT ) { return; }
 	const unsigned long long end = R_RendererMetrics_CpuClock();
 	if ( end >= begin ) { rg_rendererMetrics.presentPhaseMicroseconds[phase] += end - begin; }
 }
 
 void R_RendererMetrics_EndWaitPhase( rendererWaitCpuPhase_t phase, unsigned long long begin ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( begin == 0 || phase < 0 || phase >= RENDERER_WAIT_CPU_PHASE_COUNT ) { return; }
 	const unsigned long long end = R_RendererMetrics_CpuClock();
 	if ( end >= begin ) { rg_rendererMetrics.waitPhaseMicroseconds[phase] += end - begin; }
 }
 
 void R_RendererMetrics_EndUploadRetirement( unsigned long long begin ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( begin == 0 ) { return; }
 	const unsigned long long end = R_RendererMetrics_CpuClock();
 	if ( end >= begin ) { rg_rendererMetrics.uploadRetireMicroseconds += end - begin; }
 }
 
-static rendererCpuFrameClock_t::time_point rg_cpuFrameBeginTime;
-static rendererCpuFrameClock_t::time_point rg_frameSubmitBeginTime;
-static bool rg_frameSubmitBeginValid = false;
-static bool rg_cpuFrameBeginValid = false;
+static rendererCpuFrameClock_t::time_point rg_cpuFrameBeginTimeSlots[2];
+static rendererCpuFrameClock_t::time_point rg_frameSubmitBeginTimeSlots[2];
+static bool rg_frameSubmitBeginValidSlots[2];
+static bool rg_cpuFrameBeginValidSlots[2];
+static rendererCpuFrameClock_t::time_point rg_backendFinishTimes[2];
+static bool rg_backendFinishValid[2];
+static rendererUploadStats_t rg_frameUploadStats[2];
 static bool rg_rendererMetricsCaptureEnabledLastFrame = false;
 
 static void R_RendererMetrics_EnsureGpuFrameTimingInitialized( void ) {
@@ -750,37 +768,44 @@ static void R_RendererMetrics_EnsureGpuFrameTimingInitialized( void ) {
 }
 
 void R_RendererMetrics_MarkCpuFrameBegin( void ) {
-	rg_cpuFrameBeginTime = rendererCpuFrameClock_t::now();
-	rg_cpuFrameBeginValid = true;
-	rg_frameSubmitBeginValid = false;
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rg_cpuFrameBeginTimeSlots[R_RendererMetrics_FrameSlot()] = rendererCpuFrameClock_t::now();
+	rg_cpuFrameBeginValidSlots[R_RendererMetrics_FrameSlot()] = true;
+	rg_backendFinishValid[R_RendererMetrics_FrameSlot()] = false;
+	rg_frameSubmitBeginValidSlots[R_RendererMetrics_FrameSlot()] = false;
 }
 
 void R_RendererMetrics_MarkFrameSubmitBegin( void ) {
-	rg_frameSubmitBeginTime = rendererCpuFrameClock_t::now();
-	rg_frameSubmitBeginValid = rg_cpuFrameBeginValid;
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rg_frameSubmitBeginTimeSlots[R_RendererMetrics_FrameSlot()] = rendererCpuFrameClock_t::now();
+	rg_frameUploadStats[R_RendererMetrics_FrameSlot()] = R_RendererUpload_Stats();
+	rg_frameSubmitBeginValidSlots[R_RendererMetrics_FrameSlot()] = rg_cpuFrameBeginValidSlots[R_RendererMetrics_FrameSlot()];
 }
 
 static unsigned long long R_RendererMetrics_ConsumeCpuFrameMicroseconds( void ) {
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_rendererMetrics.frameBuildMicroseconds = rg_rendererMetrics.frameSubmitMicroseconds = 0;
-	if ( !rg_cpuFrameBeginValid ) {
+	if ( !rg_cpuFrameBeginValidSlots[R_RendererMetrics_FrameSlot()] ) {
 		return 0;
 	}
-	const rendererCpuFrameClock_t::time_point beginTime = rg_cpuFrameBeginTime;
-	rg_cpuFrameBeginValid = false;
-	const auto endTime = rendererCpuFrameClock_t::now();
+	const rendererCpuFrameClock_t::time_point beginTime = rg_cpuFrameBeginTimeSlots[R_RendererMetrics_FrameSlot()];
+	rg_cpuFrameBeginValidSlots[R_RendererMetrics_FrameSlot()] = false;
+	const auto endTime = rg_backendFinishValid[R_RendererMetrics_FrameSlot()]
+		? rg_backendFinishTimes[R_RendererMetrics_FrameSlot()] : rendererCpuFrameClock_t::now();
 	const long long elapsedMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - beginTime).count();
 	if ( elapsedMicroseconds <= 0 ) {
 		return 0;
 	}
-	if (rg_frameSubmitBeginValid && rg_frameSubmitBeginTime >= beginTime && rg_frameSubmitBeginTime <= endTime) {
-		rg_rendererMetrics.frameBuildMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(rg_frameSubmitBeginTime-beginTime).count();
+	if (rg_frameSubmitBeginValidSlots[R_RendererMetrics_FrameSlot()] && rg_frameSubmitBeginTimeSlots[R_RendererMetrics_FrameSlot()] >= beginTime && rg_frameSubmitBeginTimeSlots[R_RendererMetrics_FrameSlot()] <= endTime) {
+		rg_rendererMetrics.frameBuildMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(rg_frameSubmitBeginTimeSlots[R_RendererMetrics_FrameSlot()]-beginTime).count();
 		rg_rendererMetrics.frameSubmitMicroseconds = elapsedMicroseconds-rg_rendererMetrics.frameBuildMicroseconds;
 	}
-	rg_frameSubmitBeginValid = false;
+	rg_frameSubmitBeginValidSlots[R_RendererMetrics_FrameSlot()] = false;
 	return static_cast<unsigned long long>( elapsedMicroseconds );
 }
 
 void R_RendererMetrics_GetGpuFrameTiming( renderGpuFrameTiming_t &timing ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	R_RendererMetrics_EnsureGpuFrameTimingInitialized();
 	memset( &timing, 0, sizeof( timing ) );
 	timing.supported = rg_gpuFrameTiming.supported;
@@ -797,6 +822,7 @@ void R_RendererMetrics_GetGpuFrameTiming( renderGpuFrameTiming_t &timing ) {
 }
 
 void R_RendererMetrics_ResetGpuFrameTiming( const char *reason ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	R_RendererMetrics_EnsureGpuFrameTimingInitialized();
 	GpuFrameTimingCore_Reset( rg_gpuFrameTiming );
 	RendererBenchmarks_ResetHistory();
@@ -807,6 +833,7 @@ void R_RendererMetrics_ResetGpuFrameTiming( const char *reason ) {
 }
 
 void R_RendererMetrics_SetGpuFrameTimingBackend( renderGpuTimingBackend_t backend, bool supported ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	R_RendererMetrics_EnsureGpuFrameTimingInitialized();
 	const bool changed = rg_gpuFrameTiming.backend != static_cast<int>( backend )
 		|| rg_gpuFrameTiming.supported != supported;
@@ -817,6 +844,7 @@ void R_RendererMetrics_SetGpuFrameTimingBackend( renderGpuTimingBackend_t backen
 }
 
 unsigned int R_RendererMetrics_GpuFrameTimingGeneration( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	R_RendererMetrics_EnsureGpuFrameTimingInitialized();
 	return rg_gpuFrameTiming.generation;
 }
@@ -824,6 +852,7 @@ unsigned int R_RendererMetrics_GpuFrameTimingGeneration( void ) {
 void R_RendererMetrics_RecordGpuFrameTimingResolved( renderGpuTimingBackend_t backend,
 		int frameNumber, unsigned int generation, unsigned long long elapsedMicroseconds,
 		int currentFrameNumber ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	R_RendererMetrics_EnsureGpuFrameTimingInitialized();
 	GpuFrameTimingCore_RecordResolved( rg_gpuFrameTiming, static_cast<int>( backend ),
 		frameNumber, generation, elapsedMicroseconds,
@@ -831,11 +860,13 @@ void R_RendererMetrics_RecordGpuFrameTimingResolved( renderGpuTimingBackend_t ba
 }
 
 void R_RendererMetrics_RecordGpuFrameTimingUnavailable( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	R_RendererMetrics_EnsureGpuFrameTimingInitialized();
 	rg_gpuFrameTiming.unavailableSamples++;
 }
 
 void R_RendererMetrics_RecordGpuFrameTimingDropped( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	R_RendererMetrics_EnsureGpuFrameTimingInitialized();
 	rg_gpuFrameTiming.droppedSamples++;
 }
@@ -1035,6 +1066,8 @@ static bool R_RendererMetrics_BeginGlFullFrameTiming( rendererGpuTimerFrame_t &f
 #endif
 
 void R_RendererMetrics_BeginFrame( int frameCount ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	// The memset must stay ahead of the gate so Add*/Record* writes from
 	// disabled frames cannot leak into the first enabled frame; EndFrame is the
 	// only consumer and is gated on the same cvar, so the *_Latest snapshot
@@ -1339,34 +1372,46 @@ void R_RendererMetrics_BeginFrame( int frameCount ) {
 }
 
 void R_RendererMetrics_RecordSubmitMsec( int submitMsec ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_rendererMetrics.submitMsec += submitMsec;
 }
 
 void R_RendererMetrics_AddVisibilityMsec( int msec ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( msec > 0 ) {
 		rg_rendererMetrics.visibilityMsec += msec;
 	}
 }
 
 void R_RendererMetrics_AddPacketBuildMsec( int msec ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( msec > 0 ) {
 		rg_rendererMetrics.packetBuildMsec += msec;
 	}
 }
 
 void R_RendererMetrics_AddGraphBuildMsec( int msec ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( msec > 0 ) {
 		rg_rendererMetrics.graphBuildMsec += msec;
 	}
 }
 
 void R_RendererMetrics_AddPresentMsec( int msec ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( msec > 0 ) {
 		rg_rendererMetrics.presentMsec += msec;
 	}
 }
 
 void R_RendererMetrics_RecordBackendCommands( int draw3d, int draw2d, int setBuffers, int swapBuffers, int copyRenders, int specialEffects, int renderTargetOps ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_rendererMetrics.draw3d += draw3d;
 	rg_rendererMetrics.draw2d += draw2d;
 	rg_rendererMetrics.setBuffers += setBuffers;
@@ -1377,6 +1422,7 @@ void R_RendererMetrics_RecordBackendCommands( int draw3d, int draw2d, int setBuf
 }
 
 void R_RendererMetrics_RecordScenePackets( const scenePacketFrameStats_t &stats ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	rg_scenePacketLatest.scenePackets = stats.scenePackets;
 	rg_scenePacketLatest.passPackets = stats.passPackets;
 	rg_scenePacketLatest.drawPackets = stats.drawPackets;
@@ -1412,6 +1458,7 @@ void R_RendererMetrics_RecordScenePackets( const scenePacketFrameStats_t &stats 
 }
 
 void R_RendererMetrics_RecordRenderGraph( int graphPasses, int passPackets, int scenePackets, int drawPackets, int commandPackets, int resources, int importedResources, int transientResources, int aliasableTransientResources, int resourceAccesses, int readAccesses, int writeAccesses, int clearOps, int resolveOps, int invalidateOps, int presentOps, bool overflow ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	rg_renderGraphLatest.graphPasses = graphPasses;
 	rg_renderGraphLatest.passPackets = passPackets;
 	rg_renderGraphLatest.scenePackets = scenePackets;
@@ -1432,16 +1479,22 @@ void R_RendererMetrics_RecordRenderGraph( int graphPasses, int passPackets, int 
 }
 
 void R_RendererMetrics_RecordRenderGraphResources( const renderGraphResourceManagerStats_t &stats ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_renderGraphResourceLatest = stats;
 	rg_rendererMetrics.renderGraphResourceManager = stats;
 }
 
 void R_RendererMetrics_RecordMaterialResourceTable( const materialResourceTableStats_t &stats ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_materialResourceTableLatest = stats;
 	rg_rendererMetrics.materialResourceTable = stats;
 }
 
 void R_RendererMetrics_RecordModernShadowPlanner( const int descriptors, const int invariantFailures, const unsigned int invariantFailureMask, const int projectedCsmEligibleLights, const int projectedCsmCascadeLights, const int projectedCsmSuppressedLights, const int nonProjectedCsmLights, const int budgetThrottledLights, const unsigned int budgetThrottleReasonMask, const int throttleHistoryTrackedLights, const int throttleHistoryRepeatedBudgetMissLights, const int throttleHistoryRecoveredLights, const int throttleHistoryMaxMissStreak, const int throttleHistoryMaxMissLightDefIndex, const int lodRejectedLights, const int lodRejectedBudgetThrottledLights, const int lodRejectedUnmappedLights, const int arb2CacheReuseLights, const int arb2CacheBudgetIsolatedLights, const int arb2CacheHitPasses, const int arb2FreshUpdatePasses ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_rendererMetrics.modernShadowPlanDescriptors = descriptors;
 	rg_rendererMetrics.modernShadowPlanInvariantFailures = invariantFailures;
 	rg_rendererMetrics.modernShadowPlanInvariantFailureMask = invariantFailureMask;
@@ -1466,6 +1519,7 @@ void R_RendererMetrics_RecordModernShadowPlanner( const int descriptors, const i
 }
 
 void R_RendererMetrics_RecordModernExecutor( rendererModernExecutorMetricsMode_t mode, int graphPasses, int preparedPasses, int fallbackPasses, int preparedDrawPackets, int materialDrawPackets, int resourceDrawPackets, int geometryDrawPackets, bool vaoReady, bool frameUBOReady, bool shaderLibraryReady, int shaderProgramCount, int shaderFailureCount, bool drawPlanReady, bool drawPlanOverflow, int drawPlanDraws, int drawPlanDepthDraws, int drawPlanMaterialDraws, int drawPlanFallbackDraws, int drawPlanStateBatches, int drawPlanProgramSwitches, int drawPlanMaterialSwitches, bool submitPlanReady, bool submitPlanOverflow, int submitPlanDraws, int submitPlanFallbackDraws, int submitPlanDepthDraws, int submitPlanMaterialDraws, int submitPlanMissingAmbientDraws, int submitPlanMissingIndexDraws, int submitPlanIndexUploadDraws, bool submitExecuted, int submittedDraws, int submittedFallbackDraws, int submittedIndexUploadDraws, int submitPlanProgramBatches, int submitPlanVertexBufferBatches, int submitPlanIndexBufferBatches, int submitPlanScissorBatches, int submitPlanMaterialBatches, int submitPlanUniformUpdates, int submitPlanFrameUBOBinds, bool visibleDepthRequested, bool visibleDepthExecuted, bool visibleDepthResourceReady, bool visibleShadowResourceReady, bool visibleDepthDebugOverlayReady, int visibleDepthDraws, int visibleDepthAlphaTestDraws, int visibleDepthSkinnedDraws, int visibleDepthFallbackDraws, int visibleShadowDepthDraws, int visibleShadowFallbackDraws, int visibleStencilShadowFallbackDraws, int visibleDepthMismatchDraws, int visibleDepthDebugOverlayDraws, bool opaqueGBufferRequested, bool opaqueGBufferExecuted, bool opaqueGBufferResourcesReady, bool opaqueGBufferMRTReady, bool opaqueGBufferDebugOverlayReady, int opaqueGBufferDraws, int opaqueGBufferFallbackDraws, int opaqueGBufferAttachmentCount, int opaqueGBufferBytesPerPixel, int opaqueGBufferBandwidthKB, int opaqueGBufferDebugOverlayDraws ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	rg_modernExecutorLatest.mode = mode;
 	rg_modernExecutorLatest.graphPasses = graphPasses;
 	rg_modernExecutorLatest.preparedPasses = preparedPasses;
@@ -1536,6 +1590,8 @@ void R_RendererMetrics_RecordModernExecutor( rendererModernExecutorMetricsMode_t
 }
 
 void R_RendererMetrics_RecordDeferredResolve( bool requested, bool executed, bool resourcesReady, bool outputReady, bool programReady, bool clusterReady, bool debugOverlayReady, int resolvedPixels, int activeLights, int pointLights, int projectedLights, int lightGridContributions, int clusterReads, int resourceFallbacks, int unsupportedLightFallbacks, int fogFallbackLights, int specialFallbackLights, int overflowClusters, int clearOps, int debugMode, int debugOverlayDraws ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_deferredResolveLatest.requested = requested;
 	rg_deferredResolveLatest.executed = executed;
 	rg_deferredResolveLatest.resourcesReady = resourcesReady;
@@ -1581,6 +1637,8 @@ void R_RendererMetrics_RecordDeferredResolve( bool requested, bool executed, boo
 }
 
 void R_RendererMetrics_RecordForwardPlus( bool requested, bool executed, bool resourcesReady, bool sceneColorReady, bool sceneDepthReady, bool programReady, bool clusterReady, int draws, int opaqueDraws, int alphaTestDraws, int transparentDraws, int viewModelDraws, int fogBlendDraws, int sortedBatches, int fallbackDraws, int resourceFallbackDraws, int materialFallbackDraws, int geometryFallbackDraws, int textureFallbackDraws, int unsupportedBlendFallbackDraws, int specialEffectFallbacks, int sortFallbackDraws, int overdrawEstimate, int clusterReads, int activeLights, int pointLights, int projectedLights, int lightGridContributions, int clearOps ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_forwardPlusLatest.requested = requested;
 	rg_forwardPlusLatest.executed = executed;
 	rg_forwardPlusLatest.resourcesReady = resourcesReady;
@@ -1642,6 +1700,8 @@ void R_RendererMetrics_RecordForwardPlus( bool requested, bool executed, bool re
 }
 
 void R_RendererMetrics_RecordModernVisible( bool requested, bool executed, bool resourcesReady, bool programReady, bool sourceReady, bool backBufferReady, bool hybridTargetReady, bool shadowReady, bool hdrTargetReady, bool postProcessHandoff, bool blockedByLegacy, int compositions, int pixels, int compositeCopies, int postProcessCompositions, int depthCopies, int modernPasses, int legacyPasses, int disabledPasses, int fallbackPasses, int ownerFallbacks, int resourceFallbacks, int guiLegacyPasses, int postLegacyPasses, int specialLegacyPasses, int subviewLegacyPasses, int presentPasses, int clearOps ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_modernVisibleLatest.requested = requested;
 	rg_modernVisibleLatest.executed = executed;
 	rg_modernVisibleLatest.resourcesReady = resourcesReady;
@@ -1701,6 +1761,8 @@ void R_RendererMetrics_RecordModernVisible( bool requested, bool executed, bool 
 }
 
 void R_RendererMetrics_RecordGpuDriven( bool requested, bool executed, bool resourcesReady, bool validationRequested, bool validationReadbackReady, bool indirectExecuted, bool multiDrawReady, int sourceCommands, int eligibleCommands, int generatedCommands, int culledCommands, int visibleInstances, int cpuGeneratedCommands, int cpuCulledCommands, int cpuVisibleInstances, int gpuGeneratedCommands, int gpuCulledCommands, int gpuVisibleInstances, int cpuClusterBins, int gpuClusterBins, int validationReadbacks, int validationMismatches, int indirectDrawCalls, int multiDrawBatches, int indirectFallbacks, int computeDispatches ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_gpuDrivenLatest.requested = requested;
 	rg_gpuDrivenLatest.executed = executed;
 	rg_gpuDrivenLatest.resourcesReady = resourcesReady;
@@ -1756,6 +1818,8 @@ void R_RendererMetrics_RecordGpuDriven( bool requested, bool executed, bool reso
 }
 
 void R_RendererMetrics_RecordModernVisibility( bool requested, bool enabled, bool portalPVSPreserved, bool cpuReady, bool gpuReady, bool hiZRequested, bool hiZReady, bool hiZBuilt, bool temporalReady, bool noQueryStall, bool shadowCasterReady, int scenes, int portalVisibleAreas, int portalRejectedAreas, int cpuTested, int cpuRejected, int gpuTested, int gpuRejected, int scissorRejected, int frustumRejected, int hiZRejected, int savedDraws, int savedTriangles, int falsePositiveFallbacks, int temporalReused, int hiZLevels, int hiZBuildMsec, int shadowCasterTested, int shadowCasterRejected, int shadowCasterSavedDraws, int shadowCasterSavedTriangles ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_modernVisibilityLatest.requested = requested;
 	rg_modernVisibilityLatest.enabled = enabled;
 	rg_modernVisibilityLatest.portalPVSPreserved = portalPVSPreserved;
@@ -1821,6 +1885,8 @@ void R_RendererMetrics_RecordModernVisibility( bool requested, bool enabled, boo
 }
 
 void R_RendererMetrics_RecordLowOverhead( bool requested, bool ready, bool usesDSA, bool usesMultiBind, bool bindlessRequested, bool bindlessAvailable, bool samplerReady, int dsaUpdates, int framebufferDSAUpdates, int samplerDSACreations, int samplerDSAUpdates, int bufferMultiBindBatches, int textureMultiBindBatches, int samplerMultiBindBatches, int classicTextureBinds, int compactedBatches, int softRestores, int fullRestores, bool textureTableReady, bool textureTableUsed, int textureTableCapacity, int textureTableTextures, int textureTableDescriptors, int textureTableDraws, int textureTableUniforms, int textureTableFallbacks ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_lowOverheadLatest.requested = requested;
 	rg_lowOverheadLatest.ready = ready;
 	rg_lowOverheadLatest.usesDSA = usesDSA;
@@ -1876,26 +1942,35 @@ void R_RendererMetrics_RecordLowOverhead( bool requested, bool ready, bool usesD
 }
 
 void R_RendererMetrics_RecordGLStateCache( const glStateCacheStats_t &stats ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_glStateCacheLatest.stats = stats;
 	rg_rendererMetrics.glStateCache = stats;
 }
 
 void R_RendererMetrics_RecordClusteredLighting( const rendererClusteredLightingStats_t &stats ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_clusteredLightingLatest = stats;
 	rg_rendererMetrics.clusteredLighting = stats;
 }
 
 void R_RendererMetrics_AddUploadBytes( int bytes ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( bytes > 0 ) {
 		rg_rendererMetrics.uploadBytes += bytes;
 	}
 }
 
 void R_RendererMetrics_AddBufferStall( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_rendererMetrics.bufferStalls++;
 }
 
 static void R_RendererMetrics_RecordBenchmarkCapture( void ) {
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rendererBenchmarkFrameSample_t sample;
 	memset( &sample, 0, sizeof( sample ) );
 
@@ -1964,6 +2039,8 @@ static void R_RendererMetrics_RecordBenchmarkCapture( void ) {
 }
 
 void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCount, int visibleEntities, int viewLights, int drawElements, int surfaces, int vertexes, int indexes ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	if ( r_rendererMetrics.GetInteger() <= 0 ) {
 		return;
 	}
@@ -1981,7 +2058,7 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 	R_RendererMetrics_RecordBenchmarkCapture();
 
 	const int detail = r_rendererMetrics.GetInteger();
-	const rendererUploadStats_t &uploadStats = R_RendererUpload_Stats();
+	const rendererUploadStats_t &uploadStats = rg_frameUploadStats[R_RendererMetrics_FrameSlot()];
 	char gpuText[32];
 	R_RendererMetrics_FormatGpuMsec( rg_rendererMetrics, gpuText, sizeof( gpuText ) );
 	if ( detail >= 2 ) {
@@ -2611,6 +2688,7 @@ void R_RendererMetrics_EndFrame( int frontEndMsec, int backEndMsec, int viewCoun
 }
 
 void R_RendererMetrics_BeginGpuBackendFrame( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	// Vulkan brackets its true command-buffer lifetime in vk_GuiExecutor;
 	// the shared command-dispatch hook is intentionally not used there.
@@ -2681,6 +2759,7 @@ void R_RendererMetrics_BeginGpuBackendFrame( void ) {
 }
 
 void R_RendererMetrics_EndGpuBackendFrame( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	return;
 #else
@@ -2700,6 +2779,7 @@ void R_RendererMetrics_EndGpuBackendFrame( void ) {
 }
 
 void R_RendererMetrics_BeginGpuTimer( rendererGpuTimerSlot_t slot ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	if ( !R_RendererMetrics_GpuTimersEnabled() || rg_gpuTimerQueryActive ) {
 		return;
 	}
@@ -2726,6 +2806,7 @@ void R_RendererMetrics_BeginGpuTimer( rendererGpuTimerSlot_t slot ) {
 }
 
 void R_RendererMetrics_EndGpuTimer( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	if ( !rg_gpuTimerQueryActive ) {
 		return;
 	}
@@ -2735,6 +2816,7 @@ void R_RendererMetrics_EndGpuTimer( void ) {
 }
 
 bool R_RendererMetrics_PauseGpuTimer( rendererGpuTimerSlot_t slot ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	if ( !rg_gpuTimerQueryActive || rg_gpuTimerActiveQuery == NULL ) {
 		return false;
 	}
@@ -2746,12 +2828,14 @@ bool R_RendererMetrics_PauseGpuTimer( rendererGpuTimerSlot_t slot ) {
 }
 
 void R_RendererMetrics_ResumeGpuTimer( rendererGpuTimerSlot_t slot, bool resume ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	if ( resume ) {
 		R_RendererMetrics_BeginGpuTimer( slot );
 	}
 }
 
 void R_RendererMetrics_ShutdownGpuTimers( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	VK_GpuFrameTiming_Shutdown();
 	R_RendererMetrics_SetGpuFrameTimingBackend( RENDER_GPU_TIMING_BACKEND_NONE, false );
@@ -2793,6 +2877,7 @@ void R_RendererMetrics_ShutdownGpuTimers( void ) {
 }
 
 bool R_RendererMetrics_GpuTimersAvailable( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	return VK_GpuFrameTiming_Available();
 #else
@@ -2833,4 +2918,11 @@ bool RendererGpuTimer_RunSelfTest( void ) {
 		endAvailable ? 1 : 0 );
 	return true;
 #endif
+}
+
+void R_RendererMetrics_MarkBackEndFinished( void ) {
+	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
+	const int slot = R_RendererMetrics_FrameSlot();
+	rg_backendFinishTimes[slot] = rendererCpuFrameClock_t::now();
+	rg_backendFinishValid[slot] = true;
 }

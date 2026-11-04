@@ -1652,6 +1652,12 @@ bool R_RendererModule_FinishSelectionReload() {
 	return true;
 }
 
+void R_RendererModule_SyncConfiguration() {
+	if ( rm_state.interfacesPublished && rm_state.moduleExportValid && rm_state.moduleExport.SyncConfiguration != NULL ) {
+		rm_state.moduleExport.SyncConfiguration();
+	}
+}
+
 bool R_RendererModule_QueryRenderingDevices(renderDeviceCatalog_t& output) {
 	output = {};
 	if (!RM_AllowImageModuleChange()) return false;

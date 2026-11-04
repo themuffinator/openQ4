@@ -112,3 +112,6 @@ const char *R_TemporalPresentation_HistoryResetReasonName(
 void R_TemporalPresentation_PrintStatus_f( const idCmdArgs &args );
 
 #endif /* !__TEMPORAL_PRESENTATION_H__ */
+
+void R_TemporalPresentation_SubmitFrame( void );
+void R_TemporalPresentation_RetireFrame( void );

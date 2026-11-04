@@ -203,7 +203,7 @@ applies its change immediately.
 ===================
 */
 idRenderWorldLocal::pendingDefOp_t *idRenderWorldLocal::QueueDefOp( pendingDefOpType_t type, qhandle_t handle ) {
-	if ( !R_RenderThread_InFlight() || R_RenderThread_OnRenderThread() ) {
+	if ( !R_RenderThread_InFlight() || R_RenderThread_OnRenderThread() || R_RenderThread_FrontEndMayOverlap() ) {
 		return NULL;
 	}
 	pendingDefOp_t &op = pendingDefOps.Alloc();
@@ -878,7 +878,7 @@ void idRenderWorldLocal::FreeLightDef( qhandle_t lightHandle ) {
 		light->archived = false;
 	}
 
-	if ( light->referencedFrameNum == tr.frameCount ) {
+	if ( light->referencedFrameNum == tr.frameCount || R_RenderThread_InFlight() ) {
 		deferredFreeLightDefs.Append( light );
 		lightDefs[lightHandle] = NULL;
 		return;
@@ -1133,7 +1133,7 @@ to handle mirrors,
 ====================
 */
 void idRenderWorldLocal::RenderScene( const renderView_t *renderView, int renderFlags ) {
-	R_RenderThread_Sync( "render scene" );
+	R_RenderThread_SyncFrontEnd( "render scene" );
 #ifndef	ID_DEDICATED
 	renderView_t	copy;
 
@@ -1480,7 +1480,7 @@ static idRenderModel *R_GuiTraceModelForEntity( idRenderEntityLocal *def ) {
 
 guiPoint_t	idRenderWorldLocal::GuiTrace( qhandle_t entityHandle, const idVec3 start, const idVec3 end ) const {
 	if ( FindPendingDefOp( entityHandle, false ) != NULL ) {
-		R_RenderThread_Sync( "trace" );
+		R_RenderThread_SyncFrontEnd( "trace" );
 	}
 	localTrace_t	local;
 	localTrace_t	bestLocal;
@@ -1731,7 +1731,7 @@ static const rvDeclMatType *R_GetMaterialTypeForTrace( const idMaterial *shader,
 bool idRenderWorldLocal::ModelTrace( modelTrace_t &trace, qhandle_t entityHandle, const idVec3 &start, const idVec3 &end, const float radius ) const {
 	if ( FindPendingDefOp( entityHandle, false ) != NULL ) {
 		// trace what the game last wrote: apply the queued update first
-		R_RenderThread_Sync( "trace" );
+		R_RenderThread_SyncFrontEnd( "trace" );
 	}
 	int i;
 	bool collisionSurface;
@@ -1855,7 +1855,7 @@ const char* playerMaterialExcludeList[] = {
 
 bool idRenderWorldLocal::Trace( modelTrace_t &trace, const idVec3 &start, const idVec3 &end, const float radius, bool skipDynamic, bool skipPlayer /*_D3XP*/ ) const {
 	if ( pendingDefOps.Num() > 0 ) {
-		R_RenderThread_Sync( "trace" );
+		R_RenderThread_SyncFrontEnd( "trace" );
 	}
 	areaReference_t * ref;
 	idRenderEntityLocal *def;

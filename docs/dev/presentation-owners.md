@@ -322,8 +322,9 @@ late look, entity poses, client debris). The pacing case adds the renderer's
 front-end, back-end and GPU summary, so a slow run shows where the frame went.
 The 240 cap is judged against the budget above. Other caps are reported only.
 `--fullscreen` uses the native desktop mode instead of a 960×540 window.
-For the optional Vulkan worker, add `--cvar r_vkRenderThread 1`; its default
-remains zero. The reference-suite wrapper accepts `--render-thread 0|1` and
+For the optional Vulkan worker, add `--cvar r_vkRenderThread 1` for tic-only
+overlap or `--cvar r_vkRenderThread 2` for full front-end overlap; its default
+remains zero. The reference-suite wrapper accepts `--render-thread 0|1|2` and
 records that selection. It returns failure for a failed child, a missing or
 malformed report, or VRR coverage lost because no usable refresh was reported.
 Its `automatedPassed` result covers automation only: `physicalQualification`
@@ -787,8 +788,84 @@ control that did not fail. Their test/production inputs are unchanged by this
 PR. The registration and swap-wrapper fixture failures introduced by this PR
 are fixed and pass locally.
 
-This closes the audited backend error item and part of frame identity, not the
-full stage-2 ownership list. Frame arenas, vertex caches, dynamic snapshots,
-world snapshots, scene packets, temporal state, shared counters and lazy backend
-resources still prevent front-end overlap. Physical qualification and the
-native-resolution Quality floor remain open.
+That checkpoint closed the audited backend error item and part of frame
+identity. The subsequent implementation below addresses the stage-2 ownership
+list. Physical qualification and the native-resolution Quality floor remain
+open.
+
+### Full front-end overlap, 4 November 2026
+
+`r_vkRenderThread 2` moves the normal join to the next `EndFrame`, after GUI/VR
+command assembly. Mode 1 retains tic-only overlap and mode 0 remains the
+default. There is still only one submitted backend frame at a time. The next
+front end uses a second arena, vertex-cache lists, scene-packet frame and
+temporal state. A thread-local selector keeps backend allocations and metrics
+attached to the submitted slot, including when its worker finishes before the
+main thread collects it.
+
+Each submitted view freezes geometry, cache headers/CPU bytes, skinning
+palettes, MD5R transforms, previous positions, entity definitions and light
+definitions. Shared aliases remain shared inside the snapshot. Classic
+deformation records are rebased only for finalized draws; uninitialized
+interaction/volume records are not read. Sticky light failures return through
+identity-checked receipts. Deferred ambient and interaction surfaces retire as
+one batch at a completed handoff, before the worker wakes, or during synchronous
+retirement/shutdown. Clearing the live arena pointer before shutdown frees its
+slots prevents cleanup from allocating into an already freed slot.
+
+Static images/programs and usable light-grid areas prepare at handoff.
+Name-only image lookup uses a registry lock; cached shader validation does not
+join on every SP frame. Mutating images, materials, renderer settings or device
+state still joins. The configuration barrier extends renderer API to **31**,
+so engine and renderer modules must be built/staged together. Captures,
+loading, checked image-policy execution, locked surfaces and the Alpha Labs
+live-light path remain synchronous. Scene history seals only after a successful
+threaded handoff; inline reconstruction retains the preceding history until
+retirement.
+
+Native tests execute the production allocator/retirement methods with a held
+consumer, allocations larger than an arena block, invalid sizes, shared
+triangle retirement, cache-slot reuse and teardown/reinitialization. Two
+negative controls detect shared arena storage and split triangle retirement.
+The worker test covers 1,011 handoffs, both error severities and a renderer
+configuration mutation barrier. `rendererFrameOwnershipSelfTest` mutates source
+streams and definitions after snapshotting and checks retained values/aliases,
+including poisoned non-finalized deformation records. The reference runner
+also tests forwarding mode 2 without claiming physical qualification.
+
+Evidence is retained under `.tmp/high-refresh-overlap/`; build/stage logs for
+the earlier iterations are also under `.tmp/high-refresh-next/`. Thirteen
+focused Meson tests and 28 related source/native checks passed. Windowed
+stock-asset gameplay covered Vulkan SP `game/airdefense1`, MP `mp/q4dm1`
+listen-host/client, and an OpenGL SP control, with device input disabled. The
+broad checks covered the cap matrix, VSync, forced effects, eight classic-domain
+self-tests, worker toggles, surface recovery and renderer restart. Additional
+combination checks enabled GPU skinning, TAA, motion blur and dynamic resolution
+together, then disabled them and reloaded shaders. Engine-rendered captures
+were used throughout; no OS capture or device-input injection was used.
+
+The final retirement build passed SP (`vk-sp-airdefense1-verified`), MP and
+OpenGL (`*-retirement`). Last explicit Vulkan checkpoints were:
+
+| Role | Submitted / completed | Front ends started while busy | Front ends finished while busy |
+| --- | --- | --- | --- |
+| SP | 486 / 486 | 73 | 2 |
+| MP host | 682 / 682 | 669 | 1 |
+| MP client | 866 / 866 | 857 | 145 |
+
+Each role, including OpenGL, recorded five successful latency-flash receipts
+and 128 presentation samples with zero gameplay during drawing. All exited
+cleanly. The preceding SP retirement run completed gameplay but was correctly
+rejected by runtime verification: staging removed an import library after the
+initial inventory. Its failed report is retained; the verified rerun used an
+unchanged staged runtime. `retirement-tests.log`, `source-tests/summary.json`,
+`retirement-summary.json` and `verified-summary.json` retain the checks and
+outcomes. Benchmark reports include the exact binary hashes.
+
+The prototype proves overlap, not a performance gain. The first implementation
+also copies static streams; reducing this cost requires measured, explicitly
+retained immutable storage. Quiet paired mode 0/1/2 runs, the every-frame Quality
+floor, physical display/input checks and Wayland/macOS runtime coverage remain
+open under HF-07/HF-08 and REN-07. Shared-domain scene-packet capacity fallback
+and the post-restart Vulkan `gfxInfo` bootstrap label remain separate known
+issues.

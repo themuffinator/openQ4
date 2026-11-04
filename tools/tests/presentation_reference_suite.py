@@ -170,7 +170,7 @@ def main() -> int:
                         help="operator statement: a visible foreground window on the HF-07 reference machine")
     parser.add_argument("--windowed", action="store_true",
                         help="rehearsal: run every case in a window instead of full screen")
-    parser.add_argument("--render-thread", choices=("0", "1"), default="0",
+    parser.add_argument("--render-thread", choices=("0", "1", "2"), default="0",
                         help="Vulkan backend mode; record it with the reference evidence (default inline)")
     parser.add_argument("--sensor-seconds", type=int, default=120)
     parser.add_argument("--skip-sensor", action="store_true")

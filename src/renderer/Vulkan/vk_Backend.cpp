@@ -577,8 +577,8 @@ void GLimp_SwapBuffers( void ) {
 	if ( VK_GuiExecutor_EnsureFrameOpen() ) {
 		// Screenshot/capture readback consumes the completed swapchain image
 		// before presentation.  The GL backend observes the same
-		// tr.takingScreenshot contract in RB_SwapBuffers.
-		if ( !tr.takingScreenshot ) {
+		// R_SubmittedTakingScreenshot() contract in RB_SwapBuffers.
+		if ( !R_SubmittedTakingScreenshot() ) {
 			const unsigned long long swapBegin = r_rendererMetrics.GetInteger() > 0 ? R_RendererMetrics_CpuClock() : 0;
 			VK_GuiExecutor_EndFrameAndPresent();
 			R_RendererMetrics_EndPresentPhase( RENDERER_PRESENT_SWAP, swapBegin );
@@ -706,9 +706,11 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 
 	backEnd.renderTexture = NULL;
 	backEnd.feedbackRenderTexture = NULL;
+	if ( !R_RenderThread_OnRenderThread() ) {
 	backEnd.postProcessTexelSize = tr.postProcessTexelSize;
 	backEnd.postProcessSourceColorSpace = tr.postProcessSourceColorSpace;
 	backEnd.postProcessSMAAQuality = tr.postProcessSMAAQuality;
+	}
 	const classicSubviewDomainView_t *pendingSharedSubview = NULL;
 
 	for ( ; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
@@ -819,7 +821,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 				// Save previews can enter their capture scope after the front end
 				// queued this command. Never let that late flush read or advance
 				// gameplay history.
-				if ( tr.takingScreenshot ) {
+				if ( R_SubmittedTakingScreenshot() ) {
 					executionCommand.captureFrame = true;
 					executionCommand.historyValid = false;
 				}
@@ -910,10 +912,10 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 				VK_PostProcess_ApplyBackBuffer();
 				R_RendererMetrics_EndPresentPhase( RENDERER_PRESENT_FINAL_POST, postBegin );
 				// CaptureRenderToFile flushes a cropped save-preview frame with
-				// tr.takingScreenshot set. Match RB_SwapBuffers: retain that
+				// R_SubmittedTakingScreenshot() set. Match RB_SwapBuffers: retain that
 				// back-buffer work for readback so it can be replaced by the real
 				// frame instead of presenting the crop by itself.
-				if ( !tr.takingScreenshot ) {
+				if ( !R_SubmittedTakingScreenshot() ) {
 					R_SwapBuffersWithInputTiming();
 				}
 				if ( timingEnabled ) { R_RendererMetrics_AddPresentMsec( Sys_Milliseconds() - presentBegin ); }
@@ -1551,6 +1553,7 @@ void R_ReloadGLSLPrograms_f( const idCmdArgs &args ) {
 }
 
 void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
+	R_RenderThread_Sync( "material program stats" );
 	(void)args;
 	common->Printf( "Vulkan material programs: %d of %d registered (r_vkARBTranslation %d)\n", vkNumMaterialPrograms,
 			VK_MAX_MATERIAL_PROGRAMS, cvarSystem->GetCVarInteger( "r_vkARBTranslation" ) );
@@ -1569,6 +1572,14 @@ void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
 }
 
 bool R_ValidateGLSLProgram( newShaderStage_t *stage ) {
+	// The preceding handoff validated this immutable material. During full
+	// overlap the worker never rewrites these fields, so a producer lookup can
+	// use the result without joining. New/reloaded programs still join first.
+	if ( !R_RenderThread_OnRenderThread() && R_RenderThread_FrontEndMayOverlap()
+		&& stage != NULL && stage->glslProgramLoaded && stage->glslProgramGeneration == tr.glContextGeneration ) {
+		return stage->glslProgramValid;
+	}
+	R_RenderThread_Sync( "material program validation" );
 	if ( stage == NULL || !stage->glslProgram ) {
 		return false;
 	}
@@ -1578,6 +1589,7 @@ bool R_ValidateGLSLProgram( newShaderStage_t *stage ) {
 	const bool supported = ( family > VK_GLSL_PROGRAM_FAMILY_UNKNOWN
 			&& family < VK_GLSL_PROGRAM_FAMILY_COUNT ) || VK_MaterialPrograms_Validate( stage );
 
+	if ( R_RenderThread_OnRenderThread() && R_RenderThread_FrontEndMayOverlap() ) return supported;
 	stage->glslProgramLoaded = true;
 	stage->glslProgramValid = supported;
 	stage->glslProgramGeneration = tr.glContextGeneration;

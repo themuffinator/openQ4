@@ -188,3 +188,5 @@ const char *ClassicDeformCacheLifetime_Name(
 bool RendererClassicDeformDomain_RunSelfTest( void );
 
 #endif /* !__CLASSIC_DEFORM_DOMAIN_H__ */
+
+void R_ClassicDeformDomain_RebaseFrameCopy( classicDeformRecord_t &record, const srfTriangles_s *source, const srfTriangles_s *result );

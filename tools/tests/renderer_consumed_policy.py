@@ -24,6 +24,8 @@ def method(source, signature):
 
 
 SUPPORT = r'''
+inline void R_RenderThread_Sync(const char*) {} // Worker ownership is exercised by renderer_render_thread_runtime.py.
+
 #pragma once
 #include <algorithm>
 #include <atomic>

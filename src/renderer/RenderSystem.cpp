@@ -400,20 +400,34 @@ static bool R_IssueRenderCommandsOnRenderThread( void ) {
 	if ( frameData->cmdHead->commandId == RC_NOP && !frameData->cmdHead->next ) {
 		return false;
 	}
-	return R_RenderThread_Begin( frameData->cmdHead );
+	if ( R_RenderThread_OverlapRequested() ) R_PrepareRenderFrameResources( frameData->cmdHead );
+	if ( !R_RenderThread_Begin( frameData->cmdHead ) ) return false;
+	// Only advance producer history once a worker owns this frame. Inline
+	// reconstruction still needs the previous history until command retirement.
+	R_ScenePackets_SealFrame();
+	return true;
 }
 
 /*
 ====================
 R_RenderThread_FrameQualifies
 
-Stage 1 runs only ordinary presented frames on the render thread. Captures,
+Only ordinary presented frames run on the render thread. Captures,
 tiled screenshots and loading screens keep the inline backend: they read the
 result back, or interleave with level loading that creates and destroys
 device resources. VR presents only on OpenGL.
 ====================
 */
 bool R_RenderThread_FrameQualifies( void ) {
+	// A mode change after an earlier view was queued cannot retroactively
+	// freeze that view's packet references. Render that transition inline.
+	if ( R_RenderThread_OverlapRequested() ) {
+		for ( const emptyCommand_t *cmd = frameData->cmdHead; cmd; cmd = reinterpret_cast<const emptyCommand_t *>( cmd->next ) ) {
+			if ( cmd->commandId != RC_DRAW_VIEW ) continue;
+			const viewDef_t *view = reinterpret_cast<const drawSurfsCommand_t *>( cmd )->viewDef;
+			if ( view != NULL && !view->frameSnapshot ) return false;
+		}
+	}
 	// The Alpha Labs overlay walks the world's live lightDefs, which the game
 	// tic adds to and frees. A checked image reload binds image work to the
 	// main thread.
@@ -421,6 +435,7 @@ bool R_RenderThread_FrameQualifies( void ) {
 		&& tr.tiledViewport[0] == 0
 		&& !R_LoadingScreenActive()
 		&& ( tr.specialEffectsEnabled & SPECIAL_EFFECT_AL ) == 0
+		&& ( r_forceSpecialEffects.GetInteger() & SPECIAL_EFFECT_AL ) == 0
 		&& !R_ImagePolicyActive();
 }
 
@@ -437,7 +452,7 @@ void *R_GetCommandBuffer( int bytes ) {
 	emptyCommand_t	*cmd;
 
 	// the chain still belongs to the render thread until the frame completes
-	R_RenderThread_Sync( "command buffer" );
+	R_RenderThread_SyncFrontEnd( "command buffer" );
 	cmd = (emptyCommand_t *)R_FrameAlloc( bytes );
 	cmd->next = NULL;
 	frameData->cmdTail->next = &cmd->commandId;
@@ -534,6 +549,7 @@ have multiple views if a mirror, portal, or dynamic texture is present.
 =============
 */
 void	R_AddDrawViewCmd( viewDef_t *parms ) {
+	R_SnapshotRenderView( parms );
 	drawSurfsCommand_t	*cmd;
 
 	if ( ( parms->renderFlags & RF_DEFER_COMMAND_SUBMIT ) != 0 ) {
@@ -630,6 +646,7 @@ evaluated interactively.
 ======================
 */
 void R_LockSurfaceScene( viewDef_t *parms ) {
+	R_RenderThread_Sync( "locked surfaces" );
 	drawSurfsCommand_t	*cmd;
 	viewEntity_t			*vModel;
 
@@ -1341,6 +1358,7 @@ void idRenderSystemLocal::SetBackEndRenderer() {
 		return;
 	}
 
+	R_RenderThread_Sync( "backend selection" );
 	const char *requestedRendererName = r_renderer.GetString();
 
 	if ( !glConfig.isInitialized ) {
@@ -1460,7 +1478,7 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	}
 	// The previous frame may still be recording on the render thread; this
 	// frame's front end reuses its frame memory and vertex-cache temps.
-	R_RenderThread_Sync( "frame" );
+	R_RenderThread_SyncFrontEnd( "frame" );
 	R_RendererMetrics_MarkCpuFrameBegin();
 
 	// determine which back end we will use
@@ -1663,6 +1681,8 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 
 	// a VR frame ends on its virtual screen, which presents last
 	EndVRFrame();
+	// At most one backend is in flight. Join after building this front end.
+	R_RenderThread_Sync( "handoff" );
 
 	// check for dynamic changes that require some initialization
 	R_CheckCvars();
@@ -1693,6 +1713,11 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 		renderThreadFrameCounters = pc;
 		renderThreadFrameCountersValid = true;
 		memset( &pc, 0, sizeof( pc ) );
+		if ( R_RenderThread_FrontEndMayOverlap() ) {
+			R_AdvanceFrameData();
+			vertexCache.EndFrame();
+			R_RendererUpload_EndFrame();
+		}
 		// The render thread owns this frame's commands, frame memory and
 		// vertex-cache temps until R_RenderThread_Sync completes the frame.
 		// The back-end time reported here is the previous frame's.
@@ -1758,6 +1783,7 @@ runs it in R_RenderThread_Sync once the thread has finished the frame.
 ===============
 */
 void idRenderSystemLocal::CompleteBackEndFrame( void ) {
+	frameData_t *submittedFrame = R_BackEndFrameData();
 	if ( frameSwapClock > 0.0 ) {
 		Common_RecordFrameInputToSwap( frameLookSampleClock, frameFlashPressClock, frameSwapClock );
 	}
@@ -1770,6 +1796,14 @@ void idRenderSystemLocal::CompleteBackEndFrame( void ) {
 		renderThreadFrameCountersValid = false;
 	}
 
+	pc.c_alloc += submittedFrame->backendAllocCount;
+	pc.c_free += submittedFrame->backendFreeCount;
+	pc.c_tangentIndexes += submittedFrame->backendTangentIndexes;
+	pc.c_createShadowVolumes += submittedFrame->backendShadowVolumes;
+	staticAllocCount += submittedFrame->backendStaticAllocBytes;
+	submittedFrame->backendAllocCount = submittedFrame->backendFreeCount = 0;
+	submittedFrame->backendTangentIndexes = submittedFrame->backendShadowVolumes = 0;
+	submittedFrame->backendStaticAllocBytes = 0;
 	FinishVRFrame();
 	ProcessPendingRenderTextureDeletes();
 
@@ -1787,12 +1821,18 @@ void idRenderSystemLocal::CompleteBackEndFrame( void ) {
 	// print any other statistics and clear all of them
 	R_PerformanceCounters();
 
-	// reset frame memory and the command chain for the next frame
-	R_ToggleSmpFrame();
-
-	// we can now release the vertexes used this frame
-	vertexCache.EndFrame();
-	R_RendererUpload_EndFrame();
+	R_RetireRenderSnapshots( submittedFrame );
+	R_TemporalPresentation_RetireFrame();
+	R_SetBackEndFrameData( NULL );
+	for ( int i = 0; i < worlds.Num(); ++i ) {
+		if ( worlds[i] != NULL ) worlds[i]->FreeDeferredLightDefs();
+	}
+	// Overlap advanced the producer at handoff; retirement must not reset it.
+	if ( submittedFrame == frameData ) {
+		R_ToggleSmpFrame();
+		vertexCache.EndFrame();
+		R_RendererUpload_EndFrame();
+	}
 
 	if ( threadedFrame ) {
 		pc = ticCounters;
@@ -3251,3 +3291,8 @@ void idRenderSystemLocal::DestroyRenderTexture( idRenderTexture* renderTexture )
 
 	pendingRenderTextureDeletes.Append( renderTexture );
 }
+
+#ifndef OPENQ4_RENDERER_VK_MODULE
+viewDef_t *R_SubmittedPrimaryView( void ) { return tr.primaryView; }
+bool R_SubmittedTakingScreenshot( void ) { return tr.takingScreenshot; }
+#endif

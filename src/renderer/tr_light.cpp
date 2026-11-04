@@ -2016,7 +2016,7 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def, bool collision
 
 	// allow deferred entities to construct themselves
 	if ( def->parms.callback ) {
-		R_RenderThread_Sync( "dynamic model" );
+		R_RenderThread_SyncFrontEnd( "dynamic model" );
 		callbackUpdate = R_IssueEntityDefCallback( def );
 	} else {
 		callbackUpdate = false;
@@ -2041,7 +2041,7 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def, bool collision
 	// the render thread may still draw them; a tic-time trace waits for it.
 	if ( callbackUpdate || def->dynamicModel == NULL
 			|| ( model->IsDynamicModel() == DM_CONTINUOUS && def->dynamicModelFrameCount != tr.frameCount ) ) {
-		R_RenderThread_Sync( "dynamic model" );
+		R_RenderThread_SyncFrontEnd( "dynamic model" );
 	}
 
 	// continously animating models (particle systems, etc) will have their snapshot updated every single view

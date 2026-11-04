@@ -505,6 +505,10 @@ bool VK_PrepareStartupDevice( char *outReason, int reasonLength );
 bool VK_Device_QueryCatalog(renderDeviceCatalog_t*);
 #endif
 
+static void RGM_SyncConfiguration( void ) {
+	R_RenderThread_Sync( "renderer configuration" );
+}
+
 static void RGM_Shutdown( void ) {
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	VK_Bringup_Shutdown();
@@ -571,6 +575,7 @@ renderExport_t *GetRenderAPI( renderImport_t *moduleImport ) {
 
 	rgm_export.renderSystem = renderSystem;			// the module's statically-initialized &tr
 	rgm_export.renderModelManager = renderModelManager;
+	rgm_export.SyncConfiguration = RGM_SyncConfiguration;
 	rgm_export.TryDeviceRestart = R_TryFullVidRestart;
 	rgm_export.GetDisplayPresentation = R_GetDisplayPresentation;
 	rgm_export.TryInitializeDisplay = R_TryInitializeDisplay;

@@ -90,7 +90,8 @@
 // 28 - glconfig_t appends active GPU class and dedicated-memory telemetry.
 // 29 - Owned read-only rendering-device inventory, callable on the live module.
 // 30 - Main-thread input-clock handoff and completed-frame latency receipts.
-#define RENDER_API_VERSION			30
+// 31 - Join submitted rendering before engine-side renderer CVar mutation.
+#define RENDER_API_VERSION			31
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -451,6 +452,7 @@ typedef struct renderExport_s {
     bool (*CancelImagePolicyRecovery)(const renderImageRecoveryLease_t*,char*,int);
     bool (*ReleaseImagePolicyRecovery)(const renderImageRecoveryLease_t*,uint32_t,const renderImagePolicyResult_t*,char*,int);
 	bool (*GetRenderingDevices)(renderDeviceCatalog_t*);
+	void (*SyncConfiguration)(void);
 } renderExport_t;
 
 extern "C" {

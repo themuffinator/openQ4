@@ -398,6 +398,7 @@ idMaterial::FreeData
 */
 void idMaterial::FreeData() {
 	if ( !R_ImagePolicyContentMutation() ) return;
+	R_RenderThread_Sync( "material teardown" );
 	if (R_ConsumedPolicyThread()) { consumedPolicy = {}; consumedParseRevision = R_ImagePolicyNewResourceIdentity(); }
 	int i;
 

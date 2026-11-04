@@ -6,6 +6,28 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Experimental Vulkan front-end overlap, 4 November 2026
+
+- **Vulkan can prepare the next frame while drawing the previous one.**
+  Developers and testers can opt in with `r_vkRenderThread 2`; mode `1` keeps
+  the earlier game-tic overlap and mode `0` remains the default. Performance
+  qualification is pending, and copying submitted geometry adds CPU and memory
+  cost. This is not yet a recommendation to change players' settings.
+- Submitted geometry, entities, lights and temporal state retain their own
+  storage until completion. Renderer setting changes, resource reloads,
+  screenshots and teardown wait for their current readers.
+- **Upgrade note:** rebuild and install the engine and renderer modules
+  together (renderer API **31**). Saves, network timestamps and the 60 Hz
+  simulation remain unchanged.
+- Validation covers concurrent frame arenas, geometry/cache ownership,
+  shutdown, setting changes and worker errors, plus windowed Vulkan SP,
+  MP host/client and OpenGL SP gameplay with GPU skinning, TAA, motion blur,
+  scaling, shader reload and Vulkan surface recovery/restart. See
+  [overlap evidence](presentation-owners.md#full-front-end-overlap-4-november-2026).
+- Quiet mode 0/1/2 comparisons, the native-resolution Quality budget, physical
+  display/input qualification and Linux/macOS runtime coverage remain open in
+  HF-07/HF-08 and REN-07. These are unreleased source changes.
+
 ## High-refresh frame ownership, 4 November 2026
 
 - **Blur and other controller-driven effects keep the settings of the frame
@@ -23,7 +45,7 @@ See [player release status](../user/release-status.md).
   severity. Windowed Vulkan SP/MP host/client and OpenGL SP gameplay passed,
   including effect toggles, eight classic-domain self-tests per role and engine
   screenshot review. See [submission evidence](presentation-owners.md#submitted-frame-ownership-4-november-2026).
-- `r_vkRenderThread` and `in_presentationView` remain opt-in. Front-end overlap,
+- `r_vkRenderThread` and `in_presentationView` remain opt-in. Overlap performance,
   the Quality every-frame budget and physical display/latency qualification
   remain open under HF-07/HF-08 and REN-07. These are unreleased source changes.
 

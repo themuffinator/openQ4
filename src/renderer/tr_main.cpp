@@ -270,37 +270,54 @@ void R_ShowColoredScreenRect( const idScreenRect &rect, int colorIndex ) {
 R_ToggleSmpFrame
 ====================
 */
+static frameData_t *smpFrames[2];
+static thread_local frameData_t *backEndFrameData;
+
+frameData_t *R_BackEndFrameData( void ) {
+	return backEndFrameData != NULL ? backEndFrameData : frameData;
+}
+
+void R_SetBackEndFrameData( frameData_t *frame ) {
+	backEndFrameData = frame;
+}
+
+// Ambient surfaces and interaction surfaces may share vertices across both
+// deferred lists. Drain them as one batch, so the reference-count prepass runs
+// before either arena's ambient owners can be returned to the tri allocator.
+void R_FreeDeferredFrameSurfaces( void ) {
+	frameData_t deferred = {};
+	for ( int i = 0; i < 2; ++i ) {
+		frameData_t *frame = smpFrames[i];
+		if ( frame == NULL || frame->firstDeferredFreeTriSurf == NULL ) continue;
+		if ( deferred.lastDeferredFreeTriSurf != NULL ) {
+			deferred.lastDeferredFreeTriSurf->nextDeferredFree = frame->firstDeferredFreeTriSurf;
+		} else {
+			deferred.firstDeferredFreeTriSurf = frame->firstDeferredFreeTriSurf;
+		}
+		deferred.lastDeferredFreeTriSurf = frame->lastDeferredFreeTriSurf;
+		frame->firstDeferredFreeTriSurf = frame->lastDeferredFreeTriSurf = NULL;
+	}
+	R_FreeDeferredTriSurfs( &deferred );
+}
+
 void R_ToggleSmpFrame( void ) {
-	// captures and bakes reset frame memory directly; a frame on the render
-	// thread may still be reading it
 	R_RenderThread_Sync( "frame reset" );
+	R_AdvanceFrameData();
+}
+
+void R_AdvanceFrameData( void ) {
 	if ( r_lockSurfaces.GetBool() ) {
 		return;
 	}
-	R_FreeDeferredTriSurfs( frameData );
-	for ( int i = 0; i < tr.worlds.Num(); i++ ) {
-		if ( tr.worlds[i] != NULL ) {
-			tr.worlds[i]->FreeDeferredLightDefs();
-		}
-	}
-
-	// clear frame-temporary data
-	frameData_t		*frame;
-	frameMemoryBlock_t	*block;
-
-	// update the highwater mark
-	R_CountFrameData();
-
-	frame = frameData;
-
-	// reset the memory allocation to the first block
-	frame->alloc = frame->memory;
-
-	// clear all the blocks
-	for ( block = frame->memory ; block ; block = block->next ) {
+	if ( !R_RenderThread_InFlight() ) R_CountFrameData();
+	// Full overlap drains before waking the worker. Never touch either
+	// deferred list while the consumer can append defensive frees to its slot.
+	if ( !R_RenderThread_InFlight() ) R_FreeDeferredFrameSurfaces();
+	frameData = smpFrames[frameData->slot ^ 1];
+	frameData->alloc = frameData->memory;
+	for ( frameMemoryBlock_t *block = frameData->memory; block; block = block->next ) {
 		block->used = 0;
 	}
-
 	R_ClearCommandChain();
 }
 
@@ -315,51 +332,42 @@ R_ShutdownFrameData
 =====================
 */
 void R_ShutdownFrameData( void ) {
-	frameData_t *frame;
-	frameMemoryBlock_t *block;
-
-	// free any current data
-	frame = frameData;
-	if ( !frame ) {
-		return;
+	R_RenderThread_Sync( "frame shutdown" );
+	R_FreeDeferredFrameSurfaces();
+	frameData = NULL;
+	R_SetBackEndFrameData( NULL );
+	for ( int i = 0; i < 2; ++i ) {
+		frameData_t *frame = smpFrames[i];
+		if ( frame == NULL ) {
+			continue;
+		}
+		for ( frameMemoryBlock_t *block = frame->memory; block; ) {
+			frameMemoryBlock_t *next = block->next;
+			Mem_Free16( block );
+			block = next;
+		}
+		Mem_Free( frame );
+		smpFrames[i] = NULL;
 	}
-
-	R_FreeDeferredTriSurfs( frame );
-
-	frameMemoryBlock_t *nextBlock;
-	for ( block = frame->memory ; block ; block = nextBlock ) {
-		nextBlock = block->next;
-		Mem_Free16( block );
-	}
-	Mem_Free( frame );
 	frameData = NULL;
 }
 
-/*
-=====================
-R_InitFrameData
-=====================
-*/
+void R_FrameOwnershipSelfTest_f( const idCmdArgs &args );
+
 void R_InitFrameData( void ) {
-	int size;
-	frameData_t *frame;
-	frameMemoryBlock_t *block;
-
+	cmdSystem->AddCommand( "rendererFrameOwnershipSelfTest", R_FrameOwnershipSelfTest_f, CMD_FL_RENDERER, "validates submitted frame snapshots without input or rendering" );
 	R_ShutdownFrameData();
-
-	frameData = (frameData_t *)Mem_ClearedAlloc( sizeof( *frameData ));
-	frame = frameData;
-	size = MEMORY_BLOCK_SIZE;
-	block = (frameMemoryBlock_t *)Mem_Alloc16( size + sizeof( *block ) );
-	if ( !block ) {
-		common->FatalError( "R_InitFrameData: Mem_Alloc16() failed" );
+	for ( int i = 0; i < 2; ++i ) {
+		frameData_t *frame = (frameData_t *)Mem_ClearedAlloc( sizeof( *frame ) );
+		frameMemoryBlock_t *block = (frameMemoryBlock_t *)Mem_Alloc16( MEMORY_BLOCK_SIZE + sizeof( *block ) );
+		block->size = MEMORY_BLOCK_SIZE;
+		block->used = 0;
+		block->next = NULL;
+		frame->memory = frame->alloc = block;
+		frame->slot = i;
+		smpFrames[i] = frame;
 	}
-	block->size = size;
-	block->used = 0;
-	block->next = NULL;
-	frame->memory = block;
-	frame->memoryHighwater = 0;
-
+	frameData = smpFrames[1];
 	R_ToggleSmpFrame();
 }
 
@@ -399,11 +407,13 @@ renderer keeps its performance counters through these installed hooks.
 =================
 */
 static void R_ImageToolsOnStaticAlloc( size_t bytes ) {
+	if ( R_RenderThread_OnRenderThread() ) { R_BackEndFrameData()->backendAllocCount++; R_BackEndFrameData()->backendStaticAllocBytes += bytes; return; }
 	tr.pc.c_alloc++;
 	tr.staticAllocCount += bytes;
 }
 
 static void R_ImageToolsOnStaticFree( void ) {
+	if ( R_RenderThread_OnRenderThread() ) { R_BackEndFrameData()->backendFreeCount++; return; }
 	tr.pc.c_free++;
 }
 
@@ -438,10 +448,12 @@ static bool R_GeoShadowsEnabled( void ) {
 }
 
 static void R_GeoCountTangentIndexes( int amount ) {
+	if ( R_RenderThread_OnRenderThread() ) { R_BackEndFrameData()->backendTangentIndexes += amount; return; }
 	tr.pc.c_tangentIndexes += amount;
 }
 
 static void R_GeoCountShadowVolume( void ) {
+	if ( R_RenderThread_OnRenderThread() ) { R_BackEndFrameData()->backendShadowVolumes++; return; }
 	tr.pc.c_createShadowVolumes++;
 }
 
@@ -473,7 +485,7 @@ static void R_GeoFreeVertexCaches( srfTriangles_t *tri ) {
 }
 
 static bool R_GeoDeferFree( srfTriangles_t *tri ) {
-	frameData_t *frame = frameData;
+	frameData_t *frame = R_BackEndFrameData();
 
 	if ( !frame ) {
 		// command line utility, or rendering in editor preview mode
@@ -547,19 +559,19 @@ void *R_FrameAlloc( int bytes ) {
 
 	// a frame on the render thread owns frame memory until it completes;
 	// the backend's own allocations run on that thread
-	R_RenderThread_Sync( "frame memory" );
+	R_RenderThread_SyncFrontEnd( "frame memory" );
 
 	// A negative size (an overflowed count*sizeof in a caller) would round to a
 	// still-negative value, pass the first-fit test below, rewind block->used,
 	// and silently hand back overlapping live memory. Reject it, and fold the
 	// oversize fatal up here so a huge positive request that wraps to negative
 	// after the +16 rounding is also caught before the block math runs.
-	if ( bytes < 0 || bytes > MEMORY_BLOCK_SIZE ) {
+	if ( bytes < 0 || bytes > idMath::INT_MAX - 16 ) {
 		common->FatalError( "R_FrameAlloc: invalid size %i", bytes );
 	}
 	bytes = (bytes+16)&~15;
 	// see if it can be satisfied in the current block
-	frame = frameData;
+	frame = R_BackEndFrameData();
 	block = frame->alloc;
 
 	if ( block->size - block->used >= bytes ) {
@@ -568,28 +580,18 @@ void *R_FrameAlloc( int bytes ) {
 		return buf;
 	}
 
-	// advance to the next memory block if available
+	// Reuse a sufficiently large block, or insert one after the current
+	// allocation block. Large frame-owned skin/cache copies need not fit the
+	// ordinary one-megabyte arena granule.
 	block = block->next;
-	// create a new block if we are at the end of
-	// the chain
-	if ( !block ) {
-		int		size;
-
-		size = MEMORY_BLOCK_SIZE;
-		block = (frameMemoryBlock_t *)Mem_Alloc16( size + sizeof( *block ) );
-		if ( !block ) {
-			common->FatalError( "R_FrameAlloc: Mem_Alloc16() failed" );
-		}
-		block->size = size;
-		block->used = 0;
-		block->next = NULL;
-		frame->alloc->next = block;
-	}
-
-	// we could fix this if we needed to...
-	if ( bytes > block->size ) {
-		common->FatalError( "R_FrameAlloc of %i exceeded MEMORY_BLOCK_SIZE",
-			bytes );
+	if ( block == NULL || block->size < bytes ) {
+		const int size = Max( MEMORY_BLOCK_SIZE, bytes );
+		frameMemoryBlock_t *fresh = (frameMemoryBlock_t *)Mem_Alloc16( static_cast<size_t>( size ) + sizeof( *fresh ) );
+		fresh->size = size;
+		fresh->used = 0;
+		fresh->next = block;
+		frame->alloc->next = fresh;
+		block = fresh;
 	}
 
 	frame->alloc = block;
@@ -1508,6 +1510,7 @@ void R_RenderView( viewDef_t *parms ) {
 		static_cast<idRenderWorldLocal *>(parms->renderWorld)->WriteVisibleDefs( tr.viewDef );
 	}
 
+	R_SnapshotRenderView( parms );
 	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
 		const int packetBuildStart = Sys_Milliseconds();
 		R_ScenePackets_AddRenderView( parms );

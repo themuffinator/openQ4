@@ -156,6 +156,7 @@ void	R_RendererModule_PublishLightGridLoadReceipt( const renderLightGridLoadRece
 bool	R_RendererModule_QueryRendererSelection( renderRendererSelection_t &selection, uint64_t &serial, uint64_t &epoch );
 struct renderDeviceCatalog_t;
 bool R_RendererModule_QueryRenderingDevices(renderDeviceCatalog_t& output);
+void R_RendererModule_SyncConfiguration();
 bool R_RendererModule_RenderSelectionPending(const char* api, const char* device);
 // After checked menu persistence, supersede the original launch preferences
 // for this process's explicit renderer reload. Other launch options survive.

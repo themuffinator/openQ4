@@ -261,7 +261,11 @@ static bool R_CanUseGLSLPrograms() {
 	return true;
 }
 
+#ifdef OPENQ4_RENDERER_VK_MODULE
+thread_local glconfig_t glConfig;
+#else
 glconfig_t	glConfig;
+#endif
 
 const char *r_rendererArgs[] = { "best", "arb2", "modern", "glesd3", "arb", "Cg", "exp", "nv10", "nv20", "r200", NULL };
 const char *r_glTierArgs[] = { "auto", "legacy", "gl33", "gl41", "gl43", "gl45", "gl46", NULL };

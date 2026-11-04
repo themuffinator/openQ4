@@ -68,7 +68,7 @@ def check_build() -> None:
 
 def check_abi() -> None:
     api = read("src/renderer/RenderModuleAPI.h")
-    require(api, "#define RENDER_API_VERSION\t\t\t30", "renderer module ABI v30")
+    require(api, "#define RENDER_API_VERSION\t\t\t31", "renderer module ABI v31")
     require(api, "void\t\t\t( *RendererDeviceEvent )( int event );\t// renderDeviceEvent_t",
             "the device lifetime service retains its signature")
     if api.index("( *RendererDeviceEvent )") > api.index("( *TakeFrameInputClocks )"):

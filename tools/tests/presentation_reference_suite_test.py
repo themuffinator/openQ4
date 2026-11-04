@@ -58,10 +58,10 @@ class ReferenceSuiteTest(unittest.TestCase):
             record = {"report": {"cases": [{"pacing": {"framePacingSnapshot": {"refreshHz": refresh}}}]}}
             self.assertIsNone(suite.refresh_from([record]))
 
-    def main_run(self, name, failure=False, refresh=240):
+    def main_run(self, name, failure=False, refresh=240, render_thread="1"):
         out = self.root / name
         args = ["suite", "--basepath", str(self.root), "--output-dir", str(out), "--windowed",
-                "--skip-sensor", "--skip-review", "--renderers", "vulkan", "--render-thread", "1"]
+                "--skip-sensor", "--skip-review", "--renderers", "vulkan", "--render-thread", render_thread]
         def run_case(args, output, name, options):
             # Only refresh detection needs a capture; other reports may be policy cases.
             case = {"case": "sample", "scenario": "policy", "exit": 0,
@@ -95,6 +95,16 @@ class ReferenceSuiteTest(unittest.TestCase):
         for run in report["runs"]:
             if run["name"].startswith("vulkan-"):
                 self.assertIn("r_vkRenderThread", run["options"])
+
+    def test_full_overlap_reaches_each_vulkan_case(self):
+        code, report, summary = self.main_run("full-overlap", render_thread="2")
+        self.assertEqual(code, 0)
+        self.assertEqual(report["renderThread"], 2)
+        self.assertEqual(report["physicalQualification"], "pending")
+        for run in report["runs"]:
+            if run["name"].startswith("vulkan-"):
+                options = run["options"]
+                self.assertEqual(options[options.index("r_vkRenderThread") + 1], "2")
 
 
 if __name__ == "__main__":

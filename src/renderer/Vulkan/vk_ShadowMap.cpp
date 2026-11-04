@@ -62,6 +62,7 @@
 #pragma hdrstop
 
 #include "../tr_local.h"
+#include <atomic>
 #include "../RenderWorld_local.h"
 #include "../ShadowMapProjected.h"
 #include "../ClassicInteractionDomain.h"
@@ -376,8 +377,8 @@ Phase F3: per-light-class resource honesty + the sticky stencil fallback
 // it can create each class's shadow-map resources in this video generation —
 // the GL contract (draw_arb2.cpp g_shadowMap*ResourcesOkGeneration). Reset
 // whenever the class's resources are destroyed.
-static int vkShadowProjectedResourcesOkGeneration = -1;
-static int vkShadowPointResourcesOkGeneration = -1;
+static std::atomic<int> vkShadowProjectedResourcesOkGeneration( -1 );
+static std::atomic<int> vkShadowPointResourcesOkGeneration( -1 );
 
 bool VK_ShadowMap_ResourcesKnownGood( bool pointLight ) {
 	// VK_ShadowMap_EnsureResources (atlas + compare/raw samplers + atlas
@@ -629,6 +630,7 @@ bool VK_Exec_SetShadowMomentViews( const VkImageView views[ 3 ], VkSampler sampl
 bool VK_Exec_ShadowMomentViewsPublished( void );
 void VK_Exec_RefreshShadowMomentSets( VkDescriptorSet sets[ VK_FRAMES_IN_FLIGHT ] );
 
+static std::atomic<bool> vkShadowMomentsReady( false );
 static const VkFormat VK_SHADOW_MOMENT_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 
 static bool VK_ShadowMap_MomentsRequested( void ) {
@@ -636,8 +638,12 @@ static bool VK_ShadowMap_MomentsRequested( void ) {
 }
 
 bool VK_ShadowMap_TranslucentMomentsAvailable( void ) {
-	return VK_ShadowMap_MomentsRequested() && vkCtx.initialized
-		&& vkShadow.momentAtlasFailedSize == 0 && VK_Exec_MomentCasterModulesReady();
+	if ( !R_RenderThread_OnRenderThread() && R_RenderThread_InFlight() ) {
+		return VK_ShadowMap_MomentsRequested() && vkShadowMomentsReady.load();
+	}
+	const bool ready = vkCtx.initialized && vkShadow.momentAtlasFailedSize == 0 && VK_Exec_MomentCasterModulesReady();
+	vkShadowMomentsReady.store( ready );
+	return VK_ShadowMap_MomentsRequested() && ready;
 }
 
 // GL sizes its moment target as one projected block: an r_shadowMapSize

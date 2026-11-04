@@ -13,27 +13,22 @@
 /*
 ===============================================================================
 
-	Render thread, stage 1 (HF-07, REN-07 in docs/dev/roadmap.md).
+	Render thread (HF-07, REN-07 in docs/dev/roadmap.md).
 
 	EndFrame hands the finished command list to this thread, which runs
 	RB_ExecuteBackEndCommands (Vulkan recording, submit and present) while
 	the main thread returns to the next frame's events, console commands,
-	sound and game tic. The next BeginFrame waits for the thread and then
-	completes the frame: the steps EndFrame used to run after the backend
-	(render-texture deletes, metrics, frame memory, vertex cache).
-
-	Only the game tic overlaps the backend. The front end of the next frame
-	still starts after the backend has finished, so frame memory, the command
-	chain, scene packets and vertex-cache frame temps keep a single owner at
-	every moment and need no double buffering. Main-thread renderer entries
-	that are not safe during the tic wait first (R_RenderThread_Sync).
+	sound and game tic. Mode 1 joins at BeginFrame. Mode 2 also builds the
+	next front end in a second arena, with immutable submitted geometry/defs,
+	separate scene packets, cache headers and metrics. It joins at EndFrame
+	before handing off another frame. Resource mutation and readback retain
+	explicit barriers; neither mode permits a second backend in flight.
 
 ===============================================================================
 */
 
-idCVar r_vkRenderThread( "r_vkRenderThread", "0", CVAR_RENDERER | CVAR_BOOL,
-	"1 records and presents each frame on a render thread while the main thread "
-	"runs the next game tic (prototype; see REN-07). 0 runs the backend inline." );
+idCVar r_vkRenderThread( "r_vkRenderThread", "0", CVAR_RENDERER | CVAR_INTEGER,
+	"0 runs inline; 1 overlaps the game tic; 2 also overlaps the next front end (experimental; REN-07).", 0, 2 );
 
 // The worker must unwind before any common error path can tear down the
 // renderer. Keep fatality in the receipt so main-thread retirement does not
@@ -55,6 +50,13 @@ void R_RenderThread_Error( const char *message, bool fatal ) {
 	}
 }
 
+static frameData_t *rt_frame = NULL;
+static glconfig_t rt_config;
+static viewDef_t *rt_primaryView = NULL;
+static bool rt_takingScreenshot = false;
+static bool rt_frontEndOverlap = false;
+static int rt_frontEndsOverlapped = 0;
+static int rt_frontEndsFinishedWhileBusy = 0;
 static std::thread					rt_thread;
 static std::thread::id				rt_threadId;
 static std::mutex					rt_mutex;
@@ -100,6 +102,8 @@ static void R_RenderThread_Main( void ) {
 		bool failed = false;
 		bool fatal = false;
 		const int start = Sys_Milliseconds();
+		R_SetBackEndFrameData( rt_frame );
+		glConfig = rt_config;
 		try {
 			RB_ExecuteBackEndCommands( cmds );
 		} catch ( const renderThreadException_t &ex ) {
@@ -112,6 +116,8 @@ static void R_RenderThread_Main( void ) {
 			failed = true;
 			idStr::Copynz( rt_failure, ex.error, sizeof( rt_failure ) );
 		}
+		R_RendererMetrics_MarkBackEndFinished();
+		R_SetBackEndFrameData( NULL );
 		const int elapsed = Sys_Milliseconds() - start;
 
 		{
@@ -133,7 +139,7 @@ static void R_RenderThread_Start( void ) {
 	rt_quit = false;
 	rt_thread = std::thread( R_RenderThread_Main );
 	rt_threadId = rt_thread.get_id();
-	common->Printf( "Render thread started (r_vkRenderThread 1)\n" );
+	common->Printf( "Render thread started (r_vkRenderThread %d)\n", r_vkRenderThread.GetInteger() );
 }
 
 /*
@@ -157,13 +163,39 @@ bool R_RenderThread_InFlight( void ) {
 	return rt_inFlight.load( std::memory_order_acquire );
 }
 
+bool R_RenderThread_OverlapRequested( void ) {
+	if ( R_RenderThread_OnRenderThread() ) return rt_frontEndOverlap;
+	return r_vkRenderThread.GetInteger() == 2 && !r_lockSurfaces.GetBool();
+}
+
+bool R_RenderThread_FrontEndMayOverlap( void ) {
+	return R_RenderThread_InFlight() && rt_frontEndOverlap;
+}
+
+void R_RenderThread_SyncFrontEnd( const char *reason ) {
+	if ( !R_RenderThread_FrontEndMayOverlap() ) {
+		R_RenderThread_Sync( reason );
+	} else if ( idStr::Cmp( reason, "frame" ) == 0 ) {
+		std::lock_guard<std::mutex> lock( rt_mutex );
+		if ( rt_busy ) ++rt_frontEndsOverlapped;
+	}
+}
+
+viewDef_t *R_SubmittedPrimaryView( void ) {
+	return R_RenderThread_OnRenderThread() ? rt_primaryView : tr.primaryView;
+}
+
+bool R_SubmittedTakingScreenshot( void ) {
+	return R_RenderThread_OnRenderThread() ? rt_takingScreenshot : tr.takingScreenshot;
+}
+
 /*
 ==================
 R_RenderThread_Begin
 
 Main thread, from EndFrame. Returns false to have the caller execute the
 commands inline: the prototype is off, a capture needs the frame now, or
-the configuration is outside the audited stage-1 set.
+the configuration requires synchronous rendering.
 ==================
 */
 bool R_RenderThread_Begin( const emptyCommand_t *cmds ) {
@@ -173,6 +205,20 @@ bool R_RenderThread_Begin( const emptyCommand_t *cmds ) {
 	}
 	R_RenderThread_Start();
 	VK_Backend_PrepareThreadedFrame();
+	// All views are frozen and the preceding backend has retired. Earlier
+	// resource syncs can occur inside a still-building view, so they must not
+	// drain the producer's deferred geometry. Do it only at this handoff.
+	if ( R_RenderThread_OverlapRequested() ) R_FreeDeferredFrameSurfaces();
+	R_CountFrameData();
+	R_TemporalPresentation_SubmitFrame();
+	rt_frame = frameData;
+	rt_config = glConfig;
+	rt_primaryView = tr.primaryView;
+	rt_takingScreenshot = tr.takingScreenshot;
+	rt_frontEndOverlap = R_RenderThread_OverlapRequested();
+	backEnd.postProcessTexelSize = tr.postProcessTexelSize;
+	backEnd.postProcessSourceColorSpace = tr.postProcessSourceColorSpace;
+	backEnd.postProcessSMAAQuality = tr.postProcessSMAAQuality;
 	{
 		std::lock_guard<std::mutex> lock( rt_mutex );
 		assert( !rt_busy );
@@ -203,9 +249,8 @@ static void R_RenderThread_CountReason( const char *reason ) {
 R_RenderThread_Sync
 
 Main thread. Waits for the frame on the render thread, if any, and completes
-it. Every main-thread renderer entry that touches state the backend reads,
-other than the stage-1 tic-safe set, calls this first. The render thread
-itself never waits on itself.
+it. Resource mutations call this first; producer-only entries use the
+mode-aware SyncFrontEnd barrier. The render thread never waits on itself.
 ==================
 */
 void R_RenderThread_Sync( const char *reason ) {
@@ -221,6 +266,7 @@ void R_RenderThread_Sync( const char *reason ) {
 		std::unique_lock<std::mutex> lock( rt_mutex );
 		if ( rt_busy ) {
 			rt_syncWaits++;
+			if ( rt_frontEndOverlap && idStr::Cmp( reason, "handoff" ) == 0 ) ++rt_frontEndsFinishedWhileBusy;
 		}
 		rt_done.wait( lock, [] { return !rt_busy; } );
 		failed = rt_failed;
@@ -238,8 +284,12 @@ void R_RenderThread_Sync( const char *reason ) {
 		R_RenderThread_CountReason( reason );
 	}
 
+	R_SetBackEndFrameData( rt_frame );
 	R_RendererMetrics_RecordSubmitMsec( backEndMsec );
 	tr.CompleteBackEndFrame();
+	R_SetBackEndFrameData( NULL );
+	rt_frame = NULL;
+	rt_frontEndOverlap = false;
 	VK_Backend_CompleteThreadedFrame();
 
 	if ( fatal ) {
@@ -288,6 +338,7 @@ static void R_RenderThreadStats_f( const idCmdArgs &args ) {
 	R_RenderThread_Sync( "stats" );
 	if ( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "reset" ) == 0 ) {
 		rt_framesThreaded = rt_framesInline = rt_framesCompleted = rt_syncWaits = 0;
+		rt_frontEndsOverlapped = rt_frontEndsFinishedWhileBusy = 0;
 		rt_syncWaitUsec = 0;
 		rt_syncReasons.Clear();
 		rt_syncReasonCounts.Clear();
@@ -296,6 +347,7 @@ static void R_RenderThreadStats_f( const idCmdArgs &args ) {
 	common->Printf( "Render thread: enabled=%d running=%d threaded=%d inline=%d waits=%d waitMs=%.2f completed=%d\n",
 		r_vkRenderThread.GetBool() ? 1 : 0, rt_thread.joinable() ? 1 : 0, rt_framesThreaded, rt_framesInline,
 		rt_syncWaits, rt_syncWaitUsec * 0.001f, rt_framesCompleted );
+	common->Printf( "Render thread overlap: mode=%d frontEndsWhileBusy=%d frontEndsFinishedWhileBusy=%d\n", r_vkRenderThread.GetInteger(), rt_frontEndsOverlapped, rt_frontEndsFinishedWhileBusy );
 	for ( int i = 0; i < rt_syncReasons.Num(); i++ ) {
 		common->Printf( "Render thread early sync: %s=%d\n", rt_syncReasons[i].c_str(), rt_syncReasonCounts[i] );
 	}

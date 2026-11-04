@@ -52,12 +52,12 @@ def validate_packet_capture_edge() -> None:
     ):
         require(header, token, "packet-level capture edge")
     for token in (
-        "rg_frontEndLastDrawView",
+        "rg_scenePacketLastViews[R_ScenePackets_FrameSlot()]",
         "R_ScenePackets_FrontEndCaptureRequired",
         "r_rendererSharedSubview.GetBool()",
         "R_ScenePackets_AddCopyRender( idImage *image, int x, int y",
-        "rg_frontEndScenePacketFrame.AddSubviewCapture",
-        "rg_frontEndLastDrawView = NULL;",
+        "rg_scenePacketFrames[R_ScenePackets_FrameSlot()].AddSubviewCapture",
+        "rg_scenePacketLastViews[R_ScenePackets_FrameSlot()] = NULL;",
         "R_ScenePackets_BuildLegacyCommandStream",
         "packetFrame.AddSubviewCapture( lastDrawView",
         "subviewCaptures=%d",

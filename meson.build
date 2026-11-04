@@ -675,6 +675,8 @@ if get_option('build_native_tests')
     args: [files('tools/tests/renderer_input_latency.py')], timeout: 90)
   test('openq4-render-special-effect-snapshot', py,
     args: [files('tools/tests/renderer_special_effect_snapshot.py')], timeout: 90)
+  test('openq4-render-frame-ownership', py,
+    args: [files('tools/tests/renderer_frame_ownership.py')], timeout: 90)
   test('openq4-render-frame-identity', py,
     args: [files('tools/tests/renderer_frame_identity.py')], timeout: 90)
   test('openq4-presentation-reference-suite', py,
