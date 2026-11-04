@@ -6,6 +6,17 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Damaged ragdoll saves recover safely, 4 November 2026
+
+- Saves with inconsistent ragdoll owners, missing required definitions or
+  mismatched bodies/joints now return to Load Game instead of risking an
+  assertion or applying a pose to the wrong part. Legitimate inactive figures
+  and the existing save format are preserved.
+- Both game libraries pass Windows/Linux regression controls and the focused
+  Windows suite passes 58 checks. Seven damaged-save cases recover on each of
+  OpenGL and Vulkan, healthy ragdolls survive resave/reload, and all 11 existing
+  0.9–0.13 fixtures still load. See [scope and evidence](savegame-reliability.md#articulated-figure-reconstruction-and-saved-structure).
+
 ## Vehicle health and shield meters, 4 November 2026
 
 - Invulnerable turrets now show a full health meter, and vehicles without shields

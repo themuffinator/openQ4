@@ -1841,6 +1841,16 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   All 11 existing 0.9–0.13 release fixtures also restore and run gameplay on
   OpenGL. Every input save remains unchanged.
   Broader owning graphs and other platforms remain open.
+  Articulated-figure follow-up, 4 November: [required reconstruction and saved
+  structure](savegame-reliability.md#articulated-figure-reconstruction-and-saved-structure)
+  now validate figure ownership, loaded/active state, body/joint names and joint
+  types in both libraries. Missing required AF resources enter recovery;
+  optional inactive setup failures remain valid. Windows/Linux fixtures reject
+  16 deliberate regressions per platform; the focused Windows suite passes 58/58.
+  Seven CRC-valid damaged-ragdoll cases per renderer recover and permit a healthy
+  reload on OpenGL/Vulkan. Healthy body poses survive frozen restore, the resave
+  reloads, and all 11 existing 0.9–0.13 fixtures still restore into gameplay.
+  This closes the identified AF boundaries, not the broader graph/platform gate.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.

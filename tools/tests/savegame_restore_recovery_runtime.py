@@ -414,6 +414,163 @@ def thread_fixtures(data, frame_offset, frame_reference):
     return result, metadata
 
 
+def af_fixtures(data):
+    """Decode an AF entity prefix and body table before mutating its identity.
+
+    Only active ragdolls with attached heads are selected, rather than an earlier
+    map light that also uses AF physics. Contact records are decoded as well.
+    Every intervening class/static-object sync is checked, and no offsets are
+    inferred from a raw occurrence of a body or declaration name.
+    """
+    entries, metadata = class_table(data)
+    classes = {entry['index']: entry['name'] for entry in entries}
+    foreign = next(index for index, name in classes.items() if name == 'idWorldspawn')
+    for marker in re.finditer(re.escape(b'OQ4Y'), data):
+        position = marker.start()
+        sequence = struct.unpack_from('<i', data, position+4)[0]
+
+        def integer():
+            nonlocal position
+            value = struct.unpack_from('<i', data, position)[0]
+            position += 4
+            return value
+
+        def skip(size):
+            nonlocal position
+            assert 0 <= size < 1048576 and position+size <= len(data)-16
+            position += size
+
+        def string():
+            size = integer()
+            assert 0 <= size < 4096
+            value = data[position:position+size].decode('ascii')
+            skip(size)
+            return value
+
+        def boolean():
+            nonlocal position
+            value = data[position]
+            assert value in (0, 1)
+            position += 1
+            return value
+
+        def sync():
+            nonlocal sequence
+            assert integer() == int.from_bytes(b'OQ4Y', 'little') and integer() == sequence
+            sequence += 1
+
+        def body():
+            offset = position+4
+            name = string()
+            assert re.fullmatch(r'[A-Za-z_][A-Za-z_0-9 ]*', name)
+            skip(300)  # typed scalars, vectors, matrices and solver indexes
+            assert data[position] < 64  # six packed flags
+            skip(1)
+            return dict(offset=offset, name=name)
+
+        try:
+            sync()  # idAFEntity_Base begins
+            boolean()  # noPlayerImpactFX
+            skip(4)  # combat model contents
+            if boolean():  # combat clip model
+                boolean()
+                skip(4+4+4+12+36+24+24+4)
+                string()
+                skip(8)
+                boolean()
+                skip(4)
+                boolean()
+            skip(12+36+4)  # spawn pose and sound time
+            owner_offset = position
+            owner = integer()
+            assert owner in classes and classes[owner] == 'idAFEntity_WithAttachedHead'
+            name_offset = position+4
+            name = string()
+            assert re.fullmatch(r'[A-Za-z_][A-Za-z_0-9/]*', name)
+            boolean()  # bind constraints
+            skip(12+36+8)  # base pose, pose/rest times
+            loaded_offset = position
+            assert boolean() == 1
+            active_offset = position
+            assert boolean() == 1
+            sync()  # WriteStaticObject(physicsObj)
+            empty = 0
+            for _ in range(2):  # idClass and optional idPhysics empty frames
+                if data[position+8:position+12] != b'OQ4Y':
+                    break
+                sync()
+                sync()
+                empty += 1
+            assert empty in (1, 2)
+            sync()  # idPhysics_Base
+            assert integer() == owner
+            skip(4+12+12)
+            contacts = integer()
+            assert 0 <= contacts <= 4096
+            for _ in range(contacts):
+                assert 0 <= integer() <= 3  # contact type
+                skip(12+12+4+4)  # point, normal, distance, contents
+                string()  # material
+                skip(4+4)  # features
+                assert 0 <= integer() < 4096  # entity number
+                skip(4)  # clip ID
+                string()  # material type
+            contact_entities = integer()
+            assert 0 <= contact_entities <= 4096
+            skip(contact_entities*4)  # spawn IDs
+            sync()
+            sync()  # idPhysics_AF
+            count = integer()
+            assert 1 <= count <= 128
+            bodies = [body() for _ in range(count)]
+            assert len({b['name'].lower() for b in bodies}) == count
+            if boolean():
+                body()  # optional master body
+            constraints = integer()
+            assert 1 <= constraints <= 256
+            type_offset = position
+            constraint_type = integer()
+            assert 1 <= constraint_type <= 14
+            constraint_offset = position+4
+            constraint_name = string()
+            assert re.fullmatch(r'[A-Za-z_][A-Za-z_0-9 ]*', constraint_name)
+            assert all(integer() == -1 for _ in range(6))
+            integer()  # solver first index
+            assert data[position] < 64
+            definitions = [
+                ('ForeignAFOwner', [(owner_offset, foreign, '<i')], 'idAF::Restore: inconsistent owner reference'),
+                ('NullLoadedAFOwner', [(owner_offset, 0, '<i')], 'idAF::Restore: inconsistent loaded/active state'),
+                ('ActiveUnloadedAF', [(loaded_offset, 0, '<B'), (active_offset, 1, '<B')], 'idAF::Restore: inconsistent loaded/active state'),
+                ('WrongAFConstraintType', [(type_offset, 0, '<i')], f'type mismatch 0 (expected {constraint_type})'),
+            ]
+            result = {}
+            detail = dict(owner=owner, classname=classes[owner], figure=name, active=True,
+                          bodies=bodies, constraints=constraints, constraint_type=constraint_type,
+                          constraint_name=constraint_name, prefix_offset=marker.start())
+            for label, edits, expected in definitions:
+                changed = bytearray(data)
+                for offset, value, fmt in edits:
+                    struct.pack_into(fmt, changed, offset, value)
+                struct.pack_into('<I', changed, len(changed)-4, zlib.crc32(changed[:-16]))
+                result[label] = bytes(changed), dict(**detail, edits=edits, expected=expected)
+            for label, offset, original, expected in (
+                ('MissingAFDefinition', name_offset, name, 'idAF::Restore: could not reconstruct loaded figure'),
+                ('WrongAFBodyName', bodies[0]['offset'], bodies[0]['name'], 'idAFBody::Restore: body name mismatch'),
+                ('WrongAFConstraintName', constraint_offset, constraint_name, 'idAFConstraint::Restore: constraint name mismatch'),
+            ):
+                changed = bytearray(data)
+                replacement = 'x'*len(original)
+                assert replacement != original
+                changed[offset:offset+len(original)] = replacement.encode('ascii')
+                struct.pack_into('<I', changed, len(changed)-4, zlib.crc32(changed[:-16]))
+                result[label] = bytes(changed), dict(**detail, name_offset=offset,
+                    original=original, replacement=replacement, expected=expected)
+            return result, metadata
+        except (AssertionError, IndexError, UnicodeError, struct.error):
+            continue
+    raise AssertionError('No loaded articulated-figure prefix and body table were found.')
+
+
 def animation_fixtures(data):
     """Decode complete actor frames before editing embedded IK/animation owners."""
     entries, metadata = class_table(data)
@@ -824,7 +981,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--ui', choices=('retained', 'classic'), default='retained')
     parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
-    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics', 'animation'), default='registrations')
+    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics', 'animation', 'af'), default='registrations')
     parser.add_argument('--unavailable-pause-menu', action='store_true',
                         help='Also exercise optional retained-menu fallback during valid save loading.')
     parser.add_argument('--timeout', type=int, default=240)
@@ -840,7 +997,8 @@ def main():
         if sha(ROOT/'builddir'/relative) != sha(runtime/relative):
             parser.error('Stage the current build before running this probe: '+relative)
     original = source.read_bytes()
-    fixtures, metadata = (animation_fixtures(original) if args.cases == 'animation'
+    fixtures, metadata = (af_fixtures(original) if args.cases == 'af'
+                         else animation_fixtures(original) if args.cases == 'animation'
                          else gui_fixtures(original) if args.cases == 'guis'
                          else object_class_fixtures(original) if args.cases == 'classes'
                          else factory_fixtures(original) if args.cases == 'factories'
@@ -897,7 +1055,7 @@ def main():
         runtime={relative: sha(runtime/relative) for relative in
                  ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll', 'baseoq4/game-mp_x64.dll', 'baseoq4/pak0.pk4', 'baseoq4/pak1.pk4')},
         before={path.name: sha(path) for path in saves},
-        scope='Current v4 semantic restore rejection, real recovery UI, good reload. Hidden window, input disabled, engine screenshots.')
+        scope='Current v5 semantic restore rejection, real recovery UI, good reload. Hidden window, input disabled, engine screenshots.')
     (output/'plan.json').write_text(json.dumps(report, indent=2)+'\n')
     startup = subprocess.STARTUPINFO()
     startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW

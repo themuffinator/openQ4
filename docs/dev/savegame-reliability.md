@@ -1052,6 +1052,70 @@ regression coverage of the existing corpus, not new Q4-07 original-writer eviden
 These checks cover the identified actor and state-call paths; broader owning
 graphs and platform qualification remain open under Q4-05.
 
+### Articulated-figure reconstruction and saved structure
+
+The next 4 November Q4-05 change validates articulated figures in both game
+libraries before applying saved body and joint data:
+
+- A non-NULL saved figure owner must be its containing entity. Loaded, active
+  or bound figures require that owner; active/bound figures must also be loaded.
+- Reconstructing a figure saved as loaded must succeed. A missing/defaulted AF
+  declaration, model, animator or `af_pose` now enters save recovery at that boundary instead
+  of continuing with an incomplete structure. Inactive entities whose optional
+  AF setup failed before saving are still accepted.
+- A saved constraint type must match the reconstructed joint. This is a runtime
+  check in release builds, replacing an assertion. Body and constraint names
+  must also match before pose/solver fields are read; comparing counts alone
+  cannot detect reordered or substituted parts. Name comparison ignores case,
+  like AF declaration lookup, and retains the reconstructed name.
+
+Saved bytes and the historical readers are unchanged. A mod that changes the
+saved body's or joint's identity is refused rather than applying its state to
+a different part. This does not repair an already-damaged save.
+
+`savegame_restore_af.py` compiles the production figure, body and constraint
+readers. It exercises every field-read interruption, foreign/NULL owners,
+loaded/active/bind inconsistencies, failed required reconstruction, optional
+inactive failure, valid loaded inactive/active figures, names, types and box indexes.
+Both libraries pass on Windows and Linux, with **16 deliberate regressions**
+rejected on each platform. The Windows focused suite passes **58/58**.
+
+The runtime harness adds `--cases af`. It decodes an active attached-head
+ragdoll's class/static-object frames, contacts and body table before editing
+owner, activation, AF definition, body name, constraint name or type. All seven
+fixtures retain valid file CRCs. The shared checksum helper now accepts any
+bounded `game/` SP map name and records it, instead of requiring Storage1.
+The initial fixture parser's empty-contact restriction was unsuitable for a
+resting ragdoll; its preparation failure was fixed by decoding the contacts.
+No failed parser attempt is counted as product qualification.
+
+The first engine runs returned safely to recovery for all seven cases, but the
+missing-definition case failed the intended boundary: normal declaration lookup
+invented a one-body placeholder, and the later body-count check refused it.
+Required definitions now use a non-creating lookup and reject defaulted parses
+before `Load` runs. Those earlier reports remain as failed qualification runs.
+
+The final Windows x64 candidate passes all **seven cases on each of OpenGL and
+Vulkan**: the expected restore error, retained Load Game page and subsequent
+healthy reload all occur in the same process, with every input file unchanged.
+Engine captures confirm both the recovery page and restored Air Defense scene.
+The selected active `marine3` ragdoll has ten bodies and nine constraints. Its
+ten body poses survive a frozen healthy restore byte-for-byte; simulation then
+continues for 180 tics, a resave succeeds, and that resave reloads on Vulkan.
+Both frozen resaves retain their input object table and contain no unresolved
+references. The final candidate also restores all **11 existing 0.9–0.13 release
+fixtures** on OpenGL and runs gameplay, with the original files unchanged.
+
+Concurrent OpenGL runs paused during renderer startup, then completed within
+their harness limits (the recovery sequence took 202 seconds; the healthy
+restore/resave 236 seconds). The subsequent Vulkan resave reload took 32 seconds.
+These are functional results, not performance measurements or a resolution of
+the observed startup delay. No test process needed to be killed manually.
+
+Evidence is retained under `.tmp/q4-af/`, indexed by `evidence.json`. These
+checks cover the identified AF restore boundaries, not every owning graph,
+ragdoll behavior or target platform; Q4-05 remains open.
+
 ### Saving before the first frame after a load
 
 Fixed 3 November (Q4-05), in both game libraries. `ReadStaticObject` queued
