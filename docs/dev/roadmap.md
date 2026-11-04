@@ -1743,6 +1743,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   visual/audio parity remain open; this checks one shot and its engine capture.
   Arena was covered only as `game_mp` on `baseoq4`, not as a switch from the
   Awakening menu. Full playthroughs remain.
+  M01/M02 scrutiny, 4 November: fire volumes now use projectile/touch collision
+  while burning and clear it when quenched, including on restore; final freeze
+  hits fully dim their lights. M02's repair-bot attachment, generator defence
+  gate, objective timing and animation sequencing are corrected under a separate
+  saved script identity. Original M02 saves retain the installed program.
+  See [mission intent, findings and bounded runtime evidence](awakening-missions.md).
+  End-to-end squad routing, walker demolition/traversal and Tank/extraction
+  qualification remain part of this gate.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus
@@ -1841,6 +1849,26 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   All 11 existing 0.9–0.13 release fixtures also restore and run gameplay on
   OpenGL. Every input save remains unchanged.
   Broader owning graphs and other platforms remain open.
+  Articulated-figure follow-up, 4 November: [required reconstruction and saved
+  structure](savegame-reliability.md#articulated-figure-reconstruction-and-saved-structure)
+  now validate figure ownership, loaded/active state, body/joint names and joint
+  types in both libraries. Missing required AF resources enter recovery;
+  optional inactive setup failures remain valid. Windows/Linux fixtures reject
+  16 deliberate regressions per platform; the focused Windows suite passes 58/58.
+  Seven CRC-valid damaged-ragdoll cases per renderer recover and permit a healthy
+  reload on OpenGL/Vulkan. Healthy body poses survive frozen restore, the resave
+  reloads, and all 11 existing 0.9–0.13 fixtures still restore into gameplay.
+  This closes the identified AF boundaries, not the broader graph/platform gate.
+  Event-queue follow-up, 4 November: [queued callbacks and legacy argument
+  ownership](savegame-reliability.md#event-queues-and-interrupted-legacy-arguments)
+  now reject unsupported target callbacks and descending event times, and free
+  temporary legacy buffers after interrupted reads. Both game libraries pass
+  Windows/Linux read/allocation-failure fixtures and eight negative controls per
+  platform; the focused Windows suite passes 60/60. Save layouts are unchanged.
+  Seven CRC-valid damaged-event cases per renderer recover to Load Game and
+  reload the healthy save on OpenGL/Vulkan, with all input files unchanged.
+  All 11 existing 0.9–0.13 fixtures still restore into gameplay. Broader owning
+  graphs and other target platforms remain open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.

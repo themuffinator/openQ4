@@ -88,8 +88,6 @@ void riFireFX::Spawn( void ) {
 	stage = FIRE_LARGE;
 	burning = spawnArgs.GetBool( "on", "1" );
 	UpdateContents();
-	// Map targets may spawn after this volume.
-	PostEventMS( &EV_FireFX_LookAtTarget, 0 );
 	if ( burning ) {
 		BecomeActive( TH_THINK );
 		StartStageEffect();
@@ -116,18 +114,19 @@ void riFireFX::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( nextDamageTime );
 	savefile->ReadInt( stage );
 	savefile->ReadBool( burning );
+	// Also repair the solid clip contents stored by older saves.
 	UpdateContents();
 
 	// client effects are not saved; bring the current stage back
 	if ( burning ) {
 		StartStageEffect();
 	}
-	PostEventMS( &EV_FireFX_LookAtTarget, 0 );
 }
 
+// Match common/shot_clip: freeze projectiles hit the flame, but players and
+// squadmates can cross it and receive touch damage. A quenched/disabled vent
+// must not remain an invisible wall or absorb shots meant for enemies beyond.
 void riFireFX::UpdateContents( void ) {
-	// A flame is a damage volume and a freeze-projectile target, not an invisible
-	// wall. Extinguished/disabled vents must not intercept subsequent shots.
 	GetPhysics()->SetContents( burning && stage < FIRE_OUT ? CONTENTS_PROJECTILE | CONTENTS_TRIGGER : 0 );
 }
 
@@ -145,6 +144,7 @@ void riFireFX::StartStageEffect( void ) {
 	const idMat3 upright = ( -GetPhysics()->GetGravityNormal() ).ToMat3();
 	effect = PlayEffect( stageEffects[ stage ], GetPhysics()->GetOrigin(), upright, true );
 	Event_LookAtTarget();
+	PostEventMS( &EV_FireFX_LookAtTarget, 0 );
 }
 
 /*
@@ -236,7 +236,7 @@ void riFireFX::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 
 	const int oldHealth = health;
 	idTrigger::Damage( inflictor, attacker, dir, damageDefName, damageScale, location );
-	ShrinkTargetLights( oldHealth - Max( 0, health ) );
+	ShrinkTargetLights( oldHealth - Max( health, 0 ) );
 
 	if ( stage == FIRE_LARGE && health > 0 && health < spawnArgs.GetInt( "health", "100" ) / 2 ) {
 		StopEffect( "fx_fireLarge" );

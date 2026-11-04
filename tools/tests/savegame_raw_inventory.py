@@ -80,7 +80,7 @@ GAME: dict[str, dict[str, list[str]]] = {
                                     R("&enemy.fl,sizeof(enemy.fl)"), R("&passive.fl,sizeof(passive.fl)")]},
     "ai/AI_Actions.cpp": {"legacy-reader": [R("&fl,sizeof(fl)")]},
     "ai/AI_Move.cpp": {"legacy-reader": [R("&fl,sizeof(fl)")]},
-    "gamesys/Event.cpp": {"legacy-reader": [R("legacyData,argsize")]},
+    "gamesys/Event.cpp": {"legacy-reader": [R("legacyData.get(),argsize")]},
     "gamesys/State.cpp": {"legacy-reader": ["saveFile->Read(&fl,sizeof(fl))"]},
     "physics/Physics_RigidBody.cpp": {"legacy-reader": [R("&state.pushVelocity,sizeof(state.pushVelocity)")]},
     "IK.cpp": {"legacy-reader": [R(f"{name},sizeof({name})") for name in (

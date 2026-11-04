@@ -1052,6 +1052,122 @@ regression coverage of the existing corpus, not new Q4-07 original-writer eviden
 These checks cover the identified actor and state-call paths; broader owning
 graphs and platform qualification remain open under Q4-05.
 
+### Articulated-figure reconstruction and saved structure
+
+The next 4 November Q4-05 change validates articulated figures in both game
+libraries before applying saved body and joint data:
+
+- A non-NULL saved figure owner must be its containing entity. Loaded, active
+  or bound figures require that owner; active/bound figures must also be loaded.
+- Reconstructing a figure saved as loaded must succeed. A missing/defaulted AF
+  declaration, model, animator or `af_pose` now enters save recovery at that boundary instead
+  of continuing with an incomplete structure. Inactive entities whose optional
+  AF setup failed before saving are still accepted.
+- A saved constraint type must match the reconstructed joint. This is a runtime
+  check in release builds, replacing an assertion. Body and constraint names
+  must also match before pose/solver fields are read; comparing counts alone
+  cannot detect reordered or substituted parts. Name comparison ignores case,
+  like AF declaration lookup, and retains the reconstructed name.
+
+Saved bytes and the historical readers are unchanged. A mod that changes the
+saved body's or joint's identity is refused rather than applying its state to
+a different part. This does not repair an already-damaged save.
+
+`savegame_restore_af.py` compiles the production figure, body and constraint
+readers. It exercises every field-read interruption, foreign/NULL owners,
+loaded/active/bind inconsistencies, failed required reconstruction, optional
+inactive failure, valid loaded inactive/active figures, names, types and box indexes.
+Both libraries pass on Windows and Linux, with **16 deliberate regressions**
+rejected on each platform. The Windows focused suite passes **58/58**.
+
+The runtime harness adds `--cases af`. It decodes an active attached-head
+ragdoll's class/static-object frames, contacts and body table before editing
+owner, activation, AF definition, body name, constraint name or type. All seven
+fixtures retain valid file CRCs. The shared checksum helper now accepts any
+bounded `game/` SP map name and records it, instead of requiring Storage1.
+The initial fixture parser's empty-contact restriction was unsuitable for a
+resting ragdoll; its preparation failure was fixed by decoding the contacts.
+No failed parser attempt is counted as product qualification.
+
+The first engine runs returned safely to recovery for all seven cases, but the
+missing-definition case failed the intended boundary: normal declaration lookup
+invented a one-body placeholder, and the later body-count check refused it.
+Required definitions now use a non-creating lookup and reject defaulted parses
+before `Load` runs. Those earlier reports remain as failed qualification runs.
+
+The final Windows x64 candidate passes all **seven cases on each of OpenGL and
+Vulkan**: the expected restore error, retained Load Game page and subsequent
+healthy reload all occur in the same process, with every input file unchanged.
+Engine captures confirm both the recovery page and restored Air Defense scene.
+The selected active `marine3` ragdoll has ten bodies and nine constraints. Its
+ten body poses survive a frozen healthy restore byte-for-byte; simulation then
+continues for 180 tics, a resave succeeds, and that resave reloads on Vulkan.
+Both frozen resaves retain their input object table and contain no unresolved
+references. The final candidate also restores all **11 existing 0.9–0.13 release
+fixtures** on OpenGL and runs gameplay, with the original files unchanged.
+
+Concurrent OpenGL runs paused during renderer startup, then completed within
+their harness limits (the recovery sequence took 202 seconds; the healthy
+restore/resave 236 seconds). The subsequent Vulkan resave reload took 32 seconds.
+These are functional results, not performance measurements or a resolution of
+the observed startup delay. No test process needed to be killed manually.
+
+Evidence is retained under `.tmp/q4-af/`, indexed by `evidence.json`. These
+checks cover the identified AF restore boundaries, not every owning graph,
+ragdoll behavior or target platform; Q4-05 remains open.
+
+### Event queues and interrupted legacy arguments
+
+The next 4 November Q4-05 change checks queued events in both game libraries
+before accepting their arguments. The restored target must support the saved
+callback, matching `PostEventArgs` admission. Event times must remain in
+ascending order, matching `Schedule`; equal times and negative signed times
+remain valid. Without ordering, `ServiceEvents` could stop at a future event
+and leave earlier due events behind it. These failures use the existing
+semantic-restore recovery flow.
+
+The temporary buffer used to convert legacy raw arguments now has a scoped
+owner. Previously, an exception during its raw read leaked that allocation.
+The aligned destination remains owned by the event pool, including partially
+restored events. The allocation tag, argument layouts, writer and historical
+readers are unchanged; no save migration is needed.
+
+`savegame_restore_events.py` compiles the production queue restore, legacy
+layout/conversion, event release and queue cleanup functions with the real
+linked-list implementation. A tracked allocator and reader inject failures at
+every queue-field read and allocation in typed and legacy multi-event queues.
+It checks count limits, names, classes, NULL/wrong/unsupported targets, argument
+sizes, descending times, equal-time stability, empty/full queues and a healthy
+retry after each rejection. The typed integer codec is a fixture boundary;
+codec correctness remains covered by the separate save-codec tests. Windows
+and Linux pass both game modules and reject **eight deliberate regressions per
+platform**. The focused Windows save/restore and vehicle suite passes **60/60**.
+
+The runtime harness's `--cases events` creates seven CRC-valid damaged copies
+of a healthy Storage1 save. It decodes the global fields and first two typed
+events before changing counts, ordering, callback/class names, NULL targets or
+argument format. Every edit preserves field lengths and the embedded footer
+offset. An initial fixture implementation changed string lengths and failed
+qualification at preflight instead of reaching event restore; its report is
+retained. That failed run is not counted as event-boundary coverage.
+
+The corrected Windows x64 candidate passes **all seven cases on each of
+OpenGL and Vulkan**: each expected restore error is followed by the retained
+Load Game page, then the healthy save reloads in the same process. Every input
+file remains unchanged. Engine captures confirm the recovery page and matching
+restored Storage1 scene; hidden windowed runs disable device input.
+
+All **11 existing 0.9–0.13 historical fixtures** also restore and run gameplay
+on OpenGL, with their original files unchanged. This is regression coverage of
+the existing corpus, not new original-writer evidence. Existing UI/asset
+precache warnings remain in the runtime logs.
+
+Evidence is retained under `.tmp/q4-events/`, indexed by `evidence.json` with
+runtime/source hashes, native and runtime results, the initial failed fixture
+run and the inspected engine capture sheet. These checks cover the identified
+event-queue boundaries; Q4-05's broader owning-graph and platform qualification
+remains open.
+
 ### Saving before the first frame after a load
 
 Fixed 3 November (Q4-05), in both game libraries. `ReadStaticObject` queued

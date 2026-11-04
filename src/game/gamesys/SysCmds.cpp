@@ -2168,6 +2168,50 @@ static void Cmd_TestFlashlight_f( const idCmdArgs &args ) {
 	player->Flashlight( atoi( args.Argv( 1 ) ) != 0 );
 }
 
+// Read mission state and start existing map functions without compiling a
+// console script into the save's program. This makes scripted encounter and
+// fresh-process restore tests possible without injecting player input.
+static void Cmd_TestMission_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	if ( args.Argc() == 3 && idStr::Icmp( args.Argv( 1 ), "call" ) == 0 ) {
+		const function_t *func = gameLocal.program.FindFunction( args.Argv( 2 ) );
+		if ( func == NULL || func->eventdef != NULL || func->type->NumParameters() != 0 ) {
+			gameLocal.Printf( "testMission: expected an existing zero-argument script function\n" );
+			return;
+		}
+		idThread *thread = new idThread( func );
+		thread->DelayedStart( 0 );
+		gameLocal.Printf( "testMission: call=%s\n", func->Name() );
+		return;
+	}
+	if ( args.Argc() != 2 ) {
+		gameLocal.Printf( "usage: testMission <entity> | call <function>\n" );
+		return;
+	}
+	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
+	if ( ent == NULL ) {
+		gameLocal.Printf( "testMission: missing=%s\n", args.Argv( 1 ) );
+		return;
+	}
+	gameLocal.Printf( "testMission: name=%s health=%d hidden=%d contents=%d origin=(%s) bind=%s\n",
+		ent->name.c_str(), ent->health, ent->IsHidden(), ent->GetPhysics()->GetContents(),
+		ent->GetPhysics()->GetOrigin().ToString(), ent->GetBindMaster() ? ent->GetBindMaster()->name.c_str() : "none" );
+	if ( ent->GetAnimator() ) {
+		gameLocal.Printf( "testMissionAnim: name=%s anim=%s\n", ent->name.c_str(),
+			ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_ALL )->AnimName() );
+	}
+	if ( ent->IsType( idLight::GetClassType() ) ) {
+		gameLocal.Printf( "testMissionLight: name=%s radius=(%s)\n", ent->name.c_str(),
+			static_cast<idLight *>( ent )->GetRadius().ToString() );
+	}
+	for ( int i = 0; i < player->inventory.objectiveNames.Num(); ++i ) {
+		gameLocal.Printf( "testMissionObjective: %s\n", player->inventory.objectiveNames[i].title.c_str() );
+	}
+}
+
 // Inspect and exercise vehicle state without input or temporary script code.
 static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 	idPlayer *player = gameLocal.GetLocalPlayer();
@@ -4492,6 +4536,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "testFlashlight", Cmd_TestFlashlight_f, CMD_FL_GAME|CMD_FL_CHEAT, "set the current single-player weapon flashlight for rendering tests", idCmdSystem::ArgCompletion_Boolean );
 	cmdSystem->AddCommand( "testDoor", Cmd_TestDoor_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect or move a single-player door team for rendering tests", idGameLocal::ArgCompletion_EntityName );
 	cmdSystem->AddCommand( "testVehicle", Cmd_TestVehicle_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect an SP vehicle or fire/select/exit the local player's seat", idGameLocal::ArgCompletion_EntityName );
+	cmdSystem->AddCommand( "testMission", Cmd_TestMission_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect an SP entity or call an existing zero-argument map function" );
 	
 	cmdSystem->AddCommand( "shuffleTeams",			Cmd_ShuffleTeams_f,			CMD_FL_GAME,				"shuffle teams" );
 // RAVEN BEGIN

@@ -6,6 +6,45 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Damaged queued events recover safely, 4 November 2026
+
+- Saves with unsupported queued callbacks or out-of-order event times now
+  return to Load Game instead of silently dropping or delaying actions.
+  Interrupted reads of legacy event arguments also release their temporary
+  memory. Healthy saves retain their existing format and compatibility readers.
+- Both game libraries pass Windows/Linux failure and regression controls; the
+  focused Windows suite passes 60 checks. Seven damaged-save cases recover and
+  allow a healthy reload on each of OpenGL and Vulkan; all 11 existing historical
+  fixtures still restore into gameplay.
+  See [scope and evidence](savegame-reliability.md#event-queues-and-interrupted-legacy-arguments).
+
+## Damaged ragdoll saves recover safely, 4 November 2026
+
+- Saves with inconsistent ragdoll owners, missing required definitions or
+  mismatched bodies/joints now return to Load Game instead of risking an
+  assertion or applying a pose to the wrong part. Legitimate inactive figures
+  and the existing save format are preserved.
+- Both game libraries pass Windows/Linux regression controls and the focused
+  Windows suite passes 58 checks. Seven damaged-save cases recover on each of
+  OpenGL and Vulkan, healthy ragdolls survive resave/reload, and all 11 existing
+  0.9–0.13 fixtures still load. See [scope and evidence](savegame-reliability.md#articulated-figure-reconstruction-and-saved-structure).
+
+## Awakening opening missions, 4 November 2026
+
+- Freezing a fire vent now clears its invisible collision and fully extinguishes
+  its light. Players and squadmates can cross active flames while receiving
+  their normal damage; quenched vents also restore correctly from saves.
+- Trianfac's repair bots use their own stations, and the generator sabotage
+  waits for all six bots to be destroyed. The generator objective appears before
+  the encounter and completes after the explosion. The Tank victory completes
+  the Nexus objective, and the extraction dropship finishes landing before
+  starting its idle animation.
+- Restart m02 to adopt its script corrections. Earlier saves keep their original
+  script program; corrected saves retain a separate source identity.
+- [Mission audit and validation](awakening-missions.md) records the designer
+  intent, confirmed fixes and remaining Q4-04 qualification. These focused
+  encounter checks do not establish complete mission playthroughs.
+
 ## Vehicle health and shield meters, 4 November 2026
 
 - Invulnerable turrets now show a full health meter, and vehicles without shields

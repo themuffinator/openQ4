@@ -250,9 +250,15 @@ idAFConstraint::Restore
 void idAFConstraint::Restore( idRestoreGame *saveFile ) {
 	constraintType_t t;
 	saveFile->ReadInt( (int &)t );
-	assert( t == type );
+	if ( t != type ) {
+		saveFile->Error( "idAFConstraint::Restore: constraint '%s' type mismatch %d (expected %d)", name.c_str(), t, type );
+	}
 
-	saveFile->ReadString ( name );		// cnicholson: Added unrestored var
+	idStr savedName;
+	saveFile->ReadString( savedName );
+	if ( savedName.Icmp( name ) != 0 ) {
+		saveFile->Error( "idAFConstraint::Restore: constraint name mismatch '%s' (expected '%s')", savedName.c_str(), name.c_str() );
+	}
 
 	for (int i=0; i<6; ++i) {
         saveFile->ReadInt ( boxIndex[i] );
@@ -4398,7 +4404,11 @@ idAFBody::Restore
 */
 void idAFBody::Restore( idRestoreGame *saveFile ) {
 
-	saveFile->ReadString( name );		// cniciholson: Added Unrestored Var
+	idStr savedName;
+	saveFile->ReadString( savedName );
+	if ( savedName.Icmp( name ) != 0 ) {
+		saveFile->Error( "idAFBody::Restore: body name mismatch '%s' (expected '%s')", savedName.c_str(), name.c_str() );
+	}
 	// TORESTORE: idList<idAFBody *>		parent
 	// TORESTORE: idList<idAFBody *>		children
 	// TORESTORE: idClipModel *			clipModel

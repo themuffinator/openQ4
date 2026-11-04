@@ -69,6 +69,9 @@ void idAF::Restore( idRestoreGame *savefile, idEntity *owner ) {
 	// other entity would bind this figure's physics and animator into it.
 	idEntity *savedSelf = NULL;
 	savefile->ReadObject( savedSelf );
+	if ( owner == NULL || ( savedSelf != NULL && savedSelf != owner ) ) {
+		savefile->Error( "idAF::Restore: inconsistent owner reference" );
+	}
 	self = ( savedSelf != NULL ) ? owner : NULL;
 	savefile->ReadString( name );
 	savefile->ReadBool( hasBindConstraints );
@@ -78,13 +81,27 @@ void idAF::Restore( idRestoreGame *savefile, idEntity *owner ) {
 	savefile->ReadInt( restStartTime );
 	savefile->ReadBool( isLoaded );
 	savefile->ReadBool( isActive );
+	if ( ( ( isLoaded || isActive || hasBindConstraints ) && self == NULL )
+			|| ( ( isActive || hasBindConstraints ) && !isLoaded ) ) {
+		savefile->Error( "idAF::Restore: inconsistent loaded/active state" );
+	}
 
 	animator = NULL;
 	modifiedAnim = 0;
 
 	if ( self ) {
 		SetAnimator( self->GetAnimator() );
-		Load( self, name );
+		// Optional AF setup can have failed before saving an inactive entity.
+		// A figure saved as loaded must reconstruct before its body data is read.
+		// FindType normally invents a default one-body AF for missing names.
+		// That placeholder must not stand in for a required saved definition.
+		const idDeclAF *savedDecl = static_cast<const idDeclAF *>( declManager->FindType( DECL_AF, name, false ) );
+		if ( ( isLoaded || isActive || hasBindConstraints ) && ( savedDecl == NULL || savedDecl->GetState() == DS_DEFAULTED ) ) {
+			savefile->Error( "idAF::Restore: could not reconstruct loaded figure '%s'", name.c_str() );
+		}
+		if ( !Load( self, name ) && ( isLoaded || isActive || hasBindConstraints ) ) {
+			savefile->Error( "idAF::Restore: could not reconstruct loaded figure '%s'", name.c_str() );
+		}
 		if ( hasBindConstraints ) {
 			AddBindConstraints();
 		}

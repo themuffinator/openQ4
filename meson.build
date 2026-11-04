@@ -522,6 +522,26 @@ if get_option('build_native_tests')
   test('openq4-restore-recovery', restore_recovery_test, timeout: 30)
 
   foreach game_mode : ['game', 'mpgame']
+    restore_events_source = custom_target(
+      'openq4-restore-events-' + game_mode + '-source',
+      input: files('src' / game_mode / 'gamesys' / 'Event.cpp', 'src/idlib/containers/LinkList.h'),
+      output: 'RestoreEvents-' + game_mode + '.cpp',
+      command: [py, files('tools/tests/savegame_restore_events.py'), '--generate-native', game_mode, '@OUTPUT@'],
+    )
+    restore_events_test = executable(
+      'openq4-restore-events-' + game_mode, restore_events_source, cpp_args: ['-UNDEBUG'], install: false,
+    )
+    test('openq4-restore-events-' + game_mode, restore_events_test, timeout: 30)
+    restore_af_source = custom_target(
+      'openq4-restore-af-' + game_mode + '-source',
+      input: files('src' / game_mode / 'AF.cpp', 'src' / game_mode / 'physics' / 'Physics_AF.cpp'),
+      output: 'RestoreAF-' + game_mode + '.cpp',
+      command: [py, files('tools/tests/savegame_restore_af.py'), '--generate-native', game_mode, '@OUTPUT@'],
+    )
+    restore_af_test = executable(
+      'openq4-restore-af-' + game_mode, restore_af_source, cpp_args: ['-UNDEBUG'], install: false,
+    )
+    test('openq4-restore-af-' + game_mode, restore_af_test, timeout: 30)
     vehicle_hud_source = custom_target(
       'openq4-vehicle-hud-' + game_mode + '-source',
       input: files('src' / game_mode / 'vehicle' / 'Vehicle.cpp'),

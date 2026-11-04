@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Windowed SP restore/early-rejection/reload probe using a current Storage1 save.
+"""Windowed SP restore/early-rejection/reload probe using a current SP save.
 
 The synthetic fixture changes only the script checksum and recomputes the whole
 file CRC. It exercises the established fresh-map fallback after object creation,
@@ -60,17 +60,17 @@ def checksum_fixture(data):
     server={}
     for _ in range(count):
         key=string(); server[key.lower()]=string()
-    assert server['si_map']=='game/storage1' and server['si_gametype']=='singleplayer'
+    assert re.fullmatch(r'game/[A-Za-z0-9_/]+', server['si_map']) and server['si_gametype']=='singleplayer'
     result=bytearray(data); result[checksum_offset]^=1
     struct.pack_into('<I',result,len(result)-4,zlib.crc32(result[:protected]))
-    return bytes(result),dict(build=build,snapshot=snapshot,source_count=source_count,abi=abi,
+    return bytes(result),dict(build=build,snapshot=snapshot,source_count=source_count,abi=abi,map=server['si_map'],
         objects=objects,client_effects=classes.count('rvClientEffect'),scripts=scripts,filename=filename,
         filenum=filenum,changed_variables=changed,variables=variables,watermarks=watermarks,
         checksum_offset=checksum_offset,server_info_sync=sync)
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source-save',required=True,type=Path,help='Current Windows x64 v4 Storage1 save; read only.')
+    parser.add_argument('--source-save',required=True,type=Path,help='Current Windows x64 v5 SP save; read only.')
     parser.add_argument('--basepath',required=True,type=Path,help='Retail asset root with q4base PK4s.')
     parser.add_argument('--output',required=True,type=Path,help='New evidence directory below the project .tmp directory.')
     parser.add_argument('--timeout',type=int,default=180)
@@ -106,7 +106,7 @@ def main():
     report=dict(fixture=metadata,source_save=dict(path=str(SOURCE),sha256=sha(SOURCE)),command=command,
         harness_sha256=sha(Path(__file__)),
         runtime={str(p.relative_to(RUNTIME)):sha(p) for p in [executable,RUNTIME/'baseoq4/game-sp_x64.dll',RUNTIME/'baseoq4/game-mp_x64.dll']},
-        before={p.name:sha(p) for p in [good,bad]},scope='Current v4 script-checksum rejection after object creation, automatic fresh-map fallback and valid load again. Hidden window; input disabled; engine screenshots only.')
+        before={p.name:sha(p) for p in [good,bad]},scope='Current v5 script-checksum rejection after object creation, automatic fresh-map fallback and valid load again. Hidden window; input disabled; engine screenshots only.')
     (OUT/'plan.json').write_text(json.dumps(report,indent=2)+'\n')
     startup=subprocess.STARTUPINFO(); startup.dwFlags|=subprocess.STARTF_USESHOWWINDOW; startup.wShowWindow=subprocess.SW_HIDE
     begin=time.monotonic()
