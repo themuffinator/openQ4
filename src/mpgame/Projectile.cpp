@@ -215,7 +215,7 @@ void idProjectile::Restore( idRestoreGame *savefile ) {
  	savefile->ReadVec3( lightColor );
 
 	// Restore the physics
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	RestorePhysics ( &physicsObj );
 
 	savefile->ReadAngles( visualAngles );				// cnicholson: added unrestored var

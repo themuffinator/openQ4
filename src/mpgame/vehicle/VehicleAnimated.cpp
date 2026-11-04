@@ -175,7 +175,7 @@ void rvVehicleAnimated::Restore ( idRestoreGame *savefile ) {
 
 	physicsObj.SetSelf( this );
 	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
-	savefile->ReadStaticObject ( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	RestorePhysics ( &physicsObj );
 	physicsObj.EnableClip();
 

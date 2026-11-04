@@ -172,7 +172,7 @@ void rvVehicleRigid::Restore ( idRestoreGame *savefile ) {
 	
 	SetClipModel ( );
 
-	savefile->ReadStaticObject ( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	SetFriction ( );
 	RestorePhysics( &physicsObj );
 }

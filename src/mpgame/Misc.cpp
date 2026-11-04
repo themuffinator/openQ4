@@ -3576,7 +3576,7 @@ idShaking::Restore
 */
 void idShaking::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( active );
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	RestorePhysics( &physicsObj );
 }
 

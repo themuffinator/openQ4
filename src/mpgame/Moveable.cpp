@@ -226,7 +226,7 @@ idMoveable::Restore
 void idMoveable::Restore( idRestoreGame *savefile ) {
    	int initialSplineTime;
 
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 
 	savefile->ReadString( brokenModel );
 	savefile->ReadString( damage );

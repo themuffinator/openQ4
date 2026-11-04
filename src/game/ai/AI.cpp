@@ -467,7 +467,7 @@ void idAI::Restore( idRestoreGame *savefile ) {
 	move.Restore( savefile );
 	savedMove.Restore( savefile );
 
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	savefile->ReadBool( restorePhysics );
 	if ( restorePhysics ) {
 		RestorePhysics( &physicsObj );

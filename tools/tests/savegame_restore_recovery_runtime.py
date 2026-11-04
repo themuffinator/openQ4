@@ -414,7 +414,7 @@ def thread_fixtures(data, frame_offset, frame_reference):
     return result, metadata
 
 
-def render_handle_fixture(data, bindings=False, movers=False):
+def render_handle_fixture(data, bindings=False, movers=False, physics=False):
     """Locate a v4 entity with empty GUI slots, using its named class record.
 
     The parser checks every intervening sync and bounded record. It skips records
@@ -502,7 +502,7 @@ def render_handle_fixture(data, bindings=False, movers=False):
             sync()  # immediately following ReadRefSound
             sound_handle = integer()
             assert -1 <= sound_handle < 1048576
-            if bindings or movers:
+            if bindings or movers or physics:
                 skip(12+12+4)  # reference sound origin, velocity and listener
                 string()  # sound shader
                 skip(4)  # diversity
@@ -519,6 +519,7 @@ def render_handle_fixture(data, bindings=False, movers=False):
                     empty_frames += 1
                 assert empty_frames in (1, 2)
                 sync()  # idPhysics_Static class start
+                physics_owner_offset = position
                 self_reference = integer()
                 assert 0 < self_reference <= metadata['objects']
                 skip(12+36+12+36)  # origin/axis and local origin/axis
@@ -532,6 +533,7 @@ def render_handle_fixture(data, bindings=False, movers=False):
                     boolean()  # checked
                 boolean()  # hasMaster
                 boolean()  # isOrientated
+                physics_end_offset = position
                 sync()  # idPhysics_Static class end
                 binding_offset = position
                 original_links = [integer() for _ in range(5)]
@@ -544,6 +546,26 @@ def render_handle_fixture(data, bindings=False, movers=False):
                 assert not boolean()  # only records without signal payloads
                 skip(4+4+4)  # mpGUIState, instance and clipWorld
                 sync()  # idEntity class end proves the complete record boundary
+                if physics:
+                    # This late object survives until MapShutdown has deleted
+                    # the earlier saved owner. Interrupt before RestorePhysics
+                    # can reattach it, while retaining the outer integrity CRC.
+                    if number < 32:
+                        continue
+                    registration_cases, _ = damaged_fixtures(data)
+                    other_reference = registration_cases['DuplicateEntity'][1]['replacement']
+                    assert self_reference != other_reference
+                    fixtures = {}
+                    for label, owner in (('ForeignPhysicsOwner', other_reference), ('NullPhysicsOwner', 0)):
+                        changed = bytearray(data)
+                        struct.pack_into('<i', changed, physics_owner_offset, owner)
+                        struct.pack_into('<i', changed, physics_end_offset, 0)
+                        struct.pack_into('<I', changed, len(changed)-4, zlib.crc32(changed[:-16]))
+                        fixtures[label] = bytes(changed), dict(entity=name, entity_number=number,
+                            object_reference=self_reference, owner_offset=physics_owner_offset,
+                            replacement_owner=owner, interruption_offset=physics_end_offset,
+                            expected='ReadSyncId: marker mismatch while reading Callrestore_r end  for idPhysics_Static')
+                    return fixtures, metadata
                 if movers:
                     sync()  # idMover_Binary class start
                     skip(12+12)  # endpoints
@@ -631,7 +653,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--ui', choices=('retained', 'classic'), default='retained')
     parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
-    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis'), default='registrations')
+    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics'), default='registrations')
     parser.add_argument('--unavailable-pause-menu', action='store_true',
                         help='Also exercise optional retained-menu fallback during valid save loading.')
     parser.add_argument('--timeout', type=int, default=240)
@@ -650,8 +672,9 @@ def main():
     fixtures, metadata = (gui_fixtures(original) if args.cases == 'guis'
                          else object_class_fixtures(original) if args.cases == 'classes'
                          else factory_fixtures(original) if args.cases == 'factories'
-                         else render_handle_fixture(original, bindings=args.cases == 'bindings', movers=args.cases == 'movers')
-                         if args.cases in ('render-handles', 'bindings', 'movers')
+                         else render_handle_fixture(original, bindings=args.cases == 'bindings', movers=args.cases == 'movers',
+                                                    physics=args.cases == 'physics')
+                         if args.cases in ('render-handles', 'bindings', 'movers', 'physics')
                          else damaged_fixtures(original, spawn_refs=args.cases == 'spawn-refs', threads=args.cases == 'threads'))
     output.mkdir(parents=True, exist_ok=False)
     save = output/'save'

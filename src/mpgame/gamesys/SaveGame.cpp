@@ -2097,6 +2097,17 @@ void idRestoreGame::ReadStaticObject( idClass &obj ) {
 // RAVEN END
 }
 
+// Physics destructors consult their owning entity, including when a field
+// read throws. Establish that owner before entering the static-object reader;
+// physics Restore methods consume, but never adopt, the saved self pointer.
+void idRestoreGame::ReadPhysicsObject( idPhysics &obj, idEntity *owner ) {
+	if ( owner == NULL ) {
+		Error( "idRestoreGame::ReadPhysicsObject: missing owner for %s", obj.GetClassname() );
+	}
+	obj.SetSelf( owner );
+	ReadStaticObject( obj );
+}
+
 /*
 ================
 idRestoreGame::ReadDict

@@ -751,12 +751,12 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 	if ( num < 0 || num > MAX_SAVEGAME_VEHICLE_PARTS ) {
 		savefile->Error( "rvVehiclePosition::Restore: invalid part count %d", num );
 	}
-	// The destructor deletes every listed part: append each one only once it
-	// is fully restored, so a failed read never leaves unset pointers.
+	// Keep a scoped owner until the complete part joins its owning list.
+	// A failed read must destroy the partial part as well as earlier entries.
 	mParts.Clear ( );
 	for ( i = 0; i < num; i ++ ) {
 		idStr			spawnclass;
-		rvVehiclePart*	part;
+		std::unique_ptr<rvVehiclePart> part;
 		idTypeInfo*		typeInfo;		
 		
 		savefile->ReadString ( spawnclass );
@@ -768,9 +768,13 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 			gameLocal.Error ( "Class '%s' is not a vehicle part", spawnclass.c_str() );
 		}
 		
-		part = static_cast<rvVehiclePart*>(typeInfo->CreateInstance ( ));
+		part.reset( static_cast<rvVehiclePart*>(typeInfo->CreateInstance ( )) );
+		if ( !part ) {
+			savefile->Error( "rvVehiclePosition::Restore: failed to create part '%s'", spawnclass.c_str() );
+		}
 		savefile->ReadStaticObject ( *part );
-		mParts.Append ( part );
+		mParts.Append ( part.get() );
+		part.release();
 	}
 
 	savefile->ReadInt ( num );
@@ -780,7 +784,7 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 	mWeapons.Clear ( );
 	for ( i = 0; i < num; i ++ ) {
 		idStr			spawnclass;
-		rvVehiclePart*	part;
+		std::unique_ptr<rvVehiclePart> part;
 		idTypeInfo*		typeInfo;		
 		
 		savefile->ReadString ( spawnclass );
@@ -792,9 +796,13 @@ void rvVehiclePosition::Restore ( idRestoreGame* savefile ) {
 			gameLocal.Error ( "Class '%s' is not a vehicle part", spawnclass.c_str() );
 		}
 		
-		part = static_cast<rvVehiclePart*>(typeInfo->CreateInstance ( ));
+		part.reset( static_cast<rvVehiclePart*>(typeInfo->CreateInstance ( )) );
+		if ( !part ) {
+			savefile->Error( "rvVehiclePosition::Restore: failed to create part '%s'", spawnclass.c_str() );
+		}
 		savefile->ReadStaticObject ( *part );
-		mWeapons.Append ( part );
+		mWeapons.Append ( part.get() );
+		part.release();
 	}
 	
 	savefile->ReadVec3 ( mEyeOrigin );

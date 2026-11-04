@@ -17,7 +17,7 @@ were checked against their current issue text and discussion on 18 October:
 | --- | --- |
 | [Weapon effects, sound and reload, #170](https://github.com/themuffinator/openQ4/issues/170) | Reported on 0.13.2. The merged BSE sound-diversity fix stays closed; individual particle/reload symptoms remain qualification pending under Q4-03/AUD-01/HF-04. Current weapon, effect, build/backend and timestamped reproduction are not yet supplied; the four lighting maps do not qualify these symptoms. |
 | [Machinegun transparency, #183](https://github.com/themuffinator/openQ4/issues/183) | Report names Windows 10/RTX 3060 but no exact build, backend, map/save or asset set. Qualification pending under VK-04/REN-08; generic current weapon captures cannot reproduce or clear the reporter's firing/view conditions. The existing request for those details remains open. |
-| [Tech Li at the Hangar Perimeter lift, #184](https://github.com/themuffinator/openQ4/issues/184) | Report identifies hangar1/Windows 10 and a progression stall. The #189 medic watchdog addresses an unreachable-patient case, but the exact reporter save and normal heal/progression regression remain Q4-02 qualification; map startup does not close it. |
+| [Tech Li at the Hangar Perimeter lift, #184](https://github.com/themuffinator/openQ4/issues/184) | The supplied save identified a Turbo/scripted-mover timing race, fixed by #198. A fresh stock lift probe now checks boarding, the full lift and Tech Li reaching his exit tether; the isolated original-Turbo control reproduces his scripted-idle stall. See the [4 November qualification](#hangar-perimeter-lift-4-november-2026). Already-stuck saves still need a pre-lift restart. #189 is separate unreachable-patient recovery. |
 
 These entries classify available evidence and preserve outstanding reports. They
 do not treat absent reproduction data as a resolution or invent a root cause.
@@ -328,3 +328,45 @@ tables (1777 objects on GL, 1776 on Vulkan) and have zero unresolved references.
 Those counts come from separate simulations with random child effects, not a
 matched-frame comparison. Filtering intentionally produces warnings when the map
 tries to play other effect names; these are not missing assets.
+
+## Hangar Perimeter lift, 4 November 2026
+
+Q4-02 now has an input-free progression probe for #184, beyond loading the map.
+`tools/tests/turbo_lift_runtime.py` starts a fresh retail `game/hangar1`, shows
+the three Viper Squad members and places them at their authored boarding spots.
+It runs the stock boarding function, waits for all three to board, then puts
+the player in the map's lift trigger. The original lift and animation scripts
+perform the scene. The probe requires the full 480-unit ascent, Tech Li leaving
+scripted control and his arrival within the exit tether's radius. It samples
+his script state and world position after the lift and again fifteen seconds
+later. Sound and mouse/joystick input are disabled; the window stays hidden.
+
+The Turbo OpenGL and Vulkan runs reach `(-873.42, -530.37, -5471.75)`, inside the tether
+around `(-928, -528, -5472)`, with `scriptedDone()` returning 1. A separate
+runtime with only the exact-`idMover` Turbo exemption removed reproduces the
+stall: the lift finishes, but Tech Li remains at `(-272, -416, -5471.52)` and
+returns 0 at both later samples. This is a source-mutation control, not a retail
+or historical-release binary. The working source and ordinary staged package
+retain the fix. The reusable control runtime is
+`.tmp/runtime/q4-lift-baseline/`, with its exact mutation and module hashes.
+The normal-speed OpenGL control also reaches the same exit tether and leaves
+scripted control, covering the unchanged non-Turbo sequence.
+
+The initial harness had unquoted console script expressions, which the command
+parser expanded as CVars; that run is retained as a harness failure. A second
+attempt to approximate the old bug by halving only the lift duration did not
+reproduce it. The actual exemption-removal control includes the gate timings
+and does reproduce it. Neither failed experiment is product qualification.
+
+Use `--install-root`, `--basepath`, `--output`, `--renderer gl|vulkan` and
+`--turbo 0|1` against a staged package. `--expect-stall` is only for a separate
+runtime with the original Turbo mover behaviour. Reports include commands,
+module hashes, log hashes, sampled positions and each acceptance check. The
+parser has failing controls in CI, including a missing finish marker, wrong
+ascent, missing squad member and unreleased actor. Evidence is retained in
+`.tmp/q4-qualification/` and indexed by its `evidence.json`.
+
+This qualifies this fresh lift sequence. It does not repair an already-stuck
+save, qualify the rest of Hangar Perimeter, or substitute for the full Q4-02
+campaign playthroughs. Console-injected diagnostics are deliberately not saved,
+because the developer console's script source cannot be recompiled on load.

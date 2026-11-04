@@ -138,6 +138,9 @@ void rvVehiclePart::Restore	( idRestoreGame* savefile ) {
 	savefile->ReadInt ( soundChannel );
 
 	savefile->ReadInt ( temp );
+	if ( !parent || temp < 0 || temp >= parent->GetNumPositions() ) {
+		savefile->Error( "rvVehiclePart::Restore: invalid parent or position %d", temp );
+	}
 	position = parent->GetPosition ( temp );
 	
 	savefile->ReadVec3 ( worldOrigin );

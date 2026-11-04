@@ -104,6 +104,9 @@ def main() -> int:
                 print(f"save_codec: mutation '{name}' did not compile")
                 return 1
             code, _ = run([str(mutant)], env)
+            if code == 124:
+                print(f"save_codec: mutation '{name}' timed out; no failure was observed")
+                return 1
             if code == 0:
                 survivors.append(name)
             print(f"mutation '{name}': {'SURVIVED' if code == 0 else 'caught'}")

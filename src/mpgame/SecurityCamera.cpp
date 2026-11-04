@@ -89,7 +89,7 @@ void idSecurityCamera::Restore( idRestoreGame *savefile ) {
 	savefile->ReadVec3( viewOffset );
 							
 	savefile->ReadInt( pvsArea );
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	if ( savefile->GetOpenQ4SaveGameCompatibilityVersion() >= OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION ) {
 		savefile->ReadTraceModel( trm );
 	} else {

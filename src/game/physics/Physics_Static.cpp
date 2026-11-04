@@ -62,7 +62,10 @@ idPhysics_Static::Restore
 ================
 */
 void idPhysics_Static::Restore( idRestoreGame *savefile ) {
-	savefile->ReadObject( self );
+	// ReadPhysicsObject installed the real owner before any field can fail.
+	// Consume the historical reference without publishing a foreign pointer.
+	idEntity *savedSelf = NULL;
+	savefile->ReadObject( savedSelf );
 
 	savefile->ReadVec3( current.origin );
 	savefile->ReadMat3( current.axis );
