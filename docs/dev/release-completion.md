@@ -8,6 +8,9 @@ See [player release status](../user/release-status.md).
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
 
+- Bots keep their place in a jump-pad queue while hopping up its ramp, preventing
+  a following bot from launching into them. The reproduced CTF3 collision and
+  wider safety sweeps are under qualification.
 - Bots react to small hits that spoil a ledge approach or make a jump lethal,
   and can change a stale movement command before the next physics step after
   a hit. The remaining long-match safety gates are being rerun; see the

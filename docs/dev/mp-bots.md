@@ -114,8 +114,7 @@ stage, but the navigation gate remains failed.
 
 All three `ctf3pad-runout/` isolated launch/coast controls land alive, including
 Cortez's rounded launch pose. The original match instead launches Strauss from
-the same pad 192 ms later; a traffic collision is a hypothesis, not yet a
-qualified cause. `bot_probePad` now accepts optional `entryX entryY entryZ`
+the same pad 192 ms later. `bot_probePad` now accepts optional `entryX entryY entryZ`
 after `padName` to reproduce a walking approach. `bot_probePadTraffic` uses the
 same arguments but requires exactly two bots and a separate local observer;
 its bots become untargetable so weapon impulses cannot obscure physical traffic.
@@ -123,6 +122,19 @@ Both retain local cheat-server, live-bot, instance and proven-pad restrictions.
 At debug level 3 or higher, `BOT_PLAYER_CONTACT` records player collision traces
 without changing their physics. These diagnostics support the next reproduction;
 they do not classify a death as unavoidable.
+
+The two-bot reconstruction on `893fe4f13` reproduces that fall at
+3248 3220 -461 (`pad-traffic-diagnostic/`). The older approach is making a slow
+climb hop when the follower's grounded-only reservation check stops seeing it.
+The follower launches first, collides twice with the hopping bot and loses
+horizontal velocity; the first bot launches 176 ms later and completes the pad.
+Fresh approaches now retain their reservation while airborne, using the existing
+stale timeout and route release. The native decision case fails before this
+change and passes afterwards; restoring the grounded-only check fails again.
+`mp_bot_pad_traffic_replay.py` preserves the two-bot reproduction as a positive
+runtime regression. Its fixed-build check and renewed safety gates are pending.
+Kane's other CTF3 departure remains unresolved; the initial isolated walking
+approach survives and is not evidence that the original match was safe.
 
 ## Hit-to-movement handoff, 4 November 2026
 

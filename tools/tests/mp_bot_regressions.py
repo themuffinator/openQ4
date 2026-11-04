@@ -118,6 +118,8 @@ def main() -> None:
         assert result.returncode != 0, "late knocked-coast ownership mutation escaped"
         print("Knocked coast: late-ownership mutation rejected")
         for label, anchor, replacement in (
+            ("airborne pad approach reservation", "if ( botManager.PadApproachOf( i, otherPad, otherSince, otherLaunch, otherLanding ) &&",
+             "if ( other->pfl.onGround && botManager.PadApproachOf( i, otherPad, otherSince, otherLaunch, otherLanding ) &&"),
             ("actual floor health", "!navMesh.LandingSurvivable( self->GetPhysics()->GetOrigin(), landing, BotMaxSafeFallDelta( self ) )",
              "false"),
             ("airborne self-blast", "!shooter->pfl.onGround && model.selfPushScale > 0.0f &&",

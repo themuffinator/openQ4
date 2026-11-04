@@ -960,6 +960,11 @@ void TestPadReservation() {
     // Whoever came within reach first keeps the corridor.
     botA.padApproachSince=gameLocal.time; botB.padApproachSince=gameLocal.time-500;
     CHECK(botA.HoldForPad(&a,moveA) && !botB.HoldForPad(&b,moveB));
+    // A slow climb hop has not launched yet. Its fresh approach still owns
+    // the corridor even though the velocity-based flyer check cannot see it.
+    b.pfl.onGround=false; b.physics.velocity={0,-40,180};
+    CHECK(botA.HoldForPad(&a,moveA) && !botB.HoldForPad(&b,moveB));
+    b.pfl.onGround=true; b.physics.velocity={};
     // An approach the owner stopped confirming lapses; it cannot hold the
     // corridor after its bot died or changed route.
     botB.padApproachTime=gameLocal.time-BOT_PAD_APPROACH_STALE_MSEC-1;

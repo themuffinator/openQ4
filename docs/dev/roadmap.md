@@ -2205,8 +2205,11 @@ claim peer combinations that have not been tested.
   impulse exclusions and one recoverable DM8 rocket landing; DM8 also misses
   the minimum simulated duration. Recovery now distinguishes a hull-edge
   landing with a surviving brake from a momentary touch followed by a fatal
-  slide. That further correction needs renewed final-build long/catalog runs
-  and controlled timing. The identical-stage catalog's two CTF5 deaths pass
+  slide. The `189c4b4a9` repeat meets all four duration gates but exposes two
+  further CTF3 deaths. One reproduces a pad collision when a climb hop loses
+  its approach reservation; the reservation now survives that hop. The other
+  departure, renewed final-build long/catalog runs and controlled timing remain
+  open. The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.
   Follow-through, 4 November: the [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026)

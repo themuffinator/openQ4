@@ -2050,7 +2050,10 @@ static bool BotPadCorridorBusy( idPlayer *self, const idVec3 &launch, const idVe
 		}
 		int otherPad, otherSince;
 		idVec3 otherLaunch, otherLanding;
-		if ( other->pfl.onGround && botManager.PadApproachOf( i, otherPad, otherSince, otherLaunch, otherLanding ) &&
+		// A climb hop toward the trigger is still an approach, and may be
+		// too slow for the flyer check below. Keep its fresh reservation
+		// until the route releases it or the normal stale timeout expires.
+		if ( botManager.PadApproachOf( i, otherPad, otherSince, otherLaunch, otherLanding ) &&
 			 ( otherSince < approachSince || ( otherSince == approachSince && i < self->entityNumber ) ) &&
 			 BotPadFlightsShareCorridor( launch, landing, otherLaunch, otherLanding ) ) {
 			return true;	// it reserved the shared corridor first
