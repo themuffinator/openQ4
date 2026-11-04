@@ -100,6 +100,13 @@ combat-balance assessment. No Linux or macOS runtime result is claimed.
 | `landing-verified` | The dropship plays `hangar_land` before `hangar_idle`. This checks sequencing, not the final cinematic framing. |
 | `walker`, `squad-verified` | M01 part 2 walker entry yields one driver in seat 0 with the repair exit lock, and saves. Killing Tak already fails the mission and prevents saving. |
 
+After landing in the main checkout, the client and both game modules were
+rebuilt and staged. `repair-main` repeats the suspended generator restore and
+completion on that merged build; `fire-legacy-main` restores the original M02
+save and quenches its fire on Vulkan. Both pass. `suite.json` indexes all 16
+accepted runs. Disposable helpers, duplicate save inputs and superseded captures
+were removed; regression saves, logs and the reusable asset cache were retained.
+
 The repair probe disables squad attacks so they cannot kill the bots before
 inspection. It calls the existing shutdown callback directly, then kills the
 bots through normal damage; it does not qualify the natural Retch fight.
@@ -140,6 +147,7 @@ The worktree `E:/Repositories/openQ4/.claude/worktrees/ui-roadmap-work-aaa011`
 on `claude/ui-right-stick` was clean and fully merged at inspection (last commit
 3 November 2026), so it appears stale. Removing it is recommended after the
 user's required worktree approval. `E:/Repositories/openQ4-worktrees/e07a/openQ4`
-also appears stale: clean, detached at the merged 3 November commit `908b2c012`
-(no branch). Removing it is recommended with the same approval. Other worktrees
-had unmerged work or active changes and were preserved.
+initially appeared stale at detached commit `908b2c012`, but the final check found
+active work on `codex/q4-legacy-event-data` with uncommitted changes; it is no
+longer a cleanup candidate. Other worktrees had unmerged work or active changes
+and were preserved.
