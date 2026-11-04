@@ -334,6 +334,7 @@ jobs:
             tools/tests/macos_universal2_release_candidate.py \
             tools/tests/macos_metal_bridge.py \
             tools/tests/macos_moltenvk_policy.py \
+            tools/tests/mp_bot_audit_clock.py \
             tools/tests/mp_bot_characters.py \
             tools/tests/mp_bot_combat.py \
             tools/tests/mp_bot_death_policy.py \
@@ -344,6 +345,7 @@ jobs:
             tools/tests/mp_bot_navmesh_search.py \
             tools/tests/mp_bot_objectives.py \
             tools/tests/mp_bot_regressions.py \
+            tools/tests/mp_bot_recovery_traffic.py \
             tools/tests/mp_bot_server_menu.py \
             tools/tests/mp_bot_team_balance.py \
             tools/tests/mp_bot_team_orders.py \
@@ -824,6 +826,7 @@ jobs:
           python tools/tests/macos_universal2_release_candidate.py
           python tools/tests/macos_metal_bridge.py
           python tools/tests/macos_moltenvk_policy.py
+          python tools/tests/mp_bot_audit_clock.py
           python tools/tests/mp_bot_characters.py
           python tools/tests/mp_bot_combat.py
           python tools/tests/mp_bot_death_policy.py
@@ -834,6 +837,7 @@ jobs:
           python tools/tests/mp_bot_navmesh_search.py
           python tools/tests/mp_bot_objectives.py
           python tools/tests/mp_bot_regressions.py
+          python tools/tests/mp_bot_recovery_traffic.py
           python tools/tests/mp_bot_server_menu.py
           python tools/tests/mp_bot_team_balance.py
           python tools/tests/mp_bot_team_orders.py

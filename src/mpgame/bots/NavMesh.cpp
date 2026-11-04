@@ -198,6 +198,27 @@ static bool NavPadVolumeTouches( idEntity *pad, const idVec3 &position ) {
 			clip->GetCollisionModel(), clip->GetOrigin(), clip->GetAxis() ) != 0;
 }
 
+// The force field replaces velocity on every touching frame. Share its launch
+// calculation between route generation and a live coast caught by another pad.
+static bool NavPadLaunchVelocity( idEntity *pad, const idVec3 &gravity, idVec3 &velocity ) {
+	idEntity *target = ( pad && pad->targets.Num() ) ? pad->targets[0].GetEntity() : NULL;
+	const float g = gravity.Length();
+	if ( !target || !target->GetPhysics() || !pad->GetPhysics() || g <= 1.0f ) {
+		return false;
+	}
+	const idVec3 down = gravity / g;
+	const idVec3 diff = target->GetPhysics()->GetOrigin() - pad->GetPhysics()->GetOrigin();
+	const idVec3 vert = ( diff * down ) * down;
+	const float flightTime = idMath::Sqrt( vert.Length() / ( 0.5f * g ) );
+	if ( flightTime <= 0.0f ) {
+		return false;
+	}
+	idVec3 horizontal = diff - vert;
+	const float span = horizontal.Normalize();
+	velocity = horizontal * ( span / flightTime ) - gravity * flightTime;
+	return true;
+}
+
 /*
 ================
 NavDoorIsWalkActivated
@@ -342,6 +363,79 @@ static bool NavTraceTranslation( trace_t &trace, const idVec3 &start, const idVe
 
 static bool NavAgentTranslation( trace_t &trace, const idVec3 &start, const idVec3 &end ) {
 	return NavTraceTranslation( trace, start, end, navAgentTrace, navAgentBounds );
+}
+
+// Live recovery also needs the players that can deflect this flight. Keep
+// bodies out of route generation; only a caller supplying its own player asks
+// for this current-position traffic prediction. Replanning refreshes the poses.
+static bool NavRecoveryTranslation( trace_t &trace, const idVec3 &start, const idVec3 &end, const idPlayer *self ) {
+	NavAgentTranslation( trace, start, end );
+	if ( !self || trace.fraction <= 0.0f ) {
+		return trace.fraction >= 1.0f;
+	}
+	idBounds swept;
+	swept.FromBoundsTranslation( navAgentBounds, start, mat3_identity, trace.endpos - start );
+	for ( int i = 0; i < gameLocal.numClients; i++ ) {
+		idEntity *entity = gameLocal.entities[i];
+		if ( !entity || entity == self || !entity->IsType( idPlayer::GetClassType() ) ||
+			 entity->GetInstance() != self->GetInstance() ) {
+			continue;
+		}
+		const idPlayer *other = static_cast<const idPlayer *>( entity );
+		const idClipModel *clip = other->GetPhysics()->GetClipModel();
+		if ( other->spectating || other->health <= 0 || !clip || !clip->GetCollisionModel() ||
+			 !( clip->GetContents() & MASK_PLAYERSOLID ) || !swept.IntersectsBounds( clip->GetAbsBounds() ) ) {
+			continue;
+		}
+		trace_t hit;
+		collisionModelManager->Translation( &hit, start, end, &navAgentTrace, mat3_identity, MASK_PLAYERSOLID,
+			clip->GetCollisionModel(), clip->GetOrigin(), clip->GetAxis() );
+		if ( hit.fraction < trace.fraction ) {
+			trace = hit;
+			trace.c.entityNum = other->entityNumber;
+		}
+	}
+	return trace.fraction >= 1.0f;
+}
+
+// CrashLand requires actual upward-facing contacts at the end of the physics
+// step. A swept collision can stop descent outside that contact envelope.
+static bool NavAgentHasGroundContacts( const idVec3 &origin, const idVec3 &gravity ) {
+	idVec6 direction;
+	direction.SubVec3( 0 ) = gravity;
+	direction.SubVec3( 0 ).Normalize();
+	direction.SubVec3( 1 ).Zero();
+	contactInfo_t contacts[10];
+	const idClip *clipWorld = gameLocal.GetEntityClipWorld( NULL );
+	int count = collisionModelManager->Contacts( contacts, 10, origin, direction, CONTACT_EPSILON,
+		&navAgentTrace, mat3_identity, NAV_CLIP_MASK, clipWorld->GetWorldCollisionModel(), vec3_origin, mat3_identity );
+	for ( int i = 0; i < count; i++ ) {
+		if ( contacts[i].normal * -direction.SubVec3( 0 ) > 0.0f ) {
+			return true;
+		}
+	}
+	idBounds bounds = navAgentBounds;
+	bounds.TranslateSelf( origin );
+	bounds.ExpandSelf( CONTACT_EPSILON );
+	static idClipModel *touching[MAX_GENTITIES];
+	const int num = clipWorld->ClipModelsTouchingBounds( bounds, NAV_CLIP_MASK, touching, MAX_GENTITIES );
+	for ( int i = 0; i < num; i++ ) {
+		const idClipModel *touch = touching[i];
+		idEntity *ent = touch ? touch->GetEntity() : NULL;
+		if ( !ent || !touch->GetCollisionModel() ||
+			( touch->GetContents() & ( CONTENTS_BODY | CONTENTS_CORPSE ) ) ||
+			ent->IsType( idActor::GetClassType() ) || NavDoorIsWalkActivated( ent ) ) {
+			continue;
+		}
+		count = collisionModelManager->Contacts( contacts, 10, origin, direction, CONTACT_EPSILON,
+			&navAgentTrace, mat3_identity, NAV_CLIP_MASK, touch->GetCollisionModel(), touch->GetOrigin(), touch->GetAxis() );
+		for ( int j = 0; j < count; j++ ) {
+			if ( contacts[j].normal * -direction.SubVec3( 0 ) > 0.0f ) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 // Keep ordinary route nodes away from a hull-only sliver of support. A route
@@ -1043,7 +1137,11 @@ falling after three seconds is a fall into nothing.
 ================
 */
 bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocityIn, const idVec3 &wishIn,
-									 float maxImpactDelta, idVec3 *touchdown, bool *landedSupported, bool *touchedAffordable ) const {
+									 float maxImpactDelta, idVec3 *touchdown, bool *landedSupported, bool *touchedAffordable,
+									 bool *brakedAffordable, int knockMsec, const idPlayer *self ) const {
+	if ( brakedAffordable ) {
+		*brakedAffordable = false;
+	}
 	if ( landedSupported ) {
 		*landedSupported = false;
 	}
@@ -1065,7 +1163,42 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 	idVec3 position = origin;
 	idVec3 velocity = velocityIn;
 	int unstuck = 0;
-	for ( int frame = 0; frame < 200; frame++ ) {
+	int caughtPad = -1;
+	int maxFrames = 200;
+	auto reject = [&]( const char *reason ) {
+		if ( bot_debug.GetInteger() >= 4 ) {
+			gameLocal.Printf( "BOT_AIR_PROOF time=%d reason=%s input=%.3f %.3f start=%.3f %.3f %.3f at=%.3f %.3f %.3f velocity=%.3f %.3f %.3f\n",
+				gameLocal.time, reason, wish.x, wish.y, origin.x, origin.y, origin.z,
+				position.x, position.y, position.z, velocity.x, velocity.y, velocity.z );
+		}
+		return false;
+	};
+	auto recoveryTrace = [&]( trace_t &trace, const idVec3 &from, const idVec3 &to ) {
+		return NavRecoveryTranslation( trace, from, to, self );
+	};
+	for ( int frame = 0; frame < maxFrames; frame++ ) {
+		const int transport = TransportAtFloor( position );
+		if ( transport >= 0 ) {
+			// A free coast can still be saved by a real, known pad catch.
+			// Prove its whole continuation from this exact contact, including
+			// repeated force-field pushes. Steered catches, teleporters and
+			// a second different pad are outside this bounded proof.
+			idVec3 registeredLanding;
+			idEntity *pad = transport < MAX_GENTITIES ? gameLocal.entities[transport] : NULL;
+			if ( frame == 0 || steering || ( caughtPad >= 0 && transport != caughtPad ) ||
+				 !pad || !pad->IsType( rvJumpPad::GetClassType() ) || !pad->IsActive( TH_THINK ) ||
+				 !NaturalPadLanding( transport, registeredLanding ) || !NavPadVolumeTouches( pad, position ) ) {
+				return reject( "unproven transport" );
+			}
+			const idVec3 padGravity = gameLocal.GetCurrentGravity( pad );
+			if ( ( padGravity - gravity ).LengthSqr() > 0.01f || !NavPadLaunchVelocity( pad, padGravity, velocity ) ) {
+				return reject( "pad launch" );
+			}
+			if ( caughtPad < 0 ) {
+				caughtPad = transport;
+				maxFrames = frame + NAV_PAD_MAX_STEPS;
+			}
+		}
 		if ( steering ) {
 			const float add = speed - velocity * wish;
 			if ( add > 0.0f ) {
@@ -1074,10 +1207,15 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 		}
 		const idVec3 next = position + velocity * dt + gravity * ( 0.5f * dt * dt );
 		trace_t trace;
-		if ( NavAgentTranslation( trace, position, next ) ) {
+		if ( recoveryTrace( trace, position, next ) ) {
 			position = next;
 			velocity += gravity * dt;
 			continue;
+		}
+		if ( bot_debug.GetInteger() >= 5 ) {
+			gameLocal.Printf( "BOT_AIR_CONTACT time=%d input=%.3f %.3f frame=%d fraction=%.3f at=%.3f %.3f %.3f normal=%.3f %.3f %.3f\n",
+				gameLocal.time, wish.x, wish.y, frame, trace.fraction, trace.endpos.x, trace.endpos.y, trace.endpos.z,
+				trace.c.normal.x, trace.c.normal.y, trace.c.normal.z );
 		}
 		if ( idMath::Fabs( trace.c.normal.z ) < 0.01f ) {
 			// MP AirMove may step over a lip while close to a floor, including
@@ -1085,11 +1223,11 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			// on a full up/across/down success, as player SlideMove does.
 			const idVec3 lift( 0.0f, 0.0f, pm_stepsize.GetFloat() );
 			trace_t ground, up, across, down;
-			if ( !NavAgentTranslation( ground, trace.endpos, trace.endpos - lift ) &&
+			if ( !recoveryTrace( ground, trace.endpos, trace.endpos - lift ) &&
 				 ground.c.normal.z > NAV_WALKABLE_NORMAL_Z ) {
-				NavAgentTranslation( up, trace.endpos, trace.endpos + lift );
-				NavAgentTranslation( across, up.endpos, up.endpos + next - trace.endpos );
-				NavAgentTranslation( down, across.endpos, across.endpos - lift );
+				recoveryTrace( up, trace.endpos, trace.endpos + lift );
+				recoveryTrace( across, up.endpos, up.endpos + next - trace.endpos );
+				recoveryTrace( down, across.endpos, across.endpos - lift );
 				if ( across.fraction >= 1.0f &&
 					( down.fraction >= 1.0f || down.c.normal.z > NAV_WALKABLE_NORMAL_Z ) ) {
 					position = down.endpos;
@@ -1097,7 +1235,7 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 					continue;
 				}
 				if ( across.fraction > trace.fraction ) {
-					return false;	// a partial step needs additional collision planes
+					return reject( "partial step" );	// needs additional collision planes
 				}
 			}
 		}
@@ -1105,17 +1243,43 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			if ( touchdown ) {
 				*touchdown = trace.endpos;
 			}
-			if ( IsLethalFloor( trace.endpos ) ||
-				 NavLandingImpactDelta( trace, velocity + gravity * ( dt * trace.fraction ), gravity ) > maxImpactDelta ) {
-				return false;
+			if ( IsLethalFloor( trace.endpos ) ) {
+				return reject( "lethal floor" );
+			}
+			// SlideMove clips both its midpoint and end velocity, then
+			// CheckGround/CrashLand inspect contacts at the final position.
+			// An affordable ramp touch is not automatically a landing: CTF5's
+			// walkway bevel redirects the bot upward and back over the void.
+			// Continue that single-plane step until actual ground is reached.
+			const idVec3 clipped = idPhysics_Player::AdjustVertically( trace.c.normal, velocity + gravity * ( dt * 0.5f ) );
+			trace_t remainder;
+			const idVec3 end = trace.endpos + clipped * ( dt * ( 1.0f - trace.fraction ) );
+			if ( !recoveryTrace( remainder, trace.endpos, end ) ||
+				 TransportOnMove( trace.endpos, end, -1 ) >= 0 ) {
+				return reject( "landing remainder" );	// another collision or launch
+			}
+			if ( !NavAgentHasGroundContacts( end, gravity ) ) {
+				position = end;
+				velocity = idPhysics_Player::AdjustVertically( trace.c.normal, velocity + gravity * dt );
+				continue;
+			}
+			if ( NavLandingImpactDelta( trace, velocity + gravity * ( dt * trace.fraction ), gravity ) > maxImpactDelta ) {
+				return reject( "impact budget" );
 			}
 			idVec3 flat( velocity.x, velocity.y, 0.0f );
+			auto recoveryRunout = [&]() {
+				if ( brakedAffordable ) {
+					*brakedAffordable = RecoveryBrakeClear( trace, flat, dt * ( 1.0f - trace.fraction ),
+						Max( 0, knockMsec - ( frame + 1 ) * 16 ) );
+				}
+				return reject( "landing runout" );
+			};
 			const idVec3 stop = trace.endpos + flat * ( dt + flat.Length() / ( 20.0f * speed ) );
 			// A landing whose runout reaches a pad or a teleporter is another
 			// throw: a q4ctf5 bot that survived a rail's kick slid onto
 			// func_jumppad_3 and was flown off the map.
 			if ( TransportOnMove( trace.endpos, stop, -1 ) >= 0 ) {
-				return false;
+				return recoveryRunout();
 			}
 			if ( touchedAffordable ) {
 				*touchedAffordable = true;
@@ -1123,18 +1287,18 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			idVec3 supportedOrigin = trace.endpos;
 			if ( !NavLandingSupported( supportedOrigin ) &&
 				 !RecoveryStepClear( trace.endpos, stop, &supportedOrigin ) ) {
-				return false;
+				return recoveryRunout();
 			}
 			if ( landedSupported ) {
 				*landedSupported = true;
 			}
-			return LandingContinuationClear( supportedOrigin, stop );
+			return LandingContinuationClear( supportedOrigin, stop ) || recoveryRunout();
 		}
 		if ( trace.fraction <= 0.0f ) {
 			// Resting against the wall it slid down: step off its plane, as
 			// the player's own clip epsilon does, rather than read a wedge.
 			if ( ++unstuck > 8 ) {
-				return false;
+				return reject( "wedged" );
 			}
 			position += trace.c.normal * CM_CLIP_EPSILON;
 		} else {
@@ -1143,7 +1307,7 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 		velocity -= trace.c.normal * ( velocity * trace.c.normal );
 		velocity += gravity * dt;
 	}
-	return false;
+	return reject( "no landing" );
 }
 
 // Ground contact during knockback does not end the trajectory. Prove the
@@ -1152,6 +1316,14 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 // Steps, walls, slick floors and slopes remain unproven by this narrow solver.
 bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &velocityIn,
 		int knockMsec, float maxImpactDelta, const idVec3 &wishIn ) const {
+	auto reject = [&]( const char *reason, const idVec3 &position, const idVec3 &velocity, const idVec3 &normal ) {
+		if ( bot_debug.GetInteger() >= 4 ) {
+			gameLocal.Printf( "BOT_SLIDE_PROOF time=%d reason=%s origin=%.3f %.3f %.3f input=%.3f %.3f knock=%d at=%.3f %.3f %.3f velocity=%.3f %.3f %.3f normal=%.3f %.3f %.3f\n",
+				gameLocal.time, reason, origin.x, origin.y, origin.z, wishIn.x, wishIn.y, knockMsec,
+				position.x, position.y, position.z, velocity.x, velocity.y, velocity.z, normal.x, normal.y, normal.z );
+		}
+		return false;
+	};
 	if ( knockMsec < 0 || knockMsec > 1000 || pm_frictionoverride.GetFloat() >= 0.0f ) {
 		return false;
 	}
@@ -1161,21 +1333,29 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 		return AirInputLandingSafe( origin, velocityIn, wish, maxImpactDelta );
 	}
 	idVec3 position = origin;
-	idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );
+	idVec3 velocity = velocityIn;
 	const float dt = NAV_PAD_STEP_SECONDS;
 	const float speed = Max( 1.0f, pm_speed.GetFloat() );
 	const idVec3 groundProbe( 0.0f, 0.0f, 2.0f * CM_CLIP_EPSILON );
 	for ( int elapsed = 0; elapsed < 1000; elapsed += 16 ) {
 		trace_t ground;
 		if ( NavAgentTranslation( ground, position, position - groundProbe ) ) {
-			return AirInputLandingSafe( position, velocity, wish, maxImpactDelta );
+			return AirInputLandingSafe( position, velocity, wish, maxImpactDelta ) ||
+				reject( "air", position, velocity, vec3_origin );
 		}
+		// A future splash can arrive while the shooter is already falling.
+		// Only actual floor contact cancels descent; flattening it before the
+		// probe invents airtime to reach a ledge (and reduces impact damage).
+		velocity.z = 0.0f;
 		if ( ground.c.normal.z < 0.999f || IsLethalFloor( ground.endpos ) ||
 			 ( ground.c.material && ( ground.c.material->GetSurfaceFlags() & SURF_SLICK ) ) ||
 			 ( gameLocal.LiquidContentsAtPoint( position, NULL ) & MASK_WATER ) ) {
-			return false;
+			return reject( "ground", position, velocity, ground.c.normal );
 		}
-		if ( elapsed >= knockMsec ) {
+		// MovePlayer drops timers before WalkMove: the expiration frame
+		// already has friction and normal ground acceleration.
+		const bool knockActive = elapsed + 16 < knockMsec;
+		if ( !knockActive ) {
 			const idVec3 stop = position + velocity * ( dt + velocity.Length() / ( 20.0f * speed ) );
 			if ( TransportOnMove( position, stop, -1 ) < 0 && LandingContinuationClear( position, stop ) ) {
 				return true;
@@ -1188,12 +1368,15 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 		}
 		const float add = speed - velocity * wish;
 		if ( add > 0.0f ) {
-			velocity += wish * Min( add, ( elapsed < knockMsec ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );
+			velocity += wish * Min( add, ( knockActive ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );
 		}
 		trace_t across;
 		const idVec3 next = position + velocity * dt;
-		if ( TransportOnMove( position, next, -1 ) >= 0 || !NavAgentTranslation( across, position, next ) ) {
-			return false;
+		if ( TransportOnMove( position, next, -1 ) >= 0 ) {
+			return reject( "transport", position, velocity, vec3_origin );
+		}
+		if ( !NavAgentTranslation( across, position, next ) ) {
+			return reject( "collision", across.endpos, velocity, across.c.normal );
 		}
 		position = next;
 	}
@@ -1286,6 +1469,84 @@ static bool NavRecoverySharedSupport( const idVec3 &from, const idVec3 &to ) {
 				return true;
 			}
 		}
+	}
+	return false;
+}
+
+// A narrow involuntary landing may have enough real hull contact to stop,
+// while failing the wider five-probe support required by voluntary routes.
+// Complete the airborne collision frame before applying any ground brake.
+// Then require a shared patch of flat floor under every segment, including
+// actual end contacts. A momentary edge touch is not a surviving runout.
+bool rvNavMesh::RecoveryBrakeClear( const trace_t &impact, const idVec3 &velocityIn,
+		float remainingSeconds, int knockMsec ) const {
+	if ( impact.c.normal.z < 0.999f || knockMsec < 0 || knockMsec > 1000 ||
+		 pm_frictionoverride.GetFloat() >= 0.0f ) {
+		return false;
+	}
+	idVec3 position = impact.endpos;
+	idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );
+	auto reject = [&]( const char *reason ) {
+		if ( bot_debug.GetInteger() >= 4 ) {
+			gameLocal.Printf( "BOT_BRAKE_PROOF time=%d reason=%s origin=%.3f %.3f %.3f at=%.3f %.3f %.3f velocity=%.3f %.3f knock=%d\n",
+				gameLocal.time, reason, impact.endpos.x, impact.endpos.y, impact.endpos.z,
+				position.x, position.y, position.z, velocity.x, velocity.y, knockMsec );
+		}
+		return false;
+	};
+	const float dt = NAV_PAD_STEP_SECONDS;
+	const idVec3 down( 0.0f, 0.0f, 2.0f * CM_CLIP_EPSILON );
+	// Leave room for command-byte rounding instead of assuming exact reverse.
+	const float wishSpeed = Max( 1.0f, pm_speed.GetFloat() );
+	for ( int frame = 0; frame < 128; frame++ ) {
+		trace_t ground;
+		if ( NavAgentTranslation( ground, position, position - down ) || ground.c.normal.z < 0.999f ||
+			 ( ground.c.material && ( ground.c.material->GetSurfaceFlags() & SURF_SLICK ) ) ||
+			 IsLethalFloor( position ) || ( gameLocal.LiquidContentsAtPoint( position, NULL ) & MASK_WATER ) ) {
+			return reject( "floor" );
+		}
+		float seconds = remainingSeconds;
+		if ( frame > 0 ) {
+			seconds = dt;
+			const float speed = velocity.Length();
+			if ( speed < 1.0f ) {
+				return NavAgentHasGroundContacts( position, gameLocal.GetGravity() );
+			}
+			knockMsec = Max( 0, knockMsec - 16 );
+			const float friction = knockMsec ? 0.0f : Max( speed, 100.0f ) * 6.0f * dt;
+			// Below the runout controller's stop speed, friction finishes the
+			// stop. Otherwise allow one command byte of rounding in its brake.
+			const float brake = knockMsec ? NAV_PAD_AIR_ACCELERATE * dt * wishSpeed * 0.99f :
+				( speed <= 10.0f ? 0.0f : Max( 0.0f, Min( speed - friction, 15.0f * dt * wishSpeed ) - 15.0f * dt * wishSpeed / 127.0f ) );
+			velocity *= Max( 0.0f, speed - friction - brake ) / speed;
+		}
+		idVec3 next = position + velocity * seconds;
+		trace_t across;
+		if ( !NavAgentTranslation( across, position, next ) ) {
+			// A vertical wall can arrest a landing's runout. CTF5's lower
+			// walkway catches a coast this way; rejecting the wall made the
+			// controller brake in air and fall short of the floor entirely.
+			// Keep both supported segments and the clipped frame remainder.
+			if ( idMath::Fabs( across.c.normal.z ) >= 0.01f ||
+				 TransportOnMove( position, across.endpos, -1 ) >= 0 ||
+				 !NavRecoverySharedSupport( position, across.endpos ) ||
+				 !NavAgentHasGroundContacts( across.endpos, gameLocal.GetGravity() ) ) {
+				return reject( "blocked runout" );
+			}
+			velocity -= across.c.normal * ( ( velocity * across.c.normal ) * 1.001f ); // player OVERCLIP
+			next = across.endpos + velocity * ( seconds * ( 1.0f - across.fraction ) );
+			position = across.endpos;
+			trace_t remainder;
+			if ( !NavAgentTranslation( remainder, position, next ) ) {
+				return reject( "runout corner" );
+			}
+		}
+		if ( TransportOnMove( position, next, -1 ) >= 0 ||
+			 !NavRecoverySharedSupport( position, next ) ||
+			 !NavAgentHasGroundContacts( next, gameLocal.GetGravity() ) ) {
+			return reject( "runout" );
+		}
+		position = next;
 	}
 	return false;
 }
@@ -2125,26 +2386,13 @@ NavAirSteer through idPhysics_Player's air acceleration.
 */
 bool rvNavMesh::PadLanding( idEntity *pad, const idVec3 &launch, const idVec3 *steerTo, idVec3 &landing,
 							float *flightSeconds, float *impactDelta ) const {
-	idEntity *target = ( pad && pad->targets.Num() ) ? pad->targets[0].GetEntity() : NULL;
-	if ( !target || !target->GetPhysics() || !pad->GetPhysics() ) {
-		return false;
-	}
-
 	const idVec3 gravity = gameLocal.GetCurrentGravity( pad );
 	const float g = gravity.Length();
-	if ( g <= 1.0f ) {
+	idVec3 launchVelocity;
+	if ( !NavPadLaunchVelocity( pad, gravity, launchVelocity ) ) {
 		return false;
 	}
 	const idVec3 down = gravity / g;
-	const idVec3 diff = target->GetPhysics()->GetOrigin() - pad->GetPhysics()->GetOrigin();
-	const idVec3 vert = ( diff * down ) * down;
-	const float flightTime = idMath::Sqrt( vert.Length() / ( 0.5f * g ) );
-	if ( flightTime <= 0.0f ) {
-		return false;
-	}
-	idVec3 horizontal = diff - vert;
-	const float span = horizontal.Normalize();
-	const idVec3 launchVelocity = horizontal * ( span / flightTime ) - gravity * flightTime;
 	idVec3 velocity = launchVelocity;
 
 	const float wishSpeed = Max( 1.0f, pm_speed.GetFloat() );

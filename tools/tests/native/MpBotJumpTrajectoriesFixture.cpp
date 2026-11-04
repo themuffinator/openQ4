@@ -26,6 +26,8 @@ struct idMath {
     static float Fabs(float x) { return std::fabs(x); }
     static float Sqrt(float x) { return std::sqrt(x); }
     static float Ceil(float x) { return std::ceil(x); }
+    static float ACos(float x) { return std::acos(x); }
+    static double Pow64(double x,double y) { return std::pow(x,y); }
     static constexpr float FLOAT_EPSILON=1.192092896e-07f;
 };
 struct idVec3 {
@@ -69,9 +71,24 @@ struct idBounds {
 };
 struct CVar { float value; float GetFloat() const { return value; } int GetInteger() const { return int(value); } };
 CVar pm_stepsize{16},pm_jumpheight{48},pm_speed{320},pm_usecylinder{1},pm_frictionoverride{-1};
+CVar pm_slidevelocity{1},pm_powerslide{0.09f};
+const float OVERCLIP=1.001f;
+int missingGroundContacts=0;
+float contactsAfterX=-1e30f;
+bool NavAgentHasGroundContacts(const idVec3& origin,const idVec3&) {
+    if(origin.x<contactsAfterX) return false;
+    if(missingGroundContacts>0) { --missingGroundContacts; return false; }
+    return true;
+}
 CVar bot_debug{0};
 constexpr int MAX_GENTITIES=64, SURF_NODAMAGE=1, MASK_WATER=2, SURF_SLICK=4;
+constexpr int TH_THINK=1;
+struct rvJumpPad { static int GetClassType() { return 1; } };
 struct idEntity {
+    bool live=true;
+    int type=1;
+    bool IsType(int value) const { return type==value; }
+    bool IsActive(int) const { return live; }
     struct Physics { idVec3 origin; const idVec3& GetOrigin() const { return origin; } } physics;
     struct Target { idEntity* entity=nullptr; idEntity* GetEntity() const { return entity; } };
     struct Targets : std::vector<Target> { int Num() const { return int(size()); } } targets;
@@ -79,11 +96,26 @@ struct idEntity {
 };
 static idEntity* repeatedPad=nullptr;
 static int repeatedPadTouches=0;
+static idEntity* recoveryPad=nullptr;
+static idBounds recoveryBounds;
+static bool recoveryNatural=true,recoveryTouch=true;
+static idEntity* secondRecoveryPad=nullptr;
+static idBounds secondRecoveryBounds{{{300,-32,1000},{350,32,2000}}};
+static bool SecondRecoveryVolumeAt(const idVec3& position) {
+    idBounds body{{{-16,-16,0},{16,16,77}}}; body.TranslateSelf(position);
+    return secondRecoveryPad && body.IntersectsBounds(secondRecoveryBounds);
+}
+static bool RecoveryVolumeAt(const idVec3& position) {
+    idBounds body{{{-16,-16,0},{16,16,77}}}; body.TranslateSelf(position);
+    return recoveryPad && body.IntersectsBounds(recoveryBounds);
+}
 static bool NavPadVolumeTouches(idEntity* pad,const idVec3& position) {
     // Contact observations from the sloped CTF5 trigger: the hull is still
     // inside it after its first two upward steps. Geometry itself is checked
     // separately by the transport fixture and original-map replay.
     if (pad==repeatedPad && position.z<40 && position.x<40) { ++repeatedPadTouches; return true; }
+    if (pad==recoveryPad) return recoveryTouch && RecoveryVolumeAt(position);
+    if (pad==secondRecoveryPad) return SecondRecoveryVolumeAt(position);
     return false;
 }
 struct GameLocal {
@@ -193,6 +225,12 @@ bool Sweep(trace_t& trace,const idVec3& start,const idVec3& end,const idTraceMod
 bool NavAgentTranslation(trace_t& trace,const idVec3& start,const idVec3& end) {
     return Sweep(trace,start,end,agentHull);
 }
+struct idPlayer;
+// These geometry worlds contain no other players. Physical-traffic replays
+// separately exercise the production live-player sweep on stock maps.
+bool NavRecoveryTranslation(trace_t& trace,const idVec3& start,const idVec3& end,const idPlayer*) {
+    return NavAgentTranslation(trace,start,end);
+}
 bool NavTraceTranslation(trace_t& trace,const idVec3& start,const idVec3& end,
     const idTraceModel& model,const idBounds&) {
     return Sweep(trace,start,end,model);
@@ -209,12 +247,15 @@ public:
     bool DodgeJumpClear(const idVec3&,const idVec3&,const idVec3&,float,float=0) const;
     bool PadLanding(idEntity*,const idVec3&,const idVec3*,idVec3&,float* = nullptr,float* = nullptr) const;
     bool LandingSurvivable(const idVec3&,const navCorner_t&,float) const;
-    bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr,bool* = nullptr) const;
+    bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr,bool* = nullptr,bool* = nullptr,int = 0,const idPlayer* = nullptr) const;
+    bool RecoveryBrakeClear(const trace_t&,const idVec3&,float,int) const;
     bool KnockSlideLandingSafe(const idVec3&,const idVec3&,int,float,const idVec3& = idVec3()) const;
     bool steeredPad=false;
     bool IsSteeredPadLanding(int,const idVec3&) const { return steeredPad; }
     static const idBounds& GetAgentBounds() { return agentBounds; }
     int TransportAt(const idBounds&) const { return transported ? 1 : -1; }
+    int TransportAtFloor(const idVec3& p) const { return RecoveryVolumeAt(p) ? 1 : SecondRecoveryVolumeAt(p) ? 2 : -1; }
+    bool NaturalPadLanding(int,idVec3&) const { return recoveryNatural; }
     bool LineEntersTransport(const idVec3&,const idVec3&) const { return transported; }
     int TransportOnMove(const idVec3&,const idVec3&,int) const { return transported ? 1 : -1; }
     bool IsLethalFloor(const idVec3&) const { return lethal; }
@@ -229,11 +270,15 @@ static const char* NavWalkBlockedReason(const trace_t&,const trace_t&) { return 
 rvNavMesh navMesh;
 struct idPlayer {
     struct Physics {
+        static idVec3 AdjustVertically(const idVec3&,const idVec3&,int=0);
         idVec3 origin,velocity;
         const idVec3& GetOrigin() const { return origin; }
         const idVec3& GetLinearVelocity() const { return velocity; }
         const idBounds& GetBounds() const { return agentBounds; }
-        int GetKnockBack() const { return 0; }
+        struct { int movementFlags=0,movementTime=0; } current;
+        int GetKnockBack() const;
+        void SetKnockBack(int);
+        void RestoreKnockBack(int);
     } physics;
     Physics* GetPhysics() { return &physics; }
     Physics* GetPlayerPhysics() { return &physics; }
@@ -266,6 +311,14 @@ void Platform(float xmin,float xmax,float z) {
     solids.push_back({{xmin,-256,z-64},{xmax,256,z}});
 }
 int main() {
+    idPhysics_Player timer;
+    timer.current.movementFlags=PMF_DUCKED|PMF_TIME_LAND; timer.current.movementTime=250;
+    timer.SetKnockBack(50); CHECK(timer.GetKnockBack()==0 && timer.current.movementTime==250);
+    timer.RestoreKnockBack(50); CHECK(timer.GetKnockBack()==50);
+    CHECK(timer.current.movementFlags==(PMF_DUCKED|PMF_TIME_KNOCKBACK));
+    timer.SetKnockBack(200); CHECK(timer.GetKnockBack()==50);
+    timer.RestoreKnockBack(200); CHECK(timer.GetKnockBack()==200);
+    timer.RestoreKnockBack(0); CHECK(timer.GetKnockBack()==0 && timer.current.movementFlags==PMF_DUCKED);
     rvNavMesh nav;
     agentHull=NavCreateAgentTrace(agentBounds);
     // A box touches the far corner of this floor; the real default player's
@@ -283,6 +336,50 @@ int main() {
     pm_usecylinder.value=4; agentHull=NavCreateAgentTrace(agentBounds);
     CHECK(agentHull.numVerts==8 && std::fabs(agentHull.verts[0].x-std::sqrt(128.0f))<0.001f);
     pm_usecylinder.value=1; agentHull=NavCreateAgentTrace(agentBounds); solids.clear();
+    // A DM8 rocket lands on a narrow raised lip. Broad route support fails
+    // for both headings, but only one can keep real hull contact while braking.
+    // Include the engine trace's quarter-unit floor separation in this
+    // fixture's exact separating-axis plane (which has no clip epsilon).
+    solids.push_back({{48,-1024,288},{64,1024,352.25f}});
+    const idVec3 rocketOrigin{-24.912f,-761.135f,328.25f};
+    const idVec3 rocketVelocity{274.678f,-581.521f,241.656f};
+    bool rimBraked=false;
+    CHECK(!nav.AirInputLandingSafe(rocketOrigin,rocketVelocity,{-0.9239f,0.3827f,0},100,
+          nullptr,nullptr,nullptr,&rimBraked,154) && rimBraked);
+    CHECK(!nav.AirInputLandingSafe(rocketOrigin,rocketVelocity,{-0.941f,0.337f,0},100,
+          nullptr,nullptr,nullptr,&rimBraked,154) && !rimBraked);
+    idPlayer rocket; rocket.physics.origin=rocketOrigin; rocket.physics.velocity=rocketVelocity;
+    rocket.physics.RestoreKnockBack(154);
+    idVec3 rocketWish;
+    CHECK(BotChooseAirInput(&rocket,rocketWish));
+    nav.AirInputLandingSafe(rocketOrigin,rocketVelocity,rocketWish,100,nullptr,nullptr,nullptr,&rimBraked,154);
+    CHECK(rimBraked);
+    // The recovery continuation fails closed on absent floor, slippery ground,
+    // pending knockback, hazards, transports and a missing landing contact.
+    solids.clear(); Platform(-256,0,0);
+    trace_t rimImpact; rimImpact.endpos={-4,0,0.25f}; rimImpact.c.normal={0,0,1};
+    CHECK(nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0));
+    CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0.016f,0));
+    CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,100));
+    floorMaterial.flags=SURF_SLICK; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); floorMaterial.flags=0;
+    lethal=true; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); lethal=false;
+    transported=true; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); transported=false;
+    missingGroundContacts=1; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); missingGroundContacts=0;
+    contactsAfterX=0; CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0)); contactsAfterX=-1e30f;
+    // Endpoints on two islands cannot bridge an unsupported interval.
+    Platform(40,1024,0);
+    CHECK(!nav.RecoveryBrakeClear(rimImpact,{4000,0,0},0.016f,0));
+    solids.clear(); CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0));
+    // A wall clips the runout before it reaches the far edge. Retain the
+    // remaining tangential motion: a wall cannot save a slide off its end.
+    Platform(-256,256,0);
+    solids.push_back({{8,-256,0},{24,256,128}});
+    trace_t wallImpact; wallImpact.endpos={-16,0,0.25f}; wallImpact.c.normal={0,0,1};
+    CHECK(nav.RecoveryBrakeClear(wallImpact,{500,0,0},0.016f,0));
+    CHECK(nav.RecoveryBrakeClear(wallImpact,{500,100,0},0.016f,0));
+    solids[0].hi.y=4;
+    CHECK(!nav.RecoveryBrakeClear(wallImpact,{500,500,0},0.016f,0));
+    solids.clear();
     // A walk along q4dz3's rim was supported only by the outer two units of
     // the hull; the controller's small lateral error then lost the floor.
     Platform(12,128,0);
@@ -292,6 +389,34 @@ int main() {
     CHECK(nav.SampleFloor({24,0,1},20,rimFloor));
     solids.clear();
     const float launch=std::sqrt(2.0f*800.0f*48.0f);
+    // A pad catches a coast above the void, replacing momentum on each
+    // touching step. Its long flight still needs a real, affordable landing.
+    idEntity catchPad,catchTarget;
+    catchTarget.physics.origin={400,0,1600}; catchPad.targets.push_back({&catchTarget});
+    gameLocal.entities[1]=&catchPad; recoveryPad=&catchPad;
+    recoveryBounds={{{-16,-32,0},{16,32,64}}};
+    Platform(600,1400,0);
+    CHECK(nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    CHECK(!nav.AirInputLandingSafe({0,0,32},{200,0,100},{},idMath::INFINITY));
+    idEntity secondCatch; secondCatch.targets.push_back({&catchTarget});
+    secondRecoveryPad=&secondCatch; gameLocal.entities[2]=&secondCatch;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    secondRecoveryPad=nullptr; gameLocal.entities[2]=nullptr;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},20));
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{1,0,0},idMath::INFINITY));
+    catchPad.live=false;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    catchPad.live=true; recoveryNatural=false;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    recoveryNatural=true; recoveryTouch=false;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    recoveryTouch=true; catchPad.type=2;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    catchPad.type=1; catchTarget.physics.origin.x=2000;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    catchTarget.physics.origin.x=400; recoveryPad=nullptr; gameLocal.entities[1]=nullptr;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    solids.clear();
     // A hit during DM8's long pad flight pushes its ballistic touchdown
     // beyond the destination platform. "Past the node" alone is not proof
     // of a safe coast. Preserve natural arcs that still reach solid ground.
@@ -683,11 +808,45 @@ int main() {
         // platform even when coasting would leave it over a void.
         solids.clear(); Platform(-1024,0,0);
         CHECK(nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0}));
+        // At this rim only the expiration frame's restored friction and
+        // ground acceleration retain support. One extra knock frame loses it.
+        CHECK(nav.KnockSlideLandingSafe({-136,0,0.25f},{700,0,0},200,inf,{-1,0,0}));
+        CHECK(!nav.KnockSlideLandingSafe({-136,0,0.25f},{700,0,0},216,inf,{-1,0,0}));
+        CHECK(!nav.KnockSlideLandingSafe({-132,0,0.25f},{700,0,0},200,inf,{-1,0,0}));
         CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{1,0,0}));
         floorMaterial.flags=SURF_SLICK;
         CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0})); floorMaterial.flags=0;
         pm_frictionoverride.value=2;
         CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0})); pm_frictionoverride.value=-1;
+        // The splash proof can start above the floor during a descending
+        // jump. It must not turn the existing fall into a fresh drop at rest.
+        solids.clear(); Platform(-1024,1024,0);
+        CHECK(!nav.KnockSlideLandingSafe({0,0,64},{0,0,-900},50,40));
+        CHECK(nav.KnockSlideLandingSafe({0,0,64},{0,0,-900},50,inf));
+        solids.clear(); Platform(128,1024,0);
+        CHECK(nav.KnockSlideLandingSafe({0,0,64},{500,0,0},50,inf));
+        CHECK(!nav.KnockSlideLandingSafe({0,0,64},{500,0,-900},50,inf));
+        // A sweep can clip velocity before the actor registers any ground
+        // contact. Only that missing end-of-step contact permits deferring
+        // CrashLand; an ordinary grounded impact keeps its full cost.
+        solids.clear(); Platform(-1024,1024,0);
+        CHECK(!nav.AirInputLandingSafe({0,0,64},{100,0,-900},{},40));
+        missingGroundContacts=1;
+        CHECK(nav.AirInputLandingSafe({0,0,64},{100,0,-900},{},40));
+        CHECK(missingGroundContacts==0);
+        transported=true; missingGroundContacts=1;
+        CHECK(!nav.AirInputLandingSafe({0,0,64},{100,0,-900},{},40));
+        transported=false; missingGroundContacts=0;
+        // An affordable swept touch is not a landing either. A sloped lip
+        // can redirect the flight without ever making ground contacts.
+        // Neither support nor the last-resort touch may approve that flight.
+        bool phantomSupport=false,phantomTouch=false,phantomBrake=false;
+        missingGroundContacts=1000;
+        CHECK(!nav.AirInputLandingSafe({0,0,64},{100,0,-100},{},inf,nullptr,
+              &phantomSupport,&phantomTouch,&phantomBrake));
+        CHECK(!phantomSupport && !phantomTouch && !phantomBrake);
+        missingGroundContacts=0;
+        CHECK(nav.AirInputLandingSafe({0,0,64},{100,0,-100},{},inf));
         // Involuntary recovery may aim for a physical hull contact when
         // every supported landing fails. It remains unsafe for route proof.
         solids.clear(); Platform(-1,0,0);

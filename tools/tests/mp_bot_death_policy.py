@@ -33,7 +33,7 @@ def state(time: int, teams: dict[int, int]) -> str:
 def impulse(client: int, time: int, attacker: int, origin=(800.0, 300.0, 544.25), velocity=(170.0, -533.0, -83.0)) -> str:
     return (f"BOT_IMPULSE client={client} time={time} attacker={attacker} damage=20 "
             f"origin={origin[0]} {origin[1]} {origin[2]} kick=1 2 3 "
-            f"velocity={velocity[0]} {velocity[1]} {velocity[2]} def=damage_rocketSplash\n")
+            f"velocity={velocity[0]} {velocity[1]} {velocity[2]} def=damage_rocketSplash health=80 knock=50 armor=20 armorSave=10 preKnock=0\n")
 
 
 def death(name: str, time: int) -> str:
@@ -68,17 +68,20 @@ def check(condition: bool, message: str) -> None:
 def main() -> None:
     teams = {1: 0, 2: 1, 3: 0}
     pellet = ("BOT_IMPULSE client=1 time=2000 attacker=2 damage=10 origin=1 2 3 "
-              "kick=50 0 0 velocity={velocity} 0 0 def=damage_pellet health={health} knock=50\n")
-    shot = pellet.format(velocity=100, health=90) + pellet.format(velocity=150, health=80)
+              "kick=50 0 0 velocity={velocity} 0 0 def=damage_pellet health={health} knock=50 armor={armor} armorSave=5 preKnock={pre}\n")
+    shot = pellet.format(velocity=100, health=90, armor=45, pre=0) + pellet.format(velocity=150, health=80, armor=40, pre=50)
     [burst] = classify(state(1000, teams) + shot + death("Cortez", 4500))
     check(burst["impulse"]["damage"] == 20 and burst["impulse"]["kick"] == [100, 0, 0] and
           len(burst["impulse"]["pellets"]) == 2 and not burst["earlier_candidates"],
           "one accounted shotgun burst is one cause, retaining both pellets")
     before = [t for t in policy.trials_for(burst["impulse"]) if t.get("counterfactual")]
-    check("50.000 0.000 0.000" in before[0]["command"] and before[0]["setup"] == ["bot_probeHealth 1 100"],
-          "counterfactual removes the entire shotgun kick and damage")
+    check("50.000 0.000 0.000" in before[0]["command"] and before[0]["setup"] == ["bot_probeHealth 1 100 0 0 0 0 50"],
+          "counterfactual removes the entire shotgun kick, health and armour damage")
     for changed in (shot.replace("velocity=150", "velocity=151"),
                     shot.replace("health=80", "health=79"),
+                    shot.replace("armor=40", "armor=39"),
+                    shot.replace(" armorSave=5", ""),
+                    shot.replace("preKnock=50", "preKnock=49"),
                     shot.replace("velocity=150 0 0 def=damage_pellet", "velocity=150 0 0 def=damage_railgun"),
                     shot.replace("origin=1 2 3 kick=50 0 0 velocity=150", "origin=2 2 3 kick=50 0 0 velocity=150")):
         [separate] = classify(state(1000, teams) + changed + death("Cortez", 4500))
@@ -106,6 +109,19 @@ def main() -> None:
         return policy.decide(choice, outcomes() if choice["impulse"]["time"] == 2000 else outcomes(before=None), True)
     check(policy.replay_chain(taps, strongest)["status"] == "excluded-impulse" and visited == [3100, 2000],
           "only after a complete doomed replay, small taps cannot exhaust the bounded search before a strong cause")
+    # Equal machine-gun kicks logged to three decimals differ in squared
+    # magnitude by roundoff. Do not skip the newer hit for the largest error.
+    equal = dict(chain)
+    equal["earlier_candidates"] = [
+        {"impulse": {**chain["impulse"], "time": 2200, "kick": [7.835, 34.045, -2.137]}},
+        {"impulse": {**chain["impulse"], "time": 2100, "kick": [17.299, 30.311, -2.648]}},
+    ]
+    visited = []
+    def same_strength(choice, attempt):
+        visited.append(choice["impulse"]["time"])
+        return policy.decide(choice, outcomes(survivor="controller") if attempt else outcomes(before=None), True)
+    check(policy.replay_chain(equal, same_strength)["status"] == "navigation" and visited == [2600, 2200],
+          "rounded equal-strength kicks use recency and still stop at a survivor")
     # Positive control: enemy impulse, every decisive trial armed and fell.
     [candidate] = classify(state(1000, teams) + impulse(1, 2000, 2) + death("Cortez", 4500))
     check(candidate["status"] == "impulse-candidate" and candidate["impulse"]["attacker"] == 2,
@@ -121,14 +137,19 @@ def main() -> None:
     check(policy.decide(candidate, [o for o in outcomes() if not o.get("counterfactual")], True)["status"] ==
           "navigation", "no counterfactual trials fail closed")
     pre = [t for t in policy.trials_for({"origin": [1, 2, 3], "velocity": [300, 0, 100], "kick": [250, 0, 50],
-                                         "health": 40, "damage": 20}) if t.get("counterfactual")]
+                                         "health": 40, "damage": 20, "knock_msec": 36, "pre_knock_msec": 36,
+                                         "armor": 17, "armor_save": 8}) if t.get("counterfactual")]
     check(len(pre) == 3 and "50.000 0.000 50.000" in pre[0]["command"] and
-          pre[0]["setup"] == ["bot_probeHealth 1 60"], "the counterfactual removes the kick and the hit's damage")
+          pre[0]["setup"] == ["bot_probeHealth 1 60 36 0 0 0 25"],
+          "the counterfactual removes this hit's damage and kick while retaining an earlier knock timer")
     # Negative controls: the same impulse with a recoverable replay still fails.
     check(policy.decide(candidate, outcomes(survivor="air05"), True)["status"] == "navigation",
           "a surviving fixed-input trial keeps the death a navigation failure")
     check(policy.decide(candidate, outcomes(survivor="controller"), True)["status"] == "navigation",
           "a surviving controller trial keeps the death a navigation failure")
+    for variant in (outcomes(missing="controller"), outcomes(unarmed="controller"), outcomes(airborne="controller")):
+        check(policy.decide(candidate, variant, True)["status"] == "navigation",
+              "an incomplete controller trial cannot qualify an impulse exclusion")
     check(policy.decide(candidate, outcomes(survivor="none"), True)["status"] == "navigation",
           "surviving with no input keeps the death a navigation failure")
     check(policy.decide(candidate, outcomes(unarmed="air11"), True)["status"] == "navigation",
@@ -172,18 +193,26 @@ def main() -> None:
     [ffa] = classify(impulse(1, 2000, 3) + death("Cortez", 4500), gametype="DM")
     check(ffa["status"] == "impulse-candidate", "every other client is an enemy in DM")
     # The replay restores the health the hit left, so fall damage counts.
-    [hurt] = classify(state(1000, teams) + impulse(1, 2000, 2).replace("def=damage_rocketSplash",
-                      "def=damage_rocketSplash health=9") + death("Cortez", 4500))
-    check(hurt["impulse"]["health"] == 9 and all(t.get("setup") == ["bot_probeHealth 1 9"]
+    [hurt] = classify(state(1000, teams) + impulse(1, 2000, 2).replace("health=80", "health=9") + death("Cortez", 4500))
+    check(hurt["impulse"]["health"] == 9 and all(t.get("setup") == ["bot_probeHealth 1 9 50 0 0 0 20"]
           for t in policy.trials_for(hurt["impulse"]) if not t.get("counterfactual")),
           "replays run at the victim's post-hit health")
-    [slid] = classify(state(1000, teams) + impulse(1, 2000, 2).replace("def=damage_rocketSplash",
-                      "def=damage_rocketSplash health=76 knock=200") + death("Cortez", 4500))
-    check(all(t.get("setup") == ["bot_probeHealth 1 76 200"] for t in policy.trials_for(slid["impulse"])
+    [slid] = classify(state(1000, teams) + impulse(1, 2000, 2).replace("health=80 knock=50",
+                      "health=76 knock=200") + death("Cortez", 4500))
+    check(all(t.get("setup") == ["bot_probeHealth 1 76 200 0 0 0 20"] for t in policy.trials_for(slid["impulse"])
               if not t.get("counterfactual")),
           "replays restore the knockback time that removes ground friction")
-    check(all("setup" not in t for t in policy.trials_for(candidate["impulse"])),
-          "an impulse without logged health replays at spawn health")
+    for field in ("health", "knock_msec", "pre_knock_msec", "armor", "armor_save", "damage"):
+        for value in (None, -1, 1001):
+            incomplete = {**candidate, "impulse": {**candidate["impulse"], field: value}}
+            check(policy.decide(incomplete, outcomes(), True)["status"] == "navigation",
+                  "missing or invalid exact replay state must never use spawn defaults")
+    legacy = impulse(1, 2000, 2).replace(" armor=20 armorSave=10", "")
+    with patch.object(policy, "replay_session", side_effect=AssertionError("legacy state must not launch")):
+        result = policy.classify_log(ROSTER + state(1000, teams) + legacy + death("Cortez", 4500),
+            {"Cortez"}, "CTF", "mp/q4ctf5", Path("runtime"), "engine", Path("assets"), Path("output"), 28973)
+    check(result["navigation_world_deaths"] == 1 and result["policy_version"] == 2,
+          "old logs without armour remain failures without running misleading replays")
     # Trial assessment reads markers, arming, deaths and landings.
     trials = policy.trials_for({"origin": [1, 2, 3], "velocity": [4, 5, 6]})
     check(len([t for t in trials if t["decisive"]]) == policy.AIR_HEADINGS + 1, "16 headings plus no input decide")
@@ -224,6 +253,13 @@ def main() -> None:
                "MP_BOT_RELEASE_INPUT settle\n"
                "MP_PHYSICS slot=1 grounded=1 health=14 velocity=0 0 0\nMP_BOT_TRIAL_END settle\n")
     check(policy.assess_trials(settled, [settle_trial])[0]["survived"], "settled controller survives input release")
+    jumped = settled.replace("BOT_MOVE_PROBE", "BOT_JUMP_PROBE")
+    check(not policy.assess_trials(jumped, [settle_trial])[0]["armed"], "causal envelopes reject jump markers")
+    jump_trial = {**settle_trial, "probe_type": "JUMP"}
+    check(policy.assess_trials(jumped, [jump_trial])[0]["survived"], "positive jump regression requires its explicit marker")
+    check(not policy.assess_trials(settled, [jump_trial])[0]["armed"], "wrong positive marker rejected")
+    mixed = jumped.replace("BOT_JUMP_PROBE client=1 time=1", "BOT_JUMP_PROBE client=1 time=1\nBOT_MOVE_PROBE client=1 time=1")
+    check(not policy.assess_trials(mixed, [jump_trial])[0]["armed"], "mixed duplicate probes rejected")
     for changed in (settled.replace("MP_BOT_RELEASE_INPUT settle\n", ""),
                     settled.replace("velocity=0 0 0", "velocity=50 0 0", 1),
                     settled.replace("grounded=1 health=14", "grounded=0 health=14", 1),

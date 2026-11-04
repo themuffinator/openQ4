@@ -2651,6 +2651,60 @@ Completion substeps:
   navigation/control failures and retain strict world-death gates. Qualify route
   generation/think budgets, objectives and real combat; source tests do not close
   the previously failing runtime safety sweep.
+  Current qualification correction: [exact armour and timer audit](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026)
+  finds that earlier causal replays omitted armour. Their exclusions below are
+  historical, not final safety evidence. Policy version 2 restores post-hit and
+  pre-hit armour and rejects incomplete logs. Both DM8 pad poses and the CTF5
+  pad catch now pass isolated recovery; the ground-slide timer is corrected.
+  The rocket-slide controller now passes its isolated runtime check. CTF7's
+  low-health drop reproduces a lethal overshoot onto a lower neighbouring floor;
+  the edge guard now prices that actual floor before permitting departure.
+  Both CTF7 poses now pass isolated runtime checks. Audit logging and replay
+  also preserve actual pre/post knockback timers, including refused timer
+  resets. The `9a70f7b68` four-map long sweep has 15 raw deaths, 14 exact-state
+  impulse exclusions and one recoverable DM8 rocket landing; DM8 also misses
+  the minimum simulated duration. Recovery now distinguishes a hull-edge
+  landing with a surviving brake from a momentary touch followed by a fatal
+  slide. The `189c4b4a9` repeat meets all four duration gates but exposes two
+  further CTF3 deaths. One reproduces a pad collision when a climb hop loses
+  its approach reservation; the reservation now survives that hop. The other
+  departure, renewed final-build long/catalog runs and controlled timing remain
+  open. The `04e637ae0` repeat qualifies CTF3 directly and all six DM8 deaths
+  under the exact-state impulse policy, but retains two CTF5 navigation deaths.
+  One reproduces a ramp contact falsely accepted as a landing; recovery now
+  requires actual grounding after the clipped collision frame, and its runtime
+  replay survives. Off-route movement now guards its final command against
+  unplanned transports; two fatal CTF5 reconstructions and four nearby approach
+  checks survive. Live recovery also forecasts current player hulls, fixing a
+  reproducible DM8 body deflection. The original moving-player sequences and
+  older CTF3 missed-pad departure are not exact reproductions. CTF5/DeadZone
+  repeats clear their duration shortfalls without waiving the original failed
+  reports. The archived `04e637ae0` stage now qualifies all four duration-selected
+  long runs and all 33 catalog variants under strict causal assessment. The
+  subsequent ramp, off-route and player-contact corrections still need renewed
+  long-match, complete-catalog and controlled-timing qualification.
+  The `5bd8dff11` repeat meets all four long-run duration gates and leaves two
+  unresolved deaths after exact-state replay; its 33-variant catalog clears
+  death/duration assessment. [Wall-arrested recovery and settled braking](mp-bots.md#wall-arrested-landings-and-settled-braking-4-november-2026)
+  fix the CTF5 controller's rejected safe coast and a delayed ground-brake
+  oscillation exposed by the replay. That brake artifact requires fresh
+  final-stage qualification rather than carrying old exclusions forward.
+  The DM8 enemy-rocket/self-splash sequence and controlled timing remain open.
+  The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
+  exact-state causal exclusion, leaving zero navigation deaths and four
+  duration failures; those duration failures are not waived.
+  Follow-through, 4 November: the [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026)
+  fixes all three previously recorded long-match hit states. The renewed
+  `84dde9c6d` long runs pass CTF3/DZ3 directly and CTF5 after strict causal
+  exclusion, but expose two further DM8 failures. Airborne self-blast admission
+  and glancing-contact prediction are corrected next; renewed final-build
+  long matches, the full catalog and controlled timing remain required.
+  The `c65041464` stage passes all four targeted hit cases and ten established
+  recovery cases. CTF3/DZ3 again pass directly, and all three CTF5 deaths pass
+  strict causal exclusion. DM8 retains two recoverable failures: a coast that
+  could safely catch a second pad, and a rocket slide requiring earlier input.
+  The bounded pad-catch proof and the slide investigation continue under the
+  same acceptance gates; the new catalog sweep is not final-build qualification.
   Follow-through, 4 November: the [terminal-state audit](mp-bots.md#terminal-state-long-match-audit-4-november-2026)
   completes the earlier impulse requalification: DM8 retains one navigation
   death and CTF5 two, with three and two proven enemy-impulse exclusions.

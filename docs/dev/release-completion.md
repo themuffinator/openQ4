@@ -144,10 +144,35 @@ See [player release status](../user/release-status.md).
   into gameplay. See [scope and evidence](savegame-reliability.md#actor-animation-ownership-and-interrupted-state-calls).
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
+- Recovery preserves a safe landing stopped by a wall and settles its final
+  braking without drifting back off a ledge. The reproduced CTF5 fall is fixed;
+  the broader long-match, map-catalog and timing gates remain under qualification.
+- Bots returning to a route avoid unplanned jump pads, and airborne recovery
+  accounts for nearby players that can deflect a safe landing. Reproduced falls
+  pass isolated checks; final long-match and map-catalog qualification continues.
 
+- Bots keep their place in a jump-pad queue while hopping up its ramp, preventing
+  a following bot from launching into them. The reproduced CTF3 collision and
+  wider safety sweeps are under qualification.
+- Bots react to small hits that spoil a ledge approach or make a jump lethal,
+  and can change a stale movement command before the next physics step after
+  a hit. The remaining long-match safety gates are being rerun; see the
+  [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026).
+- Bots avoid close self-blasts during flight and account for downward momentum
+  and glancing contacts when checking a recovery landing. These further
+  corrections are undergoing the renewed traversal-safety gates.
+- Recovery continues steering after a ramp throws a bot back into the air,
+  instead of treating that brief contact as a safe landing. The reproduced
+  CTF5 rocket fall and wider safety sweeps are under qualification.
+- Recovery can preserve a coast into a working jump pad when its complete
+  onward flight has a safe landing. The recorded catch and wider safety checks
+  are still under qualification.
 - Bots can steer a dangerous knockback slide before leaving the floor and
   brake after catching a narrow ledge. Recovery also accounts for movement
   boosts so its commands match the predicted trajectory.
+- Recovery distinguishes a narrow ledge where braking can stop the bot from
+  an edge it will slide off after touching down. The remaining recorded DM8
+  rocket case and renewed safety sweeps are under qualification.
 - Bots avoid the area swept by a lethal moving crusher and check whether their
   own splash weapon would throw them off supported ground before firing.
 - Bots stopped beside a narrow walking rim can slowly move onto supported
@@ -1155,6 +1180,16 @@ made them too large to load.
   Liquid-consumer and broader presentation qualification remain open.
 - MP-07: the server diagnostic applies the measured lead/RTT prerequisite before
   adding rewind bias. State/wiring checks pass; defaults remain off.
+- MP-02 qualification correction (4 November): prior causal replays omitted
+  armour and cannot qualify final safety exclusions. Version 2 logs and restores
+  post-hit/pre-hit armour and rejects incomplete state. Both recorded DM8 pad
+  catches and the CTF5 diagonal-pad recovery pass isolated runtime checks.
+  Ground-slide prediction now restores friction on the physics timer's expiry
+  frame, and the recorded rocket-slide recovery passes. Bots also check whether
+  their momentum reaches a lower floor than their route's landing can afford.
+  Both low-health drop poses pass isolated checks. Causal audits also preserve
+  actual pre/post knockback timers, including refused resets; renewed final-build
+  long/catalog/timing gates remain open; see [bot evidence](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026).
 - MP-02: bounded percentile profiling and explicit audit budgets are implemented.
   The five-minute DM8 audit retains a navigation death, a stuck event and a
   contested timing failure; it does not close the safety or performance gate.

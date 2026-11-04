@@ -32,6 +32,7 @@ def main() -> None:
         "bool rvNavMesh::LandingContinuationClear(",
         "static bool NavRecoveryFootprintContains(",
         "static bool NavRecoverySharedSupport(",
+        "bool rvNavMesh::RecoveryBrakeClear(",
         "bool rvNavMesh::RecoveryStepClear(",
         "bool rvNavMesh::GapJumpClear(",
         "bool rvNavMesh::JumpTakeoffClear(",
@@ -42,6 +43,11 @@ def main() -> None:
         "bool rvNavMesh::KnockSlideLandingSafe(",
     ))
     physics = (ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8")
+    constants += "\n" + "\n".join(re.findall(r"^const int PMF_.*$", physics, re.M))
+    bodies = "\n".join(function(physics, signature) for signature in (
+        "void idPhysics_Player::SetKnockBack(", "void idPhysics_Player::RestoreKnockBack(",
+        "int idPhysics_Player::GetKnockBack(")) + "\n" + bodies
+    bodies = function(physics, "idVec3 idPhysics_Player::AdjustVertically(") + "\n" + function(nav, "static bool NavPadLaunchVelocity(") + "\n" + bodies
     for name, value in (("PM_ACCELERATE_MP", 15.0), ("PM_FRICTION", 6.0), ("PM_STOPSPEED", 100.0)):
         assert float(re.search(rf"const float {name}\s*=\s*([\d.]+)f", physics)[1]) == value, name
     header = (ROOT / "src/mpgame/bots/NavMesh.h").read_text(encoding="utf-8")
@@ -75,18 +81,18 @@ def main() -> None:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
         subprocess.run(command, cwd=path, check=True)
         subprocess.run([str(exe)], cwd=path, check=True)
-        origin_anchor = "idVec3 position = origin;\n\tidVec3 velocity = velocityIn;"
+        origin_anchor = "idVec3 position = origin;\n\tidVec3 velocity = velocityIn;\n\tint unstuck = 0;"
         assert fixture.count(origin_anchor) == 1
         mutated = fixture.replace(origin_anchor,
-            "idVec3 position = origin + idVec3( 0.0f, 0.0f, NAV_GROUND_OFFSET );\n\tidVec3 velocity = velocityIn;")
+            "idVec3 position = origin + idVec3( 0.0f, 0.0f, NAV_GROUND_OFFSET );\n\tidVec3 velocity = velocityIn;\n\tint unstuck = 0;")
         cpp.write_text(mutated, encoding="utf-8")
         subprocess.run(command, cwd=path, check=True)
         result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
         assert result.returncode != 0, "lifted air-recovery origin mutation escaped"
         print("Live air-recovery origin: artificial lift mutation rejected")
         mutated = fixture.replace(
-            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch ) )",
-            "if ( wish.LengthSqr() > 0.0f && navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch ) )")
+            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec, self ) || heldBrake )",
+            "if ( wish.LengthSqr() > 0.0f && ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec, self ) || heldBrake ) )")
         assert mutated != fixture
         cpp.write_text(mutated, encoding="utf-8")
         subprocess.run(command, cwd=path, check=True)
@@ -116,8 +122,29 @@ def main() -> None:
         assert result.returncode != 0, "rim-recovery rejection mutation escaped"
         print("Inward rim landing: old rejection mutation failed")
         for label, anchor, replacement in (
+            ("wall-arrested recovery", "if ( !NavAgentTranslation( across, position, next ) ) {\n\t\t\t// A vertical wall",
+             "if ( !NavAgentTranslation( across, position, next ) ) { return false;\n\t\t\t// A vertical wall"),
+            ("rim braking continuation", "*brakedAffordable = RecoveryBrakeClear( trace, flat, dt * ( 1.0f - trace.fraction ),",
+             "*brakedAffordable = false && RecoveryBrakeClear( trace, flat, dt * ( 1.0f - trace.fraction ),"),
+            ("landing frame remainder", "float seconds = remainingSeconds;", "float seconds = 0.0f;"),
+            ("continuous braking support", "!NavRecoverySharedSupport( position, next ) ||", "false ||"),
+            ("braking contact", "!NavAgentHasGroundContacts( next, gameLocal.GetGravity() )", "false"),
+            ("exact replay timer", "current.movementFlags &= ~PMF_ALL_TIMES;", "return;"),
+            ("zero replay timer", "if ( current.movementTime > 0 ) {", "if ( true ) {"),
+            ("knockback expiry before movement", "elapsed + 16 < knockMsec", "elapsed < knockMsec"),
+            ("collision without ground contact", "if ( !NavAgentHasGroundContacts( end, gravity ) ) {", "if ( false ) {"),
+            ("fatal grounded impact", "if ( !NavAgentHasGroundContacts( end, gravity ) ) {", "if ( true ) {"),
+            ("affordable contact without grounding", "if ( !NavAgentHasGroundContacts( end, gravity ) ) {",
+             "if ( NavLandingImpactDelta( trace, velocity + gravity * ( dt * trace.fraction ), gravity ) > maxImpactDelta && !NavAgentHasGroundContacts( end, gravity ) ) {"),
+            ("coasting pad catch", "if ( transport >= 0 ) {", "if ( false && transport >= 0 ) {"),
+            ("disabled recovery pad", "!pad->IsActive( TH_THINK ) ||", "false ||"),
+            ("unproven recovery pad", "!NaturalPadLanding( transport, registeredLanding ) ||", "false ||"),
+            ("initial pad impulse", "frame == 0 || steering ||", "steering ||"),
+            ("second recovery pad", "( caughtPad >= 0 && transport != caughtPad ) ||", "false ||"),
+            ("descending splash momentum", "idVec3 velocity = velocityIn;\n\tconst float dt = NAV_PAD_STEP_SECONDS;",
+             "idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );\n\tconst float dt = NAV_PAD_STEP_SECONDS;"),
             ("affordable last-resort contact", "*touchedAffordable = true;", "*touchedAffordable = false;"),
-            ("grounded steering", "velocity += wish * Min( add, ( elapsed < knockMsec ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );",
+            ("grounded steering", "velocity += wish * Min( add, ( knockActive ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );",
              "velocity += wish * 0.0f;"),
         ):
             assert fixture.count(anchor) == 1

@@ -2,6 +2,7 @@
 #pragma hdrstop
 
 #include "../Game_local.h"
+#include "../bots/Bot.h"
 
 CLASS_DECLARATION( idPhysics_Actor, idPhysics_Player )
 END_CLASS
@@ -158,7 +159,7 @@ idPhysics_Player::AdjustVertically
 given a walkable plane normal, adjust z to be in the plane without changing the horizontal direction
 ===============
 */
-idVec3 idPhysics_Player::AdjustVertically( const idVec3 &normal, const idVec3 &_in, int forceLength ) const {
+idVec3 idPhysics_Player::AdjustVertically( const idVec3 &normal, const idVec3 &_in, int forceLength ) {
 	idVec3 out;
 	idVec3 in = _in;
 
@@ -282,6 +283,23 @@ bool idPhysics_Player::SlideMove( bool gravity, bool stepUp, bool stepDown, bool
 		// if moved the entire distance
 		if ( trace.fraction >= 1.0f ) {
 			break;
+		}
+		if ( bot_debug.GetInteger() >= 4 && self && botManager.IsBot( self->entityNumber ) ) {
+			gameLocal.Printf( "BOT_PHYSICS_CONTACT client=%d time=%d other=%d origin=%s velocity=%s normal=%.3f %.3f %.3f fraction=%.4f ground=%d walking=%d bump=%d\n",
+				self->entityNumber, gameLocal.time, trace.c.entityNum, current.origin.ToString( 3 ),
+				current.velocity.ToString( 3 ), trace.c.normal.x, trace.c.normal.y, trace.c.normal.z,
+				trace.fraction, groundPlane ? 1 : 0, walking ? 1 : 0, bumpcount );
+		}
+		if ( bot_debug.GetInteger() >= 3 && self && botManager.IsBot( self->entityNumber ) &&
+			 trace.c.entityNum >= 0 && trace.c.entityNum < MAX_GENTITIES ) {
+			idEntity *other = gameLocal.entities[trace.c.entityNum];
+			if ( other && other->IsType( idPlayer::GetClassType() ) ) {
+				gameLocal.Printf( "BOT_PLAYER_CONTACT client=%d time=%d other=%d origin=%s velocity=%s otherOrigin=%s otherVelocity=%s normal=%.3f %.3f %.3f fraction=%.4f\n",
+					self->entityNumber, gameLocal.time, other->entityNumber, current.origin.ToString( 3 ),
+					current.velocity.ToString( 3 ), other->GetPhysics()->GetOrigin().ToString( 3 ),
+					other->GetPhysics()->GetLinearVelocity().ToString( 3 ), trace.c.normal.x, trace.c.normal.y,
+					trace.c.normal.z, trace.fraction );
+			}
 		}
 
 		time_left -= time_left * trace.fraction;
@@ -1909,6 +1927,18 @@ void idPhysics_Player::SetKnockBack( const int knockBackTime ) {
 
 int idPhysics_Player::GetKnockBack( void ) const {
 	return ( current.movementFlags & PMF_TIME_KNOCKBACK ) ? current.movementTime : 0;
+}
+
+void idPhysics_Player::RestoreKnockBack( const int knockBackTime ) {
+	current.movementFlags &= ~PMF_ALL_TIMES;
+	current.movementTime = Max( 0, knockBackTime );
+	if ( current.movementTime > 0 ) {
+		current.movementFlags |= PMF_TIME_KNOCKBACK;
+	}
+}
+
+float idPhysics_Player::GetMoveSpeed( void ) const {
+	return playerSpeed;
 }
 
 /*
