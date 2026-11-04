@@ -6882,6 +6882,7 @@ Parses textual entity definitions out of an entstring and spawns gentities.
 // RAVEN BEGIN
 // ddynerman: multiple game instances
 #include "awakening/M01Cinematic.inl"
+#include "awakening/MissionScripts.h"
 
 void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, unsigned short* entityNumOut, int* startSpawnCount ) {
 // RAVEN END
@@ -7009,6 +7010,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 			mapDefaultsTimer.Start();
 		}
 		args.SetDefaults( &(entityDef->dict) );
+		Awakening_CorrectM05M06Entity( args );
 // RAVEN END
 		if ( profileMapSpawn ) {
 			mapDefaultsTimer.Stop();

@@ -28,7 +28,12 @@ SOURCES = {
         'void idAI::RestoreAwakeningState', 'void idAI::AddFreeze',
         'void idAI::FreezeSolid', 'void idAI::UpdateFreeze'],
     'src/game/anim/Anim_Blend.cpp': ['void idAnimator::SetPlaybackRateScale('],
-    'src/game/awakening/ai/Monster_PainLord.cpp': ['void riMonsterPainLord::AdjustHealthByDamage('],
+    'src/game/awakening/ai/Monster_PainLord.cpp': ['void riMonsterPainLord::AdjustHealthByDamage(',
+        'bool riMonsterPainLord::DudeAttached(', 'void riMonsterPainLord::DetachDude(',
+        'void riMonsterPainLord::DamageDude(', 'int riMonsterPainLord::GetDamageForLocation(',
+        'void riMonsterPainLord::Enrage(', 'void riMonsterPainLord::Event_AtProcessingStation(',
+        'stateResult_t riMonsterPainLord::State_Torso_Stun(',
+        'stateResult_t riMonsterPainLord::State_Torso_ProcessingStation('],
     'src/game/awakening/ai/Monster_Valkaryne.cpp': ['void riMonsterValkaryne::AdjustHealthByDamage('],
     'src/game/awakening/ai/Monster_Retch.cpp': [
         'bool riMonsterRetch::ApplyBuff(', 'void riMonsterRetch::ClearBuff(',
@@ -74,7 +79,7 @@ def main() -> None:
         for path in (ROOT/'src'/tree).rglob('*.cpp'):
             assert 'GetOpenQ4SaveGameCompatibilityVersion() == OPENQ4_SAVEGAME_COMPATIBILITY_VERSION' not in path.read_text(encoding='utf-8-sig'), path
     fixture = ROOT/'tools/tests/native/AwakeningStatusBehavior.cpp'
-    constants = []
+    constants = ['static const float PAINLORD_ENRAGED_ANIM_RATE = 1.75f;']
     for source in sources.values():
         constants += re.findall(r'static const [^;\n]*\b(?:AI_FR(?:EEZ|OZ)\w*|SPACEROCKET_\w*|COCKPIT_TARGET_CONE|RETCH_\w+)\s*=[^;]*;', source)
     constants = [line for line in constants if 'RETCH_BEAM_RANGE' not in line and 'RETCH_FALLBACK_AAS' not in line]

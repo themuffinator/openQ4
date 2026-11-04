@@ -1463,4 +1463,6 @@
 	"#str_230154"	"Unavailable device"
 	"#str_230155"	"Rendering"
 	"#str_230156"	"The requested renderer is unavailable. The active fallback is shown above."
+	"#str_231680"	"Rescue Strauss"
+	"#str_231681"	"Defeat the Pain Lord before Strauss is processed. Shoot the weak points on the boss's back to interrupt him."
 }

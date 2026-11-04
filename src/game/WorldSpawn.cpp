@@ -51,6 +51,8 @@ void idWorldspawn::Spawn( void ) {
 		}
 	}
 
+	Awakening_PrepareM05M06( spawnArgs );
+
 	// call any functions specified in worldspawn
 	kv = spawnArgs.MatchPrefix( "call" );
 	while( kv != NULL ) {

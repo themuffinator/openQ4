@@ -59,6 +59,8 @@ protected:
 private:
 	void					Enrage( void );
 	void					DamageDude( int damage, const char *side );
+	bool					DudeAttached( char side ) const;
+	void					DetachDude( char side );
 	void					UpdateShieldBar( void );
 	void					RestoreShadowedDamageZones( void );
 
@@ -272,21 +274,50 @@ Stunned, or at work with his dudes still on, he takes no damage.
 ================
 */
 void riMonsterPainLord::AdjustHealthByDamage( int damage ) {
-	if ( stunned || ( atProcessingStation && dudeHealth > 0 ) ) {
+	if ( damage <= 0 || aifl.undying || stunned || ( atProcessingStation && dudeHealth > 0 ) ) {
 		return;
 	}
 
+	const int before = health;
+	bool stun = false;
 	if ( !enraged ) {
 		const float thresholds[ 2 ] = { maxHealth * 2.0f / 3.0f, maxHealth / 3.0f };
 		for ( int i = 0; i < 2; i++ ) {
 			if ( health >= thresholds[ i ] && health - damage < thresholds[ i ] ) {
-				stunned = true;
-				stunnedFunc.CallFunc( NULL );
+				// A heavy hit must not skip both shield phases or kill him while
+				// starting a stun. Leave him just below this threshold, once.
+				damage = health - Max( 1, (int)ceil( thresholds[ i ] ) - 1 );
+				stun = true;
+				break;
 			}
 		}
 	}
 
 	idAI::AdjustHealthByDamage( damage );
+	if ( stun && health < before ) {
+		interrupted = false;
+		stunned = true;
+		stunnedFunc.CallFunc( NULL );
+	}
+}
+
+// The render mask already persists in saves. Use it instead of introducing a
+// second, potentially inconsistent saved record of which captive remains.
+bool riMonsterPainLord::DudeAttached( char side ) const {
+	if ( !renderEntity.hModel ) {
+		return true;
+	}
+	const unsigned int mask = renderEntity.hModel->GetSurfaceMask( va( "models/monsters/pain_lord/pain_lord_dude_%c", side ) );
+	return mask == 0 || ( renderEntity.suppressSurfaceMask & mask ) != mask;
+}
+
+void riMonsterPainLord::DetachDude( char side ) {
+	if ( !DudeAttached( side ) ) {
+		return;
+	}
+	HideSurface( va( "models/monsters/pain_lord/pain_lord_dude_%c", side ) );
+	HideSurface( va( "models/monsters/pain_lord/pain_lord_dude_tubes_%c", side ) );
+	PlayEffect( "fx_gib", animator.GetJointHandle( va( "d%c_spine", side ) ) );
 }
 
 /*
@@ -295,6 +326,9 @@ riMonsterPainLord::DamageDude
 ================
 */
 void riMonsterPainLord::DamageDude( int damage, const char *side ) {
+	if ( damage <= 0 || dudeHealth <= 0 || !DudeAttached( side[0] ) ) {
+		return;
+	}
 	const int before = dudeHealth;
 	const float half = dudeMaxHealth * 0.5f;
 	const float quarter = dudeMaxHealth * 0.25f;
@@ -314,12 +348,12 @@ void riMonsterPainLord::DamageDude( int damage, const char *side ) {
 
 	// past half, and at nothing, a dude is torn off
 	if ( dudeHealth <= 0 || ( dudeHealth < half && before >= half ) ) {
-		const char sideLetter = side[ 0 ];
-		HideSurface( va( "models/monsters/pain_lord/pain_lord_dude_%c", sideLetter ) );
-		HideSurface( va( "models/monsters/pain_lord/pain_lord_dude_tubes_%c", sideLetter ) );
-		PlayEffect( "fx_gib", animator.GetJointHandle( va( "d%c_spine", sideLetter ) ) );
-		interrupted = true;
+		DetachDude( side[0] );
+		interrupted = stunned || atProcessingStation;
 		if ( dudeHealth <= 0 ) {
+			// One explosive hit can exhaust the entire shared pool. Both
+			// captives must disappear, even if only one joint was hit.
+			DetachDude( side[0] == 'l' ? 'r' : 'l' );
 			dudeHealth = 0;
 			Enrage();
 		}
@@ -332,11 +366,19 @@ riMonsterPainLord::GetDamageForLocation
 ================
 */
 int riMonsterPainLord::GetDamageForLocation( int damage, int location ) {
-	if ( dudeHealth > 0 ) {
-		const char *group = GetDamageGroup( location );
-		if ( !idStr::Icmp( group, "dl" ) ) {
+	const char *group = GetDamageGroup( location );
+	if ( !idStr::Icmp( group, "dl" ) ) {
+		if ( !DudeAttached( 'l' ) ) {
+			return 0;
+		}
+		if ( dudeHealth > 0 ) {
 			DamageDude( damage, "left" );
-		} else if ( !idStr::Icmp( group, "dr" ) ) {
+		}
+	} else if ( !idStr::Icmp( group, "dr" ) ) {
+		if ( !DudeAttached( 'r' ) ) {
+			return 0;
+		}
+		if ( dudeHealth > 0 ) {
 			DamageDude( damage, "right" );
 		}
 	}
@@ -399,6 +441,10 @@ riMonsterPainLord::Event_AtProcessingStation
 ================
 */
 void riMonsterPainLord::Event_AtProcessingStation( void ) {
+	if ( health <= 0 || aifl.dead ) {
+		return;
+	}
+	interrupted = false;
 	atProcessingStation = true;
 }
 
@@ -459,7 +505,7 @@ stateResult_t riMonsterPainLord::State_Torso_Stun( const stateParms_t &parms ) {
 			interrupted = false;
 			stunned = false;
 			unstunnedFunc.CallFunc( NULL );
-			PlayAnim( ANIMCHANNEL_TORSO, "stunned_end", 0 );
+			PlayAnim( ANIMCHANNEL_TORSO, enraged ? "stunned_end_rage" : "stunned_end", 0 );
 			return SRESULT_STAGE( STAGE_END_WAIT );
 
 		case STAGE_END_WAIT:

@@ -6,6 +6,18 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Awakening rescue and MCC defense, 4 November 2026
+
+- The Pain Lord fight preserves its weak-point stages under heavy damage,
+  removes destroyed captives consistently, and gives Strauss the full final
+  processing window. Interrupting that attempt buys time to finish the rescue,
+  which now has a localized objective that completes with the boss fight.
+- The MCC arrival respects Mitchell's death. Its cannon defense has a complete
+  opening fighter interval, repeating flight runs, and a reliable transition
+  into the escape; later hull damage no longer fails a completed defense.
+- Restart M05/M06 to use corrected mission scripts. Earlier saves keep their
+  original script flow. See [intent, changes and validation](awakening-m05-m06.md).
+
 ## Damaged queued events recover safely, 4 November 2026
 
 - Saves with unsupported queued callbacks or out-of-order event times now
