@@ -2206,8 +2206,9 @@ claim peer combinations that have not been tested.
   the minimum simulated duration. Recovery now distinguishes a hull-edge
   landing with a surviving brake from a momentary touch followed by a fatal
   slide. That further correction needs renewed final-build long/catalog runs
-  and controlled timing. The identical-stage catalog retains two CTF5 deaths
-  under causal review and four duration failures; none is waived.
+  and controlled timing. The identical-stage catalog's two CTF5 deaths pass
+  exact-state causal exclusion, leaving zero navigation deaths and four
+  duration failures; those duration failures are not waived.
   Follow-through, 4 November: the [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026)
   fixes all three previously recorded long-match hit states. The renewed
   `84dde9c6d` long runs pass CTF3/DZ3 directly and CTF5 after strict causal

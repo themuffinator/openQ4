@@ -2,6 +2,7 @@
 #pragma hdrstop
 
 #include "../Game_local.h"
+#include "../bots/Bot.h"
 
 CLASS_DECLARATION( idPhysics_Actor, idPhysics_Player )
 END_CLASS
@@ -282,6 +283,16 @@ bool idPhysics_Player::SlideMove( bool gravity, bool stepUp, bool stepDown, bool
 		// if moved the entire distance
 		if ( trace.fraction >= 1.0f ) {
 			break;
+		}
+		if ( bot_debug.GetInteger() >= 3 && self && botManager.IsBot( self->entityNumber ) &&
+			 trace.c.entityNum >= 0 && trace.c.entityNum < MAX_GENTITIES ) {
+			idEntity *other = gameLocal.entities[trace.c.entityNum];
+			if ( other && other->IsType( idPlayer::GetClassType() ) ) {
+				gameLocal.Printf( "BOT_PLAYER_CONTACT client=%d time=%d other=%d origin=%s velocity=%s otherOrigin=%s otherVelocity=%s normal=%s fraction=%.4f\n",
+					self->entityNumber, gameLocal.time, other->entityNumber, current.origin.ToString( 3 ),
+					current.velocity.ToString( 3 ), other->GetPhysics()->GetOrigin().ToString( 3 ),
+					other->GetPhysics()->GetLinearVelocity().ToString( 3 ), trace.c.normal.ToString( 3 ), trace.fraction );
+			}
 		}
 
 		time_left -= time_left * trace.fraction;

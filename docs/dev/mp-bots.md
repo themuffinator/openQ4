@@ -75,7 +75,8 @@ the requirement that the controller trial itself armed and died. A missing or
 unresolved controller now fails closed, even if all fixed-input trials died.
 
 The identical-stage `catalog-state/` sweep finishes all 33 variants, with 421
-kills and two CTF5 world deaths under causal review. Four runs miss the minimum
+kills, 619 completed traversals and two CTF5 world deaths. Both pass the exact-state
+causal exclusion; no navigation deaths remain in that sweep. Four runs miss the minimum
 40 simulated seconds: DM11 (37.296), DM10 (32.880), CTF8 (25.520) and Tourney1
 (22.768). Those raw duration failures are retained; shared-host contention does
 not waive the required exposure.
@@ -91,6 +92,37 @@ volumes and gaps. It prefers that surviving stop over an unproven first touch;
 voluntary traversal support remains unchanged. A native geometry case separates
 the two headings, and the positive hit suite includes the recorded state.
 Runtime qualification of this further correction remains open.
+
+On `189c4b4a9`, `strauss-runout/` records the controller stopping at
+68.50 -1037.88 352.25 with 12 health, then completing a drop, teleport and jump
+without dying. Its six-second strict terminal check remains unresolved because
+normal navigation has put it in the air again (59 health). The fixed heading
+still finishes alive and grounded at 12 health. The positive recovery case uses
+the existing 12-second/resumed-navigation check; the six-second causal gate and
+raw result are unchanged. The geometry suite rejects 23 reversions on Windows
+and Linux ASan/UBSan, four more than the earlier stage. `hit-runout/` passes all
+nine positive hit/drop cases and `air-runout/` passes all ten established outcomes,
+including the deliberate fatal-fall control. The Strauss positive case remains
+alive at 59 health and qualifies by completed navigation after recovery; its
+strict terminal-grounded result is still false. All tested runtime hashes remain
+unchanged. The renewed `long-runout/` sweep records 340.560–342.240 simulated
+seconds on each map, 337 combat kills and 633 completed traversals. DeadZone has
+zero world deaths; DM8 has five and CTF5 six under causal review. CTF3 has two
+navigation deaths: every tested input survives Kane's last recorded hit, while
+Cortez has no recent impulse. The original duration failure is resolved on this
+stage, but the navigation gate remains failed.
+
+All three `ctf3pad-runout/` isolated launch/coast controls land alive, including
+Cortez's rounded launch pose. The original match instead launches Strauss from
+the same pad 192 ms later; a traffic collision is a hypothesis, not yet a
+qualified cause. `bot_probePad` now accepts optional `entryX entryY entryZ`
+after `padName` to reproduce a walking approach. `bot_probePadTraffic` uses the
+same arguments but requires exactly two bots and a separate local observer;
+its bots become untargetable so weapon impulses cannot obscure physical traffic.
+Both retain local cheat-server, live-bot, instance and proven-pad restrictions.
+At debug level 3 or higher, `BOT_PLAYER_CONTACT` records player collision traces
+without changing their physics. These diagnostics support the next reproduction;
+they do not classify a death as unavoidable.
 
 ## Hit-to-movement handoff, 4 November 2026
 

@@ -8716,20 +8716,22 @@ rvBotManager::ProbeTraversal
 bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const idVec3 &velocity,
 								 const idVec3 &landing, navTravelType_t travel, idEntity *pad, bool dodge,
 								 const idVec3 *airDirection, const idVec3 *entryOrigin,
-								 const idVec3 *nextJump, bool naturalWalk ) {
+								 const idVec3 *nextJump, bool naturalWalk, bool padTraffic ) {
 	if ( ( travel != NAVTRAVEL_WALK && travel != NAVTRAVEL_DROP && travel != NAVTRAVEL_JUMP && travel != NAVTRAVEL_JUMPPAD ) ||
 		( ( travel == NAVTRAVEL_JUMPPAD ) != ( pad != NULL ) ) || ( dodge && travel != NAVTRAVEL_WALK ) ||
-		( airDirection && ( travel != NAVTRAVEL_WALK || dodge ) ) || ( entryOrigin && travel != NAVTRAVEL_DROP ) ||
+		( airDirection && ( travel != NAVTRAVEL_WALK || dodge ) ) ||
+		( entryOrigin && travel != NAVTRAVEL_DROP && travel != NAVTRAVEL_JUMPPAD ) || ( padTraffic && !pad ) ||
 		( naturalWalk && ( travel != NAVTRAVEL_WALK || dodge || airDirection ) ) || ( nextJump && !naturalWalk ) ) {
 		return false;
 	}
 	if ( !gameLocal.isServer || gameLocal.isClient || !gameLocal.GetLocalPlayer() ||
-		gameLocal.numClients != 2 || NumBots() != 1 || !IsBot( clientNum ) ||
+		gameLocal.numClients != ( padTraffic ? 3 : 2 ) || NumBots() != ( padTraffic ? 2 : 1 ) || !IsBot( clientNum ) ||
 		gameLocal.mpGame.IsManagedMatch() || !gameLocal.CheatsOk( false ) || !navMesh.IsValid() ) {
 		return false;
 	}
 	idPlayer *self = bots[clientNum].GetPlayer();
-	if ( !self || self == gameLocal.GetLocalPlayer() || self->health <= 0 || self->spectating ) {
+	if ( !self || self == gameLocal.GetLocalPlayer() || self->health <= 0 || self->spectating ||
+		 self->GetInstance() != gameLocal.GetLocalPlayer()->GetInstance() ) {
 		return false;
 	}
 	idVec3 naturalLanding;
@@ -8748,10 +8750,13 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 	const idAngles facing( 0.0f, ( landing - origin ).ToYaw(), 0.0f );
 	self->Teleport( origin - idVec3( 0.0f, 0.0f, CM_CLIP_EPSILON ), facing, NULL );
 	self->GetPhysics()->SetLinearVelocity( velocity );
+	if ( padTraffic ) {
+		self->fl.notarget = true;	// isolate physical traffic from weapon impulses
+	}
 	bot.aimAngles = facing;
 	bot.goalType = BOTGOAL_ROAM;
 	bot.goalOrigin = nextJump ? *nextJump : landing;
-	if ( travel == NAVTRAVEL_WALK ) {
+	if ( travel == NAVTRAVEL_WALK || ( pad && entryOrigin ) ) {
 		// A walking probe has no committed jump action to defer goal selection.
 		// Keep its supplied leg long enough to observe the impulse response.
 		bot.nextGoalSelectTime = gameLocal.time + BOT_TRAVEL_TIMEOUT_MSEC;
@@ -8768,6 +8773,10 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 	bot.traversalStartOrigin = origin;
 	bot.traversalStartTime = gameLocal.time;
 	bot.traversalEntered = bot.traversalStarted = ( pad != NULL );
+	if ( pad && entryOrigin ) {
+		bot.pathCorner = 0;
+		bot.ResetTraversal();
+	}
 	if ( dodge ) {
 		// Use normal no-route dodge admission and HoldDodgeJump, including
 		// the fresh-press pulse and player physics. This never bypasses proof.
