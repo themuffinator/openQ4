@@ -3511,7 +3511,8 @@ void Cmd_BotProbeTraversal_f( const idCmdArgs &args ) {
 	const bool airProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeAir" );
 	const bool dropProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeDrop" );
 	const bool recoverProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeRecover" );
-	const bool walkProbe = recoverProbe || !idStr::Icmp( args.Argv( 0 ), "bot_probeWalk" );
+	const bool climbProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeClimb" );
+	const bool walkProbe = recoverProbe || climbProbe || !idStr::Icmp( args.Argv( 0 ), "bot_probeWalk" );
 	const navTravelType_t travel = padProbe ? NAVTRAVEL_JUMPPAD :
 		( dropProbe ? NAVTRAVEL_DROP : ( dodgeProbe || airProbe || walkProbe || !idStr::Icmp( args.Argv( 0 ), "bot_probeMove" ) ? NAVTRAVEL_WALK : NAVTRAVEL_JUMP ) );
 	if ( args.Argc() != ( padProbe ? 12 : 11 ) && !padEntry && !( ( dropProbe || ( walkProbe && !recoverProbe ) ) && args.Argc() == 14 ) ) {
@@ -3558,7 +3559,7 @@ void Cmd_BotProbeTraversal_f( const idCmdArgs &args ) {
 	const idVec3 entry( values[9], values[10], values[11] );
 	if ( !botManager.ProbeTraversal( clientNum, origin, idVec3( values[3], values[4], values[5] ), target,
 			travel, pad, dodgeProbe, airProbe ? &airInput : NULL, padEntry || ( dropProbe && args.Argc() == 14 ) ? &entry : NULL,
-			walkProbe && args.Argc() == 14 ? &entry : NULL, walkProbe, padTraffic, recoverProbe ) ) {
+			walkProbe && args.Argc() == 14 ? &entry : NULL, walkProbe, padTraffic, recoverProbe, climbProbe ) ) {
 		gameLocal.Printf( "%s: requires an isolated local cheat server with %s live bot%s and a separate observer%s\n",
 			args.Argv( 0 ), padTraffic ? "two" : "one", padTraffic ? "s" : "",
 			padProbe ? ", and a pad with a proven natural landing" : "" );
@@ -4421,6 +4422,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "bot_probePadTraffic", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay two bots' pad traffic on an isolated local cheat server" );
 	cmdSystem->AddCommand( "bot_probeMove", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay bot movement on an isolated local cheat server" );
 	cmdSystem->AddCommand( "bot_probeWalk", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay an unforced walk and optional following jump on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeClimb", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay a pending climb attempt on an isolated local cheat server" );
 	cmdSystem->AddCommand( "bot_probeRecover", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay off-route recovery toward a supplied node on an isolated local cheat server" );
 	cmdSystem->AddCommand( "bot_probeDrop", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay a displaced bot drop on an isolated local cheat server" );
 	cmdSystem->AddCommand( "bot_probeDodge", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay bot dodge admission on an isolated local cheat server" );

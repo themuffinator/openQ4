@@ -5930,8 +5930,8 @@ void rvBot::UpdateMovement( idPlayer *self, usercmd_t &cmd ) {
 	// feet, or into the volume, without closing in is what a player hops out
 	// of, at once.  The generic unstick hop waits for the stuck detector and
 	// stays off on the approach to an action, and q4dm1's pad ramps held bots
-	// there until the route was thrown away.  The hop goes where the route
-	// already goes, so it does not perturb that approach.
+	// there until the route was thrown away. A planned volume entry retains
+	// its transport controller; ordinary climbs must prove their own flight.
 	bool climbHop = false;
 	if ( hasMoveDir && !holdForPad && self->pfl.onGround && corner.travelType == NAVTRAVEL_WALK &&
 		 ( steeringIntoVolume || corner.origin.z - origin.z > BOT_CLIMB_RISE ) &&
@@ -5955,9 +5955,13 @@ void rvBot::UpdateMovement( idPlayer *self, usercmd_t &cmd ) {
 	// A special link owns its input until its exit.  Ordinary walking may still
 	// use the generic obstruction and combat-dodge jumps, but those must not
 	// perturb drops, jump pads, or teleport entries.
-	if ( corner.travelType == NAVTRAVEL_JUMP || climbHop ) {
+	if ( corner.travelType == NAVTRAVEL_JUMP || ( climbHop && steeringIntoVolume ) ) {
 		PressJump( cmd );
-	} else if ( !committedTravel && ( gameLocal.time < unstickUntil || wantDodgeJump ) ) {
+	} else if ( climbHop || ( !committedTravel && ( gameLocal.time < unstickUntil || wantDodgeJump ) ) ) {
+		// The climb window survives a short fall and can still be pending on
+		// touchdown. Its old target says nothing about the current momentum:
+		// CTF5 hopped west while sliding east off the walkway. Use the same
+		// exact-velocity proof and held input as other discretionary hops.
 		TryDodgeJump( self, moveDir, cmd );
 	}
 
@@ -8745,13 +8749,14 @@ rvBotManager::ProbeTraversal
 bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const idVec3 &velocity,
 								 const idVec3 &landing, navTravelType_t travel, idEntity *pad, bool dodge,
 								 const idVec3 *airDirection, const idVec3 *entryOrigin,
-								 const idVec3 *nextJump, bool naturalWalk, bool padTraffic, bool recover ) {
+								 const idVec3 *nextJump, bool naturalWalk, bool padTraffic, bool recover, bool climb ) {
 	if ( ( travel != NAVTRAVEL_WALK && travel != NAVTRAVEL_DROP && travel != NAVTRAVEL_JUMP && travel != NAVTRAVEL_JUMPPAD ) ||
 		( ( travel == NAVTRAVEL_JUMPPAD ) != ( pad != NULL ) ) || ( dodge && travel != NAVTRAVEL_WALK ) ||
 		( airDirection && ( travel != NAVTRAVEL_WALK || dodge ) ) ||
 		( entryOrigin && travel != NAVTRAVEL_DROP && travel != NAVTRAVEL_JUMPPAD ) || ( padTraffic && !pad ) ||
 		( naturalWalk && ( travel != NAVTRAVEL_WALK || dodge || airDirection ) ) || ( nextJump && !naturalWalk ) ||
-		( recover && ( !naturalWalk || nextJump || padTraffic ) ) ) {
+		( recover && ( !naturalWalk || nextJump || padTraffic ) ) ||
+		( climb && ( !naturalWalk || recover || nextJump || padTraffic ) ) ) {
 		return false;
 	}
 	if ( !gameLocal.isServer || gameLocal.isClient || !gameLocal.GetLocalPlayer() ||
@@ -8800,6 +8805,13 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 	bot.pathCorner = 1;
 	bot.pathTime = gameLocal.time;
 	bot.traversalCorner = 1;
+	if ( climb ) {
+		// Restore a pending ordinary climb attempt, without forcing a jump or
+		// bypassing movement admission. Landing can retain an old climb window.
+		bot.climbCheckTarget = landing;
+		bot.climbCheckDistance = idVec3( landing.x - origin.x, landing.y - origin.y, 0.0f ).Length();
+		bot.climbCheckTime = gameLocal.time - BOT_CLIMB_HOP_MSEC;
+	}
 	bot.traversalStartOrigin = origin;
 	bot.traversalStartTime = gameLocal.time;
 	bot.traversalEntered = bot.traversalStarted = ( pad != NULL );

@@ -2710,6 +2710,17 @@ Completion substeps:
   followed by the normal pad coast; renewed runtime qualification is required.
   Verified fixes through that stage are landed in the main checkout at
   `79df4b6bc`; MP-02 remains open.
+  The `26f2bcd64` pad-approach correction passes nineteen hit cases, ten
+  recovery cases, pad traffic and all 33 catalog death/duration gates (463
+  kills, 627 traversals, one strict impulse exclusion). Its four long runs
+  meet every duration gate with 285 kills and 520 traversals, but retain one
+  CTF5 climbing-hop failure after seven strict exclusions. The bot first
+  recovers from the rail hit, then jumps against its remaining momentum.
+  Ordinary climbs now use the momentum-aware dodge proof and held input;
+  the reproduced pending-hop fall survives. Renewed full-runtime and controlled
+  timing qualification remain required.
+  The correction is landed in the main checkout at `1417cda59`, whose ten
+  CTF5 positive cases also pass.
   The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.

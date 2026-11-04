@@ -518,12 +518,13 @@ public:
 	void					RemoveAll( void );
 	void					ListBots( bool weaponDetail = false ) const;
 	// Local cheat diagnostic: one bot, or two untargetable pad-traffic bots,
-	// plus the local observer. An optional pad entry replays its walking approach.
+	// plus the local observer. An optional pad entry replays its walking approach;
+	// climb restores a pending ordinary hop window without forcing its input.
 	bool					ProbeTraversal( int clientNum, const idVec3 &origin, const idVec3 &velocity,
 											const idVec3 &landing, navTravelType_t travel, idEntity *pad = NULL, bool dodge = false,
 									const idVec3 *airDirection = NULL, const idVec3 *entryOrigin = NULL,
 									const idVec3 *nextJump = NULL, bool naturalWalk = false, bool padTraffic = false,
-									bool recover = false );
+									bool recover = false, bool climb = false );
 	// The health, and knockback time, the next traversal probe gives its bot;
 	// 0 for unchanged.
 	bool					SetProbeHealth( int clientNum, int health, int knockbackMsec = 0, const idVec3 &kick = vec3_origin, int armor = -1 );
