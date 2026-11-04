@@ -422,7 +422,7 @@ void R_ModernClusteredLighting_ResetDecalsForFrame( void ) {
 }
 
 static unsigned int R_ModernClusteredLighting_CurrentDecalGeneration( void ) {
-	unsigned int generation = static_cast<unsigned int>( tr.frameCount ) + 1u;
+	unsigned int generation = static_cast<unsigned int>( backEnd.frameCount ) + 1u;
 	return generation != 0u ? generation : 1u;
 }
 
@@ -944,7 +944,7 @@ static void R_ModernClusteredLighting_FillShadowDescriptorGpuRecord( modernClust
 	// float precision on long soaks, the 2^20 residue stays exact
 	dst.freshness[0] = static_cast<float>( src.updateFrame & 0xFFFFF );
 	dst.freshness[1] = src.atlasSlotValid ? 1.0f : 0.0f;
-	dst.freshness[2] = src.atlasSlotValid ? static_cast<float>( idMath::ClampInt( 0, 1 << 20, tr.frameCount - src.atlasContentFrame ) ) : -1.0f;
+	dst.freshness[2] = src.atlasSlotValid ? static_cast<float>( idMath::ClampInt( 0, 1 << 20, backEnd.frameCount - src.atlasContentFrame ) ) : -1.0f;
 	// Previously reserved component; preserve the GPU record/block layout.
 	dst.freshness[3] = src.normalOffsetScale;
 	memcpy( dst.shadowMatrix, src.viewShadowMatrix, sizeof( dst.shadowMatrix ) );

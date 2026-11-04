@@ -25,6 +25,7 @@ SUPPORT = r'''
 #include <string>
 #include <vector>
 static void R_RenderThread_Shutdown(){} // no render thread in this harness
+static void R_RenderThread_Sync(const char*){}
 static bool R_ImagePolicyActive(){return false;}
 static bool R_ImagePolicyOperationAllowed(){return true;}
 static void R_ImagePolicyObserveError(const char*,int=0){}

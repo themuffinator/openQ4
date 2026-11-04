@@ -485,14 +485,13 @@ Common_RecordFrameInputToSwap
 
 How long after its input each frame reached the screen's swap chain (HF-08):
 from the first late-look sample of the draw, and from the press behind a drawn
-latency flash, to the return of UpdateScreen. The renderer runs synchronously,
-so its swap or present call has returned by then. A sensor's click-to-photon
-reading minus pressToSwap leaves the GPU, compositor and display. Input older
-than a quarter second was taken outside an ordinary frame (a load) and is
+latency flash, to the backend's successful swap or present. The main thread
+records the frame at retirement, including an asynchronous backend. A sensor's
+click-to-photon reading minus pressToSwap leaves the GPU, compositor and display.
+Input older than a quarter second was taken outside an ordinary frame (a load) and is
 dropped rather than counted.
 =================
 */
-void Usercmd_TakeFrameInputClocks( double &lookSampleClock, double &flashPressClock );
 
 static const int COMMON_INPUT_TO_SWAP_HISTORY = 2048;
 
@@ -504,6 +503,7 @@ struct commonInputToSwapRing_t {
 
 static commonInputToSwapRing_t commonLookSampleToSwap;
 static commonInputToSwapRing_t commonFlashPressToSwap;
+static double commonInputToSwapResetClock = 0.0;
 
 static void Common_AddInputToSwap( commonInputToSwapRing_t &ring, double inputClock, double swapClock, double clockUnitsPerSecond ) {
 	if ( inputClock <= 0.0 || swapClock < inputClock ) {
@@ -518,17 +518,17 @@ static void Common_AddInputToSwap( commonInputToSwapRing_t &ring, double inputCl
 	ring.count = Min( ring.count + 1, COMMON_INPUT_TO_SWAP_HISTORY );
 }
 
-static void Common_RecordFrameInputToSwap( void ) {
-	double lookSampleClock = 0.0;
-	double flashPressClock = 0.0;
-	Usercmd_TakeFrameInputClocks( lookSampleClock, flashPressClock );
+void Common_RecordFrameInputToSwap( double lookSampleClock, double flashPressClock, double swapClock ) {
 	const double clockUnitsPerSecond = Common_GetPresentationClockUnitsPerSecond();
 	if ( clockUnitsPerSecond <= 0.0 ) {
 		return;
 	}
-	const double swapClock = Common_GetPresentationClockNow();
-	Common_AddInputToSwap( commonLookSampleToSwap, lookSampleClock, swapClock, clockUnitsPerSecond );
-	Common_AddInputToSwap( commonFlashPressToSwap, flashPressClock, swapClock, clockUnitsPerSecond );
+	if ( lookSampleClock >= commonInputToSwapResetClock ) {
+		Common_AddInputToSwap( commonLookSampleToSwap, lookSampleClock, swapClock, clockUnitsPerSecond );
+	}
+	if ( flashPressClock >= commonInputToSwapResetClock ) {
+		Common_AddInputToSwap( commonFlashPressToSwap, flashPressClock, swapClock, clockUnitsPerSecond );
+	}
 }
 
 static idStr Common_InputToSwapPercentiles( const commonInputToSwapRing_t &ring ) {
@@ -553,6 +553,8 @@ void openQ4_PrintPresentationLatencyStats( const char *reason ) {
 }
 
 void openQ4_ResetPresentationLatencyStats( void ) {
+	// A threaded frame handed off before this reset may retire afterwards.
+	commonInputToSwapResetClock = Common_GetPresentationClockNow();
 	commonLookSampleToSwap.count = commonLookSampleToSwap.next = 0;
 	commonFlashPressToSwap.count = commonFlashPressToSwap.next = 0;
 }
@@ -6484,7 +6486,6 @@ void idCommonLocal::Frame( void ) {
 			// normal, in-sequence screen update
 			session->UpdateScreen( false );
 		}
-		Common_RecordFrameInputToSwap();
 		Common_MarkFrameWork(openq4::FrameWorkPhase::Draw);
 
 		// report timing information
@@ -6534,7 +6535,6 @@ void idCommonLocal::GUIFrame( bool execCmd, bool network ) {
 	}
 	session->Frame();
 	session->UpdateScreen( false );	
-	Common_RecordFrameInputToSwap();
 }
 
 /*

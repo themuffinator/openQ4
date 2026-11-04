@@ -115,7 +115,17 @@ static bool rg_dynamicResolutionEnabledLastFrame = false;
 static bool rg_temporalAAEnabledLastFrame = false;
 static advancedScreenSpaceConfig_t rg_advancedScreenSpaceLast = {};
 static int rg_videoRestartCount = -1;
-static temporalPresentationFrameState_t rg_temporalFrameState;
+static temporalPresentationFrameState_t rg_temporalFrameStates[2];
+static int rg_temporalLastScalePercent;
+static unsigned int rg_temporalFrameGenerations[2];
+static char rg_temporalFrameResetReasons[2][128];
+static int R_TemporalPresentation_FrameSlot() {
+	const frameData_t *frame = R_BackEndFrameData();
+	return frame != NULL ? frame->slot : 0;
+}
+static temporalPresentationFrameState_t &R_TemporalPresentation_CurrentFrame() {
+	return rg_temporalFrameStates[R_TemporalPresentation_FrameSlot()];
+}
 static temporalScaleHistoryEntry_t rg_temporalScaleHistory[TEMPORAL_SCALE_HISTORY_COUNT];
 static int rg_temporalScaleHistoryCursor = 0;
 static unsigned int rg_temporalHistoryGeneration = 1;
@@ -256,6 +266,12 @@ const char *R_TemporalPresentation_DecisionName( temporalResolutionDecision_t de
 }
 
 void R_TemporalPresentation_InvalidateHistory( const char *reason ) {
+	if ( R_RenderThread_OnRenderThread() ) {
+		const int slot = R_TemporalPresentation_FrameSlot();
+		if ( ++rg_temporalFrameGenerations[slot] == 0 ) rg_temporalFrameGenerations[slot] = 1;
+		idStr::Copynz( rg_temporalFrameResetReasons[slot], reason != NULL ? reason : "backend reset", 128 );
+		return;
+	}
 	rg_temporalHistoryGeneration++;
 	if ( rg_temporalHistoryGeneration == 0 ) {
 		rg_temporalHistoryGeneration = 1;
@@ -266,11 +282,11 @@ void R_TemporalPresentation_InvalidateHistory( const char *reason ) {
 }
 
 unsigned int R_TemporalPresentation_HistoryGeneration( void ) {
-	return rg_temporalHistoryGeneration;
+	return R_RenderThread_OnRenderThread() ? rg_temporalFrameGenerations[R_TemporalPresentation_FrameSlot()] : rg_temporalHistoryGeneration;
 }
 
 const char *R_TemporalPresentation_LastHistoryResetReason( void ) {
-	return rg_temporalHistoryResetReason.c_str();
+	return R_RenderThread_OnRenderThread() ? rg_temporalFrameResetReasons[R_TemporalPresentation_FrameSlot()] : rg_temporalHistoryResetReason.c_str();
 }
 
 void R_TemporalPresentation_MarkCurrentFrameCapture( const char *reason ) {
@@ -280,7 +296,7 @@ void R_TemporalPresentation_MarkCurrentFrameCapture( const char *reason ) {
 			entry.eligibleForFeedback = false;
 		}
 	}
-	rg_temporalFrameState.captureFrozen = true;
+	R_TemporalPresentation_CurrentFrame().captureFrozen = true;
 	if ( rg_lastCaptureMarkedFrame == tr.frameCount ) {
 		return;
 	}
@@ -297,7 +313,7 @@ void R_TemporalPresentation_MarkCurrentFrameCapture( const char *reason ) {
 			"Temporal resolution: frame=%d captureScope=%s scale=%d%% feedbackEligible=0\n",
 			tr.frameCount,
 			( reason != NULL && reason[0] != '\0' ) ? reason : "late-capture",
-			rg_temporalFrameState.effectiveScalePercent );
+			R_TemporalPresentation_CurrentFrame().effectiveScalePercent );
 	}
 }
 
@@ -421,10 +437,10 @@ static void R_TemporalPresentation_BuildCameraState(
 		|| ( viewDef->superView != NULL
 			&& viewDef->viewport.Equals( viewDef->superView->viewport ) );
 	if ( usesPresentationExtent && rg_temporalPresentationInitialized ) {
-		camera.outputWidth = rg_temporalFrameState.nativeWidth;
-		camera.outputHeight = rg_temporalFrameState.nativeHeight;
-		camera.sceneWidth = rg_temporalFrameState.sceneWidth;
-		camera.sceneHeight = rg_temporalFrameState.sceneHeight;
+		camera.outputWidth = R_TemporalPresentation_CurrentFrame().nativeWidth;
+		camera.outputHeight = R_TemporalPresentation_CurrentFrame().nativeHeight;
+		camera.sceneWidth = R_TemporalPresentation_CurrentFrame().sceneWidth;
+		camera.sceneHeight = R_TemporalPresentation_CurrentFrame().sceneHeight;
 	} else {
 		camera.outputWidth = viewWidth;
 		camera.outputHeight = viewHeight;
@@ -483,10 +499,10 @@ void R_TemporalPresentation_PrepareView( viewDef_t *viewDef ) {
 		- viewDef->viewport.x1 + 1;
 	const int projectionHeight = viewDef->viewport.y2
 		- viewDef->viewport.y1 + 1;
-	const int sceneWidth = rg_temporalFrameState.sceneWidth > 0
-		? rg_temporalFrameState.sceneWidth : projectionWidth;
-	const int sceneHeight = rg_temporalFrameState.sceneHeight > 0
-		? rg_temporalFrameState.sceneHeight : projectionHeight;
+	const int sceneWidth = R_TemporalPresentation_CurrentFrame().sceneWidth > 0
+		? R_TemporalPresentation_CurrentFrame().sceneWidth : projectionWidth;
+	const int sceneHeight = R_TemporalPresentation_CurrentFrame().sceneHeight > 0
+		? R_TemporalPresentation_CurrentFrame().sceneHeight : projectionHeight;
 	// R_SetupProjection divides these values by its current front-end viewport.
 	// Scale the sample so the final offset remains one render-target subpixel
 	// whether the target is selected by a front-end crop or by a backend FBO.
@@ -592,7 +608,7 @@ void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
 	if ( !rg_temporalPresentationInitialized ) {
 		TemporalResolutionCore_Initialize( rg_temporalResolutionState );
 		R_TemporalPresentation_ClearScaleHistory();
-		memset( &rg_temporalFrameState, 0, sizeof( rg_temporalFrameState ) );
+		memset( &R_TemporalPresentation_CurrentFrame(), 0, sizeof( R_TemporalPresentation_CurrentFrame() ) );
 		rg_temporalPresentationInitialized = true;
 		rg_dynamicResolutionEnabledLastFrame = r_rendererDynamicResolution.GetBool();
 		rg_temporalAAEnabledLastFrame = R_TemporalPresentation_TemporalAAWanted();
@@ -683,38 +699,39 @@ void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
 			( static_cast<long long>( Max( 0, nativeHeight ) ) * manualScalePercent + 50 ) / 100 ) );
 	}
 
-	const int previousScale = rg_temporalFrameState.effectiveScalePercent;
-	memset( &rg_temporalFrameState, 0, sizeof( rg_temporalFrameState ) );
-	rg_temporalFrameState.dynamicResolutionRequested = dynamicResolutionRequested;
-	rg_temporalFrameState.dynamicResolutionActive = dynamicResolutionRequested
+	const int previousScale = rg_temporalLastScalePercent;
+	rg_temporalLastScalePercent = output.scalePercent;
+	memset( &R_TemporalPresentation_CurrentFrame(), 0, sizeof( R_TemporalPresentation_CurrentFrame() ) );
+	R_TemporalPresentation_CurrentFrame().dynamicResolutionRequested = dynamicResolutionRequested;
+	R_TemporalPresentation_CurrentFrame().dynamicResolutionActive = dynamicResolutionRequested
 		&& gpuTiming.supported;
-	rg_temporalFrameState.temporalAARequested = temporalAARequested;
-	rg_temporalFrameState.captureFrozen = captureFrame && !forceNative;
-	rg_temporalFrameState.captureForcedNative = forceNative;
-	rg_temporalFrameState.timingSupported = gpuTiming.supported;
-	rg_temporalFrameState.timingValid = gpuTiming.valid;
-	rg_temporalFrameState.frameNumber = tr.frameCount;
-	rg_temporalFrameState.nativeWidth = nativeWidth;
-	rg_temporalFrameState.nativeHeight = nativeHeight;
-	rg_temporalFrameState.sceneWidth = output.width;
-	rg_temporalFrameState.sceneHeight = output.height;
-	rg_temporalFrameState.manualScalePercent = manualScalePercent;
-	rg_temporalFrameState.effectiveScalePercent = output.scalePercent;
-	rg_temporalFrameState.sampledScalePercent = sample.scalePercent;
-	rg_temporalFrameState.timingFrameNumber = gpuTiming.frameNumber;
-	rg_temporalFrameState.timingAgeFrames = sample.ageFrames;
-	rg_temporalFrameState.timingBackend = static_cast<int>( gpuTiming.backend );
-	rg_temporalFrameState.timingGeneration = gpuTiming.generation;
-	rg_temporalFrameState.timingMicroseconds = gpuTiming.elapsedMicroseconds;
-	rg_temporalFrameState.targetMicroseconds = config.targetMicroseconds;
-	rg_temporalFrameState.temporalFeedback = idMath::ClampFloat(
+	R_TemporalPresentation_CurrentFrame().temporalAARequested = temporalAARequested;
+	R_TemporalPresentation_CurrentFrame().captureFrozen = captureFrame && !forceNative;
+	R_TemporalPresentation_CurrentFrame().captureForcedNative = forceNative;
+	R_TemporalPresentation_CurrentFrame().timingSupported = gpuTiming.supported;
+	R_TemporalPresentation_CurrentFrame().timingValid = gpuTiming.valid;
+	R_TemporalPresentation_CurrentFrame().frameNumber = tr.frameCount;
+	R_TemporalPresentation_CurrentFrame().nativeWidth = nativeWidth;
+	R_TemporalPresentation_CurrentFrame().nativeHeight = nativeHeight;
+	R_TemporalPresentation_CurrentFrame().sceneWidth = output.width;
+	R_TemporalPresentation_CurrentFrame().sceneHeight = output.height;
+	R_TemporalPresentation_CurrentFrame().manualScalePercent = manualScalePercent;
+	R_TemporalPresentation_CurrentFrame().effectiveScalePercent = output.scalePercent;
+	R_TemporalPresentation_CurrentFrame().sampledScalePercent = sample.scalePercent;
+	R_TemporalPresentation_CurrentFrame().timingFrameNumber = gpuTiming.frameNumber;
+	R_TemporalPresentation_CurrentFrame().timingAgeFrames = sample.ageFrames;
+	R_TemporalPresentation_CurrentFrame().timingBackend = static_cast<int>( gpuTiming.backend );
+	R_TemporalPresentation_CurrentFrame().timingGeneration = gpuTiming.generation;
+	R_TemporalPresentation_CurrentFrame().timingMicroseconds = gpuTiming.elapsedMicroseconds;
+	R_TemporalPresentation_CurrentFrame().targetMicroseconds = config.targetMicroseconds;
+	R_TemporalPresentation_CurrentFrame().temporalFeedback = idMath::ClampFloat(
 		0.0f, 0.98f, r_temporalAAFeedback.GetFloat() );
-	rg_temporalFrameState.temporalReactiveScale = idMath::ClampFloat(
+	R_TemporalPresentation_CurrentFrame().temporalReactiveScale = idMath::ClampFloat(
 		0.0f, 2.0f, r_temporalAAReactiveScale.GetFloat() );
-	rg_temporalFrameState.temporalDebugMode = idMath::ClampInt(
+	R_TemporalPresentation_CurrentFrame().temporalDebugMode = idMath::ClampInt(
 		0, 3, r_temporalAADebug.GetInteger() );
-	rg_temporalFrameState.advancedScreenSpace = advancedScreenSpace;
-	rg_temporalFrameState.decision = output.decision;
+	R_TemporalPresentation_CurrentFrame().advancedScreenSpace = advancedScreenSpace;
+	R_TemporalPresentation_CurrentFrame().decision = output.decision;
 
 	R_TemporalPresentation_RecordFrameScale( tr.frameCount,
 		gpuTiming.generation, output.scalePercent, !captureFrame );
@@ -725,7 +742,7 @@ void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
 				|| output.decision == TEMPORAL_RESOLUTION_DECISION_DISCONTINUITY_RESET ) ) ) {
 		common->Printf(
 			"Temporal resolution: frame=%d decision=%s scale=%d%% scene=%dx%d output=%dx%d gpu=%lluus target=%lluus sampleFrame=%d sampleScale=%d%% age=%d generation=%u capture=%d\n",
-			rg_temporalFrameState.frameNumber,
+			R_TemporalPresentation_CurrentFrame().frameNumber,
 			R_TemporalPresentation_DecisionName( output.decision ),
 			output.scalePercent, output.width, output.height,
 			nativeWidth, nativeHeight,
@@ -736,15 +753,15 @@ void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
 }
 
 const temporalPresentationFrameState_t &R_TemporalPresentation_GetFrameState( void ) {
-	return rg_temporalFrameState;
+	return R_TemporalPresentation_CurrentFrame();
 }
 
 int R_TemporalPresentation_EffectiveScreenFraction( void ) {
 	if ( !rg_temporalPresentationInitialized
-			|| rg_temporalFrameState.effectiveScalePercent <= 0 ) {
+			|| R_TemporalPresentation_CurrentFrame().effectiveScalePercent <= 0 ) {
 		return idMath::ClampInt( 10, 200, r_screenFraction.GetInteger() );
 	}
-	return rg_temporalFrameState.effectiveScalePercent;
+	return R_TemporalPresentation_CurrentFrame().effectiveScalePercent;
 }
 
 bool R_TemporalPresentation_DynamicResolutionRequested( void ) {
@@ -863,15 +880,15 @@ struct vertCache_s *R_TemporalPresentation_PreviousPositionCache(
 }
 
 void R_TemporalPresentation_SetVRExtent( int width, int height ) {
-	rg_temporalFrameState.nativeWidth = Max( 1, width );
-	rg_temporalFrameState.nativeHeight = Max( 1, height );
-	rg_temporalFrameState.sceneWidth = rg_temporalFrameState.nativeWidth;
-	rg_temporalFrameState.sceneHeight = rg_temporalFrameState.nativeHeight;
-	rg_temporalFrameState.manualScalePercent = 100;
-	rg_temporalFrameState.effectiveScalePercent = 100;
-	rg_temporalFrameState.dynamicResolutionRequested = false;
-	rg_temporalFrameState.dynamicResolutionActive = false;
-	rg_temporalFrameState.temporalAARequested = false;
+	R_TemporalPresentation_CurrentFrame().nativeWidth = Max( 1, width );
+	R_TemporalPresentation_CurrentFrame().nativeHeight = Max( 1, height );
+	R_TemporalPresentation_CurrentFrame().sceneWidth = R_TemporalPresentation_CurrentFrame().nativeWidth;
+	R_TemporalPresentation_CurrentFrame().sceneHeight = R_TemporalPresentation_CurrentFrame().nativeHeight;
+	R_TemporalPresentation_CurrentFrame().manualScalePercent = 100;
+	R_TemporalPresentation_CurrentFrame().effectiveScalePercent = 100;
+	R_TemporalPresentation_CurrentFrame().dynamicResolutionRequested = false;
+	R_TemporalPresentation_CurrentFrame().dynamicResolutionActive = false;
+	R_TemporalPresentation_CurrentFrame().temporalAARequested = false;
 }
 
 bool R_TemporalPresentation_ScreenSpaceEffectsRequested( void ) {
@@ -881,6 +898,7 @@ bool R_TemporalPresentation_ScreenSpaceEffectsRequested( void ) {
 
 void R_TemporalPresentation_PrintStatus_f( const idCmdArgs &args ) {
 	(void)args;
+	R_RenderThread_Sync( "temporal stats" );
 	const temporalPresentationFrameState_t &state =
 		R_TemporalPresentation_GetFrameState();
 	common->Printf(
@@ -937,4 +955,18 @@ void R_TemporalPresentation_PrintStatus_f( const idCmdArgs &args ) {
 	extern void VK_PostProcess_PrintTemporalMotion( void );
 	VK_PostProcess_PrintTemporalMotion();
 #endif
+}
+
+void R_TemporalPresentation_SubmitFrame( void ) {
+	const int slot = R_TemporalPresentation_FrameSlot();
+	rg_temporalFrameGenerations[slot] = rg_temporalHistoryGeneration;
+	rg_temporalFrameResetReasons[slot][0] = '\0';
+}
+
+void R_TemporalPresentation_RetireFrame( void ) {
+	const int slot = R_TemporalPresentation_FrameSlot();
+	if ( rg_temporalFrameResetReasons[slot][0] != '\0' ) {
+		R_TemporalPresentation_InvalidateHistory( rg_temporalFrameResetReasons[slot] );
+		rg_temporalFrameResetReasons[slot][0] = '\0';
+	}
 }

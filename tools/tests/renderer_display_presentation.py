@@ -60,6 +60,8 @@ static struct { unsigned long long frames=0, barriers=0, submissions=0; } vkReso
 enum {RENDERER_WAIT_FRAME_FENCE,RENDERER_WAIT_SWAPCHAIN_IMAGE,RENDERER_PRESENT_WINDOW_STATE,RENDERER_PRESENT_CONTEXT,RENDERER_PRESENT_SWAP};
 static unsigned long long R_RendererMetrics_CpuClock(){return 0;}
 static void R_RenderThread_Sync(const char*){} // no render thread in this harness
+static bool onRenderThread=false,vkThreadedRecreatePending=false;
+static bool R_RenderThread_OnRenderThread(){return onRenderThread;}
 static void R_RendererMetrics_EndWaitPhase(int,unsigned long long){}
 static void R_RendererMetrics_EndUploadRetirement(unsigned long long){}
 static void R_RendererMetrics_EndPresentPhase(int,unsigned long long){}
@@ -82,6 +84,7 @@ struct Context {
     bool initialized=true,presentationBlocked=false,uploadBatchOpen=false,uploadBatchInFlight=false;
     bool surfaceLost=false,surfaceExtentZero=false;
     VkDevice device=handle<VkDevice>(1); VkQueue graphicsQueue=handle<VkQueue>(2);
+    VkInstance instance=handle<VkInstance>(40); uint32_t graphicsQueueFamily=0;
     VkPhysicalDevice physicalDevice=handle<VkPhysicalDevice>(30); VkSurfaceKHR surface=handle<VkSurfaceKHR>(31);
     VmaAllocator allocator=(void*)1;
     VkSwapchainKHR swapchain=handle<VkSwapchainKHR>(3);
@@ -128,9 +131,14 @@ static bool VK_GuiExecutor_FrameIsOpen(){return vkExec.frameOpen;}
 // Save-preview ownership is covered by the checkpoint capture fixtures.
 static void VK_ConsumeSavePreview(int){}
 static void RB_QueueSavePreview(){}
-// Surface recovery rebuilds the surface and swapchain (VulkanDevice.cpp); the
-// double records the request and clears the loss when the window cooperates.
-static bool VK_Device_RecoverSurface(){calls.emplace_back("recover-surface");++recoverCalls;if(recoverOkay)vkCtx.surfaceLost=false;return recoverOkay;}
+bool VK_Device_RecoverSurface();
+static bool CreateVulkanSurface(void*,unsigned long long* surface){
+    assert(!onRenderThread);calls.emplace_back("recover-surface");++recoverCalls;*surface=31;return recoverOkay;
+}
+struct WindowServices { bool (*CreateVulkanSurface)(void*,unsigned long long*)=::CreateVulkanSurface; } windowServices,*vkWindowServices=&windowServices;
+static void VK_Device_DestroySwapchainObjects(){assert(!onRenderThread);calls.emplace_back("destroy-swapchain");}
+static void vkDestroySurfaceKHR(VkInstance,VkSurfaceKHR,const void*){assert(!onRenderThread);}
+static VkResult vkGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice,uint32_t,VkSurfaceKHR,VkBool32* result){*result=VK_TRUE;return VK_SUCCESS;}
 static bool VK_Device_SurfaceExtentChanged(){return surfaceExtentChanged;}
 // The withheld-image drill (r_vkPresentationFailureTest 3) runs before each
 // acquisition; the double records that and can report a failed release.
@@ -192,6 +200,7 @@ SWAPCHAIN_SUPPORT = r'''
 // Only swapchain allocation is doubled: the production interval policy,
 // present-mode selection and recreation scope execute around this boundary.
 static bool VK_Device_CreateSwapchain(){
+    assert(!onRenderThread);
     ++recreateCalls;
     if(!recreateOkay)return false;
     const int interval=VK_Device_RequestedSwapInterval();
@@ -238,6 +247,7 @@ static bool SDL3_ApplySwapInterval(){return glSetOkay;}
 CASES = r'''
 static renderDisplayPresentation_t snapshot(){renderDisplayPresentation_t s{};R_GetDisplayPresentation(&s);return s;}
 static void reset(){
+    onRenderThread=vkThreadedRecreatePending=false;
     queueResult=presentResult=endResult=flushResult=waitResult=resetResult=beginResult=resetFenceResult=idleResult=acquireResult=uploadResult=VK_SUCCESS;
     recreateOkay=executorOkay=recoverOkay=true;surfaceExtentChanged=false;surfaceExtent={1280,720};
     calls.clear();recreateCalls=submitCalls=presentCalls=acquireCalls=waitCalls=timingFailures=recoverCalls=withheldCalls=0;
@@ -330,6 +340,23 @@ int main(){
     assert(!VK_GuiExecutor_BeginFrame() && recoverCalls==1 && !vkCtx.presentationBlocked && !vkExec.frameOpen);
     acquireResult=VK_SUCCESS;open();assert(VK_GuiExecutor_SubmitFrame(true));
     reset();vkCtx.surfaceLost=true;open();assert(recoverCalls==1 && !vkCtx.surfaceLost);assert(VK_GuiExecutor_SubmitFrame(true));
+    // The worker queues recovery; no window/surface/device teardown runs there.
+    reset();onRenderThread=true;
+    assert(!VK_Device_RecreateSwapchain() && vkThreadedRecreatePending && recreateCalls==0);
+    assert(calls.empty());onRenderThread=false;VK_Device_CompleteThreadedRecovery();
+    assert(recreateCalls==1 && !vkThreadedRecreatePending);
+    VK_Device_CompleteThreadedRecovery();assert(recreateCalls==1);
+    reset();onRenderThread=true;
+    assert(!VK_Device_RecoverSurface() && vkThreadedRecreatePending && vkCtx.surfaceLost);
+    assert(calls.empty() && recoverCalls==0);
+    onRenderThread=false;VK_Device_CompleteThreadedRecovery();
+    assert(recoverCalls==1 && !vkCtx.surfaceLost && !vkThreadedRecreatePending);
+    reset();onRenderThread=true;open();presentResult=VK_ERROR_OUT_OF_DATE_KHR;
+    assert(VK_GuiExecutor_SubmitFrame(true) && vkThreadedRecreatePending && recreateCalls==0);
+    onRenderThread=false;VK_Device_CompleteThreadedRecovery();assert(recreateCalls==1);
+    reset();onRenderThread=true;acquireResult=VK_ERROR_SURFACE_LOST_KHR;
+    assert(!VK_GuiExecutor_BeginFrame() && vkThreadedRecreatePending && recoverCalls==0);
+    onRenderThread=false;VK_Device_CompleteThreadedRecovery();assert(recoverCalls==1);
     // An acquisition timeout acquired and signaled nothing: skip the frame,
     // never latch, and acquire normally on the next one.
     for(VkResult skipped:{VK_TIMEOUT,VK_NOT_READY}){
@@ -455,6 +482,8 @@ def main():
     source += SWAPCHAIN_SUPPORT
     source += method(device, "void VK_Device_BlockPresentation( renderDisplayOutcome_t outcome, VkResult error, const char *operation )")
     source += method(device, "bool VK_Device_RecreateSwapchain( void )")
+    source += method(device, "bool VK_Device_RecoverSurface( void )")
+    source += method(device, "void VK_Device_CompleteThreadedRecovery( void )")
     source += method(device, "void VK_Device_WaitUploadBatch( void )")
     source += method(device, "void VK_Device_FlushUploadBatch( void )")
     source += method(gui, "bool VK_GuiExecutor_BeginFrame( void )")

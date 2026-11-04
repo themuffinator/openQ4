@@ -277,8 +277,14 @@ The engine's own share of that delay is measured too. `framePacingSnapshot`
 prints `Presentation latency …: lookSamples=… sampleToSwap … flashes=…
 pressToSwap …`: for every frame, the time from the draw's first late-look
 input sample, and from the press behind a drawn flash, to the return of the
-renderer's swap or present call (the renderer is synchronous, so the frame has
-been handed to the swap chain by then). A sensor reading minus `pressToSwap`
+renderer's successful swap or present call. Since 3 November, those clocks
+travel with the frame through the optional Vulkan render thread. The backend
+stamps the successful swap; the main thread records the receipt at retirement.
+Returning from `UpdateScreen` is not sufficient when the backend is asynchronous.
+Failed presents, hidden offscreen frames and readbacks do not produce latency
+samples, and a reset discards receipts whose input predates it. Renderer module
+API 30 carries the clock handoff/receipt; engine and renderer modules must be
+built together. A sensor reading minus `pressToSwap`
 is the GPU, compositor and display share. The harness reports both as
 `inputToSwapMs`. Its `sensor` case is the operator's session for this: the
 operator's own mouse works (no other case reads devices), late look and the
@@ -316,6 +322,13 @@ late look, entity poses, client debris). The pacing case adds the renderer's
 front-end, back-end and GPU summary, so a slow run shows where the frame went.
 The 240 cap is judged against the budget above. Other caps are reported only.
 `--fullscreen` uses the native desktop mode instead of a 960×540 window.
+For the optional Vulkan worker, add `--cvar r_vkRenderThread 1` for tic-only
+overlap or `--cvar r_vkRenderThread 2` for full front-end overlap; its default
+remains zero. The reference-suite wrapper accepts `--render-thread 0|1|2` and
+records that selection. It returns failure for a failed child, a missing or
+malformed report, or VRR coverage lost because no usable refresh was reported.
+Its `automatedPassed` result covers automation only: `physicalQualification`
+stays `pending` until sensor readings and the operator's review are recorded.
 For variable refresh, add a run with `--swap-interval 1 --fps <refresh − 3>`
 with VRR (G-Sync, FreeSync) on in the driver. With VRR the presented rate
 follows the cap; without it, vsync rounds it down to a divisor of the refresh.
@@ -687,3 +700,354 @@ logged an error. The variable-refresh cases ran at 237, from the reported
 240 Hz refresh. Vulkan reported presented intervals in every case it captured.
 Through every 100 ms stall the hitch cases never stepped the view backwards,
 and the review sessions completed.
+
+### Threaded lifetime validation, 3 November 2026
+
+The native tests now execute the production worker state machine, bulk world
+cleanup, debug-text expiry, swap receipt and latency collector. They force
+1,006 handoffs through both completion orders, errors, disable/restart and map
+teardown, including a worker that has finished before the main thread syncs.
+Delayed main-thread collection does not inflate the recorded swap time. The
+presentation test also executes deferred acquire/present recovery against
+controlled driver/window boundaries; no surface call runs on the worker.
+
+The live lifecycle probe uses the staged x64 runtime and installed stock assets,
+with a visible 960 x 540 window and device input disabled. It cycles caps
+30/60/120/144/165/240/360/uncapped, toggles VSync, exercises debug primitives,
+injects a Vulkan surface-loss result, restarts the renderer, toggles the worker,
+and arms five engine-only latency flashes. It uses the existing gameplay
+benchmark for SP `game/airdefense1` and MP `mp/q4dm1` listen-host/client, with an
+OpenGL SP control. Reports, binary hashes, engine logs and engine-rendered
+screenshots are retained under `.tmp/high-refresh/`; original failed runs are
+kept beside the repaired reruns. These are functional checks on a shared
+machine, not the native-resolution Quality budget or physical qualification.
+
+The final SP and MP Vulkan runs passed, with submitted/completed counts
+2,636/2,636 (SP), 2,542/2,542 (host) and 1,776/1,776 (client) at their last
+explicit stats checkpoint. The OpenGL control passed too. Each of the four
+roles recorded all five flash receipts and 128 presentation samples with zero
+gameplay executed during drawing. Engine screenshots show the expected worlds
+and HUDs after recovery/restart. The nine focused Meson tests pass, including
+the million-tick ownership test and the eight qualification-runner cases.
+
+A separate diagnostic issue remains: Vulkan `gfxInfo` can report the OpenGL
+bootstrap tier as `NullRenderer` after a restart even while native Vulkan
+rendering is active. The engine screenshots and successful presentation
+receipts verify that the world still renders; that tier label is not used as
+proof of renderer or pacing qualification.
+
+### Submitted-frame ownership, 4 November 2026
+
+`RC_DRAW_SPECIAL_EFFECTS` carries the admitted mask and all controller
+parameters. Both backend adapters and reconstructed scene packets consume the
+queued values, including `r_forceSpecialEffects`; a later controller reset or
+edit cannot replace them. Only first-use image creation and resource teardown
+retain the controller's worker synchronization.
+
+Command preflight now latches the first `RC_SET_BUFFER` frame number before
+building backend resources. A mid-frame flush without that command retains the
+current backend identity. Vulkan shadow-cache stamps, prepared light tables,
+GPU timing/readbacks and query retirement, classic deformation validation and
+clustered generations use the submitted frame. Front-end deformation capture
+still uses the front-end token; explicit tokens cross the boundary without
+revalidating against mutable front-end state.
+
+The two interaction failures and two shadow invariant failures use a worker
+exception receipt. Main-thread collection retires once before dispatching the
+original recoverable/fatal error. Native tests execute the actual worker through
+1,009 handoffs, including both severities and a successful frame afterwards.
+Fatal teardown is replaced by a throwing test boundary; the test asserts that
+no common error or teardown starts on the worker.
+
+Eleven focused Meson tests pass, including production enqueue/GL/Vulkan effect
+consumption across later edits, submitted shadow records and query ages with
+the front-end counter far ahead, and the existing clock/pacing/latency coverage.
+The corrected screenshot/native-UI fixtures and CI test discovery pass locally.
+Build, test and runtime evidence is retained under `.tmp/high-refresh-next/`.
+
+Windowed stock-asset gameplay passed on the staged Windows x64 build: Vulkan
+SP `game/airdefense1`, Vulkan MP `mp/q4dm1` listen host/client and an OpenGL SP
+control. Each role passed all eight classic-domain self-tests, exercised forced
+blur and Alpha Labs enable/disable, and recorded five successful latency-flash
+receipts plus 128 samples with zero gameplay executed during drawing. Vulkan
+also cycled the cap matrix, surface recovery, `vid_restart` and worker toggles;
+its last submitted/completed checkpoints were 1,734/1,734 (SP), 1,254/1,254
+(host) and 1,350/1,350 (client). Shadow GPU queries resolved without dropped
+spans in the inspected MP logs. Engine captures of blur and the final world/HUD
+were inspected; no OS capture or device-input injection was used. A separate
+OpenGL gameplay run passed the updated scene-packet, render-graph/resource,
+modern draw-plan and executor self-tests (including their shader, pixel-transfer,
+probe-atlas and submit-plan subtests).
+
+These shared-domain probes can fall back on scene-packet capacity in the SP
+scene; they do not qualify full shared ownership. The earlier Vulkan
+`NullRenderer` bootstrap label also remains. Unrelated failures in the earlier
+PR CI were the stale generated Demos page, an image-policy mutation fixture
+whose source needle no longer matches, and a macOS MVD navigation negative
+control that did not fail. Their test/production inputs are unchanged by this
+PR. The registration and swap-wrapper fixture failures introduced by this PR
+are fixed and pass locally.
+
+That checkpoint closed the audited backend error item and part of frame
+identity. The subsequent implementation below addresses the stage-2 ownership
+list. Physical qualification and the native-resolution Quality floor remain
+open.
+
+### Full front-end overlap, 4 November 2026
+
+`r_vkRenderThread 2` moves the normal join to the next `EndFrame`, after GUI/VR
+command assembly. Mode 1 retains tic-only overlap and mode 0 remains the
+default. There is still only one submitted backend frame at a time. The next
+front end uses a second arena, vertex-cache lists, scene-packet frame and
+temporal state. A thread-local selector keeps backend allocations and metrics
+attached to the submitted slot, including when its worker finishes before the
+main thread collects it.
+
+Each submitted view freezes geometry, cache headers/CPU bytes, skinning
+palettes, MD5R transforms, previous positions, entity definitions and light
+definitions. Shared aliases remain shared inside the snapshot. Classic
+deformation records are rebased only for finalized draws; uninitialized
+interaction/volume records are not read. Sticky light failures return through
+identity-checked receipts. Deferred ambient and interaction surfaces retire as
+one batch at a completed handoff, before the worker wakes, or during synchronous
+retirement/shutdown. Clearing the live arena pointer before shutdown frees its
+slots prevents cleanup from allocating into an already freed slot.
+
+Static images/programs and usable light-grid areas prepare at handoff.
+Name-only image lookup uses a registry lock; cached shader validation does not
+join on every SP frame. Mutating images, materials, renderer settings or device
+state still joins. The configuration barrier extends renderer API to **31**,
+so engine and renderer modules must be built/staged together. Captures,
+loading, checked image-policy execution, locked surfaces and the Alpha Labs
+live-light path remain synchronous. Scene history seals only after a successful
+threaded handoff; inline reconstruction retains the preceding history until
+retirement.
+
+Native tests execute the production allocator/retirement methods with a held
+consumer, allocations larger than an arena block, invalid sizes, shared
+triangle retirement, cache-slot reuse and teardown/reinitialization. Two
+negative controls detect shared arena storage and split triangle retirement.
+The worker test covers 1,011 handoffs, both error severities and a renderer
+configuration mutation barrier. `rendererFrameOwnershipSelfTest` mutates source
+streams and definitions after snapshotting and checks retained values/aliases,
+including poisoned non-finalized deformation records. The reference runner
+also tests forwarding mode 2 without claiming physical qualification.
+
+Evidence is retained under `.tmp/high-refresh-overlap/`; build/stage logs for
+the earlier iterations are also under `.tmp/high-refresh-next/`. Thirteen
+focused Meson tests and 28 related source/native checks passed. Windowed
+stock-asset gameplay covered Vulkan SP `game/airdefense1`, MP `mp/q4dm1`
+listen-host/client, and an OpenGL SP control, with device input disabled. The
+broad checks covered the cap matrix, VSync, forced effects, eight classic-domain
+self-tests, worker toggles, surface recovery and renderer restart. Additional
+combination checks enabled GPU skinning, TAA, motion blur and dynamic resolution
+together, then disabled them and reloaded shaders. Engine-rendered captures
+were used throughout; no OS capture or device-input injection was used.
+
+The final retirement build passed SP (`vk-sp-airdefense1-verified`), MP and
+OpenGL (`*-retirement`). Last explicit Vulkan checkpoints were:
+
+| Role | Submitted / completed | Front ends started while busy | Front ends finished while busy |
+| --- | --- | --- | --- |
+| SP | 486 / 486 | 73 | 2 |
+| MP host | 682 / 682 | 669 | 1 |
+| MP client | 866 / 866 | 857 | 145 |
+
+Each role, including OpenGL, recorded five successful latency-flash receipts
+and 128 presentation samples with zero gameplay during drawing. All exited
+cleanly. The preceding SP retirement run completed gameplay but was correctly
+rejected by runtime verification: staging removed an import library after the
+initial inventory. Its failed report is retained; the verified rerun used an
+unchanged staged runtime. `retirement-tests.log`, `source-tests/summary.json`,
+`retirement-summary.json` and `verified-summary.json` retain the checks and
+outcomes. Benchmark reports include the exact binary hashes.
+
+The prototype proves overlap, not a performance gain. The first implementation
+also copies static streams; reducing this cost requires measured, explicitly
+retained immutable storage. Quiet paired mode 0/1/2 runs, the every-frame Quality
+floor, physical display/input checks and Wayland/macOS runtime coverage remain
+open under HF-07/HF-08 and REN-07. Shared-domain scene-packet capacity fallback
+and the post-restart Vulkan `gfxInfo` bootstrap label remain separate known
+issues.
+
+### Mode comparisons and snapshot reuse, 4 November 2026
+
+`tools/tests/renderer_overlap_benchmark.py` compares modes 0/1/2 in one
+windowed stock-asset SP launch. It applies Quality, then selects uncapped
+presentation with VSync off. Each mode occupies each order position once
+(0/1/2, 2/0/1, 1/2/0), with a four-second warm-up rotation followed by an
+eight-second measured rotation at the same position. Default drawable size is
+1280 x 720. Frame-time means/percentiles and snapshot copy counters are kept
+for every window. The ordinary gameplay harness verifies the runtime inventory,
+captures the engine render target and rejects engine failures. Missing,
+duplicated, mislabeled or invalid measurement windows fail the comparison.
+
+Run from the repository, using a new evidence directory:
+
+```text
+python tools/tests/renderer_overlap_benchmark.py --basepath "E:/SteamLibrary/steamapps/common/Quake 4" --output-dir .tmp/high-refresh-perf/comparison
+```
+
+When `psutil` is available, `host-load.json` records host CPU utilization and
+competing games/build tools once per second. Missing monitoring does not imply
+a quiet host. These windowed comparisons do not qualify physical presentation
+or the native-resolution Quality floor.
+
+`rendererFrameSnapshotStats reset` starts optional accounting;
+`rendererFrameSnapshotStats sample` prints and stops it. Counters include
+frames/views, copy calls/bytes, geometry/cache bytes, reused bytes and elapsed
+snapshot microseconds. The time includes preparation and copying on the front
+end, including any scheduling delay; bytes are copied payload/header bytes,
+not total arena or process memory. Ordinary play leaves accounting disabled.
+
+The first optimization shares exact source-address/byte-length ranges within
+one submitted view. Triangle and cache headers remain separate records; repeated
+vertex, index, auxiliary, palette and joint ranges reuse owned copies. The
+lookup ends with that view, so another view rebuilding the same source address
+receives fresh bytes. All geometry preparation runs before any copying,
+including CPU fallback/cache updates reached through later light chains. No
+mutable game storage is borrowed, and static streams are still copied each
+view. Native tests execute this preparation order and the production copy
+cache; negative controls detect borrowed source storage, size-blind reuse and
+late preparation. The engine ownership self-test also covers distinct triangle
+records sharing streams and a later view observing changed source contents.
+
+The reuse lookup uses frame-arena storage, with no per-stream heap nodes or
+individual frees. It grows at half occupancy to at most 65,536 slots. At its
+limit, untracked ranges take the ordinary owned-copy path; existing entries
+remain usable. Native tests exercise growth, collisions and this fallback with
+40,000 distinct ranges. The bounded lookup does not impose a geometry limit.
+
+The verified baseline and final candidate each completed all nine measurement
+windows. Values below are medians of the three window statistics, in
+milliseconds; lower is better. They are shared-machine observations, **not
+performance qualification**.
+
+| Build | Mode | Mean | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Before reuse | 0 | 9.034 | 9.00 | 12.85 | 14.05 |
+| Before reuse | 1 | 7.175 | 6.90 | 10.70 | 11.55 |
+| Before reuse | 2 | 10.953 | 10.95 | 14.35 | 16.90 |
+| Bounded reuse | 0 | 14.787 | 14.75 | 21.45 | 27.30 |
+| Bounded reuse | 1 | 12.872 | 11.65 | 22.45 | 34.35 |
+| Bounded reuse | 2 | 14.493 | 14.35 | 20.40 | 24.30 |
+
+The final mode-2 windows copied 8,790,400 bytes per frame and reused 4,637,978
+bytes per frame: **34.54% of the requested copy bytes were avoided within that
+run**. The earlier baseline copied 13,269,339 bytes per frame. Lookup-table
+storage is additional arena memory and is excluded from these payload/header
+counters. Frame-weighted elapsed snapshot time was 3.486 ms before reuse and
+3.982 ms with bounded reuse; this does not establish a timing improvement.
+Other games or build tools were present in all 163 baseline and 207 final
+host samples, with mean host CPU utilization of 88.7% and 90.0%, respectively.
+Even the unchanged inline mode slowed substantially between runs. Quiet
+paired comparisons are still required before judging elapsed cost or choosing
+a default.
+
+Evidence is retained under `.tmp/high-refresh-perf/`: `baseline-verified/` and
+`final/` contain comparison JSON, host samples, engine logs and gameplay reports
+with exact runtime hashes. `baseline-instrumentation.patch` preserves the
+instrumented baseline. `candidate/` and `candidate-unordered.patch` record the
+intermediate heap-table implementation; it avoided 34.70% of copy bytes but
+also ran under competing load. The initial `baseline/` attempt correctly
+failed evidence parsing because engine tokenization split hyphenated labels;
+the runner now uses underscores and the verified baseline passed.
+
+The final Windows x64 build/stage and all 15 focused Meson tests pass, including
+the new snapshot-copy and comparison-parser tests. Validation wiring and
+repository path portability checks also pass. See `final-build.log`,
+`final-install.log`, `final-tests.log` and `validation-hardening.log`.
+
+Windowed stock-asset Vulkan SP, MP host/client and the OpenGL SP control pass
+with the final staged binaries. Final submitted/completed checkpoints match:
+988/988 SP, 1,032/1,032 MP host and 647/647 MP client. Each Vulkan role both
+started and finished front ends while the backend was busy. Every role recorded
+five latency-flash receipts and 128 draw samples with no gameplay during
+drawing. Checks cover the ownership self-test, GPU skinning, TAA, motion blur,
+scaling/dynamic resolution, shader reload and Vulkan surface recovery/restart.
+Engine render-target captures were inspected; no OS capture or device-input
+injection was used. `reuse-final-summary.json` records SP/GL; the final MP
+record is `reuse-mp-clean-summary.json`.
+
+The older temporary proof script sent an SP-only view sweep to MP, and the
+shared gameplay harness also used SP's `viewpos` command in MP. The first MP
+record is therefore superseded. The next run removed the sweep and correctly
+failed the stricter unknown-command check on `viewpos`. The shared harness now
+uses MP's registered `getviewpos`, with SP/host/client generation and parsing
+covered by the comparison tests. The final MP rerun has no unknown commands;
+MP coverage is stationary gameplay, not a view sweep. The broader benchmark
+contract check also passes (`budget-contract-final.log`).
+
+The MP host logged a reliable-message overflow during the client's shutdown
+interval; this also appears in the earlier pre-optimization overlap evidence
+(`.tmp/high-refresh-overlap/vk-mp-q4dm1-listen-validated/`). This remains an
+unrelated MP issue, alongside the existing scene-packet capacity fallback and
+post-restart Vulkan bootstrap label. Neither the copy-volume reduction nor
+these functional runs close the quiet timing, physical display/input or
+cross-platform qualification gates.
+
+### Retained index streams, 4 November 2026
+
+Mode 2 retains owned immutable index, silhouette-index and CPU index-cache
+payloads across views/frames. The producer validates the complete byte range
+before reuse; source addresses are lookup hints, not lifetime guarantees.
+Changed contents or lengths replace the cached version. Submitted frame leases
+keep old versions alive independently of eviction, model destruction or source
+address reuse. Retirement releases leases after the worker joins, and frame
+shutdown clears leases and cached payloads. The backend only reads these index
+streams. Vertex, skinning, palette and other mutable streams retain their
+existing per-view ownership path.
+
+The cache holds at most 64 MiB of payload and 32,768 entries. Leases for in-flight
+frames can temporarily retain evicted versions in addition to that budget.
+Oversized or non-word-sized ranges use ordinary frame copies. Whole-cache
+pressure eviction bounds bookkeeping; this is intentionally conservative.
+Validation reads the full stream, so avoided copy bytes do not imply equivalent
+CPU-time savings. `r_vkSnapshotRetain 0` disables retention and clears cached
+entries at retirement; it does not invalidate submitted leases.
+
+The comparison runner accepts `--retain-indexes 0` or `1` and records the
+selection. Run each against the same staged binary in a new output directory.
+The production-header native test covers unchanged reuse, changed contents,
+length changes, live leases through clear/eviction, lease release,
+capacity fallback and a stale-content negative control. The arena ownership
+suite checks shutdown/reinitialization with the new cleanup hook.
+
+Both same-binary runs passed all nine windows at windowed 1280 x 720 Quality,
+uncapped with VSync off. Each cell below is the median of three window
+statistics (milliseconds). These are shared-machine observations.
+
+| Retention | Mode | Mean | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| off | 0 | 8.374 | 7.95 | 13.55 | 22.60 |
+| off | 1 | 7.683 | 7.20 | 12.50 | 19.00 |
+| off | 2 | 9.862 | 9.05 | 17.45 | 23.45 |
+| on | 0 | 14.826 | 13.80 | 24.25 | 36.20 |
+| on | 1 | 17.474 | 13.70 | 35.75 | 42.25 |
+| on | 2 | 18.475 | 17.30 | 29.80 | 45.35 |
+
+Mode-2 copied bytes averaged 8,534,227/frame with retention disabled and
+7,568,048/frame enabled, an observed 11.32% reduction between these runs.
+Elapsed snapshot time averaged 2.900 ms and 5.225 ms, respectively. Unchanged
+modes 0/1 also slowed substantially; no timing improvement is established.
+Competing games/build tools appeared in all 164 disabled and 169 enabled host
+samples (mean host CPU 90.2% and 86.9%). Quiet paired runs remain required.
+
+Evidence is under `.tmp/high-refresh-retain/off/` and `on/`, including full
+window statistics, host load, engine captures, runtime hashes and launch
+configuration. The Windows x64 build/stage and all 15 focused Meson tests
+passed (`build.log`, `install.log`, `tests.log`). No renderer API change is
+required by this iteration.
+
+The final stock-asset Vulkan SP and MP host/client plus OpenGL SP control pass.
+Submitted/completed counts match at 768/768 SP, 1,122/1,122 host and 863/863
+client. Each Vulkan role starts and finishes front ends while the worker is
+busy. All four roles record five flash receipts and 128 presentation samples
+with no gameplay during drawing. Ownership self-tests, GPU skinning, TAA,
+motion blur, scaling/dynamic resolution, shader reload and Vulkan surface
+recovery/restart pass. Engine screenshots were inspected; tests were windowed
+with no OS capture or device-input injection. See `retained-summary.json` and
+its per-case gameplay reports. Path portability and validation wiring pass too.
+The earlier MP shutdown overflow was not reproduced in this run; existing
+scene-packet capacity fallback and post-restart Vulkan bootstrap labeling remain
+outside this iteration.

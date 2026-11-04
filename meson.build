@@ -745,6 +745,24 @@ if get_option('build_native_tests')
     args: [files('tools/tests/presentation_hf_contract.py'), '--mutations'], timeout: 90)
   test('openq4-clock-ownership', py,
     args: [files('tools/tests/presentation_clock_ownership.py')], timeout: 90)
+  test('openq4-render-thread-contract', py,
+    args: [files('tools/tests/renderer_render_thread_contract.py')], timeout: 30)
+  test('openq4-render-thread-runtime', py,
+    args: [files('tools/tests/renderer_render_thread_runtime.py')], timeout: 90)
+  test('openq4-render-input-latency', py,
+    args: [files('tools/tests/renderer_input_latency.py')], timeout: 90)
+  test('openq4-render-special-effect-snapshot', py,
+    args: [files('tools/tests/renderer_special_effect_snapshot.py')], timeout: 90)
+  test('openq4-render-frame-ownership', py,
+    args: [files('tools/tests/renderer_frame_ownership.py')], timeout: 90)
+  test('openq4-render-snapshot-copy', py,
+    args: [files('tools/tests/renderer_snapshot_copy.py')], timeout: 90)
+  test('openq4-render-overlap-benchmark', py,
+    args: [files('tools/tests/renderer_overlap_benchmark_test.py')], timeout: 30)
+  test('openq4-render-frame-identity', py,
+    args: [files('tools/tests/renderer_frame_identity.py')], timeout: 90)
+  test('openq4-presentation-reference-suite', py,
+    args: [files('tools/tests/presentation_reference_suite_test.py')], timeout: 30)
 
   test('openq4-imported-game-regressions', py,
     args: [files('tools/tests/game_regression_suite.py'), '--log-dir', meson.project_build_root() / 'game-regression-logs'],

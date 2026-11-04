@@ -7664,6 +7664,7 @@ static bool rbRVSpecialBlurPrepared = false;
 static bool rbRVSpecialALPrepared = false;
 static bool rbRVSpecialCaptureUsesDiffuseImage = false;
 static int rbRVSpecialActiveMask = 0;
+static specialEffectsState_t rbRVSpecialEffects;
 static const viewDef_t *rbRVSpecialCommandView = NULL;
 static int rbRVSpecialCommandFrame = -1;
 
@@ -8289,15 +8290,15 @@ static bool RB_CompositeRVSpecialBlur( void ) {
 		return false;
 	}
 
-	const GLfloat effectRange = Max( tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][4], 0.01f );
-	const GLfloat focus = idMath::ClampFloat( 0.0f, 1.0f, tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][5] );
+	const GLfloat effectRange = Max( rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][4], 0.01f );
+	const GLfloat focus = idMath::ClampFloat( 0.0f, 1.0f, rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][5] );
 	const GLfloat scroll = static_cast<GLfloat>( backEnd.viewDef->renderView.time ) * 0.001f * 0.25f;
-	const GLfloat approachPercent = idMath::ClampFloat( 0.0f, 1.0f, tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][6] );
+	const GLfloat approachPercent = idMath::ClampFloat( 0.0f, 1.0f, rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][6] );
 	const GLfloat approachColor[4] = {
-		tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][0],
-		tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][1],
-		tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][2],
-		tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][3]
+		rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][0],
+		rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][1],
+		rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][2],
+		rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][3]
 	};
 
 	backEnd.currentScissor = backEnd.viewDef->scissor;
@@ -8479,17 +8480,15 @@ static bool RB_DrawRVSpecialALLight( const idVec3 &origin, float size, const idV
 }
 
 void RB_DrawSpecialEffects( const void *data ) {
-	const drawSurfsCommand_t *cmd = (const drawSurfsCommand_t *)data;
+	const drawSpecialEffectsCommand_t *cmd = (const drawSpecialEffectsCommand_t *)data;
 
 	backEnd.viewDef = cmd->viewDef;
 	rbRVSpecialCommandView = cmd->viewDef;
 	rbRVSpecialCommandFrame = backEnd.frameCount;
 	rbRVSpecialBlurPrepared = false;
 	rbRVSpecialALPrepared = false;
-	rbRVSpecialActiveMask = tr.specialEffectsEnabled;
-	if ( r_forceSpecialEffects.GetInteger() > 0 ) {
-		rbRVSpecialActiveMask = r_forceSpecialEffects.GetInteger();
-	}
+	rbRVSpecialEffects = cmd->effects;
+	rbRVSpecialActiveMask = rbRVSpecialEffects.enabled;
 
 	if ( backEnd.viewDef == NULL || backEnd.viewDef->renderWorld == NULL || backEnd.viewDef->numDrawSurfs <= 0 ) {
 		return;
@@ -8504,7 +8503,7 @@ void RB_DrawSpecialEffects( const void *data ) {
 			tr.specialBlurDepthRenderTexture->GetWidth(),
 			tr.specialBlurDepthRenderTexture->GetHeight(),
 			false,
-			Max( tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][7], 1.0f ) );
+			Max( rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][7], 1.0f ) );
 	}
 
 	if ( ( rbRVSpecialActiveMask & SPECIAL_EFFECT_AL ) != 0 && RB_EnsureRVSpecialALResources() ) {

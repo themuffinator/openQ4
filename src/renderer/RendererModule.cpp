@@ -235,6 +235,9 @@ static void RM_Services_RendererDeviceEvent( int event ) {
 	R_RendererModule_RendererDeviceEvent( event );
 }
 
+void Usercmd_TakeFrameInputClocks( double &lookSampleClock, double &flashPressClock );
+void Common_RecordFrameInputToSwap( double lookSampleClock, double flashPressClock, double swapClock );
+
 static const renderModuleServices_t rm_services = {
 	RM_Services_Printf,
 	RM_Services_Warning,
@@ -254,6 +257,8 @@ static const renderModuleServices_t rm_services = {
 	RM_Services_GetLightGridLoadPolicy,
 	RM_Services_PublishLightGridLoadReceipt,
 	RM_Services_RendererDeviceEvent,
+	Usercmd_TakeFrameInputClocks,
+	Common_RecordFrameInputToSwap,
 };
 
 /*
@@ -1645,6 +1650,12 @@ bool R_RendererModule_FinishSelectionReload() {
 	rm_selectionReloadPending = false;
 	r_actualRenderApi.SetString("UNINITIALIZED");
 	return true;
+}
+
+void R_RendererModule_SyncConfiguration() {
+	if ( rm_state.interfacesPublished && rm_state.moduleExportValid && rm_state.moduleExport.SyncConfiguration != NULL ) {
+		rm_state.moduleExport.SyncConfiguration();
+	}
 }
 
 bool R_RendererModule_QueryRenderingDevices(renderDeviceCatalog_t& output) {

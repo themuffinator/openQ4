@@ -764,7 +764,7 @@ static int VK_Post_ViewHeight( const viewDef_t *viewDef ) {
 }
 
 static void VK_Post_SynchronizeHDRExposure( const viewDef_t *viewDef, bool sceneLinear = false ) {
-	if ( !VK_Post_IsMainSceneView( viewDef ) || tr.takingScreenshot || viewDef->temporalCaptureFrame ) {
+	if ( !VK_Post_IsMainSceneView( viewDef ) || R_SubmittedTakingScreenshot() || viewDef->temporalCaptureFrame ) {
 		return;
 	}
 	const bool requested = !r_skipPostProcess.GetBool() && r_hdrToneMap.GetBool() && r_hdrAutoExposure.GetBool();
@@ -1895,7 +1895,7 @@ idImage *VK_PostProcess_TemporalMotionVectors( const viewDef_t *viewDef,
 	complete = false;
 	vkTemporalMotionEligible = vkTemporalMotionDrawn = 0;
 	vkTemporalMotionComplete = false;
-	if ( !useHistory || viewDef == NULL || depthImage == NULL || tr.takingScreenshot
+	if ( !useHistory || viewDef == NULL || depthImage == NULL || R_SubmittedTakingScreenshot()
 			|| viewDef->temporalCaptureFrame || !viewDef->temporalPreviousProjectionValid
 			|| generation != vkTemporalMotionGeneration
 			|| generation != R_TemporalPresentation_HistoryGeneration()
@@ -1918,7 +1918,7 @@ idImage *VK_PostProcess_TemporalMotionVectors( const viewDef_t *viewDef,
 
 void VK_PostProcess_CommitTemporalMotion( const viewDef_t *viewDef,
 		int width, int height, unsigned int generation ) {
-	if ( viewDef == NULL || tr.takingScreenshot || viewDef->temporalCaptureFrame
+	if ( viewDef == NULL || R_SubmittedTakingScreenshot() || viewDef->temporalCaptureFrame
 			|| generation != R_TemporalPresentation_HistoryGeneration()
 			|| !VK_Post_BuildMotionViewState( viewDef, vkTemporalMotionViewHistory, width, height ) ) {
 		VK_PostProcess_ResetTemporalMotion();
@@ -2151,7 +2151,7 @@ static float VK_Post_UpdateHDRAutoExposure( const viewDef_t *viewDef, idImage *s
 		return 1.0f;
 	}
 	// Captures use the already adapted exposure and never advance its history.
-	if ( tr.takingScreenshot || viewDef->temporalCaptureFrame || vkHDR.queuedFrame == backEnd.frameCount ) {
+	if ( R_SubmittedTakingScreenshot() || viewDef->temporalCaptureFrame || vkHDR.queuedFrame == backEnd.frameCount ) {
 		return vkHDR.adaptation.exposure;
 	}
 	const bool synchronous = !r_hdrAutoExposureAsync.GetBool();

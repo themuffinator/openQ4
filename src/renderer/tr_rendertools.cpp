@@ -2477,6 +2477,15 @@ RB_ClearDebugText
 ================
 */
 void RB_ClearDebugText( int time ) {
+	if ( rb_numDebugText == 0 && time != 0 ) {
+		rb_debugTextTime = time;
+		return;
+	}
+	// Even a time-zero clear can release retained strings without waiting when
+	// there is no active text: the backend returns before reading the array.
+	if ( rb_numDebugText != 0 ) {
+		R_RenderThread_Sync( "debug text" );
+	}
 	int			i;
 	int			num;
 	debugText_t	*text;
@@ -2513,6 +2522,7 @@ RB_AddDebugText
 ================
 */
 void RB_AddDebugText( const char *text, const idVec3 &origin, float scale, const idVec4 &color, const idMat3 &viewAxis, const int align, const int lifetime, const bool depthTest ) {
+	R_RenderThread_Sync( "debug text" );
 	debugText_t *debugText;
 
 	if ( rb_numDebugText < MAX_DEBUG_TEXT ) {
@@ -2708,6 +2718,13 @@ RB_ClearDebugLines
 ================
 */
 void RB_ClearDebugLines( int time ) {
+	// Empty lists are common during ordinary gameplay. Only the main-thread
+	// lifetime clock changes; do not turn every game tic into an early sync.
+	if ( rb_numDebugLines == 0 ) {
+		rb_debugLineTime = time;
+		return;
+	}
+	R_RenderThread_Sync( "debug lines" );
 	int			i;
 	int			num;
 	debugLine_t	*line;
@@ -2739,6 +2756,7 @@ RB_AddDebugLine
 ================
 */
 void RB_AddDebugLine( const idVec4 &color, const idVec3 &start, const idVec3 &end, const int lifeTime, const bool depthTest ) {
+	R_RenderThread_Sync( "debug lines" );
 	debugLine_t *line;
 
 	if ( rb_numDebugLines < MAX_DEBUG_LINES ) {
@@ -2824,6 +2842,11 @@ RB_ClearDebugPolygons
 ================
 */
 void RB_ClearDebugPolygons( int time ) {
+	if ( rb_numDebugPolygons == 0 ) {
+		rb_debugPolygonTime = time;
+		return;
+	}
+	R_RenderThread_Sync( "debug polygons" );
 	int				i;
 	int				num;
 	debugPolygon_t	*poly;
@@ -2856,6 +2879,7 @@ RB_AddDebugPolygon
 ================
 */
 void RB_AddDebugPolygon( const idVec4 &color, const idWinding &winding, const int lifeTime, const bool depthTest ) {
+	R_RenderThread_Sync( "debug polygons" );
 	debugPolygon_t *poly;
 
 	if ( rb_numDebugPolygons < MAX_DEBUG_POLYGONS ) {

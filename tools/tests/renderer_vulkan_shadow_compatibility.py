@@ -4420,7 +4420,7 @@ def validate_exact_static_cache_and_admission_contract() -> None:
             "entry.tileSize == tileSize",
             "entry.image != VK_NULL_HANDLE",
             "entry.layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL",
-            "entry.lastUsedFrame = tr.frameCount;",
+            "entry.lastUsedFrame = backEnd.frameCount;",
             "entry.reserved = true;",
             "return i;",
         ),
@@ -4444,7 +4444,7 @@ def validate_exact_static_cache_and_admission_contract() -> None:
             "entry.cube.image != VK_NULL_HANDLE",
             """entry.cube.layout
                 == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL""",
-            "entry.lastUsedFrame = tr.frameCount;",
+            "entry.lastUsedFrame = backEnd.frameCount;",
             "entry.reserved = true;",
             "return i;",
         ),
@@ -4558,11 +4558,11 @@ def validate_exact_static_cache_and_admission_contract() -> None:
             "projected.reserved = false;",
             "i >= projectedLimit",
             "projected.generation != tr.videoRestartCount",
-            "tr.frameCount - projected.lastUsedFrame",
+            "backEnd.frameCount - projected.lastUsedFrame",
             "point.reserved = false;",
             "i >= pointLimit",
             "point.generation != tr.videoRestartCount",
-            "tr.frameCount - point.lastUsedFrame",
+            "backEnd.frameCount - point.lastUsedFrame",
         ),
         "map/generation/residency cache invalidation",
     )
@@ -5734,7 +5734,7 @@ def validate_dynamic_caster_composition_contract() -> None:
     require_compact(
         cacheable,
         """if ( pointLight
-                && tr.frameCount - history->lastDynamicFrame
+                && backEnd.frameCount - history->lastDynamicFrame
                     < Max( 0,
                             r_shadowMapStaticHysteresisFrames.GetInteger() ) ) {""",
         "static hysteresis applies only to the baked point path",
@@ -6187,7 +6187,7 @@ def validate_update_admission_contract() -> None:
         "static const vkShadowLightHistory_t *VK_ShadowMap_FindLightHistoryConst(",
         "pure light-history lookup",
     )
-    for mutating in ("oldest", "= tr.frameCount", "history.valid = true"):
+    for mutating in ("oldest", "= backEnd.frameCount", "history.valid = true"):
         if mutating in history_const:
             raise AssertionError(
                 "The const history lookup must never claim or evict a slot"
@@ -6210,7 +6210,7 @@ def validate_update_admission_contract() -> None:
         "static void VK_ShadowMap_FinalizeCachePasses(",
         "resident entry publication",
     )
-    if finalize.count("lastUpdatedFrame = tr.frameCount;") != 2:
+    if finalize.count("lastUpdatedFrame = backEnd.frameCount;") != 2:
         raise AssertionError(
             "Both resident classes must stamp their content-write frame on publication"
         )
@@ -6402,7 +6402,7 @@ def validate_shadow_gpu_timing_contract() -> None:
     # would hang, so it is only ever carried.
     require_compact(
         begin_view,
-        """if ( span.frameNumber >= tr.frameCount ) {
+        """if ( span.frameNumber >= backEnd.frameCount ) {
             vkShadowTimingReport.pending++;
             continue;
         }""",
@@ -6423,7 +6423,7 @@ def validate_shadow_gpu_timing_contract() -> None:
     require_compact(
         begin_view,
         """if ( !span.open
-                || tr.frameCount - span.frameNumber
+                || backEnd.frameCount - span.frameNumber
                     > VK_FRAMES_IN_FLIGHT ) {""",
         "an unclosed span is reclaimed instead of leaking its queries",
     )
@@ -6611,7 +6611,7 @@ def validate_shadow_debug_overlay_contract() -> None:
     require_order(
         prepare,
         ("vkShadow.numLights = 0;", "vkShadow.preparedView = viewDef;",
-         "vkShadow.preparedFrame = tr.frameCount;"),
+         "vkShadow.preparedFrame = backEnd.frameCount;"),
         "preparation stamps the view that owns the table",
     )
     release = braced_body(
@@ -6634,7 +6634,7 @@ def validate_shadow_debug_overlay_contract() -> None:
         "the overlay refuses a light table another view prepared",
     )
     identity = braced_body(shadow_map, "static bool VK_ShadowMap_ViewPrepared(", "frame-arena ownership")
-    require_compact(identity, "return viewDef != NULL && vkShadow.preparedView == viewDef && vkShadow.preparedFrame == tr.frameCount;",
+    require_compact(identity, "return viewDef != NULL && vkShadow.preparedView == viewDef && vkShadow.preparedFrame == backEnd.frameCount;",
                     "reused frame-arena addresses cannot revive old light records")
     require(
         overlay,

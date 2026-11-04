@@ -515,6 +515,7 @@ const char *RendererMaterialClass_Name( rendererMaterialClass_t materialClass );
 const char *GeometryResourceFallbackReason_Name( geometryResourceFallbackReason_t reason );
 void R_ScenePackets_BeginFrame( void );
 void R_ScenePackets_EndFrame( void );
+void R_ScenePackets_SealFrame( void );
 bool R_ScenePackets_FrontEndCaptureRequired( void );
 bool R_ScenePackets_SidePipelineRequired( void );
 void R_ScenePackets_AddRenderView( const viewDef_t *viewDef );

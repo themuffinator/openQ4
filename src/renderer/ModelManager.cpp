@@ -665,6 +665,7 @@ idRenderModelManagerLocal::FreeModelVertexCaches
 =================
 */
 void idRenderModelManagerLocal::FreeModelVertexCaches() {
+	R_RenderThread_Sync( "model caches" );
 	for ( int i = 0 ; i < models.Num() ; i++ ) {
 		idRenderModel *model = models[i];
 		model->FreeVertexCache();

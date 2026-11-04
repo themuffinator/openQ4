@@ -70,7 +70,11 @@ static void Session_OpenAndroidSetup() {
 }
 
 extern idCVar com_skipLogoVideos;
+#ifdef OPENQ4_RENDERER_VK_MODULE
+extern thread_local glconfig_t glConfig;
+#else
 extern glconfig_t glConfig;
+#endif
 
 idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_ROM | CVAR_INTEGER, "" );
 idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 28 );

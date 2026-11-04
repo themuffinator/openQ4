@@ -688,6 +688,7 @@ idImageUploadErrorScope::~idImageUploadErrorScope() {
 
 void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	if ( !R_ImagePolicyOperationAllowed() ) return;
+	R_RenderThread_Sync( "image content" );
 	if ( !R_ImagePolicyContentMutation() ) return;
 
 
@@ -2144,6 +2145,7 @@ idImage::SetSamplerState
 ========================
 */
 void idImage::SetSamplerState( textureFilter_t tf, textureRepeat_t tr ) {
+	R_RenderThread_Sync( "image content" );
 	if ( tf == filter && tr == repeat ) {
 		return;
 	}

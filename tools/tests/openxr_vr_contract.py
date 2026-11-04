@@ -68,9 +68,11 @@ def check_build() -> None:
 
 def check_abi() -> None:
     api = read("src/renderer/RenderModuleAPI.h")
-    require(api, "#define RENDER_API_VERSION\t\t\t29", "renderer module ABI v29")
-    require(api, "void\t\t\t( *RendererDeviceEvent )( int event );\t// renderDeviceEvent_t\n} renderModuleServices_t;",
-            "the device lifetime service is the last services slot")
+    require(api, "#define RENDER_API_VERSION\t\t\t31", "renderer module ABI v31")
+    require(api, "void\t\t\t( *RendererDeviceEvent )( int event );\t// renderDeviceEvent_t",
+            "the device lifetime service retains its signature")
+    if api.index("( *RendererDeviceEvent )") > api.index("( *TakeFrameInputClocks )"):
+        raise AssertionError("frame timing services must append after the device lifetime service")
 
     render_system = read("src/renderer/RenderSystem.h")
     anchor = "virtual void ResetRetainedFontCache() = 0;"

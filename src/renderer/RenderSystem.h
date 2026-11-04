@@ -145,7 +145,11 @@ typedef struct glconfig_s {
 // outside of TR since it shouldn't be cleared during ref re-init; the window
 // layer and GUI code read (and, until the renderer-module window seam lands,
 // write) the vid/viewport fields through this public declaration
+#ifdef OPENQ4_RENDERER_VK_MODULE
+extern thread_local glconfig_t glConfig;
+#else
 extern glconfig_t glConfig;
+#endif
 
 typedef bool (*renderPortalSkyCaptureViewCallback_t)( const struct renderView_s *sourceView, struct renderView_s *portalSkyView );
 

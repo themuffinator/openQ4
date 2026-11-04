@@ -146,6 +146,7 @@ void R_ClassicDeformDomain_BeginDrawSurf( drawSurf_s *drawSurf );
 void R_ClassicDeformDomain_EndDrawSurf( drawSurf_s *drawSurf );
 
 std::uint64_t R_ClassicDeformDomain_CurrentFrameToken( void );
+std::uint64_t R_ClassicDeformDomain_BackEndFrameToken( void );
 void R_ClassicDeformDomain_SnapshotDrawSurf( const drawSurf_s *drawSurf,
 	classicDeformRole_t role, std::uint64_t frameToken,
 	classicDeformRecord_t &record );
@@ -161,7 +162,7 @@ bool R_ClassicDeformDomain_ValidateRecordForFrame(
 bool R_ClassicDeformDomain_RecordFreshForFrame(
 	const classicDeformRecord_t &record, std::uint64_t frameToken );
 bool R_ClassicDeformDomain_RecordMatchesDrawSurf(
-	const classicDeformRecord_t &record, const drawSurf_s *drawSurf );
+	const classicDeformRecord_t &record, const drawSurf_s *drawSurf, std::uint64_t frameToken );
 bool R_ClassicDeformDomain_SameProvenance(
 	const classicDeformRecord_t &a, const classicDeformRecord_t &b );
 bool R_ClassicDeformDomain_HasCompletedOutput(
@@ -187,3 +188,5 @@ const char *ClassicDeformCacheLifetime_Name(
 bool RendererClassicDeformDomain_RunSelfTest( void );
 
 #endif /* !__CLASSIC_DEFORM_DOMAIN_H__ */
+
+void R_ClassicDeformDomain_RebaseFrameCopy( classicDeformRecord_t &record, const srfTriangles_s *source, const srfTriangles_s *result );

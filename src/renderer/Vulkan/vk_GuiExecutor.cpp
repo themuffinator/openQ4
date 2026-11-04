@@ -591,6 +591,7 @@ typedef struct vkGuiExecutor_s {
 	unsigned long long temporalHistoryStorageGenerations[ 2 ];
 	const viewDef_t *	pendingSpecialEffectsView;
 	int					pendingSpecialEffectsMask;
+	specialEffectsState_t pendingSpecialEffects;
 	idRenderTexture *	pendingSpecialEffectsSource;
 	bool				pendingSpecialEffectsNeedsResolve;
 
@@ -4263,7 +4264,7 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	}
 	// The slot fence above is the sole retirement wait. Timestamp results are
 	// polled here without VK_QUERY_RESULT_WAIT_BIT before this slot is reset.
-	VK_GpuFrameTiming_BeginFrame( cmd, slot, tr.frameCount );
+	VK_GpuFrameTiming_BeginFrame( cmd, slot, backEnd.frameCount );
 
 	VkImageMemoryBarrier2 toAttachment[ 2 ];
 	memset( toAttachment, 0, sizeof( toAttachment ) );
@@ -4876,7 +4877,7 @@ static const viewDef_t *VK_TemporalPresentation_RootForView(
 	}
 
 	if ( ( viewDef->renderFlags & RF_PORTAL_SKY ) != 0 ) {
-		const viewDef_t *rootView = tr.primaryView;
+		const viewDef_t *rootView = R_SubmittedPrimaryView();
 		return rootView != viewDef
 			&& VK_TemporalPresentation_IsMainSceneView( rootView )
 			&& VK_TemporalPresentation_ViewMatchesRoot( viewDef, rootView )
@@ -5235,7 +5236,7 @@ static void VK_TemporalPresentation_ObserveHistoryAndCapture( void ) {
 		vkExec.temporalDirectHistoryFrame = -1;
 		vkExec.temporalDepthStampValid = false;
 	}
-	if ( tr.takingScreenshot
+	if ( R_SubmittedTakingScreenshot()
 			&& vkExec.temporalCaptureInvalidatedFrame != backEnd.frameCount ) {
 		R_TemporalPresentation_MarkCurrentFrameCapture(
 			"Vulkan execution-time capture" );
@@ -5537,7 +5538,7 @@ static bool VK_TemporalPresentation_ResolvePendingSceneTemporal(
 		const viewDef_t *viewDef ) {
 	const temporalPresentationFrameState_t &presentation =
 		R_TemporalPresentation_GetFrameState();
-	const bool captureFrame = tr.takingScreenshot
+	const bool captureFrame = R_SubmittedTakingScreenshot()
 		|| presentation.captureFrozen || presentation.captureForcedNative
 		|| ( viewDef != NULL && viewDef->temporalCaptureFrame );
 	if ( viewDef == NULL || !presentation.temporalAARequested || captureFrame ) {
@@ -6558,7 +6559,7 @@ typedef struct vkStencilReadback_s {
 	int				mode;		// vkStencilReadbackMode_t; 0 when nothing is pending
 	// What was read, printed with the result a frame or two later so it is
 	// never mistaken for the frame on screen when it prints.
-	int				frameCount;	// tr.frameCount of the recorded frame
+	int				frameCount;	// backEnd.frameCount of the recorded frame
 	int				viewID;
 	bool			subview;
 	bool			renderTarget;	// a render texture or cube face, not the frame's main target
@@ -6599,7 +6600,7 @@ static void VK_Exec_PrintStencilReadbacks( int slot ) {
 			continue;
 		}
 		vmaInvalidateAllocation( vkCtx.allocator, readback.allocation, 0, VK_WHOLE_SIZE );
-		const int age = tr.frameCount - readback.frameCount;
+		const int age = backEnd.frameCount - readback.frameCount;
 		common->Printf( "Vulkan stencil readback: frame %d (%d frame%s ago), view %d%s, %dx%d %s\n",
 				readback.frameCount, age, age == 1 ? "" : "s", readback.viewID,
 				readback.subview ? " (subview)" : "", readback.width, readback.height,
@@ -6779,7 +6780,7 @@ bool VK_Exec_QueueStencilReadback( int mode, const char **failure ) {
 		readback->width = (int)width;
 		readback->height = (int)height;
 		readback->mode = mode;
-		readback->frameCount = tr.frameCount;
+		readback->frameCount = backEnd.frameCount;
 		readback->viewID = backEnd.viewDef != NULL ? backEnd.viewDef->renderView.viewID : 0;
 		readback->subview = backEnd.viewDef != NULL && backEnd.viewDef->isSubview;
 		readback->renderTarget = depthEntry != NULL;
@@ -7321,12 +7322,12 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 	const int submittedSlot = vkExec.frameSlot;
 	// CaptureRenderToFile deliberately calls R_IssueRenderCommands with
-	// tr.takingScreenshot set so the GL backend leaves this crop in the back
+	// R_SubmittedTakingScreenshot() set so the GL backend leaves this crop in the back
 	// buffer for the real frame to replace. Presenting here exposes the
 	// save-preview crop (normally 320x240) for one frame. Submit it only for
 	// the synchronous readback, then resume recording against this acquired
 	// swapchain image for the actual frame.
-	const bool resumeAfterReadback = tr.takingScreenshot;
+	const bool resumeAfterReadback = R_SubmittedTakingScreenshot();
 	R_RendererMetrics_ResetGpuFrameTiming( "Vulkan synchronous screenshot readback" );
 	if ( !VK_GuiExecutor_SubmitFrame( !resumeAfterReadback ) ) {
 		// Submit may have succeeded before present failed; device loss also
@@ -7400,7 +7401,7 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 		vkExec.displayColorMapped = false;
 		// The screenshot path explicitly retired this same slot; start a fresh
 		// timing epoch for the real frame recorded after the crop.
-		VK_GpuFrameTiming_BeginFrame( vkExec.cmd, submittedSlot, tr.frameCount );
+		VK_GpuFrameTiming_BeginFrame( vkExec.cmd, submittedSlot, backEnd.frameCount );
 		VK_Exec_BeginMainRendering( true );
 	}
 	return true;
@@ -9413,7 +9414,7 @@ static void VK_TemporalPresentation_InvalidateAcceptedNoWrite(
 	// is a successful current-frame resolve, not a temporal discontinuity; do
 	// not churn the shared history generation once per frame while a leaf is on.
 	if ( !command.presentation.temporalAARequested
-			|| command.captureFrame || tr.takingScreenshot
+			|| command.captureFrame || R_SubmittedTakingScreenshot()
 			|| command.historyGeneration
 				!= R_TemporalPresentation_HistoryGeneration() ) {
 		return;
@@ -9430,7 +9431,7 @@ static bool VK_TemporalPresentation_ResolveTargets(
 		*historyAdvanced = false;
 	}
 	resolveTemporalPresentationCommand_t command = sourceCommand;
-	if ( tr.takingScreenshot ) {
+	if ( R_SubmittedTakingScreenshot() ) {
 		command.captureFrame = true;
 		command.historyValid = false;
 	}
@@ -10835,15 +10836,12 @@ Vulkan keeps the view pointer and consumes it from the matching world walk,
 after the scene color and depth are complete and before any later HUD view.
 ====================
 */
-void VK_GuiExecutor_PrepareSpecialEffects( const viewDef_t *viewDef ) {
-	int activeMask = tr.specialEffectsEnabled;
-	if ( r_forceSpecialEffects.GetInteger() > 0 ) {
-		activeMask = r_forceSpecialEffects.GetInteger();
-	}
-	activeMask &= SPECIAL_EFFECT_BLUR | SPECIAL_EFFECT_AL;
+void VK_GuiExecutor_PrepareSpecialEffects( const drawSpecialEffectsCommand_t *cmd ) {
+	vkExec.pendingSpecialEffects = cmd->effects;
+	const int activeMask = cmd->effects.enabled;
 
 	vkExec.pendingSpecialEffectsView =
-			activeMask != 0 ? viewDef : NULL;
+			activeMask != 0 ? cmd->viewDef : NULL;
 	vkExec.pendingSpecialEffectsMask = activeMask;
 	vkExec.pendingSpecialEffectsSource = NULL;
 	vkExec.pendingSpecialEffectsNeedsResolve = false;
@@ -10957,7 +10955,7 @@ static bool VK_Exec_DrawRVSpecialBlur( const viewDef_t *viewDef ) {
 	const int sourceWidth = Max( 1, sceneImage->GetUploadWidth() );
 	const int sourceHeight = Max( 1, sceneImage->GetUploadHeight() );
 	const float distanceScale =
-			Max( tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][ 7 ], 1.0f );
+			Max( vkExec.pendingSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][ 7 ], 1.0f );
 	float parms[ 16 ][ 4 ];
 	memset( parms, 0, sizeof( parms ) );
 	parms[ 0 ][ 0 ] = 1.0f / (float)sourceWidth;
@@ -10966,18 +10964,18 @@ static bool VK_Exec_DrawRVSpecialBlur( const viewDef_t *viewDef ) {
 	// 256x256 depth texture. The native pass consumes view-space distance,
 	// so translate the authored controller values at this boundary.
 	parms[ 1 ][ 0 ] = Max(
-			tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][ 4 ]
+			vkExec.pendingSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][ 4 ]
 					* distanceScale * 0.125f,
 			1.0f );
 	parms[ 2 ][ 0 ] = idMath::ClampFloat( 0.0f, 1.0f,
-			tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][ 5 ] )
+			vkExec.pendingSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][ 5 ] )
 					* distanceScale;
 	for ( int i = 0; i < 4; i++ ) {
 		parms[ 3 ][ i ] =
-				tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][ i ];
+				vkExec.pendingSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][ i ];
 	}
 	parms[ 4 ][ 0 ] = idMath::ClampFloat( 0.0f, 1.0f,
-			tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][ 6 ] );
+			vkExec.pendingSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][ 6 ] );
 	parms[ 5 ][ 0 ] = VK_RVSPECIAL_DEPTH_ZNEAR;
 
 	const int uniformOffset =
@@ -15076,6 +15074,7 @@ void R_BackendGpuSkinning_Shutdown( void ) {
 bool R_BackendGpuSkinning_PrepareAmbientCache( srfTriangles_t *tri,
 		bool needsLighting ) {
 	(void)needsLighting;
+	if ( R_RenderThread_OverlapRequested() ) return false;
 	if ( !vkExec.initialized ) {
 		return false;
 	}

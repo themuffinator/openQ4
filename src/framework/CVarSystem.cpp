@@ -35,6 +35,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "CVarCompletionSnapshot.h"
 #include "CVarDefaults.h"
 #include "CVarAssignmentCapture.h"
+#ifndef ID_DEDICATED
+#include "../renderer/RendererModule.h"
+#endif
 
 idCVar * idCVar::staticVars = NULL;
 
@@ -428,6 +431,9 @@ void idInternalCVar::Set( const char *newValue, bool force, bool fromServer ) {
 	}
 
 	if (nameString.Icmp("com_asyncInput") == 0) openq4::NativeInputBeforeInputBlockerChange();
+#ifndef ID_DEDICATED
+	if ( flags & CVAR_RENDERER ) R_RendererModule_SyncConfiguration();
+#endif
 	CVar_AssignString( valueString, newValue, ( flags & CVAR_PRIVATE ) != 0 );
 	value = valueString.c_str();
 	UpdateValue();
@@ -442,6 +448,9 @@ idInternalCVar::Reset
 ============
 */
 void idInternalCVar::Reset( void ) {
+#ifndef ID_DEDICATED
+	if ( ( flags & CVAR_RENDERER ) && valueString.Cmp( resetString.c_str() ) != 0 ) R_RendererModule_SyncConfiguration();
+#endif
 	if (nameString.Icmp("com_asyncInput") == 0 && valueString.Cmp(resetString.c_str()) != 0)
 		openq4::NativeInputBeforeInputBlockerChange();
 	CVar_AssignString( valueString, resetString.c_str(), ( flags & CVAR_PRIVATE ) != 0 );

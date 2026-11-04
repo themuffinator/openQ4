@@ -2114,6 +2114,9 @@ dump all the interactions
 =================
 */
 void idRenderWorldLocal::FreeDefs() {
+	// FreeDefs also runs directly during map shutdown. Drain queued updates
+	// before clearing the handle tables; queued frees cannot own erased slots.
+	R_RenderThread_Sync( "world defs" );
 	int		i;
 
 	generateAllInteractionsCalled = false;

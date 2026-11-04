@@ -154,7 +154,7 @@ static void RB_LogComment(const char*){}
 static void RB_ApplyCRTToBackBuffer(){calls.push_back("crt");}
 static void RB_ApplyColorMappingsToBackBuffer(){calls.push_back("color");}
 static void RB_ForceOpaquePresentAlpha(){calls.push_back("alpha");}
-static void GLimp_SwapBuffers(){calls.push_back("present");}
+static void R_SwapBuffersWithInputTiming(){calls.push_back("present");}
 '''
 
 MAIN = r'''

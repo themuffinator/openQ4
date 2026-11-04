@@ -245,7 +245,7 @@ def main() -> int:
         require(public_header, token, "public renderer module ABI")
 
     module_api = read(RENDERER / "RenderModuleAPI.h")
-    require(module_api, "#define RENDER_API_VERSION\t\t\t29", "renderer module ABI v29")
+    require(module_api, "#define RENDER_API_VERSION\t\t\t31", "renderer module ABI v31")
 
     core = read(RENDERER / "GpuFrameTimingCore.h")
     require(core, "elapsedMicroseconds == 0", "zero-duration rejection")
@@ -384,7 +384,7 @@ def main() -> int:
     require(vk_timing, "slot.pipelineComplete && vkGpuPipelineQueryPool != VK_NULL_HANDLE", "completed pipeline query read")
     require(vk_timing, "projectedPipelineValid", "explicit validity for optional pipeline counters")
     wait_at = vk_gui.find("const VkResult frameFenceResult = vkWaitForFences")
-    resolve_at = vk_gui.find("VK_GpuFrameTiming_BeginFrame( cmd, slot, tr.frameCount )")
+    resolve_at = vk_gui.find("VK_GpuFrameTiming_BeginFrame( cmd, slot, backEnd.frameCount )")
     if wait_at < 0 or resolve_at < 0 or wait_at >= resolve_at:
         raise AssertionError("Vulkan timestamps must resolve only after the slot fence retires")
     require(vk_gui, "readbackFenceResult != VK_SUCCESS", "screenshot-fence result check")

@@ -261,7 +261,11 @@ static bool R_CanUseGLSLPrograms() {
 	return true;
 }
 
+#ifdef OPENQ4_RENDERER_VK_MODULE
+thread_local glconfig_t glConfig;
+#else
 glconfig_t	glConfig;
+#endif
 
 const char *r_rendererArgs[] = { "best", "arb2", "modern", "glesd3", "arb", "Cg", "exp", "nv10", "nv20", "r200", NULL };
 const char *r_glTierArgs[] = { "auto", "legacy", "gl33", "gl41", "gl43", "gl45", "gl46", NULL };
@@ -5693,6 +5697,7 @@ static void R_PerformFullVidRestart( bool forceWindow ) {
 }
 
 static bool R_TryFullVidRestartInternal( const renderWindowRequest_t *request, bool forceWindow, char *error, int errorSize ) {
+	R_RenderThread_Sync( "display restart" );
 	if ( error != NULL && errorSize > 0 ) error[0] = '\0';
 	if ( r_recoverableRendererRestart ) return R_RendererRestartError( error, errorSize, "A renderer restart is already in progress" );
 	if ( globalImages == NULL || renderModelManager == NULL || ( !glConfig.isInitialized && !r_recoverableRendererRestore ) )
@@ -5834,6 +5839,7 @@ static GLenum R_ClearPendingGLErrors( void ) {
 }
 
 void R_VidRestart_f( const idCmdArgs &args ) {
+	R_RenderThread_Sync( "vid_restart" );
 	int	err;
 
 	// if OpenGL isn't started, do nothing
@@ -6281,6 +6287,7 @@ void idRenderSystemLocal::Clear( void ) {
 	memset( &pc, 0, sizeof( pc ) );
 	memset( &renderThreadFrameCounters, 0, sizeof( renderThreadFrameCounters ) );
 	renderThreadFrameCountersValid = false;
+	frameLookSampleClock = frameFlashPressClock = frameSwapClock = 0.0;
 	memset( &lockSurfacesCmd, 0, sizeof( lockSurfacesCmd ) );
 	memset( &identitySpace, 0, sizeof( identitySpace ) );
 	logFile = NULL;

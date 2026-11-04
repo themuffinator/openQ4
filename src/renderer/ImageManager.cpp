@@ -916,9 +916,15 @@ Allocates an idImage, adds it to the list,
 copies the name, and adds it to the hash chain.
 ==============
 */
+// Name-only lookups may overlap backend scratch-image creation. Mutating
+// callers join before taking this lock, so no waiter can hold it against the
+// worker it is collecting.
+static std::mutex imageRegistryMutex;
+
 idImage *idImageManager::AllocImage( const char *name ) {
 	// the image list and hash are read by a frame on the render thread
 	R_RenderThread_Sync( "image" );
+	std::lock_guard<std::mutex> registryLock( imageRegistryMutex );
 	if (strlen(name) >= MAX_IMAGE_NAME ) {
 		common->Error ("idImageManager::AllocImage: \"%s\" is too long\n", name);
 	}
@@ -960,6 +966,7 @@ system to be completely regenerated if needed.
 ==================
 */
 idImage *idImageManager::ImageFromFunction( const char *_name, void (*generatorFunction)( idImage *image ) ) {
+	R_RenderThread_Sync( "image registry" );
 
 	// strip any .tga file extensions from anywhere in the _name
 	idStr name = _name;
@@ -998,6 +1005,7 @@ GetImageWithParameters
 ==============
 */
 idImage	*idImageManager::GetImageWithParameters( const char *_name, textureFilter_t filter, textureRepeat_t repeat, textureUsage_t usage, cubeFiles_t cubeMap, bool allowDownSize, unsigned int flags ) const {
+	R_RenderThread_Sync( "image registry" );
 	if ( !_name || !_name[0] || idStr::Icmp( _name, "default" ) == 0 || idStr::Icmp( _name, "_default" ) == 0 ) {
 		declManager->MediaPrint( "DEFAULTED\n" );
 		return globalImages->defaultImage;
@@ -1044,6 +1052,7 @@ Loading of the image may be deferred for dynamic loading.
 */
 idImage	*idImageManager::ImageFromFile( const char *_name, textureFilter_t filter, 
 						 textureRepeat_t repeat, textureUsage_t usage, cubeFiles_t cubeMap, bool allowDownSize, unsigned int flags ) {
+	R_RenderThread_Sync( "image registry" );
 
 	if ( !_name || !_name[0] || idStr::Icmp( _name, "default" ) == 0 || idStr::Icmp( _name, "_default" ) == 0 ) {
 		declManager->MediaPrint( "DEFAULTED\n" );
@@ -1140,6 +1149,7 @@ The texture can then be streamed in lazily on first bind.
 */
 idImage *idImageManager::ImageHandleDeferred( const char *_name, textureFilter_t filter,
 						 textureRepeat_t repeat, textureUsage_t usage, cubeFiles_t cubeMap, bool allowDownSize, unsigned int flags ) {
+	R_RenderThread_Sync( "image registry" );
 
 	if ( !_name || !_name[0] || idStr::Icmp( _name, "default" ) == 0 || idStr::Icmp( _name, "_default" ) == 0 ) {
 		declManager->MediaPrint( "DEFAULTED\n" );
@@ -1192,6 +1202,7 @@ idImageManager::ScratchImage
 ========================
 */
 idImage * idImageManager::ScratchImage( const char *_name, idImageOpts *imgOpts, textureFilter_t filter, textureRepeat_t repeat, textureUsage_t usage ) {
+	R_RenderThread_Sync( "image registry" );
 	if ( !_name || !_name[0] ) {
 		idLib::FatalError( "idImageManager::ScratchImage called with empty name" );
 	}
@@ -1251,6 +1262,7 @@ idImageManager::GetImage
 ===============
 */
 idImage *idImageManager::GetImage( const char *_name ) const {
+	std::lock_guard<std::mutex> registryLock( imageRegistryMutex );
 
 	if ( !_name || !_name[0] || idStr::Icmp( _name, "default" ) == 0 || idStr::Icmp( _name, "_default" ) == 0 ) {
 		declManager->MediaPrint( "DEFAULTED\n" );
@@ -1283,6 +1295,7 @@ PurgeAllImages
 ===============
 */
 void idImageManager::PurgeAllImages() {
+	R_RenderThread_Sync( "image registry" );
 	int		i;
 	idImage	*image;
 
@@ -1300,6 +1313,7 @@ ReloadImages
 */
 void idImageManager::ReloadImages( bool all, bool fileBackedOnly ) {
 	if ( !R_ImagePolicyOperationAllowed() ) return;
+	R_RenderThread_Sync( "image registry" );
 	// a reload exists to observe files dropped since the last level load;
 	// never let it consult (or leave behind) memoized probe results
 	R_SetDDSProbeCacheActive( false );
@@ -1509,6 +1523,7 @@ Frees all images used by the previous level
 */
 void idImageManager::BeginLevelLoad() {
 	R_ImagePolicyLifecycleChanged();
+	R_RenderThread_Sync( "image registry" );
 	insideLevelLoad = true;
 
 	// search paths are stable for the whole load, so DDS replacement probes
@@ -1563,6 +1578,7 @@ idImageManager::LoadLevelImages
 ===============
 */
 int idImageManager::LoadLevelImages( bool pacifier ) {
+	R_RenderThread_Sync( "image registry" );
 	idList<sortedImage_t> pendingImages;
 	pendingImages.SetNum( CountPendingLevelLoads() );
 	const bool profileLevelLoad = cvarSystem->GetCVarBool( "com_showLevelLoadTimes" );
@@ -1671,6 +1687,7 @@ idImageManager::CountPendingLevelLoads
 ===============
 */
 int idImageManager::CountPendingLevelLoads() const {
+	R_RenderThread_Sync( "image registry" );
 	int pendingCount = 0;
 
 	for ( int i = 0; i < images.Num(); i++ ) {
@@ -1728,6 +1745,7 @@ idImageManager::PrintMemInfo
 ===============
 */
 void idImageManager::PrintMemInfo( MemInfo_t *mi ) {
+	R_RenderThread_Sync( "image registry" );
 	int i, j, total = 0;
 	int *sortIndex;
 	idFile *f;

@@ -303,6 +303,89 @@ See [player release status](../user/release-status.md).
   changes do not close those gates.
 - Evidence: [audio cancellation and loading measurements](audio-voice-evidence.md#decode-cancellation-and-loading-measurements-3-november-2026).
 
+## Experimental Vulkan front-end overlap, 4 November 2026
+
+- **Full-overlap mode can reuse unchanged index data across frames.** It keeps
+  owned copies alive until drawing finishes and refreshes them when contents
+  change. Performance qualification remains required before recommending mode 2.
+
+- **The experimental full-overlap mode avoids repeated copies of shared
+  geometry within a view.** Each submitted view keeps its own data, including
+  when a later view rebuilds the same source memory. This reduces copy volume;
+  a quiet performance comparison is still required before recommending mode 2.
+- **Vulkan can prepare the next frame while drawing the previous one.**
+  Developers and testers can opt in with `r_vkRenderThread 2`; mode `1` keeps
+  the earlier game-tic overlap and mode `0` remains the default. Performance
+  qualification is pending, and copying submitted geometry adds CPU and memory
+  cost. This is not yet a recommendation to change players' settings.
+- Submitted geometry, entities, lights and temporal state retain their own
+  storage until completion. Renderer setting changes, resource reloads,
+  screenshots and teardown wait for their current readers.
+- **Upgrade note:** rebuild and install the engine and renderer modules
+  together (renderer API **31**). Saves, network timestamps and the 60 Hz
+  simulation remain unchanged.
+- Validation covers concurrent frame arenas, geometry/cache ownership,
+  shutdown, setting changes and worker errors, plus windowed Vulkan SP,
+  MP host/client and OpenGL SP gameplay with GPU skinning, TAA, motion blur,
+  scaling, shader reload and Vulkan surface recovery/restart. See
+  [overlap evidence](presentation-owners.md#full-front-end-overlap-4-november-2026).
+- Quiet mode 0/1/2 comparisons, the native-resolution Quality budget, physical
+  display/input qualification and Linux/macOS runtime coverage remain open in
+  HF-07/HF-08 and REN-07. These are unreleased source changes.
+  The new repeatable [mode comparison and snapshot accounting](presentation-owners.md#mode-comparisons-and-snapshot-reuse-4-november-2026)
+  records shared-machine evidence without claiming those qualification gates.
+
+## High-refresh frame ownership, 4 November 2026
+
+- **Blur and other controller-driven effects keep the settings of the frame
+  being drawn.** The experimental Vulkan render thread no longer waits merely
+  because the next game tic changes an effect setting. OpenGL consumes the same
+  command snapshots, including forced-effect settings.
+- **Rendering diagnostics and shadow caches keep the submitted frame's
+  identity.** Advancing the front end cannot prematurely age Vulkan timing
+  queries or invalidate a submitted classic deformation record.
+- **Vulkan recording failures return to the main thread safely.** Fatal shadow
+  invariants retain their severity after frame retirement instead of starting
+  renderer teardown on the worker.
+- Validation includes eleven focused native/Meson checks and production-method
+  coverage for queued effect changes, submitted-frame query ages and failure
+  severity. Windowed Vulkan SP/MP host/client and OpenGL SP gameplay passed,
+  including effect toggles, eight classic-domain self-tests per role and engine
+  screenshot review. See [submission evidence](presentation-owners.md#submitted-frame-ownership-4-november-2026).
+- `r_vkRenderThread` and `in_presentationView` remain opt-in. Overlap performance,
+  the Quality every-frame budget and physical display/latency qualification
+  remain open under HF-07/HF-08 and REN-07. These are unreleased source changes.
+
+## High-refresh render-thread reliability, 3 November 2026
+
+- **The experimental Vulkan render thread retires every completed frame.**
+  Fast frames can no longer skip cleanup, lose a backend error, or apply queued
+  world changes in the wrong order. Debug drawing now waits before changing
+  storage used by the worker. Map cleanup and renderer restart retire pending
+  frames before clearing live world resources. Swapchain and lost-surface
+  recovery run on the main thread, including window queries and surface creation.
+- **Input-latency diagnostics measure the frame's successful swap.** They no
+  longer mistake the asynchronous handoff for presentation. Hidden frames,
+  readbacks and failed presents are excluded, and resetting the statistics
+  excludes older frames still awaiting retirement.
+- **High-refresh qualification reports retain failures.** The reference suite
+  returns a failing status for failed or incomplete runs and records whether
+  Vulkan used its render thread. Passing automation does not claim physical
+  latency or visual qualification.
+- **Upgrade note:** build/install the engine and renderer modules together
+  (renderer API 30). Saves, network timestamps and the 60 Hz simulation are
+  unchanged. `r_vkRenderThread` and `in_presentationView` remain off by default.
+- Validation: executable production-function tests cover 1,006 worker handoffs,
+  fast/slow completion, backend errors, shutdown/restart, swap-time receipts,
+  reset boundaries and acquire/present recovery. Eight reference-suite tests
+  cover failure aggregation. All nine focused Meson tests and windowed Vulkan
+  SP/MP host/client plus OpenGL SP gameplay checks pass; every role records
+  five successful flash receipts and no gameplay during 128 sampled draws.
+  See [validation details](presentation-owners.md#threaded-lifetime-validation-3-november-2026).
+  The Quality frame-time floor, stage-2 renderer
+  overlap, physical latency and operator motion review remain open in HF-07,
+  HF-08 and REN-07; this entry makes no performance improvement claim.
+
 ## Saves tested between Windows and Linux, 3 November 2026
 
 - **New saves made on Windows restore on Linux, and the other way round.** The

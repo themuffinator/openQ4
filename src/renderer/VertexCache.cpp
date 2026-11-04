@@ -185,8 +185,10 @@ void *idVertexCache::Position( vertCache_t *buffer ) {
 	// addresses when both buffer-object targets are zero. Clear both here:
 	// Apple GL 2.1 deliberately uses a CPU-backed cache, r_useIndexBuffers is
 	// disabled in that mode, and another pass may still have left an EBO bound.
+#ifndef OPENQ4_RENDERER_VK_MODULE
 	BindArrayBuffer( 0 );
 	BindIndexBuffer( 0 );
+#endif
 
 	// virtual memory is a real pointer
 	return (void *)((byte *)buffer->virtMem + buffer->offset);
@@ -248,7 +250,9 @@ behavior (see R_FreeTriSurfVertCache).
 ===========
 */
 void idVertexCache::ReclaimAllHeaders() {
-	ReclaimHeaderList( &deferredFreeList );
+	for ( int slot = 0; slot < NUM_VERTEX_FRAMES; ++slot ) {
+		ReclaimHeaderList( &deferredFreeList[slot] );
+	}
 	ReclaimHeaderList( &staticHeaders );
 
 	// the fixed temp buffer headers were unlinked from the lists at the
@@ -272,16 +276,8 @@ void idVertexCache::ReclaimAllHeaders() {
 		tempBuffers[i] = NULL;
 	}
 
-	// frame temp headers go back on the dynamic free list, the same wholesale
-	// relink EndFrame does; their fields are fully rewritten when reused
-	vertCache_t *block = dynamicHeaders.next;
-	if ( block != &dynamicHeaders ) {
-		block->prev = &freeDynamicHeaders;
-		dynamicHeaders.prev->next = freeDynamicHeaders.next;
-		freeDynamicHeaders.next->prev = dynamicHeaders.prev;
-		freeDynamicHeaders.next = block;
-
-		dynamicHeaders.next = dynamicHeaders.prev = &dynamicHeaders;
+	for ( int slot = 0; slot < NUM_VERTEX_FRAMES; ++slot ) {
+		RetireFrame( slot );
 	}
 }
 
@@ -350,8 +346,10 @@ void idVertexCache::Init() {
 		freeStaticHeaders.next = freeStaticHeaders.prev = &freeStaticHeaders;
 		staticHeaders.next = staticHeaders.prev = &staticHeaders;
 		freeDynamicHeaders.next = freeDynamicHeaders.prev = &freeDynamicHeaders;
-		dynamicHeaders.next = dynamicHeaders.prev = &dynamicHeaders;
-		deferredFreeList.next = deferredFreeList.prev = &deferredFreeList;
+		for ( int slot = 0; slot < NUM_VERTEX_FRAMES; ++slot ) {
+			dynamicHeaders[slot].next = dynamicHeaders[slot].prev = &dynamicHeaders[slot];
+			deferredFreeList[slot].next = deferredFreeList[slot].prev = &deferredFreeList[slot];
+		}
 	} else {
 		// a full vid_restart re-runs Init under a fresh GL context
 		ReclaimAllHeaders();
@@ -412,7 +410,7 @@ idVertexCache::Shutdown
 ===========
 */
 void idVertexCache::Shutdown() {
-	if ( staticHeaders.next == NULL || deferredFreeList.next == NULL ) {
+	if ( staticHeaders.next == NULL || deferredFreeList[listNum].next == NULL ) {
 		// never initialized; the sentinels still hold their zero-initialized
 		// static-storage values and there is nothing to free
 		return;
@@ -420,8 +418,8 @@ void idVertexCache::Shutdown() {
 
 	PurgeAll();
 
-	while( deferredFreeList.next != &deferredFreeList ) {
-		ActuallyFree( deferredFreeList.next );
+	for ( int slot = 0; slot < NUM_VERTEX_FRAMES; ++slot ) {
+		RetireFrame( slot );
 	}
 
 	for ( int i = 0; i < NUM_VERTEX_FRAMES; i++ ) {
@@ -448,8 +446,12 @@ idVertexCache::Alloc
 ===========
 */
 void idVertexCache::Alloc( void *data, int size, vertCache_t **buffer, bool indexBuffer ) {
+	if ( R_RenderThread_OnRenderThread() && R_RenderThread_FrontEndMayOverlap() ) {
+		*buffer = AllocFrameTemp( data, size, indexBuffer );
+		return;
+	}
 	// a frame on the render thread owns the cache lists until it completes
-	R_RenderThread_Sync( "vertex cache" );
+	R_RenderThread_SyncFrontEnd( "vertex cache" );
 	vertCache_t	*block;
 
 	if ( size < 0 ) {
@@ -538,7 +540,8 @@ idVertexCache::Touch
 ===========
 */
 void idVertexCache::Touch( vertCache_t *block ) {
-	R_RenderThread_Sync( "vertex cache" );
+	if ( R_RenderThread_OnRenderThread() && R_RenderThread_FrontEndMayOverlap() ) return;
+	R_RenderThread_SyncFrontEnd( "vertex cache" );
 	if ( !block ) {
 		common->Error( "idVertexCache Touch: NULL pointer" );
 	}
@@ -568,7 +571,8 @@ idVertexCache::Free
 ===========
 */
 void idVertexCache::Free( vertCache_t *block ) {
-	R_RenderThread_Sync( "vertex cache" );
+	if ( R_RenderThread_OnRenderThread() && R_RenderThread_FrontEndMayOverlap() ) return;
+	R_RenderThread_SyncFrontEnd( "vertex cache" );
 	if (!block) {
 		return;
 	}
@@ -587,10 +591,10 @@ void idVertexCache::Free( vertCache_t *block ) {
 	block->next->prev = block->prev;
 	block->prev->next = block->next;
 
-	block->next = deferredFreeList.next;
-	block->prev = &deferredFreeList;
-	deferredFreeList.next->prev = block;
-	deferredFreeList.next = block;
+	block->next = deferredFreeList[listNum].next;
+	block->prev = &deferredFreeList[listNum];
+	deferredFreeList[listNum].next->prev = block;
+	deferredFreeList[listNum].next = block;
 }
 
 /*
@@ -602,8 +606,18 @@ We can't simply sync with the GPU and overwrite what we have, because
 there may still be future references to dynamically created surfaces.
 ===========
 */
-vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size, bool indexBuffer ) {
-	R_RenderThread_Sync( "vertex cache" );
+vertCache_t *idVertexCache::AllocFrameTemp( void *data, int size, bool indexBuffer ) {
+	if ( R_RenderThread_OnRenderThread() && R_RenderThread_FrontEndMayOverlap() ) {
+		if ( size <= 0 ) return NULL;
+		vertCache_t *cache = static_cast<vertCache_t *>( R_ClearedFrameAlloc( sizeof( vertCache_t ) ) );
+		cache->virtMem = R_FrameAlloc( size );
+		memcpy( cache->virtMem, data, size );
+		cache->size = size;
+		cache->tag = TAG_TEMP;
+		cache->indexBuffer = indexBuffer;
+		return cache;
+	}
+	R_RenderThread_SyncFrontEnd( "vertex cache" );
 	vertCache_t	*block;
 
 	if ( size < 0 ) {
@@ -630,8 +644,8 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size, bool indexBuff
 		block = freeDynamicHeaders.next;
 		block->next->prev = block->prev;
 		block->prev->next = block->next;
-		block->next = dynamicHeaders.next;
-		block->prev = &dynamicHeaders;
+		block->next = dynamicHeaders[listNum].next;
+		block->prev = &dynamicHeaders[listNum];
 		block->next->prev = block;
 		block->prev->next = block;
 
@@ -678,12 +692,12 @@ vertCache_t	*idVertexCache::AllocFrameTemp( void *data, int size, bool indexBuff
 		}
 	}
 
-	// move it from the freeDynamicHeaders list to the dynamicHeaders list
+	// move it from the freeDynamicHeaders list to the dynamicHeaders[listNum] list
 	block = freeDynamicHeaders.next;
 	block->next->prev = block->prev;
 	block->prev->next = block->next;
-	block->next = dynamicHeaders.next;
-	block->prev = &dynamicHeaders;
+	block->next = dynamicHeaders[listNum].next;
+	block->prev = &dynamicHeaders[listNum];
 	block->next->prev = block;
 	block->prev->next = block;
 
@@ -755,8 +769,10 @@ void idVertexCache::EndFrame() {
 	// Always finish the frame with client-memory-safe bindings. Mixed upload
 	// paths can bind a buffer even while the legacy vertex cache is virtual,
 	// and redundant-state filtering makes the zero-bind free when already set.
+#ifndef OPENQ4_RENDERER_VK_MODULE
 	BindArrayBuffer( 0 );
 	BindIndexBuffer( 0 );
+#endif
 
 
 	currentFrame = tr.frameCount;
@@ -768,20 +784,26 @@ void idVertexCache::EndFrame() {
 	legacyAllocThisFrame = 0;
 	tempOverflow = false;
 
+	RetireFrame( listNum );
+}
+
+// The producer advances to the other buffer only after that buffer's frame
+// has retired. Keep both header lists alive for the same interval as its bytes.
+void idVertexCache::RetireFrame( int slot ) {
 	// free all the deferred free headers
-	while( deferredFreeList.next != &deferredFreeList ) {
-		ActuallyFree( deferredFreeList.next );
+	while( deferredFreeList[slot].next != &deferredFreeList[slot] ) {
+		ActuallyFree( deferredFreeList[slot].next );
 	}
 
 	// free all the frame temp headers
-	vertCache_t	*block = dynamicHeaders.next;
-	if ( block != &dynamicHeaders ) {
+	vertCache_t	*block = dynamicHeaders[slot].next;
+	if ( block != &dynamicHeaders[slot] ) {
 		block->prev = &freeDynamicHeaders;
-		dynamicHeaders.prev->next = freeDynamicHeaders.next;
-		freeDynamicHeaders.next->prev = dynamicHeaders.prev;
+		dynamicHeaders[slot].prev->next = freeDynamicHeaders.next;
+		freeDynamicHeaders.next->prev = dynamicHeaders[slot].prev;
 		freeDynamicHeaders.next = block;
 
-		dynamicHeaders.next = dynamicHeaders.prev = &dynamicHeaders;
+		dynamicHeaders[slot].next = dynamicHeaders[slot].prev = &dynamicHeaders[slot];
 	}
 }
 

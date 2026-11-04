@@ -1115,7 +1115,7 @@ def validate_engine_hooks() -> None:
     gl_blur = function_body(draw_common, "static bool RB_CompositeRVSpecialBlur( void )")
     require(
         gl_blur,
-        "idMath::ClampFloat( 0.0f, 1.0f, tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][5] )",
+        "idMath::ClampFloat( 0.0f, 1.0f, rbRVSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][5] )",
         "OpenGL normalized special-blur focus",
     )
     vk_blur = function_body(
@@ -1128,7 +1128,7 @@ def validate_engine_hooks() -> None:
     )
     require(
         vk_blur,
-        "tr.specialEffectParms[ SPECIAL_EFFECT_BLUR ][ 5 ] )\n\t\t\t\t\t* distanceScale",
+        "vkExec.pendingSpecialEffects.parms[ SPECIAL_EFFECT_BLUR ][ 5 ] )\n\t\t\t\t\t* distanceScale",
         "Vulkan normalized-focus translation",
     )
     require(

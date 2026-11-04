@@ -823,6 +823,9 @@ def validate_validation_wiring() -> None:
         "macos_dedicated_server_smoke.py",
         "windows_dedicated_server_smoke.py",
         "renderer_gameplay_benchmark.py",
+        # Mode comparisons need a staged Vulkan client and retail assets;
+        # renderer_overlap_benchmark_test.py checks the evidence parser in CI.
+        "renderer_overlap_benchmark.py",
         # Vulkan support evidence runs need a staged client, a GPU and retail
         # assets.
         "renderer_vulkan_qualification.py",

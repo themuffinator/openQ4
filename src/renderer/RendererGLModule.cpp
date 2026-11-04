@@ -95,6 +95,19 @@ idCVar r_windowHeight( "r_windowHeight", "720", CVAR_RENDERER | CVAR_ARCHIVE | C
 idCVar r_skipGuiShaders( "r_skipGuiShaders", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = skip all gui elements on surfaces, 2 = skip drawing but still handle events, 3 = draw but skip events", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 
 static const renderModuleServices_t *rgm_services = NULL;
+
+void Usercmd_TakeFrameInputClocks( double &look, double &flash ) {
+	look = flash = 0.0;
+	if ( rgm_services && rgm_services->TakeFrameInputClocks ) {
+		rgm_services->TakeFrameInputClocks( look, flash );
+	}
+}
+
+void Common_RecordFrameInputToSwap( double look, double flash, double swap ) {
+	if ( rgm_services && rgm_services->RecordFrameInputToSwap ) {
+		rgm_services->RecordFrameInputToSwap( look, flash, swap );
+	}
+}
 static const renderWindowServices_t *rgm_windowServices = NULL;
 static renderExport_t rgm_export;
 
@@ -492,6 +505,10 @@ bool VK_PrepareStartupDevice( char *outReason, int reasonLength );
 bool VK_Device_QueryCatalog(renderDeviceCatalog_t*);
 #endif
 
+static void RGM_SyncConfiguration( void ) {
+	R_RenderThread_Sync( "renderer configuration" );
+}
+
 static void RGM_Shutdown( void ) {
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	VK_Bringup_Shutdown();
@@ -558,6 +575,7 @@ renderExport_t *GetRenderAPI( renderImport_t *moduleImport ) {
 
 	rgm_export.renderSystem = renderSystem;			// the module's statically-initialized &tr
 	rgm_export.renderModelManager = renderModelManager;
+	rgm_export.SyncConfiguration = RGM_SyncConfiguration;
 	rgm_export.TryDeviceRestart = R_TryFullVidRestart;
 	rgm_export.GetDisplayPresentation = R_GetDisplayPresentation;
 	rgm_export.TryInitializeDisplay = R_TryInitializeDisplay;

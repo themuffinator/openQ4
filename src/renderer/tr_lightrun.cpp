@@ -524,6 +524,7 @@ ReloadModels and RegenerateWorld call this
 ===================
 */
 void R_FreeDerivedData( void ) {
+	R_RenderThread_Sync( "derived world data" );
 	int i, j;
 	idRenderWorldLocal *rw;
 	idRenderEntityLocal *def;

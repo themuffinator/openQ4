@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 import time
@@ -57,8 +58,22 @@ def run_case(args, output: Path, name: str, options: list[str], timeout: int = 1
     except subprocess.TimeoutExpired:
         exit_code, tail = "timeout", ""
     report = directory / "report.json"
+    parsed = None
+    try:
+        parsed = json.loads(report.read_text(encoding="utf-8"))
+        if not isinstance(parsed, dict) or not isinstance(parsed.get("cases"), list) or not parsed["cases"]:
+            raise ValueError("report contains no cases")
+        if any(not isinstance(case, dict) or "case" not in case or "exit" not in case for case in parsed["cases"]):
+            raise ValueError("report contains an invalid case")
+        if exit_code == 0 and any(case["exit"] != 0 or case.get("errors") for case in parsed["cases"]):
+            exit_code = 1
+    except (OSError, ValueError) as error:
+        tail += f"\nCannot read complete report: {error}"
+        if exit_code == 0:
+            exit_code = 1
+        parsed = None
     record = {"name": name, "options": options, "exit": exit_code, "seconds": round(time.monotonic() - started, 1),
-              "report": json.loads(report.read_text(encoding="utf-8")) if report.is_file() else None}
+              "report": parsed}
     if exit_code not in (0, 1) or record["report"] is None:
         record["tail"] = tail
     print(f"   exit {exit_code}, {record['seconds']} s", flush=True)
@@ -69,8 +84,9 @@ def refresh_from(records: list[dict]) -> float | None:
     for record in records:
         for case in (record.get("report") or {}).get("cases", []):
             snapshot = (case.get("pacing") or {}).get("framePacingSnapshot") or {}
-            if snapshot.get("refreshHz"):
-                return snapshot["refreshHz"]
+            refresh = snapshot.get("refreshHz")
+            if isinstance(refresh, (int, float)) and math.isfinite(refresh) and refresh > 3:
+                return float(refresh)
     return None
 
 
@@ -92,7 +108,9 @@ def summarise(args, records: list[dict], vrr_cap: int | None) -> str:
     lines = ["# HF-07/HF-08 reference run", "",
              f"Statement: {statement}.",
              f"Runtime: `{args.runtime_dir}`. Variable-refresh cap: {vrr_cap if vrr_cap else 'not run (no refresh reported)'}.",
-             f"Runs: {len(records)}; runs with a failed case: {', '.join(failed) if failed else 'none'}.", "",
+             f"Runs: {len(records)}; failed or incomplete runs: {', '.join(failed) if failed else 'none'}.", "",
+             "HF-07/HF-08 remain pending physical sensor measurements and the operator's motion/visual review;",
+             "a successful automated run alone does not close either gate.", "",
              "## Pacing", "",
              "| Run | Case | Swap | Drawn Hz | Draw p95/p99 ms | Presented p95/p99 ms | Queue p50 ms | Late wake p95 ms | Verdict |",
              "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
@@ -136,7 +154,7 @@ def summarise(args, records: list[dict], vrr_cap: int | None) -> str:
         if record["name"] == "review":
             lines.append(f"- review verdicts: {output / record['name'] / 'review-checklist.md'}")
         if record.get("tail"):
-            lines.append(f"- {record['name']}: did not complete ({record['exit']})")
+            lines.append(f"- {record['name']}: did not complete ({record['exit']}): {record['tail'][-500:]}")
     lines += ["", "Record the 240 Hz verdicts, the sensor readings minus the engine share and the review",
               "verdicts in HF-07/HF-08 of docs/dev/roadmap.md and the presentation owners contract."]
     return "\n".join(lines) + "\n"
@@ -152,6 +170,8 @@ def main() -> int:
                         help="operator statement: a visible foreground window on the HF-07 reference machine")
     parser.add_argument("--windowed", action="store_true",
                         help="rehearsal: run every case in a window instead of full screen")
+    parser.add_argument("--render-thread", choices=("0", "1", "2"), default="0",
+                        help="Vulkan backend mode; record it with the reference evidence (default inline)")
     parser.add_argument("--sensor-seconds", type=int, default=120)
     parser.add_argument("--skip-sensor", action="store_true")
     parser.add_argument("--skip-review", action="store_true")
@@ -164,6 +184,8 @@ def main() -> int:
     for renderer in args.renderers:
         timing = ["--present-timing"] if renderer == "vulkan" else []
         base = ["--renderer", renderer] + screen + timing
+        if renderer == "vulkan":
+            base += ["--cvar", "r_vkRenderThread", args.render_thread]
         plan.append((f"{renderer}-caps", ["--scenario", "pacing", "--fps"] + [str(c) for c in CAPS] + base))
         plan.append((f"{renderer}-vsync", ["--scenario", "pacing", "--fps", "240", "0", "--swap-interval", "1"] + base))
         plan.append((f"{renderer}-adaptive", ["--scenario", "pacing", "--fps", "240", "--swap-interval", "-1"] + base))
@@ -187,17 +209,24 @@ def main() -> int:
             refresh = refresh_from([r for r in records if r["name"] == f"{renderer}-caps"])
             if not refresh:
                 print(f"== {name}: skipped, the caps run reported no display refresh", flush=True)
+                records.append({"name": name, "options": [], "exit": "not run", "seconds": 0,
+                                "report": None, "tail": "No usable refresh reported; variable-refresh coverage is incomplete."})
                 continue
             vrr_cap = max(30, int(refresh) - 3)
             timing = ["--present-timing"] if renderer == "vulkan" else []
             options = ["--scenario", "pacing", "--fps", str(vrr_cap), "--swap-interval", "1",
                        "--renderer", renderer] + screen + timing
+            if renderer == "vulkan":
+                options += ["--cvar", "r_vkRenderThread", args.render_thread]
         records.append(run_case(args, output, name, options))
-    (output / "suite.json").write_text(json.dumps({"reference": args.reference, "vrrCap": vrr_cap, "runs": records}, indent=1),
+    failed = any(record["exit"] != 0 or not record.get("report") for record in records)
+    (output / "suite.json").write_text(json.dumps({"reference": args.reference, "renderThread": int(args.render_thread),
+                                                 "automatedPassed": not failed, "physicalQualification": "pending",
+                                                 "vrrCap": vrr_cap, "runs": records}, indent=1),
                                        encoding="utf-8")
     (output / "reference-summary.md").write_text(summarise(args, records, vrr_cap), encoding="utf-8")
     print(f"reference suite: {len(records)} runs, summary {output / 'reference-summary.md'}")
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

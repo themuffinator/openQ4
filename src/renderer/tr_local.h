@@ -348,6 +348,8 @@ const int	MAX_CLIP_PLANES	= 1;				// we may expand this to six for some subview 
 
 // viewDefs are allocated on the frame temporary stack memory
 typedef struct viewDef_s {
+	bool frameSnapshot;
+	bool lightGridAvailable;
 	// specified in the call to DrawScene()
 	renderView_t		renderView;
 
@@ -526,6 +528,18 @@ typedef struct {
 	viewDef_t	*viewDef;
 } drawSurfsCommand_t;
 
+// Controller values belong to the submitted view, not the next game tic.
+typedef struct {
+	int enabled;
+	float parms[ SPECIAL_EFFECT_MAX ][ MAX_ENTITY_SHADER_PARMS ];
+} specialEffectsState_t;
+
+typedef struct {
+	renderCommand_t commandId, *next;
+	viewDef_t *viewDef;
+	specialEffectsState_t effects;
+} drawSpecialEffectsCommand_t;
+
 // openQ4 VR: from here on the frame's default target ("the back buffer") is
 // eye 0/1, or the virtual screen for -1, at width x height.
 typedef struct {
@@ -635,7 +649,7 @@ static_assert( offsetof( frameMemoryBlock_t, base ) % 16 == 0, "frame allocator 
 // all of the information needed by the back end must be
 // contained in a frameData_t.  This entire structure is
 // duplicated so the front and back end can run in parallel
-// on an SMP machine (OBSOLETE: this capability has been removed)
+// on an SMP machine. A slot is recycled only after its consumer retires.
 typedef struct {
 	// one or more blocks of memory for all frame
 	// temporary allocations
@@ -653,9 +667,19 @@ typedef struct {
 	// commands can be inserted at the front if needed, as for required
 	// dynamically generated textures
 	emptyCommand_t	*cmdHead, *cmdTail;		// may be of other command type based on commandId
+	int slot;
+	struct frameLightReceipt_s *lightReceipts;
+	int backendAllocCount, backendFreeCount, backendTangentIndexes, backendShadowVolumes;
+	size_t backendStaticAllocBytes;
 } frameData_t;
 
 extern	frameData_t	*frameData;
+frameData_t *R_BackEndFrameData( void );
+void R_SetBackEndFrameData( frameData_t *frame );
+void R_SnapshotRenderView( viewDef_t *view );
+void R_PrepareRenderFrameResources( const emptyCommand_t *commands );
+void R_RetireRenderSnapshots( frameData_t *frame );
+
 
 //=======================================================================
 
@@ -671,16 +695,21 @@ void *R_GetCommandBuffer( int bytes );
 
 /*
 	Render thread (Vulkan module, r_vkRenderThread; REN-07 in the roadmap).
-	EndFrame hands a finished frame to it and the next BeginFrame, or any
-	main-thread entry that is unsafe while the backend runs, calls
-	R_RenderThread_Sync first. Other modules run the backend on the calling
+	EndFrame hands it a finished frame. Mode 1 joins at the next BeginFrame;
+	mode 2 builds the next front end before joining at EndFrame. Resource
+	mutations always call R_RenderThread_Sync first. Other modules run the backend on the calling
 	thread, so these are no-ops there.
 */
 #if defined( OPENQ4_RENDERER_VK_MODULE )
+// Backend failures retire on the main thread before common error/teardown.
+void	R_RenderThread_Error( const char *message, bool fatal = false );
 void	R_RenderThread_Init( void );
 bool	R_RenderThread_Begin( const emptyCommand_t *cmds );
 void	R_RenderThread_Sync( const char *reason );
 bool	R_RenderThread_InFlight( void );
+bool R_RenderThread_OverlapRequested( void );
+bool R_RenderThread_FrontEndMayOverlap( void );
+void R_RenderThread_SyncFrontEnd( const char *reason );
 bool	R_RenderThread_OnRenderThread( void );
 void	R_RenderThread_Shutdown( void );
 #else
@@ -688,10 +717,17 @@ ID_INLINE void	R_RenderThread_Init( void ) {}
 ID_INLINE bool	R_RenderThread_Begin( const emptyCommand_t * ) { return false; }
 ID_INLINE void	R_RenderThread_Sync( const char * ) {}
 ID_INLINE bool	R_RenderThread_InFlight( void ) { return false; }
+ID_INLINE bool R_RenderThread_OverlapRequested( void ) { return false; }
+ID_INLINE bool R_RenderThread_FrontEndMayOverlap( void ) { return false; }
+ID_INLINE void R_RenderThread_SyncFrontEnd( const char * ) {}
 ID_INLINE bool	R_RenderThread_OnRenderThread( void ) { return false; }
 ID_INLINE void	R_RenderThread_Shutdown( void ) {}
 #endif
 bool	R_RenderThread_FrameQualifies( void );
+void R_AdvanceFrameData( void );
+void R_FreeDeferredFrameSurfaces( void );
+viewDef_t *R_SubmittedPrimaryView( void );
+bool R_SubmittedTakingScreenshot( void );
 
 // this allows a global override of all materials
 bool R_GlobalShaderOverride( const idMaterial **shader );
@@ -1057,6 +1093,11 @@ public:
 	// counts into pc while that frame is still in flight
 	performanceCounters_t	renderThreadFrameCounters;
 	bool					renderThreadFrameCountersValid;
+	// Captured at EndFrame, stamped by the backend, consumed at retirement.
+	// These share the command chain's ownership (including inline captures).
+	double					frameLookSampleClock;
+	double					frameFlashPressClock;
+	double					frameSwapClock;
 
 	drawSurfsCommand_t		lockSurfacesCmd;	// use this when r_lockSurfaces = 1
 
@@ -1141,7 +1182,11 @@ extern backEndState_t		backEnd;
 bool RB_ClassicFogBlend_PreflightLinearView( const viewDef_t *viewDef );
 bool RB_ClassicFogBlend_DrawLinearView( const viewDef_t *viewDef, GLuint vertexProgram, GLint mvpLocation, GLint fogLocation );
 extern idRenderSystemLocal	tr;
+#ifdef OPENQ4_RENDERER_VK_MODULE
+extern thread_local glconfig_t glConfig;
+#else
 extern glconfig_t			glConfig;		// outside of TR since it shouldn't be cleared during ref re-init
+#endif
 extern bool					tr_levelshotProjectionShiftActive;
 // true when renderView's off-axis (VR eye) tangents describe a usable frustum
 bool R_ViewFovTangentsValid( const renderView_t &renderView );
@@ -1881,6 +1926,7 @@ void		GLimp_PreserveWindowOnShutdown( bool preserve );
 // same-process renderer restart.
 
 void		GLimp_SwapBuffers( void );
+void		R_SwapBuffersWithInputTiming( void );
 // Calls the system specific swapbuffers routine, and may also perform
 // other system specific cvar checks that happen every frame.
 // This will not be called if 'r_drawBuffer GL_FRONT'
@@ -2495,6 +2541,7 @@ void RB_InvalidateTemporalDepthStamp( idRenderTexture *target );
 void RB_StampTemporalDepthResolved( idRenderTexture *target,
 	int frameNumber, unsigned int historyGeneration );
 
+void RB_BeginCommandFrame( const emptyCommand_t *cmds );
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds );
 
 

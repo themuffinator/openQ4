@@ -697,7 +697,7 @@ const void	RB_SwapBuffers( const void *data ) {
 	RB_QueueSavePreview();
 
 	if ( !r_frontBuffer.GetBool() && !tr.takingScreenshot ) {
-	    GLimp_SwapBuffers();
+	    R_SwapBuffersWithInputTiming();
 	}
 }
 
@@ -1046,6 +1046,7 @@ public:
 };
 
 void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
+	RB_BeginCommandFrame( cmds );
 	// r_debugRenderToTexture
 	int	c_draw3d = 0, c_draw2d = 0, c_setBuffers = 0, c_swapBuffers = 0, c_copyRenders = 0, c_specialEffects = 0, c_renderTargetOps = 0;
 
@@ -1268,13 +1269,13 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_SPECIAL_EFFECTS );
 			if ( r_rendererSharedSpecialFrame.GetBool()
 					&& R_ClassicSpecialFrameDomain_FindRavenEffectsView(
-						reinterpret_cast<const drawSurfsCommand_t *>( cmds )->viewDef ) != NULL
+						reinterpret_cast<const drawSpecialEffectsCommand_t *>( cmds )->viewDef ) != NULL
 					&& !R_ClassicSpecialFrameDomain_ReadyForBackend(
-						reinterpret_cast<const drawSurfsCommand_t *>( cmds )->viewDef,
+						reinterpret_cast<const drawSpecialEffectsCommand_t *>( cmds )->viewDef,
 						CLASSIC_SPECIAL_FRAME_SCOPE_RAVEN_EFFECTS,
 						CLASSIC_SPECIAL_FRAME_BACKEND_GL ) ) {
 				R_ClassicSpecialFrameDomain_RecordBackendFallback(
-					reinterpret_cast<const drawSurfsCommand_t *>( cmds )->viewDef,
+					reinterpret_cast<const drawSpecialEffectsCommand_t *>( cmds )->viewDef,
 					CLASSIC_SPECIAL_FRAME_SCOPE_RAVEN_EFFECTS,
 					CLASSIC_SPECIAL_FRAME_BACKEND_GL,
 					CLASSIC_SPECIAL_FRAME_FAILURE_BACKEND_NOT_READY, 0 );

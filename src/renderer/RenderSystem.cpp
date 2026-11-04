@@ -39,6 +39,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ScenePackets.h"
 #include "TemporalPresentation.h"
 #include "SavePreviewCapture.h"
+#include "DisplayPresentation.h"
 #include "../external/smaa/AreaTex.h"
 #include "../external/smaa/SearchTex.h"
 
@@ -310,6 +311,19 @@ static void R_PerformanceCounters( void ) {
 
 
 
+// Preflight runs before the command loop reaches RC_SET_BUFFER. Latch its
+// identity first so backend caches and GPU receipts never observe the next
+// front-end frame. A mid-frame flush without SET_BUFFER retains this identity.
+void RB_BeginCommandFrame( const emptyCommand_t *cmds ) {
+	for ( const emptyCommand_t *cmd = cmds; cmd != NULL;
+			cmd = reinterpret_cast<const emptyCommand_t *>( cmd->next ) ) {
+		if ( cmd->commandId == RC_SET_BUFFER ) {
+			backEnd.frameCount = reinterpret_cast<const setBufferCommand_t *>( cmd )->frameCount;
+			return;
+		}
+	}
+}
+
 /*
 ====================
 R_IssueRenderCommands
@@ -386,20 +400,34 @@ static bool R_IssueRenderCommandsOnRenderThread( void ) {
 	if ( frameData->cmdHead->commandId == RC_NOP && !frameData->cmdHead->next ) {
 		return false;
 	}
-	return R_RenderThread_Begin( frameData->cmdHead );
+	if ( R_RenderThread_OverlapRequested() ) R_PrepareRenderFrameResources( frameData->cmdHead );
+	if ( !R_RenderThread_Begin( frameData->cmdHead ) ) return false;
+	// Only advance producer history once a worker owns this frame. Inline
+	// reconstruction still needs the previous history until command retirement.
+	R_ScenePackets_SealFrame();
+	return true;
 }
 
 /*
 ====================
 R_RenderThread_FrameQualifies
 
-Stage 1 runs only ordinary presented frames on the render thread. Captures,
+Only ordinary presented frames run on the render thread. Captures,
 tiled screenshots and loading screens keep the inline backend: they read the
 result back, or interleave with level loading that creates and destroys
 device resources. VR presents only on OpenGL.
 ====================
 */
 bool R_RenderThread_FrameQualifies( void ) {
+	// A mode change after an earlier view was queued cannot retroactively
+	// freeze that view's packet references. Render that transition inline.
+	if ( R_RenderThread_OverlapRequested() ) {
+		for ( const emptyCommand_t *cmd = frameData->cmdHead; cmd; cmd = reinterpret_cast<const emptyCommand_t *>( cmd->next ) ) {
+			if ( cmd->commandId != RC_DRAW_VIEW ) continue;
+			const viewDef_t *view = reinterpret_cast<const drawSurfsCommand_t *>( cmd )->viewDef;
+			if ( view != NULL && !view->frameSnapshot ) return false;
+		}
+	}
 	// The Alpha Labs overlay walks the world's live lightDefs, which the game
 	// tic adds to and frees. A checked image reload binds image work to the
 	// main thread.
@@ -407,6 +435,7 @@ bool R_RenderThread_FrameQualifies( void ) {
 		&& tr.tiledViewport[0] == 0
 		&& !R_LoadingScreenActive()
 		&& ( tr.specialEffectsEnabled & SPECIAL_EFFECT_AL ) == 0
+		&& ( r_forceSpecialEffects.GetInteger() & SPECIAL_EFFECT_AL ) == 0
 		&& !R_ImagePolicyActive();
 }
 
@@ -423,7 +452,7 @@ void *R_GetCommandBuffer( int bytes ) {
 	emptyCommand_t	*cmd;
 
 	// the chain still belongs to the render thread until the frame completes
-	R_RenderThread_Sync( "command buffer" );
+	R_RenderThread_SyncFrontEnd( "command buffer" );
 	cmd = (emptyCommand_t *)R_FrameAlloc( bytes );
 	cmd->next = NULL;
 	frameData->cmdTail->next = &cmd->commandId;
@@ -520,6 +549,7 @@ have multiple views if a mirror, portal, or dynamic texture is present.
 =============
 */
 void	R_AddDrawViewCmd( viewDef_t *parms ) {
+	R_SnapshotRenderView( parms );
 	drawSurfsCommand_t	*cmd;
 
 	if ( ( parms->renderFlags & RF_DEFER_COMMAND_SUBMIT ) != 0 ) {
@@ -548,7 +578,7 @@ R_AddSpecialEffects
 =============
 */
 void R_AddSpecialEffects( viewDef_t *parms ) {
-	drawSurfsCommand_t *cmd;
+	drawSpecialEffectsCommand_t *cmd;
 	int activeMask;
 
 	if ( parms == NULL ) {
@@ -576,7 +606,7 @@ void R_AddSpecialEffects( viewDef_t *parms ) {
 	}
 
 	if ( ( parms->renderFlags & RF_DEFER_COMMAND_SUBMIT ) != 0 ) {
-		cmd = (drawSurfsCommand_t *)R_GetCommandBufferDeferred(
+		cmd = (drawSpecialEffectsCommand_t *)R_GetCommandBufferDeferred(
 				sizeof( *cmd ) );
 	} else {
 		// Keep this controller command on the same side of the deferred-view
@@ -584,10 +614,12 @@ void R_AddSpecialEffects( viewDef_t *parms ) {
 		// portal-sky/subview draw can land between the special command and the
 		// primary view it captures.
 		R_SubmitDeferredCommands();
-		cmd = (drawSurfsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
+		cmd = (drawSpecialEffectsCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
 	}
 	cmd->commandId = RC_DRAW_SPECIAL_EFFECTS;
 	cmd->viewDef = parms;
+	cmd->effects.enabled = activeMask & ( SPECIAL_EFFECT_BLUR | SPECIAL_EFFECT_AL );
+	memcpy( cmd->effects.parms, tr.specialEffectParms, sizeof( cmd->effects.parms ) );
 	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
 		R_ScenePackets_AddSpecialEffects( parms, activeMask );
 	}
@@ -614,6 +646,7 @@ evaluated interactively.
 ======================
 */
 void R_LockSurfaceScene( viewDef_t *parms ) {
+	R_RenderThread_Sync( "locked surfaces" );
 	drawSurfsCommand_t	*cmd;
 	viewEntity_t			*vModel;
 
@@ -707,10 +740,7 @@ void idRenderSystemLocal::SetSpecialEffect( ESpecialEffectType Which, bool Enabl
 	if ( Which <= SPECIAL_EFFECT_NONE || Which >= SPECIAL_EFFECT_MAX ) {
 		return;
 	}
-	// the backend reads these live while it records the frame
-	if ( ( ( specialEffectsEnabled & Which ) != 0 ) != Enabled ) {
-		R_RenderThread_Sync( "special effect" );
-	}
+	// Values are copied into RC_DRAW_SPECIAL_EFFECTS at view submission.
 
 	if ( Enabled ) {
 		specialEffectsEnabled |= Which;
@@ -720,6 +750,7 @@ void idRenderSystemLocal::SetSpecialEffect( ESpecialEffectType Which, bool Enabl
 		// command without attempting an image load during command recording.
 		if ( Which == SPECIAL_EFFECT_AL && specialALLightImage == NULL
 				&& globalImages != NULL ) {
+			R_RenderThread_Sync( "special effect image" );
 			specialALLightImage = globalImages->ImageFromFile(
 					"gfx/lights/round.tga", TF_LINEAR, TR_CLAMP, TD_DEFAULT );
 		}
@@ -740,10 +771,6 @@ void idRenderSystemLocal::SetSpecialEffectParm( ESpecialEffectType Which, int Pa
 	if ( Parm < 0 || Parm >= MAX_ENTITY_SHADER_PARMS ) {
 		return;
 	}
-	if ( specialEffectParms[ Which ][ Parm ] != Value ) {
-		R_RenderThread_Sync( "special effect" );
-	}
-
 	specialEffectParms[ Which ][ Parm ] = Value;
 }
 
@@ -1331,6 +1358,7 @@ void idRenderSystemLocal::SetBackEndRenderer() {
 		return;
 	}
 
+	R_RenderThread_Sync( "backend selection" );
 	const char *requestedRendererName = r_renderer.GetString();
 
 	if ( !glConfig.isInitialized ) {
@@ -1450,7 +1478,7 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	}
 	// The previous frame may still be recording on the render thread; this
 	// frame's front end reuses its frame memory and vertex-cache temps.
-	R_RenderThread_Sync( "frame" );
+	R_RenderThread_SyncFrontEnd( "frame" );
 	R_RendererMetrics_MarkCpuFrameBegin();
 
 	// determine which back end we will use
@@ -1638,6 +1666,9 @@ EndFrame
 Returns the number of msec spent in the back end
 =============
 */
+void Usercmd_TakeFrameInputClocks( double &lookSampleClock, double &flashPressClock );
+void Common_RecordFrameInputToSwap( double lookSampleClock, double flashPressClock, double swapClock );
+
 void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	emptyCommand_t *cmd;
 
@@ -1650,6 +1681,8 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 
 	// a VR frame ends on its virtual screen, which presents last
 	EndVRFrame();
+	// At most one backend is in flight. Join after building this front end.
+	R_RenderThread_Sync( "handoff" );
 
 	// check for dynamic changes that require some initialization
 	R_CheckCvars();
@@ -1665,12 +1698,26 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	}
 
 	// start the back end up again with the new command list
+	Usercmd_TakeFrameInputClocks( frameLookSampleClock, frameFlashPressClock );
+	if ( r_hiddenWindow.GetBool() ) {
+		// Hidden Vulkan frames complete in an offscreen image; its presentation
+		// receipt serves resource lifetime, not input-to-display measurement.
+		frameLookSampleClock = frameFlashPressClock = 0.0;
+	}
+	frameSwapClock = 0.0;
 	R_RendererMetrics_MarkFrameSubmitBegin();
 	const int frameFrontEndMsec = pc.frontEndMsec;
+	// The worker can overwrite backEnd.pc as soon as we hand it this frame.
+	const int previousBackEndMsec = backEnd.pc.msec;
 	if ( R_IssueRenderCommandsOnRenderThread() ) {
 		renderThreadFrameCounters = pc;
 		renderThreadFrameCountersValid = true;
 		memset( &pc, 0, sizeof( pc ) );
+		if ( R_RenderThread_FrontEndMayOverlap() ) {
+			R_AdvanceFrameData();
+			vertexCache.EndFrame();
+			R_RendererUpload_EndFrame();
+		}
 		// The render thread owns this frame's commands, frame memory and
 		// vertex-cache temps until R_RenderThread_Sync completes the frame.
 		// The back-end time reported here is the previous frame's.
@@ -1678,7 +1725,7 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 			*frontEndMsec = frameFrontEndMsec;
 		}
 		if ( backEndMsec ) {
-			*backEndMsec = backEnd.pc.msec;
+			*backEndMsec = previousBackEndMsec;
 		}
 	} else {
 		R_IssueRenderCommands();
@@ -1703,6 +1750,29 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 
 }
 
+// Keep the receipt on the frame until the main thread retires it. In the
+// threaded path EndFrame returns before this swap has even started.
+void R_SwapBuffersWithInputTiming( void ) {
+	const bool timeInput = tr.frameLookSampleClock > 0.0 || tr.frameFlashPressClock > 0.0;
+	renderDisplayPresentation_t beforeSwap = {};
+	if ( timeInput ) {
+		R_GetDisplayPresentation( &beforeSwap );
+	}
+	GLimp_SwapBuffers();
+	if ( timeInput ) {
+		const double swapClock = sys->GetClockTicks();
+		renderDisplayPresentation_t afterSwap;
+		R_GetDisplayPresentation( &afterSwap );
+		// Failed presents, readbacks and hidden offscreen frames must not
+		// masquerade as low input-to-display latency.
+		if ( afterSwap.available && afterSwap.generation == beforeSwap.generation
+				&& afterSwap.failureSequence == beforeSwap.failureSequence
+				&& afterSwap.presentedSequence > beforeSwap.presentedSequence ) {
+			tr.frameSwapClock = swapClock;
+		}
+	}
+}
+
 /*
 ===============
 idRenderSystemLocal::CompleteBackEndFrame
@@ -1713,6 +1783,11 @@ runs it in R_RenderThread_Sync once the thread has finished the frame.
 ===============
 */
 void idRenderSystemLocal::CompleteBackEndFrame( void ) {
+	frameData_t *submittedFrame = R_BackEndFrameData();
+	if ( frameSwapClock > 0.0 ) {
+		Common_RecordFrameInputToSwap( frameLookSampleClock, frameFlashPressClock, frameSwapClock );
+	}
+	frameLookSampleClock = frameFlashPressClock = frameSwapClock = 0.0;
 	performanceCounters_t ticCounters;
 	const bool threadedFrame = renderThreadFrameCountersValid;
 	if ( threadedFrame ) {
@@ -1721,6 +1796,14 @@ void idRenderSystemLocal::CompleteBackEndFrame( void ) {
 		renderThreadFrameCountersValid = false;
 	}
 
+	pc.c_alloc += submittedFrame->backendAllocCount;
+	pc.c_free += submittedFrame->backendFreeCount;
+	pc.c_tangentIndexes += submittedFrame->backendTangentIndexes;
+	pc.c_createShadowVolumes += submittedFrame->backendShadowVolumes;
+	staticAllocCount += submittedFrame->backendStaticAllocBytes;
+	submittedFrame->backendAllocCount = submittedFrame->backendFreeCount = 0;
+	submittedFrame->backendTangentIndexes = submittedFrame->backendShadowVolumes = 0;
+	submittedFrame->backendStaticAllocBytes = 0;
 	FinishVRFrame();
 	ProcessPendingRenderTextureDeletes();
 
@@ -1738,12 +1821,18 @@ void idRenderSystemLocal::CompleteBackEndFrame( void ) {
 	// print any other statistics and clear all of them
 	R_PerformanceCounters();
 
-	// reset frame memory and the command chain for the next frame
-	R_ToggleSmpFrame();
-
-	// we can now release the vertexes used this frame
-	vertexCache.EndFrame();
-	R_RendererUpload_EndFrame();
+	R_RetireRenderSnapshots( submittedFrame );
+	R_TemporalPresentation_RetireFrame();
+	R_SetBackEndFrameData( NULL );
+	for ( int i = 0; i < worlds.Num(); ++i ) {
+		if ( worlds[i] != NULL ) worlds[i]->FreeDeferredLightDefs();
+	}
+	// Overlap advanced the producer at handoff; retirement must not reset it.
+	if ( submittedFrame == frameData ) {
+		R_ToggleSmpFrame();
+		vertexCache.EndFrame();
+		R_RendererUpload_EndFrame();
+	}
 
 	if ( threadedFrame ) {
 		pc = ticCounters;
@@ -3202,3 +3291,8 @@ void idRenderSystemLocal::DestroyRenderTexture( idRenderTexture* renderTexture )
 
 	pendingRenderTextureDeletes.Append( renderTexture );
 }
+
+#ifndef OPENQ4_RENDERER_VK_MODULE
+viewDef_t *R_SubmittedPrimaryView( void ) { return tr.primaryView; }
+bool R_SubmittedTakingScreenshot( void ) { return tr.takingScreenshot; }
+#endif

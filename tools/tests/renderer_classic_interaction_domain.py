@@ -1544,7 +1544,8 @@ def main() -> None:
     require(vk_map_abort, "VK_ShadowMap_ReleasePreparedLights( false )", "Vulkan mapped resource rollback")
     require(vk_map_abort, "memset( &vkClassicShadowTransaction", "Vulkan mapped transaction reset")
     require(vk_map_commit, "VK_ShadowMap_RenderAtlas( view->viewDef )", "Vulkan mapped transaction commit")
-    require(vk_map_commit, "common->FatalError(", "Vulkan infallible commit assertion")
+    require(vk_map_commit, "R_RenderThread_Error(", "Vulkan main-thread error receipt")
+    require(vk_map_commit, '"Vulkan: preflighted classic shadow transaction could not commit", true );', "Vulkan fatal commit assertion")
     require_before(
         vk_fail,
         "VK_ShadowMap_AbortClassicInteractionView(",

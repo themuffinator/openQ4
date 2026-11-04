@@ -287,6 +287,9 @@ void		VK_PresentTiming_Presented( uint64_t id );
 // that is off withholds them; clearing the drill rebuilds the swapchain to
 // return them. False when that rebuild fails.
 bool	VK_Device_ServiceWithheldImages( void );
+// Main thread, after joining a frame: service window/surface recovery that the
+// worker requested. A failed acquire never calls SDL from the render thread.
+void	VK_Device_CompleteThreadedRecovery( void );
 
 typedef void ( *vkImmediateRecord_t )( VkCommandBuffer cmd, void *user );
 // records upload commands into the shared upload command buffer, opening a

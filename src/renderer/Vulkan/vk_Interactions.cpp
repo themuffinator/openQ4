@@ -3216,7 +3216,7 @@ static bool VK_PBRTransparentRecord( const drawSurf_t *surf, const srfTriangles_
 			|| dynamicCount != 1 || interPass.shadowActive
 			|| vkPBRTransparentDrawCount >= vkPBRTransparentView.requiredAtLeast
 			|| vkPBRTransparentDrawCount >= VK_PBR_TRANSPARENT_MAX_DRAWS ) {
-		common->Error( "Vulkan PBR transparency record violates its view preflight" );
+		R_RenderThread_Error( "Vulkan PBR transparency record violates its view preflight" );
 		return false;
 	}
 
@@ -3273,7 +3273,7 @@ bool VK_PBR_DrawTransparentStage( VkCommandBuffer cmd, const viewDef_t *viewDef,
 		return false;
 	}
 	if ( surface->coverage.geo != tri || surface->alphaScale != alphaScale ) {
-		common->Error( "Vulkan PBR transparency stage changed after preparation" );
+		R_RenderThread_Error( "Vulkan PBR transparency stage changed after preparation" );
 		return true;
 	}
 

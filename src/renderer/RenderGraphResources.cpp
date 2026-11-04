@@ -1199,7 +1199,7 @@ static bool R_RenderGraphResources_BuildWorldSelfTestGraph( idRenderGraph &graph
 	memset( &drawCmd, 0, sizeof( drawCmd ) );
 	drawCmd.commandId = RC_DRAW_VIEW;
 	drawCmd.viewDef = &worldView;
-	drawSurfsCommand_t fxCmd;
+	drawSpecialEffectsCommand_t fxCmd;
 	memset( &fxCmd, 0, sizeof( fxCmd ) );
 	fxCmd.commandId = RC_DRAW_SPECIAL_EFFECTS;
 	fxCmd.viewDef = &worldView;
