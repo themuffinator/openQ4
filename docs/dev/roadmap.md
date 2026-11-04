@@ -913,8 +913,22 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
       focused tests pass. See
       [comparison evidence](presentation-owners.md#mode-comparisons-and-snapshot-reuse-4-november-2026).
 
+      **Retained index streams, 4 November.** Mode 2 now retains immutable,
+      owned index/silhouette-index and index-cache payloads across views and
+      frames. Each acquisition compares the complete source range; address
+      reuse or content/length changes create a new immutable version. Submitted
+      frame leases survive replacement/eviction and release at retirement.
+      The cache bounds payloads at 64 MiB and entries at 32,768; oversized
+      ranges use ordinary snapshots. `r_vkSnapshotRetain 0` selects the earlier
+      copy path for comparisons. Vertex/skinning streams still copy per view.
+      Native tests cover replacement, lifetime, eviction and stale reuse.
+      Same-binary mode comparisons pass all nine windows per run: copied bytes
+      fall from 8.53 to 7.57 MB/frame (11.32%); elapsed snapshot time rises from
+      2.90 to 5.23 ms amid competing workloads, so no timing gain is claimed.
+      See [retention evidence](presentation-owners.md#retained-index-streams-4-november-2026).
+
       **Still open:** quiet paired mode 0/1/2 measurements, further snapshot cost
-      reduction (including explicitly retained immutable static streams), the
+      reduction (including retained immutable vertex streams), the
       every-frame Quality floor, physical display/input qualification and
       Wayland/macOS runtime coverage. Do not promote the default from
       shared-machine measurements.

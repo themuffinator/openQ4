@@ -8,6 +8,10 @@ See [player release status](../user/release-status.md).
 
 ## Experimental Vulkan front-end overlap, 4 November 2026
 
+- **Full-overlap mode can reuse unchanged index data across frames.** It keeps
+  owned copies alive until drawing finishes and refreshes them when contents
+  change. Performance qualification remains required before recommending mode 2.
+
 - **The experimental full-overlap mode avoids repeated copies of shared
   geometry within a view.** Each submitted view keeps its own data, including
   when a later view rebuilds the same source memory. This reduces copy volume;

@@ -3,6 +3,7 @@
 #include "GpuSkinning.h"
 #include "RendererMetrics.h"
 #include "FrameSnapshotCopy.h"
+#include "FrameSnapshotRetain.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <new>
@@ -22,6 +23,9 @@ struct snapshotStats_t {
 };
 snapshotStats_t snapshotStats = {};
 bool snapshotProfiling = false;
+idCVar r_vkSnapshotRetain( "r_vkSnapshotRetain", "1", CVAR_RENDERER | CVAR_BOOL, "retain validated immutable index copies across overlap frames" );
+idFrameSnapshotRetainedIndexes retainedIndexes;
+std::vector<idFrameSnapshotRetainedIndexes::lease_t> retainedLeases[2];
 
 // The command arena owns these copies. No model/def/cache destructor runs on
 // them: they are render inputs, with all mutable streams copied below.
@@ -60,7 +64,23 @@ class viewSnapshot_t {
 		return static_cast<T *>( result.data );
 	}
 public:
-	vertCache_t *Cache( const vertCache_t *source ) {
+	template<class T> T *Indexes( const T *source, size_t count ) {
+		if ( source == NULL || count == 0 ) return NULL;
+		if ( count > ( idMath::INT_MAX - 16 ) / sizeof( T ) ) common->FatalError( "retained index size overflow" );
+		if ( r_vkSnapshotRetain.GetBool() ) {
+			const auto result = retainedIndexes.Acquire( source, count * sizeof( T ) );
+			if ( result.lease ) {
+				retainedLeases[frameData->slot].push_back( result.lease );
+				if ( snapshotProfiling ) {
+					if ( result.reused ) snapshotStats.reusedBytes += count * sizeof( T );
+					else { snapshotStats.copiedBytes += count * sizeof( T ); snapshotStats.copies++; }
+				}
+				return reinterpret_cast<T *>( const_cast<std::uint32_t *>( result.lease->data() ) );
+			}
+		}
+		return CopyStream( source, count );
+	}
+	vertCache_t *Cache( const vertCache_t *source, bool indexStream = false ) {
 		if ( source == NULL ) return NULL;
 		auto found = caches.find( source );
 		if ( found != caches.end() ) return found->second;
@@ -70,7 +90,8 @@ public:
 		// header permits skinning fallback to repair the submitted stream.
 		if ( source->virtMem != NULL ) {
 			const unsigned long long before = snapshotStats.copiedBytes;
-			copy->virtMem = CopyStream( static_cast<const byte *>( source->virtMem ) + source->offset, source->size );
+			const byte *bytes = static_cast<const byte *>( source->virtMem ) + source->offset;
+			copy->virtMem = indexStream ? Indexes( bytes, source->size ) : CopyStream( bytes, source->size );
 			if ( snapshotProfiling ) snapshotStats.cacheBytes += snapshotStats.copiedBytes - before;
 			copy->offset = 0;
 		}
@@ -112,8 +133,8 @@ public:
 		geometry[source] = copy;
 		const unsigned long long beforeStreams = snapshotStats.copiedBytes;
 		copy->verts = CopyStream( source->verts, source->numVerts );
-		copy->indexes = CopyStream( source->indexes, source->numIndexes );
-		copy->silIndexes = CopyStream( source->silIndexes, source->numIndexes );
+		copy->indexes = Indexes( source->indexes, source->numIndexes );
+		copy->silIndexes = Indexes( source->silIndexes, source->numIndexes );
 		copy->silEdges = CopyStream( source->silEdges, source->numSilEdges );
 		copy->shadowVertexes = CopyStream( source->shadowVertexes, source->numVerts );
 		copy->facePlanes = CopyStream( source->facePlanes, source->numIndexes / 3 );
@@ -122,7 +143,7 @@ public:
 		copy->dupVerts = CopyStream( source->dupVerts, source->numDupVerts * 2 );
 		if ( snapshotProfiling ) snapshotStats.geometryBytes += snapshotStats.copiedBytes - beforeStreams;
 		copy->ambientCache = Cache( source->ambientCache );
-		copy->indexCache = Cache( source->indexCache );
+		copy->indexCache = Cache( source->indexCache, true );
 		copy->shadowCache = Cache( source->shadowCache );
 		copy->lightingCache = Cache( source->lightingCache );
 		copy->gpuSkinningBindPoseVerts = CopyStream( source->gpuSkinningBindPoseVerts, source->numGpuSkinningVerts );
@@ -264,6 +285,8 @@ void R_FrameSnapshotStats_f( const idCmdArgs &args ) {
 }
 
 void R_RetireRenderSnapshots( frameData_t *frame ) {
+	retainedLeases[frame->slot].clear();
+	if ( !r_vkSnapshotRetain.GetBool() ) retainedIndexes.Clear();
 	for ( frameLightReceipt_s *receipt = frame->lightReceipts; receipt; receipt = receipt->next ) {
 		idRenderLightLocal *source = receipt->source;
 		const idRenderLightLocal *snapshot = receipt->snapshot;
@@ -277,6 +300,11 @@ void R_RetireRenderSnapshots( frameData_t *frame ) {
 		}
 	}
 	frame->lightReceipts = NULL;
+}
+
+void R_ClearRetainedSnapshotIndexes() {
+	for ( auto &leases : retainedLeases ) { leases.clear(); leases.shrink_to_fit(); }
+	retainedIndexes.Clear();
 }
 
 // Device uploads and light-grid residency changes run after joining the prior

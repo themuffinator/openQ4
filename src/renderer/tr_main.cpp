@@ -331,8 +331,10 @@ void R_AdvanceFrameData( void ) {
 R_ShutdownFrameData
 =====================
 */
+void R_ClearRetainedSnapshotIndexes();
 void R_ShutdownFrameData( void ) {
 	R_RenderThread_Sync( "frame shutdown" );
+	R_ClearRetainedSnapshotIndexes();
 	R_FreeDeferredFrameSurfaces();
 	frameData = NULL;
 	R_SetBackEndFrameData( NULL );

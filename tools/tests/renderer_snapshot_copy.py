@@ -10,6 +10,7 @@ from game_regression_suite import RegressionTemporaryDirectory
 ROOT = Path(__file__).resolve().parents[2]
 PREPARATION = r'''
 #include "FrameSnapshotCopy.h"
+#include "FrameSnapshotRetain.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -61,12 +62,34 @@ static void CheckPreparation(){
 '''
 CASES = r'''
 #include "FrameSnapshotCopy.h"
+#include "FrameSnapshotRetain.h"
 #include <cassert>
 #include <array>
 #include <memory>
 #include <vector>
 int main() {
  CheckPreparation();
+ // Immutable versions survive producer rewrites, eviction and frame retirement.
+ idFrameSnapshotRetainedIndexes indexStore(64);
+ std::uint32_t indices[4]={0,1,2,3};
+ auto original=indexStore.Acquire(indices,sizeof(indices));
+ auto hit=indexStore.Acquire(indices,sizeof(indices));
+ assert(hit.reused && hit.lease==original.lease);
+ indices[1]=7;
+ auto changed=indexStore.Acquire(indices,sizeof(indices));
+ assert(!changed.reused && changed.lease!=original.lease);
+ assert((*original.lease)[1]==1 && (*changed.lease)[1]==7);
+ auto shorter=indexStore.Acquire(indices,8);
+ assert(!shorter.reused && shorter.lease->size()==2);
+ std::weak_ptr<const idFrameSnapshotRetainedIndexes::block_t> weak=changed.lease;
+ indexStore.Clear(); assert(!weak.expired());
+ changed.lease.reset(); assert(weak.expired());
+ assert((*hit.lease)[1]==1);
+ std::uint32_t pressure[16]={};
+ auto evicted=indexStore.Acquire(pressure,sizeof(pressure));
+ indexStore.Acquire(indices,sizeof(indices));
+ assert((*evicted.lease)[0]==0 && !indexStore.Acquire(pressure,68).lease);
+
  std::vector<std::unique_ptr<unsigned char[]>> blocks;
  auto allocate=[&](std::size_t size)->void* {blocks.emplace_back(new unsigned char[size]);return blocks.back().get();};
  std::array<unsigned char,4096> source;source.fill(0x5a);
@@ -121,10 +144,15 @@ def main():
     (ROOT / ".tmp").mkdir(exist_ok=True)
     with RegressionTemporaryDirectory(prefix="snapshot-copy-", dir=ROOT / ".tmp") as directory:
         temp = Path(directory)
+        (temp / "FrameSnapshotRetain.h").write_text((ROOT / "src/renderer/FrameSnapshotRetain.h").read_text(), encoding="utf-8")
         for name, code, passed in (("production", header, True),
                                    ("borrowed-source", header.replace("return { copy, false };", "return { const_cast<void *>(source), false };"), False),
                                    ("size-blind", header.replace(" && entries[slot].bytes == bytes", "").replace(" ^ bytes;", ";"), False),
-                                   ("late-preparation", header, False)):
+                                   ("late-preparation", header, False), ("stale-retention", header, False)):
+            retention = (ROOT / "src/renderer/FrameSnapshotRetain.h").read_text()
+            if name == "stale-retention":
+                retention = retention.replace("std::memcmp( old->data(), source, bytes ) == 0", "true")
+            (temp / "FrameSnapshotRetain.h").write_text(retention, encoding="utf-8")
             body = preparation.replace("snapshot.Surface( view->drawSurfs[i], true, true )", "snapshot.Surface( view->drawSurfs[i], true, false )") if name == "late-preparation" else preparation
             (temp / "copy.cpp").write_text(PREPARATION + body + PREPARATION_CASE + CASES, encoding="utf-8")
             (temp / "FrameSnapshotCopy.h").write_text(code, encoding="utf-8")
@@ -133,7 +161,7 @@ def main():
             result = subprocess.run([str(exe)], capture_output=True, timeout=20)
             if (result.returncode == 0) != passed:
                 raise AssertionError(f"{name}: unexpected exit {result.returncode}")
-    print("Snapshot copies: complete-view preparation, alias reuse, distinct ranges, later-view isolation and three negative controls passed")
+    print("Snapshot copies: complete-view preparation, alias reuse, distinct ranges, later-view isolation and four negative controls passed")
 
 
 if __name__ == "__main__":

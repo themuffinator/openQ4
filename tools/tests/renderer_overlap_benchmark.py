@@ -127,6 +127,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--basepath", required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--retain-indexes", choices=("0", "1"), default="1")
     parser.add_argument("--sample-ms", type=int, default=8000)
     parser.add_argument("--warmup-ms", type=int, default=4000)
     parser.add_argument("--width", type=int, default=1280)
@@ -145,6 +146,7 @@ def main(argv=None):
     for key, value in {"in_mouse": 0, "in_joystick": 0, "in_nograb": 1,
                        "r_hiddenWindow": 0, "r_borderless": 0, "r_borderlessDefaultMigrated": 1}.items():
         bench_args += ["--set-launch-cvar", f"{key}={value}"]
+    bench_args += ["--set-cvar", f"r_vkSnapshotRetain={args.retain_indexes}"]
     for command in commands(args.sample_ms, args.warmup_ms):
         bench_args += ["--exec-command", command]
     monitor = HostLoad()
@@ -167,7 +169,7 @@ def main(argv=None):
         failures.append(str(error))
     result = {"status": "fail" if failures else "pass", "failures": failures,
               "qualification": "windowed functional performance comparison; no physical qualification",
-              "display": [args.width, args.height], "sample_ms": args.sample_ms,
+              "retained_indexes": args.retain_indexes, "display": [args.width, args.height], "sample_ms": args.sample_ms,
               "host_load_available": host_load["available"],
               "peer_activity_observed": host_load["peer_activity_observed"],
               "warmup_ms": args.warmup_ms, "benchmark_report": str(source),

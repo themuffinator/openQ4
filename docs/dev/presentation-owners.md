@@ -985,3 +985,69 @@ unrelated MP issue, alongside the existing scene-packet capacity fallback and
 post-restart Vulkan bootstrap label. Neither the copy-volume reduction nor
 these functional runs close the quiet timing, physical display/input or
 cross-platform qualification gates.
+
+### Retained index streams, 4 November 2026
+
+Mode 2 retains owned immutable index, silhouette-index and CPU index-cache
+payloads across views/frames. The producer validates the complete byte range
+before reuse; source addresses are lookup hints, not lifetime guarantees.
+Changed contents or lengths replace the cached version. Submitted frame leases
+keep old versions alive independently of eviction, model destruction or source
+address reuse. Retirement releases leases after the worker joins, and frame
+shutdown clears leases and cached payloads. The backend only reads these index
+streams. Vertex, skinning, palette and other mutable streams retain their
+existing per-view ownership path.
+
+The cache holds at most 64 MiB of payload and 32,768 entries. Leases for in-flight
+frames can temporarily retain evicted versions in addition to that budget.
+Oversized or non-word-sized ranges use ordinary frame copies. Whole-cache
+pressure eviction bounds bookkeeping; this is intentionally conservative.
+Validation reads the full stream, so avoided copy bytes do not imply equivalent
+CPU-time savings. `r_vkSnapshotRetain 0` disables retention and clears cached
+entries at retirement; it does not invalidate submitted leases.
+
+The comparison runner accepts `--retain-indexes 0` or `1` and records the
+selection. Run each against the same staged binary in a new output directory.
+The production-header native test covers unchanged reuse, changed contents,
+length changes, live leases through clear/eviction, lease release,
+capacity fallback and a stale-content negative control. The arena ownership
+suite checks shutdown/reinitialization with the new cleanup hook.
+
+Both same-binary runs passed all nine windows at windowed 1280 x 720 Quality,
+uncapped with VSync off. Each cell below is the median of three window
+statistics (milliseconds). These are shared-machine observations.
+
+| Retention | Mode | Mean | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| off | 0 | 8.374 | 7.95 | 13.55 | 22.60 |
+| off | 1 | 7.683 | 7.20 | 12.50 | 19.00 |
+| off | 2 | 9.862 | 9.05 | 17.45 | 23.45 |
+| on | 0 | 14.826 | 13.80 | 24.25 | 36.20 |
+| on | 1 | 17.474 | 13.70 | 35.75 | 42.25 |
+| on | 2 | 18.475 | 17.30 | 29.80 | 45.35 |
+
+Mode-2 copied bytes averaged 8,534,227/frame with retention disabled and
+7,568,048/frame enabled, an observed 11.32% reduction between these runs.
+Elapsed snapshot time averaged 2.900 ms and 5.225 ms, respectively. Unchanged
+modes 0/1 also slowed substantially; no timing improvement is established.
+Competing games/build tools appeared in all 164 disabled and 169 enabled host
+samples (mean host CPU 90.2% and 86.9%). Quiet paired runs remain required.
+
+Evidence is under `.tmp/high-refresh-retain/off/` and `on/`, including full
+window statistics, host load, engine captures, runtime hashes and launch
+configuration. The Windows x64 build/stage and all 15 focused Meson tests
+passed (`build.log`, `install.log`, `tests.log`). No renderer API change is
+required by this iteration.
+
+The final stock-asset Vulkan SP and MP host/client plus OpenGL SP control pass.
+Submitted/completed counts match at 768/768 SP, 1,122/1,122 host and 863/863
+client. Each Vulkan role starts and finishes front ends while the worker is
+busy. All four roles record five flash receipts and 128 presentation samples
+with no gameplay during drawing. Ownership self-tests, GPU skinning, TAA,
+motion blur, scaling/dynamic resolution, shader reload and Vulkan surface
+recovery/restart pass. Engine screenshots were inspected; tests were windowed
+with no OS capture or device-input injection. See `retained-summary.json` and
+its per-case gameplay reports. Path portability and validation wiring pass too.
+The earlier MP shutdown overflow was not reproduced in this run; existing
+scene-packet capacity fallback and post-restart Vulkan bootstrap labeling remain
+outside this iteration.
