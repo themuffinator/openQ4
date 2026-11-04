@@ -114,7 +114,7 @@ def gui_fixtures(data):
     raise AssertionError('No framed, nonempty GUI record was found.')
 
 
-def damaged_fixtures(data, spawn_refs=False, threads=False):
+def damaged_fixtures(data, spawn_refs=False, threads=False, events=False):
     _, metadata = checksum_fixture(data)
     position = metadata['server_info_sync']
     sequence = 0
@@ -183,7 +183,7 @@ def damaged_fixtures(data, spawn_refs=False, threads=False):
     client_entities = table(capacity('CENTITYNUM_BITS'))
     first_free_offset = position
     assert 0 <= integer() < capacity('GENTITYNUM_BITS')
-    if spawn_refs or threads:
+    if spawn_refs or threads or events:
         assert 0 <= integer() <= 4096  # num_entities
         assert 0 < integer() <= metadata['objects']  # world
         for maximum in (4096, 8192, 4096, 4096):
@@ -230,6 +230,11 @@ def damaged_fixtures(data, spawn_refs=False, threads=False):
         original = integer()  # lastAIAlertActor
         skip(3*4)  # lastAIAlertEntity and both alert times
         dictionary()  # spawnArgs proves the next complete sync boundary
+        if events:
+            skip(4*4+12)  # player PVS, connected areas and gravity
+            boolean()  # influenceActive
+            skip(4)  # nextGibTime
+            return event_fixtures(data, position)
         parsed, _ = render_handle_fixture(data)
         entity = parsed['ForeignModelHandle'][1]
         assert entity['entity_class'] == 'func_static'
@@ -260,6 +265,98 @@ def damaged_fixtures(data, spawn_refs=False, threads=False):
         fixtures[name] = (bytes(changed), dict(offset=offset, original=original, replacement=value, expected=expected))
     metadata.update(clients=clients, registered_entities=len(entities), registered_clients=len(client_entities))
     return fixtures, metadata
+
+
+def event_fixtures(data, offset):
+    """Decode the first two typed queue entries before mutating their fields."""
+    entries, metadata = class_table(data)
+    classes = {entry['index']: entry['name'] for entry in entries}
+    position = offset
+
+    def integer():
+        nonlocal position
+        assert position+4 <= len(data)-16
+        value = struct.unpack_from('<i', data, position)[0]
+        position += 4
+        return value
+
+    def string():
+        nonlocal position
+        begin = position
+        size = integer()
+        assert 0 <= size < 4096 and position+size <= len(data)-16
+        value = data[position:position+size].decode('ascii')
+        position += size
+        return begin, position, value
+
+    formats = {}
+    for source in (ROOT/'src/game').rglob('*.cpp'):
+        for name, arguments in re.findall(
+                r'\bidEventDef\s+\w+\s*\(\s*"([^"\n]+)"\s*(?:,\s*(NULL|"[^"]*"))?', source.read_text()):
+            value = arguments.strip('"') if arguments != 'NULL' else ''
+            assert name not in formats or formats[name] == value
+            formats[name] = value
+    count = integer()
+    assert 2 <= count <= 8192
+    records = []
+    for _ in range(2):
+        record = dict(time_offset=position, time=integer())
+        record['name_start'], record['name_end'], record['name'] = string()
+        record['type_start'], record['type_end'], record['type'] = string()
+        record['target_offset'] = position
+        record['target'] = integer()
+        assert classes[record['target']] == record['type']
+        record['format_offset'] = position
+        assert integer() == -2
+        for argument in formats[record['name']]:
+            if argument in 'fdeE':
+                integer()
+            elif argument == 'y':
+                integer(); integer()
+            elif argument == 'v':
+                integer(); integer(); integer()
+            elif argument == 's':
+                string()
+            else:
+                raise AssertionError('Use a source with no trace arguments in its first two events.')
+        records.append(record)
+    first, second = records
+    assert -2147483648 < first['time'] <= second['time']
+    result = {}
+
+    def mutate(name, begin, end, replacement, expected, **details):
+        assert len(replacement) == end-begin, 'Preserve the embedded footer offset.'
+        changed = bytearray(data[:begin]+replacement+data[end:])
+        struct.pack_into('<I', changed, len(changed)-4, zlib.crc32(changed[:-16]))
+        checksum_fixture(changed)
+        result[name] = (bytes(changed), dict(offset=begin, original_hex=data[begin:end].hex(),
+            replacement_hex=replacement.hex(), expected=expected, **details))
+
+    def number(name, begin, value, expected):
+        mutate(name, begin, begin+4, struct.pack('<i', value), expected)
+
+    def text(name, field, value, expected):
+        encoded = value.encode('ascii')
+        mutate(name, first[field+'_start'], first[field+'_end'], struct.pack('<i', len(encoded))+encoded,
+               expected, replacement_text=value)
+
+    number('NegativeEventCount', offset, -1, 'idEvent::Restore: invalid event count -1')
+    number('EventQueueOrder', second['time_offset'], first['time']-1, 'idEvent::Restore: event 1 is out of order')
+    missing_name, missing_type = 'x'*len(first['name']), 'x'*len(first['type'])
+    assert missing_name not in formats and missing_type not in classes.values()
+    text('MissingCallback', 'name', missing_name, "idEvent::Restore: unknown event '%s'" % missing_name)
+    text('MissingTargetClass', 'type', missing_type, "idEvent::Restore: unknown class '%s'" % missing_type)
+    number('NullEventTarget', first['target_offset'], 0, "event '%s' has a NULL target object" % first['name'])
+    number('BadEventArguments', first['format_offset'], -1, 'idEvent::Restore: invalid arg size -1')
+    # setShader belongs to idLight, not idThread, and has the same name length.
+    # Rejection must precede its differing argument layout.
+    assert (first['type'], first['name']) == ('idThread', '<execute>')
+    unsupported = 'setShader'
+    assert formats[unsupported] == 's'
+    text('UnsupportedEvent', 'name', unsupported,
+         "target class '%s' does not support event '%s'" % (first['type'], unsupported))
+    metadata.update(event_count=count, first_events=records)
+    return result, metadata
 
 
 def thread_fixtures(data, frame_offset, frame_reference):
@@ -981,7 +1078,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--ui', choices=('retained', 'classic'), default='retained')
     parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
-    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics', 'animation', 'af'), default='registrations')
+    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics', 'animation', 'af', 'events'), default='registrations')
     parser.add_argument('--unavailable-pause-menu', action='store_true',
                         help='Also exercise optional retained-menu fallback during valid save loading.')
     parser.add_argument('--timeout', type=int, default=240)
@@ -1005,7 +1102,8 @@ def main():
                          else render_handle_fixture(original, bindings=args.cases == 'bindings', movers=args.cases == 'movers',
                                                     physics=args.cases == 'physics')
                          if args.cases in ('render-handles', 'bindings', 'movers', 'physics')
-                         else damaged_fixtures(original, spawn_refs=args.cases == 'spawn-refs', threads=args.cases == 'threads'))
+                         else damaged_fixtures(original, spawn_refs=args.cases == 'spawn-refs', threads=args.cases == 'threads',
+                                               events=args.cases == 'events'))
     output.mkdir(parents=True, exist_ok=False)
     save = output/'save'
     # A separate test mod gives the local fault fixture precedence over staged

@@ -1116,6 +1116,58 @@ Evidence is retained under `.tmp/q4-af/`, indexed by `evidence.json`. These
 checks cover the identified AF restore boundaries, not every owning graph,
 ragdoll behavior or target platform; Q4-05 remains open.
 
+### Event queues and interrupted legacy arguments
+
+The next 4 November Q4-05 change checks queued events in both game libraries
+before accepting their arguments. The restored target must support the saved
+callback, matching `PostEventArgs` admission. Event times must remain in
+ascending order, matching `Schedule`; equal times and negative signed times
+remain valid. Without ordering, `ServiceEvents` could stop at a future event
+and leave earlier due events behind it. These failures use the existing
+semantic-restore recovery flow.
+
+The temporary buffer used to convert legacy raw arguments now has a scoped
+owner. Previously, an exception during its raw read leaked that allocation.
+The aligned destination remains owned by the event pool, including partially
+restored events. The allocation tag, argument layouts, writer and historical
+readers are unchanged; no save migration is needed.
+
+`savegame_restore_events.py` compiles the production queue restore, legacy
+layout/conversion, event release and queue cleanup functions with the real
+linked-list implementation. A tracked allocator and reader inject failures at
+every queue-field read and allocation in typed and legacy multi-event queues.
+It checks count limits, names, classes, NULL/wrong/unsupported targets, argument
+sizes, descending times, equal-time stability, empty/full queues and a healthy
+retry after each rejection. The typed integer codec is a fixture boundary;
+codec correctness remains covered by the separate save-codec tests. Windows
+and Linux pass both game modules and reject **eight deliberate regressions per
+platform**. The focused Windows save/restore and vehicle suite passes **60/60**.
+
+The runtime harness's `--cases events` creates seven CRC-valid damaged copies
+of a healthy Storage1 save. It decodes the global fields and first two typed
+events before changing counts, ordering, callback/class names, NULL targets or
+argument format. Every edit preserves field lengths and the embedded footer
+offset. An initial fixture implementation changed string lengths and failed
+qualification at preflight instead of reaching event restore; its report is
+retained. That failed run is not counted as event-boundary coverage.
+
+The corrected Windows x64 candidate passes **all seven cases on each of
+OpenGL and Vulkan**: each expected restore error is followed by the retained
+Load Game page, then the healthy save reloads in the same process. Every input
+file remains unchanged. Engine captures confirm the recovery page and matching
+restored Storage1 scene; hidden windowed runs disable device input.
+
+All **11 existing 0.9–0.13 historical fixtures** also restore and run gameplay
+on OpenGL, with their original files unchanged. This is regression coverage of
+the existing corpus, not new original-writer evidence. Existing UI/asset
+precache warnings remain in the runtime logs.
+
+Evidence is retained under `.tmp/q4-events/`, indexed by `evidence.json` with
+runtime/source hashes, native and runtime results, the initial failed fixture
+run and the inspected engine capture sheet. These checks cover the identified
+event-queue boundaries; Q4-05's broader owning-graph and platform qualification
+remains open.
+
 ### Saving before the first frame after a load
 
 Fixed 3 November (Q4-05), in both game libraries. `ReadStaticObject` queued

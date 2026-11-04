@@ -1851,6 +1851,16 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   reload on OpenGL/Vulkan. Healthy body poses survive frozen restore, the resave
   reloads, and all 11 existing 0.9–0.13 fixtures still restore into gameplay.
   This closes the identified AF boundaries, not the broader graph/platform gate.
+  Event-queue follow-up, 4 November: [queued callbacks and legacy argument
+  ownership](savegame-reliability.md#event-queues-and-interrupted-legacy-arguments)
+  now reject unsupported target callbacks and descending event times, and free
+  temporary legacy buffers after interrupted reads. Both game libraries pass
+  Windows/Linux read/allocation-failure fixtures and eight negative controls per
+  platform; the focused Windows suite passes 60/60. Save layouts are unchanged.
+  Seven CRC-valid damaged-event cases per renderer recover to Load Game and
+  reload the healthy save on OpenGL/Vulkan, with all input files unchanged.
+  All 11 existing 0.9–0.13 fixtures still restore into gameplay. Broader owning
+  graphs and other target platforms remain open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.

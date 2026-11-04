@@ -6,6 +6,18 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Damaged queued events recover safely, 4 November 2026
+
+- Saves with unsupported queued callbacks or out-of-order event times now
+  return to Load Game instead of silently dropping or delaying actions.
+  Interrupted reads of legacy event arguments also release their temporary
+  memory. Healthy saves retain their existing format and compatibility readers.
+- Both game libraries pass Windows/Linux failure and regression controls; the
+  focused Windows suite passes 60 checks. Seven damaged-save cases recover and
+  allow a healthy reload on each of OpenGL and Vulkan; all 11 existing historical
+  fixtures still restore into gameplay.
+  See [scope and evidence](savegame-reliability.md#event-queues-and-interrupted-legacy-arguments).
+
 ## Damaged ragdoll saves recover safely, 4 November 2026
 
 - Saves with inconsistent ragdoll owners, missing required definitions or
