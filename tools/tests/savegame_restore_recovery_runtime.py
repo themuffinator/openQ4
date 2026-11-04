@@ -414,6 +414,177 @@ def thread_fixtures(data, frame_offset, frame_reference):
     return result, metadata
 
 
+def animation_fixtures(data):
+    """Decode complete actor frames before editing embedded IK/animation owners."""
+    entries, metadata = class_table(data)
+    classes = {entry['index']: entry['name'] for entry in entries}
+    foreign = next(index for index, name in classes.items() if name == 'idWorldspawn')
+    for marker in re.finditer(re.escape(b'OQ4Y'), data):
+        position = marker.start()
+        sequence = struct.unpack_from('<i', data, position+4)[0]
+        calls = []
+
+        def integer():
+            nonlocal position
+            value = struct.unpack_from('<i', data, position)[0]
+            position += 4
+            return value
+
+        def skip(size):
+            nonlocal position
+            assert 0 <= size < 1048576 and position+size <= len(data)
+            position += size
+
+        def string():
+            size = integer()
+            assert 0 <= size < 4096
+            value = data[position:position+size].decode('ascii')
+            skip(size)
+            return value
+
+        def boolean():
+            nonlocal position
+            value = data[position]
+            assert value in (0, 1)
+            position += 1
+            return value
+
+        def count(maximum):
+            value = integer()
+            assert 0 <= value <= maximum
+            return value
+
+        def sync():
+            nonlocal sequence
+            assert integer() == int.from_bytes(b'OQ4Y', 'little') and integer() == sequence
+            sequence += 1
+
+        def state_thread():
+            name = string()
+            skip(8)  # result and typed flags
+            for kind in ('active', 'interrupted'):
+                for _ in range(count(65536)):
+                    offset = position+4
+                    function = string()
+                    assert function
+                    calls.append(dict(kind=kind, offset=offset, function=function))
+                    skip(20)  # flags, delay and state parameters
+            return name
+
+        try:
+            sync()  # idAFEntity_Gibbable start
+            boolean()
+            boolean()
+            sync()  # idAFEntity_Gibbable end
+            sync()  # idActor start
+            skip(8+36)  # team, rank, viewAxis
+            skip(count(4096)*4)  # enemies
+            skip(8+12+4*12+8)  # lightning, FOVs, offsets/angles, pain timers
+            for _ in range(count(65536)):
+                string()  # damage groups
+            skip(count(65536)*4)  # damage scales
+            boolean()  # inDamageEvent
+            boolean()  # use_combat_bbox
+            skip(7*4)  # joints
+            initialized_offset = position
+            initialized = boolean()
+            active_offset = position
+            active = boolean()
+            ik_owner_offset = position
+            ik_owner = integer()
+            assert ik_owner == 0 or ik_owner in classes
+            ik_anim_offset = position+4
+            ik_anim = string()
+            skip(12)  # model offset
+            if boolean():  # foot clip model
+                boolean()
+                skip(4+4+4+12+36+24+24+4)
+                string()
+                skip(8)
+                boolean()
+                skip(4)
+                boolean()
+            count(8)  # numLegs
+            count(255)  # enabledLegs
+            skip(5*8*4+4+2*8*12+2*8*4+2*8*36)  # joint arrays, directions, lengths, axes
+            skip(8*4)  # smoothing/trace distances
+            boolean()
+            boolean()
+            skip(4+4+12)  # pivot
+            boolean()
+            skip(4+8*4+12)  # old heights, waist offset
+            for _ in range(3):
+                string()  # animation/pain names
+            skip(4*4)  # blink
+            states = []
+            for expected_channel in (3, 1, 2):  # HEAD, TORSO, LEGS
+                boolean()
+                skip(8)
+                owner_offset = position
+                owner, animator_owner, channel = integer(), integer(), integer()
+                assert owner == animator_owner and owner in classes and channel == expected_channel
+                assert ik_owner in (0, owner)
+                if states:
+                    assert owner == states[0]['owner']
+                boolean()
+                thread_name = state_thread()
+                assert thread_name.endswith(f'_anim_{channel}')
+                states.append(dict(owner=owner, owner_offset=owner_offset, animator_offset=owner_offset+4,
+                                   thread_name=thread_name, channel=channel))
+            state_thread()
+            skip(4)  # head spawn ID
+            for _ in range(3):
+                boolean()
+            skip(4)  # pain time
+            skip(count(4096)*8)  # attachments
+            skip(8+4+4+12)  # vehicle controller and flashlight handle/joint/offset
+            sync()  # render light
+            skip(36+12+8)
+            for _ in range(6):
+                boolean()
+            skip(4+7*12+4)
+            string()  # material
+            skip(12*4+4+4+12+4)  # shader parms, sound and death push
+            sync()  # idActor end
+            assert classes[owner] == 'rvMonsterGrunt' and calls
+            # Some stock actors have no leg IK. Mark those records initialized
+            # to exercise the resource gate without changing the payload length.
+            definitions = [
+                ('ForeignIKOwner', [(ik_owner_offset, foreign, '<i')], 'idIK::Restore: inconsistent owner reference'),
+                ('NullActiveIKOwner', [(ik_owner_offset, 0, '<i'), (initialized_offset, 1, '<B')], 'idIK::Restore: active IK has no owner, model or animation'),
+                ('ForeignAnimOwner', [(states[0]['owner_offset'], foreign, '<i')], 'idAnimState::Restore: inconsistent owner references'),
+                ('NullAnimOwner', [(states[0]['owner_offset'], 0, '<i')], 'idAnimState::Restore: inconsistent owner references'),
+                ('ForeignAnimatorOwner', [(states[0]['animator_offset'], foreign, '<i')], 'idAnimState::Restore: inconsistent owner references'),
+                ('NullAnimatorOwner', [(states[0]['animator_offset'], 0, '<i')], 'idAnimState::Restore: inconsistent owner references'),
+            ]
+            result = {}
+            for label, edits, expected in definitions:
+                changed = bytearray(data)
+                for offset, value, fmt in edits:
+                    struct.pack_into(fmt, changed, offset, value)
+                struct.pack_into('<I', changed, len(changed)-4, zlib.crc32(changed[:-16]))
+                result[label] = bytes(changed), dict(object_reference=owner, object_class=classes[owner],
+                    states=states, class_offset=marker.start(), edits=edits, expected=expected)
+            changed = bytearray(data)
+            struct.pack_into('<i', changed, ik_owner_offset, owner)
+            struct.pack_into('<B', changed, initialized_offset, 1)
+            changed[ik_anim_offset:ik_anim_offset+len(ik_anim)] = b'x'*len(ik_anim)
+            struct.pack_into('<I', changed, len(changed)-4, zlib.crc32(changed[:-16]))
+            result['MissingIKAnimation'] = bytes(changed), dict(object_reference=owner, animation=ik_anim,
+                animation_offset=ik_anim_offset, expected='idIK::Restore: active IK has no owner, model or animation')
+            call = calls[0]
+            changed = bytearray(data)
+            replacement = 'x'*len(call['function'])
+            changed[call['offset']:call['offset']+len(replacement)] = replacement.encode('ascii')
+            struct.pack_into('<I', changed, len(changed)-4, zlib.crc32(changed[:-16]))
+            result['UnknownActorState'] = bytes(changed), dict(object_reference=owner, call=call,
+                expected="stateCall_t::Restore: unknown state '%s'" % replacement)
+            return result, metadata
+        except (AssertionError, IndexError, UnicodeError, struct.error):
+            continue
+    raise AssertionError('No complete actor frame was found.')
+
+
 def render_handle_fixture(data, bindings=False, movers=False, physics=False):
     """Locate a v4 entity with empty GUI slots, using its named class record.
 
@@ -653,7 +824,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--ui', choices=('retained', 'classic'), default='retained')
     parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
-    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics'), default='registrations')
+    parser.add_argument('--cases', choices=('registrations', 'render-handles', 'bindings', 'spawn-refs', 'movers', 'factories', 'threads', 'classes', 'guis', 'physics', 'animation'), default='registrations')
     parser.add_argument('--unavailable-pause-menu', action='store_true',
                         help='Also exercise optional retained-menu fallback during valid save loading.')
     parser.add_argument('--timeout', type=int, default=240)
@@ -669,7 +840,8 @@ def main():
         if sha(ROOT/'builddir'/relative) != sha(runtime/relative):
             parser.error('Stage the current build before running this probe: '+relative)
     original = source.read_bytes()
-    fixtures, metadata = (gui_fixtures(original) if args.cases == 'guis'
+    fixtures, metadata = (animation_fixtures(original) if args.cases == 'animation'
+                         else gui_fixtures(original) if args.cases == 'guis'
                          else object_class_fixtures(original) if args.cases == 'classes'
                          else factory_fixtures(original) if args.cases == 'factories'
                          else render_handle_fixture(original, bindings=args.cases == 'bindings', movers=args.cases == 'movers',

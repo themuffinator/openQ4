@@ -548,6 +548,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "savegame_restore_cleanup.py",
         root / "tools" / "tests" / "savegame_restore_resources.py",
         root / "tools" / "tests" / "savegame_restore_physics.py",
+        root / "tools" / "tests" / "savegame_restore_animation.py",
         root / "tools" / "tests" / "savegame_restore_gui.py",
         root / "tools" / "tests" / "savegame_restore_identity.py",
         root / "tools" / "tests" / "savegame_restore_movers.py",

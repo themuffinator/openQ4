@@ -70,7 +70,7 @@ public:
 							~idAnimState();
 
 	void					Save( idSaveGame *savefile ) const;
-	void					Restore( idRestoreGame *savefile );
+	void					Restore( idRestoreGame *savefile, idEntity *owner );
 
 	void					Init( idEntity *owner, idAnimator *_animator, int animchannel );
 	void					Shutdown( void );

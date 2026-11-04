@@ -1823,6 +1823,16 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   pass. CRC-valid OpenGL/Vulkan interruption probes return to recovery and reload
   the healthy save, and all 11 existing 0.9–0.13 fixtures restore with their input
   files unchanged. Broader owning graphs and other platforms remain open.
+  Further progress, 4 November: [actor animation and IK ownership, plus
+  interrupted state-call allocations](savegame-reliability.md#actor-animation-ownership-and-interrupted-state-calls)
+  now reject inconsistent owners and missing active resources without publishing
+  unsafe state. Inactive IK and saved layouts are preserved. Both libraries pass
+  Windows/Linux field-failure fixtures and 18 negative controls per platform;
+  the focused Windows suite passes 54/54. Eight CRC-valid corruption cases per
+  renderer recover to Load Game on OpenGL/Vulkan and reload a healthy save.
+  All 11 existing 0.9–0.13 release fixtures also restore and run gameplay on
+  OpenGL. Every input save remains unchanged.
+  Broader owning graphs and other platforms remain open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.

@@ -6,6 +6,17 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Damaged actor saves recover safely, 4 November 2026
+
+- Loading a save with inconsistent actor animation or IK data now returns to
+  Load Game instead of risking a crash or using another actor's animation state.
+  A failed load also releases partially restored state callbacks.
+- Healthy saves keep their existing format and compatibility readers. Both game
+  libraries pass the new Windows/Linux failure tests; the focused Windows suite
+  passes 54 checks. Eight damaged-save cases recover and allow a healthy reload
+  on OpenGL and Vulkan, and all 11 existing 0.9–0.13 release fixtures still load
+  into gameplay. See [scope and evidence](savegame-reliability.md#actor-animation-ownership-and-interrupted-state-calls).
+
 ## Multiplayer bot recovery follow-up, 4 November 2026
 
 - Bots can steer a dangerous knockback slide before leaving the floor and

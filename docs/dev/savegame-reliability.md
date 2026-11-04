@@ -1013,6 +1013,45 @@ now directs assertions to stderr and disables that dialog. A timed-out
 mutation is a test failure, not evidence that the golden-byte checks caught it.
 All eight codec mutations terminate and fail as expected on Windows.
 
+### Actor animation ownership and interrupted state calls
+
+The 4 November Q4-05 continuation fixes three more restore paths in both game
+libraries, without changing saved bytes or the compatibility readers:
+
+- Embedded head, torso and leg animation states receive their containing actor
+  explicitly. Their two saved owner references must agree with that actor; they
+  cannot select another object's animator or redirect its state callbacks.
+- IK consumes its saved owner as a temporary reference. A foreign owner is
+  refused, and initialized or active IK must have an owner, model and animation.
+  Previously, a missing animator produced a warning followed by a NULL
+  dereference. Failed reads now leave the component inactive. Legitimately
+  uninitialized IK, including a failed or never-attempted `Init`, still loads.
+- Active and interrupted state calls keep scoped ownership until their complete
+  record joins the thread's list. An unknown state function or an interrupted
+  field read no longer leaks the partially restored call.
+
+`savegame_restore_animation.py` compiles the production animation/IK readers,
+state-thread readers, state-call readers and list cleanup from both libraries.
+It tests every field-read failure, NULL/foreign owners, missing resources,
+channel bounds, inactive IK and unknown callbacks in each list position. Both
+the old raw flags and typed flags are exercised. Windows and Linux pass all
+cases; all **18 deliberate regressions** are detected on each platform. The
+focused Windows Meson save/restore suite passes **54/54**.
+
+The runtime harness's `animation` fixtures decode a complete Storage1 grunt
+actor record before changing references, activation flags or a state function.
+They retain valid outer checksums, so rejection occurs inside object restore.
+The eight cases on each of OpenGL and Vulkan return to the retained Load Game
+page, then the healthy save reloads into gameplay in the same process. Every
+input save stays unchanged.
+Engine captures confirm the refusal screen and restored scene. Reports, package
+identities and native logs are retained under `.tmp/q4-animation/`.
+The final staged package also restores all **11 existing 0.9–0.13 fixtures** and
+runs thirty gameplay tics on OpenGL, preserving every original input. This is
+regression coverage of the existing corpus, not new Q4-07 original-writer evidence.
+These checks cover the identified actor and state-call paths; broader owning
+graphs and platform qualification remain open under Q4-05.
+
 ### Saving before the first frame after a load
 
 Fixed 3 November (Q4-05), in both game libraries. `ReadStaticObject` queued
