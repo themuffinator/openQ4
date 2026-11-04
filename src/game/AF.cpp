@@ -90,7 +90,7 @@ void idAF::Restore( idRestoreGame *savefile, idEntity *owner ) {
 		}
 	}
 
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, owner );
 	physicsObj.SetSelf( owner );
 
 	if ( self ) {

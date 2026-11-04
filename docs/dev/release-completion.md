@@ -2078,6 +2078,18 @@ completed release material here and publish curated notes in `releases/`.
 
 ## Unreleased corrections after the withdrawn 0.14.000 build
 
+- [x] Recover safely when a damaged save fails partway through physics or
+  vehicle data. Partial physics state no longer points cleanup at another
+  entity or indexes unset contacts, and failed vehicle-part reads release their
+  allocations. Invalid vehicle seat references fail with a load error. Existing
+  save formats are unchanged. Windows/Linux fault-injection controls and the
+  Windows save/restore suite pass; runtime evidence and remaining scope are in
+  [save reliability](savegame-reliability.md#physics-and-vehicle-ownership-at-interrupted-field-boundaries).
+
+Candidate save release wording: Loading a damaged save now recovers more
+reliably when its physics or vehicle data is incomplete, so you can choose
+another save without restarting the game. Valid saves keep their existing format.
+
 - [x] Clarify UI defaults against the source and release tag: current
   `Session_menu.cpp` declares archived `ui_retained 1`; tag `v0.14.000`
   declared 0 before commit `1aa2332d9` restored 1. Align current player and
@@ -2090,7 +2102,7 @@ completed release material here and publish curated notes in `releases/`.
   credit. Distinguish its Apple Silicon/Intel Universal 2 download from our
   unsigned Apple Silicon preview packages on GitHub.
 
-- [ ] Keep script-choreographed movers at their authored speed in Turbo mode
+- [x] Keep script-choreographed movers at their authored speed in Turbo mode
   (#184). Turbo doubled every mover, but map scripts time their own waits and
   actors against a `func_mover`: hangar1's Viper Squad lift arrived about 3.5 s
   early, `aiScriptedStop` released Tech Li before his scripted stand-and-turn
@@ -2099,6 +2111,10 @@ completed release material here and publish curated notes in `releases/`.
   time with `g_turboMode 1`, released with it off and with this change. Plain
   `func_mover`s now keep their timing; doors, platforms, elevators and decorative
   movers are still sped up. `turbo_scripted_movers.py` checks the exemption.
+  On 4 November the reusable fresh-map lift probe passes boarding, ascent,
+  release and the exit tether on OpenGL and Vulkan. A separate runtime with the
+  exemption removed reproduces the stuck actor. Already-stuck saves still
+  require a pre-lift save; see the [qualification](retail-baseline-ledger.md#hangar-perimeter-lift-4-november-2026).
 
 Candidate gameplay release wording: In Turbo mode, Tech Li no longer freezes
 after the Viper Squad lift in Hangar Perimeter; lifts and machinery that levels

@@ -411,7 +411,7 @@ void rvClientMoveable::Restore( idRestoreGame *savefile ) {
 	trailEffect.Restore( savefile );
 	savefile->ReadFloat( trailAttenuateSpeed );
 		
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, gameLocal.entities[ENTITYNUM_CLIENT] );
 	
 	savefile->ReadInt( bounceSoundTime );
 	savefile->ReadSoundShader( bounceSoundShader );

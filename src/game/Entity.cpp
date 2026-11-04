@@ -1016,7 +1016,7 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 	forwardDamageEnt.Restore ( savefile );
 // RAVEN END
 
-	savefile->ReadStaticObject( defaultPhysicsObj );
+	savefile->ReadPhysicsObject( defaultPhysicsObj, this );
 	defaultPhysicsObj.SetSelf( this );
 	RestorePhysics( &defaultPhysicsObj );
 

@@ -328,6 +328,17 @@ still unavailable. Both reports still fail foreground qualification (zero
 focused observations). These are corrected diagnostic fixtures, not a passing
 repeated foreground test.
 
+The 4 November visible retry in
+`.tmp/vk-roadmap/presentation-visible-nov4/` retains unchanged runtime/harness
+hashes and records 2,398 presented samples with p99 13.286 ms. Foreground
+ownership was observed in 116 of 188 polls, so the continuous-focus gate still
+fails. Two MP-worktree clients appeared after launch and were observed during
+sampling, independently failing the contention gate. The window-control helper
+reported the live test window under the installed `E:\Games\OpenQ4` application
+identity and refused activation because of an ownership mismatch, although the
+observed process was the worktree executable. Permission to show the test was
+already granted; this is not an authorization failure or passing qualification.
+
 No driver, power-state or support-scope exception is approved by these results.
 Current foreground repeats, verified direct/hybrid routing, alternate power
 states and suitable presentation tracing on Intel remain open under VK-02.

@@ -15,6 +15,7 @@ SUPPORT = r'''
 #include <cstdio>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <vector>
 template<class T> struct idList {
     std::vector<T> data;
@@ -26,11 +27,17 @@ template<class T> struct idList {
     void AssureSize(int n) { if(Num()<n) SetNum(n); }
     void DeleteContents(bool clear) { for(auto p:data) delete p; if(clear) Clear(); }
 };
-static int clips=0, dicts=0, traces=0, callbacks=0, queued=0;
+static int clips=0, dicts=0, traces=0, callbacks=0, queued=0, parts=0;
 static bool complete=false, validated=false;
 static const int EV_PostRestore=1;
 struct idRestoreGame;
-struct idTypeInfo {};
+struct idClass;
+struct idTypeInfo {
+    bool IsType(int) { return true; }
+    idClass* CreateInstance();
+};
+using idStr=std::string;
+static int factoryMode=0;
 struct idClass {
     bool restored=false;
     virtual ~idClass()=default;
@@ -39,6 +46,7 @@ struct idClass {
     const idTypeInfo* GetType() const { return nullptr; }
     void PostEventMS(const int*,int) { ++queued; }
     void ProcessEvent(const int*) { assert(complete && validated && restored); ++callbacks; }
+    static idTypeInfo* GetClass(const idStr&) { static idTypeInfo type; return &type; }
 };
 struct idEntity : idClass {
     static int GetClassType() { return 1; }
@@ -72,6 +80,7 @@ struct Hash { void Add(int,int){} } traceModelHash;
 static const int MAX_SAVEGAME_TRACE_MODELS=20, OPENQ4_SAVEGAME_PORTABLE_COMPATIBILITY_VERSION=5;
 static const int MAX_SAVEGAME_INVENTORY_ITEMS=20, MAX_SAVEGAME_STATIC_MULTI_STATES=20;
 static const int MAX_SAVEGAME_STATIC_MULTI_CLIP_MODELS=20;
+static const int MAX_SAVEGAME_VEHICLE_PARTS=20, MAX_SAVEGAME_VEHICLE_WEAPONS=20;
 static bool validTrace=true;
 static bool SaveGameTraceModelBoundsCheck(int){return validTrace;}
 static int GetTraceModelHashKey(int v){return v;}
@@ -94,6 +103,8 @@ struct idRestoreGame {
     void ReadTraceModel(int& v){Tick(); v=0;}
     void Read(void*,size_t){Tick();}
     void ReadDict(idDict*){Tick(); Tick(); Tick();}
+    void ReadString(idStr& value){Tick(); value="part";}
+    void ReadJoint(int& value){ReadInt(value);}
     template<class T> void ReadObject(T*& v){Tick(); v=nullptr;}
     int GetOpenQ4SaveGameCompatibilityVersion(){return version;}
     [[noreturn]] void Error(const char*,...){throw std::runtime_error("invalid data");}
@@ -102,7 +113,7 @@ struct idRestoreGame {
     void ReadSaveGameFooter(){Tick(); complete=true;}
     void CallRestore_r(const idTypeInfo*,idClass* obj){
         Tick(); obj->restored=true;
-        if(obj==objects[1]) { ReadStaticObject(embedded[0]); ReadStaticObject(embedded[1]); }
+        if(objects.Num()>1 && obj==objects[1]) { ReadStaticObject(embedded[0]); ReadStaticObject(embedded[1]); }
     }
     void ReadClipModel(idClipModel*&);
     void ReadStaticObject(idClass&);
@@ -127,9 +138,64 @@ struct Inventory {
     ~Inventory(){items.DeleteContents(true);}
     void Restore(idRestoreGame*);
 };
+struct Vehicle {
+    int positions=3;
+    int* GetPosition(int index) { assert(index>=0 && index<positions); return &positions; }
+    int GetNumPositions() const { return positions; }
+};
+static Vehicle* savedParent=nullptr;
+struct ParentRef {
+    Vehicle* value=nullptr;
+    void Restore(idRestoreGame* input) { input->Tick(); value=savedParent; }
+    Vehicle* operator->() const { return value; }
+    explicit operator bool() const { return value!=nullptr; }
+};
+struct rvVehiclePart : idClass {
+    ParentRef parent;
+    struct { bool active,left,front,useCenterMass,useViewAxis; } fl{};
+    idDict spawnArgs;
+    int joint=0,soundChannel=0,worldOrigin=0,worldAxis=0,localOffset=0;
+    int* position=nullptr;
+    rvVehiclePart(){++parts;}
+    ~rvVehiclePart(){--parts;}
+    static int GetClassType(){return 1;}
+    void Restore(idRestoreGame*);
+};
+template<size_t N> void SaveCodec_ReadFlagBytes(idRestoreGame& input,bool (&flags)[N]) {
+    input.Tick(); for(auto& flag:flags) flag=false;
+}
+idClass* idTypeInfo::CreateInstance() {
+    if(factoryMode==1) return nullptr;
+    if(factoryMode==2) throw std::runtime_error("throwing factory");
+    return new rvVehiclePart;
+}
+struct { [[noreturn]] void Error(const char*,...){throw std::runtime_error("bad class");} } gameLocal;
+struct VehiclePosition {
+    idList<rvVehiclePart*> mParts,mWeapons;
+    ~VehiclePosition(){mParts.DeleteContents(true); mWeapons.DeleteContents(true);}
+    void Restore(idRestoreGame*);
+};
+void vehicleTest() {
+    for(factoryMode=0;factoryMode<3;++factoryMode) for(int fail=-1;fail<70;++fail){
+        { idRestoreGame input; input.fail=fail; VehiclePosition position;
+          try { position.Restore(&input); } catch(const std::runtime_error&){} }
+        assert(parts==0 && dicts==0);
+    }
+    Vehicle vehicle;
+    for(bool present:{false,true}) for(int count:{-1,0,2,3,2147483647}){
+        savedParent=present?&vehicle:nullptr;
+        idRestoreGame input; input.count=count; rvVehiclePart part;
+        bool refused=false;
+        try {part.Restore(&input);} catch(const std::runtime_error&){refused=true;}
+        bool valid=present && count>=0 && count<vehicle.positions;
+        assert(refused!=valid && (part.position!=nullptr)==valid);
+    }
+    savedParent=nullptr;
+}
 '''
 MAIN = r'''
 int main(){
+    vehicleTest();
     // A replacement is published only when all its fields are present. Failure
     // must keep the prior model and release the partial one, including on retry.
     for(bool old:{false,true}) for(bool present:{false,true}) for(int fail=-1;fail<5;++fail){
@@ -189,6 +255,12 @@ def source(mode: str) -> str:
     # The entire owning-list transaction; other inventory fields need game assets.
     inventory = inventory[inventory.index("// Load Items"):inventory.index("// TORESTORE:")]
     code += "void Inventory::Restore(idRestoreGame* savefile){int i,num;\n" + inventory + "}\n"
+    vehicle = function_body((tree / "vehicle/VehiclePosition.cpp").read_text(), "void rvVehiclePosition::Restore (")
+    # Complete part/weapon owning-list transactions, excluding unrelated input,
+    # seat transforms and flags. Read failures include both factory-created lists.
+    vehicle = vehicle[vehicle.index("savefile->ReadInt ( num );"):vehicle.index("savefile->ReadVec3 ( mEyeOrigin );")]
+    code += "void VehiclePosition::Restore(idRestoreGame* savefile){int i,num;\n" + vehicle + "}\n"
+    code += function_body((tree / "vehicle/VehicleParts.cpp").read_text(), "void rvVehiclePart::Restore") + "\n"
     particle = function_body((tree / "physics/Physics_Particle.cpp").read_text(),
                              "void rvPhysics_Particle::Restore(")
     assert "new idClipModel" not in particle and "delete clipModel" not in particle
@@ -219,6 +291,9 @@ def main() -> int:
                                                           "idDict* leaked = itemdict.release(); savefile->ReadDict(leaked); itemdict.reset(leaked);"),
                     "lost-trace-owner": code.replace("savefile->ReadFloat( entry->volume );",
                                                      "trmCache_t* leaked = entry.release(); savefile->ReadFloat(leaked->volume); entry.reset(leaked);"),
+                    "lost-vehicle-part": code.replace("savefile->ReadStaticObject ( *part );",
+                                                      "rvVehiclePart* leaked = part.release(); savefile->ReadStaticObject(*leaked); part.reset(leaked);"),
+                    "unbounded-vehicle-position": code.replace("!parent || temp < 0 || temp >= parent->GetNumPositions()", "false"),
                 }
             for name, candidate in cases.items():
                 assert name == "production" or candidate != code

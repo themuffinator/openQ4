@@ -958,6 +958,61 @@ also saved and restored every stage on OpenGL with no errors, in 714 seconds.
 Its binding cases (5) and thread cases (6) each refused the damaged save,
 opened the retained Load Game recovery page and loaded again.
 
+### Physics and vehicle ownership at interrupted field boundaries
+
+The 4 November Q4-05 audit found a gap in the earlier physics re-attachment:
+`RestorePhysics` ran only after the embedded reader returned. A failure inside
+that reader still left its saved `self` pointer published. When map shutdown
+deleted that referenced entity first, the physics destructor could consult a
+dead entity before the load-failure screen appeared.
+
+Both libraries now enter every embedded physics read through
+`ReadPhysicsObject`, which supplies the actual containing entity before any
+field is read. Client moveables use the shared client-physics entity, as their
+normal spawn path does. The three physics base readers consume the historical
+owner field without adopting it. This also covers articulated figures and
+brittle-fracture shards; the serialized layout and historical readers are
+unchanged.
+
+The same audit found two further interrupted-read hazards:
+
+- Physics contact lists were sized before their fields were read. Destruction
+  walks every contact and indexes the entity table, including unset entries
+  after an early failure. Restore now appends only complete contacts and refuses
+  entity numbers outside that table before publishing them.
+- Vehicle parts and weapons were allocated before restore, but only joined
+  their owning lists afterward. A failed read leaked the partial part. Scoped
+  ownership now spans factory creation, restoration and list insertion. A null
+  factory result, missing vehicle parent or out-of-range seat index is refused
+  before dereferencing it.
+
+`savegame_restore_physics.py` compiles the production owner helper, all three
+readers, their destructors and contact cleanup. It interrupts every field read,
+then marks a foreign saved owner dead before destruction. NULL and valid saved
+owners, missing containing owners and contact-index boundaries are also tested.
+The existing resource fixture now exercises both vehicle lists, null/throwing
+factories and the complete part reader's parent/seat checks. Windows and Linux
+pass for both game libraries; all 24 deliberate ownership, list and bounds
+regressions fail. The Windows save/restore Meson suite passes **52/52**.
+
+The CRC-valid `physics` cases in `savegame_restore_recovery_runtime.py` replace
+a late entity's saved physics owner, then interrupt its class-end read before
+the old re-attachment could run. OpenGL and Vulkan return to the retained Load
+Game page for both foreign and NULL owner cases and reloads its healthy
+Storage1 save afterward, with every input save unchanged. Evidence is retained
+under `.tmp/q4-qualification/`. The final staged package also restores all 11
+existing 0.9–0.13 release fixtures and runs thirty gameplay tics on OpenGL, with
+the original files unchanged. These remain the previously identified fixtures;
+this is regression coverage, not a new original-writer corpus for Q4-07.
+This qualifies these specific interruption
+paths; it does not close the wider owning-graph or platform gate.
+
+The portable codec mutation runner also exposed an unattended-test defect:
+the Windows debug CRT could wait for a modal abort dialog. The native fixture
+now directs assertions to stderr and disables that dialog. A timed-out
+mutation is a test failure, not evidence that the golden-byte checks caught it.
+All eight codec mutations terminate and fail as expected on Windows.
+
 ### Saving before the first frame after a load
 
 Fixed 3 November (Q4-05), in both game libraries. `ReadStaticObject` queued

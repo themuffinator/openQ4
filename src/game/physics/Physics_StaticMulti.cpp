@@ -83,7 +83,10 @@ idPhysics_StaticMulti::Restore
 void idPhysics_StaticMulti::Restore( idRestoreGame *savefile ) {
 	int i, num;
 
-	savefile->ReadObject( self );
+	// ReadPhysicsObject installed the real owner before any field can fail.
+	// Consume the historical reference without publishing a foreign pointer.
+	idEntity *savedSelf = NULL;
+	savefile->ReadObject( savedSelf );
 
 	savefile->ReadInt(num);
 	if ( num < 0 || num > MAX_SAVEGAME_STATIC_MULTI_STATES ) {

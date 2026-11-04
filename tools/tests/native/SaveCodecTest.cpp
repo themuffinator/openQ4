@@ -7,6 +7,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#ifdef _MSC_VER
+#include <crtdbg.h>
+#endif
 
 #define ID_INLINE inline
 using byte = unsigned char;
@@ -482,6 +485,14 @@ static void TestArrays() {
 }
 
 int main() {
+#ifdef _MSC_VER
+	// Mutation controls deliberately abort. Keep the debug CRT on stderr so
+	// unattended runs cannot wait for a modal assertion/abort dialog.
+	_CrtSetReportMode( _CRT_ASSERT, _CRTDBG_MODE_FILE );
+	_CrtSetReportFile( _CRT_ASSERT, _CRTDBG_FILE_STDERR );
+	_set_abort_behavior( 0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT );
+	_set_error_mode( _OUT_TO_STDERR );
+#endif
 	TestPrimitives();
 	TestFlags();
 	TestTraceModel();

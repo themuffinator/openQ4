@@ -64,7 +64,10 @@ idPhysics_Base::Restore
 void idPhysics_Base::Restore( idRestoreGame *savefile ) {
 	int i, num;
 
-	savefile->ReadObject( self );
+	// ReadPhysicsObject installed the real owner before any field can fail.
+	// Consume the historical reference without publishing a foreign pointer.
+	idEntity *savedSelf = NULL;
+	savefile->ReadObject( savedSelf );
 	savefile->ReadInt( clipMask );
 	savefile->ReadVec3( gravityVector );
 	savefile->ReadVec3( gravityNormal );
@@ -73,9 +76,16 @@ void idPhysics_Base::Restore( idRestoreGame *savefile ) {
 	if ( num < 0 || num > MAX_SAVEGAME_PHYSICS_CONTACTS ) {
 		savefile->Error( "idPhysics_Base::Restore: invalid contact count %d", num );
 	}
-	contacts.SetNum( num );
-	for ( i = 0; i < contacts.Num(); i++ ) {
-		savefile->ReadContactInfo( contacts[i] );
+	// ClearContacts indexes the entity table during destruction. Publish only
+	// complete, bounded records, including when a later contact read fails.
+	contacts.Clear();
+	for ( i = 0; i < num; i++ ) {
+		contactInfo_t contact;
+		savefile->ReadContactInfo( contact );
+		if ( contact.entityNum < 0 || contact.entityNum >= MAX_GENTITIES ) {
+			savefile->Error( "idPhysics_Base::Restore: invalid contact entity number %d", contact.entityNum );
+		}
+		contacts.Append( contact );
 	}
 
 	savefile->ReadInt( num );

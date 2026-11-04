@@ -369,7 +369,7 @@ void idItem::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( pulse );
 	savefile->ReadBool( canPickUp );
 
-	savefile->ReadStaticObject ( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 
 //	savefile->ReadInt(itemShellHandle);	// cnicholson: Set at end of function, do not restore
 	savefile->ReadMaterial( shellMaterial );
@@ -1710,7 +1710,7 @@ idMoveableItem::Restore
 ================
 */
 void idMoveableItem::Restore( idRestoreGame *savefile ) {
-	savefile->ReadStaticObject ( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	RestorePhysics ( &physicsObj );
 }
 

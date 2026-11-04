@@ -1199,7 +1199,7 @@ rvSplineMover::Restore
 ================
 */
 void rvSplineMover::Restore( idRestoreGame *savefile ) {
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	RestorePhysics( &physicsObj );
 
 	savefile->ReadFloat( idealSpeed );

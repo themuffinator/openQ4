@@ -67,7 +67,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | [#170: weapon effects, sound and reload animation](https://github.com/themuffinator/openQ4/issues/170) | Q4-03/AUD-01/HF-04: preserve the merged BSE sound-diversity fix; identify and qualify each remaining weapon/effect/animation symptom separately. The 26 October package could not save; the verified 31 October replacement (`f0a86b0ec`, #205) was offered for the retest. |
 | [#181: rebuilt hub2 cannot load](https://github.com/themuffinator/openQ4/issues/181) | CORE-05: the compiler allocation crash was fixed by #182. The oversized surface came from zero-area slivers: T-junction repair kept splitting them after the map's 345 pipe patches moved to explicit 10×10 subdivision, leaving 12,302,653 of 12,601,692 triangles (97.6%) collinear. Since 31 October repair leaves slivers unsplit. The reporter's map compiles in about two minutes to 298,438 triangles (largest surface 153,000 indexes), loads into single-player gameplay and saves; stock `hub2` loses 55 slivers and two near-slivers. Since 1 November the renderer sizes its silhouette edge scratch to each surface instead of stopping at 65,536 edges, so the map's 78,794-edge pipe surface keeps every edge and loads without `MAX_SIL_EDGES` warnings (previously 25,951); no stock content reached the limit. Remaining: the reporter's retest once a build with both fixes is available. See [dmap compilation](dmap-compilation.md#sliver-multiplication-in-t-junction-repair-31-october-2026) and [silhouette edges](dmap-compilation.md#silhouette-edges-on-large-surfaces-1-november-2026). |
 | [#183: machinegun transparency](https://github.com/themuffinator/openQ4/issues/183) | Q4-01/VK-04/REN-08: closed on 28 October after the reporter confirmed the `2126a232` scope corrections on both GL/Vulkan, in separate and normal installations. This is a development fix, not a new release. The test package's separate save failure (#205) was fixed by #203; the replacement package and instructions were posted here on 31 October. |
-| [#184: Tech Li at the hangar1 lift](https://github.com/themuffinator/openQ4/issues/184) | Q4-02: the supplied save identifies the Turbo/scripted-mover timing race; #198's fix landed on main in `2677fb87b` (29 October). #189 is separate unreachable-patient recovery. The verified 31 October package (`f0a86b0ec`) was offered to the reporter; qualify the fresh lift sequence in-game. The fix does not repair already-stuck saves, which still need a pre-lift save. |
+| [#184: Tech Li at the hangar1 lift](https://github.com/themuffinator/openQ4/issues/184) | Q4-02: the supplied save identifies the Turbo/scripted-mover timing race; #198's fix landed on main in `2677fb87b` (29 October). The fresh stock boarding/lift/exit sequence passes on OpenGL and Vulkan on 4 November, and removing the mover exemption reproduces the stall. #189 is separate unreachable-patient recovery. The fix does not repair already-stuck saves, which still need a pre-lift save. |
 | [#185: GOG offline installation on macOS](https://github.com/themuffinator/openQ4/issues/185) | PLAT-04/REL-01: provide extraction/path guidance and qualify the reporter's installer/package combination; do not imply that openQ4 imports Windows installers. |
 | [#186: subtitles](https://github.com/themuffinator/openQ4/issues/186) | AUD-07/UI-02/UI-04: define supported dialogue text, timing, localization and accessible display coverage. |
 | [#187: dialogue volume](https://github.com/themuffinator/openQ4/issues/187) | AUD-06/UI-01: independent spoken-dialogue gain with real mixer classification and persistent settings. |
@@ -1656,6 +1656,12 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   (radio-chatter reference, see Q4-05), and its 96 warning kinds are classified.
   This covers level changes, persistent state and save/restore at map start, not
   the gameplay between triggers; full playthroughs on each render path remain.
+  Progress, 4 November: the [fresh Hangar Perimeter lift sequence](retail-baseline-ledger.md#hangar-perimeter-lift-4-november-2026)
+  passes in Turbo mode on OpenGL and Vulkan: all three marines board, the lift
+  rises fully and Tech Li leaves scripted control and reaches his exit tether.
+  An isolated module with the old Turbo mover behaviour reproduces his idle
+  stall at the lift's top. This closes the fresh-sequence check for #184/#198;
+  it does not repair already-stuck saves or qualify the full map/campaign.
 - [ ] **Q4-03 — P1, investigation and qualification: remaining BSE/effect parity.**
   Resolve initial-light current-versus-spawn transform and rotated model-particle
   normal/tangent questions from the October audit. Qualify light/sound/decal,
@@ -1807,6 +1813,16 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   and Linux; all 50 Windows save/restore tests pass. On OpenGL and Vulkan the
   immediate resave now reloads into gameplay with zero unresolved references.
   Broader owning-graph/partial-constructor and platform qualification remains open.
+  Progress, 4 November: [physics ownership now precedes every embedded field
+  read](savegame-reliability.md#physics-and-vehicle-ownership-at-interrupted-field-boundaries),
+  closing the interruption window before the earlier re-attachment. Partial
+  contact lists cannot expose unset entity indexes to destruction. Vehicle
+  part/weapon allocations remain owned during failed reads, and missing parents
+  or invalid seat indexes are refused. Both game libraries pass Windows/Linux
+  native fixtures and 24 negative controls; all 52 Windows save/restore tests
+  pass. CRC-valid OpenGL/Vulkan interruption probes return to recovery and reload
+  the healthy save, and all 11 existing 0.9–0.13 fixtures restore with their input
+  files unchanged. Broader owning graphs and other platforms remain open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.

@@ -28,7 +28,8 @@ void boundary() { if(steps++==failAt)throw Fault(); }
 struct Data { template<class T> void Restore(T*) { boundary(); } const char* GetName() { return "fixture"; } };
 struct Args { const char* GetString(const char*,const char* fallback) { return fallback; } };
 struct Decl { void FindType(int,const char*,bool,bool) { boundary(); } } decl,*declManager=&decl;
-constexpr int DECL_ENTITYDEF=1,WPLIGHT_MAX=3;
+constexpr int DECL_ENTITYDEF=1,WPLIGHT_MAX=3,ENTITYNUM_CLIENT=0;
+struct { void* entities[1]={nullptr}; } gameLocal;
 struct World {
     int next=10000;
     std::set<int> owned;
@@ -51,7 +52,7 @@ struct idRestoreGame {
     template<class T> void ReadJoint(T&) { boundary(); }
     template<class T> void ReadVec3(T&) { boundary(); }
     template<class T> void ReadMat3(T&) { boundary(); }
-    template<class T> void ReadStaticObject(T&) { boundary(); }
+    template<class T> void ReadPhysicsObject(T&, void*) { boundary(); }
     template<class T> void ReadSoundShader(T&) { boundary(); }
     template<class T> void ReadRefSound(T&) { boundary(); }
 };

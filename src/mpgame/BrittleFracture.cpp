@@ -172,7 +172,7 @@ void idBrittleFracture::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( lastRenderEntityUpdate );
 	savefile->ReadBool( changed );
 
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	RestorePhysics( &physicsObj );
 
 	savefile->ReadInt( num );
@@ -246,7 +246,7 @@ void idBrittleFracture::Restore( idRestoreGame *savefile ) {
 		savefile->ReadInt( shards[i]->droppedTime );
 		savefile->ReadInt( shards[i]->islandNum );
 		savefile->ReadBool( shards[i]->atEdge );
-		savefile->ReadStaticObject( shards[i]->physicsObj );
+		savefile->ReadPhysicsObject( shards[i]->physicsObj, this );
 		if ( shards[i]->droppedTime < 0 ) {
 			shards[i]->clipModel = physicsObj.GetClipModel( i );
 		} else {

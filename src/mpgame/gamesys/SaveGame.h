@@ -5,6 +5,7 @@
 #include <memory>
 #include "idlib/SaveCodec.h"
 class SaveUserInterfaceCache;
+class idPhysics;
 
 /*
 
@@ -178,6 +179,7 @@ public:
 		obj = static_cast<T *>( restoredObject );
 	}
 	void					ReadStaticObject( idClass &obj );
+	void					ReadPhysicsObject( idPhysics &obj, idEntity *owner );
 	void					ReadDict( idDict *dict );
 	void					ReadMaterial( const idMaterial *&material );
 	void					ReadSkin( const idDeclSkin *&skin );

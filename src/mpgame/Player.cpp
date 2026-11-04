@@ -3028,7 +3028,7 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	savefile->ReadJoint( chestJoint );
  	savefile->ReadJoint( headJoint );
 
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
  	RestorePhysics( &physicsObj );
 
  	savefile->ReadInt( num );

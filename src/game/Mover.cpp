@@ -286,7 +286,7 @@ void idMover::Restore( idRestoreGame *savefile ) {
 	int savedStage;
 	bool hasSpline = false;
 
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	RestorePhysics( &physicsObj );
 
 	if ( savefile->GetOpenQ4SaveGameCompatibilityVersion() >= OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION ) {
@@ -3265,7 +3265,7 @@ void idMover_Binary::Restore( idRestoreGame *savefile ) {
 		buddies.Append( temp );
 	}
 
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	RestorePhysics( &physicsObj );
 
 	savefile->ReadInt( areaPortal );
@@ -5622,7 +5622,7 @@ idMover_Periodic::Restore
 ===============
 */
 void idMover_Periodic::Restore( idRestoreGame *savefile ) {
-	savefile->ReadStaticObject( physicsObj );
+	savefile->ReadPhysicsObject( physicsObj, this );
 	savefile->ReadFloat( damage );
 
 	RestorePhysics( &physicsObj );
