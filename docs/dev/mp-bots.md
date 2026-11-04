@@ -26,12 +26,23 @@ controller fails. Ground-slide traces reveal a one-frame timer mismatch:
 player physics drops knockback timers before movement, while prediction waited
 until the next frame to restore friction and ground acceleration. The predictor
 now uses the same expiration frame. Synthetic rim tests compare the expiring
-timer with an extra knockback frame; runtime qualification is pending.
+timer with an extra knockback frame. On `0d587c92a` the controller recovers to
+the upper platform and ends alive/grounded at 67 health; the fixed southwest
+control still survives at 62 health. Evidence is `rocket-armor-timer/`.
 
 The `c65041464` catalog completes all 33 variants (at least 47.376 observed
 seconds), with 448 combat kills, 618 traversals and four raw world deaths.
 Besides the corrected CTF5 pad catch, it exposes a low-health CTF7 drop after
-recovery from a rail hit. That drop still needs exact-armour investigation.
+recovery from a rail hit. Both isolated drop poses reproduce the three-damage
+fatal fall at three health and 100 armour (`ctf7drop-armor-timer/`). The route
+targets the raised floor at -111.75, but momentum takes the bot onto the lower
+neighbour near -127.75. That 384-unit fall exceeds its hard-fall budget. The
+general edge guard previously accepted any supported floor within its fixed
+depth and therefore skipped the live drop proof. It now also prices the actual
+sampled floor with current health and armour. The existing full/careful drop
+proof may then earn a safe departure; otherwise the bot brakes. Native controls
+retain affordable floors, armour effects and disabled falling damage without
+waiving voids. Runtime qualification of this correction is pending.
 Final-build long matches, catalog and controlled timing remain open.
 
 ## Hit-to-movement handoff, 4 November 2026

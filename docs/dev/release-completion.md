@@ -1033,8 +1033,10 @@ made them too large to load.
   post-hit/pre-hit armour and rejects incomplete state. Both recorded DM8 pad
   catches and the CTF5 diagonal-pad recovery pass isolated runtime checks.
   Ground-slide prediction now restores friction on the physics timer's expiry
-  frame. Its runtime check, the low-health CTF7 drop and renewed final-build
-  long/catalog/timing gates remain open; see [bot evidence](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026).
+  frame, and the recorded rocket-slide recovery passes. Bots also check whether
+  their momentum reaches a lower floor than their route's landing can afford.
+  That low-health drop correction and renewed final-build long/catalog/timing
+  gates remain open; see [bot evidence](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026).
 - MP-02: bounded percentile profiling and explicit audit budgets are implemented.
   The five-minute DM8 audit retains a navigation death, a stuck event and a
   contested timing failure; it does not close the safety or performance gate.

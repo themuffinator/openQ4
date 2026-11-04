@@ -4672,8 +4672,16 @@ static bool BotDeadlyDropAt( idPlayer *self, const idVec3 &point ) {
 		}
 		return true;
 	}
+	// The graph's landing may be a raised lip beside the floor momentum
+	// actually reaches (CTF7). A broad floor within BOT_SAFE_FALL can still
+	// kill a hurt bot. Let the live drop proof earn that departure instead.
+	navCorner_t landing;
+	landing.origin = trace.endpos;
+	landing.travelType = NAVTRAVEL_DROP;
+	landing.actionEntityNum = -1;
 	const bool unsafe = navMesh.IsValid() && ( navMesh.IsHazardous( trace.endpos, true ) ||
-		!navMesh.LandingContinuationClear( trace.endpos, trace.endpos ) );
+		!navMesh.LandingContinuationClear( trace.endpos, trace.endpos ) ||
+		!navMesh.LandingSurvivable( self->GetPhysics()->GetOrigin(), landing, BotMaxSafeFallDelta( self ) ) );
 	if ( unsafe && bot_debug.GetInteger() >= 3 ) {
 		gameLocal.Printf( "BOT_EDGE client=%d time=%d origin=%s ahead=%s velocity=%s floor=%s fraction=%.4f normal=%.3f %.3f %.3f reason=support\n",
 			self->entityNumber, gameLocal.time, self->GetPhysics()->GetOrigin().ToString( 2 ), point.ToString( 2 ),

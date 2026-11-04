@@ -30,6 +30,10 @@ CASES = {
         "name": "coasting_pad_catch",
         "setup": ["bot_probeHealth 1 74 50 0.685 -30.386 17.357"],
         "command": "bot_probeMove 1 -444.388 53.313 982.004 -306.296 -13.552 84.265 -444.388 53.313 982.004",
+    }, {
+        "name": "rocket_ground_slide",
+        "setup": ["bot_probeHealth 1 67 200 510.996 195.932 -54.711"],
+        "command": "bot_probeMove 1 828.721 -10.581 324.25 352.019 387.219 -54.711 828.721 -10.581 324.25",
     }]),
     "ctf3": ("CTF", [{
         "name": "weak_nail_walk",
@@ -41,6 +45,15 @@ CASES = {
         "observe_msec": 12000, "allow_resumed_navigation": True,
         "setup": ["bot_probeHealth 1 10 200 19.531 -499.058 -23.655"],
         "command": "bot_probeWalk 1 568.824 74.316 -33.102 19.531 146.841 299.182 580 884 -183.75",
+    }, {
+        "name": "diagonal_pad_catch",
+        "setup": ["bot_probeHealth 1 95 50 21.272 -12.727 3.242"],
+        "command": "bot_probeMove 1 721.956 854.658 -96.145 431.422 -398.978 654.039 721.956 854.658 -96.145",
+    }]),
+    "ctf7": ("CTF", [{
+        "name": "armoured_drop", "probe_type": "DROP",
+        "setup": ["bot_probeHealth 1 3 0 0 0 0 100"],
+        "command": "bot_probeDrop 1 -206 -819 256.25 -222 221 0 -236 -788 -111.75 -212 -812 256.25",
     }]),
 }
 

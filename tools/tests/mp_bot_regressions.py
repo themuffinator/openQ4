@@ -58,6 +58,7 @@ def main() -> None:
         "void rvBot::PressJump(",
         "void rvBot::TryDodgeJump(",
         "bool rvBot::HoldDodgeJump(",
+        "static bool BotDeadlyDropAt(",
         "static bool BotBrakeAtEdge( idPlayer *self, idVec3 &moveDir ) {",
         "static int BotPlannedTransport(",
         "static bool BotBrakeForTransport(",
@@ -117,6 +118,8 @@ def main() -> None:
         assert result.returncode != 0, "late knocked-coast ownership mutation escaped"
         print("Knocked coast: late-ownership mutation rejected")
         for label, anchor, replacement in (
+            ("actual floor health", "!navMesh.LandingSurvivable( self->GetPhysics()->GetOrigin(), landing, BotMaxSafeFallDelta( self ) )",
+             "false"),
             ("airborne self-blast", "!shooter->pfl.onGround && model.selfPushScale > 0.0f &&",
              "false && !shooter->pfl.onGround && model.selfPushScale > 0.0f &&"),
             ("projected airborne self-blast", "if ( !shooter->pfl.onGround && model.selfPushScale > 0.0f )",

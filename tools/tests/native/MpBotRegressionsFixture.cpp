@@ -63,6 +63,9 @@ struct idAngles {
 struct idBounds {
     idVec3 center;
     float radius=1;
+    idBounds() = default;
+    idBounds(idVec3 c,float r):center(c),radius(r) {}
+    idBounds(idVec3 lo,idVec3 hi):center((lo+hi)*.5f),radius((hi-lo).Length()*.5f) {}
     idVec3 operator[](int i) const { const float r=i?radius:-radius; return center+idVec3(r,r,r); }
     idVec3 GetCenter() const { return center; }
     float GetRadius() const { return radius; }
@@ -348,12 +351,21 @@ struct rvFreezeTagGameState : rvGameState {
     static int GetClassType() { return 1; }
     bool CanReachToThaw(idPlayer*,idPlayer*,int) { return true; }
 };
+struct trace_t { float fraction=1; idVec3 endpos; struct { idVec3 normal{0,0,1}; } c; };
+const int MASK_PLAYERSOLID=1;
+idVec3 lastEdgeProbe;
 struct idGameLocal {
     int time=1000,numClients=0,framenum=0;
     int GetMSec() const { return 16; }
     Args serverInfo;
     struct { rvGameState* GetGameState() { return nullptr; } } mpGame;
     idVec3 GetCurrentGravity(const idPlayer*) const { return {0,0,-800}; }
+    float edgeFloor=0;
+    void TraceBounds(idPlayer*,trace_t& trace,const idVec3& start,const idVec3&,const idBounds&,int,idPlayer*) {
+        lastEdgeProbe=start-idVec3(0,0,8);
+        trace.fraction=start.x>0 ? 1.0f : .5f;
+        trace.endpos={start.x,start.y,edgeFloor};
+    }
     idEntity* entities[64]={};
     idEntity* world=nullptr;
     std::map<std::string,idDict> damageDefs;
@@ -541,8 +553,6 @@ bool BotCombatSplashThreatensPlayer(idPlayer* p,idEntity*,idVec3 impact,float ra
 // A deterministic cliff at x=0. Actual hull/support geometry is exercised by
 // MpBotJumpTrajectoriesFixture; here we verify every recovery command asks the
 // production edge guard, including the nearest-node and wander branches.
-idVec3 lastEdgeProbe;
-bool BotDeadlyDropAt(idPlayer*,const idVec3& point) { lastEdgeProbe=point; return point.x>0; }
 // The floor/trace half of a step's safety is MpBotJumpTrajectoriesFixture's;
 // here a sidestep is safe unless the test says otherwise.
 bool moveDirectionSafe=true;
@@ -1275,6 +1285,24 @@ void TestMoveProjection() {
     }
     std::puts("Movement projection: production ApplyMove/CmdScale preserves full and partial world speed at yaw0/45/90: PASS");
 }
+void TestActualFloorHealth() {
+    Reset(); idPlayer self;
+    self.spawnArgs.Set("soft_fall_delta","40"); self.spawnArgs.Set("hard_fall_delta","60");
+    self.spawnArgs.Set("fatal_fall_delta","0");
+    gameLocal.damageDefs["damage_softfall"].Set("damage","5");
+    gameLocal.damageDefs["damage_hardfall"].Set("damage","10");
+    self.physics.origin={-206,-819,256.25f}; self.inventory.armor=100; self.health=3;
+    gameLocal.edgeFloor=-127.75f; navMesh.landingImpact=61.44f;
+    CHECK(BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    CHECK(navMesh.lastLandingFrom.Compare(self.physics.origin));
+    self.health=4; CHECK(!BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    self.health=3; navMesh.landingImpact=58.88f; gameLocal.edgeFloor=-111.75f;
+    CHECK(!BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    self.inventory.armor=0; CHECK(BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    self.pfl.noFallingDamage=true; CHECK(!BotDeadlyDropAt(&self,{-280,-740,256.25f}));
+    CHECK(BotDeadlyDropAt(&self,{1,0,256.25f})); // disabling damage does not waive voids
+    std::puts("Actual floor: armour and current health distinguish a raised landing from its lower neighbour: PASS");
+}
 void TestLandingHealth() {
     Reset(); idPlayer self; idItem goal;
     self.spawnArgs.Set("soft_fall_delta","40"); self.spawnArgs.Set("hard_fall_delta","60");
@@ -1655,6 +1683,7 @@ int main(int argc,char** argv) {
     if(argc==1 || !std::strcmp(argv[1],"pads")) TestUnexpectedPad();
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestAirRecovery();
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestLandingHealth();
+    if(argc==1 || !std::strcmp(argv[1],"landings")) TestActualFloorHealth();
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestDropHandoff();
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestJumpEntry();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestMoveProjection();

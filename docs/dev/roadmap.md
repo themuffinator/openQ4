@@ -2196,8 +2196,11 @@ claim peer combinations that have not been tested.
   historical, not final safety evidence. Policy version 2 restores post-hit and
   pre-hit armour and rejects incomplete logs. Both DM8 pad poses and the CTF5
   pad catch now pass isolated recovery; the ground-slide timer is corrected.
-  Its runtime check, the CTF7 low-health drop, renewed final-build long/catalog
-  runs and controlled timing remain required.
+  The rocket-slide controller now passes its isolated runtime check. CTF7's
+  low-health drop reproduces a lethal overshoot onto a lower neighbouring floor;
+  the edge guard now prices that actual floor before permitting departure.
+  Its runtime check, renewed final-build long/catalog runs and controlled timing
+  remain required.
   Follow-through, 4 November: the [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026)
   fixes all three previously recorded long-match hit states. The renewed
   `84dde9c6d` long runs pass CTF3/DZ3 directly and CTF5 after strict causal
