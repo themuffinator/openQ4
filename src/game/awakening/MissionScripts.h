@@ -5,5 +5,7 @@
 // A virtual source name distinguishes corrected fresh maps from legacy saves.
 const char *Awakening_MissionScriptName( const char *filename );
 bool Awakening_LoadMissionScript( const char *filename, idStr &source );
+void Awakening_PrepareLateMission( idDict &worldArgs );
+void Awakening_DirectLateMissionEntity( idDict &args );
 
 #endif

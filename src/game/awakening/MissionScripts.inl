@@ -8,7 +8,12 @@
 static const char * const awakeningM02Source = "maps/game/m02_trianfac.script";
 static const char * const awakeningM02Version1 = "maps/game/m02_trianfac.openq4-v1.script";
 
+#include "LateMissions.inl"
+
 bool Awakening_LoadMissionScript( const char *filename, idStr &source ) {
+	if ( Awakening_LoadLateMissionScript( filename, source ) ) {
+		return true;
+	}
 	idStr normalizedName = filename;
 	normalizedName.BackSlashesToSlashes();
 	if ( normalizedName.Icmp( awakeningM02Version1 ) != 0 || gameLocal.isMultiplayer ||
@@ -67,6 +72,10 @@ bool Awakening_LoadMissionScript( const char *filename, idStr &source ) {
 }
 
 const char *Awakening_MissionScriptName( const char *filename ) {
+	const char *lateMission = Awakening_LateMissionScriptName( filename );
+	if ( lateMission != filename ) {
+		return lateMission;
+	}
 	idStr normalizedName = filename;
 	normalizedName.BackSlashesToSlashes();
 	if ( !gameLocal.isMultiplayer && idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&

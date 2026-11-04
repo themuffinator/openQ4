@@ -1752,6 +1752,13 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   See [mission intent, findings and bounded runtime evidence](awakening-missions.md).
   End-to-end squad routing, walker demolition/traversal and Tank/extraction
   qualification remain part of this gate.
+  M08/M09 scrutiny, 4 November: versioned mission corrections address the
+  cooling-button race/re-entry, squad and cinematic handoffs, repair loops,
+  light-taunt ranges and the finale's intro/docking boundary. Original script
+  programs remain available to older saves. See the
+  [late-mission audit and runtime limits](awakening-missions.md#m08-cryofac-and-m09-valkaryne--4-november-2026).
+  Normal combat, complete traversal and timed extraction remain qualification
+  requirements; focused script callbacks do not close this work item.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus

@@ -2200,12 +2200,16 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 		ent->name.c_str(), ent->health, ent->IsHidden(), ent->GetPhysics()->GetContents(),
 		ent->GetPhysics()->GetOrigin().ToString(), ent->GetBindMaster() ? ent->GetBindMaster()->name.c_str() : "none" );
 	if ( ent->GetAnimator() ) {
-		gameLocal.Printf( "testMissionAnim: name=%s anim=%s\n", ent->name.c_str(),
-			ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_ALL )->AnimName() );
+		const idAnimBlend *torso = ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_TORSO );
+		gameLocal.Printf( "testMissionAnim: name=%s anim=%s torso=%s time=%d start=%d end=%d\n", ent->name.c_str(),
+			ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_ALL )->AnimName(),
+			torso->AnimName(), gameLocal.time, torso->GetStartTime(), torso->GetEndTime() );
 	}
 	if ( ent->IsType( idLight::GetClassType() ) ) {
-		gameLocal.Printf( "testMissionLight: name=%s radius=(%s)\n", ent->name.c_str(),
-			static_cast<idLight *>( ent )->GetRadius().ToString() );
+		idVec3 color;
+		ent->GetColor( color );
+		gameLocal.Printf( "testMissionLight: name=%s radius=(%s) color=(%s)\n", ent->name.c_str(),
+			static_cast<idLight *>( ent )->GetRadius().ToString(), color.ToString() );
 	}
 	for ( int i = 0; i < player->inventory.objectiveNames.Num(); ++i ) {
 		gameLocal.Printf( "testMissionObjective: %s\n", player->inventory.objectiveNames[i].title.c_str() );

@@ -45,6 +45,24 @@ See [player release status](../user/release-status.md).
   intent, confirmed fixes and remaining Q4-04 qualification. These focused
   encounter checks do not establish complete mission playthroughs.
 
+## Awakening Cryofac and finale corrections, 4 November 2026
+
+- Cryofac's cooling control accepts a single shutdown request, including an
+  early press, and repeated presses cannot turn the cold damage back on.
+  Navajas receives his intended movement commands, the flashlight trigger
+  works, and Tak's final attack animation finishes before scene cleanup.
+- The Valkaryne finale starts its protected sphere phase during the intro.
+  Early damage cannot skip that phase, and destroying the sphere releases the
+  boss without a later docking request. Repair bots, Navajas's scene handoff
+  and the three light-taunt sequences follow their authored progression.
+- The extraction gives the thirty seconds promised over the radio. Missing it
+  reports mission failure instead of leaving a black screen; boarding after
+  departure starts cannot launch a conflicting success sequence.
+- Restart m08/m09 to adopt the script corrections. Older saves retain their
+  original script program; corrected saves carry a separate versioned source.
+- [Design inference, fixes and qualification limits](awakening-missions.md#m08-cryofac-and-m09-valkaryne--4-november-2026)
+  distinguish the focused checks from full campaign completion.
+
 ## Vehicle health and shield meters, 4 November 2026
 
 - Invulnerable turrets now show a full health meter, and vehicles without shields

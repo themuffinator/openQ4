@@ -1,4 +1,4 @@
-# Awakening M01 and M02 mission audit
+# Awakening mission audit
 
 This is supporting evidence for **Q4-04** in [the roadmap](roadmap.md), not a
 separate development plan. Reviewed 4 November 2026 against the installed alpha
@@ -145,9 +145,141 @@ failure handler. Their replacements above are the acceptance evidence.
 
 The worktree `E:/Repositories/openQ4/.claude/worktrees/ui-roadmap-work-aaa011`
 on `claude/ui-right-stick` was clean and fully merged at inspection (last commit
-3 November 2026), so it appears stale. Removing it is recommended after the
-user's required worktree approval. `E:/Repositories/openQ4-worktrees/e07a/openQ4`
+3 November 2026). It was removed separately during the M08/M09 audit; this task
+did not remove it. `E:/Repositories/openQ4-worktrees/e07a/openQ4`
 initially appeared stale at detached commit `908b2c012`, but the final check found
 active work on `codex/q4-legacy-event-data` with uncommitted changes; it is no
 longer a cleanup candidate. Other worktrees had unmerged work or active changes
-and were preserved.
+and were preserved. The final M08/M09 inspection found
+`E:/Repositories/openQ4-worktrees/e931/openQ4` clean, detached at `85c61fe16`,
+and fully merged into the main checkout's branch. It is a cleanup candidate
+after checking whether its owner still needs it and obtaining the user's
+required worktree-removal approval.
+
+## M08 Cryofac and M09 Valkaryne — 4 November 2026
+
+### Intent and evidence
+
+This review reads the user-supplied `m08_cryofac.map/.script`,
+`m09_valkaryne.map`, `scripts/maps/m09_valkaryne.script`, actor definitions and
+animation metadata. The recovered content remains external. Corrections are
+independently authored, applied in memory by `LateMissions.inl`, and covered by
+the game library's SDK EULA. Original design/content credit remains with
+Raven/Ritual and [Justin Marshall's recovery](https://github.com/jmarshall23).
+
+M08 teaches cold as both obstruction and threat: thaw the entrance, follow Tak
+through controlled doors, watch the other fireteam die in the freezing chamber,
+shut down the leaking cryogenic system, then face the Tank guarding the descent.
+Tak's final encounter transfers the surviving escort role to Navajas. This is
+inferred from the door/console target chains, dialogue and named animation;
+it is not a claim to have the designers' original specification.
+
+M09 escalates that pursuit through two descending Makron-egg transports and
+Navajas's death, then factory machinery and a two-stage boss arena. The rotating
+Makron-sphere shields and rising cold impose pressure while the docked Valkaryne
+attacks. Destroying the sphere releases her; killing her opens the timed escape,
+extraction and Patton ending. The abandoned resurrection scene is commented out;
+this review does not invent a new ending or reactivate it.
+
+### Corrections
+
+- M08's first thaw moves `navajas`, correcting two `navahas` references. Its
+  flashlight trigger resolves the existing `FlashLightsOff` callback, and an
+  unlocked cryodoor frame displays the same enabled state as other doors.
+- Cooling requests are latched once and wait for the authored window breach.
+  Repeated or early button presses cannot stack fog movement or toggle the
+  cold damage back on. The pending request is saved with the script globals.
+- The final Valkaryne stays until `cr_kill_tak` finishes. The recovered script
+  removed her, and consequently her bound victim, about two seconds into an
+  animation with 201 frames at 24 Hz. This short-lived actor remains awake for
+  the attack so leaving its visibility area cannot stall the completion wait.
+- M09's repair bots execute their intended five repair cycles. The recovered
+  `for` statements put the increment in the condition and never enter the body.
+- Navajas's death scene moves the newly activated `navajas03`, rather than the
+  already removed `navajas02`.
+- Each light-taunt loop addresses existing lights and restores the same set it
+  extinguished: 1–63, 1–14 and 1–10. The old loops included zero, skipped half
+  the first room and restored nonexistent lights 15/11 in the other rooms.
+- The boss intro explicitly docks the Valkaryne before presenting the arena.
+  Her game class rejects damage before docking and through undocking, consumes
+  the one-time docking request on release, and ignores a late docking event.
+  Invulnerable hits cannot interrupt docked volleys with a pain reaction; the
+  sphere's authored scripted reaction still runs.
+  Script callbacks must be zero-argument functions. The sphere's rotating shell
+  stops through its actual owner, and the finale's hex-spawning loop ends after
+  victory rather than running throughout extraction. Calls to the optional,
+  removed forcefield and the already-collected escort objective are guarded.
+- Missing extraction now fails the active escape objective instead of leaving
+  a permanent black screen. The dropship waits the thirty seconds promised by
+  the radio, departing before the forty-five-second doors finish closing.
+  Departure reserves the outcome so a late boarding trigger cannot start a
+  competing success sequence. The existing, otherwise unused failure item
+  takes the existing escape objective's title before pickup removes the
+  objective entity, with no new display text.
+
+### Save and content boundaries
+
+Fresh M08 starts use `maps/game/m08_cryofac.openq4-v1.script`. Fresh M09 starts
+compile `maps/game/m09_valkaryne.openq4-v1.script` into `oq4_m09_v1`, redirecting
+the map's existing callbacks and docking request. The original `map_m09`
+program loaded by `main.script` remains untouched. Old saves retain original
+script statement indices; new saves recompile the virtual sources. M09's
+custom map sidecars take precedence. All source anchors must match their
+expected counts, otherwise fresh starts retain installed behavior. Do not edit
+these v1 transformations after publishing saves; introduce a new version.
+
+### Validation and remaining gaps
+
+`tools/tests/awakening_finale_runtime.py` exercises hidden, windowed SP runs,
+normal damage, existing script callbacks, engine screenshots and fresh-process
+save restore. It never sends keyboard/mouse input or captures the desktop.
+Windows x64 `debugoptimized` compilation/staging and the Awakening gameplay,
+CI and repository-path contracts pass. Evidence lives under `.tmp/m08-m09/`;
+each listed run retains its command, binary SHA-256 identity, report and
+`q4xbase/logs/savegame-cross-load.log`. `source-anchors.json` records the external
+source hashes and the checked replacement counts. These are local development
+checks, not a final-package or complete campaign certification.
+
+| Focused check | Passing evidence directories |
+| --- | --- |
+| First thaw reaches unlocked cryodoor 6 | `thaw-gl` |
+| Early/repeated cooling request, exit unlock, pending-request restore | `cooling-accept-gl`, `cooling-accept-restored-vk` |
+| Full 8.334-second Tak attack, cleanup, saved-scene restore | `tak-qualified-gl`, `tak-accept-restored-vk` |
+| All three taunts restore their original light colors | `lights-gl` |
+| Navajas death hands off to the descending attacker | `navajas-gl` |
+| Early/docked immunity, uninterrupted docked attack, sphere break, mobile damage and escape; docked-save restore | `boss-accept-gl`, `boss-accept-restored-vk` |
+| Save before the thirty-second departure deadline, reject late boarding, fail mission and block saves; departure restore | `extraction-accept-gl`, `extraction-accept-restored-vk` |
+| Original-program M08/M09 saves survive fresh-process restore with corrections enabled | `legacy-m08-gl`, `legacy-m08-restored-vk`, `legacy-m09-gl`, `legacy-m09-restored-vk` |
+
+The boss's engine captures were inspected in both phases. The Tak probe reads
+the animation's actual start/end times and requires it to remain present near
+the end of the clip before removal. Cooling checks both the fog position and
+the unlocked exit, rather than merely accepting a stationary fog mover. The
+probes retain the known `coldInHere` missing-host warning, and reject other
+null-entity, unsupported-event or terminated-script failures.
+
+The original-program saves were made with `g_awakeningLateMissions 0` on this
+build; restoration uses the default enabled setting. Their saved and resaved
+payloads retain the original script identity, while corrected scene saves
+contain the virtual v1 name. This checks script-program compatibility, not
+every historical binary/save format or cross-platform restore combination.
+
+The following recovered-content gaps remain distinct from verified code fixes:
+
+- M08's unused `RemoveDoorIce3` relay, undefined `ValkaryneEscape` callback,
+  deleted steam targets and scientist `FirstLabCleared` callbacks have no
+  unambiguous complete replacement sequence. The two-maiden death counter is
+  intact despite one maiden's extra dangling target; it starts the cold scene.
+- M09 still references removed cold-breath hosts, a missing forcefield,
+  abandoned `spawnTactical02`/`spawnTrashCan01` callbacks and deleted decorative
+  targets. The absent forcefield is now optional to its script; cold-breath
+  setup still stops at the missing hosts/joints. Missing media and navigation
+  warnings are not suppressed.
+- Complete physical traversal, normal weapon balance, the three-minute cold
+  deadline, escape timing, extraction framing/audio, and cross-platform runtime
+  qualification remain Q4-04 gates. Focused callbacks and forced damage cannot
+  establish those results.
+- The Vulkan boss restore reported an unrelated renderer fallback for light
+  498 (`lights/round`): a required shadow resource was unavailable and its
+  receivers rendered without that shadow. This audit does not qualify Vulkan
+  shadow parity or change the renderer.
