@@ -491,9 +491,16 @@ remain unchanged. Host/build/limit metadata is in `timing-ramp-host.json`.
 **Controlled timing is still unqualified.** The mandatory workload monitor
 observes two separate SP processes from the `9514` checkout (PIDs 7192 and
 40324); one overlaps the entire run. Contention is the report's only failure.
-Those processes belong to another task and were left running. A quiet-host
-repeat is required before accepting these timing limits; numerical results
-from this run do not waive that gate or qualify other maps/platforms.
+Those processes belong to another task and were left running. No uncontended
+repeat was completed. On 4 November 2026 the project owner accepted this
+timing-contention caveat and directed MP-02's roadmap closeout on the passing
+safety evidence above. The raw timing report retains its failure, and the
+contention monitor and numerical thresholds remain unchanged. Controlled
+timing qualification would still require a quiet-host repeat; the recorded
+measurements cover six skill-4 bots on CTF3, Windows x64/OpenGL and the
+`f6aa481e6` debugoptimized runtime on an i7-13700H. They do not qualify other
+maps/platforms. Earlier open-MP-02 statements in this investigation record
+describe historical stages, superseded by this accepted closeout.
 
 An unrelated Vulkan shadow-resource fallback warning was observed during
 earlier diagnostics. The final safety sweeps and this timing attempt use

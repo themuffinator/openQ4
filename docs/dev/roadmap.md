@@ -2184,14 +2184,30 @@ claim peer combinations that have not been tested.
   and invalid input. Twelve reversal controls fail. This qualifies adapter
   handling, not physical disk exhaustion, power loss or process interruption;
   the live and physical-workflow gates remain open.
-- [ ] **MP-02 — P1, qualification and targeted fixes: bot traversal safety.** Rerun
+- [x] **MP-02 — P1, qualification and targeted fixes: bot traversal safety.** Rerun
   staged q4dm8/q4ctf3/q4ctf5/q4dz3 after the exact-state jump/unroutable-pad fixes,
   then the complete declared-map sweep including warmup (currently 33 variants).
   Separate enemy impulses from
   navigation/control failures and retain strict world-death gates. Qualify route
   generation/think budgets, objectives and real combat; source tests do not close
   the previously failing runtime safety sweep.
-  Current qualification correction: [exact armour and timer audit](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026)
+  **Closed, 4 November 2026, with the timing-contention caveat accepted by the
+  project owner.** The archived `f6aa481e6` runtime passes all four long-match
+  and all 33 catalog death/duration gates: 710 kills, 1,103 traversals, eight
+  strict policy-2 impulse exclusions and zero navigation world deaths. All 24
+  targeted hit cases, ten recovery cases, two-bot pad traffic and thirty native
+  reversal controls on Windows/Linux pass. The fix is landed in main, with its
+  build, staging and four CTF3 recovery checks also passing.
+  The six-bot CTF3 timing run on Windows x64/OpenGL meets the selected numerical
+  limits: 0.791 ms mean / 4.25 ms worst-window p95 / 744 ms navigation generation
+  against 4 / 8 / 1,000 ms. **Controlled timing remains unqualified:** two SP
+  processes overlapped the run, and no uncontended repeat was completed. The
+  owner accepted this limitation for MP-02 closeout; the original failed report
+  and contention monitor remain unchanged. These measurements do not qualify
+  other maps or platforms. See the [closeout evidence](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026).
+  **Historical investigation and qualification record:** the open-gate statements
+  below describe earlier stages and are superseded by this closeout.
+  Qualification correction: [exact armour and timer audit](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026)
   finds that earlier causal replays omitted armour. Their exclusions below are
   historical, not final safety evidence. Policy version 2 restores post-hit and
   pre-hit armour and rejects incomplete logs. Both DM8 pad poses and the CTF5
@@ -2269,8 +2285,9 @@ claim peer combinations that have not been tested.
   The renewed CTF3 timing attempt has zero world deaths and meets the selected
   4 ms mean / 8 ms p95 / 1,000 ms generation limits (0.791 / 4.25 / 744 ms),
   but mandatory contention detection fails because two separate SP processes
-  overlap it. MP-02 remains open for a quiet-host timing repeat; no criterion
-  is waived and the original failed report is preserved.
+  overlap it. This initially left MP-02 open for a quiet-host timing repeat.
+  The closeout above accepts that outstanding qualification caveat; the
+  original failed report is preserved.
   The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.
@@ -2452,7 +2469,8 @@ claim peer combinations that have not been tested.
   re-routes from wherever a bot lands ([known limits](mp-bots.md#known-limits)).
   Every audited subject now has a recorded outcome, and the only demonstrated
   gaps (trench rims, the debug-line pool) are fixed. Lifts in custom maps stay
-  unmodelled; the strict long-match and timing gates remain under MP-02.
+  unmodelled; long-match qualification and the accepted timing-contention
+  caveat are recorded under the completed MP-02 item.
 - [ ] **MP-04 — P1, implementation and qualification: Arena completion.** Resolve
   world-pause versus continuing sound, restart/map-navigation cost and physical
   pause navigation. Capture victory/defeat/draw ledgers, progression and ceremony
