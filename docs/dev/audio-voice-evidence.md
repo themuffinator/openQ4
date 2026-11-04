@@ -1496,6 +1496,15 @@ on Windows. Meson reconfiguration passes and preserves the ordinary timeouts.
 Local evidence is under `.tmp/aud-merge/`; these focused passes do not substitute
 for the fresh GitHub validation run required before merging.
 
+The next Windows x64 run passed its Python validation and 309 native tests,
+but the same `pages` and `mp-pages` matrices also reached their 120-second limit
+without sanitizers. The 300-second allowance therefore applies to those two
+groups on Windows as well. Both complete locally without assertion failures:
+45,230,007 checks in 49.1 seconds for `pages`, and 48,003,884 checks in 23.8 seconds
+for `mp-pages`. Meson introspection verifies 300 seconds for those groups and
+120 seconds for an unaffected group. CI failure excerpts and the measured
+commands, executable identity and results are retained with the merge evidence.
+
 - `sound_settings.py --no-mutations`: 35,807 checks pass.
 - `sound_recovery.py --no-mutations`: 42,348 cumulative checks pass. These are
   counted API tests, not physical endpoint-loss tests.
