@@ -10,8 +10,9 @@ See [player release status](../user/release-status.md).
 
 The latest safety build passes all four long-match and all 33 map-catalog
 death/duration checks, with zero navigation falls after strict enemy-impulse
-assessment. The targeted recovery and pad-traffic checks also pass. Controlled
-timing remains a separate qualification; see the [current evidence](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026).
+assessment. The targeted recovery and pad-traffic checks also pass. The timing
+repeat meets its numerical limits but remains unqualified because separate SP
+tests overlapped it; see the [current evidence](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026).
 
 - Bots can recover when a ramp carries them into the air after they reach a
   walking waypoint or pass beside a jump pad.

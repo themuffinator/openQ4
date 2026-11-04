@@ -480,6 +480,25 @@ cause remain preserved. The four matches retain ten stalls, with zero no-route
 reports, goal give-ups or traversal timeouts. Controlled timing remains a
 separate gate; these shared-host functional runs do not qualify it.
 
+The subsequent five-minute CTF3 timing attempt (`timing-ramp/report.json`)
+meets the selected numerical limits: **0.791 ms** weighted mean think against
+4 ms, **4.25 ms** worst-window p95 against 8 ms, and **744 ms** navigation
+generation against 1,000 ms. Six skill-4 bots play 284.256 simulated seconds,
+with 41 kills, 103 traversals and a 3–2 capture score, with zero world deaths,
+stalls, no-route reports, goal give-ups or traversal timeouts. Runtime hashes
+remain unchanged. Host/build/limit metadata is in `timing-ramp-host.json`.
+
+**Controlled timing is still unqualified.** The mandatory workload monitor
+observes two separate SP processes from the `9514` checkout (PIDs 7192 and
+40324); one overlaps the entire run. Contention is the report's only failure.
+Those processes belong to another task and were left running. A quiet-host
+repeat is required before accepting these timing limits; numerical results
+from this run do not waive that gate or qualify other maps/platforms.
+
+An unrelated Vulkan shadow-resource fallback warning was observed during
+earlier diagnostics. The final safety sweeps and this timing attempt use
+OpenGL and do not establish Vulkan rendering qualification.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's
