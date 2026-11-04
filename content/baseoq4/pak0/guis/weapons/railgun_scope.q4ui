@@ -1201,7 +1201,8 @@
          {"id": "p69", "op": "line", "points": [[15.025, 21.025]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.22]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.22]}},
+        "antialias": false
        },
        {
         "id": "half-1",
@@ -1278,7 +1279,8 @@
          {"id": "p69", "op": "line", "points": [[28.175, 22.175]]},
          {"id": "close", "op": "close"}
         ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.11]}}
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.11]}},
+        "antialias": false
        }
       ]
      },
@@ -1419,7 +1421,8 @@
         ],
         "fillRule": "evenodd",
         "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.08]}},
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        }
       ]
      }

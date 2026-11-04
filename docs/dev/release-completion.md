@@ -37,6 +37,16 @@ See [player release status](../user/release-status.md).
   routes and other power states remain unqualified. The tool is not bundled
   with the engine, and normal rendering/input behavior is unchanged.
 
+## Smoother retained weapon scopes, 4 November 2026
+
+- Turning and tracking targets with the railgun and nailgun scopes no longer
+  rebuild their moving decorations every frame. The machinegun compass benefits
+  too, and the nailgun caches its glow while lock strength changes. Motion, lock
+  readouts and ammo indicators retain their behavior.
+- Moving decorations use cached triangle edges; stationary aiming marks and
+  lens edges retain antialiasing. Continuous-motion regression checks cover
+  1080p, 4K and portrait layouts. See [measurements and validation](ui/runtime-performance.md#moving-weapon-scopes-4-november-2026).
+
 ## Damaged queued events recover safely, 4 November 2026
 
 - Saves with unsupported queued callbacks or out-of-order event times now

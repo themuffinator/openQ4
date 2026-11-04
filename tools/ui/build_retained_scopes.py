@@ -94,6 +94,16 @@ def art(ident, paths, **props):
     return ui.vector(ident, {**ui.FULL, **props}, paths)
 
 
+def moving(paths):
+    """Faint moving furniture uses retained local triangles, not pixel cells.
+
+    Exact output-pixel coverage recompiles at every yaw/scale/subpixel change.
+    These low-contrast fills use the runtime's transformable mesh path; keep
+    the stationary reticle, aperture and focus masks analytically antialiased.
+    """
+    return [{**path, 'antialias': False} for path in paths]
+
+
 def surround(ident, aperture, tint):
     """Resolve the center shape in the full viewport, including portrait bands."""
     aperture = json.loads(json.dumps(aperture))
@@ -144,7 +154,7 @@ def machinegun(doc):
     rotate_binding(doc, 'compass', 'playerYaw')
     return [lens_focus(184),
             surround('veil', circle(182), ui.rgb('#363636', .4)),
-            center('optical-center', [art('glow', glow), art('compass', dots, transform=ui.rotation(0)), art('marks', marks)])]
+            center('optical-center', [art('glow', glow), art('compass', moving(dots), transform=ui.rotation(0)), art('marks', marks)])]
 
 
 def railgun(doc):
@@ -173,10 +183,10 @@ def railgun(doc):
         points = [(U*(14.4+radius*math.cos(math.radians(a))), U*(14.4+radius*math.sin(math.radians(a))))
                   for radius, angles in ((14.4, range(start, finish+1, 5)), (4.4, range(finish, start-1, -5))) for a in angles]
         ringpaths.append(ui.path(f'half-{index}', points, fill=ui.solid([0, 0, 0, alpha])))
-    turning = ui.vector('turning-ring', {**ui.absolute(left=U*(85-14.4), top=U*(315-14.4), width=U*28.8, height=U*28.8), 'transform': ui.rotation(0)}, ringpaths)
+    turning = ui.vector('turning-ring', {**ui.absolute(left=U*(85-14.4), top=U*(315-14.4), width=U*28.8, height=U*28.8), 'transform': ui.rotation(0)}, moving(ringpaths))
     doc.timelines.add('ring-turn', 9000, [ui.track('turning-ring', 'transform', [(0, ui.rotation(0)), (9000, ui.rotation(360))])], iterations=0)
     # The sweep stays centered; an essential timeline preserves stock optical motion.
-    sweep = art('sweep', [compound('sweep', [diamond(222), diamond(218)], ui.rgb('#00FFFF', .08), 'additive')], transform=ui.transform(), opacity=ui.number(0))
+    sweep = art('sweep', moving([compound('sweep', [diamond(222), diamond(218)], ui.rgb('#00FFFF', .08), 'additive')]), transform=ui.transform(), opacity=ui.number(0))
     doc.timelines.add('diamond-sweep', 2000, [ui.track('sweep', 'transform', [(0, ui.transform()), (1000, ui.transform(sx=680/440, sy=680/440)), (2000, ui.transform(sx=680/440, sy=680/440))]),
                                             ui.track('sweep', 'opacity', [(0, ui.number(0)), (500, ui.number(1)), (1000, ui.number(0)), (2000, ui.number(0))])], iterations=0)
     doc.events['onInit'] = [{'op': 'playTimeline', 'timeline': name} for name in ('ring-turn', 'diamond-sweep')]
@@ -198,9 +208,9 @@ def nailgun(doc):
              ring('edge', 272, 2.4, [0, 0, 0, 1]), ring('band2', 282.5, 18, ui.rgb('#020202', .71)),
              ring('hairline', 218.1, 2.2, ui.rgb('#3C2500'), 'additive')]
     haze = radial('haze', [(291.5, .08), (310, .24), (332, .4), (356, .5)], '#828282')
-    compass = art('compass', [measured('nail_ring2', [0, 0, 0, .34])], transform=ui.rotation(0))
+    compass = art('compass', moving([measured('nail_ring2', [0, 0, 0, .34])]), transform=ui.rotation(0))
     rotate_binding(doc, 'compass', 'playerYaw')
-    arrow = art('lock-arrow', [ui.path('arrow', [(U*x, U*y) for x,y in ((532.6,188),(555.3,240),(532.6,292),(539.6,240))], fill=ui.solid(ui.rgb('#623A00')), blend='additive')], transform=ui.rotation(0), opacity=ui.number(0))
+    arrow = art('lock-arrow', moving([ui.path('arrow', [(U*x, U*y) for x,y in ((532.6,188),(555.3,240),(532.6,292),(539.6,240))], fill=ui.solid(ui.rgb('#623A00')), blend='additive')]), transform=ui.rotation(0), opacity=ui.number(0))
     rotate_binding(doc, 'lock-arrow', 'lockYaw')
     doc.bind('lock-arrow.opacity', 'lock-arrow', 'opacity', {'op':'clamp', 'args':[{'state':'lockStatus'},0,1]})
     lines = []
@@ -209,7 +219,7 @@ def nailgun(doc):
         ident = f'lock-line-{i}'
         paint = ui.linear((0,0),(U*103,0),[(0,ui.rgb('#5E3800', .1 if x>320 else 1)),(1,ui.rgb('#5E3800', 1 if x>320 else .1))])
         lines.append(ui.vector(ident, {**ui.absolute(left=U*x,top=U*(y+.5),width=U*103,height=U), 'transform':ui.transform()},
-                               [ui.path('line',[(0,0),(U*103,0),(U*103,U),(0,U)],fill=paint,blend='additive')]))
+                               moving([ui.path('line',[(0,0),(U*103,0),(U*103,U),(0,U)],fill=paint,blend='additive')])))
         tracks_in.append(ui.track(ident,'transform',[(0,ui.transform()),(50,ui.transform(ty=U*(end-y)))]))
         tracks_out.append(ui.track(ident,'transform',[(0,ui.transform(ty=U*(end-y))),(300,ui.transform())]))
     readouts = ui.group('readouts', {**ui.FULL, 'opacity':ui.number(0)}, [
