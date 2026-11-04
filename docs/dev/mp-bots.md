@@ -75,6 +75,36 @@ under seeded delay, jitter, loss and duplication, receiving 244 fragments with
 clean client/server exits (`.tmp/mp-roadmap/lan-landed/report.json`). Its stage
 and hashes are recorded separately from the catalog's pinned runtime.
 
+## Single-host timing reference, 4 November 2026
+
+The final main-checkout `3550f0dfb` stage runs a five-minute CTF3 audit alone
+on this Windows x64 host (Core i7-13700H, 14 cores/20 logical processors,
+`debugoptimized`, OpenGL). Its selected reference limits are 4 ms weighted
+mean bot think per game frame, 8 ms worst-window p95 and 1,000 ms navigation
+generation. All three pass: **0.986 ms**, **5.000 ms** and **784 ms**, respectively.
+The workload monitor records no competing game or compiler process. The
+29 profile windows retain a 38.579 ms single-frame maximum; the p95 budget is
+not a guarantee that every frame stays below 8 ms. These measurements qualify
+this map, bot count and host, not every map or target platform.
+
+Six skill-4 bots play 284.128 observed seconds, with 40 combat kills, 99
+traversals and a 1-2 capture score. There are no stuck, no-route, goal give-up
+or traversal-timeout events. One world death follows an enemy nail splash,
+so the original report fails the independent safety gate despite passing all
+timing limits. The report is `.tmp/mp-roadmap/timing-ctf3-landed/report.json`,
+with host/limit metadata in `timing-host.json`. The game exits cleanly and
+runtime hashes remain unchanged: client
+`b79fdc80e522765d7c8efddbc248b6cfdd264354bc496ac1afce99fbd56dd52a`,
+MP module `0ef21de90880f7fd492a03c32aca070be6bf8a55bcebb3e1a894fec2927db22a`.
+
+The completed `timing-ctf3-classification/classification.json` retains that
+death as navigation/control: three fixed inputs land with 108 health and the
+controller lands with 113. All three no-hit controls also survive. Thus the
+enemy impulse is not a valid exclusion, and the isolated controller does not
+reproduce the match's later departure. The derived `assessment.json` beside
+the timing report passes only the timing limits and fails the selected overall
+gate. Investigating that full departure remains part of MP-02.
+
 ## Moving crusher and self-blast safety, 4 November 2026
 
 The renewed four-map audit on the earlier recovery build (`5efd1987e`) completes

@@ -2216,7 +2216,14 @@ claim peer combinations that have not been tested.
   26 stalls still recorded. The four earlier long matches retain
   one unexcluded DM8 death and one unexcluded CTF5 death after complete causal
   replays; their full later departures remain unisolated. Shared-host runs do
-  not qualify controlled timing. MP-02 remains open.
+  not qualify controlled timing. A separate [single-host timing reference](mp-bots.md#single-host-timing-reference-4-november-2026)
+  on the final main stage passes selected CTF3 limits (0.986 ms mean think,
+  5 ms worst-window p95, 784 ms navigation generation), with no competing
+  runtimes/compilers. Its independent safety report retains one unexcluded world
+  death: three fixed-input replays and the controller survive, so the full
+  match's later departure remains unisolated.
+  Other maps/platforms, remaining departures and the full sweep after the
+  final rim correction keep MP-02 open.
   Follow-through, 3 November: [knockback slide and replay corrections](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026)
   fix two isolated DM8 failures: route steering spoiled a survivable ground
   slide, and full reverse commands oscillated on a landing rim. Exact-origin
