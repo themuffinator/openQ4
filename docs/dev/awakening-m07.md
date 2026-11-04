@@ -55,6 +55,11 @@ those allowances, movements and failure conditions.
   also clean up the detached mover and surviving parts. The second map placed two
   damageable flyers whose destruction relays called missing functions; those
   callbacks now use the map's existing explosion and pilot-ejection sequence.
+  Destruction is claimed before its first wait, so repeated hits eject one
+  pilot. A hit stops the volley, retires its temporary aim point and cleans up
+  the whole assembly even before the attack begins. Removing the mover also
+  releases an attack waiting for its spline to finish. Late attack/destruction
+  callbacks cannot act on the removed flyer.
   No new attack routes or additional enemies are introduced.
 - **Boost lifecycle:** leaving the seat, disabling movement, hiding the bike,
   or destroying it stops boost thrust and clears its FOV effect. The original
@@ -72,15 +77,15 @@ Design references remain credited to Raven Software and Ritual Entertainment,
 whose alpha was recovered by Justin Marshall; see the [upstream
 credits](../../AGENTS.md#upstream-credits) and [licensing](../../LICENSING.md).
 
-Fresh starts use `maps/game/m07_race.openq4-v2.script`,
-`maps/game/m07_race1.openq4-v2.script` or
-`maps/game/m07_race2.openq4-v2.script`. Saves record that virtual filename and
-restore the same transformation. The original installed identities and v1
-transformation remain supported without changing their statement layouts.
-Restart the current race leg to adopt v2's terminal-state corrections; a v1
-save retains v1 behaviour until the next map. Boost fixes apply independently
-of that choice. Keep both transformations stable; further changes require
-a new identity.
+Fresh starts use `maps/game/m07_race.openq4-v3.script`,
+`maps/game/m07_race1.openq4-v3.script` or
+`maps/game/m07_race2.openq4-v3.script`. Saves record that virtual filename and
+restore the same transformation. The original installed identities and v1/v2
+transformations remain supported without changing their statement layouts.
+Restart the current race leg to adopt v3's bomber lifecycle corrections;
+earlier saves retain their saved script behaviour until the next map. Boost
+fixes apply independently of that choice. Keep all versioned transformations
+stable; further changes require a new identity.
 
 ## Validation
 
@@ -184,6 +189,64 @@ hidden. The two expected v1 reproductions and the unchanged machinery probe
 are indexed separately from the 15 acceptance runs. Existing content warnings
 and the driven-playthrough qualification limits below still apply.
 
+### Third review
+
+The prior bomber probes exercised completed attack runs and the second map's
+two restored destruction callbacks. They did not interrupt a paired volley or
+save during the three-frame pilot-ejection sequence. New v2 reproductions in
+`.tmp/awakening-m07-round3/before-baseline` and `volley-baseline` established:
+
+- Two destruction callbacks in one frame spawned two pilots at the same spot.
+- Destroying a flyer before its attack left its unbound base mover behind
+  until a later attack attempted cleanup.
+- Destroying it between the paired shots removed its bound launchers. The
+  volley then tried to fire the missing second launcher and terminated before
+  removing its temporary aiming entity; the target count increased from 45 to
+  46 and stayed there.
+- A later destruction callback terminated on a missing explosion entity.
+
+The v3 correction assigns one destruction sequence to each flyer before it
+yields, hides the hit flyer immediately, validates launchers after waits,
+detaches and removes temporary aim points safely, and completes cleanup after
+the existing explosion and pilot throw. An attack's mover wait is signalled
+before removal. The third map's separate girder volley receives the same
+launcher guards. Attack routes, projectile definitions, burst counts, paired
+shot delays and the authored pilot velocity calculation remain intact.
+
+The `encounters` runtime case exercises bomber two `--attack-phase before`,
+`volley` or `retreat` (the last on `m07_race1`). `--bomber 4` on `m07_race2`
+checks the girder volley. It repeats destruction callbacks, saves between the
+explosion's waits, checks for one pilot and no stranded aim point, verifies
+immediate assembly removal and eventual thread completion, and confirms that
+bomber one survives. Passing `--input <bomber.save>` resumes that interrupted
+sequence in a fresh process. These are callback probes; they do not establish
+how often real projectile damage generates duplicate callbacks.
+
+The pilot-ejection probes also retain existing ragdoll collision warnings,
+including a parked flyer shot down by a direct callback. The original velocity
+sample, spawn offset and throw are preserved; these tests do not certify
+collision-free pilot placement throughout the authored flight paths.
+
+The SP module rebuilt successfully; **112 native checks** with installed scripts,
+**28 asset-free checks**, and the gameplay, speeder-physics, Awakening CI and path
+contracts passed. Both earlier transformation bodies were compared against
+`05a6db1c5` and are unchanged (`source-compatibility.json`). All **12 runtime
+checks** below passed against the same staged module; the evidence index is
+`.tmp/awakening-m07-round3/suite.json`.
+
+| Evidence directories | Qualification |
+| --- | --- |
+| `before-race`, `before-race1`, `before-race2` | Destroying bomber two before its attack ejects one pilot, immediately removes its assembly, preserves bomber one, and makes a late attack/destruction callback harmless. |
+| `volley-race`, `volley-race1`, `volley-race2` | Destruction between paired shots ejects one pilot, cancels the attack without script warnings and returns the temporary aim-target count to its baseline. |
+| `girder-race2` | Bomber four's girder volley safely stops and retires its two authored map aim points. |
+| `retreat-race1` | Destruction while the attack waits on its base mover removes the assembly and allows the waiting thread to finish. |
+| `restore-volley-race1` | A Vulkan fresh-process restore from the middle of the explosion keeps its destruction claim, ejects one pilot and completes volley/assembly cleanup. |
+| `flow-race1` | A fresh v3 race passes the full deadline, completion, normal bomber-run cleanup, extra flyer destruction and next-leg checks. |
+| `restore-v1-race`, `restore-v2-race1` | Earlier v1/v2 saves restore exactly and pass their original full-flow checks on the new module. |
+
+The two expected v2 failures are retained separately from these acceptance
+runs. Existing media, navigation, ragdoll and later-map warnings remain visible.
+
 ## Remaining content and qualification limits
 
 - The alpha's missing media and empty navigation datasets are not repaired by
@@ -218,6 +281,13 @@ at `E:/Repositories/openQ4/.claude/worktrees/ui-roadmap-work-aaa011` as stale.
 It was not removed by this task and was no longer registered at the second
 review. No additional worktree was established to be disposable.
 
+The third review found a possible stale checkout at
+`E:/Repositories/openQ4-worktrees/e931/openQ4`: detached HEAD `85c61fe16`, no
+uncommitted changes, and its commit is already contained in the main checkout's
+branch. Consider removing it once its owner confirms it is no longer needed;
+this task did not remove it. The other checked worktrees have unmerged commits
+or active edits. The snapshot is `.tmp/awakening-m07-round3/worktrees.json`.
+
 Automatic approval review rejected cleanup of obsolete test outputs, including
 a narrowly scoped deletion after checking the absolute target and absence of
 links, with the reason "blocked by policy". The second review's attempt to
@@ -225,3 +295,7 @@ remove disposable native fixture sources/binaries and a duplicate comparison
 image received the same rejection. Disposable files therefore remain under
 `.tmp/awakening-m07/` and `.tmp/awakening-m07-round2/` alongside retained evidence
 and the reusable asset cache.
+The third review separately verified the four disposable native fixture files
+and their parent directories had no links, then attempted deletion using their
+literal absolute paths. Automatic approval review again rejected the action
+as "blocked by policy"; those files remain under `.tmp/awakening-m07-round3/`.

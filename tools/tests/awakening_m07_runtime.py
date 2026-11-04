@@ -93,10 +93,40 @@ def transition_commands(map_name):
             'openq4_assertMapState game/'+next_map]
 
 
+def encounter_commands(args):
+    number = args.bomber
+    parts = ('strafingFlyer', 'strafeBase', 'strafeRocketA', 'strafeRocketB',
+             'flyerDamage', 'flyerStrafeBoom', 'flyerStrafeExplode')
+    inspect = [f'testMission {part}_{number}' for part in parts] + ['testMission strafingFlyer_1']
+    lines = []
+    if not args.input:
+        lines += ['testMission call area1Cleared', 'wait 2', 'testMission call area2Cleared', 'wait 2',
+                  'echo M07_ENCOUNTER_BEFORE', 'listEntities *'] + inspect
+        if args.attack_phase != 'before':
+            # Strike between the paired shots: the third map omits bomber two's
+            # one-second start delay; bomber four opens its girder volley at .3s.
+            frames = 720 if args.attack_phase == 'retreat' else (22 if number == 4 else 129 if args.map == 'm07_race2' else 192)
+            lines += [f'testMission call beginBomberRun_{number}', f'wait {frames}']
+        lines += ['echo M07_ENCOUNTER_STRIKE', f'testMission call bomberExplode_{number}',
+                  f'testMission call bomberExplode_{number}', 'wait 1', 'set g_stopTime 1',
+                  'echo M07_ENCOUNTER_SAVED', 'listThreads', 'saveGame bomber',
+                  'wait 3', 'set g_stopTime 0']
+    else:
+        lines += ['echo M07_ENCOUNTER_STRIKE', f'testMission call bomberExplode_{number}']
+    lines += ['wait 8', 'echo M07_ENCOUNTER_DESTROYED', 'listEntities *'] + inspect
+    if args.attack_phase == 'before':
+        lines += [f'testMission call beginBomberRun_{number}']
+    lines += [f'testMission call bomberExplode_{number}', 'wait 200',
+              'echo M07_ENCOUNTER_FINAL', 'listEntities *', 'listThreads'] + inspect
+    return lines + ['saveGame encounter_finished', 'wait 3']
+
+
 def commands(args):
     lines = ['set g_autoExecAfterMapLoad ""', 'openq4_assertMapState game/'+args.map]
     if args.input:
         lines += report_state('RESTORED') + ['set g_stopTime 0']
+        if args.case == 'encounters':
+            return lines + encounter_commands(args)
     else:
         lines += ['god', 'notarget']
         if args.map == 'm07_race':
@@ -110,6 +140,8 @@ def commands(args):
             lines += ['testMission call speederFlight02', 'set com_fixedTic 10',
                       'wait 180', 'set com_fixedTic 1', 'wait 2']
         lines += report_state('START')
+        if args.case == 'encounters':
+            return lines + encounter_commands(args)
         if args.case == 'failed':
             return lines + failure_commands(args)
         if args.case == 'machinery':
@@ -163,7 +195,9 @@ def commands(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--map', choices=MAPS, required=True)
-    parser.add_argument('--case', choices=('flow', 'timeout1', 'timeout2', 'outro', 'boundaries', 'failed', 'failed2', 'machinery'), default='flow')
+    parser.add_argument('--case', choices=('flow', 'timeout1', 'timeout2', 'outro', 'boundaries', 'failed', 'failed2', 'machinery', 'encounters'), default='flow')
+    parser.add_argument('--attack-phase', choices=('before', 'volley', 'retreat'), default='volley')
+    parser.add_argument('--bomber', type=int, choices=(2, 4), default=2)
     parser.add_argument('--input', type=Path)
     parser.add_argument('--saved-state', choices=('second', 'finished'), default='second',
                         help='State in --input; finished is only supported by the boundaries check')
@@ -182,6 +216,10 @@ def main():
         parser.error('this check requires a fresh map start')
     if args.case == 'machinery' and args.map != 'm07_race1':
         parser.error('machinery belongs to m07_race1')
+    if args.case == 'encounters' and args.attack_phase == 'retreat' and args.map != 'm07_race1':
+        parser.error('retreat fixture belongs to m07_race1')
+    if args.bomber == 4 and (args.case != 'encounters' or args.map != 'm07_race2'):
+        parser.error('bomber four fixture belongs to m07_race2 encounters')
     output, cache = task_path(args.output), task_path(args.cache)
     output.mkdir(parents=True, exist_ok=False)
     game = output/'q4xbase'
@@ -206,7 +244,9 @@ def main():
     identity = {str(p.relative_to(ROOT)): sha(p) for p in runtime}
     asset = args.awakening/'maps/game'/f'{args.map}.script'
     asset_hash = sha(asset)
-    plan = dict(case=args.case, map=args.map, saved_state=args.saved_state if args.input else None,
+    plan = dict(case=args.case, map=args.map, attack_phase=args.attack_phase if args.case == 'encounters' else None,
+                bomber=args.bomber if args.case == 'encounters' else None,
+                saved_state=('bomber' if args.case == 'encounters' else args.saved_state) if args.input else None,
                 command=command, identity=identity, installed_script_sha256=asset_hash)
     (output/'plan.json').write_text(json.dumps(plan, indent=2)+'\n')
     startup = None
@@ -241,11 +281,33 @@ def main():
             assert sha(args.input) == input_hash == sha(game/'savegames/race_in.save'), 'input save changed'
             assert 'Game Map Init SaveGame' in log, 'save was not restored'
         if not args.input:
-            assert 'Awakening M07:' in log and 'mission corrections v2 enabled' in log, 'corrections not selected'
+            assert 'Awakening M07:' in log and 'mission corrections v3 enabled' in log, 'corrections not selected'
         if args.case in ('flow', 'outro', 'boundaries'):
             next_map = ('m07_race1', 'm07_race2', 'm08_cryofac')[MAPS.index(args.map)]
             assert 'expectedMap=game/'+next_map in log and 'Game Map Shutdown' in log, 'missing transition assertion'
-        if args.case == 'machinery':
+        if args.case == 'encounters':
+            before_log = (args.input.resolve().parents[2]/'q4xbase/logs'/LOG_NAME).read_text(errors='replace') if args.input else log
+            before = before_log.split('M07_ENCOUNTER_BEFORE', 1)[1].split('M07_ENCOUNTER_STRIKE', 1)[0]
+            final = log.split('M07_ENCOUNTER_FINAL', 1)[1]
+            destroyed = log.split('M07_ENCOUNTER_DESTROYED', 1)[1].split('M07_ENCOUNTER_FINAL', 1)[0]
+            def count_entities(section, classname):
+                return len(re.findall(r'(?m)^\s*\d+: '+re.escape(classname)+r'\s', section))
+            samples = {key: {'pilots': count_entities(section, 'monster_strogg_marine'),
+                             'aim_targets': count_entities(section, 'target_null')}
+                       for key, section in (('BEFORE', before), ('DESTROYED', destroyed), ('FINAL', final))}
+            assert samples['FINAL']['pilots'] == samples['BEFORE']['pilots'] + 1, 'duplicate/missing ejected pilot'
+            # The girder attack retires its two authored map aim points when
+            # interrupted; normal strafing owns only its temporary aim point.
+            removed_targets = 2 if args.bomber == 4 and args.attack_phase == 'volley' else 0
+            assert samples['FINAL']['aim_targets'] == samples['BEFORE']['aim_targets'] - removed_targets, 'stranded/missing volley aim target'
+            for part in ('strafingFlyer', 'strafeBase', 'strafeRocketA', 'strafeRocketB', 'flyerDamage', 'flyerStrafeBoom', 'flyerStrafeExplode'):
+                assert f'testMission: missing={part}_{args.bomber}\n' in destroyed, 'shot-down bomber left '+part
+            assert 'testMission: name=strafingFlyer_1 ' in final, 'destroyed another bomber'
+            assert not re.search(r'(?m)^\s*\d+: (?:beginBomberRun_'+str(args.bomber)+'|bomberExplode_'+str(args.bomber)+r')\s+:', final), 'stranded bomber thread'
+            encounter_log = log.split('M07_ENCOUNTER_STRIKE', 1)[1]
+            assert not re.search(r'(?i)WARNING:.*\.script\(|unknown function|expected an existing', encounter_log), 'encounter emitted script warnings'
+            assert (game/'savegames/encounter_finished.save').is_file(), 'encounter not saveable'
+        elif args.case == 'machinery':
             pipe_threads = set()
             appearances = {}
             for step in range(25):

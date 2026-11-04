@@ -4810,7 +4810,9 @@ heading. It is not the contents of the 14 September 2026 release. See the
   screen, and late checkpoints cannot complete a failed race. The first
   lockdown retains its radio warning before starting the clock.
   Bomber attacks clean up the correct aircraft, and two previously broken
-  flyer destruction sequences now work.
+  flyer destruction sequences now work. Shooting down a bomber interrupts its
+  volley cleanly and ejects one pilot, including when saving during the
+  explosion; late callbacks no longer leave orphaned attack entities.
   Restart the current race leg to use these script corrections; existing saves
   retain their original mission scripts. Boosting also stops when the rider
   leaves or the bike is disabled, without resetting its recharge time. See the

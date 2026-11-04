@@ -12,6 +12,9 @@ static const char * const awakeningM07Versions[] = {
 static const char * const awakeningM07Versions2[] = {
 	"maps/game/m07_race.openq4-v2.script", "maps/game/m07_race1.openq4-v2.script", "maps/game/m07_race2.openq4-v2.script"
 };
+static const char * const awakeningM07Versions3[] = {
+	"maps/game/m07_race.openq4-v3.script", "maps/game/m07_race1.openq4-v3.script", "maps/game/m07_race2.openq4-v3.script"
+};
 
 static bool Awakening_M07ReplaceOnce( idStr &source, const char *before, const char *after ) {
 	const int first = source.Find( before );
@@ -160,6 +163,102 @@ static bool Awakening_CorrectM07ScriptV2( idStr &source, int race ) {
 	return true;
 }
 
+static bool Awakening_M07ReplaceCount( idStr &source, const char *before, const char *after, int expected ) {
+	int count = 0;
+	for ( int at = source.Find( before ); at >= 0; at = source.Find( before, true, at + 1 ) ) { ++count; }
+	if ( count != expected ) { return false; }
+	source.Replace( before, after );
+	return true;
+}
+
+// Destruction can interrupt a volley or a mover wait. Claim each flyer before
+// yielding, let its existing explosion/ejection finish once, then remove its
+// assembly. Preserve the v1/v2 programs for saves that already own those threads.
+static bool Awakening_CorrectM07ScriptV3( idStr &source, int race ) {
+	const int count = race == 0 ? 3 : 4;
+	idStr globals = "boolean oq4_raceFailed;";
+	for ( int bomber = 1; bomber <= count; ++bomber ) {
+		globals += va( "\nboolean oq4_bomberDestroyed_%d;", bomber );
+	}
+	if ( !Awakening_M07ReplaceOnce( source, "boolean oq4_raceFailed;", globals ) ) { return false; }
+	for ( int bomber = 1; bomber <= count; ++bomber ) {
+		idStr before;
+		if ( race == 1 && bomber > 2 ) {
+			before = va( "void bomberExplode_%d() {\n\tif ( isValidEntity( $strafingFlyer_%d ) ) {\n"
+				"\t\tstroggFlyerExplosion( $strafingFlyer_%d, $flyerStrafeExplode_%d );\n"
+				"\t\tremoveFlyerBits(\"%d\");\n\t}\n}", bomber, bomber, bomber, bomber, bomber );
+		} else {
+			before = va( "void bomberExplode_%d()\n\t{\n\t\tstroggFlyerExplosion( $strafingFlyer_%d , $flyerStrafeExplode_%d );\n\t}", bomber, bomber, bomber );
+		}
+		idStr after = va( "void bomberExplode_%d() {\n"
+			"\tif ( oq4_bomberDestroyed_%d ) { return; }\n\toq4_bomberDestroyed_%d = true;\n"
+			"\tif ( isValidEntity( $strafingFlyer_%d ) && isValidEntity( $flyerStrafeExplode_%d ) ) {\n"
+			"\t\tstroggFlyerExplosion( $strafingFlyer_%d, $flyerStrafeExplode_%d );\n\t}\n"
+			"\tremoveFlyerBits(\"%d\");\n}", bomber, bomber, bomber, bomber, bomber, bomber, bomber, bomber );
+		if ( !Awakening_M07ReplaceOnce( source, before, after ) ) { return false; }
+		if ( race == 1 && bomber > 2 ) { continue; }
+		before = va( "setNewTimes($strafeBase_%d,", bomber );
+		after = va( "if ( oq4_bomberDestroyed_%d ) { return; }\n"
+			"\t\tif ( !isValidEntity( $strafingFlyer_%d ) || !isValidEntity( $strafeBase_%d ) ) { removeFlyerBits(\"%d\"); return; }\n"
+			"\t\tsetNewTimes($strafeBase_%d,", bomber, bomber, bomber, bomber, bomber );
+		if ( !Awakening_M07ReplaceOnce( source, before, after ) ) { return false; }
+		before = va( "if (!isValidEntity($strafingFlyer_%d)) { removeFlyerBits(\"%d\"); return; }", bomber, bomber );
+		after = va( "if ( oq4_bomberDestroyed_%d ) { return; }\n\t\t", bomber );
+		after += before;
+		if ( !Awakening_M07ReplaceCount( source, before, after, race == 0 && bomber > 1 ? 7 : 5 ) ) { return false; }
+	}
+	struct correction_t { const char *before; const char *after; };
+	static const correction_t corrections[] = {
+		// The fighter is valid at the loop head. Do not fire from a hidden wreck
+		// or through launchers removed by its bound-entity teardown.
+		{ "\n\t\t\tvector guessLead = $player1.getLinearVelocity();",
+		  "\n\t\t\tif ( fighter.isHidden() || !isValidEntity( projectileOne ) || !isValidEntity( projectileTwo ) ) { break; }\n"
+		  "\t\t\tvector guessLead = $player1.getLinearVelocity();" },
+		{ "sys.trigger( projectileTwo );",
+		  "if ( isValidEntity( fighter ) && isValidEntity( projectileTwo ) ) {\n"
+		  "\t\t\t\tif ( !fighter.isHidden() ) { sys.trigger( projectileTwo ); }\n\t\t\t}" },
+		{ "tempTarget.remove();\n\t\t\n\t\t\tprojectileOne.removeTarget( tempTarget );\n\t\t\tprojectileTwo.removeTarget( tempTarget );",
+		  "if ( isValidEntity( tempTarget ) ) {\n"
+		  "\t\t\t\tif ( isValidEntity( projectileOne ) ) { projectileOne.removeTarget( tempTarget ); }\n"
+		  "\t\t\t\tif ( isValidEntity( projectileTwo ) ) { projectileTwo.removeTarget( tempTarget ); }\n"
+		  "\t\t\t\ttempTarget.remove();\n\t\t\t}" },
+		{ "tempTarget.remove();\t", "if ( isValidEntity( tempTarget ) ) { tempTarget.remove(); }\t" },
+		// Hide before the first yield so the volley stops as soon as the hit is
+		// accepted. Keep the authored velocity sample and pilot throw unchanged.
+		{ "old = flyer.getWorldOrigin();",
+		  "if ( !isValidEntity( flyer ) || !isValidEntity( explosion ) ) { return; }\n"
+		  "\t\tflyer.hide();\n\t\told = flyer.getWorldOrigin();" },
+		{ "new = flyer.getWorldOrigin();",
+		  "if ( !isValidEntity( flyer ) || !isValidEntity( explosion ) ) { return; }\n\t\tnew = flyer.getWorldOrigin();" },
+		{ "sys.setSpawnArg( \"classname\", \"monster_strogg_marine\" );",
+		  "if ( !isValidEntity( flyer ) || !isValidEntity( explosion ) ) { return; }\n"
+		  "\t\tsys.setSpawnArg( \"classname\", \"monster_strogg_marine\" );" },
+		// stopMoving notifies waitFor before the mover disappears. A waiting
+		// attack can finish its idempotent cleanup instead of remaining suspended.
+		{ "flyerBit = sys.getEntity(\"strafeBase_\" + flyerNumber);\n\t\tif (flyerBit != $nullEntity)\n\t\t\tflyerBit.remove();",
+		  "flyerBit = sys.getEntity(\"strafeBase_\" + flyerNumber);\n"
+		  "\t\tif (flyerBit != $nullEntity) { flyerBit.stopMoving(); flyerBit.remove(); }" },
+	};
+	for ( size_t i = 0; i < sizeof( corrections ) / sizeof( corrections[0] ); ++i ) {
+		if ( !Awakening_M07ReplaceOnce( source, corrections[i].before, corrections[i].after ) ) { return false; }
+	}
+	if ( race == 2 ) {
+		// The fourth bomber first fires at the girders, using the same paired
+		// launcher timing. Its separate volley needs the same destruction guards.
+		if ( !Awakening_M07ReplaceOnce( source, "$strafeRocketA_4.appendTarget( $girder_target_2 );",
+			"if ( fighter.isHidden() || !isValidEntity( $strafeRocketA_4 ) || !isValidEntity( $strafeRocketB_4 ) ) { break; }\n"
+			"\t\t\t$strafeRocketA_4.appendTarget( $girder_target_2 );" ) ||
+			!Awakening_M07ReplaceOnce( source, "sys.trigger( $strafeRocketB_4 );",
+			"if ( isValidEntity( fighter ) && isValidEntity( $strafeRocketB_4 ) ) {\n"
+			"\t\t\t\tif ( !fighter.isHidden() ) { sys.trigger( $strafeRocketB_4 ); }\n\t\t\t}" ) ||
+			!Awakening_M07ReplaceOnce( source, "$strafeRocketA_4.removeTarget( $girder_target_2 );",
+			"if ( isValidEntity( $strafeRocketA_4 ) ) { $strafeRocketA_4.removeTarget( $girder_target_2 ); }" ) ||
+			!Awakening_M07ReplaceOnce( source, "$strafeRocketB_4.removeTarget( $girder_target_1 );",
+			"if ( isValidEntity( $strafeRocketB_4 ) ) { $strafeRocketB_4.removeTarget( $girder_target_1 ); }" ) ) { return false; }
+	}
+	return true;
+}
+
 static bool Awakening_LoadM07MissionScript( const char *filename, idStr &source ) {
 	idStr normalized = filename;
 	normalized.BackSlashesToSlashes();
@@ -167,14 +266,16 @@ static bool Awakening_LoadM07MissionScript( const char *filename, idStr &source 
 		return false;
 	}
 	for ( int race = 0; race < 3; ++race ) {
+		const bool version3 = normalized.Icmp( awakeningM07Versions3[race] ) == 0;
 		const bool version2 = normalized.Icmp( awakeningM07Versions2[race] ) == 0;
-		if ( !version2 && normalized.Icmp( awakeningM07Versions[race] ) != 0 ) { continue; }
+		if ( !version3 && !version2 && normalized.Icmp( awakeningM07Versions[race] ) != 0 ) { continue; }
 		char *installed = NULL;
 		const int length = fileSystem->ReadFile( awakeningM07Sources[race], reinterpret_cast<void **>( &installed ), NULL );
 		if ( length > 0 ) { source = installed; }
 		if ( installed != NULL ) { fileSystem->FreeFile( installed ); }
 		if ( length <= 0 || !Awakening_CorrectM07Script( source, race ) ||
-			( version2 && !Awakening_CorrectM07ScriptV2( source, race ) ) ) {
+			( ( version3 || version2 ) && !Awakening_CorrectM07ScriptV2( source, race ) ) ||
+			( version3 && !Awakening_CorrectM07ScriptV3( source, race ) ) ) {
 			source.Clear();
 			return false;
 		}
@@ -190,9 +291,9 @@ static const char *Awakening_M07MissionScriptName( const char *filename ) {
 		for ( int race = 0; race < 3; ++race ) {
 			if ( normalized.Icmp( awakeningM07Sources[race] ) != 0 ) { continue; }
 			idStr source;
-			if ( Awakening_LoadM07MissionScript( awakeningM07Versions2[race], source ) ) {
-				gameLocal.Printf( "Awakening M07: %s mission corrections v2 enabled\n", filename );
-				return awakeningM07Versions2[race];
+			if ( Awakening_LoadM07MissionScript( awakeningM07Versions3[race], source ) ) {
+				gameLocal.Printf( "Awakening M07: %s mission corrections v3 enabled\n", filename );
+				return awakeningM07Versions3[race];
 			}
 			gameLocal.Warning( "Awakening M07: unrecognized script; keeping installed mission behaviour" );
 		}

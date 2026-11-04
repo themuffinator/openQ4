@@ -1764,6 +1764,10 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   reject late completion callbacks. Original and v1 saved script layouts remain
   supported. Pipe machinery repeatability and next-leg HUD reset were checked
   without requiring changes.
+  A third review adds v3 bomber ownership and interruption handling: one pilot
+  per destroyed flyer, safe paired-shot cancellation, assembly and temporary
+  aim cleanup, and completion of mover-waiting attack threads. Existing v1/v2 script
+  programs remain unchanged for restore compatibility.
   Full driven traversal and race balance remain open under this item.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for

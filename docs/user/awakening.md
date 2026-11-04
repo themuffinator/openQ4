@@ -194,7 +194,8 @@ scenes, keep your settings or keep the game fair:
   checkpoints cannot turn that failure into completion.
   The first lockdown keeps its radio warning before starting
   the clock. Bomber attacks clean up correctly, and two broken flyer destruction
-  sequences now work. Restart the current race leg to use these changes;
+  sequences now work. Shooting down a bomber stops its volley cleanly and
+  ejects its pilot once. Restart the current race leg to use these changes;
   older saves keep their original mission scripts. Leaving or disabling
   the bike ends its boost while keeping the recharge time.
 
