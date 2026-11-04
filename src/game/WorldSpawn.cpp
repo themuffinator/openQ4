@@ -9,6 +9,7 @@ Worldspawn class.  Each map has one worldspawn which handles global spawnargs.
 
 
 #include "Game_local.h"
+#include "awakening/MissionScripts.h"
 
 /*
 ================
@@ -40,7 +41,7 @@ void idWorldspawn::Spawn( void ) {
 	scriptname = gameLocal.GetMapName();
 	scriptname.SetFileExtension( ".script" );
 	if ( fileSystem->ReadFile( scriptname, NULL, NULL ) > 0 ) {
-		gameLocal.program.CompileFile( scriptname );
+		gameLocal.program.CompileFile( Awakening_MissionScriptName( scriptname ) );
 
 		// call the main function by default
 		func = gameLocal.program.FindFunction( "main" );

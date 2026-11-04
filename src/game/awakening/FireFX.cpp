@@ -15,7 +15,7 @@
 	other targets are activated once it is out.
 
 	The volume's brushes must use a shot-clip material so the freeze beam can
-	hit it; the entity itself is made solid to traces here.
+	hit it; the entity keeps projectile-only collision while it burns.
 
 ===============================================================================
 */
@@ -43,6 +43,7 @@ private:
 	void					StopStageEffects( void );
 	void					ShrinkTargetLights( int damageTaken );
 	void					ActivateTargetsWhenOut( void );
+	void					UpdateContents( void );
 
 	void					Event_Touch( idEntity *other, trace_t *trace );
 	void					Event_Activate( idEntity *activator );
@@ -82,12 +83,11 @@ riFireFX::Spawn
 void riFireFX::Spawn( void ) {
 	health = spawnArgs.GetInt( "health", "100" );
 	fl.takedamage = true;
-	// solid to traces as well as a trigger, so the freeze beam can hit it
-	GetPhysics()->SetContents( CONTENTS_SOLID | CONTENTS_TRIGGER );
 
 	nextDamageTime = gameLocal.time;
 	stage = FIRE_LARGE;
 	burning = spawnArgs.GetBool( "on", "1" );
+	UpdateContents();
 	if ( burning ) {
 		BecomeActive( TH_THINK );
 		StartStageEffect();
@@ -114,11 +114,20 @@ void riFireFX::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( nextDamageTime );
 	savefile->ReadInt( stage );
 	savefile->ReadBool( burning );
+	// Also repair the solid clip contents stored by older saves.
+	UpdateContents();
 
 	// client effects are not saved; bring the current stage back
 	if ( burning ) {
 		StartStageEffect();
 	}
+}
+
+// Match common/shot_clip: freeze projectiles hit the flame, but players and
+// squadmates can cross it and receive touch damage. A quenched/disabled vent
+// must not remain an invisible wall or absorb shots meant for enemies beyond.
+void riFireFX::UpdateContents( void ) {
+	GetPhysics()->SetContents( burning && stage < FIRE_OUT ? CONTENTS_PROJECTILE | CONTENTS_TRIGGER : 0 );
 }
 
 /*
@@ -134,6 +143,7 @@ void riFireFX::StartStageEffect( void ) {
 	}
 	const idMat3 upright = ( -GetPhysics()->GetGravityNormal() ).ToMat3();
 	effect = PlayEffect( stageEffects[ stage ], GetPhysics()->GetOrigin(), upright, true );
+	PostEventMS( &EV_FireFX_LookAtTarget, 0 );
 }
 
 /*
@@ -175,11 +185,9 @@ void riFireFX::ShrinkTargetLights( int damageTaken ) {
 			continue;
 		}
 
-		const float current = idMath::Rint( light->GetRadius().x ) / baseRadius.x;
-		const float scale = current - ( damageTaken / maxHealth ) / fireCount;
-		if ( scale >= 0.0f ) {
-			light->SetRadiusXYZ( baseRadius.x * scale, baseRadius.y * scale, baseRadius.z * scale );
-		}
+		const float current = light->GetRadius().x / baseRadius.x;
+		const float scale = idMath::ClampFloat( 0.0f, 1.0f, current - ( damageTaken / maxHealth ) / fireCount );
+		light->SetRadiusXYZ( baseRadius.x * scale, baseRadius.y * scale, baseRadius.z * scale );
 	}
 }
 
@@ -227,7 +235,7 @@ void riFireFX::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 
 	const int oldHealth = health;
 	idTrigger::Damage( inflictor, attacker, dir, damageDefName, damageScale, location );
-	ShrinkTargetLights( oldHealth - health );
+	ShrinkTargetLights( oldHealth - Max( health, 0 ) );
 
 	if ( stage == FIRE_LARGE && health < spawnArgs.GetInt( "health", "100" ) / 2 ) {
 		StopEffect( "fx_fireLarge" );
@@ -237,6 +245,7 @@ void riFireFX::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 	if ( stage < FIRE_OUT && health <= 0 ) {
 		StopEffect( "fx_fireSmall" );
 		stage = FIRE_OUT;
+		UpdateContents();
 		StartStageEffect();
 		ActivateTargetsWhenOut();
 	}
@@ -268,6 +277,7 @@ Toggles the fire on and off.
 */
 void riFireFX::Event_Activate( idEntity *activator ) {
 	burning = !burning;
+	UpdateContents();
 	if ( !burning ) {
 		BecomeInactive( TH_THINK );
 		StopStageEffects();
