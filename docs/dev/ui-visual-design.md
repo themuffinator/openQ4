@@ -2810,7 +2810,8 @@ whatever its first frame happened to show.
   a #4D682F to #64883D rim, opaque in Classic and at 0.85 in Remastered, holding
   the dropship from above in #475736. Its five sections turn #A13C2B at 80, 60,
   40, 20 and 10% of the ship's health, left wing first and mid body last, and
-  clear again on repair, which the stock never sends. Gold objective markers,
+  clear again on repair (the M03 repair helper now sends the missing clear
+  events). Gold objective markers,
   broken rings 16 u across, spin at 0.35 turn a second over the place that needs
   the player. Eight red darts on the rim point in from attackers, pulsing at
   2 Hz while they fade over 3 s. An additive olive cone 52 degrees wide shows

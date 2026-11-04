@@ -123,15 +123,21 @@ def run(args, case, leg='write', source=None):
         # script (the external asset mount deliberately has highest priority).
         lines += ['script "'+' '.join(M04.split())+'"',
                   'listSpawnArgs target_null_41', 'listSpawnArgs target_null_47',
-                  'listSpawnArgs tunnel_bot', 'listSpawnArgs gunner_3_toBridge',
-                  'trigger tunnel_bot', 'script "thread bridgeGunnerGo()"',
+                  'listSpawnArgs tunnel_bot', 'listSpawnArgs strogg_ctrlRm_jumper_1_pos_1',
+                  'script "sys.assert($gunner_3_toBridge == $strogg_ctrlRm_jumper_1_pos_1)"',
+                  # The approach trigger removes the authored squad AAS barrier
+                  # before the player can reach the bridge ambush trigger.
+                  'trigger tunnel_bot', 'trigger trigger_once_35',
+                  'script "thread bridgeGunnerGo()"',
                   'wait 180', 'teleport CB1_upr_escape_pos',
-                  'aiDumpState -v',
-                  'screenshot screenshots/cellblock.tga', 'wait 240',
-                  'aiDumpState -v',
+                  'aiDumpState',
+                  'screenshot screenshots/cellblock.tga', 'wait 900',
+                  'aiDumpState',
                   'aiDumpState monster_gunner_3 -v', 'aiDumpState tunnel_bot -v',
-                  'noclip', 'setviewpos 688 -3470 390 90', 'wait 30', 'screenshot screenshots/vent.tga',
+                  'noclip', 'setviewpos 978 450 300 90', 'wait 1', 'screenshot screenshots/bridge.tga',
+                  'setviewpos 688 -3470 390 90', 'wait 30', 'screenshot screenshots/vent.tga',
                   'echo Q4_FIRE_BURNING', 'script "sys.println($func_fire_volume_1.getHealth())"',
+                  "script \"sys.trace('600 -3330 360','740 -3330 360','0 0 0','0 0 0',265,$player1); sys.assert(sys.getTraceEntity() != $func_fire_volume_1)\"",
                   "script \"sys.trace('600 -3330 360','740 -3330 360','0 0 0','0 0 0',2561,$player1); sys.assert(sys.getTraceEntity() == $func_fire_volume_1)\""]
         lines += ['damage func_fire_volume_1 1 damage_freezegun'] * 25
         lines += ['wait 30', 'echo Q4_FIRE_OUT', 'script "sys.assert($func_fire_volume_1.getHealth() <= 0)"',
@@ -212,6 +218,16 @@ def run(args, case, leg='write', source=None):
             failures.append('lower reinforcement did not reach its landing')
         if "scriptedMove: 'monster_gunner_3' could not start" in log:
             failures.append('bridge gunner route is unreachable')
+        gunner = re.findall(r'name=monster_gunner_3 .* hidden=0 origin=\(([^)]+)\)', log)
+        if not gunner or sum((v-e)**2 for v,e in zip(map(float,gunner[-1].split()), (978,654,272))) > 40**2:
+            failures.append('bridge gunner did not reach the upper bridge approach')
+        gunner_state = log.rsplit('name=monster_gunner_3',1)[-1].split('AI dump state',1)[0]
+        if 'idAI.move.status = MOVE_STATUS_DONE' not in gunner_state:
+            failures.append('bridge gunner did not finish its scripted move')
+        bots = re.findall(r'name=tunnel_bot .* hidden=0 origin=\(([^)]+)\)', log)
+        if not bots or min(sum((v-e)**2 for v,e in zip(map(float,bots[-1].split()), stop))
+                           for stop in ((1744,-3472,362),(1704,-3368,334))) > 40**2:
+            failures.append('repair bot did not reach its own workstation')
         if "Function 'playCycle' not supported on entity 'prison_camera" in log:
             failures.append('prison camera initializer still calls mover animation')
     captures = list((game/'screenshots').glob('*.tga'))

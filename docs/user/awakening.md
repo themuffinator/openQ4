@@ -131,6 +131,18 @@ alpha's own code:
 The alpha's own code or content kept these from working as designed. openQ4
 fixes them:
 
+- **Falcon defence (m03).** Both turrets show their own cannon heat, weapon
+  selection and missile status, and keep their aiming reticle visible. The
+  ship diagram agrees between guns and on foot. Repairs restore hull health
+  and clear repaired sections; the engine repair completes once. Ship state
+  survives switching guns and saving/loading.
+- **The prison (m04).** Reinforcements use the correct upper or lower
+  cellblock landing, the maintenance bot uses its own workstations, and the
+  bridge ambush has a valid destination. Camera scanning uses its existing AI.
+  The invalid starting goob-gun upgrade request is removed.
+  Start m03/m04 afresh to receive these mission callback corrections; existing
+  saves retain the mission threads with which they were created.
+
 - **Fire passages (m01, m02).** Freezing a vent clears its invisible collision
   and puts its light out fully. Burning vents allow passage while inflicting
   their authored touch damage. Saves restore the correct collision state.
@@ -219,8 +231,7 @@ supply missing performances or replacement art:
   model lacks. Both only lose an effect. m09's frosty-breath effects name a
   joint only marines have, and two of its triggers call script functions the
   developers commented out or never wrote.
-- m04's starting inventory names a goob-gun mod that does not exist, and the
-  m08 and m09 developer give lists contain typos. m08's first-lab scientists
+- The m08 and m09 developer give lists contain typos. m08's first-lab scientists
   call a script function (`FirstLabCleared`) the map never defines; nothing
   waits on it.
 - The background harvester in the m07 races is retail's cinematic one, which

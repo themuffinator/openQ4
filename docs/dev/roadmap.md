@@ -1751,6 +1751,13 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   See [mission intent, findings and bounded runtime evidence](awakening-missions.md).
   End-to-end squad routing, walker demolition/traversal and Tank/extraction
   qualification remain part of this gate.
+  Progress, 4 November: [M03/M04 review](awakening-missions.md#m03-and-m04-review-4-november-2026)
+  repairs the Falcon's shared cockpit screens, false initial lock, missing
+  reticle coverage, ship-state routing, hull repair accounting and duplicate
+  engine completion. Prison cellblock routing, maintenance-bot references,
+  camera initialization and the missing bridge destination are corrected.
+  Focused runtime and production-method probes cover these states; complete
+  mission playthroughs and the other campaign acceptance gates remain open.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus

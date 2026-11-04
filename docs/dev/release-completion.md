@@ -6,6 +6,21 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Awakening Falcon and prison refinement, 4 November 2026
+
+- The Falcon's two turrets now keep independent heat, weapon and missile
+  displays, start without a false missile lock, and retain a usable aiming
+  reticle. Ship damage and repair markers agree between both guns and the
+  on-foot display, including after saving and loading.
+- Ship repairs restore real hull health and clear repaired damage sections.
+  Restarting the engine completes and rewards the repair once.
+- Prison reinforcements reach the correct cellblock landing, the maintenance
+  bot uses its own workstations, and camera startup no longer calls an
+  unsupported animation. The missing bridge ambush destination is restored.
+- Start M03 and M04 afresh to receive their mission callback corrections.
+  Older saves retain their original mission threads. See the
+  [review and qualification limits](awakening-missions.md#m03-and-m04-review-4-november-2026).
+
 ## Damaged queued events recover safely, 4 November 2026
 
 - Saves with unsupported queued callbacks or out-of-order event times now

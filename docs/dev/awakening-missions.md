@@ -1,9 +1,119 @@
-# Awakening M01 and M02 mission audit
+# Awakening mission audits
 
 This is supporting evidence for **Q4-04** in [the roadmap](roadmap.md), not a
 separate development plan. Reviewed 4 November 2026 against the installed alpha
 maps, their entity connections, scripts, actor definitions and openQ4's SP code.
 The evidence distinguishes authored intent from completion claims.
+
+## M03 and M04 review, 4 November 2026
+
+M03 alternates defending the Falcon with repairing its systems: five fighter
+waves, crew instructions, damage-control objectives and arrival at the prison.
+The cockpit's instruments describe two different things: the ship diagram
+tracks the Falcon's hull and repair objectives; the three physical screens
+track the selected gun, cannon heat and missile lock/reload state. The turrets
+themselves are invulnerable. Giving their hull gauge the ship's health, or
+displaying a second player status bar, would misrepresent that design.
+
+M04 moves from infiltration and camera/security encounters to defending
+Darnell's bridge hack, evacuating Fox Squad from two cellblock landings, the
+Strauss capture and extraction toward M05. Reinforcement destinations and
+encounter activation are part of that choreography, not decorative markers.
+
+### Corrections
+
+- Both M03 cockpit screens had shared GUI instances. The idle turret could
+  overwrite the active one's heat, weapon selection and rocket status. Each
+  cockpit now owns unique, normally serialized screens. Event-only screen
+  timers start paused, preventing every lock state from running on the first
+  draw and ending at a false **LOCKED** indication.
+- The cockpit keeps its combat reticle even when a cinematic or nearby crew
+  member selects the on-foot interaction cursor. Default, acquiring/locked,
+  friendly and out-of-range reticles have editable vector coverage; weapon
+  targeting still supplies their colours and materials.
+- M03 damage, repair markers and directional warnings reach both turret HUDs
+  and the player's HUD. Lasting damage/marker state is stored in the ordinary
+  GUI dictionary, including for a view not drawn before saving. The on-foot
+  Remastered panel honours the mission's explicit show/hide events.
+- Repair credits now replenish the actual Falcon hull, capped at its initial
+  health, and are consumed once. Previously they only increased a failure
+  allowance while the mover stopped accepting damage at zero health. Repaired
+  diagram sections clear and rearm, including when the original health monitor
+  resumes from dialogue with a stale sample. Repairs do not resurrect a dead
+  ship. The misspelled first-wave Navajas reference binds to the existing actor.
+- Each engine-terminal press owns one stage. The first no longer waits for the
+  second and then executes completion again. Existing dialogue, timed failure,
+  reminders, effects, objective completion and the return-to-gun instruction
+  remain; the repair reward is awarded once.
+- M04 upper/lower reinforcements use their respective authored cover markers;
+  all four spawn points previously called the upper callback, whose destination
+  did not exist. The tunnel repair bot uses its own two workstations without
+  stale `repbot_1` bindings. Camera initialization leaves idle/scanning to the
+  camera's AI instead of calling an unsupported mover animation event.
+- The delayed bridge gunner's missing script reference binds to the authored
+  enemy staging point (`strogg_ctrlRm_jumper_1_pos_1`) on the upper bridge
+  approach, retaining its original height and stopping before the drop. The
+  entrance trigger is below its connected walking AAS region; the gunner
+  cannot follow the marines' scripted drop. This placement is an inference
+  from the bridge choreography and navigation, not a recovered gunner coordinate.
+- M04 no longer requests the nonexistent `weaponmod_goobgun_burst` starting
+  upgrade. The base weapon already provides burst fire; the later flamethrower
+  upgrade is not granted in its place.
+- The shared fire-volume repair from M01/M02 is retained. Directly quenching a
+  large fire now skips creating an intermediate small-fire effect, stops the
+  old stages and aims the new stage immediately as well as after deferred
+  target resolution.
+
+### Compatibility and scope
+
+Campaign callback repairs require single-player `q4xbase`, the exact chapter
+map, expected original functions and authored anchors. They edit spawn
+arguments and append separately named openQ4 helper scripts; they do not ship
+or modify recovered map/script files. Their helpers participate in the ordinary
+saved-script list. Start M03/M04 afresh to acquire the new callbacks and entity
+references; old saves retain their original mission threads. No save layout
+changes or expansion multiplayer module are introduced.
+
+The review found unused M03 ammo-jam/rear-fire sequences and an abandoned M04
+ending cinematic with references to actors the map does not contain. These are
+not reactivated. The shipped ending uses its direct end-level relay. Missing
+M04 scientist dressing, effects and screen assets remain content limitations;
+they are distinct from the corrected live encounter callbacks.
+
+### Validation
+
+`tools/tests/awakening_m03_m04_runtime.py` drives hidden, windowed SP using engine
+commands and engine render-target screenshots, with independent writable
+profiles and the installed alpha assets. No device input or desktop capture is
+used. Its M03 test-only sidecar selects the encounters; M04 invokes authored
+spawners. These are focused encounter probes, not full mission playthroughs.
+
+The probe checks both gun entries, damage/repair state, an occupied save loaded
+in a fresh process, real cannon shots through overheat and cooling, independent
+screen values, missile selection/firing, engine completion/reward count, upper
+and lower reinforcement arrival, repair-bot/bridge state and fire trace/damage
+behaviour. Evidence is retained under `.tmp/awakening-m03-m04/`.
+
+M03 passed in OpenGL and Vulkan (`release-gl/m03/`, `release-vulkan/m03/`):
+the probe restored 9,000 hull health to 12,000, cleared the repaired diagram
+section, loaded the occupied gun in a new process, overheated/cooled its cannon,
+selected/fired missiles without a false lock, and completed the engine repair
+at 13,000 health with one reward. Both physical screen sets remained unique.
+These M03 runs preceded the final M04-only destination correction.
+
+The final M04 production build passed both renderers (`qualified-gl/`,
+`qualified-vulkan/`). Both cellblock groups reached their respective landing;
+the repair bot reached its own workstation; the gunner reached approximately
+`(986, 660, 272)` and reported `MOVE_STATUS_DONE`. The fire accepted freeze
+shots, never blocked the player trace, and stopped intercepting projectiles
+after extinguishing. These runs assert the production script reference; they
+do not reposition the missing destination or the gunner in the test fixture.
+
+`awakening_chapter_behavior.py` compiles the production fire methods against
+counted doubles and covers freeze filtering, fractional/shared light dimming,
+overkill, stages, one-shot target activation and active/off/out contents.
+`awakening_status_behavior.py` also passes its 98 existing targeting/status
+checks. Q4-04 stays open for full playthroughs and the remaining campaign gates.
 
 ## Intended progression
 

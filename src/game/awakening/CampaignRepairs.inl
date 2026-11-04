@@ -94,18 +94,18 @@ static void Awakening_StartCampaignRepairs( int chapter ) {
 		}
 	} else if ( chapter == 4 && !gameLocal.FindEntity( "gunner_3_toBridge" ) ) {
 		idEntity *ambush = gameLocal.FindEntity( "trigger_once_130" );
-		if ( ambush && !idStr::Icmp( ambush->spawnArgs.GetString( "call" ), "bridgeGunnerGo" ) ) {
+		idEntity *bridge = gameLocal.FindEntity( "strogg_ctrlRm_jumper_1_pos_1" );
+		if ( ambush && bridge && !idStr::Icmp( ambush->spawnArgs.GetString( "call" ), "bridgeGunnerGo" ) &&
+			!idStr::Icmp( bridge->spawnArgs.GetString( "classname" ), "target_null" ) ) {
 			// Its missing destination leaves the delayed gunner outside the fight.
-			// Use the authored encounter entrance, with a persistent target because
-			// the one-shot trigger removes itself before the six-second delay ends.
-			idDict marker;
-			marker.Set( "classname", "target_null" );
-			marker.Set( "name", "gunner_3_toBridge" );
-			const idVec3 center = ambush->GetPhysics()->GetAbsBounds().GetCenter();
-			trace_t floor;
-			gameLocal.TracePoint( ambush, floor, center, center - idVec3( 0, 0, 256 ), MASK_SOLID, ambush );
-			marker.SetVector( "origin", floor.fraction < 1.0f ? floor.endpos + idVec3( 0, 0, 1 ) : center );
-			gameLocal.SpawnEntityDef( marker );
+			// Use the authored enemy staging point at the upper bridge approach.
+			// The entrance trigger lies
+			// below the catwalk, outside this gunner's connected walking AAS areas;
+			// it cannot follow the marines' scripted drop to the lower platform.
+			// Stay before the scripted drop; the farther marine marker is beyond
+			// the platform edge. Retain this marker's authored height. Its slot is
+			// serialized normally, just like the Navajas reference above.
+			gameLocal.program.SetEntity( "gunner_3_toBridge", bridge );
 		}
 	}
 	if ( chapter ) {
