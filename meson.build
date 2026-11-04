@@ -522,6 +522,16 @@ if get_option('build_native_tests')
   test('openq4-restore-recovery', restore_recovery_test, timeout: 30)
 
   foreach game_mode : ['game', 'mpgame']
+    vehicle_hud_source = custom_target(
+      'openq4-vehicle-hud-' + game_mode + '-source',
+      input: files('src' / game_mode / 'vehicle' / 'Vehicle.cpp'),
+      output: 'VehicleHud-' + game_mode + '.cpp',
+      command: [py, files('tools/tests/vehicle_hud.py'), '--generate-native', game_mode, '@OUTPUT@'],
+    )
+    vehicle_hud_test = executable(
+      'openq4-vehicle-hud-' + game_mode, vehicle_hud_source, cpp_args: ['-UNDEBUG'], install: false,
+    )
+    test('openq4-vehicle-hud-' + game_mode, vehicle_hud_test, timeout: 30)
     restore_animation_source = custom_target(
       'openq4-restore-animation-' + game_mode + '-source',
       input: files('src' / game_mode / 'Actor.cpp', 'src' / game_mode / 'IK.cpp',

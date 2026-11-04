@@ -549,6 +549,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "savegame_restore_resources.py",
         root / "tools" / "tests" / "savegame_restore_physics.py",
         root / "tools" / "tests" / "savegame_restore_animation.py",
+        root / "tools" / "tests" / "vehicle_hud.py",
         root / "tools" / "tests" / "savegame_restore_gui.py",
         root / "tools" / "tests" / "savegame_restore_identity.py",
         root / "tools" / "tests" / "savegame_restore_movers.py",
@@ -901,6 +902,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'savegame_cross_load.py', ['--self-test']),
         (root / "tools" / "tests" / 'bse_lifecycle_runtime.py', ['--self-test']),
         (root / "tools" / "tests" / 'turbo_lift_runtime.py', ['--self-test']),
+        (root / "tools" / "tests" / 'awakening_vehicle_runtime.py', ['--self-test']),
     ]
     failures: list[str] = []
     checks: list[tuple[Path, list[str]]] = []

@@ -17,6 +17,7 @@
 #if !defined(__GAME_VEHICLE_H__)
 	#include "../Vehicle/Vehicle.h"
 #endif
+#include "../vehicle/VehicleParts.h"
 #if !defined(__AI_MANAGER_H__)
 	#include "../ai/AI_Manager.h"
 #endif
@@ -2165,6 +2166,59 @@ static void Cmd_TestFlashlight_f( const idCmdArgs &args ) {
 	}
 	// Exercise the real weapon light without queuing a player input impulse.
 	player->Flashlight( atoi( args.Argv( 1 ) ) != 0 );
+}
+
+// Inspect and exercise vehicle state without input or temporary script code.
+static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	if ( args.Argc() < 2 || args.Argc() > 3 || ( args.Argc() == 3
+			&& idStr::Icmp( args.Argv( 2 ), "fire" ) != 0
+			&& idStr::Icmp( args.Argv( 2 ), "exit" ) != 0 ) ) {
+		gameLocal.Printf( "usage: testVehicle <entity name> [fire|exit] (omit action for status)\n" );
+		return;
+	}
+	idEntity *entity = gameLocal.FindEntity( args.Argv( 1 ) );
+	if ( entity == NULL || !entity->IsType( rvVehicle::Type ) ) {
+		gameLocal.Printf( "testVehicle: entity not found or not a vehicle\n" );
+		return;
+	}
+	rvVehicle *vehicle = static_cast<rvVehicle *>( entity );
+	int seat = player->GetVehicleController().GetVehicle() == vehicle ? player->GetVehicleController().GetPosition() : -1;
+	if ( args.Argc() == 3 ) {
+		if ( seat < 0 || seat >= vehicle->GetNumPositions() || vehicle->GetPosition( seat )->GetDriver() != player ) {
+			gameLocal.Printf( "testVehicle: action requires the local player in this vehicle\n" );
+			return;
+		}
+		if ( idStr::Icmp( args.Argv( 2 ), "fire" ) == 0 ) {
+			rvVehicleWeapon *weapon = vehicle->GetPosition( seat )->GetActiveWeapon();
+			// One diagnostic shot through the real weapon/effect path, without
+			// synthesizing input or compiling an unsaveable console script.
+			const bool fired = vehicle->IsShootingEnabled() && weapon != NULL
+				&& weapon->GetCurrentAmmo() != 0 && weapon->GetCurrentCharge() >= 1.0f && weapon->Fire();
+			gameLocal.Printf( "testVehicle: action=fire name=%s success=%d\n", vehicle->name.c_str(), fired );
+		} else {
+			const bool exited = player->ExitVehicle( false );
+			gameLocal.Printf( "testVehicle: action=exit name=%s success=%d\n", vehicle->name.c_str(), exited );
+		}
+	}
+	seat = player->GetVehicleController().GetVehicle() == vehicle ? player->GetVehicleController().GetPosition() : -1;
+	gameLocal.Printf( "testVehicle: name=%s class=%s time=%d origin=(%s) positions=%d drivers=%d playerSeat=%d locked=%d hidden=%d movement=%d shooting=%d health=%d\n",
+		vehicle->name.c_str(), vehicle->GetClassname(), gameLocal.time, vehicle->GetPhysics()->GetOrigin().ToString( 3 ),
+		vehicle->GetNumPositions(), vehicle->GetNumDrivers(), seat, vehicle->IsLocked(), vehicle->IsHidden(),
+		vehicle->IsMovementEnabled(), vehicle->IsShootingEnabled(), vehicle->health );
+	if ( vehicle->GetHud() != NULL ) {
+		gameLocal.Printf( "testVehicleHud: name=%s health=%g shield=%g\n", vehicle->name.c_str(),
+			vehicle->GetHud()->State().GetFloat( "vehicle_health" ), vehicle->GetHud()->State().GetFloat( "vehicle_shield" ) );
+	}
+	for ( int i = 0; i < vehicle->GetNumPositions(); i++ ) {
+		const rvVehiclePosition *position = vehicle->GetPosition( i );
+		idActor *driver = position->GetDriver();
+		gameLocal.Printf( "testVehicleSeat: name=%s index=%d driver=%s parent=%s\n", vehicle->name.c_str(), i,
+			driver ? driver->name.c_str() : "none", position->GetParent() ? position->GetParent()->name.c_str() : "none" );
+	}
 }
 
 // Drive the real binary mover and portal lifecycle without player input or
@@ -4412,6 +4466,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "actorFlashlight",		Cmd_Flashlight_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"toggle actor's flashlight", idGameLocal::ArgCompletion_AIName );
 	cmdSystem->AddCommand( "testFlashlight", Cmd_TestFlashlight_f, CMD_FL_GAME|CMD_FL_CHEAT, "set the current single-player weapon flashlight for rendering tests", idCmdSystem::ArgCompletion_Boolean );
 	cmdSystem->AddCommand( "testDoor", Cmd_TestDoor_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect or move a single-player door team for rendering tests", idGameLocal::ArgCompletion_EntityName );
+	cmdSystem->AddCommand( "testVehicle", Cmd_TestVehicle_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect an SP vehicle or fire/exit the local player's seat", idGameLocal::ArgCompletion_EntityName );
 	
 	cmdSystem->AddCommand( "shuffleTeams",			Cmd_ShuffleTeams_f,			CMD_FL_GAME,				"shuffle teams" );
 // RAVEN BEGIN

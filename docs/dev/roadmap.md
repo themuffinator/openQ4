@@ -1731,8 +1731,16 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
     in the same process, and in fresh base and multiplayer launches, there is
     no `q4xbase` path and no expansion definition.
 
-  Not reached: the turret and the walker. Neither took the in-game entry at
-  the positions tried, presumably locked or hidden until their sequences.
+  Progress, 4 November: the authored prison chaingun and trench walker now
+  have repeatable entry through their stock activation path, without input or
+  injected scripts. Both pass occupied save/load/resave/reload and a real
+  diagnostic shot before and after restore on OpenGL and Vulkan. Seat ownership,
+  pose, lock and HUD values survive each fresh process. The turret exits normally;
+  the walker keeps the repair sequence's authored exit lock. The probe exposed
+  division by zero in invulnerable/unshielded vehicle HUDs, now fixed in both
+  game libraries. See [vehicle evidence and limits](retail-baseline-ledger.md#awakening-vehicle-saves-and-hud-fractions-4-november-2026).
+  Walker repair completion, unlock and traversal, sustained turret bursts and
+  visual/audio parity remain open; this checks one shot and its engine capture.
   Arena was covered only as `game_mp` on `baseoq4`, not as a switch from the
   Awakening menu. Full playthroughs remain.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve

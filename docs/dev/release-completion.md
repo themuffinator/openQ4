@@ -6,6 +6,16 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Vehicle health and shield meters, 4 November 2026
+
+- Invulnerable turrets now show a full health meter, and vehicles without shields
+  show an empty shield meter. This prevents invalid HUD geometry and warnings
+  when saving from these vehicles. Damaged meters retain their normal fractions.
+- The Awakening prison turret and trench walker pass occupied save/load/resave/
+  reload checks on OpenGL and Vulkan, including firing after a load and respecting
+  the walker's repair lock. This does not qualify the complete repair sequence or
+  campaign. See [vehicle evidence and limits](retail-baseline-ledger.md#awakening-vehicle-saves-and-hud-fractions-4-november-2026).
+
 ## Damaged actor saves recover safely, 4 November 2026
 
 - Loading a save with inconsistent actor animation or IK data now returns to
