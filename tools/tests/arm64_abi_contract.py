@@ -131,7 +131,7 @@ def validate_script_pointer_width_fields(tree: str) -> None:
         "memcpy( destPtr + EVENT_TRACE_DATA_OFFSET, sourcePtr + sizeof( bool ), sizeof( trace_t ) );",
         "legacyArgSize = idEvent_GetLegacyArgLayout",
         "if ( static_cast<size_t>( argsize ) != legacyArgSize )",
-        "idEvent_ConvertLegacyRawArgs( event->eventdef, event->data, legacyData.get(), legacyOffsets );",
+        "idEvent_ConvertLegacyRawArgs( savefile, event->eventdef, event->data, legacyData.get(), legacyOffsets );",
         'throw idAllocError( "idEvent data exceeds the 32-bit heap limit" );',
         'throw idAllocError( "restored idEvent data exceeds the 32-bit heap limit" );',
         'throw idAllocError( "restored legacy idEvent data exceeds the 32-bit heap limit" );',

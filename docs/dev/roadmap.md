@@ -1861,6 +1861,19 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   reload the healthy save on OpenGL/Vulkan, with all input files unchanged.
   All 11 existing 0.9–0.13 fixtures still restore into gameplay. Broader owning
   graphs and other target platforms remain open.
+  Legacy-argument follow-up, 4 November: [bounded strings and restored trace
+  resources](savegame-reliability.md#legacy-event-strings-and-trace-resources)
+  now prevent unterminated legacy strings and obsolete material/type addresses
+  from reaching callbacks or an immediate resave. Both libraries pass native
+  Windows/Linux field-failure and lookup-failure fixtures, including 18 negative
+  controls per platform. The old raw format falls back to the material's base
+  surface type where no per-hit type was recorded; current typed traces retain
+  their saved type. Save layouts are unchanged. The focused Windows suite passes
+  60/60; three damaged-record cases recover and reload healthy gameplay on each
+  of OpenGL/Vulkan. A healthy legacy trace survives immediate resave on OpenGL
+  and reload on Vulkan with valid typed material references.
+  All 11 existing 0.9–0.13 fixtures still restore into gameplay. The broader
+  owning-graph and platform gate remains open.
 - [ ] **Q4-06 — P3, design and implementation: portable saves.** Decision,
   3 November 2026: build a portable save format, so that a save written on one
   supported platform loads on the others.

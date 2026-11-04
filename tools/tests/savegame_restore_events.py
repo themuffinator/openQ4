@@ -14,6 +14,7 @@ SUPPORT = r'''
 #include <climits>
 #include <cstdarg>
 #include <cstdint>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -35,7 +36,28 @@ constexpr int EVENT_SAVE_FORMAT_TYPED=-2;
 constexpr char D_EVENT_FLOAT='f', D_EVENT_INTEGER='d', D_EVENT_INTEGER64bit='y',
     D_EVENT_ENTITY='e', D_EVENT_ENTITY_NULL='E', D_EVENT_VECTOR='v', D_EVENT_STRING='s', D_EVENT_TRACE='t';
 constexpr int E_EVENT_SIZEOF_VEC=12;
-struct trace_t { void* material; float normal[3]; };
+struct idVec3 { float xyz[3]; };
+struct idMat3 { float rows[9]; };
+struct rvDeclMatType {} fixtureMaterialType;
+int materialLookups=0,materialTypeReads=0;
+bool failMaterialLookup=false;
+struct idMaterial {
+    const rvDeclMatType* GetMaterialType() const;
+} fixtureMaterial;
+const rvDeclMatType* idMaterial::GetMaterialType() const {
+    assert(this==&fixtureMaterial); ++materialTypeReads; return &fixtureMaterialType;
+}
+struct Decls {
+    const idMaterial* FindMaterial(const char* name,bool) {
+        ++materialLookups;
+        if(failMaterialLookup) throw std::runtime_error("material lookup failed");
+        assert(std::memchr(name,'\0',MAX_STRING_LEN));
+        assert(!std::strcmp(name,"test/material") || (name[0]=='x' && std::strlen(name)==MAX_STRING_LEN-1));
+        return &fixtureMaterial;
+    }
+} fixtureDecls;
+Decls* declManager=&fixtureDecls;
+@TRACE_TYPES@
 std::set<void*> legacyLive, eventLive;
 int allocation=0,failAllocation=-1;
 void* Allocate(size_t size,std::set<void*>& live) {
@@ -52,14 +74,23 @@ struct idEventDef {
     const char* name;
     const char* format;
     bool supported;
-    size_t GetArgSize() const { return *format?sizeof(intptr_t):0; }
+    static size_t Slot(char kind) {
+        const size_t alignment=alignof(trace_t)>alignof(intptr_t)?alignof(trace_t):alignof(intptr_t);
+        const size_t traceOffset=(sizeof(bool)+alignof(trace_t)-1)&~(alignof(trace_t)-1);
+        size_t size=kind=='s'?MAX_STRING_LEN:kind=='t'?traceOffset+sizeof(trace_t)+MAX_STRING_LEN:sizeof(intptr_t);
+        return (size+alignment-1)&~(alignment-1);
+    }
+    size_t GetArgSize() const { return GetArgOffset(GetNumArgs()); }
     const char* GetName() const { return name; }
     const char* GetArgFormat() const { return format; }
     int GetNumArgs() const { return int(std::strlen(format)); }
-    size_t GetArgOffset(int i) const { return size_t(i)*sizeof(intptr_t); }
+    size_t GetArgOffset(int i) const {
+        size_t size=0; for(int j=0;j<i;++j) size+=Slot(format[j]); return size;
+    }
     static const idEventDef* FindEvent(const idStr&);
 };
-const idEventDef defs[]={{"integer","d",true},{"empty","",true},{"unsupported","d",false}};
+const idEventDef defs[]={{"integer","d",true},{"empty","",true},{"unsupported","d",false},
+    {"legacyString","s",true},{"legacyTrace","t",true},{"legacyMixed","st",true}};
 const idEventDef* idEventDef::FindEvent(const idStr& name) {
     for(auto& def:defs) if(name==def.name) return &def;
     return nullptr;
@@ -139,6 +170,8 @@ void reset() {
     assert(legacyLive.empty() && eventLive.empty());
     assert(EventQueue.Num()==0 && FreeEvents.Num()==MAX_EVENTS);
     allocation=0; failAllocation=-1; fixtureTarget.compatible=true;
+    materialLookups=materialTypeReads=0;
+    failMaterialLookup=false;
 }
 void healthy(int format) {
     int boundaries=0,allocations=0;
@@ -212,13 +245,75 @@ void capacities() {
         reset();
     }
 }
+void legacyArguments() {
+    // Exercise the real legacy reader through queue ownership, not just copying.
+    // Layout assertions also pin the Windows x64 runtime fixtures.
+    static_assert(sizeof(trace_t)==128 && offsetof(trace_t,c)==56,"review trace fixture ABI");
+    static_assert(offsetof(contactInfo_t,material)==40 && offsetof(contactInfo_t,materialType)==64,"review contact fixture ABI");
+    for(int mode=0;mode<11;++mode) {
+        int boundaries=0;
+        for(int failure=-1;failure<boundaries;++failure) {
+            reset(); idRestoreGame input; input.failAt=failure;
+            failMaterialLookup=mode==10;
+            const idEventDef* def=idEventDef::FindEvent(mode<3?"legacyString":mode==9?"legacyMixed":"legacyTrace");
+            size_t offsets[D_EVENT_MAXARGS]={};
+            std::vector<byte> raw(idEvent_GetLegacyArgLayout(def,offsets),0);
+            if(mode<3 || mode==9) {
+                std::memset(raw.data(),'x',MAX_STRING_LEN);
+                if(mode!=2) raw[mode==0?0:MAX_STRING_LEN-1]=0;
+            }
+            if(mode>=3) {
+                const size_t begin=mode==9?offsets[1]:0;
+                raw[begin]=mode==3?0:mode==4?2:1;
+                trace_t trace; std::memset(&trace,0,sizeof(trace)); trace.fraction=0.25f;
+                trace.c.material=mode==5?nullptr:reinterpret_cast<const idMaterial*>(uintptr_t(0x1234));
+                trace.c.materialType=reinterpret_cast<const rvDeclMatType*>(uintptr_t(0x5678));
+                std::memcpy(raw.data()+begin+sizeof(bool),&trace,sizeof(trace));
+                byte* material=raw.data()+begin+sizeof(bool)+sizeof(trace);
+                if(mode==7 || mode==3 || mode==5 || mode==8) {
+                    std::memset(material,'x',MAX_STRING_LEN);
+                    if(mode==8) material[MAX_STRING_LEN-1]=0;
+                }
+                else std::memcpy(material,"test/material",sizeof("test/material"));
+            }
+            input.Put(1); input.Put(0); input.String(def->GetName()); input.String("target");
+            input.Put(1); input.Put(int(raw.size())); input.bytes.insert(input.bytes.end(),raw.begin(),raw.end());
+            std::string error;
+            try { idEvent::Restore(&input); } catch(const std::runtime_error& e) { error=e.what(); }
+            const bool invalid=mode==2 || mode==4 || mode==7 || mode==10;
+            assert((!error.empty())==(invalid || failure>=0));
+            if(failure==-1) {
+                boundaries=input.steps;
+                if(invalid) assert(error.find(mode==10?"material lookup failed":mode==4?"invalid legacy trace flag":"unterminated legacy")!=std::string::npos);
+                else {
+                    auto* event=EventQueue.Next(); assert(event && event->eventdef==def);
+                    if(mode<3 || mode==9) assert(!std::memcmp(event->data,raw.data(),MAX_STRING_LEN));
+                    if(mode>=3) {
+                        byte* data=event->data+def->GetArgOffset(mode==9?1:0);
+                        assert(*reinterpret_cast<bool*>(data)==(mode!=3));
+                        if(mode!=3) {
+                            auto* trace=reinterpret_cast<trace_t*>(data+EVENT_TRACE_DATA_OFFSET);
+                            assert(trace->fraction==0.25f);
+                            assert(trace->c.material==(mode==5?nullptr:&fixtureMaterial));
+                            assert(trace->c.materialType==(mode==5?nullptr:&fixtureMaterialType));
+                            // Immediate typed resave needs live pointers before dispatch.
+                            if(trace->c.material) assert(trace->c.material->GetMaterialType()==trace->c.materialType);
+                        }
+                        assert(materialLookups==((mode==3 || mode==5)?0:1));
+                    }
+                }
+            }
+            assert(legacyLive.empty()); reset();
+        }
+    }
+}
 int main() {
 #if defined(_MSC_VER)
     _set_abort_behavior(0,_WRITE_ABORT_MSG|_CALL_REPORTFAULT);
     _CrtSetReportMode(_CRT_ASSERT,_CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ASSERT,_CRTDBG_FILE_STDERR);
 #endif
-    healthy(EVENT_SAVE_FORMAT_TYPED); healthy(sizeof(intptr_t)); malformed(); capacities();
+    healthy(EVENT_SAVE_FORMAT_TYPED); healthy(sizeof(intptr_t)); malformed(); capacities(); legacyArguments();
     reset(); std::puts("event restore, interruptions, allocations, rejection and retry passed");
 }
 '''
@@ -227,7 +322,9 @@ int main() {
 def source(mode):
     text = (ROOT/'src'/mode/'gamesys/Event.cpp').read_text()
     constants = text[text.index('static const size_t EVENT_ARG_ALIGNMENT'):text.index('static size_t idEvent_GetLegacyArgLayout')]
-    return SUPPORT + (ROOT/'src/idlib/containers/LinkList.h').read_text() + EVENT + constants + '\n'.join(
+    collision = (ROOT/'src/cm/CollisionModel.h').read_text()
+    trace_types = collision[collision.index('// contact type'):collision.index('#define WORLD_MODEL_NAME')]
+    return SUPPORT.replace('@TRACE_TYPES@', trace_types) + (ROOT/'src/idlib/containers/LinkList.h').read_text() + EVENT + constants + '\n'.join(
         function_body(text, signature) for signature in (
             'static size_t idEvent_GetLegacyArgLayout(', 'static void idEvent_ConvertLegacyRawArgs(',
             'void idEvent::Free(', 'void idEvent::ClearEventList(', 'void idEvent::Restore(')
@@ -253,6 +350,11 @@ def main():
                     ('callback', '!event->object->RespondsTo( *event->eventdef )', 'false'),
                     ('ordering', 'i > 0 && event->time < previousTime', 'false'),
                     ('queue-cleanup', 'eventDataAllocator.Free( data );', '(void)data;'),
+                    ('legacy-string', "memchr( sourcePtr, '\\0', MAX_STRING_LEN ) == NULL", 'false'),
+                    ('legacy-trace-flag', '*sourcePtr > 1', 'false'),
+                    ('legacy-material-string', "memchr( materialName, '\\0', MAX_STRING_LEN ) == NULL", 'false'),
+                    ('legacy-material-pointer', 'trace->c.material = declManager->FindMaterial( materialName, true );', 'trace->c.material = NULL;'),
+                    ('legacy-material-type', 'trace->c.materialType = trace->c.material != NULL ? trace->c.material->GetMaterialType() : NULL;', '(void)trace;'),
                 ):
                     assert code.count(before) == 1, label
                     cases[label] = code.replace(before, after, 1)
