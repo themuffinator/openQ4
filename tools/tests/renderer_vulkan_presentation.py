@@ -22,24 +22,12 @@ import renderer_gameplay_benchmark as gameplay
 import renderer_budget_contract as timing_contract
 import renderer_validation_matrix as matrix
 import renderer_vulkan_qualification as qualification
+import renderer_foreground_observer as foreground_observer
 from mp_round_remote_smoke import verify_runtime_is_current
 
 PRESENTED = re.compile(r'Presented frames vkpacing: frames=(\d+) interval '
     r'p50=([\d.]+) p95=([\d.]+) p99=([\d.]+) max=([\d.]+) ms; queue '
     r'p50=([\d.]+) p95=([\d.]+) p99=([\d.]+) max=([\d.]+) ms; replaced=(\d+) dropped=(\d+)')
-
-
-def foreground(pid):
-    if os.name != 'nt':
-        return None
-    user = ctypes.windll.user32
-    user.GetForegroundWindow.restype = ctypes.c_void_p
-    user.GetWindowThreadProcessId.argtypes = (ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong))
-    owner = ctypes.c_ulong()
-    window = user.GetForegroundWindow()
-    if not window or not user.GetWindowThreadProcessId(window, ctypes.byref(owner)):
-        return None
-    return owner.value == pid
 
 
 def power_state():
@@ -88,7 +76,7 @@ def other_games(own_pid):
     return found
 
 
-def analyze(text, focus, budget, competing=()):
+def analyze(text, focus, budget, competing=(), focus_events=()):
     failures = []
     match = PRESENTED.search(text)
     presentation = None
@@ -105,6 +93,8 @@ def analyze(text, focus, budget, competing=()):
         failures.append('presented timing unavailable or missing')
     if len(focus) < 10 or any(value is not True for value in focus):
         failures.append('foreground ownership was not continuously observed during sampling')
+    if any(event['focused'] is not True for event in focus_events):
+        failures.append('a foreground event interrupted the sampling interval')
     if competing:
         failures.append('other openQ4 clients were observed during sampling')
     if 'hidden window renders offscreen' in text:
@@ -149,6 +139,34 @@ def analyze(text, focus, budget, competing=()):
                 cameraEndpoints=poses)
 
 
+def replace_gate(target, content):
+    pending = target.with_suffix('.pending')
+    pending.write_text(content)
+    for attempt in range(250):
+        try:
+            pending.replace(target)
+            return
+        except PermissionError:
+            time.sleep(0.02)
+    raise OSError('engine command gate remained locked: ' + str(target))
+
+
+def await_idle(seconds, timeout):
+    start = time.monotonic()
+    readiness = foreground_observer.Readiness(seconds)
+    seen = {}
+    while True:
+        now = time.monotonic()
+        competitors = other_games(0)
+        for item in competitors:
+            seen[item['pid']] = item
+        if readiness.update(now, True, competitors):
+            return dict(quietSeconds=seconds, waitedSeconds=now - start, priorClients=list(seen.values()))
+        if now - start >= timeout:
+            raise TimeoutError('other openQ4 clients did not leave a quiet prelaunch interval')
+        time.sleep(0.25)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime-dir', type=Path, default=qualification.ROOT / '.install')
@@ -160,6 +178,11 @@ def main():
     parser.add_argument('--seconds', type=int, default=20)
     parser.add_argument('--timeout', type=int, default=300)
     parser.add_argument('--p99-budget-ms', type=float, default=28)
+    parser.add_argument('--ready-seconds', type=float, default=3)
+    parser.add_argument('--idle-seconds', type=float, default=15)
+    parser.add_argument('--idle-timeout', type=float, default=600)
+    parser.add_argument('--request-focus', action='store_true',
+                        help='explicitly request focus through the engine; caller must have permission')
     args = parser.parse_args()
     if args.self_test:
         pose = 'origin: (10200 -6800 40) angles: (0 170 0)\n'
@@ -183,21 +206,50 @@ def main():
         assert analyze(text.replace('gpuSamples=256', 'gpuSamples=119'), [True] * 100, 28)['status'] == 'fail'
         assert analyze(text.replace('gpuAvailable=1 gpuSamples=256 gpuP50Us=1000 gpuP95Us=1500 gpuP99Us=2000',
             'gpuAvailable=0 gpuSamples=0 gpuP50Us=-1 gpuP95Us=-1 gpuP99Us=-1'), [True] * 100, 28)['status'] == 'fail'
-        print('Visible presentation parser: 12 acceptance/refusal controls passed')
+        assert analyze(text, [True] * 100, 28, focus_events=[dict(time=1, focused=False)])['status'] == 'fail'
+        gate = foreground_observer.Readiness(3)
+        assert not gate.update(0, True, []) and not gate.update(2, True, [])
+        assert not gate.update(3, True, [], interrupted=True)
+        assert not gate.update(4, True, []) and gate.update(7, True, [])
+        assert not gate.update(8, True, [dict(pid=1)])
+        assert not gate.update(9, None, []) and not gate.update(10, False, [])
+        assert not gate.update(11, True, []) and gate.update(14, True, [])
+        events = [dict(time=1, focused=False), dict(time=3, focused=True), dict(time=5, focused=False)]
+        assert foreground_observer.interval_events(events, 2, 4) == [events[1]]
+        assert foreground_observer.interval_events(events, None, 4) == []
+        identity = foreground_observer.ForegroundObserver.__new__(foreground_observer.ForegroundObserver)
+        identity.pid, identity.window = 42, None
+        identity.owner = lambda window: {10: 42, 11: 42, 12: 99}.get(window)
+        assert identity.owns(10) is None
+        identity.bind_window(10)
+        assert identity.owns(10) is True and identity.owns(11) is False and identity.owns(12) is False
+        assert identity.owns(0) is None
+        for window in (0, 11, 12):
+            try:
+                identity.bind_window(window)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError('invalid/replaced render window accepted')
+        print('Visible presentation parser/readiness: acceptance, focus-event and interrupted-wait controls passed')
         return 0
     if args.basepath is None or args.output_dir is None:
         parser.error('--basepath and --output-dir are required for runtime tests')
-    if args.repeats < 1 or args.seconds < 10 or args.p99_budget_ms <= 0:
+    if args.repeats < 1 or args.seconds < 10 or args.timeout <= 0 or not math.isfinite(args.p99_budget_ms) or args.p99_budget_ms <= 0:
         parser.error('positive repeats/budget and at least ten sampled seconds are required')
     if any(device < -1 or device > 255 for device in args.devices):
         parser.error('device indices must be -1 or 0 through 255')
+    if os.name != 'nt':
+        parser.error('foreground qualification currently requires the Windows event observer')
+    if any(not math.isfinite(value) or value <= 0 for value in (args.ready_seconds, args.idle_seconds, args.idle_timeout)):
+        parser.error('positive foreground/idle intervals are required')
     runtime, output = args.runtime_dir.resolve(), args.output_dir.resolve()
     if runtime == output or runtime in output.parents:
         parser.error('evidence must be outside the runtime')
     verify_runtime_is_current(runtime)
     output.mkdir(parents=True, exist_ok=False)
     sources = (Path(__file__), Path(gameplay.__file__), Path(matrix.__file__), Path(qualification.__file__),
-               Path(timing_contract.__file__))
+               Path(timing_contract.__file__), Path(foreground_observer.__file__))
     harnesses = {source.name: qualification.sha256_file(source) for source in sources}
     (output / 'harness').mkdir()
     for source in sources:
@@ -206,20 +258,28 @@ def main():
     results = []
     for device in args.devices:
         for repeat in range(args.repeats):
+            idle = await_idle(args.idle_seconds, args.idle_timeout)
             name = f'device-{device}-repeat-{repeat + 1}'
             save = output / name
             game = save / 'baseoq4'
             game.mkdir(parents=True)
             script = ['waitMsec 4000', 'god', 'notarget', 'noclip', 'setviewpos 10200 -6800 40 0 170 0',
-                'waitMsec 3000', 'gfxInfo', 'rendererDisplayProbe report',
-                'r_vkResourceProfile 1', 'rendererVulkanMemoryInfo reset',
+                'waitMsec 3000', 'gfxInfo', 'rendererDisplayProbe report']
+            if args.request_focus:
+                script += ['windowFocusTest']
+            else:
+                script += ['windowFocusTest report']
+            script += ['echo VK_PACING_READY', 'exec vkpacing_gate.cfg']
+            (game / 'vkpacing_gate.cfg').write_text('wait 6\nexec vkpacing_gate.cfg\n')
+            sampling = ['r_vkResourceProfile 1', 'rendererVulkanMemoryInfo reset',
                 'r_rendererMetrics 1', 'r_rendererGpuTimers 1', 'framePacingReset', 'rendererPresentTiming reset',
                 'echo VK_PACING_BEGIN', 'viewpos', f'waitMsec {args.seconds * 1000}', 'echo VK_PACING_END', 'viewpos',
                 'rendererPresentTiming vkpacing', 'framePacingSnapshot vkpacing',
                 'rendererBenchmarkCapture "logs/timing.csv"',
                 'r_rendererMetrics 0', 'rendererVulkanMemoryInfo', 'rendererDisplayProbe report',
-                'screenshot "screenshots/pacing.tga"', 'wait 5', 'quit']
+                'screenshot "screenshots/pacing.tga"', 'waitMsec 1000', 'quit']
             (game / 'vkpacing.cfg').write_text('\n'.join(script) + '\n')
+            (game / 'vkpacing_sample.cfg').write_text('\n'.join(sampling) + '\n')
             cvars = dict(com_performancePreset='balanced', r_rendererBenchmarkPreset='baseline',
                 r_renderApi='vulkan', r_vkDevice=str(device), r_vkPresentTiming='1', r_vkValidation='0',
                 r_hiddenWindow='0', r_fullscreen='0', r_borderless='0', r_borderlessDefaultMigrated='1',
@@ -243,10 +303,17 @@ def main():
             competing, next_process_check = {}, 0
             initial_power = power_state()
             offset, pending = 0, ''
+            ready, released, sample_end = False, None, None
+            readiness = foreground_observer.Readiness(args.ready_seconds)
+            observer, observer_errors, observations, gate_observations = None, [], [], []
+            previous_event_count, active_competitors = 0, []
             with (save / 'process.log').open('w') as stream:
                 process = subprocess.Popen(command, cwd=runtime, stdout=stream, stderr=subprocess.STDOUT)
                 try:
+                    observer = foreground_observer.ForegroundObserver(process.pid)
                     while process.poll() is None:
+                        observer.pump()
+                        now = time.monotonic()
                         if log.is_file():
                             with log.open(errors='replace') as engine:
                                 engine.seek(offset)
@@ -256,24 +323,62 @@ def main():
                             pending = lines.pop()
                             for line in lines:
                                 line = qualification.strip_colors(line).strip()
+                                handle = re.fullmatch(r'windowFocusTest: nativeWindow=(?:0x)?([0-9a-fA-F]+)', line)
+                                if handle:
+                                    observer.bind_window(int(handle.group(1), 16))
+                                if line == 'VK_PACING_READY': ready = True
                                 if line == 'VK_PACING_BEGIN': sampled = True
-                                if line == 'VK_PACING_END': sampled = False
+                                if line == 'VK_PACING_END':
+                                    sampled = False
+                                    sample_end = now
+                        focused = observer.foreground()
+                        if now >= next_process_check:
+                            active_competitors = other_games(process.pid)
+                            next_process_check = now + 1
+                        if ready and released is None:
+                            interrupted = any(event['focused'] is not True for event in observer.events[previous_event_count:])
+                            gate_observations.append(dict(seconds=now-start, focused=focused,
+                                                          competitors=len(active_competitors), interrupted=interrupted))
+                            if readiness.update(now, focused, active_competitors, interrupted):
+                                # Observe from gate release, slightly before the
+                                # reset/begin commands, to fail conservatively.
+                                released = now
+                                replace_gate(game / 'vkpacing_gate.cfg', 'exec vkpacing_sample.cfg\n')
+                        previous_event_count = len(observer.events)
                         if sampled:
-                            focus.append(foreground(process.pid))
-                            if time.monotonic() >= next_process_check:
-                                for competitor in other_games(process.pid):
-                                    competing[competitor['pid']] = competitor
-                                next_process_check = time.monotonic() + 1
+                            focus.append(focused)
+                            observations.append(dict(seconds=now-start, focused=focused,
+                                                     competitors=len(active_competitors)))
+                            for competitor in active_competitors:
+                                competing[competitor['pid']] = competitor
                         if time.monotonic() - start > args.timeout:
                             timed_out = True
                             break
                         time.sleep(0.1)
+                except Exception as error:
+                    observer_errors.append(str(error))
                 finally:
+                    if observer is not None:
+                        try:
+                            observer.close()
+                        except Exception as error:
+                            observer_errors.append(str(error))
                     if process.poll() is None:
                         process.kill()
                     code = process.wait()
             text = qualification.strip_colors(log.read_text(errors='replace')) if log.is_file() else ''
-            result = analyze(text, focus, args.p99_budget_ms, competing)
+            focus_events = foreground_observer.interval_events(observer.events if observer else [], released, sample_end)
+            result = analyze(text, focus, args.p99_budget_ms, competing, focus_events)
+            if observer is None or observer.overflow or observer.errors or observer_errors:
+                result['failures'].append('foreground event observation failed or overflowed')
+            if released is None:
+                result['failures'].append('foreground/idle readiness gate was not released')
+            observation_path = save / 'foreground.json'
+            observation_path.write_text(json.dumps(dict(prelaunch=idle, readySeconds=args.ready_seconds,
+                renderWindow=observer.window if observer else None,
+                gate=gate_observations, sampled=observations,
+                events=[dict(seconds=event['time']-start, focused=event['focused']) for event in focus_events],
+                errors=observer_errors + (observer.errors if observer else [])), indent=2) + '\n')
             if code or timed_out:
                 result['failures'].append('process failed or timed out')
             capture = game / 'screenshots/pacing.tga'
@@ -291,10 +396,12 @@ def main():
             result.update(id=name, command=command, exitCode=code, timedOut=timed_out, powerBefore=initial_power,
                 powerAfter=power_state(), selectedDevice=qualification.device_identity('vulkan', qualification.parse_engine_log(text)),
                 engineVersion=qualification.parse_engine_log(text)['version'],
+                readinessReleased=released is not None, foregroundEventCount=len(focus_events), prelaunchIdle=idle,
                 otherGameProcesses=list(competing.values()),
                 displayAdapterRoute='unverified', elapsedSeconds=time.monotonic() - start,
                 artifacts=[qualification.file_record(path, output) for path in
-                           (log, capture, trace, config, save / 'process.log', save / 'command.json') if path.is_file()])
+                           (log, capture, trace, config, observation_path, game / 'vkpacing.cfg',
+                            game / 'vkpacing_sample.cfg', save / 'process.log', save / 'command.json') if path.is_file()])
             result['status'] = 'fail' if result['failures'] else 'pass'
             results.append(result)
             (save / 'result.json').write_text(json.dumps(result, indent=2) + '\n')

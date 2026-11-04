@@ -93,6 +93,21 @@ static SDL_DisplayID* SDL_GetDisplays(int* count) {
 static unsigned SDL_GetDisplayForWindow(SDL_Window* value) { ++queries;return value->display; }
 static unsigned SDL_GetPrimaryDisplay() { ++queries;return 101; }
 static SDL_WindowFlags SDL_GetWindowFlags(SDL_Window* value) { ++queries;return value->flags; }
+static bool raiseGrantsFocus=false;
+static bool SDL_RaiseWindow(SDL_Window* value) {
+    if(!Mutate("raise"))return false;
+    if(raiseGrantsFocus)value->flags|=SDL_WINDOW_INPUT_FOCUS;
+    return true;
+}
+struct idCmdArgs { int count=1;const char* argument="invalid";int Argc()const{return count;}const char* Argv(int)const{return argument;} };
+static std::string diagnostic;
+struct FocusConsole {
+    void Printf(const char* format,...) {
+        char text[1024];va_list args;va_start(args,format);std::vsnprintf(text,sizeof(text),format,args);va_end(args);
+        diagnostic+=text;
+    }
+} focusConsole;
+static FocusConsole* common=&focusConsole;
 static bool SDL_GetWindowPosition(SDL_Window* value,int* x,int* y) {
     ++queries;if(failure=="position-query")return false;*x=value->x;*y=value->y;return true;
 }
@@ -189,7 +204,7 @@ struct EngineState {
     bool isFullscreen=false;float displayScale=3,pixelDensityX=4,pixelDensityY=5;
     int safeAreaLeft=13,safeAreaTop=14,safeAreaRight=15,safeAreaBottom=16;
 } engineWindowState;
-struct Win32 { bool cdsFullscreen=false; } win32;
+struct Win32 { bool cdsFullscreen=false;void* hWnd=reinterpret_cast<void*>(0x1234); } win32;
 struct Placement { bool valid=false;int x=0,y=0,width=640,height=480; } s_windowedPlacement;
 static void SDL3_ClientOriginToFrameOrigin(int x,int y,int& frameX,int& frameY) { frameX=x-8;frameY=y-30; }
 '''
@@ -387,7 +402,26 @@ static void WaylandEmulation() {
     wayland=false;window.flags|=SDL_WINDOW_FULLSCREEN;assert(SDL3_WindowServices_QueryWindowState(&r) && r.modePixelWidth==1920);
     std::puts("strict SDL Wayland emulation: the exclusive window's mode is observed on native Wayland only, desktop and other drivers unchanged passed");
 }
-int main() { Query();Preflight();Success();Failures();WaylandEmulation();VideoLifetime();assert(allocations==0); }
+static void FocusRequest() {
+    idCmdArgs command;
+    Reset();s_sdlWindow=nullptr;SDL3_WindowFocusTest_f(command);assert(mutations==0);s_sdlWindow=&window;
+    for(auto flag:{SDL_WINDOW_HIDDEN,SDL_WINDOW_MINIMIZED,SDL_WINDOW_FULLSCREEN}) {
+        Reset();window.flags=flag;SDL3_WindowFocusTest_f(command);assert(mutations==0);
+    }
+    Reset();command.count=2;SDL3_WindowFocusTest_f(command);assert(mutations==0);command.count=1;
+    Reset();diagnostic.clear();command.count=2;command.argument="report";
+    SDL3_WindowFocusTest_f(command);assert(mutations==0 && diagnostic.find("nativeWindow=")!=std::string::npos);
+    assert(diagnostic.find("requestAccepted=")==std::string::npos);command.count=1;
+    Reset();window.flags=0;diagnostic.clear();raiseGrantsFocus=false;
+    SDL3_WindowFocusTest_f(command);assert(mutations==1 && diagnostic.find("requestAccepted=1 focused=0")!=std::string::npos);
+    Reset();window.flags=0;diagnostic.clear();failure="raise";
+    SDL3_WindowFocusTest_f(command);assert(mutations==1 && diagnostic.find("requestAccepted=0 focused=0")!=std::string::npos);
+    Reset();window.flags=0;diagnostic.clear();raiseGrantsFocus=true;
+    SDL3_WindowFocusTest_f(command);assert(mutations==1 && diagnostic.find("requestAccepted=1 focused=1")!=std::string::npos);
+    raiseGrantsFocus=false;
+    std::puts("explicit window focus: unsafe states refused, one-shot request and independently observed focus passed");
+}
+int main() { Query();Preflight();Success();Failures();WaylandEmulation();VideoLifetime();FocusRequest();assert(allocations==0); }
 '''
 
 
@@ -404,11 +438,13 @@ def main():
     table = source.split('static const renderWindowServices_t s_sdl3WindowServices = {', 1)[1].split('};', 1)[0]
     assert table.rstrip().endswith('SDL3_WindowServices_QueryWindowState,\n\tSDL3_WindowServices_ApplyScreenParmsStrict,\n\tSDL3_WindowServices_RetainVideoSystem,\n\tSDL3_WindowServices_ReleaseVideoSystem,')
     dependencies = '\n'.join(function_body(source, signature) for signature in (
+        'static void SDL3_WindowFocusTest_f(',
         'static int SDL3_ClampViewportPixel(', 'static void SDL3_RefreshSafeArea(', 'static void SDL3_SetUIViewport(',
         'static void SDL3_SetVidSize(', 'static void SDL3_SetFullscreenState(',
         'static void SDL3_UpdateDisplayViewport(', 'static void SDL3_RecordWindowedPlacement(',
         'static bool SDL3_SetWindowBorderedCompat(',
     ))
+    assert '"windowFocusTest", SDL3_WindowFocusTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT,' in source
     compiler = next((path for name in ('clang++', 'g++', 'c++') if (path := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError('C++ compiler required')

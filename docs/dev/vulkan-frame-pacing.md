@@ -343,6 +343,32 @@ No driver, power-state or support-scope exception is approved by these results.
 Current foreground repeats, verified direct/hybrid routing, alternate power
 states and suitable presentation tracing on Intel remain open under VK-02.
 
+### Foreground readiness and event observation (4 November 2026)
+
+The runner now waits for fifteen seconds without another openQ4 client before
+launch, then holds an engine command-file gate until the actual game window has
+owned foreground focus for three uninterrupted seconds. `windowFocusTest report`
+identifies that window without changing focus. An explicitly authorized run may
+use `--request-focus` to invoke `windowFocusTest` instead: this cheat-gated
+development command requests focus once through SDL for an existing visible,
+non-minimized, windowed game. It does not inject input, and a successful SDL
+request is not treated as proof that the compositor granted focus.
+
+Windows foreground events supplement the periodic polls. The observer checks the
+exact reported window and its process, so focusing the engine console cannot
+pass. A brief intervening focus loss resets readiness or fails an active sample,
+even if both adjacent polls were focused. Hook failures and event-buffer overflow
+fail closed. `foreground.json` retains readiness, event, focus and competing-client
+observations; no other application's title or input is recorded. Sampling starts
+only after the gate is released and ends before the engine closes its window.
+
+Native controls cover refused window states, accepted-but-unfocused requests,
+SDL refusal and report-only operation. Parser/observer controls cover brief
+interruptions, same-process wrong windows, missing observations and interrupted
+readiness. These controls improve the fixture; they are not presentation results.
+An idle interval also does not replace waiting for an active MP test suite to
+finish before beginning a qualification run.
+
 ## Next work
 
 Distinguish presentation scheduling and host wake-up on the observed

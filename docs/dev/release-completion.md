@@ -6,6 +6,16 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Vulkan foreground qualification tooling, 4 November 2026
+
+- Visible pacing tests now wait for an idle test environment and sustained focus
+  on the actual game window before measuring. Foreground events catch brief
+  interruptions between polls, preventing a disrupted run from passing.
+- An opt-in, cheat-gated engine diagnostic requests focus once through SDL when
+  the tester has permission. Normal startup and input behavior are unchanged.
+  Native and parser controls pass; presentation results and remaining conditions
+  are recorded in [the pacing evidence](vulkan-frame-pacing.md).
+
 ## Multiplayer bot recovery follow-up, 4 November 2026
 
 - Bots can steer a dangerous knockback slide before leaving the floor and

@@ -421,6 +421,10 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
   one NVIDIA repeat exceeded the budget, and Intel lacks the timing extension.
   A GPU-dependent first-run preset was also found and is now pinned. These
   results do not replace the required foreground/direct/hybrid/power controls.
+  Progress, 4 November: readiness now requires an idle environment and sustained
+  focus on the identified game window; foreground events also reject brief
+  interruptions between polls. The native and observer controls pass. An active
+  MP suite must finish before running the next visible qualification repeats.
 - [x] **VK-03 — P1, implementation: finish bounded device admission and recovery.**
   Audit fixed-size instance/extension enumeration, optional extension truncation,
   the explicit-device index limit and retry after later resource/device creation

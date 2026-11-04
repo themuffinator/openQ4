@@ -4115,6 +4115,34 @@ static void SDL3_WindowMinimizeTest_f(const idCmdArgs &args) {
 		Sys_SDL_IsGameWindowShown() ? 1 : 0);
 }
 
+// Explicit, one-shot development request through the engine's own window.
+// A successful request is not proof of focus: the compositor may refuse it,
+// and pacing qualification must independently observe the whole interval.
+static void SDL3_WindowFocusTest_f(const idCmdArgs &args) {
+	const bool reportOnly = args.Argc() == 2 && strcmp(args.Argv(1), "report") == 0;
+	if ((!reportOnly && args.Argc() != 1) || s_sdlWindow == NULL) {
+		common->Printf("windowFocusTest: requires an existing visible windowed game window\n");
+		return;
+	}
+	const SDL_WindowFlags flags = SDL_GetWindowFlags(s_sdlWindow);
+	if ((flags & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED | SDL_WINDOW_FULLSCREEN)) != 0) {
+		common->Printf("windowFocusTest: hidden, minimized or fullscreen window refused\n");
+		return;
+	}
+	// Bind external observations to the render window, not another window in
+	// the same process (such as the engine console). No native focus API is used.
+	void *nativeWindow = NULL;
+#if !defined(OPENQ4_SDL3_POSIX_HOST)
+	nativeWindow = win32.hWnd;
+#endif
+	common->Printf("windowFocusTest: nativeWindow=%p\n", nativeWindow);
+	if (reportOnly) return;
+	const bool requested = SDL_RaiseWindow(s_sdlWindow);
+	common->Printf("windowFocusTest: requestAccepted=%d focused=%d\n", requested ? 1 : 0,
+		(SDL_GetWindowFlags(s_sdlWindow) & SDL_WINDOW_INPUT_FOCUS) != 0 ? 1 : 0);
+	if (!requested) common->Printf("windowFocusTest: %s\n", SDL_GetError());
+}
+
 // Pushes the event an operating system sends under memory pressure (Android, iOS)
 // through SDL's queue and event watchers, so the response is testable anywhere.
 static void SDL3_TestLowMemoryNotice_f(const idCmdArgs &args) {
@@ -6888,6 +6916,7 @@ static bool SDL3_WindowServices_PrepareWindowSystem(void) {
 		cmdSystem->AddCommand("listControllers", SDL3_ListControllers_f, CMD_FL_SYSTEM, "lists SDL3 controller, sensor, touchpad, and battery diagnostics");
 		cmdSystem->AddCommand("sdl3MouseCaptureDiagnostics", SDL3_MouseCaptureDiagnostics_f, CMD_FL_SYSTEM, "toggles SDL3 mouse capture and prints backend state; optional repeat count is clamped to 1..8");
 		cmdSystem->AddCommand("windowMinimizeTest", SDL3_WindowMinimizeTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "development: minimize the game window, as leaving full screen does, so the frame cap of a window that shows nothing can be measured without input; requires cheats");
+		cmdSystem->AddCommand("windowFocusTest", SDL3_WindowFocusTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "development: request foreground focus once for an already visible windowed game window, or use report to identify it without changing focus; requires cheats and separate permission when automated");
 		cmdSystem->AddCommand("testLowMemoryNotice", SDL3_TestLowMemoryNotice_f, CMD_FL_SYSTEM, "pushes an operating-system low-memory event through SDL, as Android and iOS deliver one");
 		s_sdlDiagnosticCommandsRegistered = true;
 	}
