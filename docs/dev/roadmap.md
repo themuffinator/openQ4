@@ -3,8 +3,10 @@
 > **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.13.2 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
 Updated 4 November 2026. The progress review below uses the integrated source and
-recorded evidence through `c09500893cea22bd7becd7a1b6ece5439c408cde`;
-uncommitted changes and work on other branches are not credited. This documentation
+recorded evidence through `c09500893cea22bd7becd7a1b6ece5439c408cde`. The MP-02
+closeout and task counts additionally include its later integrated safety
+qualification and the accepted timing-contention caveat of 4 November.
+Uncommitted changes and work on other branches are not credited. This documentation
 review did not rerun gameplay or qualify a new package. Each evidence entry retains
 its own tested source, binaries, assets and limitations. The earlier stage-one
 baseline is `7674acef91c2653e8c6153ae11e7b158c05e52ff`, recorded in
@@ -19,7 +21,7 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 4 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **15 / 115 (13.0%)** | **100 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-08, not partial substeps. |
+| Formally closed roadmap tasks | **16 / 115 (13.9%)** | **99 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-08, not partial substeps. |
 | Estimated category progress | **18 categories: 1 at 100%, 15 partial, 2 at 0%** | Includes one paused category (map tools); the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -55,7 +57,7 @@ exact; the estimate column is deliberately approximate.
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 8 | Full playthroughs, effect parity, broader restore graphs and platform/save evidence. |
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **0%** | 0 / 6 | Measured baseline, enhanced solvers, behavior preservation and integration. |
-| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 2 / 9 | Bot safety/timing, human play, physical workflows and deferred peer qualification. |
+| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 9 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
@@ -2787,16 +2789,18 @@ claim peer combinations that have not been tested.
 
 ### MP completion checkpoints
 
-**Estimate: 80%; 2/9 tasks closed.** Most systems work and have substantial local
-evidence. Bot safety still has unexcluded failures; simulated networking does not
-close physical peers. The 28 October WAN/cross-architecture deferral remains in
-effect and does not promote prediction/rewind defaults.
+**Estimate: 80%; 3/9 tasks closed.** Most systems work and have substantial local
+evidence. MP-02's final long-match/catalog safety checks pass, with its timing
+contention caveat accepted for closeout; controlled timing remains unqualified.
+Simulated networking does not close physical peers. The 28 October
+WAN/cross-architecture deferral remains in effect and does not promote
+prediction/rewind defaults.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | MP-01 — Partial | Roster/identity/vote fixes; eight live edge scenarios, failed-map retry and writer fault controls pass scoped checks. | Physical keyboard/controller flows, side-ballot scope, post-commit map-load limit and full release-order/failure coverage. |
-| MP-02 — Partial | Repeated causal replays and navigation repairs; 33-variant death/duration sweep before final rim change; one isolated CTF3 timing reference passes. | Final-change catalog repeat, unexcluded DM8/CTF5/CTF3 departures, stalls, long-match safety and timing across maps/platforms. A timing pass is not a safety pass. |
-| MP-03 — Closed | Trench jumps and debug-pool defects fixed; route-cost, collision, graph/cache and ladder/lift subjects have recorded dispositions. | Custom lifts remain unsupported; long-match safety/timing remains MP-02, not an unclosed implementation under MP-03. |
+| MP-02 — Closed with accepted timing caveat | Final `f6aa481e6` four-map long matches and all 33 catalog variants pass death/duration checks with zero navigation deaths after strict policy-2 assessment; targeted recovery, traffic and Windows/Linux controls pass. | CTF3 timing meets numerical limits but SP contention invalidates controlled qualification; no uncontended repeat was completed. Owner accepted this caveat for closeout; failed report retained, other maps/platforms unqualified. |
+| MP-03 — Closed | Trench jumps and debug-pool defects fixed; route-cost, collision, graph/cache and ladder/lift subjects have recorded dispositions. | Custom lifts remain unsupported; final safety evidence and the accepted timing-contention caveat are recorded under completed MP-02. |
 | MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return; retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
 | MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked. | Real player swimming and by-eye splash/bubble/wade review. Swimming monsters, new animations and moving volumes remain deferred. |
@@ -2806,8 +2810,8 @@ effect and does not promote prediction/rewind defaults.
 
 Completion substeps:
 
-- **Safety and skill:** isolate remaining world deaths, rerun the final catalog and
-  long matches, then qualify controlled timing and human combat separately.
+- **Safety and skill:** retain MP-02's final safety evidence and accepted timing
+  caveat; qualify human combat under MP-09.
 - **Player workflows:** exercise real match/Arena/liquid controls and visual/audio
   outcomes, including interruption and slot reuse, rather than only command paths.
 - **Peer breadth:** retain current local results; reopen deferred WAN/architecture
