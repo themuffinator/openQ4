@@ -127,9 +127,60 @@ static const awakeningMissionCorrection_t awakeningInvasionV1[] = {
 	  "sys.trigger( $player_post_turret );\n\t\tsys.waitFrame();\n\t\tthread setupRouteToHangar();" },
 };
 
+// Apply additions after the frozen v1 rules. Old saves must still compile the
+// exact v1 program, including its suspended statement offsets.
+static const awakeningMissionCorrection_t awakeningPainLordV2[] = {
+	{ "void moveToProcessingStation()\n\t{",
+	  "void moveToProcessingStation()\n\t{\n\t\tif ( PAINLORD_DEAD || PAINLORD_BUSY_WORKING ) { return; }\n"
+	  "\t\tsys.threadname( \"painlord::moveToProcessingStation\" );" },
+	{ "aiScriptedFaceWait( $theboss, $painlord_working_face, 1 );",
+	  "if ( PAINLORD_DEAD ) { return; }\n\t\taiScriptedFaceWait( $theboss, $painlord_working_face, 1 );\n"
+	  "\t\tif ( PAINLORD_DEAD ) { return; }" },
+};
+
+static const awakeningMissionCorrection_t awakeningInvasionV2[] = {
+	// Entity callbacks use rvScriptFuncUtility's anonymous thread constructor.
+	// Give the live vehicle callback the same cancellable name as script calls.
+	{ "defenseStarted = 1;\n\t\tdefenseActive = 1;",
+	  "defenseStarted = 1;\n\t\tdefenseActive = 1;\n\t\tsys.threadname( \"m06b::turretSequence\" );" },
+};
+
+static const awakeningMissionCorrection_t awakeningBioV2[] = {
+	// Script remove is deferred. Retire the cinematic double before the player
+	// teleports into his position, while the existing fade is still black.
+	{ "$dekard_boss_cinematic.remove();\n\t\tsys.trigger( $teleport_postboss );",
+	  "$dekard_boss_cinematic.remove();\n\t\tsys.waitFrame();\n\t\tsys.trigger( $teleport_postboss );" },
+};
+
+static bool Awakening_CorrectTeleporterV2( idStr &source, const char *flag, const char *monitor,
+	const char *spin, const char *core, const char *broken, const char *spawner ) {
+	const idStr entry = va( "void %s()\n\t{", monitor );
+	const idStr guarded = va( "float %sStarted = 0;\n\t%s\n"
+		"\t\tif ( %sStarted || %s || !isValidEntity( $%s ) ) { return; }\n\t\t%sStarted = 1;",
+		monitor, entry.c_str(), monitor, flag, core, monitor );
+	const idStr reset = va( "%s = false;", flag );
+	const idStr oldEnd = va( "%s = true;\n\t\t\t\t$%s.remove();", flag, spawner );
+	const idStr show = va( "$%s.show();", broken );
+	const idStr shutdown = va( "%s = true;\n\t\t\t\t$%s.stopRotating();\n\t\t\t\tsys.killthread( \"m06b::%s\" );\n"
+		"\t\t\t\t$%s.remove();\n\t\t\t\t%s", flag, core, spin, spawner, show.c_str() );
+	const awakeningMissionCorrection_t rules[] = {
+		{ entry.c_str(), guarded.c_str() }, { reset.c_str(), "" },
+		{ oldEnd.c_str(), "" }, { show.c_str(), shutdown.c_str() },
+	};
+	// stopRotating wakes waitFor so the cancelled thread can retire. Killing a
+	// mover waiter alone leaves it suspended forever after the mover is removed.
+	// Stop spawning and the mover waiter before deleting the core or yielding
+	// for the authored break effects. Re-entry must not reset a destroyed core.
+	return Awakening_CorrectSource( source, rules, sizeof( rules ) / sizeof( rules[0] ) );
+}
+
 static bool Awakening_LoadM05M06Script( const char *filename, idStr &source ) {
 	idStr file = filename;
 	file.BackSlashesToSlashes();
+	const bool version2 = file.Find( ".openq4-v2.script", false ) >= 0;
+	if ( version2 ) {
+		file.Replace( ".openq4-v2.script", ".openq4-v1.script" );
+	}
 	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
 		return false;
 	}
@@ -139,6 +190,12 @@ static bool Awakening_LoadM05M06Script( const char *filename, idStr &source ) {
 			 !Awakening_ReadMissionSource( "scripts/maps/m05_bio.script", level ) ||
 			 !Awakening_CorrectSource( boss, awakeningPainLordV1, sizeof( awakeningPainLordV1 ) / sizeof( awakeningPainLordV1[0] ) ) ||
 			 !Awakening_CorrectSource( level, awakeningBioV1, sizeof( awakeningBioV1 ) / sizeof( awakeningBioV1[0] ) ) ) {
+			return false;
+		}
+		if ( version2 && ( !Awakening_CorrectSource( boss, awakeningPainLordV2,
+				sizeof( awakeningPainLordV2 ) / sizeof( awakeningPainLordV2[0] ) ) ||
+			!Awakening_CorrectSource( level, awakeningBioV2,
+				sizeof( awakeningBioV2 ) / sizeof( awakeningBioV2[0] ) ) ) ) {
 			return false;
 		}
 		source = boss + "\n" + level;
@@ -160,6 +217,16 @@ static bool Awakening_LoadM05M06Script( const char *filename, idStr &source ) {
 	if ( file.Icmp( "maps/game/m06_mcc_invasion.openq4-v1.script" ) == 0 ) {
 		if ( !Awakening_ReadMissionSource( "scripts/maps/m06_mcc_invasion.script", source ) ||
 			 !Awakening_CorrectSource( source, awakeningInvasionV1, sizeof( awakeningInvasionV1 ) / sizeof( awakeningInvasionV1[0] ) ) ) {
+			return false;
+		}
+		if ( version2 && ( !Awakening_CorrectSource( source, awakeningInvasionV2,
+				sizeof( awakeningInvasionV2 ) / sizeof( awakeningInvasionV2[0] ) ) ||
+			!Awakening_CorrectTeleporterV2( source, "hallTeleporterDestroyed", "monitorHallTeleHealth",
+				"spinHallTeleBall", "rear_tele_ball_1", "rear_tele_broken_1", "func_spawner_enemy_light_4" ) ||
+			!Awakening_CorrectTeleporterV2( source, "commTeleporterDestroyed", "monitorCommTeleHealth",
+				"spinCommTeleBall", "comm_tele_ball", "comm_tele_broken", "func_spawner_command_dropin" ) ||
+			!Awakening_CorrectTeleporterV2( source, "teleporterDestroyed", "monitorTeleHealth",
+				"spinTeleBall", "rear_tele_ball", "rear_tele_broken", "func_spawner_enemy_light_3" ) ) ) {
 			return false;
 		}
 		source.Replace( "namespace m06b", "namespace oq4_m06b" );
@@ -184,7 +251,7 @@ void Awakening_PrepareM05M06( idDict &worldArgs ) {
 	if ( fileSystem->ReadFile( map + ".script", NULL, NULL ) > 0 ) {
 		return;
 	}
-	idStr version = map + ".openq4-v1.script";
+	idStr version = map + ".openq4-v2.script";
 	idStr source;
 	if ( !Awakening_LoadM05M06Script( version, source ) ) {
 		gameLocal.Warning( "Awakening mission corrections unavailable for %s; keeping installed scripts", map.c_str() );
@@ -192,12 +259,20 @@ void Awakening_PrepareM05M06( idDict &worldArgs ) {
 	}
 	gameLocal.program.CompileFile( version );
 	Awakening_CorrectM05M06Entity( worldArgs );
-	gameLocal.Printf( "Awakening mission corrections v1: %s\n", map.c_str() );
+	gameLocal.Printf( "Awakening mission corrections v2: %s\n", map.c_str() );
 }
 
 void Awakening_CorrectM05M06Entity( idDict &args ) {
 	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
 		return;
+	}
+	// The service lift was renamed in the map; its lamp retained the deleted
+	// name and stayed downstairs. Preserve mapper overrides of either key.
+	if ( gameLocal.program.FindFunction( "oq4_m05::main" ) != NULL &&
+		idStr::Cmp( args.GetString( "name" ), "light_8861" ) == 0 &&
+		idStr::Cmp( args.GetString( "classname" ), "light" ) == 0 &&
+		idStr::Cmp( args.GetString( "bind" ), "func_elevator_31" ) == 0 ) {
+		args.Set( "bind", "elevator2" );
 	}
 	const char *prefixes[] = { "map_m05::", "painlord::", "m06::", "m06b::" };
 	const char *corrected[] = { "oq4_m05::", "oq4_m05_painlord::", "oq4_m06::", "oq4_m06b::" };

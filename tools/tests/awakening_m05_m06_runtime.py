@@ -21,7 +21,8 @@ from savegame_cross_load import CFG_REL, LOG_NAME, client_path, launch_command, 
 
 MAPS = {'boss':'m05_bio', 'arrival':'m06_mcc', 'defense':'m06_mcc_invasion',
         'failure':'m06_mcc_invasion', 'speeder':'m06_mcc_invasion', 'checkpoint':'m05_bio',
-        'processing':'m05_bio'}
+        'processing':'m05_bio', 'teleporters':'m06_mcc_invasion',
+        'combat-save':'m06_mcc_invasion', 'teleporter-state':'m06_mcc_invasion'}
 ERROR = re.compile(r'(?mi)^(?:\^\d)?(?:ERROR:|FATAL ERROR:)|could not restore saved state|'
                    r'WriteObject FindIndex failed|Unknown command|unknown command|expected an existing zero-argument|screenshot: bad dimensions')
 
@@ -34,13 +35,38 @@ def commands(case, restore):
     if case == 'arrival':
         return lines + ['wait 2400', 'testMission mitchell_intro', 'testMission player1',
                         'screenshot "screenshots/arrival.tga"', 'saveGame mission', 'wait 5']
+    if case == 'combat-save':
+        if not restore:
+            lines += ['wait 120', 'trigger dummyTurret', 'wait 600', 'saveGame phase', 'wait 5']
+        return lines + ['wait 120', 'testVehicle turret', 'saveGame mission', 'wait 5']
+    if case in ('teleporters', 'teleporter-state'):
+        if not restore:
+            lines += ['wait 120', 'testMission call oq4_m06b::setupRouteToHangar', 'wait 360',
+                      'trigger trig_hall_teleporter', 'testMission call oq4_m06b::controlRoomCrash',
+                      'wait 180', 'saveGame phase', 'wait 5']
+        if case == 'teleporters':
+            for monitor in ('monitorTeleHealth', 'monitorHallTeleHealth', 'monitorCommTeleHealth'):
+                lines += ['testMission call oq4_m06b::'+monitor]  # re-entry while active
+            lines += ['wait 2']
+            for core in ('rear_tele_ball', 'rear_tele_ball_1', 'comm_tele_ball'):
+                lines += ['damage '+core+' 1 damage_telefrag']
+            lines += ['wait 1', 'saveGame breaking']
+        lines += ['wait 120']
+        for monitor in ('monitorTeleHealth', 'monitorHallTeleHealth', 'monitorCommTeleHealth'):
+            lines += ['testMission call oq4_m06b::'+monitor]  # re-entry after removal
+        lines += ['wait 120', 'echo M56_TELEPORTERS_STOPPED']
+        for entity in ('rear_tele_ball', 'rear_tele_ball_1', 'comm_tele_ball',
+                       'func_spawner_enemy_light_3', 'func_spawner_enemy_light_4', 'func_spawner_command_dropin',
+                       'rear_tele_broken', 'rear_tele_broken_1', 'comm_tele_broken'):
+            lines += ['testMission '+entity]
+        return lines + ['listThreads', 'saveGame mission', 'wait 5']
     if case == 'processing':
         return lines + ['wait 2400', 'trigger trigger_relay_1', 'wait 2',
                         'testMission call oq4_m05::prebossCinematic', 'wait 1800',
                         'wait 14400', 'testMission strauss', 'saveGame forbidden', 'wait 5', 'listThreads']
     if case == 'boss':
         if not restore:
-            lines += ['wait 2400', 'trigger trigger_relay_1', 'wait 2',
+            lines += ['wait 2400', 'testMission light_8861', 'trigger trigger_relay_1', 'wait 2',
                       'testMission call oq4_m05::prebossCinematic', 'wait 1800',
                       'damage theboss 10000 damage_moverCrush head', 'wait 120',
                       'echo M56_FIRST_STUN', 'testMission theboss',
@@ -60,10 +86,10 @@ def commands(case, restore):
     elif case in ('defense', 'failure'):
         if not restore:
             lines += ['wait 120', 'trigger item_objective_2',
-                      'testMission call oq4_m06b::turretSequence', 'wait 600',
+                      'trigger dummyTurret', 'wait 600',
                       'testVehicle turret', 'testVehicle turret exit', 'testVehicle turret',
                       'testVehicle turret fire', 'screenshot "screenshots/cannon.tga"',
-                      'saveGame phase', 'wait 5']
+                      'saveGame phase', 'wait 5', 'listThreads']
         if case == 'failure':
             lines += ['damage mcc_2 1 damage_telefrag', 'damage mcc_2 1 damage_telefrag',
                       'damage mcc_2 1 damage_telefrag', 'wait 120', 'testMission mcc_2', 'saveGame forbidden', 'wait 5', 'listThreads']
@@ -99,6 +125,8 @@ def main():
         parser.error('--baseline is only for a fresh checkpoint')
     if args.input and args.case == 'processing':
         parser.error('processing starts a fresh timed rescue')
+    if args.case == 'teleporter-state' and not args.input:
+        parser.error('teleporter-state requires a core-destruction save')
     output=task_path(args.output); cache=task_path(args.cache)
     output.mkdir(parents=True,exist_ok=False)
     game=output/'q4xbase';game.mkdir()
@@ -138,7 +166,7 @@ def main():
     log=path.read_text(errors='replace') if path.exists() else ''
     if process.returncode!=0 or ERROR.search(log) or log.count('M56_DONE')!=1:
         failures.append('runtime error, exit status or missing completion marker')
-    if not args.input and not args.baseline and 'Awakening mission corrections v1:' not in log:failures.append('corrections not enabled')
+    if not args.input and not args.baseline and 'Awakening mission corrections v2:' not in log:failures.append('corrections not enabled')
     if args.input and 'Game Map Init SaveGame' not in log:failures.append('input not restored')
     if args.case in ('failure', 'processing'):
         refused = "Can't save after failed mission" in log
@@ -156,6 +184,11 @@ def main():
         if log.count('PROCESSING HAS BEEN FINISHED') != 3 or 'STRAUSS DIES' not in log:
             failures.append('uninterrupted processing did not finish all three cycles')
     if args.case=='boss':
+        corrected_boss = not args.input or 'm05_bio.openq4-v2.script' in log
+        if corrected_boss and "telefragged 'dekard_boss_cinematic'" in log:
+            failures.append('rescue teleport hit the cinematic stand-in')
+        if not args.input and not re.search(r'testMission: name=light_8861 .*bind=elevator2',log):
+            failures.append('service-lift lamp did not bind to its platform')
         if not args.input and 'testMissionObjective: Rescue Strauss' not in log.split('M56_FIRST_STUN')[-1].split('M56_SECOND_STUN')[0]:
             failures.append('rescue objective missing during fight')
         if 'health=2666' not in log:failures.append('second shield phase not reached')
@@ -172,6 +205,8 @@ def main():
         if 'testMission: name=strauss health=300 hidden=0' not in victory:failures.append('Strauss not rescued')
         if 'testMissionObjective: Rescue Strauss' in victory:failures.append('rescue objective did not complete')
         if 'oq4_m05_painlord::processingLine' in victory:failures.append('processing survived victory')
+        if corrected_boss and 'PAINLORD AT PROCESSING STATION' in log.split('JUBILATION ABOUNDS')[-1]:
+            failures.append('station approach survived victory')
     if args.case=='defense':
         after=log.split('M56_DEFENSE_COMPLETE')[-1]
         if not re.search(r'testVehicle: name=turret .*drivers=0 playerSeat=-1',after):failures.append('seat not released')
@@ -181,6 +216,28 @@ def main():
         if not hull or int(hull[1]) > 0:failures.append('hull damage did not destroy MCC')
     if args.case in ('defense','failure') and not args.input:
         if 'testVehicle: action=exit name=turret success=0' not in log:failures.append('combat seat not locked')
+        if not re.search(r'(?m)^\s*\d+: oq4_m06b::turretSequence\s+:.*state=waiting$', log):
+            failures.append('vehicle entry did not name the running cannon callback')
+    if args.case == 'failure':
+        # A timed waiter remains registered until its queued wake-up. The failed
+        # save opens a modal, so registration alone cannot establish cancellation.
+        after = log.split('testMission: name=mcc_2')[-1]
+        for thread in ('turretSequence', 'startTurretSpawners', 'skyboxDroppods', 'fighterGroup1'):
+            for entry in re.findall(r'(?m)^\s*\d+: oq4_m06b::'+thread+r'\s+:.*$', after):
+                if not entry.endswith('state=cancelled'):
+                    failures.append('uncancelled cannon thread after failure: '+thread)
+    if args.case == 'combat-save' and not re.search(r'testVehicle: name=turret .*drivers=1 playerSeat=0 locked=1',log):
+        failures.append('not in active cannon')
+    if args.case in ('teleporters', 'teleporter-state'):
+        after=log.split('M56_TELEPORTERS_STOPPED')[-1]
+        for entity in ('rear_tele_ball', 'rear_tele_ball_1', 'comm_tele_ball',
+                       'func_spawner_enemy_light_3', 'func_spawner_enemy_light_4', 'func_spawner_command_dropin'):
+            if 'testMission: missing='+entity+'\n' not in after:failures.append('surviving teleporter entity: '+entity)
+        for entity in ('rear_tele_broken', 'rear_tele_broken_1', 'comm_tele_broken'):
+            if not re.search(r'testMission: name='+entity+r' health=-?\d+ hidden=0',after):
+                failures.append('broken model missing: '+entity)
+        if re.search(r'oq4_m06b::(?:spin(?:Hall|Comm)?TeleBall|monitor(?:Hall|Comm)?TeleHealth) :',after):
+            failures.append('teleporter threads survived destruction')
     if args.case=='speeder' and 'm07_race' not in log:failures.append('speeder did not reach race map')
     capture = {'boss':'rescue', 'arrival':'arrival', 'defense':'escape', 'speeder':'race'}.get(args.case)
     if capture and not (game/'screenshots'/f'{capture}.tga').is_file():

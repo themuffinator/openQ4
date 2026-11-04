@@ -1705,7 +1705,9 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   no expansion MP module or resurrection of obsolete companion-layer architecture.
   M05/M06 encounter work, 4 November: the Pain Lord's shield phases, final
   processing window and cleanup, MCC arrival continuity, and cannon/fighter
-  lifecycle are reviewed in the [mission audit](awakening-m05-m06.md).
+  lifecycle are reviewed in the [mission audit](awakening-m05-m06.md). A second
+  pass fixes normal callback cancellation, escape-teleporter shutdown/re-entry
+  and the service-lift lamp, with versioned scripts preserving v1 saves.
   Focused encounter and restore evidence belongs there; full traversal remains
   part of this gate.
   Progress, 2 November: freeze persistence passes one save/restore case. On

@@ -60,6 +60,31 @@ the alpha. See [upstream credits](../../AGENTS.md#upstream-credits) and
   are protected during the short vehicle/driver handshake. Drivers are removed
   when their run finishes, freeing their `max_active=1` spawners for later runs.
   Missing spawn results cannot bind another flight lane's vehicle.
+- **Normal callback cancellation (second review):** vehicle and AI callbacks
+  start unnamed threads, unlike the diagnostic function-call command used in
+  the first encounter probes. The station approach and cannon sequence now
+  explicitly name their threads so death/failure can cancel them. The station
+  approach also rejects duplicate and post-death calls and checks death after
+  each movement wait. This closes a gap in the first cleanup correction.
+- **Escape teleporters (second review):** each of the three core monitors claims
+  its encounter once. Destroying a core marks it destroyed, stops its rotation
+  waiter and removes its enemy spawner before deleting the core or yielding for
+  break effects. Repeated callbacks cannot reset a destroyed teleporter or start
+  duplicate rotation/health threads.
+- **Service-lift lamp (second review):** M05's lamp follows `elevator2`; its
+  original binding named a deleted lift and left the light downstairs. The
+  correction requires the original lamp name, class and binding.
+- **Rescue teleport (second review):** script removal is deferred. The outro
+  teleported the player into Dekard's cinematic stand-in in the same frame,
+  causing a telefrag before removal. A one-frame wait under the existing black
+  fade lets removal finish before the teleport.
+- **Flyby projectile ownership (second review):** a surviving fighter bullet
+  retained a raw collision-owner pointer after its aircraft was removed. An
+  early cannon resave reproduced the missing-object diagnostic. Clip owners now
+  track the entity's spawn generation, so removal or reuse of its slot/address
+  cannot keep an obsolete collision exemption. SP and MP share this fix; saves
+  still write the original object-reference field, and restore reconstructs the
+  generation from the already loaded entity table.
 
 ## Save and campaign boundaries
 
@@ -71,8 +96,9 @@ The harvester's installed animation frame callback deliberately keeps its
 original `m06b::TURRET_DEAD` flag; the corrected encounter waits for that flag.
 
 Saved corrected programs recompile the same virtual version, regardless of the
-fresh-start toggle. Keep v1 stable once released; use a new version for later
-statement changes. Unknown source anchors, a changed world callback, or a mapper's
+fresh-start toggle. Fresh starts now use v2; v1's correction arrays and generated
+script statements remain unchanged for saves from the first review. Unknown
+source anchors, a changed world callback, or a mapper's
 map sidecar leave the original mission in control. Missing source on a corrected
 save fails its load instead of substituting a different suspended program.
 
@@ -119,22 +145,54 @@ both weak-point hit orders and processing interruption/recovery. The final
 processing retry has source and native-state coverage; a player-driven last-second
 interruption is not qualified by the unattended processing probe.
 
+### Second review
+
+Evidence is under `.tmp/awakening-m05-m06-round2/`. The collision-owner
+regression executes the same extracted production methods from both SP and MP:
+`tools/tests/clip_owner_behavior.py` passes 12 checks covering deletion, copied
+clips, slot/address reuse, explicit reassignment, restore ordering and high-bit
+spawn generations. Both ordinary CI workflows run it.
+The SP and MP restore-resource executables also pass their immediate-fixup and
+interrupted-allocation checks.
+
+| Probe | Evidence and observed outcome |
+| --- | --- |
+| Early cannon save | `cannon-owner-diagnostic/` identifies the old warning as the collision owner of `projectile_q4x_strogg_fighter_bullet`. After the fix, `cannon-resave/report.json` restores the same v1 checkpoint and resaves at 13.6 seconds with the cannon occupied and locked, without a missing-object diagnostic. |
+| Three escape teleporters | `teleporters-final/report.json`: all cores and enemy spawners are removed, broken models show, repeated monitor calls are harmless and no rotation/health threads survive. |
+| Active-core restore | `teleporters-restored/report.json`: a fresh process resumes all three active cores, repeats the callbacks and destruction, then resaves cleanly. |
+| Destruction-boundary restore | `teleporters-breaking/report.json`: resume the save made one frame after core damage; shutdown completes, callbacks cannot restart it, and another save succeeds. |
+| Fresh M05 rescue | `boss-final/report.json`: the station approach starts before the kill but never reaches its console after victory; Strauss survives, the rescue objective completes and the lamp reports `bind=elevator2`. The outro no longer telefrags Dekard's cinematic stand-in. The engine rescue capture was inspected. |
+| Cannon failure through vehicle entry | `cannon-failure-final/report.json`: activate `dummyTurret`, verify the named encounter thread is waiting, destroy the hull, verify the encounter/wave threads are cancelled and saving is refused. |
+| Cannon victory through vehicle entry | `cannon-defense/report.json`: enter through the vehicle callback, fire, verify the combat exit lock, finish both harvester stages, exit inside the MCC, destroy the hull after victory and resave without failing the escape. |
+| First-review M05 save | `boss-v1-restored/report.json`: restore the original v1 stun checkpoint, finish both weak-point stages, rescue Strauss and resave with the new collision-owner code. |
+| Second-review M05 save | `boss-v2-restored/report.json`: restore the final v2 stun checkpoint in a fresh process, finish the rescue without late processing or a cinematic telefrag, and resave. |
+| Fresh MCC arrival | `arrival/report.json`: v2 compiles, the landing finishes without Mitchell's stale double, and the checkpoint saves. |
+
+The earlier exploratory teleporter run exposed suspended mover waiters even
+after `killthread`. The final version calls `stopRotating` first, waking the
+waiter so cancellation can retire it. Temporary serializer diagnostics used for
+the cannon investigation are removed from the final code.
+The initial failure probe incorrectly treated registered threads as runnable.
+`listThreads` now reports waiting/ready/cancelled state in both modules: a
+cancelled timed thread can remain registered until its queued wake-up, especially
+while the failed-save modal pauses gameplay. The test checks cancellation state.
+
 ## Remaining limits
 
 The alpha still contains missing media and abandoned ancillary callbacks.
 M06's unused Tarrant routine references deleted actors;
 it is not on the active route and is not resurrected.
 The map audit also found orphan targets/binds, including M05's unused upper
-freight-lift call panel and a light bound to a deleted lift name. The actual
-freight lift uses its scripted mover. Existing item-in-solid, missing animation,
+freight-lift call panel. The actual freight lift uses its scripted mover.
+Existing item-in-solid, missing animation,
 duplicate sound and shadow-map fallback diagnostics remain in the runtime logs.
+One stationary post-rescue probe also logged Tak abandoning a heal approach
+after 15 seconds without progress. Escort/medic navigation is not fully qualified
+by these encounter probes.
 
-An exploratory early cannon resave logged the serializer's transient-reference
-to-NULL diagnostic (`failure-restore/`); the verified phase-to-completion paths
-do not establish clean saving at every combat instant. Generic mover damage
-also ignores the console command's damage scale; the hull probes use three
-explicit retail telefrag-damage events and verify actual hull health instead.
+Generic mover damage ignores the console command's damage scale; the hull probes
+use three explicit retail telefrag-damage events and verify actual hull health.
 
 The focused probes do not qualify every escort path, optional conversation,
-camera angle, teleporter encounter, or overall combat balance. They do not
+camera angle, the full walking route between encounters, or combat balance. They do not
 provide Linux/macOS gameplay or full audiovisual parity evidence.

@@ -158,7 +158,10 @@ fixes them:
   tracks the fight and completes with victory. Mitchell no longer
   reappears in the MCC arrival. The cannon defense has a longer opening fighter
   wave, keeps its flight runs working, and stops monitoring the MCC's hull once
-  the escape begins. Restart these maps to use the corrected scripts; older
+  the escape begins. Destroyed escape teleporters stop their reinforcements and
+  rotation, and repeated triggers cannot restart them. The service-lift lamp
+  travels with its platform, and the rescue teleport clears its destination
+  before returning control. Restart these maps to use the corrected scripts; older
   saves keep their original mission flow.
 - **The Retch** asks for navigation data that two levels lack (Trianfac and
   Stranarus Trench part 2), so four of them could never move. They now walk.

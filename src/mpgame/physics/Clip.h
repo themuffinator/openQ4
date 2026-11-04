@@ -97,6 +97,7 @@ private:
 	idEntity *				entity;					// entity using this clip model
 	int						id;						// id for entities that use multiple clip models
 	idEntity *				owner;					// owner of the entity that owns this clip model
+	unsigned int			ownerSpawnId;			// runtime generation; existing saves store the owner object
 	idVec3					origin;					// origin of clip model
 	idMat3					axis;					// orientation of clip model
 	idBounds				bounds;					// bounds
@@ -169,14 +170,6 @@ ID_INLINE void idClipModel::SetId( int newId ) {
 
 ID_INLINE int idClipModel::GetId( void ) const {
 	return id;
-}
-
-ID_INLINE void idClipModel::SetOwner( idEntity *newOwner ) {
-	owner = newOwner;
-}
-
-ID_INLINE idEntity *idClipModel::GetOwner( void ) const {
-	return owner;
 }
 
 ID_INLINE const idBounds &idClipModel::GetBounds( void ) const {
