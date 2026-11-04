@@ -506,12 +506,12 @@ def main() -> None:
 
     require(
         multiplayer,
-        "uiKickSelection >= 0 && uiKickSelection < MAX_CLIENTS && IsValidVotePlayerSlot( kickVoteMap[ uiKickSelection ] )",
+        "uiKickSelection >= 0 && uiKickSelection < MAX_CLIENTS && IsCurrentPlayerTarget( kickVoteMap[ uiKickSelection ], kickVoteMapIdentities[ uiKickSelection ] )",
         "packed vote GUI kick selection",
     )
     require(
         multiplayer,
-        "sel < 0 || sel >= MAX_CLIENTS || !IsValidVotePlayerSlot( kickVoteMap[ sel ] )",
+        "sel < 0 || sel >= MAX_CLIENTS || !IsCurrentPlayerTarget( kickVoteMap[ sel ], kickVoteMapIdentities[ sel ] )",
         "packed vote GUI kick label selection",
     )
 

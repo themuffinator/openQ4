@@ -102,10 +102,10 @@ def section_tab(doc: Document, position: int, section: str, key: str) -> tuple[d
 def player_row(doc: Document, row: int, width: float) -> tuple[dict, str]:
     """A player, the scoreboard's row at 22 dp as the Match page's lists draw
     it: the name, then the team; the chosen player's row lit in olive. Accept
-    names the row (card.admin_row) and runs mpAdminSelect, which asks the game
-    to choose the row's client; the game checks it again."""
+    captures its client and connection identity in mpAdminSelect. A changed
+    occupant cancels a held press; the game checks the captured pair again."""
     ident, state = f"admin-player-{row}", f"mp.admin.player{row}"
-    for field in ("c0", "c1"):
+    for field in ("c0", "c1", "identity"):
         doc.state[f"{state}.{field}"] = {"type": "string", "initial": ""}
     doc.state[f"{state}.client"] = {"type": "number", "initial": -1}
     band = group(f"{ident}-band", {**FULL, "background-color": colour([1, 1, 1, 0.06])})
@@ -132,10 +132,11 @@ def player_row(doc: Document, row: int, width: float) -> tuple[dict, str]:
         "disabled": [(f"{ident}-focus", "opacity", number(0)), (f"{ident}-c0", "color", colour([1, 1, 1, 0.85]))],
     })
     event = f"admin_player_{row}"
-    doc.events[event] = [{"op": "setState", "values": {"card.admin_row": row}}, {"op": "action", "action": "mpAdminSelect"}]
+    doc.events[event] = [{"op": "setState", "values": {"card.admin_row": row, "card.admin_client": {"state": f"{state}.client"}, "card.admin_identity": {"state": f"{state}.identity"}}}, {"op": "action", "action": "mpAdminSelect"}]
     node = group(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(width),
                          "height": length(MATCH_LIST_ROW_H), "margin-bottom": length(1), "flex-shrink": number(0)},
-                 [band, chosen, rail, content], control={"role": "button", "label": PLACEHOLDER, "event": event, "states": states})
+                 [band, chosen, rail, content], control={"role": "button", "label": PLACEHOLDER, "event": event, "states": states,
+                                                       "context": {"state": f"{state}.identity"}})
     doc.bind(f"{ident}.display", ident, "display",
              {"op": "select", "args": [{"op": "<", "args": [row, {"state": "mp.admin.player.count"}]}, "block", "none"]})
     return node, ident
@@ -190,7 +191,7 @@ def check_labels(page_width: float, right_w: float, apply_w: float, left_x: floa
         for language, text in any_text(key).items():
             if b.text_width("marine", text, 20) > room - 46 - 20:
                 over[(key, language)] = round(b.text_width("marine", text, 20))
-    for key, room in (*((key, right_w) for key in ("#str_231291", "#str_231292", "#str_231293", "#str_231294")),
+    for key, room in (*((key, right_w) for key in ("#str_231291", "#str_231292", "#str_231293", "#str_231294", "#str_231577")),
                       ("#str_231294", apply_w), ("#str_231295", apply_w)):
         for language, text in any_text(key).items():
             if b.text_width("lowpixel", text, 14) > room - 26:
@@ -226,14 +227,22 @@ def admin_page(doc: Document, index: int, ident: str, width: float, height: floa
         "mp.admin.notice": {"type": "string", "initial": ""},
         "mp.admin.player.count": {"type": "number", "initial": 0},
         "mp.admin.player.selected": {"type": "number", "initial": -1},
+        "mp.admin.client": {"type": "number", "initial": -1},
+        "mp.admin.identity": {"type": "string", "initial": ""},
+        "card.admin_client": {"type": "number", "initial": -1},
+        "card.admin_identity": {"type": "string", "initial": ""},
         "mp.server.name": {"type": "string", "initial": ""},
         "mp.server.address": {"type": "string", "initial": ""},
         # The adapter keeps this: a field holds text not yet entered.
         "ui.numberDraftsPending": {"type": "boolean", "initial": False},
         **{f"mp.admin.console{line}": {"type": "string", "initial": ""} for line in range(CONSOLE_LINES)},
     })
-    for verb in ("mpAdminPass", "mpAdminSelect", "mpAdminBans", "mpAdminConsole", *(verb for _name, verb in (*ACTIONS, APPLY))):
+    for verb in ("mpAdminPass", "mpAdminBans", "mpAdminConsole", APPLY[1]):
         doc.session(verb, verb)
+    for verb in ("mpAdminSelect", *(verb for _name, verb in ACTIONS)):
+        prefix = "card.admin_" if verb == "mpAdminSelect" else "mp.admin."
+        doc.actions[verb] = {"operation": "session.menu", "arguments": {
+            "command": verb, "client": {"state": prefix + "client"}, "identity": {"state": prefix + "identity"}}}
     doc.actions["adminEditField"] = {"operation": "ui.numberDrafts.focus", "arguments": {}}
     valid = {"state": "mp.admin.valid"}
     controls: list = []
@@ -320,6 +329,7 @@ def admin_page(doc: Document, index: int, ident: str, width: float, height: floa
         node = f"admin-{name}"
         actions.append(action_plate(doc, node, f"mp.admin.{name}", right_w, slot * SLOT_PITCH, f"admin_{name}",
                                     [{"op": "action", "action": verb}]))
+        next(child for child in actions[-1]["children"] if child["id"] == node)["control"]["context"] = {"state": "mp.admin.identity"}
         controls.append(node)
     # View ban list asks for the list, then opens PLAYER BAN LIST.
     doc.events["admin_bans"] = [{"op": "action", "action": "mpAdminBans"}, {"op": "call", "event": "banModalShow"}]

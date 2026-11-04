@@ -385,7 +385,7 @@ private:
 		for (const auto& name : values.getMemberNames()) {
 			const auto p = "/state/"+PointerPart(name); const auto& v = values[name];
 			Require(Identifier(name),v,p,"Invalid state ID");
-			Fields(v,p,{"type","initial","cvar","view","extensions"});
+			Fields(v,p,{"type","initial","cvar","view","keyBinding","extensions"});
 			Require(v["type"].isString(),v,p+"/type","Expected a state type");
 			const auto type = v["type"].asString(); StateDeclaration declaration;
 			if (type == "number") declaration.initial = Numeric(v["initial"],p+"/initial",-1000000000000.0,1000000000000.0);
@@ -404,6 +404,18 @@ private:
 					"Expected the view source 'aspect', 'text', 'safeLeft', 'safeTop', 'safeRight' or 'safeBottom'");
 				Require(type == "number" && !v.isMember("cvar"),v,p,"A view source is a number state without a CVar source");
 				declaration.view = v["view"].asString();
+			}
+			if (v.isMember("keyBinding")) {
+				const auto& binding = v["keyBinding"];
+				Require(type == "string" && !v.isMember("cvar") && !v.isMember("view"),v,p,
+					"A key binding requires an application string state");
+				Require(binding.isString(),binding,p+"/keyBinding","Expected a key binding lookup string");
+				declaration.keyBinding = binding.asString();
+				Require(!declaration.keyBinding.empty() && declaration.keyBinding.size() <= 1024 &&
+					ValidStateValue(declaration.keyBinding) &&
+					declaration.keyBinding.find('\0') == std::string::npos &&
+					declaration.keyBinding.find_first_of("\r\n") == std::string::npos,binding,p+"/keyBinding",
+					"Expected a nonempty single-line key binding of at most 1024 bytes");
 			}
 			model.state.emplace(name,std::move(declaration));
 		}
@@ -1200,7 +1212,7 @@ private:
 			if (role == "button") Fields(control,p,{"role","action","event","label","enabled","states","navigation","detail","context","prompt","extensions"});
 			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","extensions"});
 			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
-			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","optionCount","scrollbar","placementBounds","extensions"});
+			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","context","parts","visibleRows","options","optionCount","scrollbar","placementBounds","extensions"});
 			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","integer","decimals","maxBytes","parts","extensions"});
 			else if (role == "text") Fields(control,p,{"role","action","label","enabled","states","navigation","value","maxBytes","allowEmpty","masked","parts","extensions"});
 			else if (role == "scrollbar") Fields(control,p,{"role","label","enabled","states","navigation","viewport","orientation","lineStep","minimumThumb","parts","extensions"});
@@ -1212,7 +1224,7 @@ private:
 			parsed.label = ControlLabel(control["label"],p+"/label");
 			if (control.isMember("context")) {
 				parsed.context = ReadExpression(control["context"],p+"/context");
-				Require(parsed.context->type == 2,control["context"],p+"/context","Button context must be a string");
+				Require(parsed.context->type == 2,control["context"],p+"/context","Control context must be a string");
 			}
 			if (control.isMember("prompt")) {
 				parsed.prompt = ReadExpression(control["prompt"],p+"/prompt");

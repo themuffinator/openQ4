@@ -4311,6 +4311,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "clientVoiceChat",		idMultiplayerGame::VoiceChat_f,	CMD_FL_GAME,			"voice chats: clientVoiceChat <sound shader>" );
 	cmdSystem->AddCommand( "clientVoiceChatTeam",	idMultiplayerGame::VoiceChatTeam_f,	CMD_FL_GAME,		"team voice chats: clientVoiceChat <sound shader>" );
 	cmdSystem->AddCommand( "serverVoiceMute", idMultiplayerGame::ServerVoiceMute_f, CMD_FL_GAME, "silence a voice sender for this connection: <client slot> <0|1>" );
+	cmdSystem->AddCommand( "serverAdminTarget", idMultiplayerGame::ServerAdminTarget_f, CMD_FL_GAME, "administer an exact connection: <kick|ban|switch> <client slot> <identity>" );
 	cmdSystem->AddCommand( "serverVoiceStats", idMultiplayerGame::ServerVoiceStats_f, CMD_FL_GAME, "report per-sender voice admission, forwarding and added delay" );
 // RAVEN BEGIN
 	// jshepard

@@ -1860,6 +1860,20 @@ Completion must advance through the existing dependencies:
   Real-headset comfort/readability and the full device matrix remain open.
   Visual specification 1.28 and register revision 20 add the scope as pending
   `FLOW-067`; no evidence record is bound yet.
+  Progress, 3 November: [player-target guards](ui/player-identity.md#mute-vote-and-admin-targets-3-november-2026)
+  bind remote mute/unmute requests and retained Admin selections/actions to
+  the selected connection, including authenticated rcon delivery. Classic
+  menu player choices also retain their original identity. A kick vote
+  aborts when its target disappears or is replaced, including during the
+  passed-vote delay; a mixed vote applies none of its other changes.
+  Vote requests before server admission, retained kick-choice drafts,
+  Match Control rows and the wider device/platform matrix remain open.
+  Progress, 4 November: [kick choice, draft and request identity](ui/player-identity.md#kick-choice-draft-and-request-identity-4-november-2026)
+  binds the retained choice to its ordered connection catalog and freezes that
+  catalog with queued selections. A departed target blocks the entire draft
+  until explicitly selected again or cleared. Both kick-request transports
+  carry the selected identity and reject stale requests before server admission.
+  Match Control rows and broader remote/device/platform qualification remain.
 - [ ] **UI-04 — P1, implementation and qualification: full GUI corpus migration.**
   Finish all HUD, wrist/comms, scope, vehicle, cinematic, terminal/world and scripted
   surfaces with source-bound retained lowering. Preserve legacy grouping/remainder
@@ -1951,8 +1965,8 @@ Completion must advance through the existing dependencies:
   methods, material/movie/model/generated-image operations, world-surface output
   and input, gameplay timers, independent instances and save/restart continuity.
   Current code has six canonical control roles, five node kinds,
-  partial material-image operations, empty binding-name
-  updates/text-wrap queries and an explicit world-output rejection. Map each
+  partial material-image operations, bounded scalar text-fit queries and an
+  explicit world-output rejection. Map each
   limitation to required semantics and extend existing working facilities rather
   than rebuilding them. Test actual SP/MP engine callers, simultaneous HUD/menu/
   world/editor contexts, failed recreation, timer/presentation-clock separation,
@@ -1977,6 +1991,20 @@ Completion must advance through the existing dependencies:
   retain the failed fixture views, renderer-demo refusal, diagnostic-preview
   canvas issue and unqualified native lifecycle/composition cases. This does
   not accept `INV-013` or either production model preview.
+  Progress, 4 November: [public binding names and text fitting](ui/bindings.md#public-key-binding-refresh-4-november-2026)
+  replace the two empty GUI adapter methods. CONTROLS declares its 49 binding
+  lookups and uses the public localized refresh, preserving capture overrides.
+  Text queries use the current content width and shared font runs, return whole
+  UTF-8 scalars and isolate each view's metrics. Native/adapter tests and windowed
+  SP/OpenGL English and MP/Vulkan French gameplay checks pass, with all 14 final
+  engine captures reviewed. Existing late-precache warnings remain. This does not complete shaping,
+  legacy text escapes, live IME, world output, the editor or toolkit acceptance.
+  Progress, 4 November: [choice catalog contexts](ui/player-identity.md#kick-choice-draft-and-request-identity-4-november-2026)
+  extend the subject lifetime to choices independently of their selected value.
+  Same-label catalog changes close the popup and cancel held or queued proposals,
+  including ABA changes and restoration. The production kick choice freezes that
+  catalog through dispatch. Native and GL/Vulkan gameplay checks pass; full
+  toolkit and device/platform acceptance remain open.
 - [x] **UI-10 — P0, investigation and implementation: refresh effective scope and
   source inventory.** Completed [retail/base/Awakening inventory](ui/inventory-report.md):
   264/276/324 effective paths, 358 distinct source/include-bound variants, 18

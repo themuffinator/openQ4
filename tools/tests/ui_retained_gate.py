@@ -3118,7 +3118,7 @@ int main() {
             chat = idUserInterface("guis/mpchat.gui"); chat.state["gameDraw"] = "1";
             gameObject.publish = [](idUserInterface* gui) {
                 if (gameObject.commands.back() == "retainedMultiplayerVariant") gui->SetStateBool("mp.welcome", welcomeAnswer);
-                if (gameObject.commands.back() == "retainedMultiplayerCover") { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", true); }
+                if (gameObject.commands.back() == "retainedMultiplayerCover") { gui->SetStateInt("mp.protocol", 4); gui->SetStateBool("mp.cover_allowed", true); }
                 if (gameObject.commands.back() != "retainedMultiplayerUncover") gui->SetStateInt("mp.revision", static_cast<int>(gameObject.commands.size()));
             };
             return s;
@@ -3163,7 +3163,7 @@ int main() {
         CHECK(s.guiRetainedReleasing == card && s.retainedReleaseUntil == commonObject.time + 250 && gameObject.commands.back() == "retainedMultiplayerUncover");
         s.UpdateRetainedMultiplayer(); CHECK(s.guiRetainedMultiplayer == nullptr && card->deactivations == 1);
         // Main Menu leaves for the main menu with the match running: no release.
-        s.guiActive = &mpMenu; gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", true); };
+        s.guiActive = &mpMenu; gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 4); gui->SetStateBool("mp.cover_allowed", true); };
         s.UpdateRetainedMultiplayer(); CHECK(s.guiRetainedMultiplayer == card && card->activations == 2 && card->named.back() == "open");
         gameObject.answer = [](const char*) -> const char* { return "main"; };
         s.HandleRetainedSessionRequest(card, "mpMainMenu");
@@ -3337,7 +3337,9 @@ int main() {
         gameObject.answer = [](const char*) -> const char* { return "continue"; };
         s.HandleRetainedSessionRequest(card, "mpVoteMap 3");
         CHECK(gameObject.guiCommands.back() == "retained voteSet 0 3" && s.guiRetainedMultiplayer == card);
-        s.HandleRetainedSessionRequest(card, "mpVoteKick -1"); CHECK(gameObject.guiCommands.back() == "retained voteSet 11 -1");
+        s.HandleRetainedSessionRequest(card, "mpVoteKick -1 0"); CHECK(gameObject.guiCommands.back() == "retained voteKick -1 \"0\"");
+        s.HandleRetainedSessionRequest(card, "mpVoteKick 1 0,1:4294967295,31:2031647");
+        CHECK(gameObject.guiCommands.back() == "retained voteKick 1 \"0,1:4294967295,31:2031647\"");
         s.HandleRetainedSessionRequest(card, "mpVoteControlTime 600"); CHECK(gameObject.guiCommands.back() == "retained voteSet 6 600");
         s.HandleRetainedSessionRequest(card, "mpVoteBalance 0"); CHECK(gameObject.guiCommands.back() == "retained voteSet 7 0");
         const size_t drafted = gameObject.guiCommands.size();
@@ -3405,10 +3407,10 @@ int main() {
         card->state["card.admin.password"] = std::string(65, 'x'); s.HandleRetainedSessionRequest(card, "mpAdminPass");
         CHECK(gameObject.guiCommands.size() == checked && card->state["card.admin.password"].empty() &&
               cvarSystemObject.strings["net_clientRemoteConsolePassword"] == "correct horse battery");
-        card->state["card.admin_row"] = "2"; card->state["mp.admin.player2.client"] = "7"; s.HandleRetainedSessionRequest(card, "mpAdminSelect");
-        CHECK(gameObject.guiCommands.back() == "play main_menu_selection ; retained adminSelect 7" && s.guiRetainedMultiplayer == card);
+        card->state["card.admin_row"] = "2"; card->state["mp.admin.player2.client"] = "7"; s.HandleRetainedSessionRequest(card, "mpAdminSelect 7 8199");
+        CHECK(gameObject.guiCommands.back() == "play main_menu_selection ; retained adminSelect 7 8199" && s.guiRetainedMultiplayer == card);
         for (const auto& [verb, command] : std::vector<std::pair<const char*, const char*>>{
-                 {"mpAdminKick", "retained adminKick"}, {"mpAdminBan", "retained adminBan"}, {"mpAdminSwitch", "retained adminSwitch"},
+                 {"mpAdminKick 7 8199", "retained adminKick 7 8199"}, {"mpAdminBan 7 8199", "retained adminBan 7 8199"}, {"mpAdminSwitch 7 8199", "retained adminSwitch 7 8199"},
                  {"mpAdminBans", "retained adminBans"}, {"mpAdminUnban", "retained adminUnban"}, {"mpAdminApply", "retained adminApply"}}) {
             s.HandleRetainedSessionRequest(card, verb);
             CHECK(gameObject.guiCommands.back() == std::string("play main_menu_selection ; ") + command && s.guiRetainedMultiplayer == card);
@@ -3453,7 +3455,7 @@ int main() {
         // and Back is the summary's own close. The menu replacing the summary
         // retires the summary card and covers the menu with its own.
         static idUserInterface summary("guis/summary.gui"); summary = idUserInterface("guis/summary.gui"); summary.state["gameDraw"] = "1";
-        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", true); };
+        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 4); gui->SetStateBool("mp.cover_allowed", true); };
         s.guiRetainedSummary->state["card.tab"] = "2"; s.guiActive = &summary; s.UpdateRetainedMultiplayer();
         auto* sheet = s.guiRetainedMultiplayer;
         CHECK(sheet == s.guiRetainedSummary && s.retainedMultiplayerSummary && s.RetainedSummaryCovers() && sheet->named.back() == "open" &&
@@ -3477,7 +3479,7 @@ int main() {
         // questions) keep the menu up for the campaign; Resume closes it with
         // the release.
         static idUserInterface arenaMenu("guis/arena_pause.gui"); arenaMenu = idUserInterface("guis/arena_pause.gui"); arenaMenu.state["gameDraw"] = "1";
-        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", true); };
+        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 4); gui->SetStateBool("mp.cover_allowed", true); };
         const size_t arenaAsked = gameObject.commands.size();
         s.guiActive = &arenaMenu; s.UpdateRetainedMultiplayer();
         auto* arenaPause = s.guiRetainedMultiplayer;
@@ -3501,7 +3503,7 @@ int main() {
         // The game may refuse now (the join offer, an Arena Campaign match): the
         // stock menu keeps this opening, and the next asks again.
         auto refused = Mp(true, true);
-        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 2); gui->SetStateBool("mp.cover_allowed", false); };
+        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 4); gui->SetStateBool("mp.cover_allowed", false); };
         refused.UpdateRetainedMultiplayer(); refused.UpdateRetainedMultiplayer();
         CHECK(refused.guiRetainedMultiplayer == nullptr && refused.retainedMultiplayerUncovered && gameObject.commands.size() == 2 && refused.retainedStock.Num() == 0);
         refused.guiActive = nullptr; refused.UpdateRetainedMultiplayer(); refused.guiActive = &mpMenu; refused.UpdateRetainedMultiplayer();
@@ -5287,13 +5289,13 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     import retained_mp_admin
     assert keys[-1] == 'kick' and [(key, verb) for key, verb, _label, _control in retained_mp_admin.ROWS] == list(zip(keys[:-1], admin_fields))
     for key, verb, _label, control in retained_mp_admin.ROWS:
+        arguments = {'command': verb, 'value': {'input': 'value'}}
         assert document['actions'][verb] == {'operation': 'session.menuValue', 'input': 'boolean' if control[0] == 'toggle' else 'number',
-                                             'arguments': {'command': verb, 'value': {'input': 'value'}}}, verb
+                                             'arguments': arguments}, verb
     admin_publisher = function_body(mp_game, 'void idMultiplayerGame::PublishRetainedAdmin(')
     assert re.findall(r'"([a-z]+)"', re.search(r'static const char \*const fields\[ RVF_COUNT \] = \{([^}]*)\};', admin_publisher).group(1)) == keys
     for constant, value in (('PLAYERS', retained_mp_admin.PLAYERS), ('BANS', 32), ('CONSOLE_LINES', retained_mp_admin.CONSOLE_LINES)):
         assert f'static const int RETAINED_ADMIN_{constant} = {value};' in header, constant
-    assert f'static const int RETAINED_MP_ADMIN_PLAYERS = {retained_mp_admin.PLAYERS};' in menu
     assert f'static const int RETAINED_MP_PASSWORD_BYTES = {retained_mp_admin.PASSWORD_BYTES};' in menu
     assert f'static const int RETAINED_MP_COMMAND_BYTES = {retained_mp_admin.COMMAND_BYTES};' in menu
     # The game: a client becomes an admin only by the server's answer, every
@@ -5312,8 +5314,12 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     publisher = function_body(mp_game, 'void idMultiplayerGame::PublishRetainedVote(')
     assert re.findall(r'"([a-z]+)"', re.search(r'static const char \*const fields\[ RVF_COUNT \] = \{([^}]*)\};', publisher).group(1)) == keys
     for key, verb, _label, control in retained_mp_menus.VOTE_ROWS:
+        arguments = {'command': verb, 'value': {'input': 'value'}}
+        if key == 'kick':
+            arguments['catalog'] = {'state': 'mp.vote.kick_catalog'}
+            assert card_controls(document['root'])['vote-row-kick']['context'] == {'state': 'mp.vote.kick_catalog'}
         assert document['actions'][verb] == {'operation': 'session.menuValue', 'input': 'boolean' if control[0] == 'toggle' else 'number',
-                                             'arguments': {'command': verb, 'value': {'input': 'value'}}}, verb
+                                             'arguments': arguments}, verb
     assert f'static const int RETAINED_VOTE_LINES = {retained_mp_menus.VOTE_LINES};' in header
     request = function_body(menu, 'void idSessionLocal::HandleRetainedMultiplayerRequest(')
     assert request.index('} else if ( Session_RetainedValueRequest( request, RETAINED_MP_VOTE_FIELDS,') < \
@@ -5349,7 +5355,7 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     assert 'DisableMenu' not in set_branch and 'return true' not in set_branch
     call_branch = command[command.index('if ( !sub.Icmp( "callVote" )'):command.index('if ( ( !sub.Icmp( "select" )')]
     assert call_branch.index('RetainedVoteRefusal() != NULL || RetainedVoteChanges( data ) == 0') < \
-        call_branch.index('ClientCallPackedVote( data );') < call_branch.index('DisableMenu();')
+        call_branch.index('ClientCallPackedVote( data, retainedVoteKickIdentity );') < call_branch.index('DisableMenu();')
     changes = function_body(mp_game, 'int idMultiplayerGame::RetainedVoteChanges(')
     assert 'retainedVoteDraft[ limit.field ] != si.GetInt( limit.key )' in changes and 'retainedVoteMap.Icmp( current ) != 0' in changes
     assert cover.index('retainedMenuCovered = true;') < cover.index('ResetRetainedVoteDraft();') < cover.index('PublishRetainedMenu( card );')
@@ -5545,6 +5551,9 @@ def main() -> int:
     session_bindings = re.findall(r'"([^"]+)"', re.search(r'RETAINED_CONTROLS_BINDINGS\[\] = \{([^}]*)\};', menu).group(1))
     assert list(retained_controls.BINDINGS) == stock_bindings == session_bindings and len(stock_bindings) == 49
     controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    assert [controls_document['state'][f'controls.{row}.keys']['keyBinding'] for row in range(49)] == session_bindings
+    controls_publish = function_body(menu, 'void idSessionLocal::PublishRetainedControls(')
+    assert controls_publish.index('gui->SetKeyBindingNames();') < controls_publish.index('retainedControlsCapture >= 0') < controls_publish.index('gui->StateChanged(')
     assert {name: action['arguments']['command'] for name, action in controls_document['actions'].items()} == \
         {'controlsBind': 'controlsBind', 'controlsClear': 'controlsClear', 'back': 'controlsBack'}
     controls_key = function_body(menu, 'bool idSessionLocal::RetainedControlsKey(')

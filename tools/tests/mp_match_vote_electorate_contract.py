@@ -31,14 +31,14 @@ STUBS = r'''
 const int LEGACY_VOTE_MSEC=20000, PACKED_VOTE_MSEC=30000;
 const int MAX_CLIENTS = 32, MAX_GAME_MESSAGE_SIZE = 4096;
 using byte = unsigned char;
-enum vote_flags_t { VOTE_NONE, VOTE_MULTIFIELD, VOTE_TIMELIMIT };
+enum vote_flags_t { VOTE_NONE, VOTE_MULTIFIELD, VOTE_TIMELIMIT, VOTE_KICK };
 enum { PLAYER_VOTE_NONE, PLAYER_VOTE_WAIT, PLAYER_VOTE_YES, PLAYER_VOTE_NO };
 enum { VOTE_RESET, VOTE_ABORTED, VOTE_PASSED, VOTE_FAILED, VOTE_UPDATE };
 enum { GAME_RELIABLE_MESSAGE_STARTPACKEDVOTE, GAME_RELIABLE_MESSAGE_CASTVOTE, MP_RULE_MANAGED_MATCH };
 enum { VOTEFLAG_KICK=1, VOTEFLAG_MAP=2, VOTEFLAG_GAMETYPE=4, VOTEFLAG_TIMELIMIT=8,
        VOTEFLAG_FRAGLIMIT=16, VOTEFLAG_TOURNEYLIMIT=32, VOTEFLAG_CAPTURELIMIT=64,
        VOTEFLAG_BUYING=128, VOTEFLAG_TEAMBALANCE=256, VOTEFLAG_CONTROLTIME=512 };
-struct idEntity { bool player = false; bool IsType(int) const { return player; } };
+struct idEntity { bool player = false; int identity = 1; bool IsType(int) const { return player; } };
 struct idPlayer : idEntity {
     idPlayer() { player = true; }
     bool spectating = false, wantSpectate = false, fake = false;
@@ -75,6 +75,7 @@ struct idMultiplayerGame {
     Rules matchRules;
     vote_flags_t vote = VOTE_NONE;
     int yesVotes = 0, noVotes = 0, voteEligibleCount = 0, voteTimeOut = 0, voteExecTime = 0;
+    int voteKickIdentity = 0;
     int notifications = 0, lastNotice = -1, executions = 0, cooldowns = 0;
     bool voted = false;
     std::string voteValue;
@@ -89,12 +90,14 @@ struct idMultiplayerGame {
     void ServerStartPackedVote(int clientNum, const voteStruct_t& data);
     void CastVote(int clientNum, bool castVote);
     void CheckVote();
+    bool VoteKickTargetCurrent() const;
 };
 struct Game {
     bool isClient = false, isServer = true;
     int time = 1000, numClients = MAX_CLIENTS, localClientNum = 0;
     idEntity* entities[MAX_CLIENTS] = {};
     idMultiplayerGame mpGame;
+    int GetSpawnId(const idEntity* entity) const { return entity->identity; }
     void ServerSendChatMessage(int, const char*, const char*) {}
 } gameLocal;
 '''
@@ -182,8 +185,29 @@ void Lifecycle(bool packed) {
     gameLocal.time = mp.voteTimeOut + 1; mp.CheckVote();
     CHECK(mp.lastNotice == VOTE_FAILED && mp.vote == VOTE_NONE);
 }
+void KickIdentity(bool packed) {
+    Reset(2, 0);
+    auto& mp = gameLocal.mpGame;
+    players[1].identity = 8193;
+    if (packed) {
+        voteStruct_t data; data.m_fieldFlags = VOTEFLAG_KICK | VOTEFLAG_TIMELIMIT;
+        data.m_kick = 1; data.m_timeLimit = 5;
+        mp.ServerStartPackedVote(0, data);
+    } else {
+        mp.ServerStartVote(0, VOTE_KICK, "1");
+    }
+    CHECK(mp.voteKickIdentity == 8193 && mp.VoteKickTargetCurrent());
+    mp.CastVote(1, true); mp.CheckVote();
+    CHECK(mp.voteExecTime == 3000);
+    // The object can be reused at the same address. Only its identity changed.
+    players[1].identity = 12289;
+    gameLocal.time = 3001; mp.CheckVote();
+    CHECK(mp.executions == 0 && mp.vote == VOTE_NONE && mp.lastNotice == VOTE_ABORTED);
+    Start(packed); CHECK(mp.voteKickIdentity == 0 && mp.VoteKickTargetCurrent());
+}
 int main() {
     Eligibility(); Lifecycle(false); Lifecycle(true);
+    KickIdentity(false); KickIdentity(true);
     std::puts("human/bot electorate, both transports, majority, slot reuse and execution delay: PASS");
 }
 '''
@@ -192,7 +216,9 @@ int main() {
 def main() -> None:
     source = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
     functions = [function(source, signature) for signature in (
-        "static bool IsValidVotePlayerSlot(", "static bool IsEligibleVotePlayerSlot(",
+        "static bool IsValidVotePlayerSlot(", "static bool IsCurrentPlayerTarget(",
+        "static bool ParseBoundedVoteInteger(", "static bool ParseVotePlayerSlot(",
+        "static bool IsEligibleVotePlayerSlot(", "bool idMultiplayerGame::VoteKickTargetCurrent(",
         "void idMultiplayerGame::ServerStartVote(", "void idMultiplayerGame::ServerStartPackedVote(",
         "void idMultiplayerGame::CastVote(", "void idMultiplayerGame::CheckVote(",
     )]

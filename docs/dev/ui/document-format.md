@@ -276,9 +276,12 @@ in every state and preserves the button's own hit box. The runtime uses these
 declarations for focus, paired activation and modal input scopes; other widget
 roles and the game bridge remain open. [Live bindings](bindings.md) can now own
 control availability and cancel an ineligible pending activation.
-A button may also declare a string expression `context` naming its current
-subject. Context changes cancel held activation and invalidate queued actions;
-see [connection identity](player-identity.md#contract). Other roles reject it.
+A button or choice may also declare a string expression `context` naming its
+current subject or ordered catalog. Context changes cancel held activation and
+invalidate queued actions, even if the text later changes back. A choice also
+closes its popup and retires pending proposals; its selected value is separate
+from the catalog identity. See [connection identity](player-identity.md#contract)
+and [catalog lists](value-controls.md#catalog-lists). Other roles reject it.
 A button may declare `prompt`, the verb a prompt bar shows for Accept while it
 holds focus: a localization key, or a string expression over state whose
 result is one. A result that is not a key leaves the bar's own verb. Other

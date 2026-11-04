@@ -340,8 +340,36 @@ static void ButtonContextOwnership() {
 	Check(f.input.Restore(snapshot,f.error) && !f.input.CanDispatchControlAction(fresh),"restore cannot carry queued context authority");
 }
 
+static void ChoiceContextOwnership() {
+	Fixture f; Expression context; context.type=2; context.state="catalog";
+	f.model.root.children[3].control->context=context;
+	f.input.Reset(f.model); f.input.SetBounds(f.bounds);
+	f.values["choice"].context="0,1:4097"; f.Refresh();
+	f.input.Focus("choice"); f.Press(MenuInput::Right); const auto queued=f.Actions().front();
+	Check(queued.contextToken && f.input.CanDispatchControlAction(queued),"choice proposal carries its catalog lifetime");
+	f.Refresh(); Check(f.input.CanDispatchControlAction(queued),"unchanged catalog keeps queued choice");
+	f.values["choice"].context="0,1:8193"; f.Refresh();
+	Check(!f.input.CanDispatchControlAction(queued) && !f.View("choice").pending,"replacement cancels a queued choice despite identical labels and value");
+	f.values["choice"].context="0,1:4097"; f.Refresh();
+	Check(!f.input.CanDispatchControlAction(queued),"catalog ABA cannot revive an old choice");
+	f.Accept("choice"); f.input.Input(MenuInput::Accept,true);
+	f.values["choice"].context="0,1:12289"; f.Refresh(); f.input.Input(MenuInput::Accept,false);
+	Check(f.Actions().empty() && !f.View("choice").popupOpen,"replaced catalog closes popup and cancels held semantic selection");
+	f.Accept("choice"); f.input.PointerPart("choice",{},"o0"); f.input.Pointer(true);
+	f.values["choice"].context="0,1:16385"; f.Refresh(); f.input.Pointer(false);
+	Check(f.Actions().empty() && !f.View("choice").popupOpen,"replaced catalog cancels held pointer selection");
+	f.input.Focus("choice"); f.Press(MenuInput::Right); const auto fresh=f.Actions().front();
+	Check(f.input.CanDispatchControlAction(fresh),"fresh choice targets the current catalog");
+	auto bad=f.values;bad["choice"].context.reset();
+	Check(!f.input.SetReadbacks(bad,f.error) && f.input.CanDispatchControlAction(fresh),"missing catalog fails atomically");
+	bad=f.values;bad["choice"].context=std::string("bad\0catalog",11);
+	Check(!f.input.SetReadbacks(bad,f.error),"invalid catalog text fails atomically");
+	const auto snapshot=f.input.Capture();
+	Check(f.input.Restore(snapshot,f.error) && !f.input.CanDispatchControlAction(fresh),"restoring a view cannot restore choice authority");
+}
+
 int main() {
 	ButtonAndToggle(); AtomicReadbacks(); SliderKeyboard(); SliderPointerAndCancel(); ChoiceNavigation(); ChoiceStepping(); FocusPresentation(); LostFocusResumes();
-	ChoicePointerAndReadback(); PersistenceAndLifetime(); QueuedReadbackOwnership(); ButtonContextOwnership(); QueueBound();
+	ChoicePointerAndReadback(); PersistenceAndLifetime(); QueuedReadbackOwnership(); ButtonContextOwnership(); ChoiceContextOwnership(); QueueBound();
 	std::printf("PASS: value interaction (%u assertions)\n",checks); return 0;
 }

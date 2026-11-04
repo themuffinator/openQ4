@@ -369,6 +369,7 @@ public:
 	void			ReceiveAndPlayVoiceData( const idBitMsg &inMsg );
 	void			ResetVoiceState( int client = -1 );
 	static void		ServerVoiceMute_f( const idCmdArgs& args );
+	static void		ServerAdminTarget_f( const idCmdArgs& args );
 	static void		ServerVoiceStats_f( const idCmdArgs& args );
 
 // jshepard: selects a map at random that will run with the current game type
@@ -599,7 +600,7 @@ public:
 
 	static void		Vote_f( const idCmdArgs &args );
 	static void		CallVote_f( const idCmdArgs &args );
-	void			ClientCallVote( vote_flags_t voteIndex, const char *voteValue );
+	void			ClientCallVote( vote_flags_t voteIndex, const char *voteValue, int kickIdentity = 0 );
 	void			ServerCallVote( int clientNum, const idBitMsg &msg );
 	void			ClientStartVote( int clientNum, const char *voteString );
 	void			ServerStartVote( int clientNum, vote_flags_t voteIndex, const char *voteValue );
@@ -611,7 +612,7 @@ public:
 	void			ExecuteVote( void );
 // RAVEN BEGIN
 // shouchard:  multiline vote handlers
-	void			ClientCallPackedVote( const voteStruct_t &voteData );
+	void			ClientCallPackedVote( const voteStruct_t &voteData, int kickIdentity = 0 );
 	void			ServerCallPackedVote( int clientNum, const idBitMsg &msg );
 	void			ClientStartPackedVote( int clientNum, const voteStruct_t &voteData );
 	void			ServerStartPackedVote( int clientNum, const voteStruct_t &voteData );
@@ -635,7 +636,7 @@ public:
 // shouchard:  added commands to mute/unmute voice chat
 	void			ClientVoiceMute( int clientNum, bool mute );
 	int				GetClientNumFromPlayerName( const char *playerName );
-	void			ServerHandleVoiceMuting( int clientSrc, int clientDest, bool mute );
+	void			ServerHandleVoiceMuting( int clientSrc, int clientDest, int identity, bool mute );
 // shouchard:  fixing a bug in multiplayer where round timer sounds (5 minute
 //             warning, etc.) don't go away at the end of the round.
 	void			ClearAnnouncerSounds( void );
@@ -1309,6 +1310,10 @@ private:
 	idStr			retainedVoteMap;
 	idList<int>		retainedVoteMaps;
 	idList<int>		retainedVoteKick;
+	idStr			retainedVoteKickCatalog;
+	int				retainedVoteKickIdentity = 0;
+	bool			retainedVoteKickStale = false;
+	bool			SetRetainedVoteKick( int row, const char *catalog );
 	bool			retainedVoteMapsRequested;
 	void			ResetRetainedVoteDraft( void );
 	void			RetainedVoteChoices( void );
@@ -1338,6 +1343,7 @@ private:
 	bool			retainedAdminValid;
 	int				retainedAdminState;
 	int				retainedAdminClient;		// the player chosen, by client number (-1: none)
+	idStr			retainedAdminIdentity;
 	int				retainedAdminBan;			// the ban chosen, by row (-1: none)
 	int				retainedAdminDraft[ RVF_COUNT ];
 	idStr			retainedAdminMap;
@@ -1418,6 +1424,8 @@ private:
 	vote_flags_t	vote;					// active vote or VOTE_NONE
 	int				voteTimeOut;			// when the current vote expires
 	int				voteExecTime;			// delay between vote passed msg and execute
+	int				voteKickIdentity = 0;	// connection captured when the server starts a kick vote
+	bool			VoteKickTargetCurrent( void ) const;
 	int				yesVotes;				// counter for yes votes
 	int				noVotes;				// and for no votes
 	int				voteEligibleCount;		// frozen electorate size for the active inherited vote
@@ -1425,6 +1433,7 @@ private:
 	idStr			voteString;				// the vote string ( client )
 	bool			voted;					// hide vote box ( client )
 	int				kickVoteMap[ MAX_CLIENTS ];
+	int				kickVoteMapIdentities[ MAX_CLIENTS ] = {};
 // RAVEN BEGIN
 // shouchard:  names for kickVoteMap
 	idStr			kickVoteMapNames[ MAX_CLIENTS ];

@@ -137,7 +137,7 @@ static const char *const RETAINED_MP_ESCAPE_GUI = "guis/menu/mp_escape.q4ui";
 static const char *const RETAINED_MP_WELCOME_GUI = "guis/menu/mp_welcome.q4ui";
 // The version of the game's answer to retainedMultiplayerCover that the card
 // relies on; a game module without it keeps its stock menu.
-static const int RETAINED_MP_PROTOCOL = 2;
+static const int RETAINED_MP_PROTOCOL = 4;
 // Each card's pages that still hand off to their stock pages: none now. While
 // any remain, the gate leaves that card's stock menu in place and only
 // ui_retainedMultiplayer opts into it. ui_retained_gate.py keeps each list
@@ -194,7 +194,6 @@ static const int RETAINED_MP_NAME_BYTES = 23;
 static const int RETAINED_MP_CLAN_BYTES = 12;
 // The Admin page's player and ban lists (RETAINED_ADMIN_PLAYERS and
 // RETAINED_ADMIN_BANS in the game).
-static const int RETAINED_MP_ADMIN_PLAYERS = 32;
 static const int RETAINED_MP_ADMIN_BANS = 32;
 // The Settings pages' value controls, "<verb> <row>": the three model lists
 // (the game's slots 0 to 2) and the crosshair.
@@ -3077,26 +3076,10 @@ void idSessionLocal::PublishRetainedControls( idUserInterface *gui ) {
 	if ( gui == NULL ) {
 		return;
 	}
-	for ( int row = 0; row < RETAINED_CONTROLS_ROWS; row++ ) {
-		idStr keys;
-		if ( row == retainedControlsCapture ) {
-			keys = common->GetLanguageDict()->GetString( "#str_07000" );
-		} else {
-			for ( int key = 0; key < K_LAST_KEY; key++ ) {
-				if ( idKeyInput::KeyIsBoundTo( key, RETAINED_CONTROLS_BINDINGS[ row ] ) ) {
-					// A letter or digit key shows as its cap does.
-					idStr name = idKeyInput::KeyNumToString( key, true );
-					if ( name.Length() == 1 ) {
-						name.ToUpper();
-					}
-					keys = Session_RetainedList( keys.c_str(), name.c_str() );
-				}
-			}
-			if ( keys.IsEmpty() ) {
-				keys = common->GetLanguageDict()->GetString( "#str_07133" );
-			}
-		}
-		gui->SetStateString( va( "controls.%d.keys", row ), keys.c_str() );
+	gui->SetKeyBindingNames();
+	if ( retainedControlsCapture >= 0 && retainedControlsCapture < RETAINED_CONTROLS_ROWS ) {
+		gui->SetStateString( va( "controls.%d.keys", retainedControlsCapture ),
+			common->GetLanguageDict()->GetString( "#str_07000" ) );
 	}
 	gui->SetStateInt( "controls.capture", retainedControlsCapture );
 	gui->StateChanged( common->GetPresentationTime() );
@@ -11157,8 +11140,12 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 	int voteField = -1, voteValue = 0;
 	const bool select = !idStr::Icmp( request, "mpSelectPlayer" ) || !idStr::Icmpn( request, "mpSelectPlayer ", 15 ),
 		mute = !idStr::Icmp( request, "mpMute" ) || !idStr::Icmpn( request, "mpMute ", 7 ),
-		befriend = !idStr::Icmp( request, "mpFriend" ) || !idStr::Icmpn( request, "mpFriend ", 9 );
-	if ( select || mute || befriend ) {
+		befriend = !idStr::Icmp( request, "mpFriend" ) || !idStr::Icmpn( request, "mpFriend ", 9 ),
+		adminSelect = !idStr::Icmp( request, "mpAdminSelect" ) || !idStr::Icmpn( request, "mpAdminSelect ", 14 ),
+		adminKick = !idStr::Icmp( request, "mpAdminKick" ) || !idStr::Icmpn( request, "mpAdminKick ", 12 ),
+		adminBan = !idStr::Icmp( request, "mpAdminBan" ) || !idStr::Icmpn( request, "mpAdminBan ", 11 ),
+		adminSwitch = !idStr::Icmp( request, "mpAdminSwitch" ) || !idStr::Icmpn( request, "mpAdminSwitch ", 14 );
+	if ( select || mute || befriend || adminSelect || adminKick || adminBan || adminSwitch ) {
 		const char *payload = strchr( request, ' ' );
 		const idStr operands = payload != NULL ? payload + 1 : "";
 		const int separator = operands.Find( ' ' );
@@ -11175,7 +11162,8 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 			return;
 		}
 		// None of them closes the menu.
-		gameCommand = va( "play main_menu_selection ; retained %s %d %s", select ? "select" : mute ? "mute" : "friend", client, identity.c_str() );
+		gameCommand = va( "play main_menu_selection ; retained %s %d %s", select ? "select" : mute ? "mute" : befriend ? "friend" :
+			adminSelect ? "adminSelect" : adminKick ? "adminKick" : adminBan ? "adminBan" : "adminSwitch", client, identity.c_str() );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpWelcomeAction" ) ) {
 		const int slot = gui->State().GetInt( "card.welcome_action", "-1" );
@@ -11250,6 +11238,19 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		// cannot cast keeps it open.
 		command = !idStr::Icmp( request, "mpVoteYes" ) ? "play main_menu_selection ; retained vote yes" :
 			"play main_menu_selection ; retained vote no";
+	} else if ( !idStr::Icmpn( request, "mpVoteKick ", 11 ) ) {
+		const idStr operands = request + 11;
+		const int separator = operands.Find( ' ' );
+		const idStr row = separator >= 0 ? operands.Left( separator ) : idStr();
+		const idStr catalog = separator >= 0 ? operands.Right( operands.Length() - separator - 1 ) : idStr();
+		bool valid = row == "-1" || ( row.Length() >= 1 && row.Length() <= 2 );
+		for ( int i = 0; valid && row != "-1" && i < row.Length(); ++i ) valid = row[i] >= '0' && row[i] <= '9';
+		valid = valid && atoi( row.c_str() ) < RETAINED_MP_CLIENTS && catalog.Length() >= 1 && catalog.Length() <= 512;
+		for ( int i = 0; valid && i < catalog.Length(); ++i ) valid = ( catalog[i] >= '0' && catalog[i] <= '9' ) || catalog[i] == ':' || catalog[i] == ',';
+		if ( !valid ) return;
+		// The game command lexer splits commas and colons outside quotes.
+		gameCommand = va( "retained voteKick %s \"%s\"", row.c_str(), catalog.c_str() );
+		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpCallVote" ) ) {
 		command = "play main_menu_selection ; retained callVote";
 	} else if ( Session_RetainedValueRequest( request, RETAINED_MP_VOTE_FIELDS,
@@ -11312,15 +11313,6 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		}
 		guiActive->SetStateString( "admin_console_input", text.c_str() );
 		command = "retained adminConsole";
-	} else if ( !idStr::Icmp( request, "mpAdminSelect" ) ) {
-		const int row = gui->State().GetInt( "card.admin_row", "-1" );
-		if ( row < 0 || row >= RETAINED_MP_ADMIN_PLAYERS ) {
-			common->Warning( "retained UI: the multiplayer card asked for admin player row %d", row );
-			return;
-		}
-		// The row's client by the game's own list; the game checks it again.
-		gameCommand = va( "play main_menu_selection ; retained adminSelect %d", gui->State().GetInt( va( "mp.admin.player%d.client", row ), "-1" ) );
-		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpAdminBanPick" ) ) {
 		const int row = gui->State().GetInt( "card.admin_ban_pick", "-1" );
 		if ( row < 0 || row >= RETAINED_MP_ADMIN_BANS ) {
@@ -11329,12 +11321,6 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		}
 		gameCommand = va( "play main_menu_selection ; retained adminBanSelect %d", row );
 		command = gameCommand.c_str();
-	} else if ( !idStr::Icmp( request, "mpAdminKick" ) ) {
-		command = "play main_menu_selection ; retained adminKick";
-	} else if ( !idStr::Icmp( request, "mpAdminBan" ) ) {
-		command = "play main_menu_selection ; retained adminBan";
-	} else if ( !idStr::Icmp( request, "mpAdminSwitch" ) ) {
-		command = "play main_menu_selection ; retained adminSwitch";
 	} else if ( !idStr::Icmp( request, "mpAdminBans" ) ) {
 		command = "play main_menu_selection ; retained adminBans";
 	} else if ( !idStr::Icmp( request, "mpAdminUnban" ) ) {

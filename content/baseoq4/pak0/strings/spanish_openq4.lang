@@ -1464,4 +1464,6 @@
 	"#str_230155"	"Renderizado"
 	"#str_230156"	"El renderizador solicitado no está disponible. El alternativo activo se muestra arriba."
 	"#str_230157"	"Sacudidas en cinemáticas"
+	"#str_231577"	"Se requiere actualizar el servidor."
+	"#str_231578"	"Selecciona al jugador de nuevo."
 }

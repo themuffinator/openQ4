@@ -53,6 +53,10 @@ struct Vertex {
 };
 
 struct Bounds { float x = 0, y = 0, width = 0, height = 0; };
+struct TextFit {
+	bool overflow = false;
+	int maxIndex = -1, lastWhitespace = -1; // UTF-8 byte indices, as in the public GUI API.
+};
 struct NumberTextGeometry {
 	std::string control;
 	NumberEditIdentity identity;
@@ -444,6 +448,11 @@ public:
 	bool CanDispatchModalBack(const ControlAction& action, double monotonicSeconds);
 	bool CanDispatchControlAction(const ControlAction& action, double monotonicSeconds);
 	bool GetBounds(const std::string& id, Bounds& bounds) const;
+	// Measure a plain, unwrapped scalar string with a visible text node's last
+	// laid-out content width and font. A first overwide scalar stays whole so
+	// callers can progress. Unavailable/invalid queries preserve the output.
+	// This does not implement grapheme/shaping clusters or legacy text escapes.
+	bool QueryTextFit(const std::string& id, std::string_view text, TextFit& result) const;
 	bool SetProperty(const std::string& id, const std::string& property, const std::string& value);
 	bool SetText(const std::string& id, const std::string& text);
 	bool IsLoaded() const;

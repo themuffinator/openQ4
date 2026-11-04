@@ -65,6 +65,8 @@ enum { SE_KEY=1,SE_MOUSE,SE_CHAR,K_TAB=10,K_SHIFT,K_UPARROW,K_DOWNARROW,K_LEFTAR
        K_JOY1,K_JOY2,K_JOY3,K_JOY4,K_JOY5,K_JOY6,K_JOY7,K_JOY8,K_JOY9,K_JOY10,K_JOY11,K_JOY12,K_JOY13,K_JOY14,K_JOY15,K_JOY16,
        K_HOME,K_END,K_PGUP,K_PGDN,K_MWHEELUP,K_MWHEELDOWN,K_CTRL,K_ALT,K_RIGHT_ALT,K_BACKSPACE,K_DEL,K_INS,K_LAST_KEY=512 };
 struct idKeyInput {
+    static inline std::map<int,std::string> bindings;
+    static bool KeyIsBoundTo(int key,const char* binding) { return bindings.contains(key) && bindings.at(key)==binding; }
     static inline bool shift=false,swapped=false;
     static bool IsDown(int key) { return key==K_SHIFT && shift; }
     static int MenuControllerKey(int key) { return swapped && (key==K_JOY3 || key==K_JOY4) ? (key==K_JOY3 ? K_JOY4 : K_JOY3) : key; }
@@ -133,6 +135,8 @@ struct Files {
     void FreeFile(void* data) { std::free(data); }
 } files,*fileSystem=&files;
 struct Common {
+    const Common* GetLanguageDict() const { return this; }
+    const char* GetString(const char* key) const { return std::strcmp(key,"#str_231533")==0 ? "%s / %s" : "None"; }
     int warnings=0;
     std::vector<std::string> prints;
     void Warning(const char*,...) { ++warnings; }
@@ -190,6 +194,7 @@ struct Interaction::NativeSettlement::Impl {};
 Interaction::NativeSettlement::~NativeSettlement() { std::abort(); }
 const NativeTextEditorReceipt& Interaction::NativeSettlement::Receipt() const { std::abort(); }
 struct Bounds { float x=0,y=0,width=0,height=0; };
+struct TextFit { bool overflow=false; int maxIndex=-1,lastWhitespace=-1; };
 struct Viewport {
     int width=1920,height=1080;
     float displayScale=1,userScale=1,pixelDensityX=2,pixelDensityY=2,originX=80,originY=40;
@@ -467,6 +472,12 @@ public:
     mutable std::vector<std::string> boundReads;
     bool GetBounds(const std::string& name,Bounds& result) const {
         boundReads.push_back(name); if(!boundsAvailable)return false; result=bounds; return true;
+    }
+    bool textFitAvailable=true;
+    TextFit textFit{true,7,3};
+    mutable std::pair<std::string,std::string> textFitQuery;
+    bool QueryTextFit(const std::string& name,std::string_view text,TextFit& result) const {
+        textFitQuery={name,std::string(text)}; if(!textFitAvailable)return false; result=textFit; return true;
     }
     bool FocusControl(const std::string& name,double) {selected=name; return true;}
     static constexpr size_t MaxSnapshotBytes=128u*1024u*1024u;
@@ -849,6 +860,36 @@ static std::vector<std::pair<std::string,std::string>> Dictionary(const idUserIn
         result.emplace_back(entry->GetKey(),entry->GetValue());
     }
     return result;
+}
+static void CheckPublicTextQueries() {
+    const auto original=modelTemplate;
+    modelTemplate.state["binding.forward"]={std::string{},"","","_forward"};
+    modelTemplate.state["binding.save"]={std::string{},"","","savegame quick"};
+    {
+        idUserInterfaceRetained gui;
+        assert(gui.InitFromFile("test.q4ui",true,true));
+        idKeyInput::bindings={{101,"_forward"},{102,"_forward"}};
+        gui.SetStateString("text","untouched");
+        gui.SetKeyBindingNames(); gui.StateChanged(0);
+        assert(std::get<std::string>(Live().state.at("binding.forward"))=="KEY101 / KEY102");
+        assert(std::get<std::string>(Live().state.at("binding.save"))=="None");
+        assert(std::string(gui.GetStateString("text"))=="untouched");
+        gui.SetStateString("binding.forward","capture"); gui.StateChanged(0);
+        assert(std::get<std::string>(Live().state.at("binding.forward"))=="capture");
+        idKeyInput::bindings={{103,"savegame quick"}};
+        gui.SetKeyBindingNames(); gui.StateChanged(0);
+        assert(std::get<std::string>(Live().state.at("binding.forward"))=="None");
+        assert(std::get<std::string>(Live().state.at("binding.save"))=="KEY103");
+        wrapInfo_t fit;
+        assert(gui.GetMaxTextIndex("label","A\xc3\xa9",fit) && fit.maxIndex==7 && fit.lastWhitespace==3);
+        assert(Live().textFitQuery==std::make_pair(std::string("label"),std::string("A\xc3\xa9")));
+        Live().textFit={false,-1,1};
+        assert(!gui.GetMaxTextIndex("label","a b",fit) && fit.maxIndex==-1 && fit.lastWhitespace==1);
+        Live().textFitAvailable=false; fit.maxIndex=99;
+        assert(!gui.GetMaxTextIndex("missing","a",fit) && fit.maxIndex==99 && fit.lastWhitespace==1);
+        assert(!gui.GetMaxTextIndex(nullptr,"a",fit) && !gui.GetMaxTextIndex("label",nullptr,fit) && fit.maxIndex==99);
+    }
+    idKeyInput::bindings.clear(); modelTemplate=original;
 }
 static void CheckPromptUpdates() {
     const auto original=modelTemplate;
@@ -1279,7 +1320,7 @@ static void CheckEventBridge() {
     const auto player=[](const char* command,StateValue client,StateValue identity) {
         return ActionInvocation{"player","session.menu",{{"command",std::string(command)},{"client",client},{"identity",identity}}};
     };
-    for (const auto* command : {"mpSelectPlayer","mpMute","mpFriend"}) {
+    for (const auto* command : {"mpSelectPlayer","mpMute","mpFriend","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch"}) {
         assert(ValidInvocation(player(command,0.0,std::string("8192")),error));
         assert(ValidInvocation(player(command,31.0,std::string("4294967295")),error));
         for (StateValue client : {StateValue(-1.0),StateValue(32.0),StateValue(2.5),StateValue(true),
@@ -1294,11 +1335,17 @@ static void CheckEventBridge() {
         idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
         eventPlans["players"]={{},{player("mpSelectPlayer",4.0,std::string("8196")),
                                   player("mpMute",31.0,std::string("4294967295")),
-                                  player("mpFriend",7.0,std::string("16391"))}};
+                                    player("mpFriend",7.0,std::string("16391")),
+                                    player("mpAdminSelect",4.0,std::string("8196")),
+                                    player("mpAdminKick",31.0,std::string("4294967295")),
+                                    player("mpAdminBan",7.0,std::string("16391")),
+                                    player("mpAdminSwitch",9.0,std::string("16393"))}};
         gui.HandleNamedEvent("players");
         gui.SetStateInt("card.client",19); gui.SetStateString("card.identity","99999");
+          gui.SetStateInt("mp.admin.client",19); gui.SetStateString("mp.admin.identity","99999");
         bool close=false; assert(gui.DispatchApplicationActions(gui.PendingApplicationCommand(),close) && !close);
-        for (const auto* expected : {"mpSelectPlayer 4 8196","mpMute 31 4294967295","mpFriend 7 16391"}) {
+        for (const auto* expected : {"mpSelectPlayer 4 8196","mpMute 31 4294967295","mpFriend 7 16391",
+                "mpAdminSelect 4 8196","mpAdminKick 31 4294967295","mpAdminBan 7 16391","mpAdminSwitch 9 16393"}) {
             idStr request; assert(gui.TakeSessionRequest(ActionMarker,request) && request==expected);
         }
         idStr none; assert(!gui.TakeSessionRequest(ActionMarker,none));
@@ -1309,7 +1356,12 @@ static void CheckEventBridge() {
     const auto valued=[](const char* command,StateValue value) {
         return ActionInvocation{"x","session.menuValue",{{"command",std::string(command)},{"value",value}}};
     };
-    assert(ValidInvocation(valued("mpVoteMap",3.0),error) && ValidInvocation(valued("mpVoteKick",-1.0),error));
+    assert(ValidInvocation(valued("mpVoteMap",3.0),error) && !ValidInvocation(valued("mpVoteKick",-1.0),error));
+    auto kickChoice=valued("mpVoteKick",-1.0);kickChoice.arguments["catalog"]=std::string("0,31:8191");
+    assert(ValidInvocation(kickChoice,error));
+    for(const auto& bad:{std::string(""),std::string("0;quit"),std::string("0\nquit"),std::string(513,'0')}) {
+        kickChoice.arguments["catalog"]=bad;assert(!ValidInvocation(kickChoice,error));
+    }
     assert(ValidInvocation(valued("mpVoteControlTime",999.0),error) && ValidInvocation(valued("mpVoteBalance",true),error));
     // A Match Control rule's value is a whole number from 0 to 10000, the
     // largest value a rule takes; the other verbs keep -1 to 999.
@@ -2837,6 +2889,7 @@ int main() {
     modelTemplate.root.control=Control{}; modelTemplate.root.control->action="brightness";
     files.sources={{"test.q4ui","valid"},{"bad.q4ui","invalid"},{"next.q4ui","next"},{"menuXq4ui","valid"}};
     CheckPresentationBridge();
+    CheckPublicTextQueries();
     CheckPromptUpdates();
     {
         idUserInterfaceRetained gui;

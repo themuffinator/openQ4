@@ -53,8 +53,8 @@ BINDINGS = tuple(binding for _section, _heading, rows in SECTIONS for _label, bi
 def controls_document() -> dict:
     doc = Document("openq4.controls")
     doc.state["controls.capture"] = {"type": "number", "initial": -1}
-    for row in range(len(BINDINGS)):
-        doc.state[f"controls.{row}.keys"] = {"type": "string", "initial": ""}
+    for row, binding in enumerate(BINDINGS):
+        doc.state[f"controls.{row}.keys"] = {"type": "string", "initial": "", "keyBinding": binding}
     doc.session("controlsBind", "controlsBind")
     doc.session("controlsClear", "controlsClear")
     tabs, row = [], 0

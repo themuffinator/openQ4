@@ -240,12 +240,14 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 		if (!ValidStateValue(value.value) || !expression || value.value.index() != expression->type ||
 			(item.control.role != ControlRole::Toggle && value.mixed)) { error = "Invalid control readback type"; return false; }
 		if (item.control.role == ControlRole::Choice) {
+			if (value.context.has_value() != item.control.context.has_value() ||
+				(value.context && !ValidStateValue(*value.context))) { error = "Invalid choice context"; return false; }
 			const auto options = std::get<ChoiceSpec>(item.control.widget).options.size();
 			if (value.enabledOptions.size() != options || (!value.optionLabels.empty() && value.optionLabels.size() != options) ||
 				(value.optionCount && *value.optionCount > options)) {
 				error = "Invalid choice availability"; return false;
 			}
-		} else if (!value.enabledOptions.empty() || !value.optionLabels.empty() || value.optionCount) {
+		} else if (!value.enabledOptions.empty() || !value.optionLabels.empty() || value.optionCount || value.context) {
 			error = "Unexpected choice availability"; return false;
 		}
 	}
@@ -255,7 +257,9 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 	std::map<std::string,std::uint64_t> revisions;
 	for (const auto& [id,value] : readbacks) {
 		const auto& item = items.at(id);
-		if ((item.number || item.control.context) && (!item.readback || item.readback->value != value.value)) {
+		const bool contextChanged = item.control.context && (!item.readback || (item.control.role == ControlRole::Choice ?
+			item.readback->context != value.context : item.readback->value != value.value));
+		if (contextChanged || (item.number && (!item.readback || item.readback->value != value.value))) {
 			const auto revision = ProposalToken();
 			if (!revision) { error = "Control readback identity exhausted"; return false; }
 			revisions.emplace(id,revision);
@@ -264,15 +268,18 @@ bool Interaction::SetReadbacks(const std::map<std::string,ControlReadback>& read
 	for (const auto& [id,value] : readbacks) {
 		auto& item = items.at(id);
 		const bool changed = !item.readback || item.readback->value != value.value;
+		const bool contextChanged = item.control.context && (!item.readback || (item.control.role == ControlRole::Choice ?
+			item.readback->context != value.context : changed));
 		// An open list whose labels or length change closes: its rows moved
 		// under the pointer and the highlight.
 		if (popup == id && item.readback && (item.readback->optionLabels != value.optionLabels ||
-			item.readback->optionCount != value.optionCount)) CancelGesture();
+			item.readback->optionCount != value.optionCount || contextChanged)) CancelGesture();
         if(popup==id && HasChoiceBar(item.control) && (changed || item.readback->enabledOptions!=value.enabledOptions))CancelGesture();
 		item.readback = value;
-		if (changed && item.control.context) {
+		if (contextChanged) {
 			item.contextToken = revisions.at(id);
 			if (armed == id) { armed.clear(); armedOption.clear(); popupAcceptArm = false; }
+			item.pending.reset(); item.proposalToken = 0; item.rejected.reset();
 		}
 		if (changed && item.number) item.number->draftRevision = revisions.at(id);
 		if (changed && item.number && item.number->native) DropNumberNative(id,item);

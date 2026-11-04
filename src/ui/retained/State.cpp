@@ -235,6 +235,11 @@ bool State::EvaluateDerived(const StateValues& base, const StateValues* overlay,
 				error = "Invalid number readback type"; return reject();
 			}
 		} else if (control.role == ControlRole::Choice) {
+			if (control.context) {
+				StateValue context;
+				if (!EvaluateTyped(*control.context,base,overlay,context,error) || !std::holds_alternative<std::string>(context)) return reject();
+				value.context = std::get<std::string>(context);
+			}
 			const auto* spec = std::get_if<ChoiceSpec>(&control.widget);
 			if (!spec) { error = "Invalid choice readback descriptor"; return reject(); }
 			if (spec->optionCount) {

@@ -225,6 +225,37 @@ See [player release status](../user/release-status.md).
 - Two recorded DM8 failures now survive isolated gameplay replays. The wider
   traversal-safety gate remains open; see [qualification and limits](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026).
 
+## Kick votes keep their selected player, 4 November 2026
+
+- A changing player list can no longer redirect a retained kick choice or a
+  delayed kick-vote request to someone who reused the connection slot.
+- If the selected player leaves, the Vote page asks you to select again.
+  Other drafted changes wait too, so a mixed vote cannot silently lose its kick.
+- Install matching engine, multiplayer module and menus. Remote kick votes
+  require an updated server; ordinary non-kick votes keep their existing format.
+
+## Retained interface text queries, 4 November 2026
+
+- Interface authors can request localized key-binding labels and measure how
+  much plain text fits a retained label. Measurements follow its font, text
+  size and available width and preserve complete UTF-8 characters.
+- CONTROLS uses the shared binding-name path for its existing capture, clear
+  and rebind behavior. Install matching engine and menu content together.
+- This is a toolkit increment; full IME, complex-script shaping and the visual
+  editor remain in development. See [the text and binding contract](ui/bindings.md#public-key-binding-refresh-4-november-2026).
+
+## Multiplayer menu player targets, 3 November 2026
+
+- Mute and unmute requests and the Admin menu's player actions stay attached
+  to the player selected, even if someone else takes that connection slot
+  before the request arrives. Kick votes are cancelled if their target leaves
+  before execution.
+- Install the matching engine, multiplayer module and menu package together.
+  On older servers, muting remains local and remote menu player administration
+  requires an updated server; direct console administration is unchanged.
+- The remaining vote-request and Match Control identity work stays open under
+  UI-03. See [the implementation contract](ui/player-identity.md#mute-vote-and-admin-targets-3-november-2026).
+
 ## Immediate resaves and interrupted loads, 3 November 2026
 
 - **Saving immediately after loading now produces a loadable save.** This also

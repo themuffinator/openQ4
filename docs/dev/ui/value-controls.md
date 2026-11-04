@@ -60,6 +60,13 @@ such as the displays, display modes and refresh rates the SYSTEM page offers.
 - **Changes under an open list.** A change to the labels or the count closes an
   open popup, because its rows moved under the pointer and the highlight. A
   change to availability alone keeps today's behaviour.
+- **Catalog identity.** An optional string `context` expression identifies the
+  subjects behind the rows, independently of the selected value. Changing it
+  closes the popup, cancels held selection and invalidates queued proposals,
+  including a change back to the original text. This protects replacements
+  with identical labels. Applications must also freeze the catalog or subject
+  in their action operands and recheck it at the receiving boundary. The Vote
+  page uses the ordered client slots and spawn identities for this purpose.
 
 The readback carries the published labels and the count beside the option
 availability, and they are evaluated atomically with it. An invalid count

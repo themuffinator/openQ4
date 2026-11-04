@@ -854,6 +854,8 @@ def validate_validation_wiring() -> None:
         "android_emulator_smoke.py",
         "renderer_milestone_d_acceptance.py",
         "renderer_milestone_d_fixture.py",
+        # Requires a staged Vulkan client and installed retail assets.
+        "renderer_vulkan_material_capacity.py",
         # Radio graph evidence plays decoded audio through a staged client on
         # retail assets.
         "audio_graphs.py",

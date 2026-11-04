@@ -1464,4 +1464,6 @@
 	"#str_230155"	"Rendering"
 	"#str_230156"	"The requested renderer is unavailable. The active fallback is shown above."
 	"#str_230157"	"Cinematic shake"
+	"#str_231577"	"Server update required."
+	"#str_231578"	"Select the player again."
 }

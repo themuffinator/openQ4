@@ -84,8 +84,9 @@ static std::string Source() {
 	parent["properties"]["pointer-events"]=Typed("keyword","auto");
 	parent["properties"]["transform"]=Typed("transform",Array({0,0,1,1,0}),"dp");
 	parent["properties"]["font-family"]=Typed("font","choice-font"); parent["properties"]["font-size"]=Typed("length",18,"dp");
+	source["state"]["catalog"]["type"]="string"; source["state"]["catalog"]["initial"]="";
 	auto choice=Box("choice",0,0,180,30); AttachControl(source,choice,"choice","choice","number"); auto& c=choice["control"];
-	c["visibleRows"]=2; c["parts"]["popup"]="popup"; c["parts"]["viewport"]="viewport"; c["parts"]["content"]="content"; c["parts"]["value"]="choice-value";
+	c["context"]=Ref("catalog"); c["visibleRows"]=2; c["parts"]["popup"]="popup"; c["parts"]["viewport"]="viewport"; c["parts"]["content"]="content"; c["parts"]["value"]="choice-value";
 	auto popup=Box("popup",0,0,180,80), viewport=Box("viewport",0,0,180,80), content=Box("content",0,0,180,240);
 	Colour(popup,{.08,.12,.16,1}); viewport["properties"]["overflow"]=Typed("keyword","hidden");
 	for (unsigned i=0;i<6;++i) {

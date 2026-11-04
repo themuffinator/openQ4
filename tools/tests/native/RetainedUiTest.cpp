@@ -1222,6 +1222,59 @@ static void CheckSharedDocument(TestHost& host) {
 		"a runtime loaded from the parsed document presents as one loaded from the source");
 }
 
+static void CheckPublicTextQueries(TestHost& host) {
+	const std::string source=R"json({"format":"openq4-ui","version":1,"id":"text-fit",
+	 "state":{"key":{"type":"string","initial":"","keyBinding":"savegame quick"}},
+	 "root":{"id":"root","type":"group","children":[
+	  {"id":"label","type":"text","properties":{"width":{"type":"length","value":25,"unit":"dp"},
+	   "height":{"type":"length","value":30,"unit":"dp"},"padding":{"type":"length","value":10,"unit":"dp"},
+	   "font-size":{"type":"length","value":20,"unit":"dp"},"text":{"type":"text","value":"#str_test"}}},
+	  {"id":"narrow","type":"text","properties":{"width":{"type":"length","value":5,"unit":"dp"},
+	   "font-size":{"type":"length","value":20,"unit":"dp"},"text":{"type":"text","value":"#str_test"}}},
+	  {"id":"hidden","type":"text","properties":{"width":{"type":"length","value":25,"unit":"dp"},
+	   "display":{"type":"keyword","value":"none"},"text":{"type":"text","value":"#str_test"}}}
+	 ]}})json";
+	std::vector<Diagnostic> diagnostics;
+	Document document; const bool parsed=document.Load(source,diagnostics);
+	if (!parsed) for (const auto& diagnostic:diagnostics) std::fprintf(stderr,"%s: %s\n",diagnostic.pointer.c_str(),diagnostic.message.c_str());
+	Check(parsed,"key-binding text query document compiles");
+	Check(document.Model().state.at("key").keyBinding=="savegame quick" && !document.Model().state.at("key").HostSourced(),
+		"binding lookup is explicit application text, including argument-bearing commands");
+	for (const auto& value:{"0","\"\"","\"bad\\nline\"","\"bad\\u0000tail\""}) {
+		Document bad=document;
+		Check(!bad.ReplaceValue("/state/key/keyBinding",value,diagnostics) && bad.Source()==source,"invalid binding declaration preserves source");
+	}
+	Document bad=document;
+	Check(!bad.ReplaceValue("/state/key",R"({"type":"string","initial":"","cvar":"x","keyBinding":"_forward"})",diagnostics),
+		"binding state cannot also be CVar sourced");
+	Runtime runtime(host); Check(runtime.LoadDocument(document,"text-fit.q4ui",diagnostics),"load real query layout");
+	Viewport viewport; Check(runtime.Frame(viewport,1),"lay out text queries");
+	TextFit fit;
+	Check(runtime.QueryTextFit("label","a b",fit) && fit.overflow && fit.maxIndex==2 && fit.lastWhitespace==1,
+		"query uses content width excluding padding and preserves the last fitting space");
+	Check(runtime.QueryTextFit("label","a\xc3\xa9\xf0\x9f\x98\x80",fit) && fit.overflow && fit.maxIndex==3 && fit.lastWhitespace==-1,
+		"overflow returns whole UTF-8 source bytes, never a split multibyte scalar");
+	Check(runtime.QueryTextFit("narrow","\xf0\x9f\x98\x80x",fit) && fit.overflow && fit.maxIndex==4,
+		"first overwide scalar remains whole so a wrapping caller progresses");
+	Check(runtime.QueryTextFit("label","ab",fit) && !fit.overflow && fit.maxIndex==-1,
+		"fitting text resets an earlier overflow result");
+	Check(runtime.QueryTextFit("label","",fit) && !fit.overflow && fit.lastWhitespace==-1,"empty text fits");
+	fit={true,99,98};
+	for (const auto* id:{"missing","root","hidden"}) Check(!runtime.QueryTextFit(id,"abc",fit) && fit.maxIndex==99 && fit.lastWhitespace==98,
+		"missing, non-text and hidden nodes leave output untouched");
+	for (const auto& text:{std::string("\xc0\x80",2),std::string("a\0b",3),std::string(65537,'x')})
+		Check(!runtime.QueryTextFit("label",text,fit) && fit.maxIndex==99,"invalid and oversized query text leaves output untouched");
+	viewport.displayScale=2; Check(runtime.Frame(viewport,2) && runtime.QueryTextFit("label","abc",fit) && fit.maxIndex==2,
+		"density scales content and typography together");
+	viewport.textScale=2; Check(runtime.Frame(viewport,3) && runtime.QueryTextFit("label","abc",fit) && fit.maxIndex==1,
+		"text scaling changes the actual fitting byte index");
+	Runtime other(host); Check(other.LoadDocument(document,"other-fit.q4ui",diagnostics) && other.Frame({},1),"second independent text context");
+	Check(other.QueryTextFit("label","abc",fit) && fit.maxIndex==2 && runtime.QueryTextFit("label","abc",fit) && fit.maxIndex==1,
+		"queries retain each view's density and text scale");
+	runtime.Shutdown(); fit={true,99,98};
+	Check(!runtime.QueryTextFit("label","abc",fit) && fit.maxIndex==99,"closed context cannot return stale metrics");
+}
+
 int main(int argc, char** argv) {
 	CheckInitializationPacing();
 	CheckTypedActionDescriptors();
@@ -2200,6 +2253,7 @@ int main(int argc, char** argv) {
 	CheckDetailCard(host);
 	CheckAcceptPrompts(host);
 	CheckSharedDocument(host);
+	CheckPublicTextQueries(host);
 	CheckSoftFocus(host);
 	CheckDirectBackdrop(host);
 	CheckSpeedStreak(host);

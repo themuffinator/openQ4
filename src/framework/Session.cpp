@@ -4875,7 +4875,7 @@ static void Session_RetainedGui_f( const idCmdArgs &args ) {
 		return;
 	}
 #endif
-	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | inspect <id> | widget <id> | focus <id> | menu <action> <0|1> | stick <x> <y> <msec> | number <begin|replace|select|preedit|input|undo|redo|commit|keep|reload|cancel> <id> [text or offsets] | state <id> <value> | pending <key> <value> | lines <key> <line> [line ...] | presentation <alias> <value> <override:0|1> | event <name> | trigger | update | save | restore\n" );
+	common->Printf( "openq4_retainedGui: requires a retained test/active GUI and report | inspect <id> | textfit <id> <text> | widget <id> | focus <id> | menu <action> <0|1> | stick <x> <y> <msec> | number <begin|replace|select|preedit|input|undo|redo|commit|keep|reload|cancel> <id> [text or offsets] | state <id> <value> | pending <key> <value> | lines <key> <line> [line ...] | presentation <alias> <value> <override:0|1> | event <name> | trigger | update | save | restore\n" );
 }
 
 // The summary card's chat field without device input: "<text>" types it with

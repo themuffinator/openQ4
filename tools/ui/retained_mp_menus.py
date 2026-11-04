@@ -1603,9 +1603,14 @@ def vote_row(doc: Document, key: str, verb: str, label_key: str, control: tuple,
         count = {"state": f"{state_key}_count"}
     elif kind == "slider":
         slider = (*control[1:], 0)
-    return value_row(doc, f"vote-row-{key}", label_key, kind, width, value_x, value={"state": state_key}, action=verb,
-                     entries=entries, count=count, slider=slider, allowed={"state": f"{state_key}.row_allowed"},
-                     shown={"state": f"{state_key}.row_shown"})
+    row = value_row(doc, f"vote-row-{key}", label_key, kind, width, value_x, value={"state": state_key}, action=verb,
+                    entries=entries, count=count, slider=slider, allowed={"state": f"{state_key}.row_allowed"},
+                    shown={"state": f"{state_key}.row_shown"})
+    if key == "kick":
+        doc.state["mp.vote.kick_catalog"] = {"type": "string", "initial": ""}
+        row["control"]["context"] = {"state": "mp.vote.kick_catalog"}
+        doc.actions[verb]["arguments"]["catalog"] = {"state": "mp.vote.kick_catalog"}
+    return row
 
 
 def vote_keycap(ident: str, key_state: str, available: str, doc: Document) -> dict:
@@ -1646,7 +1651,7 @@ def check_vote_labels(width: float, value_x: float) -> None:
     # the running vote's texts with short values in their formats.
     texts = [(key, "lowpixel", 14, VOTE_LEFT_W - 26) for key in ("#str_231048", "#str_231049", "#str_231050")]
     texts += [(key, "lowpixel", 14, min(width, SLOT_W) - 26) for key in ("#str_231050", "#str_108023", "#str_231049", "#str_104273",
-                                                                          "#str_231051")]
+                                                                          "#str_231051", "#str_231577", "#str_231578")]
     texts += [(VOTE_RUNNING, "lowpixel", 14, VOTE_LEFT_W), (VOTE_NONE_RUNNING, "lowpixel", 15, VOTE_LEFT_W),
               (VOTE_CALL, "lowpixel", 14, width * 0.5), (VOTE_LOCKED, "lowpixel", 14, width * 0.5)]
     texts += [(key, "lowpixel", 15, VOTE_LEFT_W) for key in ("#str_231045", "#str_231046", "#str_104435", "#str_104422", "#str_104423",
