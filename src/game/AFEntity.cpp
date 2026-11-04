@@ -975,6 +975,20 @@ bool idAFEntity_Base::LoadAF( const char* keyname ) {
 		return false;
 	}
 
+	// The Awakening's placed Strogg corpse inherits an obsolete AF name.
+	// Loading a default one-body figure appears to work but creates saves that
+	// cannot reconstruct the required figure. Use the shipped matching rig;
+	// preserve an explicitly supplied definition of the old name.
+	if ( !gameLocal.isMultiplayer && idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+			idStr::Icmp( spawnArgs.GetString( "classname" ), "env_ragdoll_strogg_marine" ) == 0 && fileName.Icmp( "strogg_marine" ) == 0 ) {
+		const idDecl *original = declManager->FindType( DECL_AF, fileName, false );
+		const idDecl *replacement = declManager->FindType( DECL_AF, "monster_strogg_marine", false );
+		if ( ( original == NULL || original->GetState() == DS_DEFAULTED ) &&
+				replacement != NULL && replacement->GetState() != DS_DEFAULTED ) {
+			fileName = "monster_strogg_marine";
+		}
+	}
+
 	af.SetAnimator( GetAnimator() );
 	if ( !af.Load( this, fileName ) ) {
 		gameLocal.Error( "idAFEntity_Base::LoadAF: Couldn't load af file '%s' on entity '%s'", fileName.c_str(), name.c_str() );

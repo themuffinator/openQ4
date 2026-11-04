@@ -909,6 +909,8 @@ public:
 
 private:
 	bool				state;
+	bool				IsAwakeningSquadGate( void ) const;
+	void				Event_PostRestore( void );
 
 	void				Event_Activate( idEntity *activator );
 };

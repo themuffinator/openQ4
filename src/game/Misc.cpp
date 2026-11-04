@@ -4020,7 +4020,23 @@ void idFuncAASPortal::Event_Activate( idEntity *activator ) {
 
 CLASS_DECLARATION( idEntity, idFuncAASObstacle )
 	EVENT( EV_Activate,				idFuncAASObstacle::Event_Activate )
+	EVENT( EV_PostRestore,			idFuncAASObstacle::Event_PostRestore )
 END_CLASS
+
+bool idFuncAASObstacle::IsAwakeningSquadGate( void ) const {
+	return !gameLocal.isMultiplayer &&
+		idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+		gameLocal.mapFileNameStripped.Icmp( "m01_stranarus_trench2" ) == 0 &&
+		name.Icmp( "m04_building_unit2_seq_3_ai_blocker_top_level" ) == 0;
+}
+
+void idFuncAASObstacle::Event_PostRestore( void ) {
+	// Older saves may have closed this gate behind a trailing squad member.
+	// The one-shot arrival trigger disappears when it first opens the route.
+	if ( IsAwakeningSquadGate() && gameLocal.FindEntity( "m04_building_unit2_seq_4" ) == NULL ) {
+		SetState( false );
+	}
+}
 
 /*
 ===============
@@ -4048,6 +4064,9 @@ idFuncAASObstacle::Restore
 void idFuncAASObstacle::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( state );
 	gameLocal.SetAASAreaState( GetPhysics()->GetAbsBounds(), AREACONTENTS_OBSTACLE, state );
+	if ( IsAwakeningSquadGate() ) {
+		PostEventMS( &EV_PostRestore, 0 );
+	}
 }
 
 /*
@@ -4066,7 +4085,10 @@ idFuncAASObstacle::Event_Activate
 ================
 */
 void idFuncAASObstacle::Event_Activate( idEntity *activator ) {
-	state ^= 1;
+	// M01 opens the stair route on arrival, then toggles it again after the
+	// Retch introduction. A slower Navajas can still be downstairs. Keep the
+	// released route open so he can reach the walker demolition sequences.
+	state = IsAwakeningSquadGate() ? false : !state;
 	gameLocal.SetAASAreaState( GetPhysics()->GetAbsBounds(), AREACONTENTS_OBSTACLE, state );
 }
 

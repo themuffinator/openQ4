@@ -1750,8 +1750,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   gate, objective timing and animation sequencing are corrected under a separate
   saved script identity. Original M02 saves retain the installed program.
   See [mission intent, findings and bounded runtime evidence](awakening-missions.md).
-  End-to-end squad routing, walker demolition/traversal and Tank/extraction
-  qualification remain part of this gate.
+  Follow-up checkpointed game-input runs cover M01/M02 squad routing, both
+  walker demolition defences and courtyard traversal, generator/download
+  defence, normal Tank victory, extraction framing and M03's autosave. They
+  exposed and verified repairs for restored flame duplication, corpse and
+  walker saves, Navajas's stair/courtyard route, Tak's lifting-door approach,
+  the repeated boss console and the extraction actor. God mode and ammunition
+  refills exclude balance qualification; uninterrupted and other-platform
+  campaign playthroughs remain part of this gate.
 
   **M01 interior dramatic-feedback pass (implemented, 4 November).** Revision 3
   preserves Tak's repair face fill, exact dialogue sequence and 132.912-second

@@ -44,6 +44,7 @@ private:
 	void					ShrinkTargetLights( int damageTaken );
 	void					ActivateTargetsWhenOut( void );
 	void					UpdateContents( void );
+	void					Event_RestoreStageEffect( void );
 
 	void					Event_Touch( idEntity *other, trace_t *trace );
 	void					Event_Activate( idEntity *activator );
@@ -57,11 +58,13 @@ private:
 
 // shares the event number rvEffect registers under the same name
 const idEventDef EV_FireFX_LookAtTarget( "lookAtTarget", NULL );
+const idEventDef EV_FireFX_RestoreStageEffect( "<fireFXRestoreStage>", NULL );
 
 CLASS_DECLARATION( idTrigger, riFireFX )
 	EVENT( EV_Touch,				riFireFX::Event_Touch )
 	EVENT( EV_Activate,				riFireFX::Event_Activate )
 	EVENT( EV_FireFX_LookAtTarget,	riFireFX::Event_LookAtTarget )
+	EVENT( EV_FireFX_RestoreStageEffect, riFireFX::Event_RestoreStageEffect )
 END_CLASS
 
 /*
@@ -117,8 +120,43 @@ void riFireFX::Restore( idRestoreGame *savefile ) {
 	// Also repair the solid clip contents stored by older saves.
 	UpdateContents();
 
-	// client effects are not saved; bring the current stage back
-	if ( burning ) {
+	// Client effects restore after their owner. Reconcile on the first frame
+	// instead of allocating another loop while the saved graph is incomplete.
+	PostEventMS( &EV_FireFX_RestoreStageEffect, 0 );
+}
+
+void riFireFX::Event_RestoreStageEffect( void ) {
+	static const char * const stageEffects[] = { "fx_fireLarge", "fx_fireSmall", "fx_smoke" };
+	effect = NULL;
+	if ( !burning || stage < FIRE_LARGE || stage > FIRE_OUT ) {
+		StopStageEffects();
+		return;
+	}
+	const idDecl *stageDecls[3];
+	for ( int i = FIRE_LARGE; i <= FIRE_OUT; ++i ) {
+		stageDecls[i] = gameLocal.GetEffect( spawnArgs, stageEffects[i] );
+	}
+	for ( rvClientEntity *cent = clientEntities.Next(); cent != NULL; cent = cent->bindNode.Next() ) {
+		if ( !cent->IsType( rvClientEffect::Type ) ) {
+			continue;
+		}
+		rvClientEffect *fx = static_cast<rvClientEffect *>( cent );
+		bool isStageEffect = false;
+		for ( int i = FIRE_LARGE; i <= FIRE_OUT; ++i ) {
+			isStageEffect |= stageDecls[i] != NULL && fx->GetRenderEffect()->declEffect == stageDecls[i];
+		}
+		if ( !isStageEffect ) {
+			continue;
+		}
+		if ( fx->GetRenderEffect()->declEffect == stageDecls[stage] && !effect.IsValid() ) {
+			effect = fx;
+		} else {
+			fx->Stop( true );
+		}
+	}
+	if ( effect.IsValid() ) {
+		Event_LookAtTarget();
+	} else {
 		StartStageEffect();
 	}
 }

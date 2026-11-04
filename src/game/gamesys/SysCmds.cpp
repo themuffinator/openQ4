@@ -2178,6 +2178,43 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
+	if ( ( args.Argc() == 3 || args.Argc() == 4 ) && idStr::Icmp( args.Argv( 1 ), "path" ) == 0 ) {
+		idEntity *traveller = args.Argc() == 4 ? gameLocal.FindEntity( args.Argv( 2 ) ) : player;
+		idEntity *goalEntity = gameLocal.FindEntity( args.Argv( args.Argc() - 1 ) );
+		idAAS *aas = traveller != NULL && traveller->IsType( idAI::Type ) ? static_cast<idAI *>( traveller )->aas : gameLocal.GetAAS( "aas32" );
+		if ( traveller == NULL || goalEntity == NULL || aas == NULL || aas->GetSettings() == NULL ) {
+			gameLocal.Printf( "testMissionPath: unavailable\n" );
+			return;
+		}
+		const idVec3 origin = traveller->GetPhysics()->GetOrigin();
+		idVec3 goal = goalEntity->GetPhysics()->GetOrigin();
+		const idBounds search( idVec3( -32, -32, -128 ), idVec3( 32, 32, 64 ) );
+		const int from = aas->PointReachableAreaNum( origin, search, AREA_REACHABLE_WALK );
+		const int to = aas->PointReachableAreaNum( goal, search, AREA_REACHABLE_WALK );
+		aasPath_t path;
+		if ( from == 0 || to == 0 ) {
+			gameLocal.Printf( "testMissionPath: unreachable from=%d to=%d\n", from, to );
+			return;
+		}
+		aas->PushPointIntoAreaNum( to, goal );
+		if ( !aas->WalkPathToGoal( path, from, origin, to, goal, TFL_WALK | TFL_AIR | TFL_WALKOFFLEDGE ) ) {
+			gameLocal.Printf( "testMissionPath: blocked from=%d to=%d\n", from, to );
+			return;
+		}
+		// Reporting only: the external test driver decides whether to apply
+		// authorized game input. Never teleport or move actors to pass a route.
+		gameLocal.Printf( "testMissionPath: goal=%s next=(%s) distance=%.2f\n",
+			goalEntity->name.c_str(), path.moveGoal.ToString(), ( goal - origin ).Length() );
+		trace_t trace;
+		gameLocal.Translation( traveller, trace, origin, path.moveGoal, traveller->GetPhysics()->GetClipModel(),
+			traveller->GetPhysics()->GetAxis(), traveller->GetPhysics()->GetClipMask(), traveller );
+		if ( trace.fraction < 1.0f ) {
+			idEntity *obstacle = gameLocal.entities[trace.c.entityNum];
+			gameLocal.Printf( "testMissionObstacle: name=%s fraction=%.3f point=(%s)\n",
+				obstacle ? obstacle->name.c_str() : "none", trace.fraction, trace.endpos.ToString() );
+		}
+		return;
+	}
 	if ( args.Argc() == 3 && idStr::Icmp( args.Argv( 1 ), "call" ) == 0 ) {
 		const function_t *func = gameLocal.program.FindFunction( args.Argv( 2 ) );
 		if ( func == NULL || func->eventdef != NULL || func->type->NumParameters() != 0 ) {
@@ -2190,7 +2227,7 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 		return;
 	}
 	if ( args.Argc() != 2 ) {
-		gameLocal.Printf( "usage: testMission <entity> | call <function>\n" );
+		gameLocal.Printf( "usage: testMission <entity> | call <function> | path [actor] <entity>\n" );
 		return;
 	}
 	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
@@ -2201,6 +2238,25 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 	gameLocal.Printf( "testMission: name=%s health=%d hidden=%d contents=%d origin=(%s) bind=%s\n",
 		ent->name.c_str(), ent->health, ent->IsHidden(), ent->GetPhysics()->GetContents(),
 		ent->GetPhysics()->GetOrigin().ToString(), ent->GetBindMaster() ? ent->GetBindMaster()->name.c_str() : "none" );
+	const idMat3 &axis = ent->IsType( rvVehicle::Type ) ? static_cast<rvVehicle *>( ent )->GetAxis() : ent->GetPhysics()->GetAxis();
+	gameLocal.Printf( "testMissionAxis: name=%s angles=(%s)\n", ent->name.c_str(), axis.ToAngles().ToString() );
+	if ( ent->IsType( idAI::Type ) ) {
+		idAI *ai = static_cast<idAI *>( ent );
+		gameLocal.Printf( "testMissionAI: name=%s status=%d blocked=%d unreachable=%d goal=%s obstacle=%s slide=%s step=%.1f\n",
+			ent->name.c_str(), ai->move.moveStatus, ai->move.fl.blocked, ai->move.fl.goalUnreachable,
+			ai->move.goalEntity.IsValid() ? ai->move.goalEntity.GetEntity()->name.c_str() : "none",
+			ai->move.obstacle.IsValid() ? ai->move.obstacle.GetEntity()->name.c_str() : "none",
+			ai->physicsObj.GetSlideMoveEntity() ? ai->physicsObj.GetSlideMoveEntity()->name.c_str() : "none",
+			ai->physicsObj.GetMaxStepHeight() );
+	}
+	for ( rvClientEntity *cent = ent->clientEntities.Next(); cent != NULL; cent = cent->bindNode.Next() ) {
+		if ( cent->IsType( rvClientEffect::Type ) ) {
+			rvClientEffect *fx = static_cast<rvClientEffect *>( cent );
+			gameLocal.Printf( "testMissionEffect: name=%s effect=%s loop=%d modelSuppressed=%d\n",
+				ent->name.c_str(), fx->GetEffectName(), fx->GetRenderEffect()->loop,
+				ent->GetRenderEntity()->hModel != NULL && ent->GetModelDefHandle() == -1 );
+		}
+	}
 	if ( ent->GetAnimator() ) {
 		gameLocal.Printf( "testMissionAnim: name=%s anim=%s\n", ent->name.c_str(),
 			ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_ALL )->AnimName() );

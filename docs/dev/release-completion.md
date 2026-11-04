@@ -43,6 +43,27 @@ See [player release status](../user/release-status.md).
 - Tak's face retains natural skin tone and detail while freeing the player
   from the dropship harness in M01. A local cabin fill light covers that repair
   sequence and is removed before gameplay; his model and textures are unchanged.
+- Loading a save no longer adds another copy of each burning vent's flame
+  effect. Existing duplicate effects are reconciled on load.
+- M01's placed Strogg corpse uses the available articulated rig, allowing new
+  saves to reload. Saves already written with the missing rig's invalid
+  placeholder still require restarting the map. The stair route also stays
+  open for squadmates trailing behind the Retch introduction.
+- Walker saves retain their stop-animation name safely in both game libraries.
+- Navajas now clears the opened courtyard door and reaches M01's final regroup.
+  Earlier M01 saves retain their cinematic script; new starts use the lighting
+  revision under a separate script identity. M01 saves from the interim,
+  unversioned lighting development build may require restarting that map.
+- M02's extraction now directs the Darnell spawned for that scene to the
+  dropship. Restart M02 for this additional script correction; original and
+  version 1 saves retain their previous script identities.
+- Tak now waits clear of his squadmates at M02's lifting door, allowing the
+  door and lift sequence to proceed. Existing saves stalled at this point
+  recover when loaded.
+- M02's Nexus console now activates once, preventing firing near it from
+  restarting the Tank introduction. Earlier post-introduction saves are guarded
+  too. Squad routes, walker defences, Tank victory and extraction into M03 have
+  been exercised with checkpointed game-input runs.
 - Freezing a fire vent now clears its invisible collision and fully extinguishes
   its light. Players and squadmates can cross active flames while receiving
   their normal damage; quenched vents also restore correctly from saves.

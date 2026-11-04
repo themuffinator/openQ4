@@ -19,7 +19,7 @@ public:
 	virtual void		UpdateState				( void );
 	virtual void		SetInput				( int position, const usercmd_t& cmd, const idAngles& newAngles );
 
-	const char*			stopAnimName;
+	idStr				stopAnimName;
 
 	virtual bool		FindClearExitPoint		( int pos, idVec3& origin, idMat3& axis ) const;
 
@@ -115,11 +115,9 @@ rvVehicleWalker::Restore
 ================
 */
 void rvVehicleWalker::Restore ( idRestoreGame *savefile ) {
-	//twhitaker: I just happened to see this, while going through this code which I originally wrote (at 3am or so).
-	//TODO: fix this.  Make stopAnimName an idStr?
-	idStr str;
-	savefile->ReadString( str );
-	stopAnimName = str;
+	// Own the restored text: a pointer into a temporary idStr dangles as soon
+	// as Restore returns, before State_Stop uses the animation name.
+	savefile->ReadString( stopAnimName );
 }
 
 /*
