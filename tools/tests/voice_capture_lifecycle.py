@@ -131,6 +131,7 @@ int main(){
     assert(captureQueue.count==4 && captureQueue.dropped>=996);
     now+=121; assert(!sound.GetVoiceData(packet,sizeof(packet)) && captureQueue.count==0);
     // Local test consumes capture without admitting anything for network send.
+    assert(!sound.UpdateVoiceChat(true,true,true));
     Feed(160); const auto before=captured;
     assert(!sound.UpdateVoiceChat(true,true,true)); assert(captured==before+1);
     assert(!sound.GetVoiceData(packet,sizeof(packet)));
@@ -160,7 +161,69 @@ int main(){
     initFail=false; now+=1001; assert(sound.UpdateVoiceChat(true,true,false));
     now+=251; SoundVoiceChat_Render(); assert(!sessionActive && !captureStream);
     assert(lockCount>1000 && quitCount==initCount-1); // one failed SDL init never owned a reference
-    std::puts("PASS: capture consent, PTT, local test, PCM/gain, callback bounds, privacy closure, fault retries and stall recovery");
+    // A local test can leave a fourth queued frame and half an assembled frame.
+    // Neither may become a network packet when PTT is already down on test exit.
+    assert(!sound.UpdateVoiceChat(true,false,true));
+    Feed(640,12000); Feed(80,12000);
+    const auto localBefore=captured;
+    assert(!sound.UpdateVoiceChat(true,false,true));
+    assert(captured==localBefore+3 && captureQueue.count==1 && partialSamples==80);
+    assert(sound.UpdateVoiceChat(true,true,false));
+    assert(!sound.GetVoiceData(packet,sizeof(packet)) && captureQueue.count==0 && partialSamples==0);
+    Feed(80,2000); assert(!sound.GetVoiceData(packet,sizeof(packet)));
+    Feed(80,2000); assert(sound.GetVoiceData(packet,sizeof(packet)));
+    oq4voice::Decode(packet,sizeof(packet),decoded);
+    for(auto sample:decoded) assert(std::abs(sample-2000)<100);
+    // Entering the local test also discards queued and partial network speech.
+    Feed(640,12000); Feed(80,12000);
+    const auto networkBefore=captured;
+    assert(!sound.UpdateVoiceChat(true,true,true));
+    assert(captured==networkBefore && captureQueue.count==0 && partialSamples==0);
+    Feed(160); assert(!sound.UpdateVoiceChat(true,false,true));
+    assert(captured==networkBefore+1);
+    // Failed reopening still discards every test byte before retrying PTT.
+    Feed(640,12000); Feed(80,12000); openFail=true;
+    assert(!sound.UpdateVoiceChat(true,true,false));
+    assert(!captureStream && captureQueue.count==0 && partialSamples==0);
+    assert(!sound.GetVoiceData(packet,sizeof(packet)));
+    openFail=false; now+=1000; assert(sound.UpdateVoiceChat(true,true,false));
+    assert(!sound.GetVoiceData(packet,sizeof(packet)));
+    // A partial frame has an age too: later callbacks must not timestamp old
+    // speech as new. Exercise both one long gap and several short gaps, and wrap.
+    for(bool wrap:{false,true}) {
+        if(wrap) now=0xffffffc0u;
+        const auto droppedBefore=captureQueue.dropped;
+        Feed(40,12000); now+=60; Feed(40,12000); now+=61; Feed(80,2000);
+        assert(!sound.GetVoiceData(packet,sizeof(packet)) && partialSamples==80);
+        assert(captureQueue.dropped==droppedBefore+1);
+        Feed(80,2000); assert(sound.GetVoiceData(packet,sizeof(packet)));
+        oq4voice::Decode(packet,sizeof(packet),decoded);
+        for(auto sample:decoded) assert(std::abs(sample-2000)<100);
+        Feed(80,12000); now+=121; Feed(80,2000);
+        assert(!sound.GetVoiceData(packet,sizeof(packet)) && partialSamples==80);
+        Feed(80,2000); assert(sound.GetVoiceData(packet,sizeof(packet)));
+        oq4voice::Decode(packet,sizeof(packet),decoded);
+        for(auto sample:decoded) assert(std::abs(sample-2000)<100);
+    }
+    Feed(80,12000); now+=oq4voice::MaxAgeMsec; Feed(80,2000);
+    assert(sound.GetVoiceData(packet,sizeof(packet)));
+    oq4voice::Decode(packet,sizeof(packet),decoded);
+    for(int i=0;i<160;++i) assert(decoded[i]==oq4voice::Expand(oq4voice::Compress(i<80?12000:2000)));
+    // The diagnostic clock pair must describe the timestamp actually encoded,
+    // including skew and 32-bit wrap, without any receiver/network observation.
+    for(uint32_t start:{1000u,0xfffffff0u}) for(float rate:{.999f,1.001f}) {
+        now=start; s_voiceTestClockRate.SetFloat(1); stampSkewed=false;
+        Feed(160); assert(sound.GetVoiceData(packet,sizeof(packet)));
+        const uint32_t first=oq4voice::Read32(packet+5);
+        s_voiceTestClockRate.SetFloat(rate); now+=10000;
+        Feed(160); assert(sound.GetVoiceData(packet,sizeof(packet)));
+        const uint32_t last=oq4voice::Read32(packet+5);
+        assert(stampSource==now && uint32_t(int64_t(stampClock))==last);
+        assert(std::abs(int(last-first)-(rate<1?9990:10010))<=1);
+    }
+    s_voiceTestClockRate.SetFloat(1);
+    sound.ResetVoiceChat();
+    std::puts("PASS: capture consent, PTT/test isolation, partial age, packet-clock observations, PCM/gain, callback bounds and fault recovery");
 }
 '''.replace('@PRODUCTION@', production)
     scratch = ROOT / '.tmp/audio/capture-lifecycle'

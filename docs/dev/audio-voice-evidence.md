@@ -1286,7 +1286,224 @@ No host input or microphone was used. Physical-device, mobile, macOS,
 independent-machine voice and VR subtitle gates remain open, as does missing
 transcript and full campaign coverage.
 
+## Decode cancellation and loading measurements, 3 November 2026
+
+AUD-03 still contained an implementation gap: `CancelDecode` cancelled the job
+list and waited, but a running PCM or stream-envelope decode never checked its
+token. The wait therefore scaled with the whole track. Production workers now
+check before codec setup and between blocks. An interrupted job retains its
+cursor, input and reservation until joined; finalizing a retained sample resumes
+it, while freeing it discards the partial data. Codec setup and one block remain
+indivisible, so this is not a hard real-time cancellation guarantee.
+
+The low-memory traversal previously finalized every decode, including OpenAL
+uploads, before deciding which samples to free. It now cancels disposable samples
+without uploading them and leaves active, looping, never-purge and loading
+samples protected. Admission reclamation and level finalization also discard
+stale jobs before joining retained work.
+
+`audio_decode_budget.py` now compiles the production worker, join, cancel, trim,
+reclaim and level-finalization functions. A real portable job worker pauses at a
+counted codec boundary; the test cancels it and checks that it stops after one
+block, keeps reservations until join and either frees everything once or resumes
+to the exact expected PCM/envelope. Pre-start cancellation and header corruption
+are separate cases. These checks pass with Windows Clang and Linux GCC under
+WSL, including `-Werror`. Separate platform scratch directories prevent a WSL
+test from replacing a Windows test executable. An initial Linux harness build
+overlapped a test-source edit and failed; that log remains separate from the
+completed rerun.
+
+`audio_scene_audit.py` now records complete, consistent map-load and media-phase
+reports before each scene. `--decode-mode worker|inline`, `--decode-memory-mb`
+and `--audio-memory-mb` pin the configuration. Its sound-disabled baseline also
+reports signed load-time differences. A negative difference is retained as
+cache/scheduling noise, not converted into a speedup. Sound finalization is the
+main-thread join/upload/reverb phase, not all audio work, which can overlap game
+initialization. Fourteen harness checks pass, including missing/inconsistent
+timers, map boundaries and mismatched baseline maps.
+
+Other completed checks in this round: actual Vorbis PCM/seek/loop/lengthless-stream
+tests; aggregate memory, stream budget and payload restore; voice capture consent
+and lifecycle, transport and protocol gates; subtitle selection/layout; Arena
+pause ownership; retail reverb and screen-shake contracts; 35,807 counted settings
+checks, 42,348 cumulative recovery checks and eight distance-harness checks.
+OpenAL loopback centre routing and mod room rolloff pass using the main checkout's
+existing provider (`c5b7aa0c5237c4d202f798fe7825f59af5bb4b9a1ac1e654e7011908843fbb83`).
+No physical microphone or host input was used.
+
+The Windows x64 debugoptimized client, dedicated server, SP/MP modules and OpenGL
+renderer build and stage successfully; all nine selected Meson sound, voice,
+subtitle, Arena and job-system tests pass. In stock gameplay,
+`audio_output_recovery_runtime.py` passes all 32 checks: output interruption,
+paused resume, both lengthless-stream fixtures, live stereo/surround/HRTF
+transitions, the SDL low-memory notice and replay of a purged sample. The trim
+reduces managed residency from 154,939 to 55,497 KiB while keeping 93 referenced
+samples. `audio_memory_runtime.py` passes all 13 checks, including continued
+active playback under deliberate exhaustion, retry after budget recovery and
+two restarts with identical 214,246 KiB reservations and no fallback beeps.
+The stock reference inventory again finds all 3,672 speech shaders and all
+3,495 scanned references covered, with no routing gaps; this is static coverage,
+not an ordered campaign playthrough.
+
+Two passes through `game/airdefense1`, `game/mcc_landing` and `game/network2`
+also pass in each decode mode with a 16 MiB pending-decode budget and a 256 MiB
+aggregate payload budget: 15 checks with workers and a sound-disabled comparison,
+13 with inline decoding. Each mode starts eight dialogue lines, preserves mute
+and transcript checks, plays streams on recycled voices and refuses no audio
+allocation. Per-map residency grows by at most 8 KiB between passes; stream
+reservations stay at 2,448, 2,448 and 9,792 KiB respectively. The managed-payload
+peak is 252,703 KiB with workers and 240,025 KiB inline.
+
+| Map | Worker load, passes 1 / 2 (ms) | Inline load, passes 1 / 2 (ms) | Sound disabled, passes 1 / 2 (ms) |
+| --- | ---: | ---: | ---: |
+| `game/airdefense1` | 7,803 / 5,076 | 8,798 / 5,915 | 4,749 / 4,071 |
+| `game/mcc_landing` | 8,959 / 4,652 | 5,776 / 5,576 | 4,137 / 3,535 |
+| `game/network2` | 3,512 / 3,168 | 4,578 / 3,006 | 3,332 / 2,499 |
+
+Sound finalization takes 3–37 ms across these runs. Other builds were active on
+the host, so these are successful measurements, not a controlled speed comparison
+or a device loading budget. The worker sound-on/off private-memory differences
+span 142,012–352,844 KiB, with up to 158,373 KiB beyond tracked payloads; silent
+process memory itself varies substantially. This run does not establish a new
+provider-memory bound. Opening probes do not qualify dialogue reached later
+through combat or player movement.
+
+The tested build is `908b2c012` plus this round's two sound-source changes, Windows
+x64 `debugoptimized`, with the OpenGL renderer and native tests enabled. Local
+evidence is retained under `.tmp/aud-roadmap/`: `evidence-manifest.json` records
+source, runtime and report hashes; `output-recovery/result.json`,
+`memory-pressure/result.json`, `scenes-worker/result.json` and
+`scenes-inline/result.json` retain configurations and results. Their engine logs,
+rendered WAV output and captures remain alongside them. Generated test binaries,
+fixtures and image caches are disposable and are removed after verification.
+
+This does not close the AUD checkboxes. AUD-01 still requires retail listening;
+AUD-02 physical endpoint/lifecycle and target-OS listening; AUD-03 mobile provider
+memory, device loading budgets and real low-memory notices; AUD-04 physical
+surround; AUD-05 physical capture/hotplug and independent-machine clocks;
+AUD-06 full gameplay-order dialogue/device coverage; and AUD-07 missing licensed
+transcripts, full gameplay-order coverage and physical stereo-HUD placement.
+
+## Local-test isolation and partial capture age, 4 November 2026
+
+AUD-05 had two further implementation gaps in the production capture path:
+
+- Leaving the local microphone test while push-to-talk was already held reused
+  the capture stream. The test drains at most three frames per update from a
+  four-frame ring; its last frame and partially assembled frame could therefore
+  be sent over the network after the mode change. Switching modes now closes
+  the old stream, joins its callback, discards SDL resampler/input state and the
+  engine ring/partial frame, and stops the local playback channel before opening
+  a fresh stream. A failed reopen cannot release old test data either.
+- Incomplete frames had no age check. A later callback could finish a stale
+  fragment and stamp it with the current time. The partial frame now records its
+  first callback's time and expires after the same 120 ms limit as queued capture.
+  Repeated shorter gaps cannot refresh its age; a completed frame retains the
+  existing completion timestamp.
+
+Both failures were reproduced before their fixes in `voice_capture_lifecycle.py`.
+The expanded production-code harness passes with Windows Clang and Linux GCC,
+including queued and partial test audio, both transition directions, failure to
+reopen, long and accumulated short callback gaps, unsigned clock wrap and the
+exact 120 ms boundary. Distinct PCM values prove the returned frame contains only
+fresh audio after a discard. These tests use deterministic SDL interfaces and
+never open a microphone.
+
+The Windows x64 debugoptimized client/dedicated build and staging pass. The
+transport and protocol-gating harnesses pass, as do the three selected Meson
+voice-packet, output-recovery and sound-settings recovery tests.
+
+`voice_chat_runtime.py --dummy-capture` now checks consent, local playback,
+closure, reopening, revocation and peer isolation in real multiplayer gameplay.
+It explicitly selects SDL's dummy input for every child process; that input
+provides silence and cannot fall back to a physical microphone. No keyboard or
+mouse input is injected. The native PCM regression proves the mode boundary;
+dummy capture qualifies callback, playback-submission and peer-isolation
+integration, not microphone quality or physical hotplug.
+
+The first peer run passed the new capture checks but hit the previously recorded
+Windows control-script replacement race during reconnect. Its host's polling
+chain ended at a failed `exec`; it also missed the bidirectional cadence and
+fast-clock thresholds at 960×540 on the shared host. The voice harness now keeps
+its polling driver immutable and appends each phase and the next driver call in
+order. A failed phase-file read returns to that driver and retries; selecting the
+next phase before its commands prevents replay. A deliberate missing-file probe
+checks recovery in the actual engine. The first driver attempt exposed filename
+tokenization in console variables; generated control filenames now use
+underscores, and `vstr`'s append semantics are explicit. That failed startup is
+retained too. A subsequent driver attempt exposed reconnect replay; the peer
+now selects its idle step before disconnecting and avoids starting a second
+driver on the next map. Every phase is checked for exactly one execution.
+Subsequent peer runs use 480×270 windows to reduce render contention.
+
+The first complete dedicated run passed 30 of 31 checks. Its fast-clock phase
+delivered 475 frames, rejected none and added at most 22 ms latency, but the
+receiver baseline shifted only −3 ms against a −5 ms threshold. That baseline
+also contains network jitter; its sign alone cannot prove a 10 ms sender drift.
+`listVoiceChat` now reports the last encoded frame's source clock and packet
+timestamp. The audit checks their elapsed-time difference against the injected
+±0.1% rate, allowing 2 ms rounding, and still requires over 200 delivered frames,
+at most 2% rejection and at most 120 ms added latency. Receiver baseline movement
+remains visible. Native tests verify that both clock observations match actual
+packet headers for slow/fast clocks, including 32-bit wrap. Admission and the
+wire format are unchanged.
+
+The final listen and dedicated runs each pass all 31 checks, including the
+missing-control-file recovery probe, exactly one execution of every phase,
+capture consent/local playback/revocation, no test audio sent to peers,
+bidirectional voice, mute/moderation, loss/reorder, congestion recovery,
+reconnect identity, bounded playback and clean exit. Both sender-clock probes
+measure −11 ms slow and +11 ms fast, consistent with their source-clock
+intervals within the 2 ms tolerance. Neither drift phase rejects a frame;
+maximum added latency is 21 ms on listen and 28 ms on dedicated. Rendered 400 Hz
+voice amplitudes range from 0.0349 to 0.0887, above the 0.02 threshold.
+
+The tested build is `39aa329a9` plus this round's `VoiceChat.cpp` changes;
+client SHA-256 is `923d7faa5292fae249baee815cc31caab0ad78e749eb7bda10ab263e2df172a0`.
+Final reports are `voice-listen-retry/result.json` and
+`voice-dedicated/result.json` under the evidence directory, with harness
+SHA-256 `06e1c34ba105ec348c39a05cb3fda71d66f35b9d1590509504a6a72a4db16cf9`.
+`evidence-manifest.json` records source, runtime and retained report/audio hashes.
+
+Evidence is retained under `.tmp/aud-followup/`, including the two failing
+pre-fix capture logs, the passing Windows/Linux logs, build/staging output and
+runtime reports. An early staging attempt overlapped the final link and failed
+to copy the locked executable; staging was rerun after compilation completed,
+before launching any game. Physical capture/hotplug, independent-machine clocks
+and OS/device breadth remain open under AUD-05. The other AUD gates retain their
+existing limits; neither issue changes the subtitle or dialogue-coverage claims.
+
 ## Other verification and limitations
+
+### PR #212 merge qualification, 4 November 2026
+
+The audio head's first Commit Validation run failed in unrelated validation
+paths. The MVD mutation harness gave its Unix executable the same path as its
+header overlay; the Vulkan resize mutation still expected the code before the
+render-thread synchronization call. Both harnesses now exercise their intended
+mutations. The save-codec fixture reports an unexpected exception as a failed
+test instead of leaving Windows CI at an unhandled-exception dialog. The two
+largest retained page matrices get 300 seconds under sanitizers, retaining their
+120-second ordinary limit and every assertion after both hit the sanitizer limit.
+
+The retained Demos document also varied by eight last-bit scale values between
+Python 3.11 and 3.12+, whose floating-point sums differ. Its total tag width now
+uses the same tenth-unit precision as each tag before computing the scale.
+The canonical generator produces matching output on Windows Python 3.11 and
+Linux Python 3.12. MVD's 15 mutation controls and the save codec's eight controls
+pass on both platforms; the renderer metadata baseline and all mutations pass
+on Windows. Meson reconfiguration passes and preserves the ordinary timeouts.
+Local evidence is under `.tmp/aud-merge/`; these focused passes do not substitute
+for the fresh GitHub validation run required before merging.
+
+The next Windows x64 run passed its Python validation and 309 native tests,
+but the same `pages` and `mp-pages` matrices also reached their 120-second limit
+without sanitizers. The 300-second allowance therefore applies to those two
+groups on Windows as well. Both complete locally without assertion failures:
+45,230,007 checks in 49.1 seconds for `pages`, and 48,003,884 checks in 23.8 seconds
+for `mp-pages`. Meson introspection verifies 300 seconds for those groups and
+120 seconds for an unaffected group. CI failure excerpts and the measured
+commands, executable identity and results are retained with the merge evidence.
 
 - `sound_settings.py --no-mutations`: 35,807 checks pass.
 - `sound_recovery.py --no-mutations`: 42,348 cumulative checks pass. These are

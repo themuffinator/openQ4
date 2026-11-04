@@ -90,6 +90,14 @@ void SDLCALL Capture( void*, SDL_AudioStream* stream, int, int ) {
 		return;
 	}
 	while ( available >= 2 ) {
+		const uint32_t now = VoiceNow();
+		// A partially assembled frame must not carry old speech across a callback
+		// stall and then acquire a fresh timestamp when its final samples arrive.
+		if ( partialSamples && now - partial.time > oq4voice::MaxAgeMsec ) {
+			partialSamples = 0;
+			++captureQueue.dropped;
+		}
+		if ( !partialSamples ) partial.time = now;
 		const int bytes = (std::min)( available, ( oq4voice::Samples - partialSamples ) * 2 );
 		const int got = SDL_GetAudioStreamData( stream, partial.pcm + partialSamples, bytes );
 		if ( got <= 0 ) break;
@@ -231,6 +239,9 @@ void ListVoice( const idCmdArgs& ) {
 	common->Printf( "VOICE_STATUS active=%d recording=%d status=%d capture_opens=%u captured=%u played=%u rejected=%u playback_drops=%u max_queue_ms=%d\n",
 		sessionActive, recording, s_voiceChatStatus.GetInteger(), captureOpens, captured, played, rejected, playbackDrops,
 		oq4voice::FrameMsec * oq4voice::MaxQueuedFrames );
+	// The most recently encoded frame's source clock and packet timestamp. Unlike
+	// a receiver's latency baseline, their difference contains no network jitter.
+	common->Printf( "VOICE_CLOCK source_ms=%u stamp_ms=%u\n", stampSource, uint32_t( int64_t( stampClock ) ) );
 #if defined(USE_SDL3) && !defined(ID_DEDICATED)
 	if ( ownsAudioSubsystem ) common->Printf( "VOICE_CAPTURE_DRIVER %s\n", SDL_GetCurrentAudioDriver() );
 #endif
@@ -306,7 +317,15 @@ bool idSoundSystemLocal::UpdateVoiceChat( bool active, bool transmit, bool local
 	const uint32_t now = VoiceNow();
 	lastUpdate = now;
 	sessionActive = active && !s_noSound.GetBool();
+	const bool wasMicrophoneTest = microphoneTest;
 	microphoneTest = sessionActive && localTest && s_voiceChatCapture.GetBool();
+	if ( microphoneTest != wasMicrophoneTest ) {
+		// A test frame must never become network speech when PTT is already down
+		// on test exit. Closing joins the callback and discards SDL's resampler,
+		// queued frames and the partial frame before opening the new capture mode.
+		CloseCapture();
+		StopVoiceData( LocalTestClient );
+	}
 	if ( localTest && !s_voiceChatCapture.GetBool() ) s_voiceChatTest.SetBool( false );
 	if ( !sessionActive ) { SoundVoiceChat_Shutdown(); return false; }
 	const bool synthetic = SyntheticActive( now );

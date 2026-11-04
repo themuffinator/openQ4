@@ -120,12 +120,46 @@ int main() {
     std::puts("PASS: byte admission, backpressure, retained reservations, join/cancel and failed-decode recovery");
 }
 '''
-    scratch = ROOT / '.tmp/audio/decode-budget'
+    # Windows and WSL may validate this checkout concurrently; never replace a
+    # running executable (or its generated source) with the other platform's.
+    scratch = ROOT / '.tmp/audio/decode-budget' / os.name
     scratch.mkdir(parents=True, exist_ok=True)
     cpp, exe = scratch / 'test.cpp', scratch / 'test.exe'
     cpp.write_text(harness)
     command = [os.environ.get('CXX', 'clang++'), '-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT), str(cpp), '-o', str(exe)]
     subprocess.run(command, cwd=scratch, check=True)
+    subprocess.run([str(exe)], cwd=scratch, check=True)
+
+    # The budget model alone cannot prove cancellation of a worker already inside
+    # the codec. Execute the production loops on the real portable job system.
+    decode = body(source, 'struct idSoundSampleDecode\n') + ';\n'
+    decode += body(source, 'static void SoundSample_AccumulateEnvelope(') + '\n'
+    decode += body(source, 'static void SoundSample_DecodeFrames(') + '\n'
+    decode += 'static void SoundSample_RunDecode(idSoundSampleDecode&, const idJobContext* = nullptr);\n'
+    decode += body(source, 'static void SoundSample_RunDecode( idSoundSampleDecode& decode, const idJobContext* context )') + '\n'
+    decode += body(source, 'static void SoundSample_DecodeJob( const idJobContext& context )\n') + '\n'
+    join = body(source, 'void idSoundSample_OpenAL::FinishDecode()') + '\n'
+    join += body(source, 'void idSoundSample_OpenAL::CancelDecode()')
+    cpp = scratch / 'worker.cpp'
+    cpp.write_text((ROOT / 'tools/tests/native/SoundSampleDecodeTest.cpp').read_text()
+                   .replace('// @DECODE@', decode).replace('// @JOIN@', join))
+    exe = scratch / 'worker.exe'
+    command = [os.environ.get('CXX', 'clang++'), '-std=c++20', '-Wall', '-Wextra', '-Werror',
+               '-I', str(ROOT), str(cpp), str(ROOT / 'src/framework/ParallelJobSystem.cpp'), '-o', str(exe)]
+    if os.name != 'nt':
+        command += ['-pthread']
+    subprocess.run(command, cwd=scratch, check=True)
+    subprocess.run([str(exe)], cwd=scratch, check=True, timeout=30)
+
+    system = (ROOT / 'src/sound/snd_system.cpp').read_text()
+    cpp = scratch / 'trim.cpp'
+    cpp.write_text((ROOT / 'tools/tests/native/SoundMemoryTrimRuntimeTest.cpp').read_text().replace(
+        '// @PRODUCTION@', body(system, 'void idSoundSystemLocal::TrimMemory(') + '\n' +
+        body(system, 'void idSoundSystemLocal::EndLevelLoad(') + '\n' +
+        body(source, 'static void SoundMemoryReclaim() {')))
+    exe = scratch / 'trim.exe'
+    subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                    '-I', str(ROOT), str(cpp), '-o', str(exe)], cwd=scratch, check=True)
     subprocess.run([str(exe)], cwd=scratch, check=True)
 
 

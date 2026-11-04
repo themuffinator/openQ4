@@ -15910,7 +15910,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "*", "args": [1.572239278072379, {"op": "/", "args": [14.0, {"state": "view.text"}]}]},
+     {"op": "*", "args": [1.5722392780723786, {"op": "/", "args": [14.0, {"state": "view.text"}]}]},
      {"op": "/", "args": [14.0, {"state": "view.text"}]}
     ]
    }
@@ -15923,7 +15923,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "*", "args": [1.572239278072379, {"op": "/", "args": [22.5, {"state": "view.text"}]}]},
+     {"op": "*", "args": [1.5722392780723786, {"op": "/", "args": [22.5, {"state": "view.text"}]}]},
      {"op": "/", "args": [22.5, {"state": "view.text"}]}
     ]
    }
@@ -15936,7 +15936,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "*", "args": [1.572239278072379, {"op": "/", "args": [14.0, {"state": "view.text"}]}]},
+     {"op": "*", "args": [1.5722392780723786, {"op": "/", "args": [14.0, {"state": "view.text"}]}]},
      {"op": "/", "args": [14.0, {"state": "view.text"}]}
     ]
    }
@@ -15949,7 +15949,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "*", "args": [1.572239278072379, {"op": "/", "args": [22.5, {"state": "view.text"}]}]},
+     {"op": "*", "args": [1.5722392780723786, {"op": "/", "args": [22.5, {"state": "view.text"}]}]},
      {"op": "/", "args": [22.5, {"state": "view.text"}]}
     ]
    }
@@ -15962,7 +15962,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "*", "args": [1.572239278072379, {"op": "/", "args": [14.0, {"state": "view.text"}]}]},
+     {"op": "*", "args": [1.5722392780723786, {"op": "/", "args": [14.0, {"state": "view.text"}]}]},
      {"op": "/", "args": [14.0, {"state": "view.text"}]}
     ]
    }
@@ -15975,7 +15975,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "*", "args": [1.572239278072379, {"op": "/", "args": [22.5, {"state": "view.text"}]}]},
+     {"op": "*", "args": [1.5722392780723786, {"op": "/", "args": [22.5, {"state": "view.text"}]}]},
      {"op": "/", "args": [22.5, {"state": "view.text"}]}
     ]
    }
@@ -15988,7 +15988,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "*", "args": [1.572239278072379, {"op": "/", "args": [14.0, {"state": "view.text"}]}]},
+     {"op": "*", "args": [1.5722392780723786, {"op": "/", "args": [14.0, {"state": "view.text"}]}]},
      {"op": "/", "args": [14.0, {"state": "view.text"}]}
     ]
    }
@@ -16001,7 +16001,7 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "*", "args": [1.572239278072379, {"op": "/", "args": [22.5, {"state": "view.text"}]}]},
+     {"op": "*", "args": [1.5722392780723786, {"op": "/", "args": [22.5, {"state": "view.text"}]}]},
      {"op": "/", "args": [22.5, {"state": "view.text"}]}
     ]
    }

@@ -1376,11 +1376,11 @@ void idSoundSample_OpenAL::PrintDecodeMemoryInfo()
 
 // One Vorbis frame per call, straight into place: what stb_vorbis_decode_memory loops
 // on. Thread-safe: it touches only the stream and the output it is given.
-static void SoundSample_DecodeFrames( stb_vorbis* vorbis, const int channels, short* pcm, const unsigned int capacityFrames, unsigned int& decodedFrames )
+static void SoundSample_DecodeFrames( stb_vorbis* vorbis, const int channels, short* pcm, const unsigned int capacityFrames, unsigned int& decodedFrames, const idJobContext* context )
 {
-	decodedFrames = 0;
 	while( decodedFrames < capacityFrames )
 	{
+		if( context != NULL && context->IsCancellationRequested() ) return;
 		const int frames = stb_vorbis_get_frame_short_interleaved( vorbis, channels, pcm + ( size_t )decodedFrames * channels,
 			static_cast<int>( ( capacityFrames - decodedFrames ) * channels ) );
 		if( frames <= 0 )
@@ -1572,7 +1572,7 @@ FinishDecode joins the job the envelope reads silent; voices can already stream.
 False leaves the sample untouched for the synchronous path.
 ========================
 */
-static void SoundSample_RunDecode( idSoundSampleDecode& decode );
+static void SoundSample_RunDecode( idSoundSampleDecode& decode, const idJobContext* context = NULL );
 static void SoundSample_DecodeJob( const idJobContext& context );
 
 bool idSoundSample_OpenAL::BeginOggStreamEnvelope( const idStr& filename, idFile* file, int channels, int rate, unsigned int frames, idSoundSampleDecode** asyncDecode )
@@ -1647,8 +1647,12 @@ bool idSoundSample_OpenAL::BeginOggStreamEnvelope( const idStr& filename, idFile
 
 // Opens the stream if the main thread did not, decodes it and releases the stream and
 // the file bytes. Runs on a worker, or inline.
-static void SoundSample_RunDecode( idSoundSampleDecode& decode )
+static void SoundSample_RunDecode( idSoundSampleDecode& decode, const idJobContext* context )
 {
+	// Cancellation stops between bounded codec blocks, including before setup.
+	// Keep the cursor, input and reservation until the main thread joins: FreeData
+	// discards them, while FinishDecode can resume a globally cancelled job inline.
+	if( context != NULL && context->IsCancellationRequested() ) return;
 	if( decode.vorbis == NULL && decode.fileData != NULL && !decode.headerMismatch )
 	{
 		int vorbisError = 0;
@@ -1676,26 +1680,26 @@ static void SoundSample_RunDecode( idSoundSampleDecode& decode )
 		// A streamed track: only its envelope, a block at a time; no PCM is kept.
 		// One that decodes short is damaged and loads the ordinary way.
 		short block[SoundVorbisStream::ChunkFrames * 2];
-		uint64 decoded = 0;
-		while( decoded < decode.capacityFrames )
+		while( decode.decodedFrames < decode.capacityFrames )
 		{
+			if( context != NULL && context->IsCancellationRequested() ) return;
 			const int count = stb_vorbis_get_samples_short_interleaved( decode.vorbis, decode.channels, block,
-				Min( SoundVorbisStream::ChunkFrames, static_cast<int>( decode.capacityFrames - decoded ) ) * decode.channels );
+				Min( SoundVorbisStream::ChunkFrames, static_cast<int>( decode.capacityFrames - decode.decodedFrames ) ) * decode.channels );
 			if( count <= 0 )
 			{
 				break;
 			}
-			SoundSample_AccumulateEnvelope( block, count, decode.channels, decode.sampleRate, decoded, decode.envelope, decode.envelopeEntries );
-			decoded += count;
+			SoundSample_AccumulateEnvelope( block, count, decode.channels, decode.sampleRate, decode.decodedFrames, decode.envelope, decode.envelopeEntries );
+			decode.decodedFrames += count;
 		}
-		decode.decodedFrames = static_cast<unsigned int>( decoded );
-		decode.headerMismatch = decoded != decode.capacityFrames;
+		decode.headerMismatch = decode.decodedFrames != decode.capacityFrames;
 		stb_vorbis_close( decode.vorbis );
 		decode.vorbis = NULL;
 	}
 	if( decode.vorbis != NULL )
 	{
-		SoundSample_DecodeFrames( decode.vorbis, decode.channels, decode.pcm, decode.capacityFrames, decode.decodedFrames );
+		SoundSample_DecodeFrames( decode.vorbis, decode.channels, decode.pcm, decode.capacityFrames, decode.decodedFrames, context );
+		if( context != NULL && context->IsCancellationRequested() ) return;
 		stb_vorbis_close( decode.vorbis );
 		decode.vorbis = NULL;
 	}
@@ -1708,7 +1712,7 @@ static void SoundSample_RunDecode( idSoundSampleDecode& decode )
 
 static void SoundSample_DecodeJob( const idJobContext& context )
 {
-	SoundSample_RunDecode( *static_cast<idSoundSampleDecode*>( context.data ) );
+	SoundSample_RunDecode( *static_cast<idSoundSampleDecode*>( context.data ), &context );
 }
 
 /*
@@ -2063,7 +2067,7 @@ void idSoundSample_OpenAL::FinishDecode()
 	{
 		decode->list->Wait();
 	}
-	// a cancelled job never ran: decode it here
+	// A cancelled job may be unstarted or partially decoded: finish it here.
 	SoundSample_RunDecode( *decode );
 	const bool mismatch = decode->headerMismatch;
 	const unsigned int decodedFrames = decode->decodedFrames;
@@ -2308,9 +2312,6 @@ Called before deleting the object and at the start of LoadResource()
 ========================
 */
 static void SoundMemoryReclaim() {
-	// Join pending work before refusing a payload. Do not edit decodingSamples:
-	// this can run while its owner is iterating it. Workers only release bytes.
-	for( int i = 0; i < soundSystemLocal.samples.Num(); ++i ) soundSystemLocal.samples[i]->FinishDecode();
 	// Only old-map cache entries may be reclaimed. Keep every current-map,
 	// never-purge and active-channel reference, including inaudible/paused ones.
 	for( int i = 0; i < soundSystemLocal.samples.Num(); ++i ) {
@@ -2331,6 +2332,10 @@ static void SoundMemoryReclaim() {
 		}
 		if( !active ) sample->FreeData();
 	}
+	// Cancel discarded jobs before joining retained work: uploading a discarded
+	// sample would spend the headroom this reclaim is meant to recover. Do not edit
+	// decodingSamples here; this can run while its owner is iterating it.
+	for( int i = 0; i < soundSystemLocal.samples.Num(); ++i ) soundSystemLocal.samples[i]->FinishDecode();
 }
 
 void idSoundSample_OpenAL::FreeData()

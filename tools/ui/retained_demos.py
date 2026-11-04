@@ -317,7 +317,9 @@ def tall_demos_page(result: dict) -> dict:
     from retained_tall import CONTENT_W, TallLayout
     tall = TallLayout(result)
     list_w = CONTENT_W - 40
-    span = sum(tag_width(key) for _, key in TAGS) + TAG_GAP * (len(TAGS) - 1)
+    # Tag widths use tenths of a unit. Quantize their total too: Python 3.12's
+    # compensated sum otherwise changes the serialized scale's final bits.
+    span = round(sum(tag_width(key) for _, key in TAGS) + TAG_GAP * (len(TAGS) - 1), 1)
     tall_filters(tall, tuple(ident for ident, _key in TAGS), (LIST_LEFT, TAG_TOP, span), list_w)
     below = tall_detail(tall, "demo", PREVIEW, ("demo-kind", "demo-status", "demo-detail"), (DETAIL_LEFT, KIND_TOP), PLATES)
     heads = {column: (U * (LIST_LEFT + max(0.0, left - 1)), U * HEAD_TOP) for column, _key, left, _width in COLUMNS}
