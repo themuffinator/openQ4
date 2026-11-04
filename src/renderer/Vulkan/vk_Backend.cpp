@@ -1740,6 +1740,7 @@ void R_RenderGraphResources_Shutdown( void ) {
 // The Vulkan module's GPU resources live in VMA heaps rather than GL's
 // render-graph pool, so report those instead.
 void R_RenderGraphResources_PrintGfxInfo( void ) {
+	R_RenderThread_Sync( "resource profile" );
 	VK_Device_PrintMemoryInfo();
 	common->Printf( "Vulkan images: resident=%d capacity=%d\n", VK_Image_GetResidentCount(), VK_MAX_IMAGES );
 	VK_Device_PrintPipelineInfo();
