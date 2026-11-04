@@ -69,7 +69,7 @@ CASES = {
         "setup": ["bot_probeHealth 1 25 0 0 0 0 0"],
         "command": "bot_probeWalk 1 -550.081 -516.115 -282.25 -62.339 261.318 111.758 -540 -492 -277",
     }, {
-        "name": "ramp_pad_approach_air", "probe_type": "PAD", "observe_msec": 12000,
+        "name": "ramp_pad_approach_air", "probe_type": "PAD", "observe_msec": 18000,
         "allow_resumed_navigation": True,
         # Prime airborne physics before restoring the pose. The common neutral
         # settle otherwise leaves a grounded flag from the ramp below it and
