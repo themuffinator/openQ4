@@ -2690,6 +2690,13 @@ Completion substeps:
   oscillation exposed by the replay. That brake artifact requires fresh
   final-stage qualification rather than carrying old exclusions forward.
   The DM8 enemy-rocket/self-splash sequence and controlled timing remain open.
+  The `51517896f` repeat passes all 33 catalog death/duration gates and all
+  eighteen hit, ten recovery and two-bot traffic checks. Its long runs meet
+  every duration gate but retain one recoverable CTF5 low-health descent.
+  The next correction forecasts a steered approach to a known catch pad
+  followed by the normal pad coast; renewed runtime qualification is required.
+  Verified fixes through that stage are landed in the main checkout at
+  `79df4b6bc`; MP-02 remains open.
   The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.

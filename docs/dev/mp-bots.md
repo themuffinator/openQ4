@@ -310,6 +310,45 @@ case now uses the established requirement of at least two completed traversals
 after recovery when normal navigation has resumed. The original strict outcome
 remains in every report; death-exclusion criteria are unaffected.
 
+The committed `51517896f` build passes the 27 decision and 24 geometry reversal
+controls on Windows and Linux ASan/UBSan, plus navigation, combat, causal-policy,
+audit-clock and repository-path checks. All eighteen hit cases, ten recovery
+cases and the two-bot pad-traffic check pass on that same committed stage
+(`hit-wall-final/`, `air-wall-final/`, `traffic-wall-final/`). Both new wall cases finish grounded at
+45 health after twelve seconds, including rest before controller release.
+`guard-failure-selfblast-wall-envelope-sampled/` tests all sixteen fixed headings
+and no input for twelve seconds on the committed stage; all seventeen die.
+The same source's controller and brake also die in
+`guard-failure-selfblast-wall-settle/`. This establishes no surviving tested
+post-blast input, not a causal exclusion: the bot's already-fired projectile
+is not recreated in the enemy-hit counterfactual. The final runtime is preserved
+by `runtime-wall.json` and its hash-checked delta archive.
+
+The complete `catalog-wall/assessment.json` passes all 33 variants with 471
+kills, 616 traversals and two strict impulse exclusions. `long-wall/assessment.json`
+meets all four duration gates (276.720–284.560 simulated seconds), with 293
+kills, 469 traversals, four exclusions and one recoverable CTF5 death. Sledge's
+nine-health descent at 118512 ms has five surviving fixed headings, while its
+controller dies. `guard-failure-pad-descent-wall-diagnostic/` reproduces that
+failure and a surviving westward input. The forecast rejects every steered
+approach to the catch pad, then chooses a coast whose landing costs too much
+health. The next correction forecasts the adjustment before the catch followed
+by the normal coast that owns the bot's movement after launch. Its whole
+continuation must still be affordable and supported; disabled/unknown pads,
+teleporters, initial-pad poses and a second distinct pad remain unproven.
+Native controls require the approach and reject continuing that input after
+launch. All 26 geometry reversions pass on Windows and Linux ASan/UBSan.
+`guard-failure-pad-descent-pad-catch/` now lands its controller alive at four
+health, then completes a further pad and drop without dying. The terminal
+sample is airborne in another route, and remains a strict terminal failure;
+the new positive regression uses the existing two-completed-traversals
+criterion. The fixed westward control remains grounded at four health.
+Renewed full-runtime qualification of this further correction is required.
+
+The verified fixes through `51517896f` are merged into the main checkout by
+`79df4b6bc`; its integration build and staging pass. That merge does not close
+MP-02 or qualify the subsequent pad-approach correction.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's

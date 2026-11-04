@@ -82,6 +82,11 @@ CASES = {
         "name": "wall_runout_fixed_coast", "observe_msec": 12000,
         "setup": ["bot_probeHealth 1 45 50 13.023 21.29 -1.463 0"],
         "command": "bot_probeAir 1 583.431 120.247 -61.195 18.727 -441.232 -369.033 0 0 0",
+    }, {
+        "name": "pad_catch_approach", "observe_msec": 12000,
+        "allow_resumed_navigation": True,
+        "setup": ["bot_probeHealth 1 9 50 8.927 -23.186 2.781 0"],
+        "command": "bot_probeMove 1 1090.429 109.865 154.281 410.068 368.839 -76.021 1090.429 109.865 154.281",
     }]),
     "ctf7": ("CTF", [{
         "name": "armoured_drop", "probe_type": "DROP",

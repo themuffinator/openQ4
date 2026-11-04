@@ -403,7 +403,10 @@ int main() {
     CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
     secondRecoveryPad=nullptr; gameLocal.entities[2]=nullptr;
     CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},20));
-    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{1,0,0},idMath::INFINITY));
+    CHECK(nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{1,0,0},idMath::INFINITY));
+    // An adjustment before the catch is followed by the bot's normal pad
+    // coast. Holding this opposite input after launch misses the platform.
+    CHECK(nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{-1,0,0},idMath::INFINITY));
     catchPad.live=false;
     CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
     catchPad.live=true; recoveryNatural=false;
