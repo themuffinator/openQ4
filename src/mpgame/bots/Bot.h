@@ -363,6 +363,7 @@ private:
 	int						probeStartTime;
 	bool					probeAirborneSeen;	// the probed bot has left the ground since the probe
 	int						airRecoverReported;	// last airborne-recovery start logged, so one line per fall
+	bool					airRecoverSliding;	// proven input before the knock leaves the floor
 	bool					airRecovering;		// braking a knocked fall until it has stopped on the ground
 	int						knockbackTime;		// last applied knockback, which alone can start that brake
 	int						knockbackFrameTime;	// the frame knockbackFrameKick sums

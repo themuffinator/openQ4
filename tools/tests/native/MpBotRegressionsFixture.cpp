@@ -49,6 +49,7 @@ struct idVec3 {
     const char* ToString(int) const { return "fixture"; }
 };
 const idVec3 vec3_zero;
+const idVec3 vec3_origin;
 struct idAngles {
     float pitch=0,yaw=0,roll=0;
     idAngles(float p=0,float y=0,float r=0):pitch(p),yaw(y),roll(r) {}
@@ -233,7 +234,8 @@ struct rvNavPath {
 // the field too.  A field given targets records how many it was asked for.
 struct Nav {
     bool slideCoastSafe=false;
-    bool KnockSlideCoastSafe(const idVec3&,const idVec3&,int,float) const { return slideCoastSafe; }
+    bool slideInputSafe=false;
+    bool KnockSlideLandingSafe(const idVec3&,const idVec3&,int,float,const idVec3& wish) const { return slideCoastSafe || (slideInputSafe && wish.x>0.70f && wish.x<0.71f && wish.y>0.70f); }
     bool IsValid() const { return true; }
     int probes=0,searches=0,fields=0,snaps=0,lastTargets=-1;
     bool roam=false,fieldLive=false;
@@ -417,6 +419,7 @@ struct rvBot {
     int traversalCorner=-1,stuckPathCorner=0,goalSelectedTime=0;
     int padHoldSince=0,stuckTime=0,stuckChecks=0,unstickUntil=0,traversalStartTime=0;
     int padApproachEntity=-1,padApproachSince=0,padApproachTime=0,airRecoverReported=0,airRecoverLanded=0;
+    bool airRecoverSliding=false;
     bool airRecovering=false;
     int knockbackTime=0,airborneSince=0,airRecoverPlanTime=0,knockbackFrameTime=-1;
     idVec3 knockbackFrameKick;
@@ -536,9 +539,9 @@ bool airLandingUnsafe=false;
 bool BotAirLandingUnsafe(idPlayer*,idVec3& touchdown) { touchdown={}; return airLandingUnsafe; }
 // The fall simulation is the navmesh's; here a chosen input may be imposed.
 bool airChoiceSet=false; idVec3 airChoice; int airChoices=0;
-void BotChooseAirInput(idPlayer* self,idVec3& wish) {
-    ++airChoices; if(airChoiceSet) { wish=airChoice; return; }
-    wish=idVec3(-self->physics.velocity.x,-self->physics.velocity.y,0); wish.Normalize();
+bool BotChooseAirInput(idPlayer* self,idVec3& wish) {
+    ++airChoices; if(airChoiceSet) { wish=airChoice; return true; }
+    wish=idVec3(-self->physics.velocity.x,-self->physics.velocity.y,0); wish.Normalize(); return true;
 }
 bool BotMoveDirectionSafe(idPlayer*,const idVec3&) { return moveDirectionSafe; }
 // PRODUCTION_FUNCTIONS
@@ -1028,9 +1031,13 @@ void TestAirRecovery() {
     self.pfl.onGround=true; self.physics.velocity={700,-300,0}; self.physics.knockback=200;
     navMesh.slideCoastSafe=true;
     cmd.forwardmove=127;
-    CHECK(bot.RecoverInAir(&self,cmd) && !bot.airRecovering && cmd.forwardmove==0);
+    CHECK(bot.RecoverInAir(&self,cmd) && bot.airRecovering && bot.airRecoverSliding && cmd.forwardmove==0);
+    bot.airRecovering=bot.airRecoverSliding=false;
     navMesh.slideCoastSafe=false;
     CHECK(!bot.RecoverInAir(&self,cmd));
+    navMesh.slideInputSafe=true; cmd={};
+    CHECK(bot.RecoverInAir(&self,cmd) && bot.airRecoverSliding && cmd.forwardmove>0 && cmd.rightmove<0);
+    navMesh.slideInputSafe=false; bot.airRecovering=bot.airRecoverSliding=false;
     self.physics.knockback=0;
     CHECK(!bot.RecoverInAir(&self,cmd));
     airLandingUnsafe=true;
@@ -1204,6 +1211,9 @@ void TestMoveProjection() {
         bot.path.Clear(); bot.pathCorner=0; bot.aimAngles.yaw=0;
         usercmd_t ordinary; bot.ApplyMove({1,0,0},ordinary);
         CHECK(std::fabs(ordinary.forwardmove*physics.CmdScale(ordinary,false)-320*modifier)<0.01f);
+        bot.airRecovering=true; usercmd_t recovery; bot.ApplyMove({1,0,0},recovery);
+        const float recoverySpeed=recovery.forwardmove*physics.CmdScale(recovery,false);
+        CHECK(recoverySpeed<=320.01f && recoverySpeed>316); bot.airRecovering=false;
     }
     std::puts("Movement projection: production ApplyMove/CmdScale preserves full and partial world speed at yaw0/45/90: PASS");
 }

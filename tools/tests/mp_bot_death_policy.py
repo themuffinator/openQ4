@@ -217,6 +217,38 @@ def main() -> None:
             sample.replace(terminal, f"Rhodes {obituary}\n" + terminal), trials)}
         check(rows["air04"]["died"] and not rows["air04"]["survived"],
               "a respawn after a liquid death cannot masquerade as recovery")
+    settle_trial = dict(name="settle", decisive=True, release_input_after_msec=3000)
+    settled = ("MP_BOT_TRIAL_BEGIN settle\nBOT_MOVE_PROBE client=1 time=1\n"
+               "BOT_PROBE_GROUNDED client=1 time=2 health=14\n"
+               "MP_PHYSICS slot=1 grounded=1 health=14 velocity=0 0 0\n"
+               "MP_BOT_RELEASE_INPUT settle\n"
+               "MP_PHYSICS slot=1 grounded=1 health=14 velocity=0 0 0\nMP_BOT_TRIAL_END settle\n")
+    check(policy.assess_trials(settled, [settle_trial])[0]["survived"], "settled controller survives input release")
+    for changed in (settled.replace("MP_BOT_RELEASE_INPUT settle\n", ""),
+                    settled.replace("velocity=0 0 0", "velocity=50 0 0", 1),
+                    settled.replace("grounded=1 health=14", "grounded=0 health=14", 1),
+                    settled.replace("grounded=1 health=14", "grounded=1 health=0", 1),
+                    settled.replace("MP_BOT_RELEASE_INPUT settle\n", "MP_BOT_RELEASE_INPUT settle\nRhodes died\n")):
+        check(not policy.assess_trials(changed, [settle_trial])[0]["survived"],
+              "input release cannot disguise an unsettled, missing or dead recovery")
+    from mp_bot_air_recovery_replay import assess_recovery_trials
+    resumed_trial = dict(name="resumed", decisive=True, expect_survival=True, allow_resumed_navigation=True)
+    resumed = ("MP_BOT_TRIAL_BEGIN resumed\nBOT_MOVE_PROBE client=1 time=1\n"
+               "BOT_PROBE_GROUNDED client=1 time=2 health=18\n"
+               "bot Rhodes: completed drop from 1 2 3 to 4 5 6\n"
+               "bot Rhodes: completed teleport from 4 5 6 to 7 8 9\n"
+               "MP_PHYSICS slot=1 grounded=0 health=18 velocity=10 20 100\nMP_BOT_TRIAL_END resumed\n")
+    accepted = assess_recovery_trials(resumed, [resumed_trial])[0]
+    check(accepted["recovery_passed"] and not accepted["survived"],
+          "resumed navigation is isolated positive recovery evidence, not grounded causal survival")
+    for changed in (resumed.replace("completed teleport", "starting teleport"),
+                    resumed.replace("bot Rhodes:", "bot Voss:"),
+                    resumed.replace("health=18 velocity", "health=0 velocity"),
+                    resumed.replace("MP_PHYSICS", "Rhodes died\nMP_PHYSICS"),
+                    resumed.replace("BOT_PROBE_GROUNDED client=1 time=2 health=18\n", ""),
+                    resumed.replace("MP_BOT_TRIAL_BEGIN resumed\n", "")):
+        check(not assess_recovery_trials(changed, [resumed_trial])[0]["recovery_passed"],
+              "new motion, missing state, other players and death cannot qualify recovery")
     summary = policy.summarise([policy.decide(candidate, outcomes(), True),
                                 policy.decide(candidate, outcomes(survivor="air00"), True)])
     check(summary["navigation_world_deaths"] == 1 and summary["excluded_impulse_deaths"] == 1,

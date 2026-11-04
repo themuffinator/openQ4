@@ -68,9 +68,9 @@ struct idBounds {
     }
 };
 struct CVar { float value; float GetFloat() const { return value; } int GetInteger() const { return int(value); } };
-CVar pm_stepsize{16},pm_jumpheight{48},pm_speed{320},pm_usecylinder{1};
+CVar pm_stepsize{16},pm_jumpheight{48},pm_speed{320},pm_usecylinder{1},pm_frictionoverride{-1};
 CVar bot_debug{0};
-constexpr int MAX_GENTITIES=64, SURF_NODAMAGE=1, MASK_WATER=2;
+constexpr int MAX_GENTITIES=64, SURF_NODAMAGE=1, MASK_WATER=2, SURF_SLICK=4;
 struct idEntity {
     struct Physics { idVec3 origin; const idVec3& GetOrigin() const { return origin; } } physics;
     struct Target { idEntity* entity=nullptr; idEntity* GetEntity() const { return entity; } };
@@ -209,8 +209,8 @@ public:
     bool DodgeJumpClear(const idVec3&,const idVec3&,const idVec3&,float,float=0) const;
     bool PadLanding(idEntity*,const idVec3&,const idVec3*,idVec3&,float* = nullptr,float* = nullptr) const;
     bool LandingSurvivable(const idVec3&,const navCorner_t&,float) const;
-    bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr) const;
-    bool KnockSlideCoastSafe(const idVec3&,const idVec3&,int,float) const;
+    bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr,bool* = nullptr) const;
+    bool KnockSlideLandingSafe(const idVec3&,const idVec3&,int,float,const idVec3& = idVec3()) const;
     bool steeredPad=false;
     bool IsSteeredPadLanding(int,const idVec3&) const { return steeredPad; }
     static const idBounds& GetAgentBounds() { return agentBounds; }
@@ -233,10 +233,13 @@ struct idPlayer {
         const idVec3& GetOrigin() const { return origin; }
         const idVec3& GetLinearVelocity() const { return velocity; }
         const idBounds& GetBounds() const { return agentBounds; }
+        int GetKnockBack() const { return 0; }
     } physics;
     Physics* GetPhysics() { return &physics; }
+    Physics* GetPlayerPhysics() { return &physics; }
     int GetInstance() const { return 0; }
 };
+using idPhysics_Player=idPlayer::Physics;
 constexpr int CONTENTS_TRIGGER=0x100;
 struct idItem {
     bool pickedUp=false,hidden=false;
@@ -668,13 +671,33 @@ int main() {
         // Knockback can carry a grounded player beyond its ordinary stopping
         // reserve before friction returns. Follow the coast to the next floor.
         solids.clear(); Platform(-1024,0,0);
-        CHECK(!nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,0},200,inf));
+        CHECK(!nav.KnockSlideLandingSafe({-120,0,0.25f},{700,0,0},200,inf));
         Platform(80,1024,-32);
-        CHECK(nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,0},200,inf));
-        CHECK(!nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,0},200,0));
-        CHECK(!nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,20},200,inf));
+        CHECK(nav.KnockSlideLandingSafe({-120,0,0.25f},{700,0,0},200,inf));
+        CHECK(!nav.KnockSlideLandingSafe({-120,0,0.25f},{700,0,0},200,0));
+        CHECK(!nav.KnockSlideLandingSafe({-120,0,0.25f},{700,0,20},200,inf));
         transported=true;
-        CHECK(!nav.KnockSlideCoastSafe({-120,0,0.25f},{700,0,0},200,inf));
+        CHECK(!nav.KnockSlideLandingSafe({-120,0,0.25f},{700,0,0},200,inf));
+        transported=false;
+        // Starting steering during the grounded hit can retain the upper
+        // platform even when coasting would leave it over a void.
+        solids.clear(); Platform(-1024,0,0);
+        CHECK(nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0}));
+        CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{1,0,0}));
+        floorMaterial.flags=SURF_SLICK;
+        CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0})); floorMaterial.flags=0;
+        pm_frictionoverride.value=2;
+        CHECK(!nav.KnockSlideLandingSafe({-180,0,0.25f},{700,0,0},200,inf,{-1,0,0})); pm_frictionoverride.value=-1;
+        // Involuntary recovery may aim for a physical hull contact when
+        // every supported landing fails. It remains unsafe for route proof.
+        solids.clear(); Platform(-1,0,0);
+        bool touched=false;
+        CHECK(!nav.AirInputLandingSafe({14,0,10},{0,0,-20},{},inf,nullptr,nullptr,&touched) && touched);
+        idPlayer rimFall; rimFall.physics.origin={14,0,10}; rimFall.physics.velocity={0,0,-20};
+        idVec3 rimInput;
+        CHECK(BotChooseAirInput(&rimFall,rimInput) && rimInput.LengthSqr()==0);
+        transported=true;
+        CHECK(!nav.AirInputLandingSafe({14,0,10},{0,0,-20},{},inf,nullptr,nullptr,&touched) && !touched);
         transported=false;
         // CTF5 rail recovery: first contact is a rim, but inward momentum
         // retains shared hull support until the whole footprint is on floor.

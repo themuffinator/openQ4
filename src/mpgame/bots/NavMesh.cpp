@@ -1043,9 +1043,12 @@ falling after three seconds is a fall into nothing.
 ================
 */
 bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocityIn, const idVec3 &wishIn,
-									 float maxImpactDelta, idVec3 *touchdown, bool *landedSupported ) const {
+									 float maxImpactDelta, idVec3 *touchdown, bool *landedSupported, bool *touchedAffordable ) const {
 	if ( landedSupported ) {
 		*landedSupported = false;
+	}
+	if ( touchedAffordable ) {
+		*touchedAffordable = false;
 	}
 	const idVec3 gravity = gameLocal.GetGravity();
 	if ( gravity.Length() <= 1.0f ) {
@@ -1114,6 +1117,9 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			if ( TransportOnMove( trace.endpos, stop, -1 ) >= 0 ) {
 				return false;
 			}
+			if ( touchedAffordable ) {
+				*touchedAffordable = true;
+			}
 			idVec3 supportedOrigin = trace.endpos;
 			if ( !NavLandingSupported( supportedOrigin ) &&
 				 !RecoveryStepClear( trace.endpos, stop, &supportedOrigin ) ) {
@@ -1140,26 +1146,49 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 	return false;
 }
 
-// Ground contact during knockback does not end the trajectory: friction is
-// disabled and route input still uses air acceleration. Prove a flat-floor
-// coast through that interval, then its fall or ordinary stopping reserve.
-// Steps, walls and slopes need a richer slide solver and remain unproven here.
-bool rvNavMesh::KnockSlideCoastSafe( const idVec3 &origin, const idVec3 &velocityIn,
-		int knockMsec, float maxImpactDelta ) const {
-	if ( knockMsec <= 0 || knockMsec > 1000 || velocityIn.z > 0.0f ) {
+// Ground contact during knockback does not end the trajectory. Prove the
+// selected input through its friction-free slide, then ordinary ground control
+// until stopping is safe or the same input owns the resulting flight.
+// Steps, walls, slick floors and slopes remain unproven by this narrow solver.
+bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &velocityIn,
+		int knockMsec, float maxImpactDelta, const idVec3 &wishIn ) const {
+	if ( knockMsec < 0 || knockMsec > 1000 || pm_frictionoverride.GetFloat() >= 0.0f ) {
 		return false;
+	}
+	idVec3 wish( wishIn.x, wishIn.y, 0.0f );
+	wish.Normalize();
+	if ( velocityIn.z > 0.0f ) {
+		return AirInputLandingSafe( origin, velocityIn, wish, maxImpactDelta );
 	}
 	idVec3 position = origin;
 	idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );
 	const float dt = NAV_PAD_STEP_SECONDS;
+	const float speed = Max( 1.0f, pm_speed.GetFloat() );
 	const idVec3 groundProbe( 0.0f, 0.0f, 2.0f * CM_CLIP_EPSILON );
-	for ( int elapsed = 0; elapsed < knockMsec; elapsed += 16 ) {
+	for ( int elapsed = 0; elapsed < 1000; elapsed += 16 ) {
 		trace_t ground;
 		if ( NavAgentTranslation( ground, position, position - groundProbe ) ) {
-			return AirInputLandingSafe( position, velocity, vec3_origin, maxImpactDelta );
+			return AirInputLandingSafe( position, velocity, wish, maxImpactDelta );
 		}
-		if ( ground.c.normal.z < 0.999f || IsLethalFloor( ground.endpos ) ) {
+		if ( ground.c.normal.z < 0.999f || IsLethalFloor( ground.endpos ) ||
+			 ( ground.c.material && ( ground.c.material->GetSurfaceFlags() & SURF_SLICK ) ) ||
+			 ( gameLocal.LiquidContentsAtPoint( position, NULL ) & MASK_WATER ) ) {
 			return false;
+		}
+		if ( elapsed >= knockMsec ) {
+			const idVec3 stop = position + velocity * ( dt + velocity.Length() / ( 20.0f * speed ) );
+			if ( TransportOnMove( position, stop, -1 ) < 0 && LandingContinuationClear( position, stop ) ) {
+				return true;
+			}
+			const float currentSpeed = velocity.Length();
+			if ( currentSpeed > 0.0f ) {
+				const float drop = Max( currentSpeed, 100.0f ) * 6.0f * dt;
+				velocity *= Max( 0.0f, currentSpeed - drop ) / currentSpeed;
+			}
+		}
+		const float add = speed - velocity * wish;
+		if ( add > 0.0f ) {
+			velocity += wish * Min( add, ( elapsed < knockMsec ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );
 		}
 		trace_t across;
 		const idVec3 next = position + velocity * dt;
@@ -1168,16 +1197,7 @@ bool rvNavMesh::KnockSlideCoastSafe( const idVec3 &origin, const idVec3 &velocit
 		}
 		position = next;
 	}
-	// The next physics frame has ordinary friction/control. If already off
-	// the floor, the air proof owns the rest; never approve just the first touch.
-	trace_t ground;
-	if ( NavAgentTranslation( ground, position, position - groundProbe ) ) {
-		return AirInputLandingSafe( position, velocity, vec3_origin, maxImpactDelta );
-	}
-	const float speed = Max( 1.0f, pm_speed.GetFloat() );
-	const idVec3 stop = position + velocity * ( dt + velocity.Length() / ( 20.0f * speed ) );
-	return ground.c.normal.z >= 0.999f && !IsLethalFloor( ground.endpos ) &&
-		TransportOnMove( position, stop, -1 ) < 0 && LandingContinuationClear( position, stop );
+	return false;
 }
 
 bool rvNavMesh::LandingContinuationClear( const idVec3 &origin, const idVec3 &next ) const {

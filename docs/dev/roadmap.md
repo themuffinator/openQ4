@@ -2175,6 +2175,16 @@ claim peer combinations that have not been tested.
   navigation/control failures and retain strict world-death gates. Qualify route
   generation/think budgets, objectives and real combat; source tests do not close
   the previously failing runtime safety sweep.
+  Follow-through, 4 November: the [terminal-state audit](mp-bots.md#terminal-state-long-match-audit-4-november-2026)
+  completes the earlier impulse requalification: DM8 retains one navigation
+  death and CTF5 two, with three and two proven enemy-impulse exclusions.
+  [Earlier steering and marginal-contact recovery](mp-bots.md#earlier-knockback-control-and-marginal-landings-4-november-2026)
+  repair two additional isolated poses. Sixteen Windows/Linux native reversal
+  controls pass. Ten real-physics recovery outcomes pass their explicit positive
+  criteria, including a settled CTF5 recovery and a DM8 recovery followed by two
+  completed traversals. Their strict original report remains preserved; neither
+  positive-only criterion weakens death exclusions. The second CTF5 departure,
+  current long-match/catalog safety and controlled timing still need closure.
   Follow-through, 3 November: [knockback slide and replay corrections](mp-bots.md#knockback-slide-and-replay-corrections-3-november-2026)
   fix two isolated DM8 failures: route steering spoiled a survivable ground
   slide, and full reverse commands oscillated on a landing rim. Exact-origin

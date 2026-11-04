@@ -6,6 +6,15 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Multiplayer bot recovery follow-up, 4 November 2026
+
+- Bots can steer a dangerous knockback slide before leaving the floor and
+  brake after catching a narrow ledge. Recovery also accounts for movement
+  boosts so its commands match the predicted trajectory.
+- Two additional recorded DM8/CTF5 poses now recover in isolated gameplay.
+  Windows/Linux regression controls pass; long-match safety remains under
+  qualification. See [evidence and limits](mp-bots.md#earlier-knockback-control-and-marginal-landings-4-november-2026).
+
 ## Multiplayer bot knockback recovery, 3 November 2026
 
 - Bots better preserve a safe landing after a rocket or rail hit, including

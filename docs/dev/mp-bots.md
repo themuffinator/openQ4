@@ -5,6 +5,104 @@ authoring or compile step. Bots arrive with a name, a way of playing and
 something to say about it. This describes their behaviour, validation and
 current limits.
 
+## Terminal-state long-match audit, 4 November 2026
+
+Fresh five-minute, six-bot, skill-4 matches on `6357fd37e` retain strict
+world-death failures. DM8 records 284.160 simulated seconds, 107 combat kills,
+162 completed traversals, two stuck events and four world deaths. CTF5 records
+284.144 seconds, 80 kills, 219 traversals, six stuck events and four world deaths.
+Neither records a goal give-up or traversal timeout. Runtime hashes remain
+unchanged; reports are in `.tmp/mp-roadmap/bots-dm8-final/` and
+`bots-ctf5-final/`. These shared-host runs do not qualify controlled timing.
+
+The completed terminal-state causal assessment is recorded separately in
+`.tmp/mp-roadmap/reconciled-classification.json`: DM8 has three excluded enemy
+impulses and one navigation/control death (Voss); CTF5 has two excluded enemy
+impulses and two navigation/control deaths (Sledge). Every exclusion retains
+its complete post-hit envelope and surviving no-hit counterfactual. The raw
+match failures and original interrupted causal reports remain unchanged.
+
+The checker now treats a contiguous shotgun burst as one impulse only when
+victim, time, attacker, origin, damage definition, knockback and every health/
+velocity transition agree. The counterfactual removes the entire burst and
+retains its component pellets. After a complete latest-hit replay proves that
+both the hit and every no-hit control were already lost, the bounded earlier-hit
+search tries stronger kicks first. Later machinegun taps can otherwise exhaust
+the search before its rocket cause. Missing trials or a surviving post-hit
+input still prohibit fallback; the exclusion proof is unchanged. The grouped
+Cortez and prioritized Sledge reruns retain exact-command/runtime checks for
+reused completed batches and fresh logs for changed trials. Their provenance
+is in `grouped-shot-classification/` and `prioritized-impulse-classification/`.
+
+Voss's DM8 hit has a surviving northeast input onto a raised lip. Sledge's
+first CTF5 rail has surviving fixed inputs onto the lower walkway, while the
+controller leaves a marginal touchdown. Sledge's second CTF5 death remains
+unisolated: its earlier rocket controller lands, then begins a later pad flight,
+so that isolated state does not reproduce the match's subsequent departure.
+Neither a live bot at an arbitrary airborne endpoint nor a brief touchdown
+closes the gate. Replays also count drowning, slime and lava obituaries, so a
+respawn cannot disguise a liquid death as survival.
+
+## Earlier knockback control and marginal landings, 4 November 2026
+
+The recorded Voss and Sledge poses expose two additional recovery gaps.
+Grounded knockback can need steering before the airborne flag changes. The
+bounded flat-floor proof now tries the held input, including coasting, then
+sixteen headings through the remaining knockback and ordinary ground control.
+It requires a safe stopping reserve or a proven flight, and refuses slopes,
+steps, walls, slick floors, liquids and custom friction. A new sliding state
+keeps that input until takeoff or safe braking. Recovery commands also respect
+the base speed used by prediction when Haste or Scout boosts movement.
+
+The DM8 ledge has an affordable physical hull touchdown even though it fails
+the broad support required for ordinary routes. When every supported landing
+fails, involuntary recovery now keeps such a touchdown as its last resort,
+then brakes on contact as the fixed-input replay does. This is a recovery
+heuristic, not a new safe-route admission or an impulse-death exclusion.
+Lethal, unaffordable and transport landings cannot supply that fallback.
+The held input survives replanning when it remains the best physical contact.
+The air predictor also models the player's descending step over a nearby lip;
+a continuously supported inward rim landing retains its proved movement.
+
+Several earlier hypotheses were insufficient in the real maps despite passing
+native controls. The original six cases, two new controller poses and two fixed
+input controls are retained in `mp_bot_air_recovery_replay.py`. Failed
+`air-integrated-final`, `early-slide-candidate` and `air-recovery-qualified`
+reports remain in `.tmp/mp-roadmap/`, alongside the focused diagnostic runs.
+The speculative wall-stop and ground-turn simulators were removed.
+
+The CTF5 controller can recover, stop, then select a new pad route before the
+six-second trial ends. Its isolated positive regression therefore reports its
+state at three seconds before releasing bot commands, then lets player/world
+physics run for three more seconds. It passes only if already alive, grounded
+and effectively motionless at release, with no death and a grounded live final
+state. Missing or duplicate release markers, speed, airborne state and deaths
+fail closed. Causal exclusion envelopes continue their original complete trials
+and do not use this release option.
+
+The final ten-case replay retains its original strict report in
+`.tmp/mp-roadmap/air-recovery-final/report.json`. Eight positive cases finish
+alive and grounded, and the deliberately lost pose still dies. The remaining
+DM8 controller lands alive, completes a drop and a teleport, then starts a new
+jump; it is alive but airborne at the six-second endpoint. The separate
+`recovery-assessment.json` records that as positive recovery followed by
+navigation, without changing the original failure or granting a causal
+exclusion. This opt-in assessment requires two completed traversals after
+touchdown, the bot's own markers, a live final state and no world death.
+Missing markers, a single completion, another bot's actions and death all fail.
+All ten expected recovery outcomes pass this assessment, with clean exits and
+unchanged hashes: client
+`2154c46339a1bc10cb92a3caf770544a4c25bb79a5b22bfb1a25ceeb1409f536`,
+MP module `049b97009335419d47b56bf8d82b56ca5e28af039e66669a91755aa0a58be57d`.
+These isolated probes do not qualify continued long-match navigation.
+
+The final native decision and geometry suites pass on Windows and Linux x64,
+with Linux Clang ASan/UBSan and sixteen failing reversal controls. Controls
+include early steering, slide friction/acceleration, affordable marginal contact,
+actual-origin prediction, descending steps, input retention and rim braking.
+Ordinary route support, hazards, transport refusal and boosted command speed
+remain checked. Logs are `.tmp/mp-roadmap/bot-*-touch-brake*.log`.
+
 ## Long-match recovery audit, 3 November 2026
 
 The renewed five-minute, six-bot, skill-4 DM8 audit records 284.128 simulated

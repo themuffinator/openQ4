@@ -39,8 +39,11 @@ def main() -> None:
         "bool rvNavMesh::PadLanding(",
         "bool rvNavMesh::LandingSurvivable(",
         "bool rvNavMesh::AirInputLandingSafe(",
-        "bool rvNavMesh::KnockSlideCoastSafe(",
+        "bool rvNavMesh::KnockSlideLandingSafe(",
     ))
+    physics = (ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8")
+    for name, value in (("PM_ACCELERATE_MP", 15.0), ("PM_FRICTION", 6.0), ("PM_STOPSPEED", 100.0)):
+        assert float(re.search(rf"const float {name}\s*=\s*([\d.]+)f", physics)[1]) == value, name
     header = (ROOT / "src/mpgame/bots/NavMesh.h").read_text(encoding="utf-8")
     bodies = function(header, "ID_INLINE bool NavAirSteer(").replace("ID_INLINE ", "") + "\n" + bodies
     bot = (ROOT / "src/mpgame/bots/Bot.cpp").read_text(encoding="utf-8")
@@ -48,7 +51,7 @@ def main() -> None:
     item = (ROOT / "src/mpgame/Item.cpp").read_text(encoding="utf-8")
     bodies += "\n" + function(item, "bool idItem::TouchesPickup(")
     bodies += "\n" + function(bot, "static int BotRecoveryHealthAt(")
-    bodies += "\n" + function(bot, "static void BotChooseAirInput(")
+    bodies += "\n" + function(bot, "static bool BotChooseAirInput(")
     constants += "\n" + re.search(r"^static const float\s+BOT_EDGE_LOOKAHEAD[^\n]+", bot, re.M).group()
     constants += "\n" + re.search(r"^static const float\s+NAV_AIR_STEER_DEADBAND[^\n]+", header, re.M).group()
     hull = function(nav, "static idTraceModel NavCreateAgentTrace(")
@@ -82,18 +85,18 @@ def main() -> None:
         assert result.returncode != 0, "lifted air-recovery origin mutation escaped"
         print("Live air-recovery origin: artificial lift mutation rejected")
         mutated = fixture.replace(
-            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit ) )",
-            "if ( wish.LengthSqr() > 0.0f && navMesh.AirInputLandingSafe( origin, velocity, wish, limit ) )")
+            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch ) )",
+            "if ( wish.LengthSqr() > 0.0f && navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch ) )")
         assert mutated != fixture
         cpp.write_text(mutated, encoding="utf-8")
         subprocess.run(command, cwd=path, check=True)
         result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
         assert result.returncode != 0, "discarded safe-coast mutation escaped"
         print("Proven air coast: nonzero-only mutation rejected")
-        anchor = "for ( int elapsed = 0; elapsed < knockMsec; elapsed += 16 )"
+        anchor = "for ( int elapsed = 0; elapsed < 1000; elapsed += 16 )"
         assert fixture.count(anchor) == 1
         cpp.write_text(fixture.replace(anchor,
-            "for ( int elapsed = knockMsec; elapsed < knockMsec; elapsed += 16 )"), encoding="utf-8")
+            "for ( int elapsed = 1000; elapsed < 1000; elapsed += 16 )"), encoding="utf-8")
         subprocess.run(command, cwd=path, check=True)
         result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
         assert result.returncode != 0, "omitted friction-free slide mutation escaped"
@@ -112,6 +115,17 @@ def main() -> None:
         result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
         assert result.returncode != 0, "rim-recovery rejection mutation escaped"
         print("Inward rim landing: old rejection mutation failed")
+        for label, anchor, replacement in (
+            ("affordable last-resort contact", "*touchedAffordable = true;", "*touchedAffordable = false;"),
+            ("grounded steering", "velocity += wish * Min( add, ( elapsed < knockMsec ? NAV_PAD_AIR_ACCELERATE : 15.0f ) * dt * speed );",
+             "velocity += wish * 0.0f;"),
+        ):
+            assert fixture.count(anchor) == 1
+            cpp.write_text(fixture.replace(anchor, replacement), encoding="utf-8")
+            subprocess.run(command, cwd=path, check=True)
+            result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
+            assert result.returncode != 0, f"{label} mutation escaped"
+            print(f"{label}: reverted-fix mutation rejected")
         mutated = fixture.replace(
             "const float groundSpeed = speed * ( groundWish ? Min( 1.0f, inputLength ) : 1.0f );",
             "const float groundSpeed = speed;")

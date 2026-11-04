@@ -263,10 +263,18 @@ def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[
         terminal = re.findall(r"^MP_PHYSICS slot=1 grounded=([01]) health=(-?\d+) velocity=.*$", body, re.M)
         final_grounded = bool(terminal and terminal[-1][0] == "1")
         final_health = int(terminal[-1][1]) if terminal else None
+        release_settled = True
+        if trial.get("release_input_after_msec"):
+            marker = f"MP_BOT_RELEASE_INPUT {trial['name']}"
+            sections = re.split(rf"^{re.escape(marker)}$", body, flags=re.M)
+            releases = re.findall(r"^MP_PHYSICS slot=1 grounded=([01]) health=(-?\d+) velocity=([-\d.]+) ([-\d.]+) ([-\d.]+)$",
+                                  sections[0], re.M) if len(sections) == 2 else []
+            release_settled = bool(releases and releases[-1][0] == "1" and int(releases[-1][1]) > 0
+                                   and sum(float(v) ** 2 for v in releases[-1][2:]) <= 1.0)
         survived = (armed and not died and grounded is not None and int(grounded.group(1)) > 0
-                    and final_grounded and final_health > 0)
+                    and release_settled and final_grounded and final_health > 0)
         outcomes.append({**trial, "armed": armed, "died": died, "grounded": grounded is not None,
-                         "final_grounded": final_grounded, "final_health": final_health,
+                         "final_grounded": final_grounded, "final_health": final_health, "release_settled": release_settled,
                          "survived": survived,
                          "reason": ("not armed" if not armed else "died to the world" if died else
                                     "final state missing" if not terminal else
@@ -368,8 +376,20 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
         # repopulates items; player Init clears god/noclip but preserves notarget.
         script += ["set bot_pause 1", "serverMapRestart", "waitMsec 1000", "god", "noclip", f"setviewpos {observer}",
                    neutral, "waitMsec 64", f"echo MP_BOT_TRIAL_BEGIN {trial['name']}",
-                   *trial.get("setup", []), trial["command"], "set bot_pause 0", f"waitMsec {TRIAL_OBSERVE_MSEC}",
-                   "openq4_reportMPState",
+                   *trial.get("setup", []), trial["command"], "set bot_pause 0"]
+        release = trial.get("release_input_after_msec")
+        if release is not None:
+            if not 0 < release < TRIAL_OBSERVE_MSEC:
+                raise ValueError("input release must be inside the observation window")
+            # This optional isolated-recovery mode stops issuing commands after
+            # the controller has settled. World/player physics keeps running;
+            # assessment requires rest BEFORE release as well as final survival.
+            script += [f"waitMsec {release}", "openq4_reportMPState",
+                       f"echo MP_BOT_RELEASE_INPUT {trial['name']}", "set bot_pause 1",
+                       f"waitMsec {TRIAL_OBSERVE_MSEC - release}"]
+        else:
+            script += [f"waitMsec {TRIAL_OBSERVE_MSEC}"]
+        script += ["openq4_reportMPState",
                    f"echo MP_BOT_TRIAL_END {trial['name']}",
                    # A bot that died, or walked off later, would refuse or
                    # spoil the next trial: replace it with a fresh one.

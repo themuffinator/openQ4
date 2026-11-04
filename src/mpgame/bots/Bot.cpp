@@ -629,6 +629,7 @@ rvBot::rvBot( void ) {
 	probeStartTime		= 0;
 	probeAirborneSeen	= false;
 	airRecoverReported	= 0;
+	airRecoverSliding	= false;
 	airRecovering		= false;
 	knockbackTime		= 0;
 	knockbackFrameTime	= -1;
@@ -946,6 +947,7 @@ void rvBot::OnSpawn( void ) {
 	probeAirActive		= false;
 	probeAirborneSeen	= false;
 	airRecoverReported	= 0;
+	airRecoverSliding	= false;
 	airRecovering		= false;
 	knockbackTime		= 0;
 	knockbackFrameTime	= -1;
@@ -4407,7 +4409,7 @@ void rvBot::ApplyMove( const idVec3 &moveDir, usercmd_t &cmd ) const {
 	const bool action = pathCorner >= 0 && pathCorner < path.Num() &&
 		( path[pathCorner].travelType != NAVTRAVEL_WALK ||
 		  ( pathCorner + 1 < path.Num() && path[pathCorner + 1].travelType != NAVTRAVEL_WALK ) );
-	idPlayer *self = ( action || dodgeHopActive ) ? GetPlayer() : NULL;
+	idPlayer *self = ( action || dodgeHopActive || airRecovering ) ? GetPlayer() : NULL;
 	if ( self ) {
 		// Haste/Scout may boost ordinary running, but the trajectory proofs
 		// use base pm_speed for both ground and air wish acceleration.
@@ -4830,18 +4832,20 @@ BotChooseAirInput
 Keep a proven air input, otherwise try the eight braking-relative headings,
 the sixteen world headings used by the recovery audit, then none. Prefer an
 affordable landing with stopping room, then affordable supported ground. If
-none exists, aim for supported floor, favouring a live health pickup, before
-falling back to braking. This never approves a voluntary traversal.
+none exists, retain an affordable physical touchdown as a last resort, then
+a supported floor with a live health pickup, before falling back to braking.
+This never approves a voluntary traversal.
 ================
 */
-static void BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
+static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 	const idVec3 origin = self->GetPhysics()->GetOrigin();
 	const idVec3 &velocity = self->GetPhysics()->GetLinearVelocity();
 	const float limit = BotMaxSafeFallDelta( self );
+	bool heldTouch = false;
 	// Replanning must not replace a still-safe heading with a different one
 	// whose prediction starts from a slightly different point every 200 ms.
-	if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit ) ) {
-		return;
+	if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch ) ) {
+		return true;
 	}
 	idVec3 brake( -velocity.x, -velocity.y, 0.0f );
 	if ( brake.Normalize() <= 1.0f ) {
@@ -4857,6 +4861,8 @@ static void BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 	}
 	idVec3 lastResort = wish;
 	int lastResortHealth = haveLastResort ? BotRecoveryHealthAt( self, lastTouchdown ) : 0;
+	bool haveTouch = heldTouch;
+	idVec3 touchInput = wish;
 	for ( int i = 0; i < 25; i++ ) {
 		idVec3 candidate = vec3_origin;
 		if ( i < 8 ) {
@@ -4867,10 +4873,14 @@ static void BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 			const float angle = DEG2RAD( ( i - 8 ) * 22.5f );
 			candidate.Set( idMath::Cos( angle ), idMath::Sin( angle ), 0.0f );
 		}
-		bool landed = false;
-		if ( navMesh.AirInputLandingSafe( origin, velocity, candidate, limit, NULL, &landed ) ) {
+		bool landed = false, touched = false;
+		if ( navMesh.AirInputLandingSafe( origin, velocity, candidate, limit, NULL, &landed, &touched ) ) {
 			wish = candidate;
-			return;
+			return true;
+		}
+		if ( touched && !haveTouch ) {
+			haveTouch = true;
+			touchInput = candidate;
 		}
 		if ( landed && !haveSupported ) {
 			// Supported floor without the stopping reserve still beats the
@@ -4902,7 +4912,11 @@ static void BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 				candidateSupported, candidateSupported ? BotRecoveryHealthAt( self, candidateTouchdown ) : 0 );
 		}
 	}
-	wish = haveSupported ? supported : ( haveLastResort ? lastResort : brake );
+	// An involuntary fall with no supported solution still benefits from an
+	// affordable physical touchdown (a wall can catch a narrow hull ledge).
+	// This is a last resort, never proof for a voluntary route or an exclusion.
+	wish = haveSupported ? supported : ( haveTouch ? touchInput : ( haveLastResort ? lastResort : brake ) );
+	return haveSupported || haveTouch || haveLastResort;
 }
 
 /*
@@ -4948,20 +4962,43 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 	if ( airRecovering && ( transported || self->health <= 0 ) ) {
 		airRecovering = false;
 	}
-	if ( !airRecovering && self->pfl.onGround && !transported && !traversalStarted &&
+	if ( !airRecovering || !self->pfl.onGround ) {
+		airRecoverSliding = false;
+	}
+	const int knockMsec = static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->GetKnockBack();
+	if ( self->pfl.onGround && !transported && !traversalStarted &&
 		knockbackTime && gameLocal.time - knockbackTime <= BOT_AIR_RECOVER_SLIDE_MSEC &&
-		static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->GetKnockBack() > 0 && speed > pm_speed.GetFloat() &&
+		( airRecoverSliding || ( knockMsec > 0 && speed > pm_speed.GetFloat() ) ) &&
 		!LiquidAtFeet() && navMesh.IsValid() ) {
-		if ( navMesh.KnockSlideCoastSafe( self->GetPhysics()->GetOrigin(), velocity,
-			static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->GetKnockBack(), BotMaxSafeFallDelta( self ) ) ) {
-			// During the hit's friction-free slide, even grounded route input
-			// uses air acceleration. Preserve a safe coast before it leaves the
-			// ledge; airborne recovery alone can start after rescue is impossible.
-			cmd.forwardmove = cmd.rightmove = cmd.upmove = 0;
-			stuckTime = gameLocal.time;
-			return true;
+		const idVec3 origin = self->GetPhysics()->GetOrigin();
+		const idVec3 flat( velocity.x, velocity.y, 0.0f );
+		const idVec3 stop = origin + flat * ( MS2SEC( gameLocal.GetMSec() ) +
+			speed / ( 20.0f * Max( 1.0f, pm_speed.GetFloat() ) ) );
+		if ( airRecoverSliding && knockMsec <= 0 && velocity.z <= 0.0f &&
+			navMesh.LandingContinuationClear( origin, stop ) ) {
+			airRecoverSliding = false;	// ordinary touchdown braking now has room
+		} else {
+			idVec3 wish = airRecoverSliding ? airRecoverWish : vec3_origin;
+			bool proven = velocity.z > 0.0f ? BotChooseAirInput( self, wish ) :
+				navMesh.KnockSlideLandingSafe( origin, velocity, knockMsec, BotMaxSafeFallDelta( self ), wish );
+			for ( int i = 0; !proven && i < 16; i++ ) {
+				const float angle = DEG2RAD( i * 22.5f );
+				wish.Set( idMath::Cos( angle ), idMath::Sin( angle ), 0.0f );
+				proven = navMesh.KnockSlideLandingSafe( origin, velocity, knockMsec, BotMaxSafeFallDelta( self ), wish );
+			}
+			if ( proven ) {
+				airRecoverWish = wish;
+				airRecovering = airRecoverSliding = true;
+				airRecoverPlanTime = gameLocal.time;
+				airRecoverLanded = 0;
+				ApplyMove( wish, cmd );
+				cmd.upmove = 0;
+				stuckTime = gameLocal.time;
+				return true;
+			}
 		}
 	}
+
 	if ( airRecovering && self->pfl.onGround ) {
 		if ( !airRecoverLanded ) {
 			airRecoverLanded = gameLocal.time;
@@ -4984,6 +5021,7 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 			stuckTime = gameLocal.time;
 			return true;
 		}
+
 		if ( speed <= BOT_AIR_RECOVER_STOP_SPEED || gameLocal.time - airRecoverLanded > BOT_AIR_RECOVER_RUNOUT_MSEC ) {
 			airRecovering = false;
 			return false;
