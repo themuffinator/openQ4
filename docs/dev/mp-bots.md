@@ -443,6 +443,15 @@ stage: each ramp case lands alive and completes two further traversals, with
 pass all thirty reversal controls. The committed build still requires the
 complete long-match, catalog and controlled-timing gates.
 
+The committed `f6aa481e6` runtime is preserved in `runtime-ramp.json` and
+`runtime-ramp.zip`. Its 24 hit cases pass `hit-ramp/assessment.json`, which
+records the hashes of both source reports. The original full run passed 23/24:
+the pad approach recovered, then ended airborne during its next jump after
+one completed traversal. `hit-ramp-ctf3-extended/` keeps identical setup and
+commands, extends that observation to eighteen seconds and passes all four
+CTF3 cases. The original failed report remains unchanged. The ten established
+air-recovery cases and two-bot pad traffic also pass on this exact stage.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's
