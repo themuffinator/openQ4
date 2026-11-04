@@ -215,6 +215,7 @@ protected:
 	idPlayer *				GetPlayerDriver( void ) const;
 	void					SendGuiEvent( const char *name ) const;
 	void					SetGuiStateFloat( const char *name, float value ) const;
+	void					PrepareScreens( void ) const;
 	void					PrecacheSound( const char *soundKey, const char *defaultShader = "" ) const;
 	void					PlaySound( const char *soundKey, const char *defaultShader = "" ) const;
 
@@ -282,6 +283,7 @@ void riVehicleCockpitWeapon::Spawn( void ) {
 	reticuleScaleDistance = spawnArgs.GetFloat( "reticuleScaleDistance", "5000" );
 	reticuleInterpolationTime = SEC2MS( spawnArgs.GetFloat( "reticuleInterpolationTime", "1" ) );
 	crosshair = CROSSHAIR_DEFAULT;
+	PrepareScreens();
 }
 
 /*
@@ -333,6 +335,43 @@ void riVehicleCockpitWeapon::UpdateCursorGUI( idUserInterface* gui ) const {
 	gui->SetStateString( "crossImage", material );
 	gui->SetStateString( "crossColor", color );
 	gui->StateChanged( gameLocal.time );
+	// A seated gunner cannot talk to the crew through the hull. Their focus
+	// cursor (or the entering cinematic) must not hide the weapon reticle.
+	gui->HandleNamedEvent( "showCrossCombat" );
+	gui->HandleNamedEvent( "weaponChange" );
+}
+
+void riVehicleCockpitWeapon::PrepareScreens( void ) const {
+	rvVehicle *vehicle = parent.GetEntity();
+	if ( vehicle == NULL ) {
+		return;
+	}
+	// The recovered screens left their event-only timers running at startup.
+	// All lock and magazine states then execute together on the first redraw,
+	// ending at LOCKED/empty regardless of the weapon. Named events restart
+	// only the appropriate timer. Keep the installed artwork and animations.
+	for ( int i = 0; i < MAX_RENDERENTITY_GUI; ++i ) {
+		idUserInterface *&gui = vehicle->GetRenderEntity()->gui[i];
+		if ( gui == NULL ) {
+			continue;
+		}
+		// Noninteractive map GUIs normally share an instance. These screens
+		// receive per-weapon state, so an idle cockpit must not overwrite another
+		// gun's heat, selection, lock or magazine. The unique flag also survives
+		// the ordinary GUI save/restore path.
+		if ( !gui->IsUniqued() ) {
+			gui = uiManager->FindGui( gui->Name(), true, true );
+			if ( gui == NULL ) {
+				continue;
+			}
+			UpdateGuiParms( gui, &vehicle->spawnArgs );
+		}
+		for ( const char *timer : { "firstRocketLoaded", "secondRocketLoaded", "thirdRocketLoaded",
+			"fourthRocketLoaded", "fifthRocketLoaded", "rocketEmpty", "lock_status_notarget",
+			"lock_status_acquiringtarget", "lock_status_lockedtarget", "anim_active_guns", "anim_active_rockets" } ) {
+			gui->SetPresentationValue( va( "%s::notime", timer ), "1" );
+		}
+	}
 }
 
 /*
@@ -1006,6 +1045,8 @@ void riVCWMissileTurret::Spawn( void ) {
 	PrecacheSound( "snd_rightFire" );
 	PrecacheSound( "snd_leftFire" );
 	PrecacheSound( "snd_select", MISSILE_SELECT_SOUND );
+	SendGuiEvent( "lockStatusNoTarget" );
+	SendGuiEvent( "rocketEmpty" );
 }
 
 /*

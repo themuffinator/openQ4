@@ -28,4 +28,7 @@ extern const idEventDef EV_PainLord_AtProcessingStation;
 extern const idEventDef EV_Thread_ControlPointController;
 extern const idEventDef EV_Thread_ControlPercentToWin;
 
+// The Falcon has three views of one ship: on foot and in either turret.
+bool Awakening_DispatchShipStatus( int guiEnum, const char *eventName );
+
 #endif /* !__AWAKENING_SCRIPTEVENTS_H__ */

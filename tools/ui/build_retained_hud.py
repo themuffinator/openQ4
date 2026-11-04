@@ -131,6 +131,25 @@ def build():
             if kind=='icons':
                 aliases(name,prefix+name+'_colored',prefix+name+'_colored.tga')
     for name in ('veh_mgun','veh_rocket','veh_shell'):aliases(name,'gfx/guis/vehicles/'+name)
+    # Awakening cockpit reticles: four rounded brackets, optional range rails,
+    # acquisition arrows, and the friendly-fire veto. Tint remains weapon-owned.
+    corners = 'M0 42V34Q0 22 12 22H32V26H14Q8 26 8 34V42Z '
+    corners += 'M96 22H116Q128 22 128 34V42H120V34Q120 26 114 26H96Z '
+    corners += 'M0 86H8V94Q8 102 14 102H32V106H12Q0 106 0 94Z '
+    corners += 'M120 86H128V94Q128 106 116 106H96V102H114Q120 102 120 94Z'
+    brackets = [path(corners, fill=[1,1,1,.55], stroke=WHITE, width=.7),
+                path('M62.5 62.5L65.5 65.5M65.5 62.5L62.5 65.5', fill=None, stroke=WHITE, width=1)]
+    rails = [path('M5 46H8V82H5Z M120 46H123V82H120Z', fill=[1,1,1,.35], stroke=WHITE, width=.5)]
+    add('aa-space-default',brackets+rails,['gfx/guis/q4x_crosshairs/aa_space_default'])
+    add('aa-space-oor',brackets,['gfx/guis/q4x_crosshairs/aa_space_oor'])
+    add('aa-space-acquire',brackets+rails+[
+        path('M12 48L28 64L12 80Z M116 48L100 64L116 80Z',fill=[1,1,1,.55],stroke=WHITE,width=1)],
+        ['gfx/guis/q4x_crosshairs/aa_space_acquire','gfx/guis/q4x_crosshairs/aa_space_lock'])
+    add('aa-space-friendly',[
+        path('M16 64A48 34 0 1 0 112 64A48 34 0 1 0 16 64Z',fill=None,stroke=[1,1,1,.12],width=2),
+        path('M20 35L108 93M108 35L20 93',fill=None,stroke=WHITE,width=7),
+        path('M20 35L108 93M108 35L20 93',fill=None,stroke=[.5,.5,.5,1],width=5)],
+        ['gfx/guis/q4x_crosshairs/aa_space_friendly'])
     for name in ('marinelogo','strogglogo','quakelogo'):aliases(name,'gfx/guis/mainmenu/'+name)
     for name in ('ctf_flag','onectf_arc','noammo'):aliases(name,'gfx/guis/hud/'+name)
     aliases('frowny','gfx/mp/frowny')

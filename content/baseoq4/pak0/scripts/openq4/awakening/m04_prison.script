@@ -1,0 +1,34 @@
+// Original openQ4 encounter repairs; no recovered map or script is distributed.
+namespace oq4_m04 {
+	// The two repair stops are stationary. Stale repbot_1 bind calls refer to
+	// no actor (and the second even uses the first stop); movement and facing
+	// already hold the real bot at each authored workstation.
+	void tunnelRepair( entity bot ) {
+		while ( isValidEntity( bot ) ) {
+			aiScriptedAnimLoop( bot, "idle", 12 );
+			sys.waitFrame();
+			aiScriptedMoveWait( bot, $tunBot_spot_1, 8, 0 );
+			aiScriptedFaceWait( bot, $func_static_54312, 0 );
+			sys.wait( 1 );
+			aiScriptedActionWait( bot, $func_static_54312, 0 );
+			sys.wait( 0.5 );
+			aiScriptedAnimLoop( bot, "idle", 12 );
+			sys.wait( 1 );
+			aiScriptedMoveWait( bot, $tunBot_spot_2, 8, 0 );
+			aiScriptedFaceWait( bot, $func_static_54314, 0 );
+			sys.wait( 1 );
+			aiScriptedActionWait( bot, $func_static_54314, 0 );
+			sys.wait( 0.5 );
+			aiScriptedAnimLoop( bot, "idle", 12 );
+			sys.wait( 1 );
+		}
+	}
+	// Both landings already have authored cover positions and marine defenders.
+	// Bring each reinforcement onto its own landing during the cell evacuation.
+	void upperReinforcement( entity attacker ) {
+		aiScriptedMove( attacker, $CB1_upr_cvr_pos_1, 16, 1 );
+	}
+	void lowerReinforcement( entity attacker ) {
+		aiScriptedMove( attacker, $CB1_lwr_cvr_pos_1, 16, 1 );
+	}
+}

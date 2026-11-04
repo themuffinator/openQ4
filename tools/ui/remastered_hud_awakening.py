@@ -183,6 +183,8 @@ def ship_panel(doc: HudDocument, *, always: bool, cone: bool) -> dict:
     panel = box("ship", u(PANEL_X), u(PANEL_Y), u(128), u(128), layers, **{"display": ui.keyword("block" if always else "none")})
     if not always:
         doc.show("ship", S("oq4.ship"))
+        doc.on("aa_showShipStatusOn", {"op": "setState", "values": {"oq4.ship": True}})
+        doc.on("aa_showShipStatusOff", {"op": "setState", "values": {"oq4.ship": False}})
     # A joining peer finds the markers spinning.
     doc.joins.append(play("ship-spin"))
     return panel
