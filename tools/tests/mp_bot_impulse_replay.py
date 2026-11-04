@@ -442,7 +442,13 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
                    # The removed client takes a moment to leave its slot.
                    "removebot Rhodes", f"waitMsec {TRIAL_REMOVE_MSEC}", "addbot Rhodes 4 exact", f"waitMsec {TRIAL_RESPAWN_MSEC}"]
     script += ["echo MP_BOT_REPLAY_END", "quit"]
-    (game / "impulse_replay.cfg").write_text("\n".join(script) + "\n", encoding="utf-8")
+    config = "\n".join(script) + "\n"
+    # CmdSystem's text buffer is 64 KiB, including commands already queued
+    # around exec. Dense extended probes must split trials or sample less
+    # often; silently dropping the script leaves a hidden server running.
+    if len(config.encode("utf-8")) >= 60 * 1024:
+        raise ValueError("replay script exceeds the command-buffer budget; split trials or increase sample_msec")
+    (game / "impulse_replay.cfg").write_text(config, encoding="utf-8")
     cvars = {
         "win_allowMultipleInstances" if os.name == "nt" else "sys_allowMultipleInstances": "1",
         "sys_consoleWindow": "0", "in_tty": "0", "in_mouse": "0", "in_joystick": "0",

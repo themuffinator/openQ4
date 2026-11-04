@@ -27,7 +27,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from mp_round_remote_smoke import verify_runtime_is_current
+from mp_round_remote_smoke import verify_runtime_is_current, write_script
 
 try:
     import psutil
@@ -63,6 +63,56 @@ NAV_EVENTS = {
 
 def strip_colours(text: str) -> str:
     return re.sub(r"\^[0-9a-zA-Z]", "", text)
+
+
+class SimulationProgress:
+    """Read only complete server-clock lines inside one audit window."""
+
+    def __init__(self):
+        self.pending = ""
+        self.started = False
+        self.valid = True
+        self.first = None
+        self.last = None
+        self.offset = 0
+
+    def feed(self, text: str):
+        lines = (self.pending + text).split("\n")
+        self.pending = lines.pop()
+        for line in lines:
+            if "MP_" not in line:
+                continue
+            line = strip_colours(line).strip()
+            if line == "MP_BOT_AUDIT_BEGIN":
+                if self.started:
+                    self.valid = False  # never borrow time from a restarted audit
+                self.started = True
+            elif self.started and (match := re.match(r"MP_STATE time=(\d+) ", line)):
+                current = int(match[1])
+                if self.last is not None and current < self.last:
+                    self.valid = False
+                if self.first is None:
+                    self.first = current
+                self.last = current
+
+    def poll(self, path: Path):
+        try:
+            with path.open("rb") as source:
+                source.seek(0, os.SEEK_END)
+                if source.tell() < self.offset:
+                    self.valid = False
+                    return
+                source.seek(self.offset)
+                text = source.read()
+                self.offset = source.tell()
+        except OSError:
+            return
+        self.feed(text.decode("utf-8", errors="replace"))
+
+    @property
+    def seconds(self):
+        return ((self.last - self.first) / 1000.0
+                if self.valid and self.first is not None and self.last is not None else None)
 
 
 def world_deaths(text: str, bot_names: set[str]) -> list[str]:
@@ -118,6 +168,8 @@ def main() -> int:
     parser.add_argument("--seconds", type=int, default=120)
     parser.add_argument("--min-sim-seconds", type=int, default=None,
                         help="require this much observed server time, independent of wall-clock waits")
+    parser.add_argument("--extend-to-min-sim", action="store_true",
+                        help="after --seconds, keep observing until the logged minimum server time or timeout")
     parser.add_argument("--port", type=int, default=28972)
     parser.add_argument("--timeout", type=int, default=0, help="defaults to seconds + 150")
     parser.add_argument("--profile-period", type=int, default=10)
@@ -140,6 +192,8 @@ def main() -> int:
         parser.error(f"use 2 to {len(NAMES)} bots")
     if args.min_sim_seconds is not None and args.min_sim_seconds < 1:
         parser.error("--min-sim-seconds must be positive")
+    if args.extend_to_min_sim and args.min_sim_seconds is None:
+        parser.error("--extend-to-min-sim requires --min-sim-seconds")
     if args.classify_impulses and (args.debug < 2 or args.max_world_deaths is None):
         parser.error("--classify-impulses needs --debug 2 (BOT_IMPULSE traces) and --max-world-deaths")
     if args.require_uncontended and psutil is None:
@@ -178,9 +232,16 @@ def main() -> int:
         script.append("set com_speeds 1")
     for _ in range(args.seconds // 5):
         script += ["waitMsec 5000", "openq4_reportMPState"]
-    if args.speeds:
-        script.append("set com_speeds 0")
-    script += ["echo MP_BOT_AUDIT_END", "quit"]
+    finish = (["set com_speeds 0"] if args.speeds else []) + ["echo MP_BOT_AUDIT_END", "quit"]
+    finish_path = game / "bot_audit_finish.cfg"
+    if args.extend_to_min_sim:
+        # The launcher publishes completion only after reading sufficient
+        # server time. Missing logs or a stalled clock reach the normal hard
+        # timeout and fail; neither can shorten or waive the duration gate.
+        write_script(finish_path, ["waitMsec 5000", "openq4_reportMPState", "exec bot_audit_finish.cfg"])
+        script.append("exec bot_audit_finish.cfg")
+    else:
+        script += finish
     (game / "bot_audit.cfg").write_text("\n".join(script) + "\n", encoding="utf-8")
 
     cvars = {
@@ -221,6 +282,10 @@ def main() -> int:
     cpu_samples: list[tuple[float, float]] = []
     competing_workloads: set[tuple[int, str]] = set()
     competing_details: dict[tuple[int, float], dict] = {}
+    progress = SimulationProgress()
+    finish_published = False
+    extension_error = None
+    next_progress_poll = 0.0
     with (output / "console.log").open("w", encoding="utf-8") as console:
         process = subprocess.Popen(command, cwd=runtime, stdout=console, stderr=subprocess.STDOUT,
                                    creationflags=creationflags)
@@ -251,6 +316,18 @@ def main() -> int:
             try:
                 code = process.wait(timeout=0.5)
             except subprocess.TimeoutExpired:
+                if args.extend_to_min_sim and not finish_published and time.monotonic() >= next_progress_poll:
+                    next_progress_poll = time.monotonic() + 5.0
+                    progress.poll(log_path)
+                    if progress.seconds is not None and progress.seconds >= args.min_sim_seconds:
+                        try:
+                            write_script(finish_path, finish)
+                        except OSError as error:
+                            extension_error = str(error)
+                            process.kill()
+                            code = process.wait()
+                            break
+                        finish_published = True
                 # The fatal-error UI can keep a hidden process alive forever.
                 # Its own engine log is sufficient evidence; stop only this
                 # audit's child instead of waiting out the startup timeout.
@@ -276,6 +353,8 @@ def main() -> int:
     sample = measured.partition("\nMP_BOT_AUDIT_END")[0]
 
     failures = []
+    if extension_error:
+        failures.append("could not publish audit completion: " + extension_error)
     if code != 0 or "\nMP_BOT_AUDIT_END" not in clean:
         failures.append(f"server failed to complete (exit {code})")
     errors = re.findall(r"^.*(?:ERROR:|FATAL:|Assertion failed).*$", clean, re.M)
@@ -412,11 +491,13 @@ def main() -> int:
         runtime_unchanged = False
     if not runtime_unchanged:
         failures.append("staged runtime changed during the match or its causal replays")
-    minutes = max(args.seconds / 60.0, 1e-6)
+    rate_window_seconds = 5.0 * len(game_times) if args.extend_to_min_sim else args.seconds
+    minutes = max(rate_window_seconds / 60.0, 1e-6)
     bot_minutes = minutes * args.bots
     report = {
         "map": args.map_name, "gametype": args.gametype, "bots": args.bots, "skill": args.skill,
         "seconds": args.seconds, "exit_code": code, "elapsed_seconds": round(time.time() - started, 1),
+        "extend_to_min_sim": args.extend_to_min_sim, "rate_window_seconds": rate_window_seconds,
         "runtime_identity": runtime_identity,
         "runtime_unchanged": runtime_unchanged,
         "navmesh": {"nodes": int(navmesh.group(1)), "links": int(navmesh.group(2)),

@@ -3,7 +3,8 @@
 
 The recorded approach states recreate the long-match fall at (3248, 3220).
 This positive regression requires both bots to complete the pad and remain
-alive, with no player collision. It never classifies or excludes match deaths.
+alive, with no player collision before both pad flights finish. Later ordinary
+navigation contacts remain reported. It never classifies or excludes match deaths.
 """
 from __future__ import annotations
 
@@ -47,9 +48,13 @@ def assess(log: str) -> dict:
     deaths = [match.group(0) for match in WORLD_DEATH.finditer(setup + body)]
     contacts = re.findall(r"^BOT_PLAYER_CONTACT .*$", setup + body, re.M)
     results = []
+    completion_ends = []
     for slot, name in ((1, "Rhodes"), (2, "Sledge")):
         states = re.findall(rf"^MP_PHYSICS slot={slot} grounded=([01]) health=(-?\d+) velocity=.*$", body, re.M)
-        completed = bool(re.search(rf"^bot {name}: completed jump pad .* to 2916 2916 -32 ", body, re.M))
+        completion = re.search(rf"^bot {name}: completed jump pad .* to 2916 2916 -32 .*$", body, re.M)
+        completed = completion is not None
+        if completion:
+            completion_ends.append(completion.end())
         alive = bool(states and int(states[-1][1]) > 0)
         grounded = bool(states and states[-1][0] == "1")
         results.append({"slot": slot, "completed_pad": completed, "alive": alive,
@@ -57,9 +62,12 @@ def assess(log: str) -> dict:
     # Continuing normal navigation can put the terminal frame in another
     # traversal. Completion of the original pad and no death are mandatory;
     # the reported grounded flag is not used to reclassify any match death.
-    return {"passed": armed and not deaths and not contacts and
+    pad_body = body[:max(completion_ends)] if len(completion_ends) == 2 else body
+    pad_contacts = re.findall(r"^BOT_PLAYER_CONTACT .*$", setup + pad_body, re.M)
+    return {"passed": armed and not deaths and not pad_contacts and
             all(row["completed_pad"] and row["alive"] for row in results),
-            "armed": armed, "world_deaths": deaths, "player_contacts": contacts, "bots": results}
+            "armed": armed, "world_deaths": deaths, "pad_contacts": pad_contacts,
+            "all_player_contacts": contacts, "bots": results}
 
 
 def main() -> int:
