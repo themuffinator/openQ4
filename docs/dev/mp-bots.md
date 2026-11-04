@@ -188,10 +188,20 @@ lines and clock resets cannot supply elapsed simulation time. The default fixed
 window and final duration/death criteria remain unchanged; Windows/Linux clock
 controls and a stock-map pilot pass. `long-hop-duration/` repeats CTF5 and
 DeadZone for 277.984 and 278.080 observed seconds, respectively. CTF5 records
-82 kills, 188 traversals and five deaths awaiting causal assessment; DeadZone
-records 55 kills, 78 traversals and no world deaths. The earlier short reports
-are retained. The frozen-stage full catalog and causal replays are continuing;
-remaining failure fixes and controlled timing are still required. Shared-host
+82 kills, 188 traversals and five deaths; four pass causal exclusion. Kane's
+remaining case fails closed because fixed input `air04` is still alive and
+airborne at six seconds, while the other post-hit inputs and controller die.
+DeadZone records 55 kills, 78 traversals and no world deaths. The combined
+same-runtime four-map assessment records 334 kills, 551 traversals, 11 raw
+deaths, ten exclusions and that unresolved case (`long-hop-combined/`). It does
+not erase the earlier short runs or the two CTF5 failures in `long-hop/`.
+
+The complete `catalog-hop/` sweep reaches all 33 variants with at least 97.216
+observed seconds each, 915 kills and 1,283 traversals. DM8's one death and CTF5's
+two pass strict causal exclusion. DM6's one death after a shotgun hit still
+needs replay, so `catalog-hop/assessment.json` remains failed. The sweep also
+retains 125 stuck events, five goal give-ups and one traversal timeout (DM6).
+Remaining failure fixes and controlled timing are still required. Shared-host
 frame-trace runs do not establish performance budgets.
 
 The CTF5 ramp reconstruction records a world collision at
