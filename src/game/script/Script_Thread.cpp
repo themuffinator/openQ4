@@ -3,6 +3,7 @@
 
 
 #include "../Game_local.h"
+#include "../awakening/ScriptEvents.h"
 
 const idEventDef EV_Thread_Execute( "<execute>", NULL );
 const idEventDef EV_Thread_SetCallback( "<script_setcallback>", NULL );
@@ -2241,6 +2242,9 @@ idThread::Event_SendNamedEvent
 ===============================
 */
 void idThread::Event_SendNamedEvent( int guiEnum, const char *namedEvent ) {
+	if ( Awakening_DispatchShipStatus( guiEnum, namedEvent ) ) {
+		return;
+	}
 
 	typedef enum {
 		SNE_PLAYERHUD = 0,

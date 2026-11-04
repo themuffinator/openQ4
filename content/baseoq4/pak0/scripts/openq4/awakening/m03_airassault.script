@@ -1,0 +1,94 @@
+// Original openQ4 repairs; runs against the player's installed Awakening map.
+#include "scripts/doom_defs.script"
+namespace oq4_m03 {
+	// Repair rewards must replenish the actual damageable hull. The alpha only
+	// adds them to its failure comparison; idMover stops taking damage at zero,
+	// making the ship immortal after the first repair. Consume each credit once.
+	void monitorRepairs() {
+		float restored;
+		float hull;
+		while ( isValidEntity( $drop_ship ) ) {
+			hull = $drop_ship.getHealth();
+			restored = map_m03aa::DSHEALTHADD;
+			if ( restored > 0 ) {
+				map_m03aa::DSHEALTHADD = 0;
+				if ( hull > 0 ) {
+					hull = hull + restored;
+					if ( hull > map_m03aa::DROPSHIP_HEALTH ) {
+						hull = map_m03aa::DROPSHIP_HEALTH;
+					}
+					$drop_ship.setHealth( hull );
+				}
+			}
+			// The original monitor can yield for dialogue with an old health
+			// sample. Reconcile every frame so it cannot relatch a repaired section.
+			if ( hull > map_m03aa::GLOBAL_DS_HEALTH_80 && map_m03aa::GUI_80 ) {
+				map_m03aa::GUI_80 = false;
+				sys.sendNamedEvent( GUI_PLAYERHUD, "ship_health_01_off" );
+			}
+			if ( hull > map_m03aa::GLOBAL_DS_HEALTH_60 && map_m03aa::GUI_60 ) {
+				map_m03aa::GUI_60 = false;
+				sys.sendNamedEvent( GUI_PLAYERHUD, "ship_health_02_off" );
+			}
+			if ( hull > map_m03aa::GLOBAL_DS_HEALTH_40 && map_m03aa::GUI_40 ) {
+				map_m03aa::GUI_40 = false;
+				sys.sendNamedEvent( GUI_PLAYERHUD, "ship_health_03_off" );
+			}
+			if ( hull > map_m03aa::GLOBAL_DS_HEALTH_20 && map_m03aa::GUI_20 ) {
+				map_m03aa::GUI_20 = false;
+				sys.sendNamedEvent( GUI_PLAYERHUD, "ship_health_04_off" );
+			}
+			if ( hull > map_m03aa::GLOBAL_DS_HEALTH_10 && map_m03aa::GUI_10 ) {
+				map_m03aa::GUI_10 = false;
+				sys.sendNamedEvent( GUI_PLAYERHUD, "ship_health_05_off" );
+			}
+			sys.waitFrame();
+		}
+	}
+
+	void remindEngineEngage() {
+		while ( map_m03aa::EVENT_ENGINE ) {
+			sys.wait( 5 );
+			if ( map_m03aa::EVENT_ENGINE ) {
+				radioChatterPlayWait( $radiochatter, "vo_marks_dekprsseng" );
+			}
+			sys.wait( 3 );
+			if ( map_m03aa::EVENT_ENGINE ) {
+				radioChatterPlayWait( $radiochatter, "vo_marks_deknow" );
+			}
+		}
+	}
+
+	// Each terminal press owns one step. The alpha's first invocation waits for
+	// the second, then falls through and executes the reward/completion again.
+	void restartEngine() {
+		if ( !map_m03aa::EVENT_ENGINE ) {
+			return;
+		}
+		if ( map_m03aa::ENGINE_STEP_1 ) {
+			map_m03aa::ENGINE_STEP_1 = false;
+			$forwardgui.setGuiParm( "noninteractive", 1 );
+			sys.trigger( $enginefire_fx_1 );
+			sys.trigger( $enginefire_fx_2 );
+			sys.trigger( $enginefire_fx_3 );
+			$enginesmoke_fx_1.remove();
+			$enginesmoke_fx_2.remove();
+			$engine_thrust_fx_1.hide();
+			$forwardgui.guiEvent( "enginestep1" );
+			radioChatterPlayWait( $radiochatter, "vo_vansen_okport" );
+			sys.wait( 2 );
+			radioChatterPlayWait( $radiochatter, "vo_vansen_reactclr" );
+			$forwardgui.guiEvent( "enginestep2" );
+			radioChatterPlay( $radiochatter, "vo_vansen_pressengag" );
+			map_m03aa::ENGINE_STEP_2 = true;
+			$forwardgui.setGuiParm( "noninteractive", 0 );
+			thread remindEngineEngage();
+			return;
+		}
+		if ( map_m03aa::ENGINE_STEP_2 ) {
+			// The installed completion keeps its dialogue, objective and return-to-
+			//gun choreography. It closes EVENT_ENGINE before its first yield.
+			map_m03aa::engineFireOut();
+		}
+	}
+}

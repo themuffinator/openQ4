@@ -133027,6 +133027,2832 @@
         ]
       },
       {
+        "id": "aa-space-default",
+        "type": "vector",
+        "properties": {
+          "position": {
+            "type": "keyword",
+            "value": "absolute"
+          },
+          "left": {
+            "type": "length",
+            "value": 0,
+            "unit": "dp"
+          },
+          "top": {
+            "type": "length",
+            "value": 0,
+            "unit": "dp"
+          },
+          "width": {
+            "type": "length",
+            "value": 128,
+            "unit": "dp"
+          },
+          "height": {
+            "type": "length",
+            "value": 128,
+            "unit": "dp"
+          },
+          "display": {
+            "type": "keyword",
+            "value": "none"
+          }
+        },
+        "paths": [
+          {
+            "id": "p0",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.09375
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.109375
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p8",
+                "op": "close"
+              },
+              {
+                "id": "p9",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p10",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.90625
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p11",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p12",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p13",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p14",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p15",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.890625
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p16",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p17",
+                "op": "close"
+              },
+              {
+                "id": "p18",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p19",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p20",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p21",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.109375
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p22",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p23",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p24",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.09375
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p25",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p26",
+                "op": "close"
+              },
+              {
+                "id": "p27",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p28",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p29",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p30",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.90625
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p31",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p32",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p33",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.890625
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p34",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p35",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "solid",
+              "color": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  0.55
+                ]
+              }
+            },
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 0.7,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          },
+          {
+            "id": "p1",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.48828125
+                    },
+                    {
+                      "fraction": 0.48828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.51171875
+                    },
+                    {
+                      "fraction": 0.51171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.51171875
+                    },
+                    {
+                      "fraction": 0.48828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.48828125
+                    },
+                    {
+                      "fraction": 0.51171875
+                    }
+                  ]
+                ]
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 1.0,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          },
+          {
+            "id": "p2",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0390625
+                    },
+                    {
+                      "fraction": 0.359375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.359375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.640625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0390625
+                    },
+                    {
+                      "fraction": 0.640625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "close"
+              },
+              {
+                "id": "p5",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.359375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9609375
+                    },
+                    {
+                      "fraction": 0.359375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9609375
+                    },
+                    {
+                      "fraction": 0.640625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p8",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.640625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p9",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "solid",
+              "color": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  0.35
+                ]
+              }
+            },
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 0.5,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          }
+        ]
+      },
+      {
+        "id": "aa-space-oor",
+        "type": "vector",
+        "properties": {
+          "position": {
+            "type": "keyword",
+            "value": "absolute"
+          },
+          "left": {
+            "type": "length",
+            "value": 0,
+            "unit": "dp"
+          },
+          "top": {
+            "type": "length",
+            "value": 0,
+            "unit": "dp"
+          },
+          "width": {
+            "type": "length",
+            "value": 128,
+            "unit": "dp"
+          },
+          "height": {
+            "type": "length",
+            "value": 128,
+            "unit": "dp"
+          },
+          "display": {
+            "type": "keyword",
+            "value": "none"
+          }
+        },
+        "paths": [
+          {
+            "id": "p0",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.09375
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.109375
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p8",
+                "op": "close"
+              },
+              {
+                "id": "p9",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p10",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.90625
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p11",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p12",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p13",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p14",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p15",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.890625
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p16",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p17",
+                "op": "close"
+              },
+              {
+                "id": "p18",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p19",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p20",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p21",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.109375
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p22",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p23",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p24",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.09375
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p25",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p26",
+                "op": "close"
+              },
+              {
+                "id": "p27",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p28",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p29",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p30",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.90625
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p31",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p32",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p33",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.890625
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p34",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p35",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "solid",
+              "color": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  0.55
+                ]
+              }
+            },
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 0.7,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          },
+          {
+            "id": "p1",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.48828125
+                    },
+                    {
+                      "fraction": 0.48828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.51171875
+                    },
+                    {
+                      "fraction": 0.51171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.51171875
+                    },
+                    {
+                      "fraction": 0.48828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.48828125
+                    },
+                    {
+                      "fraction": 0.51171875
+                    }
+                  ]
+                ]
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 1.0,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          }
+        ]
+      },
+      {
+        "id": "aa-space-acquire",
+        "type": "vector",
+        "properties": {
+          "position": {
+            "type": "keyword",
+            "value": "absolute"
+          },
+          "left": {
+            "type": "length",
+            "value": 0,
+            "unit": "dp"
+          },
+          "top": {
+            "type": "length",
+            "value": 0,
+            "unit": "dp"
+          },
+          "width": {
+            "type": "length",
+            "value": 128,
+            "unit": "dp"
+          },
+          "height": {
+            "type": "length",
+            "value": 128,
+            "unit": "dp"
+          },
+          "display": {
+            "type": "keyword",
+            "value": "none"
+          }
+        },
+        "paths": [
+          {
+            "id": "p0",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.09375
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.109375
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p8",
+                "op": "close"
+              },
+              {
+                "id": "p9",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p10",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.90625
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p11",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.171875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p12",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p13",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.328125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p14",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p15",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.890625
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p16",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.203125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p17",
+                "op": "close"
+              },
+              {
+                "id": "p18",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p19",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p20",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p21",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.109375
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p22",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p23",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.25
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p24",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.09375
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p25",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.0
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p26",
+                "op": "close"
+              },
+              {
+                "id": "p27",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p28",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.671875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p29",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p30",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 1.0
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.90625
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p31",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p32",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.75
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p33",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.890625
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p34",
+                "op": "quadratic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.796875
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p35",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "solid",
+              "color": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  0.55
+                ]
+              }
+            },
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 0.7,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          },
+          {
+            "id": "p1",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.48828125
+                    },
+                    {
+                      "fraction": 0.48828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.51171875
+                    },
+                    {
+                      "fraction": 0.51171875
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.51171875
+                    },
+                    {
+                      "fraction": 0.48828125
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.48828125
+                    },
+                    {
+                      "fraction": 0.51171875
+                    }
+                  ]
+                ]
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 1.0,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          },
+          {
+            "id": "p2",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0390625
+                    },
+                    {
+                      "fraction": 0.359375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.359375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0625
+                    },
+                    {
+                      "fraction": 0.640625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.0390625
+                    },
+                    {
+                      "fraction": 0.640625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "close"
+              },
+              {
+                "id": "p5",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.359375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9609375
+                    },
+                    {
+                      "fraction": 0.359375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9609375
+                    },
+                    {
+                      "fraction": 0.640625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p8",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.9375
+                    },
+                    {
+                      "fraction": 0.640625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p9",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "solid",
+              "color": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  0.35
+                ]
+              }
+            },
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 0.5,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          },
+          {
+            "id": "p3",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.09375
+                    },
+                    {
+                      "fraction": 0.375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.21875
+                    },
+                    {
+                      "fraction": 0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.09375
+                    },
+                    {
+                      "fraction": 0.625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "close"
+              },
+              {
+                "id": "p4",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.90625
+                    },
+                    {
+                      "fraction": 0.375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.78125
+                    },
+                    {
+                      "fraction": 0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p6",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.90625
+                    },
+                    {
+                      "fraction": 0.625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p7",
+                "op": "close"
+              }
+            ],
+            "fill": {
+              "type": "solid",
+              "color": {
+                "type": "color",
+                "value": [
+                  1,
+                  1,
+                  1,
+                  0.55
+                ]
+              }
+            },
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 1.0,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          }
+        ]
+      },
+      {
+        "id": "aa-space-friendly",
+        "type": "vector",
+        "properties": {
+          "position": {
+            "type": "keyword",
+            "value": "absolute"
+          },
+          "left": {
+            "type": "length",
+            "value": 0,
+            "unit": "dp"
+          },
+          "top": {
+            "type": "length",
+            "value": 0,
+            "unit": "dp"
+          },
+          "width": {
+            "type": "length",
+            "value": 128,
+            "unit": "dp"
+          },
+          "height": {
+            "type": "length",
+            "value": 128,
+            "unit": "dp"
+          },
+          "display": {
+            "type": "keyword",
+            "value": "none"
+          }
+        },
+        "paths": [
+          {
+            "id": "p0",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.125
+                    },
+                    {
+                      "fraction": 0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "cubic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.125
+                    },
+                    {
+                      "fraction": 0.646700625
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.292893203125
+                    },
+                    {
+                      "fraction": 0.765625
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.5
+                    },
+                    {
+                      "fraction": 0.765625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "cubic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.707106796875
+                    },
+                    {
+                      "fraction": 0.765625
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.875
+                    },
+                    {
+                      "fraction": 0.646700625
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.875
+                    },
+                    {
+                      "fraction": 0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "cubic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.875
+                    },
+                    {
+                      "fraction": 0.353299375
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.707106796875
+                    },
+                    {
+                      "fraction": 0.234375
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.5
+                    },
+                    {
+                      "fraction": 0.234375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p4",
+                "op": "cubic",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.292893203125
+                    },
+                    {
+                      "fraction": 0.234375
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.125
+                    },
+                    {
+                      "fraction": 0.353299375
+                    }
+                  ],
+                  [
+                    {
+                      "fraction": 0.125
+                    },
+                    {
+                      "fraction": 0.5
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p5",
+                "op": "close"
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    0.12
+                  ]
+                }
+              },
+              "widthDp": 2.0,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          },
+          {
+            "id": "p1",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.15625
+                    },
+                    {
+                      "fraction": 0.2734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.84375
+                    },
+                    {
+                      "fraction": 0.7265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.84375
+                    },
+                    {
+                      "fraction": 0.2734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.15625
+                    },
+                    {
+                      "fraction": 0.7265625
+                    }
+                  ]
+                ]
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 7.0,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          },
+          {
+            "id": "p2",
+            "commands": [
+              {
+                "id": "p0",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.15625
+                    },
+                    {
+                      "fraction": 0.2734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p1",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.84375
+                    },
+                    {
+                      "fraction": 0.7265625
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p2",
+                "op": "move",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.84375
+                    },
+                    {
+                      "fraction": 0.2734375
+                    }
+                  ]
+                ]
+              },
+              {
+                "id": "p3",
+                "op": "line",
+                "points": [
+                  [
+                    {
+                      "fraction": 0.15625
+                    },
+                    {
+                      "fraction": 0.7265625
+                    }
+                  ]
+                ]
+              }
+            ],
+            "stroke": {
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "type": "color",
+                  "value": [
+                    0.5,
+                    0.5,
+                    0.5,
+                    1
+                  ]
+                }
+              },
+              "widthDp": 5.0,
+              "minimumPixels": 0,
+              "join": "round",
+              "cap": "round"
+            }
+          }
+        ]
+      },
+      {
         "id": "solid",
         "type": "vector",
         "properties": {

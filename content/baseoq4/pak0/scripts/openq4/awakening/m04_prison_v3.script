@@ -1,0 +1,34 @@
+// Append new callbacks without changing helpers referenced by existing saves.
+#include "scripts/openq4/awakening/m04_prison_v2.script"
+
+namespace oq4_m04_v3 {
+	void unlockSecurity() {
+		// Claim completion before starting any deferred dialogue. This console
+		// is an override, not a toggle for the alarm, shutters and AAS barrier.
+		if ( SECROOMSPECS ) {
+			return;
+		}
+		SECROOMSPECS = 1;
+		$func_static_54011.setGuiParm( "noninteractive", "1" );
+		unlockSecRoomDoors();
+	}
+
+	void turretApproach() {
+		thread cellblock3_prisoners();
+		// Decide once, before yielding. A camera destroyed during the attack
+		// cannot also take the bypass and start a second door-hacking thread.
+		if ( !isLivingEntity( $prison_camera_8 ) ) {
+			sys.trigger( $trigger_relay_25 );
+			return;
+		}
+		// Preserve the authored staggered arrival and balcony jump. The two
+		// deaths feed trigger_count_6, then the same one-shot relay as the bypass.
+		sys.wait( 2 );
+		sys.trigger( $monster_grunt_2 );
+		sys.waitFrame();
+		aiScriptedMoveWait( $monster_grunt_2, $Tbalcony_jumpdown_pos_3, 8, 0 );
+		aiScriptedAnimWait( $monster_grunt_2, "jump128", 8, 1 );
+		sys.wait( 2 );
+		sys.trigger( $monster_gunner_1 );
+	}
+}

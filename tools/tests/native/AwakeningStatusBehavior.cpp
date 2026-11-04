@@ -22,6 +22,7 @@ enum { ANIMCHANNEL_ALL, ANIMCHANNEL_TORSO, ANIMCHANNEL_LEGS, ANIM_NumAnimChannel
 enum { INVALID_JOINT=-1, MOVE_STATUS_DONE=1, MASK_SHOT_RENDERMODEL=2, SND_CHANNEL_ANY=3, SND_CHANNEL_VOICE=4, SND_CHANNEL_VOICE2=5, SND_CHANNEL_DAMAGE=6, PMOD_PROJECTILE_DEATHPUSH=7 };
 static int EV_DamageOverTime, EV_DamageOverTimeEffect;
 struct idMath {
+    static int ClampInt(int lo,int hi,int n){return std::clamp(n,lo,hi);}
     static float ClampFloat(float lo,float hi,float f){return std::clamp(f,lo,hi);}
     static float Cos(float f){return std::cos(f);}
 };
@@ -212,7 +213,11 @@ struct Position {
     idPlayer* driver=nullptr;idVec3 eye;idVec3 axes[3]={{1,0,0},{0,1,0},{0,0,1}};
     idPlayer* GetDriver(){return driver;}idVec3 GetEyeOrigin(){return eye;}const idVec3* GetEyeAxis(){return axes;}
 };
-struct riVehicleCockpitWeapon {
+struct rvVehicleWeapon {
+    int count=1,jointIndex=0,fired=0;bool failFire=false;
+    bool Fire(){if(failFire)return false;fired+=count;return true;}
+};
+struct riVehicleCockpitWeapon : rvVehicleWeapon {
     Position ownPosition;Position* position=&ownPosition;idEntityPtr<idEntity> parent;
     idActor* FindEnemyNearCrosshair(float,float,bool&)const;
 };
@@ -223,12 +228,17 @@ struct riVCWMissileTurret : riVehicleCockpitWeapon {
     lockState_t lockState=LOCK_NONE;idEntityPtr<idActor> lockTarget;
     int lockStartTime=0,timeToHardLock=250,crosshair=CROSSHAIR_DEFAULT;float lockRange=14000;
     Guide closestGuide,lockedGuide,acquiringGuide,outOfRangeGuide;idDict spawnArgs;idVec3 aimPoint;
+    static const int MAGAZINE_SIZE=5;
+    int rocketsLoaded=0,nextLoadTime=0,loadDelay=500;
+    const idVec3* launchAxis=nullptr;
+    std::vector<std::string> events,sounds;
     void SetLockState(lockState_t);void UpdateTargeting();
+    void SetRocketsLoaded(int);void UpdateMagazine();bool Fire();
     idPlayer* GetPlayerDriver(){return position->driver;}
     idEntity* GetAimedEntity(float,idVec3&){return nullptr;}bool IsFriendly(idEntity*){return false;}
     void StopGuides(){closestGuide.Stop();lockedGuide.Stop();acquiringGuide.Stop();outOfRangeGuide.Stop();}
     const char* GetClassname(){return "turret";}
-    void PlaySound(const char*){}void SendGuiEvent(const char*){}
+    void PlaySound(const char* s){sounds.push_back(s);}void SendGuiEvent(const char* s){events.push_back(s);}
 };
 struct stateParms_t {int stage=0,blendFrames=0;};using stateResult_t=int;
 enum {WP_OUTOFAMMO,WP_READY,SRESULT_DONE=2,SRESULT_WAIT=3,SRESULT_ERROR=4};
@@ -348,6 +358,23 @@ int main(){
         near.fl.notarget=false;near.physics.bounds.center={14000,0,0};CHECK(gun.FindEnemyNearCrosshair(30,14000,out)==&near&&!out);
         near.physics.bounds.center={0,10000,0};CHECK(gun.FindEnemyNearCrosshair(30,0,out)==&far&&!out);
         gun.position->driver=nullptr;CHECK(gun.FindEnemyNearCrosshair(30,14000,out)==nullptr&&!out);
+    }
+    // Five loading indicators describe real rockets. Empty/acquiring attempts
+    // must not fire or reset a pending reload; partial/full charges fire as shown.
+    Reset();{gameLocal.time=0;riVCWMissileTurret gun;
+        CHECK(!gun.Fire()&&gun.fired==0&&gun.sounds.empty());
+        gun.UpdateMagazine();CHECK(gun.rocketsLoaded==1);
+        gameLocal.time=499;gun.UpdateMagazine();CHECK(gun.rocketsLoaded==1);
+        gameLocal.time=500;gun.UpdateMagazine();CHECK(gun.rocketsLoaded==2);
+        gun.lockState=gun.LOCK_ACQUIRING;CHECK(!gun.Fire()&&gun.rocketsLoaded==2);
+        gun.lockState=gun.LOCK_LOCKED;gun.failFire=true;
+        CHECK(!gun.Fire()&&gun.rocketsLoaded==2&&gun.count==1);
+        gun.failFire=false;CHECK(gun.Fire()&&gun.fired==2&&gun.rocketsLoaded==0&&gun.count==1);
+        CHECK(gun.events.back()=="rocketEmpty");CHECK(!gun.Fire()&&gun.fired==2);
+        gameLocal.time=3000;gun.UpdateMagazine();CHECK(gun.rocketsLoaded==5);
+        CHECK(gun.events.back()=="fifthRocketLoaded");
+        gun.lockState=gun.LOCK_NONE;CHECK(gun.Fire()&&gun.fired==7&&gun.rocketsLoaded==0);
+        gun.loadDelay=0;gun.nextLoadTime=gameLocal.time;gun.UpdateMagazine();CHECK(gun.rocketsLoaded==5);
     }
     // Both firing modes and both ammo models expose ready/out-of-ammo correctly.
     for(bool alt:{false,true})for(int ammo:{0,1,10})for(int clip:{0,8}){

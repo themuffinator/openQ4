@@ -131,6 +131,30 @@ alpha's own code:
 The alpha's own code or content kept these from working as designed. openQ4
 fixes them:
 
+- **Falcon defence (m03).** Both turrets show their own cannon heat, weapon
+  selection and missile status, and keep their aiming reticle visible. The
+  ship diagram agrees between guns and on foot. Repairs restore hull health
+  and clear repaired sections; the engine repair completes once. Ship state
+  survives switching guns and saving/loading.
+  Missile volleys fire the loaded charge shown on the cockpit display, from
+  one to five rockets; an empty magazine must reload before firing again.
+- **The prison (m04).** Reinforcements use the correct upper or lower
+  cellblock landing, the maintenance bot uses its own workstations, and the
+  bridge ambush has a valid destination. Camera scanning uses its existing AI.
+  The invalid starting goob-gun upgrade request is removed.
+  Cellblock attackers switch to combat before reaching the marines' occupied
+  cover positions.
+  The security override completes once, keeping the alarm off and shutters in
+  place. Destroying the turret-room camera during the ambush no longer starts
+  the door hack early or twice.
+  The camera's collision box now fits its hanging model, letting it appear
+  and scan instead of remaining hidden against the cell door above it.
+  Start m03/m04 afresh to receive these mission callback corrections; existing
+  saves retain the mission threads with which they were created.
+  The prison's security alarm now gives quieter, local warning pulses with
+  pauses, and computer alarms are less intrusive. This audio improvement also
+  applies to existing saves; the security console still switches the alert off.
+
 - **Fire passages (m01, m02).** Freezing a vent clears its invisible collision
   and puts its light out fully. Burning vents allow passage while inflicting
   their authored touch damage. Saves restore the correct collision state.
@@ -219,8 +243,7 @@ supply missing performances or replacement art:
   model lacks. Both only lose an effect. m09's frosty-breath effects name a
   joint only marines have, and two of its triggers call script functions the
   developers commented out or never wrote.
-- m04's starting inventory names a goob-gun mod that does not exist, and the
-  m08 and m09 developer give lists contain typos. m08's first-lab scientists
+- The m08 and m09 developer give lists contain typos. m08's first-lab scientists
   call a script function (`FirstLabCleared`) the map never defines; nothing
   waits on it.
 - The background harvester in the m07 races is retail's cinematic one, which

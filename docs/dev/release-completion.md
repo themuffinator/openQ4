@@ -79,6 +79,34 @@ See [player release status](../user/release-status.md).
   trace can be resaved immediately and loaded again. All 11 existing historical
   save fixtures still restore into gameplay.
 
+## Awakening Falcon and prison refinement, 4 November 2026
+
+- The Falcon's two turrets now keep independent heat, weapon and missile
+  displays, start without a false missile lock, and retain a usable aiming
+  reticle. Ship damage and repair markers agree between both guns and the
+  on-foot display, including after saving and loading.
+- Missile volleys now match the one-to-five loaded rockets shown in the
+  cockpit. Empty firing attempts cannot bypass reloading.
+- Ship repairs restore real hull health and clear repaired damage sections.
+  Restarting the engine completes and rewards the repair once.
+- Prison reinforcements reach the correct cellblock landing, the maintenance
+  bot uses its own workstations, and camera startup no longer calls an
+  unsupported animation. The missing bridge ambush destination is restored.
+  Reinforcements switch to combat before reaching occupied marine cover,
+  avoiding a stalled approach during the cell evacuation.
+- The prison's constant alarm is now a quieter, localized warning with long
+  pauses. Nearby computer alarms also leave room for dialogue and combat cues.
+  The security console still stops the warning, and the improvement applies
+  to existing saves as well as new games.
+- Start M03 and M04 afresh to receive their mission callback corrections.
+  Older saves retain their original mission threads. See the
+  [review and qualification limits](awakening-missions.md#m03-and-m04-review-4-november-2026).
+- The prison security override completes once: repeated use cannot restart
+  the alarm or lift the shutters farther. Destroying the turret-room camera
+  after the ambush starts no longer starts an early or duplicate door hack.
+  Cameras also fit their hanging models, allowing the blocked turret-room
+  camera to appear, scan and take damage as intended.
+
 ## Damaged queued events recover safely, 4 November 2026
 
 - Saves with unsupported queued callbacks or out-of-order event times now

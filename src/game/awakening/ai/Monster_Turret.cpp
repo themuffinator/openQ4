@@ -19,8 +19,8 @@
 	is facing its target and "lockDelay" seconds have passed since it stopped
 	(the m04 prison turrets).
 
-	"scanAnim": with no enemy it cycles this animation and drops back to
-	"idle" once it has one (the prison security cameras).
+	"scanAnim": it sweeps until an enemy is visible, then drops back to
+	"idle" to track it (the prison security cameras).
 
 ===============================================================================
 */
@@ -176,16 +176,20 @@ stateResult_t riMonsterTurret::State_Combat( const stateParms_t &parms ) {
 
 	if ( !enemy.ent ) {
 		CheckForEnemy( true );
-		if ( enemy.ent && scanAnim[ 0 ] ) {
-			animator.CycleAnim( ANIMCHANNEL_ALL, animator.GetAnim( "idle" ), gameLocal.time, 0 );
-		}
 	}
 
-	// sweep while there is nobody to watch
-	if ( !enemy.ent && scanAnim[ 0 ] ) {
+	// A teammate can supply an unseen enemy before our first combat frame.
+	// Always initialize the pose, and keep sweeping until there is something
+	// this camera can actually see. Do not restart the cycle on every frame.
+	if ( scanAnim[ 0 ] ) {
+		const bool watching = IsEnemyVisible();
+		const char *anim = watching ? "idle" : scanAnim;
 		const idAnim *current = animator.CurrentAnim( ANIMCHANNEL_ALL )->Anim();
-		if ( current == NULL || idStr::Icmp( current->Name(), scanAnim ) ) {
-			animator.CycleAnim( ANIMCHANNEL_ALL, animator.GetAnim( scanAnim ), gameLocal.time, 0 );
+		if ( current == NULL || idStr::Icmp( current->Name(), anim ) ) {
+			animator.CycleAnim( ANIMCHANNEL_ALL, animator.GetAnim( anim ), gameLocal.time, 0 );
+		}
+		if ( !watching ) {
+			return SRESULT_WAIT;
 		}
 	}
 

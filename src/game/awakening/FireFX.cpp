@@ -181,6 +181,7 @@ void riFireFX::StartStageEffect( void ) {
 	}
 	const idMat3 upright = ( -GetPhysics()->GetGravityNormal() ).ToMat3();
 	effect = PlayEffect( stageEffects[ stage ], GetPhysics()->GetOrigin(), upright, true );
+	Event_LookAtTarget();
 	PostEventMS( &EV_FireFX_LookAtTarget, 0 );
 }
 
@@ -275,13 +276,13 @@ void riFireFX::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 	idTrigger::Damage( inflictor, attacker, dir, damageDefName, damageScale, location );
 	ShrinkTargetLights( oldHealth - Max( health, 0 ) );
 
-	if ( stage == FIRE_LARGE && health < spawnArgs.GetInt( "health", "100" ) / 2 ) {
+	if ( stage == FIRE_LARGE && health > 0 && health < spawnArgs.GetInt( "health", "100" ) / 2 ) {
 		StopEffect( "fx_fireLarge" );
 		stage = FIRE_SMALL;
 		StartStageEffect();
 	}
 	if ( stage < FIRE_OUT && health <= 0 ) {
-		StopEffect( "fx_fireSmall" );
+		StopStageEffects();
 		stage = FIRE_OUT;
 		UpdateContents();
 		StartStageEffect();

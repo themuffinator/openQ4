@@ -38,7 +38,9 @@ SOURCES = {
         'void riProjectileSpaceRocket::SetTargetPosition(', 'void riProjectileSpaceRocket::Think('],
     'src/game/awakening/vehicle/CockpitWeapons.cpp': [
         'idActor *riVehicleCockpitWeapon::FindEnemyNearCrosshair(',
-        'void riVCWMissileTurret::SetLockState(', 'void riVCWMissileTurret::UpdateTargeting('],
+        'void riVCWMissileTurret::SetLockState(', 'void riVCWMissileTurret::UpdateTargeting(',
+        'void riVCWMissileTurret::SetRocketsLoaded(', 'void riVCWMissileTurret::UpdateMagazine(',
+        'bool riVCWMissileTurret::Fire('],
     'src/game/weapon/WeaponNapalmGun.cpp': ['stateResult_t WeaponNapalmGun::State_Idle('],
 }
 

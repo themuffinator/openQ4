@@ -2276,10 +2276,11 @@ static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
-	if ( args.Argc() < 2 || args.Argc() > 3 || ( args.Argc() == 3
+	const bool selecting = args.Argc() == 4 && !idStr::Icmp( args.Argv( 2 ), "select" ) && idStr::IsNumeric( args.Argv( 3 ) );
+	if ( !selecting && ( args.Argc() < 2 || args.Argc() > 3 || ( args.Argc() == 3
 			&& idStr::Icmp( args.Argv( 2 ), "fire" ) != 0
-			&& idStr::Icmp( args.Argv( 2 ), "exit" ) != 0 ) ) {
-		gameLocal.Printf( "usage: testVehicle <entity name> [fire|exit] (omit action for status)\n" );
+			&& idStr::Icmp( args.Argv( 2 ), "exit" ) != 0 ) ) ) {
+		gameLocal.Printf( "usage: testVehicle <entity name> [fire|exit|select <index>] (omit action for status)\n" );
 		return;
 	}
 	idEntity *entity = gameLocal.FindEntity( args.Argv( 1 ) );
@@ -2289,12 +2290,19 @@ static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 	}
 	rvVehicle *vehicle = static_cast<rvVehicle *>( entity );
 	int seat = player->GetVehicleController().GetVehicle() == vehicle ? player->GetVehicleController().GetPosition() : -1;
-	if ( args.Argc() == 3 ) {
+	if ( args.Argc() >= 3 ) {
 		if ( seat < 0 || seat >= vehicle->GetNumPositions() || vehicle->GetPosition( seat )->GetDriver() != player ) {
 			gameLocal.Printf( "testVehicle: action requires the local player in this vehicle\n" );
 			return;
 		}
-		if ( idStr::Icmp( args.Argv( 2 ), "fire" ) == 0 ) {
+		if ( selecting ) {
+			const int index = atoi( args.Argv( 3 ) );
+			const bool valid = vehicle->GetPosition( seat )->GetWeapon( index ) != NULL;
+			if ( valid ) {
+				vehicle->GetPosition( seat )->SelectWeapon( index );
+			}
+			gameLocal.Printf( "testVehicle: action=select name=%s index=%d success=%d\n", vehicle->name.c_str(), index, valid );
+		} else if ( idStr::Icmp( args.Argv( 2 ), "fire" ) == 0 ) {
 			rvVehicleWeapon *weapon = vehicle->GetPosition( seat )->GetActiveWeapon();
 			// One diagnostic shot through the real weapon/effect path, without
 			// synthesizing input or compiling an unsaveable console script.
@@ -2315,11 +2323,35 @@ static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "testVehicleHud: name=%s health=%g shield=%g\n", vehicle->name.c_str(),
 			vehicle->GetHud()->State().GetFloat( "vehicle_health" ), vehicle->GetHud()->State().GetFloat( "vehicle_shield" ) );
 	}
+	for ( int i = 0; i < MAX_RENDERENTITY_GUI; ++i ) {
+		idUserInterface *gui = vehicle->GetRenderEntity()->gui[i];
+		if ( gui ) {
+			idStr locked, guns, rockets, acquiring, loaded;
+			gui->GetPresentationValue( "LockStatusLT::visible", locked );
+			gui->GetPresentationValue( "active_guns::visible", guns );
+			gui->GetPresentationValue( "active_rockets::visible", rockets );
+			gui->GetPresentationValue( "LockStatusAT::visible", acquiring );
+			for ( const char *slot : { "first", "second", "third", "fourth", "fifth" } ) {
+				idStr visible;
+				if ( gui->GetPresentationValue( va( "%s_rocket_loaded::visible", slot ), visible ) ) {
+					loaded += visible;
+				}
+			}
+			gameLocal.Printf( "testVehicleScreen: name=%s index=%d unique=%d heat=%g locked=%s guns=%s rockets=%s acquiring=%s loaded=%s\n",
+				vehicle->name.c_str(), i, gui->IsUniqued(), gui->State().GetFloat( "HeatPercentage" ),
+				locked.c_str(), guns.c_str(), rockets.c_str(), acquiring.c_str(), loaded.c_str() );
+		}
+	}
 	for ( int i = 0; i < vehicle->GetNumPositions(); i++ ) {
-		const rvVehiclePosition *position = vehicle->GetPosition( i );
+		rvVehiclePosition *position = vehicle->GetPosition( i );
 		idActor *driver = position->GetDriver();
 		gameLocal.Printf( "testVehicleSeat: name=%s index=%d driver=%s parent=%s\n", vehicle->name.c_str(), i,
 			driver ? driver->name.c_str() : "none", position->GetParent() ? position->GetParent()->name.c_str() : "none" );
+		for ( int w = 0; position->GetWeapon( w ) != NULL; ++w ) {
+			rvVehicleWeapon *weapon = position->GetWeapon( w );
+			gameLocal.Printf( "testVehicleWeapon: seat=%d index=%d class=%s selected=%d\n", i, w,
+				weapon->GetClassname(), weapon == position->GetActiveWeapon() );
+		}
 	}
 }
 
@@ -4570,7 +4602,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "actorFlashlight",		Cmd_Flashlight_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"toggle actor's flashlight", idGameLocal::ArgCompletion_AIName );
 	cmdSystem->AddCommand( "testFlashlight", Cmd_TestFlashlight_f, CMD_FL_GAME|CMD_FL_CHEAT, "set the current single-player weapon flashlight for rendering tests", idCmdSystem::ArgCompletion_Boolean );
 	cmdSystem->AddCommand( "testDoor", Cmd_TestDoor_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect or move a single-player door team for rendering tests", idGameLocal::ArgCompletion_EntityName );
-	cmdSystem->AddCommand( "testVehicle", Cmd_TestVehicle_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect an SP vehicle or fire/exit the local player's seat", idGameLocal::ArgCompletion_EntityName );
+	cmdSystem->AddCommand( "testVehicle", Cmd_TestVehicle_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect an SP vehicle or fire/select/exit the local player's seat", idGameLocal::ArgCompletion_EntityName );
 	cmdSystem->AddCommand( "testMission", Cmd_TestMission_f, CMD_FL_GAME|CMD_FL_CHEAT, "inspect an SP entity or call an existing zero-argument map function" );
 	
 	cmdSystem->AddCommand( "shuffleTeams",			Cmd_ShuffleTeams_f,			CMD_FL_GAME,				"shuffle teams" );

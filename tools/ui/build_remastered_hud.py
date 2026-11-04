@@ -113,9 +113,10 @@ def on_foot_document(*, strogg: bool, awakening: bool) -> dict:
     ])
     # The stock windows that hold an event's lasting effect (hud.gui and its family).
     ride = ("p_tram::visible", "enterTram") if strogg else ("p_flatbed::visible", "enterFlatbed")
+    ship_joins = [("shipstatus::visible", "aa_showShipStatusOn")] if awakening else []
     joins = join_events(doc, [("desktop::hidden", "hideHud"), ("p_radio::visible", "radioChatterUp"),
                               ("BossBar::visible", "showBossBar"), ("p_boss_shield_bar_left::visible", "showBossShieldBar"),
-                              ("brackets::visible", "showBrackets"), ("missile_indicator::visible", "missileThreatUp"), ride])
+                              ("brackets::visible", "showBrackets"), ("missile_indicator::visible", "missileThreatUp"), ride, *ship_joins])
     return doc.build(root, {"canvas": {"height": 720, "minWidth": 960},
                             "extensions": {"openq4": {"reference": "ui-visual-design.md 14.3-14.12",
                                                       "stock": "guis/hud_strogg.gui" if strogg else "guis/hud.gui",

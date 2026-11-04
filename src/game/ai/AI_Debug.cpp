@@ -103,6 +103,21 @@ idAI::GetDebugInfo
 void idAI::GetDebugInfo ( debugInfoProc_t proc, void* userData ) {
 	// Base class first
 	idActor::GetDebugInfo ( proc, userData );
+	proc( "idAI", "thinkFlags", va( "0x%x", thinkFlags ), userData );
+	proc( "idAI", "aifl.awake", aifl.awake ? "true" : "false", userData );
+	proc( "idAI", "CanBecomeSolid()", CanBecomeSolid() ? "true" : "false", userData );
+	if ( IsHidden() && !CanBecomeSolid() ) {
+		idClipModel *clipModels[ MAX_GENTITIES ];
+		const int count = gameLocal.ClipModelsTouchingBounds( this, physicsObj.GetAbsBounds(),
+			MASK_MONSTERSOLID, clipModels, MAX_GENTITIES );
+		for ( int i = 0; i < count; ++i ) {
+			idClipModel *clip = clipModels[ i ];
+			idEntity *blocker = clip->GetEntity();
+			if ( !clip->IsRenderModel() && blocker != this && blocker->fl.takedamage && physicsObj.ClipContents( clip ) ) {
+				proc( "idAI", "solidBlocker", blocker->GetName(), userData );
+			}
+		}
+	}
 	proc( "idAI", "freezeFactor", va( "%g", freezeFactor ), userData );
 	proc( "idAI", "frozenSolidTime", va( "%d", frozenSolidTime ), userData );
 	proc( "idAI", "frozenLocation", va( "%d", frozenLocation ), userData );

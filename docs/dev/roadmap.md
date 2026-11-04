@@ -2243,6 +2243,22 @@ Completion substeps must keep three forms of evidence distinct:
      qualification; physical speaker/headphone comparisons and headset comfort
      remain wider campaign qualification. Candidate release notes are updated.
 
+
+  Progress, 4 November: [M03/M04 review](awakening-missions.md#m03-and-m04-review-4-november-2026)
+  repairs the Falcon's shared cockpit screens, false initial lock, missing
+  reticle coverage, ship-state routing, hull repair accounting and duplicate
+  engine completion. Prison cellblock routing, maintenance-bot references,
+  camera initialization and the missing bridge destination are corrected.
+  A second pass ties missile volleys to the displayed magazine, exercises
+  positive lock/restore transitions and separates reinforcement arrival from
+  occupied marine cover. Script checks now report failures in release builds.
+  A third pass replaces M04's constant global siren and computer alarm loops
+  with quieter, localized reminders, preserving console shutoff and old saves.
+  A fourth pass makes the security override one-time and prevents late camera
+  destruction from starting an early or duplicate turret-room door hack.
+  Fitted camera bounds remove the upper cell door overlap that blocked startup.
+  Focused runtime and production-method probes cover these states; complete
+  mission playthroughs and the other campaign acceptance gates remain open.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented

@@ -1,9 +1,276 @@
-# Awakening M01 and M02 mission audit
+# Awakening mission audits
 
 This is supporting evidence for **Q4-04** in [the roadmap](roadmap.md), not a
 separate development plan. Reviewed 4 November 2026 against the installed alpha
 maps, their entity connections, scripts, actor definitions and openQ4's SP code.
 The evidence distinguishes authored intent from completion claims.
+
+## M03 and M04 review, 4 November 2026
+
+M03 alternates defending the Falcon with repairing its systems: five fighter
+waves, crew instructions, damage-control objectives and arrival at the prison.
+The cockpit's instruments describe two different things: the ship diagram
+tracks the Falcon's hull and repair objectives; the three physical screens
+track the selected gun, cannon heat and missile lock/reload state. The turrets
+themselves are invulnerable. Giving their hull gauge the ship's health, or
+displaying a second player status bar, would misrepresent that design.
+
+M04 moves from infiltration and camera/security encounters to defending
+Darnell's bridge hack, evacuating Fox Squad from two cellblock landings, the
+Strauss capture and extraction toward M05. Reinforcement destinations and
+encounter activation are part of that choreography, not decorative markers.
+
+### Corrections
+
+- Both M03 cockpit screens had shared GUI instances. The idle turret could
+  overwrite the active one's heat, weapon selection and rocket status. Each
+  cockpit now owns unique, normally serialized screens. Event-only screen
+  timers start paused, preventing every lock state from running on the first
+  draw and ending at a false **LOCKED** indication.
+- The cockpit keeps its combat reticle even when a cinematic or nearby crew
+  member selects the on-foot interaction cursor. Default, acquiring/locked,
+  friendly and out-of-range reticles have editable vector coverage; weapon
+  targeting still supplies their colours and materials.
+- A follow-up review found that the five rocket indicators did not control
+  ammunition: a full charge fired one rocket, while an empty magazine could
+  fire after the shorter weapon cooldown. The launcher now fires the displayed
+  charge, from one to five rockets, refuses empty/acquiring shots, and catches
+  up reload timing after a long frame. The existing multi-shot spread and sound
+  support the charged-volley interpretation. This is inferred from the authored
+  magazine and weapon code, not a recovered design specification.
+- M03 damage, repair markers and directional warnings reach both turret HUDs
+  and the player's HUD. Lasting damage/marker state is stored in the ordinary
+  GUI dictionary, including for a view not drawn before saving. The on-foot
+  Remastered panel honours the mission's explicit show/hide events.
+- Repair credits now replenish the actual Falcon hull, capped at its initial
+  health, and are consumed once. Previously they only increased a failure
+  allowance while the mover stopped accepting damage at zero health. Repaired
+  diagram sections clear and rearm, including when the original health monitor
+  resumes from dialogue with a stale sample. Repairs do not resurrect a dead
+  ship. The misspelled first-wave Navajas reference binds to the existing actor.
+- Each engine-terminal press owns one stage. The first no longer waits for the
+  second and then executes completion again. Existing dialogue, timed failure,
+  reminders, effects, objective completion and the return-to-gun instruction
+  remain; the repair reward is awarded once.
+- M04 upper/lower reinforcements use their respective authored cover markers;
+  all four spawn points previously called the upper callback, whose destination
+  did not exist. The tunnel repair bot uses its own two workstations without
+  stale `repbot_1` bindings. Camera initialization leaves idle/scanning to the
+  camera's AI instead of calling an unsupported mover animation event.
+  With the real defenders present, the first repair could leave an attacker
+  trying to occupy their cover, unable to finish scripted movement or attack.
+  The second revision hands control back to combat AI 128 units from the marker.
+  A new `m04_prison_v2.script` retains the original helper unchanged for saves
+  that already reference it.
+- The delayed bridge gunner's missing script reference binds to the authored
+  enemy staging point (`strogg_ctrlRm_jumper_1_pos_1`) on the upper bridge
+  approach, retaining its original height and stopping before the drop. The
+  entrance trigger is below its connected walking AAS region; the gunner
+  cannot follow the marines' scripted drop. This placement is an inference
+  from the bridge choreography and navigation, not a recovered gunner coordinate.
+- M04 no longer requests the nonexistent `weaponmod_goobgun_burst` starting
+  upgrade. The base weapon already provides burst fire; the later flamethrower
+  upgrade is not granted in its place.
+- The security alarm's 1.5-second recording was both global and looping,
+  repeating at full gain throughout the prison. It now plays locally at
+  -12 dB, immediately on activation and then every 12–16 seconds. Its 96/1400
+  unit distance range keeps the alert around the security encounter. The
+  flashing lights and original objective/console callbacks remain intact.
+  A pulse finishes naturally when disabled; no new pulse starts afterward,
+  including when the console is used during a quiet interval.
+- Three computer alarms also looped four-second recordings continuously.
+  They now play the same installed samples at -18 dB within 360 units,
+  every 19–29 seconds. They remain local machinery ambience rather than an
+  additional level-wide security warning. These timings and levels are an
+  editorial refinement inferred from the security sequence and dialogue.
+- The security override console now completes once and then becomes
+  noninteractive. Its reusable relay previously moved both shutters another
+  120 units and toggled the disabled alarm back on with every additional press.
+  Completion is claimed before deferred dialogue, so repeated activations
+  cannot race it. The completed GUI state and script flag serialize normally.
+- The turret-room approach chooses its camera branch once. Previously,
+  destroying camera 8 during the staggered grunt/gunner arrival also started
+  the bypass, allowing the door hack before the attackers died and starting
+  another copy when their death counter fired. Both paths now use the existing
+  one-shot hack relay; the ambush retains its authored timing and jump.
+  The separately appended `m04_prison_v3.script` preserves older helper files.
+- Prison cameras use collision bounds fitted to their hanging model and full
+  scan animation: a 32-unit horizontal half-width and z=-36..4, instead of the
+  inherited z=0..74 actor box. Camera 8's old box overlapped
+  `cellblk3_UPRspawndoor_4`, leaving it hidden, invulnerable and waiting to
+  activate. The repair preserves camera origins, viewing angles and health,
+  and respects explicit map bounds. `aiDumpState -v` now identifies solid
+  blockers when diagnosing a hidden AI that cannot wake.
+  A second startup fault left the camera without any animation when a
+  teammate supplied an unseen enemy before its first combat frame. It now
+  initializes its pose, sweeps while the target is occluded and uses the idle
+  tracking pose when the target becomes visible, without restarting the sweep
+  every frame. Combat turrets without `scanAnim` retain their original path.
+- The shared fire-volume repair from M01/M02 is retained. Directly quenching a
+  large fire now skips creating an intermediate small-fire effect, stops the
+  old stages and aims the new stage immediately as well as after deferred
+  target resolution.
+
+### Compatibility and scope
+
+Campaign callback repairs require single-player `q4xbase`, the exact chapter
+map, expected original functions and authored anchors. They edit spawn
+arguments and append separately named openQ4 helper scripts; they do not ship
+or modify recovered map/script files. Their helpers participate in the ordinary
+saved-script list. Start M03/M04 afresh to acquire the new callbacks and entity
+references; old saves retain their original mission threads. No save layout
+changes or expansion multiplayer module are introduced.
+
+Alarm pacing also applies when loading an existing M04 save. The migration
+matches the exact map, original console function, speaker names and shaders,
+and leaves custom pacing alone. It replaces the old emitter and preserves
+whether it was on or off. Revised saves keep the existing speaker timer,
+including its pending reminder during a quiet interval. No script statements
+or serialized fields are added for this change. Computer samples use implicit
+one-shot declarations: setting `s_looping 0` alone cannot clear a loop flag
+inside the original sound declaration.
+
+The review found unused M03 ammo-jam/rear-fire sequences and an abandoned M04
+ending cinematic with references to actors the map does not contain. These are
+not reactivated. The shipped ending uses its direct end-level relay. Missing
+M04 scientist dressing, effects and screen assets remain content limitations;
+they are distinct from the corrected live encounter callbacks.
+
+### Validation
+
+`tools/tests/awakening_m03_m04_runtime.py` drives hidden, windowed SP using engine
+commands and engine render-target screenshots, with independent writable
+profiles and the installed alpha assets. No device input or desktop capture is
+used. Its M03 test-only sidecar selects the encounters; M04 invokes authored
+spawners. These are focused encounter probes, not full mission playthroughs.
+
+The probe checks both gun entries, damage/repair state, an occupied save loaded
+in a fresh process, real cannon shots through overheat and cooling, independent
+screen values, missile selection/firing, engine completion/reward count, upper
+and lower reinforcement arrival, repair-bot/bridge state and fire trace/damage
+behaviour. Evidence is retained under `.tmp/awakening-m03-m04/`.
+
+M03 passed in OpenGL and Vulkan (`release-gl/m03/`, `release-vulkan/m03/`):
+the probe restored 9,000 hull health to 12,000, cleared the repaired diagram
+section, loaded the occupied gun in a new process, overheated/cooled its cannon,
+selected/fired missiles without a false lock, and completed the engine repair
+at 13,000 health with one reward. Both physical screen sets remained unique.
+These M03 runs preceded the final M04-only destination correction.
+
+The final M04 production build passed both renderers (`qualified-gl/`,
+`qualified-vulkan/`). Both cellblock groups reached their respective landing;
+the repair bot reached its own workstation; the gunner reached approximately
+`(986, 660, 272)` and reported `MOVE_STATUS_DONE`. The fire accepted freeze
+shots, never blocked the player trace, and stopped intercepting projectiles
+after extinguishing. These runs assert the production script reference; they
+do not reposition the missing destination or the gunner in the test fixture.
+
+`awakening_chapter_behavior.py` compiles the production fire methods against
+counted doubles and covers freeze filtering, fractional/shared light dimming,
+overkill, stages, one-shot target activation and active/off/out contents.
+`awakening_status_behavior.py` now passes 111 targeting/status/magazine checks.
+The follow-up harness `awakening_chapter_followup.py` adds positive acquisition,
+lock/save/load, full/partial volleys and an occupied cellblock evacuation.
+The core harness now emits explicit failures for script state checks: script
+`assert` is disabled in release builds and was insufficient evidence for exact
+repair totals and one-shot completion. Follow-up runtime results below supersede
+those earlier assertion-only claims. Q4-04 stays open for full playthroughs and
+the remaining campaign gates.
+
+The second-pass build passes the stronger core probe (`round2-core-gl/`) and
+the positive missile-lock probe on both renderers (`round2-lock-gl/`,
+`round2-lock-vulkan/`). Acquiring/locked/cleared screen values agree with the
+weapon; a full magazine and lock survive a fresh-process restore. The launcher
+fires five, rejects an empty shot 432 ms later despite its 400 ms cooldown, and
+fires one after 640 ms. The core probe explicitly verifies the 12,000/13,000
+hull totals, one engine repair reward, independent screens, heat/cooling, both
+reinforcement approaches, the maintenance bot and bridge gunner.
+
+The occupied rescue probe uses four normal simulation tics per rendered frame.
+It observes the initial fight, then periodically kills nearby attacking Strogg
+through the ordinary AI death event as a substitute for player covering fire.
+An unattended run left the medic blocked by fighting enemies; it does not prove
+a navigation defect or justify making the encounter complete without defence.
+This is a sequence/route check, not a combat-balance or full-playthrough claim.
+`round2-rescue-qualified/` passes: attackers leave scripted movement and fire,
+all six prisoner callbacks remove their actors, the final cell opens, and no
+scripted movement failure or timeout is reported. Original scenario timing,
+actor health and marine routes are unchanged in production. The earlier
+`round2-rescue-*` diagnostics retain fixture failures and the unattended control;
+they are not acceptance runs.
+
+The third-pass Windows build and stage pass. `awakening_alarm_runtime.py`
+uses the real OpenAL mixer with its null output backend, never physical input
+or desktop capture. The accepted alarm results are:
+
+| Evidence directory | Result |
+| --- | --- |
+| `round3-alarm-baseline/` | Previous binary: actual global/looping flags and full gain; produces active/off regression saves. |
+| `round3-alarm-final/` | Fresh map: 1.5-second security pulses with silent gaps and reminders, all three quieter computer samples, console shutoff, and silence at the distant bridge. Normal wall occlusion is enabled. |
+| `round3-alarm-active/`, `round3-alarm-old-off/` | Old active and inactive saves migrate without losing their logical alert state. |
+| `round3-alarm-gap/`, `round3-alarm-new-off/` | Revised saves preserve a pending reminder through a quiet gap, and keep an inactive alarm off. |
+
+Each candidate run checks shutoff during a gap, restart, and the actual
+`unlockSecRoomDoors` callback during a pulse; no later reminder revives the
+disabled alert. These checks establish mixer gain, timing and state, not a
+headphone listening assessment. Early alarm probes contain diagnostic failures
+from declaration-name filtering, inaudible distant one-shots, and placing the
+listener inside console dressing. Their reports are not acceptance results;
+the saved gap/off checkpoints used by restore probes remain regression fixtures.
+
+`round3-lock-gl/` passes M03 acquisition, locked save/load, five/one-rocket
+volleys, empty-magazine rejection and lock clearing on the new build. A custom
+110-degree FOV remains 110 through entry, restore and exit; the existing script
+offset is -10 while seated and returns to zero on exit. The engine screenshot
+also shows five loaded indicators, the selected launcher and a locked reticle.
+Gameplay/CI contracts and repository path checks pass. Full playthroughs,
+Linux/macOS runtime qualification and the other Q4-04 gates remain open.
+
+The fourth-pass Windows build/stage and gameplay, CI and path contracts pass.
+`awakening_prison_runtime.py` uses real map relays, normal damage and the
+authored death counter; no console script is compiled into its saves. Its
+OpenGL results under `.tmp/awakening-m03-m04/` are:
+
+| Evidence directory | Result |
+| --- | --- |
+| `round4-console-baseline/` | Previous binary reproduces 120 additional shutter units and a restarted alarm on the second activation. |
+| `round4-console-fixed/`, `round4-console-restore/` | Repeat use keeps both shutters stationary and the alarm off; completed GUI state survives a fresh-process restore. The real OpenAL mixer uses null output. |
+| `round4-camera-blocker/` | Diagnostic identifies the upper cell door preventing camera startup; not an acceptance run. |
+| `round4-original-qualified/` | Original installed encounter function, with the camera now functional, reproduces one premature hack and a second after the two deaths. |
+| `round4-early-qualified/` | Early camera destruction bypasses the ambush and starts one hack; the gunner stays hidden. |
+| `round4-late-qualified/`, `round4-alive-qualified/` | Camera wakes/scans; late destruction or leaving it alive keeps the hack gated on both deaths and starts it once. |
+| `round4-pending/`, `round4-pending-restore/` | Save during the initial delay, with the camera destroyed and both attackers still hidden; a new process resumes the ambush and waits for both deaths. |
+
+The engine capture in `round4-alive-qualified/` shows the hanging camera in
+gameplay. Rendering is skipped during most later sequence probes to reduce
+GPU contention, then enabled for the engine screenshot. Earlier diagnostics
+include an observer inside the ambush trigger and a helper compilation error;
+their failure reports are retained and are not acceptance evidence.
+`round4-native/` compiles the actual camera state method and checks initial
+unseen/visible targets, an uninterrupted sweep, loss/reacquisition of visibility
+and the ordinary combat turret path. The existing fire-volume controls also
+pass. This remains focused encounter qualification, not a full playthrough or
+physical GUI interaction test.
+
+An unrelated existing multi-screen GUI setter issue was also observed:
+`Event_SetGuiParm` repeatedly prepends `gui_` while iterating screens, leaving
+redundant `gui_gui_noninteractive` spawn arguments. Each screen still receives
+the correct `noninteractive` state, so it does not invalidate the console fix.
+The shared setter cleanup remains outside this mission change.
+
+An unrelated developer-console compiler fault was reproduced while constructing
+that probe: an include inside a function reaches the file-boundary diagnostic
+with an unnamed global scope, and `idVarDef::Name()` dereferences its null name
+instead of reporting the unsupported include. The helper now compiles at file
+scope. Crash dumps, logs and a symbolized stack are retained under
+`.tmp/awakening-m03-m04/round2-compiler-crash/`; this compiler robustness issue
+remains open and is not part of the campaign repairs.
+
+The final workspace check found `E:/Repositories/openQ4-worktrees/e931/openQ4`
+(detached at `85c61fe16`) clean and fully merged. Removal is suggested after the
+required user approval. The previously identified `claude/ui-right-stick`
+worktree disappeared from the final inventory; this task did not remove it.
+Missing alpha media remains an unrelated content limitation, as described above.
 
 ## Intended progression
 
