@@ -284,7 +284,9 @@ def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[
         if marker is not None and marker not in ("AIR", "MOVE", "JUMP", "DROP", "PAD", "DODGE"):
             raise ValueError(f"unknown traversal probe marker: {marker}")
         probes = re.findall(r"^BOT_(AIR|MOVE|JUMP|DROP|PAD|DODGE)_PROBE client=1 ", body, re.M)
-        armed = len(probes) == 1 and probes[0] in ((marker,) if marker else ("AIR", "MOVE"))
+        setup_errors = re.findall(r"^(?:usage: bot_probe\w+|bot_probe\w+:|Unknown command ['\"]bot_probe).*$", body, re.M)
+        armed = (not setup_errors and len(probes) == 1
+                 and probes[0] in ((marker,) if marker else ("AIR", "MOVE")))
         died = any(match.group(1) == bot for match in WORLD_DEATH.finditer(body))
         grounded = re.search(r"^BOT_PROBE_GROUNDED client=1 .* health=(\d+)$", body, re.M)
         terminal = re.findall(r"^MP_PHYSICS slot=1 grounded=([01]) health=(-?\d+) velocity=.*$", body, re.M)
@@ -301,9 +303,10 @@ def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[
         survived = (armed and not died and grounded is not None and int(grounded.group(1)) > 0
                     and release_settled and final_grounded and final_health > 0)
         outcomes.append({**trial, "armed": armed, "died": died, "grounded": grounded is not None,
+                         "setup_errors": setup_errors,
                          "final_grounded": final_grounded, "final_health": final_health, "release_settled": release_settled,
                          "survived": survived,
-                         "reason": ("not armed" if not armed else "died to the world" if died else
+                         "reason": ("probe setup rejected" if setup_errors else "not armed" if not armed else "died to the world" if died else
                                     "final state missing" if not terminal else
                                     "not alive and grounded at the end" if not survived else "landed alive")})
     return outcomes
@@ -408,6 +411,13 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
     for trial in trials:
         words = trial["command"].split()
         neutral = " ".join(words[:5] + ["0", "0", "0"] + words[8:])
+        if "neutral_command" in trial:
+            # Positive flight regressions may prepare an airborne physics
+            # state instead of settling on the floor beneath their saved pose.
+            # Causal envelopes keep their fixed preparation unchanged.
+            if trial.get("expect_survival") is not True or trial.get("counterfactual"):
+                raise ValueError("custom neutral preparation is only for positive recovery regressions")
+            neutral = trial["neutral_command"]
         # Restore the world as well as the bot. A preceding trial can collect
         # the health pickup that makes the next heading survivable. Restart
         # repopulates items; player Init clears god/noclip but preserves notarget.

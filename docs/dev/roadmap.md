@@ -2899,6 +2899,14 @@ Completion substeps:
   timing qualification remain required.
   The correction is landed in the main checkout at `1417cda59`, whose ten
   CTF5 positive cases also pass.
+  The `f57364857` stage passes all four long-match death/duration gates with
+  six strict impulse exclusions, all 21 positive hit cases, ten recovery cases
+  and pad traffic. Its complete catalog retains one CTF3 ramp departure after
+  two exclusions. [Unpressed ramp-flight recovery](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026)
+  addresses ascent, a consumed walking route and an intended pad that has not
+  launched the bot; thirty native reversal controls pass on Windows/Linux.
+  Full runtime qualification of that correction and controlled timing remain
+  required. The climbing-hop fix is landed in main at `4768b7d61`.
   The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.

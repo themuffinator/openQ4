@@ -58,6 +58,25 @@ CASES = {
         "name": "weak_nail_walk",
         "setup": ["bot_probeHealth 1 113 52 -49.744 57.825 105.27"],
         "command": "bot_probeWalk 1 2971.629 3232.276 -255.75 122.007 367.183 105.27 3108 3108 -255.75",
+    }, {
+        "name": "ramp_walk_ground", "observe_msec": 12000,
+        "allow_resumed_navigation": True,
+        "setup": ["bot_probeHealth 1 25 0 0 0 0 0"],
+        "command": "bot_probeWalk 1 -521.9 -570.4 -287.75 -91.6 277 0 -540 -492 -277",
+    }, {
+        "name": "ramp_walk_air", "observe_msec": 18000,
+        "allow_resumed_navigation": True,
+        "setup": ["bot_probeHealth 1 25 0 0 0 0 0"],
+        "command": "bot_probeWalk 1 -550.081 -516.115 -282.25 -62.339 261.318 111.758 -540 -492 -277",
+    }, {
+        "name": "ramp_pad_approach_air", "probe_type": "PAD", "observe_msec": 12000,
+        "allow_resumed_navigation": True,
+        # Prime airborne physics before restoring the pose. The common neutral
+        # settle otherwise leaves a grounded flag from the ramp below it and
+        # permits one artificial walking command before the flight controller.
+        "neutral_command": "bot_probeAir 1 -550.081 -516.115 -218.25 0 0 0 0 0 0",
+        "setup": ["bot_probeHealth 1 25 0 0 0 0 0"],
+        "command": "bot_probePad 1 -550.081 -516.115 -282.25 -62.339 261.318 111.758 84 84 -31.75 func_jumppad_10 -540 -492 -277",
     }]),
     "ctf5": ("CTF", [{
         "name": "pending_climb", "observe_msec": 12000,

@@ -4995,11 +4995,11 @@ simulation finds the far side within reach and not the near, toward that
 let the throw carry a bot over a lower ledge's edge - and through a short
 runout after touchdown.
 
-An unsafe unpressed WALK fall also starts it: the ground edge guard can brake
-on a sloping rim just as support is lost, leaving no grounded frame to finish
-the brake. It must not then steer for the walking corner through the void.
-A walking approach to a jump has not taken off until jump is pressed; planned
-drops and transport entries retain their own flight controller.
+An unsafe unpressed WALK flight also starts it: a sloping rim can throw the
+bot upward just as it consumes its final corner. Neither that rise nor an
+empty route makes the coast safe. An intended pad has not launched the bot
+until it actually touches the volume; planned drops, teleport entries and
+observed pad flights retain their own controller.
 
 A fall a strong knock caused starts it too: one the knock threw off the
 ground, one that slid off a ledge in the knockback's friction-free time -
@@ -5105,14 +5105,13 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 	const bool knocked = knockbackTime && gameLocal.time - knockbackTime <= BOT_AIR_RECOVER_KNOCK_MSEC &&
 		airborneSince && knockbackTime >= airborneSince -
 		( airborneVoluntary ? BOT_AIR_RECOVER_TAKEOFF_MSEC : BOT_AIR_RECOVER_SLIDE_MSEC );
-	const bool walking = pathCorner >= 0 && pathCorner < path.Num() &&
-		path[pathCorner].travelType == NAVTRAVEL_WALK;
-	const bool walkingDeparture = walking && pathCorner + 1 < path.Num() &&
+	const bool walking = path.IsEmpty() || ( pathCorner >= 0 && pathCorner < path.Num() &&
+		path[pathCorner].travelType == NAVTRAVEL_WALK );
+	const bool walkingDeparture = walking && pathCorner >= 0 && pathCorner + 1 < path.Num() &&
 		( path[pathCorner + 1].travelType == NAVTRAVEL_DROP ||
-		  path[pathCorner + 1].travelType == NAVTRAVEL_JUMPPAD ||
 		  path[pathCorner + 1].travelType == NAVTRAVEL_TELEPORT );
 	const bool walkingFall = walking && !walkingDeparture && airborneSince &&
-		!airborneVoluntary && velocity.z <= 0.0f;
+		!airborneVoluntary;
 	// Route steering can spoil a survivable coast before the next prediction
 	// notices the lost landing. A hit during a jump/drop also invalidates its
 	// takeoff proof (including its health budget): a safe coast is not proof

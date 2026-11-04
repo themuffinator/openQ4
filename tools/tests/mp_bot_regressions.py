@@ -112,6 +112,19 @@ def main() -> None:
         result = subprocess.run([str(exe), "landings"], cwd=path, capture_output=True, text=True)
         assert result.returncode != 0, "knock-only walking-fall mutation escaped"
         print("Unpressed WALK recovery: knock-only mutation rejected")
+        for label, anchor, replacement in (
+            ("ramp ascent recovery", "!airborneVoluntary;", "!airborneVoluntary && velocity.z <= 0.0f;"),
+            ("completed walking route", "const bool walking = path.IsEmpty() || (", "const bool walking = false || ("),
+            ("unlaunched pad approach", "path[pathCorner + 1].travelType == NAVTRAVEL_DROP ||\n\t\t  path[pathCorner + 1].travelType == NAVTRAVEL_TELEPORT",
+             "path[pathCorner + 1].travelType == NAVTRAVEL_DROP || path[pathCorner + 1].travelType == NAVTRAVEL_JUMPPAD ||\n\t\t  path[pathCorner + 1].travelType == NAVTRAVEL_TELEPORT"),
+        ):
+            mutated = harness.replace(anchor, replacement)
+            assert mutated != harness, label
+            cpp.write_text(mutated, encoding="utf-8")
+            subprocess.run(command, cwd=path, check=True)
+            result = subprocess.run([str(exe), "landings"], cwd=path, capture_output=True, text=True)
+            assert result.returncode != 0, f"{label} mutation escaped"
+            print(f"{label}: reverted-fix mutation rejected")
         mutated = harness.replace("!protectCoast && !BotAirLandingUnsafe", "!BotAirLandingUnsafe")
         assert mutated != harness
         cpp.write_text(mutated, encoding="utf-8")

@@ -245,6 +245,9 @@ See [player release status](../user/release-status.md).
   into gameplay. See [scope and evidence](savegame-reliability.md#actor-animation-ownership-and-interrupted-state-calls).
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
+- Bots can recover when a ramp carries them into the air after they reach a
+  walking waypoint or pass beside a jump pad. The reproduced departure and
+  renewed safety gates are under qualification.
 - Bots check their remaining momentum before hopping up an ordinary ledge,
   preventing a pending climb attempt from jumping back off a recovered walkway.
   The reproduced CTF5 fall now survives; wider safety gates are under qualification.
