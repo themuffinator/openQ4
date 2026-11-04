@@ -1911,6 +1911,10 @@ int idPhysics_Player::GetKnockBack( void ) const {
 	return ( current.movementFlags & PMF_TIME_KNOCKBACK ) ? current.movementTime : 0;
 }
 
+float idPhysics_Player::GetMoveSpeed( void ) const {
+	return playerSpeed;
+}
+
 /*
 ================
 idPhysics_Player::SetDebugLevel

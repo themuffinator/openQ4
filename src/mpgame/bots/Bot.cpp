@@ -7480,6 +7480,19 @@ void rvBot::Think( usercmd_t &cmd ) {
 	UpdateBuying( self );
 	UpdateWeapon( self );
 	UpdateFire( self, cmd );
+	if ( bot_debug.GetInteger() >= 3 && ( !self->pfl.onGround || airRecovering ||
+		( knockbackFrameTime >= 0 && gameLocal.time - knockbackFrameTime <= 500 ) ) ) {
+		const idPhysics_Player *physics = static_cast<const idPhysics_Player *>( self->GetPlayerPhysics() );
+		gameLocal.Printf( "BOT_CONTROL client=%d time=%d origin=%s velocity=%s health=%d grounded=%d crouched=%d speed=%.3f modifier=%.3f knock=%d strong=%d airborne=%d voluntary=%d recover=%d sliding=%d landed=%d wish=%s cmd=%d,%d,%d buttons=%d yaw=%.3f commandYaw=%.3f corner=%d/%d type=%d started=%d target=%s\n",
+			clientNum, gameLocal.time, physics->GetOrigin().ToString( 3 ), physics->GetLinearVelocity().ToString( 3 ),
+			self->health, self->pfl.onGround ? 1 : 0, physics->IsCrouching() ? 1 : 0, physics->GetMoveSpeed(),
+			self->PowerUpModifier( PMOD_SPEED ), physics->GetKnockBack(), knockbackTime, airborneSince, airborneVoluntary ? 1 : 0,
+			airRecovering ? 1 : 0, airRecoverSliding ? 1 : 0, airRecoverLanded, airRecoverWish.ToString( 3 ),
+			cmd.forwardmove, cmd.rightmove, cmd.upmove, cmd.buttons, aimAngles.yaw,
+			SHORT2ANGLE( cmd.angles[1] ) + self->GetDeltaViewAngles()[1], pathCorner, path.Num(),
+			pathCorner >= 0 && pathCorner < path.Num() ? path[pathCorner].travelType : -1,
+			traversalStarted ? 1 : 0, pathCorner >= 0 && pathCorner < path.Num() ? path[pathCorner].origin.ToString( 3 ) : "-" );
+	}
 	if ( self->pfl.onGround && cmd.upmove > 0 ) {
 		jumpPressTime = gameLocal.time;
 	}
