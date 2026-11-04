@@ -6,6 +6,15 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Shader allocation failure recovery, 4 November 2026
+
+- A failed Vulkan shader descriptor allocation now returns the uniform memory
+  reserved for that draw. Repeated failures no longer consume space needed by
+  later rendering; the affected authored stage still skips with a diagnostic.
+- Native capacity and recovery controls pass on Windows and Linux, including
+  descriptor pools, uniform space and pipeline-cache reuse. GPU pressure
+  qualification remains open; see [evidence and limits](vulkan-material-programs.md#draw-resource-failure-and-capacity-controls-4-november-2026).
+
 ## Renderer restart residency and debug views, 4 November 2026
 
 - Video restarts keep textures from old maps unloaded, avoiding a reproduced

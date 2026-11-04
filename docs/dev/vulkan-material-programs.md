@@ -458,6 +458,36 @@ and reports are retained in `.tmp/vk-roadmap/capacity-candidate-versions/`,
 `capacity-candidate-storage/` and `capacity-storage/`. These development builds
 carry a dirty `g908b2c01` version; the reports bind the exact runtime hashes.
 
+## Draw-resource failure and capacity controls (4 November 2026)
+
+A native driver-refusal reproduction found that failed descriptor allocation
+consumed the uniform reservation made immediately before it. After 3,000 refused
+bind attempts, no draw was recorded but the four-MiB ring cursor had advanced
+from 256 to 4,193,328 bytes; later attempts failed for uniform exhaustion. The
+reservation is now returned when descriptor allocation fails, before any
+descriptor update or command records a reference to it. The same 3,000 refusals
+leave the cursor at 256, preserve earlier bytes, and allow the next successful
+draw to use the remaining budget.
+
+`renderer_vulkan_material_resources.py` executes the production binding,
+allocation, pool reset and pipeline-cache functions against counted Vulkan
+driver doubles. Windows and Linux (WSL) controls pass:
+
+| Resource | Exercised boundary and recovery |
+| --- | --- |
+| Uniform ring | The production four-MiB limit accepts 2,730 blocks with 256-byte alignment, then refuses without crossing guards; the next frame recovers. |
+| Authored descriptors | Four pools of 2,048 draws reach 8,192; overflow leaves existing allocations intact. A larger host-side test ring isolates this quota; it is not a production setting change. |
+| Program pipelines | 512 entries remain usable at capacity. Releasing one identity frees exactly its two variants; retained keys remain unchanged and the freed entries can be reused. |
+| Failure paths | Pool creation/reset, shader/pipeline creation, texture residency and descriptor allocation refuse safely and recover; frame slots remain independent. |
+
+The cache controls also distinguish target format, MSAA, orientation, alpha
+coverage and vertex-stream variants. Reports and generated source remain in
+`.tmp/vk-roadmap/material-resource-{baseline,candidate,windows,linux}/`; the
+baseline is an intentional failed reproduction. These native controls do not
+replace the remaining GPU pressure, authored-lighting or mod-content image
+qualification. The ordinary source-version eviction evidence above retains its
+separate scope.
+
 ## Dependency provenance
 
 [glslang 16.6.0](https://github.com/KhronosGroup/glslang/tree/16.6.0) is pinned by

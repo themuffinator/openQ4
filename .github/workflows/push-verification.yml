@@ -576,6 +576,7 @@ jobs:
             tools/tests/renderer_display_presentation.py \
             tools/tests/renderer_debug_readback.py \
             tools/tests/renderer_image_residency.py \
+            tools/tests/renderer_vulkan_material_resources.py \
             tools/tests/renderer_gl_display_policy.py \
             tools/tests/sdl3_strict_window.py \
             tools/tests/ui_capture_display_device.py \
@@ -1026,6 +1027,7 @@ jobs:
           python tools/tests/renderer_display_presentation.py
           python tools/tests/renderer_debug_readback.py
           python tools/tests/renderer_image_residency.py
+          python tools/tests/renderer_vulkan_material_resources.py
           python tools/tests/renderer_gl_display_policy.py
           python tools/tests/sdl3_strict_window.py
           python tools/tests/ui_capture_display_device.py

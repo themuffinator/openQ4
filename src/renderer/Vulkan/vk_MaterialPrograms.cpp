@@ -585,13 +585,19 @@ bool BindProgram( Program *program, idImage *const images[oq4material::MaxTextur
         program->vertex, program->fragment, pipelineLayout, stateBits, separateColor, program->compiled.vertexInputMask );
     if ( pipeline == VK_NULL_HANDLE ) { return Fail( *program, "material pipeline allocation failed" ); }
     VkDescriptorBufferInfo buffer = {};
+    const int uniformCheckpoint = VK_Exec_InteractionUniformCheckpoint();
     if ( !VK_Exec_AuthoredUniformAlloc( &block, sizeof( block ), buffer ) ) { return Fail( *program, "material uniform ring exhausted" ); }
     const VkDescriptorSetLayout layouts[] = {uniformLayout, textureLayout};
     VkDescriptorSet sets[2] = {};
     VkDescriptorSetAllocateInfo allocate = {};
     allocate.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate.descriptorPool = pool; allocate.descriptorSetCount = 2; allocate.pSetLayouts = layouts;
-    if ( vkAllocateDescriptorSets( vkCtx.device, &allocate, sets ) != VK_SUCCESS ) { return Fail( *program, "material descriptor allocation failed" ); }
+    if ( vkAllocateDescriptorSets( vkCtx.device, &allocate, sets ) != VK_SUCCESS ) {
+        // No descriptor or command references this reservation. Repeated
+        // refusals must leave the remaining ring available to later draws.
+        VK_Exec_InteractionUniformRestore( uniformCheckpoint );
+        return Fail( *program, "material descriptor allocation failed" );
+    }
     ++framePools[slot].draws;
     VkWriteDescriptorSet writes[1 + oq4material::MaxTextures] = {};
     for ( int i = 0; i <= oq4material::MaxTextures; ++i ) {

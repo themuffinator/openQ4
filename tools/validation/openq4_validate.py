@@ -889,6 +889,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'renderer_display_presentation.py', []),
         (root / "tools" / "tests" / 'renderer_debug_readback.py', []),
         (root / "tools" / "tests" / 'renderer_image_residency.py', []),
+        (root / "tools" / "tests" / 'renderer_vulkan_material_resources.py', []),
         (root / "tools" / "tests" / 'renderer_gl_display_policy.py', []),
         (root / "tools" / "tests" / 'sdl3_strict_window.py', []),
         (root / "tools" / "tests" / 'ui_capture_display_device.py', []),

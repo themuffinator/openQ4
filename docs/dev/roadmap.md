@@ -633,6 +633,12 @@ and untested drivers remain open, with no tolerance or support-tier change.
   remain open. The integrated-build lighting repeat passes all 26 independent
   controls per backend, but its strict full-frame comparison still fails five
   shadow-boundary pixels across three cases; the image gate remains unchanged.
+  Progress, 4 November: [native draw-resource controls](vulkan-material-programs.md#draw-resource-failure-and-capacity-controls-4-november-2026)
+  exercise the four-pool descriptor quota, four-MiB uniform ring, 512-entry
+  pipeline cache and frame-slot recovery on Windows and Linux. A reproduced
+  descriptor-allocation failure no longer consumes unused uniform reservations
+  and starves later draws. GPU pressure, broader lighting and mod-content
+  qualification remain open.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
