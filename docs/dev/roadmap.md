@@ -2907,6 +2907,16 @@ Completion substeps:
   launched the bot; thirty native reversal controls pass on Windows/Linux.
   Full runtime qualification of that correction and controlled timing remain
   required. The climbing-hop fix is landed in main at `4768b7d61`.
+  The `f6aa481e6` ramp correction now passes all four long-match and all 33
+  catalog death/duration gates: 710 kills, 1,103 completed traversals, eight
+  strict policy-2 impulse exclusions and zero navigation world deaths. All
+  24 targeted hit cases, ten established recovery cases, pad traffic and thirty
+  Windows/Linux native reversal controls pass. Two positive ramp observations
+  extend to eighteen seconds; their original incomplete terminal results remain
+  preserved, and causal exclusion criteria are unchanged. The fix is landed
+  in main at `26460c802`, whose build, stage and four CTF3 recovery cases pass.
+  Controlled timing remains separate; source/runtime evidence is recorded in
+  the [ramp-flight qualification](mp-bots.md#unpressed-ramp-flights-and-consumed-walking-routes-4-november-2026).
   The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.

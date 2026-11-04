@@ -452,6 +452,34 @@ commands, extends that observation to eighteen seconds and passes all four
 CTF3 cases. The original failed report remains unchanged. The ten established
 air-recovery cases and two-bot pad traffic also pass on this exact stage.
 
+`catalog-ramp/assessment.json` passes every declared variant's death and
+duration gate: 33 maps, 424 kills and 605 completed traversals. Its single raw
+CTF5 rail-hit death passes policy-2 exclusion, leaving zero navigation deaths.
+The raw report remains a failure before that assessment. Three no-route
+reports, 49 stalls and one goal give-up remain recorded, with no traversal
+timeouts. This is safety/duration evidence, not controlled timing.
+
+The fix and observation update are landed in the main checkout at `26460c802`.
+Its build/stage and all four CTF3 recovery cases pass in
+`E:/Repositories/openQ4/.tmp/mp02-integration/hit-ramp-ctf3/`. An initial local
+build attempt was stopped during reconfiguration after detecting another
+task's active build in the same directory; the subsequent non-overlapping
+build and staging both succeeded. The main checkout contains additional
+integrations, so this package check supplements the archived exact-stage
+safety evidence rather than changing its recorded runtime identity.
+
+`long-ramp/assessment.json` also passes all four long-match death/duration
+gates on `f6aa481e6`, with 275.664–279.008 simulated seconds per map, 286 combat
+kills and 498 completed traversals. CTF3 and DeadZone have no raw world deaths.
+DM8's two and CTF5's five pass the unchanged exact-state policy-2 exclusion:
+every post-hit steering/no-input/controller trial dies, and a corresponding
+no-hit control survives. Three CTF5 bullet hits arrived after the fall was
+already lost; their complete failed counterfactuals required tracing back to
+the earlier rail hit before exclusion. All original reports and each attempted
+cause remain preserved. The four matches retain ten stalls, with zero no-route
+reports, goal give-ups or traversal timeouts. Controlled timing remains a
+separate gate; these shared-host functional runs do not qualify it.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's
