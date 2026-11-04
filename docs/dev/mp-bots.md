@@ -17,7 +17,12 @@ requires armour continuity. Raw reports and earlier assessments remain intact.
 
 `bot_probeHealth client health [knockbackMsec [kickX kickY kickZ [armor]]]`
 restores an optional exact armour value. `BOT_IMPULSE` records `armor` after the
-hit and `armorSave`; older logs cannot qualify version-2 exclusions.
+hit and `armorSave`. It also records the actual knockback interval after
+`SetKnockBack` and `preKnock`: an existing movement timer can refuse a hit's
+requested interval. Counterfactuals preserve the earlier knock, and shotgun
+groups preserve the first pellet's prior timer. Probes replace inherited timers
+explicitly, including zero, so a neutral setup's landing cannot silently refuse
+the recorded interval. Older logs cannot qualify version-2 exclusions.
 
 The `a3172f89a` pad-catch correction passes both recorded DM8 hit poses and the
 CTF5 diagonal-pad hit replay, all alive and grounded at the strict terminal
@@ -42,7 +47,10 @@ depth and therefore skipped the live drop proof. It now also prices the actual
 sampled floor with current health and armour. The existing full/careful drop
 proof may then earn a safe departure; otherwise the bot brakes. Native controls
 retain affordable floors, armour effects and disabled falling damage without
-waiving voids. Runtime qualification of this correction is pending.
+waiving voids. On `dc89724d1`, both drop poses land on the raised floor with two
+health and finish alive/grounded (the later pose collects health afterwards).
+Evidence is `ctf7drop-floor/`; `hit-floor/` expands the positive suite to eight
+cases. Final qualification will use the corrected timer-replay implementation.
 Final-build long matches, catalog and controlled timing remain open.
 
 ## Hit-to-movement handoff, 4 November 2026

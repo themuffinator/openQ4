@@ -1035,8 +1035,9 @@ made them too large to load.
   Ground-slide prediction now restores friction on the physics timer's expiry
   frame, and the recorded rocket-slide recovery passes. Bots also check whether
   their momentum reaches a lower floor than their route's landing can afford.
-  That low-health drop correction and renewed final-build long/catalog/timing
-  gates remain open; see [bot evidence](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026).
+  Both low-health drop poses pass isolated checks. Causal audits also preserve
+  actual pre/post knockback timers, including refused resets; renewed final-build
+  long/catalog/timing gates remain open; see [bot evidence](mp-bots.md#exact-armour-and-timer-qualification-4-november-2026).
 - MP-02: bounded percentile profiling and explicit audit budgets are implemented.
   The five-minute DM8 audit retains a navigation death, a stuck event and a
   contested timing failure; it does not close the safety or performance gate.

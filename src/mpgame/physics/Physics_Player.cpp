@@ -1911,6 +1911,14 @@ int idPhysics_Player::GetKnockBack( void ) const {
 	return ( current.movementFlags & PMF_TIME_KNOCKBACK ) ? current.movementTime : 0;
 }
 
+void idPhysics_Player::RestoreKnockBack( const int knockBackTime ) {
+	current.movementFlags &= ~PMF_ALL_TIMES;
+	current.movementTime = Max( 0, knockBackTime );
+	if ( current.movementTime > 0 ) {
+		current.movementFlags |= PMF_TIME_KNOCKBACK;
+	}
+}
+
 float idPhysics_Player::GetMoveSpeed( void ) const {
 	return playerSpeed;
 }

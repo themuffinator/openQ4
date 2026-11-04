@@ -33,7 +33,7 @@ def state(time: int, teams: dict[int, int]) -> str:
 def impulse(client: int, time: int, attacker: int, origin=(800.0, 300.0, 544.25), velocity=(170.0, -533.0, -83.0)) -> str:
     return (f"BOT_IMPULSE client={client} time={time} attacker={attacker} damage=20 "
             f"origin={origin[0]} {origin[1]} {origin[2]} kick=1 2 3 "
-            f"velocity={velocity[0]} {velocity[1]} {velocity[2]} def=damage_rocketSplash health=80 knock=50 armor=20 armorSave=10\n")
+            f"velocity={velocity[0]} {velocity[1]} {velocity[2]} def=damage_rocketSplash health=80 knock=50 armor=20 armorSave=10 preKnock=0\n")
 
 
 def death(name: str, time: int) -> str:
@@ -68,8 +68,8 @@ def check(condition: bool, message: str) -> None:
 def main() -> None:
     teams = {1: 0, 2: 1, 3: 0}
     pellet = ("BOT_IMPULSE client=1 time=2000 attacker=2 damage=10 origin=1 2 3 "
-              "kick=50 0 0 velocity={velocity} 0 0 def=damage_pellet health={health} knock=50 armor={armor} armorSave=5\n")
-    shot = pellet.format(velocity=100, health=90, armor=45) + pellet.format(velocity=150, health=80, armor=40)
+              "kick=50 0 0 velocity={velocity} 0 0 def=damage_pellet health={health} knock=50 armor={armor} armorSave=5 preKnock={pre}\n")
+    shot = pellet.format(velocity=100, health=90, armor=45, pre=0) + pellet.format(velocity=150, health=80, armor=40, pre=50)
     [burst] = classify(state(1000, teams) + shot + death("Cortez", 4500))
     check(burst["impulse"]["damage"] == 20 and burst["impulse"]["kick"] == [100, 0, 0] and
           len(burst["impulse"]["pellets"]) == 2 and not burst["earlier_candidates"],
@@ -81,6 +81,7 @@ def main() -> None:
                     shot.replace("health=80", "health=79"),
                     shot.replace("armor=40", "armor=39"),
                     shot.replace(" armorSave=5", ""),
+                    shot.replace("preKnock=50", "preKnock=49"),
                     shot.replace("velocity=150 0 0 def=damage_pellet", "velocity=150 0 0 def=damage_railgun"),
                     shot.replace("origin=1 2 3 kick=50 0 0 velocity=150", "origin=2 2 3 kick=50 0 0 velocity=150")):
         [separate] = classify(state(1000, teams) + changed + death("Cortez", 4500))
@@ -123,9 +124,11 @@ def main() -> None:
     check(policy.decide(candidate, [o for o in outcomes() if not o.get("counterfactual")], True)["status"] ==
           "navigation", "no counterfactual trials fail closed")
     pre = [t for t in policy.trials_for({"origin": [1, 2, 3], "velocity": [300, 0, 100], "kick": [250, 0, 50],
-                                         "health": 40, "damage": 20, "knock_msec": 50, "armor": 17, "armor_save": 8}) if t.get("counterfactual")]
+                                         "health": 40, "damage": 20, "knock_msec": 36, "pre_knock_msec": 36,
+                                         "armor": 17, "armor_save": 8}) if t.get("counterfactual")]
     check(len(pre) == 3 and "50.000 0.000 50.000" in pre[0]["command"] and
-          pre[0]["setup"] == ["bot_probeHealth 1 60 0 0 0 0 25"], "the counterfactual removes the kick and the hit's health/armour damage")
+          pre[0]["setup"] == ["bot_probeHealth 1 60 36 0 0 0 25"],
+          "the counterfactual removes this hit's damage and kick while retaining an earlier knock timer")
     # Negative controls: the same impulse with a recoverable replay still fails.
     check(policy.decide(candidate, outcomes(survivor="air05"), True)["status"] == "navigation",
           "a surviving fixed-input trial keeps the death a navigation failure")
@@ -183,7 +186,7 @@ def main() -> None:
     check(all(t.get("setup") == ["bot_probeHealth 1 76 200 0 0 0 20"] for t in policy.trials_for(slid["impulse"])
               if not t.get("counterfactual")),
           "replays restore the knockback time that removes ground friction")
-    for field in ("health", "knock_msec", "armor", "armor_save", "damage"):
+    for field in ("health", "knock_msec", "pre_knock_msec", "armor", "armor_save", "damage"):
         for value in (None, -1, 1001):
             incomplete = {**candidate, "impulse": {**candidate["impulse"], field: value}}
             check(policy.decide(incomplete, outcomes(), True)["status"] == "navigation",

@@ -8799,10 +8799,8 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 		}
 		probeArmor = -1;
 		probeHealth = 0;
-		if ( probeKnockback > 0 ) {
-			static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->SetKnockBack( probeKnockback );
-			probeKnockback = 0;
-		}
+		static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->RestoreKnockBack( probeKnockback );
+		probeKnockback = 0;
 		OnPlayerKnockback( self, probeKick );
 		probeKick.Zero();
 	}

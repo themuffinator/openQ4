@@ -266,7 +266,10 @@ struct idPlayer {
         const idVec3& GetOrigin() const { return origin; }
         const idVec3& GetLinearVelocity() const { return velocity; }
         const idBounds& GetBounds() const { return agentBounds; }
-        int GetKnockBack() const { return 0; }
+        struct { int movementFlags=0,movementTime=0; } current;
+        int GetKnockBack() const;
+        void SetKnockBack(int);
+        void RestoreKnockBack(int);
     } physics;
     Physics* GetPhysics() { return &physics; }
     Physics* GetPlayerPhysics() { return &physics; }
@@ -299,6 +302,14 @@ void Platform(float xmin,float xmax,float z) {
     solids.push_back({{xmin,-256,z-64},{xmax,256,z}});
 }
 int main() {
+    idPhysics_Player timer;
+    timer.current.movementFlags=PMF_DUCKED|PMF_TIME_LAND; timer.current.movementTime=250;
+    timer.SetKnockBack(50); CHECK(timer.GetKnockBack()==0 && timer.current.movementTime==250);
+    timer.RestoreKnockBack(50); CHECK(timer.GetKnockBack()==50);
+    CHECK(timer.current.movementFlags==(PMF_DUCKED|PMF_TIME_KNOCKBACK));
+    timer.SetKnockBack(200); CHECK(timer.GetKnockBack()==50);
+    timer.RestoreKnockBack(200); CHECK(timer.GetKnockBack()==200);
+    timer.RestoreKnockBack(0); CHECK(timer.GetKnockBack()==0 && timer.current.movementFlags==PMF_DUCKED);
     rvNavMesh nav;
     agentHull=NavCreateAgentTrace(agentBounds);
     // A box touches the far corner of this floor; the real default player's

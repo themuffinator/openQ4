@@ -42,6 +42,10 @@ def main() -> None:
         "bool rvNavMesh::KnockSlideLandingSafe(",
     ))
     physics = (ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8")
+    constants += "\n" + "\n".join(re.findall(r"^const int PMF_.*$", physics, re.M))
+    bodies = "\n".join(function(physics, signature) for signature in (
+        "void idPhysics_Player::SetKnockBack(", "void idPhysics_Player::RestoreKnockBack(",
+        "int idPhysics_Player::GetKnockBack(")) + "\n" + bodies
     bodies = function(physics, "idVec3 idPhysics_Player::AdjustVertically(") + "\n" + function(nav, "static bool NavPadLaunchVelocity(") + "\n" + bodies
     for name, value in (("PM_ACCELERATE_MP", 15.0), ("PM_FRICTION", 6.0), ("PM_STOPSPEED", 100.0)):
         assert float(re.search(rf"const float {name}\s*=\s*([\d.]+)f", physics)[1]) == value, name
@@ -117,6 +121,8 @@ def main() -> None:
         assert result.returncode != 0, "rim-recovery rejection mutation escaped"
         print("Inward rim landing: old rejection mutation failed")
         for label, anchor, replacement in (
+            ("exact replay timer", "current.movementFlags &= ~PMF_ALL_TIMES;", "return;"),
+            ("zero replay timer", "if ( current.movementTime > 0 ) {", "if ( true ) {"),
             ("knockback expiry before movement", "elapsed + 16 < knockMsec", "elapsed < knockMsec"),
             ("collision without ground contact", "NavAgentHasGroundContacts( end, gravity ) ||", "true ||"),
             ("fatal grounded impact", "NavAgentHasGroundContacts( end, gravity ) ||", "false ||"),

@@ -50,7 +50,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 IMPULSE_WINDOW_MSEC = 6000
 AIR_HEADINGS = 16
-POLICY_VERSION = 2  # exact post-hit armour and pre-hit armour restoration required
+POLICY_VERSION = 2  # exact post/pre-hit armour and actual knockback timers required
 TRIAL_OBSERVE_MSEC = 6000
 TRIAL_RESPAWN_MSEC = 3000  # each trial gets a freshly added bot
 TRIAL_REMOVE_MSEC = 2500   # the removed client takes a moment to leave its slot
@@ -59,7 +59,7 @@ FREE_FOR_ALL_MODES = {"DM", "TOURNEY"}  # every other mode has teams; unknown me
 IMPULSE = re.compile(
     r"^BOT_IMPULSE client=(\d+) time=(-?\d+) attacker=(-?\d+) damage=(-?\d+) origin=(\S+) (\S+) (\S+) "
     r"kick=(\S+) (\S+) (\S+) velocity=(\S+) (\S+) (\S+) def=(\S+)(?: health=(-?\d+))?(?: knock=(\d+))?"
-    r"(?: armor=(-?\d+))?(?: armorSave=(-?\d+))?", re.M)
+    r"(?: armor=(-?\d+))?(?: armorSave=(-?\d+))?(?: preKnock=(\d+))?", re.M)
 WORLD_DEATH = re.compile(r"^(\S+) (?:was killed by world|died|drowned|dissolved in slime|burned in lava)$", re.M)
 WORLD_HIT = re.compile(r"^bot (\S+): hit by world for \d+ at (\S+) (\S+) (\S+) .*\(time (\d+)\)$", re.M)
 # `botlist` rows: client, name, character, style, skill, then (since the combat
@@ -141,7 +141,8 @@ def classify(clean: str, names: set[str], gametype: str, window_msec: int = IMPU
                  "health": int(m.group(15)) if m.group(15) else None,
                  "knock_msec": int(m.group(16)) if m.group(16) else None,
                  "armor": int(m.group(17)) if m.group(17) else None,
-                 "armor_save": int(m.group(18)) if m.group(18) else None, "offset": m.start()}
+                 "armor_save": int(m.group(18)) if m.group(18) else None,
+                 "pre_knock_msec": int(m.group(19)) if m.group(19) else None, "offset": m.start()}
                 for m in IMPULSE.finditer(clean)]
     # One shotgun shot applies several pellets before physics advances. Replay
     # its complete kick, not every intermediate pellet as a separate cause.
@@ -159,12 +160,14 @@ def classify(clean: str, names: set[str], gametype: str, window_msec: int = IMPU
                      previous["armor"] is not None and impulse["armor"] is not None and
                      previous["armor_save"] is not None and impulse["armor_save"] is not None and
                      previous["armor"] - impulse["armor_save"] == impulse["armor"] and
+                     previous["knock_msec"] == impulse["pre_knock_msec"] and
                      all(abs(previous["velocity"][axis] + impulse["kick"][axis] - impulse["velocity"][axis]) < 0.01
                          for axis in range(3)))
         if same_shot:
             pellets = previous.get("pellets", [{k: v for k, v in previous.items() if k != "offset"}])
             grouped[-1] = {**impulse, "damage": previous["damage"] + impulse["damage"],
                            "armor_save": previous["armor_save"] + impulse["armor_save"],
+                           "pre_knock_msec": previous["pre_knock_msec"],
                            "kick": [previous["kick"][axis] + impulse["kick"][axis] for axis in range(3)],
                            "pellets": pellets + [{k: v for k, v in impulse.items() if k != "offset"}]}
         else:
@@ -214,7 +217,7 @@ def classify(clean: str, names: set[str], gametype: str, window_msec: int = IMPU
 def replay_state_complete(impulse: dict) -> bool:
     """Never qualify a fall using spawn defaults or a rejected probe setup."""
     limits = {"health": (1, 1000), "knock_msec": (0, 1000), "armor": (0, 1000),
-              "damage": (0, 1000), "armor_save": (0, 1000)}
+              "damage": (0, 1000), "armor_save": (0, 1000), "pre_knock_msec": (0, 1000)}
     if not all(isinstance(impulse.get(key), int) and lo <= impulse[key] <= hi
                for key, (lo, hi) in limits.items()):
         return False
@@ -257,7 +260,7 @@ def trials_for(impulse: dict) -> list[dict]:
         for trial in counterfactual:
             trial.update(decisive=False, counterfactual=True)
             if replay_state_complete(impulse):
-                trial["setup"] = [f"bot_probeHealth 1 {health + impulse['damage']} 0 0 0 0 {armor + impulse['armor_save']}"]
+                trial["setup"] = [f"bot_probeHealth 1 {health + impulse['damage']} {impulse['pre_knock_msec']} 0 0 0 {armor + impulse['armor_save']}"]
         trials += counterfactual
     return trials
 

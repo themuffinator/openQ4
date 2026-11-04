@@ -68,6 +68,8 @@ public:
 	void					SetMovementType( const pmtype_t type );
 	void					SetPlayerInput( const usercmd_t &cmd, const idAngles &newViewAngles );
 	void					SetKnockBack( const int knockBackTime );
+	// Isolated diagnostic replay: replace inherited movement timers exactly.
+	void					RestoreKnockBack( const int knockBackTime );
 	int						GetKnockBack( void ) const;
 	float					GetMoveSpeed( void ) const;
 	// Shared with the bot trajectory proof; uses the same slide cvars.

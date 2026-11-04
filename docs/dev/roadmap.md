@@ -2199,8 +2199,10 @@ claim peer combinations that have not been tested.
   The rocket-slide controller now passes its isolated runtime check. CTF7's
   low-health drop reproduces a lethal overshoot onto a lower neighbouring floor;
   the edge guard now prices that actual floor before permitting departure.
-  Its runtime check, renewed final-build long/catalog runs and controlled timing
-  remain required.
+  Both CTF7 poses now pass isolated runtime checks. Audit logging and replay
+  also preserve actual pre/post knockback timers, including refused timer
+  resets. Renewed final-build long/catalog runs and controlled timing remain
+  required.
   Follow-through, 4 November: the [hit-to-movement correction](mp-bots.md#hit-to-movement-handoff-4-november-2026)
   fixes all three previously recorded long-match hit states. The renewed
   `84dde9c6d` long runs pass CTF3/DZ3 directly and CTF5 after strict causal
