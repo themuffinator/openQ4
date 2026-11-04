@@ -4695,6 +4695,30 @@ static bool BotBrakeAtEdge( idPlayer *self, idVec3 &moveDir ) {
 	if ( !BotDeadlyDropAt( self, ahead ) ) {
 		return false;
 	}
+	// A rim node can be walkable but lack the broad support this guard needs.
+	// Once stopped, braking forever cannot move the bot onto the safer parallel
+	// line (CTF6's base walkways). Creep sideways only along continuously
+	// supported ground; fast drift and friction-free knocks still brake first.
+	const idVec3 flat( velocity.x, velocity.y, 0.0f );
+	if ( flat.LengthSqr() <= Square( BOT_RECOVER_EDGE_SPEED ) && navMesh.IsValid() &&
+		static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->GetKnockBack() <= 0 ) {
+		idVec3 wish = moveDir;
+		wish.z = 0.0f;
+		const float magnitude = wish.Normalize();
+		const float turns[4] = { 45.0f, -45.0f, 90.0f, -90.0f };
+		for ( int i = 0; magnitude > 0.0f && i < 4; i++ ) {
+			const float c = idMath::Cos( DEG2RAD( turns[i] ) );
+			const float s = idMath::Sin( DEG2RAD( turns[i] ) );
+			const idVec3 inward( wish.x * c - wish.y * s, wish.x * s + wish.y * c, 0.0f );
+			const idVec3 origin = self->GetPhysics()->GetOrigin();
+			const idVec3 next = origin + flat * BOT_EDGE_LOOKAHEAD + inward * 16.0f;
+			if ( navMesh.LandingContinuationClear( origin, next ) &&
+				navMesh.TransportOnMove( origin, next, -1 ) < 0 && BotMoveDirectionSafe( self, inward ) ) {
+				moveDir = inward * Min( magnitude, BOT_RECOVER_EDGE_SPEED / Max( 1.0f, pm_speed.GetFloat() ) );
+				return true;
+			}
+		}
+	}
 	moveDir.Set( -velocity.x, -velocity.y, 0.0f );
 	const float speed = moveDir.Normalize();
 	if ( speed <= 1.0f ) {

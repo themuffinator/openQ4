@@ -115,6 +115,13 @@ def main() -> None:
         assert result.returncode != 0, "late knocked-coast ownership mutation escaped"
         print("Knocked coast: late-ownership mutation rejected")
         for label, anchor, replacement in (
+            ("supported rim steering", "magnitude > 0.0f && i < 4", "magnitude > 0.0f && i < 0"),
+            ("rim steering support", "navMesh.LandingContinuationClear( origin, next ) &&",
+             "true &&"),
+            ("rim steering knock interval", "self->GetPlayerPhysics() )->GetKnockBack() <= 0",
+             "self->GetPlayerPhysics() )->GetKnockBack() <= 1000"),
+            ("rim steering speed limit", "flat.LengthSqr() <= Square( BOT_RECOVER_EDGE_SPEED )",
+             "flat.LengthSqr() <= Square( 1000.0f )"),
             ("supported rim continuation", "navMesh.RecoveryStepClear( origin, stop, &supported )",
              "false && navMesh.RecoveryStepClear( origin, stop, &supported )"),
             ("grounded knock coast", "if ( self->pfl.onGround && !transported && !traversalStarted &&",

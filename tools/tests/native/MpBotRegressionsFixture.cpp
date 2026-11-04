@@ -269,7 +269,7 @@ struct Nav {
         auto it=impactAtX.find(corner.origin.x);
         return (it==impactAtX.end() ? landingImpact : it->second)<=limit;
     }
-    bool continuationClear=true;
+    bool continuationClear=true,directionalContinuation=false;
     bool jumpTakeoffClear=false;
     int jumpTakeoffChecks=0;
     idVec3 lastJumpOrigin,lastJumpVelocity,lastJumpLanding,lastJumpFirstWish;
@@ -284,7 +284,9 @@ struct Nav {
     bool RecoveryStepClear(const idVec3&,const idVec3& target,idVec3* supported=nullptr) {
         ++recoveryStepChecks; if(supported) *supported=target; return recoveryStepClear;
     }
-    bool LandingContinuationClear(const idVec3&,const idVec3&) { return continuationClear; }
+    bool LandingContinuationClear(const idVec3&,const idVec3& next) {
+        return continuationClear && (!directionalContinuation || next.x<=0);
+    }
     int TransportAt(const idBounds&) const { return transport; }
     std::vector<std::pair<int,float>> volumesAhead;
     mutable int transportMoves=0;
@@ -1468,6 +1470,7 @@ void TestDodgeOwnership() {
 
 void TestRecoveryEdge() {
     Reset(); idPlayer self; gameLocal.entities[0]=&self;
+    moveDirectionSafe=false; // no clear sidestep in these stopping controls
     rvBot bot; bot.recoverSearchTime=gameLocal.time; bot.recoverValid=true;
     bot.recoverTarget={100,0,0}; self.physics.origin={-8,0,0}; self.physics.velocity={100,0,0};
     usercmd_t cmd; CHECK(bot.RecoverToNavMesh(&self,cmd));
@@ -1525,6 +1528,29 @@ void TestRecoveryEdge() {
     CHECK(cmd.forwardmove>0); // ground guard cannot take over an airborne recovery
     std::puts("Recovery edge: nearest-node and wander commands brake before void; rescue toward support and broad floor remain usable: PASS");
 }
+void TestRimSteering() {
+    Reset(); idPlayer self; self.physics.origin={-8,0,0};
+    navMesh.directionalContinuation=true;
+    idVec3 wish(1,0,0);
+    CHECK(BotBrakeAtEdge(&self,wish));
+    CHECK(std::fabs(wish.x)<0.001f && wish.y>0 && wish.Length()*pm_speed.GetFloat()<=BOT_RECOVER_EDGE_SPEED+0.01f);
+    // Neither a gap, a wall nor an unplanned transport can supply the detour.
+    navMesh.continuationClear=false; wish={1,0,0};
+    CHECK(BotBrakeAtEdge(&self,wish) && wish.LengthSqr()==0);
+    navMesh.continuationClear=true; moveDirectionSafe=false; wish={1,0,0};
+    CHECK(BotBrakeAtEdge(&self,wish) && wish.LengthSqr()==0);
+    moveDirectionSafe=true; navMesh.volumesAhead={{3,-100}}; wish={1,0,0};
+    CHECK(BotBrakeAtEdge(&self,wish) && wish.LengthSqr()==0);
+    navMesh.volumesAhead.clear(); self.physics.knockback=50; wish={1,0,0};
+    CHECK(BotBrakeAtEdge(&self,wish) && wish.LengthSqr()==0);
+    self.physics.knockback=0; self.physics.velocity={0,100,0}; wish={1,0,0};
+    CHECK(BotBrakeAtEdge(&self,wish) && wish.y<0 && std::fabs(wish.x)<0.001f);
+    self.physics.velocity={}; navMesh.valid=false; wish={1,0,0};
+    CHECK(BotBrakeAtEdge(&self,wish) && wish.LengthSqr()==0);
+    navMesh.valid=true; self.pfl.onGround=false; wish={1,0,0};
+    CHECK(!BotBrakeAtEdge(&self,wish) && wish.x==1);
+    std::puts("Rim steering: slow supported sidestep, gaps/walls/transports/knocks refused: PASS");
+}
 void TestSelfKnockback() {
     idPlayer self; self.physics.origin={}; self.physics.velocity={10,0,0};
     botCombatShotModel_t model; navMesh={}; selfBlastExposed=true;
@@ -1558,6 +1584,7 @@ void TestSelfKnockback() {
     std::puts("Self splash: supported slide, exposure, future pose, exact push scaling and timer: PASS");
 }
 int main(int argc,char** argv) {
+    if(argc==1 || !std::strcmp(argv[1],"movement")) TestRimSteering();
     if(argc==1 || !std::strcmp(argv[1],"selfknock")) TestSelfKnockback();
     if(argc==1 || !std::strcmp(argv[1],"goals")) TestGoals();
     if(argc==1 || !std::strcmp(argv[1],"perception")) TestPerception();
