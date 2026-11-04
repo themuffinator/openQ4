@@ -69,6 +69,7 @@ CASES = {
         "command": "bot_probeMove 1 721.956 854.658 -96.145 431.422 -398.978 654.039 721.956 854.658 -96.145",
     }, {
         "name": "rocket_ramp_glance",
+        "observe_msec": 12000,
         "setup": ["bot_probeHealth 1 60 124 56.315 -252.725 170.467 18"],
         "command": "bot_probeMove 1 618.9 983.089 -183.75 -117.871 -521.892 170.467 604 956 -183.75",
     }]),

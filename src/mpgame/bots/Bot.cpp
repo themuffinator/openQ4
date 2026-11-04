@@ -8821,7 +8821,10 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 		bot.repathFailures = 2;
 		bot.recoverValid = true;
 		bot.recoverTarget = landing;
-		bot.recoverSearchTime = gameLocal.time + BOT_TRAVEL_TIMEOUT_MSEC;
+		// The replay observes up to thirty seconds. Do not replace its
+		// supplied recovery goal with unrelated roaming after ten seconds.
+		bot.nextGoalSelectTime = gameLocal.time + 3 * BOT_TRAVEL_TIMEOUT_MSEC;
+		bot.recoverSearchTime = bot.nextGoalSelectTime;
 	}
 	if ( travel == NAVTRAVEL_WALK && !dodge && !airDirection && !naturalWalk ) {
 		// A walking probe replays a post-impulse state: the thrown bot's own
