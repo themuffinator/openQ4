@@ -260,6 +260,13 @@ def main() -> None:
     check(not policy.assess_trials(settled, [jump_trial])[0]["armed"], "wrong positive marker rejected")
     mixed = jumped.replace("BOT_JUMP_PROBE client=1 time=1", "BOT_JUMP_PROBE client=1 time=1\nBOT_MOVE_PROBE client=1 time=1")
     check(not policy.assess_trials(mixed, [jump_trial])[0]["armed"], "mixed duplicate probes rejected")
+    for error in ("usage: bot_probeHealth <client> <health>",
+                  "bot_probeHealth: requires a local isolated server",
+                  "Unknown command 'bot_probeHealth'"):
+        rejected = settled.replace("MP_BOT_TRIAL_BEGIN settle\n", "MP_BOT_TRIAL_BEGIN settle\n" + error + "\n")
+        outcome = policy.assess_trials(rejected, [settle_trial])[0]
+        check(not outcome["armed"] and not outcome["survived"] and outcome["setup_errors"] == [error],
+              "rejected setup commands cannot qualify a causal replay")
     for changed in (settled.replace("MP_BOT_RELEASE_INPUT settle\n", ""),
                     settled.replace("velocity=0 0 0", "velocity=50 0 0", 1),
                     settled.replace("grounded=1 health=14", "grounded=0 health=14", 1),
@@ -277,6 +284,9 @@ def main() -> None:
     accepted = assess_recovery_trials(resumed, [resumed_trial])[0]
     check(accepted["recovery_passed"] and not accepted["survived"],
           "resumed navigation is isolated positive recovery evidence, not grounded causal survival")
+    rejected = resumed.replace("BOT_MOVE_PROBE", "usage: bot_probeHealth <client> <health>\nBOT_MOVE_PROBE")
+    check(not assess_recovery_trials(rejected, [resumed_trial])[0]["recovery_passed"],
+          "resumed navigation cannot qualify rejected positive setup")
     for changed in (resumed.replace("completed teleport", "starting teleport"),
                     resumed.replace("bot Rhodes:", "bot Voss:"),
                     resumed.replace("health=18 velocity", "health=0 velocity"),

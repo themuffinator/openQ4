@@ -1077,9 +1077,9 @@ void TestAirRecovery() {
     // its replay lands again with full air input against the throw.
     Reset(); idPlayer self; self.pfl.onGround=false; self.physics.velocity={300,0,180};
     rvBot bot; bot.path.Append({0,0,0}); bot.path.Append({200,0,0});
-    usercmd_t cmd; airLandingUnsafe=true;
-    // Only a fall a knock caused: none, a stale one, or one before the bot's
-    // own takeoff - it landed and jumped since - starts nothing.
+    usercmd_t cmd; airLandingUnsafe=false;
+    // A safe coast needs no recovery for an absent/stale knock or one before
+    // the bot's own takeoff. A recent knock protects it from route steering.
     bot.airborneSince=gameLocal.time-84;
     CHECK(!bot.RecoverInAir(&self,cmd) && !bot.airRecovering && cmd.forwardmove==0);
     bot.knockbackTime=gameLocal.time-BOT_AIR_RECOVER_KNOCK_MSEC-1; bot.airborneSince=bot.knockbackTime;
@@ -1186,7 +1186,7 @@ void TestAirRecovery() {
     airChoice={}; gameLocal.time+=BOT_AIR_RECOVER_REPLAN_MSEC; cmd={};
     CHECK(chooser.RecoverInAir(&self,cmd) && cmd.rightmove==0 && cmd.forwardmove==0 && airChoices==3);
     // A grounded brake may lose support on a sloping WALK rim before it
-    // stops. An unsafe, descending fall still recovers without an enemy hit.
+    // stops. Unsafe involuntary flights recover without an enemy hit.
     Reset(); self.pfl.onGround=false; self.physics.velocity={110,52,-60};
     auto walker=[&]() { rvBot b; b.path.Append({0,0,0}); b.path.Append({100,0,0});
         b.pathCorner=1; b.airborneSince=gameLocal.time-16; return b; };
@@ -1199,14 +1199,32 @@ void TestAirRecovery() {
     CHECK(slipped.RecoverInAir(&self,cmd));
     slipped=walker(); slipped.airborneVoluntary=true; cmd={};
     CHECK(!slipped.RecoverInAir(&self,cmd));
-    for(int action : {NAVTRAVEL_DROP,NAVTRAVEL_JUMPPAD,NAVTRAVEL_TELEPORT}) {
+    for(int action : {NAVTRAVEL_DROP,NAVTRAVEL_TELEPORT}) {
         slipped=walker(); slipped.path.Append({200,0,0},action); cmd={};
         CHECK(!slipped.RecoverInAir(&self,cmd));
         slipped.pathCorner=2; CHECK(!slipped.RecoverInAir(&self,cmd));
     }
-    slipped=walker(); self.physics.velocity.z=20; CHECK(!slipped.RecoverInAir(&self,cmd));
-    self.physics.velocity.z=-60; airLandingUnsafe=false; CHECK(!slipped.RecoverInAir(&self,cmd));
-    std::puts("Air recovery: knocked coasts and unsafe WALK falls protected; own jumps, planned departures and pad volumes untouched: PASS");
+    // A ramp can launch it before the final corner is consumed; waiting for
+    // descent loses CTF3's reachable floor. An empty route must not disable
+    // recovery on the following frame either.
+    slipped=walker(); self.physics.velocity.z=112; cmd={};
+    CHECK(slipped.RecoverInAir(&self,cmd) && slipped.airRecovering);
+    slipped=walker(); slipped.path.Clear(); cmd={};
+    CHECK(slipped.RecoverInAir(&self,cmd) && slipped.airRecovering);
+    // An unlaunched pad ahead is only an intention, not ownership of a flight
+    // that is already missing its trigger. Real pad volumes/flights above
+    // still reject recovery, and safe approaches keep their input.
+    slipped=walker(); slipped.path.Append({200,0,0},NAVTRAVEL_JUMPPAD); cmd={};
+    CHECK(slipped.RecoverInAir(&self,cmd) && slipped.airRecovering);
+    for(bool empty : {false,true}) {
+        slipped=walker();
+        if(empty) slipped.path.Clear();
+        else slipped.path.Append({200,0,0},NAVTRAVEL_JUMPPAD);
+        airLandingUnsafe=false; cmd={}; CHECK(!slipped.RecoverInAir(&self,cmd));
+        airLandingUnsafe=true; slipped.airborneVoluntary=true;
+        CHECK(!slipped.RecoverInAir(&self,cmd));
+    }
+    std::puts("Air recovery: unsafe unpressed flights protected through ascent, route completion and unlaunched pad approaches; safe arcs and flight owners retained: PASS");
 }
 void TestUnexpectedPad() {
     Reset(); idPlayer self; rvJumpPad pad; idItem goal;

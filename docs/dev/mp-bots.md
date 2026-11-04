@@ -384,6 +384,65 @@ reversions pass on Windows and Linux ASan/UBSan. Both input phases enter the
 positive hit suite; full runtime qualification and controlled timing remain
 open.
 
+The committed `f57364857` stage passes all 21 positive hit cases, ten recovery
+cases and pad traffic. `long-climb/assessment.json` passes all four long-match
+death/duration gates (275.056–286.144 simulated seconds), with 279 kills, 516
+completed traversals and six policy-2 enemy-impulse exclusions. The complete
+`catalog-climb/assessment.json` retains one CTF3 navigation death after two
+strict exclusions: 481 kills and 616 traversals across all 33 variants. The
+runtime is archived by `runtime-climb.json`. The source is merged into the main
+checkout at `4768b7d61`, whose build, staging and twelve CTF5 positive cases pass.
+
+### Unpressed ramp flights and consumed walking routes, 4 November 2026
+
+The CTF3 catalog's Cortez death at 35056 ms remains a navigation failure.
+Its earlier machine-gun hit has surviving counterfactual inputs. Later, the
+bot runs beside `func_jumppad_10`, rides its sloping rim upward and misses the
+launcher. The sampled airborne pose at 34240 ms is already too late for the
+tested recovery inputs (`guard-failure-missed-pad-baseline/`). Two reconstructed
+grounded approaches with an explicitly planned pad launch survive, while an
+ordinary walking leg from the same later ground state reproduces a fatal ramp
+departure (`guard-failure-missed-entry-baseline/`).
+
+In that walking reconstruction the first airborne frame still rises at 112
+units/second. The follower consumes its nearby final corner and clears the
+route. Recovery previously required a descending flight with a retained WALK
+corner, so both ascent and route completion prevented intervention. An unlaunched
+pad in the next corner also suppressed it. `guard-failure-ramp-launch-baseline/`
+replays the first airborne pose: ordinary walking and a fixed eastward input
+die, while forced recovery lands at 25 health and completes a pad and a jump.
+That control finishes alive but airborne in a later route; its strict terminal
+failure is retained, and it is not a causal exclusion.
+
+Recovery now admits an unsafe unpressed flight while rising, after its walking
+route is consumed, or while still missing an intended pad. A safe coast,
+voluntary jump, planned drop/teleport entry and actual pad volume or flight keep
+their previous ownership. Thirty production-decision reversal controls pass on
+Windows and Linux ASan/UBSan, including separate reversions of each admission
+change. Three positive CTF3 cases cover the grounded walking approach, its first
+airborne pose and an unlaunched pad approach. Runtime qualification continues.
+
+The initial pad replay was invalid: its health command had an extra argument,
+and settling the saved airborne pose on the ramp left an artificial grounded
+physics flag. Positive-only preparation now primes an airborne state before
+the measured trial, then restores the recorded pose and health. Preparing it
+inside the trial instead produced two probe markers and correctly failed
+arming. Both failed reports remain in `hit-ramp-candidate/` and
+`hit-ramp-airborne/`. The valid pad replay in `hit-ramp-primed/` survives;
+that run's ordinary airborne walk recovers but ends during its next route
+before a second traversal completes, so its failed twelve-second result is
+retained and the observation is extended to eighteen seconds. No death
+exclusion uses this positive-only preparation or resumed-navigation criterion.
+Replay assessment now rejects probe usage, precondition and unknown-command
+errors even when a later movement probe arms. Negative controls cover both
+causal survival and resumed-navigation assessment.
+
+`hit-ramp-extended/report.json` passes all four CTF3 cases on the candidate
+stage: each ramp case lands alive and completes two further traversals, with
+74–99 health at the end. Final Windows and Linux ASan/UBSan decision suites
+pass all thirty reversal controls. The committed build still requires the
+complete long-match, catalog and controlled-timing gates.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's
