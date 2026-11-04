@@ -2331,6 +2331,21 @@ static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 	if ( vehicle->GetHud() != NULL ) {
 		gameLocal.Printf( "testVehicleHud: name=%s health=%g shield=%g\n", vehicle->name.c_str(),
 			vehicle->GetHud()->State().GetFloat( "vehicle_health" ), vehicle->GetHud()->State().GetFloat( "vehicle_shield" ) );
+		const idDict &hudState = vehicle->GetHud()->State();
+		idStr timer = "-1", timer2 = "-1";
+		vehicle->GetHud()->GetPresentationValue( "speedertimer::visible", timer );
+		vehicle->GetHud()->GetPresentationValue( "speedertimer2::visible", timer2 );
+		int progress = 0;
+		for ( int pip = 10; pip <= 100; pip += 10 ) {
+			idStr visible;
+			if ( vehicle->GetHud()->GetPresentationValue( va( "progress_%d_on::visible", pip ), visible ) && atoi( visible ) ) {
+				++progress;
+			}
+		}
+		gameLocal.Printf( "testVehicleRace: seconds=%g hundredths=%g timer=%d timer2=%d progress=%g boost=%d envelope=%g failed=%d\n",
+			hudState.GetFloat( "currenttime" ), hudState.GetFloat( "currenttime2" ),
+			atoi( timer ), atoi( timer2 ), static_cast<float>( progress ),
+			hudState.GetInt( "oq4_boost" ), hudState.GetFloat( "oq4_boost_envelope" ), player->pfl.objectiveFailed );
 	}
 	for ( int i = 0; i < MAX_RENDERENTITY_GUI; ++i ) {
 		idUserInterface *gui = vehicle->GetRenderEntity()->gui[i];

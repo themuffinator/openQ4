@@ -90,7 +90,7 @@ def check_vehicle_friction() -> None:
     ceiling = function_body(source, "float rvVehicleRigid::GetMaxFriction ( void ) const", "VehicleRigid.cpp")
     require(ceiling, "return 1.0f;", "rvVehicleRigid::GetMaxFriction")
     restore = function_body(source, "void rvVehicleRigid::Restore ( idRestoreGame *savefile )", "VehicleRigid.cpp")
-    require_order(restore, ("ReadStaticObject ( physicsObj );", "SetFriction ( );", "RestorePhysics"),
+    require_order(restore, ("ReadPhysicsObject( physicsObj, this );", "SetFriction ( );", "RestorePhysics"),
                   "rvVehicleRigid::Restore")
     save = function_body(source, "void rvVehicleRigid::Save ( idSaveGame *savefile ) const", "VehicleRigid.cpp")
     reject(save, r"Friction", "rvVehicleRigid::Save")

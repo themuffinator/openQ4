@@ -254,6 +254,7 @@ jobs:
             tools/tests/awakening_status_behavior.py \
             tools/tests/clip_owner_behavior.py \
             tools/tests/medic_yield_behavior.py \
+            tools/tests/awakening_m07_behavior.py \
             tools/tests/awakening_m01_cinematic.py \
             tools/tests/awakening_status_runtime.py \
             tools/tests/monster_hit_materials.py \
@@ -771,6 +772,7 @@ jobs:
           python tools/tests/awakening_status_behavior.py
           python tools/tests/clip_owner_behavior.py
           python tools/tests/medic_yield_behavior.py
+          python tools/tests/awakening_m07_behavior.py
           python tools/tests/generated_animation_cache.py
           python tools/tests/level_load_cache.py
           python tools/tests/lightgrid_map_identity.py

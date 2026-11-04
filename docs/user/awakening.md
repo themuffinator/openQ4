@@ -227,6 +227,18 @@ scenes, keep your settings or keep the game fair:
   updating the sequence: saves made with a different revision of its script
   may require a fresh map start.
 
+- **The speeder races (m07).** Clocks, carried time and objectives now follow
+  each checkpoint consistently. Finishing clears the countdown and fills the
+  progress display, which stays full even if another progress trigger fires.
+  Missing a gate stops driving and firing during the failure screen; late
+  checkpoints cannot turn that failure into completion.
+  The first lockdown keeps its radio warning before starting
+  the clock. Bomber attacks clean up correctly, and two broken flyer destruction
+  sequences now work. Shooting down a bomber stops its volley cleanly and
+  ejects its pilot once. Restart the current race leg to use these changes;
+  older saves keep their original mission scripts. Leaving or disabling
+  the bike ends its boost while keeping the recharge time.
+
 - **Your field of view is yours.** The alpha's m03 gun scripts and the speeder
   bike's boost rewrote your FOV setting. openQ4 applies those changes to the
   view only and never touches the setting.

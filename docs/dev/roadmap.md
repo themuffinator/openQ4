@@ -2269,6 +2269,24 @@ Completion substeps must keep three forms of evidence distinct:
   Fitted camera bounds remove the upper cell door overlap that blocked startup.
   Focused runtime and production-method probes cover these states; complete
   mission playthroughs and the other campaign acceptance gates remain open.
+
+  Progress, 4 November (M07): the three race scripts now use versioned mission
+  corrections for late clock callbacks, single stage transitions, time
+  carryover, objective ordering, zero-clamped expiry and a completed HUD. Boost
+  cancellation respects seat exit, movement disablement and destruction while
+  preserving recharge. See the [M07 audit and qualification limits](awakening-m07.md).
+  Bomber cleanup now targets each attack's own assembly; the two missing
+  destruction callbacks use the existing authored sequence.
+  A second review added v2 terminal-state guards: repeatable progress volumes
+  cannot reduce a completed HUD, and failed gates disable vehicle controls and
+  reject late completion callbacks. Original and v1 saved script layouts remain
+  supported. Pipe machinery repeatability and next-leg HUD reset were checked
+  without requiring changes.
+  A third review adds v3 bomber ownership and interruption handling: one pilot
+  per destroyed flyer, safe paired-shot cancellation, assembly and temporary
+  aim cleanup, and completion of mover-waiting attack threads. Existing v1/v2 script
+  programs remain unchanged for restore compatibility.
+  Full driven traversal and race balance remain open under this item.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented
