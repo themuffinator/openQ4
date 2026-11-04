@@ -7,6 +7,9 @@ work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
+- Low-health bots can adjust their airborne approach to a catch pad when
+  a straight coast would end in a fatal landing. The reproduced descent now
+  survives and resumes navigation; broader safety qualification continues.
 - Recovery preserves a safe landing stopped by a wall and settles its final
   braking without drifting back off a ledge. The reproduced CTF5 fall is fixed;
   the broader long-match, map-catalog and timing gates remain under qualification.

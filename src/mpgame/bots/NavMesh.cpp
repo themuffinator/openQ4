@@ -1130,10 +1130,11 @@ rvNavMesh::AirInputLandingSafe
 
 The knocked-fall counterpart of RunningDropClear: idPhysics_Player's air
 acceleration toward one fixed wish, gravity, and the hull swept frame by
-frame, sliding along walls, until it comes down on walkable ground. The
+frame, sliding along walls, until it comes down on walkable ground. A known
+pad catch hands movement to its normal coast, as the live controller does. The
 landing must be supported and not lethal, cost no more than the impact the
-bot can afford, and leave room to stop at MP ground acceleration. Still
-falling after three seconds is a fall into nothing.
+bot can afford, and leave room to stop at MP ground acceleration. Each fall
+and caught-pad continuation has a bounded flight budget.
 ================
 */
 bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocityIn, const idVec3 &wishIn,
@@ -1153,7 +1154,7 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 		return true;
 	}
 	idVec3 wish( wishIn.x, wishIn.y, 0.0f );
-	const bool steering = wish.Normalize() > 0.0f;
+	bool steering = wish.Normalize() > 0.0f;
 	const float speed = Max( 1.0f, pm_speed.GetFloat() );
 	// Match the 16 ms player integration step. Doubling it changes the air
 	// acceleration before each sweep and misses narrow recoverable landings.
@@ -1179,13 +1180,14 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 	for ( int frame = 0; frame < maxFrames; frame++ ) {
 		const int transport = TransportAtFloor( position );
 		if ( transport >= 0 ) {
-			// A free coast can still be saved by a real, known pad catch.
-			// Prove its whole continuation from this exact contact, including
-			// repeated force-field pushes. Steered catches, teleporters and
-			// a second different pad are outside this bounded proof.
+			// Recovery may steer into a real, known pad catch. The live bot
+			// hands movement to the pad's normal coast when it launches, so
+			// prove that whole continuation from this exact contact, including
+			// repeated force-field pushes. Teleporters and a second different
+			// pad remain outside this bounded proof.
 			idVec3 registeredLanding;
 			idEntity *pad = transport < MAX_GENTITIES ? gameLocal.entities[transport] : NULL;
-			if ( frame == 0 || steering || ( caughtPad >= 0 && transport != caughtPad ) ||
+			if ( frame == 0 || ( caughtPad >= 0 && transport != caughtPad ) ||
 				 !pad || !pad->IsType( rvJumpPad::GetClassType() ) || !pad->IsActive( TH_THINK ) ||
 				 !NaturalPadLanding( transport, registeredLanding ) || !NavPadVolumeTouches( pad, position ) ) {
 				return reject( "unproven transport" );
@@ -1198,6 +1200,7 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 				caughtPad = transport;
 				maxFrames = frame + NAV_PAD_MAX_STEPS;
 			}
+			steering = false;
 		}
 		if ( steering ) {
 			const float add = speed - velocity * wish;
