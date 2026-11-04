@@ -151,16 +151,30 @@ int main(int argc,char **argv) {
 		const std::string original{std::istreambuf_iterator<char>(input),{}};
 		files.files[awakeningM07Sources[race]]=original;
 		idStr corrected; CHECK(Awakening_LoadM07MissionScript(awakeningM07Versions[race],corrected));
+		CHECK(corrected.Find("oq4_raceFailed")<0);
 		CHECK(corrected.Find("boolean oq4_raceComplete;")>=0);
 		CHECK(corrected.Find("!oq4_raceComplete")>=0);
 		for (int bomber=2;bomber<=(race==0?3:race==1?2:4);++bomber) {
 			const std::string expected="sys.waitFor( $strafeBase_"+std::to_string(bomber)+" );\n\t\tremoveFlyerBits(\""+std::to_string(bomber)+"\");";
 			CHECK(corrected.Find(expected.c_str())>=0);
 		}
-		CHECK(!std::strcmp(Awakening_M07MissionScriptName(awakeningM07Sources[race]),awakeningM07Versions[race]));
+		CHECK(!std::strcmp(Awakening_M07MissionScriptName(awakeningM07Sources[race]),awakeningM07Versions2[race]));
+		idStr latest; CHECK(Awakening_LoadM07MissionScript(awakeningM07Versions2[race],latest));
+		CHECK(latest.Find("boolean oq4_raceFailed;")>=0 && latest!=corrected);
+		// An otherwise recognized script with an ambiguous new anchor must not
+		// select a partly corrected v2, nor break its existing v1 save identity.
+		files.files[awakeningM07Sources[race]]+="\nvoid raceProgress90()\n\t{ }\n";
+		idStr rejected; CHECK(!Awakening_LoadM07MissionScript(awakeningM07Versions2[race],rejected) && rejected.empty());
+		CHECK(!std::strcmp(Awakening_M07MissionScriptName(awakeningM07Sources[race]),awakeningM07Sources[race]));
+		CHECK(Awakening_LoadM07MissionScript(awakeningM07Versions[race],rejected));
+		files.files[awakeningM07Sources[race]]=original;
 		idStr windows=awakeningM07Versions[race]; windows.Replace("/","\\");
 		idStr repeated; CHECK(Awakening_LoadM07MissionScript(windows,repeated) && repeated==corrected);
 		CHECK(!Awakening_LoadM07MissionScript(awakeningM07Sources[race],repeated));
+		files.game="baseoq4"; CHECK(!Awakening_LoadM07MissionScript(windows,repeated)); files.game="q4xbase";
+		gameLocal.isMultiplayer=true; CHECK(!Awakening_LoadM07MissionScript(windows,repeated)); gameLocal.isMultiplayer=false;
+		windows=awakeningM07Versions2[race]; windows.Replace("/","\\");
+		CHECK(Awakening_LoadM07MissionScript(windows,repeated) && repeated==latest);
 		files.game="baseoq4"; CHECK(!Awakening_LoadM07MissionScript(windows,repeated)); files.game="q4xbase";
 		gameLocal.isMultiplayer=true; CHECK(!Awakening_LoadM07MissionScript(windows,repeated)); gameLocal.isMultiplayer=false;
 		files.files[awakeningM07Sources[race]]+="\nfloat area1TimeLeft;\n";

@@ -1759,6 +1759,11 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   preserving recharge. See the [M07 audit and qualification limits](awakening-m07.md).
   Bomber cleanup now targets each attack's own assembly; the two missing
   destruction callbacks use the existing authored sequence.
+  A second review added v2 terminal-state guards: repeatable progress volumes
+  cannot reduce a completed HUD, and failed gates disable vehicle controls and
+  reject late completion callbacks. Original and v1 saved script layouts remain
+  supported. Pipe machinery repeatability and next-leg HUD reset were checked
+  without requiring changes.
   Full driven traversal and race balance remain open under this item.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for

@@ -1,13 +1,16 @@
 /*
  * M07 race corrections, authored for openQ4 under the Quake 4 SDK EULA.
  * Transform installed scripts; do not redistribute recovered content.
- * Keep v1 stable: saved threads recompile this virtual source on restore.
+ * Keep each version stable: saved threads recompile its source on restore.
  */
 static const char * const awakeningM07Sources[] = {
 	"maps/game/m07_race.script", "maps/game/m07_race1.script", "maps/game/m07_race2.script"
 };
 static const char * const awakeningM07Versions[] = {
 	"maps/game/m07_race.openq4-v1.script", "maps/game/m07_race1.openq4-v1.script", "maps/game/m07_race2.openq4-v1.script"
+};
+static const char * const awakeningM07Versions2[] = {
+	"maps/game/m07_race.openq4-v2.script", "maps/game/m07_race1.openq4-v2.script", "maps/game/m07_race2.openq4-v2.script"
 };
 
 static bool Awakening_M07ReplaceOnce( idStr &source, const char *before, const char *after ) {
@@ -118,6 +121,45 @@ static bool Awakening_CorrectM07Script( idStr &source, int race ) {
 	return true;
 }
 
+// Apply only after v1. Separate identity preserves existing saved statement
+// offsets, while fresh starts treat both success and failure as terminal.
+static bool Awakening_CorrectM07ScriptV2( idStr &source, int race ) {
+	if ( !Awakening_M07ReplaceOnce( source, "boolean oq4_raceComplete;",
+		"boolean oq4_raceComplete;\nboolean oq4_raceFailed;" ) ) { return false; }
+	const char *callbacks[] = { "startTimerArea1", "startTimerArea2", "area1Cleared", "area2Cleared" };
+	for ( size_t i = 0; i < sizeof( callbacks ) / sizeof( callbacks[0] ); ++i ) {
+		idStr before = va( "void %s()\n\t{", callbacks[i] );
+		idStr after = before;
+		after += "\n\t\tif ( oq4_raceFailed ) { return; }";
+		if ( !Awakening_M07ReplaceOnce( source, before, after ) ) { return false; }
+	}
+	// These are repeatable position triggers. Retain backtracking feedback while
+	// racing, but never overwrite the settled result after a finish or failure.
+	for ( int progress = 0; progress <= 100; progress += 10 ) {
+		idStr before = va( "void raceProgress%d()\n\t{", progress );
+		idStr after = before;
+		after += "\n\t\tif ( oq4_raceComplete || oq4_raceFailed ) { return; }";
+		if ( !Awakening_M07ReplaceOnce( source, before, after ) ) { return false; }
+	}
+	const char *area = race == 0 ? "RACE_AREA" : race == 1 ? "RACE1_AREA" : "RACE2_AREA";
+	for ( int gate = 1; gate <= 2; ++gate ) {
+		idStr before = va( "if( %s <= %d && !oq4_raceComplete )\n\t\t\t{", area, gate );
+		idStr after = va( "if( %s <= %d && !oq4_raceComplete && !oq4_raceFailed )\n\t\t\t{\n"
+			"\t\t\t\toq4_raceFailed = true;\n"
+			"\t\t\t\t$vehicle_speeder_1.disableMovement();\n"
+			"\t\t\t\t$vehicle_speeder_1.disableWeapon();", area, gate );
+		if ( !Awakening_M07ReplaceOnce( source, before, after ) ) { return false; }
+		before = gate == 1 ? "while( timeNow <= AREA1_TIME_EXPIRED && !oq4_raceArea2Started && !oq4_raceComplete )"
+			: "while( timeNow <= AREA2_TIME_EXPIRED && !oq4_raceComplete )";
+		after = before;
+		after.Replace( " )", " && !oq4_raceFailed )" );
+		if ( !Awakening_M07ReplaceOnce( source, before, after ) ) { return false; }
+	}
+	if ( race == 2 && !Awakening_M07ReplaceOnce( source, "void raceExitCinematic()\n\t{",
+		"void raceExitCinematic()\n\t{\n\t\tif ( oq4_raceFailed ) { return; }" ) ) { return false; }
+	return true;
+}
+
 static bool Awakening_LoadM07MissionScript( const char *filename, idStr &source ) {
 	idStr normalized = filename;
 	normalized.BackSlashesToSlashes();
@@ -125,12 +167,14 @@ static bool Awakening_LoadM07MissionScript( const char *filename, idStr &source 
 		return false;
 	}
 	for ( int race = 0; race < 3; ++race ) {
-		if ( normalized.Icmp( awakeningM07Versions[race] ) != 0 ) { continue; }
+		const bool version2 = normalized.Icmp( awakeningM07Versions2[race] ) == 0;
+		if ( !version2 && normalized.Icmp( awakeningM07Versions[race] ) != 0 ) { continue; }
 		char *installed = NULL;
 		const int length = fileSystem->ReadFile( awakeningM07Sources[race], reinterpret_cast<void **>( &installed ), NULL );
 		if ( length > 0 ) { source = installed; }
 		if ( installed != NULL ) { fileSystem->FreeFile( installed ); }
-		if ( length <= 0 || !Awakening_CorrectM07Script( source, race ) ) {
+		if ( length <= 0 || !Awakening_CorrectM07Script( source, race ) ||
+			( version2 && !Awakening_CorrectM07ScriptV2( source, race ) ) ) {
 			source.Clear();
 			return false;
 		}
@@ -146,9 +190,9 @@ static const char *Awakening_M07MissionScriptName( const char *filename ) {
 		for ( int race = 0; race < 3; ++race ) {
 			if ( normalized.Icmp( awakeningM07Sources[race] ) != 0 ) { continue; }
 			idStr source;
-			if ( Awakening_LoadM07MissionScript( awakeningM07Versions[race], source ) ) {
-				gameLocal.Printf( "Awakening M07: %s mission corrections v1 enabled\n", filename );
-				return awakeningM07Versions[race];
+			if ( Awakening_LoadM07MissionScript( awakeningM07Versions2[race], source ) ) {
+				gameLocal.Printf( "Awakening M07: %s mission corrections v2 enabled\n", filename );
+				return awakeningM07Versions2[race];
 			}
 			gameLocal.Warning( "Awakening M07: unrecognized script; keeping installed mission behaviour" );
 		}

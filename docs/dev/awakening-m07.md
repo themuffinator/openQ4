@@ -39,6 +39,12 @@ those allowances, movements and failure conditions.
   frame, both timer fields hide at completion, and the progress display reaches
   100 percent on all three legs. The original third map had no placed
   `raceProgress100` callback. Completed races ignore late gate-failure callbacks.
+- **Stable result:** repeatable progress volumes still report the rider's
+  position during the race, including backtracking. Once the leg is completed,
+  they cannot reduce its full progress display. Once a gate fails, they cannot
+  change its result or complete objectives. Failure disables driving and firing
+  during the return-screen delay, which also cancels boost through the existing
+  movement check. The final arrival cinematic cannot override a failed leg.
 - **Player view reset:** the second and third maps called the camera-only
   `setFOV` event on the player, producing an unsupported-event warning. They
   now use the existing script FOV bridge to reset the temporary view offset,
@@ -66,13 +72,15 @@ Design references remain credited to Raven Software and Ritual Entertainment,
 whose alpha was recovered by Justin Marshall; see the [upstream
 credits](../../AGENTS.md#upstream-credits) and [licensing](../../LICENSING.md).
 
-Fresh starts use `maps/game/m07_race.openq4-v1.script`,
-`maps/game/m07_race1.openq4-v1.script` or
-`maps/game/m07_race2.openq4-v1.script`. Saves record that virtual filename and
-restore the same transformation. Older saves retain their original installed
-script names and statement layouts. Restart the current race leg to adopt the
-mission-script corrections. Boost fixes apply independently of that choice.
-Keep these v1 transformations stable; future changes require a new identity.
+Fresh starts use `maps/game/m07_race.openq4-v2.script`,
+`maps/game/m07_race1.openq4-v2.script` or
+`maps/game/m07_race2.openq4-v2.script`. Saves record that virtual filename and
+restore the same transformation. The original installed identities and v1
+transformation remain supported without changing their statement layouts.
+Restart the current race leg to adopt v2's terminal-state corrections; a v1
+save retains v1 behaviour until the next map. Boost fixes apply independently
+of that choice. Keep both transformations stable; further changes require
+a new identity.
 
 ## Validation
 
@@ -92,7 +100,7 @@ The Windows x64 SP module was rebuilt through the Meson wrapper and staged in
 the worktree's stable `.install/` path. Tests used independent copies of the
 main checkout's client, renderers and matching package files; the engine was
 not changed by this task. `engine-provenance.json`, `pack-provenance.json` and
-each run's `plan.json` record those identities. The final native fixture passed
+each run's `plan.json` record those identities. The first-pass native fixture passed
 67 checks with the installed scripts; its asset-free boost run passed 28.
 Gameplay, speeder-physics, Awakening CI and repository-path contracts passed.
 No Linux or macOS runtime result is claimed.
@@ -129,6 +137,53 @@ probes sample repeatedly before the failure screen unloads the map; completion
 probes assert that simulation time has exceeded the carried deadline plus its
 five-second closure.
 
+### Second review
+
+The second review reproduced two additional defects in the v1 module. Calling
+the authored progress callbacks after completion reduced the HUD from ten pips
+to nine. After a missed gate, driving and firing remained enabled; late
+checkpoint callbacks removed the failed objective, started a new timer and
+filled the progress display while the player's failure flag was still set.
+These reproductions live in `.tmp/awakening-m07-round2/boundaries-before` and
+`failure-before`. The v2 transformation fixes those boundaries without altering
+the gate allowances or the five-second closing period.
+
+Two other suspicions did not reproduce and required no implementation change:
+the next map reset its HUD to zero, and the rotating-pipe machinery completed
+and repeated its cycle during a 100-second simulation. The machinery probe
+observed two distinct cycle threads, each present in four samples spaced four
+seconds apart, with no overlap. Its report is `machinery-before/report.json`.
+This checks cycle liveness, not the safety or feel of driving through the pipes.
+
+The expanded runtime harness has `boundaries`, `failed`, `failed2` and
+`machinery` cases. `--input <race.save>` checks an in-progress restore;
+`--case boundaries --saved-state finished --input <finished.save>` checks the
+saved completion state. Both compare against the producing run's log, so keep
+that profile's log beside the save. Boundary captures wait for the stock
+objective popup to close naturally, because it temporarily suppresses drawing
+the vehicle HUD. No input is sent to dismiss it.
+
+The second-pass SP build passed. The native fixture passed **94 checks** with
+the installed scripts and **28** without assets; the gameplay, speeder-physics,
+Awakening CI and repository-path contracts also passed. The v1 transformation
+body is unchanged from the first-pass commit. All **15 runtime runs** below
+passed against the staged v2-capable module; `.tmp/awakening-m07-round2/suite.json`
+indexes the reports and runtime hashes.
+
+| Evidence directories | Qualification |
+| --- | --- |
+| `boundaries-race`, `boundaries-race1`, `boundaries-race2` | All ten progress callbacks below 100 percent leave a completed leg at ten pips. Both next M07 maps start at zero; the final leg reaches M08. |
+| `failed-race`, `failed-race1`, `failed-race2`, and matching `failed2-*` runs | Both gates on all three legs honour the closing delay, reach zero, disable driving/firing and preserve their failed objective, countdown and progress after late timer/checkpoint/progress callbacks. The final-leg arrival callback cannot bypass failure. |
+| `restore-v1-race`, `restore-v1-race1`, `restore-v1-race2` | Existing first-pass saves restore exactly, then pass the full deadline, bomber cleanup and next-map checks. The last uses Vulkan. |
+| `restore-v2-race1` | A new in-progress save restores exactly, stays completed beyond the gate deadline and passes bomber cleanup and transition checks. |
+| `restore-finished-race`, `restore-finished-race2` | New completed saves retain their result and reject progress regression after a fresh-process restore. The last uses Vulkan and waits for the objective popup before capture. |
+
+The OpenGL in-progress restore and Vulkan completed restore captures were
+inspected: all ten progress pips remain visible and both countdown fields are
+hidden. The two expected v1 reproductions and the unchanged machinery probe
+are indexed separately from the 15 acceptance runs. Existing content warnings
+and the driven-playthrough qualification limits below still apply.
+
 ## Remaining content and qualification limits
 
 - The alpha's missing media and empty navigation datasets are not repaired by
@@ -158,13 +213,15 @@ path while retaining the friction and restored-physics ordering checks.
 
 ## Workspace findings
 
-`E:/Repositories/openQ4/.claude/worktrees/ui-roadmap-work-aaa011`, branch
-`claude/ui-right-stick`, is clean and fully merged into the main checkout's
-branch; its last commit is dated 3 November 2026. It appears stale and removal
-is recommended after the user's required worktree approval. It was left intact.
+The first review identified the clean, merged `claude/ui-right-stick` worktree
+at `E:/Repositories/openQ4/.claude/worktrees/ui-roadmap-work-aaa011` as stale.
+It was not removed by this task and was no longer registered at the second
+review. No additional worktree was established to be disposable.
 
 Automatic approval review rejected cleanup of obsolete test outputs, including
 a narrowly scoped deletion after checking the absolute target and absence of
-links, with the reason "blocked by policy". Disposable preliminary profiles
-therefore remain under `.tmp/awakening-m07/` alongside the retained evidence and
-reusable asset cache.
+links, with the reason "blocked by policy". The second review's attempt to
+remove disposable native fixture sources/binaries and a duplicate comparison
+image received the same rejection. Disposable files therefore remain under
+`.tmp/awakening-m07/` and `.tmp/awakening-m07-round2/` alongside retained evidence
+and the reusable asset cache.

@@ -4805,7 +4805,9 @@ heading. It is not the contents of the 14 September 2026 release. See the
 
 - [x] The three speeder races keep their clocks, carried time and objectives
   in step with progress. Completed legs clear the timer and fill the progress
-  display; late callbacks cannot restart or fail a finished leg. The first
+  display; late callbacks cannot restart, fail or reduce the progress of a
+  finished leg. A missed gate disables driving and firing during the failure
+  screen, and late checkpoints cannot complete a failed race. The first
   lockdown retains its radio warning before starting the clock.
   Bomber attacks clean up the correct aircraft, and two previously broken
   flyer destruction sequences now work.

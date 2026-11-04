@@ -189,7 +189,10 @@ scenes, keep your settings or keep the game fair:
 
 - **The speeder races (m07).** Clocks, carried time and objectives now follow
   each checkpoint consistently. Finishing clears the countdown and fills the
-  progress display. The first lockdown keeps its radio warning before starting
+  progress display, which stays full even if another progress trigger fires.
+  Missing a gate stops driving and firing during the failure screen; late
+  checkpoints cannot turn that failure into completion.
+  The first lockdown keeps its radio warning before starting
   the clock. Bomber attacks clean up correctly, and two broken flyer destruction
   sequences now work. Restart the current race leg to use these changes;
   older saves keep their original mission scripts. Leaving or disabling

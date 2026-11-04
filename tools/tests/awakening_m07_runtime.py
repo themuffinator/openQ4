@@ -44,6 +44,9 @@ def sample(log, marker):
     clock = re.search(r'testVehicle: [^\n]*time=(\d+)', section)
     assert clock, 'missing simulation clock'
     result['time'] = int(clock.group(1))
+    controls = re.search(r'testVehicle: [^\n]*movement=(\d) shooting=(\d)', section)
+    assert controls, 'missing vehicle control state'
+    result['movement'], result['shooting'] = map(int, controls.groups())
     result['objectives'] = re.findall(r'testMissionObjective: ([^\r\n]+)', section)
     return result
 
@@ -59,6 +62,19 @@ def timeout_commands():
     for step in range(40):
         lines += ['wait 25'] + report_state(f'TIMEOUT_{step}')
     return lines + ['set com_fixedTic 1']
+
+
+def failure_commands(args, second=False):
+    # Sample inside the authored ten-second failure return delay. The fixture's
+    # fixed start waits leave ~32/69 seconds in stage one and ~92/139 in two.
+    frames = (640 if args.map == 'm07_race' else 930) if second else (250 if args.map == 'm07_race' else 480)
+    lines = ['set com_fixedTic 10', f'wait {frames}', 'set com_fixedTic 1'] + report_state('FAILED')
+    lines += ['testMission call area1Cleared', 'wait 2', 'testMission call area2Cleared',
+              'testMission call startTimerArea1', 'testMission call startTimerArea2', 'wait 2']
+    lines += [f'testMission call raceProgress{progress}' for progress in range(0, 101, 10)]
+    if args.map == 'm07_race2':
+        lines += ['testMission call raceExitCinematic', 'wait 100']
+    return lines + report_state('AFTER_FAILED')
 
 
 def bomber_entities(map_name):
@@ -94,6 +110,16 @@ def commands(args):
             lines += ['testMission call speederFlight02', 'set com_fixedTic 10',
                       'wait 180', 'set com_fixedTic 1', 'wait 2']
         lines += report_state('START')
+        if args.case == 'failed':
+            return lines + failure_commands(args)
+        if args.case == 'machinery':
+            lines += ['testMission call area1Cleared', 'wait 2', 'testMission call area2Cleared',
+                      'wait 2', 'set com_fixedTic 10']
+            for step in range(25):
+                lines += ['wait 25', f'echo M07_MACHINE_{step}', 'testVehicle vehicle_speeder_1',
+                          'testMission pipe_section_1', 'testMission pipeReamer_1', 'testMission pipeReamer_2',
+                          'listThreads']
+            return lines + ['set com_fixedTic 1', 'saveGame machinery', 'wait 3']
         if args.case == 'timeout1':
             return lines + timeout_commands()
         lines += ['wait 30'] + report_state('FIRST')
@@ -102,10 +128,20 @@ def commands(args):
         lines += report_state('SECOND')
         if args.case == 'timeout2':
             return lines + timeout_commands()
+        if args.case == 'failed2':
+            return lines + failure_commands(args, second=True)
         lines += ['set g_stopTime 1'] + report_state('SAVED') + ['saveGame race', 'wait 3', 'set g_stopTime 0']
     if args.case == 'outro':
         return lines + ['testMission call area2Cleared', 'wait 2'] + transition_commands(args.map)
     lines += ['testMission call area2Cleared', 'wait 2'] + report_state('FINISHED')
+    if args.case == 'boundaries':
+        lines += [f'testMission call raceProgress{progress}' for progress in range(0, 100, 10)]
+        # The stock objective popup temporarily suppresses vehicle HUD drawing.
+        # Let it close before the capture, without dismissing it through input.
+        lines += ['set com_fixedTic 10', 'wait 75', 'set com_fixedTic 1'] + report_state('SETTLED')
+        lines += ['screenshot screenshots/finished.tga', 'saveGame finished', 'wait 3']
+        lines += transition_commands(args.map)
+        return lines + (report_state('NEXT') if args.map != 'm07_race2' else [])
     # Exercise the original delayed objective window and stale callbacks.
     lines += ['testMission call area2Cleared', 'testMission call area1Cleared',
               'testMission call startTimerArea1', 'testMission call startTimerArea2',
@@ -127,8 +163,10 @@ def commands(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--map', choices=MAPS, required=True)
-    parser.add_argument('--case', choices=('flow', 'timeout1', 'timeout2', 'outro'), default='flow')
+    parser.add_argument('--case', choices=('flow', 'timeout1', 'timeout2', 'outro', 'boundaries', 'failed', 'failed2', 'machinery'), default='flow')
     parser.add_argument('--input', type=Path)
+    parser.add_argument('--saved-state', choices=('second', 'finished'), default='second',
+                        help='State in --input; finished is only supported by the boundaries check')
     parser.add_argument('--retail', type=Path, required=True)
     parser.add_argument('--awakening', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
@@ -136,10 +174,14 @@ def main():
     parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
     parser.add_argument('--timeout', type=int, default=600)
     args = parser.parse_args()
+    if args.saved_state == 'finished' and (not args.input or args.case != 'boundaries'):
+        parser.error('finished restore requires --input and --case boundaries')
     if args.case == 'outro' and args.map != 'm07_race2':
         parser.error('outro belongs to m07_race2')
-    if args.input and args.case.startswith('timeout'):
-        parser.error('timeout checks require a fresh map start')
+    if args.input and args.case in ('timeout1', 'timeout2', 'failed', 'failed2', 'machinery'):
+        parser.error('this check requires a fresh map start')
+    if args.case == 'machinery' and args.map != 'm07_race1':
+        parser.error('machinery belongs to m07_race1')
     output, cache = task_path(args.output), task_path(args.cache)
     output.mkdir(parents=True, exist_ok=False)
     game = output/'q4xbase'
@@ -164,7 +206,8 @@ def main():
     identity = {str(p.relative_to(ROOT)): sha(p) for p in runtime}
     asset = args.awakening/'maps/game'/f'{args.map}.script'
     asset_hash = sha(asset)
-    plan = dict(case=args.case, map=args.map, command=command, identity=identity, installed_script_sha256=asset_hash)
+    plan = dict(case=args.case, map=args.map, saved_state=args.saved_state if args.input else None,
+                command=command, identity=identity, installed_script_sha256=asset_hash)
     (output/'plan.json').write_text(json.dumps(plan, indent=2)+'\n')
     startup = None
     if sys.platform == 'win32':
@@ -198,17 +241,42 @@ def main():
             assert sha(args.input) == input_hash == sha(game/'savegames/race_in.save'), 'input save changed'
             assert 'Game Map Init SaveGame' in log, 'save was not restored'
         if not args.input:
-            assert 'Awakening M07:' in log and 'mission corrections v1 enabled' in log, 'corrections not selected'
-        if not args.case.startswith('timeout'):
+            assert 'Awakening M07:' in log and 'mission corrections v2 enabled' in log, 'corrections not selected'
+        if args.case in ('flow', 'outro', 'boundaries'):
             next_map = ('m07_race1', 'm07_race2', 'm08_cryofac')[MAPS.index(args.map)]
             assert 'expectedMap=game/'+next_map in log and 'Game Map Shutdown' in log, 'missing transition assertion'
-        if args.case == 'outro':
+        if args.case == 'machinery':
+            pipe_threads = set()
+            appearances = {}
+            for step in range(25):
+                section = log.split(f'M07_MACHINE_{step} ', 1)[1].split('M07_MACHINE_', 1)[0]
+                ids = re.findall(r'(?m)^\s*(\d+): pipeCycle\s+:', section)
+                assert len(ids) <= 1, 'overlapping/stalled pipe cycles'
+                pipe_threads.update(ids)
+                for thread_id in ids:
+                    appearances[thread_id] = appearances.get(thread_id, 0) + 1
+                assert 'testMission: missing=' not in section, 'missing machinery'
+            assert len(pipe_threads) >= 2 and max(appearances.values()) <= 9, 'pipe cycle did not finish and repeat'
+            assert (game/'savegames/machinery.save').is_file(), 'machinery not saveable'
+            samples = {'pipe_threads': sorted(pipe_threads), 'appearances': appearances}
+        elif args.case in ('failed', 'failed2'):
+            labels = ('START', 'SECOND', 'FAILED', 'AFTER_FAILED') if args.case == 'failed2' else ('START', 'FAILED', 'AFTER_FAILED')
+            samples = {label: sample(log, 'M07_SAMPLE_'+label) for label in labels}
+            failed, later = samples['FAILED'], samples['AFTER_FAILED']
+            running = samples['SECOND' if args.case == 'failed2' else 'START']
+            assert (failed['time'] - running['time']) / 1000 >= running['seconds'] + running['hundredths']/100 + 4.9, 'failed before final closure'
+            assert failed['seconds'] == failed['hundredths'] == 0, 'failed timer did not settle at zero'
+            assert failed['failed'] == later['failed'] == 1, 'failure did not persist'
+            assert failed['movement'] == failed['shooting'] == 0, 'failed race still has vehicle controls'
+            assert failed['objectives'] == later['objectives'] and failed['progress'] == later['progress'], 'late checkpoint completed a failed race'
+            assert all(failed[key] == later[key] for key in ('seconds', 'hundredths', 'timer', 'timer2', 'movement', 'shooting')), 'failed state changed after callbacks'
+        elif args.case == 'outro':
             assert 'game/m08_cryofac' in log and 'Game Map Shutdown' in log, 'outro did not change map'
         else:
             labels = (['RESTORED'] if args.input else ['START'])
             if not args.input and args.case != 'timeout1':
                 labels += ['FIRST', 'DUPLICATE', 'SECOND']
-                if args.case == 'flow':
+                if args.case in ('flow', 'boundaries'):
                     labels += ['SAVED']
             if not args.case.startswith('timeout'):
                 labels += ['FINISHED', 'SETTLED']
@@ -222,7 +290,8 @@ def main():
                 assert 'FAILED' in samples, 'missed gate did not fail mission'
             if args.input:
                 previous_log = args.input.resolve().parents[2]/'q4xbase/logs'/LOG_NAME
-                previous = sample(previous_log.read_text(errors='replace'), 'M07_SAMPLE_SAVED')
+                previous = sample(previous_log.read_text(errors='replace'),
+                                  'M07_SAMPLE_SETTLED' if args.saved_state == 'finished' else 'M07_SAMPLE_SAVED')
                 assert samples['RESTORED'] == previous, 'saved race state changed on restore'
             if 'FIRST' in samples:
                 a, b, c = (samples[x] for x in ('FIRST', 'DUPLICATE', 'SECOND'))
@@ -238,22 +307,27 @@ def main():
                 assert elapsed >= running['seconds'] + running['hundredths']/100 + 4.9, 'gate failed before final closure'
             else:
                 running = samples['RESTORED' if args.input else 'SAVED']
-                elapsed = (samples['SETTLED']['time'] - running['time']) / 1000
-                assert elapsed > running['seconds'] + running['hundredths']/100 + 5, 'probe did not outlast gate closure'
+                if args.case == 'flow':
+                    elapsed = (samples['SETTLED']['time'] - running['time']) / 1000
+                    assert elapsed > running['seconds'] + running['hundredths']/100 + 5, 'probe did not outlast gate closure'
                 for label in ('FINISHED', 'SETTLED'):
                     s = samples[label]
                     assert s['timer'] == s['timer2'] == s['failed'] == 0, f'completion resurrected/fails at {label}'
                     assert s['progress'] == 10 and not s['objectives'], f'incomplete progress/objectives at {label}'
                 assert (game/'savegames/finished.save').is_file(), 'completion not saveable'
                 assert (game/'screenshots/finished.tga').is_file(), 'engine capture missing'
-                before, after = log.split('M07_BOMBERS_BEFORE', 1)[1].split('M07_BOMBERS_AFTER', 1)
-                assert 'testMission: missing=' not in before, 'bomber fixture missing before probe'
-                assert 'testMission: name=strafingFlyer_1 ' in after, 'later bomber removed first bomber'
-                for name in bomber_entities(args.map)[1]:
-                    assert 'testMission: missing='+name+'\n' in after, 'bomber not removed: '+name
-                bomber_log = log.split('M07_BOMBERS_BEFORE', 1)[1].split('Game Map Shutdown', 1)[0]
-                assert 'unknown function' not in bomber_log and 'expected an existing' not in bomber_log, 'unresolved bomber callbacks'
-    except (AssertionError, OSError, ValueError) as error:
+                if args.case == 'flow':
+                    before, after = log.split('M07_BOMBERS_BEFORE', 1)[1].split('M07_BOMBERS_AFTER', 1)
+                    assert 'testMission: missing=' not in before, 'bomber fixture missing before probe'
+                    assert 'testMission: name=strafingFlyer_1 ' in after, 'later bomber removed first bomber'
+                    for name in bomber_entities(args.map)[1]:
+                        assert 'testMission: missing='+name+'\n' in after, 'bomber not removed: '+name
+                    bomber_log = log.split('M07_BOMBERS_BEFORE', 1)[1].split('Game Map Shutdown', 1)[0]
+                    assert 'unknown function' not in bomber_log and 'expected an existing' not in bomber_log, 'unresolved bomber callbacks'
+                elif args.map != 'm07_race2':
+                    samples['NEXT'] = sample(log, 'M07_SAMPLE_NEXT')
+                    assert samples['NEXT']['progress'] == 0, 'completed HUD carried into next race'
+    except (AssertionError, OSError, ValueError, IndexError) as error:
         failures.append(str(error))
     report = dict(plan, passed=not failures, failures=failures, samples=samples,
                   seconds=time.monotonic()-started, warnings=re.findall(r'(?mi)^.*WARNING:.*$', log))
