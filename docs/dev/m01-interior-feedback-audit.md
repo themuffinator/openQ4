@@ -2,7 +2,8 @@
 
 Investigated 4 November 2026. This is evidence and an acceptance reference for
 **Q4-04 in [the active roadmap](roadmap.md)**, which owns the implementation
-order. The proposed feedback pass is not implemented by this document.
+order. The baseline below is historical; the revision-3 implementation and its
+qualification are recorded at the end of this document.
 
 ## Scope and baseline
 
@@ -201,6 +202,116 @@ Acceptance for Q4-04:
 - Update player-facing candidate release notes only when the changes exist and
   their tested scope is known. This planning audit does not promote the feature
   or close Q4-04.
+
+## Implemented revision 3, 4 November 2026
+
+Fresh M01 starts use `m01_dropship-v3.script`. Original and lighting-only v2
+scripts remain available under their immutable names for suspended saves.
+The complete dialogue token sequence and the repair face-fill block are
+unchanged from v2. Interior duration remains **132.912 game seconds**, with
+cabin entry at 150.096 and gameplay handoff at 283.008 on both renderers.
+Restart M01 to receive the new direction; loading an earlier save deliberately
+retains that save's scene revision.
+Saves from the interim unversioned lighting development build may require a
+map restart; retaining v1 and v2 does not make two different programs under the
+same old filename interchangeable.
+
+### Delivered behavior
+
+- Cabin, wind and airframe rattle persist across the interior sets. Environmental
+  beds duck 4 dB during overlapping speech, with an additional 3 dB reduction
+  during the rescue quiet beat and welding. The local tool ducks 2 dB during
+  speech. Per-actor foley supplies harness, gear, boot and rappel contacts.
+- Light/heavy/breach cues dispatch sound, camera envelope, fixture dip and
+  damage effects in the same script tick. Their strength/duration parameters
+  are 0.9 degrees/0.70 s, 1.8/1.05 and 2.8/1.40 respectively. Damped rotation
+  composes once after the authored camera sample, with no camera translation,
+  accumulated state, new save bytes or effect on ordinary player views.
+- A modest rattle/damage loop and small smoke leaks sustain the damaged cabin.
+  Cold breach/exit light, short fixture dips and a distinct late engine failure
+  carry the progression into evacuation. The repair face fill remains steady.
+- Both cutting intervals own a positional tool emitter, low-amplitude blue glow,
+  small sparks and smoke following Tak's right index-finger joint. Sound ranges
+  use the engine's actual distance units. Effect calls use declared `fx_*`
+  keys, as required by the entity script API. The visible smoke/glow is restrained;
+  sparks are small and the player-harness contact is mostly below the close-up
+  crop. A culling-disabled diagnostic did not materially change that framing.
+  Effects were not moved across Tak's face to exaggerate their visibility.
+- The descent adds rope movement and a restrained landing contact/settle.
+  Scene emitters, lights, loops and worker threads are removed at handoff and
+  after the engine's normal skip path.
+- **Cinematic shake** is localized in all twelve language tables and exposed
+  in retained and classic game settings. Zero disables the added motion;
+  `vr_enable` also forces it to zero. Reduced flashing omits spark bursts and
+  fixture dips, steadies the evacuation emergency material and weld glow,
+  and retains sound, smoke and face light.
+
+The original non-looping `m1_action` score lasts 51.691 seconds. Its traced
+start and natural expiry explain its disappearance early in the cabin; it is
+not restarted at the breach or during the deaths. New environmental layers
+supply continuity after it ends. The focused diagnostic now cancels the hangar
+script threads, but still contains map ambience, so only full production entry
+recordings qualify the mix.
+
+### Qualification evidence
+
+Evidence root: `E:/Repositories/openQ4/.tmp/m01-feedback/`. All visual evidence
+comes from engine `screenshot`; tests used hidden windowed sessions without
+mouse/keyboard input. Each result records binary and content SHA-256 identities.
+
+| Check | Result and evidence |
+| --- | --- |
+| Full hangar, cabin, evacuation, repair, descent and gameplay | `final-gl/` and `final-vk/`: PASS, no scene runtime errors, identical semantic beat times, full cleanup and ordinary gameplay after handoff. One-second survey plus breach/tool/engine-failure capture bursts. |
+| Stereo and HRTF output | Both full runs recorded OpenAL PCM; Vulkan explicitly enabled Built-In HRTF. The user auditioned the repair excerpt and confirmed **dialogue is clear**. This does not claim a separate audition on both physical speaker and headphone systems. |
+| Save/load in eight phases | `phase-checkpoints/`: actual named autosaves and restores at cabin, incoming, breach, rescue, evacuation, first weld, engine failure and descent. PASS; all eight fixtures retained. |
+| Skip in eight phases | Fresh process restore and real engine skip for each fixture; `skip-matrix.json`: 8/8 PASS, gameplay and all helper/light counts zero. |
+| Older scene revisions | `legacy-v1/`, `legacy-v2/`, `legacy-matrix.json`: both existing old-revision fixtures restore and resave/reload successfully. These are compatibility fixtures, not a claim of every historical mid-scene save. |
+| High-refresh configuration and repair restore | `repair-restored/`: fresh repair restore, 144 FPS cap, normal time, rendering, audio and full handoff PASS. Several concurrent test games prevent a claim of sustained 144 FPS performance. |
+| Reduced flashing and shake off | `reduced-off/`: full restored cabin through gameplay PASS; every recorded added camera angle is zero, sound and dialogue remain, helper cleanup complete. |
+| VR comfort setting | `vr-comfort/`: restored late repair through gameplay PASS, all added camera angles zero with `vr_enable 1`. No physical headset qualification is claimed. |
+| Pause/time hold | At repair, simulation time remains 92944 during the diagnostic stop/resume. Production retained-pause clock/cache/resume tests also pass; this is not a manual pause-menu interaction test. |
+| Settings | `settings-final/`: engine screenshot shows the localized control without overlap; semantic left action changes 1.0 to 0.9 and the CVar reads back 0.9. Developer-off `testAutoSave` is refused. Generated-screen consistency, GUI clipping and retained adapter tests pass. |
+| Current integrated build | After staging, `current-final/` repeats the complete production path on GL, and `current-vk/` restores late repair through gameplay on Vulkan: both PASS. The independently copied matching runtime avoids concurrent restaging of `.install/`; `current-runtime.json` records its identity. The interrupted shared-install attempts are not counted as passes. |
+
+`final-metrics.json` records sampled maximum camera rotations: GL
+1.764/0.738/1.509 degrees (pitch/yaw/roll), Vulkan 2.127/0.756/1.800.
+Sampling and differing rendered frames explain the difference; these are
+observations, not formal maxima. Flight motion stays below 0.3 degrees per axis.
+There is no translation into nearby geometry. Tak's earlier thumbs-up and
+repair face/eyes remain readable in both full captures.
+
+The added persistent scene budget is at most three shadowless lights including
+the existing face fill, three helper entities including the tool source, and
+two worker threads. The cue owner has eight explicitly owned sound channels;
+local actor foley owns one channel per actor. The tool creates at most one
+spark burst every 0.35 s and one small smoke effect every 1.8 s, only during
+its two contact intervals; damage smoke is spaced 5.7 s apart. All are bounded,
+non-looping installed particle definitions. Whole-map maxima were 80/84 BSE
+effects and 2187/2152 particle units (GL/Vulkan); these include unrelated map
+effects and are **not** an isolated overhead measurement against the baseline.
+
+PCM contains 14/3 exact rail-valued samples in the complete GL/Vulkan recordings,
+with 4/1 inside the approximate interior windows and 4/0 during repair.
+This is not a zero-clipping certification or evidence of audible distortion.
+The repair was audibly accepted by the user. Tool gain is 0.523 during speech
+and 0.707 between lines, while its source is much quieter than the engine beds;
+raw emitter gain alone cannot compare their perceived loudness. Bed gains during
+repair speech are approximately 0.088/0.070/0.031, and speech remains unattenuated.
+
+Reproduce a full normal-time run using the matched runtime:
+
+```powershell
+python tools/tests/awakening_m01_cinematic.py --runtime .tmp/runtime/candidate --retail "E:/SteamLibrary/steamapps/common/Quake 4" --awakening E:/Games/Quake_4_Alpha-main --output .tmp/m01-feedback/replay --cache .tmp/awakening-m01-m02/cache --duration 315 --capture-start 140 --interval 1 --audio --trace --finish-after-handoff
+```
+
+Use `--api vk --hrtf` for the other full configuration. Use `--checkpoint-all`
+for phase fixtures and `--load-save <fixture> --skip-beat <phase>` for skips.
+Accelerated/no-render lifecycle results do not qualify audiovisual timing.
+
+The pass is implemented and scene-qualified within these limits. Q4-04 remains
+open for the broader thirteen-map campaign gate. Physical-device comparisons,
+headset comfort and an isolated performance baseline remain broader qualification
+work; no claim of those results is made here.
 
 ## Other findings and limits
 

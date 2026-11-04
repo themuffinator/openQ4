@@ -31,6 +31,15 @@ See [player release status](../user/release-status.md).
 
 ## Awakening opening missions, 4 November 2026
 
+- M01's dropship now builds from engine rumble into coordinated impacts,
+  emergency light dips, hull strain, wind and local harness/rope/welding sounds.
+  Environmental layers duck under dialogue, and Tak's improved repair lighting
+  is preserved. Cinematic shake has an amount/off control; reduced flashing
+  keeps stable lighting and non-flashing feedback. Restart M01 for the new
+  sequence; older saves retain their original scene revision.
+- The complete scene passes OpenGL/Vulkan playback, eight phase save/load and
+  eight skip checks. The repair mix was auditioned and confirmed clear; see
+  [tested scope and remaining device/performance limits](m01-interior-feedback-audit.md#implemented-revision-3-4-november-2026).
 - Tak's face retains natural skin tone and detail while freeing the player
   from the dropship harness in M01. A local cabin fill light covers that repair
   sequence and is removed before gameplay; his model and textures are unchanged.

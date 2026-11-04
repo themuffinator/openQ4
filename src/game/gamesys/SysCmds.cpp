@@ -3,6 +3,8 @@
 
 
 #include "../Game_local.h"
+
+extern void Awakening_TestM01Feedback_f( const idCmdArgs &args );
 // RAVEN BEGIN
 #include "../ai/AI.h"
 #if !defined(__GAME_PROJECTILE_H__)
@@ -4463,6 +4465,8 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "game_memory",			idClass::DisplayInfo_f,		CMD_FL_GAME,				"displays game class info" );
 	cmdSystem->AddCommand( "listClasses",			idClass::ListClasses_f,		CMD_FL_GAME,				"lists game classes" );
 	cmdSystem->AddCommand( "listThreads",			idThread::ListThreads_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"lists script threads" );
+	cmdSystem->AddCommand( "testM01Feedback", Awakening_TestM01Feedback_f, CMD_FL_GAME|CMD_FL_CHEAT,
+		"report M01 feedback ownership, or skip through the normal cinematic path" );
 	cmdSystem->AddCommand( "listEntities",			Cmd_EntityList_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"lists game entities" );
 	cmdSystem->AddCommand( "listClientEntities",	Cmd_ClientEntityList_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists client entities" );
 	cmdSystem->AddCommand( "listActiveEntities",	Cmd_ActiveEntityList_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists active game entities" );

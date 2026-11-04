@@ -1,0 +1,124 @@
+// Original revision-3 mixes; samples belong to the installed retail/Awakening assets.
+// Camera response is scene-local, independent of global sound shakes.
+
+sound oq4_m01v3_cabin {
+    no_occlusion
+    global
+    looping
+    volumeDb -14
+    sound/ambience/m03/dropship_interior.ogg
+}
+
+sound oq4_m01v3_wind {
+    no_occlusion
+    global
+    looping
+    volumeDb -16
+    sound/ambience/m03/wind_high1.ogg
+}
+
+sound oq4_m01v3_rattle {
+    no_occlusion
+    global
+    looping
+    volumeDb -23
+    sound/ambience/xian/chris/wavs/chris_beds_2/deep_rattle_drone.ogg
+}
+
+sound oq4_m01v3_hit {
+    no_occlusion
+    global
+    volumeDb -12
+    sound/ambience/m01/mcc_impact_1.ogg
+}
+
+sound oq4_m01v3_breach {
+    no_occlusion
+    global
+    volumeDb -10
+    sound/vehicles/dropship/space_explo_ship.ogg
+}
+
+sound oq4_m01v3_engine_fail {
+    no_occlusion
+    global
+    volumeDb -17
+    sound/ambience/m03/dropship_loseeng.ogg
+}
+
+sound oq4_m01v3_evasive {
+    no_occlusion
+    global
+    volumeDb -21
+    sound/ambience/m03/dropship_evasive1.ogg
+}
+
+sound oq4_m01v3_alarm {
+    no_occlusion
+    global
+    looping
+    volumeDb -23
+    sound/ambience/m01/incoming_alarm.ogg
+}
+
+sound oq4_m01v3_creak {
+    no_occlusion
+    global
+    volumeDb -12
+    sound/ambience/xian/metals/creaks/creak_10.ogg
+}
+
+sound oq4_m01v3_harness {
+    no_occlusion
+    minDistance 40
+    maxDistance 400
+    volumeDb -8
+    sound/ambience/m03/harness_open.ogg
+}
+
+sound oq4_m01v3_weld {
+    no_occlusion
+    minDistance 40
+    maxDistance 400
+    looping
+    volumeDb -3
+    sound/effects/generic/weld_loop.ogg
+}
+
+sound oq4_m01v3_gear {
+    no_occlusion
+    minDistance 40
+    maxDistance 400
+    volumeDb -12
+    sound/marine/player/steps/gear_mvemnt_01.ogg
+}
+
+sound oq4_m01v3_boot {
+    no_occlusion
+    minDistance 40
+    maxDistance 400
+    volumeDb -10
+    sound/marine/player/steps/ladder1.ogg
+}
+
+sound oq4_m01v3_rope {
+    no_occlusion
+    minDistance 40
+    maxDistance 400
+    volumeDb -20
+    sound/strogg/tactical_transfer/rappel1.ogg
+}
+
+sound oq4_m01v3_rope_global {
+    no_occlusion
+    global
+    volumeDb -24
+    sound/strogg/tactical_transfer/rappel2.ogg
+}
+
+sound oq4_m01v3_land {
+    no_occlusion
+    global
+    volumeDb -7
+    sound/marine/player/steps/dirt_01.ogg
+}

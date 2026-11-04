@@ -1753,35 +1753,33 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   End-to-end squad routing, walker demolition/traversal and Tank/extraction
   qualification remain part of this gate.
 
-  **M01 interior dramatic-feedback pass (planned, 4 November).** The full
-  hangar-to-gameplay audit confirms working cabin/wind/welding output, but sparse
-  environmental layers, no added cinematic impact response and brief effects
-  during sustained actions. Preserve the Tak face-lighting correction and the
-  immutable scene-script/save revisions. Use the
-  [dropship audit and beat acceptance](m01-interior-feedback-audit.md) as supporting
-  evidence; the ordered work remains here:
+  **M01 interior dramatic-feedback pass (implemented, 4 November).** Revision 3
+  preserves Tak's repair face fill, exact dialogue sequence and 132.912-second
+  interior timing. Fresh starts add ducked cabin/wind/rattle layers, positional
+  foley, synchronized impact tiers, bounded camera response, damage lighting,
+  joint-following tool effects and a completed descent sound transition.
+  Original/v2 scripts remain immutable for saves. The localized shake control,
+  reduced-flashing treatment and VR motion suppression are implemented.
+  The [dropship audit and beat acceptance](m01-interior-feedback-audit.md#implemented-revision-3-4-november-2026)
+  records the ordered plan's delivered scope and limits:
 
-  1. **Audio baseline and continuity.** Trace cue/channel ownership and score
-     lifetime on the full entry path; isolate the direct-cabin diagnostic's early
-     emitter stop. Rebalance environmental detail, dialogue ducking and headroom;
-     retain deliberately quiet story beats. Confirm the mix by listening as well
-     as recording active voices and PCM.
-  2. **Coupled impact response.** Implement one scene-owned dispatch for sound,
-     bounded camera impulse, fixture response and effects, with light/heavy/breach
-     tiers. Compose the offset once after authored camera sampling, with explicit
-     shake amount/off and existing VR comfort behavior. Keep normal player and
-     unrelated cinematic paths unchanged.
-  3. **Damage progression and close action.** Carry damage state across interior
-     sets; add restrained hull strain, localized dust/sparks and motivated light
-     changes. Bind Tak's weld sound, emission and glow to tool contact, preserve
-     face readability, and align spatial harness/rail/rope/landing foley. Review
-     framing and the descent-to-world audio transition.
-  4. **Qualification and release evidence.** Run full GL/Vulkan entry plus phase
-     save/skip/restart, high-refresh and pause/resume cases; compare normal,
-     reduced-flashing and shake-off modes. Require synchronized cues, readable
-     faces/dialogue, bounded resource cost and complete effect/camera cleanup at
-     handoff. Audition headphone/speaker output, verify installed-asset-only
-     dependencies, and update candidate release notes with the tested result.
+  1. **Audio continuity — implemented and checked.** Full production stereo/HRTF
+     recordings trace ownership, ducking and natural score expiry. The user
+     auditioned the repair passage and confirmed clear dialogue.
+  2. **Coupled impact response — implemented and checked.** Three finite tiers
+     compose once after camera sampling; no translation or accumulated offset.
+     Shake-off and the VR setting yield zero added motion.
+  3. **Damage and close action — implemented and reviewed.** Damage carries across
+     sets; tool audio/glow/emission follow both repair intervals. Face lighting
+     and squad sightlines remain readable; sparks stay small and mostly below
+     the close-up crop.
+  4. **Scene qualification — passed within documented scope.** Full GL/Vulkan
+     playbacks reach gameplay with identical beat times. Eight phase saves and
+     eight fresh-process skip cases pass, as do old-revision restore/resave,
+     normal-time repair at a 144 FPS cap, reduced flashing, pause-clock tests
+     and the settings control. Concurrent games prevent isolated performance
+     qualification; physical speaker/headphone comparisons and headset comfort
+     remain wider campaign qualification. Candidate release notes are updated.
 
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
