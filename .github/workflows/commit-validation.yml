@@ -261,6 +261,8 @@ jobs:
             tools/tests/renderer_special_effect_snapshot.py \
             tools/tests/renderer_frame_identity.py \
             tools/tests/renderer_frame_ownership.py \
+            tools/tests/renderer_snapshot_copy.py \
+            tools/tests/renderer_overlap_benchmark_test.py \
             tools/tests/presentation_reference_suite_test.py \
             tools/tests/hdr_postprocess_math.py \
             tools/tests/idstr_input_safety.py \
@@ -755,6 +757,8 @@ jobs:
           python tools/tests/renderer_special_effect_snapshot.py
           python tools/tests/renderer_frame_identity.py
           python tools/tests/renderer_frame_ownership.py
+          python tools/tests/renderer_snapshot_copy.py
+          python tools/tests/renderer_overlap_benchmark_test.py
           python tools/tests/presentation_reference_suite_test.py
           python tools/tests/hdr_postprocess_math.py
           python tools/tests/idstr_input_safety.py

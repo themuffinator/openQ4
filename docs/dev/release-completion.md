@@ -8,6 +8,10 @@ See [player release status](../user/release-status.md).
 
 ## Experimental Vulkan front-end overlap, 4 November 2026
 
+- **The experimental full-overlap mode avoids repeated copies of shared
+  geometry within a view.** Each submitted view keeps its own data, including
+  when a later view rebuilds the same source memory. This reduces copy volume;
+  a quiet performance comparison is still required before recommending mode 2.
 - **Vulkan can prepare the next frame while drawing the previous one.**
   Developers and testers can opt in with `r_vkRenderThread 2`; mode `1` keeps
   the earlier game-tic overlap and mode `0` remains the default. Performance
@@ -27,6 +31,8 @@ See [player release status](../user/release-status.md).
 - Quiet mode 0/1/2 comparisons, the native-resolution Quality budget, physical
   display/input qualification and Linux/macOS runtime coverage remain open in
   HF-07/HF-08 and REN-07. These are unreleased source changes.
+  The new repeatable [mode comparison and snapshot accounting](presentation-owners.md#mode-comparisons-and-snapshot-reuse-4-november-2026)
+  records shared-machine evidence without claiming those qualification gates.
 
 ## High-refresh frame ownership, 4 November 2026
 

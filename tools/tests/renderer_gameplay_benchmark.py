@@ -1510,7 +1510,8 @@ def parse_benchmark_config(text: str) -> BenchmarkConfigEvidence:
         scene_map, entity_filter = assertion.groups()
         start_commands = scene_snapshot_commands(VIEW_BEGIN, scene_map, entity_filter)
     else:
-        start_commands = ["viewpos"]
+        # MP registers getviewpos; retain viewpos for existing SP evidence.
+        start_commands = ["getviewpos"] if lines[cursor : cursor + 1] == ["getviewpos"] else ["viewpos"]
     if lines[cursor : cursor + len(start_commands)] != start_commands:
         raise ValueError("generated benchmark config is missing the post-command viewpos")
     cursor += len(start_commands)
@@ -1776,7 +1777,7 @@ def build_scripted_capture_lines(
     # before those commands described the wrong camera and omitted pitch/roll.
     lines.extend(
         scene_snapshot_commands(VIEW_BEGIN, scene_contract["map"], scene_contract["entityFilter"])
-        if scene_contract else ["viewpos"]
+        if scene_contract else ["getviewpos" if spec.mode == "MP" else "viewpos"]
     )
     if renderer_metrics:
         # A client can reload the game module while connecting and re-exec an

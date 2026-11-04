@@ -895,10 +895,29 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
       show both forms of overlap; OpenGL remains an inline control. See
       [ownership and validation evidence](presentation-owners.md#full-front-end-overlap-4-november-2026).
 
-      **Still open:** quiet paired mode 0/1/2 performance measurements, snapshot
-      cost reduction, physical display/input qualification and Wayland/macOS
-      runtime coverage. Do not promote the default or claim the Quality floor
-      from shared-machine functional tests.
+      **Snapshot-cost iteration, 4 November.** The in-launch comparison runner
+      exercises modes 0/1/2 in balanced order at windowed 1280 x 720 Quality,
+      with uncapped presentation and VSync off. It retains per-window timing,
+      optional snapshot accounting, runtime identities and peer-load evidence.
+      Initial measurements identified about 13 MB of copying per mode-2 frame.
+      Exact source ranges now share an owned copy within one view. All geometry
+      preparation precedes copying, and a bounded arena-backed lookup avoids
+      per-stream heap nodes. Later views still take new copies; borrowed game
+      data and cross-view caching remain prohibited without a lifetime contract.
+      Native tests cover aliasing, distinct ranges, preparation order, table
+      growth/capacity fallback and later-view isolation. The final nine-window
+      comparison passes and avoids 34.54% of requested snapshot copy bytes
+      (4.64 MB/frame reused, 8.79 MB/frame copied). All host samples contained
+      competing games/build tools; elapsed snapshot time was 3.98 ms/frame
+      versus 3.49 ms before reuse, so no timing gain is established. All 15
+      focused tests pass. See
+      [comparison evidence](presentation-owners.md#mode-comparisons-and-snapshot-reuse-4-november-2026).
+
+      **Still open:** quiet paired mode 0/1/2 measurements, further snapshot cost
+      reduction (including explicitly retained immutable static streams), the
+      every-frame Quality floor, physical display/input qualification and
+      Wayland/macOS runtime coverage. Do not promote the default from
+      shared-machine measurements.
 - [ ] **REN-08 — P1, qualification and targeted implementation: complete post-
   processing combinations.** Qualify motion blur independently of TAA: it has its
   own history, limited rigid-opaque object vectors and subview/time-gap resets;

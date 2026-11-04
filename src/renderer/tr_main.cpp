@@ -353,9 +353,11 @@ void R_ShutdownFrameData( void ) {
 }
 
 void R_FrameOwnershipSelfTest_f( const idCmdArgs &args );
+void R_FrameSnapshotStats_f( const idCmdArgs &args );
 
 void R_InitFrameData( void ) {
 	cmdSystem->AddCommand( "rendererFrameOwnershipSelfTest", R_FrameOwnershipSelfTest_f, CMD_FL_RENDERER, "validates submitted frame snapshots without input or rendering" );
+	cmdSystem->AddCommand( "rendererFrameSnapshotStats", R_FrameSnapshotStats_f, CMD_FL_RENDERER, "reset starts snapshot copy/timing accounting; a label prints and stops it" );
 	R_ShutdownFrameData();
 	for ( int i = 0; i < 2; ++i ) {
 		frameData_t *frame = (frameData_t *)Mem_ClearedAlloc( sizeof( *frame ) );

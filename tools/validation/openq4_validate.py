@@ -586,6 +586,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "renderer_special_effect_snapshot.py",
         root / "tools" / "tests" / "renderer_frame_identity.py",
         root / "tools" / "tests" / "renderer_frame_ownership.py",
+        root / "tools" / "tests" / "renderer_snapshot_copy.py",
+        root / "tools" / "tests" / "renderer_overlap_benchmark_test.py",
         root / "tools" / "tests" / "presentation_reference_suite_test.py",
         root / "tools" / "tests" / "hdr_postprocess_math.py",
         root / "tools" / "tests" / "idstr_input_safety.py",

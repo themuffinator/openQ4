@@ -869,3 +869,119 @@ floor, physical display/input checks and Wayland/macOS runtime coverage remain
 open under HF-07/HF-08 and REN-07. Shared-domain scene-packet capacity fallback
 and the post-restart Vulkan `gfxInfo` bootstrap label remain separate known
 issues.
+
+### Mode comparisons and snapshot reuse, 4 November 2026
+
+`tools/tests/renderer_overlap_benchmark.py` compares modes 0/1/2 in one
+windowed stock-asset SP launch. It applies Quality, then selects uncapped
+presentation with VSync off. Each mode occupies each order position once
+(0/1/2, 2/0/1, 1/2/0), with a four-second warm-up rotation followed by an
+eight-second measured rotation at the same position. Default drawable size is
+1280 x 720. Frame-time means/percentiles and snapshot copy counters are kept
+for every window. The ordinary gameplay harness verifies the runtime inventory,
+captures the engine render target and rejects engine failures. Missing,
+duplicated, mislabeled or invalid measurement windows fail the comparison.
+
+Run from the repository, using a new evidence directory:
+
+```text
+python tools/tests/renderer_overlap_benchmark.py --basepath "E:/SteamLibrary/steamapps/common/Quake 4" --output-dir .tmp/high-refresh-perf/comparison
+```
+
+When `psutil` is available, `host-load.json` records host CPU utilization and
+competing games/build tools once per second. Missing monitoring does not imply
+a quiet host. These windowed comparisons do not qualify physical presentation
+or the native-resolution Quality floor.
+
+`rendererFrameSnapshotStats reset` starts optional accounting;
+`rendererFrameSnapshotStats sample` prints and stops it. Counters include
+frames/views, copy calls/bytes, geometry/cache bytes, reused bytes and elapsed
+snapshot microseconds. The time includes preparation and copying on the front
+end, including any scheduling delay; bytes are copied payload/header bytes,
+not total arena or process memory. Ordinary play leaves accounting disabled.
+
+The first optimization shares exact source-address/byte-length ranges within
+one submitted view. Triangle and cache headers remain separate records; repeated
+vertex, index, auxiliary, palette and joint ranges reuse owned copies. The
+lookup ends with that view, so another view rebuilding the same source address
+receives fresh bytes. All geometry preparation runs before any copying,
+including CPU fallback/cache updates reached through later light chains. No
+mutable game storage is borrowed, and static streams are still copied each
+view. Native tests execute this preparation order and the production copy
+cache; negative controls detect borrowed source storage, size-blind reuse and
+late preparation. The engine ownership self-test also covers distinct triangle
+records sharing streams and a later view observing changed source contents.
+
+The reuse lookup uses frame-arena storage, with no per-stream heap nodes or
+individual frees. It grows at half occupancy to at most 65,536 slots. At its
+limit, untracked ranges take the ordinary owned-copy path; existing entries
+remain usable. Native tests exercise growth, collisions and this fallback with
+40,000 distinct ranges. The bounded lookup does not impose a geometry limit.
+
+The verified baseline and final candidate each completed all nine measurement
+windows. Values below are medians of the three window statistics, in
+milliseconds; lower is better. They are shared-machine observations, **not
+performance qualification**.
+
+| Build | Mode | Mean | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Before reuse | 0 | 9.034 | 9.00 | 12.85 | 14.05 |
+| Before reuse | 1 | 7.175 | 6.90 | 10.70 | 11.55 |
+| Before reuse | 2 | 10.953 | 10.95 | 14.35 | 16.90 |
+| Bounded reuse | 0 | 14.787 | 14.75 | 21.45 | 27.30 |
+| Bounded reuse | 1 | 12.872 | 11.65 | 22.45 | 34.35 |
+| Bounded reuse | 2 | 14.493 | 14.35 | 20.40 | 24.30 |
+
+The final mode-2 windows copied 8,790,400 bytes per frame and reused 4,637,978
+bytes per frame: **34.54% of the requested copy bytes were avoided within that
+run**. The earlier baseline copied 13,269,339 bytes per frame. Lookup-table
+storage is additional arena memory and is excluded from these payload/header
+counters. Frame-weighted elapsed snapshot time was 3.486 ms before reuse and
+3.982 ms with bounded reuse; this does not establish a timing improvement.
+Other games or build tools were present in all 163 baseline and 207 final
+host samples, with mean host CPU utilization of 88.7% and 90.0%, respectively.
+Even the unchanged inline mode slowed substantially between runs. Quiet
+paired comparisons are still required before judging elapsed cost or choosing
+a default.
+
+Evidence is retained under `.tmp/high-refresh-perf/`: `baseline-verified/` and
+`final/` contain comparison JSON, host samples, engine logs and gameplay reports
+with exact runtime hashes. `baseline-instrumentation.patch` preserves the
+instrumented baseline. `candidate/` and `candidate-unordered.patch` record the
+intermediate heap-table implementation; it avoided 34.70% of copy bytes but
+also ran under competing load. The initial `baseline/` attempt correctly
+failed evidence parsing because engine tokenization split hyphenated labels;
+the runner now uses underscores and the verified baseline passed.
+
+The final Windows x64 build/stage and all 15 focused Meson tests pass, including
+the new snapshot-copy and comparison-parser tests. Validation wiring and
+repository path portability checks also pass. See `final-build.log`,
+`final-install.log`, `final-tests.log` and `validation-hardening.log`.
+
+Windowed stock-asset Vulkan SP, MP host/client and the OpenGL SP control pass
+with the final staged binaries. Final submitted/completed checkpoints match:
+988/988 SP, 1,032/1,032 MP host and 647/647 MP client. Each Vulkan role both
+started and finished front ends while the backend was busy. Every role recorded
+five latency-flash receipts and 128 draw samples with no gameplay during
+drawing. Checks cover the ownership self-test, GPU skinning, TAA, motion blur,
+scaling/dynamic resolution, shader reload and Vulkan surface recovery/restart.
+Engine render-target captures were inspected; no OS capture or device-input
+injection was used. `reuse-final-summary.json` records SP/GL; the final MP
+record is `reuse-mp-clean-summary.json`.
+
+The older temporary proof script sent an SP-only view sweep to MP, and the
+shared gameplay harness also used SP's `viewpos` command in MP. The first MP
+record is therefore superseded. The next run removed the sweep and correctly
+failed the stricter unknown-command check on `viewpos`. The shared harness now
+uses MP's registered `getviewpos`, with SP/host/client generation and parsing
+covered by the comparison tests. The final MP rerun has no unknown commands;
+MP coverage is stationary gameplay, not a view sweep. The broader benchmark
+contract check also passes (`budget-contract-final.log`).
+
+The MP host logged a reliable-message overflow during the client's shutdown
+interval; this also appears in the earlier pre-optimization overlap evidence
+(`.tmp/high-refresh-overlap/vk-mp-q4dm1-listen-validated/`). This remains an
+unrelated MP issue, alongside the existing scene-packet capacity fallback and
+post-restart Vulkan bootstrap label. Neither the copy-volume reduction nor
+these functional runs close the quiet timing, physical display/input or
+cross-platform qualification gates.

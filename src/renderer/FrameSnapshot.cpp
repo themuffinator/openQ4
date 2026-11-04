@@ -1,6 +1,8 @@
 // Copyright (C) 2026 DarkMatter Productions
 #include "tr_local.h"
 #include "GpuSkinning.h"
+#include "RendererMetrics.h"
+#include "FrameSnapshotCopy.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <new>
@@ -12,6 +14,15 @@ struct frameLightReceipt_s {
 };
 
 namespace {
+// Main-thread diagnostics, enabled explicitly for a measured window. Ordinary
+// play pays no clock reads or per-copy accounting.
+struct snapshotStats_t {
+	unsigned long long copiedBytes, reusedBytes, cacheBytes, geometryBytes, copies, views, frames, microseconds;
+	int lastFrame;
+};
+snapshotStats_t snapshotStats = {};
+bool snapshotProfiling = false;
+
 // The command arena owns these copies. No model/def/cache destructor runs on
 // them: they are render inputs, with all mutable streams copied below.
 template<class T> T *Copy( const T *source, size_t count = 1 ) {
@@ -21,14 +32,33 @@ template<class T> T *Copy( const T *source, size_t count = 1 ) {
 	}
 	T *result = static_cast<T *>( R_FrameAlloc( static_cast<int>( count * sizeof( T ) ) ) );
 	memcpy( result, source, count * sizeof( T ) );
+	if ( snapshotProfiling ) {
+		snapshotStats.copiedBytes += count * sizeof( T );
+		snapshotStats.copies++;
+	}
 	return result;
 }
 
 class viewSnapshot_t {
+	idFrameSnapshotCopies streamCopies;
 	std::unordered_map<const srfTriangles_t *, srfTriangles_t *> geometry;
 	std::unordered_map<const vertCache_t *, vertCache_t *> caches;
 	std::unordered_set<const drawSurf_t *> surfaces;
 	std::unordered_set<const viewEntity_t *> entities;
+	template<class T> T *CopyStream( const T *source, size_t count ) {
+		if ( source == NULL || count == 0 ) return NULL;
+		if ( count > ( idMath::INT_MAX - 16 ) / sizeof( T ) ) {
+			common->FatalError( "render snapshot stream size overflow" );
+		}
+		const size_t bytes = count * sizeof( T );
+		const auto result = streamCopies.Copy( source, bytes,
+			[]( size_t size ) { return R_FrameAlloc( static_cast<int>( size ) ); } );
+		if ( snapshotProfiling ) {
+			if ( result.reused ) snapshotStats.reusedBytes += bytes;
+			else { snapshotStats.copiedBytes += bytes; snapshotStats.copies++; }
+		}
+		return static_cast<T *>( result.data );
+	}
 public:
 	vertCache_t *Cache( const vertCache_t *source ) {
 		if ( source == NULL ) return NULL;
@@ -39,7 +69,9 @@ public:
 		// Vulkan consumes CPU staging bytes. Owning the bytes as well as the
 		// header permits skinning fallback to repair the submitted stream.
 		if ( source->virtMem != NULL ) {
-			copy->virtMem = Copy( static_cast<const byte *>( source->virtMem ) + source->offset, source->size );
+			const unsigned long long before = snapshotStats.copiedBytes;
+			copy->virtMem = CopyStream( static_cast<const byte *>( source->virtMem ) + source->offset, source->size );
+			if ( snapshotProfiling ) snapshotStats.cacheBytes += snapshotStats.copiedBytes - before;
 			copy->offset = 0;
 		}
 		copy->tag = TAG_TEMP;
@@ -48,13 +80,11 @@ public:
 		return copy;
 	}
 
-	srfTriangles_t *Geometry( const srfTriangles_t *source ) {
-		if ( source == NULL ) return NULL;
-		auto found = geometry.find( source );
-		if ( found != geometry.end() ) return found->second;
-		// Complete any deferred CPU fallback before the worker sees this stream.
-		// In overlap mode new poses already take the complete CPU path, but a
-		// cached pose can have been produced before the mode changed.
+	void PrepareGeometry( const srfTriangles_t *source ) {
+		if ( source == NULL || !geometry.emplace( source, nullptr ).second ) return;
+		// Finish every potentially mutating preparation before taking any stream
+		// copy. Two triangle records can share vertices while only one still
+		// needs tangents or a CPU skinning fallback.
 		srfTriangles_t *prepared = const_cast<srfTriangles_t *>( source );
 		if ( prepared->gpuSkinningDeferred ) {
 			prepared->gpuSkinningDeferred = false;
@@ -65,36 +95,43 @@ public:
 				memcpy( static_cast<byte *>( cache->virtMem ) + cache->offset, prepared->verts, bytes );
 			}
 		}
-		// Shadow casters and debug draws used to create these caches during
-		// recording. Preparing them here keeps the shared geometry allocators
-		// and cache bookkeeping on the producer.
 		if ( R_TriHasPrimBatchMesh( prepared ) ) {
 			R_CreatePackedSurfaceFrameCaches( prepared, true, true );
 		} else if ( prepared->ambientCache == NULL && prepared->verts != NULL && prepared->numVerts > 0 ) {
 			R_CreateAmbientCache( prepared, false );
 		}
+		PrepareGeometry( source->ambientSurface );
+		PrepareGeometry( source->topAmbientSurface );
+	}
+
+	srfTriangles_t *Geometry( const srfTriangles_t *source ) {
+		if ( source == NULL ) return NULL;
+		auto found = geometry.find( source );
+		if ( found != geometry.end() && found->second != NULL ) return found->second;
 		srfTriangles_t *copy = Copy( source );
-		geometry.emplace( source, copy );
-		copy->verts = Copy( source->verts, source->numVerts );
-		copy->indexes = Copy( source->indexes, source->numIndexes );
-		copy->silIndexes = Copy( source->silIndexes, source->numIndexes );
-		copy->silEdges = Copy( source->silEdges, source->numSilEdges );
-		copy->shadowVertexes = Copy( source->shadowVertexes, source->numVerts );
-		copy->facePlanes = Copy( source->facePlanes, source->numIndexes / 3 );
-		copy->dominantTris = Copy( source->dominantTris, source->numVerts );
-		copy->mirroredVerts = Copy( source->mirroredVerts, source->numMirroredVerts );
-		copy->dupVerts = Copy( source->dupVerts, source->numDupVerts * 2 );
+		geometry[source] = copy;
+		const unsigned long long beforeStreams = snapshotStats.copiedBytes;
+		copy->verts = CopyStream( source->verts, source->numVerts );
+		copy->indexes = CopyStream( source->indexes, source->numIndexes );
+		copy->silIndexes = CopyStream( source->silIndexes, source->numIndexes );
+		copy->silEdges = CopyStream( source->silEdges, source->numSilEdges );
+		copy->shadowVertexes = CopyStream( source->shadowVertexes, source->numVerts );
+		copy->facePlanes = CopyStream( source->facePlanes, source->numIndexes / 3 );
+		copy->dominantTris = CopyStream( source->dominantTris, source->numVerts );
+		copy->mirroredVerts = CopyStream( source->mirroredVerts, source->numMirroredVerts );
+		copy->dupVerts = CopyStream( source->dupVerts, source->numDupVerts * 2 );
+		if ( snapshotProfiling ) snapshotStats.geometryBytes += snapshotStats.copiedBytes - beforeStreams;
 		copy->ambientCache = Cache( source->ambientCache );
 		copy->indexCache = Cache( source->indexCache );
 		copy->shadowCache = Cache( source->shadowCache );
 		copy->lightingCache = Cache( source->lightingCache );
-		copy->gpuSkinningBindPoseVerts = Copy( source->gpuSkinningBindPoseVerts, source->numGpuSkinningVerts );
-		copy->gpuSkinningVerts = Copy( source->gpuSkinningVerts, source->numGpuSkinningVerts );
-		copy->gpuSkinningJointPalette = Copy( source->gpuSkinningJointPalette, source->numGpuSkinningJoints * GPU_SKINNING_JOINT_FLOATS );
+		copy->gpuSkinningBindPoseVerts = CopyStream( source->gpuSkinningBindPoseVerts, source->numGpuSkinningVerts );
+		copy->gpuSkinningVerts = CopyStream( source->gpuSkinningVerts, source->numGpuSkinningVerts );
+		copy->gpuSkinningJointPalette = CopyStream( source->gpuSkinningJointPalette, source->numGpuSkinningJoints * GPU_SKINNING_JOINT_FLOATS );
 		copy->gpuSkinningJointPaletteAlloc = NULL;
-		copy->previousPositions = Copy( source->previousPositions, source->numPreviousPositions );
+		copy->previousPositions = CopyStream( source->previousPositions, source->numPreviousPositions );
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
-		copy->skinToModelTransforms = Copy( source->skinToModelTransforms, source->numSkinToModelTransforms * 16 );
+		copy->skinToModelTransforms = CopyStream( source->skinToModelTransforms, source->numSkinToModelTransforms * 16 );
 		copy->skinToModelTransformsAlloc = NULL;
 #endif
 		copy->ambientSurface = Geometry( source->ambientSurface );
@@ -108,11 +145,19 @@ public:
 		viewEntity_t *view = const_cast<viewEntity_t *>( source );
 		const idRenderEntityLocal *def = source->entityDef;
 		view->entityDef = new ( R_FrameAlloc( sizeof( *def ) ) ) idRenderEntityLocal( *def );
-		view->entityDef->parms.joints = Copy( def->parms.joints, def->parms.numJoints );
+		view->entityDef->parms.joints = CopyStream( def->parms.joints, def->parms.numJoints );
 		view->entityDef->parms.remoteRenderView = Copy( def->parms.remoteRenderView );
 	}
 
-	void Surface( const drawSurf_t *source, bool finalized = false ) {
+	void Surface( const drawSurf_t *source, bool finalized = false, bool prepare = false ) {
+		if ( source != NULL && prepare ) {
+			PrepareGeometry( source->geo );
+			PrepareGeometry( source->pbrLightGeo );
+			if ( finalized && source->classicDeform.initialized && source->classicDeform.valid ) {
+				PrepareGeometry( source->classicDeform.sourceGeometry.geometry );
+			}
+			return;
+		}
 		if ( source == NULL || !surfaces.insert( source ).second ) return;
 		drawSurf_t *surf = const_cast<drawSurf_t *>( source );
 		Entity( surf->space );
@@ -127,8 +172,8 @@ public:
 		surf->decalColorCache = Cache( surf->decalColorCache );
 		surf->previousPositionCache = Cache( surf->previousPositionCache );
 	}
-	void Chain( const drawSurf_t *surf ) {
-		for ( ; surf != NULL; surf = surf->nextOnLight ) Surface( surf );
+	void Chain( const drawSurf_t *surf, bool prepare = false ) {
+		for ( ; surf != NULL; surf = surf->nextOnLight ) Surface( surf, false, prepare );
 	}
 };
 }
@@ -138,6 +183,27 @@ static void R_SnapshotRenderViewInternal( viewDef_t *view ) {
 	view->frameSnapshot = true;
 	view->lightGridAvailable = view->renderWorld != NULL && view->renderWorld->AnyLightGridAvailable();
 	viewSnapshot_t snapshot;
+	// Preparation may mutate aliased streams. Freeze only after the complete
+	// view has been prepared, including geometry reached through light chains.
+	for ( int i = 0; i < view->numDrawSurfs; ++i ) snapshot.Surface( view->drawSurfs[i], true, true );
+	for ( int i = 0; i < view->numOutlineDrawSurfs; ++i ) snapshot.Surface( view->outlineDrawSurfs[i], false, true );
+	for ( const viewLight_t *light = view->viewLights; light; light = light->next ) {
+		if ( light->lightDef != NULL ) snapshot.PrepareGeometry( light->lightDef->frustumTris );
+		snapshot.PrepareGeometry( light->frustumTris );
+		snapshot.Chain( light->globalShadows, true );
+		snapshot.Chain( light->localShadows, true );
+		snapshot.Chain( light->localInteractions, true );
+		snapshot.Chain( light->globalInteractions, true );
+		snapshot.Chain( light->translucentInteractions, true );
+		snapshot.Chain( light->globalShadowMapStencilSupplements, true );
+		snapshot.Chain( light->localShadowMapStencilSupplements, true );
+		snapshot.Chain( light->localShadowMapCasters, true );
+		snapshot.Chain( light->globalShadowMapCasters, true );
+		snapshot.Chain( light->localShadowMapDynamicCasters, true );
+		snapshot.Chain( light->globalShadowMapDynamicCasters, true );
+		snapshot.Chain( light->localTranslucentShadowMapCasters, true );
+		snapshot.Chain( light->globalTranslucentShadowMapCasters, true );
+	}
 	for ( viewEntity_t *entity = view->viewEntitys; entity; entity = entity->next ) snapshot.Entity( entity );
 	for ( int i = 0; i < view->numDrawSurfs; ++i ) snapshot.Surface( view->drawSurfs[i], true );
 	for ( int i = 0; i < view->numOutlineDrawSurfs; ++i ) snapshot.Surface( view->outlineDrawSurfs[i] );
@@ -169,7 +235,32 @@ static void R_SnapshotRenderViewInternal( viewDef_t *view ) {
 }
 
 void R_SnapshotRenderView( viewDef_t *view ) {
-	if ( R_RenderThread_OverlapRequested() ) R_SnapshotRenderViewInternal( view );
+	if ( !R_RenderThread_OverlapRequested() || view == NULL || view->frameSnapshot ) return;
+	const unsigned long long begin = snapshotProfiling ? R_RendererMetrics_CpuClock() : 0;
+	R_SnapshotRenderViewInternal( view );
+	if ( snapshotProfiling ) {
+		snapshotStats.microseconds += R_RendererMetrics_CpuClock() - begin;
+		snapshotStats.views++;
+		if ( snapshotStats.lastFrame != tr.frameCount ) {
+			snapshotStats.lastFrame = tr.frameCount;
+			snapshotStats.frames++;
+		}
+	}
+}
+
+void R_FrameSnapshotStats_f( const idCmdArgs &args ) {
+	R_RenderThread_Sync( "snapshot stats" );
+	if ( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "reset" ) == 0 ) {
+		snapshotStats = {};
+		snapshotStats.lastFrame = -1;
+		snapshotProfiling = true;
+		return;
+	}
+	common->Printf( "Frame snapshot stats %s: frames=%llu views=%llu copies=%llu bytes=%llu geometryBytes=%llu cacheBytes=%llu cpuUs=%llu reusedBytes=%llu\n",
+		args.Argc() > 1 ? args.Argv( 1 ) : "total", snapshotStats.frames, snapshotStats.views,
+		snapshotStats.copies, snapshotStats.copiedBytes, snapshotStats.geometryBytes,
+		snapshotStats.cacheBytes, snapshotStats.microseconds, snapshotStats.reusedBytes );
+	snapshotProfiling = false;
 }
 
 void R_RetireRenderSnapshots( frameData_t *frame ) {
@@ -274,7 +365,12 @@ void R_FrameOwnershipSelfTest_f( const idCmdArgs &args ) {
 	surf.geo = &geometry;
 	surf.space = &space;
 	surf.previousPositionCache = &cache;
-	drawSurf_t *draws[2] = { &surf, &surf };
+	// Distinct interaction/ambient records can point at identical streams.
+	srfTriangles_t aliasGeometry = geometry;
+	drawSurf_t aliasSurf = {};
+	aliasSurf.geo = &aliasGeometry;
+	aliasSurf.space = &space;
+	drawSurf_t *draws[3] = { &surf, &surf, &aliasSurf };
 	idRenderLightLocal light;
 	light.parms.lightRadius.Set( 17, 18, 19 );
 	viewLight_t viewLight = {};
@@ -288,7 +384,7 @@ void R_FrameOwnershipSelfTest_f( const idCmdArgs &args ) {
 	viewLight.globalShadows = &volume;
 	viewDef_t view = {};
 	view.drawSurfs = draws;
-	view.numDrawSurfs = 2;
+	view.numDrawSurfs = 3;
 	view.viewEntitys = &space;
 	view.viewLights = &viewLight;
 	frameLightReceipt_s *savedReceipts = frameData->lightReceipts;
@@ -299,7 +395,19 @@ void R_FrameOwnershipSelfTest_f( const idCmdArgs &args ) {
 	verts[0].xyz.Zero(); indexes[1] = 0; palette[0] = 0;
 	previous[0].Zero(); memset( cacheBytes, 0, sizeof( cacheBytes ) );
 	entity.parms.origin.Zero(); light.parms.lightRadius.Zero();
+	// The same addresses may already contain a new pose when another view is
+	// assembled. Its lookup must not reuse the preceding view's frozen bytes.
+	drawSurf_t laterSurf = {};
+	laterSurf.geo = &geometry;
+	drawSurf_t *laterDraws[1] = { &laterSurf };
+	viewDef_t laterView = {};
+	laterView.drawSurfs = laterDraws;
+	laterView.numDrawSurfs = 1;
+	R_SnapshotRenderViewInternal( &laterView );
 	const bool passed = surf.geo == submitted && submitted != &geometry
+		&& aliasSurf.geo != submitted && aliasSurf.geo->verts == submitted->verts
+		&& aliasSurf.geo->indexes == submitted->indexes
+		&& laterSurf.geo->verts != submitted->verts && laterSurf.geo->verts[0].xyz.x == 0
 		&& submitted->verts[0].xyz.x == 1 && submitted->indexes[1] == 1
 		&& submitted->gpuSkinningJointPalette[0] == 7 && submitted->previousPositions[0].x == 8
 		&& submitted->ambientCache != &cache && submitted->ambientCache->offset == 0
@@ -312,6 +420,6 @@ void R_FrameOwnershipSelfTest_f( const idCmdArgs &args ) {
 		&& viewLight.globalInteractions == &surf && volume.geo == submitted;
 	// These fixtures are stack-owned, and are never eligible for light receipts.
 	frameData->lightReceipts = savedReceipts;
-	common->Printf( "Renderer frame ownership self-test %s: geometry, cache bytes, aliases, palettes, previous positions and defs\n", passed ? "passed" : "FAILED" );
+	common->Printf( "Renderer frame ownership self-test %s: geometry, cache bytes, stream aliases, later-view isolation, palettes, previous positions and defs\n", passed ? "passed" : "FAILED" );
 	if ( !passed ) common->Error( "Renderer frame ownership self-test failed" );
 }
