@@ -42,7 +42,7 @@ def main() -> None:
         "bool rvNavMesh::KnockSlideLandingSafe(",
     ))
     physics = (ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8")
-    bodies = function(physics, "idVec3 idPhysics_Player::AdjustVertically(") + "\n" + bodies
+    bodies = function(physics, "idVec3 idPhysics_Player::AdjustVertically(") + "\n" + function(nav, "static bool NavPadLaunchVelocity(") + "\n" + bodies
     for name, value in (("PM_ACCELERATE_MP", 15.0), ("PM_FRICTION", 6.0), ("PM_STOPSPEED", 100.0)):
         assert float(re.search(rf"const float {name}\s*=\s*([\d.]+)f", physics)[1]) == value, name
     header = (ROOT / "src/mpgame/bots/NavMesh.h").read_text(encoding="utf-8")
@@ -119,6 +119,11 @@ def main() -> None:
         for label, anchor, replacement in (
             ("collision without ground contact", "NavAgentHasGroundContacts( end, gravity ) ||", "true ||"),
             ("fatal grounded impact", "NavAgentHasGroundContacts( end, gravity ) ||", "false ||"),
+            ("coasting pad catch", "if ( transport >= 0 ) {", "if ( false && transport >= 0 ) {"),
+            ("disabled recovery pad", "!pad->IsActive( TH_THINK ) ||", "false ||"),
+            ("unproven recovery pad", "!NaturalPadLanding( transport, registeredLanding ) ||", "false ||"),
+            ("initial pad impulse", "frame == 0 || steering ||", "steering ||"),
+            ("second recovery pad", "( caughtPad >= 0 && transport != caughtPad ) ||", "false ||"),
             ("descending splash momentum", "idVec3 velocity = velocityIn;\n\tconst float dt = NAV_PAD_STEP_SECONDS;",
              "idVec3 velocity( velocityIn.x, velocityIn.y, 0.0f );\n\tconst float dt = NAV_PAD_STEP_SECONDS;"),
             ("affordable last-resort contact", "*touchedAffordable = true;", "*touchedAffordable = false;"),

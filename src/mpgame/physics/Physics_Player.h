@@ -187,8 +187,6 @@ private:
 	void					DropTimers( void );
 	void					MovePlayer( int msec );
 
-	// forceLength:
-
 	float					Pm_Accelerate( void );
 	float					Pm_AirAccelerate( void );
 };

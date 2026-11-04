@@ -80,7 +80,13 @@ bool NavAgentHasGroundContacts(const idVec3&,const idVec3&) {
 }
 CVar bot_debug{0};
 constexpr int MAX_GENTITIES=64, SURF_NODAMAGE=1, MASK_WATER=2, SURF_SLICK=4;
+constexpr int TH_THINK=1;
+struct rvJumpPad { static int GetClassType() { return 1; } };
 struct idEntity {
+    bool live=true;
+    int type=1;
+    bool IsType(int value) const { return type==value; }
+    bool IsActive(int) const { return live; }
     struct Physics { idVec3 origin; const idVec3& GetOrigin() const { return origin; } } physics;
     struct Target { idEntity* entity=nullptr; idEntity* GetEntity() const { return entity; } };
     struct Targets : std::vector<Target> { int Num() const { return int(size()); } } targets;
@@ -88,11 +94,26 @@ struct idEntity {
 };
 static idEntity* repeatedPad=nullptr;
 static int repeatedPadTouches=0;
+static idEntity* recoveryPad=nullptr;
+static idBounds recoveryBounds;
+static bool recoveryNatural=true,recoveryTouch=true;
+static idEntity* secondRecoveryPad=nullptr;
+static idBounds secondRecoveryBounds{{{300,-32,1000},{350,32,2000}}};
+static bool SecondRecoveryVolumeAt(const idVec3& position) {
+    idBounds body{{{-16,-16,0},{16,16,77}}}; body.TranslateSelf(position);
+    return secondRecoveryPad && body.IntersectsBounds(secondRecoveryBounds);
+}
+static bool RecoveryVolumeAt(const idVec3& position) {
+    idBounds body{{{-16,-16,0},{16,16,77}}}; body.TranslateSelf(position);
+    return recoveryPad && body.IntersectsBounds(recoveryBounds);
+}
 static bool NavPadVolumeTouches(idEntity* pad,const idVec3& position) {
     // Contact observations from the sloped CTF5 trigger: the hull is still
     // inside it after its first two upward steps. Geometry itself is checked
     // separately by the transport fixture and original-map replay.
     if (pad==repeatedPad && position.z<40 && position.x<40) { ++repeatedPadTouches; return true; }
+    if (pad==recoveryPad) return recoveryTouch && RecoveryVolumeAt(position);
+    if (pad==secondRecoveryPad) return SecondRecoveryVolumeAt(position);
     return false;
 }
 struct GameLocal {
@@ -224,6 +245,8 @@ public:
     bool IsSteeredPadLanding(int,const idVec3&) const { return steeredPad; }
     static const idBounds& GetAgentBounds() { return agentBounds; }
     int TransportAt(const idBounds&) const { return transported ? 1 : -1; }
+    int TransportAtFloor(const idVec3& p) const { return RecoveryVolumeAt(p) ? 1 : SecondRecoveryVolumeAt(p) ? 2 : -1; }
+    bool NaturalPadLanding(int,idVec3&) const { return recoveryNatural; }
     bool LineEntersTransport(const idVec3&,const idVec3&) const { return transported; }
     int TransportOnMove(const idVec3&,const idVec3&,int) const { return transported ? 1 : -1; }
     bool IsLethalFloor(const idVec3&) const { return lethal; }
@@ -302,6 +325,34 @@ int main() {
     CHECK(nav.SampleFloor({24,0,1},20,rimFloor));
     solids.clear();
     const float launch=std::sqrt(2.0f*800.0f*48.0f);
+    // A pad catches a coast above the void, replacing momentum on each
+    // touching step. Its long flight still needs a real, affordable landing.
+    idEntity catchPad,catchTarget;
+    catchTarget.physics.origin={400,0,1600}; catchPad.targets.push_back({&catchTarget});
+    gameLocal.entities[1]=&catchPad; recoveryPad=&catchPad;
+    recoveryBounds={{{-16,-32,0},{16,32,64}}};
+    Platform(600,1400,0);
+    CHECK(nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    CHECK(!nav.AirInputLandingSafe({0,0,32},{200,0,100},{},idMath::INFINITY));
+    idEntity secondCatch; secondCatch.targets.push_back({&catchTarget});
+    secondRecoveryPad=&secondCatch; gameLocal.entities[2]=&secondCatch;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    secondRecoveryPad=nullptr; gameLocal.entities[2]=nullptr;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},20));
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{1,0,0},idMath::INFINITY));
+    catchPad.live=false;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    catchPad.live=true; recoveryNatural=false;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    recoveryNatural=true; recoveryTouch=false;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    recoveryTouch=true; catchPad.type=2;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    catchPad.type=1; catchTarget.physics.origin.x=2000;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    catchTarget.physics.origin.x=400; recoveryPad=nullptr; gameLocal.entities[1]=nullptr;
+    CHECK(!nav.AirInputLandingSafe({-80,0,96},{320,0,-100},{},idMath::INFINITY));
+    solids.clear();
     // A hit during DM8's long pad flight pushes its ballistic touchdown
     // beyond the destination platform. "Past the node" alone is not proof
     // of a safe coast. Preserve natural arcs that still reach solid ground.

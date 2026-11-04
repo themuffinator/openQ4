@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay the four recoverable long-match hit states recorded on 4 November.
+"""Replay the recoverable long-match hit states recorded on 4 November.
 
 These are positive recovery regressions, not full match snapshots or causal
 exclusions. The weak-hit cases enter through the real knockback handler instead
@@ -26,6 +26,10 @@ CASES = {
         "name": "bevel_descent",
         "setup": ["bot_probeHealth 1 7 50 -16.301 -22.592 21.187"],
         "command": "bot_probeMove 1 -170.137 169.962 860.787 273.625 226.057 -332.896 -170.137 169.962 860.787",
+    }, {
+        "name": "coasting_pad_catch",
+        "setup": ["bot_probeHealth 1 74 50 0.685 -30.386 17.357"],
+        "command": "bot_probeMove 1 -444.388 53.313 982.004 -306.296 -13.552 84.265 -444.388 53.313 982.004",
     }]),
     "ctf3": ("CTF", [{
         "name": "weak_nail_walk",

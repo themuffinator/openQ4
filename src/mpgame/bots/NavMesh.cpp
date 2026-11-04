@@ -198,6 +198,27 @@ static bool NavPadVolumeTouches( idEntity *pad, const idVec3 &position ) {
 			clip->GetCollisionModel(), clip->GetOrigin(), clip->GetAxis() ) != 0;
 }
 
+// The force field replaces velocity on every touching frame. Share its launch
+// calculation between route generation and a live coast caught by another pad.
+static bool NavPadLaunchVelocity( idEntity *pad, const idVec3 &gravity, idVec3 &velocity ) {
+	idEntity *target = ( pad && pad->targets.Num() ) ? pad->targets[0].GetEntity() : NULL;
+	const float g = gravity.Length();
+	if ( !target || !target->GetPhysics() || !pad->GetPhysics() || g <= 1.0f ) {
+		return false;
+	}
+	const idVec3 down = gravity / g;
+	const idVec3 diff = target->GetPhysics()->GetOrigin() - pad->GetPhysics()->GetOrigin();
+	const idVec3 vert = ( diff * down ) * down;
+	const float flightTime = idMath::Sqrt( vert.Length() / ( 0.5f * g ) );
+	if ( flightTime <= 0.0f ) {
+		return false;
+	}
+	idVec3 horizontal = diff - vert;
+	const float span = horizontal.Normalize();
+	velocity = horizontal * ( span / flightTime ) - gravity * flightTime;
+	return true;
+}
+
 /*
 ================
 NavDoorIsWalkActivated
@@ -1105,7 +1126,31 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 	idVec3 position = origin;
 	idVec3 velocity = velocityIn;
 	int unstuck = 0;
-	for ( int frame = 0; frame < 200; frame++ ) {
+	int caughtPad = -1;
+	int maxFrames = 200;
+	for ( int frame = 0; frame < maxFrames; frame++ ) {
+		const int transport = TransportAtFloor( position );
+		if ( transport >= 0 ) {
+			// A free coast can still be saved by a real, known pad catch.
+			// Prove its whole continuation from this exact contact, including
+			// repeated force-field pushes. Steered catches, teleporters and
+			// a second different pad are outside this bounded proof.
+			idVec3 registeredLanding;
+			idEntity *pad = transport < MAX_GENTITIES ? gameLocal.entities[transport] : NULL;
+			if ( frame == 0 || steering || ( caughtPad >= 0 && transport != caughtPad ) ||
+				 !pad || !pad->IsType( rvJumpPad::GetClassType() ) || !pad->IsActive( TH_THINK ) ||
+				 !NaturalPadLanding( transport, registeredLanding ) || !NavPadVolumeTouches( pad, position ) ) {
+				return false;
+			}
+			const idVec3 padGravity = gameLocal.GetCurrentGravity( pad );
+			if ( ( padGravity - gravity ).LengthSqr() > 0.01f || !NavPadLaunchVelocity( pad, padGravity, velocity ) ) {
+				return false;
+			}
+			if ( caughtPad < 0 ) {
+				caughtPad = transport;
+				maxFrames = frame + NAV_PAD_MAX_STEPS;
+			}
+		}
 		if ( steering ) {
 			const float add = speed - velocity * wish;
 			if ( add > 0.0f ) {
@@ -1209,6 +1254,14 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 // Steps, walls, slick floors and slopes remain unproven by this narrow solver.
 bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &velocityIn,
 		int knockMsec, float maxImpactDelta, const idVec3 &wishIn ) const {
+	auto reject = [&]( const char *reason, const idVec3 &position, const idVec3 &velocity, const idVec3 &normal ) {
+		if ( bot_debug.GetInteger() >= 4 ) {
+			gameLocal.Printf( "BOT_SLIDE_PROOF time=%d reason=%s origin=%.3f %.3f %.3f input=%.3f %.3f knock=%d at=%.3f %.3f %.3f velocity=%.3f %.3f %.3f normal=%.3f %.3f %.3f\n",
+				gameLocal.time, reason, origin.x, origin.y, origin.z, wishIn.x, wishIn.y, knockMsec,
+				position.x, position.y, position.z, velocity.x, velocity.y, velocity.z, normal.x, normal.y, normal.z );
+		}
+		return false;
+	};
 	if ( knockMsec < 0 || knockMsec > 1000 || pm_frictionoverride.GetFloat() >= 0.0f ) {
 		return false;
 	}
@@ -1225,7 +1278,8 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 	for ( int elapsed = 0; elapsed < 1000; elapsed += 16 ) {
 		trace_t ground;
 		if ( NavAgentTranslation( ground, position, position - groundProbe ) ) {
-			return AirInputLandingSafe( position, velocity, wish, maxImpactDelta );
+			return AirInputLandingSafe( position, velocity, wish, maxImpactDelta ) ||
+				reject( "air", position, velocity, vec3_origin );
 		}
 		// A future splash can arrive while the shooter is already falling.
 		// Only actual floor contact cancels descent; flattening it before the
@@ -1234,7 +1288,7 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 		if ( ground.c.normal.z < 0.999f || IsLethalFloor( ground.endpos ) ||
 			 ( ground.c.material && ( ground.c.material->GetSurfaceFlags() & SURF_SLICK ) ) ||
 			 ( gameLocal.LiquidContentsAtPoint( position, NULL ) & MASK_WATER ) ) {
-			return false;
+			return reject( "ground", position, velocity, ground.c.normal );
 		}
 		if ( elapsed >= knockMsec ) {
 			const idVec3 stop = position + velocity * ( dt + velocity.Length() / ( 20.0f * speed ) );
@@ -1253,8 +1307,11 @@ bool rvNavMesh::KnockSlideLandingSafe( const idVec3 &origin, const idVec3 &veloc
 		}
 		trace_t across;
 		const idVec3 next = position + velocity * dt;
-		if ( TransportOnMove( position, next, -1 ) >= 0 || !NavAgentTranslation( across, position, next ) ) {
-			return false;
+		if ( TransportOnMove( position, next, -1 ) >= 0 ) {
+			return reject( "transport", position, velocity, vec3_origin );
+		}
+		if ( !NavAgentTranslation( across, position, next ) ) {
+			return reject( "collision", across.endpos, velocity, across.c.normal );
 		}
 		position = next;
 	}
@@ -2186,26 +2243,13 @@ NavAirSteer through idPhysics_Player's air acceleration.
 */
 bool rvNavMesh::PadLanding( idEntity *pad, const idVec3 &launch, const idVec3 *steerTo, idVec3 &landing,
 							float *flightSeconds, float *impactDelta ) const {
-	idEntity *target = ( pad && pad->targets.Num() ) ? pad->targets[0].GetEntity() : NULL;
-	if ( !target || !target->GetPhysics() || !pad->GetPhysics() ) {
-		return false;
-	}
-
 	const idVec3 gravity = gameLocal.GetCurrentGravity( pad );
 	const float g = gravity.Length();
-	if ( g <= 1.0f ) {
+	idVec3 launchVelocity;
+	if ( !NavPadLaunchVelocity( pad, gravity, launchVelocity ) ) {
 		return false;
 	}
 	const idVec3 down = gravity / g;
-	const idVec3 diff = target->GetPhysics()->GetOrigin() - pad->GetPhysics()->GetOrigin();
-	const idVec3 vert = ( diff * down ) * down;
-	const float flightTime = idMath::Sqrt( vert.Length() / ( 0.5f * g ) );
-	if ( flightTime <= 0.0f ) {
-		return false;
-	}
-	idVec3 horizontal = diff - vert;
-	const float span = horizontal.Normalize();
-	const idVec3 launchVelocity = horizontal * ( span / flightTime ) - gravity * flightTime;
 	idVec3 velocity = launchVelocity;
 
 	const float wishSpeed = Max( 1.0f, pm_speed.GetFloat() );

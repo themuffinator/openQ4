@@ -61,6 +61,26 @@ contacts before deferring impact cost; ordinary grounded impacts retain their
 health limit. Targeted and broader runtime qualification of these corrections
 is still required.
 
+The subsequent `c65041464` stage passes the four hit replays (including the
+seven-health descent) and all ten established recovery cases. Each new hit case
+finishes alive and grounded. The contact proof and airborne self-blast controls
+bring the Windows/Linux native suite to 36 rejected reversions. The renewed
+long runs finish with 280.144–283.984 observed seconds: CTF3 and DZ3 have no
+world deaths, and all three CTF5 deaths pass the unchanged impulse exclusion.
+DM8 has four deaths: two strictly excluded impulses and two recoverable failures.
+One rocket-driven ground slide needs earlier steering. Its first machine-gun hit in
+Voss's last fall independently reproduces a controller failure: coasting from
+`(-444.388, 53.313, 982.004)` catches another pad and lands alive on the upper
+platform, whereas braking falls into the void. The new bounded coast proof
+follows one registered, active pad catch and its repeated velocity pushes all
+the way to an affordable supported landing with stopping room. Initial contact,
+steered catches, teleporters, unknown destinations and a second different pad
+remain unproven. Runtime qualification of this additional correction is pending.
+The later hit in that same pad flight also has surviving coast controls; the
+earlier pose isolates where the controller first spoils the reachable catch.
+`bot_debug 4` now records a refused ground-slide proof's exact position,
+velocity and collision normal to distinguish its ground and air phases.
+
 ## Complete catalog and renewed long matches, 4 November 2026
 
 The `ee6207834` build completes all 33 declared map variants against the installed

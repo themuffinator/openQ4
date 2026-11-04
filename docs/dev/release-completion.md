@@ -15,6 +15,9 @@ See [player release status](../user/release-status.md).
 - Bots avoid close self-blasts during flight and account for downward momentum
   and glancing contacts when checking a recovery landing. These further
   corrections are undergoing the renewed traversal-safety gates.
+- Recovery can preserve a coast into a working jump pad when its complete
+  onward flight has a safe landing. The recorded catch and wider safety checks
+  are still under qualification.
 - Bots can steer a dangerous knockback slide before leaving the floor and
   brake after catching a narrow ledge. Recovery also accounts for movement
   boosts so its commands match the predicted trajectory.

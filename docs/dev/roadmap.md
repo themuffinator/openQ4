@@ -2197,6 +2197,12 @@ claim peer combinations that have not been tested.
   exclusion, but expose two further DM8 failures. Airborne self-blast admission
   and glancing-contact prediction are corrected next; renewed final-build
   long matches, the full catalog and controlled timing remain required.
+  The `c65041464` stage passes all four targeted hit cases and ten established
+  recovery cases. CTF3/DZ3 again pass directly, and all three CTF5 deaths pass
+  strict causal exclusion. DM8 retains two recoverable failures: a coast that
+  could safely catch a second pad, and a rocket slide requiring earlier input.
+  The bounded pad-catch proof and the slide investigation continue under the
+  same acceptance gates; the new catalog sweep is not final-build qualification.
   Follow-through, 4 November: the [terminal-state audit](mp-bots.md#terminal-state-long-match-audit-4-november-2026)
   completes the earlier impulse requalification: DM8 retains one navigation
   death and CTF5 two, with three and two proven enemy-impulse exclusions.
