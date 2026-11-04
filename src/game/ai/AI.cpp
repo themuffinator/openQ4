@@ -3972,6 +3972,29 @@ bool idAI::UpdateAnimationControllers( void ) {
 	return true;
 }
 
+// A medic leading an escort can be boxed in by an idle follower. Use the
+// normal move-aside tactic, with its AAS search and completion handling, rather
+// than changing collision or interrupting a scripted/combat move.
+bool idAI::RequestMoveAside( idActor *requester ) {
+	if ( DebugFilter( ai_debugMove ) ) {
+		gameLocal.Printf( "aiMoveAside: name=%s requester=%s leader=%s scripted=%d action=%d done=%d disabled=%d tether=%d enemy=%d tactic=%d mask=%x\n",
+			GetName(), requester ? requester->GetName() : "none", leader ? leader->GetName() : "none",
+			aifl.scripted, aifl.action, move.fl.done, move.fl.disabled, IsTethered(), enemy.ent != NULL,
+			combat.tacticalCurrent, combat.tacticalMaskAvailable );
+	}
+	if ( !requester || requester != leader || requester->team != team ||
+		requester->health <= 0 || IsHidden() || aifl.dead || aifl.scripted ||
+		aifl.action || !move.fl.done || move.fl.disabled || IsTethered() || enemy.ent ||
+		combat.tacticalCurrent == AITACTICAL_MOVE_PLAYERPUSH ||
+		!( combat.tacticalMaskAvailable & AITACTICAL_MOVE_PLAYERPUSH_BIT ) ) {
+		return false;
+	}
+	pusher = requester;
+	aifl.pushed = true;
+	ForceTacticalUpdate();
+	return true;
+}
+
 void idAI::OnTouch( idEntity *other, trace_t *trace ) {
 	// if we dont have an enemy or had one for at least a second that is a potential enemy the set the enemy	
 	if ( other->IsType( idActor::GetClassType() )

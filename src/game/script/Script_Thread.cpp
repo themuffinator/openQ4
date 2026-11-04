@@ -573,9 +573,11 @@ void idThread::ListThreads_f( const idCmdArgs &args ) {
 	n = threadList.Num();
 	for( i = 0; i < n; i++ ) {
 		//threadList[ i ]->DisplayInfo();
-		gameLocal.Printf( "%3i: %-20s : %s(%d)\n", threadList[ i ]->threadNum, threadList[ i ]->threadName.c_str(), threadList[ i ]->interpreter.CurrentFile(), threadList[ i ]->interpreter.CurrentLine() );
+		gameLocal.Printf( "%3i: %-20s : %s(%d) state=%s\n", threadList[ i ]->threadNum, threadList[ i ]->threadName.c_str(),
+			threadList[ i ]->interpreter.CurrentFile(), threadList[ i ]->interpreter.CurrentLine(),
+			threadList[ i ]->IsDying() ? "cancelled" : ( threadList[ i ]->IsWaiting() ? "waiting" : "ready" ) );
 	}
-	gameLocal.Printf( "%d active threads\n\n", n );
+	gameLocal.Printf( "%d registered threads\n\n", n );
 }
 
 /*

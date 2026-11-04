@@ -78,8 +78,10 @@ bool rvAASFindGoalForHide::TestArea( class idAAS *aas, int areaNum, const aasAre
 rvAASFindGoalOutOfRange::rvAASFindGoalOutOfRange
 ============
 */
-rvAASFindGoalOutOfRange::rvAASFindGoalOutOfRange( idAI* _owner ) {
+rvAASFindGoalOutOfRange::rvAASFindGoalOutOfRange( idAI* _owner, const idVec3& _avoidOrigin, float distance ) {
 	owner = _owner;
+	avoidOrigin = _avoidOrigin;
+	minimumDistanceSqr = Square( Max( 0.0f, distance ) );
 }
 
 /*
@@ -88,6 +90,12 @@ rvAASFindAreaOutOfRange::TestArea
 ============
 */
 bool rvAASFindGoalOutOfRange::TestPoint ( idAAS* aas, const idVec3& pos, const float zAllow ) {
+	// FindNearestGoal bounds travel relative to the AI, not separation from
+	// the entity being avoided. Without this test it accepts the current
+	// position and reports a successful move aside without taking a step.
+	if ( ( pos - avoidOrigin ).LengthSqr() < minimumDistanceSqr ) {
+		return false;
+	}
 	return aiManager.ValidateDestination ( owner, pos );
 }
 

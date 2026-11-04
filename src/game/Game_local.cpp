@@ -2,6 +2,7 @@
 
 
 #include "Game_local.h"
+#include "awakening/MissionScripts.h"
 
 // RAVEN BEGIN
 #include "../bse/BSEInterface.h"
@@ -2729,7 +2730,9 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 		idMapEntity *mapEnt = mapFile->GetEntity( i );
 
 		if ( !InhibitEntitySpawn( mapEnt->epairs ) ) {
-			CacheDictionaryMedia( &mapEnt->epairs );
+			idDict mediaArgs = mapEnt->epairs;
+			Awakening_CorrectM05M06Entity( mediaArgs );
+			CacheDictionaryMedia( &mediaArgs );
 			const char *classname = mapEnt->epairs.GetString( "classname" );
 			if ( classname[0] != '\0' ) {
 				FindEntityDef( classname, false );
@@ -7012,6 +7015,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 			mapDefaultsTimer.Start();
 		}
 		args.SetDefaults( &(entityDef->dict) );
+		Awakening_CorrectM05M06Entity( args );
 // RAVEN END
 		if ( profileMapSpawn ) {
 			mapDefaultsTimer.Stop();
@@ -7048,7 +7052,9 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 			if ( profileMapSpawn ) {
 				mapMediaTimer.Start();
 			}
-			CacheDictionaryMedia( &mapEnt->epairs );
+			idDict mediaArgs = mapEnt->epairs;
+			Awakening_CorrectM05M06Entity( mediaArgs );
+			CacheDictionaryMedia( &mediaArgs );
 			if ( profileMapSpawn ) {
 				mapMediaTimer.Stop();
 			}

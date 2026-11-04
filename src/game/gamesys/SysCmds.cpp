@@ -2257,13 +2257,22 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 				ent->GetRenderEntity()->hModel != NULL && ent->GetModelDefHandle() == -1 );
 		}
 	}
+	if ( ent->IsType( idPlayer::GetClassType() ) ) {
+		gameLocal.Printf( "testMissionPlayer: name=%s armor=%d\n", ent->name.c_str(),
+			static_cast<idPlayer *>( ent )->inventory.armor );
+	}
+	if ( ent->GetRenderEntity()->gui[0] ) {
+		gameLocal.Printf( "testMissionGui: name=%s interactive=%d target=%s source=%s\n", ent->name.c_str(),
+			ent->GetRenderEntity()->gui[0]->IsInteractive(), ent->spawnArgs.GetString( "target", "none" ),
+			ent->GetRenderEntity()->gui[0]->Name() );
+	}
 	if ( ent->GetAnimator() ) {
 		gameLocal.Printf( "testMissionAnim: name=%s anim=%s\n", ent->name.c_str(),
 			ent->GetAnimator()->CurrentAnim( ANIMCHANNEL_ALL )->AnimName() );
 	}
 	if ( ent->IsType( idLight::GetClassType() ) ) {
-		gameLocal.Printf( "testMissionLight: name=%s radius=(%s)\n", ent->name.c_str(),
-			static_cast<idLight *>( ent )->GetRadius().ToString() );
+		gameLocal.Printf( "testMissionLight: name=%s radius=(%s) material=%s\n", ent->name.c_str(),
+			static_cast<idLight *>( ent )->GetRadius().ToString(), ent->spawnArgs.GetString( "texture" ) );
 	}
 	for ( int i = 0; i < player->inventory.objectiveNames.Num(); ++i ) {
 		gameLocal.Printf( "testMissionObjective: %s\n", player->inventory.objectiveNames[i].title.c_str() );

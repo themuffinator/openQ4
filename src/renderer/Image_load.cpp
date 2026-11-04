@@ -74,6 +74,20 @@ static const char *R_FindMissingQ4StockImageFallback( const char *imageName ) {
 	idStr canonicalName = imageName;
 	canonicalName.BackSlashesToSlashes();
 	canonicalName.StripFileExtension();
+	// The recovered tactical trooper material misspells its own texture folder.
+	// Keep the authored source first and salt the generated cache exactly as for
+	// the retail fallbacks below, so an installed correction takes precedence.
+	if ( idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 ) {
+		if ( canonicalName.Icmp( "gfx/effects/fire/p_fire2a" ) == 0 ) {
+			return "gfx/effects/fire/fire2a.tga";
+		}
+		if ( canonicalName.Icmp( "downsize( models/monsters/a4x_tactical/q4x_tt_body_s, 1)" ) == 0 ) {
+			return "downsize( models/monsters/q4x_tactical/q4x_tt_body_s, 1)";
+		}
+		if ( canonicalName.Icmp( "models/monsters/a4x_tactical/q4x_tt_body_s" ) == 0 ) {
+			return "models/monsters/q4x_tactical/q4x_tt_body_s.tga";
+		}
+	}
 
 	struct q4StockImageFallback_t {
 		const char *missingName;

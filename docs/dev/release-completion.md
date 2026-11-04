@@ -107,6 +107,32 @@ See [player release status](../user/release-status.md).
   Cameras also fit their hanging models, allowing the blocked turret-room
   camera to appear, scan and take damage as intended.
 
+## Awakening rescue and MCC defense, 4 November 2026
+
+- The Pain Lord fight preserves its weak-point stages under heavy damage,
+  removes destroyed captives consistently, and gives Strauss the full final
+  processing window. Interrupting that attempt buys time to finish the rescue,
+  which now has a localized objective that completes with the boss fight.
+- The MCC arrival respects Mitchell's death. Its cannon defense has a complete
+  opening fighter interval, repeating flight runs, and a reliable transition
+  into the escape; later hull damage no longer fails a completed defense.
+- Destroyed escape teleporters stop spawning enemies and animating immediately,
+  and repeated triggers cannot restart them. Boss victory and cannon failure
+  cancel pending encounter actions during normal vehicle/AI callbacks too.
+  M05's service-lift lamp now travels with the platform, and its rescue teleport
+  waits for the cinematic stand-in to leave the destination.
+- Bullets left behind by departing fighters no longer retain deleted collision
+  owners, fixing an active-cannon save warning and preventing later entities
+  from inheriting an old bullet's collision exemption.
+- Idle squad followers give their medic leader room to reach the player. The
+  unused upper freight panel no longer offers a broken lift interaction, and
+  several missing light, monitor and character/effect texture references use
+  their installed counterparts. Fast command-room teleporter kills also prevent
+  its delayed activation from running after destruction.
+- Restart M05/M06 to use corrected mission scripts and entity assignments.
+  Earlier saves keep their
+  original script flow. See [intent, changes and validation](awakening-m05-m06.md).
+
 ## Damaged queued events recover safely, 4 November 2026
 
 - Saves with unsupported queued callbacks or out-of-order event times now

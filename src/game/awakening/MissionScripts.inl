@@ -5,11 +5,17 @@
  * See docs/dev/awakening-missions.md for intent, provenance and validation.
  */
 
+#include "MissionScripts.h"
+#include "MissionM05M06.inl"
+
 static const char * const awakeningM02Source = "maps/game/m02_trianfac.script";
 static const char * const awakeningM02Version1 = "maps/game/m02_trianfac.openq4-v1.script";
 static const char * const awakeningM02Version2 = "maps/game/m02_trianfac.openq4-v2.script";
 
 bool Awakening_LoadMissionScript( const char *filename, idStr &source ) {
+	if ( Awakening_LoadM05M06Script( filename, source ) ) {
+		return true;
+	}
 	idStr normalizedName = filename;
 	normalizedName.BackSlashesToSlashes();
 	const bool version2 = normalizedName.Icmp( awakeningM02Version2 ) == 0;

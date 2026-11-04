@@ -2160,6 +2160,16 @@ Completion substeps must keep three forms of evidence distinct:
   transient corpse pin loss on restore as a bounded limitation. Verify base/Arena/
   MP isolation after restart. Keep the completed classes, gameplay and turret work;
   no expansion MP module or resurrection of obsolete companion-layer architecture.
+  M05/M06 encounter work, 4 November: the Pain Lord's shield phases, final
+  processing window and cleanup, MCC arrival continuity, and cannon/fighter
+  lifecycle are reviewed in the [mission audit](awakening-m05-m06.md). A second
+  pass fixes normal callback cancellation, escape-teleporter shutdown/re-entry
+  and the service-lift lamp, with versioned scripts preserving v1 saves. A third
+  pass addresses the blocked medic approach, unused freight panel and incomplete
+  media references, plus a delayed teleporter activation race in invasion v3;
+  v1/v2 script statements remain unchanged.
+  Focused encounter and restore evidence belongs there; full traversal remains
+  part of this gate.
   Progress, 2 November: freeze persistence passes one save/restore case. On
   `game/m01_stranarus_trench2` a spawned Strogg marine hit by the freeze gun
   reports "frozen solid" at 5888 ms, the game saves and restores, the marine

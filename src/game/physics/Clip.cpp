@@ -481,6 +481,7 @@ void idClipModel::Init( void ) {
 	entity = NULL;
 	id = 0;
 	owner = NULL;
+	ownerSpawnId = 0;
 	origin.Zero();
 	axis.Identity();
 	bounds.Zero();
@@ -547,6 +548,7 @@ idClipModel::idClipModel( const idClipModel *model ) {
 	entity = model->entity;
 	id = model->id;
 	owner = model->owner;
+	ownerSpawnId = model->ownerSpawnId;
 	origin = model->origin;
 	axis = model->axis;
 	bounds = model->bounds;
@@ -584,14 +586,45 @@ idClipModel::~idClipModel( void ) {
 
 /*
 ================
-idClipModel::Save
+idClipModel::SetOwner / GetOwner
 ================
 */
+void idClipModel::SetOwner( idEntity *newOwner ) {
+	owner = NULL;
+	ownerSpawnId = 0;
+	if ( newOwner == NULL ) {
+		return;
+	}
+	int entityNum = newOwner->entityNumber;
+	if ( entityNum < 0 || entityNum >= MAX_GENTITIES || gameLocal.entities[entityNum] != newOwner ) {
+		// During restore the entity table and spawn IDs are loaded before class
+		// payloads. The referenced owner's entityNumber may not be restored yet.
+		for ( entityNum = 0; entityNum < MAX_GENTITIES; ++entityNum ) {
+			if ( gameLocal.entities[entityNum] == newOwner ) {
+				break;
+			}
+		}
+		if ( entityNum == MAX_GENTITIES ) {
+			return;
+		}
+	}
+	owner = newOwner;
+	ownerSpawnId = static_cast<unsigned int>( PackEntitySpawnId( gameLocal.spawnIds[entityNum], entityNum ) );
+}
+
+idEntity *idClipModel::GetOwner( void ) const {
+	const unsigned int entityNum = ownerSpawnId & ( ( 1u << GENTITYNUM_BITS ) - 1 );
+	// Never dereference the cached pointer: its entity may have been deleted,
+	// and even its address/slot may have been reused by the next fighter wave.
+	return owner != NULL && gameLocal.entities[entityNum] == owner &&
+		static_cast<unsigned int>( gameLocal.spawnIds[entityNum] ) == ( ownerSpawnId >> GENTITYNUM_BITS ) ? owner : NULL;
+}
+
 void idClipModel::Save( idSaveGame *savefile ) const {
 	savefile->WriteBool( enabled );
 	savefile->WriteObject( entity );
 	savefile->WriteInt( id );
-	savefile->WriteObject( owner );
+	savefile->WriteObject( GetOwner() );
 	savefile->WriteVec3( origin );
 	savefile->WriteMat3( axis );
 	savefile->WriteBounds( bounds );
@@ -623,6 +656,7 @@ void idClipModel::Restore( idRestoreGame *savefile ) {
 	savefile->ReadObject( entity );
 	savefile->ReadInt( id );
 	savefile->ReadObject( owner );
+	SetOwner( owner );
 	savefile->ReadVec3( origin );
 	savefile->ReadMat3( axis );
 	savefile->ReadBounds( bounds );
@@ -1386,10 +1420,10 @@ int idClip::GetTraceClipModels( const idBounds &bounds, int contentMask, const i
 // RAVEN END
 		} else if ( cm->entity == passOwner ) {
 			clipModelList[i] = NULL;			// missiles don't clip with their owner
-		} else if ( cm->owner ) {
-			if ( cm->owner == passEntity ) {
+		} else if ( idEntity *clipOwner = cm->GetOwner() ) {
+			if ( clipOwner == passEntity ) {
 				clipModelList[i] = NULL;		// don't clip against own missiles
-			} else if ( cm->owner == passOwner ) {
+			} else if ( clipOwner == passOwner ) {
 				clipModelList[i] = NULL;		// don't clip against other missiles from same owner
 			}
 		}

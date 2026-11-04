@@ -1909,6 +1909,9 @@ bool idAI::UpdateTactical_r ( void ) {
 				
 			case AITACTICAL_MOVE_PLAYERPUSH:
 				result = MoveOutOfRange ( pusher, (move.followRange[0] + move.followRange[1]) / 2.0f );
+				if ( DebugFilter( ai_debugMove ) ) {
+					gameLocal.Printf( "aiMoveAside: name=%s path=%d\n", GetName(), result );
+				}
 				break;				
 				
 			case AITACTICAL_COVER:
@@ -2030,7 +2033,9 @@ int idAI::FilterTactical ( int availableTactical ) {
 	if ( aifl.scripted ) {
 		availableTactical &= ~(AITACTICAL_MOVE_PLAYERPUSH_BIT);
 	} else {
-		if ( !pusher || !pusher->IsType ( idPlayer::GetClassType ( ) ) ) {
+		// A follower may also give its own leader room to reach a patient.
+		const bool leaderPush = pusher && pusher == leader && leader->team == team;
+		if ( !pusher || ( !pusher->IsType( idPlayer::GetClassType() ) && !leaderPush ) ) {
 			//no current pusher
 			if ( combat.tacticalCurrent == AITACTICAL_MOVE_PLAYERPUSH ) {
 				//in the middle of a push move, just continue it

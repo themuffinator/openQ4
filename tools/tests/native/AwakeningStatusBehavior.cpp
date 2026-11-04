@@ -3,6 +3,8 @@
 // target validity are asserted below; gameplay algorithms are not reimplemented.
 #include <algorithm>
 #include <cmath>
+#include <cstdarg>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -15,6 +17,9 @@
 static int checks;
 #define CHECK(x) do { ++checks; if (!(x)) { std::fprintf(stderr, "line %d: %s\n", __LINE__, #x); std::exit(1); } } while (false)
 static bool Near(float a, float b) { return std::fabs(a-b) < 0.0001f; }
+template<class T> static T Max(T a,T b){return std::max(a,b);}
+static const char* va(const char* format,...){static char text[1024];va_list args;va_start(args,format);vsnprintf(text,sizeof(text),format,args);va_end(args);return text;}
+struct idStr {static int Icmp(const char* a,const char* b){return std::strcmp(a,b);}};
 #define MS2SEC(x) ((x)*0.001f)
 #define SEC2MS(x) int((x)*1000)
 #define DEG2RAD(x) ((x)*0.0174532925199433f)
@@ -108,7 +113,9 @@ struct idEntity {
     virtual ~idEntity()=default;
     int health=100,entityNumber=0;bool hidden=false,removed=false;
     struct {bool takedamage=true,notarget=false,quickBurn=false;} fl;
-    struct {const idMaterial* overlayShader=nullptr;} renderEntity;
+    struct Model {unsigned int GetSurfaceMask(const char* surface)const{return std::string(surface).back()=='l'?1:2;}} model;
+    struct {const idMaterial* overlayShader=nullptr;Model* hModel=nullptr;unsigned int suppressSurfaceMask=0;} renderEntity;
+    void HideSurface(const char* surface){if(renderEntity.hModel)renderEntity.suppressSurfaceMask|=renderEntity.hModel->GetSurfaceMask(surface);}
     idDict spawnArgs;Physics physics;std::string name="test";
     virtual bool IsType(int type)const{return type==0;}
     Physics* GetPhysics(){return &physics;}const Physics* GetPhysics()const{return &physics;}
@@ -175,10 +182,20 @@ struct idAI : idActor {
     void Killed(idEntity*,idEntity*,int,const idVec3&,int)override{if(!aifl.dead)++kills;aifl.dead=true;}
     void TurnToward(const idVec3&){}
 };
+struct stateParms_t {int stage=0,blendFrames=0;};using stateResult_t=int;
 struct riMonsterPainLord : idAI {
-    bool stunned=false,enraged=false,atProcessingStation=false;int dudeHealth=100;float maxHealth=100;
-    struct {int calls=0;void CallFunc(void*){++calls;}} stunnedFunc;
+    bool stunned=false,enraged=false,atProcessingStation=false,interrupted=false;int dudeHealth=100,dudeMaxHealth=100;float maxHealth=100;
+    struct Callback {int calls=0;void CallFunc(void*){++calls;}} stunnedFunc,enragedFunc,unstunnedFunc,processingBrokenFunc,processingDoneFunc;
+    struct {int threshold=10;} pain;
+    const char* GetDamageGroup(int location){return location==1?"dl":location==2?"dr":"head";}
+    bool animDone=true;std::string lastAnim;
+    void PlayAnim(int,const char* anim,int){lastAnim=anim;}
+    bool AnimDone(int,int){return animDone;}void OverrideAnim(int){}
     void AdjustHealthByDamage(int)override;
+    bool DudeAttached(char)const;void DetachDude(char);void DamageDude(int,const char*);
+    int GetDamageForLocation(int,int)override;void Enrage();void Event_AtProcessingStation();
+    stateResult_t State_Torso_Stun(const stateParms_t&);
+    stateResult_t State_Torso_ProcessingStation(const stateParms_t&);
 };
 struct riMonsterValkaryne : idAI {bool docked=false;void AdjustHealthByDamage(int)override;};
 struct riMonsterRetch : idAI {
@@ -240,7 +257,6 @@ struct riVCWMissileTurret : riVehicleCockpitWeapon {
     const char* GetClassname(){return "turret";}
     void PlaySound(const char* s){sounds.push_back(s);}void SendGuiEvent(const char* s){events.push_back(s);}
 };
-struct stateParms_t {int stage=0,blendFrames=0;};using stateResult_t=int;
 enum {WP_OUTOFAMMO,WP_READY,SRESULT_DONE=2,SRESULT_WAIT=3,SRESULT_ERROR=4};
 static int SRESULT_STAGE(int stage){return stage+10;}
 struct WeaponNapalmGun {
@@ -277,6 +293,42 @@ int main(){
     Reset();{idAI ai;ai.health=5;g_perfTest_aiUndying.b=true;Damage(ai,"freeze");CHECK(ai.health==1&&!ai.IsFrozenSolid());}
     Reset();{riMonsterPainLord ai;ai.stunned=true;ai.health=1;Damage(ai,"freeze");CHECK(ai.health==1&&!ai.IsFrozenSolid());
         ai.stunned=false;ai.atProcessingStation=true;Damage(ai,"freeze");CHECK(ai.health==1&&!ai.IsFrozenSolid());}
+    // A lethal body hit cannot bypass either authored shield phase. Stun
+    // callbacks fire once, and stale interruptions cannot cancel a new stun.
+    Reset();{riMonsterPainLord ai;ai.health=ai.maxHealth=8000;ai.interrupted=true;
+        ai.AdjustHealthByDamage(100000);CHECK(ai.health==5333&&ai.stunned&&ai.stunnedFunc.calls==1&&!ai.interrupted);
+        ai.AdjustHealthByDamage(100000);CHECK(ai.health==5333&&ai.stunnedFunc.calls==1);
+        ai.stunned=false;ai.AdjustHealthByDamage(100000);CHECK(ai.health==2666&&ai.stunnedFunc.calls==2);
+        ai.stunned=false;ai.enraged=true;ai.AdjustHealthByDamage(3000);CHECK(ai.health<0&&ai.stunnedFunc.calls==2);}
+    Reset();{riMonsterPainLord ai;ai.aifl.undying=true;ai.AdjustHealthByDamage(10000);
+        CHECK(ai.health==100&&!ai.stunned&&ai.stunnedFunc.calls==0);}
+    // A detached captive cannot drain the survivor's shield through its old
+    // collision joints. The existing saved render mask is authoritative.
+    for(char first:{'l','r'}){Reset();riMonsterPainLord ai;ai.renderEntity.hModel=&ai.model;ai.stunned=true;
+        const char* side=first=='l'?"left":"right";const char* other=first=='l'?"right":"left";
+        ai.DamageDude(51,side);CHECK(ai.dudeHealth==49&&!ai.DudeAttached(first)&&ai.interrupted&&ai.effects==1);
+        ai.interrupted=false;ai.DamageDude(20,side);CHECK(ai.dudeHealth==49&&!ai.interrupted);
+        CHECK(ai.GetDamageForLocation(10,first=='l'?1:2)==0&&ai.dudeHealth==49);
+        ai.DamageDude(49,other);CHECK(ai.dudeHealth==0&&ai.enraged&&!ai.stunned&&ai.effects==2);
+        CHECK(!ai.DudeAttached('l')&&!ai.DudeAttached('r')&&ai.enragedFunc.calls==1);
+        CHECK(ai.GetDamageForLocation(10,1)==0&&ai.GetDamageForLocation(10,2)==0);
+        CHECK(ai.GetDamageForLocation(10,0)==10); // Visible body still takes damage.
+        ai.DamageDude(100,other);CHECK(ai.effects==2&&ai.enragedFunc.calls==1);}
+    Reset();{riMonsterPainLord ai;ai.renderEntity.hModel=&ai.model;ai.DamageDude(1000,"left");
+        CHECK(ai.dudeHealth==0&&ai.effects==2&&ai.enraged&&ai.enragedFunc.calls==1);}
+    Reset();{riMonsterPainLord ai;ai.DamageDude(-10,"left");CHECK(ai.dudeHealth==100);
+        ai.atProcessingStation=true;ai.DamageDude(26,"left");CHECK(ai.dudeHealth==74&&ai.interrupted);
+        ai.Event_AtProcessingStation();CHECK(ai.atProcessingStation&&!ai.interrupted);
+        ai.atProcessingStation=false;ai.health=0;ai.Event_AtProcessingStation();CHECK(!ai.atProcessingStation);}
+    for(bool rage:{false,true}){riMonsterPainLord ai;ai.stunned=true;ai.interrupted=true;ai.enraged=rage;
+        CHECK(ai.State_Torso_Stun({2,0})==SRESULT_STAGE(4));
+        CHECK(ai.lastAnim==(rage?"stunned_end_rage":"stunned_end")&&!ai.interrupted&&!ai.stunned&&ai.unstunnedFunc.calls==1);}
+    for(bool interrupt:{false,true}){riMonsterPainLord ai;ai.atProcessingStation=true;ai.animDone=false;
+        CHECK(ai.State_Torso_ProcessingStation({0,4})==SRESULT_STAGE(1)&&ai.lastAnim=="console_idle");
+        CHECK(ai.State_Torso_ProcessingStation({1,4})==SRESULT_WAIT&&ai.processingDoneFunc.calls==0);
+        ai.interrupted=interrupt;ai.animDone=true;
+        CHECK(ai.State_Torso_ProcessingStation({1,4})==SRESULT_DONE&&!ai.atProcessingStation);
+        CHECK(ai.processingBrokenFunc.calls==int(interrupt)&&ai.processingDoneFunc.calls==int(!interrupt));}
     Reset();{riMonsterValkaryne ai;ai.docked=true;ai.health=1;Damage(ai,"freeze");CHECK(ai.health==1&&!ai.IsFrozenSolid());}
     Reset();{idAI ai;ai.health=1;ai.damageTakenScale=0;Damage(ai,"freeze");CHECK(ai.health==1&&!ai.IsFrozenSolid());}
     Reset();{idPlayer player;gameLocal.player=&player;idAI ally;ally.health=1;

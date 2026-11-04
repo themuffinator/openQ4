@@ -457,6 +457,7 @@ public:
 	rvSpawner*				GetSpawner						( void );
 
 	idActor*				GetLeader						( void ) const;
+	bool					RequestMoveAside				( idActor *requester );
 
 							// Outputs a list of all monsters to the console.
 	static void				List_f( const idCmdArgs &args );
