@@ -17,8 +17,10 @@ See [player release status](../user/release-status.md).
   pressure exposed a separate reload failure: new shaders could remain missing
   until a video restart. The existing eviction policy now reclaims retired,
   stale programs when their pipelines fill the cache; current and in-flight
-  programs remain protected. GPU qualification of that correction is pending;
-  see [evidence and limits](vulkan-material-programs.md#draw-resource-failure-and-capacity-controls-4-november-2026).
+  programs remain protected. Both adapters recover exactly in the pipeline
+  pressure sequence; all sixteen GL/Vulkan comparisons differ by at most one
+  display level, with no validation messages. See
+  [evidence and limits](vulkan-material-programs.md#draw-resource-failure-and-capacity-controls-4-november-2026).
 
 ## Renderer restart residency and debug views, 4 November 2026
 

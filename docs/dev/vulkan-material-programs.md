@@ -521,8 +521,30 @@ cache is full, using the same current/in-flight protection as version and byte
 pressure. It does not evict on an ordinary driver allocation failure with free
 cache capacity, nor evict just to service an existing cache hit. The finite
 scan skips pipeline-free versions and stops if no safe victim remains. Native
-policy and binding-retry controls pass on Windows; Linux and GPU correction
-qualification are recorded separately when complete.
+policy and binding-retry controls pass on Windows and Linux (WSL).
+
+The clean `dc81503ee` build passes `renderer_vulkan_pipeline_pressure.py` on
+RTX 4060 Laptop and Intel Iris Xe with validation enabled. Each run exercises
+63 programs below capacity, 65 at pressure, reuse of an existing key, a new
+66th program after reload, settled recovery and full restart. Both adapters
+reclaim exactly one retired version, draw the new program without skips, and
+preserve every image exactly. OpenGL and both Vulkan adapters pass all eight
+independent controls; all sixteen paired captures differ by at most one display
+level. No validation or unexpected diagnostic is logged. The original pressure
+warning remains required, and no warning is allowed after recovery.
+
+Reports and engine images are retained in
+`.tmp/vk-roadmap/pipeline-fixed-{gl,nvidia,intel}/` and
+`pipeline-comparison-{nvidia,intel}/`. The exact package is
+`runtime-dc81503e.zip`, SHA-256
+`2c161eb5103891d3e8704d1d54d1e84b22c1fbfb1e523b5bb0dde7f03d0a1c38`.
+Run either pressure harness with `--runtime-root`, `--basepath`, `--output-dir`
+and `--backend gl|vk`; `--device` selects the Vulkan adapter. Each has a separate
+`--compare GL_REPORT VK_REPORT --output-dir ...` mode. They require the existing
+compiled original PBR laboratory runtime and keep writable fixtures in the
+isolated test profile. Descriptor-driver refusal remains a native test, not a
+GPU fault-injection qualification. Broader authored-lighting/mod content and
+the existing strict five-pixel lighting mismatch remain open.
 
 ## Dependency provenance
 
