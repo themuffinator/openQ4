@@ -33,7 +33,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "LevelShotDepth.h"
 #include "Model_local.h"
 #include "simplex.h"	// line font definition
-#include <climits>
 
 #define MAX_DEBUG_LINES			16384
 
@@ -453,7 +452,7 @@ static bool RB_GetDebugReadbackArea( bool viewport, debugReadbackArea_t &area ) 
 	// All callers allocate at most four bytes per pixel through the renderer's
 	// signed-size allocator. Check before either multiplication or allocation.
 	if ( area.targetWidth <= 0 || area.targetHeight <= 0
-		|| area.targetWidth > INT_MAX / 4 / area.targetHeight ) {
+		|| area.targetWidth > idMath::INT_MAX / 4 / area.targetHeight ) {
 		return false;
 	}
 	area.x = area.y = 0;

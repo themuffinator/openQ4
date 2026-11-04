@@ -17,6 +17,7 @@ SUPPORT = r'''
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#undef INT_MAX
 using GLuint=unsigned; using GLint=int; using GLenum=unsigned; using byte=unsigned char;
 enum { GL_DRAW_FRAMEBUFFER_BINDING=1, GL_READ_FRAMEBUFFER_BINDING, GL_SAMPLE_BUFFERS,
        GL_VIEWPORT, GL_PACK_ALIGNMENT, GL_READ_FRAMEBUFFER, GL_DRAW_FRAMEBUFFER,
@@ -74,7 +75,10 @@ void glDrawPixels(int width,int height,GLenum format,GLenum type,const void *dat
     assert((b[0]==128 && b[1]==128 && b[2]==0) || (b[0]==128 && b[1]==128 && b[2]==128 && b[3]==255));
 }
 struct CVar { bool GetBool() const { return true; } } r_showDepth,r_showIntensity;
-namespace idMath { byte Ftob(float value) { return byte(value); } }
+struct idMath {
+    static constexpr int INT_MAX = 2147483647;
+    static byte Ftob(float value) { return byte(value); }
+};
 void glLoadIdentity() {} void glMatrixMode(GLenum) {} void GL_State(int) {}
 void glPushMatrix() {} void glPopMatrix() {} void glOrtho(double,double,double,double,double,double) {}
 void glRasterPos2f(float,float) {} void glColor3f(float,float,float) {} void RB_BindNullDebugImage() {}
@@ -117,9 +121,9 @@ int main() {
     reset();idRenderTexture vr{12,640,480};standIn=&vr;drawFbo=12;viewport[2]=640;viewport[3]=480;
     RB_ShowDepthBuffer();assert(drawExtent[0]==640 && drawExtent[1]==480);
     reset();drawFbo=99;assert(!RB_GetDebugReadbackArea(true,area));RB_ShowDepthBuffer();assert(reads==0 && allocations==0);
-    reset();idRenderTexture invalid{7,INT_MAX,2};drawFbo=7;backEnd.renderTexture=&invalid;
+    reset();idRenderTexture invalid{7,idMath::INT_MAX,2};drawFbo=7;backEnd.renderTexture=&invalid;
     assert(!RB_GetDebugReadbackArea(false,area));invalid.width=0;assert(!RB_GetDebugReadbackArea(false,area));
-    for(int coordinate:{-1,INT_MAX}) {
+    for(int coordinate:{-1,idMath::INT_MAX}) {
         reset();viewport[0]=coordinate;RB_ShowIntensity();assert(reads==0 && draws==0 && allocations==0);
     }
     reset();viewport[2]=0;RB_ShowDepthBuffer();assert(reads==0 && draws==0);
