@@ -1475,6 +1475,27 @@ existing limits; neither issue changes the subtitle or dialogue-coverage claims.
 
 ## Other verification and limitations
 
+### PR #212 merge qualification, 4 November 2026
+
+The audio head's first Commit Validation run failed in unrelated validation
+paths. The MVD mutation harness gave its Unix executable the same path as its
+header overlay; the Vulkan resize mutation still expected the code before the
+render-thread synchronization call. Both harnesses now exercise their intended
+mutations. The save-codec fixture reports an unexpected exception as a failed
+test instead of leaving Windows CI at an unhandled-exception dialog. The two
+largest retained page matrices get 300 seconds under sanitizers, retaining their
+120-second ordinary limit and every assertion after both hit the sanitizer limit.
+
+The retained Demos document also varied by eight last-bit scale values between
+Python 3.11 and 3.12+, whose floating-point sums differ. Its total tag width now
+uses the same tenth-unit precision as each tag before computing the scale.
+The canonical generator produces matching output on Windows Python 3.11 and
+Linux Python 3.12. MVD's 15 mutation controls and the save codec's eight controls
+pass on both platforms; the renderer metadata baseline and all mutations pass
+on Windows. Meson reconfiguration passes and preserves the ordinary timeouts.
+Local evidence is under `.tmp/aud-merge/`; these focused passes do not substitute
+for the fresh GitHub validation run required before merging.
+
 - `sound_settings.py --no-mutations`: 35,807 checks pass.
 - `sound_recovery.py --no-mutations`: 42,348 cumulative checks pass. These are
   counted API tests, not physical endpoint-loss tests.
