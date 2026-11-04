@@ -197,7 +197,11 @@ struct riMonsterPainLord : idAI {
     stateResult_t State_Torso_Stun(const stateParms_t&);
     stateResult_t State_Torso_ProcessingStation(const stateParms_t&);
 };
-struct riMonsterValkaryne : idAI {bool docked=false;void AdjustHealthByDamage(int)override;};
+struct riMonsterValkaryne : idAI {
+    bool docked=false,undockRequested=false;
+    struct {struct {bool disabled=false;} fl;} actionRangedAttack;
+    bool DamageProtected()const;void AdjustHealthByDamage(int)override;
+};
 struct riMonsterRetch : idAI {
     static int GetClassType(){return 5;}
     bool IsType(int type)const override{return type==5||idAI::IsType(type);}
@@ -330,6 +334,11 @@ int main(){
         CHECK(ai.State_Torso_ProcessingStation({1,4})==SRESULT_DONE&&!ai.atProcessingStation);
         CHECK(ai.processingBrokenFunc.calls==int(interrupt)&&ai.processingDoneFunc.calls==int(!interrupt));}
     Reset();{riMonsterValkaryne ai;ai.docked=true;ai.health=1;Damage(ai,"freeze");CHECK(ai.health==1&&!ai.IsFrozenSolid());}
+    Reset();{riMonsterValkaryne ai;ai.health=100;ai.undockRequested=true;
+        ai.AdjustHealthByDamage(20);CHECK(ai.health==100);
+        ai.undockRequested=false;ai.spawnArgs.Set("requestDocking","dock");ai.actionRangedAttack.fl.disabled=true;
+        ai.AdjustHealthByDamage(20);CHECK(ai.health==100);
+        ai.spawnArgs.Set("openq4_dockingComplete","1");ai.AdjustHealthByDamage(20);CHECK(ai.health==80);}
     Reset();{idAI ai;ai.health=1;ai.damageTakenScale=0;Damage(ai,"freeze");CHECK(ai.health==1&&!ai.IsFrozenSolid());}
     Reset();{idPlayer player;gameLocal.player=&player;idAI ally;ally.health=1;
         ally.Damage(&player,&player,{0,0,1},"freeze",1,7);CHECK(ally.health==1&&!ally.IsFrozenSolid());}

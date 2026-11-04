@@ -34,7 +34,8 @@ SOURCES = {
         'void riMonsterPainLord::Enrage(', 'void riMonsterPainLord::Event_AtProcessingStation(',
         'stateResult_t riMonsterPainLord::State_Torso_Stun(',
         'stateResult_t riMonsterPainLord::State_Torso_ProcessingStation('],
-    'src/game/awakening/ai/Monster_Valkaryne.cpp': ['void riMonsterValkaryne::AdjustHealthByDamage('],
+    'src/game/awakening/ai/Monster_Valkaryne.cpp': ['bool riMonsterValkaryne::DamageProtected(',
+        'void riMonsterValkaryne::AdjustHealthByDamage('],
     'src/game/awakening/ai/Monster_Retch.cpp': [
         'bool riMonsterRetch::ApplyBuff(', 'void riMonsterRetch::ClearBuff(',
         'bool riMonsterRetch::FindBuffTarget(', 'void riMonsterRetch::Event_RestoreBuff('],
