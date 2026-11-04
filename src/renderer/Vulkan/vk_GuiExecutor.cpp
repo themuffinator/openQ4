@@ -2172,6 +2172,10 @@ VkPipeline VK_Exec_AuthoredMaterialPipeline( int identity, VkShaderModule vertex
     return pipeline;
 }
 
+bool VK_Exec_ProgramPipelineCapacityExhausted() {
+    return vkExec.numProgramPipelines >= VK_MAX_PROGRAM_PIPELINES;
+}
+
 void VK_Exec_ReleaseAuthoredMaterialPipelines( int identity ) {
     const int key = 0x10000 + identity;
     int kept = 0;

@@ -22,12 +22,14 @@ SUPPORT = r'''
 #include <string>
 constexpr int MaxPrograms = 256, VK_FRAMES_IN_FLIGHT = 2;
 constexpr size_t MaxCompilerBytes = 32 * 1024 * 1024;
-struct Program { uint64_t lastUseFrame=0; size_t bytes=0; int identity=0; };
+struct Program { uint64_t lastUseFrame=0; size_t bytes=0; int identity=0; int pipelines=0; };
 std::vector<std::unique_ptr<Program>> programs;
 std::map<std::string,int> currentPrograms;
 uint64_t frameSerial=100;
 size_t compilerBytes=0;
 int evictions=0;
+int pipelines=0;
+bool VK_Exec_ProgramPipelineCapacityExhausted() { return pipelines>=512; }
 std::vector<int> released;
 bool IsCurrent(int index);
 void Release(Program &program) {
@@ -35,6 +37,7 @@ void Release(Program &program) {
     assert(program.lastUseFrame + VK_FRAMES_IN_FLIGHT <= frameSerial);
     assert(compilerBytes >= program.bytes);
     compilerBytes -= program.bytes;
+    pipelines -= program.pipelines;
     released.push_back(program.identity);
 }
 void add(size_t bytes, uint64_t use, bool current) {
@@ -43,7 +46,7 @@ void add(size_t bytes, uint64_t use, bool current) {
     compilerBytes += bytes;
     if(current) currentPrograms[std::to_string(index)]=index;
 }
-void reset() { programs.clear();currentPrograms.clear();released.clear();compilerBytes=0;evictions=0;frameSerial=100; }
+void reset() { programs.clear();currentPrograms.clear();released.clear();compilerBytes=0;evictions=0;frameSerial=100;pipelines=0; }
 '''
 CASES = r'''
 int main() {
@@ -82,6 +85,28 @@ int main() {
     assert(AcquireSlot()==40 && released.back()==40);
     programs[40]=std::make_unique<Program>(Program{100,200,40});compilerBytes+=200;
     assert(AcquireSlot()==0 && programs[40] && programs[41]);
+    reset();
+    // Pipeline capacity can fill with far fewer than 256 source versions.
+    // Ignore ordinary driver allocation failure; preserve current and in-flight
+    // owners, and scan past a retired version that owns no pipelines.
+    add(100,0,true); programs[0]->pipelines=504;
+    add(100,99,false); programs[1]->pipelines=8;
+    add(100,0,false);
+    pipelines=511;
+    assert(!ReclaimPipelineCapacity() && released.empty());
+    pipelines=512;
+    assert(!ReclaimPipelineCapacity() && released==std::vector<int>{2});
+    assert(programs[0] && programs[1] && pipelines==512);
+    ++frameSerial;
+    assert(ReclaimPipelineCapacity() && released==std::vector<int>({2,1}));
+    assert(programs[0] && !programs[1] && pipelines==504 && compilerBytes==100);
+    assert(!ReclaimPipelineCapacity() && evictions==2);
+    reset();
+    // Exhausting all 256 stale, pipeline-free records terminates without
+    // claiming that native or otherwise unowned pipeline slots were reclaimed.
+    for(int i=0;i<MaxPrograms;++i) add(100,0,false);
+    pipelines=512;
+    assert(!ReclaimPipelineCapacity() && evictions==MaxPrograms && pipelines==512);
 }
 '''
 
@@ -90,7 +115,7 @@ def main():
     production = (ROOT / 'src/renderer/Vulkan/vk_MaterialPrograms.cpp').read_text()
     source = SUPPORT + ''.join(method(production, signature) for signature in (
         'bool IsCurrent( int index )', 'int EvictionCandidate()', 'void Evict( int slot )',
-        'int AcquireSlot()', 'bool ReserveCompilerStorage( size_t bytes )')) + CASES
+        'bool ReclaimPipelineCapacity()', 'int AcquireSlot()', 'bool ReserveCompilerStorage( size_t bytes )')) + CASES
     compiler = next((path for name in ('clang++', 'g++', 'c++') if (path := shutil.which(name))), None)
     if compiler is None:
         raise RuntimeError('a C++ compiler is required')
@@ -102,7 +127,7 @@ def main():
         cpp.write_text(source)
         subprocess.run([compiler, '-std=c++17', str(cpp), '-o', str(exe)], check=True)
         subprocess.run([str(exe)], check=True)
-    print('Vulkan material cache: production version/storage eviction, in-flight protection and slot reuse passed')
+    print('Vulkan material cache: production version/storage/pipeline eviction, in-flight protection and slot reuse passed')
 
 
 if __name__ == '__main__':

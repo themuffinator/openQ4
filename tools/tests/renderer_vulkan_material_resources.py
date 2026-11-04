@@ -110,6 +110,10 @@ int VK_Exec_ActiveFrameSlot() { return vkExec.frameSlot; }
 std::set<std::string> diagnostics;
 int suppressedDiagnostics=0,peakDraws=0;
 uint64_t frameSerial=1;
+// Retirement selection is independently executed by renderer_vulkan_material_cache.
+// The binding test selects one released identity to verify the actual retry.
+int reclaimIdentity=-1;
+bool ReclaimPipelineCapacity();
 VkDescriptorSetLayout uniformLayout=VK_NULL_HANDLE,textureLayout=VK_NULL_HANDLE;
 VkPipelineLayout pipelineLayout=VK_NULL_HANDLE;
 FramePools framePools[VK_FRAMES_IN_FLIGHT];
@@ -138,12 +142,18 @@ void vkDestroyPipeline(VkDevice,VkPipeline pipeline,const VkAllocationCallbacks 
 '''
 
 MAIN = r'''
+bool ReclaimPipelineCapacity() {
+    if(reclaimIdentity<0 || !VK_Exec_ProgramPipelineCapacityExhausted())return false;
+    VK_Exec_ReleaseAuthoredMaterialPipelines(reclaimIdentity);reclaimIdentity=-1;
+    return true;
+}
 std::vector<unsigned char> backing[VK_FRAMES_IN_FLIGHT];
 oq4material::UniformBlock block={};
 idImage *images[oq4material::MaxTextures]={};
 Program program;
 void Reset(int capacity=VK_UNIFORM_RING_BYTES) {
     failPool=failSets=failReset=failPipeline=failShader=false;resident=scopeOpen=true;
+    reclaimIdentity=-1;
     creates=resets=allocations=updates=binds=pipelineRequests=0;
     driverPools.clear();diagnostics.clear();commonStore={};imageEntry={};livePipelines.clear();destroyedPipelines=0;
     currentTarget={};currentTarget.colorCount=1;currentTarget.colorFormats[0]=VK_FORMAT_R8G8B8A8_UNORM;
@@ -250,6 +260,14 @@ int main() {
     currentTarget.lowerOrigin=true;assert(Bind());
     assert(VK_Exec_AuthoredMaterialPipeline(1,program.vertex,program.fragment,pipelineLayout,GLS_ALPHA_COVERAGE,false,3));
     assert(vkExec.numProgramPipelines==5);
+    Reset();
+    for(int i=0;i<VK_MAX_PROGRAM_PIPELINES;++i)
+        assert(VK_Exec_AuthoredMaterialPipeline(1000+i,11,12,13,0,false,3));
+    assert(VK_Exec_ProgramPipelineCapacityExhausted());
+    assert(!Bind() && allocations==0 && destroyedPipelines==0);
+    reclaimIdentity=1000;
+    assert(Bind() && allocations==1 && destroyedPipelines==1);
+    assert(VK_Exec_ProgramPipelineCapacityExhausted());
     std::printf("Limits exercised: uniform draws=%d, descriptor draws=%d, cached pipelines=%d\n",accepted,quota,VK_MAX_PROGRAM_PIPELINES);
     std::puts("Authored resources: descriptor refusal, uniform/pool/pipeline limits, frame isolation and recovery passed");
 }
@@ -281,6 +299,7 @@ def run(output):
         (executor,'static int VK_Ring_Alloc('),(executor,'bool VK_Exec_AuthoredUniformAlloc('),
         (executor,'int VK_Exec_InteractionUniformCheckpoint('),(executor,'void VK_Exec_InteractionUniformRestore('),
         (executor,'static bool VK_Exec_PipelineTargetsMatch('),(executor,'VkPipeline VK_Exec_AuthoredMaterialPipeline('),
+        (executor,'bool VK_Exec_ProgramPipelineCapacityExhausted('),
         (executor,'void VK_Exec_ReleaseAuthoredMaterialPipelines('),
         (material,'const char *Kind('),(material,'bool Report('),(material,'bool Fail('),
         (material,'bool CreateLayouts('),(material,'bool CreateModule('),(material,'VkDescriptorPool DrawPool('),

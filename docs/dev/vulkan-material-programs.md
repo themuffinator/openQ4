@@ -488,6 +488,42 @@ replace the remaining GPU pressure, authored-lighting or mod-content image
 qualification. The ordinary source-version eviction evidence above retains its
 separate scope.
 
+`renderer_vulkan_uniform_pressure.py` now qualifies the real four-MiB ring on
+the clean `323b44dab` build. It draws 128 identical authored stages on 16
+coincident specimens (2,048 requested draws), then 32 specimens (4,096), and
+returns to one stage. Both RTX 4060 Laptop and Intel Iris Xe reach the real
+capacity warning and skip excess stages without changing the image. Draw/skip
+counters prove that reducing the workload resumes drawing without further
+skips; shader reload and full video restart also recover exactly. OpenGL and
+both Vulkan adapters pass all eight independent controls, with all sixteen
+paired full-frame comparisons within one display level. Validation reports no
+messages. These deliberately redundant stages make safe rejection observable;
+arbitrary omitted stages can still change a material's appearance.
+
+Reports, fixtures, raw logs and engine images are retained under
+`.tmp/vk-roadmap/uniform-fixed-{gl,nvidia,intel}/` and
+`uniform-comparison-{nvidia,intel}/`. The earlier `uniform-probe-nvidia/` remains
+failed evidence: its warning matcher omitted idTech log color codes. The
+corrected checker accepts only the exact authored-program and four-MiB capacity
+warnings, requires them inside the pressure interval, and rejects any other
+diagnostic. The rebuilt ordinary authored GLSL suite also passes all 20 paired
+controls with exact recovery in `material-normal-323-{gl,vk,comparison}/`.
+
+Pipeline pressure then reproduced another recovery defect on the same build:
+65 program identities with eight color-mask variants fill the shared 512-entry
+cache. Existing keys and an unchanged reload remain usable, but a new program
+after reload stays absent (29,943 changed pixels, maximum error 174) until a
+video restart. `pipeline-new-program-nvidia/` retains that failed control;
+`pipeline-probe-nvidia/` retains the narrower unchanged-program pass.
+
+Binding now retries after reclaiming retired stale versions when the pipeline
+cache is full, using the same current/in-flight protection as version and byte
+pressure. It does not evict on an ordinary driver allocation failure with free
+cache capacity, nor evict just to service an existing cache hit. The finite
+scan skips pipeline-free versions and stops if no safe victim remains. Native
+policy and binding-retry controls pass on Windows; Linux and GPU correction
+qualification are recorded separately when complete.
+
 ## Dependency provenance
 
 [glslang 16.6.0](https://github.com/KhronosGroup/glslang/tree/16.6.0) is pinned by

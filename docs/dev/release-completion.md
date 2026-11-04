@@ -12,8 +12,13 @@ See [player release status](../user/release-status.md).
   reserved for that draw. Repeated failures no longer consume space needed by
   later rendering; the affected authored stage still skips with a diagnostic.
 - Native capacity and recovery controls pass on Windows and Linux, including
-  descriptor pools, uniform space and pipeline-cache reuse. GPU pressure
-  qualification remains open; see [evidence and limits](vulkan-material-programs.md#draw-resource-failure-and-capacity-controls-4-november-2026).
+  descriptor pools, uniform space and pipeline-cache reuse. NVIDIA and Intel
+  also recover from real uniform exhaustion with unchanged images. Pipeline
+  pressure exposed a separate reload failure: new shaders could remain missing
+  until a video restart. The existing eviction policy now reclaims retired,
+  stale programs when their pipelines fill the cache; current and in-flight
+  programs remain protected. GPU qualification of that correction is pending;
+  see [evidence and limits](vulkan-material-programs.md#draw-resource-failure-and-capacity-controls-4-november-2026).
 
 ## Renderer restart residency and debug views, 4 November 2026
 

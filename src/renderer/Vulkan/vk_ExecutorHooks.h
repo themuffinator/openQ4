@@ -91,6 +91,7 @@ VkPipeline VK_Exec_AuthoredMaterialPipeline( int identity, VkShaderModule vertex
 // Destroys every cached pipeline of an evicted authored version. The caller
 // guarantees no frame in flight still references them.
 void VK_Exec_ReleaseAuthoredMaterialPipelines( int identity );
+bool VK_Exec_ProgramPipelineCapacityExhausted();
 VkPipeline			VK_Exec_PostPipeline( int kind, VkShaderModule vertModule,
 							VkShaderModule fragModule, int stateBits );
 VkPipeline			VK_Exec_ExtraPipeline( int kind, VkShaderModule vertModule,

@@ -540,12 +540,12 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions and exact-package budgets. |
-| VK-02 — Partial | Host/GPU/presentation diagnostics and controlled preset selection exist; six failed diagnostic repeats retained. | Obtain foreground/direct/hybrid/power controls; meet repeated visible pacing budgets or approve an evidence-backed scope limitation. |
+| VK-02 — Partial | Six controlled foreground samples pass the declared 28 ms presentation p99 budget on NVIDIA/Intel; failed diagnostic repeats remain retained. | Physical direct/hybrid routing, other power conditions and the broader exact-package pacing matrix. |
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
-| VK-04 — Partial | Authored GLSL/ARB, reload repair, fallback policy and small/padded-source version eviction tested; integrated lighting controls pass. | Fix/resolve the unchanged strict five-pixel image failure; cover descriptor/uniform/pipeline exhaustion, broader authored lighting and mod content. |
+| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform pressure recovers on NVIDIA/Intel. | Qualify the pipeline-pressure recovery correction; resolve the unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
-| VK-06 — Partial | Resource counters and workload profiles exist; several proposed mechanisms have measured deferral reasons. | Demonstrate improved tails and bounded caches in matched runs/soaks; preserve ordering and restart lifetimes before promoting any optimization. |
-| VK-07 — Partial | Readback inventory, failed-write handling and 4x/8x MSAA resize/restart/cubemap comparisons pass. | Remaining debug/depth/stencil/nested-target combinations; frame identity and bounded deferred resources across the broader matrix. |
+| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed and two-cycle NVIDIA/Intel map tours pass. | Demonstrate improved tails and long-session cache plateaus in matched runs/soaks; preserve ordering and restart lifetimes before promotion. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons and 50–200% depth/intensity views pass. | Cropped/offset/nested targets, remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -637,8 +637,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
   exercise the four-pool descriptor quota, four-MiB uniform ring, 512-entry
   pipeline cache and frame-slot recovery on Windows and Linux. A reproduced
   descriptor-allocation failure no longer consumes unused uniform reservations
-  and starves later draws. GPU pressure, broader lighting and mod-content
-  qualification remain open.
+  and starves later draws. Real uniform-pressure controls now pass on NVIDIA
+  and Intel, including load reduction, reload and restart, with all sixteen
+  GL/Vulkan image pairs within one display level. Pipeline pressure reproduced
+  new programs remaining absent after reload; the existing eviction policy now
+  reclaims safely retired stale versions when their pipelines fill the cache.
+  GPU qualification of that correction, descriptor-driver failure, broader
+  lighting and mod-content qualification remain open.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,

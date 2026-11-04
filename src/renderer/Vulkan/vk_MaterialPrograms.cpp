@@ -150,6 +150,20 @@ void Evict( int slot ) {
     ++evictions;
 }
 
+// Pipeline pressure can precede the source-version and byte limits. Reuse the
+// same retirement policy: current and in-flight programs must keep their GPU
+// resources. A stale version may own no pipelines, so keep searching until a
+// slot is freed or the finite version table has no eligible victim left.
+bool ReclaimPipelineCapacity() {
+    if ( !VK_Exec_ProgramPipelineCapacityExhausted() ) { return false; }
+    do {
+        const int slot = EvictionCandidate();
+        if ( slot < 0 ) { return false; }
+        Evict( slot );
+    } while ( VK_Exec_ProgramPipelineCapacityExhausted() );
+    return true;
+}
+
 int AcquireSlot() {
     for ( size_t i = 0; i < programs.size(); ++i ) {
         if ( programs[i] == nullptr ) { return static_cast<int>( i ); }
@@ -583,6 +597,10 @@ bool BindProgram( Program *program, idImage *const images[oq4material::MaxTextur
     block.textureOrientation[0] = static_cast<float>( flipMask );
     VkPipeline pipeline = VK_Exec_AuthoredMaterialPipeline( program->identity,
         program->vertex, program->fragment, pipelineLayout, stateBits, separateColor, program->compiled.vertexInputMask );
+    if ( pipeline == VK_NULL_HANDLE && ReclaimPipelineCapacity() ) {
+        pipeline = VK_Exec_AuthoredMaterialPipeline( program->identity,
+            program->vertex, program->fragment, pipelineLayout, stateBits, separateColor, program->compiled.vertexInputMask );
+    }
     if ( pipeline == VK_NULL_HANDLE ) { return Fail( *program, "material pipeline allocation failed" ); }
     VkDescriptorBufferInfo buffer = {};
     const int uniformCheckpoint = VK_Exec_InteractionUniformCheckpoint();
