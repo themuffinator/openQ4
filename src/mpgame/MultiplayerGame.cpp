@@ -24,7 +24,7 @@ static_assert( MP_MATCH_VIEW_MAX_MESSAGE_BYTES + 1 <= MAX_GAME_MESSAGE_SIZE,
 idCVar g_spectatorChat( "g_spectatorChat", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "let spectators talk to everyone during game" );
 // Target-bearing requests are safe only when both ends understand the
 // connection identity. Older servers still use slots; never send them one.
-idCVar si_uiTargetProtocol( "si_uiTargetProtocol", "1", CVAR_GAME | CVAR_INTEGER | CVAR_ROM | CVAR_SERVERINFO, "identity-bound UI player requests" );
+idCVar si_uiTargetProtocol( "si_uiTargetProtocol", "2", CVAR_GAME | CVAR_INTEGER | CVAR_ROM | CVAR_SERVERINFO, "identity-bound UI player requests" );
 
 static const int ARENA_RESULT_REVIEW_MSEC = 6000;
 // The ordered ceremony that follows the exit condition: a frozen tableau the
@@ -1279,6 +1279,8 @@ idMultiplayerGame::idMultiplayerGame() {
 	retainedStatIdentity.Clear();
 	memset( retainedVoteDraft, 0, sizeof( retainedVoteDraft ) );
 	retainedVoteDraft[ RVF_KICK ] = -1;
+	retainedVoteKickIdentity = 0;
+	retainedVoteKickStale = false;
 	retainedVoteMapsRequested = false;
 	retainedAdminValid = false;
 	retainedAdminState = RAS_NONE;
@@ -12595,6 +12597,19 @@ void idMultiplayerGame::CheckVote( void ) {
 // RAVEN BEGIN
 // shouchard:  multifield voting here
 
+// Kick requests carry an identity in addition to the slot. Ordinary console
+// calls capture now; retained/classic menu drafts pass their captured subject.
+static bool PrepareVoteKickTarget( int client, int &identity ) {
+	if ( gameLocal.isClient && gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) < 2 ) return false;
+	if ( !IsValidVotePlayerSlot( client ) ) return false;
+	if ( identity == 0 ) identity = gameLocal.GetSpawnId( gameLocal.entities[ client ] );
+	return IsCurrentPlayerTarget( client, identity );
+}
+
+static bool ReadVoteKickTarget( const idBitMsg &msg, int client ) {
+	return msg.GetRemainingReadBits() == 32 && IsCurrentPlayerTarget( client, msg.ReadLong() );
+}
+
 /*
 ================
 idMultiplayerGame::ClientCallPackedVote
@@ -12602,11 +12617,14 @@ idMultiplayerGame::ClientCallPackedVote
 The assumption is that the zero changes case has been handled above.
 ================
 */
-void idMultiplayerGame::ClientCallPackedVote( const voteStruct_t &voteData ) {
+void idMultiplayerGame::ClientCallPackedVote( const voteStruct_t &voteData, int kickIdentity ) {
 	idBitMsg	outMsg;
 	byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
 
 	assert( 0 != voteData.m_fieldFlags );
+	if ( voteData.m_fieldFlags & VOTEFLAG_KICK ) {
+		if ( !PrepareVoteKickTarget( voteData.m_kick, kickIdentity ) ) return;
+	}
 
 	// send 
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
@@ -12642,6 +12660,7 @@ void idMultiplayerGame::ClientCallPackedVote( const voteStruct_t &voteData ) {
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_CONTROLTIME ) ) {
 		outMsg.WriteShort( idMath::ClampShort( voteData.m_controlTime ) );
 	}
+	if ( voteData.m_fieldFlags & VOTEFLAG_KICK ) outMsg.WriteLong( kickIdentity );
 	networkSystem->ClientSendReliableMessage( outMsg );
 }
 
@@ -12899,6 +12918,9 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 		}
 	}
 
+	if ( wireFieldFlags & VOTEFLAG_KICK ) {
+		if ( !ReadVoteKickTarget( msg, voteData.m_kick ) ) return;
+	}
 	if ( msg.GetRemainingReadBits() != 0 ) {
 		common->Warning( "Ignoring packed vote from client %d with %d trailing bits", clientNum, msg.GetRemainingReadBits() );
 		return;
@@ -16692,7 +16714,7 @@ join panel's blur while it covers the connect-time join offer, and
 uncovering gives the panel its soft focus back while the offer stands.
 ================
 */
-static const int RETAINED_MENU_PROTOCOL = 3;
+static const int RETAINED_MENU_PROTOCOL = 4;
 
 void idMultiplayerGame::SetRetainedMenuCover( bool covered, idUserInterface *card ) {
 	if ( card == NULL ) {
@@ -17599,6 +17621,8 @@ void idMultiplayerGame::ResetRetainedVoteDraft( void ) {
 	retainedVoteDraft[ RVF_RESTART ] = 0;
 	retainedVoteDraft[ RVF_BUYING ] = si.GetBool( "si_isBuyingEnabled" ) ? 1 : 0;
 	retainedVoteDraft[ RVF_KICK ] = -1;
+	retainedVoteKickIdentity = 0;
+	retainedVoteKickStale = false;
 	retainedVoteMapsRequested = false;
 }
 
@@ -17635,14 +17659,30 @@ void idMultiplayerGame::RetainedVoteChoices( void ) {
 		NormalizeMapDeclPath( fileSystem->GetMapDecl( retainedVoteMaps[ 0 ] )->GetString( "path" ), retainedVoteMap );
 	}
 	retainedVoteKick.Clear();
+	retainedVoteKickCatalog = "0";
 	for ( int i = 0; i < gameLocal.numClients && i < MAX_CLIENTS && retainedVoteKick.Num() < RETAINED_PLAYER_ROWS; i++ ) {
 		if ( IsValidVotePlayerSlot( i ) && i != gameLocal.localClientNum ) {
 			retainedVoteKick.Append( i );
+			retainedVoteKickCatalog += va( ",%d:%u", i, (unsigned int)gameLocal.GetSpawnId( gameLocal.entities[ i ] ) );
 		}
 	}
-	if ( retainedVoteKick.FindIndex( retainedVoteDraft[ RVF_KICK ] ) < 0 ) {
+	if ( retainedVoteDraft[ RVF_KICK ] >= 0 && ( retainedVoteKick.FindIndex( retainedVoteDraft[ RVF_KICK ] ) < 0 ||
+		!IsCurrentPlayerTarget( retainedVoteDraft[ RVF_KICK ], retainedVoteKickIdentity ) ) ) {
 		retainedVoteDraft[ RVF_KICK ] = -1;
+		retainedVoteKickIdentity = 0;
+		retainedVoteKickStale = true;
 	}
+}
+
+bool idMultiplayerGame::SetRetainedVoteKick( int row, const char *catalog ) {
+	RetainedVoteChoices();
+	if ( !RetainedVoteFieldShown( RVF_KICK ) || !RetainedVoteFieldAllowed( RVF_KICK ) ||
+		catalog == NULL || retainedVoteKickCatalog != catalog || row < -1 || row >= retainedVoteKick.Num() ) return false;
+	const int client = row < 0 ? -1 : retainedVoteKick[ row ];
+	retainedVoteDraft[ RVF_KICK ] = client;
+	retainedVoteKickIdentity = client < 0 ? 0 : gameLocal.GetSpawnId( gameLocal.entities[ client ] );
+	retainedVoteKickStale = false;
+	return true;
 }
 
 // The vote flag each drafted field changes, in retainedVoteField_t order.
@@ -17699,6 +17739,7 @@ int idMultiplayerGame::RetainedVoteChanges( voteStruct_t &data ) {
 	data.m_captureLimit = data.m_buying = data.m_teamBalance = data.m_controlTime = 0;
 	data.m_map.Clear();
 	RetainedVoteChoices();
+	if ( retainedVoteKickStale ) return 0;
 	const idDict &si = gameLocal.serverInfo;
 	const auto changes = [&]( int field ) { return RetainedVoteFieldShown( field ) && RetainedVoteFieldAllowed( field ); };
 	idStr current;
@@ -17755,6 +17796,9 @@ something.
 ================
 */
 const char *idMultiplayerGame::RetainedVoteRefusal( void ) {
+	RetainedVoteChoices();
+	if ( retainedVoteKickStale ) return "#str_231578";
+	if ( retainedVoteDraft[ RVF_KICK ] >= 0 && gameLocal.isClient && gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) < 2 ) return "#str_231577";
 	if ( IsManagedMatch() ) {
 		return "#str_231050";
 	}
@@ -17840,11 +17884,8 @@ bool idMultiplayerGame::SetRetainedVoteField( int field, int value ) {
 			retainedVoteDraft[ field ] = value;
 			return true;
 		case RVF_KICK:
-			if ( value < -1 || value >= retainedVoteKick.Num() ) {
-				return false;
-			}
-			retainedVoteDraft[ field ] = value < 0 ? -1 : retainedVoteKick[ value ];
-			return true;
+			// A row alone cannot identify a player after a catalog refresh.
+			return false;
 		default:
 			return false;
 	}
@@ -18000,6 +18041,7 @@ void idMultiplayerGame::PublishRetainedVote( idUserInterface *card, bool &change
 			MPRetainedPlainText( gameLocal.userInfo[ retainedVoteKick[ i ] ].GetString( "ui_name" ), 64, 1 ) : idStr();
 		publish( va( "mp.vote.kick%d", i ), name.c_str() );
 	}
+	publish( "mp.vote.kick_catalog", retainedVoteKickCatalog.c_str() );
 	publish( "mp.vote.kick_count", va( "%d", 1 + retainedVoteKick.Num() ) );
 	publish( "mp.vote.kick", va( "%d", retainedVoteKick.FindIndex( retainedVoteDraft[ RVF_KICK ] ) ) );
 }
@@ -18197,7 +18239,7 @@ const char *idMultiplayerGame::RetainedAdminRefusal( int action ) {
 		serverAdminData_t data;
 		return RetainedAdminChanges( data ) ? NULL : "#str_231295";
 	}
-	if ( gameLocal.isClient && gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) != 1 ) {
+	if ( gameLocal.isClient && gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) < 1 ) {
 		return "#str_231577";
 	}
 	if ( !IsValidVotePlayerSlot( retainedAdminClient ) || retainedAdminIdentity.IsEmpty() ||
@@ -19335,12 +19377,20 @@ bool idMultiplayerGame::HandleRetainedMenuCommand( const idCmdArgs &args, int &i
 		}
 		return false;
 	}
+	if ( !sub.Icmp( "voteKick" ) && args.Argc() - icmd >= 2 && retainedMenuCovered ) {
+		const idStr row = args.Argv( icmd++ );
+		const idStr catalog = args.Argv( icmd++ );
+		bool valid = row == "-1" || ( row.Length() >= 1 && row.Length() <= 2 );
+		for ( int i = 0; valid && row != "-1" && i < row.Length(); ++i ) valid = row[i] >= '0' && row[i] <= '9';
+		if ( valid ) SetRetainedVoteKick( atoi( row.c_str() ), catalog.c_str() );
+		return false;
+	}
 	if ( !sub.Icmp( "callVote" ) && retainedMenuCovered ) {
 		voteStruct_t data;
 		if ( RetainedVoteRefusal() != NULL || RetainedVoteChanges( data ) == 0 ) {
 			return false;
 		}
-		ClientCallPackedVote( data );
+		ClientCallPackedVote( data, retainedVoteKickIdentity );
 		ResetRetainedVoteDraft();
 		DisableMenu();
 		return true;
@@ -20000,7 +20050,11 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 			
 			// kick
 			int uiKickSelection = mainGui->State().GetInt( "playerList_sel_0" );
-			if ( uiKickSelection >= 0 && uiKickSelection < MAX_CLIENTS && IsCurrentPlayerTarget( kickVoteMap[ uiKickSelection ], kickVoteMapIdentities[ uiKickSelection ] ) ) {
+			if ( uiKickSelection >= 0 ) {
+				if ( uiKickSelection >= MAX_CLIENTS || !IsCurrentPlayerTarget( kickVoteMap[ uiKickSelection ], kickVoteMapIdentities[ uiKickSelection ] ) ) {
+					common->Printf( "%s\n", common->GetLocalizedString( "#str_231578" ) );
+					return NULL;
+				}
 				voteData.m_kick = kickVoteMap[ uiKickSelection ];
 				voteData.m_fieldFlags |= VOTEFLAG_KICK;
 			}
@@ -20101,7 +20155,7 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 			if ( 0 == voteData.m_fieldFlags ) {
 				//AddChatLine( common->GetLocalizedString( "#str_104400" ) );
 			} else {
-				ClientCallPackedVote( voteData );
+				ClientCallPackedVote( voteData, ( voteData.m_fieldFlags & VOTEFLAG_KICK ) ? kickVoteMapIdentities[ uiKickSelection ] : 0 );
 			}
 			/*
 			// sjh:  original doom code here
@@ -23687,15 +23741,21 @@ void idMultiplayerGame::ClientUpdateVote( vote_result_t status, int yesCount, in
 idMultiplayerGame::ClientCallVote
 ================
 */
-void idMultiplayerGame::ClientCallVote( vote_flags_t voteIndex, const char *voteValue ) {
+void idMultiplayerGame::ClientCallVote( vote_flags_t voteIndex, const char *voteValue, int kickIdentity ) {
 	idBitMsg	outMsg;
 	byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
+
+	if ( voteIndex == VOTE_KICK ) {
+		int client = -1;
+		if ( !ParseVotePlayerSlot( voteValue, client ) || !PrepareVoteKickTarget( client, kickIdentity ) ) return;
+	}
 
 	// send 
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
 	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_CALLVOTE );
 	outMsg.WriteByte( voteIndex );
 	outMsg.WriteString( voteValue );
+	if ( voteIndex == VOTE_KICK ) outMsg.WriteLong( kickIdentity );
 	networkSystem->ClientSendReliableMessage( outMsg );
 }
 
@@ -23800,6 +23860,10 @@ void idMultiplayerGame::ServerCallVote( int clientNum, const idBitMsg &msg ) {
 		return;
 	}
 	msg.ReadString( value, sizeof( value ) );
+	if ( voteIndex == VOTE_KICK ) {
+		int client = -1;
+		if ( !ParseVotePlayerSlot( value, client ) || !ReadVoteKickTarget( msg, client ) ) return;
+	}
 	if ( msg.GetRemainingReadBits() != 0 ) {
 		common->Warning( "Ignoring legacy vote from client %d with %d trailing bits", clientNum, msg.GetRemainingReadBits() );
 		return;
@@ -25053,7 +25117,7 @@ void idMultiplayerGame::ClientVoiceMute( int muteClient, bool mute ) {
 	gameLocal.GetLocalPlayer()->MutePlayer( muteClient, mute );
 
 	// tell the server
-	if( gameLocal.isClient && gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) == 1 ) {
+	if( gameLocal.isClient && gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) >= 1 ) {
 		idBitMsg outMsg;
 		byte msgBuf[128];
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
@@ -25165,7 +25229,7 @@ idMultiplayerGame::HandleServerAdminBanPlayer
 // connection as well, because delivery can follow a disconnect/reconnect.
 static bool SendRemoteAdminPlayerTarget( const char *operation, int client ) {
 	if ( gameLocal.isServer || gameLocal.isListenServer ) return false;
-	if ( gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) == 1 ) {
+	if ( gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) >= 1 ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon serverAdminTarget %s %d %u", operation, client,
 			static_cast<unsigned>( gameLocal.GetSpawnId( gameLocal.entities[ client ] ) ) ) );
 	} else {

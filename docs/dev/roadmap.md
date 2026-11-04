@@ -1475,6 +1475,12 @@ archived provenance; new scheduling belongs here.
   passed-vote delay; a mixed vote applies none of its other changes.
   Vote requests before server admission, retained kick-choice drafts,
   Match Control rows and the wider device/platform matrix remain open.
+  Progress, 4 November: [kick choice, draft and request identity](ui/player-identity.md#kick-choice-draft-and-request-identity-4-november-2026)
+  binds the retained choice to its ordered connection catalog and freezes that
+  catalog with queued selections. A departed target blocks the entire draft
+  until explicitly selected again or cleared. Both kick-request transports
+  carry the selected identity and reject stale requests before server admission.
+  Match Control rows and broader remote/device/platform qualification remain.
 - [ ] **UI-04 — P1, implementation and qualification: full GUI corpus migration.**
   Finish all HUD, wrist/comms, scope, vehicle, cinematic, terminal/world and scripted
   surfaces with source-bound retained lowering. Preserve legacy grouping/remainder
@@ -1594,6 +1600,12 @@ archived provenance; new scheduling belongs here.
   SP/OpenGL English and MP/Vulkan French gameplay checks pass, with all 14 final
   engine captures reviewed. Existing late-precache warnings remain. This does not complete shaping,
   legacy text escapes, live IME, world output, the editor or toolkit acceptance.
+  Progress, 4 November: [choice catalog contexts](ui/player-identity.md#kick-choice-draft-and-request-identity-4-november-2026)
+  extend the subject lifetime to choices independently of their selected value.
+  Same-label catalog changes close the popup and cancel held or queued proposals,
+  including ABA changes and restoration. The production kick choice freezes that
+  catalog through dispatch. Native and GL/Vulkan gameplay checks pass; full
+  toolkit and device/platform acceptance remain open.
 - [x] **UI-10 — P0, investigation and implementation: refresh effective scope and
   source inventory.** Completed [retail/base/Awakening inventory](ui/inventory-report.md):
   264/276/324 effective paths, 358 distinct source/include-bound variants, 18

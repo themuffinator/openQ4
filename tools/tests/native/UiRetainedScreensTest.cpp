@@ -345,7 +345,7 @@ static void CheckSessionActions(const Document& document) {
 			verb == "mpAdminSelect" || verb == "mpAdminKick" || verb == "mpAdminBan" || verb == "mpAdminSwitch";
 		const bool save = verb == "loadSelect" || verb == "saveSelect" || verb == "loadSave" || verb == "loadDelete";
 		Check(!save || (action.arguments.at("index").type == 0 && action.arguments.at("generation").type == 0),"save command carries catalog operands");
-		Check(action.arguments.size() == (player || save ? 3u : value ? 2u : 1u),"command carries exactly its typed operands");
+		Check(action.arguments.size() == (player || save || verb == "mpVoteKick" ? 3u : value ? 2u : 1u),"command carries exactly its typed operands");
 		Check(!player || (action.arguments.at("client").type == 0 && action.arguments.at("identity").type == 2),"player command carries client and connection identity");
 		Check((value ? SessionValueCommands : SessionCommands).contains(std::get<std::string>(command->second.literal)),
 			"every command is in the session allowlist");
@@ -713,6 +713,7 @@ static void CheckVote(ScreenHost& host, const char* path) {
 		Check(runtime.ResolveAction(actions[0].action,invocation,error,&*actions[0].proposal) &&
 			invocation.operation == "session.menuValue" && std::get<std::string>(invocation.arguments.at("command")) == verb,
 			"with the value verb");
+		if (std::string(verb)=="mpVoteKick") Check(std::get<std::string>(invocation.arguments.at("catalog"))=="0,1:4097,2:4098","kick row freezes its connection catalog");
 		runtime.AcknowledgeControlProposal(actions[0].node,actions[0].proposalToken,true);
 		return invocation.arguments.at("value");
 	};
@@ -728,7 +729,7 @@ static void CheckVote(ScreenHost& host, const char* path) {
 		{"mp.vote.map2",std::string("Bloodwork")},{"mp.vote.map",1.0},{"mp.vote.gametype_count",12.0},
 		{"mp.vote.gametype2",std::string("Team DM")},{"mp.vote.gametype",2.0},{"mp.vote.timelimit",10.0},{"mp.vote.fraglimit",20.0},
 		{"mp.vote.balance",true},{"mp.vote.shuffle",false},{"mp.vote.restart",false},{"mp.vote.buying",false},
-		{"mp.vote.kick_count",3.0},{"mp.vote.kick0",std::string("Anderson")},{"mp.vote.kick1",std::string("Rhodes")},{"mp.vote.kick",-1.0},
+		{"mp.vote.kick_catalog",std::string("0,1:4097,2:4098")},{"mp.vote.kick_count",3.0},{"mp.vote.kick0",std::string("Anderson")},{"mp.vote.kick1",std::string("Rhodes")},{"mp.vote.kick",-1.0},
 		{"mp.vote.locked",true}};
 	const char* const keys[] = {"map","gametype","timelimit","fraglimit","capturelimit","tourneylimit","controltime","balance","shuffle",
 		"restart","buying","kick"};
@@ -789,6 +790,17 @@ static void CheckVote(ScreenHost& host, const char* path) {
 	press(MenuInput::Down,2.1);
 	press(MenuInput::Accept,2.15);
 	Check(std::get<double>(request("mpVoteKick")) == 0,"choosing a player asks for their row");
+	press(MenuInput::Right,2.2); const auto queued=runtime.TakeActions();
+	Check(queued.size()==1 && runtime.CanDispatchControlAction(queued[0],2.21),"current kick choice can dispatch");
+	Check(runtime.SetState({{"mp.vote.kick_catalog",std::string("0,1:8193,2:4098")}},error,2.22),"replace same-name player in catalog");
+	Check(!runtime.CanDispatchControlAction(queued[0],2.23),"queued production kick choice cannot follow replaced player");
+	Check(runtime.SetState({{"mp.vote.kick_catalog",std::string("0,1:4097,2:4098")}},error,2.24),"restore catalog text");
+	Check(!runtime.CanDispatchControlAction(queued[0],2.25),"catalog ABA never restores old action authority");
+	Check(runtime.OpenChoicePopup("vote-row-kick",2.3),"reopen kick choice"); runtime.Frame(viewport,2.31);
+	runtime.MenuAction(MenuInput::Accept,true,2.32);
+	Check(runtime.SetState({{"mp.vote.kick_catalog",std::string("0,1:12289,2:4098")}},error,2.33),"replace player during held choice");
+	runtime.MenuAction(MenuInput::Accept,false,2.34); runtime.Frame(viewport,2.35);
+	Check(runtime.TakeActions().empty() && !runtime.GetWidgetState("vote-row-kick")->popupOpen,"production popup closes and discards held choice");
 	// A vote runs: who called it, its lines, the time left and the tally, and
 	// Yes and No with the keys bound to them; the page opens on Yes.
 	Check(runtime.SetState({{"mp.vote.running",true},{"mp.vote.caller",std::string("CALLED BY Anderson")},

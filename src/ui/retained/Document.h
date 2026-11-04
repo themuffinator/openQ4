@@ -216,7 +216,7 @@ struct Control {
 	std::variant<std::monostate, ToggleSpec, SliderSpec, ChoiceSpec, NumberSpec, ScrollSpec> widget;
 	// Buttons only: the detail this control names (DocumentModel::detail).
 	std::optional<double> detail;
-	// Buttons may name the current subject of an activation. A changed context
+	// Buttons and choices may name the current subject/catalog of an activation. A changed context
 	// cancels a held press and invalidates queued work, even if it changes back.
 	std::optional<Expression> context;
 	// Buttons may name the verb the prompt bar shows for Accept while they hold
@@ -247,6 +247,7 @@ struct ControlReadback {
 	// options. An absent count means every option.
 	std::vector<std::string> optionLabels;
 	std::optional<std::size_t> optionCount;
+	std::optional<std::string> context; // Choice catalog identity, independent of its selected value.
 	bool operator==(const ControlReadback&) const = default;
 };
 struct ModalSpec {

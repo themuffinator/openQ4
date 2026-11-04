@@ -138,3 +138,67 @@ Control rows still need identity-bound catalog operands. Ban-list refresh,
 map-transition identity lifetimes, remote timing, physical devices and other
 platforms require further qualification. No product requirement, migration
 resource or final gate is accepted by this change.
+
+## Kick choice, draft and request identity, 4 November 2026
+
+The retained kick choice publishes an ordered catalog of client slots and
+32-bit spawn identities. Its string `context` closes the popup and cancels
+held or queued input when that catalog changes, including a replacement with
+the same player name. `session.menuValue` freezes both the proposed row and
+the catalog. The session validates their syntax; the game refreshes the catalog
+and requires an exact match before resolving the row. A row without a catalog
+cannot select a kick target.
+
+The draft retains the selected identity. Departure or replacement clears the
+selection and blocks the entire draft, including other changed fields, with
+a localized instruction to select again. Explicitly choosing a player or
+No one acknowledges that change. Returning to the page with a new draft also
+resets it. The menu-cover handshake is now `mp.protocol 4`; engine, multiplayer
+module and menu content must be installed together.
+
+The classic menu also rejects its whole draft when the cached kick subject is
+gone, rather than silently dropping the kick and submitting the other fields.
+
+Both legacy and packed kick requests append the selected 32-bit identity.
+Server admission requires exactly those four remaining bytes and a live
+matching player before starting any part of the vote. Missing, truncated,
+trailing or stale identity payloads reject the entire request. The previous
+guards still protect voting, the passed-vote delay and execution. Ordinary
+non-kick requests retain their wire shape. Console calls capture the target
+at invocation; menu callers pass the identity already held by their draft.
+
+`si_uiTargetProtocol=2` advertises kick-request identity support. Current clients
+retain version-1 mute/Admin support, but refuse remote kick requests to older
+servers; the retained Vote page explains that a server update is required.
+New servers reject older slot-only kick requests. No proprietary-DLL or retail
+network interoperability is implied.
+
+Native tests cover choice contexts, same-label replacement, held semantic and
+pointer selection, queued proposals, ABA changes, restoration, and the actual
+production Vote document. The compiled game harness exercises the real sender
+methods and admission guards, malformed identity payloads, old-server fallback,
+ordered catalog selection and draft invalidation. It isolates the kick portion
+of catalog refresh from map enumeration. The reusable windowed probe is
+`tools/ui/capture_vote_targets.py`; its engine captures and logs qualify menu
+selection and loopback slot reuse, not physical input or delayed remote traffic.
+
+Validation uses a freshly built and staged Windows x64 debugoptimized client
+and multiplayer module. All ten affected native suites pass; the adapter rejects
+all twenty mutation controls and the player-target harness rejects all ten.
+The session gate passes 1,033 checks plus its server-card, loading and prompt
+suites, including a punctuated catalog kept intact through the command boundary.
+Generation/label-fit checks cover all twelve languages; encoding, path and
+validation-workflow checks pass.
+
+OpenGL at 1280x720 in English and Vulkan at 1920x1080 in French complete the
+same-name replacement, stale mixed draft, explicit No one acknowledgement and
+fresh kick flow, then return to gameplay. All 22 final engine screenshots were
+reviewed. Neither run reports retained-UI warnings or errors. Each reports 179
+stock/bot late-precache warnings and one missing `models/monsters/burn_misc_sm`
+image warning; those asset issues remain outside this increment. Exact source,
+binary, report and capture hashes, failed attempts and cleanup status are in
+`.tmp/ui-vote-targets/validation-evidence.json`.
+
+Match Control rows, ban-list refresh, map-transition identity lifetimes,
+remote timing, physical devices and other platforms still need qualification.
+No product requirement, migration resource or final gate is accepted here.

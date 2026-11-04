@@ -525,6 +525,7 @@ jobs:
             tools/tests/ui_player_targets.py \
             tools/ui/capture_player_identity.py \
             tools/ui/capture_text_queries.py \
+            tools/ui/capture_vote_targets.py \
             tools/ui/capture_save_browser.py \
             tools/tests/ui_stock_level_load.py \
             tools/ui/build_retained_screens.py \

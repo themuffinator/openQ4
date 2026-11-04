@@ -6,6 +6,15 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Kick votes keep their selected player, 4 November 2026
+
+- A changing player list can no longer redirect a retained kick choice or a
+  delayed kick-vote request to someone who reused the connection slot.
+- If the selected player leaves, the Vote page asks you to select again.
+  Other drafted changes wait too, so a mixed vote cannot silently lose its kick.
+- Install matching engine, multiplayer module and menus. Remote kick votes
+  require an updated server; ordinary non-kick votes keep their existing format.
+
 ## Retained interface text queries, 4 November 2026
 
 - Interface authors can request localized key-binding labels and measure how

@@ -306,13 +306,17 @@ static void ButtonContexts() {
 	Check(state.Reset(document.Model(),error) && state.Set({{"subject",std::string("8193")}},error) &&
 		state.ControlValues().at("button").value == StateValue(std::string("8193")),"button context evaluates a typed subject");
 	Check(state.Set({{"subject",std::string("16385")}},error) && state.ControlValues().at("button").value == StateValue(std::string("16385")),"button context follows authoritative state");
+	source["root"]["children"][2]["control"]["context"] = Ref("subject");
+	Load(document,source);
+	Check(state.Reset(document.Model(),error) && state.Set({{"subject",std::string("catalog-a")}},error) &&
+		state.ControlValues().at("choice").context == std::optional<std::string>("catalog-a"),"choice catalog evaluates separately from selected value");
 	for (int invalid = 0; invalid < 3; ++invalid) {
 		auto bad = source;
 		if (invalid == 0) bad["root"]["children"][3]["control"]["context"] = Ref("brightness");
 		if (invalid == 1) bad["root"]["children"][3]["control"]["context"] = Ref("absent");
 		if (invalid == 2) bad["root"]["children"][0]["control"]["context"] = Ref("subject");
 		std::vector<Diagnostic> diagnostics;
-		Check(!document.Load(Text(bad),diagnostics) && !diagnostics.empty(),"context rejects wrong types, absent state and non-buttons");
+		Check(!document.Load(Text(bad),diagnostics) && !diagnostics.empty(),"context rejects wrong types, absent state and unsupported control roles");
 	}
 }
 int main() {

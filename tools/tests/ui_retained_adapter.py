@@ -1356,7 +1356,12 @@ static void CheckEventBridge() {
     const auto valued=[](const char* command,StateValue value) {
         return ActionInvocation{"x","session.menuValue",{{"command",std::string(command)},{"value",value}}};
     };
-    assert(ValidInvocation(valued("mpVoteMap",3.0),error) && ValidInvocation(valued("mpVoteKick",-1.0),error));
+    assert(ValidInvocation(valued("mpVoteMap",3.0),error) && !ValidInvocation(valued("mpVoteKick",-1.0),error));
+    auto kickChoice=valued("mpVoteKick",-1.0);kickChoice.arguments["catalog"]=std::string("0,31:8191");
+    assert(ValidInvocation(kickChoice,error));
+    for(const auto& bad:{std::string(""),std::string("0;quit"),std::string("0\nquit"),std::string(513,'0')}) {
+        kickChoice.arguments["catalog"]=bad;assert(!ValidInvocation(kickChoice,error));
+    }
     assert(ValidInvocation(valued("mpVoteControlTime",999.0),error) && ValidInvocation(valued("mpVoteBalance",true),error));
     // A Match Control rule's value is a whole number from 0 to 10000, the
     // largest value a rule takes; the other verbs keep -1 to 999.

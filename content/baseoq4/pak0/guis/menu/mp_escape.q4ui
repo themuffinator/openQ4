@@ -1101,6 +1101,7 @@
   "mp.vote.kick30": {"type": "string", "initial": ""},
   "mp.vote.kick31": {"type": "string", "initial": ""},
   "mp.vote.kick_count": {"type": "number", "initial": 0},
+  "mp.vote.kick_catalog": {"type": "string", "initial": ""},
   "mp.vote.call.shown": {"type": "boolean", "initial": false},
   "mp.vote.call.available": {"type": "boolean", "initial": false},
   "mp.vote.call.label": {"type": "string", "initial": ""},
@@ -2483,7 +2484,7 @@
   "mpVoteKick": {
    "operation": "session.menuValue",
    "input": "number",
-   "arguments": {"command": "mpVoteKick", "value": {"input": "value"}}
+   "arguments": {"command": "mpVoteKick", "value": {"input": "value"}, "catalog": {"state": "mp.vote.kick_catalog"}}
   },
   "mpCallVote": {"operation": "session.menu", "arguments": {"command": "mpCallVote"}},
   "mpMatch": {"operation": "session.menu", "arguments": {"command": "mpMatch"}},
@@ -187663,7 +187664,8 @@
                 "thumb": "vote-row-kick-scroll-thumb",
                 "lineStep": 22.0,
                 "minimumThumb": 24
-               }
+               },
+               "context": {"state": "mp.vote.kick_catalog"}
               }
              }
             ]

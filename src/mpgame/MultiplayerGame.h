@@ -600,7 +600,7 @@ public:
 
 	static void		Vote_f( const idCmdArgs &args );
 	static void		CallVote_f( const idCmdArgs &args );
-	void			ClientCallVote( vote_flags_t voteIndex, const char *voteValue );
+	void			ClientCallVote( vote_flags_t voteIndex, const char *voteValue, int kickIdentity = 0 );
 	void			ServerCallVote( int clientNum, const idBitMsg &msg );
 	void			ClientStartVote( int clientNum, const char *voteString );
 	void			ServerStartVote( int clientNum, vote_flags_t voteIndex, const char *voteValue );
@@ -612,7 +612,7 @@ public:
 	void			ExecuteVote( void );
 // RAVEN BEGIN
 // shouchard:  multiline vote handlers
-	void			ClientCallPackedVote( const voteStruct_t &voteData );
+	void			ClientCallPackedVote( const voteStruct_t &voteData, int kickIdentity = 0 );
 	void			ServerCallPackedVote( int clientNum, const idBitMsg &msg );
 	void			ClientStartPackedVote( int clientNum, const voteStruct_t &voteData );
 	void			ServerStartPackedVote( int clientNum, const voteStruct_t &voteData );
@@ -1310,6 +1310,10 @@ private:
 	idStr			retainedVoteMap;
 	idList<int>		retainedVoteMaps;
 	idList<int>		retainedVoteKick;
+	idStr			retainedVoteKickCatalog;
+	int				retainedVoteKickIdentity = 0;
+	bool			retainedVoteKickStale = false;
+	bool			SetRetainedVoteKick( int row, const char *catalog );
 	bool			retainedVoteMapsRequested;
 	void			ResetRetainedVoteDraft( void );
 	void			RetainedVoteChoices( void );

@@ -1212,7 +1212,7 @@ private:
 			if (role == "button") Fields(control,p,{"role","action","event","label","enabled","states","navigation","detail","context","prompt","extensions"});
 			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","extensions"});
 			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
-			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","parts","visibleRows","options","optionCount","scrollbar","placementBounds","extensions"});
+			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","context","parts","visibleRows","options","optionCount","scrollbar","placementBounds","extensions"});
 			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","integer","decimals","maxBytes","parts","extensions"});
 			else if (role == "text") Fields(control,p,{"role","action","label","enabled","states","navigation","value","maxBytes","allowEmpty","masked","parts","extensions"});
 			else if (role == "scrollbar") Fields(control,p,{"role","label","enabled","states","navigation","viewport","orientation","lineStep","minimumThumb","parts","extensions"});
@@ -1224,7 +1224,7 @@ private:
 			parsed.label = ControlLabel(control["label"],p+"/label");
 			if (control.isMember("context")) {
 				parsed.context = ReadExpression(control["context"],p+"/context");
-				Require(parsed.context->type == 2,control["context"],p+"/context","Button context must be a string");
+				Require(parsed.context->type == 2,control["context"],p+"/context","Control context must be a string");
 			}
 			if (control.isMember("prompt")) {
 				parsed.prompt = ReadExpression(control["prompt"],p+"/prompt");

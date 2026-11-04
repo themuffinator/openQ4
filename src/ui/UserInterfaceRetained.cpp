@@ -393,6 +393,13 @@ std::optional<int> SessionMenuValue(const std::string& command, const StateValue
 	return static_cast<int>(number);
 }
 
+// A kick choice carries the exact ordered connection catalog that produced its row.
+bool ValidVoteCatalog(const std::string& text) {
+	return !text.empty() && text.size() <= 512 && std::all_of(text.begin(),text.end(),[](char c) {
+		return (c >= '0' && c <= '9') || c == ':' || c == ',';
+	});
+}
+
 bool ValidOperation(const Action& action) {
 	if (action.operation == "player.setup.apply") return ValidPlayerSetupAction(action);
 	if (action.operation.starts_with("settings.system.")) { std::string error; return UI_SettingsOperation(action,error); }
@@ -441,11 +448,14 @@ bool ValidOperation(const Action& action) {
 	if (action.operation == "session.menuValue") {
 		// A literal value verb, and the control's own value as its operand.
 		const auto command = action.arguments.find("command"), value = action.arguments.find("value");
-		if (action.arguments.size() != 2 || command == action.arguments.end() || value == action.arguments.end() ||
+		if (command == action.arguments.end() || value == action.arguments.end() ||
 			command->second.type != 2 || !value->second.inputValue || (value->second.type != 0 && value->second.type != 1)) return false;
 		const auto& expression = command->second;
-		return expression.op.empty() && expression.state.empty() && expression.presentation.empty() && !expression.inputValue &&
-			SessionMenuValueCommand(std::get<std::string>(expression.literal));
+		if (!expression.op.empty() || !expression.state.empty() || !expression.presentation.empty() || expression.inputValue ||
+			!SessionMenuValueCommand(std::get<std::string>(expression.literal))) return false;
+		const auto catalog = action.arguments.find("catalog");
+		return std::get<std::string>(expression.literal) == "mpVoteKick" ?
+			action.arguments.size() == 3 && catalog != action.arguments.end() && catalog->second.type == 2 : action.arguments.size() == 2;
 	}
 	const auto value = action.arguments.find("value");
 	if (action.arguments.size() != 1 || value == action.arguments.end()) return false;
@@ -491,9 +501,15 @@ bool ValidInvocation(const ActionInvocation& invocation, std::string& error) {
 	}
 	if (invocation.operation == "session.menuValue") {
 		const auto command = invocation.arguments.find("command"), value = invocation.arguments.find("value");
-		if (invocation.arguments.size() == 2 && command != invocation.arguments.end() && value != invocation.arguments.end() &&
+		if (command != invocation.arguments.end() && value != invocation.arguments.end() &&
 			std::holds_alternative<std::string>(command->second) && SessionMenuValueCommand(std::get<std::string>(command->second)) &&
-			SessionMenuValue(std::get<std::string>(command->second),value->second)) return true;
+			SessionMenuValue(std::get<std::string>(command->second),value->second)) {
+			const auto catalog = invocation.arguments.find("catalog");
+			if (std::get<std::string>(command->second) == "mpVoteKick") {
+				if (invocation.arguments.size() == 3 && catalog != invocation.arguments.end() &&
+					std::holds_alternative<std::string>(catalog->second) && ValidVoteCatalog(std::get<std::string>(catalog->second))) return true;
+			} else if (invocation.arguments.size() == 2) return true;
+		}
 		error = "Unsupported session value request: "+invocation.action; return false;
 	}
 	const auto value = invocation.arguments.find("value");
@@ -1732,7 +1748,9 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 		if (invocation.operation == "session.menuValue") {
 			// Validated again at resolution; the session reads "<verb> <value>".
 			const auto value = SessionMenuValue(std::get<std::string>(invocation.arguments.at("command")),invocation.arguments.at("value"));
-			const auto request = std::get<std::string>(invocation.arguments.at("command"))+" "+std::to_string(value.value_or(0));
+			auto request = std::get<std::string>(invocation.arguments.at("command"))+" "+std::to_string(value.value_or(0));
+			if (const auto catalog = invocation.arguments.find("catalog"); catalog != invocation.arguments.end())
+				request += " " + std::get<std::string>(catalog->second);
 			const bool accepted = value && impl->sessionRequests.size() < 64;
 			if (accepted) impl->sessionRequests.push_back(request);
 			else impl->Error(value ? "Session menu request queue exceeded 64 requests" : "Session value request out of range");

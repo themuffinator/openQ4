@@ -133,7 +133,7 @@ static const char *const RETAINED_MP_ESCAPE_GUI = "guis/menu/mp_escape.q4ui";
 static const char *const RETAINED_MP_WELCOME_GUI = "guis/menu/mp_welcome.q4ui";
 // The version of the game's answer to retainedMultiplayerCover that the card
 // relies on; a game module without it keeps its stock menu.
-static const int RETAINED_MP_PROTOCOL = 3;
+static const int RETAINED_MP_PROTOCOL = 4;
 // Each card's pages that still hand off to their stock pages: none now. While
 // any remain, the gate leaves that card's stock menu in place and only
 // ui_retainedMultiplayer opts into it. ui_retained_gate.py keeps each list
@@ -11234,6 +11234,19 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		// cannot cast keeps it open.
 		command = !idStr::Icmp( request, "mpVoteYes" ) ? "play main_menu_selection ; retained vote yes" :
 			"play main_menu_selection ; retained vote no";
+	} else if ( !idStr::Icmpn( request, "mpVoteKick ", 11 ) ) {
+		const idStr operands = request + 11;
+		const int separator = operands.Find( ' ' );
+		const idStr row = separator >= 0 ? operands.Left( separator ) : idStr();
+		const idStr catalog = separator >= 0 ? operands.Right( operands.Length() - separator - 1 ) : idStr();
+		bool valid = row == "-1" || ( row.Length() >= 1 && row.Length() <= 2 );
+		for ( int i = 0; valid && row != "-1" && i < row.Length(); ++i ) valid = row[i] >= '0' && row[i] <= '9';
+		valid = valid && atoi( row.c_str() ) < RETAINED_MP_CLIENTS && catalog.Length() >= 1 && catalog.Length() <= 512;
+		for ( int i = 0; valid && i < catalog.Length(); ++i ) valid = ( catalog[i] >= '0' && catalog[i] <= '9' ) || catalog[i] == ':' || catalog[i] == ',';
+		if ( !valid ) return;
+		// The game command lexer splits commas and colons outside quotes.
+		gameCommand = va( "retained voteKick %s \"%s\"", row.c_str(), catalog.c_str() );
+		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpCallVote" ) ) {
 		command = "play main_menu_selection ; retained callVote";
 	} else if ( Session_RetainedValueRequest( request, RETAINED_MP_VOTE_FIELDS,
