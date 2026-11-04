@@ -165,7 +165,9 @@ bool Sweep(trace_t& trace,const idVec3& start,const idVec3& end,const idTraceMod
             float a=(lo-origin)/speed,z=(hi-origin)/speed;
             float sign=-1;
             if (a>z) { std::swap(a,z); sign=1; }
-            if (a>enter) { enter=a; normal=axis*sign; }
+            // A sweep starting exactly on a face still reports that face's
+            // normal when moving into it, as the engine collision trace does.
+            if (a>enter || (a==enter && normal.LengthSqr()==0)) { enter=a; normal=axis*sign; }
             leave=std::min(leave,z);
             if (enter>leave) { missed=true; break; }
         }
@@ -655,6 +657,14 @@ int main() {
         solids.clear(); Platform(24,1024,0.5f);
         CHECK(!nav.AirInputLandingSafe({0,0,0},{500,0,0},{},inf));
         CHECK(nav.AirInputLandingSafe({0,0,1},{500,0,0},{},inf));
+        // A descending player close to a floor can air-step onto a raised
+        // lip. The full step keeps horizontal momentum, including overshoot.
+        solids.clear(); Platform(-1024,24,0); Platform(24,1024,12);
+        idVec3 stepped;
+        CHECK(nav.AirInputLandingSafe({0,0,8},{500,0,-20},{},inf,&stepped));
+        CHECK(stepped.z>11 && stepped.x>8);
+        solids.clear(); Platform(-1024,24,0); Platform(24,40,12);
+        CHECK(!nav.AirInputLandingSafe({0,0,8},{500,0,-20},{},inf));
         // Knockback can carry a grounded player beyond its ordinary stopping
         // reserve before friction returns. Follow the coast to the next floor.
         solids.clear(); Platform(-1024,0,0);

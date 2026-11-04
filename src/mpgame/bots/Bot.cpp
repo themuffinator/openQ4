@@ -4966,6 +4966,24 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 		if ( !airRecoverLanded ) {
 			airRecoverLanded = gameLocal.time;
 		}
+		const idVec3 origin = self->GetPhysics()->GetOrigin();
+		const idVec3 flat( velocity.x, velocity.y, 0.0f );
+		const idVec3 stop = origin + flat * ( MS2SEC( gameLocal.GetMSec() ) +
+			speed / ( 20.0f * Max( 1.0f, pm_speed.GetFloat() ) ) );
+		idVec3 supported;
+		if ( !navMesh.LandingContinuationClear( origin, origin ) &&
+			navMesh.RecoveryStepClear( origin, stop, &supported ) ) {
+			// The air proof may admit a rim only because forward momentum
+			// reaches full support. Braking before that point cancels the very
+			// continuation it proved and can drop the hull off the corner.
+			idVec3 inward = supported - origin;
+			inward.z = 0.0f;
+			inward.Normalize();
+			ApplyMove( inward, cmd );
+			cmd.upmove = 0;
+			stuckTime = gameLocal.time;
+			return true;
+		}
 		if ( speed <= BOT_AIR_RECOVER_STOP_SPEED || gameLocal.time - airRecoverLanded > BOT_AIR_RECOVER_RUNOUT_MSEC ) {
 			airRecovering = false;
 			return false;

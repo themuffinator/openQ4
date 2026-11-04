@@ -67,6 +67,23 @@ def check(condition: bool, message: str) -> None:
 
 def main() -> None:
     teams = {1: 0, 2: 1, 3: 0}
+    pellet = ("BOT_IMPULSE client=1 time=2000 attacker=2 damage=10 origin=1 2 3 "
+              "kick=50 0 0 velocity={velocity} 0 0 def=damage_pellet health={health} knock=50\n")
+    shot = pellet.format(velocity=100, health=90) + pellet.format(velocity=150, health=80)
+    [burst] = classify(state(1000, teams) + shot + death("Cortez", 4500))
+    check(burst["impulse"]["damage"] == 20 and burst["impulse"]["kick"] == [100, 0, 0] and
+          len(burst["impulse"]["pellets"]) == 2 and not burst["earlier_candidates"],
+          "one accounted shotgun burst is one cause, retaining both pellets")
+    before = [t for t in policy.trials_for(burst["impulse"]) if t.get("counterfactual")]
+    check("50.000 0.000 0.000" in before[0]["command"] and before[0]["setup"] == ["bot_probeHealth 1 100"],
+          "counterfactual removes the entire shotgun kick and damage")
+    for changed in (shot.replace("velocity=150", "velocity=151"),
+                    shot.replace("health=80", "health=79"),
+                    shot.replace("velocity=150 0 0 def=damage_pellet", "velocity=150 0 0 def=damage_railgun"),
+                    shot.replace("origin=1 2 3 kick=50 0 0 velocity=150", "origin=2 2 3 kick=50 0 0 velocity=150")):
+        [separate] = classify(state(1000, teams) + changed + death("Cortez", 4500))
+        check(len(separate["earlier_candidates"]) == 1 and "pellets" not in separate["impulse"],
+              "unaccounted or different shots must remain separate causes")
     [chain] = classify(state(1000, teams) + impulse(1, 2000, 2) + impulse(1, 2600, 2) + death("Cortez", 4500))
     check(chain["earlier_candidates"][0]["impulse"]["time"] == 2000, "retain earlier enemy causes")
     for first, second, expected, count in [
@@ -80,6 +97,15 @@ def main() -> None:
         result = policy.replay_chain(chain, lambda c, i: policy.decide(c, [first, second][i], True))
         check(result["status"] == expected and len(result["causal_replays"]) == count,
               "earlier-cause search requires complete already-doomed trials and unchanged exclusion proof")
+    [taps] = classify(state(1000, teams) + impulse(1, 2000, 2) +
+                      "".join(impulse(1, time, 2) for time in range(2100, 3200, 100)) + death("Cortez", 4500))
+    taps["earlier_candidates"][-1]["impulse"]["kick"] = [500, 0, 0]
+    visited = []
+    def strongest(choice, attempt):
+        visited.append(choice["impulse"]["time"])
+        return policy.decide(choice, outcomes() if choice["impulse"]["time"] == 2000 else outcomes(before=None), True)
+    check(policy.replay_chain(taps, strongest)["status"] == "excluded-impulse" and visited == [3100, 2000],
+          "only after a complete doomed replay, small taps cannot exhaust the bounded search before a strong cause")
     # Positive control: enemy impulse, every decisive trial armed and fell.
     [candidate] = classify(state(1000, teams) + impulse(1, 2000, 2) + death("Cortez", 4500))
     check(candidate["status"] == "impulse-candidate" and candidate["impulse"]["attacker"] == 2,

@@ -273,7 +273,9 @@ struct Nav {
     }
     bool recoveryStepClear=false;
     int recoveryStepChecks=0;
-    bool RecoveryStepClear(const idVec3&,const idVec3&) { ++recoveryStepChecks; return recoveryStepClear; }
+    bool RecoveryStepClear(const idVec3&,const idVec3& target,idVec3* supported=nullptr) {
+        ++recoveryStepChecks; if(supported) *supported=target; return recoveryStepClear;
+    }
     bool LandingContinuationClear(const idVec3&,const idVec3&) { return continuationClear; }
     int TransportAt(const idBounds&) const { return transport; }
     std::vector<std::pair<int,float>> volumesAhead;
@@ -1048,6 +1050,12 @@ void TestAirRecovery() {
     CHECK(!bot.RecoverInAir(&self,cmd) && !bot.airRecovering && cmd.rightmove==0);
     rvBot slow; slow.airRecovering=true; self.physics.velocity={0,-40,0};
     CHECK(!slow.RecoverInAir(&self,cmd) && !slow.airRecovering);
+    rvBot rim; rim.airRecovering=true; self.physics.velocity={200,-400,0};
+    navMesh.continuationClear=false; navMesh.recoveryStepClear=true; cmd={};
+    CHECK(rim.RecoverInAir(&self,cmd) && cmd.forwardmove>0 && cmd.rightmove>0);
+    navMesh.recoveryStepClear=false; cmd={};
+    CHECK(rim.RecoverInAir(&self,cmd) && cmd.forwardmove<0 && cmd.rightmove<0);
+    navMesh.continuationClear=true;
     // A knock that turns the walk into the route's drop (q4ctf5): the drop's
     // landing is out of reach, so the route gives way to the brake.
     self.pfl.onGround=false; self.physics.velocity={397,-433,38}; airLandingUnsafe=true; cmd={};

@@ -114,6 +114,8 @@ def main() -> None:
         assert result.returncode != 0, "late knocked-coast ownership mutation escaped"
         print("Knocked coast: late-ownership mutation rejected")
         for label, anchor, replacement in (
+            ("supported rim continuation", "navMesh.RecoveryStepClear( origin, stop, &supported )",
+             "false && navMesh.RecoveryStepClear( origin, stop, &supported )"),
             ("grounded knock coast", "if ( !airRecovering && self->pfl.onGround && !transported && !traversalStarted &&",
              "if ( false && !airRecovering && self->pfl.onGround && !transported && !traversalStarted &&"),
             ("low-speed edge brake", "moveDir *= Min( 1.0f, speed / Max( 1.0f, pm_speed.GetFloat() ) );",

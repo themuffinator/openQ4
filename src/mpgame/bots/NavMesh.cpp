@@ -1076,6 +1076,28 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			velocity += gravity * dt;
 			continue;
 		}
+		if ( idMath::Fabs( trace.c.normal.z ) < 0.01f ) {
+			// MP AirMove may step over a lip while close to a floor, including
+			// while descending. Keep the remaining displacement and momentum
+			// on a full up/across/down success, as player SlideMove does.
+			const idVec3 lift( 0.0f, 0.0f, pm_stepsize.GetFloat() );
+			trace_t ground, up, across, down;
+			if ( !NavAgentTranslation( ground, trace.endpos, trace.endpos - lift ) &&
+				 ground.c.normal.z > NAV_WALKABLE_NORMAL_Z ) {
+				NavAgentTranslation( up, trace.endpos, trace.endpos + lift );
+				NavAgentTranslation( across, up.endpos, up.endpos + next - trace.endpos );
+				NavAgentTranslation( down, across.endpos, across.endpos - lift );
+				if ( across.fraction >= 1.0f &&
+					( down.fraction >= 1.0f || down.c.normal.z > NAV_WALKABLE_NORMAL_Z ) ) {
+					position = down.endpos;
+					velocity += gravity * dt;
+					continue;
+				}
+				if ( across.fraction > trace.fraction ) {
+					return false;	// a partial step needs additional collision planes
+				}
+			}
+		}
 		if ( trace.c.normal.z >= NAV_WALKABLE_NORMAL_Z && velocity * gravity > 0.0f ) {
 			if ( touchdown ) {
 				*touchdown = trace.endpos;

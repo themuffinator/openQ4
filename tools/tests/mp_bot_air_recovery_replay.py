@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay DM8 recovery failures and their surviving controls from 3 November.
+"""Replay DM8/CTF5 recovery failures and surviving controls from 3 November.
 
 The later Rhodes pose is the rounded BOT_AIR_RECOVER observation, not a full
 match snapshot. Voss's rocket state is the recorded BOT_IMPULSE observation.
@@ -23,6 +23,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--runtime-dir", type=Path, default=ROOT / ".install")
     parser.add_argument("--port", type=int, default=29080)
+    parser.add_argument("--map", choices=("all", "dm8", "ctf5"), default="all")
     args = parser.parse_args()
     runtime, output = args.runtime_dir.resolve(), args.output_dir.resolve()
     if output.exists():
@@ -49,16 +50,41 @@ def main() -> int:
          "setup": ["bot_probeHealth 1 53 134"],
          "command": f"bot_probeAir 1 {pose} 0 1 0"},
     ]
+    pose = "103.247 -656.602 328.250 -172.655 -590.704 333.543"
+    trials += [
+        {"name": "raised_lip_controller", "decisive": True, "expect_survival": True,
+         "setup": ["bot_probeHealth 1 18 180"],
+         "command": f"bot_probeMove 1 {pose} 103.247 -656.602 328.250"},
+        {"name": "raised_lip_northeast", "decisive": True, "expect_survival": True,
+         "setup": ["bot_probeHealth 1 18 180"],
+         "command": f"bot_probeAir 1 {pose} 0.7071 0.7071 0"},
+    ]
     executable = "openQ4-client_x64.exe" if os.name == "nt" else "openQ4-client_x64"
+    pose = "350.388 1160.896 0.250 184.511 -712.429 -33.655"
+    ctf_trials = [
+        {"name": "rim_controller", "decisive": True, "expect_survival": True,
+         "setup": ["bot_probeHealth 1 14 200"],
+         "command": f"bot_probeMove 1 {pose} 350.388 1160.896 0.250"},
+        {"name": "rim_northeast", "decisive": True, "expect_survival": True,
+         "setup": ["bot_probeHealth 1 14 200"],
+         "command": f"bot_probeAir 1 {pose} 0.3827 0.9239 0"},
+    ]
     identity = replay_identity(runtime, executable)
-    complete, log, code = replay_session(runtime, executable, args.basepath.resolve(), output,
-                                         "mp/q4dm8", "DM", trials, args.port, 300)
-    outcomes = assess_trials(log, trials)
+    complete, outcomes, codes = True, [], {}
+    for name, game_map, mode, cases in (("dm8", "mp/q4dm8", "DM", trials),
+                                        ("ctf5", "mp/q4ctf5", "CTF", ctf_trials)):
+        if args.map not in ("all", name):
+            continue
+        done, log, code = replay_session(runtime, executable, args.basepath.resolve(), output / name,
+                                         game_map, mode, cases, args.port, 350)
+        complete = complete and done
+        codes[name] = code
+        outcomes += [{**trial, "map": game_map} for trial in assess_trials(log, cases)]
     unchanged = replay_identity(runtime, executable) == identity
     passed = complete and unchanged and all(
         trial["armed"] and (trial["survived"] if trial["expect_survival"] else trial["died"])
         for trial in outcomes)
-    report = {"passed": passed, "complete": complete, "exit_code": code,
+    report = {"passed": passed, "complete": complete, "exit_codes": codes,
               "runtime_identity": identity, "runtime_unchanged": unchanged, "trials": outcomes}
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"passed": passed, "trials": [

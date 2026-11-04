@@ -139,6 +139,29 @@ def classify(clean: str, names: set[str], gametype: str, window_msec: int = IMPU
                  "health": int(m.group(15)) if m.group(15) else None,
                  "knock_msec": int(m.group(16)) if m.group(16) else None, "offset": m.start()}
                 for m in IMPULSE.finditer(clean)]
+    # One shotgun shot applies several pellets before physics advances. Replay
+    # its complete kick, not every intermediate pellet as a separate cause.
+    # Require a contiguous same-attacker/pose/definition chain whose logged
+    # velocity and health changes account for the next pellet exactly (within
+    # the three-decimal velocity log precision). Keep every component as evidence.
+    grouped = []
+    for impulse in impulses:
+        previous = grouped[-1] if grouped else None
+        same_shot = (previous is not None and impulse["def"].startswith("damage_pellet") and
+                     all(previous[key] == impulse[key] for key in
+                         ("client", "time", "attacker", "origin", "def", "knock_msec")) and
+                     previous["health"] is not None and impulse["health"] is not None and
+                     previous["health"] - impulse["damage"] == impulse["health"] and
+                     all(abs(previous["velocity"][axis] + impulse["kick"][axis] - impulse["velocity"][axis]) < 0.01
+                         for axis in range(3)))
+        if same_shot:
+            pellets = previous.get("pellets", [{k: v for k, v in previous.items() if k != "offset"}])
+            grouped[-1] = {**impulse, "damage": previous["damage"] + impulse["damage"],
+                           "kick": [previous["kick"][axis] + impulse["kick"][axis] for axis in range(3)],
+                           "pellets": pellets + [{k: v for k, v in impulse.items() if k != "offset"}]}
+        else:
+            grouped.append(impulse)
+    impulses = grouped
     deaths = world_deaths(clean, names)
     results = []
     for index, death in enumerate(deaths):
@@ -298,10 +321,14 @@ def replay_chain(candidate: dict, run) -> dict:
 
     A surviving input, missing trial or incomplete session never permits a
     fallback. Every attempted cause still needs the unchanged exclusion proof.
+    After that gate, test the strongest earlier kicks first: a stream of taps
+    during an already-lost rocket flight must not consume the whole search.
     """
     attempts = []
-    choices = [candidate] + [{**candidate, **earlier}
-                             for earlier in candidate.get("earlier_candidates", [])[:8]]
+    earlier = sorted(candidate.get("earlier_candidates", []), key=lambda row:
+        (sum(component * component for component in row["impulse"]["kick"]), row["impulse"]["time"]),
+        reverse=True)
+    choices = [candidate] + [{**candidate, **row} for row in earlier[:8]]
     for attempt, choice in enumerate(choices):
         result = run(choice, attempt)
         attempts.append({k: v for k, v in result.items() if k != "earlier_candidates"})

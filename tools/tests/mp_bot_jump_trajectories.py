@@ -98,6 +98,13 @@ def main() -> None:
         result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
         assert result.returncode != 0, "omitted friction-free slide mutation escaped"
         print("Grounded knockback: omitted slide mutation rejected")
+        anchor = "if ( idMath::Fabs( trace.c.normal.z ) < 0.01f )"
+        assert fixture.count(anchor) == 1
+        cpp.write_text(fixture.replace(anchor, "if ( false && idMath::Fabs( trace.c.normal.z ) < 0.01f )"), encoding="utf-8")
+        subprocess.run(command, cwd=path, check=True)
+        result = subprocess.run([str(exe)], cwd=path, capture_output=True, text=True)
+        assert result.returncode != 0, "missing air-step mutation escaped"
+        print("Descending recovery: missing air-step mutation rejected")
         mutated = fixture.replace("!RecoveryStepClear( trace.endpos, stop, &supportedOrigin )", "true")
         assert mutated != fixture
         cpp.write_text(mutated, encoding="utf-8")
