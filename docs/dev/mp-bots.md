@@ -259,6 +259,57 @@ original moving-player departures and Kane's older CTF3 missed-pad departure
 are not claimed as exact reproductions. Final-build long matches, all 33 map
 variants and controlled timing remain required.
 
+### Wall-arrested landings and settled braking, 4 November 2026
+
+The `5bd8dff11` four-map repeat meets every duration gate (274.560–275.888
+simulated seconds), with 273 kills, 515 traversals and eleven raw world deaths.
+Exact-state replay leaves two unresolved deaths: Kane's CTF5 wall landing and
+a DM8 enemy-rocket/self-splash sequence. The 33-variant catalog retains 439
+kills, 602 traversals and three raw deaths, all classified as enemy impulses.
+The reports remain in `.tmp/mp02-falls/long-guard-standard/` and
+`catalog-guard/`; `assessment-ordered.json` preserves the derived assessments.
+These are historical stage results, not qualification of the following fix.
+
+Equal-strength machine-gun hits were ordered by rounding noise in their logged
+vectors, sometimes choosing an older surviving pose before the actual fatal
+hit. Earlier candidates now compare magnitude to two decimals and then recency.
+Stronger hits still come first; only a complete all-dead envelope advances the
+search, and any survivor or incomplete trial still stops it. The bounded search
+and policy-2 causal requirements are unchanged.
+
+The CTF5 controller rejected a coast whose landing runout was safely arrested
+by a wall, then braked in air and fell short of the walkway. Emergency recovery
+now admits one vertical wall collision with supported movement on both sides
+of the contact and a clear, grounded clipped remainder. A corner, lost support,
+hazard or unplanned transport still rejects it. This does not admit voluntary
+routes. The recorded pose now reaches the walkway alive at 45 health and stops
+before normal navigation resumes (`guard-failure-coast-wall-brake/`).
+
+The fixed-input replay also exposed a separate ground brake oscillation:
+full reverse acceleration alternated between 14 and -72.4 units/second and
+walked an initially safe landing off the ledge after ten seconds. Both replay
+and production recovery now scale the final brake to the remaining speed after
+friction. Production runout continues to ten units/second, matching the proof's
+final friction-only coast. Native controls integrate the actual generated
+commands at several speeds and view angles, rejecting reversal and cumulative
+drift; wall controls retain a slide-off-the-wall negative case.
+
+The positive hit suite adds the recorded controller and fixed-coast poses,
+both observed for twelve seconds. The controller must already be alive,
+grounded and stopped before its diagnostic input is released at two seconds,
+then remain alive and grounded. Causal replay never uses this release. Earlier
+fixed-input deaths may include the old brake artifact, so fresh long-match and
+complete-catalog runs on the corrected stage are required. The DM8 duel's
+original firing decision is not recorded; its self-splash is neither waived
+as an enemy impulse nor claimed fixed from the isolated post-hit failure.
+
+The corrected stop also changes subsequent roaming in the existing DM8 player
+deflection case. `hit-wall/` preserves its strict terminal-air result: it first
+lands alive, then completes a pad, jump and drop without dying. This positive
+case now uses the established requirement of at least two completed traversals
+after recovery when normal navigation has resumed. The original strict outcome
+remains in every report; death-exclusion criteria are unaffected.
+
 ## Hit-to-movement handoff, 4 November 2026
 
 The three remaining long-match falls expose two timing gaps. DM8 Strauss's
@@ -3417,7 +3468,9 @@ position, velocity and game time so a fall can be traced to the preceding
 input or hit. `bot_debug 3` adds edge-braking origins, lookahead positions, floor
 contacts and rejection reasons, plus exact accepted takeoffs and traversal-frame
 commands. `bot_debug 4` additionally logs each live predicted jump frame and
-ordinary walking frames and dodge landing decisions. `bot_probeMove` accepts the same coordinates as
+ordinary walking frames, dodge landing decisions and airborne proof rejection
+reasons. `bot_debug 5` adds each predicted airborne collision plane.
+`bot_probeMove` accepts the same coordinates as
 `bot_probeJump` but installs an ordinary walking leg for isolated impulse
 investigations, under the same local-server restrictions;
 `navmesh probe` reports the full-hull and support-

@@ -365,10 +365,13 @@ def replay_chain(candidate: dict, run) -> dict:
     fallback. Every attempted cause still needs the unchanged exclusion proof.
     After that gate, test the strongest earlier kicks first: a stream of taps
     during an already-lost rocket flight must not consume the whole search.
+    Logged vectors have three decimal places. Group their sub-centimetre
+    magnitude noise so equal-strength hits retain reverse chronological order.
     """
     attempts = []
     earlier = sorted(candidate.get("earlier_candidates", []), key=lambda row:
-        (sum(component * component for component in row["impulse"]["kick"]), row["impulse"]["time"]),
+        (round(math.sqrt(sum(component * component for component in row["impulse"]["kick"])), 2),
+         row["impulse"]["time"]),
         reverse=True)
     choices = [candidate] + [{**candidate, **row} for row in earlier[:8]]
     for attempt, choice in enumerate(choices):

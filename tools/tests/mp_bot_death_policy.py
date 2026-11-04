@@ -109,6 +109,19 @@ def main() -> None:
         return policy.decide(choice, outcomes() if choice["impulse"]["time"] == 2000 else outcomes(before=None), True)
     check(policy.replay_chain(taps, strongest)["status"] == "excluded-impulse" and visited == [3100, 2000],
           "only after a complete doomed replay, small taps cannot exhaust the bounded search before a strong cause")
+    # Equal machine-gun kicks logged to three decimals differ in squared
+    # magnitude by roundoff. Do not skip the newer hit for the largest error.
+    equal = dict(chain)
+    equal["earlier_candidates"] = [
+        {"impulse": {**chain["impulse"], "time": 2200, "kick": [7.835, 34.045, -2.137]}},
+        {"impulse": {**chain["impulse"], "time": 2100, "kick": [17.299, 30.311, -2.648]}},
+    ]
+    visited = []
+    def same_strength(choice, attempt):
+        visited.append(choice["impulse"]["time"])
+        return policy.decide(choice, outcomes(survivor="controller") if attempt else outcomes(before=None), True)
+    check(policy.replay_chain(equal, same_strength)["status"] == "navigation" and visited == [2600, 2200],
+          "rounded equal-strength kicks use recency and still stop at a survivor")
     # Positive control: enemy impulse, every decisive trial armed and fell.
     [candidate] = classify(state(1000, teams) + impulse(1, 2000, 2) + death("Cortez", 4500))
     check(candidate["status"] == "impulse-candidate" and candidate["impulse"]["attacker"] == 2,

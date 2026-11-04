@@ -122,6 +122,8 @@ def main() -> None:
         assert result.returncode != 0, "rim-recovery rejection mutation escaped"
         print("Inward rim landing: old rejection mutation failed")
         for label, anchor, replacement in (
+            ("wall-arrested recovery", "if ( !NavAgentTranslation( across, position, next ) ) {\n\t\t\t// A vertical wall",
+             "if ( !NavAgentTranslation( across, position, next ) ) { return false;\n\t\t\t// A vertical wall"),
             ("rim braking continuation", "*brakedAffordable = RecoveryBrakeClear( trace, flat, dt * ( 1.0f - trace.fraction ),",
              "*brakedAffordable = false && RecoveryBrakeClear( trace, flat, dt * ( 1.0f - trace.fraction ),"),
             ("landing frame remainder", "float seconds = remainingSeconds;", "float seconds = 0.0f;"),

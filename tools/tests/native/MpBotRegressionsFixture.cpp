@@ -433,6 +433,8 @@ struct botItemCandidate_t { idItem* item; float utility,score; };
 struct botItemOption_t { idItem* item; float utility; int pendingMsec; int node; };
 struct rvBot {
     bool probeAirActive=false;
+    idVec3 probeAirDirection;
+    void ProbeAirControl(idPlayer*,usercmd_t&);
     void OnKnockback(const idVec3&);
     void RefreshKnockbackMove(usercmd_t&);
     idPlayer* GetPlayer() const { return gameLocal.GetClientByNum(clientNum); }
@@ -1129,7 +1131,9 @@ void TestAirRecovery() {
     gameLocal.time+=BOT_AIR_RECOVER_RUNOUT_MSEC+1; cmd={};
     CHECK(!bot.RecoverInAir(&self,cmd) && !bot.airRecovering && cmd.rightmove==0);
     rvBot slow; slow.airRecovering=true; self.physics.velocity={0,-40,0};
-    CHECK(!slow.RecoverInAir(&self,cmd) && !slow.airRecovering);
+    cmd={}; CHECK(slow.RecoverInAir(&self,cmd) && slow.airRecovering && cmd.rightmove<0);
+    self.physics.velocity={0,-10,0}; cmd={};
+    CHECK(!slow.RecoverInAir(&self,cmd) && !slow.airRecovering && cmd.rightmove==0);
     rvBot rim; rim.airRecovering=true; self.physics.velocity={200,-400,0};
     navMesh.continuationClear=false; navMesh.recoveryStepClear=true; cmd={};
     CHECK(rim.RecoverInAir(&self,cmd) && cmd.forwardmove>0 && cmd.rightmove>0);
@@ -1484,6 +1488,43 @@ void TestJumpEntry() {
     std::puts("Jump entry: exact live position/momentum, same launch steering, settled recenter, fresh-press cost bound and timeout: PASS");
 }
 
+void TestGroundBraking() {
+    for(bool probe:{true,false}) for(float yaw:{0.0f,45.0f,90.0f})
+    for(float initial:{14.0f,35.6f,72.4f,160.0f,320.0f,600.0f}) {
+        Reset(); idPlayer self; gameLocal.entities[0]=&self;
+        self.pfl.onGround=true; self.physics.velocity={initial,0,0};
+        rvBot bot; bot.aimAngles.yaw=yaw; bot.airRecovering=true;
+        navMesh.continuationClear=true;
+        for(int frame=0;frame<120;frame++) {
+            usercmd_t cmd{};
+            if(probe) bot.ProbeAirControl(&self,cmd); else bot.RecoverInAir(&self,cmd);
+            idVec3 forward,right; bot.aimAngles.ToVectors(&forward,&right,nullptr);
+            idVec3 wish=forward*float(cmd.forwardmove)+right*float(cmd.rightmove);
+            const float wishSpeed=wish.Normalize()*self.physics.CmdScale(cmd,false);
+            // Flat MP ground: independent friction/acceleration integration
+            // exposes reversal and cumulative drift, rather than just checking
+            // that the command points against the current velocity.
+            const idVec3 before=self.physics.velocity;
+            const float speed=before.Length();
+            if(speed>0) self.physics.velocity*=Max(0.0f,speed-Max(speed,100.0f)*6.0f*0.016f)/speed;
+            const float add=wishSpeed-self.physics.velocity*wish;
+            if(add>0) self.physics.velocity+=wish*Min(add,15.0f*0.016f*wishSpeed);
+            CHECK(self.physics.velocity*before>=-0.01f);
+            CHECK(self.physics.velocity.Length()<=speed+0.01f);
+            self.physics.origin+=self.physics.velocity*0.016f;
+            gameLocal.time+=16;
+        }
+        CHECK(self.physics.velocity.Length()<0.01f);
+        CHECK(self.physics.origin.Length()<100.0f);
+    }
+    Reset(); idPlayer self; gameLocal.entities[0]=&self;
+    rvBot bot; self.pfl.onGround=false; bot.probeAirDirection={1,0,0};
+    usercmd_t cmd{}; bot.ProbeAirControl(&self,cmd); CHECK(cmd.forwardmove==127);
+    self.pfl.onGround=true; self.physics.velocity={35,0,0}; self.physics.knockback=50;
+    cmd={}; bot.ProbeAirControl(&self,cmd); CHECK(cmd.forwardmove==-127);
+    std::puts("Ground braking: probe and recovery settle without reversal or drift; air/knock input retained: PASS");
+}
+
 void TestDodgeOwnership() {
     Reset(); idPlayer self; gameLocal.entities[0]=&self;
     rvBot bot; bot.path.Append({500,0,0}); usercmd_t cmd;
@@ -1714,6 +1755,7 @@ int main(int argc,char** argv) {
     if(argc==1 || !std::strcmp(argv[1],"landings")) TestJumpEntry();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestMoveProjection();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestDodgeOwnership();
+    if(argc==1 || !std::strcmp(argv[1],"movement")) TestGroundBraking();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestRecoveryEdge();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestRecoveryTransport();
 }

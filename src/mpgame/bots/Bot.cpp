@@ -67,7 +67,7 @@ static const int	BOT_PAD_APPROACH_STALE_MSEC = 100;	// a pad approach not confir
 static const float	BOT_PAD_APPROACH_REACH	= 320.0f;	// a bot this close to its pad publishes the approach
 static const float	BOT_EDGE_LOOKAHEAD		= 0.15f;	// seconds of velocity the void-edge guard looks ahead
 static const float	BOT_SAFE_FALL			= 512.0f;	// floor this far down is a fall, not the void (NAV_MAX_DROP)
-static const float	BOT_AIR_RECOVER_STOP_SPEED = 60.0f;	// a recovered fall's touchdown brake ends below this speed
+static const float	BOT_AIR_RECOVER_STOP_SPEED = 10.0f;	// match RecoveryBrakeClear's final friction-only coast
 static const int	BOT_AIR_RECOVER_RUNOUT_MSEC = 600;	// and at most this long after touchdown
 static const int	BOT_AIR_RECOVER_KNOCK_MSEC = 1000;	// a fall this soon after a knockback may be braked
 static const int	BOT_AIR_RECOVER_TAKEOFF_MSEC = 50;	// that came at most this long before the bot left the ground
@@ -2231,6 +2231,14 @@ flight; once grounded, brake as hard as the feet allow.  No route, goal or
 pad adoption runs, so the outcome is the player physics' answer alone.
 ================
 */
+// The strongest ordinary MP ground brake that will not accelerate backwards.
+// Match friction before acceleration and leave half a command byte for rounding.
+static float BotGroundBrakeStrength( float speed ) {
+	const float dt = Max( 1, gameLocal.GetMSec() ) * 0.001f;
+	const float afterFriction = Max( 0.0f, speed - Max( speed, 100.0f ) * 6.0f * dt );
+	return Min( 1.0f, Max( 0.0f, afterFriction / ( 15.0f * dt * Max( 1.0f, pm_speed.GetFloat() ) ) - 0.5f / 127.0f ) );
+}
+
 void rvBot::ProbeAirControl( idPlayer *self, usercmd_t &cmd ) {
 	if ( !self->pfl.onGround ) {
 		if ( probeAirDirection.LengthSqr() > 0.0f ) {
@@ -2240,7 +2248,14 @@ void rvBot::ProbeAirControl( idPlayer *self, usercmd_t &cmd ) {
 	}
 	const idVec3 &velocity = self->GetPhysics()->GetLinearVelocity();
 	idVec3 brake( -velocity.x, -velocity.y, 0.0f );
-	if ( brake.Normalize() > 10.0f ) {
+	const float speed = brake.Normalize();
+	if ( speed > 10.0f ) {
+		// Full reverse ground acceleration can cross zero every frame and
+		// walk a settled replay off its ledge. Reduce the requested speed as
+		// it stops; the friction-free knock interval still needs full input.
+		if ( static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->GetKnockBack() <= 0 ) {
+			brake *= BotGroundBrakeStrength( speed );
+		}
 		ApplyMove( brake, cmd );
 	}
 }
@@ -5072,6 +5087,9 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 		if ( speed <= BOT_AIR_RECOVER_STOP_SPEED || gameLocal.time - airRecoverLanded > BOT_AIR_RECOVER_RUNOUT_MSEC ) {
 			airRecovering = false;
 			return false;
+		}
+		if ( knockMsec <= 0 ) {
+			brake *= BotGroundBrakeStrength( speed );
 		}
 		ApplyMove( brake, cmd );
 		cmd.upmove = 0;

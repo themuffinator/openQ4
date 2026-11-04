@@ -44,6 +44,7 @@ CASES = {
         "command": "bot_probeMove 1 -24.912 -761.135 328.25 274.678 -581.521 241.656 -24.912 -761.135 328.25",
     }, {
         "name": "rocket_player_deflection", "observe_msec": 12000,
+        "allow_resumed_navigation": True,
         "setup": ["noclip", "setviewpos 700 60 68", "waitMsec 64",
                   "bot_probeHealth 1 66 190 259.792 -144.761 370.375 1"],
         "command": "bot_probeMove 1 544.251 70.468 0.25 601.687 -126.201 370.375 544.251 70.468 0.25",
@@ -72,6 +73,15 @@ CASES = {
         "observe_msec": 12000,
         "setup": ["bot_probeHealth 1 60 124 56.315 -252.725 170.467 18"],
         "command": "bot_probeMove 1 618.9 983.089 -183.75 -117.871 -521.892 170.467 604 956 -183.75",
+    }, {
+        "name": "wall_runout_controller", "observe_msec": 12000,
+        "release_input_after_msec": 2000,
+        "setup": ["bot_probeHealth 1 45 50 13.023 21.29 -1.463 0"],
+        "command": "bot_probeMove 1 583.431 120.247 -61.195 18.727 -441.232 -369.033 583.431 120.247 -61.195",
+    }, {
+        "name": "wall_runout_fixed_coast", "observe_msec": 12000,
+        "setup": ["bot_probeHealth 1 45 50 13.023 21.29 -1.463 0"],
+        "command": "bot_probeAir 1 583.431 120.247 -61.195 18.727 -441.232 -369.033 0 0 0",
     }]),
     "ctf7": ("CTF", [{
         "name": "armoured_drop", "probe_type": "DROP",

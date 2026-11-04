@@ -2223,6 +2223,13 @@ claim peer combinations that have not been tested.
   long runs and all 33 catalog variants under strict causal assessment. The
   subsequent ramp, off-route and player-contact corrections still need renewed
   long-match, complete-catalog and controlled-timing qualification.
+  The `5bd8dff11` repeat meets all four long-run duration gates and leaves two
+  unresolved deaths after exact-state replay; its 33-variant catalog clears
+  death/duration assessment. [Wall-arrested recovery and settled braking](mp-bots.md#wall-arrested-landings-and-settled-braking-4-november-2026)
+  fix the CTF5 controller's rejected safe coast and a delayed ground-brake
+  oscillation exposed by the replay. That brake artifact requires fresh
+  final-stage qualification rather than carrying old exclusions forward.
+  The DM8 enemy-rocket/self-splash sequence and controlled timing remain open.
   The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.

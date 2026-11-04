@@ -370,6 +370,16 @@ int main() {
     Platform(40,1024,0);
     CHECK(!nav.RecoveryBrakeClear(rimImpact,{4000,0,0},0.016f,0));
     solids.clear(); CHECK(!nav.RecoveryBrakeClear(rimImpact,{500,0,0},0,0));
+    // A wall clips the runout before it reaches the far edge. Retain the
+    // remaining tangential motion: a wall cannot save a slide off its end.
+    Platform(-256,256,0);
+    solids.push_back({{8,-256,0},{24,256,128}});
+    trace_t wallImpact; wallImpact.endpos={-16,0,0.25f}; wallImpact.c.normal={0,0,1};
+    CHECK(nav.RecoveryBrakeClear(wallImpact,{500,0,0},0.016f,0));
+    CHECK(nav.RecoveryBrakeClear(wallImpact,{500,100,0},0.016f,0));
+    solids[0].hi.y=4;
+    CHECK(!nav.RecoveryBrakeClear(wallImpact,{500,500,0},0.016f,0));
+    solids.clear();
     // A walk along q4dz3's rim was supported only by the outer two units of
     // the hull; the controller's small lateral error then lost the floor.
     Platform(12,128,0);

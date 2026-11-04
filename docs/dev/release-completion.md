@@ -7,6 +7,9 @@ work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
+- Recovery preserves a safe landing stopped by a wall and settles its final
+  braking without drifting back off a ledge. The reproduced CTF5 fall is fixed;
+  the broader long-match, map-catalog and timing gates remain under qualification.
 - Bots returning to a route avoid unplanned jump pads, and airborne recovery
   accounts for nearby players that can deflect a safe landing. Reproduced falls
   pass isolated checks; final long-match and map-catalog qualification continues.
