@@ -1743,6 +1743,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   visual/audio parity remain open; this checks one shot and its engine capture.
   Arena was covered only as `game_mp` on `baseoq4`, not as a switch from the
   Awakening menu. Full playthroughs remain.
+  M01/M02 scrutiny, 4 November: fire volumes now use projectile/touch collision
+  while burning and clear it when quenched, including on restore; final freeze
+  hits fully dim their lights. M02's repair-bot attachment, generator defence
+  gate, objective timing and animation sequencing are corrected under a separate
+  saved script identity. Original M02 saves retain the installed program.
+  See [mission intent, findings and bounded runtime evidence](awakening-missions.md).
+  End-to-end squad routing, walker demolition/traversal and Tank/extraction
+  qualification remain part of this gate.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus

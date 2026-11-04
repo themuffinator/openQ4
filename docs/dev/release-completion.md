@@ -6,6 +6,22 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Awakening opening missions, 4 November 2026
+
+- Freezing a fire vent now clears its invisible collision and fully extinguishes
+  its light. Players and squadmates can cross active flames while receiving
+  their normal damage; quenched vents also restore correctly from saves.
+- Trianfac's repair bots use their own stations, and the generator sabotage
+  waits for all six bots to be destroyed. The generator objective appears before
+  the encounter and completes after the explosion. The Tank victory completes
+  the Nexus objective, and the extraction dropship finishes landing before
+  starting its idle animation.
+- Restart m02 to adopt its script corrections. Earlier saves keep their original
+  script program; corrected saves retain a separate source identity.
+- [Mission audit and validation](awakening-missions.md) records the designer
+  intent, confirmed fixes and remaining Q4-04 qualification. These focused
+  encounter checks do not establish complete mission playthroughs.
+
 ## Vehicle health and shield meters, 4 November 2026
 
 - Invulnerable turrets now show a full health meter, and vehicles without shields

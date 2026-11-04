@@ -2222,17 +2222,21 @@ const function_t *idProgram::CompileFunction( const char *functionName, const ch
 idProgram::CompileFile
 ================
 */
+#include "../awakening/MissionScripts.inl"
+
 void idProgram::CompileFile( const char *filename ) {
 	char *src;
 	bool result;
-
-	if ( fileSystem->ReadFile( filename, ( void ** )&src, NULL ) < 0 ) {
-		gameLocal.Error( "Couldn't load %s\n", filename );
+	idStr missionSource;
+	if ( Awakening_LoadMissionScript( filename, missionSource ) ) {
+		result = CompileText( filename, missionSource, false );
+	} else {
+		if ( fileSystem->ReadFile( filename, ( void ** )&src, NULL ) < 0 ) {
+			gameLocal.Error( "Couldn't load %s\n", filename );
+		}
+		result = CompileText( filename, src, false );
+		fileSystem->FreeFile( src );
 	}
-
-	result = CompileText( filename, src, false );
-
-	fileSystem->FreeFile( src );
 
 	if ( g_disasm.GetBool() ) {
 		Disassemble();
