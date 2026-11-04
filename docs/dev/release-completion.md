@@ -4803,6 +4803,17 @@ heading. It is not the contents of the 14 September 2026 release. See the
 
 ## Unreleased — Quake 4: The Awakening (`q4xbase`)
 
+- [x] The three speeder races keep their clocks, carried time and objectives
+  in step with progress. Completed legs clear the timer and fill the progress
+  display; late callbacks cannot restart or fail a finished leg. The first
+  lockdown retains its radio warning before starting the clock.
+  Bomber attacks clean up the correct aircraft, and two previously broken
+  flyer destruction sequences now work.
+  Restart the current race leg to use these script corrections; existing saves
+  retain their original mission scripts. Boosting also stops when the rider
+  leaves or the bike is disabled, without resetting its recharge time. See the
+  [M07 audit](awakening-m07.md) for validation and remaining playthrough limits.
+
 - [x] The unreleased expansion's campaign loads on openQ4 from its own
   content and openQ4's binaries, never its leaked game DLL. Its game code is
   rebuilt as the new `openQ4-game-awakening` game-library layer: every class

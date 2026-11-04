@@ -5,10 +5,15 @@
  * See docs/dev/awakening-missions.md for intent, provenance and validation.
  */
 
+#include "M07MissionScript.inl"
+
 static const char * const awakeningM02Source = "maps/game/m02_trianfac.script";
 static const char * const awakeningM02Version1 = "maps/game/m02_trianfac.openq4-v1.script";
 
 bool Awakening_LoadMissionScript( const char *filename, idStr &source ) {
+	if ( Awakening_LoadM07MissionScript( filename, source ) ) {
+		return true;
+	}
 	idStr normalizedName = filename;
 	normalizedName.BackSlashesToSlashes();
 	if ( normalizedName.Icmp( awakeningM02Version1 ) != 0 || gameLocal.isMultiplayer ||
@@ -67,6 +72,7 @@ bool Awakening_LoadMissionScript( const char *filename, idStr &source ) {
 }
 
 const char *Awakening_MissionScriptName( const char *filename ) {
+	filename = Awakening_M07MissionScriptName( filename );
 	idStr normalizedName = filename;
 	normalizedName.BackSlashesToSlashes();
 	if ( !gameLocal.isMultiplayer && idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&

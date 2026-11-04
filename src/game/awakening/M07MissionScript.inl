@@ -1,0 +1,157 @@
+/*
+ * M07 race corrections, authored for openQ4 under the Quake 4 SDK EULA.
+ * Transform installed scripts; do not redistribute recovered content.
+ * Keep v1 stable: saved threads recompile this virtual source on restore.
+ */
+static const char * const awakeningM07Sources[] = {
+	"maps/game/m07_race.script", "maps/game/m07_race1.script", "maps/game/m07_race2.script"
+};
+static const char * const awakeningM07Versions[] = {
+	"maps/game/m07_race.openq4-v1.script", "maps/game/m07_race1.openq4-v1.script", "maps/game/m07_race2.openq4-v1.script"
+};
+
+static bool Awakening_M07ReplaceOnce( idStr &source, const char *before, const char *after ) {
+	const int first = source.Find( before );
+	if ( first < 0 || source.Find( before, true, first + 1 ) >= 0 ) {
+		return false;
+	}
+	source.Replace( before, after );
+	return true;
+}
+
+static bool Awakening_CorrectM07Script( idStr &source, int race ) {
+	source.Replace( "\r\n", "\n" );
+	struct correction_t { const char *before; const char *after; };
+	static const correction_t corrections[] = {
+		{ "float area1TimeLeft;", "float area1TimeLeft;\n"
+		  "boolean oq4_raceArea1Started;\nboolean oq4_raceArea2Started;\nboolean oq4_raceComplete;" },
+		// Late or repeated callbacks must not reset an already moving gate.
+		{ "void startTimerArea1()\n\t{", "void startTimerArea1()\n\t{\n"
+		  "\t\tif ( oq4_raceArea1Started || oq4_raceArea2Started || oq4_raceComplete ) { return; }\n"
+		  "\t\toq4_raceArea1Started = true;" },
+		{ "void startTimerArea2()\n\t{", "void startTimerArea2()\n\t{\n"
+		  "\t\tif ( oq4_raceArea2Started || oq4_raceComplete ) { return; }\n"
+		  "\t\toq4_raceArea2Started = true;" },
+		// Establish carried time before launching the gate thread. Issue the
+		// objective now, so fast completion cannot precede its delayed creation.
+		{ "AREA2_TIME_EXPIRED = AREA2_TIME_STARTED + AREA2_TOTAL_TIME + area1TimeLeft;",
+		  "AREA2_TIME_EXPIRED = AREA2_TIME_STARTED + AREA2_TOTAL_TIME + area1TimeLeft;\n"
+		  "\t\tthread lockdownGate2Down();\n\t\tsys.trigger( $objective_area2 );" },
+		{ "\n\t\tthread lockdownGate2Down();\n\t\tsys.wait( 5 );\n\t\tsys.trigger( $objective_area2 );",
+		  "\n\t\tsys.wait( 5 );" },
+		// Completion must not depend on the adjacent position trigger's order.
+		{ "void area1Cleared()\n\t{", "void area1Cleared()\n\t{\n"
+		  "\t\tif ( oq4_raceArea2Started || oq4_raceComplete ) { return; }\n\t\tspeederInArea2();" },
+		{ "void area2Cleared()\n\t{", "void area2Cleared()\n\t{\n"
+		  "\t\tif ( oq4_raceComplete ) { return; }\n\t\toq4_raceComplete = true;\n"
+		  "\t\tspeederInArea3();\n"
+		  "\t\t$vehicle_speeder_1.guiEvent( \"hidespeedertimer\" );\n"
+		  "\t\t$vehicle_speeder_1.guiEvent( \"hidespeedertimer2\" );\n"
+		  "\t\t$vehicle_speeder_1.guiEvent( \"showprogress100\" );" },
+		// waitFrame can overshoot. Keep zero throughout the final gate closure.
+		{ "float timeLeft = AREA1_TIME_EXPIRED - timeNow;",
+		  "float timeLeft = AREA1_TIME_EXPIRED - timeNow;\n\t\t\t\tif ( timeLeft < 0 ) { timeLeft = 0; }" },
+		{ "float timeLeft = AREA2_TIME_EXPIRED - timeNow;",
+		  "float timeLeft = AREA2_TIME_EXPIRED - timeNow;\n\t\t\t\tif ( timeLeft < 0 ) { timeLeft = 0; }" },
+		{ "while( timeNow <= AREA1_TIME_EXPIRED )",
+		  "while( timeNow <= AREA1_TIME_EXPIRED && !oq4_raceArea2Started && !oq4_raceComplete )" },
+		{ "while( timeNow <= AREA2_TIME_EXPIRED )",
+		  "while( timeNow <= AREA2_TIME_EXPIRED && !oq4_raceComplete )" },
+	};
+	for ( size_t i = 0; i < sizeof( corrections ) / sizeof( corrections[0] ); ++i ) {
+		if ( !Awakening_M07ReplaceOnce( source, corrections[i].before, corrections[i].after ) ) {
+			return false;
+		}
+	}
+	if ( race != 0 ) {
+		// setFOV belongs to cameras, not the player. The script CVar bridge
+		// applies a neutral view offset while preserving the user's chosen FOV.
+		if ( !Awakening_M07ReplaceOnce( source, "$player1.setFOV( 90 );", "sys.setcvar( \"g_fov\", \"90\" );" ) ) {
+			return false;
+		}
+	}
+	// Copied bomber runs all cleaned up flyer one, leaving their own assemblies
+	// behind and potentially removing a different attack that was still running.
+	const int bomberCount = race == 0 ? 3 : race == 1 ? 2 : 4;
+	for ( int bomber = 1; bomber <= bomberCount; ++bomber ) {
+		if ( bomber > 1 ) {
+			idStr before = va( "sys.waitFor( $strafeBase_%d );\n\t\tremoveFlyerBits(\"1\");", bomber );
+			idStr after = va( "sys.waitFor( $strafeBase_%d );\n\t\tremoveFlyerBits(\"%d\");", bomber, bomber );
+			if ( !Awakening_M07ReplaceOnce( source, before, after ) ) { return false; }
+		}
+		// A shot-down flyer exits the attack early. Its detached mover must
+		// still be removed, as must any surviving launchers/effects.
+		idStr before = va( "if (!isValidEntity($strafingFlyer_%d)) // make sure it hasn't been destroyed before manipulating it\n\t\treturn;", bomber );
+		idStr after = va( "if (!isValidEntity($strafingFlyer_%d)) { removeFlyerBits(\"%d\"); return; }", bomber, bomber );
+		int count = 0;
+		for ( int at = source.Find( before ); at >= 0; at = source.Find( before, true, at + 1 ) ) { ++count; }
+		if ( count != ( race == 0 && bomber > 1 ? 7 : 5 ) ) {
+			return false;
+		}
+		source.Replace( before, after );
+	}
+	if ( race == 1 ) {
+		// The extra placed flyers have damage relays and explosion FX, but no
+		// relay callbacks. Use the map's own shared destruction sequence.
+		if ( source.Find( "void bomberExplode_3(" ) >= 0 || source.Find( "void bomberExplode_4(" ) >= 0 ) {
+			return false;
+		}
+		if ( !Awakening_M07ReplaceOnce( source, "void bomberExplode_1()",
+			"void bomberExplode_3() {\n"
+			"\tif ( isValidEntity( $strafingFlyer_3 ) ) {\n"
+			"\t\tstroggFlyerExplosion( $strafingFlyer_3, $flyerStrafeExplode_3 );\n\t\tremoveFlyerBits(\"3\");\n\t}\n}\n"
+			"void bomberExplode_4() {\n"
+			"\tif ( isValidEntity( $strafingFlyer_4 ) ) {\n"
+			"\t\tstroggFlyerExplosion( $strafingFlyer_4, $flyerStrafeExplode_4 );\n\t\tremoveFlyerBits(\"4\");\n\t}\n}\n"
+			"void bomberExplode_1()" ) ) {
+			return false;
+		}
+	}
+	const char *area = race == 0 ? "RACE_AREA" : race == 1 ? "RACE1_AREA" : "RACE2_AREA";
+	for ( int gate = 1; gate <= 2; ++gate ) {
+		idStr before = va( "if( %s <= %d )", area, gate );
+		idStr after = va( "if( %s <= %d && !oq4_raceComplete )", area, gate );
+		if ( !Awakening_M07ReplaceOnce( source, before, after ) ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool Awakening_LoadM07MissionScript( const char *filename, idStr &source ) {
+	idStr normalized = filename;
+	normalized.BackSlashesToSlashes();
+	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
+		return false;
+	}
+	for ( int race = 0; race < 3; ++race ) {
+		if ( normalized.Icmp( awakeningM07Versions[race] ) != 0 ) { continue; }
+		char *installed = NULL;
+		const int length = fileSystem->ReadFile( awakeningM07Sources[race], reinterpret_cast<void **>( &installed ), NULL );
+		if ( length > 0 ) { source = installed; }
+		if ( installed != NULL ) { fileSystem->FreeFile( installed ); }
+		if ( length <= 0 || !Awakening_CorrectM07Script( source, race ) ) {
+			source.Clear();
+			return false;
+		}
+		return true;
+	}
+	return false;
+}
+
+static const char *Awakening_M07MissionScriptName( const char *filename ) {
+	idStr normalized = filename;
+	normalized.BackSlashesToSlashes();
+	if ( !gameLocal.isMultiplayer && idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 ) {
+		for ( int race = 0; race < 3; ++race ) {
+			if ( normalized.Icmp( awakeningM07Sources[race] ) != 0 ) { continue; }
+			idStr source;
+			if ( Awakening_LoadM07MissionScript( awakeningM07Versions[race], source ) ) {
+				gameLocal.Printf( "Awakening M07: %s mission corrections v1 enabled\n", filename );
+				return awakeningM07Versions[race];
+			}
+			gameLocal.Warning( "Awakening M07: unrecognized script; keeping installed mission behaviour" );
+		}
+	}
+	return filename;
+}

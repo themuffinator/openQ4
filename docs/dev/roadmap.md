@@ -1752,6 +1752,14 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
   See [mission intent, findings and bounded runtime evidence](awakening-missions.md).
   End-to-end squad routing, walker demolition/traversal and Tank/extraction
   qualification remain part of this gate.
+  Progress, 4 November (M07): the three race scripts now use versioned mission
+  corrections for late clock callbacks, single stage transitions, time
+  carryover, objective ordering, zero-clamped expiry and a completed HUD. Boost
+  cancellation respects seat exit, movement disablement and destruction while
+  preserving recharge. See the [M07 audit and qualification limits](awakening-m07.md).
+  Bomber cleanup now targets each attack's own assembly; the two missing
+  destruction callbacks use the existing authored sequence.
+  Full driven traversal and race balance remain open under this item.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 readers and current corruption checks. Design safe recovery for
   object-restore failure after map teardown; evaluate staged-world rollback versus

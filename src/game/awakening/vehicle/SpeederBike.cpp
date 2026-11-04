@@ -260,10 +260,16 @@ void riVehiclePartBoost::Restore( idRestoreGame *savefile ) {
 ================
 riVehiclePartBoost::Activate
 
-Boosting has nothing to switch on: it only listens to the driver.
+Leaving the seat ends thrust and its view effect immediately. Preserve the
+original recharge deadline so getting out and back in cannot reset the boost.
 ================
 */
 void riVehiclePartBoost::Activate( bool activate ) {
+	rvVehiclePart::Activate( activate );
+	if ( !activate && state == BOOST_PUSHING ) {
+		state = BOOST_RECHARGING;
+		SetBoostActive( false );
+	}
 }
 
 /*
@@ -274,7 +280,7 @@ How hard the boost pushes, 0..1, "elapsed" milliseconds into it.
 ================
 */
 float riVehiclePartBoost::Envelope( int elapsed ) const {
-	if ( elapsed < 0 || elapsed > attackTime + sustainTime + decayTime ) {
+	if ( elapsed < 0 || elapsed >= attackTime + sustainTime + decayTime ) {
 		return 0.0f;
 	}
 	if ( elapsed < attackTime ) {
@@ -316,9 +322,16 @@ void riVehiclePartBoost::RunPostPhysics( void ) {
 		return;
 	}
 
+	const bool canBoost = position != NULL && position->IsOccupied() && vehicle->IsMovementEnabled()
+		&& !vehicle->IsHidden() && vehicle->health > 0;
+	if ( !canBoost && state == BOOST_PUSHING ) {
+		state = BOOST_RECHARGING;
+		SetBoostActive( false );
+	}
+
 	switch ( state ) {
 		case BOOST_READY:
-			if ( position->IsOccupied() && position->mInputCmd.upmove < 0 ) {
+			if ( canBoost && position->mInputCmd.upmove < 0 ) {
 				state = BOOST_PUSHING;
 				startTime = gameLocal.time;
 				readyTime = gameLocal.time + attackTime + sustainTime + decayTime + refreshTime;
@@ -328,7 +341,7 @@ void riVehiclePartBoost::RunPostPhysics( void ) {
 
 		case BOOST_PUSHING: {
 			const int elapsed = gameLocal.time - startTime;
-			if ( elapsed > attackTime + sustainTime + decayTime ) {
+			if ( elapsed >= attackTime + sustainTime + decayTime ) {
 				state = BOOST_RECHARGING;
 				SetBoostActive( false );
 				break;
@@ -345,7 +358,7 @@ void riVehiclePartBoost::RunPostPhysics( void ) {
 		}
 
 		case BOOST_RECHARGING:
-			if ( gameLocal.time > readyTime ) {
+			if ( gameLocal.time >= readyTime ) {
 				state = BOOST_READY;
 			}
 			break;
