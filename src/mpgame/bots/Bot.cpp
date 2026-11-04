@@ -7501,7 +7501,9 @@ void rvBot::Think( usercmd_t &cmd ) {
 	UpdateBuying( self );
 	UpdateWeapon( self );
 	UpdateFire( self, cmd );
-	if ( bot_debug.GetInteger() >= 3 && ( !self->pfl.onGround || airRecovering ||
+	// Level four also records quiet grounded approaches, so an unintended
+	// transport entry can be reconstructed before its first airborne frame.
+	if ( bot_debug.GetInteger() >= 3 && ( bot_debug.GetInteger() >= 4 || !self->pfl.onGround || airRecovering ||
 		( knockbackFrameTime >= 0 && gameLocal.time - knockbackFrameTime <= 500 ) ) ) {
 		const idPhysics_Player *physics = static_cast<const idPhysics_Player *>( self->GetPlayerPhysics() );
 		gameLocal.Printf( "BOT_CONTROL client=%d time=%d origin=%s velocity=%s health=%d grounded=%d crouched=%d speed=%.3f modifier=%.3f knock=%d strong=%d airborne=%d voluntary=%d recover=%d sliding=%d landed=%d wish=%s cmd=%d,%d,%d buttons=%d yaw=%.3f commandYaw=%.3f corner=%d/%d type=%d started=%d target=%s\n",
