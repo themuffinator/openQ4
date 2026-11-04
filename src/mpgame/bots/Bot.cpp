@@ -70,7 +70,6 @@ static const float	BOT_SAFE_FALL			= 512.0f;	// floor this far down is a fall, n
 static const float	BOT_AIR_RECOVER_STOP_SPEED = 60.0f;	// a recovered fall's touchdown brake ends below this speed
 static const int	BOT_AIR_RECOVER_RUNOUT_MSEC = 600;	// and at most this long after touchdown
 static const int	BOT_AIR_RECOVER_KNOCK_MSEC = 1000;	// a fall this soon after a knockback may be braked
-static const float	BOT_AIR_RECOVER_MIN_KICK = 150.0f;	// and only a knockback at least this strong
 static const int	BOT_AIR_RECOVER_TAKEOFF_MSEC = 50;	// that came at most this long before the bot left the ground
 static const int	BOT_AIR_RECOVER_REPLAN_MSEC = 250;	// how often a held fall re-chooses its air input
 static const int	BOT_AIR_RECOVER_SLIDE_MSEC = 400;	// a walk-off this soon after a knock is the knock's slide
@@ -5073,9 +5072,13 @@ bool rvBot::RecoverInAir( idPlayer *self, usercmd_t &cmd ) {
 	const bool walkingFall = walking && !walkingDeparture && airborneSince &&
 		!airborneVoluntary && velocity.z <= 0.0f;
 	// Route steering can spoil a survivable coast before the next prediction
-	// notices the lost landing. Own an unplanned knocked flight immediately;
-	// planned flight controllers still hand over only if their coast is unsafe.
-	const bool protectCoast = knocked && !traversalStarted && ( path.IsEmpty() || walking );
+	// notices the lost landing. A hit during a jump/drop also invalidates its
+	// takeoff proof (including its health budget): a safe coast is not proof
+	// that continuing toward the old landing is still safe. Pad flights retain
+	// their controller while their coast remains safe.
+	const bool ballistic = pathCorner >= 0 && pathCorner < path.Num() &&
+		( path[pathCorner].travelType == NAVTRAVEL_JUMP || path[pathCorner].travelType == NAVTRAVEL_DROP );
+	const bool protectCoast = knocked && ( ballistic || ( !traversalStarted && ( path.IsEmpty() || walking ) ) );
 	idVec3 touchdown = self->GetPhysics()->GetOrigin();
 	if ( !airRecovering && ( ( !knocked && !walkingFall ) ||
 		( !protectCoast && !BotAirLandingUnsafe( self, touchdown ) ) ) ) {
@@ -7561,10 +7564,13 @@ rvBotManager::rvBotManager
 rvBotManager::rvBotManager( void ) {
 	probeHealth		= 0;
 	probeKnockback	= 0;
+	probeKick.Zero();
 	navBuilt			= false;
 	navFailed			= false;
 	nextMinPlayerCheck	= 0;
 	profileThinkTicks	= 0.0;
+	profileFrameTicks	= 0.0;
+	profileFrameNumber	= -1;
 	profileMaxTicks		= 0.0;
 	profileFrames		= 0;
 	nextProfileTime		= 0;
@@ -7607,6 +7613,8 @@ void rvBotManager::Init( void ) {
 	nextLeaderCheck		= 0;
 	items.Clear();
 	profileThinkTicks	= 0.0;
+	profileFrameTicks	= 0.0;
+	profileFrameNumber	= -1;
 	profileMaxTicks		= 0.0;
 	profileFrames		= 0;
 	nextProfileTime		= 0;
@@ -8782,6 +8790,8 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 			static_cast<idPhysics_Player *>( self->GetPlayerPhysics() )->SetKnockBack( probeKnockback );
 			probeKnockback = 0;
 		}
+		OnPlayerKnockback( self, probeKick );
+		probeKick.Zero();
 	}
 	bot.probeWatch = true;
 	bot.probeStartTime = gameLocal.time;
@@ -8798,14 +8808,16 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 rvBotManager::SetProbeHealth
 ================
 */
-bool rvBotManager::SetProbeHealth( int clientNum, int health, int knockbackMsec ) {
+bool rvBotManager::SetProbeHealth( int clientNum, int health, int knockbackMsec, const idVec3 &kick ) {
 	if ( !gameLocal.isServer || gameLocal.isClient || !gameLocal.GetLocalPlayer() || gameLocal.numClients != 2 ||
 		 NumBots() != 1 || !IsBot( clientNum ) || gameLocal.mpGame.IsManagedMatch() || !gameLocal.CheatsOk( false ) ||
-		 health < 1 || health > 1000 || knockbackMsec < 0 || knockbackMsec > 1000 ) {
+		 health < 1 || health > 1000 || knockbackMsec < 0 || knockbackMsec > 1000 ||
+		 !( kick.LengthSqr() <= Square( 10000.0f ) ) ) {
 		return false;
 	}
 	probeHealth = health;
 	probeKnockback = knockbackMsec;
+	probeKick = kick;
 	return true;
 }
 
@@ -9154,17 +9166,53 @@ void rvBotManager::OnPlayerKnockback( idPlayer *victim, const idVec3 &kick ) {
 	if ( !gameLocal.isMultiplayer || gameLocal.isClient || !victim || !IsBot( victim->entityNumber ) ) {
 		return;
 	}
-	// A machine gun's 25-unit nudges are not a throw, but a shotgun's pellets
-	// land as separate hits in one frame: four of 49 threw a q4dm8 bot off
-	// its ledge. Sum one frame's kicks before judging the throw.
-	rvBot &bot = bots[victim->entityNumber];
-	if ( bot.knockbackFrameTime != gameLocal.time ) {
-		bot.knockbackFrameTime = gameLocal.time;
-		bot.knockbackFrameKick.Zero();
+	bots[victim->entityNumber].OnKnockback( kick );
+}
+
+void rvBot::OnKnockback( const idVec3 &kick ) {
+	if ( kick.LengthSqr() <= 0.0f ) {
+		return;
 	}
-	bot.knockbackFrameKick += kick;
-	if ( bot.knockbackFrameKick.LengthSqr() >= Square( BOT_AIR_RECOVER_MIN_KICK ) ) {
-		bot.knockbackTime = gameLocal.time;
+	// Even a small nail or machine-gun impulse can spoil a ledge approach or
+	// leave a committed jump unaffordable. Let the live landing proof decide
+	// whether recovery is needed; kick magnitude alone cannot decide safety.
+	if ( knockbackFrameTime != gameLocal.time ) {
+		knockbackFrameTime = gameLocal.time;
+		knockbackFrameKick.Zero();
+	}
+	knockbackFrameKick += kick;
+	knockbackTime = gameLocal.time;
+	airRecoverPlanTime = gameLocal.time - BOT_AIR_RECOVER_REPLAN_MSEC;
+	airRecoverLanded = 0;
+}
+
+void rvBot::RefreshKnockbackMove( usercmd_t &cmd ) {
+	idPlayer *self = GetPlayer();
+	if ( !self || self->health <= 0 || self->spectating || probeAirActive ||
+		 knockbackFrameTime != gameLocal.time || knockbackTime != gameLocal.time ) {
+		return;
+	}
+	// Bot Think precedes entity Think. A weapon can hit this player between
+	// command generation and its physics step. Recheck the changed flight
+	// before consuming the old command, with the hit's final health/timer.
+	// Keep the existing view, weapons and buttons; only recovery movement owns
+	// this refresh. In particular, a safe pad flight retains its controller.
+	if ( dodgeHopActive && knockbackTime >= dodgeHopStartTime ) {
+		ResetDodgeJump();
+	}
+	if ( !self->pfl.onGround && !airborneSince ) {
+		airborneSince = gameLocal.time;
+		airborneVoluntary = false;
+	}
+	RecoverInAir( self, cmd );
+}
+
+void rvBotManager::RefreshKnockbackMove( idPlayer *player, usercmd_t &cmd ) {
+	if ( gameLocal.isMultiplayer && !gameLocal.isClient && player && IsBot( player->entityNumber ) &&
+		 !bot_pause.GetBool() && bots[player->entityNumber].knockbackFrameTime == gameLocal.time ) {
+		const double start = idLib::sys->GetClockTicks();
+		bots[player->entityNumber].RefreshKnockbackMove( cmd );
+		profileFrameTicks += idLib::sys->GetClockTicks() - start;
 	}
 }
 
@@ -9623,6 +9671,8 @@ rvBotManager::Think
 ================
 */
 void rvBotManager::Think( void ) {
+	profileFrameNumber = -1;
+	profileFrameTicks = 0.0;
 	if ( !gameLocal.isMultiplayer || gameLocal.isClient || !gameLocal.isServer ) {
 		return;
 	}
@@ -9658,12 +9708,22 @@ void rvBotManager::Think( void ) {
 		}
 	}
 
-	UpdateProfile( idLib::sys->GetClockTicks() - thinkStart );
+	profileFrameTicks += idLib::sys->GetClockTicks() - thinkStart;
+	profileFrameNumber = gameLocal.framenum;
 
 	if ( bot_debugNav.GetInteger() >= 1 && navMesh.IsValid() ) {
 		idPlayer *viewer = gameLocal.GetLocalPlayer();
 		if ( viewer ) {
 			navMesh.DebugDraw( viewer->GetPhysics()->GetOrigin(), 1024.0f );
 		}
+	}
+}
+
+void rvBotManager::FinishFrameProfile( void ) {
+	// Include movement refreshed between entity thinks in this same frame's
+	// mean, maximum and distribution. Paused/skipped bot frames add no sample.
+	if ( profileFrameNumber == gameLocal.framenum ) {
+		UpdateProfile( profileFrameTicks );
+		profileFrameNumber = -1;
 	}
 }

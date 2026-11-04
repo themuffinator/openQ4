@@ -102,6 +102,8 @@ public:
 
 	// One server frame.  Writes the client's user command in place.
 	void					Think( usercmd_t &cmd );
+	void					OnKnockback( const idVec3 &kick );
+	void					RefreshKnockbackMove( usercmd_t &cmd );
 
 	// Called when the player entity behind this bot respawns.
 	void					OnSpawn( void );
@@ -506,6 +508,7 @@ public:
 	// Called once per server frame from idGameLocal::RunFrame, before any
 	// entity thinks, so the bots' commands are in place when players read them.
 	void					Think( void );
+	void					FinishFrameProfile( void );
 
 	// Console entry points.  skillLevel is the optional per-bot override from
 	// "addbot <name> <skill>"; -1 means follow bot_skill.
@@ -521,7 +524,7 @@ public:
 									const idVec3 *nextJump = NULL, bool naturalWalk = false );
 	// The health, and knockback time, the next traversal probe gives its bot;
 	// 0 for unchanged.
-	bool					SetProbeHealth( int clientNum, int health, int knockbackMsec = 0 );
+	bool					SetProbeHealth( int clientNum, int health, int knockbackMsec = 0, const idVec3 &kick = vec3_origin );
 
 	// Re-bind every live bot after the character roster has been reparsed.
 	// botreload must call this before the next frame runs, or every bot is
@@ -555,6 +558,7 @@ public:
 	// Called from idPlayer::Damage whenever knockback is applied to a bot,
 	// including impulses that friendly fire or armour leave without damage.
 	void					OnPlayerKnockback( idPlayer *victim, const idVec3 &kick );
+	void					RefreshKnockbackMove( idPlayer *player, usercmd_t &cmd );
 
 	// Called once for an accepted typed-chat line on the server.  It chooses at
 	// most one visible bot to answer and lets that bot's character content,
@@ -647,6 +651,7 @@ private:
 
 	int						probeHealth;			// pending bot_probeHealth value
 	int						probeKnockback;		// and its knockback milliseconds
+	idVec3					probeKick;			// already included in the probe velocity; reaction only
 	int						decisionFrame;			// gameLocal.framenum the count belongs to
 	int						decisionsThisFrame;
 
@@ -664,6 +669,8 @@ private:
 	// bot_profile accumulators.  Wall-clock measurement only; nothing here
 	// feeds a decision.
 	double					profileThinkTicks;
+	double					profileFrameTicks;
+	int						profileFrameNumber;
 	double					profileMaxTicks;
 	int						profileFrames;
 	rvBotFrameProfile		profileDistribution;

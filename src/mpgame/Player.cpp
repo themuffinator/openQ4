@@ -11233,6 +11233,7 @@ void idPlayer::Think( void ) {
 	// grab out usercmd
 	usercmd_t oldCmd = usercmd;
 	usercmd = gameLocal.usercmds[ IsFakeClient() ? MAX_CLIENTS : entityNumber ];
+	botManager.RefreshKnockbackMove( this, usercmd );
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
 	ApplyWeaponWheelInputMask();

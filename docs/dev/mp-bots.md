@@ -5,6 +5,36 @@ authoring or compile step. Bots arrive with a name, a way of playing and
 something to say about it. This describes their behaviour, validation and
 current limits.
 
+## Hit-to-movement handoff, 4 November 2026
+
+The three remaining long-match falls expose two timing gaps. DM8 Strauss's
+machine-gun hit leaves two health during a committed jump; the 35-unit kick
+was below the recovery threshold, and its old lower landing was now lethal.
+CTF3 Sledge's roughly 130-unit nail impulse also missed that threshold; by
+the first descending WALK recovery, the reachable ledge had been lost.
+CTF5 Strauss's rail hit lands after bot command generation but before player
+physics. One more frame of the pad command advances it beyond the recoverable
+hit pose. Replays from the next logged pose reproduce that failure; debug
+command traces show full movement speed and later oscillating fallback input,
+not a speed or view-angle mismatch.
+
+Every nonzero kick now invalidates the recovery plan. A hit during a jump or
+drop protects an affordable coast rather than continuing an obsolete takeoff
+proof. Player Think also refreshes recovery movement after copying its command,
+so an earlier entity's hit can change this frame's movement before physics.
+Safe pad flights retain their controller. The refresh leaves view and weapon
+input intact, and its CPU cost joins the same frame's bot profiling sample.
+
+`bot_probeHealth client health [knockbackMsec [kickX kickY kickZ]]` can now
+replay the real hit handler. The optional kick is already included in the
+following probe's velocity; it is never added twice. The isolated local cheat
+server restrictions remain. `mp_bot_hit_recovery_replay.py` exercises the three
+recorded states, including natural walking and the committed jump; these are
+positive recovery checks, not complete match snapshots or causal exclusions.
+Native decision tests reject restored weak-hit thresholds, delayed command
+refresh and continued jump ownership. Runtime qualification is in progress
+under `.tmp/mp02-falls/`; the prior failed reports remain unchanged.
+
 ## Complete catalog and renewed long matches, 4 November 2026
 
 The `ee6207834` build completes all 33 declared map variants against the installed

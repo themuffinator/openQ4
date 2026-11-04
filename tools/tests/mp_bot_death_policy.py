@@ -224,6 +224,13 @@ def main() -> None:
                "MP_BOT_RELEASE_INPUT settle\n"
                "MP_PHYSICS slot=1 grounded=1 health=14 velocity=0 0 0\nMP_BOT_TRIAL_END settle\n")
     check(policy.assess_trials(settled, [settle_trial])[0]["survived"], "settled controller survives input release")
+    jumped = settled.replace("BOT_MOVE_PROBE", "BOT_JUMP_PROBE")
+    check(not policy.assess_trials(jumped, [settle_trial])[0]["armed"], "causal envelopes reject jump markers")
+    jump_trial = {**settle_trial, "probe_type": "JUMP"}
+    check(policy.assess_trials(jumped, [jump_trial])[0]["survived"], "positive jump regression requires its explicit marker")
+    check(not policy.assess_trials(settled, [jump_trial])[0]["armed"], "wrong positive marker rejected")
+    mixed = jumped.replace("BOT_JUMP_PROBE client=1 time=1", "BOT_JUMP_PROBE client=1 time=1\nBOT_MOVE_PROBE client=1 time=1")
+    check(not policy.assess_trials(mixed, [jump_trial])[0]["armed"], "mixed duplicate probes rejected")
     for changed in (settled.replace("MP_BOT_RELEASE_INPUT settle\n", ""),
                     settled.replace("velocity=0 0 0", "velocity=50 0 0", 1),
                     settled.replace("grounded=1 health=14", "grounded=0 health=14", 1),

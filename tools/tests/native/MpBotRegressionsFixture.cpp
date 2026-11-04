@@ -36,6 +36,7 @@ struct idVec3 {
     idVec3(float a,float b,float c):x(a),y(b),z(c) {}
     void Set(float a,float b,float c) { x=a; y=b; z=c; }
     idVec3 operator+(const idVec3& b) const { return {x+b.x,y+b.y,z+b.z}; }
+    idVec3& operator+=(const idVec3& b) { x+=b.x; y+=b.y; z+=b.z; return *this; }
     idVec3 operator-(const idVec3& b) const { return {x-b.x,y-b.y,z-b.z}; }
     idVec3 operator-() const { return {-x,-y,-z}; }
     idVec3 operator*(float f) const { return {x*f,y*f,z*f}; }
@@ -419,6 +420,9 @@ struct rvBotManager {
 struct botItemCandidate_t { idItem* item; float utility,score; };
 struct botItemOption_t { idItem* item; float utility; int pendingMsec; int node; };
 struct rvBot {
+    bool probeAirActive=false;
+    void OnKnockback(const idVec3&);
+    void RefreshKnockbackMove(usercmd_t&);
     idPlayer* GetPlayer() const { return gameLocal.GetClientByNum(clientNum); }
     idStr name="bot";
     int clientNum=0,pathCorner=0,pathTime=0,goalType=BOTGOAL_ROAM,goalGiveUpTime=0;
@@ -1012,6 +1016,46 @@ void TestTransportGuard() {
     std::puts("Transport guard: momentum short of an unplanned pad brakes, a wish slides square or stops, never reverses inward; planned pad and flights untouched: PASS");
 }
 void TestAirRecovery() {
+    // The real hit handler must admit weak impulses. Waiting until the nail
+    // thrown WALK is descending loses CTF3's last reachable ledge.
+    Reset(); idPlayer weak; gameLocal.entities[0]=&weak;
+    weak.pfl.onGround=false; weak.physics.velocity={122,367,105};
+    rvBot tapped; tapped.path.Append({2971,3232,-256}); tapped.path.Append({3108,3108,-256});
+    tapped.OnKnockback({}); CHECK(tapped.knockbackTime==0);
+    tapped.OnKnockback({-49.744f,57.825f,105.27f});
+    CHECK(tapped.knockbackTime==gameLocal.time);
+    usercmd_t stale; stale.forwardmove=127; stale.upmove=127; stale.buttons=BUTTON_ATTACK;
+    tapped.RefreshKnockbackMove(stale);
+    CHECK(tapped.airRecovering && stale.forwardmove<0 && stale.upmove==0);
+    CHECK((stale.buttons & BUTTON_ATTACK)!=0); // refresh does not regenerate weapon/view input
+    // A small hit leaves only two health during DM8's committed jump. Its
+    // coast is affordable, but the old lower landing is not. Own that coast.
+    rvBot jumper; jumper.path.Append({-76,891,617}); jumper.path.Append({-44,868,328},NAVTRAVEL_JUMP);
+    jumper.pathCorner=1; jumper.traversalStarted=true;
+    weak.health=2; weak.physics.velocity={25,31,251};
+    jumper.OnKnockback({1.514f,34.961f,-0.643f});
+    airChoiceSet=true; airChoice={}; airLandingUnsafe=false;
+    stale.forwardmove=127; jumper.RefreshKnockbackMove(stale);
+    CHECK(jumper.airRecovering && jumper.path.IsEmpty() && stale.forwardmove==0 && stale.rightmove==0);
+    // CTF5's pad command was generated before an entity applied the rail.
+    // Refresh replaces that obsolete input before the player's physics step;
+    // a still-safe pad coast keeps its command and route.
+    rvBot pad; pad.path.Append({569,-143,-184}); pad.path.Append({580,884,-184},NAVTRAVEL_JUMPPAD);
+    pad.pathCorner=1; pad.traversalStarted=true; pad.traversalStartTime=gameLocal.time-336;
+    weak.health=10; weak.physics.velocity={19.531f,146.841f,299.182f};
+    pad.OnKnockback({19.531f,-499.058f,-23.655f});
+    stale.forwardmove=71; pad.RefreshKnockbackMove(stale);
+    CHECK(!pad.airRecovering && stale.forwardmove==71 && pad.path.Num()==2);
+    airLandingUnsafe=true; airChoice={0,-1,0}; pad.RefreshKnockbackMove(stale);
+    CHECK(pad.airRecovering && stale.forwardmove==0 && stale.rightmove>0 && pad.path.IsEmpty());
+    airChoice={1,0,0}; pad.airRecoverPlanTime=gameLocal.time; pad.OnKnockback({1,0,0});
+    pad.RefreshKnockbackMove(stale);
+    CHECK(stale.forwardmove>0 && stale.rightmove==0); // a second hit replans without the periodic delay
+    // The hook is for a hit after this frame's bot command generation only.
+    rvBot quiet; stale.forwardmove=127; quiet.RefreshKnockbackMove(stale);
+    CHECK(stale.forwardmove==127 && !quiet.airRecovering);
+    quiet.OnKnockback({1,0,0}); gameLocal.time+=16; quiet.RefreshKnockbackMove(stale);
+    CHECK(stale.forwardmove==127 && !quiet.airRecovering);
     // q4ctf5: a rocket's splash threw a walking bot off the south walkway;
     // its replay lands again with full air input against the throw.
     Reset(); idPlayer self; self.pfl.onGround=false; self.physics.velocity={300,0,180};

@@ -62,6 +62,8 @@ def main() -> None:
         "static int BotPlannedTransport(",
         "static bool BotBrakeForTransport(",
         "bool rvBot::RecoverInAir(",
+        "void rvBot::OnKnockback(",
+        "void rvBot::RefreshKnockbackMove(",
         "bool rvBot::RecoverToNavMesh(",
         "void rvBot::UpdateEnemy(",
         "int rvBot::EnemyLastKnownTime(",
@@ -115,6 +117,9 @@ def main() -> None:
         assert result.returncode != 0, "late knocked-coast ownership mutation escaped"
         print("Knocked coast: late-ownership mutation rejected")
         for label, anchor, replacement in (
+            ("weak impulse admission", "if ( kick.LengthSqr() <= 0.0f )", "if ( kick.LengthSqr() < Square( 150.0f ) )"),
+            ("same-frame movement refresh", "\tRecoverInAir( self, cmd );", "\t// disabled recovery refresh"),
+            ("hit jump coast ownership", "ballistic || ( !traversalStarted", "false || ( !traversalStarted"),
             ("supported rim steering", "magnitude > 0.0f && i < 4", "magnitude > 0.0f && i < 0"),
             ("rim steering support", "navMesh.LandingContinuationClear( origin, next ) &&",
              "true &&"),

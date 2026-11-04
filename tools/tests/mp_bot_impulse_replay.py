@@ -257,7 +257,13 @@ def assess_trials(sample: str, trials: list[dict], bot: str = "Rhodes") -> list[
                              "reason": "trial markers missing"})
             continue
         body = sample[starts[0].end():ends[0].start()]
-        armed = len(re.findall(r"^BOT_(?:AIR|MOVE)_PROBE client=1 ", body, re.M)) == 1
+        # Traversal regressions can name their exact marker. Causal impulse
+        # envelopes retain the original AIR/MOVE restriction by default.
+        marker = trial.get("probe_type")
+        if marker is not None and marker not in ("AIR", "MOVE", "JUMP", "DROP", "PAD", "DODGE"):
+            raise ValueError(f"unknown traversal probe marker: {marker}")
+        probes = re.findall(r"^BOT_(AIR|MOVE|JUMP|DROP|PAD|DODGE)_PROBE client=1 ", body, re.M)
+        armed = len(probes) == 1 and probes[0] in ((marker,) if marker else ("AIR", "MOVE"))
         died = any(match.group(1) == bot for match in WORLD_DEATH.finditer(body))
         grounded = re.search(r"^BOT_PROBE_GROUNDED client=1 .* health=(\d+)$", body, re.M)
         terminal = re.findall(r"^MP_PHYSICS slot=1 grounded=([01]) health=(-?\d+) velocity=.*$", body, re.M)
