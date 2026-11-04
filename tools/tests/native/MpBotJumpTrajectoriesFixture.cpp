@@ -225,6 +225,12 @@ bool Sweep(trace_t& trace,const idVec3& start,const idVec3& end,const idTraceMod
 bool NavAgentTranslation(trace_t& trace,const idVec3& start,const idVec3& end) {
     return Sweep(trace,start,end,agentHull);
 }
+struct idPlayer;
+// These geometry worlds contain no other players. Physical-traffic replays
+// separately exercise the production live-player sweep on stock maps.
+bool NavRecoveryTranslation(trace_t& trace,const idVec3& start,const idVec3& end,const idPlayer*) {
+    return NavAgentTranslation(trace,start,end);
+}
 bool NavTraceTranslation(trace_t& trace,const idVec3& start,const idVec3& end,
     const idTraceModel& model,const idBounds&) {
     return Sweep(trace,start,end,model);
@@ -241,7 +247,7 @@ public:
     bool DodgeJumpClear(const idVec3&,const idVec3&,const idVec3&,float,float=0) const;
     bool PadLanding(idEntity*,const idVec3&,const idVec3*,idVec3&,float* = nullptr,float* = nullptr) const;
     bool LandingSurvivable(const idVec3&,const navCorner_t&,float) const;
-    bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr,bool* = nullptr,bool* = nullptr,int = 0) const;
+    bool AirInputLandingSafe(const idVec3&,const idVec3&,const idVec3&,float,idVec3* = nullptr,bool* = nullptr,bool* = nullptr,bool* = nullptr,int = 0,const idPlayer* = nullptr) const;
     bool RecoveryBrakeClear(const trace_t&,const idVec3&,float,int) const;
     bool KnockSlideLandingSafe(const idVec3&,const idVec3&,int,float,const idVec3& = idVec3()) const;
     bool steeredPad=false;

@@ -91,8 +91,8 @@ def main() -> None:
         assert result.returncode != 0, "lifted air-recovery origin mutation escaped"
         print("Live air-recovery origin: artificial lift mutation rejected")
         mutated = fixture.replace(
-            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec ) || heldBrake )",
-            "if ( wish.LengthSqr() > 0.0f && ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec ) || heldBrake ) )")
+            "if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec, self ) || heldBrake )",
+            "if ( wish.LengthSqr() > 0.0f && ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec, self ) || heldBrake ) )")
         assert mutated != fixture
         cpp.write_text(mutated, encoding="utf-8")
         subprocess.run(command, cwd=path, check=True)

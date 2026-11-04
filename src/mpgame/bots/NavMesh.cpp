@@ -365,6 +365,39 @@ static bool NavAgentTranslation( trace_t &trace, const idVec3 &start, const idVe
 	return NavTraceTranslation( trace, start, end, navAgentTrace, navAgentBounds );
 }
 
+// Live recovery also needs the players that can deflect this flight. Keep
+// bodies out of route generation; only a caller supplying its own player asks
+// for this current-position traffic prediction. Replanning refreshes the poses.
+static bool NavRecoveryTranslation( trace_t &trace, const idVec3 &start, const idVec3 &end, const idPlayer *self ) {
+	NavAgentTranslation( trace, start, end );
+	if ( !self || trace.fraction <= 0.0f ) {
+		return trace.fraction >= 1.0f;
+	}
+	idBounds swept;
+	swept.FromBoundsTranslation( navAgentBounds, start, mat3_identity, trace.endpos - start );
+	for ( int i = 0; i < gameLocal.numClients; i++ ) {
+		idEntity *entity = gameLocal.entities[i];
+		if ( !entity || entity == self || !entity->IsType( idPlayer::GetClassType() ) ||
+			 entity->GetInstance() != self->GetInstance() ) {
+			continue;
+		}
+		const idPlayer *other = static_cast<const idPlayer *>( entity );
+		const idClipModel *clip = other->GetPhysics()->GetClipModel();
+		if ( other->spectating || other->health <= 0 || !clip || !clip->GetCollisionModel() ||
+			 !( clip->GetContents() & MASK_PLAYERSOLID ) || !swept.IntersectsBounds( clip->GetAbsBounds() ) ) {
+			continue;
+		}
+		trace_t hit;
+		collisionModelManager->Translation( &hit, start, end, &navAgentTrace, mat3_identity, MASK_PLAYERSOLID,
+			clip->GetCollisionModel(), clip->GetOrigin(), clip->GetAxis() );
+		if ( hit.fraction < trace.fraction ) {
+			trace = hit;
+			trace.c.entityNum = other->entityNumber;
+		}
+	}
+	return trace.fraction >= 1.0f;
+}
+
 // CrashLand requires actual upward-facing contacts at the end of the physics
 // step. A swept collision can stop descent outside that contact envelope.
 static bool NavAgentHasGroundContacts( const idVec3 &origin, const idVec3 &gravity ) {
@@ -1105,7 +1138,7 @@ falling after three seconds is a fall into nothing.
 */
 bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocityIn, const idVec3 &wishIn,
 									 float maxImpactDelta, idVec3 *touchdown, bool *landedSupported, bool *touchedAffordable,
-									 bool *brakedAffordable, int knockMsec ) const {
+									 bool *brakedAffordable, int knockMsec, const idPlayer *self ) const {
 	if ( brakedAffordable ) {
 		*brakedAffordable = false;
 	}
@@ -1132,6 +1165,9 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 	int unstuck = 0;
 	int caughtPad = -1;
 	int maxFrames = 200;
+	auto recoveryTrace = [&]( trace_t &trace, const idVec3 &from, const idVec3 &to ) {
+		return NavRecoveryTranslation( trace, from, to, self );
+	};
 	for ( int frame = 0; frame < maxFrames; frame++ ) {
 		const int transport = TransportAtFloor( position );
 		if ( transport >= 0 ) {
@@ -1163,7 +1199,7 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 		}
 		const idVec3 next = position + velocity * dt + gravity * ( 0.5f * dt * dt );
 		trace_t trace;
-		if ( NavAgentTranslation( trace, position, next ) ) {
+		if ( recoveryTrace( trace, position, next ) ) {
 			position = next;
 			velocity += gravity * dt;
 			continue;
@@ -1174,11 +1210,11 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			// on a full up/across/down success, as player SlideMove does.
 			const idVec3 lift( 0.0f, 0.0f, pm_stepsize.GetFloat() );
 			trace_t ground, up, across, down;
-			if ( !NavAgentTranslation( ground, trace.endpos, trace.endpos - lift ) &&
+			if ( !recoveryTrace( ground, trace.endpos, trace.endpos - lift ) &&
 				 ground.c.normal.z > NAV_WALKABLE_NORMAL_Z ) {
-				NavAgentTranslation( up, trace.endpos, trace.endpos + lift );
-				NavAgentTranslation( across, up.endpos, up.endpos + next - trace.endpos );
-				NavAgentTranslation( down, across.endpos, across.endpos - lift );
+				recoveryTrace( up, trace.endpos, trace.endpos + lift );
+				recoveryTrace( across, up.endpos, up.endpos + next - trace.endpos );
+				recoveryTrace( down, across.endpos, across.endpos - lift );
 				if ( across.fraction >= 1.0f &&
 					( down.fraction >= 1.0f || down.c.normal.z > NAV_WALKABLE_NORMAL_Z ) ) {
 					position = down.endpos;
@@ -1205,7 +1241,7 @@ bool rvNavMesh::AirInputLandingSafe( const idVec3 &origin, const idVec3 &velocit
 			const idVec3 clipped = idPhysics_Player::AdjustVertically( trace.c.normal, velocity + gravity * ( dt * 0.5f ) );
 			trace_t remainder;
 			const idVec3 end = trace.endpos + clipped * ( dt * ( 1.0f - trace.fraction ) );
-			if ( !NavAgentTranslation( remainder, trace.endpos, end ) ||
+			if ( !recoveryTrace( remainder, trace.endpos, end ) ||
 				 TransportOnMove( trace.endpos, end, -1 ) >= 0 ) {
 				return false;	// another collision or launch is not a proven landing
 			}

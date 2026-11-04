@@ -522,7 +522,8 @@ public:
 	bool					ProbeTraversal( int clientNum, const idVec3 &origin, const idVec3 &velocity,
 											const idVec3 &landing, navTravelType_t travel, idEntity *pad = NULL, bool dodge = false,
 									const idVec3 *airDirection = NULL, const idVec3 *entryOrigin = NULL,
-									const idVec3 *nextJump = NULL, bool naturalWalk = false, bool padTraffic = false );
+									const idVec3 *nextJump = NULL, bool naturalWalk = false, bool padTraffic = false,
+									bool recover = false );
 	// The health, and knockback time, the next traversal probe gives its bot;
 	// 0 for unchanged.
 	bool					SetProbeHealth( int clientNum, int health, int knockbackMsec = 0, const idVec3 &kick = vec3_origin, int armor = -1 );

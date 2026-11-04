@@ -105,6 +105,7 @@ static const float	BOT_SCAN_PERIOD_SEC		= 7.0f;		// one sweep out and back
 static const float	BOT_COMBAT_STEER_DOT	= 0.85f;	// combat owns the feet once it bends the route past ~30 degrees
 
 static bool BotBrakeAtEdge( idPlayer *self, idVec3 &moveDir );
+static bool BotBrakeForTransport( idPlayer *self, idVec3 &moveDir, int plannedEntityNum );
 
 // The aim point is biased up the target's own bounding box rather than by a
 // fixed number of units, so it lands in the same place on any player model.  A
@@ -2616,12 +2617,16 @@ bool rvBot::RecoverToNavMesh( idPlayer *self, usercmd_t &cmd ) {
 					unstickUntil = 0;
 				}
 			}
+			// The initial no-route guard saw only momentum, before recovery
+			// chose this command (or replaced its edge brake with a crawl).
+			// No transport is planned while returning to the mesh.
+			const bool transportBraking = BotBrakeForTransport( self, moveDir, -1 );
 			ApplyMove( moveDir, cmd );
 			// The hop over whatever stands between the bot and its node is
 			// proved by a whole simulated flight, up to a hundred box sweeps.
 			// A stranded bot asked for it on every other grounded frame; four
 			// times a second is as often as the obstacle changes.
-			if ( !braking && ( ( gameLocal.framenum + clientNum ) % 16 ) == 0 ) {
+			if ( !braking && !transportBraking && ( ( gameLocal.framenum + clientNum ) % 16 ) == 0 ) {
 				TryDodgeJump( self, moveDir, cmd );
 			}
 			return true;
@@ -2657,6 +2662,7 @@ bool rvBot::RecoverToNavMesh( idPlayer *self, usercmd_t &cmd ) {
 
 	if ( moveDir.Normalize() > 0.0f ) {
 		BotBrakeAtEdge( self, moveDir );
+		BotBrakeForTransport( self, moveDir, -1 );
 		ApplyMove( moveDir, cmd );
 	}
 
@@ -4879,7 +4885,7 @@ static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 	bool heldTouch = false, heldBrake = false;
 	// Replanning must not replace a still-safe heading with a different one
 	// whose prediction starts from a slightly different point every 200 ms.
-	if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec ) || heldBrake ) {
+	if ( navMesh.AirInputLandingSafe( origin, velocity, wish, limit, NULL, NULL, &heldTouch, &heldBrake, knockMsec, self ) || heldBrake ) {
 		return true;
 	}
 	idVec3 brake( -velocity.x, -velocity.y, 0.0f );
@@ -4894,7 +4900,7 @@ static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 	idVec3 lastTouchdown;
 	bool haveLastResort = false;
 	if ( limit < idMath::INFINITY && wish.LengthSqr() > 0.0f ) {
-		navMesh.AirInputLandingSafe( origin, velocity, wish, idMath::INFINITY, &lastTouchdown, &haveLastResort );
+		navMesh.AirInputLandingSafe( origin, velocity, wish, idMath::INFINITY, &lastTouchdown, &haveLastResort, NULL, NULL, knockMsec, self );
 	}
 	idVec3 lastResort = wish;
 	int lastResortHealth = haveLastResort ? BotRecoveryHealthAt( self, lastTouchdown ) : 0;
@@ -4911,7 +4917,7 @@ static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 			candidate.Set( idMath::Cos( angle ), idMath::Sin( angle ), 0.0f );
 		}
 		bool landed = false, touched = false, braked = false;
-		if ( navMesh.AirInputLandingSafe( origin, velocity, candidate, limit, NULL, &landed, &touched, &braked, knockMsec ) ) {
+		if ( navMesh.AirInputLandingSafe( origin, velocity, candidate, limit, NULL, &landed, &touched, &braked, knockMsec, self ) ) {
 			wish = candidate;
 			return true;
 		}
@@ -4933,7 +4939,7 @@ static bool BotChooseAirInput( idPlayer *self, idVec3 &wish ) {
 		idVec3 candidateTouchdown = vec3_origin;
 		bool candidateSupported = false;
 		if ( limit < idMath::INFINITY && !haveSupported ) {
-			navMesh.AirInputLandingSafe( origin, velocity, candidate, idMath::INFINITY, &candidateTouchdown, &candidateSupported );
+			navMesh.AirInputLandingSafe( origin, velocity, candidate, idMath::INFINITY, &candidateTouchdown, &candidateSupported, NULL, NULL, knockMsec, self );
 		}
 		if ( candidateSupported ) {
 			// If every affordable landing is out of reach, supported floor
@@ -8721,12 +8727,13 @@ rvBotManager::ProbeTraversal
 bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const idVec3 &velocity,
 								 const idVec3 &landing, navTravelType_t travel, idEntity *pad, bool dodge,
 								 const idVec3 *airDirection, const idVec3 *entryOrigin,
-								 const idVec3 *nextJump, bool naturalWalk, bool padTraffic ) {
+								 const idVec3 *nextJump, bool naturalWalk, bool padTraffic, bool recover ) {
 	if ( ( travel != NAVTRAVEL_WALK && travel != NAVTRAVEL_DROP && travel != NAVTRAVEL_JUMP && travel != NAVTRAVEL_JUMPPAD ) ||
 		( ( travel == NAVTRAVEL_JUMPPAD ) != ( pad != NULL ) ) || ( dodge && travel != NAVTRAVEL_WALK ) ||
 		( airDirection && ( travel != NAVTRAVEL_WALK || dodge ) ) ||
 		( entryOrigin && travel != NAVTRAVEL_DROP && travel != NAVTRAVEL_JUMPPAD ) || ( padTraffic && !pad ) ||
-		( naturalWalk && ( travel != NAVTRAVEL_WALK || dodge || airDirection ) ) || ( nextJump && !naturalWalk ) ) {
+		( naturalWalk && ( travel != NAVTRAVEL_WALK || dodge || airDirection ) ) || ( nextJump && !naturalWalk ) ||
+		( recover && ( !naturalWalk || nextJump || padTraffic ) ) ) {
 		return false;
 	}
 	if ( !gameLocal.isServer || gameLocal.isClient || !gameLocal.GetLocalPlayer() ||
@@ -8803,6 +8810,18 @@ bool rvBotManager::ProbeTraversal( int clientNum, const idVec3 &origin, const id
 		bot.probeAirActive = true;
 		bot.probeAirDirection.Set( airDirection->x, airDirection->y, 0.0f );
 		bot.probeAirDirection.Normalize();
+	}
+	if ( recover ) {
+		// Exercise normal off-route movement with the supplied nearest-node
+		// answer. Keep it only for this bounded diagnostic; physics and all
+		// movement guards still run, and later goal selection resumes normally.
+		bot.path.Clear();
+		bot.pathCorner = 0;
+		bot.ResetTraversal();
+		bot.repathFailures = 2;
+		bot.recoverValid = true;
+		bot.recoverTarget = landing;
+		bot.recoverSearchTime = gameLocal.time + BOT_TRAVEL_TIMEOUT_MSEC;
 	}
 	if ( travel == NAVTRAVEL_WALK && !dodge && !airDirection && !naturalWalk ) {
 		// A walking probe replays a post-impulse state: the thrown bot's own

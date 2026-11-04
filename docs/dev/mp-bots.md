@@ -211,9 +211,53 @@ required end-of-step grounding only when the apparent impact exceeded the
 health budget. It now completes the clipped collision frame for affordable
 touches too, continuing the flight when actual ground contacts are absent.
 The new native case fails before this change and passes afterwards, with all
-24 geometry reversions rejected on Windows. The recorded hit joins the
-positive suite as `rocket_ramp_glance`; runtime and Linux qualification of
-this further correction remain pending.
+24 geometry reversions rejected on Windows and Linux ASan/UBSan. The recorded
+hit joins the positive suite as `rocket_ramp_glance`. On the `5a2f78a3d` candidate,
+the controller survives twelve seconds and finishes grounded at 100 health
+(`current-failures-ground/`), where the prior stage died.
+
+The outstanding `04e637ae0` classifications are now complete. Extending Kane's
+identical `air04` input to twelve seconds records its world death; its apparent
+six-second survival was still a fall. The unchanged policy therefore excludes
+that impulse (`ctf5-hop-air04-extended/`). The derived four-map assessment
+`long-hop-combined-extended/` passes with 334 kills, 551 traversals and eleven
+strict exclusions. The DM6 shotgun death also passes exact-state replay,
+so `catalog-hop/assessment-dm6.json` passes all 33 death/duration gates with
+915 kills, 1,283 traversals and four exclusions. Earlier failed assessments,
+short runs and the two separate CTF5 failures remain preserved. These results
+qualify the archived stage, not the subsequent corrections or timing.
+
+### Live recovery around pads and players
+
+The remaining CTF5 unplanned entry was preceded by an exhausted route. Its
+initial no-route guard checked momentum before recovery chose a new command;
+nearest-node recovery and wandering then applied only the edge guard. The
+normal WALK probes therefore exercised the wrong movement path. The new local
+cheat `bot_probeRecover` supplies a bounded nearest-node answer while running
+normal off-route movement and physics. Two westward reconstructions at nine
+health enter the unplanned pad and die (`unplanned-pad-before/`). Applying the
+transport guard after recovery's final command, including a supported-rim
+crawl, keeps all four nearby approaches alive and grounded at nine health for
+twelve seconds (`unplanned-pad-guarded/`). The node targets are diagnostic
+reconstructions, not an exact snapshot of the original match. Native tests
+reject the old node and wander paths; all 25 decision reversions pass on
+Windows and Linux ASan/UBSan.
+
+The DM8 stationary-body envelope has three surviving headings among sixteen,
+while its controller and no-input trial die (`body-hop-envelope/`). Navmesh
+generation correctly excludes players from architecture, but live airborne
+recovery reused that exclusion and forecast a coast through another player.
+Recovery now additionally sweeps the current live hulls in the same instance,
+excluding itself, spectators, dead players and non-solid clips. World collision
+and the existing affordable-floor proof still apply. This is a current-position
+forecast refreshed by replanning, not a prediction of another player's future
+commands. The rocket collision now survives at 66 health, and the later falling
+body-contact probe at 31 health, both grounded after twelve seconds
+(`body-predicted/`); `body-ground/` preserves the prior controller failure.
+Both become positive regressions alongside the four off-route cases. The
+original moving-player departures and Kane's older CTF3 missed-pad departure
+are not claimed as exact reproductions. Final-build long matches, all 33 map
+variants and controlled timing remain required.
 
 ## Hit-to-movement handoff, 4 November 2026
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay the recoverable long-match hit states recorded on 4 November.
+"""Replay recoverable long-match hit and off-route states recorded on 4 November.
 
 These are positive recovery regressions, not full match snapshots or causal
 exclusions. The weak-hit cases enter through the real knockback handler instead
@@ -12,7 +12,10 @@ import json
 import os
 from pathlib import Path
 
-from mp_bot_impulse_replay import replay_identity, replay_session
+from mp_bot_impulse_replay import (
+    TRIAL_OBSERVE_MSEC, TRIAL_REMOVE_MSEC, TRIAL_RESPAWN_MSEC,
+    replay_identity, replay_session,
+)
 from mp_bot_air_recovery_replay import assess_recovery_trials
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +42,16 @@ CASES = {
         "observe_msec": 12000, "allow_resumed_navigation": True,
         "setup": ["bot_probeHealth 1 12 154 170.551 -246.454 241.656 0"],
         "command": "bot_probeMove 1 -24.912 -761.135 328.25 274.678 -581.521 241.656 -24.912 -761.135 328.25",
+    }, {
+        "name": "rocket_player_deflection", "observe_msec": 12000,
+        "setup": ["noclip", "setviewpos 700 60 68", "waitMsec 64",
+                  "bot_probeHealth 1 66 190 259.792 -144.761 370.375 1"],
+        "command": "bot_probeMove 1 544.251 70.468 0.25 601.687 -126.201 370.375 544.251 70.468 0.25",
+    }, {
+        "name": "fall_player_contact", "observe_msec": 12000,
+        "setup": ["noclip", "setviewpos 475 342 68", "waitMsec 64",
+                  "bot_probeHealth 1 31 50 5.182 12.799 32.161 0"],
+        "command": "bot_probeWalk 1 446.359 355.924 134.854 171.735 -81.538 -465.89 532 364 0.25",
     }]),
     "ctf3": ("CTF", [{
         "name": "weak_nail_walk",
@@ -66,6 +79,18 @@ CASES = {
     }]),
 }
 
+# A normal WALK probe cannot exercise the no-route recovery that entered an
+# unplanned CTF5 pad. The westward approaches die before the transport guard;
+# all four must remain alive and grounded for twelve seconds after the fix.
+for start_name, pose in (("slow", "771.99 -297.27 -183.75 18.71 18.61 0"),
+                         ("moving", "765.95 -303.31 -183.75 -138.13 -138.19 0")):
+    for direction, target in (("west", "652 -336 -183.75"), ("diagonal", "652 -420 -183.75")):
+        CASES["ctf5"][1].append({
+            "name": f"off_route_{start_name}_{direction}", "observe_msec": 12000,
+            "setup": ["bot_probeHealth 1 9 0 0 0 0 0"],
+            "command": f"bot_probeRecover 1 {pose} {target}",
+        })
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -85,8 +110,11 @@ def main() -> int:
         if args.map not in ("all", name):
             continue
         cases = [{**trial, "expect_survival": True} for trial in cases]
+        observation = sum(trial.get("observe_msec", TRIAL_OBSERVE_MSEC) +
+                          TRIAL_REMOVE_MSEC + TRIAL_RESPAWN_MSEC + 1200 for trial in cases)
+        timeout = 150 + observation * 3 // 1000
         done, log, code = replay_session(runtime, executable, args.basepath.resolve(), output / name,
-                                        "mp/q4" + name, mode, cases, args.port, 180)
+                                        "mp/q4" + name, mode, cases, args.port, timeout)
         complete = complete and done
         codes[name] = code
         outcomes += [{**trial, "map": name} for trial in assess_recovery_trials(log, cases)]

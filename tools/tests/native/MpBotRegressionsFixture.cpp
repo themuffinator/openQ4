@@ -1605,6 +1605,27 @@ void TestRecoveryEdge() {
     CHECK(cmd.forwardmove>0); // ground guard cannot take over an airborne recovery
     std::puts("Recovery edge: nearest-node and wander commands brake before void; rescue toward support and broad floor remain usable: PASS");
 }
+void TestRecoveryTransport() {
+    Reset(); idPlayer self; gameLocal.entities[0]=&self;
+    moveDirectionSafe=false;
+    rvBot bot; bot.recoverSearchTime=gameLocal.time; bot.recoverValid=true;
+    bot.recoverTarget={100,0,0}; self.physics.origin={-200,0,0};
+    navMesh.volumesAhead={{9,-190}};
+    usercmd_t cmd; CHECK(bot.RecoverToNavMesh(&self,cmd));
+    CHECK(cmd.forwardmove==0 && cmd.rightmove==0 && cmd.upmove==0);
+    // The same guard must cover a wandering bot without a nearest node.
+    bot.recoverValid=false; bot.recoverWanderUntil=gameLocal.time+1000; bot.recoverWanderYaw=0;
+    cmd={}; CHECK(!bot.RecoverToNavMesh(&self,cmd));
+    CHECK(cmd.forwardmove==0 && cmd.rightmove==0 && cmd.upmove==0);
+    navMesh.volumesAhead.clear(); cmd={}; bot.RecoverToNavMesh(&self,cmd);
+    CHECK(cmd.forwardmove>0); // ordinary supported wandering still moves
+    // Nor may the supported-rim override reintroduce an unplanned volume.
+    bot.recoverValid=true; bot.recoverTarget={-28,63,0}; self.physics.origin={16,0,0};
+    navMesh.recoveryStepClear=true; navMesh.volumesAhead={{9,-100}};
+    cmd={}; CHECK(bot.RecoverToNavMesh(&self,cmd));
+    CHECK(cmd.forwardmove==0 && cmd.rightmove==0 && cmd.upmove==0);
+    std::puts("Off-route recovery: nearest-node, wander and supported-rim commands stop before unplanned transport: PASS");
+}
 void TestRimSteering() {
     Reset(); idPlayer self; self.physics.origin={-8,0,0};
     navMesh.directionalContinuation=true;
@@ -1694,4 +1715,5 @@ int main(int argc,char** argv) {
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestMoveProjection();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestDodgeOwnership();
     if(argc==1 || !std::strcmp(argv[1],"movement")) TestRecoveryEdge();
+    if(argc==1 || !std::strcmp(argv[1],"movement")) TestRecoveryTransport();
 }

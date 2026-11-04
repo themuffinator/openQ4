@@ -61,7 +61,7 @@ def main() -> None:
         "static bool BotDeadlyDropAt(",
         "static bool BotBrakeAtEdge( idPlayer *self, idVec3 &moveDir ) {",
         "static int BotPlannedTransport(",
-        "static bool BotBrakeForTransport(",
+        "static bool BotBrakeForTransport( idPlayer *self, idVec3 &moveDir, int plannedEntityNum ) {",
         "bool rvBot::RecoverInAir(",
         "void rvBot::OnKnockback(",
         "void rvBot::RefreshKnockbackMove(",
@@ -118,6 +118,10 @@ def main() -> None:
         assert result.returncode != 0, "late knocked-coast ownership mutation escaped"
         print("Knocked coast: late-ownership mutation rejected")
         for label, anchor, replacement in (
+            ("off-route node transport", "const bool transportBraking = BotBrakeForTransport( self, moveDir, -1 );",
+             "const bool transportBraking = false;"),
+            ("off-route wander transport", "\t\tBotBrakeForTransport( self, moveDir, -1 );",
+             "\t\t// omitted wander transport guard"),
             ("airborne pad approach reservation", "if ( botManager.PadApproachOf( i, otherPad, otherSince, otherLaunch, otherLanding ) &&",
              "if ( other->pfl.onGround && botManager.PadApproachOf( i, otherPad, otherSince, otherLaunch, otherLanding ) &&"),
             ("actual floor health", "!navMesh.LandingSurvivable( self->GetPhysics()->GetOrigin(), landing, BotMaxSafeFallDelta( self ) )",

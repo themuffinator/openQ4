@@ -2212,11 +2212,17 @@ claim peer combinations that have not been tested.
   open. The `04e637ae0` repeat qualifies CTF3 directly and all six DM8 deaths
   under the exact-state impulse policy, but retains two CTF5 navigation deaths.
   One reproduces a ramp contact falsely accepted as a landing; recovery now
-  requires actual grounding after the clipped collision frame. A second
-  low-health unplanned pad entry and older moving-player departures remain
-  unresolved. CTF5/DeadZone repeats clear their duration shortfalls without
-  waiving the original failed reports. The new ramp correction still needs
-  runtime, complete-catalog and controlled-timing qualification.
+  requires actual grounding after the clipped collision frame, and its runtime
+  replay survives. Off-route movement now guards its final command against
+  unplanned transports; two fatal CTF5 reconstructions and four nearby approach
+  checks survive. Live recovery also forecasts current player hulls, fixing a
+  reproducible DM8 body deflection. The original moving-player sequences and
+  older CTF3 missed-pad departure are not exact reproductions. CTF5/DeadZone
+  repeats clear their duration shortfalls without waiving the original failed
+  reports. The archived `04e637ae0` stage now qualifies all four duration-selected
+  long runs and all 33 catalog variants under strict causal assessment. The
+  subsequent ramp, off-route and player-contact corrections still need renewed
+  long-match, complete-catalog and controlled-timing qualification.
   The identical-stage `9a70f7b68` catalog's two CTF5 deaths pass
   exact-state causal exclusion, leaving zero navigation deaths and four
   duration failures; those duration failures are not waived.

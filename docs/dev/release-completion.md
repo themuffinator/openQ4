@@ -7,6 +7,9 @@ work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
 ## Multiplayer bot recovery follow-up, 4 November 2026
+- Bots returning to a route avoid unplanned jump pads, and airborne recovery
+  accounts for nearby players that can deflect a safe landing. Reproduced falls
+  pass isolated checks; final long-match and map-catalog qualification continues.
 
 - Bots keep their place in a jump-pad queue while hopping up its ramp, preventing
   a following bot from launching into them. The reproduced CTF3 collision and
