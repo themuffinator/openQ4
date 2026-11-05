@@ -151,7 +151,8 @@ enum vkPostPassKind_t {
 	VK_POST_DEBUG_VIEW,
 	VK_POST_HDR_LUMINANCE,
 	VK_POST_MOTION_VECTORS_PREVIOUS,
-	VK_POST_MOTION_VECTORS_REACTIVE
+	VK_POST_MOTION_VECTORS_REACTIVE,
+	VK_POST_SKY_MASK
 };
 
 // scene shader modules, created the first time a pass needs one
@@ -171,6 +172,7 @@ enum vkPostSceneModule_t {
 	VK_POST_MODULE_MOTION_VECTORS_PREVIOUS_VERT,
 	VK_POST_MODULE_MOTION_VECTORS_REACTIVE_VERT,
 	VK_POST_MODULE_MOTION_VECTORS_REACTIVE_FRAG,
+	VK_POST_MODULE_SKY_MASK,
 	VK_POST_SCENE_MODULE_COUNT
 };
 
@@ -195,7 +197,8 @@ static const vkPostModuleSource_t vkPostSceneModuleSources[ VK_POST_SCENE_MODULE
 	{ vk_post_hdr_luminance_frag_spv, vk_post_hdr_luminance_frag_spv_size, "HDR luminance reduction fragment" },
 	{ vk_post_motionvectors_previous_vert_spv, vk_post_motionvectors_previous_vert_spv_size, "post posed motion vector vertex" },
 	{ vk_post_motionvectors_reactive_vert_spv, vk_post_motionvectors_reactive_vert_spv_size, "post reactive coverage vertex" },
-	{ vk_post_motionvectors_reactive_frag_spv, vk_post_motionvectors_reactive_frag_spv_size, "post reactive coverage fragment" }
+	{ vk_post_motionvectors_reactive_frag_spv, vk_post_motionvectors_reactive_frag_spv_size, "post reactive coverage fragment" },
+	{ vk_post_skymask_frag_spv, vk_post_skymask_frag_spv_size, "post portal-sky mask fragment" }
 };
 
 // RB_BLOOM_MAX_LEVELS and RB_BLOOM_BASE_WEIGHTS (draw_common.cpp)
@@ -270,6 +273,14 @@ typedef struct vkPostSceneState_s {
 	// Half-resolution classic AO (VK_Post_DrawSSAOHalf): r AO, g view depth
 	idImage *			ssaoHalf;
 	idRenderTexture *	ssaoHalfTarget;
+
+	// The main view's world depth drawn single-sample before its portal-sky
+	// backdrop (VK_PostProcess_PortalSkyMask); its capture is ssaoWorldDepth.
+	idImage *			earlyWorldColor;
+	idImage *			earlyWorldDepth;
+	idRenderTexture *	earlyWorldTarget;
+	const viewDef_t *	earlyWorldView;
+	int					earlyWorldFrame;
 
 	idImage *			bloomImages[ VK_POST_BLOOM_MAX_LEVELS ][ 2 ];
 	idRenderTexture *	bloomTargets[ VK_POST_BLOOM_MAX_LEVELS ][ 2 ];
@@ -524,6 +535,7 @@ void VK_PostProcess_Shutdown( void ) {
 	delete vkPostScene.motionVectorTarget;
 	delete vkPostScene.ssaoFieldTarget;
 	delete vkPostScene.ssaoHalfTarget;
+	delete vkPostScene.earlyWorldTarget;
 	delete vkTemporalMotionTarget;
 	vkTemporalMotionTarget = NULL;
 	vkTemporalMotionImage = NULL;
@@ -535,6 +547,7 @@ void VK_PostProcess_Shutdown( void ) {
 	vkPostScene.celWorldDepthFrame = -1;
 	vkPostScene.ssaoClassicDepthFrame = -1;
 	vkPostScene.ssaoFieldFrame = -1;
+	vkPostScene.earlyWorldFrame = -1;
 	VK_Post_ResetMotionBlurHistory();
 }
 
@@ -1156,6 +1169,12 @@ ones, the world copy (draw_common.cpp RB_CaptureSSAOWorldDepthImage).
 ====================
 */
 int VK_PostProcess_WorldDepthCaptures( const viewDef_t *viewDef ) {
+	// The world depth this view's portal-sky mask already drew and captured
+	// into ssaoWorldDepth (VK_PostProcess_PortalSkyMask) stands in for the
+	// SSAO snapshot. Only main views capture into that image, so the portal
+	// view's own prepass, which resets the frame stamp below, leaves it intact.
+	const bool earlyWorld = vkPostScene.earlyWorldView == viewDef
+		&& vkPostScene.earlyWorldFrame == backEnd.frameCount;
 	vkPostScene.ssaoWorldDepthFrame = -1;
 	vkPostScene.celWorldDepthFrame = -1;
 	vkPostScene.ssaoClassicDepthFrame = -1;
@@ -1177,6 +1196,17 @@ int VK_PostProcess_WorldDepthCaptures( const viewDef_t *viewDef ) {
 				}
 			}
 		}
+	}
+	// Only the plain SSAO snapshot has an early equivalent; cel ink and the
+	// native PBR split keep their in-prepass captures.
+	if ( captures == VK_POST_CAPTURE_SSAO_WORLD && earlyWorld ) {
+		static bool logged = false;
+		if ( !logged ) {
+			logged = true;
+			common->Printf( "Vulkan: SSAO uses the portal-sky mask's world depth (no prepass snapshot)\n" );
+		}
+		vkPostScene.ssaoWorldDepthFrame = backEnd.frameCount;
+		return 0;
 	}
 	return captures;
 }
@@ -1219,12 +1249,205 @@ void VK_PostProcess_CaptureWorldDepth( const viewDef_t *viewDef, int fillPhase, 
 	if ( fillPhase == ( split ? 2 : 1 ) && ( captures & VK_POST_CAPTURE_SSAO_WORLD ) != 0
 			&& phaseDrawn[ 0 ] + phaseDrawn[ 1 ] + ( split ? phaseDrawn[ 2 ] : 0 ) > 0 ) {
 		idImage *image = VK_Post_EnsureImage( vkPostScene.ssaoWorldDepth, "_vkSSAOWorldDepth", VK_Post_DepthImage );
+		vkGpuPhaseScope timing( VK_Exec_ActiveCmd(), VK_GPU_PHASE_SSAO_SNAPSHOT );
 		if ( VK_Post_CaptureDepth( image, viewDef ) ) {
 			vkPostScene.ssaoWorldDepthFrame = backEnd.frameCount;
 			vkPostScene.ssaoWorldDepthWidth = width;
 			vkPostScene.ssaoWorldDepthHeight = height;
 		}
 	}
+}
+
+/*
+====================
+Portal-sky mask
+
+A portal-sky backdrop is a whole second view drawn into the scene target
+before its main view, and it shows only where the main view draws nothing:
+the compiled map has no sky faces, and the main prepass writes black over
+every opaque or perforated pixel it covers. Before a command list runs, each
+backdrop view is paired with the next main view of the same world, viewport
+and target. At the backdrop's depth clear, the main view's world surfaces (the
+SSAO world filter) are drawn depth-only into a single-sample target and
+captured. A full-screen pass then sets the backdrop's depth to 1 wherever that
+world depth, or any of its eight neighbours, is still far, and to 0 elsewhere.
+Every depth-tested pass of the backdrop rejects the 0 pixels before shading.
+The neighbourhood covers multisampled silhouette pixels whose centre the world
+covers but some samples do not. Translucent surfaces, alpha-tested holes and
+models leave far depth, so the backdrop still draws behind them. The capture
+is the SSAO world depth for the main view, which then takes no snapshot in its
+prepass. r_vkPortalSkyMask 0 restores the full backdrop and the snapshot.
+====================
+*/
+static idCVar r_vkPortalSkyMask( "r_vkPortalSkyMask", "1", CVAR_RENDERER | CVAR_BOOL,
+	"draw the portal-sky backdrop only where its main view's world leaves far depth" );
+
+static const int VK_PORTAL_SKY_MASK_MAX = 8;
+typedef struct vkPortalSkyPair_s {
+	const viewDef_t *	portal;
+	const viewDef_t *	mainView;
+} vkPortalSkyPair_t;
+static vkPortalSkyPair_t vkPortalSkyPairs[ VK_PORTAL_SKY_MASK_MAX ];
+static int vkPortalSkyPairCount = 0;
+
+void VK_PostProcess_PlanPortalSkyMask( const emptyCommand_t *cmds ) {
+	vkPortalSkyPairCount = 0;
+	if ( !r_vkPortalSkyMask.GetBool() || r_skipPostProcess.GetBool() ) {
+		return;
+	}
+	const idRenderTexture *target = NULL;
+	for ( const emptyCommand_t *cmd = cmds; cmd != NULL; cmd = (const emptyCommand_t *)cmd->next ) {
+		if ( cmd->commandId == RC_SET_RENDERTEXTURE ) {
+			target = ( (const setRenderTargetCommand_t *)cmd )->renderTexture;
+			continue;
+		}
+		if ( cmd->commandId != RC_DRAW_VIEW ) {
+			continue;
+		}
+		const viewDef_t *portal = ( (const drawSurfsCommand_t *)cmd )->viewDef;
+		if ( portal == NULL || ( portal->renderFlags & RF_PORTAL_SKY ) == 0
+				|| vkPortalSkyPairCount >= VK_PORTAL_SKY_MASK_MAX ) {
+			continue;
+		}
+		// The owner is the next main view; another target in between, or a
+		// main view that does not match, leaves this backdrop whole.
+		const idRenderTexture *laterTarget = target;
+		for ( const emptyCommand_t *next = (const emptyCommand_t *)cmd->next; next != NULL;
+				next = (const emptyCommand_t *)next->next ) {
+			if ( next->commandId == RC_SET_RENDERTEXTURE ) {
+				laterTarget = ( (const setRenderTargetCommand_t *)next )->renderTexture;
+				continue;
+			}
+			if ( next->commandId != RC_DRAW_VIEW ) {
+				continue;
+			}
+			const viewDef_t *mainView = ( (const drawSurfsCommand_t *)next )->viewDef;
+			if ( mainView == NULL || !VK_Post_IsMainSceneView( mainView ) ) {
+				continue;
+			}
+			if ( laterTarget == target && mainView->renderWorld == portal->renderWorld
+					&& mainView->viewport.Equals( portal->viewport ) ) {
+				vkPortalSkyPairs[ vkPortalSkyPairCount ].portal = portal;
+				vkPortalSkyPairs[ vkPortalSkyPairCount ].mainView = mainView;
+				vkPortalSkyPairCount++;
+			}
+			break;
+		}
+	}
+}
+
+// Single-sample colour + depth target the size of the active framebuffer;
+// the colour is only the prepass's black, which nothing reads.
+static bool VK_Post_EnsureEarlyWorldTarget( int width, int height ) {
+	idRenderTexture *&target = vkPostScene.earlyWorldTarget;
+	if ( target != NULL ) {
+		int currentWidth = 0, currentHeight = 0;
+		tr.GetRenderTextureSize( target, currentWidth, currentHeight );
+		if ( currentWidth != width || currentHeight != height ) {
+			tr.ResizeRenderTexture( target, width, height );
+		}
+		return target != NULL && target->EnsureDeviceHandle();
+	}
+	idImageOpts opts;
+	opts.format = FMT_RGBA8;
+	opts.colorFormat = CFM_DEFAULT;
+	opts.numLevels = 1;
+	opts.textureType = TT_2D;
+	opts.isPersistant = true;
+	opts.width = width;
+	opts.height = height;
+	opts.numMSAASamples = 0;
+	if ( vkPostScene.earlyWorldColor == NULL ) {
+		vkPostScene.earlyWorldColor = globalImages->ScratchImage( "_vkEarlyWorldColor", &opts, TF_NEAREST, TR_CLAMP, TD_DEFAULT );
+	}
+	opts.format = FMT_DEPTH_STENCIL;
+	if ( vkPostScene.earlyWorldDepth == NULL ) {
+		vkPostScene.earlyWorldDepth = globalImages->ScratchImage( "_vkEarlyWorldDepth", &opts, TF_NEAREST, TR_CLAMP, TD_DEPTH );
+	}
+	if ( vkPostScene.earlyWorldColor == NULL || vkPostScene.earlyWorldDepth == NULL ) {
+		return false;
+	}
+	target = tr.CreateRenderTexture( vkPostScene.earlyWorldColor, vkPostScene.earlyWorldDepth );
+	if ( target != NULL ) {
+		target->SetDebugLabel( "Vulkan early world depth" );
+	}
+	return target != NULL && target->EnsureDeviceHandle();
+}
+
+// Depth 1 where the captured world depth or a neighbour is far, else 0;
+// colour is untouched (blend ZERO, ONE).
+static bool VK_Post_DrawSkyMask( const viewDef_t *portal, idImage *worldDepth ) {
+	const VkShaderModule fragModule = VK_Post_SceneModule( VK_POST_MODULE_SKY_MASK );
+	VkCommandBuffer cmd = VK_Exec_ActiveCmd();
+	if ( fragModule == VK_NULL_HANDLE || cmd == VK_NULL_HANDLE ) {
+		return false;
+	}
+	const float block[ 4 ] = { 1.0f / (float)VK_Post_ViewWidth( portal ), 1.0f / (float)VK_Post_ViewHeight( portal ), 0.0f, 0.0f };
+	const VkDescriptorSet sets[ 1 ] = { VK_Post_Descriptor( worldDepth ) };
+	const int uniformOffset = VK_Exec_InteractionUniformAlloc( block, sizeof( block ) );
+	const VkPipeline pipeline = VK_Exec_PostPipeline( VK_POST_SKY_MASK, vkPost.fullscreenVert, fragModule,
+			GLS_SRCBLEND_ZERO | GLS_DSTBLEND_ONE );
+	if ( !VK_Post_SetsReady( pipeline, sets, 1, uniformOffset ) ) {
+		return false;
+	}
+	const int fbHeight = VK_Exec_ActiveFramebufferHeight();
+	VkViewport viewport;
+	memset( &viewport, 0, sizeof( viewport ) );
+	viewport.x = (float)portal->viewport.x1;
+	viewport.y = (float)( VK_Exec_ActiveLowerOrigin() ? portal->viewport.y1 : fbHeight - portal->viewport.y1 );
+	viewport.width = (float)VK_Post_ViewWidth( portal );
+	viewport.height = ( VK_Exec_ActiveLowerOrigin() ? 1.0f : -1.0f ) * VK_Post_ViewHeight( portal );
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport( cmd, 0, 1, &viewport );
+	VK_Exec_SetViewScissor( cmd, portal, fbHeight );
+	VK_Post_ResetDrawState( cmd );
+	vkCmdSetDepthTestEnable( cmd, VK_TRUE );
+	vkCmdSetDepthCompareOp( cmd, VK_COMPARE_OP_ALWAYS );
+	vkCmdSetDepthWriteEnable( cmd, VK_TRUE );
+	VK_Post_BindAndDraw( cmd, pipeline, sets, 1, uniformOffset );
+	VK_Post_ResetDrawState( cmd );
+	return true;
+}
+
+bool VK_PostProcess_PortalSkyMask( const viewDef_t *portal ) {
+	const viewDef_t *mainView = NULL;
+	for ( int i = 0; i < vkPortalSkyPairCount; i++ ) {
+		if ( vkPortalSkyPairs[ i ].portal == portal ) {
+			mainView = vkPortalSkyPairs[ i ].mainView;
+			break;
+		}
+	}
+	if ( mainView == NULL || !mainView->viewport.Equals( portal->viewport ) || !VK_Post_EnsureModules() ) {
+		return false;
+	}
+	idRenderTexture *sceneTarget = VK_Exec_ActiveRenderTexture();
+	const int sceneFace = VK_Exec_ActiveCubeFace();
+	const int fbWidth = VK_Exec_ActiveFramebufferWidth();
+	const int fbHeight = VK_Exec_ActiveFramebufferHeight();
+	if ( sceneTarget == NULL || sceneFace != 0 || !VK_Post_EnsureEarlyWorldTarget( fbWidth, fbHeight ) ) {
+		return false;
+	}
+	idImage *capture = VK_Post_EnsureImage( vkPostScene.ssaoWorldDepth, "_vkSSAOWorldDepth", VK_Post_DepthImage );
+	bool captured = false;
+	if ( capture != NULL && VK_Exec_SetRenderTarget( vkPostScene.earlyWorldTarget, 0,
+			r_vkPostDepthTransitionReference.GetBool() ) ) {
+		captured = VK_Exec_DrawWorldDepth( mainView, VK_Post_SSAOWorldDepthSurf )
+			&& VK_Post_CaptureDepth( capture, mainView );
+	}
+	if ( !VK_Exec_SetRenderTarget( sceneTarget, sceneFace ) || !captured ) {
+		return false;
+	}
+	vkPostScene.earlyWorldView = mainView;
+	vkPostScene.earlyWorldFrame = backEnd.frameCount;
+	vkPostScene.ssaoWorldDepthWidth = VK_Post_ViewWidth( mainView );
+	vkPostScene.ssaoWorldDepthHeight = VK_Post_ViewHeight( mainView );
+	const bool masked = VK_Post_DrawSkyMask( portal, capture );
+	static bool logged = false;
+	if ( !logged ) {
+		logged = true;
+		common->Printf( "Vulkan: portal-sky mask %s\n", masked ? "drew" : "pass failed (backdrop unmasked)" );
+	}
+	return masked;
 }
 
 // ---- SSAO (RB_STD_SSAO) ----

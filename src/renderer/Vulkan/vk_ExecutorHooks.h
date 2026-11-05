@@ -114,6 +114,12 @@ void				VK_PostProcess_ConsumeHDRSample( unsigned int generation, int frame, flo
 bool				VK_PostProcess_HDRSceneRequested( void );
 // Called before any temporary scene scaling mutates the incoming viewport.
 void VK_PostProcess_BeginView( const viewDef_t *viewDef );
+// Portal-sky mask: pair each backdrop view with the main view it backs, once
+// per executed command list; then, at the backdrop's depth clear, draw the
+// main view's world depth and keep the backdrop to the pixels it leaves far.
+void VK_PostProcess_PlanPortalSkyMask( const emptyCommand_t *cmds );
+bool VK_PostProcess_PortalSkyMask( const viewDef_t *portalView );
+bool VK_Exec_DrawWorldDepth( const viewDef_t *viewDef, bool ( *accept )( const drawSurf_t *surf ) );
 
 // TAA transform history is independent of motion blur. Commit only after the
 // matching color history is written; captures and failed writes discard it.

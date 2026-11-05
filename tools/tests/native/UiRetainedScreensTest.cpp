@@ -12,6 +12,7 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <tuple>
 #include <map>
 #include <set>
 #include <string>
@@ -299,7 +300,7 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","cl_player_ou
 	"in_touchscreen","in_joystickLowBatteryRumbleThreshold","in_joystickLowBatteryRumbleScale","in_promptStyle","in_swapConfirmBack",
 	"g_crosshairCustom","g_crosshairSize","g_crosshairColor","hud_hitMarker","ui_hudLayout","ui_hudScale","ui_hudWidth",
 	"ui_hudSafeInset","g_objectivesToggle","ui_hudOpacity","ui_hudDamageDirection","ui_hudPickups","ui_hudWeaponStrip",
-	"ui_reducedFlashing","g_corpseSink","con_allowConsole","g_autoSkipCinematics","ui_cinematicShake","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
+	"ui_reducedFlashing","ui_retainedOpaqueBacking","g_corpseSink","con_allowConsole","g_autoSkipCinematics","ui_cinematicShake","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
 	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
 	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch"};
 
@@ -940,12 +941,9 @@ static void CheckAdmin(ScreenHost& host, const char* path) {
 		{"mp.admin.switch.available",true},{"mp.admin.client",4.0},{"mp.admin.identity",std::string("8196")}},error,2.6),"a player chosen");
 	runtime.Frame(viewport,2.7);
 	Check(text("admin-player-1-chosen","display") == "block" && text("admin-player-0-chosen","display") == "none","the chosen row lights");
-	for (const auto& [event,verb] : std::vector<std::pair<const char*,const char*>>{{"admin_kick","mpAdminKick"},{"admin_ban","mpAdminBan"},
-		{"admin_switch","mpAdminSwitch"}}) {
-		Check(runtime.RunEvent(event,2.8,effects,error) && asked(verb),"an available player action asks the session");
-		Check(std::get<double>(effects.actions[0].arguments.at("client")) == 4 &&
-			std::get<std::string>(effects.actions[0].arguments.at("identity")) == "8196","admin actions capture the selected connection");
-	}
+	Check(runtime.RunEvent("admin_switch",2.8,effects,error) && asked("mpAdminSwitch"),"Force team switch asks the session at once");
+	Check(std::get<double>(effects.actions[0].arguments.at("client")) == 4 &&
+		std::get<std::string>(effects.actions[0].arguments.at("identity")) == "8196","admin actions capture the selected connection");
 	// Neither a row nor an armed player action follows a new occupant.
 	// A later fresh press remains usable; this checks the production document's
 	// contexts, not just the generic interaction implementation.
@@ -960,6 +958,8 @@ static void CheckAdmin(ScreenHost& host, const char* path) {
 		Check(runtime.TakeActions().empty(),"target replacement cancels the held Admin control");
 		runtime.MenuAction(MenuInput::Accept,true,targetTime+.004);
 		runtime.MenuAction(MenuInput::Accept,false,targetTime+.005);
+		// A fresh press activates the control (Kick's and Ban's open their
+		// confirmation when the activation runs, checked above).
 		Check(runtime.TakeActions().size() == 1,"a fresh Admin activation still works");
 		targetTime += .03;
 	}
@@ -1045,6 +1045,52 @@ static void CheckAdmin(ScreenHost& host, const char* path) {
 		"the next trigger wraps to Players");
 	Check(runtime.RunEvent("onSectionPrevious",5.8,effects,error) && std::get<double>(runtime.GetState().at("card.admin_section")) == 2,
 		"the previous trigger wraps to Console");
+	Check(runtime.RunEvent("admin_section_players",5.9,effects,error),"back to the Players section");
+	runtime.Frame(viewport,5.95);
+	// Back on Players with the player chosen: Kick and Ban ask first in the stock confirmation, naming the player the
+	// dialog captured; Yes acts on that player even if the selection changed
+	// beneath it, No asks nothing.
+	Check(runtime.SetState({{"mp.admin.kick.detail",std::string("Anderson")},{"mp.admin.ban.detail",std::string("Anderson")},
+		{"mp.admin.client",4.0},{"mp.admin.identity",std::string("8196")}},error,6.0),
+		"the chosen player's name");
+	double confirmTime = 6.0;
+	for (const auto& [event,modal,verb] : std::vector<std::tuple<std::string,std::string,std::string>>{
+		{"admin_kick","adminKickModal","mpAdminKick"},{"admin_ban","adminBanModal","mpAdminBan"}}) {
+		Check(runtime.RunEvent(event,confirmTime,effects,error) && effects.actions.empty(),"Kick and Ban ask first");
+		Check(std::get<bool>(runtime.GetState().at(modal+".visible")) &&
+			std::get<std::string>(runtime.GetState().at("card.admin_confirm_name")) == "Anderson","the confirmation names the player");
+		runtime.Frame(viewport,confirmTime+.3);
+		Check(text(modal+"-name","text") == "Anderson" && text(modal,"display") == "block","the dialog shows the name");
+		Check(runtime.RunEvent(modal+"Hide",confirmTime+.31,effects,error) && effects.actions.empty() &&
+			!std::get<bool>(runtime.GetState().at(modal+".contents")),"No asks nothing");
+		runtime.Frame(viewport,confirmTime+.8);
+		Check(runtime.RunEvent(event,confirmTime+.81,effects,error) && effects.actions.empty(),"asked again");
+		Check(runtime.SetState({{"mp.admin.client",9.0},{"mp.admin.identity",std::string("16388")}},error,confirmTime+.82),
+			"the selection changes beneath the dialog");
+		Check(runtime.RunEvent(modal+"Yes",confirmTime+.83,effects,error) && asked(verb.c_str()),"Yes asks the session");
+		Check(std::get<double>(effects.actions[0].arguments.at("client")) == 4 &&
+			std::get<std::string>(effects.actions[0].arguments.at("identity")) == "8196","Yes acts on the player the dialog named");
+		Check(runtime.SetState({{"mp.admin.client",4.0},{"mp.admin.identity",std::string("8196")}},error,confirmTime+.84),"restore the selection");
+		runtime.Frame(viewport,confirmTime+1.3);
+		confirmTime += 1.4;
+	}
+	// A long list: reopening the page on Players brings the chosen player's
+	// row into view and focuses it.
+	{
+		StateValues many = {{"mp.admin.player.count",30.0},{"mp.admin.player.selected",28.0},{"card.admin_section",0.0}};
+		for (int row = 0; row < 30; ++row) {
+			const std::string key = "mp.admin.player"+std::to_string(row);
+			many[key+".c0"] = std::string("Player ")+std::to_string(row+1); many[key+".client"] = static_cast<double>(row);
+			many[key+".identity"] = std::to_string(4096+row);
+		}
+		Check(runtime.SetState(many,error,9.0),"thirty players, the 29th chosen");
+		Check(runtime.RunEvent("tab_players",9.05,effects,error) && runtime.RunEvent("tab_admin",9.4,effects,error),"reopen the Admin page");
+		runtime.Frame(viewport,9.8);
+		runtime.Frame(viewport,9.9);
+		const auto list = bounds("admin-players"), row = bounds("admin-player-28");
+		Check(runtime.FocusedControl() == "admin-player-28","the chosen player's row takes the focus");
+		Check(row.y >= list.y-.5f && row.y+row.height <= list.y+list.height+.5f,"and stands inside the list");
+	}
 	Check(host.errors == 0,"no runtime diagnostics across the Admin page");
 }
 
@@ -1372,6 +1418,13 @@ static void CheckMatch(ScreenHost& host, const char* path) {
 	Check(runtime.SetState({{"mp.match.team.more",true}},error,7.5),"more rows than the card has");
 	runtime.Frame(viewport,7.6);
 	Check(text("match-team-more","display") == "block","the list offers the stock page");
+	// Each list holds the game's RETAINED_MATCH_*_ROWS: a full server's team
+	// rows, every replacement, proposal template and pool map.
+	for (const auto& [list,rows] : std::vector<std::pair<std::string,int>>{{"team",64},{"replacement",32},{"proposal",7},
+		{"series-map",32},{"series-history",24}}) {
+		Check(runtime.PresentedValue("match-"+list+"-"+std::to_string(rows-1),"display").has_value() &&
+			!runtime.PresentedValue("match-"+list+"-"+std::to_string(rows),"display").has_value(),("the "+list+" list's rows").c_str());
+	}
 	// Proposals: the running proposals, the ballot target and the ballots;
 	// the proposals to make, Create proposal and the latest result.
 	Check(runtime.RunEvent("onSectionNext",7.7,effects,error) && section() == 2,"on to Proposals");

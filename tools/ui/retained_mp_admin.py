@@ -51,6 +51,11 @@ TEAM_COLUMN = 130.0                 # the players list's team column (dp)
 # The player actions and Apply changes, the game's retainedAdminAction_t, with
 # the session verb each runs; the game publishes each as mp.admin.<name>.*.
 ACTIONS = (("kick", "mpAdminKick"), ("ban", "mpAdminBan"), ("switch", "mpAdminSwitch"))
+# Kick and Ban ask first in the stock confirmation (section 14.18: destructive
+# actions use the stock modal), titled as their plates and naming the player;
+# the stock page asked nothing. Each modal's question, in openQ4's tables.
+CONFIRMED = {"kick": ("#str_200230", "#str_231590"), "ban": ("#str_200231", "#str_231591")}
+CONFIRM_W = 480.0
 APPLY = ("apply", "mpAdminApply")
 # The Server section's drafted settings, in the game's retainedVoteField_t
 # order without the kick, as the session's RETAINED_MP_ADMIN_FIELDS lists
@@ -327,8 +332,12 @@ def admin_page(doc: Document, index: int, ident: str, width: float, height: floa
     actions = []
     for slot, (name, verb) in enumerate(ACTIONS):
         node = f"admin-{name}"
-        actions.append(action_plate(doc, node, f"mp.admin.{name}", right_w, slot * SLOT_PITCH, f"admin_{name}",
-                                    [{"op": "action", "action": verb}]))
+        # A confirmed action captures the player it will name when it asks.
+        steps = ([{"op": "setState", "values": {"card.admin_confirm_client": {"state": "mp.admin.client"},
+                                                "card.admin_confirm_identity": {"state": "mp.admin.identity"},
+                                                "card.admin_confirm_name": {"state": f"mp.admin.{name}.detail"}}},
+                  {"op": "call", "event": f"{confirm_modal(name)}Show"}] if name in CONFIRMED else [{"op": "action", "action": verb}])
+        actions.append(action_plate(doc, node, f"mp.admin.{name}", right_w, slot * SLOT_PITCH, f"admin_{name}", steps))
         next(child for child in actions[-1]["children"] if child["id"] == node)["control"]["context"] = {"state": "mp.admin.identity"}
         controls.append(node)
     # View ban list asks for the list, then opens PLAYER BAN LIST.
@@ -402,16 +411,73 @@ def admin_page(doc: Document, index: int, ident: str, width: float, height: floa
     page = page_group(doc, index, ident, width, height, [gate, live], controls)
     # Opening the page focuses the password until the player is an admin,
     # then the section shown.
+    # On Players the chosen player's row takes the focus, which scrolls it
+    # into view, as the Players page reveals its selected row.
+    chosen = [{"op": "if", "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, row]},
+               "then": [{"op": "focus", "control": f"admin-player-{row}"}]} for row in range(PLAYERS)]
     focus_steps: list = []
     for position in reversed(range(len(SECTIONS))):
+        steps = [{"op": "focus", "control": f"admin-tab-{SECTIONS[position]}"}, *(chosen if SECTIONS[position] == "players" else [])]
         focus_steps = [{"op": "if", "condition": {"op": "==", "args": [{"state": "card.admin_section"}, position]},
-                        "then": [{"op": "focus", "control": f"admin-tab-{SECTIONS[position]}"}], **({"else": focus_steps} if focus_steps else {})}]
+                        "then": steps, **({"else": focus_steps} if focus_steps else {})}]
     focus = [{"op": "if", "condition": valid, "then": focus_steps, "else": [{"op": "focus", "control": "admin-password"}]}]
     return page, focus
 
 
+def confirm_modal(name: str) -> str:
+    return f"admin{name.capitalize()}Modal"
+
+
+def confirm_modals(doc: Document) -> list:
+    """Kick's and Ban's confirmations: the stock modal titled as the plate, its
+    question and under it the player's name as the dialog captured it. Yes
+    sends the action for that captured player (the game refuses it if they
+    have left or their slot was taken); No and back cancel. Above 100 % text
+    the question takes the lines the running language needs and the dialog
+    grows with it, as the Arena's reset question does."""
+    from build_retained_screens import (LARGER, absolute, confirmation, per_language, text_buckets, text_source, text_sum,
+                                        text_times, wrapped_lines)
+    doc.state.update({"card.admin_confirm_client": {"type": "number", "initial": -1},
+                      "card.admin_confirm_identity": {"type": "string", "initial": ""},
+                      "card.admin_confirm_name": {"type": "string", "initial": ""}})
+    text_source(doc)
+    modals = []
+    for name, verb in ACTIONS:
+        if name not in CONFIRMED:
+            continue
+        title, question = CONFIRMED[name]
+        modal = confirm_modal(name)
+        confirmed = f"{verb}Confirmed"
+        doc.actions[confirmed] = {"operation": "session.menu", "arguments": {
+            "command": verb, "client": {"state": "card.admin_confirm_client"}, "identity": {"state": "card.admin_confirm_identity"}}}
+        body_w = CONFIRM_W - 66
+        counts = wrapped_lines((question,), "lowpixel", 17, body_w)
+        lines = text_buckets({scale: per_language(doc, {language: found[scale] for language, found in counts.items()}) for scale in (1.5, 2)})
+        base = max(found[1] for found in counts.values())
+        if base > 2:
+            raise SystemExit(f"{modal}: the question needs {base} lines at 100 %; the dialog holds two and the name")
+        needed = text_times({"op": "*", "args": [lines, 22]})
+        ask = label(f"{modal}-question", question, {**absolute(left=33, top=71, width=body_w, height=44),
+                                                     **typeface("lowpixel", 17, 22, [1, 1, 1, 0.8])})
+        doc.bind(f"text.{modal}-question.height", f"{modal}-question", "height",
+                 {"op": "select", "args": [LARGER, {"op": "max", "args": [44, needed]}, 44]})
+        who = label(f"{modal}-name", PLACEHOLDER, {**absolute(left=33, top=71 + 44, width=body_w, height=22),
+                                                    **typeface("lowpixel", 17, 22, rgb(VALUE)), "white-space": keyword("nowrap"),
+                                                    "overflow": keyword("hidden")})
+        doc.bind(f"{modal}-name.text", f"{modal}-name", "text", {"state": "card.admin_confirm_name"})
+        doc.bind(f"text.{modal}-name.top", f"{modal}-name", "top",
+                 {"op": "select", "args": [LARGER, {"op": "+", "args": [71, {"op": "max", "args": [44, needed]}]}, 115]})
+        doc.bind(f"text.{modal}-name.height", f"{modal}-name", "height", {"op": "select", "args": [LARGER, text_times(22), 22]})
+        doc.events[f"{modal}Yes"] = [{"op": "call", "event": f"{modal}Hide"}, {"op": "action", "action": confirmed}]
+        modals.append(confirmation(doc, modal, title, PLACEHOLDER, None, yes_event=f"{modal}Yes", contents=[ask, who],
+                                   contents_grow=text_sum({"op": "max", "args": [0, text_sum(-44, needed)]}, text_times(22), -22)))
+    return modals
+
+
 def admin_modals(doc: Document) -> list:
-    """The Admin page's dialog: PLAYER BAN LIST over the game's list
+    """The Admin page's dialogs: PLAYER BAN LIST over the game's list
     (mp.admin.ban*), its rows choosing through mpAdminBanPick and REMOVE BAN
-    lifting the chosen ban through mpAdminUnban."""
-    return [ban_list_modal(doc, prefix="mp.admin", pick_key="card.admin_ban_pick", pick_verb="mpAdminBanPick", remove_verb="mpAdminUnban")]
+    lifting the chosen ban through mpAdminUnban; and Kick's and Ban's
+    confirmations."""
+    return [ban_list_modal(doc, prefix="mp.admin", pick_key="card.admin_ban_pick", pick_verb="mpAdminBanPick", remove_verb="mpAdminUnban"),
+            *confirm_modals(doc)]

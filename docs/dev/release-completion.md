@@ -13,10 +13,28 @@ See [player release status](../user/release-status.md).
   and decoding these tracks now happens on background worker threads. Before,
   each start could add a few milliseconds to one frame, enough to contribute
   to some of the 20 ms hitches seen at high frame rates.
-- These sounds start on the next frame, typically a few milliseconds later, and
-  at the same position as before. Nothing needs to be reinstalled or changed.
-  `s_asyncStreamDecode 0` restores the previous behaviour for comparison.
+- These sounds start a frame or two later than before (about 20–30 ms in
+  testing), at the same position in the track. Nothing needs to be
+  reinstalled or changed. `s_asyncStreamDecode 0` restores the previous
+  behaviour for comparison.
 - Evidence: [streamed sound starts off the main thread](presentation-owners.md#streamed-sound-starts-off-the-main-thread-5-november-2026).
+
+## Multiplayer menus and an opaque menu backing, 5 November 2026
+
+- The in-match menu's player lists now show who is dead (a skull, the row
+  dimmed), which players are bots, and each player's connection quality as
+  four bars, as the scoreboard does.
+- Kick and Ban on the Admin page ask before acting and name the player. Yes
+  removes exactly that player, even if the selection changed meanwhile.
+- The Admin page now opens with the chosen player in view on a long list.
+- The Match page lists a full 32-player server's roster, every substitute,
+  every vote option (including the new side forfeit) and 32 maps, instead of
+  sending you to the classic page part-way down.
+- French and Italian players now see the "team has too many players" and
+  "already on this team" messages in their own language.
+- Game Options > HUD gains Opaque Menu Backing: Yes draws a solid dark
+  backdrop behind menus and dialogs instead of the blurred view behind them.
+- Install the matching engine, multiplayer module and menus together.
 
 ## Faster ambient occlusion on Quality, 5 November 2026
 
@@ -28,6 +46,11 @@ See [player release status](../user/release-status.md).
 - Ultra keeps full-resolution ambient occlusion. `r_ssaoResolution 1` forces
   full resolution on any preset and `2` forces half; the default `0` chooses
   automatically. OpenGL is unchanged.
+- On Vulkan, maps with a skybox world beyond the level (such as the
+  Air Defense levels) no longer render that backdrop behind walls and terrain
+  that hide it. Ambient occlusion also no longer pauses the scene's depth pass
+  to copy it. Together this saves around 1 ms per frame at 1440p Quality, with
+  the same image. `r_vkPortalSkyMask 0` turns it off.
 - With the experimental Vulkan front-end overlap (`r_vkRenderThread 2`), a
   periodic 15–20 ms stall is gone: its geometry cache now retires old entries
   gradually instead of emptying itself all at once.
@@ -44,6 +67,11 @@ See [player release status](../user/release-status.md).
   as an aborted attempt with no score, and **Advance map** replays it once the
   map is repaired. A server that restarts from such a checkpoint on another map
   is released the same way.
+- Spectators can follow bots and late joiners in casual matches again. During
+  live play, the server refused anyone who joined after warmup, including every
+  bot added mid-match, as a camera target until the next warmup.
+- Falling into slime or lava now throws a visible splash. The old effects were too
+  small to see against the glowing surface.
 - Step-by-step checklists for the remaining hands-on multiplayer checks
   (keyboard/controller workflows, Arena pause, swimming, weapon visuals, real
   networks and bot difficulty) are in

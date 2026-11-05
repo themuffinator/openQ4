@@ -113,13 +113,15 @@ entityDef liquid_openq4
 	"snd_leave_lava"			"ambient_water_splash_small"
 	"snd_under_lava"			"player_sounds_water"
 	"snd_clear_lava"			"player_sounds_medlabs_gasp"
-	"fx_splash_lava"			"effects/levels/putra/acid_splash.fx"
+	// player-scale: the drip-sized acid_splash vanished against a lit lava surface
+	"fx_splash_lava"			"effects/levels/waste/wastesplash.fx"
 
 	"snd_enter_slime"			"ambient_water_splash_big"
 	"snd_leave_slime"			"ambient_water_splash_small"
 	"snd_under_slime"			"player_sounds_water"
 	"snd_clear_slime"			"player_sounds_medlabs_gasp"
-	"fx_splash_slime"			"effects/ambient/slime_pool.fx"
+	// player-scale: the flat slime_pool quad was invisible on entry
+	"fx_splash_slime"			"effects/mapobjects/tube_goo_splash.fx"
 
 	// drowning: a gasp each time the lungs give out
 	"snd_drown"					"player_sounds_medlabs_gasp"

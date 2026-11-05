@@ -424,3 +424,37 @@ on its own: a player whose connection is slower than the match needs has to
 lower `net_clientMaxRate`. Whether to adapt automatically is a design decision.
 Simulated conditions do not model route changes, cross-traffic sharing a
 bottleneck, or asymmetric links (the rate applies both ways).
+
+## Remote weapon play and live spectator follows, 5 November 2026
+
+`mp_remote_weapon_capture.py` runs a listen host on q4dm1, playing with god
+mode and `notarget`, with three bots. A second process joins over loopback as
+a spectator and follows a bot. It writes bursts of engine captures, first
+person and then third person, while the host logs the server's camera verdict
+for every observer/target pair (`MP_CAMERA ... allowed=`). No operating-system
+input is used.
+
+The first runs found a casual-match defect. During live play the server
+refused every bot as a follow target (`allowed=0`), while it allowed the human
+host. A bot added after warmup is bound to the match session before it is in
+game, and participation was re-synchronized only in warmup and countdown, so
+the bot stayed inactive until the next warmup. An interim fix that synced on
+entering the game exposed the same gap from the other side: a client that
+switched to spectating during live play kept an active player's state, and
+with it no follow rights. A casual session has no roster transactions, so
+`idMultiplayerGame::Run` now mirrors participation in every phase for
+non-managed sessions. Managed matches still freeze participation outside
+warmup. `mp_match_spectator_follow_contract.py` pins the rule, and its
+single-reversal control fails.
+
+After the fix (`.tmp/mp-side/weapon-fix3/report.json`, SHA-256
+`df9b035ed1a661ab6cb5d5c1a74c5b70d7ecc10c91ae05cba190f93c792471ed`, OpenGL,
+skill-5 bots, 120 captures per view), the server allows the host and all three
+bots, and the spectator follows bot 3 for the whole run. Inspected captures of
+that bot's lightning-gun fight show the beam leaving the drawn gun and ending
+on the target. Impact sparks, damage numbers and the hit marker sit on the
+target under the crosshair. Third-person captures show the followed body from
+behind. This qualifies remote weapon presentation as a loopback spectator sees
+it. The firing player's own same-fire-frame alignment needs real input and
+stays in the [human checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction),
+together with impaired and WAN peers. Defaults are unchanged.

@@ -2137,6 +2137,24 @@ windowed processes with mouse/controller input disabled. No host input or OS
 screen capture was used. Evidence is under `.tmp/retained-ui-completion/`;
 this is a bounded working-copy checkpoint, with no product acceptance.
 
+## Opaque Menu Backing (5 November 2026)
+
+The opaque-backing option, which covers the screen behind the retained
+menus' dialogs and pause with the stock 0.94 scrim instead of the softened
+view, was a CVar only (`ui_retainedOpaqueBacking`). It is now a row in Game
+Options > HUD, after Reduced Flashing, on both the retained page and the
+stock one (`set_game_opaquebacking`). The label is `#str_231592` in all
+twelve languages. The stock page's later rows move down one 24 px step,
+with its scroll range (77), content height (2162) and section jumps. The
+adapter allows the CVar as a player setting. The stock page's
+Cinematic Shake row, added without a settings-registry entry, now has one,
+and `settings_menu_coverage.py`'s scroll pins follow both rows.
+
+An engine capture on OpenGL opens Game Options > HUD from the title and
+toggles the row: the CVar reads 0, then 1, then 0 again
+(`.tmp/ui-roadmap/opaque-gl/`). The native Game Options, Settings,
+safe-area and pages suites pass.
+
 ## The settings sub-pages (31 October 2026)
 
 CONTROLS, GAME OPTIONS and AUDIO were drafted as full-screen panels that
@@ -3826,7 +3844,7 @@ what remains across every retained menu.
 - Soft focus covers the confirmations, the pause screen and the SYSTEM
   page's two dialogs. The SYSTEM dialogs have no enter or leave motion, so
   their soft focus switches with their visibility. The opaque-backing option
-  has no Settings row yet (`ui_retainedOpaqueBacking` is a CVar). A node
+  is Game Options > HUD > Opaque Menu Backing (`ui_retainedOpaqueBacking`). A node
   inside a composition layer gets no soft focus, because only the base
   surface is read. Only the confirmation width exists.
 - The multiplayer Escape and Welcome cards present by default

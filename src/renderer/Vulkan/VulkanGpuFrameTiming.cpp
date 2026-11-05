@@ -18,7 +18,8 @@ static idCVar r_vkGpuProjectedStatisticsScope( "r_vkGpuProjectedStatisticsScope"
 static const int VK_GPU_QUERIES_PER_FRAME = 2 + VK_GPU_PHASE_COUNT * 2;
 static const char *vkGpuPhaseNames[] = { "ssaoDepth", "ssaoColor", "ssaoDraw", "motion", "bloom", "worldDepth", "worldLights", "worldShadowMaps",
 	"worldAmbientPre", "worldComposition", "worldFog", "worldAmbientPost", "worldMaterialPost", "smaaEdge", "smaaWeights", "smaaBlend",
-	"worldView", "portalView", "targetResolve", "shadowProjected", "shadowCache", "shadowCompose", "shadowPoint" };
+	"worldView", "portalView", "targetResolve", "shadowProjected", "shadowCache", "shadowCompose", "shadowPoint",
+	"ssaoSnapshot" };
 static_assert( sizeof( vkGpuPhaseNames ) / sizeof( vkGpuPhaseNames[0] ) == VK_GPU_PHASE_COUNT, "GPU phase names must match query pairs" );
 static_assert( VK_GPU_PHASE_COUNT <= 32, "GPU phase masks must contain every query pair" );
 // Result order follows increasing VkQueryPipelineStatisticFlagBits values.

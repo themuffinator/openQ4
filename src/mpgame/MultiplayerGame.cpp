@@ -16355,7 +16355,14 @@ void idMultiplayerGame::Run( void ) {
 
 	CommonRun();
 	PublishMVDMarkers();
-	if ( matchSession.GetPhase() == WARMUP || matchSession.GetPhase() == COUNTDOWN ) {
+	// openQ4: a casual session has no roster transactions, so it mirrors every
+	// join, spectate and leave in every phase.  Syncing only in warmup and
+	// countdown left anyone who entered or changed sides during live play with
+	// stale participation until the next warmup: bots added mid-match were
+	// never followable and a player who switched to spectating kept a player's
+	// view rights.  Managed matches still freeze participation outside warmup.
+	if ( matchSession.GetPhase() == WARMUP || matchSession.GetPhase() == COUNTDOWN ||
+		!IsManagedMatch() ) {
 		SynchronizeAllMatchParticipants();
 	}
 	// Participant mutations can cancel the authoritative countdown. Apply that
@@ -18891,6 +18898,21 @@ view has moved since it last did.
 ================
 */
 void idMultiplayerGame::PublishRetainedMatch( idUserInterface *card, bool &changed ) {
+	// The card holds every row Match Control can hold, apart from the team
+	// rows and series history past a full server's (see the header).
+	static_assert( RETAINED_MATCH_TEAM_ROWS >= 2 + MAX_CLIENTS && RETAINED_MATCH_TEAM_ROWS <= MP_MATCH_CONTROL_MAX_TEAM_ROWS,
+		"the card's team rows hold both sides and every client" );
+	static_assert( RETAINED_MATCH_REPLACEMENT_ROWS == MP_MATCH_CONTROL_MAX_REPLACEMENT_ROWS,
+		"the card's replacement rows follow Match Control's" );
+	static_assert( RETAINED_MATCH_PROPOSAL_ROWS == MP_MATCH_CONTROL_MAX_PROPOSAL_TEMPLATE_ROWS,
+		"the card's proposal rows follow Match Control's templates" );
+	static_assert( RETAINED_MATCH_PROFILE_ROWS == MP_MATCH_CONTROL_MAX_PROFILE_ROWS, "the card's profile rows follow Match Control's" );
+	static_assert( RETAINED_MATCH_RULE_ROWS == MP_RULE_FIELD_COUNT, "the card holds a row for every rule field" );
+	static_assert( RETAINED_MATCH_SERIES_MAP_ROWS == MP_MATCH_CONTROL_MAX_SERIES_MAP_ROWS,
+		"the card's map pool rows follow Match Control's" );
+	static_assert( RETAINED_MATCH_HISTORY_ROWS <= MP_MATCH_CONTROL_MAX_SERIES_HISTORY_ROWS,
+		"the card's series history rows fit Match Control's" );
+	static_assert( RETAINED_MATCH_EVIDENCE_ROWS == MP_MATCH_CONTROL_MAX_EVIDENCE_ROWS, "the card's evidence rows follow Match Control's" );
 	if ( mainGui == NULL ) {
 		return;
 	}

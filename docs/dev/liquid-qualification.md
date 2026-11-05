@@ -134,3 +134,47 @@ world deaths and one stuck event. It logged 58 crossings:
 
 Still open: swimming under player control (real input only) and splash, bubble
 and wade presentation checked by eye.
+
+## Splash and bubble presentation by eye, 5 November 2026
+
+`mp_liquid_effects_capture.py` drops a god-mode listen host, in third person,
+into the liquid lab's deep water, slime and lava pools. It writes bursts of
+engine captures through each surface, holds the host on the deep pool's floor
+and lifts it back out. `g_debugLiquid` ties each burst to the server's entry,
+submersion and exit transitions, and `bse_debug 1` lists every effect the
+client actually plays. No operating-system input is used.
+
+The first runs found a presentation defect. The water entry splash
+(`splash_lrg`) rises clearly at the surface where the player crosses it. The
+slime and lava splashes played, but nothing showed in any entry frame.
+`slime_pool.fx` is one flat 30-unit surface quad that fades in, and
+`putra/acid_splash.fx` is a drip-sized splash with 3- to 6-unit lines. The
+shared liquid definition now uses player-scale stock effects for player and
+monster entries: `mapobjects/tube_goo_splash.fx` for slime (green goo spray,
+splash lines and a spreading surface stain) and `levels/waste/wastesplash.fx`
+for lava (dark-red spray and steam). Projectile crossings keep their separate,
+smaller `fx_impact_*` effects.
+
+The run on the rebuilt package passes (`.tmp/mp-side/liquid-fx-r5/report.json`,
+SHA-256 `3efc22034a6725f91ed4d3fb01a43f95ee53e2d072eb1c34cafd1a1fa15308d4`;
+client `d4e78340…f599`, `game-mp_x64.dll` `e0ff8c70…ce7e`, `pak0.pk4`
+`cedebec8…8ac2`, OpenGL). It plays `splash_lrg` and the head bubble trail
+`recomp_bubble` in water, `tube_goo_splash` in slime and `wastesplash` in lava,
+and inspected captures show:
+
+- **Water:** a white splash column rises from the crossing point as the player
+  enters. The next frame is the tinted, refracted underwater view.
+- **Slime:** a green goo plume with droplets rises over the entry point.
+- **Lava:** a dark-red spray with steam rises over the entry point. It is subtler
+  against the bright surface, but visible, where the old effect showed nothing.
+- **Bubbles:** the stock trail spawns tiny 2- to 6-unit bubbles across a
+  200-unit sphere. At 170 units in third person only a few faint green points
+  near the head can be told from the underwater material's own specks, which
+  remain in a control capture with effect rendering off. Effect logging, not
+  the capture, establishes that the trail plays.
+
+The hazard pools are 64 units deep over a raised floor, so a standing player is
+neck-deep, not submerged, and has no bubble trail there. Wading has no visual
+effect. It is the `snd_wade` sound while moving, which needs real movement and
+stays with the [human checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye),
+as do swimming under player control and a by-eye pass at normal play distances.

@@ -2251,7 +2251,13 @@ MATCH_SERIES_LABELS = tuple(key for _name, _token, key, _body in MATCH_SERIES_AC
 # The Match Control lists the card can select a row of, by the card's index
 # (card.match_list): the session's RETAINED_MP_MATCH_LISTS in the same order.
 MATCH_LISTS = ("team", "replacement", "proposal", "profile", "rule", "series_map")
-MATCH_TEAM_ROWS, MATCH_REPLACEMENT_ROWS = 32, 16   # RETAINED_MATCH_TEAM_ROWS and _REPLACEMENT_ROWS in the game
+# Each list's rows: the game's RETAINED_MATCH_*_ROWS, read from its header,
+# which says which lists hold every row Match Control can and which end with
+# the way to the stock page past a full server's rows.
+MATCH_ROW_COUNTS = {name: int(value) for name, value in re.findall(
+    r"static const int RETAINED_MATCH_(\w+)_ROWS = (\d+);",
+    (ROOT / "src" / "mpgame" / "MultiplayerGame.h").read_text(encoding="utf-8"))}
+MATCH_TEAM_ROWS, MATCH_REPLACEMENT_ROWS = MATCH_ROW_COUNTS["TEAM"], MATCH_ROW_COUNTS["REPLACEMENT"]
 MATCH_LIST_ROW_H = 22.0
 MATCH_TEAMS_W = 450.0                   # the Teams section's lists; the role and the actions take the rest
 MATCH_TEAMS_HEAD, MATCH_REPLACEMENTS_HEAD, MATCH_ROLE = "#str_41736", "#str_41785", "#str_41787"
@@ -2261,7 +2267,7 @@ MATCH_ROLES = (("#str_42470", 1), ("#str_42471", 2), ("#str_42472", 3), ("#str_4
 # Proposals: the proposal a ballot or a cancellation goes to (the session's
 # RETAINED_MP_MATCH_SCOPES by index), under the stock page's own names for
 # the two, and the ballot each proposal the player may make takes.
-MATCH_PROPOSAL_ROWS = 6                 # RETAINED_MATCH_PROPOSAL_ROWS in the game
+MATCH_PROPOSAL_ROWS = MATCH_ROW_COUNTS["PROPOSAL"]
 MATCH_PROPOSALS_W = 430.0               # the running proposals and the ballots; the proposals to make take the rest
 MATCH_BALLOT_TARGET = "#str_41793"
 MATCH_SCOPES = (("#str_41738", 0), ("#str_41739", 1))
@@ -2270,7 +2276,7 @@ MATCH_PROPOSAL_SCOPE_KEYS = ("#str_42490", "#str_42491")
 # _RULE_ROWS in the game), each field's type, and the value to stage, a whole
 # number up to the largest a rule takes (the session's
 # RETAINED_MP_MATCH_RULE_VALUE_MAX).
-MATCH_PROFILE_ROWS, MATCH_RULE_ROWS = 16, 34
+MATCH_PROFILE_ROWS, MATCH_RULE_ROWS = MATCH_ROW_COUNTS["PROFILE"], MATCH_ROW_COUNTS["RULE"]
 MATCH_RULES_W = 430.0                   # the rules' lists; the value, the staged changes and the actions take the rest
 MATCH_PROFILE_HEAD, MATCH_RULES_HEAD, MATCH_VALUE, MATCH_STAGED_HEAD = "#str_41788", "#str_41745", "#str_41789", "#str_41746"
 MATCH_RULE_VALUE_MAX, MATCH_RULE_VALUE_MESSAGE = 10000, "#str_231059"
@@ -2279,7 +2285,8 @@ MATCH_RULE_VALUE_MAX, MATCH_RULE_VALUE_MESSAGE = 10000, "#str_231059"
 # in the game; the last two only to read), the format a staged series takes
 # (the session's RETAINED_MP_MATCH_SERIES_PROFILES by index, under the
 # projection's own names), and the texts the rows' columns hold.
-MATCH_SERIES_MAP_ROWS, MATCH_HISTORY_ROWS, MATCH_EVIDENCE_ROWS = 16, 24, 5
+MATCH_SERIES_MAP_ROWS, MATCH_HISTORY_ROWS, MATCH_EVIDENCE_ROWS = (MATCH_ROW_COUNTS["SERIES_MAP"], MATCH_ROW_COUNTS["HISTORY"],
+                                                                 MATCH_ROW_COUNTS["EVIDENCE"])
 MATCH_SERIES_W = 450.0                  # the Series and Evidence lists; the format and the actions take the rest
 MATCH_MAP_POOL_HEAD, MATCH_HISTORY_HEAD, MATCH_EVIDENCE_HEAD, MATCH_RECENT_HEAD = "#str_41752", "#str_41753", "#str_41763", "#str_41766"
 MATCH_SERIES_FORMAT, MATCH_REFRESH = "#str_41788", "#str_41771"

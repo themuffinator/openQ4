@@ -265,6 +265,17 @@ last-human run is `smoke-human-final/report.json`; the opponent-removal run is
 `smoke-opponents-final/report.json`. These checks do not qualify
 the full team/round/Tourney, remote-client or controller matrix below.
 
+The `--finish-by-time` ending needs a sole leader when the clock expires.
+Stock Quake 4 (`rvDMGameState::Run` in the 1.4.2 SDK) enters sudden death
+rather than review when players are tied for first at the time limit, and
+openQ4 keeps that rule (with `si_overtime 0`). The free-for-all DM fixture
+originally killed the human, which left the two paused bots tied at 0, so the
+match correctly entered sudden death and the review checkpoints failed. It now
+kills both bots, so the human finishes alone at 0 against -1. Team and duel
+modes keep the human's death, which already decides the score. A timed ending
+scripts about 92 seconds of match time, so the smoke's default engine timeout
+is 180 seconds; at 120 seconds a loaded machine could expire it during review.
+
 Other observations remain separate from this lifecycle change:
 
 - The casual vote electorate's `IsEligibleVotePlayerSlot` still uses the
@@ -1345,6 +1356,14 @@ differed, the reconnected client kept a menu flag that the idle-menu assertion
 rejects, and report validation expected one row per played map. Each failure
 occurred after the product path had behaved as designed.
 
+Vulkan follow-through: the same side-ballot smoke passes with
+`--renderer vulkan` on a later rebuilt package. That package also carries the
+casual participation-sync and liquid splash changes and other sessions' working-
+tree edits. Report `.tmp/mp-side/side-vk/report.json` (SHA-256
+`02e6c3b09328df2885fc759308a15e09e8c461225503576768116e705ae19375`) ran 205.2 seconds, and all three clients
+exited 0. The ballots, thresholds and the Strogg forfeit won by Marine match
+the OpenGL run.
+
 These do not close MP-01: physical localized keyboard and controller workflows
 remain (see the [human qualification checklists](mp-human-qualification.md)),
-along with other renderers and platforms.
+along with other platforms.

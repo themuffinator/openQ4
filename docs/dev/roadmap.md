@@ -544,6 +544,24 @@ not merely paperwork or a final screenshot.
   and [long-frame attribution](presentation-owners.md#long-frame-attribution-5-november-2026).
   The every-frame floor stays open: about 7.7 ms of GPU work remains per frame,
   and main-thread tic frames exceed 6.67 ms.
+  **Floor decision, 5 November:** the user replaced the every-frame rule with a
+  percentile budget. The Quality floor is now a **99th-percentile frame
+  interval at or under 6.67 ms**; the maximum is reported but not judged.
+  `airdefense_performance.py` gates on p99 and records the Vulkan worker
+  mode (`--render-thread`). In quiet windows the half-resolution Quality GPU
+  frame averages 6.9–7.4 ms, so the p99 floor still needs about 2.5 ms of
+  mean frame time removed, as well as the heavy-view tail. Clipping the portal
+  sky to its visible region is not exact in the current pass order: the
+  compiled map has no sky faces, so where the backdrop shows is only known
+  from the main view's depth, after the backdrop is drawn. See
+  [where the floor stands](presentation-owners.md#half-resolution-ssao-for-quality-5-november-2026).
+  A portal-sky mask now gets that depth early. At the backdrop's depth clear,
+  Vulkan draws the main view's world depth single-sample and keeps the backdrop
+  to the pixels it leaves far, dilated one pixel. It is exact against
+  full-frame captures, and the same capture replaces SSAO's prepass snapshot.
+  Normalized to bloom under heavy GPU contention, the GPU frame fell 16% (about
+  1.1 ms); the CPU cost of the early world draw still needs a quiet run. See
+  the [portal-sky mask](presentation-owners.md#portal-sky-mask-5-november-2026).
 - [ ] **HF-08 — P1, qualification: late look and alternate views in play.**
   Run late look in live MP (listen host and remote client, prediction recovery),
   zoomed, on lifts and trams and through rapid turns, and measure physical
@@ -1775,6 +1793,10 @@ Completion must advance through the existing dependencies:
   GAME, CHAPTERS and CREATE SERVER over a levelshot, through a cardless detail
   definition (`FLOW-050`). Join Game's docked detail column for expanded
   layouts and the section layout remain.
+  Progress, 5 November: Game Options > HUD gains
+  [Opaque Menu Backing](ui/retained-screens.md#opaque-menu-backing-5-november-2026),
+  the accessibility alternative to the softened backdrop, on the retained and
+  stock pages in every shipped language.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual
@@ -1905,7 +1927,19 @@ Completion must advance through the existing dependencies:
   a skull with the row at half while dead or out of the Tourney, a BOT tag,
   and network-quality bars stepped by the game. French and Italian players now
   read the stock team-refusal messages in their language. Native card checks
-  cover each mark; live MP captures and device qualification remain.
+  cover each mark, and a live OpenGL deathmatch with bots shows them in play;
+  Vulkan and device qualification remain.
+  Progress, 5 November: Kick and Ban on the Escape card's Admin page now
+  [ask first](ui/multiplayer-menus.md#kick-and-ban-confirmations-5-november-2026)
+  in the stock confirmation, naming the player; YES acts on exactly that
+  player's captured connection. Native checks and a Vulkan listen-server
+  capture that kicks a bot cover the flow.
+  The Match page's lists now hold a
+  [full server's rows](ui/multiplayer-menus.md#match-list-capacities-5-november-2026):
+  64 team rows, 32 replacements, every proposal template and 32 pool maps,
+  checked against Match Control's model at compile time. The model's 128
+  team rows and history steps would put the Escape card past the runtime's
+  16 MiB document limit, so those still hand off past a full server's.
 - [ ] **UI-04 — P1, implementation and qualification: full GUI corpus migration.**
   Finish all HUD, wrist/comms, scope, vehicle, cinematic, terminal/world and scripted
   surfaces with source-bound retained lowering. Preserve legacy grouping/remainder
@@ -2840,13 +2874,13 @@ prediction/rewind defaults.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| MP-01 — Partial | Roster/identity/vote fixes; eight live edge scenarios, failed-map retry, writer fault controls, live team-forfeit side ballots and post-commit map-load release pass scoped checks. | Physical keyboard/controller flows ([checklist](mp-human-qualification.md#mp-01-competitive-match-control-by-hand)) and other renderers/platforms. |
+| MP-01 — Partial | Roster/identity/vote fixes; eight live edge scenarios, failed-map retry, writer fault controls, live team-forfeit side ballots and post-commit map-load release pass scoped checks; side ballots pass on OpenGL and Vulkan. | Physical keyboard/controller flows ([checklist](mp-human-qualification.md#mp-01-competitive-match-control-by-hand)) and other platforms. |
 | MP-02 — Closed with accepted timing caveat | Final `f6aa481e6` four-map long matches and all 33 catalog variants pass death/duration checks with zero navigation deaths after strict policy-2 assessment; targeted recovery, traffic and Windows/Linux controls pass. | CTF3 timing meets numerical limits but SP contention invalidates controlled qualification; no uncontended repeat was completed. Owner accepted this caveat for closeout; failed report retained, other maps/platforms unqualified. |
 | MP-03 — Closed | Trench jumps and debug-pool defects fixed; route-cost, collision, graph/cache and ladder/lift subjects have recorded dispositions. | Custom lifts remain unsupported; final safety evidence and the accepted timing-contention caveat are recorded under completed MP-02. |
 | MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return ([checklist](mp-human-qualification.md#mp-04-arena-by-hand)); retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
-| MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked. | Real player swimming and by-eye splash/bubble/wade review ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)). Swimming monsters, new animations and moving volumes remain deferred. |
-| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; defaults remain off. | Remote weapon-play/same-fire-frame visuals and remaining peer transitions ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); real WAN and default promotion only when selected and qualified. |
+| MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked. | Real player swimming, wade sound and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
+| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; defaults remain off. | Firing player's same-fire-frame visuals and remaining peer transitions ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. | Physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 
@@ -2917,6 +2951,10 @@ Completion substeps:
   `mp_match_*` contracts pass. Remaining: the physical keyboard/controller
   workflows in the [human checklist](mp-human-qualification.md#mp-01-competitive-match-control-by-hand),
   and other renderers and platforms.
+  Follow-through, 5 November: the side-ballot smoke also passes on Vulkan. Both
+  ballots and the Strogg forfeit won by Marine match the OpenGL run, with clean
+  exits ([evidence](competitive-match-reference-audit.md#side-ballots-and-post-commit-map-load-release-2026-11-05)).
+  Other platforms and the physical workflows remain.
 - [x] **MP-02 — P1, qualification and targeted fixes: bot traversal safety.** Rerun
   staged q4dm8/q4ctf3/q4ctf5/q4dz3 after the exact-state jump/unroutable-pad fixes,
   then the complete declared-map sweep including warmup (currently 33 variants).
@@ -3373,6 +3411,15 @@ Completion substeps:
   values of 100, 56, 100 and 56. The engine capture shows the underwater view
   and AIR gauge. This does not close physical swimming or the remaining effects
   presentation checks.
+  Progress, 5 November: [splash and bubble presentation](liquid-qualification.md#splash-and-bubble-presentation-by-eye-5-november-2026)
+  is checked from engine captures, using `mp_liquid_effects_capture.py` with
+  effect logging. The water splash and head bubble trail play and the splash
+  shows. The slime and lava splashes played but could not be seen: the shared
+  definition used a flat surface quad and a drip-sized effect. They now use
+  player-scale stock effects (`tube_goo_splash`, `wastesplash`), and both show
+  in the rebuilt package. Wading has no visual effect, only its moving sound.
+  Remaining: swimming under player control, wade sound and a by-eye pass at
+  play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)).
 - [ ] **MP-07 — P1, implementation and qualification: coupled prediction and
   rewind.** In `src/mpgame/gamesys/SysCvar.cpp` both enhanced prediction and lag
   compensation default off. Preserve the coupled displayed-pose-age and rewind
@@ -3454,6 +3501,16 @@ Completion substeps:
   The executable state fixture includes the production weapon resolution blocks
   and rejects nine reversals. Remote weapon-play and same-fire-frame visual
   qualification remain open, and defaults are unchanged.
+  Progress, 5 November: [remote weapon play](mp-network-qualification.md#remote-weapon-play-and-live-spectator-follows-5-november-2026)
+  is checked from a loopback spectator's captures with `mp_remote_weapon_capture.py`.
+  A followed bot's lightning beam runs from the drawn gun to its target, and the
+  impact, damage numbers and hit marker sit on the target. The run found and
+  fixed a casual-match defect: during live play the server refused every bot as
+  a follow target, because participation was synchronized only in warmup and
+  countdown. Casual sessions now mirror participation in every phase, and the
+  follow contract pins this with a failing reversal. Remaining: the firing
+  player's same-fire-frame view, impaired and WAN peers
+  ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)).
 - [ ] **MP-08 — P1, qualification and decision: network and content interoperability.**
   Qualify real cross-platform/architecture peers over IPv4 and IPv6, fragmentation/
   MTU/rate limits, congestion, high player counts, discovery and reconnect. Preserve

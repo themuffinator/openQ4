@@ -8,9 +8,12 @@ motion and screenshots, with mouse/joystick capture disabled. Example:
 The default workload is native 2560x1440 with Quality, the preset below Ultra.
 Its 144 FPS cap is disabled for the 150 FPS qualification. Ultra remains available
 as an explicit historical-comparison workload; neither preset is modified here.
-Every measured frame must meet the floor; average or percentile passes alone
-cannot qualify a run. Raw engine logs, captures, launch commands and runtime/Git
-identity remain in each underlying gameplay report.
+The floor is the 99th percentile frame interval at or under 6.67 ms (the user's
+decision on 5 November 2026, replacing the earlier every-frame rule, which exact
+optimization cannot meet on the laptop reference); the maximum is reported, not
+judged. --render-thread selects and records the Vulkan worker mode. Raw engine
+logs, captures, launch commands and runtime/Git identity remain in each
+underlying gameplay report.
 """
 from __future__ import annotations
 
@@ -26,7 +29,9 @@ import renderer_gameplay_benchmark as benchmark
 
 ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_MS = 27000  # Includes the complete 24-second game-time sweep and its wall-clock overrun.
-MAX_FRAME_MS = 6.66  # Conservative with the engine's 0.01 ms maximum reporting precision.
+# 150 FPS: the engine reports percentiles as the upper edge of 50 us bins, so a
+# pass is never rounded in.
+P99_FRAME_MS = 6.6667
 ULTRA_QUALITY = {
     "com_performancePreset": "ultra", "r_multiSamples": 16, "r_postAA": 3,
     "image_anisotropy": 16, "image_picmip": 0, "image_downSize": 0,
@@ -136,6 +141,10 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--width", type=int, default=2560)
     parser.add_argument("--height", type=int, default=1440)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--render-thread", type=int, choices=(0, 1, 2), default=0,
+                        help="Vulkan worker mode (r_vkRenderThread); 0 is the shipped default")
+    parser.add_argument("--runtime-dir", default="",
+                        help="staged runtime (default .install; alternates live below .tmp/stock-runtime/)")
     parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args(argv)
     quality = QUALITY_PROFILES[args.preset]
@@ -162,8 +171,9 @@ def main(argv: list[str]) -> int:
                 "--maxfps", "0", "--swap-intervals", "0", "--display-modes", "fullscreen",
                 "--render-api", args.render_api, "--width", str(args.width), "--height", str(args.height),
                 "--pacing-only", "--no-gpu-timers", "--sample-msec", str(SAMPLE_MS),
-                "--min-pacing-hz", "150", "--max-p95-ms", "6.6667", "--max-p99-ms", "6.6667",
-                "--max-frame-ms", str(MAX_FRAME_MS), "--timeout", "300", "--output-dir", str(directory),
+                "--min-pacing-hz", "150", "--max-p99-ms", str(P99_FRAME_MS),
+                "--timeout", "300", "--output-dir", str(directory),
+                *(["--runtime-dir", args.runtime_dir] if args.runtime_dir else []),
             ]
             for name, value in {
                 "in_mouse": 0, "in_joystick": 0, "ui_retained": 1, "ui_hudLayout": 1,
@@ -175,6 +185,7 @@ def main(argv: list[str]) -> int:
                     "image_downSizeBump", "image_downSizeSpecular", "image_ignoreHighQuality",
                     "image_usePrecompressedTextures")}, "r_hiddenWindow": 0,
                 "r_ignoreGLErrors": 1,  # Runtime defaults; correctness runs use the diagnostic harness.
+                "r_vkRenderThread": args.render_thread,
             }.items():
                 command += ["--set-launch-cvar", f"{name}={value}"]
             for name, value in {
@@ -204,10 +215,11 @@ def main(argv: list[str]) -> int:
             payload = {"status": "pass" if len(results) == args.runs and all(r["status"] == "pass" for r in results) else "fail",
                        "width": args.width, "height": args.height, "renderApi": args.render_api,
                        "preset": args.preset, "quality": quality, "postAA": POST_AA[args.preset], "targetFps": 150,
-                       "maxFrameMs": MAX_FRAME_MS, "requestedRuns": args.runs, "results": results}
+                       "p99FrameMs": P99_FRAME_MS, "renderThread": args.render_thread,
+                       "requestedRuns": args.runs, "results": results}
             (output / "qualification.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
             print(f"run {run}: {result['status']}; mean={role['summary'].get('pacingHz')} FPS, "
-                  f"max={role['summary'].get('pacingMaxMs')} ms", flush=True)
+                  f"p99={role['summary'].get('pacingP99Ms')} ms, max={role['summary'].get('pacingMaxMs')} ms", flush=True)
     finally:
         if old_hint is None:
             os.environ.pop("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", None)
