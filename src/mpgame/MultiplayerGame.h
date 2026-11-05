@@ -1377,15 +1377,21 @@ private:
 	void			PublishRetainedSettings( idUserInterface *card, bool &changed );
 	// The Escape card's Match page (section 14.18): Match Control, mirrored
 	// from the game's own projection of it on the menu (the match_* states),
-	// the status lines one key each and the lists' rows up to the card's
-	// rows for each (past them the page offers the stock page).
+	// the status lines one key each and each list's rows. The replacements,
+	// proposals, profiles, rule fields, map pool and evidence hold every row
+	// Match Control can (MatchControlModel.h); the team rows hold a full
+	// 32-player server's sides, participants and 30 seats, invitations or
+	// queue places, and the series history 24 steps. Past those two (the
+	// Escape card is near the runtime's 16 MiB document limit) a list ends
+	// with the way to the stock page. tools/ui/retained_mp_menus.py reads
+	// these numbers; PublishRetainedMatch asserts them against the model.
 	static const int RETAINED_MATCH_STATUS_LINES = 6;
-	static const int RETAINED_MATCH_TEAM_ROWS = 32;
-	static const int RETAINED_MATCH_REPLACEMENT_ROWS = 16;
-	static const int RETAINED_MATCH_PROPOSAL_ROWS = 6;
+	static const int RETAINED_MATCH_TEAM_ROWS = 64;
+	static const int RETAINED_MATCH_REPLACEMENT_ROWS = 32;
+	static const int RETAINED_MATCH_PROPOSAL_ROWS = 7;
 	static const int RETAINED_MATCH_PROFILE_ROWS = 16;
 	static const int RETAINED_MATCH_RULE_ROWS = 34;
-	static const int RETAINED_MATCH_SERIES_MAP_ROWS = 16;
+	static const int RETAINED_MATCH_SERIES_MAP_ROWS = 32;
 	static const int RETAINED_MATCH_HISTORY_ROWS = 24;
 	static const int RETAINED_MATCH_EVIDENCE_ROWS = 5;
 	void			PublishRetainedMatch( idUserInterface *card, bool &changed );

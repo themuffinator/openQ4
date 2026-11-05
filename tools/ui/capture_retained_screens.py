@@ -124,7 +124,8 @@ SCENARIOS = {
         'screenshot "screenshots/mpcard-triggers-admin.tga"', *prompt_style(0),
     ]),
     # The Escape card's Admin page on a listen server, whose host is the
-    # admin: the players (two bots), a bot chosen and kicked, View ban list,
+    # admin: the players (two bots), a bot chosen, Kick's confirmation and the
+    # bot kicked, View ban list,
     # the Server section with a frag limit drafted and applied, and the
     # console running status.
     'mpadmin': ('mp:mp/q4dm1', [
@@ -135,7 +136,11 @@ SCENARIOS = {
         'openq4_retainedGui focus "admin-player-1"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 400',
         'openq4_retainedGui inspect "admin-player-1-chosen"', 'openq4_retainedGui inspect "admin-kick"',
         'screenshot "screenshots/mpadmin-chosen.tga"',
-        'openq4_retainedGui focus "admin-kick"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 1500',
+        # Kick asks first in the stock confirmation, naming the bot; YES kicks it.
+        'openq4_retainedGui focus "admin-kick"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 600',
+        'openq4_retainedGui inspect "adminKickModal"', 'openq4_retainedGui inspect "adminKickModal-name"',
+        'screenshot "screenshots/mpadmin-kick-confirm.tga"',
+        'openq4_retainedGui focus "adminKickModal_yes"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 1500',
         'openq4_retainedGui inspect "admin-player-2"', 'screenshot "screenshots/mpadmin-kicked.tga"',
         'openq4_retainedGui focus "admin-bans"', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 600',
         'openq4_retainedGui inspect "banModal"', 'screenshot "screenshots/mpadmin-bans.tga"',

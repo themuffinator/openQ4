@@ -29,7 +29,8 @@ lists the pages that still do in `RETAINED_MP_ESCAPE_MISSING_PAGES` and
 hand-off pages (its `stock_<page>` programs). Both cards therefore present
 with `ui_retained` alone; `ui_retained 0` keeps the classic join panel and
 the stock in-match menu. A page that is built may still hand off what it
-cannot show (`classic_<page>`: the Match page's lists' rows past the card's)
+cannot show (`classic_<page>`: the Match page's team rows or series history
+past a full server's)
 without counting as missing. Players never see a mix of card and stock pages
 unless they opt in.
 
@@ -260,9 +261,10 @@ Teams is built:
   in the columns Match Control writes; the row chosen is lit in olive. Below
   them, the participants a substitution can bring in, and the latest result,
   so an action's outcome shows where it was taken. Choosing a row tells the
-  game, which checks every action against it. The card holds 32 team rows
-  and 16 participants; past them a list ends with the way to the stock page,
-  which shows them all.
+  game, which checks every action against it. The card holds 64 team rows,
+  a full 32-player server's sides, participants and 30 seats, invitations or
+  queue places, and all 32 participants a substitution can bring in; past
+  the team rows the list ends with the way to the stock page.
 - **The role.** The role an invitation or an assignment gives (Player,
   Captain, Coach or Substitute), a list that keeps its value on the game's
   menu as the stock choice does. Where a Duel side can be bound, the two
@@ -328,7 +330,10 @@ and for a list's row by the list's index in `RETAINED_MP_MATCH_LISTS` and
 the row's: the session sets the stock list's own selection on the game's
 menu and sends its token, as the stock list does. The card never sends text
 of its own, and the game checks every action again against its accepted
-view. A list's rows past the card's open the stock page (`classic_match`).
+view. The lists hold a full server's rows
+([Match list capacities](#match-list-capacities-5-november-2026)); past the
+team rows or the series history's a list's link opens the stock page
+(`classic_match`).
 
 ### The Settings page
 
@@ -501,7 +506,14 @@ then offered Players, Server and Console. The card's page
   are the card's action plates, each with the chosen player beside it or,
   unavailable, why: no player chosen, the player's own row, a mode without
   teams, a managed match. They run the stock page's own actions, and the menu
-  stays open. View ban list asks a client's server for its list and opens
+  stays open. Kick and Ban ask first in the stock confirmation, which the
+  stock page did not (section 14.18: destructive actions use the stock
+  modal): titled as the plate, the question (`#str_231590`, `#str_231591`)
+  and under it the player's name in the value color. The dialog captures the
+  chosen player's client, connection identity and name as it opens, so YES
+  acts on exactly the player it names even if the selection changes beneath
+  it, and the game refuses the request if that player has left or their slot
+  was taken. NO and Back send nothing. View ban list asks a client's server for its list and opens
   PLAYER BAN LIST, the Create Server page's dialog over the game's list,
   where a row's Accept chooses a ban and REMOVE BAN lifts it.
 - **Server.** The stock page's settings drafted as the Vote page drafts a
@@ -894,6 +906,62 @@ with their colors. It checks the skull and dimming, the tag in place of the
 bars, each step's lit count and color, and the columns' order under their
 headings.
 
+In the engine, `tools/ui/capture_multiplayer_rosters.py` on OpenGL at 1280x720
+(staged at local `94b9daad5` with the working tree) passed all its checks
+in 15 captures. Its live deathmatch on `mp/q4dm1` shows both bots with BOT
+tags and no bars, and the local player, just killed, with the skull, the
+dimmed row and four lit bars. The 32-slot fixture views publish no step and
+show no bars. Evidence: `.tmp/ui-roadmap/rosters-gl/result.json`, SHA-256
+`db2201fbc8c93e614410a1f9e962fbb10fad3ffa0a2e60f7473fabe738941673`.
+
+## Kick and Ban confirmations, 5 November 2026
+
+Kick and Ban on the Admin page asked nothing first, as on the stock page, so
+one press removed or banned a player. They now open the stock confirmation
+described under [the Admin page](#the-admin-page), naming the player the
+dialog captured. The new questions are in all twelve shipped languages and fit
+two lines at 100 % text in each; the generator refuses one that would not. Above
+100 % the question and the name grow and the dialog with them.
+Force team switch still acts at once.
+
+The native Admin test opens each dialog, checks the name it shows, answers
+NO (nothing is sent), opens it again, changes the selection beneath it and
+answers YES: the request carries the player the dialog named. A fresh press
+on either plate opens its dialog rather than sending, alongside the existing
+held-press identity checks.
+
+The `mpadmin` engine capture now stops at the dialog and then presses YES:
+on Vulkan and OpenGL at 1280x720, on a listen server with bots, the dialog
+names the chosen bot, YES sends `mpAdminKick` and the server kicks it. The
+logs carry no retained-UI warnings. Evidence: `.tmp/ui-roadmap/admin-vk/` and
+`.tmp/ui-roadmap/match-gl/mpadmin/`.
+
+## Match list capacities, 5 November 2026
+
+The Match page's lists held fewer rows than Match Control can publish: 32
+team rows, though a full server's two sides and 32 participants alone need
+34; 16 replacements of 32; 6 proposal templates, so the 7th (the side-scoped
+Forfeit ballot of `94b9daad5`) handed off; and 16 of a map pool's 32 maps.
+The card now holds 64 team rows, 32 replacements, every proposal template
+(7), 32 pool maps and, as before, 24 steps of series history. The generator
+reads the counts from `MultiplayerGame.h`, and `PublishRetainedMatch`
+asserts each against Match Control's model at compile time: equal for the
+replacements, proposals, profiles, rule fields, pool and evidence; at least
+both sides and every client for the team rows; and no more than the model
+for the history.
+
+The model's own bounds are larger (128 team rows and 128 history steps), but
+the Escape card cannot hold them. At those counts it measured 16.4 MB, past
+the runtime's 16 MiB document source limit, and it no longer loaded. The card
+is now 14.9 MB (13.5 MB before). Team rows past a full server's, or a longer
+series history, still end their list with the way to the stock page.
+
+The native Match checks confirm each list's last declared row and that none
+follows it.
+The 14.9 MB card loads and presents in the engine: the `mpcard-triggers`
+capture opens the Match page on an OpenGL listen server
+(`.tmp/ui-roadmap/match-gl/mpcard-triggers/`).
+
 ## Map catalogs, 24 October 2026
 
 The Vote and Admin pages' map choices held 48 maps a game type, so a server
@@ -1223,12 +1291,11 @@ The card's acceptance continues under `FLOW-046`.
 
 ## Known limitations
 
-- A Match Control list's rows past the card's hand off to the stock page,
-  and the stock menu then keeps the menu until it closes; the card does not
-  come back over it.
+- The Match page's team rows past 64 and series history past 24 steps hand
+  off to the stock page, and the stock menu then keeps the menu until it
+  closes. The Escape card is near the runtime's 16 MiB document limit.
 - The Admin page's console completes nothing with Tab, as the stock console
   did, and its player list never scrolls the chosen row into view by itself.
-  Kick and Ban ask nothing first, as on the stock page.
 - Choosing an unavailable action does not announce its reason to the
   accessibility text backing yet, and a controller gives no rumble.
 - The Team page has no Tourney queue or arena controls; Tourney offers what

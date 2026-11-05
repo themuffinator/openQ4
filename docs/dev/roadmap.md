@@ -1914,7 +1914,19 @@ Completion must advance through the existing dependencies:
   a skull with the row at half while dead or out of the Tourney, a BOT tag,
   and network-quality bars stepped by the game. French and Italian players now
   read the stock team-refusal messages in their language. Native card checks
-  cover each mark; live MP captures and device qualification remain.
+  cover each mark, and a live OpenGL deathmatch with bots shows them in play;
+  Vulkan and device qualification remain.
+  Progress, 5 November: Kick and Ban on the Escape card's Admin page now
+  [ask first](ui/multiplayer-menus.md#kick-and-ban-confirmations-5-november-2026)
+  in the stock confirmation, naming the player; YES acts on exactly that
+  player's captured connection. Native checks and a Vulkan listen-server
+  capture that kicks a bot cover the flow.
+  The Match page's lists now hold a
+  [full server's rows](ui/multiplayer-menus.md#match-list-capacities-5-november-2026):
+  64 team rows, 32 replacements, every proposal template and 32 pool maps,
+  checked against Match Control's model at compile time. The model's 128
+  team rows and history steps would put the Escape card past the runtime's
+  16 MiB document limit, so those still hand off past a full server's.
 - [ ] **UI-04 — P1, implementation and qualification: full GUI corpus migration.**
   Finish all HUD, wrist/comms, scope, vehicle, cinematic, terminal/world and scripted
   surfaces with source-bound retained lowering. Preserve legacy grouping/remainder

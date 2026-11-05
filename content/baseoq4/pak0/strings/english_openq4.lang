@@ -1466,6 +1466,8 @@
 	"#str_230157"	"Cinematic shake"
 	"#str_231577"	"Server update required."
 	"#str_231578"	"Select the player again."
+	"#str_231590"	"Kick this player from the server?"
+	"#str_231591"	"Ban this player from the server? They cannot rejoin until the ban is removed."
 	"#str_231680"	"Rescue Strauss"
 	"#str_231681"	"Defeat the Pain Lord before Strauss is processed. Shoot the weak points on the boss's back to interrupt him."
 	"#str_43012"	"Graphics options"
