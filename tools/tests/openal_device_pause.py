@@ -40,6 +40,7 @@ static int CheckALErrors(){return AL_NO_ERROR;}
 static int Sys_Milliseconds(){return 3000;}
 struct SoundSystem {bool muted=false;bool IsMuted(){return muted;}} systemValue,*soundSystem=&systemValue;
 struct Voice {void FlushSourceBuffers(){} bool IsPlaying(){return false;}};
+struct idSoundOggStream {static void ReapReleased(bool){}};
 template<class T> struct List:std::vector<T> {
     int Num()const{return static_cast<int>(this->size());}
     void AddUnique(T value){this->push_back(value);}
