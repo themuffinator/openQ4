@@ -1018,7 +1018,8 @@ static void BuildProposalTemplateRowText( char *destination, int destinationByte
 	text.Append( OperationLabel( row.opcode ) );
 	text.Append( "\t" );
 	text.Append( Localized( MPMatchControlProposalScopeKey(
-		MP_MATCH_VIEW_PROPOSAL_GLOBAL ) ) );
+		row.targetKind == MP_MATCH_CONTROL_PROPOSAL_TARGET_OWN_SIDE ?
+			MP_MATCH_VIEW_PROPOSAL_SIDE : MP_MATCH_VIEW_PROPOSAL_GLOBAL ) ) );
 }
 
 static void BuildProfileRowText( char *destination, int destinationBytes,

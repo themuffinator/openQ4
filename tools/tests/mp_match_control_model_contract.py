@@ -331,6 +331,10 @@ const mpMatchOperationDescriptor_t *MPMatchOperationDescriptor(
 			MP_MATCH_OPERATION_FLAG_ALLOW_PARTICIPANT_TARGET |
 			MP_MATCH_OPERATION_FLAG_REQUIRE_PARTICIPANT_TARGET |
 			(allowTeamTargetOnTemplates ? MP_MATCH_OPERATION_FLAG_ALLOW_TEAM_TARGET : 0u);
+	} else if (opcode == MP_MATCH_OP_FORFEIT) {
+		descriptor.flags = MP_MATCH_OPERATION_FLAG_PROPOSABLE |
+			MP_MATCH_OPERATION_FLAG_ALLOW_TEAM_TARGET |
+			MP_MATCH_OPERATION_FLAG_REQUIRE_TEAM_TARGET;
 	}
 	return &descriptor;
 }
@@ -897,7 +901,7 @@ int main(void) {
 		model.ReplacementRow(FindReplacement(model, 105))->rostered &&
 		model.ReplacementRow(FindReplacement(model, 105))->rosterRole ==
 			MP_MATCH_VIEW_ROSTER_SUBSTITUTE);
-	CHECK(model.ProposalTemplateRowCount() == 6);
+	CHECK(model.ProposalTemplateRowCount() == 7);
 	CHECK(model.ProfileRowCount() == 2 && model.RuleRowCount() == 3);
 	CHECK(model.SeriesMapRowCount() == 2 && model.SeriesHistoryRowCount() == 2);
 	CHECK(model.EvidenceRowCount() == 3);
@@ -1015,7 +1019,7 @@ int main(void) {
 	CHECK(!MPMatchControlCommandFromToken("select_team_row", invalidCommand));
 	CHECK(invalidCommand == MP_MATCH_CONTROL_COMMAND_INVALID);
 
-	// All six proposal recipes are typed and retain a global ballot. Removal
+	// The six global proposal recipes are typed and retain a global ballot. Removal
 	// additionally carries one stable participant target.
 	const mpMatchOperationOpcode_t recipes[] = {
 		MP_MATCH_OP_RESUME_REQUEST, MP_MATCH_OP_RULES_SELECT_PROFILE,
@@ -1054,6 +1058,29 @@ int main(void) {
 			CHECK(request.argumentCount == 1);
 		}
 	}
+
+	// The seventh recipe is the one side ballot: a team forfeit vote. Its scope
+	// and team target are always the recipient's own side, whatever the action
+	// selector says, and it carries no participant target or nested reason.
+	CHECK(model.ProposalTemplateRowCount() == 7);
+	CHECK(model.SelectProposalTemplateRow(FindTemplate(model, MP_MATCH_OP_FORFEIT)));
+	CHECK(!model.ProposalTemplateRow(model.SelectedProposalTemplateRow())->globalOnly);
+	CHECK(model.ProposalTemplateRow(model.SelectedProposalTemplateRow())->targetKind ==
+		MP_MATCH_CONTROL_PROPOSAL_TARGET_OWN_SIDE);
+	for (int choice = 0; choice < 3; ++choice) {
+		const mpMatchControlSideChoice_t sideChoice = choice == 0 ?
+			MP_MATCH_CONTROL_SIDE_CHOICE_NONE : (choice == 1 ?
+				MP_MATCH_CONTROL_SIDE_CHOICE_ZERO : MP_MATCH_CONTROL_SIDE_CHOICE_ONE);
+		model.SetActionSideChoice(sideChoice);
+		mpMatchOperationRequest_t sideBallot; sideBallot.Clear();
+		CHECK(model.BuildRequest(MP_MATCH_CONTROL_COMMAND_PROPOSAL_CREATE,
+			++requestId, sideBallot, &error));
+		CHECK(sideBallot.hasTeamTarget && sideBallot.teamTarget == MP_MATCH_TEAM_MARINE);
+		CHECK(!sideBallot.hasParticipantTarget && sideBallot.argumentCount == 1);
+		CHECK(Argument(sideBallot, MP_MATCH_ARG_PROPOSED_OPCODE)->value.enumValue ==
+			MP_MATCH_OP_FORFEIT);
+	}
+	CHECK(model.SetActionSideChoice(MP_MATCH_CONTROL_SIDE_CHOICE_NONE));
 
 	// Removal never falls back to the selected row's transport slot, and every
 	// failed target/series-state preflight leaves caller output byte-identical.
@@ -1444,6 +1471,18 @@ int main(void) {
 			CHECK(targeted.hasTeamTarget && targeted.teamTarget ==
 				(side == 0 ? MP_MATCH_TEAM_MARINE : MP_MATCH_TEAM_STROGG));
 		}
+		// Choosing a side for direct authority never lets a referee call that
+		// side's own vote.
+		CHECK(neutralModel.SelectProposalTemplateRow(FindTemplate(neutralModel,
+			MP_MATCH_OP_FORFEIT)));
+		mpMatchOperationRequest_t refereeSideBallot;
+		memset(&refereeSideBallot, 0x5a, sizeof(refereeSideBallot));
+		const mpMatchOperationRequest_t refereeSideBallotBefore = refereeSideBallot;
+		CHECK(!neutralModel.BuildRequest(MP_MATCH_CONTROL_COMMAND_PROPOSAL_CREATE,
+			++requestId, refereeSideBallot, &error));
+		CHECK(error.reason == MP_MATCH_CONTROL_ERROR_INVALID_SIDE &&
+			memcmp(&refereeSideBallot, &refereeSideBallotBefore,
+				sizeof(refereeSideBallot)) == 0);
 	}
 
 	// Syntax-only choice mutation cannot confer authority. An ordinary captain
@@ -1506,6 +1545,13 @@ int main(void) {
 	mpMatchOperationRequest_t duelOpponent; duelOpponent.Clear();
 	CHECK(!duelModel.BuildRequest(MP_MATCH_CONTROL_COMMAND_FORFEIT,
 		++requestId, duelOpponent, &error));
+	CHECK(error.reason == MP_MATCH_CONTROL_ERROR_INVALID_SIDE);
+	// A Duel contestant has no gameplay team, so there is no side electorate.
+	CHECK(duelModel.SelectProposalTemplateRow(FindTemplate(duelModel,
+		MP_MATCH_OP_FORFEIT)));
+	mpMatchOperationRequest_t duelSideBallot; duelSideBallot.Clear();
+	CHECK(!duelModel.BuildRequest(MP_MATCH_CONTROL_COMMAND_PROPOSAL_CREATE,
+		++requestId, duelSideBallot, &error));
 	CHECK(error.reason == MP_MATCH_CONTROL_ERROR_INVALID_SIDE);
 
 	// An explicit referee selection survives ordinary view refreshes so an

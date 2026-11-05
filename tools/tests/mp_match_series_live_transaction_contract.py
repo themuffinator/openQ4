@@ -257,6 +257,51 @@ def map_session_handoff_contracts(multiplayer: str) -> None:
             f"{signature} rollback snapshot",
         )
 
+    # A MAP_ACTIVE selection whose handoff never reached a session is released
+    # as an aborted attempt with no artifacts, so Advance replays the map.
+    abort = function(
+        multiplayer,
+        "bool idMultiplayerGame::AbortUnstartedCompetitionSeriesMap",
+        "unstarted series map release",
+    )
+    require_order(
+        abort,
+        (
+            "series.GetState() != MP_SERIES_MAP_ACTIVE",
+            "MP_SERIES_MAP_ABORTED, MP_SERIES_SIDE_NONE, 0, 0, linkedSessionId,",
+            "mapInput.outcome = MP_SERIES_REPORT_MAP_ABORTED;",
+            "MP_MATCH_TRANSITION_MAP_SHUTDOWN",
+            "MP_SERIES_REPORT_ARTIFACT_NOT_REQUESTED",
+            "report.AppendMapResult( mapInput )",
+        ),
+        "unstarted series map release",
+    )
+    require_order(
+        begin_session,
+        (
+            "matchSeries.GetState() == MP_SERIES_MAP_ACTIVE && matchSeriesAwaitingMapSession &&",
+            "!CompetitionSeriesMapMatchesRuntime( matchSeries, gameLocal.gameType,",
+            "AbortUnstartedCompetitionSeriesMap( seriesCandidate, reportCandidate,",
+            "PersistCompetitionSeriesCandidate( seriesCandidate, reportCandidate,",
+            "matchSeries = seriesCandidate;",
+            "matchSeriesAwaitingMapSession = false;",
+            "PersistCompetitionSeriesCandidate( matchSeries, matchSeriesReport,",
+        ),
+        "failed handoff released before session binding",
+    )
+    require_order(
+        restore,
+        (
+            "const bool unstartedActiveMap = candidate.GetState() == MP_SERIES_MAP_ACTIVE &&",
+            "candidate.GetState() == MP_SERIES_MAP_COMPLETE &&",
+            "matchRules.Committed().Digest()",
+            "AbortUnstartedCompetitionSeriesMap( candidate, reportCandidate,",
+            "PersistCompetitionSeriesCandidate( candidate, reportCandidate,",
+            "matchSeries = candidate;",
+        ),
+        "restored unstarted map released as an aborted attempt",
+    )
+
 
 def evidence_commit_contracts(multiplayer: str) -> None:
     effects = function(

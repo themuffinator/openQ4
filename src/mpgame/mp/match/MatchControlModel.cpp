@@ -18,7 +18,7 @@ static_assert( MP_MATCH_CONTROL_MAX_TEAM_ROWS >=
 	"Match Control team-row capacity no longer covers a maximum accepted view" );
 static_assert( MP_MATCH_CONTROL_MAX_PROFILE_ROWS >= MP_MATCH_PROFILE_COUNT,
 	"Match Control profile-row capacity no longer covers the rule registry" );
-static_assert( MP_MATCH_CONTROL_MAX_PROPOSAL_TEMPLATE_ROWS == 6,
+static_assert( MP_MATCH_CONTROL_MAX_PROPOSAL_TEMPLATE_ROWS == 7,
 	"Match Control proposal recipes require an explicit schema review" );
 static_assert( MP_MATCH_PROTOCOL_MAX_ARGUMENTS >= 3,
 	"Match Control proposal and veto requests require at least three arguments" );
@@ -803,7 +803,8 @@ bool mpMatchControlModel::BuildProposalTemplateRows(
 		MP_MATCH_OP_RULES_STAGE_FIELD,
 		MP_MATCH_OP_RULES_COMMIT,
 		MP_MATCH_OP_ABORT,
-		MP_MATCH_OP_PARTICIPANT_REMOVE
+		MP_MATCH_OP_PARTICIPANT_REMOVE,
+		MP_MATCH_OP_FORFEIT
 	};
 	for ( int index = 0; index < static_cast<int>( sizeof( templateOpcodes ) /
 			sizeof( templateOpcodes[ 0 ] ) ); ++index ) {
@@ -824,7 +825,18 @@ bool mpMatchControlModel::BuildProposalTemplateRows(
 			MP_MATCH_OPERATION_FLAG_ALLOW_TEAM_TARGET |
 			MP_MATCH_OPERATION_FLAG_REQUIRE_TEAM_TARGET;
 		row.globalOnly = ( descriptor->flags & targetFlags ) == 0;
-		if ( ( descriptor->flags &
+		if ( templateOpcodes[ index ] == MP_MATCH_OP_FORFEIT ) {
+			// The one explicit side-ballot recipe: the required team target is
+			// the recipient's own side, which the server also uses as the scope.
+			if ( ( descriptor->flags & targetFlags ) != targetFlags ||
+				( descriptor->flags &
+					MP_MATCH_OPERATION_FLAG_ALLOW_PARTICIPANT_TARGET ) != 0 ) {
+				SetError( error, MP_MATCH_CONTROL_ERROR_INVALID_VALUE,
+					MP_MATCH_OP_PROPOSAL_CREATE, index );
+				return false;
+			}
+			row.targetKind = MP_MATCH_CONTROL_PROPOSAL_TARGET_OWN_SIDE;
+		} else if ( ( descriptor->flags &
 				MP_MATCH_OPERATION_FLAG_REQUIRE_PARTICIPANT_TARGET ) != 0 ) {
 			row.targetKind = MP_MATCH_CONTROL_PROPOSAL_TARGET_PARTICIPANT;
 		} else if ( ( descriptor->flags &
@@ -1695,6 +1707,27 @@ bool mpMatchControlModel::BuildRequest( mpMatchControlCommand_t command,
 					opcode, selectedProposalTemplateRow,
 					MP_MATCH_ARG_PROPOSED_OPCODE );
 				return false;
+			}
+			if ( selectedTemplate->targetKind ==
+					MP_MATCH_CONTROL_PROPOSAL_TARGET_OWN_SIDE ) {
+				// A side ballot always belongs to the recipient's own team. The
+				// action-side selector is ignored: authority over another side
+				// never calls that side's vote.
+				if ( selectedTemplate->globalOnly ||
+						selectedTemplate->opcode != MP_MATCH_OP_FORFEIT ) {
+					SetError( error, MP_MATCH_CONTROL_ERROR_SELECTION_INVALID,
+						opcode, selectedProposalTemplateRow,
+						MP_MATCH_ARG_PROPOSED_OPCODE );
+					return false;
+				}
+				if ( !IsPlayableSide( recipient.side ) || !teamKnown[ recipient.side ] ) {
+					SetError( error, MP_MATCH_CONTROL_ERROR_INVALID_SIDE, opcode,
+						selectedProposalTemplateRow );
+					return false;
+				}
+				candidate.hasTeamTarget = true;
+				candidate.teamTarget = ProtocolTeamForSide( recipient.side );
+				break;
 			}
 			if ( !selectedTemplate->globalOnly ) {
 				SetError( error, MP_MATCH_CONTROL_ERROR_SELECTION_INVALID,

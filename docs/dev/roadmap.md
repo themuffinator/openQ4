@@ -2797,13 +2797,22 @@ enhanced solver. The product rules below are requirements, not current features.
 Sources: [competitive closure audit](competitive-match-reference-audit.md),
 [bot implementation](mp-bots.md), [Arena ceremony](arena-campaign-ceremony.md),
 [demo architecture](multiview-demos.md), [MVD qualification](mvd-qualification-2026-09-07.md),
-[liquid implementation history](archive/2026-10-18/plans/2026-08-07-liquid-support.md).
+[liquid implementation history](archive/2026-10-18/plans/2026-08-07-liquid-support.md),
+[human qualification checklists](mp-human-qualification.md).
 
 Current delivery scope, 28 October: the user deferred real WAN and
 cross-architecture peer qualification for now. MP-07/MP-08 retain those gates for
 future support qualification; local implementation, simulation and current-host
 checks continue. This deferral does not promote prediction/rewind defaults or
 claim peer combinations that have not been tested.
+
+Human gates, 5 November: the owner chose to run, in person, the gates that need
+a person or physical hardware. These are keyboard/controller workflows, Arena pause
+and audio endpoints, real swimming and effects by eye, weapon visuals, physical
+networks and bot difficulty. They follow the
+[human qualification checklists](mp-human-qualification.md), because automated
+fixtures never synthesize input. Each such gate stays open until its checklist
+result is recorded.
 
 ### MP completion checkpoints
 
@@ -2816,15 +2825,15 @@ prediction/rewind defaults.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| MP-01 — Partial | Roster/identity/vote fixes; eight live edge scenarios, failed-map retry and writer fault controls pass scoped checks. | Physical keyboard/controller flows, side-ballot scope, post-commit map-load limit and full release-order/failure coverage. |
+| MP-01 — Partial | Roster/identity/vote fixes; eight live edge scenarios, failed-map retry, writer fault controls, live team-forfeit side ballots and post-commit map-load release pass scoped checks. | Physical keyboard/controller flows ([checklist](mp-human-qualification.md#mp-01-competitive-match-control-by-hand)) and other renderers/platforms. |
 | MP-02 — Closed with accepted timing caveat | Final `f6aa481e6` four-map long matches and all 33 catalog variants pass death/duration checks with zero navigation deaths after strict policy-2 assessment; targeted recovery, traffic and Windows/Linux controls pass. | CTF3 timing meets numerical limits but SP contention invalidates controlled qualification; no uncontended repeat was completed. Owner accepted this caveat for closeout; failed report retained, other maps/platforms unqualified. |
 | MP-03 — Closed | Trench jumps and debug-pool defects fixed; route-cost, collision, graph/cache and ladder/lift subjects have recorded dispositions. | Custom lifts remain unsupported; final safety evidence and the accepted timing-contention caveat are recorded under completed MP-02. |
-| MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return; retain failure-path and UI/audio dependencies. |
+| MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return ([checklist](mp-human-qualification.md#mp-04-arena-by-hand)); retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
-| MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked. | Real player swimming and by-eye splash/bubble/wade review. Swimming monsters, new animations and moving volumes remain deferred. |
-| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; defaults remain off. | Remote weapon-play/same-fire-frame visuals and remaining peer transitions; real WAN and default promotion only when selected and qualified. |
-| MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. | Physical MTU/multi-record DNS, cross-machine load and deferred WAN/other-architecture peers; actual retail-binary rejection check without claiming interoperability. |
-| MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness; retune from that evidence. |
+| MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked. | Real player swimming and by-eye splash/bubble/wade review ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)). Swimming monsters, new animations and moving volumes remain deferred. |
+| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; defaults remain off. | Remote weapon-play/same-fire-frame visuals and remaining peer transitions ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); real WAN and default promotion only when selected and qualified. |
+| MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. | Physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
+| MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 
 Completion substeps:
 
@@ -2877,6 +2886,22 @@ Completion substeps:
   and invalid input. Twelve reversal controls fail. This qualifies adapter
   handling, not physical disk exhaustion, power loss or process interruption;
   the live and physical-workflow gates remain open.
+  Progress, 5 November: side ballots and the post-commit map-load limit are
+  closed ([evidence](competitive-match-reference-audit.md#side-ballots-and-post-commit-map-load-release-2026-11-05)).
+  The owner chose a targeted template: **Forfeit | Side** is a team forfeit
+  vote. Its scope and target are always the recipient's own side. The server
+  accepts it only from an active member of that side while forfeit is legal,
+  and a passed ballot runs the ordinary forfeit. `mp_match_side_ballot_smoke.py`
+  passes live with three humans. Only Strogg sees the Strogg ballot, the
+  captain's NO fails it, and a later YES ends the match as a Strogg forfeit won
+  by Marine. A committed series map that never starts a session, after a load
+  failure past the preflight or on recovery onto another map, is now released
+  as an aborted, artifact-free attempt that Advance replays. Before this, every
+  later session refused to bind. `mp_series_smoke.py --broken-map-retry` passes
+  the whole path live. Five native reversal controls fail, and all 53 asset-free
+  `mp_match_*` contracts pass. Remaining: the physical keyboard/controller
+  workflows in the [human checklist](mp-human-qualification.md#mp-01-competitive-match-control-by-hand),
+  and other renderers and platforms.
 - [x] **MP-02 — P1, qualification and targeted fixes: bot traversal safety.** Rerun
   staged q4dm8/q4ctf3/q4ctf5/q4dz3 after the exact-state jump/unroutable-pad fixes,
   then the complete declared-map sweep including warmup (currently 33 variants).
@@ -3504,6 +3529,15 @@ Completion substeps:
   fragments), with unchanged runtime hashes and clean exits. The 59 broader
   match/network contracts pass. Real WAN, physical MTU and architecture gates
   retain their previous scope and deferrals.
+  Progress, 5 November: the retail-client check now runs the real binary on
+  request. `mp_retail_protocol_smoke.py --retail-client-binary` starts the
+  installed `Quake4.exe` windowed and loopback-bound, connects it to the openQ4
+  server and requires the protocol refusal in its own log. The Steam 1.4.2
+  executable demands elevation (WinError 740) and the harness never elevates,
+  so the check is step 8.4 of the [human checklist](mp-human-qualification.md#mp-08-real-network-conditions),
+  run from an elevated prompt. The default run passes again on the current
+  stage. The retail 2.85 server is refused for its protocol and never joined,
+  and the openQ4 server answers a 1.4.2 challenge with `server uses protocol 2.41`.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,

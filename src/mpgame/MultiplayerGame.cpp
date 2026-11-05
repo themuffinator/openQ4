@@ -4230,6 +4230,69 @@ bool idMultiplayerGame::PersistCompetitionSeriesCandidate(
 	return true;
 }
 
+/*
+================
+idMultiplayerGame::AbortUnstartedCompetitionSeriesMap
+
+openQ4: a series map is checkpointed MAP_ACTIVE before its handoff.  When that
+map never starts a session - its load failed after the preflight, or the server
+came back on a different map - no result can ever be sealed for it.  Record the
+selection as an aborted attempt instead, with no artifacts, so the ordinary
+recovered-review Advance replays the same map.  Aborted attempts keep their
+selection and count toward the series attempt limit, which bounds retries.
+Mutates only the candidates; the caller persists and adopts them.
+================
+*/
+bool idMultiplayerGame::AbortUnstartedCompetitionSeriesMap(
+		mpCompetitionSeries &series, mpCompetitionSeriesReport &report,
+		uint64_t seriesId, uint64_t linkedSessionId ) const {
+	if ( seriesId == 0 || linkedSessionId == 0 ||
+		series.GetState() != MP_SERIES_MAP_ACTIVE || !report.IsInitialized() ) {
+		return false;
+	}
+	const uint64_t rulesDigest = report.GetIdentity().rulesDigest;
+	const mpSeriesMutationResult aborted = series.CommitMapResult(
+		MP_SERIES_MAP_ABORTED, MP_SERIES_SIDE_NONE, 0, 0, linkedSessionId,
+		rulesDigest, series.GetRevision() );
+	if ( aborted.WasRejected() || !series.ValidateInvariants() ) {
+		gameLocal.Warning( "competition series could not record its unstarted map "
+			"(reason %d)", aborted.reason );
+		return false;
+	}
+	const int attemptIndex = series.GetAttemptCount() - 1;
+	const mpSeriesMapAttempt *attempt = series.GetAttempt( attemptIndex );
+	const mpSeriesSelectedMap *selection = attempt != NULL ?
+		series.GetSelectedMap( attempt->selectionIndex ) : NULL;
+	const mpSeriesConfiguration &configuration = series.GetConfiguration();
+	if ( attempt == NULL || selection == NULL || selection->poolIndex < 0 ||
+		selection->poolIndex >= configuration.mapPoolCount ) {
+		return false;
+	}
+	mpSeriesReportMapResultInput mapInput;
+	memset( &mapInput, 0, sizeof( mapInput ) );
+	mapInput.attempt = static_cast<uint32_t>( attemptIndex + 1 );
+	mapInput.sessionId = attempt->matchSessionId;
+	mapInput.mapToken = configuration.mapPool[ selection->poolIndex ];
+	mapInput.rulesDigest = attempt->rulesDigest;
+	mapInput.outcome = MP_SERIES_REPORT_MAP_ABORTED;
+	mapInput.reason = static_cast<uint16_t>( MP_MATCH_TRANSITION_MAP_SHUTDOWN );
+	mapInput.winnerContestant = MP_SERIES_SIDE_NONE;
+	for ( int kind = 0; kind < MP_SERIES_REPORT_ARTIFACT_KIND_COUNT; ++kind ) {
+		mapInput.artifacts[ kind ].status = MP_SERIES_REPORT_ARTIFACT_NOT_REQUESTED;
+		mapInput.artifacts[ kind ].qpath = "";
+	}
+	const mpSeriesReportWriteResult appended = report.AppendMapResult( mapInput );
+	if ( appended.code != MP_SERIES_REPORT_WRITE_ACCEPTED ) {
+		gameLocal.Warning( "competition report could not record its unstarted map "
+			"(reason %d)", appended.reason );
+		return false;
+	}
+	gameLocal.Warning( "competition series map '%s' never started a session; "
+		"recorded attempt %d as aborted so Advance replays it",
+		mapInput.mapToken, attemptIndex + 1 );
+	return true;
+}
+
 bool idMultiplayerGame::PersistCompetitionSeries( void ) {
 	const uint64_t linkedSession = matchSeriesLinkedSessionId != 0 ?
 		matchSeriesLinkedSessionId : matchSession.GetSessionId();
@@ -4380,8 +4443,14 @@ bool idMultiplayerGame::RestoreCompetitionSeriesIfRequested( void ) {
 			static_cast<unsigned long long>( requestedId ) );
 		return false;
 	}
-	if ( ( candidate.GetState() == MP_SERIES_MAP_ACTIVE ||
-		candidate.GetState() == MP_SERIES_MAP_COMPLETE ) &&
+	// openQ4: a MAP_ACTIVE checkpoint restored on a different map never sealed a
+	// result: its map failed to load or the process stopped before it could.
+	// It is released below as an aborted attempt; a completed map's review still
+	// has to be restored on its own map.
+	const bool unstartedActiveMap = candidate.GetState() == MP_SERIES_MAP_ACTIVE &&
+		!CompetitionSeriesMapMatchesRuntime( candidate, gameLocal.gameType,
+			gameLocal.GetMapName() );
+	if ( candidate.GetState() == MP_SERIES_MAP_COMPLETE &&
 		!CompetitionSeriesMapMatchesRuntime( candidate, gameLocal.gameType,
 			gameLocal.GetMapName() ) ) {
 		gameLocal.Warning( "competition series %llu does not belong to loaded map '%s'",
@@ -4393,6 +4462,15 @@ bool idMultiplayerGame::RestoreCompetitionSeriesIfRequested( void ) {
 		gameLocal.Warning( "competition series %llu rules identity does not match "
 			"the active competitive profile",
 			static_cast<unsigned long long>( requestedId ) );
+		return false;
+	}
+	if ( unstartedActiveMap && ( candidate.GetConfiguration().gameType != gameLocal.gameType ||
+		!AbortUnstartedCompetitionSeriesMap( candidate, reportCandidate,
+			record.seriesId, record.linkedSessionId ) ||
+		!PersistCompetitionSeriesCandidate( candidate, reportCandidate,
+			record.seriesId, record.linkedSessionId ) ) ) {
+		gameLocal.Warning( "competition series %llu does not belong to loaded map '%s'",
+			static_cast<unsigned long long>( requestedId ), gameLocal.GetMapName() );
 		return false;
 	}
 	matchSeries = candidate;
@@ -8886,6 +8964,23 @@ bool idMultiplayerGame::BeginMatchSession( void ) {
 	}
 	matchViewObservedItemTimingRevision = matchItemTiming.GetRevision();
 	matchEvidenceMode = idMath::ClampInt( 0, 2, g_matchEvidence.GetInteger() );
+	if ( matchSeries.GetState() == MP_SERIES_MAP_ACTIVE && matchSeriesAwaitingMapSession &&
+		!CompetitionSeriesMapMatchesRuntime( matchSeries, gameLocal.gameType,
+			gameLocal.GetMapName() ) ) {
+		// The committed map's handoff never reached a session: its load failed
+		// after the preflight, or another map was started.  Release the series
+		// back to review instead of leaving every later session inoperable.
+		mpCompetitionSeries seriesCandidate = matchSeries;
+		mpCompetitionSeriesReport reportCandidate = matchSeriesReport;
+		if ( AbortUnstartedCompetitionSeriesMap( seriesCandidate, reportCandidate,
+				matchSeriesId, matchSeriesLinkedSessionId ) &&
+			PersistCompetitionSeriesCandidate( seriesCandidate, reportCandidate,
+				matchSeriesId, matchSeriesLinkedSessionId ) ) {
+			matchSeries = seriesCandidate;
+			matchSeriesReport = reportCandidate;
+			matchSeriesAwaitingMapSession = false;
+		}
+	}
 	if ( matchSeries.GetState() == MP_SERIES_MAP_ACTIVE ) {
 		if ( !CompetitionSeriesMapMatchesRuntime( matchSeries,
 			gameLocal.gameType, gameLocal.GetMapName() ) ||

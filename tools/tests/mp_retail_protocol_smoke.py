@@ -14,8 +14,12 @@ Two scenarios, each on IPv4 loopback with hidden windows and no input:
   and one byte), and must answer with the protocol print that client shows.
   An openQ4 challenge on the same server must still be answered normally.
 
-The retail client itself is not run: it opens a visible game window. Its
-packet is reproduced byte for byte instead.
+By default the retail client itself is not run, because it opens a visible
+game window; its packet is reproduced byte for byte instead.
+`--retail-client-binary` additionally starts the installed `Quake4.exe`
+windowed, bound to loopback with its writable files redirected into the output
+directory, connects it to the openQ4 server and requires the protocol refusal
+in its own console log. The harness stops it afterwards; no input is sent.
 """
 from __future__ import annotations
 
@@ -101,6 +105,8 @@ def main() -> int:
     parser.add_argument("--client-port", type=int, default=28992)
     parser.add_argument("--startup-timeout", type=int, default=420)
     parser.add_argument("--timeout", type=int, default=90)
+    parser.add_argument("--retail-client-binary", action="store_true",
+                        help="also run the real Quake4.exe (a visible window) against the openQ4 server")
     args = parser.parse_args()
     if os.name != "nt":
         parser.error("the retail binaries are Windows executables")
@@ -317,6 +323,47 @@ def main() -> int:
             _, offset = rstr(info, 2)
             _, protocol = struct.unpack_from("<ii", info, offset)
             report["retail_client"]["info_protocol"] = [protocol >> 16, protocol & 0xFFFF]
+        binary_started = False
+        if args.retail_client_binary:
+            # The real 1.4.2 client: windowed, loopback-bound, its files kept in
+            # the output directory, and stopped by the harness afterwards.
+            client_home = output / "retail-client"
+            (client_home / "q4base").mkdir(parents=True)
+            binary = report["retail_client"]["binary"] = {"refusal_logged": False}
+            try:
+                launch("retail_client_binary", [
+                    str(retail_paths["Quake4.exe"]), "+set", "fs_basepath", str(retail).lower(),
+                    "+set", "fs_savepath", str(client_home).lower(), "+set", "r_fullscreen", "0",
+                    "+set", "r_mode", "3", "+set", "s_noSound", "1", "+set", "logFile", "2",
+                    "+set", "net_ip", "127.0.0.1", "+set", "net_port", str(args.client_port),
+                    "+set", "com_allowConsole", "1", "+connect", f"127.0.0.1:{openq4_port}"], retail)
+                binary_started = True
+            except OSError as error:
+                # The Steam 1.4.2 Quake4.exe demands elevation (WinError 740).
+                # The harness never elevates; run it from an elevated prompt.
+                binary["launch_error"] = str(error)
+                report["failures"].append("the real Quake4.exe could not start: " + (
+                    "it requires elevation; run this check from an elevated prompt"
+                    if getattr(error, "winerror", None) == 740 else str(error)))
+        if binary_started:
+            refusal = "server uses protocol %d.%d" % OPENQ4_PROTOCOL
+            deadline = time.monotonic() + args.timeout
+            retail_client_log = None
+            while time.monotonic() < deadline and processes["retail_client_binary"].poll() is None:
+                retail_client_log = next(iter(sorted(client_home.glob("*/qconsole.log"))), None)
+                if retail_client_log is not None and refusal in read_log(retail_client_log):
+                    binary["refusal_logged"] = True
+                    break
+                time.sleep(0.5)
+            binary["exited_by_itself"] = processes["retail_client_binary"].poll() is not None
+            stop("retail_client_binary", processes["retail_client_binary"].kill)
+            if retail_client_log is not None:
+                text = read_log(retail_client_log)
+                binary["log"] = str(retail_client_log)
+                binary["version"] = next(iter(re.findall(r"Quake4 [^\n]*1\.4\.2[^\n]*", text)), None)
+                binary["protocol_lines"] = [line for line in text.splitlines() if "protocol" in line][:8]
+            if not binary["refusal_logged"]:
+                report["failures"].append("the real Quake4.exe did not log the openQ4 protocol refusal")
         write_script(commands, ["quit"])
         processes["openq4_server"].wait(timeout=30)
         report["retail_client"]["server_exit_code"] = processes["openq4_server"].returncode
@@ -343,7 +390,7 @@ def main() -> int:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
-                    if role != "client":
+                    if role not in ("client", "retail_client_binary"):
                         report["failures"].append(f"{role} required forced termination")
         for stream in streams:
             stream.close()

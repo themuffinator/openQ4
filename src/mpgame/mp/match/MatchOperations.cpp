@@ -1086,6 +1086,33 @@ mpOperationExecutionResult_t mpMatchOperationExecutor::ExecuteInternal(
 				return Reject( MP_OPERATION_REASON_TARGET_ALIGNMENT,
 					session, rules, proposals, series );
 			}
+			if ( request.hasTeamTarget ) {
+				// A side ballot is decided by that side's own active players, so
+				// only one of them may open it.  Referees, operators and the
+				// opposing side keep their direct operations instead; authority
+				// over a side never lets anyone call that side's vote.
+				if ( principal.actorState == NULL || !principal.actorState->active ||
+						principal.actorState->side != principal.targetSide ) {
+					return Reject( MP_OPERATION_REASON_NOT_AUTHORIZED,
+						session, rules, proposals, series );
+				}
+				// The vote must be able to execute now.  A side ballot that could
+				// only fail at execution would cost the side its scope for the
+				// whole window.
+				const mpMatchOperationArgument_t *proposedOpcode = FindArgument( request,
+					MP_MATCH_ARG_PROPOSED_OPCODE );
+				const mpMatchOperationDescriptor_t *proposedDescriptor =
+					proposedOpcode != NULL ? MPMatchOperationDescriptor(
+						static_cast<mpMatchOperationOpcode_t>(
+							proposedOpcode->value.enumValue ) ) : NULL;
+				if ( proposedDescriptor == NULL ||
+						( proposedDescriptor->legalPhaseMask &
+							( static_cast<mpMatchPhaseMask_t>( 1u ) <<
+								session.GetPhase() ) ) == 0 ) {
+					return Reject( MP_OPERATION_REASON_WRONG_PHASE,
+						session, rules, proposals, series );
+				}
+			}
 			mpOperationExecutionResult_t result = NeedsAdapter(
 				MP_OPERATION_CONTINUATION_PROPOSAL_CREATE, request.opcode, principal,
 				session, rules, proposals, series );

@@ -25,6 +25,11 @@ ROLLBACK_DEF = "".join([
         ("name", "oq4seriesrollback"), ("DM", "0"), ("Team DM", "1"), ("Tourney", "0"), ("CTF", "0"),
         ("loadimage", "gfx/guis/loadscreens/q4dm1"), ("mp_thumb", "gfx/guis/mainmenu/thumb_q4dm1"))),
     "}\n"])
+# --broken-map-retry ships a .map that exists (so the preflight accepts it) but
+# cannot be parsed, so the load fails only after MAP_ACTIVE is checkpointed.
+BROKEN_MAP_TEXT = "openQ4 broken-map fixture: deliberately not a map file\n"
+# Without a .proc the renderer refuses the world after the commit.
+BROKEN_MAP_ERROR = "couldn't load maps/" + ROLLBACK_MAP
 
 
 class SeriesRun:
@@ -52,6 +57,9 @@ class SeriesRun:
         self.rollback = {}
         # Subclass fixtures reuse run() with their own arguments.
         self.missing_map_retry = getattr(args, "missing_map_retry", False)
+        self.broken_map_retry = getattr(args, "broken_map_retry", False)
+        # Engine errors a fixture provokes on purpose; any other error still fails.
+        self.expected_errors = ()
         for role, game in self.games.items():
             game.mkdir(parents=True, exist_ok=True)
             self.loops[role] = game / "series_commands.cfg"
@@ -70,7 +78,7 @@ class SeriesRun:
 
     def launch_overrides(self, role):
         # The rollback fixture's whole pool is the map that has no files yet.
-        if role == "host" and self.missing_map_retry:
+        if role == "host" and ( self.missing_map_retry or self.broken_map_retry ):
             return {"si_mapCycle": ROLLBACK_MAP}
         return {}
 
@@ -118,13 +126,14 @@ class SeriesRun:
         until = min(self.deadline, time.monotonic() + timeout)
         while time.monotonic() < until:
             texts = {role: read_log(path) for role, path in self.logs.items()}
-            error = re.search(r"(?:FATAL(?: ERROR|:)|ERROR:|Unknown command|usage: openq4_guiSet|"
-                              r"Reliable messages overflow|reliable message queue overflowed|"
-                              r"competition report rejected|could not project match evidence|"
-                              r"could not (?:capture|persist|finalize) competition|"
-                              r"MP_CONTROL match_result_message=[^\n]* \| Rejected \||"
-                              r"MP_CONTROL action requires|MP_CONTROL rejected|"
-                              r"competitive finalization remains pending)[^\n]*", "\n".join(texts.values()))
+            errors = re.finditer(r"(?:FATAL(?: ERROR|:)|ERROR:|Unknown command|usage: openq4_guiSet|"
+                                 r"Reliable messages overflow|reliable message queue overflowed|"
+                                 r"competition report rejected|could not project match evidence|"
+                                 r"could not (?:capture|persist|finalize) competition|"
+                                 r"MP_CONTROL match_result_message=[^\n]* \| Rejected \||"
+                                 r"MP_CONTROL action requires|MP_CONTROL rejected|"
+                                 r"competitive finalization remains pending)[^\n]*", "\n".join(texts.values()))
+            error = next((e for e in errors if not any(x in e[0] for x in self.expected_errors)), None)
             if error:
                 raise RuntimeError(f"engine or diagnostic error during {label}: {error[0]}")
             if any(p.poll() is not None for p in self.processes.values()):
@@ -230,13 +239,27 @@ class SeriesRun:
             report["final"]["winner"] != 0):
             raise RuntimeError("persisted final series identity, score or winner differs")
         maps = report["maps"]
-        if maps["accepted"] != played or maps["dropped"] != 0 or len(maps["entries"]) != played:
+        # A post-commit load failure leaves one aborted, artifact-free attempt
+        # ahead of the replayed map.
+        aborted = 1 if self.broken_map_retry else 0
+        if (maps["accepted"] != played + aborted or maps["dropped"] != 0 or
+                len(maps["entries"]) != played + aborted):
             raise RuntimeError("persisted series map count differs or contains drops")
+        entries = maps["entries"]
+        if aborted:
+            first = entries[0]
+            if (first["attempt"] != 1 or first["outcome"] != "aborted" or
+                    first["sessionId"] != self.rollback["failed_session"] or
+                    first["map"] != ROLLBACK_MAP or
+                    any(first["artifacts"][kind]["status"] != "notRequested" for kind in ("evidence", "mvd"))):
+                raise RuntimeError(f"the unstarted map's report row differs: {first}")
+            self.rollback["report_row"] = first
+            entries = entries[1:]
         paths, sessions = [str(final_path)], []
-        for number, entry in enumerate(maps["entries"], 1):
+        for number, entry in enumerate(entries, 1):
             winner = (number - 1) % 2 if self.args.full_distance else 0
             expected = next(c for c in self.captures if c["label"] == f"map-{number}-live-host")
-            if (entry["attempt"] != number or entry["sessionId"] != expected["session"] or
+            if (entry["attempt"] != number + aborted or entry["sessionId"] != expected["session"] or
                 entry["outcome"] != "forfeit" or entry["winner"] != winner or
                 entry["rulesDigest"] != report["rules"]["digest"]):
                 raise RuntimeError(f"persisted series map {number} differs from accepted gameplay")
@@ -337,7 +360,9 @@ class SeriesRun:
             for role, text in texts.items()), timeout=90)
         self.admission()
         for role in self.games:
-            self.open_menu(role)
+            # A client that reconnected after a dropped server keeps its menu
+            # flag; open Match Control directly instead of asserting it idle.
+            self.open_menu(role, review=self.broken_map_retry)
         return self.await_view("host", "new map session",
                                lambda v: v["session"] != previous_session, timeout=60)
 
@@ -386,6 +411,68 @@ class SeriesRun:
                          "restored_from": {e: f"{p.name}:{n}" for e, (p, n) in sources.items()}}
         self.action("host", "series_advance", confirm=True)
 
+    def broken_map_rollback(self, session, loaded_counts):
+        # The final veto selected a declared map whose .map exists but cannot be
+        # parsed. The preflight accepts it, MAP_ACTIVE is checkpointed and the
+        # load fails afterwards, dropping the listen server. The next session
+        # must release the series as an aborted attempt, and Advance must then
+        # replay the same map once its files are repaired.
+        game = self.games["host"]
+        self.wait("post-commit map load failure", lambda texts: BROKEN_MAP_ERROR in texts["host"], timeout=90)
+        series_id = self.view_series_id
+        checkpoint = game / f"match-series/series-{series_id}.oq4series"
+        failed_mtime = checkpoint.stat().st_mtime_ns if checkpoint.is_file() else 0
+        counts = self.load_counts()
+        self.inject("host", ["waitMsec 1000", "spawnServer mp/q4dm1"])
+        self.wait("fallback map after the failed load", lambda texts:
+                  texts["host"].count("Game Map Init") > counts["host"] and
+                  "never started a session" in texts["host"], timeout=120)
+        warning = read_log(self.logs["host"])
+        self.inject("client", ["set g_autoExecAfterMapLoad series_start.cfg", "waitMsec 500",
+                    f"connect 127.0.0.1:{self.port}"])
+        self.admission()
+        # The reconnected client returns from the main menu, so open Match
+        # Control the way review does instead of asserting an idle client.
+        for role in self.games:
+            self.open_menu(role, review=True)
+        released = self.await_view("host", "released series", lambda v:
+            v["series"]["state"] == 5 and v["series"]["wins"] == [0, 0] and v["session"] != session and
+            v["phase"] == 1, timeout=60)
+        history = released["series"]["history"]
+        if len(history) != 1 or history[0]["outcome"] != 3 or history[0]["attempt"] != 1:
+            raise RuntimeError(f"the unstarted map was not recorded as an aborted attempt: {history}")
+        if not checkpoint.is_file() or checkpoint.stat().st_mtime_ns <= failed_mtime:
+            raise RuntimeError("the released series was not checkpointed")
+        for role in self.games:
+            self.capture(role, "post-commit-load-released", released)
+        # The log keeps the deliberate load error, so it stays tolerated; no
+        # other error is.
+        sources = {}
+        for pak in sorted((self.args.basepath / "q4base").glob("*.pk4")):
+            with zipfile.ZipFile(pak) as archive:
+                for name in archive.namelist():
+                    stem, extension = os.path.splitext(name.lower())
+                    if stem == "maps/mp/q4dm1" and extension in (".map", ".proc", ".cm"):
+                        sources[extension] = (pak, name)
+        if len(sources) != 3:
+            raise RuntimeError(f"stock q4dm1 map files are missing from the installed packages: {sources}")
+        for extension, (pak, name) in sources.items():
+            with zipfile.ZipFile(pak) as archive:
+                data = archive.read(name)
+            for role_game in self.games.values():
+                destination = role_game / "maps" / (ROLLBACK_MAP + extension)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(data)
+        self.rollback = {"map": ROLLBACK_MAP, "kind": "post-commit parse failure",
+                         "engine_error": BROKEN_MAP_ERROR, "failed_session": session,
+                         "released_session": released["session"],
+                         "released_series_revision": released["series"]["revision"],
+                         "history": history, "warning_logged": "never started a session" in warning,
+                         "restored_from": {e: f"{p.name}:{n}" for e, (p, n) in sources.items()}}
+        previous_session, counts = released["session"], self.load_counts()
+        self.action("host", "series_advance", confirm=True)
+        return previous_session, counts
+
     def load_counts(self):
         return {role: read_log(path).count("Game Map Init") for role, path in self.logs.items()}
 
@@ -431,11 +518,15 @@ class SeriesRun:
         return restored
 
     def run(self):
-        if self.missing_map_retry:
+        if self.missing_map_retry or self.broken_map_retry:
             # Peers need the same decls, or the listen server's checksum refuses the client.
             for game in self.games.values():
                 (game / "def").mkdir(parents=True, exist_ok=True)
                 (game / "def/oq4seriesrollback.def").write_text(ROLLBACK_DEF, encoding="utf-8")
+                if self.broken_map_retry:
+                    broken = game / "maps" / (ROLLBACK_MAP + ".map")
+                    broken.parent.mkdir(parents=True, exist_ok=True)
+                    broken.write_text(BROKEN_MAP_TEXT, encoding="utf-8")
         self.launch("host")
         self.wait("host warmup", lambda t: "MP match phase: 0 -> 1" in t["host"])
         self.launch("client")
@@ -446,9 +537,11 @@ class SeriesRun:
         self.action("host", "series_stage", before=["openq4_matchControl set match_series_profile_choice " + profile])
         first = self.await_view("host", "series setup", lambda v: v["series"]["state"] == 1)
         series_id = first["series"]["id"]
+        self.view_series_id = series_id
         tokens = [m["token"] for m in first["series"]["maps"]]
         if first["series"]["best_of"] != self.args.best_of or (
-                tokens != [ROLLBACK_MAP] if self.missing_map_retry else len(tokens) != 5):
+                tokens != [ROLLBACK_MAP] if ( self.missing_map_retry or self.broken_map_retry ) else
+                len(tokens) != 5):
             raise RuntimeError("series profile or stock map pool differs")
         self.action("host", "series_start", confirm=True)
         view = self.await_view("host", "veto start", lambda v: v["series"]["state"] == 2)
@@ -463,12 +556,17 @@ class SeriesRun:
             token = {0: "veto_ban", 1: "veto_pick", 2: "veto_side_marine", 3: "veto_decider"}[action]
             last_veto = series["veto_step"] + 1 == series["veto_steps"]
             previous_session, loaded_counts = view["session"], self.load_counts()
+            if last_veto and self.broken_map_retry:
+                # The final veto schedules the broken map; its load error is expected.
+                self.expected_errors = (BROKEN_MAP_ERROR,)
             self.action("host", token, confirm=True, before=[
                 f"openq4_matchControl set match_series_map_rows_sel_0 {chosen['pool_index']}",
                 "openq4_matchControl action select_series_map"])
             if last_veto:
                 if self.missing_map_retry:
                     self.missing_map_rollback(previous_session, loaded_counts)
+                if self.broken_map_retry:
+                    previous_session, loaded_counts = self.broken_map_rollback(previous_session, loaded_counts)
                 # The accepted final veto schedules the first selected map.
                 # Subsequent map handoffs use the explicit Advance action.
                 view = self.wait_map(previous_session, loaded_counts)
@@ -564,6 +662,9 @@ def main():
     parser.add_argument("--failure-map", type=int, default=1)
     parser.add_argument("--missing-map-retry", action="store_true",
                         help="BO1 on a declared map without files: two refused loads roll back, then a retry plays")
+    parser.add_argument("--broken-map-retry", action="store_true",
+                        help="BO1 on a declared map whose .map cannot be parsed: the post-commit load "
+                             "failure releases the series as an aborted attempt, then a repaired retry plays")
     parser.add_argument("--restart-after-map", type=int, default=0,
                         help="abruptly stop both test peers after this review and restore the durable series")
     parser.add_argument("--timeout", type=int, default=900)
@@ -571,8 +672,10 @@ def main():
     played = args.best_of if args.full_distance else args.best_of // 2 + 1
     if args.restart_after_map < 0 or args.restart_after_map >= played:
         parser.error("restart-after-map must be zero or precede the winning map")
-    if args.missing_map_retry and (args.best_of != 1 or args.duel or args.restart_after_map):
-        parser.error("missing-map-retry is a Team DM BO1 fixture without restarts")
+    if (args.missing_map_retry or args.broken_map_retry) and (
+            args.best_of != 1 or args.duel or args.restart_after_map or
+            (args.missing_map_retry and args.broken_map_retry)):
+        parser.error("missing-map-retry and broken-map-retry are separate Team DM BO1 fixtures without restarts")
     if not 1 <= args.failure_map <= played:
         parser.error("failure-map must identify a played map")
     run = SeriesRun(args)

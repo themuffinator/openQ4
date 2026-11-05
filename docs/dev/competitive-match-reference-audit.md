@@ -1009,7 +1009,11 @@ claim.
 The [3 November live closure runs](#live-closure-scenarios-2026-11-03) cover the
 named substitution, invitation-expiry, proposal-execution, map-load rollback,
 countdown, timeout-charging, stale-camera and spectator-invitation edges in
-items 2, 3 and 5; the limits recorded there still apply.
+items 2, 3 and 5; the limits recorded there still apply. The
+[5 November runs](#side-ballots-and-post-commit-map-load-release-2026-11-05)
+cover item 3's side proposal display, thresholds and execution, and the
+post-commit map-load failure. Item 4's physical input is left to the
+[human qualification checklists](mp-human-qualification.md).
 
 ## Summary chat clipping qualification (2026-09-07)
 
@@ -1248,3 +1252,99 @@ unready could land; the fixture now stages 25 seconds.
 These reports do not close MP-01. Physical localized keyboard and controller
 workflows, side-ballot qualification, the post-commit map-load limit, other
 renderers and platforms, and the remaining release closure order stay open.
+
+## Side ballots and post-commit map-load release (2026-11-05)
+
+Two MP-01 limits recorded on 3 November are closed in source.
+
+**Side ballots.** The owner chose a targeted template rather than recording
+side ballots as protocol-only. Forfeit is now proposable, and Match Control
+gains a seventh template, **Forfeit | Side**: a team forfeit vote. It is the
+only side ballot. Its team target, and so its ballot scope, is always the
+recipient's own known gameplay side, whatever the action-side or scope
+selectors say. The server accepts a team-targeted `proposal_create` only from
+an active participant on that side, and only while the proposed operation is
+legal in the current phase. Referees, operators, the opposing side and
+inactive members are refused before any adapter work. The electorate is the
+side's connected active humans with a majority threshold, and a passed ballot
+runs the ordinary forfeit through the revalidating executor, which still
+requires the proposer to be on the forfeiting side. Duel contestants have no
+gameplay team, so the model refuses the template locally.
+
+Executable coverage: `mp_match_operations_contract.py` adds a five-participant
+side-ballot case (warmup phase refusal; opposing-side, unsided referee-grant and
+inactive-member refusals; a TEAM_A continuation for an active Marine; a passed
+Strogg forfeit recorded for a Marine proposer refused at execution; a passed
+two-voter Marine ballot forfeiting the match). `mp_match_control_model_contract.py`
+checks the seventh recipe, its own-side target under every action-side choice,
+the neutral referee's and the Duel contestant's refusals, and that any other
+team-targeted descriptor is still refused. `mp_match_protocol_contract.py` pins
+forfeit's proposable, team-target-required descriptor. Five single-reversal
+controls fail: the own-side and active creation guards, the proposed-phase
+guard, the model's own-side target and the seventh recipe. All 53 asset-free
+`mp_match_*` contracts pass.
+
+`tools/tests/mp_match_side_ballot_smoke.py` passes live on a staged Windows x64
+OpenGL debug build of `daec4635` with uncommitted working-tree changes (log
+banner `+gdaec4635.dirty`). Besides this change, the stage included another
+session's in-progress retained-menu edits (`MultiplayerGame.cpp` row publishes
+and the regenerated `mp_escape`/`mp_welcome`/`mp_summary` documents), which
+this run does not exercise. Report `.tmp/mp-side/smoke-r4/report.json`
+(SHA-256 `add36353ec010f26b99ce2286cff9581f63a15252192190b31c86b44a223164f`)
+ran 239.2 seconds, and all three clients exited 0. Runtime SHA-256: client
+`c982a09b…3fba3`, `game-mp_x64.dll` `1ea49dee…48e5`, `pak0.pk4`
+`c8dcc3c0…3a7b`. The host is the Marine captain, the client the Strogg captain
+and the observer an invited Strogg player, in live Team DM on hidden 960x540
+loopback peers with no operating-system input. The observer's first
+**Forfeit | Side** ballot opened as scope side, side Strogg, 2 eligible,
+2 YES required, with the caller's YES. The Strogg captain was eligible and the
+Marine host saw neither a side nor a global ballot. The captain's NO failed it
+and play continued. The per-opcode cooldown runs from a ballot's end, not its
+opening. After that cooldown, a second ballot (id 2) passed on the captain's
+YES. Review recorded a forfeit (outcome 2, reason forfeit) won by Marine, and
+the session continued into the next warmup. Two earlier attempts stopped on
+harness defects and are retained: `smoke-r1` lacked the NO token's opcode
+mapping, and `smoke-r3` waited the cooldown from the ballot's opening.
+
+**Post-commit map-load failure.** A series map is checkpointed MAP_ACTIVE
+before its handoff. If its `.map` existed but failed to load afterwards, the
+in-process series stayed MAP_ACTIVE with the handoff pending, and every later
+`BeginMatchSession` refused to bind on any other map, so managed play stopped
+until an operator abandoned the series. Recovery on another map was refused for
+the same reason. Now a MAP_ACTIVE selection whose handoff never reached a
+session is released as an aborted attempt: `AbortUnstartedCompetitionSeriesMap`
+commits `MP_SERIES_MAP_ABORTED` with no winner or score and appends a report row
+(aborted, map-shutdown reason, no evidence or MVD artifact) in one checkpoint.
+The ordinary recovered-review Advance then replays the same map, because aborted
+attempts keep their selection. `BeginMatchSession` does this when the pending
+handoff's map does not match the runtime map; recovery does it for a restored
+MAP_ACTIVE checkpoint on another map of the same mode. A completed map's review
+must still be restored on its own map. The existing series attempt limit bounds
+retries, and the revision/attempt arithmetic the recovery validator checks is
+unchanged. `mp_match_series_live_transaction_contract.py` pins both call sites
+and the helper's outcome, reason and artifact policy.
+
+`tools/tests/mp_series_smoke.py --broken-map-retry` passes live on the same
+staged runtime. Report `.tmp/mp-side/broken-r6/report.json` has SHA-256
+`bfc47404a1b96dda99511d583e8efa14e1e804636a921fa1277b6e402f9f0727`, 10 engine
+captures and both exits 0. Two humans play a Team DM BO1 series on a declared
+map whose `.map` exists but has no `.proc`. The preflight accepts it, so the
+final veto checkpoints MAP_ACTIVE, and the load then fails with
+`couldn't load maps/mp/oq4seriesrollback`, dropping the listen server. The host
+restarts on stock q4dm1 and the client reconnects. That session logs the
+release and recovers a review. The series view shows attempt 1 as aborted
+with no winner and a 0-0 score, at series revision 6, and the checkpoint was
+rewritten. With the map's files restored from stock q4dm1, **Advance map**
+replays it, and it plays, forfeits and completes the series 1-0. The published
+series report keeps both rows. Row 1 is the aborted attempt: it is bound to the
+lobby session, has reason 18 (map shutdown) and marks both artifacts
+`notRequested`. Row 2 is the forfeit, with evidence and MVD available. Five
+earlier attempts (`broken-r1` to `r5`) stopped on fixture defects and are
+retained. The tolerated-error window opened too late, the expected error text
+differed, the reconnected client kept a menu flag that the idle-menu assertion
+rejects, and report validation expected one row per played map. Each failure
+occurred after the product path had behaved as designed.
+
+These do not close MP-01: physical localized keyboard and controller workflows
+remain (see the [human qualification checklists](mp-human-qualification.md)),
+along with other renderers and platforms.

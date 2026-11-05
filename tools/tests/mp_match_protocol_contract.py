@@ -258,6 +258,16 @@ def bounded_schema_contract(header: str, source: str) -> None:
     require(source, "static_cast<mpMatchProtocolSessionId_t>( sessionHigh ) << 32",
             "full-width envelope session decoding")
     require(source, "MP_MATCH_PROTOCOL_REASON_NOT_PROPOSABLE", "proposal eligibility rejection")
+    # Forfeit is the one side-ballot operation: proposable, with the required
+    # team target that becomes the ballot scope.
+    forfeit = re.search(
+        r'\{\s*MP_MATCH_OP_FORFEIT,\s*"forfeit".*?\}', source, re.DOTALL)
+    if forfeit is None or not re.search(
+            r'MP_MATCH_OPERATION_FLAG_PROPOSABLE\s*\|\s*'
+            r'MP_MATCH_OPERATION_FLAG_ALLOW_TEAM_TARGET\s*\|\s*'
+            r'MP_MATCH_OPERATION_FLAG_REQUIRE_TEAM_TARGET', forfeit.group(0)):
+        raise AssertionError(
+            "forfeit must stay proposable with a required team target (side ballot)")
     require(source, "targetDescriptor->arguments", "nested proposal argument validation")
 
 

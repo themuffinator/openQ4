@@ -426,10 +426,13 @@ Bots and ordinary spectators do not silently decide competitive settings.
 
 One global proposal and one proposal for each side can coexist. Match Control
 shows the caller, action, remaining time, vote counts, threshold, eligibility
-and recorded ballot. The current creation templates are global and target-free;
-the side selector can address an already-authorized side proposal for voting or
-cancellation but does not invent a side or participant target. Adding a targeted
-template requires an explicit protocol and authorization review.
+and recorded ballot. Every creation template but one is global.
+**Forfeit (Side)** is a team forfeit vote: any active player can open it for
+their own team during live play. Only that team sees and votes on it, and a
+majority of the team's connected players must vote yes. If it passes, the team
+forfeits exactly as if its captain had chosen Forfeit. Referees and the other
+team cannot open one, and Duel has no team ballot. The side selector otherwise
+only picks which open ballot to vote on or cancel.
 
 When a proposal fails, expires, is canceled or becomes invalid after a phase
 change, its slot is released for another proposal. The normal cooldown still
@@ -459,8 +462,14 @@ the series when a contestant has enough wins. The server records the chosen
 side mapping, starts the map through the normal `nextMap` path, and commits only an authoritative decided or
 forfeit result to the series score. An abort does not award a series point. If a
 selected map's metadata or actual map file is unavailable before handoff, the
-attempt is recorded and the series remains ready to retry. This preflight does
-not recover corrupt map data or failures occurring after loading begins.
+attempt is recorded and the series remains ready to retry. If the map passes
+that check but then fails to load, for example because its file is corrupt, the
+next session started on any other map records that selection as an aborted
+attempt with no score. Match Control then shows it as a review, and
+**Advance map** loads the same map again once it has been repaired. The same
+applies when a server restarts from a checkpoint whose map had been selected
+but not completed, if it comes back on a different map. Each aborted attempt
+counts toward the series attempt limit.
 
 Every active series mutation is captured in one schema-versioned bounded
 checkpoint under the active save path:

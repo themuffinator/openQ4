@@ -285,6 +285,20 @@ static void InitDescriptors( void ) {
         MP_MATCH_OPERATION_FLAG_ALLOW_PARTICIPANT_TARGET |
         MP_MATCH_OPERATION_FLAG_REQUIRE_PARTICIPANT_TARGET,
         MP_MATCH_COOLDOWN_PRIVILEGED );
+    SetDescriptor( MP_MATCH_OP_PROPOSAL_CREATE, MP_MATCH_PROTOCOL_CAP_PROPOSAL_CREATE,
+        MP_MATCH_PHASE_WARMUP | MP_MATCH_PHASE_COUNTDOWN | MP_MATCH_PHASE_GAMEON |
+        MP_MATCH_PHASE_SUDDENDEATH | MP_MATCH_PHASE_GAMEREVIEW |
+        MP_MATCH_PHASE_NEXTGAME,
+        MP_MATCH_OPERATION_FLAG_ALLOW_PARTICIPANT_TARGET |
+        MP_MATCH_OPERATION_FLAG_ALLOW_TEAM_TARGET |
+        MP_MATCH_OPERATION_FLAG_NESTED_ARGUMENTS,
+        MP_MATCH_COOLDOWN_INTERACTION );
+    SetDescriptor( MP_MATCH_OP_FORFEIT, MP_MATCH_PROTOCOL_CAP_FORFEIT,
+        MP_MATCH_PHASE_GAMEON | MP_MATCH_PHASE_SUDDENDEATH,
+        MP_MATCH_OPERATION_FLAG_PROPOSABLE |
+        MP_MATCH_OPERATION_FLAG_ALLOW_TEAM_TARGET |
+        MP_MATCH_OPERATION_FLAG_REQUIRE_TEAM_TARGET,
+        MP_MATCH_COOLDOWN_PRIVILEGED );
     SetDescriptor( MP_MATCH_OP_SERIES_CONTESTANT_BIND,
         MP_MATCH_PROTOCOL_CAP_SERIES_MANAGE, MP_MATCH_PHASE_WARMUP,
         MP_MATCH_OPERATION_FLAG_ALLOW_PARTICIPANT_TARGET |
@@ -781,8 +795,174 @@ static int DuelTimeouts( void ) {
     return 0;
 }
 
+// A side ballot is a team forfeit vote. Only an active member of the side may
+// open it, only while forfeit itself is legal, and a passed ballot executes the
+// ordinary forfeit for that side through the same revalidating executor.
+static mpMatchOperationRequest_t SideBallotRequest( const mpMatchSession &session,
+        int slot, unsigned int generation, mpMatchTeam_t team ) {
+    mpMatchOperationRequest_t request;
+    request.Clear();
+    request.sessionId = session.GetSessionId();
+    request.requestId = 500u + static_cast<unsigned int>( slot );
+    request.opcode = MP_MATCH_OP_PROPOSAL_CREATE;
+    request.expectedSessionRevision = session.GetSessionRevision();
+    request.actorSlot = slot;
+    request.actorBindingGeneration = generation;
+    request.hasTeamTarget = true;
+    request.teamTarget = team;
+    request.argumentCount = 1;
+    request.arguments[ 0 ].fieldId = MP_MATCH_ARG_PROPOSED_OPCODE;
+    request.arguments[ 0 ].value.SetEnum( MP_MATCH_OP_FORFEIT );
+    return request;
+}
+
+static int SideBallots( void ) {
+    mpMatchSession session;
+    CHECK( session.Reset( 77, mpMatchEngineTime::FromMilliseconds( 0 ) ) );
+    CHECK( session.TransitionPhase( WARMUP, MP_MATCH_TRANSITION_SESSION_INITIALIZED,
+        mpParticipantId::Invalid(), session.GetSessionRevision() ).WasApplied() );
+    mpMatchReadinessPolicy policy;
+    policy.policy = MP_MATCH_READY_INDIVIDUAL;
+    policy.botPolicy = MP_MATCH_BOTS_EXCLUDED;
+    policy.teamMode = true;
+    policy.maximumActivePerSide = 8;
+    policy.requiredSideMask = 3;
+    CHECK( session.ConfigureReadiness( policy, session.GetSessionRevision() ).WasApplied() );
+    // Slots 0 and 1 play Marine, slot 2 Strogg, slot 3 is an unsided spectator
+    // and slot 4 a Marine who has been made inactive.
+    const int sides[ 5 ] = { 0, 0, 1, MP_MATCH_SIDE_NONE, 0 };
+    mpParticipantId people[ 5 ];
+    unsigned int generations[ 5 ];
+    for ( int slot = 0; slot < 5; ++slot ) {
+        CHECK( session.BindParticipant( slot, true, MPMatchRoleBit( MP_MATCH_ROLE_PLAYER ),
+            session.GetSessionRevision(), people[ slot ] ).WasApplied() );
+        CHECK( session.GetSlotGeneration( slot, generations[ slot ] ) );
+        if ( sides[ slot ] != MP_MATCH_SIDE_NONE ) {
+            CHECK( session.SetParticipantSide( people[ slot ], sides[ slot ],
+                session.GetSessionRevision() ).WasApplied() );
+            CHECK( !session.SetParticipantActive( people[ slot ], slot != 4,
+                session.GetSessionRevision() ).WasRejected() );
+        }
+    }
+    mpCompetitiveRules rules;
+    mpProposalService proposals;
+    mpProposalCooldownPolicy_t cooldowns;
+    cooldowns.Clear();
+    CHECK( proposals.Reset( session.GetSessionId(),
+        mpProposalEngineTime::FromMilliseconds( 0 ), cooldowns ) );
+    mpCompetitionSeries series;
+    mpMatchOperationExecutor executor;
+
+    // Warmup: proposal creation is legal, forfeit is not, so no ballot opens.
+    mpOperationAdapterContext_t context = MakeContext( rules, proposals, series );
+    Fingerprint before = Snapshot( session, rules, proposals, series );
+    mpMatchOperationRequest_t request = SideBallotRequest( session, 0, generations[ 0 ],
+        MP_MATCH_TEAM_MARINE );
+    mpOperationExecutionResult_t result = executor.Execute( request, context,
+        session, rules, proposals, series );
+    CHECK( result.outcome == MP_OPERATION_REJECTED );
+    CHECK( result.reason == MP_OPERATION_REASON_WRONG_PHASE );
+    CHECK( Same( before, Snapshot( session, rules, proposals, series ) ) );
+
+    CHECK( session.BeginCountdown( 1, 0x1001, MP_MATCH_TRANSITION_REFEREE_FORCE_READY,
+        people[ 0 ], session.GetSessionRevision() ).WasApplied() );
+    CHECK( session.TransitionPhase( GAMEON, MP_MATCH_TRANSITION_COUNTDOWN_COMPLETE,
+        mpParticipantId::Invalid(), session.GetSessionRevision() ).WasApplied() );
+
+    // The opposing side, an unsided participant holding a referee grant and an
+    // inactive member of the side are all refused before any adapter work.
+    const int refusedSlots[ 3 ] = { 2, 3, 4 };
+    for ( int index = 0; index < 3; ++index ) {
+        const int slot = refusedSlots[ index ];
+        context = MakeContext( rules, proposals, series );
+        context.trustedTransportSlot = slot;
+        context.preauthenticatedRefereeGrant = slot == 3;
+        before = Snapshot( session, rules, proposals, series );
+        request = SideBallotRequest( session, slot, generations[ slot ],
+            MP_MATCH_TEAM_MARINE );
+        result = executor.Execute( request, context, session, rules, proposals, series );
+        CHECK( result.outcome == MP_OPERATION_REJECTED );
+        CHECK( result.reason == MP_OPERATION_REASON_NOT_AUTHORIZED );
+        CHECK( Same( before, Snapshot( session, rules, proposals, series ) ) );
+    }
+
+    // An active Marine opens a Marine-scoped ballot.
+    context = MakeContext( rules, proposals, series );
+    before = Snapshot( session, rules, proposals, series );
+    request = SideBallotRequest( session, 0, generations[ 0 ], MP_MATCH_TEAM_MARINE );
+    result = executor.Execute( request, context, session, rules, proposals, series );
+    CHECK( result.outcome == MP_OPERATION_NEEDS_ADAPTER );
+    CHECK( result.continuation.kind == MP_OPERATION_CONTINUATION_PROPOSAL_CREATE );
+    CHECK( result.continuation.proposalScope == MP_PROPOSAL_SCOPE_TEAM_A );
+    CHECK( Same( before, Snapshot( session, rules, proposals, series ) ) );
+
+    // A passed Strogg-scoped forfeit whose recorded proposer is a Marine cannot
+    // concede for Strogg at execution.
+    mpMatchOperationRequest_t forfeit = MakeRequest( MP_MATCH_OP_FORFEIT, session,
+        generations[ 0 ] );
+    forfeit.hasTeamTarget = true;
+    forfeit.teamTarget = MP_MATCH_TEAM_STROGG;
+    mpProposalCreateParams_t create;
+    create.Clear();
+    create.sessionId = session.GetSessionId();
+    create.proposalId = 31;
+    create.scope = MP_PROPOSAL_SCOPE_TEAM_B;
+    create.electorateCount = 1;
+    create.electorate[ 0 ].participant = people[ 0 ].SequencePart();
+    create.electorate[ 0 ].human = true;
+    create.requiredQuorum = 1;
+    create.requiredYes = 1;
+    create.createdAt = mpProposalEngineTime::FromMilliseconds( 1 );
+    create.expiresAt = mpProposalEngineTime::FromMilliseconds( 30001 );
+    create.caller = people[ 0 ].SequencePart();
+    create.callerVotePolicy = MP_PROPOSAL_CALLER_VOTE_YES;
+    create.operation = forfeit;
+    CHECK( proposals.Create( create, proposals.GetRevision() ).WasApplied() );
+    CHECK( proposals.GetProposal( MP_PROPOSAL_SCOPE_TEAM_B )->status ==
+        MP_PROPOSAL_STATUS_PASSED );
+    context = MakeContext( rules, proposals, series );
+    before = Snapshot( session, rules, proposals, series );
+    result = executor.ExecutePassedProposal( MP_PROPOSAL_SCOPE_TEAM_B, 31,
+        context, session, rules, proposals, series );
+    CHECK( result.outcome == MP_OPERATION_REJECTED );
+    CHECK( result.reason == MP_OPERATION_REASON_TARGET_ALIGNMENT );
+    CHECK( Same( before, Snapshot( session, rules, proposals, series ) ) );
+    CHECK( session.GetPhase() == GAMEON );
+
+    // The Marines' passed ballot - two voters, both YES - forfeits Marine.
+    forfeit.teamTarget = MP_MATCH_TEAM_MARINE;
+    create.proposalId = 32;
+    create.scope = MP_PROPOSAL_SCOPE_TEAM_A;
+    create.electorateCount = 2;
+    create.electorate[ 1 ].participant = people[ 1 ].SequencePart();
+    create.electorate[ 1 ].human = true;
+    create.requiredQuorum = 2;
+    create.requiredYes = 2;
+    create.operation = forfeit;
+    CHECK( proposals.Create( create, proposals.GetRevision() ).WasApplied() );
+    CHECK( proposals.GetProposal( MP_PROPOSAL_SCOPE_TEAM_A )->status ==
+        MP_PROPOSAL_STATUS_ACTIVE );
+    CHECK( proposals.CastBallot( session.GetSessionId(), MP_PROPOSAL_SCOPE_TEAM_A, 32,
+        people[ 1 ].SequencePart(), MP_PROPOSAL_BALLOT_YES,
+        mpProposalEngineTime::FromMilliseconds( 2 ),
+        proposals.GetRevision() ).WasApplied() );
+    CHECK( proposals.GetProposal( MP_PROPOSAL_SCOPE_TEAM_A )->status ==
+        MP_PROPOSAL_STATUS_PASSED );
+    context = MakeContext( rules, proposals, series );
+    result = executor.ExecutePassedProposal( MP_PROPOSAL_SCOPE_TEAM_A, 32,
+        context, session, rules, proposals, series );
+    CHECK( result.outcome == MP_OPERATION_APPLIED );
+    CHECK( result.continuation.kind == MP_OPERATION_CONTINUATION_PROPOSAL_ACKNOWLEDGE );
+    CHECK( session.GetPhase() == GAMEREVIEW );
+    CHECK( session.GetLastTransition().reason == MP_MATCH_TRANSITION_FORFEIT );
+    CHECK( session.ValidateInvariants() );
+    CHECK( proposals.ValidateInvariants() );
+    return 0;
+}
+
 int main( void ) {
     CHECK( DuelTimeouts() == 0 );
+    CHECK( SideBallots() == 0 );
     mpMatchSession session;
     CHECK( session.Reset( 0x123456789ULL, mpMatchEngineTime::FromMilliseconds( 0 ) ) );
     CHECK( session.TransitionPhase( WARMUP, MP_MATCH_TRANSITION_SESSION_INITIALIZED,

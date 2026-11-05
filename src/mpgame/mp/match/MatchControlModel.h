@@ -17,7 +17,7 @@
 
 static const int MP_MATCH_CONTROL_MAX_TEAM_ROWS = 128;
 static const int MP_MATCH_CONTROL_MAX_REPLACEMENT_ROWS = MP_MATCH_VIEW_MAX_PARTICIPANTS;
-static const int MP_MATCH_CONTROL_MAX_PROPOSAL_TEMPLATE_ROWS = 6;
+static const int MP_MATCH_CONTROL_MAX_PROPOSAL_TEMPLATE_ROWS = 7;
 static const int MP_MATCH_CONTROL_MAX_PROFILE_ROWS = 16;
 static const int MP_MATCH_CONTROL_MAX_RULE_ROWS = MP_MATCH_VIEW_MAX_RULE_FIELDS;
 static const int MP_MATCH_CONTROL_MAX_SERIES_MAP_ROWS = MP_MATCH_VIEW_MAX_SERIES_MAP_POOL;
@@ -120,6 +120,9 @@ typedef struct mpMatchControlReplacementRow_s {
 typedef enum {
 	MP_MATCH_CONTROL_PROPOSAL_TARGET_NONE = 0,
 	MP_MATCH_CONTROL_PROPOSAL_TARGET_PARTICIPANT,
+	// The recipient's own side.  It is both the operation's team target and the
+	// ballot scope, so only that side's active players vote.
+	MP_MATCH_CONTROL_PROPOSAL_TARGET_OWN_SIDE,
 	MP_MATCH_CONTROL_PROPOSAL_TARGET_KIND_COUNT
 } mpMatchControlProposalTargetKind_t;
 

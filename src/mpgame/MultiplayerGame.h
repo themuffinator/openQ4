@@ -1058,6 +1058,10 @@ private:
 						const mpCompetitionSeries &series,
 						const mpCompetitionSeriesReport &report,
 						uint64_t seriesId, uint64_t linkedSessionId );
+	bool			AbortUnstartedCompetitionSeriesMap(
+						mpCompetitionSeries &series,
+						mpCompetitionSeriesReport &report,
+						uint64_t seriesId, uint64_t linkedSessionId ) const;
 	bool			InitializeCompetitionSeriesReport(
 						const mpCompetitionSeries &series, uint64_t seriesId,
 						const int contestantSlots[ MP_SERIES_SIDE_COUNT ],

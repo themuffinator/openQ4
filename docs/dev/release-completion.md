@@ -6,6 +6,23 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Team forfeit votes and failed series map loads, 5 November 2026
+
+- Competitive teams can now vote to concede. Any active player can open
+  **Forfeit (Side)** from Match Control during live play. Only that team sees
+  and votes on it, a majority of its connected players must agree, and a passed
+  vote forfeits exactly as the captain's Forfeit does. Referees and the other
+  team cannot open one.
+- A series map that passes its file check but then fails to load no longer
+  leaves the server unable to run managed matches. The next session records it
+  as an aborted attempt with no score, and **Advance map** replays it once the
+  map is repaired. A server that restarts from such a checkpoint on another map
+  is released the same way.
+- Step-by-step checklists for the remaining hands-on multiplayer checks
+  (keyboard/controller workflows, Arena pause, swimming, weapon visuals, real
+  networks and bot difficulty) are in
+  [mp-human-qualification.md](mp-human-qualification.md).
+
 ## Android host integration, 4 November 2026
 
 - SigmaTouch menu controls no longer start gameplay actions behind a menu, and
