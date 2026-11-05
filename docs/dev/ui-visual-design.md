@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.37, 3 November 2026 (1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.38, 5 November 2026 (1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -652,6 +652,16 @@ the art stretches with them:
 Titles are upper case, a noun or a question (EXIT GAME, OVERWRITE SAVE?);
 bodies are sentence case; actions are short verbs (YES and NO, CONNECT and
 CANCEL, OK, CLOSE).
+
+**Black frame** (version 1.38, the product owner's rule): every pop-up built
+on the modal silhouette (the modal, system message and countdown frames under
+Pop-up frames below) carries a neat, thin and elegant opaque black frame,
+drawn on top of the glow without hiding it. It traces the silhouette's outline
+in black at 1.00, 1.5 dp wide in the Marine family; in the Strogg family it is
+3 dp, beneath the rail, so the rail keeps its color with a fine black edge
+either side. It adds to the construction above: the silhouette, the glow, the
+lit margin and the slot are unchanged, and the glow still shows around the
+frame.
 
 **Band**: the framing bands and loading edges below.
 
@@ -4090,6 +4100,13 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.38: the black frame
+
+Section 6's modals gain a thin opaque black frame tracing their silhouette,
+drawn on top of the glow without hiding it (the product owner's rule of 5
+November 2026). It adds to the construction; nothing else of the modal
+changes. No requirement changes, and nothing is accepted.
 
 ### Version 1.37: the initializing screen's entrance and cadence
 

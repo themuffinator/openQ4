@@ -2137,6 +2137,33 @@ windowed processes with mouse/controller input disabled. No host input or OS
 screen capture was used. Evidence is under `.tmp/retained-ui-completion/`;
 this is a bounded working-copy checkpoint, with no product acceptance.
 
+## The pop-up black frame (5 November 2026)
+
+Every pop-up now carries a neat, thin, opaque black frame (visual
+specification 1.38, the product owner's rule). It adds to each construction
+and changes nothing else:
+
+- **Modal confirmations** (`confirmation()` in `build_retained_screens.py`:
+  every confirmation, notice, list and entry dialog in sixteen documents)
+  trace the silhouette's outline in black at 1.00, 1.5 dp wide, drawn in the
+  frame layer on top of the glow; the 0.70 silhouette, the glow and the lit
+  margin around it are unchanged. In the Strogg family the frame is 3 dp
+  beneath the orange rail, so the rail keeps its color with a fine black edge
+  either side.
+- **The DISPLAY page's Keep or Revert and unapplied-changes dialogs**
+  (`retained_system.py`) gain a 3 dp black stroke beneath their plate; the
+  plate's fill covers its inner half, so a fine black edge shows outside the
+  olive outline.
+
+All 65 retained native suites and the retained gate pass. Engine captures
+show the Admin page's Kick confirmation on Vulkan, the Strogg Exit
+confirmation and the DISPLAY page's unapplied-changes dialog on OpenGL, each
+framed with the glow or outline still showing (`.tmp/ui-roadmap/frame-vk/`,
+`.tmp/ui-roadmap/frame-gl/`). The UI register's binding of the visual
+specification was already stale before this change (it matches neither form
+of the earlier text), so the specification's new hash waits for a register
+increment with the other stale bindings.
+
 ## Opaque Menu Backing (5 November 2026)
 
 The opaque-backing option, which covers the screen behind the retained

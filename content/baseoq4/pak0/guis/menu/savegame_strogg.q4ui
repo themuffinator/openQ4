@@ -55700,6 +55700,28 @@
             "fill": {"type": "solid", "color": {"type": "color", "value": [0.0392, 0.0196, 0.0118, 0.85]}}
            },
            {
+            "id": "rim",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[6.562, 3.562]]},
+             {"id": "p1", "op": "line", "points": [[13.125, 3.562]]},
+             {"id": "p2", "op": "line", "points": [[42.569, 20.562]]},
+             {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
+             {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
+             {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
+             {"id": "p6", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p7", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p8", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -27.284}]]},
+             {"id": "close", "op": "close"}
+            ],
+            "stroke": {
+             "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+             "widthDp": 3.0,
+             "minimumPixels": 1,
+             "join": "miter",
+             "cap": "butt"
+            }
+           },
+           {
             "id": "rail",
             "commands": [
              {"id": "p0", "op": "move", "points": [[6.562, 3.562]]},
@@ -56621,6 +56643,28 @@
              {"id": "close", "op": "close"}
             ],
             "fill": {"type": "solid", "color": {"type": "color", "value": [0.0392, 0.0196, 0.0118, 0.85]}}
+           },
+           {
+            "id": "rim",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[6.562, 3.562]]},
+             {"id": "p1", "op": "line", "points": [[13.125, 3.562]]},
+             {"id": "p2", "op": "line", "points": [[42.569, 20.562]]},
+             {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
+             {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
+             {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
+             {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
+             {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
+             {"id": "p8", "op": "line", "points": [[6.562, 176.716]]},
+             {"id": "close", "op": "close"}
+            ],
+            "stroke": {
+             "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+             "widthDp": 3.0,
+             "minimumPixels": 1,
+             "join": "miter",
+             "cap": "butt"
+            }
            },
            {
             "id": "rail",

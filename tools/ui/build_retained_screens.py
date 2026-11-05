@@ -1451,6 +1451,13 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
     flank = round(slot_depth * STROGG_SHOULDER, 4) if strogg else slot_depth
     right = width - inset
     silhouette = strogg_modal_silhouette(width, height) if strogg else [modal_silhouette(width, height)]
+    # Pop-ups carry a neat, thin, opaque black frame (user rule, 5 November
+    # 2026): the silhouette's outline drawn in black on top of the glow, which
+    # stays as it is around it. The Strogg frame lies under its rail, so the
+    # rail keeps its color with a fine black edge either side.
+    rim = {"id": "rim", "commands": json.loads(json.dumps(silhouette[0]["commands"])),
+           "stroke": stroke(solid([0, 0, 0, 1]), 3.0 if strogg else 1.5)}
+    silhouette = [silhouette[0], rim, *silhouette[1:]]
     glow_tint = ST_LIGHT if strogg else GLOW_MODAL
     whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
     glow_top, glow_bottom = -U * 87, height + U * 108

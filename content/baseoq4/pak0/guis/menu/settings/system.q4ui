@@ -63735,6 +63735,26 @@
       },
       "paths": [
        {
+        "id": "rim",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[12, 0]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -12}, 0]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 12]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -12}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 1, "dp": -12}, {"fraction": 1}]]},
+         {"id": "p5", "op": "line", "points": [[0, {"fraction": 1}]]},
+         {"id": "p6", "op": "line", "points": [[0, 12]]},
+         {"id": "close", "op": "close"}
+        ],
+        "stroke": {
+         "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+         "widthDp": 3,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       },
+       {
         "id": "dialog",
         "commands": [
          {"id": "p0", "op": "move", "points": [[12, 0]]},
@@ -64431,6 +64451,26 @@
        "max-height": {"type": "length", "value": 100, "unit": "%"}
       },
       "paths": [
+       {
+        "id": "rim",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[12, 0]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -12}, 0]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 12]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -12}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 1, "dp": -12}, {"fraction": 1}]]},
+         {"id": "p5", "op": "line", "points": [[0, {"fraction": 1}]]},
+         {"id": "p6", "op": "line", "points": [[0, 12]]},
+         {"id": "close", "op": "close"}
+        ],
+        "stroke": {
+         "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+         "widthDp": 3,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       },
        {
         "id": "dialog",
         "commands": [

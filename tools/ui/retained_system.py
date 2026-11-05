@@ -465,7 +465,11 @@ def dialog(doc: Document, prefix: str, title_key: str, texts: list, buttons: lis
                                              "box-sizing": keyword("border-box"),
                                              "width": length(DIALOG_W, "em"), "max-width": length(100, "%"), "padding": length(16),
                                              "flex-direction": keyword("column"), "max-height": length(100, "%")},
-                   [path("dialog", cut, fill=solid([0.035, 0.047, 0.031, 1]), stroke=stroke(solid(rgb(OLIVE, 0.7)), 1))],
+                   # The pop-up's thin opaque black frame (user rule, 5 November
+                   # 2026), beneath the plate: the fill covers its inner half, so
+                   # it shows as a fine black edge outside the olive outline.
+                   [path("rim", cut, stroke=stroke(solid([0, 0, 0, 1]), 3)),
+                    path("dialog", cut, fill=solid([0.035, 0.047, 0.031, 1]), stroke=stroke(solid(rgb(OLIVE, 0.7)), 1))],
                    [region, actions])
     soft = group(f"{prefix}-panel-softfocus", {**whole, "display": keyword("none"), "backdrop-blur": length(7.5),
                                                "backdrop-saturate": number(0.8)})
