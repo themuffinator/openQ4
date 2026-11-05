@@ -1210,6 +1210,63 @@ locate the sky, and full-frame captures with the clip on lost the whole sky
 capture noise of at most 27 levels). An exact clip would need the main view's
 depth before the backdrop is drawn, which reorders the frame.
 
+### Portal-sky mask, 5 November 2026
+
+The main view's depth is now available before the backdrop is drawn, without
+reordering the frame: `VK_PostProcess_PortalSkyMask` draws the world part of
+it early. Before a command list runs, `VK_PostProcess_PlanPortalSkyMask` pairs
+each portal-sky view with the next main view of the same world, viewport and
+render target. At the backdrop's depth clear, the main view's world surfaces
+(the SSAO world filter) are drawn depth-only into a single-sample target the
+size of the framebuffer. `VK_Exec_DrawWorldDepth` uses the prepass's own
+per-surface fill, `VK_Exec_FillDepthSurface`, extracted unchanged from
+`VK_GuiExecutor_Draw3DView`. The depth is captured through the single-sample
+copy path, so there is no multisampled resolve.
+
+`post_skymask.frag` then sets the backdrop's depth: 1 wherever the captured
+world depth, or any of its eight neighbours, is still far, and 0 elsewhere.
+The neighbours cover multisampled silhouette pixels. Every depth-tested pass
+of the backdrop rejects the 0 pixels before shading. This is exact because
+the main prepass writes black over every opaque or perforated pixel it
+covers. Translucent surfaces, alpha-tested holes and models leave far depth
+and keep the backdrop behind them.
+
+The same capture is the main view's SSAO world depth, so its prepass takes no
+snapshot (`VK_PostProcess_WorldDepthCaptures` returns 0 for the plain SSAO
+case; cel ink and the native-PBR split keep their captures).
+`r_vkPortalSkyMask 0` restores the full backdrop and the snapshot. The mask
+applies only while the backdrop's viewport equals its main view's.
+Presentation scaling rescales views in place, and at 100% it is the identity.
+
+Exactness. Full-frame captures at seven fixed views compared mask off, on and
+off again, with game time stopped after positioning. Particles and the gun
+were hidden and auto-exposure was off; the animated HUD bar is the only
+off/off noise. With SSAO off (`pmask4`), six views are pixel-identical
+outside the HUD. The seventh has scene animation that time stopping does not
+freeze, and its off/off captures already differ by up to 153 levels. With
+SSAO on (`pmask3`), the remaining differences are one-level AO changes on world
+surfaces, plus thin lines of up to 57 levels on world silhouettes against the
+sky. SSAO now reads world depth at pixel centres instead of multisample 0, so
+an edge pixel whose first sample was sky now receives AO. A validation-layer
+run through the mask, capture and SSAO reuse logged no messages (`pvalid1`).
+
+Cost. Three peer games held the GPU at 96–100%, so absolute phase times were
+unusable. Each window's phases are therefore divided by its bloom time, which
+the mask does not touch (`maskab2`, four alternating rounds, medians):
+
+| Per bloom | Mask off | Mask on |
+| --- | ---: | ---: |
+| GPU frame (main + portal + resolve) | 6.37 | 5.35 |
+| Depth prepass | 0.73 | 0.28 |
+| Portal-sky view, including the early world depth and mask | 1.26 | 1.00 |
+| Main view | 4.81 | 4.19 |
+
+The GPU frame falls by 16%, about 1.1 ms at the quiet bloom cost of about
+1.1 ms. The snapshot is gone from the prepass, and the backdrop is cheaper even
+after paying for the early world depth. The early pass records the world's
+depth draws a second time on the backend thread. That CPU cost could not be
+measured under the same contention and needs a quiet paired run.
+
 Evidence is under `.tmp/hf-floor/runs/` (`dshots1`, `valid1`, `gpuab1`,
 `gpuab2`, `snap1`), built from a detached worktree so that peer sessions'
 staging could not replace the runtime under test.

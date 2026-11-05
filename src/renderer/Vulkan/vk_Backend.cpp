@@ -712,6 +712,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	backEnd.postProcessSMAAQuality = tr.postProcessSMAAQuality;
 	}
 	const classicSubviewDomainView_t *pendingSharedSubview = NULL;
+	VK_PostProcess_PlanPortalSkyMask( cmds );
 
 	for ( ; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
 		if ( pendingSharedSubview != NULL

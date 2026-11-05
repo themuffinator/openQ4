@@ -553,6 +553,13 @@ not merely paperwork or a final screenshot.
   compiled map has no sky faces, so where the backdrop shows is only known
   from the main view's depth, after the backdrop is drawn. See
   [where the floor stands](presentation-owners.md#half-resolution-ssao-for-quality-5-november-2026).
+  A portal-sky mask now gets that depth early. At the backdrop's depth clear,
+  Vulkan draws the main view's world depth single-sample and keeps the backdrop
+  to the pixels it leaves far, dilated one pixel. It is exact against
+  full-frame captures, and the same capture replaces SSAO's prepass snapshot.
+  Normalized to bloom under heavy GPU contention, the GPU frame fell 16% (about
+  1.1 ms); the CPU cost of the early world draw still needs a quiet run. See
+  the [portal-sky mask](presentation-owners.md#portal-sky-mask-5-november-2026).
 - [ ] **HF-08 — P1, qualification: late look and alternate views in play.**
   Run late look in live MP (listen host and remote client, prediction recovery),
   zoomed, on lifts and trams and through rapid turns, and measure physical

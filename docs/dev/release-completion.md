@@ -16,6 +16,11 @@ See [player release status](../user/release-status.md).
 - Ultra keeps full-resolution ambient occlusion. `r_ssaoResolution 1` forces
   full resolution on any preset and `2` forces half; the default `0` chooses
   automatically. OpenGL is unchanged.
+- On Vulkan, maps with a skybox world beyond the level (such as the
+  Air Defense levels) no longer render that backdrop behind walls and terrain
+  that hide it. Ambient occlusion also no longer pauses the scene's depth pass
+  to copy it. Together this saves around 1 ms per frame at 1440p Quality, with
+  the same image. `r_vkPortalSkyMask 0` turns it off.
 - With the experimental Vulkan front-end overlap (`r_vkRenderThread 2`), a
   periodic 15–20 ms stall is gone: its geometry cache now retires old entries
   gradually instead of emptying itself all at once.

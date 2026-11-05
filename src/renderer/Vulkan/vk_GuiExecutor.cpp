@@ -14298,6 +14298,266 @@ bool VK_Exec_HDRScenePipelinesReady( const viewDef_t *view ) {
 	return VK_PBR_RetargetBakedView( view );
 }
 
+// One surface of the depth fill (RB_T_FillDepthBuffer): binds its geometry,
+// space and alpha-tested stages and draws its depth into the active target.
+// Returns whether the surface's geometry was bound (it counts as drawn). The
+// main prepass and the early world depth (VK_Exec_DrawWorldDepth) share it.
+typedef struct vkDepthFillState_s {
+	const struct viewEntity_s *	currentSpace;
+	bool						weaponDepthRange;
+	float						mvp[ 16 ];
+	VkPipeline					boundPipeline;	// same-value re-binds are skipped
+	VkDescriptorSet				boundSet;
+	VkViewport					viewport;		// maxDepth follows the weapon range
+} vkDepthFillState_t;
+
+static bool VK_Exec_FillDepthSurface( VkCommandBuffer cmd, int slot, const viewDef_t *viewDef,
+		const drawSurf_t *drawSurf, int fbHeight, vkDepthFillState_t &fill ) {
+	const idMaterial *shader = drawSurf->material;
+	const srfTriangles_t *tri = drawSurf->geo;
+	if ( shader == NULL || tri == NULL || !shader->IsDrawn() ) {
+		return false;
+	}
+	if ( tri->numIndexes <= 0 || tri->indexes == NULL ) {
+		return false;
+	}
+	if ( shader->Coverage() == MC_TRANSLUCENT ) {
+		return false;	// translucents neither write nor test here
+	}
+	if ( tri->ambientCache == NULL ) {
+		return false;
+	}
+	const float *regs = drawSurf->shaderRegisters;
+	// RB_T_FillDepthBuffer: alpha-tested stages of a perforated
+	// surface also mask per-sample coverage on an MSAA target, so
+	// the later EQUAL passes inherit the dithered edge
+	vkExec.alphaToCoverageSurface = VK_Exec_UseAlphaToCoverage( shader );
+	const bool nativePBRCoverage = VK_PBR_DepthCoverage( drawSurf );
+
+	// if all stages are conditioned off, skip
+	int stage;
+	const int stageCount = shader->GetNumStages();
+	for ( stage = 0; stage < stageCount; stage++ ) {
+		const shaderStage_t *pStage = shader->GetStage( stage );
+		if ( regs == NULL || regs[ pStage->conditionRegister ] != 0 ) {
+			break;
+		}
+	}
+	if ( stage == stageCount ) {
+		return false;
+	}
+
+	if ( !VK_Exec_BindTriGeometry( cmd, slot, tri ) ) {
+		return false;
+	}
+	VK_Exec_SetSurfScissor( cmd, viewDef, drawSurf, fbHeight );
+
+	// space change: rebuild the MVP (depth hacks included) and the
+	// weapon depth-range window
+	if ( drawSurf->space != fill.currentSpace ) {
+		fill.currentSpace = drawSurf->space;
+		VK_BuildSurfMVP( viewDef, drawSurf, fill.mvp );
+		const bool wantWeaponRange = drawSurf->space->weaponDepthHack;
+		if ( wantWeaponRange != fill.weaponDepthRange ) {
+			fill.weaponDepthRange = wantWeaponRange;
+			fill.viewport.maxDepth = wantWeaponRange ? 0.5f : 1.0f;
+			vkCmdSetViewport( cmd, 0, 1, &fill.viewport );
+		}
+	}
+
+	// polygon offset per material
+	if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		vkCmdSetDepthBiasEnable( cmd, VK_TRUE );
+		vkCmdSetDepthBias( cmd, r_offsetUnits.GetFloat() * shader->GetPolygonOffset(), 0.0f, r_offsetFactor.GetFloat() );
+	}
+
+	// subviews down-modulate instead of drawing black
+	const bool isSubview = shader->GetSort() == SS_SUBVIEW;
+	vkGuiPushConstants_t push;
+	memcpy( push.mvp, fill.mvp, sizeof( push.mvp ) );
+	push.stageColor[ 0 ] = push.stageColor[ 1 ] = push.stageColor[ 2 ] = isSubview ? 1.0f : 0.0f;
+	push.stageColor[ 3 ] = 1.0f;
+	push.texMatrixS[ 0 ] = 1.0f; push.texMatrixS[ 1 ] = 0.0f; push.texMatrixS[ 2 ] = 0.0f; push.texMatrixS[ 3 ] = 0.0f;
+	push.texMatrixT[ 0 ] = 0.0f; push.texMatrixT[ 1 ] = 1.0f; push.texMatrixT[ 2 ] = 0.0f; push.texMatrixT[ 3 ] = 0.0f;
+	push.params[ 0 ] = 0.0f;	// SVC_IGNORE
+	push.params[ 1 ] = 0.0f;	// alpha test off (per-stage below)
+	push.params[ 2 ] = 0.0f;
+	push.params[ 3 ] = 0.0f;	// no texmatrix
+
+	const int fillBlendBits = isSubview ? ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) : 0;
+
+	bool drawSolid = shader->Coverage() == MC_OPAQUE;
+
+	if ( shader->Coverage() == MC_PERFORATED ) {
+		// alpha-tested stages punch holes; if none draws, fall back solid
+		bool didDraw = false;
+		for ( stage = 0; stage < stageCount; stage++ ) {
+			const shaderStage_t *pStage = shader->GetStage( stage );
+			if ( !pStage->hasAlphaTest ) {
+				continue;
+			}
+			if ( regs != NULL && regs[ pStage->conditionRegister ] == 0 ) {
+				continue;
+			}
+			didDraw = true;
+			const float stageAlpha = regs != NULL ? regs[ pStage->color.registers[ 3 ] ] : 1.0f;
+			if ( stageAlpha <= 0.0f ) {
+				continue;
+			}
+			if ( pStage->texture.image == NULL || pStage->texture.texgen != TG_EXPLICIT ) {
+				continue;
+			}
+			// Native PBR owns coverage from its typed albedo. A classic
+			// copy with the same name can have different alpha mip rounding
+			// or upload/storage rules, so it cannot supply the PBR depth mask.
+			idImage *depthImage = nativePBRCoverage
+				? shader->GetPBRInfo().albedo.image : pStage->texture.image;
+			VkDescriptorSet stageDescriptor = VK_GuiExecutor_GetImageDescriptor( depthImage->GetDeviceHandle() );
+			if ( stageDescriptor == VK_NULL_HANDLE ) {
+				continue;
+			}
+			// per-stage polygon offset (RB_PrepareStageTexturing contract)
+			const bool stagePolygonOffset = pStage->privatePolygonOffset != 0.0f;
+			if ( stagePolygonOffset ) {
+				vkCmdSetDepthBiasEnable( cmd, VK_TRUE );
+				vkCmdSetDepthBias( cmd, r_offsetUnits.GetFloat() * pStage->privatePolygonOffset, 0.0f, r_offsetFactor.GetFloat() );
+			}
+			// The classic depth fill always supplies primary alpha through
+			// glColor, even when the later ambient stage uses vertex colors.
+			push.stageColor[ 3 ] = nativePBRCoverage ? stageAlpha
+				: idMath::ClampFloat( 0.0f, 1.0f, stageAlpha );
+			push.params[ 1 ] = VK_Exec_AlphaTestModeValue( pStage );
+			push.params[ 2 ] = regs != NULL ? regs[ pStage->alphaTestRegister ] : 0.5f;
+			if ( nativePBRCoverage && push.params[ 1 ] == 1.0f ) {
+				push.params[ 1 ] = vkExec.alphaToCoverageSurface ? 3.0f : 4.0f;
+			}
+			VK_Exec_SetPushTextureMatrix( pStage, regs, push );
+			VkPipeline pipeline = VK_GuiExecutor_GetPipeline( fillBlendBits );
+			if ( pipeline == VK_NULL_HANDLE ) {
+				continue;
+			}
+			if ( pipeline != fill.boundPipeline ) {
+				vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+				fill.boundPipeline = pipeline;
+			}
+			if ( stageDescriptor != fill.boundSet ) {
+				vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkExec.pipelineLayout, 0, 1, &stageDescriptor, 0, NULL );
+				fill.boundSet = stageDescriptor;
+			}
+			vkCmdPushConstants( cmd, vkExec.pipelineLayout,
+					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+			VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
+			vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+			if ( stagePolygonOffset ) {
+				if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+					vkCmdSetDepthBias( cmd, r_offsetUnits.GetFloat() * shader->GetPolygonOffset(), 0.0f, r_offsetFactor.GetFloat() );
+				} else {
+					vkCmdSetDepthBiasEnable( cmd, VK_FALSE );
+				}
+			}
+			// restore solid-fill push defaults for the next stage
+			push.stageColor[ 3 ] = 1.0f;
+			push.params[ 1 ] = 0.0f;
+			push.params[ 2 ] = 0.0f;
+			push.params[ 3 ] = 0.0f;
+		}
+		if ( !didDraw ) {
+			drawSolid = true;
+		}
+	}
+
+	if ( drawSolid ) {
+		VkDescriptorSet whiteDescriptor = VK_GuiExecutor_GetImageDescriptor( globalImages->whiteImage->GetDeviceHandle() );
+		VkPipeline pipeline = VK_GuiExecutor_GetPipeline( fillBlendBits );
+		if ( whiteDescriptor != VK_NULL_HANDLE && pipeline != VK_NULL_HANDLE ) {
+			if ( pipeline != fill.boundPipeline ) {
+				vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+				fill.boundPipeline = pipeline;
+			}
+			if ( whiteDescriptor != fill.boundSet ) {
+				vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkExec.pipelineLayout, 0, 1, &whiteDescriptor, 0, NULL );
+				fill.boundSet = whiteDescriptor;
+			}
+			vkCmdPushConstants( cmd, vkExec.pipelineLayout,
+					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+			VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
+			vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+		}
+	}
+
+	if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
+		vkCmdSetDepthBiasEnable( cmd, VK_FALSE );
+	}
+	return true;
+}
+
+/*
+====================
+VK_Exec_DrawWorldDepth
+
+Clears the active target's depth over the view's rectangle and draws the
+depth of the view's surfaces that `accept` keeps, exactly as its prepass
+would (alpha tests, polygon offsets, depth hacks). The caller has made a
+target current whose framebuffer matches the view's; the portal-sky mask uses
+this to learn the main view's world depth before the backdrop is drawn
+(vk_PostProcess.cpp). Returns false when nothing could be recorded.
+====================
+*/
+bool VK_Exec_DrawWorldDepth( const viewDef_t *viewDef, bool ( *accept )( const drawSurf_t *surf ) ) {
+	if ( viewDef == NULL || accept == NULL || !VK_Exec_MainRenderingScopeOpen()
+			|| vkExec.activeDepthAttachmentView == VK_NULL_HANDLE ) {
+		return false;
+	}
+	VkCommandBuffer cmd = vkExec.cmd;
+	const int slot = vkExec.frameSlot;
+	const int fbHeight = VK_Exec_ActiveFramebufferHeight();
+	const int vpX = viewDef->viewport.x1;
+	const int vpYGL = viewDef->viewport.y1;
+	const int vpW = viewDef->viewport.x2 - viewDef->viewport.x1 + 1;
+	const int vpH = viewDef->viewport.y2 - viewDef->viewport.y1 + 1;
+	vkDepthFillState_t fill;
+	if ( !VK_BuildCanonicalViewport( fill.viewport, (float)vpX, (float)vpYGL, (float)vpW, (float)vpH,
+			(float)fbHeight ) ) {
+		return false;
+	}
+	vkCmdSetViewport( cmd, 0, 1, &fill.viewport );
+	VK_Exec_SetViewScissor( cmd, viewDef, fbHeight );
+	VkClearAttachment clearAtt;
+	memset( &clearAtt, 0, sizeof( clearAtt ) );
+	clearAtt.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	clearAtt.clearValue.depthStencil.depth = 1.0f;
+	VkClearRect clearRect;
+	memset( &clearRect, 0, sizeof( clearRect ) );
+	clearRect.rect.offset.x = Max( 0, vpX );
+	clearRect.rect.offset.y = Max( 0, VK_Exec_ActiveLowerOrigin() ? vpYGL : fbHeight - vpYGL - vpH );
+	clearRect.rect.extent.width = (uint32_t)vpW;
+	clearRect.rect.extent.height = (uint32_t)vpH;
+	clearRect.layerCount = 1;
+	vkCmdClearAttachments( cmd, 1, &clearAtt, 1, &clearRect );
+
+	fill.currentSpace = NULL;
+	fill.weaponDepthRange = false;
+	VK_FixupClipSpaceZ( fill.mvp, viewDef->projectionMatrix );
+	fill.boundPipeline = VK_NULL_HANDLE;
+	fill.boundSet = VK_NULL_HANDLE;
+	vkCmdSetDepthTestEnable( cmd, VK_TRUE );
+	vkCmdSetDepthWriteEnable( cmd, VK_TRUE );
+	vkCmdSetDepthCompareOp( cmd, VK_COMPARE_OP_LESS_OR_EQUAL );
+	vkCmdSetDepthBiasEnable( cmd, VK_FALSE );
+	vkCmdSetStencilTestEnable( cmd, VK_FALSE );
+	vkCmdSetFrontFace( cmd, VK_Exec_CanonicalFrontFace() );
+	vkCmdSetCullMode( cmd, viewDef->isMirror ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_FRONT_BIT );
+	for ( int i = 0; i < viewDef->numDrawSurfs; i++ ) {
+		const drawSurf_t *drawSurf = viewDef->drawSurfs[ i ];
+		if ( drawSurf != NULL && accept( drawSurf ) ) {
+			(void)VK_Exec_FillDepthSurface( cmd, slot, viewDef, drawSurf, fbHeight, fill );
+		}
+	}
+	vkExec.alphaToCoverageSurface = false;
+	vkCmdSetDepthBiasEnable( cmd, VK_FALSE );
+	return true;
+}
+
 void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef ) {
 	VK_HDRScene_ResetView();
 	VK_PBR_PrepareBakedView( NULL );
@@ -14435,6 +14695,15 @@ void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef ) {
 			vkCmdClearAttachments( cmd, 1, &clearAtt, 1, &clearRect );
 		}
 	}
+	// A portal-sky backdrop shows only where its main view's world leaves far
+	// depth; elsewhere this depth becomes 0 and every depth-tested pass of the
+	// backdrop skips the pixel (vk_PostProcess.cpp portal-sky mask). Presentation
+	// scaling rescales views in place, so the mask applies only while the
+	// backdrop's viewport still equals its main view's (an identity scale).
+	if ( ( viewDef->renderFlags & RF_PORTAL_SKY ) != 0 ) {
+		(void)VK_PostProcess_PortalSkyMask( viewDef );
+		vkCmdSetViewport( cmd, 0, 1, &viewport );
+	}
 
 	// per-space state tracking (matrix + weapon depth-range hack)
 	const struct viewEntity_s *currentSpace = NULL;
@@ -14445,8 +14714,13 @@ void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef ) {
 	// same-value pipeline/descriptor re-binds are semantic no-ops; the fill
 	// uses at most two pipelines and mostly the white-image descriptor, so
 	// skip re-recording identical binds (no other bind sites exist in this loop)
-	VkPipeline depthFillBoundPipeline = VK_NULL_HANDLE;
-	VkDescriptorSet depthFillBoundSet = VK_NULL_HANDLE;
+	vkDepthFillState_t fill;
+	fill.currentSpace = currentSpace;
+	fill.weaponDepthRange = weaponDepthRange;
+	memcpy( fill.mvp, mvp, sizeof( fill.mvp ) );
+	fill.boundPipeline = VK_NULL_HANDLE;
+	fill.boundSet = VK_NULL_HANDLE;
+	fill.viewport = viewport;
 
 	// ---- pass 1: depth fill (RB_STD_FillDepthBuffer contract) ----
 	// SSAO and the cel world ink want depth snapshots of part of the scene
@@ -14467,185 +14741,12 @@ void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef ) {
 
 		for ( int surfNum = 0; surfNum < numDrawSurfs; surfNum++ ) {
 			const drawSurf_t *drawSurf = drawSurfs[ surfNum ];
-			const idMaterial *shader = drawSurf->material;
-			const srfTriangles_t *tri = drawSurf->geo;
-			if ( shader == NULL || tri == NULL || !shader->IsDrawn() ) {
-				continue;
-			}
 			if ( worldDepthCaptures != 0
 					&& VK_PostProcess_DepthFillPhase( drawSurf, worldDepthCaptures ) != fillPhase ) {
 				continue;
 			}
-			if ( tri->numIndexes <= 0 || tri->indexes == NULL ) {
-				continue;
-			}
-			if ( shader->Coverage() == MC_TRANSLUCENT ) {
-				continue;	// translucents neither write nor test here
-			}
-			if ( tri->ambientCache == NULL ) {
-				continue;
-			}
-			const float *regs = drawSurf->shaderRegisters;
-			// RB_T_FillDepthBuffer: alpha-tested stages of a perforated
-			// surface also mask per-sample coverage on an MSAA target, so
-			// the later EQUAL passes inherit the dithered edge
-			vkExec.alphaToCoverageSurface = VK_Exec_UseAlphaToCoverage( shader );
-			const bool nativePBRCoverage = VK_PBR_DepthCoverage( drawSurf );
-
-			// if all stages are conditioned off, skip
-			int stage;
-			const int stageCount = shader->GetNumStages();
-			for ( stage = 0; stage < stageCount; stage++ ) {
-				const shaderStage_t *pStage = shader->GetStage( stage );
-				if ( regs == NULL || regs[ pStage->conditionRegister ] != 0 ) {
-					break;
-				}
-			}
-			if ( stage == stageCount ) {
-				continue;
-			}
-
-			if ( !VK_Exec_BindTriGeometry( cmd, slot, tri ) ) {
-				continue;
-			}
-			fillPhaseDrawn[ fillPhase ]++;
-			VK_Exec_SetSurfScissor( cmd, viewDef, drawSurf, fbHeight );
-
-			// space change: rebuild the MVP (depth hacks included) and the
-			// weapon depth-range window
-			if ( drawSurf->space != currentSpace ) {
-				currentSpace = drawSurf->space;
-				VK_BuildSurfMVP( viewDef, drawSurf, mvp );
-				const bool wantWeaponRange = drawSurf->space->weaponDepthHack;
-				if ( wantWeaponRange != weaponDepthRange ) {
-					weaponDepthRange = wantWeaponRange;
-					viewport.maxDepth = wantWeaponRange ? 0.5f : 1.0f;
-					vkCmdSetViewport( cmd, 0, 1, &viewport );
-				}
-			}
-
-			// polygon offset per material
-			if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
-				vkCmdSetDepthBiasEnable( cmd, VK_TRUE );
-				vkCmdSetDepthBias( cmd, r_offsetUnits.GetFloat() * shader->GetPolygonOffset(), 0.0f, r_offsetFactor.GetFloat() );
-			}
-
-			// subviews down-modulate instead of drawing black
-			const bool isSubview = shader->GetSort() == SS_SUBVIEW;
-			vkGuiPushConstants_t push;
-			memcpy( push.mvp, mvp, sizeof( push.mvp ) );
-			push.stageColor[ 0 ] = push.stageColor[ 1 ] = push.stageColor[ 2 ] = isSubview ? 1.0f : 0.0f;
-			push.stageColor[ 3 ] = 1.0f;
-			push.texMatrixS[ 0 ] = 1.0f; push.texMatrixS[ 1 ] = 0.0f; push.texMatrixS[ 2 ] = 0.0f; push.texMatrixS[ 3 ] = 0.0f;
-			push.texMatrixT[ 0 ] = 0.0f; push.texMatrixT[ 1 ] = 1.0f; push.texMatrixT[ 2 ] = 0.0f; push.texMatrixT[ 3 ] = 0.0f;
-			push.params[ 0 ] = 0.0f;	// SVC_IGNORE
-			push.params[ 1 ] = 0.0f;	// alpha test off (per-stage below)
-			push.params[ 2 ] = 0.0f;
-			push.params[ 3 ] = 0.0f;	// no texmatrix
-
-			const int fillBlendBits = isSubview ? ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) : 0;
-
-			bool drawSolid = shader->Coverage() == MC_OPAQUE;
-
-			if ( shader->Coverage() == MC_PERFORATED ) {
-				// alpha-tested stages punch holes; if none draws, fall back solid
-				bool didDraw = false;
-				for ( stage = 0; stage < stageCount; stage++ ) {
-					const shaderStage_t *pStage = shader->GetStage( stage );
-					if ( !pStage->hasAlphaTest ) {
-						continue;
-					}
-					if ( regs != NULL && regs[ pStage->conditionRegister ] == 0 ) {
-						continue;
-					}
-					didDraw = true;
-					const float stageAlpha = regs != NULL ? regs[ pStage->color.registers[ 3 ] ] : 1.0f;
-					if ( stageAlpha <= 0.0f ) {
-						continue;
-					}
-					if ( pStage->texture.image == NULL || pStage->texture.texgen != TG_EXPLICIT ) {
-						continue;
-					}
-					// Native PBR owns coverage from its typed albedo. A classic
-					// copy with the same name can have different alpha mip rounding
-					// or upload/storage rules, so it cannot supply the PBR depth mask.
-					idImage *depthImage = nativePBRCoverage
-						? shader->GetPBRInfo().albedo.image : pStage->texture.image;
-					VkDescriptorSet stageDescriptor = VK_GuiExecutor_GetImageDescriptor( depthImage->GetDeviceHandle() );
-					if ( stageDescriptor == VK_NULL_HANDLE ) {
-						continue;
-					}
-					// per-stage polygon offset (RB_PrepareStageTexturing contract)
-					const bool stagePolygonOffset = pStage->privatePolygonOffset != 0.0f;
-					if ( stagePolygonOffset ) {
-						vkCmdSetDepthBiasEnable( cmd, VK_TRUE );
-						vkCmdSetDepthBias( cmd, r_offsetUnits.GetFloat() * pStage->privatePolygonOffset, 0.0f, r_offsetFactor.GetFloat() );
-					}
-					// The classic depth fill always supplies primary alpha through
-					// glColor, even when the later ambient stage uses vertex colors.
-					push.stageColor[ 3 ] = nativePBRCoverage ? stageAlpha
-						: idMath::ClampFloat( 0.0f, 1.0f, stageAlpha );
-					push.params[ 1 ] = VK_Exec_AlphaTestModeValue( pStage );
-					push.params[ 2 ] = regs != NULL ? regs[ pStage->alphaTestRegister ] : 0.5f;
-					if ( nativePBRCoverage && push.params[ 1 ] == 1.0f ) {
-						push.params[ 1 ] = vkExec.alphaToCoverageSurface ? 3.0f : 4.0f;
-					}
-					VK_Exec_SetPushTextureMatrix( pStage, regs, push );
-					VkPipeline pipeline = VK_GuiExecutor_GetPipeline( fillBlendBits );
-					if ( pipeline == VK_NULL_HANDLE ) {
-						continue;
-					}
-					if ( pipeline != depthFillBoundPipeline ) {
-						vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
-						depthFillBoundPipeline = pipeline;
-					}
-					if ( stageDescriptor != depthFillBoundSet ) {
-						vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkExec.pipelineLayout, 0, 1, &stageDescriptor, 0, NULL );
-						depthFillBoundSet = stageDescriptor;
-					}
-					vkCmdPushConstants( cmd, vkExec.pipelineLayout,
-							VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-					VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-					vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
-					if ( stagePolygonOffset ) {
-						if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
-							vkCmdSetDepthBias( cmd, r_offsetUnits.GetFloat() * shader->GetPolygonOffset(), 0.0f, r_offsetFactor.GetFloat() );
-						} else {
-							vkCmdSetDepthBiasEnable( cmd, VK_FALSE );
-						}
-					}
-					// restore solid-fill push defaults for the next stage
-					push.stageColor[ 3 ] = 1.0f;
-					push.params[ 1 ] = 0.0f;
-					push.params[ 2 ] = 0.0f;
-					push.params[ 3 ] = 0.0f;
-				}
-				if ( !didDraw ) {
-					drawSolid = true;
-				}
-			}
-
-			if ( drawSolid ) {
-				VkDescriptorSet whiteDescriptor = VK_GuiExecutor_GetImageDescriptor( globalImages->whiteImage->GetDeviceHandle() );
-				VkPipeline pipeline = VK_GuiExecutor_GetPipeline( fillBlendBits );
-				if ( whiteDescriptor != VK_NULL_HANDLE && pipeline != VK_NULL_HANDLE ) {
-					if ( pipeline != depthFillBoundPipeline ) {
-						vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
-						depthFillBoundPipeline = pipeline;
-					}
-					if ( whiteDescriptor != depthFillBoundSet ) {
-						vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkExec.pipelineLayout, 0, 1, &whiteDescriptor, 0, NULL );
-						depthFillBoundSet = whiteDescriptor;
-					}
-					vkCmdPushConstants( cmd, vkExec.pipelineLayout,
-							VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-					VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-					vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
-				}
-			}
-
-			if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
-				vkCmdSetDepthBiasEnable( cmd, VK_FALSE );
+			if ( VK_Exec_FillDepthSurface( cmd, slot, viewDef, drawSurf, fbHeight, fill ) ) {
+				fillPhaseDrawn[ fillPhase ]++;
 			}
 		}
 		vkExec.alphaToCoverageSurface = false;
@@ -14653,11 +14754,15 @@ void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef ) {
 			// the copy restarts rendering at the 2D baseline; the next phase
 			// re-latches the fill state, the space and the bound objects
 			VK_PostProcess_CaptureWorldDepth( viewDef, fillPhase, worldDepthCaptures, fillPhaseDrawn );
-			currentSpace = NULL;
-			depthFillBoundPipeline = VK_NULL_HANDLE;
-			depthFillBoundSet = VK_NULL_HANDLE;
+			fill.currentSpace = NULL;
+			fill.boundPipeline = VK_NULL_HANDLE;
+			fill.boundSet = VK_NULL_HANDLE;
 		}
 	}
+	currentSpace = fill.currentSpace;
+	weaponDepthRange = fill.weaponDepthRange;
+	memcpy( mvp, fill.mvp, sizeof( mvp ) );
+	viewport = fill.viewport;
 
 	// Native PBR keeps SSAO off its direct light: the occlusion field its
 	// indirect light reads is drawn now, from the complete prepass depth.
