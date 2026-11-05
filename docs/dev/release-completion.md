@@ -218,10 +218,22 @@ See [player release status](../user/release-status.md).
 
 ## Awakening Cryofac and finale corrections, 4 November 2026
 
+- Cryofac's freezer staging waits until the preceding thaw scene finishes,
+  preventing overlapping squad commands and attempts to cross a still-locked
+  door. Restart M08 to use revision 3; earlier saves keep their script revision.
+
+- The finale's three blast-door controls now work. Closing each door behind you
+  earns its intended escape-time bonus, and repeated activation cannot reopen
+  it or stack rewards. Restart M09 to use revision 4; existing saves retain
+  their selected script revision.
+- Cryofac and the finale use surviving installed assets for missing tables,
+  arm materials, objective imagery and effects. Unavailable small decorative
+  surgical props no longer appear as error cubes.
+
 - The squad clears the thawed entrance more reliably, and Navajas stays on the
   correct floor during the lower-console scene. The finale's cold-breath effects
   now attach to surviving actors without aborting setup on removed characters.
-  Restart M08 to adopt its revision 2 corrections, and M09 for revision 3;
+  Restart M08 to adopt its revision 3 corrections, and M09 for revision 4;
   earlier saves retain their original script behavior.
 - M09 now completes Navajas's escort objective after the bomb is ready, activates
   the second shaft's intended Iron Maiden encounter, and keeps the cave stairs

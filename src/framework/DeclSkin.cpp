@@ -120,6 +120,12 @@ bool idDeclSkin::Parse( const char *text, const int textLength, bool noCaching )
 			declManager->FindMaterial( token2, false ) == NULL ) {
 			map.to = declManager->FindMaterial( "models/monsters/strogg_marine/smv_arms3_lo", false );
 		}
+		if ( idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+			idStr::Icmp( GetName(), "skins/monsters/q4x_strogg_marine/q4x_smv_shotgun" ) == 0 &&
+			token2.Icmp( "models/monsters/q4x_strogg_marine/q4x_smv_arms2_lo" ) == 0 &&
+			declManager->FindMaterial( token2, false ) == NULL ) {
+			map.to = declManager->FindMaterial( "models/monsters/strogg_marine/smv_arms2_lo", false );
+		}
 		if ( map.to == NULL ) {
 			map.to = declManager->FindMaterial( token2 );
 		}

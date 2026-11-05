@@ -2309,9 +2309,12 @@ Completion substeps must keep three forms of evidence distinct:
   with 16 HP and reaching the ending after restoring that checkpoint. The shared
   melee path also guards AI-only defender state when attacking the player.
   These checkpointed runs retain the M08 developer-loadout limitation; they do
-  not qualify uninterrupted campaign balance. Missing optional blast-door
-  panels remain a documented recovered-content gap. Testing ended at the
-  user's request after extraction succeeded.
+  not qualify uninterrupted campaign balance. The subsequent focused follow-up
+  restores the three optional blast-door controls in M09 v4, serializes M08 v3
+  freezer staging after the thaw handoff, and repairs the identified missing media
+  using surviving installed assets. Earlier script
+  revisions remain reproducible. Full traversal was not repeated; the focused
+  follow-up evidence remains in the late-mission audit.
   Original script
   programs remain available to older saves. See the
   [late-mission audit and runtime limits](awakening-missions.md#m08-cryofac-and-m09-valkaryne--4-november-2026).

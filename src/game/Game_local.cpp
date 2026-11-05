@@ -2660,6 +2660,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 		if ( !InhibitEntitySpawn( mapEnt->epairs ) ) {
 			idDict mediaArgs = mapEnt->epairs;
 			Awakening_CorrectM05M06Entity( mediaArgs );
+			Awakening_CorrectLateMissionMedia( mediaArgs );
 			CacheDictionaryMedia( &mediaArgs );
 			const char *classname = mapEnt->epairs.GetString( "classname" );
 			if ( classname[0] != '\0' ) {
@@ -6781,6 +6782,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 			Awakening_DirectM01Relay( args );
 		}
 		Awakening_DirectLateMissionEntity( args );
+		Awakening_CorrectLateMissionMedia( args );
 		if ( profileMapSpawn ) {
 			mapCopyTimer.Stop();
 			mapDefLookupTimer.Start();
@@ -6840,6 +6842,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 			}
 			idDict mediaArgs = mapEnt->epairs;
 			Awakening_CorrectM05M06Entity( mediaArgs );
+			Awakening_CorrectLateMissionMedia( mediaArgs );
 			CacheDictionaryMedia( &mediaArgs );
 			if ( profileMapSpawn ) {
 				mapMediaTimer.Stop();
@@ -6932,6 +6935,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 	}
 
 	Awakening_StartCampaignRepairs( awakeningChapter );
+	Awakening_StartLateMissionDetails();
 	Printf( "...%i entities spawned, %i inhibited\n\n", num, inhibit );
 	if ( profileMapSpawn ) {
 		mapSpawnTimer.Stop();

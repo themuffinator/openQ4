@@ -142,6 +142,65 @@ def commands(case, restoring, revision='v2', breath=(), callbacks=()):
                   'wait 5', 'setviewpos 112 -1100 -572 90', 'testMission call CoreMonitor', 'wait 2400',
                   'testMission navajas', 'echo FINALE_CORE_DOOR', 'listSpawnArgs cryodoor_5',
                   'echo FINALE_CORE_DOOR_END']
+    elif case == 'freezer-sequence':
+        # Deliberately overlap the two scene requests. Actor relocation is
+        # isolated setup; no save is qualified after console script injection.
+        lines += ['wait 120', 'setviewpos -1100 -1100 -710 0', 'wait 5',
+                  'testMission stopThread Intro', 'testMission stopThread FirstFreeze',
+                  'script "$tak.scriptedStop(); $navajas.scriptedStop(); $tak.setOrigin($tak_firstfreeze_pos_1.getOrigin()); $navajas.setOrigin($navajas_firstfreeze_pos_1.getOrigin())"',
+                  'wait 5', 'testMission call FirstFreeze', 'testMission call StartFreezerMaidens',
+                  'wait 120', 'echo FINALE_FREEZER_QUEUED', 'testMission darnell', 'testMission redshirt',
+                  'script "sys.println(openq4_firstThawComplete)"', 'wait 5',
+                  'wait 9000', 'echo FINALE_FREEZER_STAGED',
+                  'script "sys.println(openq4_firstThawComplete)"', 'wait 5',
+                  'testMission tak', 'testMission navajas', 'listSpawnArgs cryodoor_6',
+                  'testMission darnell', 'testMission redshirt',
+                  'setviewpos -1100 -540 -710 180', 'wait 5',
+                  'screenshot "screenshots/freezer-staged.tga"']
+    elif case == 'cryo-media':
+        lines += ['wait 120', 'setviewpos -1040 -1160 -956 270', 'wait 10',
+                  'screenshot "screenshots/cryo-props.tga"']
+        for name in ('func_static_54642', 'func_static_55793', 'func_static_55794',
+                     'func_static_55795', 'func_static_55797', 'func_static_55799', 'func_static_55800'):
+            lines += [f'testMission {name}', f'listSpawnArgs {name}']
+    elif case == 'freezer-navigation':
+        lines += ['god', 'setviewpos -1100 -1100 -710 0', 'wait 5', 'testMission tak', 'testMission tak_pos_32']
+        for goal in ('cryodoor_6_tak_pos_1', 'cryodoor_6_tak_pos_2', 'tak_pos_31', 'tak_pos_32'):
+            lines += [f'echo BEFORE_{goal}', f'testMission path tak {goal}']
+        lines += ['script "$cryodoor_6.lock(0); $cryodoor_6.open()"', 'wait 120']
+        for goal in ('cryodoor_6_tak_pos_1', 'cryodoor_6_tak_pos_2', 'tak_pos_32'):
+            lines += [f'echo OPEN_{goal}', f'testMission path tak {goal}']
+        lines += ['script "$tak.scriptedMove($tak_pos_32, 8, 0)"', 'wait 1500', 'testMission tak',
+                  'testMission path tak tak_pos_32', 'screenshot "screenshots/freezer-navigation.tga"']
+    elif case == 'navigation':
+        lines += ['wait 120', 'setviewpos 112 -1100 -572 90']
+        for actor in ('tak', 'navajas'):
+            lines += [f'testMission {actor}']
+            for goal in ('tak_pos_28', 'navajas_pos_28', 'cryodoor_5_tak_pos_1', 'cryodoor_5_tak_pos_2'):
+                lines += [f'testMission {goal}', f'testMission path {actor} {goal}']
+        lines += ['testMission call CoreMonitor', 'wait 2400', 'testMission tak', 'testMission navajas', 'listSpawnArgs cryodoor_5',
+                  'screenshot "screenshots/navigation.tga"']
+    elif case == 'blast-doors':
+        panels = ('exitdooronepanel', 'exitdoortwopanel', 'exitdoorthreepanel')
+        doors = ('func_door_144', 'func_door_143', 'func_door_145', 'func_door_146', 'func_door_147', 'func_door_148')
+        lines += ['wait 120']
+        if not restoring:
+            lines += ['testMission call oq4_m09_v1::valkDead', 'wait 120']
+        for index, panel in enumerate(panels):
+            x, y, yaw = ((-3520, -2032, 0), (-4048, -2400, 270), (-4416, -2928, 0))[index]
+            lines += [f'setviewpos {x} {y} -4972 {yaw}', 'wait 5', f'testMission {panel}',
+                      f'screenshot "screenshots/panel{index+1}.tga"',
+                      f'testMission activateGui {panel}', 'wait 20']
+            if index == 0 and not restoring:
+                lines += ['saveGame sealing', 'wait 5']
+            lines += ['wait 130', f'testMission {panel}',
+                      f'testMission activateGui {panel}', f'trigger openq4_{panel}_relay', 'wait 5',
+                      f'listSpawnArgs {panel}', f'testMission {panel}']
+        lines += [f'testMission {door}' for door in doors]
+        lines += ['saveGame sealed', 'wait 5',
+                  'echo FINALE_SEAL_FLAGS', 'script "if (oq4_m09_v1::EXIT_DOOR_ONE_CLOSED) {sys.println(1);} if (oq4_m09_v1::EXIT_DOOR_TWO_CLOSED) {sys.println(1);} if (oq4_m09_v1::EXIT_DOOR_THREE_CLOSED) {sys.println(1);}"', 'wait 5']
+        for hurt in ('makronroom_hurt', 'exit_tun_hurt_1', 'exit_tun_hurt_2', 'exit_tun_hurt_3'):
+            lines += [f'testMission {hurt}']
     elif case == 'intro':
         lines += ['wait 600', 'listThreads', 'testMission player1',
                   'screenshot \"screenshots/intro.tga\"', 'saveGame intro', 'wait 5']
@@ -177,7 +236,7 @@ def commands(case, restoring, revision='v2', breath=(), callbacks=()):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--case', choices=('boss', 'docked-perches', 'escort-objective', 'maiden-trigger', 'stairs-clearance', 'cooling', 'cooling-early', 'thaw-door', 'tak', 'lights', 'navajas', 'intro', 'missed-extraction', 'cold-breath', 'entrance-clearance', 'core-monitor', 'callbacks', 'successful-extraction'), required=True)
+    p.add_argument('--case', choices=('freezer-sequence', 'cryo-media', 'freezer-navigation', 'navigation', 'blast-doors', 'boss', 'docked-perches', 'escort-objective', 'maiden-trigger', 'stairs-clearance', 'cooling', 'cooling-early', 'thaw-door', 'tak', 'lights', 'navajas', 'intro', 'missed-extraction', 'cold-breath', 'entrance-clearance', 'core-monitor', 'callbacks', 'successful-extraction'), required=True)
     p.add_argument('--map', choices=('m08_cryofac', 'm09_valkaryne'))
     p.add_argument('--retail', type=Path, required=True)
     p.add_argument('--awakening', type=Path, required=True)
@@ -188,9 +247,11 @@ def main():
     p.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
     p.add_argument('--timeout', type=int, default=300)
     args = p.parse_args()
+    if args.case in ('navigation', 'freezer-navigation') and not args.input:
+        p.error('navigation probes require an appropriate route checkpoint')
     if args.legacy and args.case not in ('intro', 'callbacks'):
         p.error('--legacy is supported by intro and callback probes')
-    if args.input and args.case in ('navajas', 'thaw-door', 'core-monitor', 'entrance-clearance', 'callbacks'):
+    if args.input and args.case in ('navajas', 'thaw-door', 'core-monitor', 'entrance-clearance', 'callbacks', 'freezer-sequence'):
         p.error('--input is not supported by this fresh sequence probe')
     exe = client_path(ROOT/'.install')
     verify_runtime_is_current(ROOT/'.install', exe.name)
@@ -202,11 +263,11 @@ def main():
         stage_input(args.input.resolve(), game/'savegames', 'finale_in')
     cfg = game/CFG_REL
     cfg.parent.mkdir(parents=True, exist_ok=True)
-    map_name = 'game/'+(args.map or ('m08_cryofac' if args.case in ('cooling', 'cooling-early', 'thaw-door', 'tak', 'core-monitor', 'entrance-clearance') else 'm09_valkaryne'))
-    revision = 'v2' if map_name.endswith('m08_cryofac') else 'v3'
+    map_name = 'game/'+(args.map or ('m08_cryofac' if args.case in ('cooling', 'cooling-early', 'thaw-door', 'tak', 'core-monitor', 'entrance-clearance', 'cryo-media', 'freezer-sequence', 'navigation', 'freezer-navigation') else 'm09_valkaryne'))
+    revision = 'v3' if map_name.endswith('m08_cryofac') else 'v4'
     if args.input:
         payload = args.input.read_bytes()
-        revision = next((v for v in ('v3', 'v2') if (map_name.split('/')[-1]+f'.openq4-{v}.script').encode('ascii') in payload), 'v1')
+        revision = next((v for v in ('v4', 'v3', 'v2') if (map_name.split('/')[-1]+f'.openq4-{v}.script').encode('ascii') in payload), 'v1')
     callbacks = []
     if args.case == 'callbacks':
         callbacks = [('trigger_once_46', 'call', 'ValkaryneEscape'),
@@ -358,6 +419,57 @@ def main():
         door = log.split('FINALE_THAW_DOOR \n')[-1].split('FINALE_THAW_DOOR_END')[0]
         if not re.search(r'"locked"\s+(?:\^\d)?"0"', door) or "Entity not found for event 'scriptedMove'" in log:
             failures.append('first thaw did not reach and unlock cryodoor_6')
+    if args.case == 'freezer-sequence':
+        queued = re.sub(r'\^\d', '', log.split('FINALE_FREEZER_QUEUED \n')[-1].split('FINALE_FREEZER_STAGED')[0])
+        staged = re.sub(r'\^\d', '', log.split('FINALE_FREEZER_STAGED \n')[-1])
+        if not re.search(r'^0(?:\.0*)?\s*$', queued, re.M) or not re.search(r'^1(?:\.0*)?\s*$', staged, re.M):
+            failures.append('early freezer request did not wait for and resume after the first thaw')
+        for actor, origin in (('tak', (-1251, -498, -768)), ('navajas', (-1251, -610, -768))):
+            rows = states(log, actor)
+            if not rows or math.dist(tuple(map(float, rows[-1]['origin'].split())), origin) > 24:
+                failures.append(f'{actor} did not reach the freezer staging point')
+        if not re.search(r'"locked"\s+(?:\^\d)?"0"', log):
+            failures.append('first thaw did not open cryodoor_6')
+        if 'WARNING: ^1scriptedMove:' in log:
+            failures.append('sequenced freezer scene still reports a movement failure')
+    if args.case == 'navigation':
+        expected = {'tak': (-343, -1130, -640), 'navajas': (37, -898, -640)}
+        for name, origin in expected.items():
+            rows = states(log, name)
+            if not rows or math.dist(tuple(map(float, rows[-1]['origin'].split())), origin) > 24:
+                failures.append(f'{name} did not finish the console/door route')
+        if not re.search(r'"locked"\s+(?:\^\d)?"0"', log):
+            failures.append('console route did not unlock cryodoor_5')
+        if 'WARNING: ^1scriptedMove:' in log:
+            failures.append('console route still reports a scripted movement failure')
+    if args.case == 'freezer-navigation':
+        rows = states(log, 'tak')
+        if not rows or math.dist(tuple(map(float, rows[-1]['origin'].split())), (-1251, -498, -768)) > 24:
+            failures.append('Tak did not reach the freezer staging marker')
+        if 'WARNING: ^1scriptedMove:' in log:
+            failures.append('freezer staging still reports a scripted movement failure')
+    if args.case in ('cryo-media', 'blast-doors'):
+        if any(phrase in log for phrase in ("Couldn't load image:", "Couldn't load model:")):
+            failures.append('late-mission media remains unresolved')
+    if args.case == 'blast-doors':
+        expected = {'func_door_144': (-3472, -1952, -4944), 'func_door_143': (-3568, -1952, -4944),
+                    'func_door_145': (-3968, -2448, -4944), 'func_door_146': (-3968, -2352, -4944),
+                    'func_door_147': (-4368, -2848, -4944), 'func_door_148': (-4464, -2848, -4944)}
+        for name, origin in expected.items():
+            rows = states(log, name)
+            if not rows or math.dist(tuple(map(float, rows[-1]['origin'].split())), origin) > 1:
+                failures.append(f'{name} did not seal at its authored closed origin')
+        for index, name in enumerate(('exitdooronepanel', 'exitdoortwopanel', 'exitdoorthreepanel')):
+            activations = log.count(f'testMissionGuiActivated: {name}\n')
+            if activations != (0 if args.input and index == 0 else 1):
+                failures.append(f'{name} did not accept exactly one GUI activation')
+            if not re.search(rf'testMissionGui: name={name} interactive=0 ', log):
+                failures.append(f'{name} did not become noninteractive')
+        if not (game/'savegames/sealed.save').is_file():
+            failures.append('sealed-door save was not written')
+        flag_log = re.sub(r'\^\d', '', log.split('FINALE_SEAL_FLAGS \n')[-1])
+        if len(re.findall(r'^1(?:\.0*)?\s*$', flag_log, re.M)) != 3:
+            failures.append('three physical closures did not award all three authored delay flags')
     if args.case == 'intro':
         saved = game/'savegames/intro.save'
         source_id = (map_name.split('/')[-1]+f'.openq4-{revision}.script').encode('ascii')

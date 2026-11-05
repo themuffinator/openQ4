@@ -10,4 +10,7 @@ void Awakening_CorrectM05M06Entity( idDict &args );
 void Awakening_PrepareLateMission( idDict &worldArgs );
 void Awakening_DirectLateMissionEntity( idDict &args );
 
+void Awakening_CorrectLateMissionMedia( idDict &args );
+void Awakening_StartLateMissionDetails();
+
 #endif

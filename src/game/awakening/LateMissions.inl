@@ -8,10 +8,12 @@
 static const char * const awakeningM08Source = "maps/game/m08_cryofac.script";
 static const char * const awakeningM08Version1 = "maps/game/m08_cryofac.openq4-v1.script";
 static const char * const awakeningM08Version2 = "maps/game/m08_cryofac.openq4-v2.script";
+static const char * const awakeningM08Version3 = "maps/game/m08_cryofac.openq4-v3.script";
 static const char * const awakeningM09Source = "scripts/maps/m09_valkaryne.script";
 static const char * const awakeningM09Version1 = "maps/game/m09_valkaryne.openq4-v1.script";
 static const char * const awakeningM09Version2 = "maps/game/m09_valkaryne.openq4-v2.script";
 static const char * const awakeningM09Version3 = "maps/game/m09_valkaryne.openq4-v3.script";
+static const char * const awakeningM09Version4 = "maps/game/m09_valkaryne.openq4-v4.script";
 static idCVar g_awakeningLateMissions( "g_awakeningLateMissions", "1", CVAR_GAME | CVAR_BOOL,
 	"Use openQ4 M08/M09 mission corrections on fresh starts; saves retain their selected revision" );
 
@@ -88,9 +90,11 @@ static bool Awakening_CorrectColdBreath( idStr &source ) {
 static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source ) {
 	idStr path = filename;
 	path.BackSlashesToSlashes();
-	const bool cryo = path.Icmp( awakeningM08Version1 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
-	const bool version3 = path.Icmp( awakeningM09Version3 ) == 0;
-	const bool version2 = version3 || path.Icmp( awakeningM09Version2 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
+	const bool cryoVersion3 = path.Icmp( awakeningM08Version3 ) == 0;
+	const bool cryo = cryoVersion3 || path.Icmp( awakeningM08Version1 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
+	const bool version4 = path.Icmp( awakeningM09Version4 ) == 0;
+	const bool version3 = version4 || path.Icmp( awakeningM09Version3 ) == 0;
+	const bool version2 = cryoVersion3 || version3 || path.Icmp( awakeningM09Version2 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
 	if ( !Awakening_LateCampaignActive() || ( !cryo && !version2 && path.Icmp( awakeningM09Version1 ) != 0 ) ) {
 		return false;
 	}
@@ -215,6 +219,20 @@ static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source
 			source.Replace( "namespace oq4_m09_v1", "namespace oq4_m09_v2" );
 		}
 	}
+	if ( cryoVersion3 ) {
+		// The player can reach the freezer trigger while FirstFreeze is still
+		// speaking. Do not teleport its other fireteam or steal the marines'
+		// move commands until that scene has operated the intervening door.
+		static const awakeningCorrection_t thirdCryoEdits[] = {
+			{ "void StartFreezerMaidens()\n{", "void StartFreezerMaidens()\n{\n"
+			  "\twhile ( !openq4_firstThawComplete ) { sys.wait( 0.1 ); }", 1 },
+			{ "sys.wait( 1.0 );\n\taiScriptedMove( $navajas, $cryodoor_6_navajas_pos_1, 16, 0 );",
+			  "sys.wait( 1.0 );\n\taiScriptedMove( $navajas, $cryodoor_6_navajas_pos_1, 16, 0 );\n"
+			  "\topenq4_firstThawComplete = 1;", 1 },
+		};
+		if ( !Awakening_ApplyCorrections( source, thirdCryoEdits, sizeof( thirdCryoEdits ) / sizeof( thirdCryoEdits[0] ) ) ) { return false; }
+		source.Insert( "float openq4_firstThawComplete = 0;\n", 0 );
+	}
 	if ( version3 ) {
 		static const awakeningCorrection_t thirdFinaleEdits[] = {
 			// The bomb is ready at this warning. The ensuing scripted death must
@@ -245,6 +263,36 @@ static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source
 		if ( !Awakening_ApplyCorrections( source, thirdFinaleEdits, sizeof( thirdFinaleEdits ) / sizeof( thirdFinaleEdits[0] ) ) ) { return false; }
 		source.Replace( "namespace oq4_m09_v2", "namespace oq4_m09_v3" );
 	}
+	if ( version4 ) {
+		// Keep every published revision immutable for save recompilation.
+		source.Replace( "namespace oq4_m09_v3", "namespace oq4_m09_v4" );
+		static const awakeningCorrection_t fourthFinaleEdits[] = {
+			{ "void exitDoorOneDisable()\n{", R"script(void openq4_sealDoor( entity panel, entity first, entity second ) {
+	if ( !panel || !first || !second || VALK_ALIVE || panel.getIntKey( "openq4_sealing" ) ) { return; }
+	panel.setKey( "openq4_sealing", "1" );
+	panel.setGuiParm( "noninteractive", "1" );
+	// start_open swaps POS1/POS2: open() moves these doors to the authored
+	// closed origins. Confirm BOTH leaves arrived, including after a blockage.
+	first.open();
+	while ( sys.vecLength( first.getOrigin() - first.getVectorKey( "origin" ) ) > 1 ||
+	        sys.vecLength( second.getOrigin() - second.getVectorKey( "origin" ) ) > 1 ) {
+		sys.wait( 0.1 );
+		first.open();
+	}
+	panel.setKey( "openq4_sealed", "1" );
+}
+
+void exitDoorOneDisable()
+{)script", 1 },
+			{ "$exitdooronepanel.setGuiParm( \"noninteractive\", \"1\" );\n\tsys.wait( 2 );\n\tEXIT_DOOR_ONE_CLOSED = true;",
+			  "if ( !$exitdooronepanel ) { return; }\n\topenq4_sealDoor( $exitdooronepanel, $func_door_144, $func_door_143 );\n\tEXIT_DOOR_ONE_CLOSED = $exitdooronepanel.getIntKey( \"openq4_sealed\" );", 1 },
+			{ "$exitdoortwopanel.setGuiParm( \"noninteractive\", \"1\" );\n\tsys.wait( 2 );\n\tEXIT_DOOR_TWO_CLOSED = true;",
+			  "if ( !$exitdoortwopanel ) { return; }\n\topenq4_sealDoor( $exitdoortwopanel, $func_door_145, $func_door_146 );\n\tEXIT_DOOR_TWO_CLOSED = $exitdoortwopanel.getIntKey( \"openq4_sealed\" );", 1 },
+			{ "$exitdoorthreepanel.setGuiParm( \"noninteractive\", \"1\" );\n\tsys.wait( 2 );\n\tEXIT_DOOR_THREE_CLOSED = true;",
+			  "if ( !$exitdoorthreepanel ) { return; }\n\topenq4_sealDoor( $exitdoorthreepanel, $func_door_147, $func_door_148 );\n\tEXIT_DOOR_THREE_CLOSED = $exitdoorthreepanel.getIntKey( \"openq4_sealed\" );", 1 },
+		};
+		if ( !Awakening_ApplyCorrections( source, fourthFinaleEdits, sizeof( fourthFinaleEdits ) / sizeof( fourthFinaleEdits[0] ) ) ) { return false; }
+	}
 	return true;
 }
 
@@ -253,9 +301,9 @@ static const char *Awakening_LateMissionScriptName( const char *filename ) {
 	path.BackSlashesToSlashes();
 	if ( g_awakeningLateMissions.GetBool() && Awakening_LateCampaignActive() && path.Icmp( awakeningM08Source ) == 0 ) {
 		idStr source;
-		if ( Awakening_LoadLateMissionScript( awakeningM08Version2, source ) ) {
-			gameLocal.Printf( "Awakening M08: mission corrections v2 enabled\n" );
-			return awakeningM08Version2;
+		if ( Awakening_LoadLateMissionScript( awakeningM08Version3, source ) ) {
+			gameLocal.Printf( "Awakening M08: mission corrections v3 enabled\n" );
+			return awakeningM08Version3;
 		}
 		gameLocal.Warning( "Awakening M08: unrecognized script; keeping installed mission behaviour" );
 	}
@@ -274,13 +322,13 @@ void Awakening_PrepareLateMission( idDict &worldArgs ) {
 	// A custom sidecar owns the map; do not layer our revision over it.
 	if ( fileSystem->ReadFile( "maps/game/m09_valkaryne.script", NULL, NULL ) > 0 ) { return; }
 	idStr source;
-	if ( !Awakening_LoadLateMissionScript( awakeningM09Version3, source ) ) {
+	if ( !Awakening_LoadLateMissionScript( awakeningM09Version4, source ) ) {
 		gameLocal.Warning( "Awakening M09: unrecognized script; keeping installed mission behaviour" );
 		return;
 	}
-	gameLocal.program.CompileFile( awakeningM09Version3 );
-	worldArgs.Set( "call", "oq4_m09_v3::main" );
-	gameLocal.Printf( "Awakening M09: mission corrections v3 enabled\n" );
+	gameLocal.program.CompileFile( awakeningM09Version4 );
+	worldArgs.Set( "call", "oq4_m09_v4::main" );
+	gameLocal.Printf( "Awakening M09: mission corrections v4 enabled\n" );
 }
 
 void Awakening_DirectLateMissionEntity( idDict &args ) {
@@ -292,8 +340,9 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 	idStr cryoProgram = main ? gameLocal.program.GetFilename( main->filenum ) : "";
 	cryoProgram.BackSlashesToSlashes();
 	const bool correctedCryo = map.Icmp( "maps/game/m08_cryofac" ) == 0 &&
-		( cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 );
-	const char *finaleNamespace = gameLocal.program.FindFunction( "oq4_m09_v3::main" ) ? "oq4_m09_v3::" :
+		( cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 || cryoProgram.Icmp( awakeningM08Version3 ) == 0 );
+	const char *finaleNamespace = gameLocal.program.FindFunction( "oq4_m09_v4::main" ) ? "oq4_m09_v4::" :
+		gameLocal.program.FindFunction( "oq4_m09_v3::main" ) ? "oq4_m09_v3::" :
 		gameLocal.program.FindFunction( "oq4_m09_v2::main" ) ? "oq4_m09_v2::" : "oq4_m09_v1::";
 	const bool correctedFinale = map.Icmp( "maps/game/m09_valkaryne" ) == 0 &&
 		gameLocal.program.FindFunction( va( "%smain", finaleNamespace ) ) != NULL;
@@ -326,7 +375,11 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 		}
 	}
 	if ( correctedFinale ) {
-		if ( gameLocal.program.FindFunction( "oq4_m09_v3::main" ) != NULL &&
+		if ( gameLocal.program.FindFunction( "oq4_m09_v4::main" ) && !idStr::Icmpn( args.GetString( "team" ), "tunneldoors", 11 ) ) {
+			args.SetBool( "no_touch", true );
+			args.Set( "wait", "-1" );
+		}
+		if ( ( gameLocal.program.FindFunction( "oq4_m09_v4::main" ) != NULL || gameLocal.program.FindFunction( "oq4_m09_v3::main" ) != NULL ) &&
 			!idStr::Icmp( args.GetString( "name" ), "trigger_once_15" ) ) {
 			// Both surviving actors lost their old leading underscore in the
 			// recovered map; the trigger still points at the obsolete names.
@@ -358,3 +411,5 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 		args.Set( "call", "FlashLightsOff" );
 	}
 }
+
+#include "LateMissionDetails.inl"

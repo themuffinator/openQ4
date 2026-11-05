@@ -2179,6 +2179,21 @@ static void Cmd_TestMission_f( const idCmdArgs &args ) {
 	if ( gameLocal.IsMultiplayer() || player == NULL || !gameLocal.CheatsOk( false ) ) {
 		return;
 	}
+	if ( args.Argc() == 3 && !idStr::Icmp( args.Argv( 1 ), "stopThread" ) ) {
+		// Isolated scene setup, without appending console bytecode to saves.
+		idThread::KillThread( args.Argv( 2 ) );
+		return;
+	}
+	if ( args.Argc() == 3 && !idStr::Icmp( args.Argv( 1 ), "activateGui" ) ) {
+		idEntity *panel = gameLocal.FindEntity( args.Argv( 2 ) );
+		if ( panel && panel->GetRenderEntity()->gui[0] && panel->GetRenderEntity()->gui[0]->IsInteractive() ) {
+			// Exercise the same command emitted by a world GUI. No player or
+			// host mouse/keyboard input is synthesized by this diagnostic.
+			panel->HandleGuiCommands( panel, "activate" );
+			gameLocal.Printf( "testMissionGuiActivated: %s\n", panel->name.c_str() );
+		}
+		return;
+	}
 	if ( args.Argc() == 4 && !idStr::Icmp( args.Argv( 1 ), "dispatch" ) ) {
 		// A file-driven controller can observe an acknowledgement after the
 		// next poll has already queued the same file. Consume the sequence

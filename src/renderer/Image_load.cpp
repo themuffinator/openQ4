@@ -78,6 +78,12 @@ static const char *R_FindMissingQ4StockImageFallback( const char *imageName ) {
 	// Keep the authored source first and salt the generated cache exactly as for
 	// the retail fallbacks below, so an installed correction takes precedence.
 	if ( idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 ) {
+		if ( canonicalName.Icmp( "textures/common/white" ) == 0 ) {
+			return "gfx/guis/white.tga";
+		}
+		if ( canonicalName.Icmp( "gfx/effects/fluids_drips/drop_additive" ) == 0 ) {
+			return "makeIntensity( gfx/effects/fluids_drips/drop_blue.tga )";
+		}
 		if ( canonicalName.Icmp( "gfx/effects/fire/p_fire2a" ) == 0 ) {
 			return "gfx/effects/fire/fire2a.tga";
 		}

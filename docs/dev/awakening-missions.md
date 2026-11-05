@@ -973,3 +973,77 @@ identities are retained with each profile. Integration preserves the earlier
 mission tooling and is checked by compilation, source contracts and controller
 protocol checks. No additional gameplay replay was started after the user
 requested testing to stop.
+
+
+### Blast-door controls, media and navigation follow-up — 4 November 2026
+
+M09 revision 4 restores the three optional escape controls using the surviving
+`tunneldoors1`/`2`/`3` movers, the installed Strogg bottom-monitor model and the
+existing localized `generic_seal.gui`. The panels sit on the exit side of each
+doorway. Each relay latches its request, disables the panel, and waits for both
+leaves to reach their authored closed origins before awarding the original
+explosion-delay flag. These `start_open` movers reverse their logical positions;
+the closure deliberately uses their second position. Touching a sealed door
+cannot reopen it. Duplicate callbacks cannot add bonuses or toggle the doors.
+The optional choice remains optional; the earlier successful open-door escape
+is still supported. This supersedes the missing-panel finding above.
+
+Fresh M09 starts select `maps/game/m09_valkaryne.openq4-v4.script`. Published
+v1–v3 transformations remain unchanged for save recompilation. Custom map
+sidecars retain ownership, supplied panels are retained, and a missing or
+mismatched door anchor prevents adding that panel.
+
+Media repair uses the player's installed assets, without shipping recovered
+content. M08's missing table variants use the surviving retail table models;
+missing decorative surgical tools retain their named entities but omit error
+cubes and collision. M09's missing escort-objective image uses the surviving
+`m09_obj_01`, and the shotgun Strogg marine uses its corresponding retail arm
+material when the expansion variant is absent. The white and water-drip image
+references use shipped white/neutralized drip images. Installed originals always
+win. The earlier fire-image correction was already present in the main checkout.
+
+Focused evidence is retained under `.tmp/m08-m09-refinement/`. These probes use
+hidden windowed SP, scene callbacks, engine captures and checkpoint restores;
+they do not inject player input or establish a new traversal/balance result.
+
+M08 revision 3 also serializes the freezer staging request behind `FirstFreeze`.
+An early request previously teleported the other fireteam and reassigned Tak and
+Navajas while the thaw dialogue still owned them. In the restored checkpoint,
+the approach marker is reachable with cryodoor 6 locked, but its exit marker and
+`tak_pos_32` are not; opening that door makes both paths valid. The earlier
+scene can also overwrite a prematurely issued move with its dialogue-facing
+command. The new saved completion latch lets the thaw finish operating the door
+and handing off both marines before the next scene starts. No AAS reachability,
+collision geometry, NPC collision or teleport fallback is changed.
+
+The lower-console checkpoint completes normally: Tak reaches the far doorway,
+Navajas reaches his lower-floor station, and cryodoor 5 unlocks without a
+scripted-movement warning. Its initial blocked route beyond the locked door is
+expected. The M09 PROC/CM/AAS CRC discrepancy remains an external render-data
+provenance mismatch; CM and AAS agree with the loaded map. It is not repaired by
+falsifying CRCs or rebuilding geometry as part of this focused mission patch.
+
+Focused validation passed on the staged Windows x64 OpenGL runtime:
+
+- `freezer-sequence-gl`: an intentionally early freezer request waits for the
+  thaw completion latch; Tak and Navajas reach their staging markers, cryodoor 6
+  unlocks, and no scripted-movement failure occurs. Actor relocation is isolated
+  scene setup, not traversal evidence; this console-instrumented run creates no
+  qualification save.
+- `seals-gui-gl` and `seals-gui-restored-gl`: GUI command activation closes all six
+  door leaves, awards all three delay flags, and disables each panel. A fresh
+  process restores a save taken while the first door is moving, completes it,
+  and accepts each remaining panel once. Duplicate requests do not reopen doors.
+- `media-m08`: the identified missing model/image warnings are absent, and engine
+  captures confirm the repaired props. The console-route checkpoint and media
+  probe were recorded before the additional M08 v3 ordering change; their binary
+  identities and script revisions remain in their reports.
+
+`legacy-v3-restore-gl` also restores an older M09 revision 3 save and writes
+a new save retaining that revision. The native build, Awakening gameplay/CI
+contracts and repository path checks pass.
+Reports, exact command streams, binary hashes, captures and validation limits are
+indexed by `.tmp/m08-m09-refinement/validation-summary.json`. Existing recovered
+content still emits unrelated duplicate-declaration, embedded-item and empty ASE
+mesh warnings. The isolated freezer setup also emits a medic-follow warning;
+that is distinct from the scripted route, which completes successfully.
