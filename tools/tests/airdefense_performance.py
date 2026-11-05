@@ -40,6 +40,9 @@ ULTRA_QUALITY = {
     "r_shadowMapCascadeStabilize": 1, "r_motionBlurObjectVectors": 1,
     "r_shadowMapHashedAlpha": 1, "r_shadowMapTranslucentReceivers": 1,
     "r_shadowMapPointLights": 1, "r_ssao": 1, "r_ssaoSamples": 32,
+    # Automatic: full resolution at Ultra's 32 samples, half at Quality's 20.
+    # The CVar is archived, so a stale value would otherwise pick either.
+    "r_ssaoResolution": 0,
     "r_bloom": 1, "r_bloomMipCount": 5, "r_motionBlur": 1, "r_motionBlurSamples": 16,
     "r_hdrSceneTarget": 1, "r_hdrToneMap": 1, "r_useLightGrid": 1,
     "r_skipBump": 0, "r_skipSpecular": 0, "r_skipSky": 0,

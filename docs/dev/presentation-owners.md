@@ -1000,8 +1000,10 @@ existing per-view ownership path.
 
 The cache holds at most 64 MiB of payload and 32,768 entries. Leases for in-flight
 frames can temporarily retain evicted versions in addition to that budget.
-Oversized or non-word-sized ranges use ordinary frame copies. Whole-cache
-pressure eviction bounds bookkeeping; this is intentionally conservative.
+Oversized or non-word-sized ranges use ordinary frame copies. Pressure
+evicts least-recently-used entries until a new stream fits. Until 5 November
+it cleared the whole cache, which stalled a frame; see
+[long-frame attribution](#long-frame-attribution-5-november-2026).
 Validation reads the full stream, so avoided copy bytes do not imply equivalent
 CPU-time savings. `r_vkSnapshotRetain 0` disables retention and clears cached
 entries at retirement; it does not invalidate submitted leases.
@@ -1105,3 +1107,109 @@ count, bloom, MSAA, or dynamic resolution), not a render-thread mode. Evidence
 is under `.tmp/hf-floor/runs/` (`cycle-base`, `phases-base`, `frames0`,
 `sens1`), with launch arguments and runtime hashes. `sens2` and the later
 `cycle-base` windows ran under peer load and are not used.
+
+### Half-resolution SSAO for Quality, 5 November 2026
+
+The user chose to halve SSAO's resolution for Quality while Ultra keeps full
+resolution. `r_ssaoResolution` (archived, default `0`) selects it on Vulkan.
+`0` is automatic: full resolution at the maximum `r_ssaoSamples` (32, Ultra)
+and half below it (Quality's 20, Enhanced's 12). `1` forces full resolution
+and `2` forces half. The presets already own `r_ssaoSamples`, so no preset
+target or SYSTEM catalog version changes. OpenGL keeps its full-resolution
+pass.
+
+The classic multiply pass becomes two draws (`VK_Post_DrawSSAOHalf`). The
+first draws a half-size RGBA16F target. Each texel computes the AO of the even
+pixel of its 2×2 block exactly as the full-resolution pass computes it there,
+and stores that pixel's view depth, or a negative marker where sky or a
+foreground model takes no AO. The second draws at full resolution: sky and
+foreground pixels are untouched as before, and every other pixel blends one,
+two or four neighbouring texels, its own block and, on odd rows/columns, the
+next. A tap counts only within 4% of the pixel's view depth (at least two
+units), so AO does not cross silhouettes; with no tap that close, the closest
+in depth stands in. Even pixels therefore reproduce the full-resolution value.
+`r_ssaoDebug` now shows the half-resolution AO when that path is active,
+white wherever no AO applies. Native PBR's occlusion field and
+`r_vkSSAOReferenceComposition` keep the full-resolution pass.
+
+Image check. AO-only captures (`r_ssaoDebug 1`, particles and gun hidden) of
+five fixed airdefense1 views compare full against half resolution on the pixels
+that receive AO. Mean AO agrees within 0.002 in every view; the mean absolute
+difference is 0.001–0.004 (under one level in 255) and the 99th percentile
+0.018–0.043. The difference image shows only the noise pattern's texture, with
+no halos at silhouettes. A Khronos validation-layer run through the full, half
+and debug paths logged no messages.
+
+GPU cost (paired windows in one fullscreen 2560 x 1440 Quality launch,
+`r_vkRenderThread 2`, 600-frame `r_vkGpuPhaseProfile` per window):
+
+| Windows | SSAO draw | SSAO depth copy | Main view | GPU frame |
+| --- | ---: | ---: | ---: | ---: |
+| Full, first pair (`gpuab1`) | 1.75 | 0.41 | 7.08 | 8.69 |
+| Half, first pair (`gpuab1`) | 0.76 | 0.43 | 6.08 | 7.72 |
+| Full, median of five (`gpuab2`) | 2.12 | 0.49 | 8.12 | 10.13 |
+| Half, median of five (`gpuab2`) | 0.95 | 0.48 | 7.86 | 9.92 |
+| SSAO off, median of five (`gpuab2`) | — | — | 4.10 | 6.09 |
+
+Times are in milliseconds. Peer sessions' clients shared the GPU during
+`gpuab2`, so whole-frame medians mix contended and quiet windows. The SSAO
+draw is the robust measure: 55–57% cheaper in every pairing, about 1.0–1.2 ms
+per frame. The first pair, run before the contention, removed 1.0 ms from the
+main view.
+
+The off windows show a cost the SSAO phases do not include. The world-depth
+snapshot the prepass copies for SSAO (`VK_PostProcess_CaptureWorldDepth`)
+ends rendering mid-prepass, resolves the whole 4x depth buffer and blits it.
+In the quieter windows of a diagnostic A/B (`snap1`, a worktree-only switch,
+not committed), the prepass took 0.79–0.84 ms with the snapshot and
+0.32–0.33 ms without it (0.31 ms with SSAO off), and lighting took 1.70 ms
+against 1.43–1.49 ms. The snapshot therefore costs about 0.75 ms per frame.
+Removing it without changing the AO needs another source of world-only depth,
+such as a separate single-sample world depth draw. That is the next measured
+GPU lever.
+
+Evidence is under `.tmp/hf-floor/runs/` (`dshots1`, `valid1`, `gpuab1`,
+`gpuab2`, `snap1`), built from a detached worktree so that peer sessions'
+staging could not replace the runtime under test.
+
+### Long-frame attribution, 5 November 2026
+
+`profileFrameWork` now writes each frame's start time on the presentation
+clock (`startMs`, QueryPerformanceCounter on Windows) as the CSV's last
+column. `tools/debug/cpu_sampler.py` records the same clock with every
+sample, and its `frames` command places main-thread samples in the frames
+that ran them. It compares frames over a threshold with the rest and lists
+the longest frames' stacks. A 36-second fullscreen Quality sweep in mode 2
+(`hitch1`, 3,600 frames, 26 over 14 ms) attributed the long frames to three
+causes:
+
+- **Retained-index cache clears.** Long draw phases of 20–23 ms were mostly
+  frees of thousands of retained index streams. Under pressure,
+  `idFrameSnapshotRetainedIndexes` cleared the whole cache (up to 64 MiB or
+  32,768 streams) in one frame and re-copied everything afterwards. Frame-
+  temporary geometry adds a new source address every frame, so the cache
+  filled and cleared periodically. It now evicts least-recently-used streams
+  one at a time until a new stream fits. Streams reused every frame stay
+  resident, and one-shot streams age out at the tail. The production-header
+  test covers recency order and the entry cap, and a whole-clear negative
+  control fails it. The rerun (`hitch2`) has no bulk-free samples (eight in
+  `hitch1`). Its overall timings ran under 52% host load and are not
+  comparable. Retention's steady cost remains: validating each reused stream
+  with `memcmp`, hashing and freeing evicted streams took about 7–11% of the
+  main thread in these runs. Not retaining a stream until its address recurs,
+  so that one-shot streams take ordinary frame-arena copies, is the next
+  candidate, to be judged by a quiet A/B.
+- **Window-message processing.** About a quarter of long-frame samples, against
+  under 0.5% elsewhere, were inside SDL's event pump. Windows was initializing
+  text-services/IME state and reading colour-profile settings there. The engine
+  enables text input only for the console or a focused text field, and neither
+  was active, so other windows' activity on this shared desktop drove these
+  messages. Recheck on a quiet reference desktop before treating them as an
+  engine cost.
+- **Streaming sound starts.** `idSoundSystemLocal::Render` opens, seeks and
+  decodes the first buffer of Ogg Vorbis streams on the main thread when a
+  streamed voice starts, a few milliseconds each. Moving stream preparation
+  off the main thread belongs with the audio work.
+
+Evidence is under `.tmp/hf-floor/runs/hitch1` and `hitch2`
+(`samples.json`, `frame-work.csv`, engine logs).

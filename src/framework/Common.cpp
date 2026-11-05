@@ -6406,11 +6406,13 @@ static void Common_EndFrameWork(int frame) {
 	static const char* names[]{"gap","wait","events","configuration","commands","session","draw","tail"};
 	idFile* file=fileSystem->OpenFileWrite("diagnostics/frame-work.csv");
 	if (file) {
-		file->Printf("frame,totalMs,gapMs,waitMs,eventsMs,configurationMs,commandsMs,sessionMs,drawMs,tailMs\n");
+		// startMs: Wait-phase start on the presentation clock (QueryPerformanceCounter
+		// ticks in milliseconds on Windows), for tools/debug/cpu_sampler.py frames.
+		file->Printf("frame,totalMs,gapMs,waitMs,eventsMs,configurationMs,commandsMs,sessionMs,drawMs,tailMs,startMs\n");
 		for (const auto& sample:samples) {
 			file->Printf("%d,%.6f",sample.frame,sample.Total());
 			for (double value:sample.milliseconds) file->Printf(",%.6f",value);
-			file->Printf("\n");
+			file->Printf(",%.6f\n",sample.startMs);
 		}
 		fileSystem->CloseFile(file);
 	}

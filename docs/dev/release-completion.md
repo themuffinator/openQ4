@@ -6,6 +6,20 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Faster ambient occlusion on Quality, 5 November 2026
+
+- On Vulkan, the Quality preset (and any setting below 32 SSAO samples) now
+  computes ambient occlusion at half resolution and upsamples it along depth
+  edges. At native 2560 x 1440 this cuts the effect's GPU cost by more than
+  half, about 1 ms per frame on an RTX 4060 laptop GPU, with shading that matches
+  the full-resolution result to within about one level in 255 on average.
+- Ultra keeps full-resolution ambient occlusion. `r_ssaoResolution 1` forces
+  full resolution on any preset and `2` forces half; the default `0` chooses
+  automatically. OpenGL is unchanged.
+- With the experimental Vulkan front-end overlap (`r_vkRenderThread 2`), a
+  periodic 15–20 ms stall is gone: its geometry cache now retires old entries
+  gradually instead of emptying itself all at once.
+
 ## Team forfeit votes and failed series map loads, 5 November 2026
 
 - Competitive teams can now vote to concede. Any active player can open

@@ -89,6 +89,21 @@ int main() {
  auto evicted=indexStore.Acquire(pressure,sizeof(pressure));
  indexStore.Acquire(indices,sizeof(indices));
  assert((*evicted.lease)[0]==0 && !indexStore.Acquire(pressure,68).lease);
+ // Pressure evicts the least recently acquired streams only, never the whole cache.
+ idFrameSnapshotRetainedIndexes lru(64);
+ std::uint32_t a[4]={1,1,1,1},b[4]={2,2,2,2},c[4]={3,3,3,3},d[8]={4,4,4,4,4,4,4,4};
+ lru.Acquire(a,sizeof(a));lru.Acquire(b,sizeof(b));lru.Acquire(c,sizeof(c));
+ assert(lru.Acquire(a,sizeof(a)).reused);
+ lru.Acquire(d,sizeof(d));
+ assert(lru.Size()==3 && lru.ResidentBytes()==64);
+ assert(lru.Acquire(a,sizeof(a)).reused && lru.Acquire(c,sizeof(c)).reused && lru.Acquire(d,sizeof(d)).reused);
+ assert(!lru.Acquire(b,sizeof(b)).reused);
+ // One-shot ranges beyond the entry cap displace the oldest one at a time.
+ idFrameSnapshotRetainedIndexes capped;
+ std::vector<std::array<std::uint32_t,4>> oneShot(idFrameSnapshotRetainedIndexes::maximumEntries+7232);
+ for(std::size_t i=0;i<oneShot.size();++i){oneShot[i].fill(static_cast<std::uint32_t>(i));capped.Acquire(oneShot[i].data(),16);}
+ assert(capped.Size()==idFrameSnapshotRetainedIndexes::maximumEntries);
+ assert(capped.Acquire(oneShot.back().data(),16).reused && !capped.Acquire(oneShot.front().data(),16).reused);
 
  std::vector<std::unique_ptr<unsigned char[]>> blocks;
  auto allocate=[&](std::size_t size)->void* {blocks.emplace_back(new unsigned char[size]);return blocks.back().get();};
@@ -148,10 +163,14 @@ def main():
         for name, code, passed in (("production", header, True),
                                    ("borrowed-source", header.replace("return { copy, false };", "return { const_cast<void *>(source), false };"), False),
                                    ("size-blind", header.replace(" && entries[slot].bytes == bytes", "").replace(" ^ bytes;", ";"), False),
-                                   ("late-preparation", header, False), ("stale-retention", header, False)):
+                                   ("late-preparation", header, False), ("stale-retention", header, False),
+                                   ("whole-clear", header, False)):
             retention = (ROOT / "src/renderer/FrameSnapshotRetain.h").read_text()
             if name == "stale-retention":
                 retention = retention.replace("std::memcmp( old->data(), source, bytes ) == 0", "true")
+            if name == "whole-clear":
+                retention = retention.replace("Erase( entries.find( recency.back() ) );", "Clear();")
+                assert "Clear();" in retention
             (temp / "FrameSnapshotRetain.h").write_text(retention, encoding="utf-8")
             body = preparation.replace("snapshot.Surface( view->drawSurfs[i], true, true )", "snapshot.Surface( view->drawSurfs[i], true, false )") if name == "late-preparation" else preparation
             (temp / "copy.cpp").write_text(PREPARATION + body + PREPARATION_CASE + CASES, encoding="utf-8")
@@ -161,7 +180,8 @@ def main():
             result = subprocess.run([str(exe)], capture_output=True, timeout=20)
             if (result.returncode == 0) != passed:
                 raise AssertionError(f"{name}: unexpected exit {result.returncode}")
-    print("Snapshot copies: complete-view preparation, alias reuse, distinct ranges, later-view isolation and four negative controls passed")
+    print("Snapshot copies: complete-view preparation, alias reuse, distinct ranges, later-view isolation, "
+          "least-recently-used retention and five negative controls passed")
 
 
 if __name__ == "__main__":

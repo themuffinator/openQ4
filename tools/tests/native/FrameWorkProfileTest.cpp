@@ -20,6 +20,8 @@ int main() {
 	CHECK(profile.Samples().size()==2 && profile.Samples()[0].frame==10);
 	CHECK(profile.Samples()[0].Total()==7 && profile.Samples()[1].Total()==10);
 	CHECK(profile.Samples()[1].milliseconds[0]==3);
+	// Each frame keeps the clock reading its Wait phase began at, for external samplers.
+	CHECK(profile.Samples()[0].startMs==100 && profile.Samples()[1].startMs==110);
 	CHECK(!Frame(profile,12,120) && profile.Samples().size()==2);
 	CHECK(profile.Reset(1)); profile.Begin(200); profile.Mark(FrameWorkPhase::Wait,201);
 	CHECK(profile.Reset(1)); // Command restarts in the middle of a frame.
@@ -32,5 +34,5 @@ int main() {
 	profile.Begin(0); profile.Mark(FrameWorkPhase::Wait,std::numeric_limits<double>::quiet_NaN());
 	CHECK(!profile.End(0,7) && Frame(profile,1,10));
 	CHECK(profile.Reset(0) && !profile.Active() && profile.Samples().empty());
-	std::puts("frame work profile: exact phases, gaps, bounded capture, reset, stop and invalid-clock controls passed");
+	std::puts("frame work profile: exact phases, gaps, frame start times, bounded capture, reset, stop and invalid-clock controls passed");
 }

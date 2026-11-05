@@ -267,6 +267,10 @@ typedef struct vkPostSceneState_s {
 	int					ssaoFieldFrame;
 	bool				ssaoFieldFlip;		// its rows run opposite to the view's target
 
+	// Half-resolution classic AO (VK_Post_DrawSSAOHalf): r AO, g view depth
+	idImage *			ssaoHalf;
+	idRenderTexture *	ssaoHalfTarget;
+
 	idImage *			bloomImages[ VK_POST_BLOOM_MAX_LEVELS ][ 2 ];
 	idRenderTexture *	bloomTargets[ VK_POST_BLOOM_MAX_LEVELS ][ 2 ];
 
@@ -519,6 +523,7 @@ void VK_PostProcess_Shutdown( void ) {
 	}
 	delete vkPostScene.motionVectorTarget;
 	delete vkPostScene.ssaoFieldTarget;
+	delete vkPostScene.ssaoHalfTarget;
 	delete vkTemporalMotionTarget;
 	vkTemporalMotionTarget = NULL;
 	vkTemporalMotionImage = NULL;
@@ -1231,7 +1236,8 @@ typedef struct vkPostSSAOBlock_s {
 	float	depthInfo[ 4 ];
 	float	params[ 4 ];
 	float	params2[ 4 ];
-	float	modeInfo[ 4 ];		// x mode (0 classic, 1 field, 2 apply), y field rows flipped
+	float	modeInfo[ 4 ];		// x mode (0 classic, 1 field, 2 apply, 3 half, 4 upsample), y field rows flipped
+	float	halfInfo[ 4 ];		// xy half-resolution target size, zw view size
 } vkPostSSAOBlock_t;
 
 static void VK_Post_FillSSAOBlock( vkPostSSAOBlock_t &block, const viewDef_t *viewDef,
@@ -1272,6 +1278,69 @@ bool VK_PostProcess_SSAOField( const viewDef_t *viewDef, idImage **image, bool *
 static idCVar r_vkSSAOReferenceComposition( "r_vkSSAOReferenceComposition", "0", CVAR_RENDERER | CVAR_BOOL,
 	"use the resolved-color SSAO composition reference for validation" );
 
+static bool VK_Post_EnsureColorTarget( idImage *&image, idRenderTexture *&target, const char *name,
+		int width, int height, textureFilter_t filter, const char *label );
+
+/*
+====================
+VK_Post_DrawSSAOHalf
+
+The classic multiply pass at half resolution (R_SSAOHalfResolution). The AO
+of the even pixel of each 2x2 block goes into a half-size target, computed as
+the full-resolution pass computes it there; a full-resolution pass then
+multiplies the scene by a depth-aware upsample of it. Sky and foreground
+pixels stay untouched exactly as before. With debug set (r_ssaoDebug) the
+upsample writes the AO itself instead, white where no AO applies. The
+reference composition and native PBR's occlusion field keep the
+full-resolution pass.
+====================
+*/
+static bool VK_Post_DrawSSAOHalf( const viewDef_t *viewDef, VkShaderModule fragModule, idImage *worldDepth,
+		idImage *finalDepth, int width, int height, bool debug ) {
+	idRenderTexture *sceneTarget = VK_Exec_ActiveRenderTexture();
+	const int sceneFace = VK_Exec_ActiveCubeFace();
+	const int halfWidth = ( width + 1 ) / 2;
+	const int halfHeight = ( height + 1 ) / 2;
+	if ( !VK_Post_EnsureColorTarget( vkPostScene.ssaoHalf, vkPostScene.ssaoHalfTarget, "_vkSSAOHalf",
+			halfWidth, halfHeight, TF_NEAREST, "SSAO half resolution" ) ) {
+		vkPostFailReason = "the half-resolution target could not be created";
+		return false;
+	}
+	vkPostSSAOBlock_t block;
+	VK_Post_FillSSAOBlock( block, viewDef, width, height, 3.0f, false );
+	block.halfInfo[ 0 ] = (float)halfWidth;
+	block.halfInfo[ 1 ] = (float)halfHeight;
+	block.halfInfo[ 2 ] = (float)width;
+	block.halfInfo[ 3 ] = (float)height;
+	bool drawn = false;
+	if ( VK_Exec_SetRenderTarget( vkPostScene.ssaoHalfTarget, 0, r_vkPostDepthTransitionReference.GetBool() ) ) {
+		const VkDescriptorSet sets[ 5 ] = {
+			VK_Post_Descriptor( globalImages->whiteImage ), VK_Post_Descriptor( worldDepth ),
+			VK_Post_Descriptor( finalDepth ), VK_Post_Descriptor( finalDepth ),
+			VK_Post_Descriptor( globalImages->whiteImage )
+		};
+		const int uniformOffset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
+		const VkPipeline pipeline = VK_Exec_PostPipeline( VK_POST_SSAO, vkPost.fullscreenVert, fragModule,
+				GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+		drawn = VK_Post_DrawTarget( pipeline, sets, 5, uniformOffset );
+	}
+	if ( !VK_Exec_SetRenderTarget( sceneTarget, sceneFace ) || !drawn ) {
+		vkPostFailReason = "the half-resolution pass failed";
+		return false;
+	}
+	block.modeInfo[ 0 ] = 4.0f;
+	block.modeInfo[ 2 ] = 1.0f;
+	const VkDescriptorSet sets[ 5 ] = {
+		VK_Post_Descriptor( globalImages->whiteImage ), VK_Post_Descriptor( worldDepth ),
+		VK_Post_Descriptor( finalDepth ), VK_Post_Descriptor( finalDepth ),
+		VK_Post_Descriptor( vkPostScene.ssaoHalf )
+	};
+	const int uniformOffset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
+	const VkPipeline pipeline = VK_Exec_PostPipeline( VK_POST_SSAO, vkPost.fullscreenVert, fragModule,
+			( debug ? GLS_SRCBLEND_ONE : GLS_SRCBLEND_DST_COLOR ) | GLS_DSTBLEND_ZERO );
+	return VK_Post_DrawSceneRect( viewDef, pipeline, sets, 5, uniformOffset );
+}
+
 static bool VK_Post_DrawSSAO( const viewDef_t *viewDef ) {
 	const VkShaderModule fragModule = VK_Post_SceneModule( VK_POST_MODULE_SSAO );
 	if ( fragModule == VK_NULL_HANDLE || !VK_Post_ProjectionUsable( viewDef ) ) {
@@ -1296,8 +1365,21 @@ static bool VK_Post_DrawSSAO( const viewDef_t *viewDef ) {
 	const idRenderTexture *target = VK_Exec_ActiveRenderTexture();
 	const idImage *color = target != NULL && target->GetNumColorImages() == 1 ? target->GetColorImage( 0 ) : NULL;
 	const bool field = VK_Post_SSAOFieldValid( viewDef );
-	const bool multiply = !field && !r_vkSSAOReferenceComposition.GetBool() && !r_ssaoDebug.GetBool() && color != NULL
+	const bool composable = !field && !r_vkSSAOReferenceComposition.GetBool() && color != NULL
 		&& ( color->GetOpts().format == FMT_RGBA8 || color->GetOpts().format == FMT_RGBA16F );
+	const bool multiply = composable && !r_ssaoDebug.GetBool();
+	// the world-only snapshot when the prepass took one at this size,
+	// otherwise the finished depth, like OpenGL's _currentDepth fallback
+	idImage *worldDepth = finalDepth;
+	if ( vkPostScene.ssaoWorldDepthFrame == backEnd.frameCount && vkPostScene.ssaoWorldDepth != NULL
+			&& vkPostScene.ssaoWorldDepthWidth == width && vkPostScene.ssaoWorldDepthHeight == height ) {
+		worldDepth = vkPostScene.ssaoWorldDepth;
+	}
+	if ( composable && R_SSAOHalfResolution() ) {
+		// The debug view shows the half-resolution AO the scene would receive.
+		vkGpuPhaseScope drawTiming(VK_Exec_ActiveCmd(),VK_GPU_PHASE_SSAO_DRAW);
+		return VK_Post_DrawSSAOHalf( viewDef, fragModule, worldDepth, finalDepth, width, height, !multiply );
+	}
 	idImage *scene = globalImages->whiteImage;
 	if ( !multiply )
 	{
@@ -1308,14 +1390,6 @@ static bool VK_Post_DrawSSAO( const viewDef_t *viewDef ) {
 		vkPostFailReason = "the scene copy failed";
 		return false;
 	}
-	// the world-only snapshot when the prepass took one at this size,
-	// otherwise the finished depth, like OpenGL's _currentDepth fallback
-	idImage *worldDepth = finalDepth;
-	if ( vkPostScene.ssaoWorldDepthFrame == backEnd.frameCount && vkPostScene.ssaoWorldDepth != NULL
-			&& vkPostScene.ssaoWorldDepthWidth == width && vkPostScene.ssaoWorldDepthHeight == height ) {
-		worldDepth = vkPostScene.ssaoWorldDepth;
-	}
-
 	// A view with an occlusion field only applies its classic factor.
 	vkGpuPhaseScope drawTiming(VK_Exec_ActiveCmd(),VK_GPU_PHASE_SSAO_DRAW);
 	vkPostSSAOBlock_t block;

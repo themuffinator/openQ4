@@ -529,6 +529,19 @@ not merely paperwork or a final screenshot.
   configuration still has isolated 20–38 ms frames. Exact optimization cannot
   close the floor. It needs a decision on the Quality workload plus removal of
   those long frames; see the [quiet baseline](presentation-owners.md#quiet-quality-floor-baseline-5-november-2026).
+  The user chose half-resolution SSAO for Quality, with Ultra kept at full
+  resolution. On Vulkan, `r_ssaoResolution 0` (automatic) now halves it below
+  32 samples. The SSAO draw is 55–57% cheaper (about 1.0–1.2 ms), and AO-only
+  captures match full resolution to a mean of 0.001–0.004. The world-depth
+  snapshot SSAO takes mid-prepass costs another measured 0.75 ms and is the
+  next GPU lever. Long-frame attribution (`cpu_sampler.py frames` with
+  `profileFrameWork` start times) found and fixed whole-cache clears of
+  mode 2's retained index streams. It also traced streamed-sound starts to the
+  main thread and window-message bursts to desktop activity; see
+  [half-resolution SSAO](presentation-owners.md#half-resolution-ssao-for-quality-5-november-2026)
+  and [long-frame attribution](presentation-owners.md#long-frame-attribution-5-november-2026).
+  The every-frame floor stays open: about 7.7 ms of GPU work remains per frame,
+  and main-thread tic frames exceed 6.67 ms.
 - [ ] **HF-08 — P1, qualification: late look and alternate views in play.**
   Run late look in live MP (listen host and remote client, prediction recovery),
   zoomed, on lifts and trams and through rapid turns, and measure physical

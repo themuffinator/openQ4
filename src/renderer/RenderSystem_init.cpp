@@ -301,6 +301,27 @@ idCVar r_ssaoPower( "r_ssaoPower", "1.6", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FL
 idCVar r_ssaoMaxDistance( "r_ssaoMaxDistance", "220.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "fade SSAO out past this view-space distance", 16.0f, 4096.0f );
 idCVar r_ssaoSamples( "r_ssaoSamples", "20", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of SSAO spiral samples", 4, 32, idCmdSystem::ArgCompletion_Integer<4,32> );
 idCVar r_ssaoDebug( "r_ssaoDebug", "0", CVAR_RENDERER | CVAR_BOOL, "visualize SSAO only" );
+idCVar r_ssaoResolution( "r_ssaoResolution", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
+	"Vulkan SSAO resolution: 0 automatic (full at the maximum r_ssaoSamples, half below), 1 full, 2 half", 0, 2,
+	idCmdSystem::ArgCompletion_Integer<0,2> );
+
+/*
+====================
+R_SSAOHalfResolution
+
+Automatic keeps the maximum sample count (Ultra's 32) at full resolution and
+draws lower counts, such as Quality's 20, at half resolution: at native
+1440p the full-resolution pass was the largest single GPU cost of the Quality
+frame. The performance presets own r_ssaoSamples, so they select this too.
+====================
+*/
+bool R_SSAOHalfResolution() {
+	switch ( r_ssaoResolution.GetInteger() ) {
+		case 1: return false;
+		case 2: return true;
+		default: return r_ssaoSamples.GetInteger() < 32;
+	}
+}
 idCVar r_motionBlur( "r_motionBlur", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable subtle camera motion blur post-process" );
 idCVar r_motionBlurStrength( "r_motionBlurStrength", "0.45", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "motion blur strength multiplier", 0.0f, 2.0f );
 idCVar r_motionBlurMaxPixels( "r_motionBlurMaxPixels", "10", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "maximum motion blur radius in pixels", 0.0f, 64.0f );

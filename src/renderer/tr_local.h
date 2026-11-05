@@ -1255,6 +1255,8 @@ extern idCVar r_ssaoPower;				// SSAO response curve
 extern idCVar r_ssaoMaxDistance;		// SSAO far-distance fade
 extern idCVar r_ssaoSamples;			// SSAO spiral sample count
 extern idCVar r_ssaoDebug;				// visualize SSAO only
+extern idCVar r_ssaoResolution;			// 0 automatic, 1 full, 2 half resolution
+bool R_SSAOHalfResolution();			// r_ssaoResolution resolved against r_ssaoSamples
 extern idCVar r_motionBlur;				// enable camera motion blur post-process
 extern idCVar r_motionBlurStrength;		// motion blur strength multiplier
 extern idCVar r_motionBlurMaxPixels;	// maximum motion blur radius in pixels

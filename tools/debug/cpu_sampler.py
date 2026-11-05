@@ -10,6 +10,12 @@ staging places beside the executable and game modules.
     python tools/debug/cpu_sampler.py record <pid> <seconds> <out.json> [--hz 150]
     python tools/debug/cpu_sampler.py report <out.json> [--top 40]
     python tools/debug/cpu_sampler.py tree <out.json> <function> [--depth 3] [--min 0.5]
+    python tools/debug/cpu_sampler.py frames <out.json> <frame-work.csv> [--threshold 6.67]
+
+`frames` finds what long frames do differently: run `profileFrameWork <n>` in
+the client while `record` samples it, then pass the CSV it writes. Each sample
+carries a QueryPerformanceCounter time, the clock behind the CSV's startMs, so
+main-thread samples land in the frame that was running.
 
 Keep the target alive until `record` finishes: it walks the copied stacks
 after sampling and still reads code and unwind data from the process. Copying
@@ -21,7 +27,9 @@ graphics driver is attributed to its nearest export (for example
 vkGetInstanceProcAddr).
 """
 import argparse
+import bisect
 import collections
+import csv
 import ctypes
 import json
 import random
@@ -138,6 +146,15 @@ def record(pid: int, seconds: float, out: str, hz: float) -> None:
     if not targets:
         raise SystemExit("no thread used more than 15% of a core")
 
+    # Sample times share the engine's presentation clock (QueryPerformanceCounter),
+    # so `frames` can place each sample in a profileFrameWork frame.
+    qpc, qpc_frequency = ctypes.c_int64(), ctypes.c_int64()
+    k32.QueryPerformanceFrequency(ctypes.byref(qpc_frequency))
+
+    def qpc_ms() -> float:
+        k32.QueryPerformanceCounter(ctypes.byref(qpc))
+        return qpc.value * 1000.0 / qpc_frequency.value
+
     context_buffer = ctypes.create_string_buffer(CONTEXT_SIZE + 16)
     context = (ctypes.addressof(context_buffer) + 15) & ~15
     stack_buffer = ctypes.create_string_buffer(8 * 1024 * 1024)
@@ -150,6 +167,7 @@ def record(pid: int, seconds: float, out: str, hz: float) -> None:
             began = time.perf_counter()
             if k32.SuspendThread(handle) == 0xFFFFFFFF:
                 continue
+            taken = qpc_ms()
             try:
                 ctypes.memset(context, 0, CONTEXT_SIZE)
                 ctypes.c_uint32.from_address(context + CONTEXT_FLAGS_OFFSET).value = CONTEXT_AMD64_CONTROL_INTEGER
@@ -162,7 +180,7 @@ def record(pid: int, seconds: float, out: str, hz: float) -> None:
                 read = ctypes.c_size_t()
                 k32.ReadProcessMemory(process, rsp, stack_buffer, size, ctypes.byref(read))
                 samples.append((tid, ctypes.string_at(context, CONTEXT_SIZE), rsp,
-                                ctypes.string_at(stack_buffer, read.value)))
+                                ctypes.string_at(stack_buffer, read.value), taken))
             finally:
                 k32.ResumeThread(handle)
                 suspended += time.perf_counter() - began
@@ -190,7 +208,8 @@ def record(pid: int, seconds: float, out: str, hz: float) -> None:
     table_callback = FunctionTableAccess(dbg.SymFunctionTableAccess64)
     base_callback = GetModuleBase(dbg.SymGetModuleBase64)
     stacks = {tid: collections.Counter() for tid in targets}
-    for tid, context_bytes, rsp, stack in samples:
+    walked = []  # (tid, time, address tuple) per sample, in sampling order
+    for tid, context_bytes, rsp, stack, taken in samples:
         current["rsp"], current["stack"] = rsp, stack
         ctypes.memmove(context, context_bytes, CONTEXT_SIZE)
         frame = STACKFRAME64()
@@ -207,6 +226,7 @@ def record(pid: int, seconds: float, out: str, hz: float) -> None:
                 break
             addresses.append(frame.AddrPC.Offset)
         stacks[tid][tuple(addresses)] += 1
+        walked.append((tid, taken, tuple(addresses)))
 
     dbg.SymRefreshModuleList(process)
     symbol = SYMBOL_INFO()
@@ -229,6 +249,16 @@ def record(pid: int, seconds: float, out: str, hz: float) -> None:
         for addresses, count in counter.items():
             named[" <- ".join(name_of(a) for a in addresses)] += count
         result["threads"][str(tid)] = [[count, stack] for stack, count in named.most_common()]
+    # Per-sample timeline: [thread, QPC milliseconds, index into stackTable].
+    table, index = [], {}
+    result["timeline"] = []
+    for tid, taken, addresses in walked:
+        text = " <- ".join(name_of(a) for a in addresses)
+        if text not in index:
+            index[text] = len(table)
+            table.append(text)
+        result["timeline"].append([tid, round(taken, 4), index[text]])
+    result["stackTable"] = table
     with open(out, "w", encoding="utf-8") as handle:
         json.dump(result, handle, indent=0)
 
@@ -274,6 +304,61 @@ def tree(path: str, function: str, depth: int, minimum: float) -> None:
                 print(f"{100 * count / total:6.2f}% {'  ' * (len(chain) - 1)}{chain[-1][:110]}")
 
 
+def frames(path: str, csv_path: str, threshold: float, top: int) -> None:
+    """Attribute main-thread samples to profileFrameWork frames and compare long frames with the rest.
+
+    The CSV's startMs is when each frame's Wait phase began on the presentation clock; a frame runs
+    for its totalMs minus the gap before it. Samples outside every recorded frame are ignored.
+    """
+    data = load(path)
+    if "timeline" not in data:
+        raise SystemExit(f"{path} has no per-sample timeline; record it with this version")
+    with open(csv_path, encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    if not rows or "startMs" not in rows[0]:
+        raise SystemExit(f"{csv_path} has no startMs column; capture it with a current engine")
+    spans = sorted((float(r["startMs"]), float(r["startMs"]) + float(r["totalMs"]) - float(r["gapMs"]),
+                    float(r["totalMs"]), int(r["frame"]), r) for r in rows)
+    starts = [span[0] for span in spans]
+    counts = collections.Counter(tid for tid, _, _ in data["timeline"])
+    main_tid = counts.most_common(1)[0][0]
+    table = data["stackTable"]
+    long_frames, groups = collections.defaultdict(list), {"long": collections.Counter(), "other": collections.Counter()}
+    totals = {"long": 0, "other": 0}
+    for tid, taken, stack in data["timeline"]:
+        if tid != main_tid:
+            continue
+        at = bisect.bisect_right(starts, taken) - 1
+        if at < 0 or taken >= spans[at][1]:
+            continue
+        group = "long" if spans[at][2] > threshold else "other"
+        totals[group] += 1
+        names = table[stack].split(" <- ") if table[stack] else ["?"]
+        for name in set(names):
+            groups[group][name] += 1
+        if group == "long":
+            long_frames[at].append(names)
+    long_count = sum(1 for span in spans if span[2] > threshold)
+    print(f"thread {main_tid}: {len(spans)} frames, {long_count} over {threshold} ms; "
+          f"samples in long frames {totals['long']}, in other frames {totals['other']}")
+    if not totals["long"]:
+        return
+    print("-- inclusive share in long frames vs other frames (largest excess first)")
+    excess = []
+    for name, count in groups["long"].items():
+        share = count / totals["long"]
+        other = groups["other"][name] / max(1, totals["other"])
+        excess.append((share - other, share, other, name))
+    for delta, share, other, name in sorted(excess, reverse=True)[:top]:
+        print(f"{100 * share:6.2f}% long {100 * other:6.2f}% other  {name[:120]}")
+    print("-- longest sampled frames (frame, total ms, session/draw ms): innermost game/engine frames of each sample")
+    for at in sorted(long_frames, key=lambda i: -spans[i][2])[:12]:
+        row = spans[at][4]
+        print(f"frame {spans[at][3]} {spans[at][2]:.2f} ms (session {float(row['sessionMs']):.2f}, draw {float(row['drawMs']):.2f})")
+        for names in long_frames[at][:6]:
+            print("    " + " <- ".join(names[:6])[:200])
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -290,6 +375,11 @@ def main(argv: list[str]) -> int:
     callees.add_argument("function")
     callees.add_argument("--depth", type=int, default=3)
     callees.add_argument("--min", type=float, default=0.5)
+    per_frame = commands.add_parser("frames", help="attribute samples to profileFrameWork frames; compare long frames")
+    per_frame.add_argument("json")
+    per_frame.add_argument("csv", help="diagnostics/frame-work.csv from the same run (needs its startMs column)")
+    per_frame.add_argument("--threshold", type=float, default=6.67, help="a frame longer than this many ms is long")
+    per_frame.add_argument("--top", type=int, default=30)
     args = parser.parse_args(argv)
     if args.command == "record":
         if sys.platform != "win32":
@@ -297,6 +387,8 @@ def main(argv: list[str]) -> int:
         record(args.pid, args.seconds, args.out, args.hz)
     elif args.command == "report":
         report(args.json, args.top)
+    elif args.command == "frames":
+        frames(args.json, args.csv, args.threshold, args.top)
     else:
         tree(args.json, args.function, args.depth, args.min)
     return 0

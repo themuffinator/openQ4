@@ -320,6 +320,7 @@ Generated on 2026-04-19.
 | `r_ssaoMaxDistance` | src/renderer/RenderSystem_init.cpp:115 |
 | `r_ssaoPower` | src/renderer/RenderSystem_init.cpp:114 |
 | `r_ssaoRadius` | src/renderer/RenderSystem_init.cpp:111 |
+| `r_ssaoResolution` | src/renderer/RenderSystem_init.cpp:304 |
 | `r_ssaoSamples` | src/renderer/RenderSystem_init.cpp:116 |
 | `r_stencilTranslucentShadows` | src/renderer/RenderSystem_init.cpp:184 |
 | `r_stretched` | src/sys/macos/PreferencesDialog.cpp:36 |

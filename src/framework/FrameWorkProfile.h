@@ -9,6 +9,10 @@ namespace openq4 {
 enum class FrameWorkPhase { Gap, Wait, Events, Configuration, Commands, Session, Draw, Tail, Count };
 struct FrameWorkSample {
 	int frame = 0;
+	// When the frame's Wait phase began, on the clock passed to Begin (the
+	// presentation clock in milliseconds: QueryPerformanceCounter on Windows),
+	// so external samplers on the same clock can attribute work to frames.
+	double startMs = 0;
 	std::array<double, static_cast<int>(FrameWorkPhase::Count)> milliseconds{};
 	double Total() const { double total=0; for (double value:milliseconds) total+=value; return total; }
 };
@@ -26,7 +30,7 @@ public:
 	void Begin(double now) {
 		recording=Active() && std::isfinite(now);
 		if (!recording) return;
-		current={}; next=static_cast<int>(FrameWorkPhase::Wait); last=now;
+		current={}; current.startMs=now; next=static_cast<int>(FrameWorkPhase::Wait); last=now;
 		current.milliseconds[0]=previousEnd>=0 && now>=previousEnd ? now-previousEnd : 0;
 	}
 	void Mark(FrameWorkPhase phase, double now) {

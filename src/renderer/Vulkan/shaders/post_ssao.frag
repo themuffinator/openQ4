@@ -25,6 +25,7 @@ layout(std140, set = 6, binding = 0) uniform SSAOBlock {
     vec4 params;			// x: radius, y: bias, z: intensity, w: power
     vec4 params2;			// x: max distance, y: sample count
     vec4 modeInfo;			// x: mode, y: the field's rows run opposite to this target's
+    vec4 halfInfo;			// xy: half-resolution target size, zw: view size in pixels
 } block;
 
 #define invTexSize			block.texInfo.xy
@@ -41,7 +42,10 @@ layout(std140, set = 6, binding = 0) uniform SSAOBlock {
 // 0 classic: darken the lit scene. 1 field: before lighting, write the
 // occlusion native PBR applies to its indirect light (r) and the factor for
 // classic world pixels (g); b marks pixels with world depth. 2 apply: darken
-// only the classic world pixels with the field's factor.
+// only the classic world pixels with the field's factor. 3 half: the classic
+// AO of the even pixel of each 2x2 block into a half-resolution target (r: AO,
+// g: view depth, negative where the pixel takes none). 4 upsample: darken the
+// lit scene with the half-resolution AO; AOField is that target.
 #define ssaoMode			block.modeInfo.x
 #define ssaoFieldFlip		block.modeInfo.y
 #define ssaoMultiply		block.modeInfo.z
@@ -215,8 +219,80 @@ void ApplyMain( vec2 uv ) {
 	outColor = vec4( scene.rgb * field.g, scene.a );
 }
 
+// Mode 3. Each texel takes the AO of the even pixel of its 2x2 block of the
+// view, computed exactly as the full-resolution pass computes it there, so
+// those pixels match it after the upsample.
+void HalfMain( vec2 uv ) {
+	ivec2 halfTexel = min( ivec2( uv * block.halfInfo.xy ), ivec2( block.halfInfo.xy ) - 1 );
+	ivec2 fullPixel = min( halfTexel * 2, ivec2( block.halfInfo.zw ) - 1 );
+	vec2 fullUv = ( vec2( fullPixel ) + 0.5 ) * invTexSize;
+	float depth = SampleDepth( fullUv );
+	if ( depth >= 0.99999 || PixelIsForeground( fullUv, depth ) ) {
+		outColor = vec4( 1.0, -1.0, 0.0, 1.0 );
+		return;
+	}
+	vec3 centerPos = ReconstructViewPosition( fullUv, depth );
+	outColor = vec4( ComputeAmbientOcclusion( fullUv, centerPos ), -centerPos.z, 0.0, 1.0 );
+}
+
+// Mode 4. A pixel's half-resolution neighbours are its own block's texel and,
+// on odd rows or columns, the next block's: one, two or four equally weighted
+// bilinear taps. A tap counts only near this pixel's depth, so AO does not
+// bleed across silhouettes; with none near, the closest in depth stands in.
+float UpsampledOcclusion( vec2 uv, float viewDepth ) {
+	ivec2 pixel = ivec2( uv * block.halfInfo.zw );
+	ivec2 base = pixel >> 1;
+	ivec2 odd = pixel & 1;
+	ivec2 last = ivec2( block.halfInfo.xy ) - 1;
+	float tolerance = max( viewDepth * 0.04, 2.0 );
+	float weighted = 0.0;
+	float weight = 0.0;
+	float closestAo = 1.0;
+	float closestDelta = 1e30;
+	for ( int y = 0; y <= odd.y; ++y ) {
+		for ( int x = 0; x <= odd.x; ++x ) {
+			vec2 tap = texelFetch( AOField, min( base + ivec2( x, y ), last ), 0 ).rg;
+			if ( tap.g < 0.0 ) {
+				continue;
+			}
+			float delta = abs( tap.g - viewDepth );
+			float w = max( 0.0, 1.0 - delta / tolerance );
+			weighted += tap.r * w;
+			weight += w;
+			if ( delta < closestDelta ) {
+				closestDelta = delta;
+				closestAo = tap.r;
+			}
+		}
+	}
+	return weight > 0.0 ? weighted / weight : closestAo;
+}
+
+void UpsampleMain( vec2 uv ) {
+	float depth = SampleDepth( uv );
+	if ( depth >= 0.99999 || PixelIsForeground( uv, depth ) ) {
+		outColor = vec4( 1.0 );
+		return;
+	}
+	float viewDepth = ViewSpaceZFromDepth( depth ) * -1.0;
+	if ( viewDepth >= ssaoMaxDistance ) {
+		outColor = vec4( 1.0 );
+		return;
+	}
+	float ao = UpsampledOcclusion( uv, viewDepth );
+	outColor = vec4( ao, ao, ao, 1.0 );
+}
+
 void main() {
 	vec2 uv = fragUV;
+	if ( ssaoMode > 3.5 ) {
+		UpsampleMain( uv );
+		return;
+	}
+	if ( ssaoMode > 2.5 ) {
+		HalfMain( uv );
+		return;
+	}
 	if ( ssaoMode > 1.5 ) {
 		ApplyMain( uv );
 		return;
