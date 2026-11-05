@@ -250,6 +250,15 @@ def main() -> None:
                       "static bool MatchControlFollowCommand( const char *token )"):
         extracted += signature + " {" + function_body(multiplayer, signature) + "}\n"
     assert "MatchControlFollowCommand( token )" in function_body(multiplayer, "bool idMultiplayerGame::HandleMatchControlCommand(")
+    # A casual session mirrors participation in every phase. Syncing only in
+    # warmup/countdown left bots added mid-match inactive, so the server refused
+    # them as follow targets (and a player who switched to spectating kept a
+    # player's view rights) until the next warmup.
+    run = function_body(multiplayer, "void idMultiplayerGame::Run( void )")
+    sync = run.index("SynchronizeAllMatchParticipants();")
+    guard = run.rfind("if (", 0, sync)
+    assert "matchSession.GetPhase() == WARMUP" in run[guard:sync] and \
+        "!IsManagedMatch()" in run[guard:sync], "casual sessions must sync participants in every phase"
     update = function_body(multiplayer, "void idMultiplayerGame::UpdateMainGui(")
     assert update.index('SetStateBool( "match_follow_visible", MatchControlFollowPlayer() != NULL )') < update.index("mainGui->StateChanged")
     preamble = HARNESS.split("#define CHECK")[0].replace(

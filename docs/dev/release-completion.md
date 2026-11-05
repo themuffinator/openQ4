@@ -37,6 +37,11 @@ See [player release status](../user/release-status.md).
   as an aborted attempt with no score, and **Advance map** replays it once the
   map is repaired. A server that restarts from such a checkpoint on another map
   is released the same way.
+- Spectators can follow bots and late joiners in casual matches again. During
+  live play, the server refused anyone who joined after warmup, including every
+  bot added mid-match, as a camera target until the next warmup.
+- Falling into slime or lava now throws a visible splash. The old effects were too
+  small to see against the glowing surface.
 - Step-by-step checklists for the remaining hands-on multiplayer checks
   (keyboard/controller workflows, Arena pause, swimming, weapon visuals, real
   networks and bot difficulty) are in

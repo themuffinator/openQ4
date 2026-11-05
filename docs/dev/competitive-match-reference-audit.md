@@ -1345,6 +1345,14 @@ differed, the reconnected client kept a menu flag that the idle-menu assertion
 rejects, and report validation expected one row per played map. Each failure
 occurred after the product path had behaved as designed.
 
+Vulkan follow-through: the same side-ballot smoke passes with
+`--renderer vulkan` on a later rebuilt package. That package also carries the
+casual participation-sync and liquid splash changes and other sessions' working-
+tree edits. Report `.tmp/mp-side/side-vk/report.json` (SHA-256
+`02e6c3b09328df2885fc759308a15e09e8c461225503576768116e705ae19375`) ran 205.2 seconds, and all three clients
+exited 0. The ballots, thresholds and the Strogg forfeit won by Marine match
+the OpenGL run.
+
 These do not close MP-01: physical localized keyboard and controller workflows
 remain (see the [human qualification checklists](mp-human-qualification.md)),
-along with other renderers and platforms.
+along with other platforms.

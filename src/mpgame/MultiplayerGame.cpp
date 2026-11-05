@@ -16355,7 +16355,14 @@ void idMultiplayerGame::Run( void ) {
 
 	CommonRun();
 	PublishMVDMarkers();
-	if ( matchSession.GetPhase() == WARMUP || matchSession.GetPhase() == COUNTDOWN ) {
+	// openQ4: a casual session has no roster transactions, so it mirrors every
+	// join, spectate and leave in every phase.  Syncing only in warmup and
+	// countdown left anyone who entered or changed sides during live play with
+	// stale participation until the next warmup: bots added mid-match were
+	// never followable and a player who switched to spectating kept a player's
+	// view rights.  Managed matches still freeze participation outside warmup.
+	if ( matchSession.GetPhase() == WARMUP || matchSession.GetPhase() == COUNTDOWN ||
+		!IsManagedMatch() ) {
 		SynchronizeAllMatchParticipants();
 	}
 	// Participant mutations can cancel the authoritative countdown. Apply that
