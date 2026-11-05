@@ -17159,8 +17159,30 @@ void idMultiplayerGame::PublishRetainedPlayers( idUserInterface *card, bool &cha
 			publish( va( "%s.deaths", key.c_str() ), player != NULL && list != 2 ? va( "%d", rowStat != NULL ? rowStat->deaths : 0 ) : "" );
 			publish( va( "%s.time", key.c_str() ), player != NULL ? va( "%d", GetPlayerTime( player ) ) : "" );
 			publish( va( "%s.bot", key.c_str() ), player != NULL && botManager.IsBot( client ) ? "1" : "0" );
+			// The held scoreboard's dead mark (section 14.14): a skull and the
+			// row at 0.50 while a playing player is dead or out of the Tourney.
+			const bool dead = player != NULL && list != 2 && !player->spectating && ( player->health <= 0 ||
+				( gameLocal.gameType == GAME_TOURNEY && player->GetTourneyStatus() == PTS_ELIMINATED ) );
+			publish( va( "%s.dead", key.c_str() ), dead ? "1" : "0" );
 			// The network-quality bars read the ping as a number.
 			publish( va( "%s.ping_ms", key.c_str() ), player != NULL ? va( "%d", playerState[ client ].ping ) : "0" );
+			// The Players lists' network-quality bars take their step and color
+			// from the game, with the held scoreboard's thresholds and colors
+			// (tools/ui/remastered_hud_scoreboard.py ping_bars): 4 to 60 ms and
+			// 3 to 120 in #B5C784, 2 to 200 in #E3AD36, then 1 in #E46D56; 0
+			// shows none. Choosing the color here keeps each of the card's 96
+			// rows to one short binding a bar (tools/ui/retained_mp_menus.py).
+			static const float barTints[ 3 ][ 3 ] = { { 0xB5, 0xC7, 0x84 }, { 0xE3, 0xAD, 0x36 }, { 0xE4, 0x6D, 0x56 } };
+			int bars = 0;
+			if ( player != NULL && !botManager.IsBot( client ) ) {
+				const int ping = playerState[ client ].ping;
+				bars = ping <= 60 ? 4 : ping <= 120 ? 3 : ping <= 200 ? 2 : 1;
+			}
+			const float *barTint = barTints[ bars >= 3 || bars == 0 ? 0 : bars == 2 ? 1 : 2 ];
+			publish( va( "%s.bars", key.c_str() ), va( "%d", bars ) );
+			publish( va( "%s.bars_r", key.c_str() ), va( "%.4f", barTint[ 0 ] / 255.0f ) );
+			publish( va( "%s.bars_g", key.c_str() ), va( "%.4f", barTint[ 1 ] / 255.0f ) );
+			publish( va( "%s.bars_b", key.c_str() ), va( "%.4f", barTint[ 2 ] / 255.0f ) );
 		}
 	}
 	// KILLS shows in the flag modes, as on the held scoreboard.

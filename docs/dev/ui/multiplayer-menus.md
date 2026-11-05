@@ -147,8 +147,10 @@ spectators, #8B964B for everyone outside team modes) holding the title and the
 team's score, then lists its players in the scoreboard's rows (section 14.14):
 a band at 0.08, or 0.29 with the orange marker for the player's own row; the speaker,
 crossed in red when the player is muted; the friend silhouette, 0.125 when the
-player is not a friend; the name, the score and the ping. The name, score and
-ping headings run once above the lists. The player's own team comes first
+player is not a friend; a skull while the player is dead or out of the
+Tourney, with the whole row at 0.50; the name, followed for a bot by the BOT
+tag on its olive plate; the score; the network-quality bars (four steps by
+ping, as on the held scoreboard, empty for a bot); and the ping. The name, score and ping headings run once above the lists. The player's own team comes first
 (Marines while spectating), then the other team, then the spectators, whose
 band shows only while there are any. Each row keeps its readable 24 dp pitch.
 The rows and team bands scroll below fixed column headings, with the existing
@@ -848,6 +850,50 @@ network session. Full slot-identity safety, map catalogs beyond 128, physical
 devices, portrait/long-language layouts and optimized performance remain with
 UI-03/UI-02/UI-07. No requirement, resource or final gate is accepted here.
 
+## Players list marks and team refusals, 5 November 2026
+
+The Players lists (Escape, Welcome and the summary's Statistics page) now
+carry the held scoreboard's marks. The game publishes more states per row
+beside its existing `bot` (`PublishRetainedPlayers`): `dead`, for a playing
+player at no health or a Tourney player eliminated (spectators never count
+as dead); `bars`, the network-quality step with the held scoreboard's
+thresholds (4 to 60 ms, 3 to 120, 2 to 200, then 1; 0 for a bot or an empty
+row); and `bars_r`, `bars_g` and `bars_b`, that step's color (#B5C784 for
+three or four, #E3AD36 for two, #E46D56 for one).
+
+- A dead row shows the skull in its own 18 dp slot after the friend symbol
+  and stands at 0.50.
+- A bot's name is followed by the BOT tag (`#str_231231`), dark Lowpixel on
+  an olive plate at 0.85. Here the plate is the label's own background, so
+  it lacks the held scoreboard's 4 dp cut corner: a vector plate would cost
+  each row another node.
+- Every other row shows the four bars between the score and the ping, lit to
+  its step, unlit bars at 0.20 of the same color.
+- The name keeps at least 150 dp (155.7 dp on the Escape card), which the
+  generator enforces in every language.
+
+Each card declares 96 rows (32 for each list), so the marks are built for
+size. Each bar is one rectangle whose color binds to the game's published
+color: the held scoreboard's four drawn variants cost about 8 KB a row, and
+choosing the color in the document about 3 KB more. The marks still add about
+11 KB of source and seven nodes a row: Escape grows from 12.55 to 13.85 MB
+(6,932 to 7,604 nodes), the summary from 7.52 to 8.69 MB (4,142 to 4,814) and
+Welcome from 2.45 to 3.50 MB (1,555 to 2,227). Document loads
+(`openq4-retained-ui-benchmark --load`) grow with them. On this machine
+Welcome went from about 85 to 125-150 ms of document time in debugoptimized
+builds. The measurements ran beside other sessions' builds and spread
+widely, so an idle-machine figure remains part of UI-07.
+
+The stock team-refusal messages (`#str_202039` to `#str_202042`: a team with
+too many players, or the one the player is already on) were missing from the
+French and Italian tables, so those players read them in English on the
+Welcome card's team cards. The openQ4 tables now supply them.
+
+The native card test publishes a dead player, a bot and the bars' four steps
+with their colors. It checks the skull and dimming, the tag in place of the
+bars, each step's lit count and color, and the columns' order under their
+headings.
+
 ## Map catalogs, 24 October 2026
 
 The Vote and Admin pages' map choices held 48 maps a game type, so a server
@@ -1187,15 +1233,10 @@ The card's acceptance continues under `FLOW-046`.
   accessibility text backing yet, and a controller gives no rumble.
 - The Team page has no Tourney queue or arena controls; Tourney offers what
   deathmatch does.
-- The stock team-refusal messages are English in French and Italian, whose
-  tables lack them.
 - [Player identity guards](player-identity.md) now protect local friend/mute
   marks, selections and retained player requests across slot reuse. Delayed
   remote voice-mute packets still name only a slot; their server-side race and
   identity protection for kick/admin targets remain under UI-03.
-- The Players lists still lack the BOT tag, dead-player mark and network-quality
-  bars used by the remastered scoreboard; their capacity and scrolling are
-  covered by the bounded increment above.
 - Left and right move focus between the lists and the statistics; they do not
   switch tabs as section 14.18 asks (decision D2 is open).
 - The Welcome card's Join page has no Watch for Tourney's arenas and no

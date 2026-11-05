@@ -24,6 +24,7 @@ import re
 from pathlib import Path
 
 import build_retained_screens as b
+import hud_svg
 from build_retained_screens import (EASE_OUT, FULL, MARKER, OLIVE, ORANGE, RAIL_CARD, SOFT_FOCUS_BLUR,
                                     SOFT_FOCUS_SATURATION, VALUE, Document, absolute, colour, confirmation, group,
                                     keyword, label, length, linear, link, marker_path, number, path, picture, rgb, solid,
@@ -606,6 +607,12 @@ WEAPONS = (("weapon_machinegun", "item_machinegun", (1, 1, 0)), ("weapon_shotgun
 AWARDS = ("excellent", "impressive", "humiliation", "combo_kill", "rampage", "capture", "assist", "defense")
 FLAG_AWARDS = 3
 MUTE_LABELS, FRIEND_LABELS = ("#str_200250", "#str_200251"), ("#str_200248", "#str_200249")
+# The held scoreboard's marks (section 14.14): the skull's slot, the BOT tag
+# in the header-band construction and the network-quality bars before ping.
+BOT_KEY, BOT_TINT, DARK_TEXT = "#str_231231", "#8B964B", "#10140A"
+STATE_W, BARS_GAP, BARS_W, NAME_FLOOR = 18.0, 6.0, 22.0, 150.0
+SKULL = ("M4 0a4 4 0 0 1 4 4c0 1.4-.7 2-1.3 2.7v1.3H1.3V6.7C.7 6 0 5.4 0 4a4 4 0 0 1 4-4z"
+         "M2.4 3.4h1.2v1.2H2.4zM4.4 3.4h1.2v1.2H4.4z")
 MUTE_SELF, FRIEND_SELF = "#str_231031", "#str_231032"
 STAT_PLATES_TOP = 192.0
 
@@ -616,13 +623,17 @@ def widest(keys, face: str, size: float) -> float:
 
 def list_columns(width: float) -> dict:
     """The rows' columns: the marker, the speaker and friend symbols, the
-    name taking what is left, then the score and the ping at the widest of
-    their heading in any language and their longest values."""
+    dead mark, the name taking what is left (a bot's BOT tag within it),
+    then the score, the network-quality bars and the ping, the score and
+    ping at the widest of their heading in any language and their longest
+    values."""
     score = max(widest([SCORE_KEY], "lowpixel", 11), b.text_width("lowpixel", "-999", ROW_FACE)) + 2
     ping = max(widest([PING_KEY], "lowpixel", 11), b.text_width("lowpixel", "999", ROW_FACE)) + 2
-    columns = {"marker": 12.0, "speaker": 18.0, "friend": 20.0, "score": round(score, 3), "ping": round(ping, 3), "gap": 8.0, "end": 4.0}
-    columns["name"] = width - columns["marker"] - columns["speaker"] - columns["friend"] - score - ping - columns["gap"] - columns["end"]
-    if columns["name"] < 160:
+    columns = {"marker": 12.0, "speaker": 18.0, "friend": 20.0, "state": STATE_W, "score": round(score, 3),
+               "bars": BARS_GAP + BARS_W, "ping": round(ping, 3), "gap": 8.0, "end": 4.0}
+    columns["name"] = (width - columns["marker"] - columns["speaker"] - columns["friend"] - columns["state"] - score
+                       - columns["bars"] - ping - columns["gap"] - columns["end"])
+    if columns["name"] < NAME_FLOOR:
         raise SystemExit(f"the player lists leave {columns['name']:.0f} dp for names")
     return columns
 
@@ -653,6 +664,51 @@ def friend_icon(ident: str) -> dict:
     ])
 
 
+def skull_icon(ident: str) -> dict:
+    """The held scoreboard's dead mark (section 14.14): a white skull in its
+    own slot, shown by opacity so the slot keeps its room. One node a row:
+    each node costs every card's load about 0.07 ms."""
+    skull = {"id": "k", "commands": hud_svg.commands(SKULL, (1.5, 0, 0, 1.5, 1, 1.5)), "fillRule": "evenodd",
+             "fill": solid([1, 1, 1, 1])}
+    return vector(ident, {"position": keyword("relative"), "display": keyword("block"), "width": length(14), "height": length(16),
+                          "margin-right": length(STATE_W - 14), "flex-shrink": number(0), "opacity": number(0)}, [skull])
+
+
+def bot_tag(ident: str) -> dict:
+    """The BOT tag (section 14.9), as on the held scoreboard: dark Lowpixel
+    text on an olive plate at 0.85. One label node, its plate a background,
+    so the tag costs a row a single node."""
+    return label(ident, BOT_KEY, {"position": keyword("relative"), "display": keyword("none"), "white-space": keyword("nowrap"),
+                                  "flex-shrink": number(0), "margin-left": length(6), "padding-left": length(6),
+                                  "padding-right": length(6), "background-color": colour(rgb(BOT_TINT, 0.85)),
+                                  **typeface("lowpixel", 10.8, 15, rgb(DARK_TEXT)), "letter-spacing": length(0.6)})
+
+
+def ping_meter(doc: Document, ident: str, key: str) -> dict:
+    """The network-quality bars (section 13.13), as on the held scoreboard:
+    four bars rising from the text's baseline, lit to the row's step, unlit
+    bars at 0.20 of the same color. The game publishes the step (`bars`, 4 at
+    60 ms or less down to 1 past 200 ms, 0 for a bot or an empty row, which
+    keeps the room, empty, so ping lines up) and its color (`bars_r`, `_g`,
+    `_b`: #B5C784 for three or four, #E3AD36 for two, #E46D56 for one), so
+    each bar is one rectangle with one short binding: every row exists 96
+    times on a card, and four drawn variants or colors chosen here cost each
+    card about 0.4 MB more."""
+    level = {"state": f"{key}.bars"}
+    tint = [{"state": f"{key}.bars_{channel}"} for channel in "rgb"]
+    bars = []
+    for bar in range(4):
+        x, h = 2 + bar * 5, 4.5 + bar * 3.3
+        node = f"{ident}-bar{bar}"
+        bars.append(group(node, {**absolute(left=x, top=round(15 - h, 3), width=3.3, height=round(h, 3)),
+                                 "background-color": colour([1, 1, 1, 0])}))
+        alpha = {"op": "select", "args": [{"op": ">", "args": [level, bar]}, 1, {"op": "select", "args": [
+            {"op": ">", "args": [level, 0]}, 0.2, 0]}]}
+        doc.bind(f"{node}.background-color", node, "background-color", [*tint, alpha])
+    return group(f"{ident}-bars", {"position": keyword("relative"), "display": keyword("block"), "width": length(BARS_W),
+                                   "height": length(16), "margin-left": length(BARS_GAP), "flex-shrink": number(0)}, bars)
+
+
 def team_band(ident: str, width: float, height: float, tint: str, cut: float = 8.0) -> dict:
     """A header band in a team's color (section 6): an upper-leading cut, top
     and leading rails, the fill full to half the width and fading toward the
@@ -676,9 +732,11 @@ def player_row(doc: Document, prefix: str, kind: str, row: int, width: float, co
                interactive: bool = True) -> tuple[dict, str]:
     """One row of a list, the scoreboard's row (section 14.14): a band at
     0.08, 0.29 and the orange marker for the player's own row; the speaker, crossed
-    when muted, and the friend symbol; the name, the score and the ping. The
-    player whose statistics show is lit in olive. Choosing a row records its
-    client and runs mpSelectPlayer; the game checks the client again."""
+    when muted, and the friend symbol; a skull while dead, the name (a bot's
+    with its BOT tag), the score, the network-quality bars and the ping, the
+    row at 0.50 while its player is dead. The player whose statistics show is
+    lit in olive. Choosing a row records its client and runs mpSelectPlayer;
+    the game checks the client again."""
     ident = f"{prefix}-{kind}-{row}"
     key = f"mp.players.{kind}{row}"
     doc.state.update({
@@ -686,7 +744,9 @@ def player_row(doc: Document, prefix: str, kind: str, row: int, width: float, co
         f"{key}.name": {"type": "string", "initial": ""},
         f"{key}.score": {"type": "string", "initial": ""}, f"{key}.ping": {"type": "string", "initial": ""},
         f"{key}.friend": {"type": "boolean", "initial": False}, f"{key}.muted": {"type": "boolean", "initial": False},
-        f"{key}.local": {"type": "boolean", "initial": False},
+        f"{key}.local": {"type": "boolean", "initial": False}, f"{key}.bot": {"type": "boolean", "initial": False},
+        f"{key}.dead": {"type": "boolean", "initial": False}, f"{key}.bars": {"type": "number", "initial": 0},
+        **{f"{key}.bars_{channel}": {"type": "number", "initial": 1} for channel in "rgb"},
     })
     whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
     band = vector(f"{ident}-band", {**absolute(left=0, top=0, width=width, height=length(100, "%")), "opacity": number(0.08)},
@@ -727,9 +787,16 @@ def player_row(doc: Document, prefix: str, kind: str, row: int, width: float, co
                                                **typeface("lowpixel", ROW_FACE, 16, [1, 1, 1, 0.6])})
     for part in ("name", "score", "ping"):
         doc.bind(f"{ident}-{part}.text", f"{ident}-{part}", "text", {"state": f"{key}.{part}"})
+    skull = skull_icon(f"{ident}-skull")
+    doc.bind(f"{ident}-skull.opacity", f"{ident}-skull", "opacity", {"op": "select", "args": [{"state": f"{key}.dead"}, 1, 0]})
+    tag = bot_tag(f"{ident}-bot")
+    doc.bind(f"{ident}-bot.display", f"{ident}-bot", "display", {"op": "select", "args": [{"state": f"{key}.bot"}, "block", "none"]})
+    bars = ping_meter(doc, ident, key)
     content = group(f"{ident}-content", {**absolute(left=2, top=0, width=width - 2, height=length(100, "%")), "display": keyword("flex"),
-                                         "flex-direction": keyword("row"), "align-items": keyword("center"), "pointer-events": keyword("none")},
-                    [marker, spacer, speaker, friend, name, score, ping])
+                                         "flex-direction": keyword("row"), "align-items": keyword("center"), "pointer-events": keyword("none"),
+                                         "opacity": number(1)},
+                    [marker, spacer, speaker, friend, skull, name, tag, score, bars, ping])
+    doc.bind(f"{ident}-content.opacity", f"{ident}-content", "opacity", {"op": "select", "args": [{"state": f"{key}.dead"}, 0.5, 1]})
     props = {"position": keyword("relative"), "display": keyword("none"), "width": length(width), "height": length(ROW_MAX),
              "flex-shrink": number(0)}
     if interactive:
@@ -802,8 +869,8 @@ def player_lists(doc: Document, prefix: str, width: float, height: float, intera
                           "card.identity": {"type": "string", "initial": ""}, "mp.stat.identity": {"type": "string", "initial": ""}})
     columns = list_columns(width)
     heading = {**typeface("lowpixel", 11, LIST_HEAD_H, [1, 1, 1, 0.4]), "white-space": keyword("nowrap")}
-    name_left = columns["marker"] + columns["speaker"] + columns["friend"] + 2
-    score_right = width - columns["end"] - columns["ping"] - columns["gap"]
+    name_left = columns["marker"] + columns["speaker"] + columns["friend"] + columns["state"] + 2
+    score_right = width - columns["end"] - columns["ping"] - columns["gap"] - columns["bars"]
     headings = group(f"{prefix}-headings", {"position": keyword("relative"), "display": keyword("block"), "width": length(width),
                                             "height": length(LIST_HEAD_H), "flex-shrink": number(0)}, [
         label(f"{prefix}-head-name", NAME_KEY, {**absolute(left=name_left, top=0, width=columns["name"], height=LIST_HEAD_H), **heading}),

@@ -1885,6 +1885,12 @@ Completion must advance through the existing dependencies:
   until explicitly selected again or cleared. Both kick-request transports
   carry the selected identity and reject stale requests before server admission.
   Match Control rows and broader remote/device/platform qualification remain.
+  Progress, 5 November: the multiplayer cards' Players lists gained the held
+  scoreboard's [marks](ui/multiplayer-menus.md#players-list-marks-and-team-refusals-5-november-2026):
+  a skull with the row at half while dead or out of the Tourney, a BOT tag,
+  and network-quality bars stepped by the game. French and Italian players now
+  read the stock team-refusal messages in their language. Native card checks
+  cover each mark; live MP captures and device qualification remain.
 - [ ] **UI-04 — P1, implementation and qualification: full GUI corpus migration.**
   Finish all HUD, wrist/comms, scope, vehicle, cinematic, terminal/world and scripted
   surfaces with source-bound retained lowering. Preserve legacy grouping/remainder

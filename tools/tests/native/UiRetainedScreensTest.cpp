@@ -530,6 +530,13 @@ static void CheckEscape(ScreenHost& host, const char* path) {
 		lists[row+".client"] = static_cast<double>(client); lists[row+".name"] = std::string(names[client]);
 		lists[row+".score"] = std::to_string(10-client); lists[row+".ping"] = std::to_string(20+client);
 		lists[row+".local"] = client == 1; lists[row+".friend"] = client == 0; lists[row+".muted"] = client == 2;
+		// Rhodes is dead and Gladiator is a bot; the pings span the bars' steps.
+		lists[row+".dead"] = client == 2; lists[row+".bot"] = client == 4;
+		// The game publishes each row's step and its color.
+		const double bars[] = {4,3,2,1,0,4};
+		const double tints[][3] = {{0xB5,0xC7,0x84},{0xB5,0xC7,0x84},{0xE3,0xAD,0x36},{0xE4,0x6D,0x56},{1,1,1},{0xB5,0xC7,0x84}};
+		lists[row+".bars"] = bars[client];
+		lists[row+".bars_r"] = tints[client][0]/255; lists[row+".bars_g"] = tints[client][1]/255; lists[row+".bars_b"] = tints[client][2]/255;
 	}
 	Check(runtime.SetState(lists,error,2.9),"publish the Players page");
 	// Q, E and the strip's keycaps: the next tab at once, its page cross-fading
@@ -562,6 +569,33 @@ static void CheckEscape(ScreenHost& host, const char* path) {
 	Check(text("players-a-2-speaker-slash","display") == "block" && text("players-a-0-speaker-slash","display") == "none" &&
 		Near(number("players-a-0-friend","opacity"),1,.001f) && Near(number("players-a-2-friend","opacity"),.125f,.001f),
 		"muted players' speakers are crossed and friends lit");
+	struct Rgba { float r, g, b, a; };
+	const auto color = [&](const char* node) { const auto value = runtime.PresentedValue(node,"background-color");
+		Check(value.has_value(),"a presented color");
+		return value.has_value() ? Rgba{static_cast<float>(value->data[0]),static_cast<float>(value->data[1]),
+			static_cast<float>(value->data[2]),static_cast<float>(value->data[3])} : Rgba{-1,-1,-1,-1}; };
+	// The held scoreboard's marks: a skull (its slot kept) and the row at half while dead, a
+	// BOT tag beside a bot's name in place of its bars, and the bars by ping.
+	Check(Near(number("players-a-2-skull","opacity"),1,.001f) && Near(number("players-a-0-skull","opacity"),0,.001f) &&
+		Near(number("players-a-2-content","opacity"),.5f,.001f) && Near(number("players-a-0-content","opacity"),1,.001f),
+		"a dead player's row shows the skull at half");
+	Check(text("players-b-1-bot","display") == "block" && text("players-b-0-bot","display") == "none" &&
+		Near(color("players-b-1-bar0").a,0,.001f) && Near(color("players-b-0-bar0").a,1,.001f),"a bot shows its tag, not bars");
+	// Four steps lit, three, two and one, in the color the game gives; unlit bars at 0.20.
+	Check(Near(color("players-a-0-bar3").a,1,.001f) && Near(color("players-a-1-bar3").a,.2f,.001f) &&
+		Near(color("players-a-1-bar2").a,1,.001f) && Near(color("players-a-2-bar1").a,1,.001f) &&
+		Near(color("players-a-2-bar2").a,.2f,.001f) && Near(color("players-b-0-bar1").a,.2f,.001f),"the bars light to the step");
+	Check(Near(color("players-a-0-bar0").g,0xC7/255.f,.01f) && Near(color("players-a-2-bar0").r,0xE3/255.f,.01f) &&
+		Near(color("players-a-2-bar0").g,0xAD/255.f,.01f) && Near(color("players-b-0-bar0").g,0x6D/255.f,.01f),
+		"each row's bars take the color the game publishes");
+	{
+		const auto name = bounds("players-b-1-name"), tag = bounds("players-b-1-bot"), score = bounds("players-b-1-score");
+		const auto bars = bounds("players-b-0-bars"), ping = bounds("players-b-0-ping"), score0 = bounds("players-b-0-score");
+		Check(name.x+name.width <= tag.x+.5f && tag.x+tag.width <= score.x+.5f,"the BOT tag sits between the name and the score");
+		Check(score0.x+score0.width <= bars.x+.5f && bars.x+bars.width <= ping.x+.5f,"the bars stand between the score and the ping");
+		const auto head = bounds("players-head-score");
+		Check(Near(head.x+head.width,score0.x+score0.width,1.5f),"the score heading stays over its column");
+	}
 	const auto lists0 = bounds("players-lists"), stats0 = bounds("players-stats");
 	Check(lists0.x+lists0.width <= stats0.x,"the statistics stand beside the lists");
 	Check(Near(bounds("players-a-0").height,24,.01f) && bounds("players-a-1").y >= bounds("players-a-0").y+23.9f,"few players take the widest pitch");
