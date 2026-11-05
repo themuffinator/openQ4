@@ -709,6 +709,18 @@ def ping_meter(doc: Document, ident: str, key: str) -> dict:
                                    "height": length(16), "margin-left": length(BARS_GAP), "flex-shrink": number(0)}, bars)
 
 
+# The faction marks (section 6's emblems, the HUD's `marinelogo` and
+# `strogglogo` vectors) for the Marine and Strogg teams, by team index.
+FACTION_MARKS = ("marinelogo", "strogglogo")
+
+
+def faction_mark(ident: str, team: int, left: float, top: float, size: float, props: dict | None = None) -> dict:
+    """A team's faction mark, white at 0.95, `size` dp square."""
+    return group(ident, {**absolute(left=left, top=top, width=size, height=size), "display": keyword("block"),
+                         "pointer-events": keyword("none"), **(props or {})},
+                 hud_svg.icon_nodes(FACTION_MARKS[team], f"{ident}-g", 0, 0, size, tint=[1, 1, 1, 0.95]))
+
+
 def team_band(ident: str, width: float, height: float, tint: str, cut: float = 8.0) -> dict:
     """A header band in a team's color (section 6): an upper-leading cut, top
     and leading rails, the fill full to half the width and fading toward the
@@ -897,7 +909,14 @@ def player_lists(doc: Document, prefix: str, width: float, height: float, intera
             variants.append(team_band(node, width, LIST_BAND_H, BAND_TINTS[tint], cut=6))
             doc.bind(f"{node}.display", node, "display",
                      {"op": "select", "args": [{"op": "==", "args": [{"state": f"mp.players.{kind}.color"}, tint]}, "block", "none"]})
-        title = label(f"{band}-title", PLACEHOLDER, {**absolute(left=16, top=0, width=width * 0.6, height=LIST_BAND_H),
+        marks = []
+        for team in (0, 1):
+            if team in tints:
+                node = faction_mark(f"{band}-mark{team}", team, 8, (LIST_BAND_H - 14) / 2, 14, {"display": keyword("none")})
+                doc.bind(f"{node['id']}.display", node["id"], "display",
+                         {"op": "select", "args": [{"op": "==", "args": [{"state": f"mp.players.{kind}.color"}, team]}, "block", "none"]})
+                marks.append(node)
+        title = label(f"{band}-title", PLACEHOLDER, {**absolute(left=28, top=0, width=width * 0.6 - 12, height=LIST_BAND_H),
                       **typeface("marine", 15, LIST_BAND_H, [1, 1, 1, 0.95]), "white-space": keyword("nowrap"), "overflow": keyword("hidden")})
         score = label(f"{band}-score", PLACEHOLDER, {**absolute(left=round(score_right - 80, 3), top=0, width=80, height=LIST_BAND_H),
                       **typeface("lowpixel", 16, LIST_BAND_H, rgb(VALUE)), "text-align": keyword("right"), "white-space": keyword("nowrap")})
@@ -905,7 +924,7 @@ def player_lists(doc: Document, prefix: str, width: float, height: float, intera
         doc.bind(f"{band}-score.text", f"{band}-score", "text", {"state": f"mp.players.{kind}.score"})
         holder = group(band, {"position": keyword("relative"), "display": keyword("none"), "width": length(width),
                               "height": length(LIST_BAND_H), "flex-shrink": number(0),
-                              "margin-top": length(0 if kind == "a" else LIST_GAP)}, [*variants, title, score])
+                              "margin-top": length(0 if kind == "a" else LIST_GAP)}, [*variants, *marks, title, score])
         doc.bind(f"{band}.display", band, "display", {"op": "select", "args": [shown[kind], "block", "none"]})
         children.append(holder)
         for row in range(PLAYER_ROWS):
@@ -1094,7 +1113,8 @@ def team_card(doc: Document, team: int, left: float, width: float) -> tuple[dict
                        ({"fraction": 1, "dp": -20}, {"fraction": 1, "dp": -3.5})], closed=False, stroke=stroke(solid(rgb(ORANGE)), 1.2))])
     band = team_band(f"{ident}-band", width, TEAM_BAND_H, tint)
     band["properties"]["display"] = keyword("block")
-    name = label(f"{ident}-label", PLACEHOLDER, {**absolute(left=16, top=0, width=width * 0.62, height=TEAM_BAND_H),
+    mark = faction_mark(f"{ident}-mark", team, 12, (TEAM_BAND_H - 20) / 2, 20)
+    name = label(f"{ident}-label", PLACEHOLDER, {**absolute(left=40, top=0, width=width * 0.62 - 24, height=TEAM_BAND_H),
                  **typeface("marine", 20, TEAM_BAND_H, [1, 1, 1, 0.95]), "white-space": keyword("nowrap"), "overflow": keyword("hidden")})
     doc.bind(f"{ident}-label.text", f"{ident}-label", "text", {"state": f"{key}.label"})
     score = label(f"{ident}-score", PLACEHOLDER, {**absolute(left=width * 0.62, top=0, right=12, height=TEAM_BAND_H),
@@ -1131,7 +1151,7 @@ def team_card(doc: Document, team: int, left: float, width: float) -> tuple[dict
     })
     event = f"join_slot_{team}"
     plate = group(ident, {**absolute(left=0, top=0, width=width, height=TEAM_CARD_H), "opacity": number(1)},
-                  [body, band, focus, name, score, count_label, count, flag, lock],
+                  [body, band, mark, focus, name, score, count_label, count, flag, lock],
                   control={"role": "button", "label": PLACEHOLDER, "event": event, "states": ids})
     doc.bind(f"{ident}.opacity", ident, "opacity", {"op": "select", "args": [{"state": f"{key}.available"}, 1, 0.6]})
     holder = group(f"{ident}-slot", {**absolute(left=left, top=TEAM_CARD_TOP, width=width, height=TEAM_CARD_H),

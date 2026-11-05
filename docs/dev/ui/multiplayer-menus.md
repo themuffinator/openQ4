@@ -145,7 +145,8 @@ spectates or readies and closes the menu, as the stock buttons do.
 The team lists stand beside the selected player's statistics. Each list opens
 with a band in its team's color (#6AA42B Marine, #FF7B04 Strogg, #999999 for
 spectators, #8B964B for everyone outside team modes) holding the title and the
-team's score, then lists its players in the scoreboard's rows (section 14.14):
+team's score (the Marine and Strogg bands lead with their faction marks), then
+lists its players in the scoreboard's rows (section 14.14):
 a band at 0.08, or 0.29 with the orange marker for the player's own row; the speaker,
 crossed in red when the player is muted; the friend silhouette, 0.125 when the
 player is not a friend; a skull while the player is dead or out of the
@@ -387,7 +388,7 @@ which asks first in the stock confirmation.
 - **Join.** The mode and map, then the match state, the time left in the value
   color, the limit and the player count. Team modes show the two team cards,
   each the plate that joins its team: the header band in the team's color with
-  its name and score, its player count and, in CTF, its flag's state (at
+  its faction mark (the HUD's Marine or Strogg emblem), name and score, its player count and, in CTF, its flag's state (at
   base, taken or dropped). A team the stock balance rule refuses dims with its
   lock and reason and shakes when chosen. Auto join follows, focused, naming
   the team it picks, then Spectate. Deathmatch shows the three leaders with
@@ -864,6 +865,20 @@ network session. Full slot-identity safety, map catalogs beyond 128, physical
 devices, portrait/long-language layouts and optimized performance remain with
 UI-03/UI-02/UI-07. No requirement, resource or final gate is accepted here.
 
+## Faction marks, 5 November 2026
+
+The Welcome card's team cards and the Players lists' Marine and Strogg bands
+now carry their faction marks, as section 6 and the scoreboard's panels do:
+the HUD's `marinelogo` and `strogglogo` vectors in white, 20 dp on a team
+card before its name and 14 dp on a band before its title. Spectator and
+deathmatch bands carry none; every band's title starts after the mark's
+room, so the titles align. The Escape card grows by about 35 KB.
+
+Native checks place each team card's mark in its band before the name and
+show only the band's own team's mark. A Vulkan Team DM listen server with
+four bots, in German with `ui_autoJoin 0`, shows both marks on the Join page's
+cards and on the Players page's bands (`.tmp/ui-roadmap/faction-vk/`).
+
 ## Players list marks and team refusals, 5 November 2026
 
 The Players lists (Escape, Welcome and the summary's Statistics page) now
@@ -1315,8 +1330,7 @@ The card's acceptance continues under `FLOW-046`.
 - Left and right move focus between the lists and the statistics; they do not
   switch tabs as section 14.18 asks (decision D2 is open).
 - The Welcome card's Join page has no Watch for Tourney's arenas and no
-  place in the queue (neither has a model yet), and its team cards carry no
-  faction mark.
+  place in the queue (neither has a model yet).
 - The Settings pages have no model preview (retained documents have no 3D
   view).
 - Voice capture/playback, the meter and local test have since been implemented;

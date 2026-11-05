@@ -563,6 +563,9 @@ static void CheckEscape(ScreenHost& host, const char* path) {
 		"each list shows its players' rows");
 	Check(text("players-a-band-0","display") == "block" && text("players-a-band-1","display") == "none" &&
 		text("players-b-band-1","display") == "block" && text("players-s-band","display") == "block","the bands take their teams' colors");
+	Check(text("players-a-band-mark0","display") == "block" && text("players-a-band-mark1","display") == "none" &&
+		text("players-b-band-mark1","display") == "block" && text("players-b-band-mark0","display") == "none",
+		"the Marine and Strogg bands carry their faction marks");
 	Check(text("players-a-1-marker","display") == "block" && text("players-a-0-marker","display") == "none" &&
 		Near(number("players-a-1-band","opacity"),.29f,.001f) && Near(number("players-a-0-band","opacity"),.08f,.001f),
 		"the player's own row is brighter and marked");
@@ -1810,6 +1813,11 @@ static void CheckWelcome(ScreenHost& host, const char* path) {
 	const auto marines = bounds("join-slot-0"), strogg = bounds("join-slot-1"), automatic = bounds("join-slot-2");
 	Check(marines.x+marines.width <= strogg.x && Near(marines.y,strogg.y) && automatic.y >= marines.y+marines.height,
 		"the team cards stand side by side above Auto join");
+	{
+		const auto mark = bounds("join-slot-0-mark"), name = bounds("join-slot-0-label"), band = bounds("join-slot-0-band");
+		Check(mark.x >= band.x && mark.x+mark.width <= name.x+.5f && mark.y >= band.y-.5f && mark.y+mark.height <= band.y+band.height+.5f &&
+			bounds("join-slot-1-mark").width > 0,"each team card's faction mark leads its band, before the name");
+	}
 	Check(Near(number("join-slot-0","opacity"),.6f,.001f) && text("join-slot-0-lock","display") == "block" &&
 		text("join-slot-0-reason","display") == "block","a refused team dims with its lock and reason");
 	Check(Near(number("join-slot-1","opacity"),1,.001f) && text("join-slot-1-lock","display") == "none" &&

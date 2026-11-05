@@ -9942,6 +9942,18 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "mp.players.a.color"}, 3]}, "block", "none"]}
   },
   {
+   "id": "players-a-band-mark0.display",
+   "node": "players-a-band-mark0",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "mp.players.a.color"}, 0]}, "block", "none"]}
+  },
+  {
+   "id": "players-a-band-mark1.display",
+   "node": "players-a-band-mark1",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "mp.players.a.color"}, 1]}, "block", "none"]}
+  },
+  {
    "id": "players-a-band-title.text",
    "node": "players-a-band-title",
    "property": "text",
@@ -15184,6 +15196,18 @@
   {
    "id": "players-b-band-1.display",
    "node": "players-b-band-1",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "mp.players.b.color"}, 1]}, "block", "none"]}
+  },
+  {
+   "id": "players-b-band-mark0.display",
+   "node": "players-b-band-mark0",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "mp.players.b.color"}, 0]}, "block", "none"]}
+  },
+  {
+   "id": "players-b-band-mark1.display",
+   "node": "players-b-band-mark1",
    "property": "display",
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "mp.players.b.color"}, 1]}, "block", "none"]}
   },
@@ -156461,14 +156485,268 @@
                   ]
                  },
                  {
+                  "id": "players-a-band-mark0",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 8, "unit": "dp"},
+                   "top": {"type": "length", "value": 4.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"},
+                   "pointer-events": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "players-a-band-mark0-g",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "block"}
+                    },
+                    "paths": [
+                     {
+                      "id": "p0",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[7.1097, 0.5798]]},
+                       {"id": "c1", "op": "line", "points": [[13.4528, 5.0873]]},
+                       {"id": "c2", "op": "line", "points": [[13.4528, 8.8241]]},
+                       {"id": "c3", "op": "line", "points": [[7.1097, 13.2761]]},
+                       {"id": "c4", "op": "line", "points": [[0.7653, 8.8241]]},
+                       {"id": "c5", "op": "line", "points": [[0.7653, 5.0873]]},
+                       {"id": "c6", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "none"},
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}},
+                       "widthDp": 0.6125,
+                       "minimumPixels": 0,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "p1",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[6.7597, 1.8375]]},
+                       {"id": "c1", "op": "line", "points": [[6.7597, 5.9208]]},
+                       {"id": "c2", "op": "line", "points": [[5.7388, 9.3042]]},
+                       {"id": "c3", "op": "line", "points": [[5.7972, 9.6833]]},
+                       {"id": "c4", "op": "line", "points": [[6.6722, 11.9292]]},
+                       {"id": "c5", "op": "line", "points": [[6.6722, 12.1625]]},
+                       {"id": "c6", "op": "line", "points": [[6.5263, 12.1625]]},
+                       {"id": "c7", "op": "line", "points": [[1.5388, 8.6625]]},
+                       {"id": "c8", "op": "line", "points": [[1.3347, 8.4292]]},
+                       {"id": "c9", "op": "line", "points": [[1.4805, 8.3242]]},
+                       {"id": "c10", "op": "line", "points": [[4.6591, 8.3242]]},
+                       {"id": "c11", "op": "line", "points": [[6.5841, 2.0125]]},
+                       {"id": "c12", "op": "close"},
+                       {"id": "c13", "op": "move", "points": [[7.4591, 1.8375]]},
+                       {"id": "c14", "op": "line", "points": [[7.4591, 5.9208]]},
+                       {"id": "c15", "op": "line", "points": [[8.4799, 9.3042]]},
+                       {"id": "c16", "op": "line", "points": [[8.4222, 9.6833]]},
+                       {"id": "c17", "op": "line", "points": [[7.5472, 11.9292]]},
+                       {"id": "c18", "op": "line", "points": [[7.5472, 12.1625]]},
+                       {"id": "c19", "op": "line", "points": [[7.693, 12.1625]]},
+                       {"id": "c20", "op": "line", "points": [[12.6805, 8.6625]]},
+                       {"id": "c21", "op": "line", "points": [[12.8841, 8.4292]]},
+                       {"id": "c22", "op": "line", "points": [[12.7383, 8.3242]]},
+                       {"id": "c23", "op": "line", "points": [[9.5591, 8.3242]]},
+                       {"id": "c24", "op": "line", "points": [[7.6347, 2.0125]]},
+                       {"id": "c25", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     },
+                     {
+                      "id": "p2",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[7.1097, 6.2708]]},
+                       {"id": "c1", "op": "line", "points": [[8.0722, 9.3625]]},
+                       {"id": "c2", "op": "line", "points": [[7.868, 9.8292]]},
+                       {"id": "c3", "op": "line", "points": [[6.3508, 9.8292]]},
+                       {"id": "c4", "op": "line", "points": [[6.1466, 9.3625]]},
+                       {"id": "c5", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     },
+                     {
+                      "id": "p3",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[6.4966, 10.2667]]},
+                       {"id": "c1", "op": "line", "points": [[7.7216, 10.2667]]},
+                       {"id": "c2", "op": "line", "points": [[7.7216, 10.4883]]},
+                       {"id": "c3", "op": "line", "points": [[6.4966, 10.4883]]},
+                       {"id": "c4", "op": "close"},
+                       {"id": "c5", "op": "move", "points": [[6.6722, 10.7333]]},
+                       {"id": "c6", "op": "line", "points": [[7.5472, 10.7333]]},
+                       {"id": "c7", "op": "line", "points": [[7.5472, 10.9317]]},
+                       {"id": "c8", "op": "line", "points": [[6.6722, 10.9317]]},
+                       {"id": "c9", "op": "close"},
+                       {"id": "c10", "op": "move", "points": [[6.7883, 11.1708]]},
+                       {"id": "c11", "op": "line", "points": [[7.4299, 11.1708]]},
+                       {"id": "c12", "op": "line", "points": [[7.4299, 11.3633]]},
+                       {"id": "c13", "op": "line", "points": [[6.7883, 11.3633]]},
+                       {"id": "c14", "op": "close"},
+                       {"id": "c15", "op": "move", "points": [[6.9638, 11.6375]]},
+                       {"id": "c16", "op": "line", "points": [[7.2555, 11.6375]]},
+                       {"id": "c17", "op": "line", "points": [[7.2555, 11.7833]]},
+                       {"id": "c18", "op": "line", "points": [[6.9638, 11.7833]]},
+                       {"id": "c19", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "players-a-band-mark1",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 8, "unit": "dp"},
+                   "top": {"type": "length", "value": 4.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"},
+                   "pointer-events": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "players-a-band-mark1-g",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "block"}
+                    },
+                    "paths": [
+                     {
+                      "id": "p0",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[4.5004, 0.3442]]},
+                       {"id": "c1", "op": "line", "points": [[3.7596, 1.435]]},
+                       {"id": "c2", "op": "line", "points": [[3.0479, 2.9925]]},
+                       {"id": "c3", "op": "line", "points": [[3.5438, 3.0742]]},
+                       {"id": "c4", "op": "line", "points": [[3.8704, 3.4883]]},
+                       {"id": "c5", "op": "line", "points": [[5.1538, 7.9683]]},
+                       {"id": "c6", "op": "line", "points": [[4.9087, 8.1608]]},
+                       {"id": "c7", "op": "line", "points": [[4.6346, 7.9683]]},
+                       {"id": "c8", "op": "line", "points": [[2.7738, 3.9492]]},
+                       {"id": "c9", "op": "line", "points": [[2.6104, 4.0308]]},
+                       {"id": "c10", "op": "line", "points": [[1.9804, 6.4925]]},
+                       {"id": "c11", "op": "line", "points": [[2.1437, 6.5742]]},
+                       {"id": "c12", "op": "line", "points": [[2.5579, 6.3583]]},
+                       {"id": "c13", "op": "line", "points": [[2.9138, 6.5508]]},
+                       {"id": "c14", "op": "line", "points": [[4.2496, 8.6567]]},
+                       {"id": "c15", "op": "line", "points": [[3.8121, 9.0942]]},
+                       {"id": "c16", "op": "line", "points": [[2.1204, 7.4783]]},
+                       {"id": "c17", "op": "line", "points": [[1.8988, 7.4783]]},
+                       {"id": "c18", "op": "line", "points": [[1.8171, 7.945]]},
+                       {"id": "c19", "op": "line", "points": [[2.0096, 9.94]]},
+                       {"id": "c20", "op": "line", "points": [[2.4471, 9.5025]]},
+                       {"id": "c21", "op": "line", "points": [[2.7213, 9.45]]},
+                       {"id": "c22", "op": "line", "points": [[3.5963, 9.9692]]},
+                       {"id": "c23", "op": "line", "points": [[3.4038, 10.5117]]},
+                       {"id": "c24", "op": "line", "points": [[2.2837, 10.5408]]},
+                       {"id": "c25", "op": "line", "points": [[2.2313, 10.815]]},
+                       {"id": "c26", "op": "line", "points": [[2.8321, 12.0167]]},
+                       {"id": "c27", "op": "line", "points": [[2.9663, 12.0458]]},
+                       {"id": "c28", "op": "line", "points": [[3.0771, 11.7425]]},
+                       {"id": "c29", "op": "line", "points": [[3.4038, 11.5267]]},
+                       {"id": "c30", "op": "line", "points": [[3.8121, 11.7425]]},
+                       {"id": "c31", "op": "line", "points": [[4.0046, 12.2383]]},
+                       {"id": "c32", "op": "line", "points": [[3.5963, 12.8917]]},
+                       {"id": "c33", "op": "line", "points": [[3.9229, 13.3583]]},
+                       {"id": "c34", "op": "line", "points": [[5.0021, 13.4458]]},
+                       {"id": "c35", "op": "line", "points": [[5.2938, 11.7192]]},
+                       {"id": "c36", "op": "cubic", "points": [[4.5582, 10.9398], [4.5231, 9.733], [5.2121, 8.9122]]},
+                       {"id": "c37", "op": "line", "points": [[5.9471, 8.575]]},
+                       {"id": "c38", "op": "line", "points": [[4.6054, 2.065]]},
+                       {"id": "c39", "op": "close"},
+                       {"id": "c40", "op": "move", "points": [[9.0621, 0.3442]]},
+                       {"id": "c41", "op": "line", "points": [[9.8029, 1.435]]},
+                       {"id": "c42", "op": "line", "points": [[10.5146, 2.9925]]},
+                       {"id": "c43", "op": "line", "points": [[10.0188, 3.0742]]},
+                       {"id": "c44", "op": "line", "points": [[9.6921, 3.4883]]},
+                       {"id": "c45", "op": "line", "points": [[8.4087, 7.9683]]},
+                       {"id": "c46", "op": "line", "points": [[8.6538, 8.1608]]},
+                       {"id": "c47", "op": "line", "points": [[8.9279, 7.9683]]},
+                       {"id": "c48", "op": "line", "points": [[10.7888, 3.9492]]},
+                       {"id": "c49", "op": "line", "points": [[10.9521, 4.0308]]},
+                       {"id": "c50", "op": "line", "points": [[11.5821, 6.4925]]},
+                       {"id": "c51", "op": "line", "points": [[11.4188, 6.5742]]},
+                       {"id": "c52", "op": "line", "points": [[11.0046, 6.3583]]},
+                       {"id": "c53", "op": "line", "points": [[10.6487, 6.5508]]},
+                       {"id": "c54", "op": "line", "points": [[9.3129, 8.6567]]},
+                       {"id": "c55", "op": "line", "points": [[9.7504, 9.0942]]},
+                       {"id": "c56", "op": "line", "points": [[11.4421, 7.4783]]},
+                       {"id": "c57", "op": "line", "points": [[11.6638, 7.4783]]},
+                       {"id": "c58", "op": "line", "points": [[11.7454, 7.945]]},
+                       {"id": "c59", "op": "line", "points": [[11.5529, 9.94]]},
+                       {"id": "c60", "op": "line", "points": [[11.1154, 9.5025]]},
+                       {"id": "c61", "op": "line", "points": [[10.8413, 9.45]]},
+                       {"id": "c62", "op": "line", "points": [[9.9663, 9.9692]]},
+                       {"id": "c63", "op": "line", "points": [[10.1587, 10.5117]]},
+                       {"id": "c64", "op": "line", "points": [[11.2788, 10.5408]]},
+                       {"id": "c65", "op": "line", "points": [[11.3313, 10.815]]},
+                       {"id": "c66", "op": "line", "points": [[10.7304, 12.0167]]},
+                       {"id": "c67", "op": "line", "points": [[10.5962, 12.0458]]},
+                       {"id": "c68", "op": "line", "points": [[10.4854, 11.7425]]},
+                       {"id": "c69", "op": "line", "points": [[10.1587, 11.5267]]},
+                       {"id": "c70", "op": "line", "points": [[9.7504, 11.7425]]},
+                       {"id": "c71", "op": "line", "points": [[9.5579, 12.2383]]},
+                       {"id": "c72", "op": "line", "points": [[9.9663, 12.8917]]},
+                       {"id": "c73", "op": "line", "points": [[9.6396, 13.3583]]},
+                       {"id": "c74", "op": "line", "points": [[8.5604, 13.4458]]},
+                       {"id": "c75", "op": "line", "points": [[8.2688, 11.7192]]},
+                       {"id": "c76", "op": "cubic", "points": [[9.0043, 10.9398], [9.0394, 9.733], [8.3504, 8.9122]]},
+                       {"id": "c77", "op": "line", "points": [[7.6154, 8.575]]},
+                       {"id": "c78", "op": "line", "points": [[8.9571, 2.065]]},
+                       {"id": "c79", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     },
+                     {
+                      "id": "p1",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[6.2125, 9.2167]]},
+                       {"id": "c1", "op": "line", "points": [[7.9917, 9.2167]]},
+                       {"id": "c2", "op": "line", "points": [[7.0292, 10.4417]]},
+                       {"id": "c3", "op": "line", "points": [[8.05, 10.5]]},
+                       {"id": "c4", "op": "line", "points": [[5.8333, 13.475]]},
+                       {"id": "c5", "op": "line", "points": [[6.3583, 11.2]]},
+                       {"id": "c6", "op": "line", "points": [[5.3667, 11.1417]]},
+                       {"id": "c7", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
                   "id": "players-a-band-title",
                   "type": "text",
                   "properties": {
                    "text": {"type": "text", "value": "#str_230030"},
                    "position": {"type": "keyword", "value": "absolute"},
-                   "left": {"type": "length", "value": 16, "unit": "dp"},
+                   "left": {"type": "length", "value": 28, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 206.4, "unit": "dp"},
+                   "width": {"type": "length", "value": 194.4, "unit": "dp"},
                    "height": {"type": "length", "value": 22.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "marine"},
                    "font-size": {"type": "length", "value": 15, "unit": "dp"},
@@ -171291,14 +171569,268 @@
                   ]
                  },
                  {
+                  "id": "players-b-band-mark0",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 8, "unit": "dp"},
+                   "top": {"type": "length", "value": 4.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"},
+                   "pointer-events": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "players-b-band-mark0-g",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "block"}
+                    },
+                    "paths": [
+                     {
+                      "id": "p0",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[7.1097, 0.5798]]},
+                       {"id": "c1", "op": "line", "points": [[13.4528, 5.0873]]},
+                       {"id": "c2", "op": "line", "points": [[13.4528, 8.8241]]},
+                       {"id": "c3", "op": "line", "points": [[7.1097, 13.2761]]},
+                       {"id": "c4", "op": "line", "points": [[0.7653, 8.8241]]},
+                       {"id": "c5", "op": "line", "points": [[0.7653, 5.0873]]},
+                       {"id": "c6", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "none"},
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}},
+                       "widthDp": 0.6125,
+                       "minimumPixels": 0,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "p1",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[6.7597, 1.8375]]},
+                       {"id": "c1", "op": "line", "points": [[6.7597, 5.9208]]},
+                       {"id": "c2", "op": "line", "points": [[5.7388, 9.3042]]},
+                       {"id": "c3", "op": "line", "points": [[5.7972, 9.6833]]},
+                       {"id": "c4", "op": "line", "points": [[6.6722, 11.9292]]},
+                       {"id": "c5", "op": "line", "points": [[6.6722, 12.1625]]},
+                       {"id": "c6", "op": "line", "points": [[6.5263, 12.1625]]},
+                       {"id": "c7", "op": "line", "points": [[1.5388, 8.6625]]},
+                       {"id": "c8", "op": "line", "points": [[1.3347, 8.4292]]},
+                       {"id": "c9", "op": "line", "points": [[1.4805, 8.3242]]},
+                       {"id": "c10", "op": "line", "points": [[4.6591, 8.3242]]},
+                       {"id": "c11", "op": "line", "points": [[6.5841, 2.0125]]},
+                       {"id": "c12", "op": "close"},
+                       {"id": "c13", "op": "move", "points": [[7.4591, 1.8375]]},
+                       {"id": "c14", "op": "line", "points": [[7.4591, 5.9208]]},
+                       {"id": "c15", "op": "line", "points": [[8.4799, 9.3042]]},
+                       {"id": "c16", "op": "line", "points": [[8.4222, 9.6833]]},
+                       {"id": "c17", "op": "line", "points": [[7.5472, 11.9292]]},
+                       {"id": "c18", "op": "line", "points": [[7.5472, 12.1625]]},
+                       {"id": "c19", "op": "line", "points": [[7.693, 12.1625]]},
+                       {"id": "c20", "op": "line", "points": [[12.6805, 8.6625]]},
+                       {"id": "c21", "op": "line", "points": [[12.8841, 8.4292]]},
+                       {"id": "c22", "op": "line", "points": [[12.7383, 8.3242]]},
+                       {"id": "c23", "op": "line", "points": [[9.5591, 8.3242]]},
+                       {"id": "c24", "op": "line", "points": [[7.6347, 2.0125]]},
+                       {"id": "c25", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     },
+                     {
+                      "id": "p2",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[7.1097, 6.2708]]},
+                       {"id": "c1", "op": "line", "points": [[8.0722, 9.3625]]},
+                       {"id": "c2", "op": "line", "points": [[7.868, 9.8292]]},
+                       {"id": "c3", "op": "line", "points": [[6.3508, 9.8292]]},
+                       {"id": "c4", "op": "line", "points": [[6.1466, 9.3625]]},
+                       {"id": "c5", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     },
+                     {
+                      "id": "p3",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[6.4966, 10.2667]]},
+                       {"id": "c1", "op": "line", "points": [[7.7216, 10.2667]]},
+                       {"id": "c2", "op": "line", "points": [[7.7216, 10.4883]]},
+                       {"id": "c3", "op": "line", "points": [[6.4966, 10.4883]]},
+                       {"id": "c4", "op": "close"},
+                       {"id": "c5", "op": "move", "points": [[6.6722, 10.7333]]},
+                       {"id": "c6", "op": "line", "points": [[7.5472, 10.7333]]},
+                       {"id": "c7", "op": "line", "points": [[7.5472, 10.9317]]},
+                       {"id": "c8", "op": "line", "points": [[6.6722, 10.9317]]},
+                       {"id": "c9", "op": "close"},
+                       {"id": "c10", "op": "move", "points": [[6.7883, 11.1708]]},
+                       {"id": "c11", "op": "line", "points": [[7.4299, 11.1708]]},
+                       {"id": "c12", "op": "line", "points": [[7.4299, 11.3633]]},
+                       {"id": "c13", "op": "line", "points": [[6.7883, 11.3633]]},
+                       {"id": "c14", "op": "close"},
+                       {"id": "c15", "op": "move", "points": [[6.9638, 11.6375]]},
+                       {"id": "c16", "op": "line", "points": [[7.2555, 11.6375]]},
+                       {"id": "c17", "op": "line", "points": [[7.2555, 11.7833]]},
+                       {"id": "c18", "op": "line", "points": [[6.9638, 11.7833]]},
+                       {"id": "c19", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "players-b-band-mark1",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 8, "unit": "dp"},
+                   "top": {"type": "length", "value": 4.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"},
+                   "pointer-events": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "players-b-band-mark1-g",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "block"}
+                    },
+                    "paths": [
+                     {
+                      "id": "p0",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[4.5004, 0.3442]]},
+                       {"id": "c1", "op": "line", "points": [[3.7596, 1.435]]},
+                       {"id": "c2", "op": "line", "points": [[3.0479, 2.9925]]},
+                       {"id": "c3", "op": "line", "points": [[3.5438, 3.0742]]},
+                       {"id": "c4", "op": "line", "points": [[3.8704, 3.4883]]},
+                       {"id": "c5", "op": "line", "points": [[5.1538, 7.9683]]},
+                       {"id": "c6", "op": "line", "points": [[4.9087, 8.1608]]},
+                       {"id": "c7", "op": "line", "points": [[4.6346, 7.9683]]},
+                       {"id": "c8", "op": "line", "points": [[2.7738, 3.9492]]},
+                       {"id": "c9", "op": "line", "points": [[2.6104, 4.0308]]},
+                       {"id": "c10", "op": "line", "points": [[1.9804, 6.4925]]},
+                       {"id": "c11", "op": "line", "points": [[2.1437, 6.5742]]},
+                       {"id": "c12", "op": "line", "points": [[2.5579, 6.3583]]},
+                       {"id": "c13", "op": "line", "points": [[2.9138, 6.5508]]},
+                       {"id": "c14", "op": "line", "points": [[4.2496, 8.6567]]},
+                       {"id": "c15", "op": "line", "points": [[3.8121, 9.0942]]},
+                       {"id": "c16", "op": "line", "points": [[2.1204, 7.4783]]},
+                       {"id": "c17", "op": "line", "points": [[1.8988, 7.4783]]},
+                       {"id": "c18", "op": "line", "points": [[1.8171, 7.945]]},
+                       {"id": "c19", "op": "line", "points": [[2.0096, 9.94]]},
+                       {"id": "c20", "op": "line", "points": [[2.4471, 9.5025]]},
+                       {"id": "c21", "op": "line", "points": [[2.7213, 9.45]]},
+                       {"id": "c22", "op": "line", "points": [[3.5963, 9.9692]]},
+                       {"id": "c23", "op": "line", "points": [[3.4038, 10.5117]]},
+                       {"id": "c24", "op": "line", "points": [[2.2837, 10.5408]]},
+                       {"id": "c25", "op": "line", "points": [[2.2313, 10.815]]},
+                       {"id": "c26", "op": "line", "points": [[2.8321, 12.0167]]},
+                       {"id": "c27", "op": "line", "points": [[2.9663, 12.0458]]},
+                       {"id": "c28", "op": "line", "points": [[3.0771, 11.7425]]},
+                       {"id": "c29", "op": "line", "points": [[3.4038, 11.5267]]},
+                       {"id": "c30", "op": "line", "points": [[3.8121, 11.7425]]},
+                       {"id": "c31", "op": "line", "points": [[4.0046, 12.2383]]},
+                       {"id": "c32", "op": "line", "points": [[3.5963, 12.8917]]},
+                       {"id": "c33", "op": "line", "points": [[3.9229, 13.3583]]},
+                       {"id": "c34", "op": "line", "points": [[5.0021, 13.4458]]},
+                       {"id": "c35", "op": "line", "points": [[5.2938, 11.7192]]},
+                       {"id": "c36", "op": "cubic", "points": [[4.5582, 10.9398], [4.5231, 9.733], [5.2121, 8.9122]]},
+                       {"id": "c37", "op": "line", "points": [[5.9471, 8.575]]},
+                       {"id": "c38", "op": "line", "points": [[4.6054, 2.065]]},
+                       {"id": "c39", "op": "close"},
+                       {"id": "c40", "op": "move", "points": [[9.0621, 0.3442]]},
+                       {"id": "c41", "op": "line", "points": [[9.8029, 1.435]]},
+                       {"id": "c42", "op": "line", "points": [[10.5146, 2.9925]]},
+                       {"id": "c43", "op": "line", "points": [[10.0188, 3.0742]]},
+                       {"id": "c44", "op": "line", "points": [[9.6921, 3.4883]]},
+                       {"id": "c45", "op": "line", "points": [[8.4087, 7.9683]]},
+                       {"id": "c46", "op": "line", "points": [[8.6538, 8.1608]]},
+                       {"id": "c47", "op": "line", "points": [[8.9279, 7.9683]]},
+                       {"id": "c48", "op": "line", "points": [[10.7888, 3.9492]]},
+                       {"id": "c49", "op": "line", "points": [[10.9521, 4.0308]]},
+                       {"id": "c50", "op": "line", "points": [[11.5821, 6.4925]]},
+                       {"id": "c51", "op": "line", "points": [[11.4188, 6.5742]]},
+                       {"id": "c52", "op": "line", "points": [[11.0046, 6.3583]]},
+                       {"id": "c53", "op": "line", "points": [[10.6487, 6.5508]]},
+                       {"id": "c54", "op": "line", "points": [[9.3129, 8.6567]]},
+                       {"id": "c55", "op": "line", "points": [[9.7504, 9.0942]]},
+                       {"id": "c56", "op": "line", "points": [[11.4421, 7.4783]]},
+                       {"id": "c57", "op": "line", "points": [[11.6638, 7.4783]]},
+                       {"id": "c58", "op": "line", "points": [[11.7454, 7.945]]},
+                       {"id": "c59", "op": "line", "points": [[11.5529, 9.94]]},
+                       {"id": "c60", "op": "line", "points": [[11.1154, 9.5025]]},
+                       {"id": "c61", "op": "line", "points": [[10.8413, 9.45]]},
+                       {"id": "c62", "op": "line", "points": [[9.9663, 9.9692]]},
+                       {"id": "c63", "op": "line", "points": [[10.1587, 10.5117]]},
+                       {"id": "c64", "op": "line", "points": [[11.2788, 10.5408]]},
+                       {"id": "c65", "op": "line", "points": [[11.3313, 10.815]]},
+                       {"id": "c66", "op": "line", "points": [[10.7304, 12.0167]]},
+                       {"id": "c67", "op": "line", "points": [[10.5962, 12.0458]]},
+                       {"id": "c68", "op": "line", "points": [[10.4854, 11.7425]]},
+                       {"id": "c69", "op": "line", "points": [[10.1587, 11.5267]]},
+                       {"id": "c70", "op": "line", "points": [[9.7504, 11.7425]]},
+                       {"id": "c71", "op": "line", "points": [[9.5579, 12.2383]]},
+                       {"id": "c72", "op": "line", "points": [[9.9663, 12.8917]]},
+                       {"id": "c73", "op": "line", "points": [[9.6396, 13.3583]]},
+                       {"id": "c74", "op": "line", "points": [[8.5604, 13.4458]]},
+                       {"id": "c75", "op": "line", "points": [[8.2688, 11.7192]]},
+                       {"id": "c76", "op": "cubic", "points": [[9.0043, 10.9398], [9.0394, 9.733], [8.3504, 8.9122]]},
+                       {"id": "c77", "op": "line", "points": [[7.6154, 8.575]]},
+                       {"id": "c78", "op": "line", "points": [[8.9571, 2.065]]},
+                       {"id": "c79", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     },
+                     {
+                      "id": "p1",
+                      "commands": [
+                       {"id": "c0", "op": "move", "points": [[6.2125, 9.2167]]},
+                       {"id": "c1", "op": "line", "points": [[7.9917, 9.2167]]},
+                       {"id": "c2", "op": "line", "points": [[7.0292, 10.4417]]},
+                       {"id": "c3", "op": "line", "points": [[8.05, 10.5]]},
+                       {"id": "c4", "op": "line", "points": [[5.8333, 13.475]]},
+                       {"id": "c5", "op": "line", "points": [[6.3583, 11.2]]},
+                       {"id": "c6", "op": "line", "points": [[5.3667, 11.1417]]},
+                       {"id": "c7", "op": "close"}
+                      ],
+                      "fillRule": "nonzero",
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.95]}}
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
                   "id": "players-b-band-title",
                   "type": "text",
                   "properties": {
                    "text": {"type": "text", "value": "#str_230030"},
                    "position": {"type": "keyword", "value": "absolute"},
-                   "left": {"type": "length", "value": 16, "unit": "dp"},
+                   "left": {"type": "length", "value": 28, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 206.4, "unit": "dp"},
+                   "width": {"type": "length", "value": 194.4, "unit": "dp"},
                    "height": {"type": "length", "value": 22.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "marine"},
                    "font-size": {"type": "length", "value": 15, "unit": "dp"},
@@ -186064,9 +186596,9 @@
                   "properties": {
                    "text": {"type": "text", "value": "#str_230030"},
                    "position": {"type": "keyword", "value": "absolute"},
-                   "left": {"type": "length", "value": 16, "unit": "dp"},
+                   "left": {"type": "length", "value": 28, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 206.4, "unit": "dp"},
+                   "width": {"type": "length", "value": 194.4, "unit": "dp"},
                    "height": {"type": "length", "value": 22.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "marine"},
                    "font-size": {"type": "length", "value": 15, "unit": "dp"},
