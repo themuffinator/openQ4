@@ -1074,6 +1074,23 @@ static void CheckAdmin(ScreenHost& host, const char* path) {
 		runtime.Frame(viewport,confirmTime+1.3);
 		confirmTime += 1.4;
 	}
+	// A long list: reopening the page on Players brings the chosen player's
+	// row into view and focuses it.
+	{
+		StateValues many = {{"mp.admin.player.count",30.0},{"mp.admin.player.selected",28.0},{"card.admin_section",0.0}};
+		for (int row = 0; row < 30; ++row) {
+			const std::string key = "mp.admin.player"+std::to_string(row);
+			many[key+".c0"] = std::string("Player ")+std::to_string(row+1); many[key+".client"] = static_cast<double>(row);
+			many[key+".identity"] = std::to_string(4096+row);
+		}
+		Check(runtime.SetState(many,error,9.0),"thirty players, the 29th chosen");
+		Check(runtime.RunEvent("tab_players",9.05,effects,error) && runtime.RunEvent("tab_admin",9.4,effects,error),"reopen the Admin page");
+		runtime.Frame(viewport,9.8);
+		runtime.Frame(viewport,9.9);
+		const auto list = bounds("admin-players"), row = bounds("admin-player-28");
+		Check(runtime.FocusedControl() == "admin-player-28","the chosen player's row takes the focus");
+		Check(row.y >= list.y-.5f && row.y+row.height <= list.y+list.height+.5f,"and stands inside the list");
+	}
 	Check(host.errors == 0,"no runtime diagnostics across the Admin page");
 }
 

@@ -502,7 +502,9 @@ then offered Players, Server and Console. The card's page
   its password, until the map changes.
 - **Players.** The players by client number, each row the scoreboard's with
   the player's team, the chosen one lit; a row's Accept names its client to
-  the game (`retained adminSelect <client>`). Kick, Ban and Force team switch
+  the game (`retained adminSelect <client>`). Opening the page on Players
+  focuses the chosen player's row, which scrolls a long list to it, as the
+  Players page reveals its selected row. Kick, Ban and Force team switch
   are the card's action plates, each with the chosen player beside it or,
   unavailable, why: no player chosen, the player's own row, a mode without
   teams, a managed match. They run the stock page's own actions, and the menu
@@ -930,6 +932,12 @@ answers YES: the request carries the player the dialog named. A fresh press
 on either plate opens its dialog rather than sending, alongside the existing
 held-press identity checks.
 
+The Admin page's player list did not bring the chosen player into view when it
+opened, so with a long list the selection could sit below the fold. Opening the
+page on Players now focuses that row (focus reveal scrolls it into view). A
+native check reopens the page with 30 players and the 29th chosen; the same
+check fails against the earlier card.
+
 The `mpadmin` engine capture now stops at the dialog and then presses YES:
 on Vulkan and OpenGL at 1280x720, on a listen server with bots, the dialog
 names the chosen bot, YES sends `mpAdminKick` and the server kicks it. The
@@ -1295,7 +1303,7 @@ The card's acceptance continues under `FLOW-046`.
   off to the stock page, and the stock menu then keeps the menu until it
   closes. The Escape card is near the runtime's 16 MiB document limit.
 - The Admin page's console completes nothing with Tab, as the stock console
-  did, and its player list never scrolls the chosen row into view by itself.
+  did.
 - Choosing an unavailable action does not announce its reason to the
   accessibility text backing yet, and a controller gives no rumble.
 - The Team page has no Tourney queue or arena controls; Tourney offers what

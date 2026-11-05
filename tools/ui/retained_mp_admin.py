@@ -411,10 +411,15 @@ def admin_page(doc: Document, index: int, ident: str, width: float, height: floa
     page = page_group(doc, index, ident, width, height, [gate, live], controls)
     # Opening the page focuses the password until the player is an admin,
     # then the section shown.
+    # On Players the chosen player's row takes the focus, which scrolls it
+    # into view, as the Players page reveals its selected row.
+    chosen = [{"op": "if", "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, row]},
+               "then": [{"op": "focus", "control": f"admin-player-{row}"}]} for row in range(PLAYERS)]
     focus_steps: list = []
     for position in reversed(range(len(SECTIONS))):
+        steps = [{"op": "focus", "control": f"admin-tab-{SECTIONS[position]}"}, *(chosen if SECTIONS[position] == "players" else [])]
         focus_steps = [{"op": "if", "condition": {"op": "==", "args": [{"state": "card.admin_section"}, position]},
-                        "then": [{"op": "focus", "control": f"admin-tab-{SECTIONS[position]}"}], **({"else": focus_steps} if focus_steps else {})}]
+                        "then": steps, **({"else": focus_steps} if focus_steps else {})}]
     focus = [{"op": "if", "condition": valid, "then": focus_steps, "else": [{"op": "focus", "control": "admin-password"}]}]
     return page, focus
 

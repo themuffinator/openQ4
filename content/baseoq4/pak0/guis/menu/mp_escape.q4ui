@@ -7974,7 +7974,169 @@
        {
         "op": "if",
         "condition": {"op": "==", "args": [{"state": "card.admin_section"}, 0]},
-        "then": [{"op": "focus", "control": "admin-tab-players"}],
+        "then": [
+         {"op": "focus", "control": "admin-tab-players"},
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 0]},
+          "then": [{"op": "focus", "control": "admin-player-0"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 1]},
+          "then": [{"op": "focus", "control": "admin-player-1"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 2]},
+          "then": [{"op": "focus", "control": "admin-player-2"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 3]},
+          "then": [{"op": "focus", "control": "admin-player-3"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 4]},
+          "then": [{"op": "focus", "control": "admin-player-4"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 5]},
+          "then": [{"op": "focus", "control": "admin-player-5"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 6]},
+          "then": [{"op": "focus", "control": "admin-player-6"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 7]},
+          "then": [{"op": "focus", "control": "admin-player-7"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 8]},
+          "then": [{"op": "focus", "control": "admin-player-8"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 9]},
+          "then": [{"op": "focus", "control": "admin-player-9"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 10]},
+          "then": [{"op": "focus", "control": "admin-player-10"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 11]},
+          "then": [{"op": "focus", "control": "admin-player-11"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 12]},
+          "then": [{"op": "focus", "control": "admin-player-12"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 13]},
+          "then": [{"op": "focus", "control": "admin-player-13"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 14]},
+          "then": [{"op": "focus", "control": "admin-player-14"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 15]},
+          "then": [{"op": "focus", "control": "admin-player-15"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 16]},
+          "then": [{"op": "focus", "control": "admin-player-16"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 17]},
+          "then": [{"op": "focus", "control": "admin-player-17"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 18]},
+          "then": [{"op": "focus", "control": "admin-player-18"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 19]},
+          "then": [{"op": "focus", "control": "admin-player-19"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 20]},
+          "then": [{"op": "focus", "control": "admin-player-20"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 21]},
+          "then": [{"op": "focus", "control": "admin-player-21"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 22]},
+          "then": [{"op": "focus", "control": "admin-player-22"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 23]},
+          "then": [{"op": "focus", "control": "admin-player-23"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 24]},
+          "then": [{"op": "focus", "control": "admin-player-24"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 25]},
+          "then": [{"op": "focus", "control": "admin-player-25"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 26]},
+          "then": [{"op": "focus", "control": "admin-player-26"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 27]},
+          "then": [{"op": "focus", "control": "admin-player-27"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 28]},
+          "then": [{"op": "focus", "control": "admin-player-28"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 29]},
+          "then": [{"op": "focus", "control": "admin-player-29"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 30]},
+          "then": [{"op": "focus", "control": "admin-player-30"}]
+         },
+         {
+          "op": "if",
+          "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 31]},
+          "then": [{"op": "focus", "control": "admin-player-31"}]
+         }
+        ],
         "else": [
          {
           "op": "if",
@@ -9301,7 +9463,169 @@
                      {
                       "op": "if",
                       "condition": {"op": "==", "args": [{"state": "card.admin_section"}, 0]},
-                      "then": [{"op": "focus", "control": "admin-tab-players"}],
+                      "then": [
+                       {"op": "focus", "control": "admin-tab-players"},
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 0]},
+                        "then": [{"op": "focus", "control": "admin-player-0"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 1]},
+                        "then": [{"op": "focus", "control": "admin-player-1"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 2]},
+                        "then": [{"op": "focus", "control": "admin-player-2"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 3]},
+                        "then": [{"op": "focus", "control": "admin-player-3"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 4]},
+                        "then": [{"op": "focus", "control": "admin-player-4"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 5]},
+                        "then": [{"op": "focus", "control": "admin-player-5"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 6]},
+                        "then": [{"op": "focus", "control": "admin-player-6"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 7]},
+                        "then": [{"op": "focus", "control": "admin-player-7"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 8]},
+                        "then": [{"op": "focus", "control": "admin-player-8"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 9]},
+                        "then": [{"op": "focus", "control": "admin-player-9"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 10]},
+                        "then": [{"op": "focus", "control": "admin-player-10"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 11]},
+                        "then": [{"op": "focus", "control": "admin-player-11"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 12]},
+                        "then": [{"op": "focus", "control": "admin-player-12"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 13]},
+                        "then": [{"op": "focus", "control": "admin-player-13"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 14]},
+                        "then": [{"op": "focus", "control": "admin-player-14"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 15]},
+                        "then": [{"op": "focus", "control": "admin-player-15"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 16]},
+                        "then": [{"op": "focus", "control": "admin-player-16"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 17]},
+                        "then": [{"op": "focus", "control": "admin-player-17"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 18]},
+                        "then": [{"op": "focus", "control": "admin-player-18"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 19]},
+                        "then": [{"op": "focus", "control": "admin-player-19"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 20]},
+                        "then": [{"op": "focus", "control": "admin-player-20"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 21]},
+                        "then": [{"op": "focus", "control": "admin-player-21"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 22]},
+                        "then": [{"op": "focus", "control": "admin-player-22"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 23]},
+                        "then": [{"op": "focus", "control": "admin-player-23"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 24]},
+                        "then": [{"op": "focus", "control": "admin-player-24"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 25]},
+                        "then": [{"op": "focus", "control": "admin-player-25"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 26]},
+                        "then": [{"op": "focus", "control": "admin-player-26"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 27]},
+                        "then": [{"op": "focus", "control": "admin-player-27"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 28]},
+                        "then": [{"op": "focus", "control": "admin-player-28"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 29]},
+                        "then": [{"op": "focus", "control": "admin-player-29"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 30]},
+                        "then": [{"op": "focus", "control": "admin-player-30"}]
+                       },
+                       {
+                        "op": "if",
+                        "condition": {"op": "==", "args": [{"state": "mp.admin.player.selected"}, 31]},
+                        "then": [{"op": "focus", "control": "admin-player-31"}]
+                       }
+                      ],
                       "else": [
                        {
                         "op": "if",
