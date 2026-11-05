@@ -10,8 +10,8 @@
   "defaultsModal.visible": {"type": "boolean", "initial": false},
   "defaultsModal.contents": {"type": "boolean", "initial": false},
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
-  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "summary.section": {"type": "number", "initial": -1},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
   "from_controls": {"type": "boolean", "initial": false},
@@ -432,6 +432,82 @@
   "noticeRest2": [{"op": "playTimeline", "timeline": "noticeRest2"}]
  },
  "bindings": [
+  {
+   "id": "defaultsModal-tab.width",
+   "node": "defaultsModal-tab",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+     235.824,
+     {
+      "op": "select",
+      "args": [
+       {"op": "==", "args": [{"state": "language"}, "czech"]},
+       230.922,
+       {
+        "op": "select",
+        "args": [
+         {"op": "==", "args": [{"state": "language"}, "english"]},
+         220.957,
+         {
+          "op": "select",
+          "args": [
+           {"op": "==", "args": [{"state": "language"}, "french"]},
+           268.961,
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+             195.48,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "italian"]},
+               190.637,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                 264.348,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                   291.715,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                     214.059,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                       221.855,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 183.0, 310.805]}
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
   {
    "id": "text.defaultsModal-title-outline-1.font-size",
    "node": "defaultsModal-title-outline-1",
@@ -10219,6 +10295,132 @@
     {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 1.6, 1]},
     0
    ]
+  },
+  {
+   "id": "tall.defaultsModal-tab.transform",
+   "node": "defaultsModal-tab",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+      {
+       "op": "*",
+       "args": [
+        {"op": "-", "args": [1.6, 1]},
+        {
+         "op": "*",
+         "args": [
+          0.5,
+          {
+           "op": "select",
+           "args": [
+            {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+            235.824,
+            {
+             "op": "select",
+             "args": [
+              {"op": "==", "args": [{"state": "language"}, "czech"]},
+              230.922,
+              {
+               "op": "select",
+               "args": [
+                {"op": "==", "args": [{"state": "language"}, "english"]},
+                220.957,
+                {
+                 "op": "select",
+                 "args": [
+                  {"op": "==", "args": [{"state": "language"}, "french"]},
+                  268.961,
+                  {
+                   "op": "select",
+                   "args": [
+                    {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                    195.48,
+                    {
+                     "op": "select",
+                     "args": [
+                      {"op": "==", "args": [{"state": "language"}, "italian"]},
+                      190.637,
+                      {
+                       "op": "select",
+                       "args": [
+                        {"op": "==", "args": [{"state": "language"}, "polish"]},
+                        264.348,
+                        {
+                         "op": "select",
+                         "args": [
+                          {"op": "==", "args": [{"state": "language"}, "russian"]},
+                          291.715,
+                          {
+                           "op": "select",
+                           "args": [
+                            {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                            214.059,
+                            {
+                             "op": "select",
+                             "args": [
+                              {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                              221.855,
+                              {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 183.0, 310.805]}
+                             ]
+                            }
+                           ]
+                          }
+                         ]
+                        }
+                       ]
+                      }
+                     ]
+                    }
+                   ]
+                  }
+                 ]
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 17.0]}]},
+      0
+     ]
+    },
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, 1.6, 1]},
+    0
+   ]
+  },
+  {
+   "id": "tall.defaultsModal-tab.left",
+   "node": "defaultsModal-tab",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, {"op": "*", "args": [1.6, 11.625]}, 11.625]
+   }
+  },
+  {
+   "id": "tall.defaultsModal-tab.top",
+   "node": "defaultsModal-tab",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 1.0]}, {"op": "*", "args": [1.6, 3.562]}, 3.562]
+   }
   },
   {
    "id": "tall.defaultsModal-title-outline.left",
@@ -21902,11 +22104,54 @@
             ],
             "stroke": {
              "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-             "widthDp": 1.5,
+             "widthDp": 3.0,
              "minimumPixels": 1,
              "join": "miter",
              "cap": "butt"
             }
+           }
+          ],
+          "children": [
+           {
+            "id": "defaultsModal-tab",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 11.625, "unit": "dp"},
+             "top": {"type": "length", "value": 3.562, "unit": "dp"},
+             "width": {"type": "length", "value": 310.805, "unit": "dp"},
+             "height": {"type": "length", "value": 17.0, "unit": "dp"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+            },
+            "paths": [
+             {
+              "id": "tab",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
+               {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
+             },
+             {
+              "id": "tab-rim",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+               "widthDp": 3.0,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
            }
           ]
          },

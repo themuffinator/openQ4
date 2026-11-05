@@ -653,15 +653,28 @@ Titles are upper case, a noun or a question (EXIT GAME, OVERWRITE SAVE?);
 bodies are sentence case; actions are short verbs (YES and NO, CONNECT and
 CANCEL, OK, CLOSE).
 
-**Black frame** (version 1.38, the product owner's rule): every pop-up built
-on the modal silhouette (the modal, system message and countdown frames under
-Pop-up frames below) carries a neat, thin and elegant opaque black frame,
-drawn on top of the glow without hiding it. It traces the silhouette's outline
-in black at 1.00, 1.5 dp wide in the Marine family; in the Strogg family it is
-3 dp, beneath the rail, so the rail keeps its color with a fine black edge
-either side. It adds to the construction above: the silhouette, the glow, the
-lit margin and the slot are unchanged, and the glow still shows around the
-frame.
+**Black frame** (version 1.38, the product owner's rule): every pop-up carries
+a neat, thin and elegant opaque black frame, drawn on top of the glow without
+hiding it.
+
+- **Modal frames** (the modal, system message and countdown frames under
+  Pop-up frames below) trace the silhouette's outline in black at 1.00, 3 dp
+  wide in the Marine family; in the Strogg family it is 4.5 dp, beneath the
+  rail, so the rail keeps its color with a black edge either side.
+- **The title's tab.** The frame fills the title slot in opaque black from the
+  raised top line, behind the title, and steps down to the slot's floor just
+  past the title's end at 45 degrees (the Strogg family's 30), so the title
+  stands on its own background. The tab's run follows the running language's
+  title plus 10 dp, capped where the slot's trailing flank begins; a title
+  that is not a localization key takes the whole slot. The tab's top and step
+  carry the frame's edge (and, in the Strogg family, its rail).
+- **Plate dialogs and dropdown lists** (the DISPLAY page's dialogs, every
+  dropdown list) take a 4 dp black stroke beneath their body, so 2 dp of black
+  shows outside their own outline or border.
+
+It adds to each construction: the silhouette, the glow, the lit margin, the
+slot's floor and trailing flank, and each plate's and list's own outline are
+unchanged, and the glow still shows around the frame.
 
 **Band**: the framing bands and loading edges below.
 
@@ -4103,10 +4116,12 @@ UI-05 qualification remain open.
 
 ### Version 1.38: the black frame
 
-Section 6's modals gain a thin opaque black frame tracing their silhouette,
-drawn on top of the glow without hiding it (the product owner's rule of 5
-November 2026). It adds to the construction; nothing else of the modal
-changes. No requirement changes, and nothing is accepted.
+Section 6's pop-ups gain an opaque black frame (the product owner's rule of 5
+November 2026): modals trace their silhouette in black on top of the glow
+without hiding it, with a black tab behind the title that steps down at 45
+degrees past its end, and the DISPLAY page's dialogs and every dropdown list
+gain a black edge outside their own outline. It adds to each construction;
+nothing else changes. No requirement changes, and nothing is accepted.
 
 ### Version 1.37: the initializing screen's entrance and cadence
 

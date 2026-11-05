@@ -20,8 +20,8 @@
   "quitModal.visible": {"type": "boolean", "initial": false},
   "quitModal.contents": {"type": "boolean", "initial": false},
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
-  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "view.text": {"type": "number", "initial": 1, "view": "text"},
   "exitModal.visible": {"type": "boolean", "initial": false},
   "exitModal.contents": {"type": "boolean", "initial": false},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
@@ -166,6 +166,75 @@
   "noticeRest2": [{"op": "playTimeline", "timeline": "noticeRest2"}]
  },
  "bindings": [
+  {
+   "id": "quitModal-tab.width",
+   "node": "quitModal-tab",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+     284.277,
+     {
+      "op": "select",
+      "args": [
+       {"op": "==", "args": [{"state": "language"}, "czech"]},
+       316.922,
+       {
+        "op": "select",
+        "args": [
+         {"op": "==", "args": [{"state": "language"}, "english"]},
+         277.574,
+         {
+          "op": "select",
+          "args": [
+           {"op": "==", "args": [{"state": "language"}, "german"]},
+           351.914,
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+             252.863,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "italian"]},
+               242.078,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                 295.176,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                   277.57,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                     292.598,
+                     {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 272.996, 352.125]}
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
   {
    "id": "text.quitModal-title-outline-1.font-size",
    "node": "quitModal-title-outline-1",
@@ -1730,6 +1799,82 @@
    "node": "quitModal-glow-soft",
    "property": "display",
    "value": {"op": "select", "args": [{"state": "soft_focus"}, "block", "none"]}
+  },
+  {
+   "id": "exitModal-tab.width",
+   "node": "exitModal-tab",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+     209.312,
+     {
+      "op": "select",
+      "args": [
+       {"op": "==", "args": [{"state": "language"}, "czech"]},
+       200.266,
+       {
+        "op": "select",
+        "args": [
+         {"op": "==", "args": [{"state": "language"}, "english"]},
+         164.535,
+         {
+          "op": "select",
+          "args": [
+           {"op": "==", "args": [{"state": "language"}, "french"]},
+           140.055,
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "german"]},
+             222.793,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+               139.879,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                 180.824,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "polish"]},
+                   186.633,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "russian"]},
+                     183.066,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                       200.402,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 158.43, 244.168]}
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "text.exitModal-title-outline-1.font-size",
@@ -13288,6 +13433,125 @@
    ]
   },
   {
+   "id": "tall.quitModal-tab.transform",
+   "node": "quitModal-tab",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {
+       "op": "*",
+       "args": [
+        {"op": "-", "args": [1.6, 1]},
+        {
+         "op": "*",
+         "args": [
+          0.5,
+          {
+           "op": "select",
+           "args": [
+            {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+            284.277,
+            {
+             "op": "select",
+             "args": [
+              {"op": "==", "args": [{"state": "language"}, "czech"]},
+              316.922,
+              {
+               "op": "select",
+               "args": [
+                {"op": "==", "args": [{"state": "language"}, "english"]},
+                277.574,
+                {
+                 "op": "select",
+                 "args": [
+                  {"op": "==", "args": [{"state": "language"}, "german"]},
+                  351.914,
+                  {
+                   "op": "select",
+                   "args": [
+                    {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                    252.863,
+                    {
+                     "op": "select",
+                     "args": [
+                      {"op": "==", "args": [{"state": "language"}, "italian"]},
+                      242.078,
+                      {
+                       "op": "select",
+                       "args": [
+                        {"op": "==", "args": [{"state": "language"}, "polish"]},
+                        295.176,
+                        {
+                         "op": "select",
+                         "args": [
+                          {"op": "==", "args": [{"state": "language"}, "russian"]},
+                          277.57,
+                          {
+                           "op": "select",
+                           "args": [
+                            {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                            292.598,
+                            {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 272.996, 352.125]}
+                           ]
+                          }
+                         ]
+                        }
+                       ]
+                      }
+                     ]
+                    }
+                   ]
+                  }
+                 ]
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 17.0]}]},
+      0
+     ]
+    },
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    0
+   ]
+  },
+  {
+   "id": "tall.quitModal-tab.left",
+   "node": "quitModal-tab",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 11.625]}, 11.625]
+   }
+  },
+  {
+   "id": "tall.quitModal-tab.top",
+   "node": "quitModal-tab",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 3.562]}, 3.562]
+   }
+  },
+  {
    "id": "tall.quitModal-title-outline.left",
    "node": "quitModal-title-outline",
    "property": "left",
@@ -14364,6 +14628,132 @@
     {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
     0
    ]
+  },
+  {
+   "id": "tall.exitModal-tab.transform",
+   "node": "exitModal-tab",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {
+       "op": "*",
+       "args": [
+        {"op": "-", "args": [1.6, 1]},
+        {
+         "op": "*",
+         "args": [
+          0.5,
+          {
+           "op": "select",
+           "args": [
+            {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+            209.312,
+            {
+             "op": "select",
+             "args": [
+              {"op": "==", "args": [{"state": "language"}, "czech"]},
+              200.266,
+              {
+               "op": "select",
+               "args": [
+                {"op": "==", "args": [{"state": "language"}, "english"]},
+                164.535,
+                {
+                 "op": "select",
+                 "args": [
+                  {"op": "==", "args": [{"state": "language"}, "french"]},
+                  140.055,
+                  {
+                   "op": "select",
+                   "args": [
+                    {"op": "==", "args": [{"state": "language"}, "german"]},
+                    222.793,
+                    {
+                     "op": "select",
+                     "args": [
+                      {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+                      139.879,
+                      {
+                       "op": "select",
+                       "args": [
+                        {"op": "==", "args": [{"state": "language"}, "italian"]},
+                        180.824,
+                        {
+                         "op": "select",
+                         "args": [
+                          {"op": "==", "args": [{"state": "language"}, "polish"]},
+                          186.633,
+                          {
+                           "op": "select",
+                           "args": [
+                            {"op": "==", "args": [{"state": "language"}, "russian"]},
+                            183.066,
+                            {
+                             "op": "select",
+                             "args": [
+                              {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                              200.402,
+                              {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 158.43, 244.168]}
+                             ]
+                            }
+                           ]
+                          }
+                         ]
+                        }
+                       ]
+                      }
+                     ]
+                    }
+                   ]
+                  }
+                 ]
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 17.0]}]},
+      0
+     ]
+    },
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    0
+   ]
+  },
+  {
+   "id": "tall.exitModal-tab.left",
+   "node": "exitModal-tab",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 11.625]}, 11.625]
+   }
+  },
+  {
+   "id": "tall.exitModal-tab.top",
+   "node": "exitModal-tab",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 3.562]}, 3.562]
+   }
   },
   {
    "id": "tall.exitModal-title-outline.left",
@@ -32178,11 +32568,54 @@
               ],
               "stroke": {
                "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-               "widthDp": 1.5,
+               "widthDp": 3.0,
                "minimumPixels": 1,
                "join": "miter",
                "cap": "butt"
               }
+             }
+            ],
+            "children": [
+             {
+              "id": "quitModal-tab",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 11.625, "unit": "dp"},
+               "top": {"type": "length", "value": 3.562, "unit": "dp"},
+               "width": {"type": "length", "value": 352.125, "unit": "dp"},
+               "height": {"type": "length", "value": 17.0, "unit": "dp"},
+               "pointer-events": {"type": "keyword", "value": "none"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "paths": [
+               {
+                "id": "tab",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
+                 {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
+               },
+               {
+                "id": "tab-rim",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                 "widthDp": 3.0,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
              }
             ]
            },
@@ -32985,11 +33418,54 @@
               ],
               "stroke": {
                "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-               "widthDp": 1.5,
+               "widthDp": 3.0,
                "minimumPixels": 1,
                "join": "miter",
                "cap": "butt"
               }
+             }
+            ],
+            "children": [
+             {
+              "id": "exitModal-tab",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 11.625, "unit": "dp"},
+               "top": {"type": "length", "value": 3.562, "unit": "dp"},
+               "width": {"type": "length", "value": 244.168, "unit": "dp"},
+               "height": {"type": "length", "value": 17.0, "unit": "dp"},
+               "pointer-events": {"type": "keyword", "value": "none"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "paths": [
+               {
+                "id": "tab",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
+                 {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
+               },
+               {
+                "id": "tab-rim",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                 "widthDp": 3.0,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
              }
             ]
            },

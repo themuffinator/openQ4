@@ -38440,6 +38440,82 @@
    "value": {"op": "/", "args": [15, {"state": "view.text"}]}
   },
   {
+   "id": "joinIpModal-tab.width",
+   "node": "joinIpModal-tab",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+     216.23,
+     {
+      "op": "select",
+      "args": [
+       {"op": "==", "args": [{"state": "language"}, "czech"]},
+       221.625,
+       {
+        "op": "select",
+        "args": [
+         {"op": "==", "args": [{"state": "language"}, "english"]},
+         245.652,
+         {
+          "op": "select",
+          "args": [
+           {"op": "==", "args": [{"state": "language"}, "french"]},
+           180.086,
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "german"]},
+             265.758,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+               246.16,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                 200.816,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                   251.104,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                     237.586,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                       188.902,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 236.875, 307.879]}
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
    "id": "text.joinIpModal-title-outline-1.font-size",
    "node": "joinIpModal-title-outline-1",
    "property": "font-size",
@@ -38994,6 +39070,82 @@
       "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
      },
      36.0
+    ]
+   }
+  },
+  {
+   "id": "findModal-tab.width",
+   "node": "findModal-tab",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+     236.453,
+     {
+      "op": "select",
+      "args": [
+       {"op": "==", "args": [{"state": "language"}, "czech"]},
+       253.195,
+       {
+        "op": "select",
+        "args": [
+         {"op": "==", "args": [{"state": "language"}, "english"]},
+         250.793,
+         {
+          "op": "select",
+          "args": [
+           {"op": "==", "args": [{"state": "language"}, "french"]},
+           194.973,
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "german"]},
+             299.477,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+               262.629,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "polish"]},
+                 282.52,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                   293.41,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                     306.566,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                       247.684,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 250.664, 310.965]}
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
     ]
    }
   },
@@ -151248,11 +151400,53 @@
             ],
             "stroke": {
              "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-             "widthDp": 1.5,
+             "widthDp": 3.0,
              "minimumPixels": 1,
              "join": "miter",
              "cap": "butt"
             }
+           }
+          ],
+          "children": [
+           {
+            "id": "joinIpModal-tab",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 12.429, "unit": "dp"},
+             "top": {"type": "length", "value": 3.562, "unit": "dp"},
+             "width": {"type": "length", "value": 307.879, "unit": "dp"},
+             "height": {"type": "length", "value": 17.0, "unit": "dp"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "tab",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
+               {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
+             },
+             {
+              "id": "tab-rim",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+               "widthDp": 3.0,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
            }
           ]
          },
@@ -152390,11 +152584,53 @@
             ],
             "stroke": {
              "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-             "widthDp": 1.5,
+             "widthDp": 3.0,
              "minimumPixels": 1,
              "join": "miter",
              "cap": "butt"
             }
+           }
+          ],
+          "children": [
+           {
+            "id": "findModal-tab",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 11.625, "unit": "dp"},
+             "top": {"type": "length", "value": 3.562, "unit": "dp"},
+             "width": {"type": "length", "value": 310.965, "unit": "dp"},
+             "height": {"type": "length", "value": 17.0, "unit": "dp"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "tab",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
+               {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
+             },
+             {
+              "id": "tab-rim",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+               "widthDp": 3.0,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
            }
           ]
          },

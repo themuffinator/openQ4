@@ -12808,6 +12808,68 @@
    "value": {"op": "/", "args": [22, {"state": "view.text"}]}
   },
   {
+   "id": "overwriteModal-tab.width",
+   "node": "overwriteModal-tab",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+     296.973,
+     {
+      "op": "select",
+      "args": [
+       {"op": "==", "args": [{"state": "language"}, "czech"]},
+       258.098,
+       {
+        "op": "select",
+        "args": [
+         {"op": "==", "args": [{"state": "language"}, "english"]},
+         245.145,
+         {
+          "op": "select",
+          "args": [
+           {"op": "==", "args": [{"state": "language"}, "french"]},
+           351.953,
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+             286.133,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "polish"]},
+               245.301,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "russian"]},
+                 347.436,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                   304.09,
+                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 200.703, 352.125]}
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
    "id": "text.overwriteModal-title-outline-1.font-size",
    "node": "overwriteModal-title-outline-1",
    "property": "font-size",
@@ -14282,6 +14344,82 @@
    "node": "overwriteModal-target",
    "property": "text",
    "value": {"state": "save.target"}
+  },
+  {
+   "id": "noticeModal-tab.width",
+   "node": "noticeModal-tab",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "==", "args": [{"state": "language"}, "brazilian"]},
+     114.891,
+     {
+      "op": "select",
+      "args": [
+       {"op": "==", "args": [{"state": "language"}, "czech"]},
+       157.031,
+       {
+        "op": "select",
+        "args": [
+         {"op": "==", "args": [{"state": "language"}, "english"]},
+         151.285,
+         {
+          "op": "select",
+          "args": [
+           {"op": "==", "args": [{"state": "language"}, "french"]},
+           136.008,
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "language"}, "german"]},
+             155.289,
+             {
+              "op": "select",
+              "args": [
+               {"op": "==", "args": [{"state": "language"}, "hungarian"]},
+               154.277,
+               {
+                "op": "select",
+                "args": [
+                 {"op": "==", "args": [{"state": "language"}, "italian"]},
+                 181.531,
+                 {
+                  "op": "select",
+                  "args": [
+                   {"op": "==", "args": [{"state": "language"}, "russian"]},
+                   158.789,
+                   {
+                    "op": "select",
+                    "args": [
+                     {"op": "==", "args": [{"state": "language"}, "spanish"]},
+                     159.297,
+                     {
+                      "op": "select",
+                      "args": [
+                       {"op": "==", "args": [{"state": "language"}, "turkish"]},
+                       114.266,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 104.441, 195.344]}
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "text.noticeModal-title-outline-1.font-size",
@@ -56358,11 +56496,53 @@
             ],
             "stroke": {
              "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-             "widthDp": 1.5,
+             "widthDp": 3.0,
              "minimumPixels": 1,
              "join": "miter",
              "cap": "butt"
             }
+           }
+          ],
+          "children": [
+           {
+            "id": "overwriteModal-tab",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 11.625, "unit": "dp"},
+             "top": {"type": "length", "value": 3.562, "unit": "dp"},
+             "width": {"type": "length", "value": 352.125, "unit": "dp"},
+             "height": {"type": "length", "value": 17.0, "unit": "dp"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "tab",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
+               {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
+             },
+             {
+              "id": "tab-rim",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+               "widthDp": 3.0,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
            }
           ]
          },
@@ -57172,11 +57352,53 @@
             ],
             "stroke": {
              "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-             "widthDp": 1.5,
+             "widthDp": 3.0,
              "minimumPixels": 1,
              "join": "miter",
              "cap": "butt"
             }
+           }
+          ],
+          "children": [
+           {
+            "id": "noticeModal-tab",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 11.625, "unit": "dp"},
+             "top": {"type": "length", "value": 3.562, "unit": "dp"},
+             "width": {"type": "length", "value": 195.344, "unit": "dp"},
+             "height": {"type": "length", "value": 17.0, "unit": "dp"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "tab",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
+               {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
+             },
+             {
+              "id": "tab-rim",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+               "widthDp": 3.0,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
            }
           ]
          },

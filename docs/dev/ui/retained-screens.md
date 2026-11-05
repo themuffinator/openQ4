@@ -2139,27 +2139,30 @@ this is a bounded working-copy checkpoint, with no product acceptance.
 
 ## The pop-up black frame (5 November 2026)
 
-Every pop-up now carries a neat, thin, opaque black frame (visual
-specification 1.38, the product owner's rule). It adds to each construction
-and changes nothing else:
+Every pop-up now carries an opaque black frame (visual specification 1.38, the
+product owner's rule). It adds to each construction and changes nothing else:
 
 - **Modal confirmations** (`confirmation()` in `build_retained_screens.py`:
-  every confirmation, notice, list and entry dialog in sixteen documents)
-  trace the silhouette's outline in black at 1.00, 1.5 dp wide, drawn in the
-  frame layer on top of the glow; the 0.70 silhouette, the glow and the lit
-  margin around it are unchanged. In the Strogg family the frame is 3 dp
-  beneath the orange rail, so the rail keeps its color with a fine black edge
-  either side.
-- **The DISPLAY page's Keep or Revert and unapplied-changes dialogs**
-  (`retained_system.py`) gain a 3 dp black stroke beneath their plate; the
-  plate's fill covers its inner half, so a fine black edge shows outside the
-  olive outline.
+  every confirmation, notice, list and entry dialog) trace the silhouette's
+  outline in black at 1.00, 3 dp wide, on top of the glow; the 0.70
+  silhouette, the glow and the lit margin around it are unchanged. In the
+  Strogg family the frame is 4.5 dp beneath the orange rail.
+- **The title's tab.** The frame fills the title slot in black from the raised
+  top line behind the title and steps down to the slot's floor 10 dp past the
+  title's end, at 45 degrees (Strogg 30). The tab's width follows the running
+  language's title (`per_language` on `sys_lang`), capped where the slot's
+  trailing flank begins. It is a child of the frame layer, so it enters and
+  leaves with it; the Strogg tab carries the rail along its top and step.
+- **The DISPLAY page's dialogs** (`retained_system.py`) and **every dropdown
+  list** (`choice_popup` in `retained_mp_menus.py`) gain a 4 dp black stroke
+  beneath their plate or body, so 2 dp of black shows outside their own
+  outline or border.
 
 All 65 retained native suites and the retained gate pass. Engine captures
-show the Admin page's Kick confirmation on Vulkan, the Strogg Exit
-confirmation and the DISPLAY page's unapplied-changes dialog on OpenGL, each
-framed with the glow or outline still showing (`.tmp/ui-roadmap/frame-vk/`,
-`.tmp/ui-roadmap/frame-gl/`). The UI register's binding of the visual
+show the Admin page's Kick confirmation on Vulkan, and the Strogg Exit
+confirmation, the DISPLAY page's unapplied-changes dialog and an open Game
+Options list on OpenGL (`.tmp/ui-roadmap/frame2-vk/`, `.tmp/ui-roadmap/frame2-gl/`,
+`.tmp/ui-roadmap/frame2-list/`). The UI register's binding of the visual
 specification was already stale before this change (it matches neither form
 of the earlier text), so the specification's new hash waits for a register
 increment with the other stale bindings.

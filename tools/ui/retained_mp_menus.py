@@ -1432,7 +1432,12 @@ def choice_popup(ident: str, entries: list, width: float) -> tuple[dict, list]:
             entry["enabled"] = enabled[0]
         options.append(entry)
     view_h = min(VOTE_VISIBLE_ROWS, len(entries)) * VOTE_OPTION_H
+    # The pop-up's opaque black frame (user rule, 5 November 2026), beneath
+    # the body: the fill covers its inner half, so 2 dp of black shows outside
+    # the faint border.
+    edge = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
     frame = vector(f"{ident}-popup-frame", FULL, [
+        path("rim", edge, stroke=stroke(solid([0, 0, 0, 1]), 4)),
         path("body", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})], fill=solid([0, 0, 0, 0.96]),
              stroke=stroke(solid(b.rgb("#B2CD43", 0.2)), 1)),
     ])

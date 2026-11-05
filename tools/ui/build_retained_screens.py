@@ -1453,10 +1453,12 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
     silhouette = strogg_modal_silhouette(width, height) if strogg else [modal_silhouette(width, height)]
     # Pop-ups carry a neat, thin, opaque black frame (user rule, 5 November
     # 2026): the silhouette's outline drawn in black on top of the glow, which
-    # stays as it is around it. The Strogg frame lies under its rail, so the
-    # rail keeps its color with a fine black edge either side.
+    # stays as it is around it, 3 dp so it reads at a glance. The Strogg frame
+    # lies under its rail, so the rail keeps its color with a black edge
+    # either side. The title's tab (below) joins it.
+    rim_w = 4.5 if strogg else 3.0
     rim = {"id": "rim", "commands": json.loads(json.dumps(silhouette[0]["commands"])),
-           "stroke": stroke(solid([0, 0, 0, 1]), 3.0 if strogg else 1.5)}
+           "stroke": stroke(solid([0, 0, 0, 1]), rim_w)}
     silhouette = [silhouette[0], rim, *silhouette[1:]]
     glow_tint = ST_LIGHT if strogg else GLOW_MODAL
     whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
@@ -1499,6 +1501,33 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
         if needed > title_end - foot:
             raise ValueError(f"{ident}: the {language} title {title_key} needs {needed:.1f} dp of {title_end - foot:.1f}"
                              + ("" if wide_title else "; pass wide_title=True"))
+    # The title's tab (user rule, 5 November 2026): the frame fills the slot
+    # in opaque black from the raised top line, behind the title, and steps
+    # down to the slot's floor just past the title's end, at 45 degrees (the
+    # Strogg family's 30), so the title stands on its own background. Its run
+    # follows the running language's title, capped where the slot's trailing
+    # flank begins; a title that is not a localization key takes the whole
+    # slot.
+    raised, tab_pad = 3.5625, 10.0
+    tab_left = slot_lead - rim_w / 2
+    tab_cap = slot_trail - flank
+    def tab_width(run: float) -> float:
+        return round(min(foot + run + tab_pad, tab_cap) + flank - tab_left, 3)
+    if title_key.startswith("#str_"):
+        widths = {language: tab_width(text_width(face, text, 20) - 1.5 * (len(text) - 1))
+                  for language, text in merged_text(title_key).items()}
+    else:
+        widths = {"english": tab_width(tab_cap)}
+    tab_edge = [(0, 0), ({"fraction": 1, "dp": -flank}, 0), ({"fraction": 1}, slot_depth)]
+    tab_paths = [path("tab", [*tab_edge, (0, slot_depth)], fill=solid([0, 0, 0, 1])),
+                 path("tab-rim", tab_edge, closed=False, stroke=stroke(solid([0, 0, 0, 1]), rim_w))]
+    if strogg:
+        tab_paths.append(path("tab-rail", tab_edge, closed=False, stroke=stroke(solid(rgb(ST_LINE, 0.75)), 1.5)))
+    tab = vector(f"{ident}-tab", {**absolute(left=round(tab_left, 4), top=raised, width=max(widths.values()), height=slot_depth),
+                                  "pointer-events": keyword("none")}, tab_paths)
+    if len(set(widths.values())) > 1:
+        doc.bind(f"{ident}-tab.width", f"{ident}-tab", "width", per_language(doc, widths))
+    frame["children"] = [*frame.get("children", []), tab]
     title_style = {**typeface(face, 20, 24, title_tint), "letter-spacing": length(-0.075, "em"), "white-space": keyword("nowrap")}
     title_box = absolute(left=round(foot, 4), top=-4, width=round(title_end - foot, 4), height=24)
     if strogg:
