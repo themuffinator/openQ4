@@ -520,6 +520,15 @@ not merely paperwork or a final screenshot.
   faults in the procedure: slow windows reported nothing, image regeneration
   outran the per-case timeout, and the summary dropped cases it could not judge.
   Physical runs on the desktop reference remain.
+  Quiet baseline, 5 November: in the first measurement window without peer
+  load, the Quality rotation is GPU-bound on its laptop reference. Render-thread
+  modes 0, 1 and 2 each average about 9.5–9.9 ms. GPU work averages 10.0 ms per
+  frame, with a 14.9 ms maximum, and 2,014 of 2,016 frames exceed 6.67 ms on the
+  GPU alone. SSAO is the largest lever (about 1.9 ms), then bloom (about 0.5 ms).
+  With SSAO off, the median is 6.1–6.35 ms but p99 stays about 11 ms, and every
+  configuration still has isolated 20–38 ms frames. Exact optimization cannot
+  close the floor. It needs a decision on the Quality workload plus removal of
+  those long frames; see the [quiet baseline](presentation-owners.md#quiet-quality-floor-baseline-5-november-2026).
 - [ ] **HF-08 — P1, qualification: late look and alternate views in play.**
   Run late look in live MP (listen host and remote client, prediction recovery),
   zoomed, on lifts and trams and through rapid turns, and measure physical

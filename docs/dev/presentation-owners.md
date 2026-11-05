@@ -1051,3 +1051,57 @@ its per-case gameplay reports. Path portability and validation wiring pass too.
 The earlier MP shutdown overflow was not reproduced in this run; existing
 scene-packet capacity fallback and post-restart Vulkan bootstrap labeling remain
 outside this iteration.
+
+### Quiet Quality floor baseline, 5 November 2026
+
+All earlier Quality-floor timings ran beside a dozen peer builds and clients.
+On 5 November the host was briefly quiet (9–37% CPU at launch, no other game
+client), and four fullscreen runs were taken from `main` at `2fdb9fe98`
+(`builddir`, debugoptimized, staged into `.install`). The workload was native
+2560 x 1440 Quality on Vulkan: `game/airdefense1`, a 360° rotation every 12 s
+from the start position, Remastered HUD, uncapped, VSync off. Windows taken
+after peer builds resumed fell to 44–48 Hz with simulation-bound pacing, so they
+are excluded. Times are in milliseconds.
+
+| Run | Mean | p50 | p95 | p99 | Max |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `r_vkRenderThread 0` | 9.89 | 9.85 | 12.20 | 15.65 | 22.35 |
+| `r_vkRenderThread 1` (two windows) | 9.49–9.66 | 9.35–9.55 | 11.90–12.60 | 12.95–16.95 | 14.08–66.18 |
+| `r_vkRenderThread 2` | 9.71 | 9.65 | 11.90 | 12.90 | 18.87 |
+
+In a quiet window the three render-thread modes are within noise of each
+other, because this host is **GPU-bound** at Quality. With GPU timers on, a
+2,016-frame capture in mode 0 measured 10.02 ms of GPU work per frame (p50
+9.77, p99 12.95, maximum 14.88), and 2,014 of those frames exceeded 6.67 ms on
+the GPU alone. The CPU side was 4.50 ms of frame building and 4.09 ms of
+recording/submission per frame. Mode 2 overlaps those two, but cannot shorten
+the GPU frame.
+
+A 2,048-frame `r_vkGpuPhaseProfile` attributes the GPU frame: the main view
+6.43 ms (maximum 10.44) and the portal sky 1.51 ms, plus a 0.16 ms target
+resolve. Within the main view, SSAO takes 1.94 ms (0.39 ms depth capture,
+1.55 ms drawing), lights 1.64 ms, bloom and tone mapping 1.08 ms, the depth
+prepass 0.70 ms, shadow maps 0.60 ms, the ambient walks 0.83 ms and SMAA
+0.22 ms. `profileFrameWork` puts the game session at 1.05 ms mean (p99 4.38 ms).
+
+One launch alternated windows in mode 2 to bound what each area could give
+back. Each value is a range over two rotated windows:
+
+| Window | Present mean | p50 | p99 | Max |
+| --- | ---: | ---: | ---: | ---: |
+| Quality | 8.30–8.70 | 8.80–9.05 | 14.45–14.50 | 24.99–37.88 |
+| `r_ssao 0` | 6.73–6.91 | 6.10–6.35 | 11.05–11.30 | 28.83–33.39 |
+| `r_bloom 0` | 8.02–8.33 | 8.35 | 12.70–14.70 | 23.15–26.59 |
+| `r_skipSubviews 1` | 8.58–8.71 | 8.90–9.10 | 12.55–12.65 | 19.75–20.79 |
+
+`r_skipSubviews` does not remove the portal sky, so that row is the baseline
+again. Even with SSAO disabled, the p99 is about 11 ms, and every
+configuration has isolated 20–38 ms frames. Meeting the every-frame floor on
+this reference therefore needs two things. The worst GPU frames, at about
+15 ms, must fall below 6.67 ms, a cut of more than half that exact
+reordering cannot supply. The isolated long frames must also be removed. That
+is a workload decision for the Quality preset (SSAO resolution or sample
+count, bloom, MSAA, or dynamic resolution), not a render-thread mode. Evidence
+is under `.tmp/hf-floor/runs/` (`cycle-base`, `phases-base`, `frames0`,
+`sens1`), with launch arguments and runtime hashes. `sens2` and the later
+`cycle-base` windows ran under peer load and are not used.
