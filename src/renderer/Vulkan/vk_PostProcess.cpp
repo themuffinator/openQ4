@@ -1219,6 +1219,7 @@ void VK_PostProcess_CaptureWorldDepth( const viewDef_t *viewDef, int fillPhase, 
 	if ( fillPhase == ( split ? 2 : 1 ) && ( captures & VK_POST_CAPTURE_SSAO_WORLD ) != 0
 			&& phaseDrawn[ 0 ] + phaseDrawn[ 1 ] + ( split ? phaseDrawn[ 2 ] : 0 ) > 0 ) {
 		idImage *image = VK_Post_EnsureImage( vkPostScene.ssaoWorldDepth, "_vkSSAOWorldDepth", VK_Post_DepthImage );
+		vkGpuPhaseScope timing( VK_Exec_ActiveCmd(), VK_GPU_PHASE_SSAO_SNAPSHOT );
 		if ( VK_Post_CaptureDepth( image, viewDef ) ) {
 			vkPostScene.ssaoWorldDepthFrame = backEnd.frameCount;
 			vkPostScene.ssaoWorldDepthWidth = width;

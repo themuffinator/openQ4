@@ -1168,6 +1168,32 @@ Removing it without changing the AO needs another source of world-only depth,
 such as a separate single-sample world depth draw. That is the next measured
 GPU lever.
 
+A new `ssaoSnapshot` phase in `r_vkGpuPhaseProfile` times the copy itself
+(`snapphase1`, three rounds). It takes 0.42–0.50 ms of the prepass, against a
+prepass of 0.69–0.83 ms with SSAO and 0.25–0.32 ms without. Lighting then
+costs about 0.13 ms more and the first ambient walk about 0.1 ms more, which
+is smaller than the first estimate. A worktree-only timer around the flipped
+blit in `VK_Exec_CopyRender` measured about 0.2 ms for all of a frame's depth
+blits under heavy contention. Each depth capture's cost is therefore mostly
+the render-pass resolve of the whole 4x depth buffer, which is bandwidth-bound.
+This applies equally to the final-depth capture SSAO takes after the scene
+(`ssaoDepth`, about 0.4 ms). A cheaper copy mechanism would recover little.
+Only a world-depth source that never reads the multisampled buffer removes the
+snapshot, at the cost of recording the world's depth draws twice.
+
+Where the floor stands. In the quiet windows of `snapphase1`, the
+half-resolution Quality frame averaged 6.90–7.42 ms of GPU work. Removing the
+snapshot (about 0.45 ms net) and confining the portal sky (1.3–1.6 ms) to the
+screen bounds of the main view's sky surfaces could bring the average under
+6.67 ms. The portal-sky change needs a view-wide scissor in every Vulkan pass,
+because a surface's scissor replaces the view's. However, the frames looking
+at the most geometry run about 60% above the mean (the main view peaked at
+10.4 ms against a 6.4 ms mean in the baseline), and frames that run a game tic
+exceed 6.67 ms on the main thread alone. Exact optimization of the current
+Quality workload therefore cannot hold every frame at or under 6.67 ms on this
+reference. Closing the floor needs a further decision: a percentile budget,
+further Quality reductions, or dynamic resolution.
+
 Evidence is under `.tmp/hf-floor/runs/` (`dshots1`, `valid1`, `gpuab1`,
 `gpuab2`, `snap1`), built from a detached worktree so that peer sessions'
 staging could not replace the runtime under test.
