@@ -542,6 +542,17 @@ not merely paperwork or a final screenshot.
   and [long-frame attribution](presentation-owners.md#long-frame-attribution-5-november-2026).
   The every-frame floor stays open: about 7.7 ms of GPU work remains per frame,
   and main-thread tic frames exceed 6.67 ms.
+  **Floor decision, 5 November:** the user replaced the every-frame rule with a
+  percentile budget. The Quality floor is now a **99th-percentile frame
+  interval at or under 6.67 ms**; the maximum is reported but not judged.
+  `airdefense_performance.py` gates on p99 and records the Vulkan worker
+  mode (`--render-thread`). In quiet windows the half-resolution Quality GPU
+  frame averages 6.9–7.4 ms, so the p99 floor still needs about 2.5 ms of
+  mean frame time removed, as well as the heavy-view tail. Clipping the portal
+  sky to its visible region is not exact in the current pass order: the
+  compiled map has no sky faces, so where the backdrop shows is only known
+  from the main view's depth, after the backdrop is drawn. See
+  [where the floor stands](presentation-owners.md#half-resolution-ssao-for-quality-5-november-2026).
 - [ ] **HF-08 — P1, qualification: late look and alternate views in play.**
   Run late look in live MP (listen host and remote client, prediction recovery),
   zoomed, on lifts and trams and through rapid turns, and measure physical

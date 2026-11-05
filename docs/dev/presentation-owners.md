@@ -1194,6 +1194,22 @@ Quality workload therefore cannot hold every frame at or under 6.67 ms on this
 reference. Closing the floor needs a further decision: a percentile budget,
 further Quality reductions, or dynamic resolution.
 
+The user chose the percentile budget: **p99 frame interval at or under
+6.67 ms**, with the maximum reported. `airdefense_performance.py` now passes
+`--max-p99-ms 6.6667` and no maximum gate, accepts `--render-thread 0|1|2`
+(recorded as `renderThread`), and accepts `--runtime-dir` for a candidate
+under `.tmp/stock-runtime/`.
+
+A portal-sky clip was prototyped and rejected. The idea was to clear the
+backdrop view's depth to 0 outside the main view's sky region so its passes
+reject those pixels. airdefense1's compiled `.proc` contains no sky faces:
+dmap leaves the openings empty, and the backdrop shows wherever the main view
+draws nothing. Neither the main view's draw list nor its stage-less faces
+locate the sky, and full-frame captures with the clip on lost the whole sky
+(`pshots1`, `pshots2`: up to 2.4 million pixels changed against an off/off
+capture noise of at most 27 levels). An exact clip would need the main view's
+depth before the backdrop is drawn, which reorders the frame.
+
 Evidence is under `.tmp/hf-floor/runs/` (`dshots1`, `valid1`, `gpuab1`,
 `gpuab2`, `snap1`), built from a detached worktree so that peer sessions'
 staging could not replace the runtime under test.
