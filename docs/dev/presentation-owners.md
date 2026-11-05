@@ -1267,6 +1267,19 @@ after paying for the early world depth. The early pass records the world's
 depth draws a second time on the backend thread. That CPU cost could not be
 measured under the same contention and needs a quiet paired run.
 
+First p99 qualification attempt. `airdefense_performance.py --render-thread 2`
+ran three fullscreen Quality runs on the candidate runtime
+(`.tmp/stock-runtime/hf-candidate`: half-resolution SSAO, portal-sky mask;
+before the streamed-audio change `867fa47fd`). Each run started after three
+consecutive 30-second checks found no game clients or builds, CPU under 25%
+and GPU under 15%. The workload checks passed; pacing failed at 77.2, 58.9 and
+57.6 FPS mean, with p99 26.65, 27.45 and 26.15 ms. The same build measured
+about 105 Hz in probe rotations an hour earlier, and peer builds were running
+again (79% CPU) when the runs ended. The quiet check guards only the start of
+a six-minute run, so this records contention, not the build's p99.
+Qualification needs a host that stays quiet throughout, or the reference
+desktop. Evidence: `.tmp/airdefense-perf/p99-mode2-20261105-2142`.
+
 Evidence is under `.tmp/hf-floor/runs/` (`dshots1`, `valid1`, `gpuab1`,
 `gpuab2`, `snap1`), built from a detached worktree so that peer sessions'
 staging could not replace the runtime under test.
