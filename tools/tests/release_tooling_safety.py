@@ -1395,9 +1395,10 @@ def validate_manual_release_companion_checkout() -> None:
     release_job_offset = workflow.index("  release:")
     release_steps_offset = workflow.index("    steps:", release_job_offset)
     release_header = workflow[release_job_offset:release_steps_offset]
-    for token in ('needs: [metadata, builds, android]', "needs.android.result == 'success'"):
+    for token in ('needs: [metadata, content_packs, builds, android]', "needs.android.result == 'success'",
+                  "needs.content_packs.result == 'success'"):
         if token not in release_header:
-            raise AssertionError('Android APK validation must gate release publication: ' + token)
+            raise AssertionError('Android APK and content pack validation must gate release publication: ' + token)
     if (
         "needs.builds.result == 'success'"
         " && inputs.generate_linux_arm64_evidence_candidate == false"

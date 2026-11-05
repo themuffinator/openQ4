@@ -29,10 +29,15 @@ python tools/build/prepare_android_deps.py --ndk "${ANDROID_NDK_HOME}" \
     --sdl-source "${sdl_source}" --openal-source "${task_root}/sources/openal-soft-${openal_version}" \
     --prefix "${task_root}/deps" --build-root "${task_root}/dependency-builds" --api 24 --jobs 4
 python tools/build/android_cross.py --ndk "${ANDROID_NDK_HOME}" --api 24 --out "${task_root}/arm64.ini"
+# A release build ships the same content packs as every other platform.
+prebuilt_args=()
+if [ -n "${OPENQ4_PREBUILT_CONTENT_PACKS:-}" ]; then
+    prebuilt_args=("-Dprebuilt_content_packs=${OPENQ4_PREBUILT_CONTENT_PACKS}")
+fi
 bash tools/build/meson_setup.sh setup builddir/android-arm64 \
     --cross-file "${task_root}/arm64.ini" --buildtype=release -Db_ndebug=true \
     --wrap-mode=forcefallback "-Dandroid_deps_root=${task_root}/deps" \
-    -Dversion_track=stable "-Dversion_base_override=${version}"
+    -Dversion_track=stable "-Dversion_base_override=${version}" "${prebuilt_args[@]}"
 bash tools/build/meson_setup.sh compile -C builddir/android-arm64 -j 4
 bash tools/build/meson_setup.sh install -C builddir/android-arm64 --no-rebuild --skip-subprojects
 python tools/build/verify_release_source_provenance.py --project-root "${project_root}" \

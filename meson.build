@@ -1855,6 +1855,12 @@ if build_engine or build_games
   ).stdout().strip().split('
 ')
   openq4_pak_header_args = []
+  # A release passes -Dprebuilt_content_packs=<dir>: every platform then copies
+  # the release's single build of each pack instead of repacking it.
+  openq4_prebuilt_pack_args = []
+  if get_option('prebuilt_content_packs') != ''
+    openq4_prebuilt_pack_args = ['--prebuilt-dir', get_option('prebuilt_content_packs')]
+  endif
   foreach openq4_pack_row : openq4_content_pack_table
     openq4_pack_fields = openq4_pack_row.strip().split('|')
     openq4_pack_name = openq4_pack_fields[0]
@@ -1892,7 +1898,7 @@ if build_engine or build_games
         '@OUTPUT@',
         '--stage-out',
         meson.current_build_dir() / 'baseoq4' / openq4_pack_name,
-      ],
+      ] + openq4_prebuilt_pack_args,
       depend_files: openq4_pak_script_files + files(
         'tools/build/build_openq4_pack.py',
       ),

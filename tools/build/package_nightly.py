@@ -36,6 +36,7 @@ from generate_release_docs import GeneratedDocSite, generate_release_docs_site
 from gamelibs_stage_path import MANIFEST_NAME as GAMELIBS_STAGE_MANIFEST_NAME, stage_root as gamelibs_stage_root
 from game_layer import PACKAGED_LAYER_GAME_DIRS, RETIRED_LAYER_GAME_DIRS, LayerError, read_layer_mod_json
 from openq4_pak import (
+    OPENQ4_BULK_PACK_NAMES,
     OPENQ4_CONTENT_PACKS_BY_NAME,
     OPENQ4_PK4_FORBIDDEN_FILES,
     OPENQ4_PACK_NAMES,
@@ -2557,7 +2558,15 @@ def create_release_archive(
     archive_path: Path,
     archive_format: str,
     executable_relative_paths: set[Path] | None = None,
+    *,
+    excluded_relative_paths: frozenset[str] = frozenset(),
+    rootless: bool = False,
 ) -> None:
+    """Archive package_root under its own folder name, or at the archive root when rootless.
+
+    An update archive is rootless so it extracts straight into an existing
+    openQ4 folder, replacing files, and leaves out the bulk content packs.
+    """
     validate_archive_output_outside_input_tree(package_root, archive_path, "release archive output")
     prepare_archive_output_path(archive_path, "release archive output")
 
@@ -2581,7 +2590,9 @@ def create_release_archive(
                 if not path.is_file():
                     continue
                 relative_path = path.relative_to(package_root)
-                arcname = (Path(package_root.name) / relative_path).as_posix()
+                if relative_path.as_posix() in excluded_relative_paths:
+                    continue
+                arcname = relative_path.as_posix() if rootless else (Path(package_root.name) / relative_path).as_posix()
                 info = ZipInfo(arcname, date_time=DETERMINISTIC_ARCHIVE_TIMESTAMP)
                 info.compress_type = ZIP_DEFLATED
                 mode = 0o100644
@@ -2599,7 +2610,9 @@ def create_release_archive(
             if not path.is_file():
                 continue
             relative_path = path.relative_to(package_root)
-            arcname = (Path(package_root.name) / relative_path).as_posix()
+            if relative_path.as_posix() in excluded_relative_paths:
+                continue
+            arcname = relative_path.as_posix() if rootless else (Path(package_root.name) / relative_path).as_posix()
             info = archive.gettarinfo(path, arcname=arcname)
             info.uid = 0
             info.gid = 0
@@ -2611,6 +2624,69 @@ def create_release_archive(
                 info.mode = 0o755
             with path.open("rb") as handle:
                 archive.addfile(info, handle)
+
+
+UPDATE_ARCHIVE_SUFFIX = "-update"
+WINDOWS_SYMBOL_ARCHIVE_SUFFIX = "-symbols.zip"
+
+
+def update_archive_excluded_paths() -> frozenset[str]:
+    """The bulk content packs, which full packages carry and update archives leave out."""
+    return frozenset(f"{GAME_DIR_NAME}/{pak_name}" for pak_name in OPENQ4_BULK_PACK_NAMES)
+
+
+def move_windows_symbols(package_root: Path, symbol_root: Path) -> list[Path]:
+    """Move every PDB out of the package into symbol_root, keeping relative paths.
+
+    Players never need them; crash reports are symbolized from the symbols asset,
+    as the Linux debug-symbol and macOS dSYM archives already are.
+    """
+    if symbol_root.exists():
+        shutil.rmtree(symbol_root)
+    moved: list[Path] = []
+    for path in sorted(package_root.rglob("*.pdb")):
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeError(f"Windows symbol is not a regular file: {path}")
+        relative = path.relative_to(package_root)
+        destination = symbol_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(path), str(destination))
+        moved.append(relative)
+    return moved
+
+
+def create_windows_symbol_archive(
+    package_root: Path, symbol_root: Path, archive_path: Path, symbols: list[Path], version: str, arch: str
+) -> None:
+    """Zip the moved PDBs with a manifest pairing each with its binary's SHA-256."""
+    prepare_archive_output_path(archive_path, "Windows symbol archive output")
+    lines = [
+        "openQ4 Windows symbols",
+        f"version={version}",
+        f"arch={arch}",
+        f"runtime_archive={package_root.name}.zip",
+    ]
+    for relative in symbols:
+        binary = None
+        for suffix in (".exe", ".dll"):
+            candidate = package_root / relative.with_suffix(suffix)
+            if candidate.is_file():
+                binary = candidate
+                break
+        binary_digest = sha256_file(binary) if binary is not None else "-"
+        binary_name = binary.relative_to(package_root).as_posix() if binary is not None else "-"
+        lines.append(f"{relative.as_posix()}\t{sha256_file(symbol_root / relative)}\t{binary_name}\t{binary_digest}")
+    write_text_file(symbol_root / "SYMBOLS.txt", lines)
+    with ZipFile(archive_path, "w", compression=ZIP_DEFLATED, compresslevel=9) as archive:
+        for path in sorted(symbol_root.rglob("*")):
+            if not path.is_file():
+                continue
+            info = ZipInfo((Path(symbol_root.name) / path.relative_to(symbol_root)).as_posix(), date_time=DETERMINISTIC_ARCHIVE_TIMESTAMP)
+            info.compress_type = ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
+            info.create_system = 3
+            with path.open("rb") as source, archive.open(info, "w") as target:
+                shutil.copyfileobj(source, target, length=1024 * 1024)
 
 
 def get_package_executable_archive_paths(
@@ -4165,6 +4241,21 @@ def main(argv: list[str]) -> int:
         packaged_layers if args.platform == "macos" else (),
     )
 
+    windows_symbol_archive_path: Path | None = None
+    if args.platform == "windows":
+        try:
+            symbol_root = output_dir / f"{package_stem}-symbols"
+            moved_symbols = move_windows_symbols(package_root, symbol_root)
+            if moved_symbols:
+                windows_symbol_archive_path = output_dir / f"{package_stem}{WINDOWS_SYMBOL_ARCHIVE_SUFFIX}"
+                create_windows_symbol_archive(
+                    package_root, symbol_root, windows_symbol_archive_path, moved_symbols, version, args.arch
+                )
+        except (OSError, RuntimeError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+
+    update_archive_path: Path | None = None
     try:
         create_release_archive(
             package_root,
@@ -4172,6 +4263,16 @@ def main(argv: list[str]) -> int:
             archive_format,
             archive_executable_paths,
         )
+        if args.platform in ("windows", "linux") and archive_format in ("zip", "tar.gz", "tar.xz"):
+            update_archive_path = output_dir / f"{package_stem}{UPDATE_ARCHIVE_SUFFIX}{archive_suffix}"
+            create_release_archive(
+                package_root,
+                update_archive_path,
+                archive_format,
+                archive_executable_paths,
+                excluded_relative_paths=update_archive_excluded_paths(),
+                rootless=True,
+            )
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -4208,6 +4309,10 @@ def main(argv: list[str]) -> int:
     print(f"Packaged openQ4 release {version} for {args.platform}")
     print(f"Package directory: {package_root}")
     print(f"Release archive: {archive_path}")
+    if update_archive_path is not None:
+        print(f"Update archive (no {', '.join(OPENQ4_BULK_PACK_NAMES)}): {update_archive_path}")
+    if windows_symbol_archive_path is not None:
+        print(f"Windows symbol archive: {windows_symbol_archive_path}")
     print(f"Archive format: {archive_format}")
     print(f"Version manifest: {package_root / 'VERSION.txt'}")
     print(f"Documentation portal: {generated_docs.index_path} ({generated_docs.page_count} pages)")

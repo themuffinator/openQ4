@@ -4,6 +4,7 @@
 Subcommands:
 
   meson-list           one `name|source|stem` line per pack, for Meson's pack targets
+  bulk-list            the bulk packs (published on their own), one name per line
   digest               source digest of every pack (or --pack) in a working tree
   digest-at-rev        source digest of every pack at a git revision, without a checkout
 
@@ -33,6 +34,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("meson-list", help="List packs for Meson.")
+    sub.add_parser("bulk-list", help="List the bulk packs.")
 
     digest = sub.add_parser("digest", help="Digest pack sources in a working tree.")
     digest.add_argument("--source-root", default=".", help="Repository root.")
@@ -94,6 +96,11 @@ def main(argv: list[str]) -> int:
         if args.command == "meson-list":
             for spec in OPENQ4_CONTENT_PACKS:
                 print(f"{spec.name}|{spec.source}|{Path(spec.name).stem}")
+            return 0
+        if args.command == "bulk-list":
+            for spec in OPENQ4_CONTENT_PACKS:
+                if spec.bulk:
+                    print(spec.name)
             return 0
 
         specs = selected_specs(args.pack)

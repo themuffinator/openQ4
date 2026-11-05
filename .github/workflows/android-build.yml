@@ -12,6 +12,11 @@ on:
       version:
         required: true
         type: string
+      content_packs_artifact:
+        description: Artifact holding the release's prebuilt content packs and content-packs.json
+        required: false
+        type: string
+        default: ''
     secrets:
       ANDROID_RELEASE_KEYSTORE_BASE64:
         required: true
@@ -64,9 +69,20 @@ jobs:
           "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
             "ndk;${ANDROID_NDK_VERSION}" 'platforms;android-35' 'build-tools;35.0.0'
           echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+      - name: Download the release's content packs
+        if: inputs.content_packs_artifact != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.content_packs_artifact }}
+          path: ${{ runner.temp }}/content-packs
       - name: Build native modules and unsigned release APK
         shell: bash
-        run: bash tools/build/build_android_release.sh
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.content_packs_artifact }}" ]; then
+            export OPENQ4_PREBUILT_CONTENT_PACKS="${RUNNER_TEMP}/content-packs"
+          fi
+          bash tools/build/build_android_release.sh
       - name: Sign and verify release APK
         env:
           ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}

@@ -4,11 +4,21 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
 import time
 from pathlib import Path
 
-from openq4_pak import OPENQ4_PACK_NAMES, advance_mtime_ns, copy_file_if_changed, create_game_pk4
+from openq4_pak import (
+    OPENQ4_PACK_NAMES,
+    Pk4BuildResult,
+    advance_mtime_ns,
+    copy_file_if_changed,
+    create_game_pk4,
+    inspect_game_pk4,
+    pack_source_digest,
+)
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -25,6 +35,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--stage-out",
         default="",
         help="Optional additional baseoq4/<pak>.pk4 path to copy for direct builddir launches.",
+    )
+    parser.add_argument(
+        "--prebuilt-dir",
+        default="",
+        help=(
+            "Directory holding this pack prebuilt, with the content-packs.json that "
+            "tools/build/content_pack_release.py build wrote. The prebuilt file is "
+            "copied instead of packing, after its SHA-256 and recorded source digest "
+            "are checked against the file and the checked-out sources; any mismatch "
+            "is an error, never a silent repack."
+        ),
     )
     parser.add_argument(
         "--exclude",
@@ -65,6 +86,36 @@ def require_manifest_file(path: Path, pak_name: str) -> Path:
     return resolved
 
 
+def sha256_hex(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def copy_prebuilt_pack(prebuilt_dir: Path, pak_name: str, source_dir: Path, pak_out: Path) -> Pk4BuildResult:
+    """Use the release's one build of this pack, so every platform ships its bytes."""
+    manifest_path = prebuilt_dir / "content-packs.json"
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    record = next((pack for pack in document.get("packs", []) if pack.get("name") == pak_name), None)
+    if record is None:
+        raise RuntimeError(f"{manifest_path} does not list {pak_name}")
+    prebuilt = prebuilt_dir / pak_name
+    if prebuilt.is_symlink() or not prebuilt.is_file():
+        raise RuntimeError(f"prebuilt {pak_name} is missing or not a regular file: {prebuilt}")
+    if sha256_hex(prebuilt) != record["sha256"]:
+        raise RuntimeError(f"prebuilt {pak_name} does not have the SHA-256 its manifest records")
+    digest, _count = pack_source_digest(source_dir, pak_name)
+    if digest != record["source_digest"]:
+        raise RuntimeError(
+            f"prebuilt {pak_name} was built from other sources (source digest {record['source_digest']}, "
+            f"checked-out sources {digest})"
+        )
+    copy_file_if_changed(prebuilt, pak_out)
+    return inspect_game_pk4(pak_out, pak_name=pak_name)
+
+
 def main(argv: list[str]) -> int:
     started_ns = time.time_ns()
     args = parse_args(argv)
@@ -85,8 +136,14 @@ def main(argv: list[str]) -> int:
             return 1
 
     try:
-        result = create_game_pk4(source_dir, pak_out, pak_name=pak_name, content_filters=args.exclude)
-    except RuntimeError as exc:
+        if args.prebuilt_dir:
+            if args.exclude:
+                raise RuntimeError("--prebuilt-dir cannot be combined with --exclude")
+            result = copy_prebuilt_pack(Path(args.prebuilt_dir).resolve(), pak_name, source_dir, pak_out)
+            print(f"using prebuilt {pak_name} from {Path(args.prebuilt_dir).resolve()}")
+        else:
+            result = create_game_pk4(source_dir, pak_out, pak_name=pak_name, content_filters=args.exclude)
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

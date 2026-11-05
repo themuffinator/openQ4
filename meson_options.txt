@@ -176,3 +176,10 @@ option(
   value: false,
   description: 'Build focused dependency-light native engine tests used by validation profiles.',
 )
+
+option(
+  'prebuilt_content_packs',
+  type: 'string',
+  value: '',
+  description: 'Directory holding prebuilt openQ4 content packs and their content-packs.json (tools/build/content_pack_release.py build). Each pack target copies the prebuilt file after checking that its recorded source digest matches the checked-out sources, so every platform build of a release carries the same pack bytes. Empty packs from source.',
+)

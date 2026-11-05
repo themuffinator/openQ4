@@ -45,6 +45,8 @@ On a machine without a display, use the dedicated server executable below.
 
 The dedicated server does not need a GPU or an OpenGL-capable desktop session, but it still needs the same retail `q4base/` assets and matching openQ4 game modules as the client.
 
+Of openQ4's own content packs, a dedicated server needs only `baseoq4/pak0.pk4`. The light grids (`pak1.pk4`) and loadscreens (`pak2.pk4`) are for clients, so a server-only install can delete them and save about 800 MB; the server log then notes that it does not carry them. Clients keep using their own copies on your server, pure or not: those packs never enter a server's pure list.
+
 For light testing, plan on a modern 64-bit host with at least 2 GB RAM available to the operating system and server, plus the same package and Quake 4 asset storage described in the [Getting Started system requirements](getting-started.md#system-requirements). For public servers, prefer 4 GB+ RAM, a stable wired connection, and enough upload bandwidth for the player count you advertise.
 
 ## Quick Start

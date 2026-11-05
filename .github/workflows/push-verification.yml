@@ -79,6 +79,7 @@ jobs:
             tools/build/prepare_android_deps.py \
             tools/build/build_openq4_pack.py \
             tools/build/content_packs.py \
+            tools/build/content_pack_release.py \
             tools/build/build_pak0.py \
             tools/build/build_windows_installer.py \
             tools/build/check_staged_content_edits.py \
@@ -390,6 +391,7 @@ jobs:
             tools/tests/openq4_pure_pack.py \
             tools/tests/p0_governance_evidence.py \
             tools/tests/packaging_safety.py \
+            tools/tests/content_pack_release_tests.py \
             tools/tests/parallel_job_system.py \
             tools/tests/pbr_orm_packer.py \
             tools/tests/pbr_procedural_fixture.py \
@@ -903,6 +905,7 @@ jobs:
           python tools/tests/openq4_pure_pack.py
           python tools/tests/p0_governance_evidence.py
           python tools/tests/packaging_safety.py
+          python tools/tests/content_pack_release_tests.py
           python tools/tests/parallel_job_system.py
           python tools/tests/pbr_orm_packer.py
           python tools/tests/pbr_procedural_fixture.py

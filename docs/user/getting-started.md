@@ -63,6 +63,37 @@ If you prefer a self-contained setup, keep these side by side in the same root f
 > silent and conversation-gated campaign scenes may not advance; verify or reinstall the retail
 > files instead of renaming a numbered patch.
 
+## Updating openQ4
+
+openQ4's own content comes in three packs in `baseoq4/`:
+
+| Pack | Contents | Size |
+| --- | --- | ---: |
+| `pak0.pk4` | Menus, fonts, strings, shaders and other core runtime files | about 14 MB |
+| `pak1.pk4` | Baked light grids | about 270 MB |
+| `pak2.pk4` | Loadscreens | about 530 MB |
+
+The light grids and loadscreens change only when they are re-baked or
+recaptured, so most releases leave them alone. Each release's notes say whether
+they changed. When they did not, you do not need the whole package again:
+
+1. Download the **update archive** for your platform, for example
+   `openq4-<version>-windows-x64-update.zip` or
+   `openq4-<version>-linux-x64-update.tar.xz`. It holds everything except
+   `pak1.pk4` and `pak2.pk4`.
+2. Extract it **into your existing openQ4 folder**, replacing files. It has no
+   top-level folder of its own.
+
+If a release did change `pak1.pk4` or `pak2.pk4`, download that file from the
+release page too and save it in `baseoq4/` under the same name, or install the
+full package instead. If a pack is missing or does not match, openQ4 says which
+one and where to get it when it starts.
+
+The Windows installer and the Linux AppImage update as whole downloads. Windows
+debugging symbols (`.pdb` files) are no longer in the player package; they are
+published separately as `openq4-<version>-windows-<arch>-symbols.zip` for crash
+analysis.
+
 ## Platform Notes
 
 ### Windows

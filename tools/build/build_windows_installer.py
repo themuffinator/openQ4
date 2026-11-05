@@ -146,9 +146,7 @@ def validate_output_paths(output_dir: Path, script_path: Path, installer_path: P
 def validate_package_dir(package_dir: Path, arch: str) -> None:
     required_paths = [
         package_dir / f"{PRODUCT_NAME}-client_{arch}.exe",
-        package_dir / f"{PRODUCT_NAME}-client_{arch}.pdb",
         package_dir / f"{PRODUCT_NAME}-ded_{arch}.exe",
-        package_dir / f"{PRODUCT_NAME}-ded_{arch}.pdb",
         package_dir / "OpenAL32.dll",
         package_dir / "README.html",
         package_dir / "LICENSE",
@@ -158,11 +156,10 @@ def validate_package_dir(package_dir: Path, arch: str) -> None:
         package_dir / "baseoq4" / "mod.json",
         *(package_dir / "baseoq4" / pack_name for pack_name in OPENQ4_PACK_NAMES),
         package_dir / "baseoq4" / f"game-sp_{arch}.dll",
-        package_dir / "baseoq4" / f"game-sp_{arch}.pdb",
         package_dir / "baseoq4" / f"game-mp_{arch}.dll",
-        package_dir / "baseoq4" / f"game-mp_{arch}.pdb",
     ]
-    # a packaged game-library layer (q4xbase) must be complete: its mod.json, modules and symbols
+    # a packaged game-library layer (q4xbase) must be complete: its mod.json and modules.
+    # Symbols are published separately (the -symbols.zip asset), never installed.
     for layer in PACKAGED_LAYER_GAME_DIRS:
         layer_dir = package_dir / layer
         if layer_dir.is_symlink():
@@ -171,7 +168,6 @@ def validate_package_dir(package_dir: Path, arch: str) -> None:
             required_paths.append(layer_dir / "mod.json")
             for module in (f"game-sp_{arch}", f"game-mp_{arch}"):
                 required_paths.append(layer_dir / f"{module}.dll")
-                required_paths.append(layer_dir / f"{module}.pdb")
 
     missing = [path for path in required_paths if not path.is_file() and not path.is_symlink()]
     if missing:

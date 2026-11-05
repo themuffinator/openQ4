@@ -20,7 +20,9 @@ from zipfile import BadZipFile, ZipFile
 MAX_RELEASE_ASSETS = 64
 MAX_ARCHIVE_EXPANDED_BYTES = 16 * 1024 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 100000
-SAFE_ASSET_NAME_RE = re.compile(r"openq4-[A-Za-z0-9][A-Za-z0-9._+-]{0,248}")
+# Release assets are openq4-<tag>-... packages, plus the standalone content packs,
+# published under their runtime names (pak1.pk4) so a player saves them as-is.
+SAFE_ASSET_NAME_RE = re.compile(r"openq4-[A-Za-z0-9][A-Za-z0-9._+-]{0,248}|pak[0-9]\.pk4")
 
 
 def _lstat(path: Path, label: str) -> os.stat_result:
@@ -81,7 +83,7 @@ def validate_expected_names(expected_names: list[str]) -> tuple[str, ...]:
 def verify_archive_integrity(path: Path) -> None:
     """Read the entire payload, including compression trailers, before upload."""
     try:
-        if path.name.endswith((".zip", ".apk")):
+        if path.name.endswith((".zip", ".apk", ".pk4")):
             with ZipFile(path) as archive:
                 members = archive.infolist()
                 if len(members) > MAX_ARCHIVE_MEMBERS or sum(

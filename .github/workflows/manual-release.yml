@@ -609,9 +609,114 @@ jobs:
           print("release_matrix=" + json.dumps({"include": matrix}, separators=(",", ":")))
           PY
 
+  # Build each content pack once (or reuse the previous release's file when its
+  # sources are unchanged), so every platform package, installer and update
+  # channel carries the same bytes (roadmap PKG-01/PKG-02).
+  content_packs:
+    name: Content Packs
+    needs: metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.openq4_source_sha }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Fetch the previous release's reusable content packs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREVIOUS_TAG: ${{ needs.metadata.outputs.latest_release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous_dir="${RUNNER_TEMP}/previous-content-packs"
+          rm -rf "${previous_dir}"
+          mkdir -p "${previous_dir}"
+          if [ -z "${PREVIOUS_TAG}" ] || ! gh release download "${PREVIOUS_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" --pattern 'openq4-*-content-packs.json' --dir "${previous_dir}"; then
+            echo "The previous release publishes no content pack manifest; every pack is built from source."
+            exit 0
+          fi
+          shopt -s nullglob
+          manifests=("${previous_dir}"/openq4-*-content-packs.json)
+          shopt -u nullglob
+          if [ "${#manifests[@]}" -ne 1 ]; then
+            echo "Expected exactly one content pack manifest on ${PREVIOUS_TAG}, found ${#manifests[@]}."
+            exit 1
+          fi
+          mv "${manifests[0]}" "${previous_dir}/content-packs.json"
+          python tools/build/content_pack_release.py plan \
+            --source-root . \
+            --previous-manifest "${previous_dir}/content-packs.json" \
+            --reuse-list "${RUNNER_TEMP}/reusable-content-packs.txt"
+          while IFS= read -r pack; do
+            if [[ ! "${pack}" =~ ^pak[0-9]\.pk4$ ]]; then
+              echo "Unsafe content pack name in the reuse plan: ${pack@Q}"
+              exit 1
+            fi
+            if ! gh release download "${PREVIOUS_TAG}" --repo "${GITHUB_REPOSITORY}" \
+                --pattern "${pack}" --dir "${previous_dir}"; then
+              echo "${pack} is not published on ${PREVIOUS_TAG}; it is built from source."
+            fi
+          done < "${RUNNER_TEMP}/reusable-content-packs.txt"
+
+      - name: Build or reuse each content pack once
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="${RUNNER_TEMP}/content-packs"
+          previous_dir="${RUNNER_TEMP}/previous-content-packs"
+          build_args=(
+            build
+            --source-root .
+            --out-dir "${out_dir}"
+            --version-tag "${{ needs.metadata.outputs.version_tag }}"
+          )
+          if [ -f "${previous_dir}/content-packs.json" ]; then
+            build_args+=(--previous-manifest "${previous_dir}/content-packs.json" --previous-packs-dir "${previous_dir}")
+          fi
+          python tools/build/content_pack_release.py "${build_args[@]}"
+
+          # The bulk packs are published on their own under their runtime names,
+          # with the manifest that records every pack's digests and status.
+          asset_dir="${RUNNER_TEMP}/content-pack-assets"
+          rm -rf "${asset_dir}"
+          mkdir -p "${asset_dir}"
+          cp "${out_dir}/content-packs.json" "${asset_dir}/openq4-${{ needs.metadata.outputs.version_tag }}-content-packs.json"
+          mapfile -t bulk_packs < <(python tools/build/content_packs.py bulk-list)
+          for pack in "${bulk_packs[@]}"; do
+            cp "${out_dir}/${pack}" "${asset_dir}/${pack}"
+          done
+
+      - name: Upload content packs for the platform builds
+        uses: actions/upload-artifact@v7
+        with:
+          name: openq4-content-packs-${{ needs.metadata.outputs.version_tag }}
+          path: ${{ runner.temp }}/content-packs
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload standalone content pack assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: openq4-release-${{ needs.metadata.outputs.version_tag }}-content-packs
+          path: ${{ runner.temp }}/content-pack-assets
+          if-no-files-found: error
+          compression-level: 0
+
   builds:
     name: ${{ matrix.label }}
-    needs: metadata
+    needs: [metadata, content_packs]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     env:
@@ -638,6 +743,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install meson ninja markdown
+
+      - name: Download the release's content packs
+        uses: actions/download-artifact@v8
+        with:
+          name: openq4-content-packs-${{ needs.metadata.outputs.version_tag }}
+          path: ${{ runner.temp }}/content-packs
 
       - name: Show release metadata
         shell: bash
@@ -751,7 +862,8 @@ jobs:
             "-Dplatform_backend=${{ matrix.platform_backend }}",
             "-Dmacos_graphics_bridge=${{ matrix.macos_graphics_bridge }}",
             "-Dversion_track=stable",
-            "-Dversion_base_override=${{ needs.metadata.outputs.version }}"
+            "-Dversion_base_override=${{ needs.metadata.outputs.version }}",
+            "-Dprebuilt_content_packs=$(Join-Path $env:RUNNER_TEMP 'content-packs')"
           )
           if (-not [string]::IsNullOrWhiteSpace($env:OPENQ4_OPENAL_ROOT)) {
             $setupArgs += "-Dopenal_root_override=$env:OPENQ4_OPENAL_ROOT"
@@ -798,6 +910,7 @@ jobs:
             "-Dmacos_openal_provider=${{ matrix.macos_openal_provider }}"
             -Dversion_track=stable
             "-Dversion_base_override=${{ needs.metadata.outputs.version }}"
+            "-Dprebuilt_content_packs=${RUNNER_TEMP}/content-packs"
           )
           if [ "${{ matrix.platform }}" = "linux" ]; then
             setup_args+=("-Dlinux_x11=enabled")
@@ -1241,6 +1354,22 @@ jobs:
               exit 1
             fi
             echo "symbols_archive_path=${symbols_archive_path}" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ matrix.platform }}" = "windows" ] || [ "${{ matrix.platform }}" = "linux" ]; then
+            update_archive_path="${RUNNER_TEMP}/openq4-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-update${{ matrix.archive_ext }}"
+            if [ ! -f "${update_archive_path}" ]; then
+              echo "Expected update archive not found: ${update_archive_path}"
+              exit 1
+            fi
+            echo "update_archive_path=${update_archive_path}" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            windows_symbols_path="${RUNNER_TEMP}/openq4-${{ needs.metadata.outputs.version_tag }}-windows-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-symbols.zip"
+            if [ ! -f "${windows_symbols_path}" ]; then
+              echo "Expected Windows symbol archive not found: ${windows_symbols_path}"
+              exit 1
+            fi
+            echo "windows_symbols_path=${windows_symbols_path}" >> "$GITHUB_OUTPUT"
           fi
           echo "archive_path=${archive_path}" >> "$GITHUB_OUTPUT"
           echo "package_dir=${package_dir}" >> "$GITHUB_OUTPUT"
@@ -1998,6 +2127,22 @@ jobs:
           path: ${{ steps.package.outputs.archive_path }}
           if-no-files-found: error
 
+      - name: Upload update archive
+        if: (matrix.platform == 'windows' || matrix.platform == 'linux') && inputs.generate_linux_arm64_evidence_candidate == false
+        uses: actions/upload-artifact@v7
+        with:
+          name: openq4-release-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-update
+          path: ${{ steps.package.outputs.update_archive_path }}
+          if-no-files-found: error
+
+      - name: Upload Windows symbols
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: openq4-release-${{ needs.metadata.outputs.version_tag }}-windows-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-symbols
+          path: ${{ steps.package.outputs.windows_symbols_path }}
+          if-no-files-found: error
+
       - name: Upload macOS dSYM symbols
         if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v7
@@ -2032,17 +2177,18 @@ jobs:
 
   android:
     name: Android APK
-    needs: metadata
+    needs: [metadata, content_packs]
     if: inputs.generate_linux_arm64_evidence_candidate == false
     uses: ./.github/workflows/android-build.yml
     with:
       version: ${{ needs.metadata.outputs.version_tag }}
+      content_packs_artifact: openq4-content-packs-${{ needs.metadata.outputs.version_tag }}
     secrets: inherit
 
   release:
     name: Publish Release
-    needs: [metadata, builds, android]
-    if: ${{ needs.builds.result == 'success' && inputs.generate_linux_arm64_evidence_candidate == false && needs.android.result == 'success' }}
+    needs: [metadata, content_packs, builds, android]
+    if: ${{ needs.builds.result == 'success' && inputs.generate_linux_arm64_evidence_candidate == false && needs.android.result == 'success' && needs.content_packs.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -2118,25 +2264,36 @@ jobs:
             "openq4-${{ needs.metadata.outputs.version_tag }}-android-arm64-experimental.apk"
             "openq4-${{ needs.metadata.outputs.version_tag }}-android-dependency-sources.tar.xz"
             "openq4-${{ needs.metadata.outputs.version_tag }}-windows-x64.zip"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-windows-x64-update.zip"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-windows-x64-symbols.zip"
             "openq4-${{ needs.metadata.outputs.version_tag }}-windows-x64-setup.exe"
             "openq4-${{ needs.metadata.outputs.version_tag }}-windows-arm64.zip"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-windows-arm64-update.zip"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-windows-arm64-symbols.zip"
             "openq4-${{ needs.metadata.outputs.version_tag }}-windows-arm64-setup.exe"
             "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64.tar.xz"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64-update.tar.xz"
             "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64-debugsymbols.tar.xz"
             "openq4-${{ needs.metadata.outputs.version_tag }}-x86_64.AppImage"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-content-packs.json"
           )
+          # The bulk content packs are published under their runtime names.
+          mapfile -t bulk_packs < <(python tools/build/content_packs.py bulk-list)
+          expected+=("${bulk_packs[@]}")
 
           echo "${{ needs.metadata.outputs.linux_arm64_release_reason }}"
           echo "${{ needs.metadata.outputs.macos_release_reason }}"
           if [ "${{ needs.metadata.outputs.linux_arm64_support_tier }}" = "preview" ]; then
             expected+=(
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview.tar.xz"
+              "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-update.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-debugsymbols.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-preview-aarch64.AppImage"
             )
           else
             expected+=(
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64.tar.xz"
+              "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-update.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-debugsymbols.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-aarch64.AppImage"
             )
@@ -2167,6 +2324,71 @@ jobs:
             --manifest "${asset_manifest}" \
             "${expected_args[@]}"
           echo "asset_manifest=${asset_manifest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify content packs and update archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREVIOUS_TAG: ${{ needs.metadata.outputs.latest_release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="${RUNNER_TEMP}/release-artifacts"
+          tag="${{ needs.metadata.outputs.version_tag }}"
+          manifest="${artifact_dir}/openq4-${tag}-content-packs.json"
+          mapfile -t bulk_packs < <(python tools/build/content_packs.py bulk-list)
+
+          # Every package that can be read here carries the manifest's bytes:
+          # the zips, tarballs and APK, full and update archives alike.
+          identity_args=(verify-identity --manifest "${manifest}" --report "${RUNNER_TEMP}/content-pack-identity.json")
+          shopt -s nullglob
+          for archive in "${artifact_dir}/openq4-${tag}-"*.zip "${artifact_dir}/openq4-${tag}-"*.tar.xz \
+              "${artifact_dir}/openq4-${tag}-"*.tar.gz "${artifact_dir}/openq4-${tag}-"*.apk; do
+            case "$(basename "${archive}")" in
+              *symbols*|*dependency-sources*) continue ;;
+            esac
+            identity_args+=(--archive "${archive}")
+          done
+          shopt -u nullglob
+          standalone_args=()
+          for pack in "${bulk_packs[@]}"; do
+            identity_args+=(--pack-file "${pack}=${artifact_dir}/${pack}")
+            standalone_args+=(--pack "${pack}=${artifact_dir}/${pack}")
+          done
+          python tools/build/content_pack_release.py "${identity_args[@]}"
+
+          # The previous full package plus this update archive (and any changed
+          # bulk pack, published on its own) must equal this full package.
+          previous_dir="${RUNNER_TEMP}/previous-release"
+          rm -rf "${previous_dir}"
+          mkdir -p "${previous_dir}"
+          if [ -z "${PREVIOUS_TAG}" ] || ! gh release download "${PREVIOUS_TAG}" --repo "${GITHUB_REPOSITORY}" \
+              --pattern 'openq4-*-content-packs.json' --dir "${previous_dir}"; then
+            echo "${PREVIOUS_TAG:-The previous release} predates content pack manifests; this release is a full download, and the update proof starts with the next one."
+            exit 0
+          fi
+          shopt -s nullglob
+          previous_manifests=("${previous_dir}"/openq4-*-content-packs.json)
+          shopt -u nullglob
+          mv "${previous_manifests[0]}" "${previous_dir}/content-packs.json"
+          for platform in windows-x64.zip linux-x64.tar.xz; do
+            gh release download "${PREVIOUS_TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "openq4-*-${platform}" --dir "${previous_dir}"
+            shopt -s nullglob
+            previous_full=("${previous_dir}"/openq4-*-"${platform}")
+            shopt -u nullglob
+            if [ "${#previous_full[@]}" -ne 1 ]; then
+              echo "Expected one previous ${platform} package, found ${#previous_full[@]}."
+              exit 1
+            fi
+            stem="${platform%%.*}"
+            extension="${platform#*.}"
+            python tools/build/content_pack_release.py verify-update \
+              --previous-full "${previous_full[0]}" \
+              --update "${artifact_dir}/openq4-${tag}-${stem}-update.${extension}" \
+              --new-full "${artifact_dir}/openq4-${tag}-${platform}" \
+              "${standalone_args[@]}" \
+              --report "${RUNNER_TEMP}/update-proof-${stem}.json"
+            rm -f "${previous_full[0]}"
+          done
 
       - name: Revalidate accepted Linux ARM64 archive after artifact download
         if: needs.metadata.outputs.linux_arm64_support_tier == 'first-class'
@@ -2219,6 +2441,18 @@ jobs:
             --run-id "${GITHUB_RUN_ID}" \
             --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --output "${RUNNER_TEMP}/release-changelog.md"
+
+          notes_args=(
+            notes
+            --manifest "${RUNNER_TEMP}/release-artifacts/openq4-${{ needs.metadata.outputs.version_tag }}-content-packs.json"
+            --update-asset-example "openq4-${{ needs.metadata.outputs.version_tag }}-windows-x64-update.zip"
+            --out "${RUNNER_TEMP}/release-changelog.md"
+            --append
+          )
+          if [ -f "${RUNNER_TEMP}/previous-release/content-packs.json" ]; then
+            notes_args+=(--previous-manifest "${RUNNER_TEMP}/previous-release/content-packs.json")
+          fi
+          python tools/build/content_pack_release.py "${notes_args[@]}"
 
           printf '\n## Linux ARM64 Support\n\n%s\n' \
             "${LINUX_ARM64_RELEASE_REASON}" >> "${RUNNER_TEMP}/release-changelog.md"
@@ -2302,7 +2536,8 @@ jobs:
           mapfile -t asset_names < "${RELEASE_ASSET_MANIFEST}"
           assets=()
           for asset_name in "${asset_names[@]}"; do
-            if [[ ! "${asset_name}" =~ ^openq4-[A-Za-z0-9._+-]+$ ]] || [[ "${asset_name}" == *..* ]]; then
+            if { [[ ! "${asset_name}" =~ ^openq4-[A-Za-z0-9._+-]+$ ]] && [[ ! "${asset_name}" =~ ^pak[0-9]\.pk4$ ]]; } \
+                || [[ "${asset_name}" == *..* ]]; then
               echo "Verified release asset manifest contains an unsafe filename: ${asset_name@Q}"
               exit 1
             fi
@@ -2331,12 +2566,14 @@ jobs:
             if [ "${LINUX_ARM64_SUPPORT_TIER}" = "preview" ]; then
               stale_linux_arm64_assets=(
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64.tar.xz"
+                "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-update.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-debugsymbols.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-aarch64.AppImage"
               )
             else
               stale_linux_arm64_assets=(
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview.tar.xz"
+                "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-update.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-debugsymbols.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-preview-aarch64.AppImage"
               )
