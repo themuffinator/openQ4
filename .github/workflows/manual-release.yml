@@ -670,6 +670,9 @@ jobs:
           done < "${RUNNER_TEMP}/reusable-content-packs.txt"
 
       - name: Build or reuse each content pack once
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          PREVIOUS_VERSION: ${{ needs.metadata.outputs.latest_release_version }}
         shell: bash
         run: |
           set -euo pipefail
@@ -683,6 +686,11 @@ jobs:
           )
           if [ -f "${previous_dir}/content-packs.json" ]; then
             build_args+=(--previous-manifest "${previous_dir}/content-packs.json" --previous-packs-dir "${previous_dir}")
+          fi
+          # A patch release (same major.minor as the previous release) must not
+          # change bulk content, so its players need only the update archive.
+          if [ -n "${PREVIOUS_VERSION}" ] && [ "${RELEASE_VERSION%.*}" = "${PREVIOUS_VERSION%.*}" ]; then
+            build_args+=(--forbid-bulk-changes)
           fi
           python tools/build/content_pack_release.py "${build_args[@]}"
 

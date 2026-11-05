@@ -160,6 +160,19 @@ def command_build(args: argparse.Namespace) -> int:
         state = f"reused from {reused_from}" if reused_from else "built"
         print(f"{spec.name}: {state}, {format_size(entry['size'])}, sha256 {entry['sha256']}")
 
+    if args.forbid_bulk_changes and previous is not None:
+        changed = [
+            pack["name"] for pack in packs
+            if pack["bulk"] and pack["name"] in previous_packs and pack["sha256"] != previous_packs[pack["name"]]["sha256"]
+        ]
+        if changed:
+            raise RuntimeError(
+                "patch releases do not change bulk content, but "
+                + ", ".join(changed)
+                + f" changed since {previous.get('version_tag')}; make this a minor release, "
+                "or ship the content fix as an overlay pack"
+            )
+
     write_manifest(out_dir / MANIFEST_NAME, {
         "schema": MANIFEST_SCHEMA,
         "version_tag": args.version_tag,
@@ -435,6 +448,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     build.add_argument("--version-tag", required=True)
     build.add_argument("--previous-manifest", default="")
     build.add_argument("--previous-packs-dir", default="", help="directory holding previously published packs to reuse")
+    build.add_argument("--forbid-bulk-changes", action="store_true",
+                       help="fail if a bulk pack differs from the previous release's (patch releases)")
 
     notes = sub.add_parser("notes")
     notes.add_argument("--manifest", required=True)

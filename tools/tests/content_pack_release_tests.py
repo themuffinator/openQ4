@@ -97,6 +97,20 @@ class ContentPackReleaseTests(unittest.TestCase):
         self.assertIn("pak2.pk4 build", plan.stdout)
         self.assertIn("pak1.pk4 reuse", plan.stdout)
 
+    def test_patch_release_rejects_changed_bulk_packs(self) -> None:
+        source = self.work / "source"
+        make_sources(source)
+        self.build(source, self.work / "r1", "0.20.0")
+        write(source / openq4_pak.OPENQ4_CONTENT_PACKS_BY_NAME["pak1.pk4"].source / "maps/mp/extra.lightgrid", "rebake\n")
+        result = run(BUILD / "content_pack_release.py", "build", "--source-root", source, "--out-dir", self.work / "r2",
+                     "--version-tag", "0.20.1", "--previous-manifest", self.work / "r1" / "content-packs.json",
+                     "--previous-packs-dir", self.work / "r1", "--forbid-bulk-changes")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("patch releases do not change bulk content", result.stderr)
+        self.assertIn("pak1.pk4", result.stderr)
+        workflow = (ROOT / ".github/workflows/manual-release.yml").read_text(encoding="utf-8")
+        self.assertIn('build_args+=(--forbid-bulk-changes)', workflow)
+
     def test_notes_state_each_pack(self) -> None:
         source = self.work / "source"
         make_sources(source)
