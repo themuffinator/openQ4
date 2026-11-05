@@ -55,6 +55,17 @@ See [player release status](../user/release-status.md).
   periodic 15–20 ms stall is gone: its geometry cache now retires old entries
   gradually instead of emptying itself all at once.
 
+## Multiplayer join crash near new players, 5 November 2026
+
+- A multiplayer client could occasionally drop with
+  `idCollisionModelManagerLocal::Contents model passed was nullptr` just after
+  connecting. It happened when its movement or water check touched a player or
+  bot that had just appeared and was not yet drawn. Collision checks now skip
+  that placeholder shape, as single player already did. Clients only need the
+  updated multiplayer module.
+- `tools/tests/clip_empty_model_behavior.py` runs the shared single-player and
+  multiplayer filter and fails if either tree drops it or they diverge.
+
 ## Team forfeit votes and failed series map loads, 5 November 2026
 
 - Competitive teams can now vote to concede. Any active player can open
