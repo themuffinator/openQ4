@@ -265,6 +265,17 @@ last-human run is `smoke-human-final/report.json`; the opponent-removal run is
 `smoke-opponents-final/report.json`. These checks do not qualify
 the full team/round/Tourney, remote-client or controller matrix below.
 
+The `--finish-by-time` ending needs a sole leader when the clock expires.
+Stock Quake 4 (`rvDMGameState::Run` in the 1.4.2 SDK) enters sudden death
+rather than review when players are tied for first at the time limit, and
+openQ4 keeps that rule (with `si_overtime 0`). The free-for-all DM fixture
+originally killed the human, which left the two paused bots tied at 0, so the
+match correctly entered sudden death and the review checkpoints failed. It now
+kills both bots, so the human finishes alone at 0 against -1. Team and duel
+modes keep the human's death, which already decides the score. A timed ending
+scripts about 92 seconds of match time, so the smoke's default engine timeout
+is 180 seconds; at 120 seconds a loaded machine could expire it during review.
+
 Other observations remain separate from this lifecycle change:
 
 - The casual vote electorate's `IsEligibleVotePlayerSlot` still uses the

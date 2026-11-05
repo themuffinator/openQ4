@@ -29,7 +29,9 @@ def main() -> int:
     parser.add_argument("--executable-name", help="runtime executable basename for an isolated test copy")
     parser.add_argument("--output-dir", type=Path, default=ROOT / ".tmp/mp-match-flow-smoke")
     parser.add_argument("--basepath", type=Path, default=Path(r"C:\Program Files (x86)\Steam\steamapps\common\Quake 4"))
-    parser.add_argument("--timeout", type=int, default=120)
+    # A timed ending scripts ~92 s of match time on top of engine start-up and
+    # map load; 120 s left a few seconds of slack and expired under load.
+    parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--exit-population", choices=("opponents", "human"), default="opponents")
     parser.add_argument("--gametype", choices=GAMETYPES, default="DM")
     parser.add_argument("--map", dest="map_name", help="stock map override")
@@ -63,6 +65,12 @@ def main() -> int:
     gamepath = savepath / "baseoq4"
     gamepath.mkdir(parents=True, exist_ok=True)
     take_flag = "teleport " + ("openq4_neutral_flag" if "One Flag" in args.gametype else "mp_ctf_strogg_flag_1")
+    # A timed match ends in review only with a sole leader: stock Quake 4
+    # (rvDMGameState::Run) enters sudden death when the clock expires with
+    # players tied for first. In free-for-all DM a human suicide leaves the two
+    # paused bots tied at 0, so the bots die instead and the human leads 0-(-1).
+    # Team and duel modes already get a decisive score from the human's death.
+    time_kills = ["kill 1", "kill 2"] if args.gametype == "DM" else ["kill 0"]
     score_flag = "teleport " + ("mp_ctf_strogg_flag_1" if "One Flag" in args.gametype else "mp_ctf_marine_flag_1")
     ending = (["teleport powerup_deadzone_3", "waitMsec 1000", "teleport trigger_controlzone",
                "waitMsec 7500", *checkpoint("review"), "waitMsec 12000"]
@@ -71,7 +79,7 @@ def main() -> int:
                take_flag, "waitMsec 1000", score_flag, "waitMsec 3500", *checkpoint("capture_two"),
                "waitMsec 1000", *checkpoint("review"), "waitMsec 12000"]
               if args.finish_by_capture else
-              ["kill 0", "waitMsec 65000", *checkpoint("review"), "waitMsec 12000"]
+              [*time_kills, "waitMsec 65000", *checkpoint("review"), "waitMsec 12000"]
               if args.finish_by_time else
               ["kill 1", "waitMsec 1000", *checkpoint("round_one"),
                "waitMsec 6500", *checkpoint("round_two"),
