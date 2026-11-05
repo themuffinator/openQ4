@@ -1481,4 +1481,12 @@
 	"#str_231680"	"Salva Strauss"
 	"#str_231681"	"Sconfiggi il Signore del dolore prima che Strauss venga trasformato. Colpisci i punti deboli sulla schiena del boss per interromperlo."
 	"#str_43012"	"Opzioni grafiche"
+	"#str_231700"	"openQ4 non può avviarsi perché un pacchetto di contenuti manca o non corrisponde a questa versione."
+	"#str_231701"	"contenuti principali di runtime"
+	"#str_231702"	"griglie di illuminazione"
+	"#str_231703"	"schermate di caricamento"
+	"#str_231704"	"%s (%s) manca dalla cartella %s."
+	"#str_231705"	"%s (%s) nella cartella %s non corrisponde a questa versione di openQ4."
+	"#str_231706"	"Installa il pacchetto completo di openQ4 %s, oppure scarica ciascun pacchetto elencato per quella versione da %s e salvalo nella cartella %s con lo stesso nome."
+	"#str_231707"	"Dettagli:"
 }

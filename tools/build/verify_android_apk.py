@@ -12,7 +12,7 @@ import subprocess
 import zipfile
 
 from android_elf import android_abi, validate_library
-from android_package import package_manifest
+from android_package import content_pack_names, package_manifest
 
 VARIANTS = {
     'phone': ('arm64-v8a', 'com.darkmatter.openq4', False),
@@ -67,7 +67,7 @@ def verify_payload(apk: Path, stage: Path, version: str, variant: str = 'phone')
         path = stage / 'lib' / name
         validate_library(path, 24, abi)
         expected[f'lib/{abi}/{name}'] = path
-    for name in ('baseoq4/pak0.pk4', 'baseoq4/pak1.pk4', 'baseoq4/mod.json',
+    for name in (*(f'baseoq4/{pack}' for pack in content_pack_names()), 'baseoq4/mod.json',
                  'licenses/sdl3/LICENSE.txt', 'licenses/openal-soft/COPYING',
                  'licenses/android-ndk/NOTICE.toolchain', 'licenses/QUAKE-4-SDK-EULA.rtf', 'licenses/MD4.txt'):
         if not (stage / name).is_file():
@@ -99,7 +99,7 @@ def verify_payload(apk: Path, stage: Path, version: str, variant: str = 'phone')
         for name, data in fonts.items():
             if archive.getinfo(name).file_size != len(data) or archive.read(name) != data:
                 raise ValueError(f'APK setup typeface differs from staged pak0: {name}')
-        for name in ('assets/baseoq4/pak0.pk4', 'assets/baseoq4/pak1.pk4'):
+        for name in (f'assets/baseoq4/{pack}' for pack in content_pack_names()):
             if archive.getinfo(name).compress_type != zipfile.ZIP_STORED:
                 raise ValueError('PK4 archives must be stored without redundant APK compression')
         for name, path in expected.items():

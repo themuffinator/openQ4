@@ -122,7 +122,8 @@ final class PackageStorage {
             names.add(name);
             previous = name;
         }
-        for (String required : new String[] { "mod.json", "pak0.pk4", "pak1.pk4" }) {
+        // Keep in step with tools/build/content_packs.json (tools/tests/android_build.py checks it).
+        for (String required : new String[] { "mod.json", "pak0.pk4", "pak1.pk4", "pak2.pk4" }) {
             if (!names.contains(required)) throw new IOException("Missing package manifest entry: " + required);
         }
         for (String name : names) {

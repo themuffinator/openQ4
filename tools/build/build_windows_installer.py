@@ -16,6 +16,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from game_layer import PACKAGED_LAYER_GAME_DIRS  # noqa: E402
+from openq4_pak import OPENQ4_PACK_NAMES  # noqa: E402
 
 
 PRODUCT_NAME = "openQ4"
@@ -155,8 +156,7 @@ def validate_package_dir(package_dir: Path, arch: str) -> None:
         package_dir / "LICENSES" / "QUAKE-4-SDK-EULA.rtf",
         package_dir / "docs" / "index.html",
         package_dir / "baseoq4" / "mod.json",
-        package_dir / "baseoq4" / "pak0.pk4",
-        package_dir / "baseoq4" / "pak1.pk4",
+        *(package_dir / "baseoq4" / pack_name for pack_name in OPENQ4_PACK_NAMES),
         package_dir / "baseoq4" / f"game-sp_{arch}.dll",
         package_dir / "baseoq4" / f"game-sp_{arch}.pdb",
         package_dir / "baseoq4" / f"game-mp_{arch}.dll",

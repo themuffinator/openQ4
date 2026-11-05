@@ -15,6 +15,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+CONTENT_PACK_NAMES = tuple(
+    pack["name"]
+    for pack in json.loads((Path(__file__).resolve().with_name("content_packs.json")).read_text(encoding="utf-8"))["packs"]
+)
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -66,8 +71,7 @@ REQUIRED_SHARED_PATHS = (
     "collect_macos_support_info.sh",
     "assets/splash/quake4_rt_bitmap_4001.bmp",
     "baseoq4/mod.json",
-    "baseoq4/pak0.pk4",
-    "baseoq4/pak1.pk4",
+    *(f"baseoq4/{name}" for name in CONTENT_PACK_NAMES),
     MOLTENVK_DYLIB_NAME,
     "licenses/openal-soft/COPYING",
     "licenses/openal-soft/LICENSE-pffft",

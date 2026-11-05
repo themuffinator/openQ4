@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "comment": "openQ4 runtime content packs. This table drives the Meson pack targets, the generated engine pack table (openq4_paks_generated.h), the packagers, the archive verifiers and Android packaging. See docs/dev/content-pack-distribution.md.",
+  "packs": [
+    {
+      "name": "pak0.pk4",
+      "source": "content/baseoq4/pak0",
+      "contents": "core runtime content",
+      "contents_string": "#str_231701",
+      "client_only": false,
+      "bulk": false,
+      "required_files": [
+        "glprogs/smaa_blend.fs",
+        "glprogs/smaa_blend.vs",
+        "glprogs/smaa_edge.fs",
+        "glprogs/smaa_edge.vs",
+        "glprogs/smaa_weights.fs",
+        "glprogs/smaa_weights.vs",
+        "materials/postprocess_openq4.mtr"
+      ]
+    },
+    {
+      "name": "pak1.pk4",
+      "source": "content/baseoq4/pak1",
+      "contents": "light grids",
+      "contents_string": "#str_231702",
+      "client_only": true,
+      "bulk": true,
+      "required_files": [
+        "maps/mp/q4dm1.lightgridpack"
+      ]
+    },
+    {
+      "name": "pak2.pk4",
+      "source": "content/baseoq4/pak2",
+      "contents": "loadscreens",
+      "contents_string": "#str_231703",
+      "client_only": true,
+      "bulk": true,
+      "required_files": [
+        "gfx/guis/loadscreens/generic.dds",
+        "gfx/guis/loadscreens/generic.tga"
+      ]
+    }
+  ]
+}

@@ -3,8 +3,24 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 import re
+
+CONTENT_PACKS_TABLE = Path(__file__).resolve().with_name('content_packs.json')
+
+
+def content_pack_names() -> tuple[str, ...]:
+    """Every runtime pack in tools/build/content_packs.json, in load order."""
+    document = json.loads(CONTENT_PACKS_TABLE.read_text(encoding='utf-8'))
+    names = tuple(pack['name'] for pack in document['packs'])
+    if not names or any(not re.fullmatch(r'pak[0-9]\.pk4', name) for name in names):
+        raise ValueError('Invalid content pack table')
+    return names
+
+
+def required_package_files() -> set[str]:
+    return {'mod.json', *content_pack_names()}
 
 
 def package_manifest(directory: Path) -> bytes:
@@ -18,7 +34,7 @@ def package_manifest(directory: Path) -> bytes:
                     or len(name.split('/')) > 16 or any(part in ('.', '..') for part in name.split('/'))):
                 raise ValueError(f'Invalid package path: {name}')
             entries[name] = path
-    if len(entries) > 4096 or not {'mod.json', 'pak0.pk4', 'pak1.pk4'} <= entries.keys():
+    if len(entries) > 4096 or not required_package_files() <= entries.keys():
         raise ValueError('Invalid package manifest file count or missing required file')
     lines = ['openQ4-package-v1\n']
     total = 0

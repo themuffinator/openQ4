@@ -106,8 +106,7 @@ def validate_wrapper() -> None:
     require(stager, '"renderer-gl_*.dll"', "fast install renderer staging")
     require(stager, '"--temporary-runtime"', "isolated compatibility runtime staging")
     require(stager, 'source_root / ".tmp" / "stock-runtime"', "temporary runtime containment")
-    require(stager, '"pak0.pk4"', "fast install stages pak0")
-    require(stager, '"pak1.pk4"', "fast install stages pak1")
+    require(stager, "*OPENQ4_PACK_NAMES,", "fast install stages every table pack")
     reject(stager, '"*.lib",\n    "pak0.pk4"', "fast install must not copy linker artifacts as runtime content")
 
     windows_runtime = read("tools/build/windows_runtime.py")

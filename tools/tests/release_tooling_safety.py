@@ -744,6 +744,7 @@ def validate_windows_installer_payload_requirements() -> None:
         "baseoq4/mod.json",
         "baseoq4/pak0.pk4",
         "baseoq4/pak1.pk4",
+        "baseoq4/pak2.pk4",
         "baseoq4/game-sp_x64.pdb",
         "baseoq4/game-mp_x64.pdb",
     ]
@@ -787,6 +788,7 @@ def validate_windows_installer_symlink_guards() -> None:
         "baseoq4/mod.json",
         "baseoq4/pak0.pk4",
         "baseoq4/pak1.pk4",
+        "baseoq4/pak2.pk4",
         "baseoq4/game-sp_x64.dll",
         "baseoq4/game-sp_x64.pdb",
         "baseoq4/game-mp_x64.dll",

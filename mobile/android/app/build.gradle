@@ -107,10 +107,10 @@ tasks.register('stageOpenQ4Assets', Sync) {
     }
     into(generatedAssets)
     doFirst {
-        ['baseoq4/pak0.pk4', 'baseoq4/pak1.pk4', 'baseoq4/mod.json',
+        (openQ4ContentPackNames().collect { "baseoq4/${it}" } + ['baseoq4/mod.json',
          'LICENSE', 'LICENSING.md', 'CONTRIBUTORS.md', 'licenses/QUAKE-4-SDK-EULA.rtf',
-         'licenses/MD4.txt'].each { name ->
-            if (!new File(nativeStage, name).isFile()) {
+         'licenses/MD4.txt']).each { name ->
+            if (!new File(nativeStage, name as String).isFile()) {
                 throw new GradleException("Missing staged ${name}; run the Meson install step first.")
             }
         }

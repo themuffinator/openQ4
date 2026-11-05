@@ -454,6 +454,12 @@ public:
 
 extern idFileSystem *		fileSystem;
 
+// Reports a missing or mismatched client-only openQ4 content pack that
+// filesystem startup found, now that the string tables can localize it. Call
+// once after the startup language load; later filesystem restarts report such
+// a failure at once.
+void						FS_RaiseDeferredContentPackFailure( void );
+
 /*
 ================================================
 idFileLocal is a FileStream wrapper that automatically closes a file when the

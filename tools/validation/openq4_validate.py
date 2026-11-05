@@ -71,8 +71,12 @@ MACOS_STATIC_DRY_RUN_PROFILES = (
 
 STAGED_REQUIRED_GAME_FILES = (
     "mod.json",
-    "pak0.pk4",
-    "pak1.pk4",
+    *(
+        pack["name"]
+        for pack in json.loads(
+            (Path(__file__).resolve().parents[2] / "tools" / "build" / "content_packs.json").read_text(encoding="utf-8")
+        )["packs"]
+    ),
 )
 
 STAGED_FORBIDDEN_LOOSE_GAME_PATHS = (

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-from openq4_pak import copy_file_if_changed, is_relative_to
+from openq4_pak import OPENQ4_PACK_NAMES, copy_file_if_changed, is_relative_to
 from windows_runtime import cleanup_windows_stage_target, is_windows_host
 
 
@@ -39,8 +39,7 @@ MACOS_ROOT_RUNTIME_PATTERNS = (
 )
 COMMON_GAME_RUNTIME_PATTERNS = (
     "mod.json",
-    "pak0.pk4",
-    "pak1.pk4",
+    *OPENQ4_PACK_NAMES,
 )
 GAME_RUNTIME_PATTERNS = (
     "game-sp_*.dll",

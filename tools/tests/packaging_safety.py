@@ -346,23 +346,20 @@ def validate_legacy_build_pak0_copy_does_not_follow_symlink() -> None:
 
 def validate_legacy_build_pak0_cli_guards() -> None:
     source_root = WORK / "build-pak0-cli"
-    pak0_source = source_root / "pak0"
-    pak1_source = source_root / "pak1"
-    write_file(pak0_source / "materials" / "ok.mtr")
-    write_file(pak1_source / "gfx" / "loadscreen.tga")
+    real_pak0_source = source_root / "real-pak0"
+    write_file(real_pak0_source / "materials" / "ok.mtr")
+    for spec in OPENQ4_PAK.OPENQ4_CONTENT_PACKS[1:]:
+        write_file(source_root / spec.source / "gfx" / "loadscreen.tga")
 
-    pak0_link = source_root / "pak0-link"
-    if make_symlink(pak0_source, pak0_link, target_is_directory=True):
+    pak0_link = source_root / OPENQ4_PAK.OPENQ4_CONTENT_PACKS[0].source
+    pak0_link.parent.mkdir(parents=True, exist_ok=True)
+    if make_symlink(real_pak0_source, pak0_link, target_is_directory=True):
         result = run_script(
             BUILD_DIR / "build_pak0.py",
-            "--pak0-source-dir",
-            pak0_link,
-            "--pak1-source-dir",
-            pak1_source,
-            "--pak0-out",
-            WORK / "build-pak0-cli" / "pak0.pk4",
-            "--pak1-out",
-            WORK / "build-pak0-cli" / "pak1.pk4",
+            "--source-root",
+            source_root,
+            "--out-dir",
+            WORK / "build-pak0-cli" / "out",
             "--header-out",
             WORK / "build-pak0-cli" / "openq4_paks_generated.h",
         )
@@ -569,6 +566,7 @@ def validate_fast_stage_cross_platform_policy() -> None:
         "mod.json",
         "pak0.pk4",
         "pak1.pk4",
+        "pak2.pk4",
     )
     for filename in root_files:
         write_file(source_root / filename, filename.encode("utf-8"))
@@ -596,6 +594,7 @@ def validate_fast_stage_cross_platform_policy() -> None:
                 "mod.json",
                 "pak0.pk4",
                 "pak1.pk4",
+                "pak2.pk4",
             },
         ),
         "linux": (
@@ -611,6 +610,7 @@ def validate_fast_stage_cross_platform_policy() -> None:
                 "mod.json",
                 "pak0.pk4",
                 "pak1.pk4",
+                "pak2.pk4",
             },
         ),
         "darwin": (
@@ -625,6 +625,7 @@ def validate_fast_stage_cross_platform_policy() -> None:
                 "mod.json",
                 "pak0.pk4",
                 "pak1.pk4",
+                "pak2.pk4",
             },
         ),
     }
@@ -943,10 +944,13 @@ def validate_build_pack_and_header_cli_guards() -> None:
     if make_symlink(pak_target, pak_link):
         result = run_script(
             BUILD_DIR / "generate_pak_header.py",
-            "--pak0",
-            pak_link,
-            "--pak1",
-            pak_target,
+            "--pack",
+            f"pak0.pk4={pak_link}",
+            *(
+                argument
+                for pak_name in OPENQ4_PAK.OPENQ4_PACK_NAMES[1:]
+                for argument in ("--pack", f"{pak_name}={pak_target}")
+            ),
             "--header-out",
             WORK / "pak-header" / "openq4_paks_generated.h",
         )
@@ -984,7 +988,11 @@ def validate_unchanged_pack_rebuild_stays_current() -> None:
             raise AssertionError(f"build_openq4_pack.py failed to build {pak_name}: {result.stderr}")
 
     header_out = root / "out" / "openq4_paks_generated.h"
-    header_args = ("--pak0", root / "out" / "pak0.pk4", "--pak1", root / "out" / "pak1.pk4", "--header-out", header_out)
+    header_args = (
+        *(argument for pak_name in pack_args for argument in ("--pack", f"{pak_name}={root / 'out' / pak_name}")),
+        "--header-out",
+        header_out,
+    )
     result = run_script(BUILD_DIR / "generate_pak_header.py", *header_args)
     if result.returncode != 0:
         raise AssertionError(f"generate_pak_header.py failed: {result.stderr}")

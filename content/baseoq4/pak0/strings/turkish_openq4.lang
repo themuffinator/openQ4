@@ -1472,4 +1472,12 @@
 	"#str_231680"	"Strauss'u kurtar"
 	"#str_231681"	"Strauss işlenmeden önce Acı Lordu'nu yen. Onu durdurmak için sırtındaki zayıf noktalara ateş et."
 	"#str_43012"	"Grafik seçenekleri"
+	"#str_231700"	"Bir içerik paketi eksik olduğu veya bu sürümle eşleşmediği için openQ4 başlatılamıyor."
+	"#str_231701"	"temel çalışma zamanı içeriği"
+	"#str_231702"	"ışık ızgaraları"
+	"#str_231703"	"yükleme ekranları"
+	"#str_231704"	"%s (%s), %s klasöründe eksik."
+	"#str_231705"	"%s (%s), %s klasöründe bu openQ4 sürümüyle eşleşmiyor."
+	"#str_231706"	"Tam openQ4 %s paketini yükleyin veya listelenen her paketi o sürüm için %s adresinden indirip aynı adla %s klasörüne kaydedin."
+	"#str_231707"	"Ayrıntılar:"
 }

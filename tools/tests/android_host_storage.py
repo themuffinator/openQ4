@@ -23,7 +23,7 @@ def main() -> None:
     java_home = os.environ.get("JAVA_HOME", "")
     parser.add_argument("--javac", default=shutil.which("javac") or
                         (str(Path(java_home) / "bin/javac") if java_home else None))
-    parser.add_argument("--package-source", type=Path, help="also verify and repair actual staged pak0/pak1/mod data")
+    parser.add_argument("--package-source", type=Path, help="also verify and repair actual staged pak0/pak1/pak2/mod data")
     args = parser.parse_args()
     if not args.javac:
         parser.error("a JDK is required (--javac or JAVA_HOME)")
@@ -318,6 +318,7 @@ public final class StorageTest {
         Path assets = SDLActivity.assets.root.toPath();
         write(assets.resolve("baseoq4/pak0.pk4"), "first pack");
         write(assets.resolve("baseoq4/pak1.pk4"), "second pack");
+        write(assets.resolve("baseoq4/pak2.pk4"), "third pack");
         write(assets.resolve("baseoq4/mod.json"), "{\"version\":1}");
         write(assets.resolve("baseoq4/nested/data.txt"), "nested content");
         String first = manifest(assets);
@@ -683,7 +684,7 @@ public final class StoragePackageProbe {
             assets = scratch / "full-package/assets"
             base = assets / "baseoq4"
             base.mkdir(parents=True)
-            for name in ("pak0.pk4", "pak1.pk4", "mod.json"):
+            for name in ("pak0.pk4", "pak1.pk4", "pak2.pk4", "mod.json"):
                 shutil.copyfile(args.package_source.resolve() / name, base / name)
             manifest = package_manifest(base)
             (assets / "openq4-package-manifest.txt").write_bytes(manifest)

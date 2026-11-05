@@ -1472,4 +1472,12 @@
 	"#str_231680"	"Mentsd meg Strausst"
 	"#str_231681"	"Győzd le a Fájdalom Urát, mielőtt feldolgoznák Strausst. Lődd a hátán lévő gyenge pontokat, hogy megszakítsd a műveletet."
 	"#str_43012"	"Grafikai beállítások"
+	"#str_231700"	"Az openQ4 nem indítható, mert egy tartalomcsomag hiányzik, vagy nem egyezik ezzel a verzióval."
+	"#str_231701"	"alapvető futásidejű tartalom"
+	"#str_231702"	"fényrácsok"
+	"#str_231703"	"betöltőképernyők"
+	"#str_231704"	"A(z) %s (%s) hiányzik a(z) %s mappából."
+	"#str_231705"	"A(z) %s (%s) a(z) %s mappában nem egyezik az openQ4 ezen verziójával."
+	"#str_231706"	"Telepítsd a teljes openQ4 %s csomagot, vagy töltsd le a felsorolt csomagokat ehhez a verzióhoz innen: %s, és mentsd őket azonos néven a(z) %s mappába."
+	"#str_231707"	"Részletek:"
 }

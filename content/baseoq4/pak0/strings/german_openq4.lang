@@ -1472,4 +1472,12 @@
 	"#str_231680"	"Strauss retten"
 	"#str_231681"	"Besiegen Sie den Schmerzensfürsten, bevor Strauss verarbeitet wird. Schießen Sie auf die Schwachstellen an seinem Rücken, um ihn zu unterbrechen."
 	"#str_43012"	"Grafikoptionen"
+	"#str_231700"	"openQ4 kann nicht starten, weil ein Inhaltspaket fehlt oder nicht zu dieser Version passt."
+	"#str_231701"	"Laufzeit-Kerninhalte"
+	"#str_231702"	"Lichtgitter"
+	"#str_231703"	"Ladebildschirme"
+	"#str_231704"	"%s (%s) fehlt im Ordner %s."
+	"#str_231705"	"%s (%s) im Ordner %s passt nicht zu dieser openQ4-Version."
+	"#str_231706"	"Installieren Sie das vollständige openQ4-%s-Paket oder laden Sie jedes aufgeführte Paket für diese Version von %s herunter und speichern Sie es unter demselben Namen im Ordner %s."
+	"#str_231707"	"Details:"
 }

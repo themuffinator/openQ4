@@ -45,7 +45,7 @@ The experimental Android ARM64 APK, native builds, SigmaTouch host integration a
 
 - **[Meson](https://mesonbuild.com/)** 1.6.0 or newer
 - **[Ninja](https://ninja-build.org/)** (recommended backend)
-- **Python 3** (used by `tools/build/sync_icons.py`, `baseoq4/pak0.pk4` / `baseoq4/pak1.pk4` generation, and the wrapper scripts)
+- **Python 3** (used by `tools/build/sync_icons.py`, `baseoq4/pak0.pk4` to `baseoq4/pak2.pk4` generation, and the wrapper scripts)
 
 ### Windows Note
 
@@ -448,7 +448,7 @@ directory makes every validation run and every VS Code build reconfigure the
 other's optimization level and force a full rebuild. Use the Debug Build steps
 below when you genuinely want an unoptimized client.
 
-Use **Full Build and Stage openQ4 (Meson Optimized)** when you intentionally need the full configure + compile + `meson install --no-rebuild --skip-subprojects` path. If you add or remove files under `content/baseoq4/pak0/` or `content/baseoq4/pak1/`, run **Configure openQ4 (Meson Optimized)** once so Meson refreshes the pack dependency list; edits to existing content files are picked up by the fast build.
+Use **Full Build and Stage openQ4 (Meson Optimized)** when you intentionally need the full configure + compile + `meson install --no-rebuild --skip-subprojects` path. If you add or remove files under `content/baseoq4/pak0/`, `pak1/` or `pak2/`, run **Configure openQ4 (Meson Optimized)** once so Meson refreshes the pack dependency list; edits to existing content files are picked up by the fast build.
 
 ### VS Code Launch Configurations
 
@@ -631,13 +631,14 @@ bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subproje
 | `openQ4-client_<arch>[.exe]` | Main engine executable |
 | `openQ4-ded_<arch>[.exe]` | Dedicated server |
 | `baseoq4/pak0.pk4` | Compiled openQ4 core runtime content pack |
-| `baseoq4/pak1.pk4` | Compiled openQ4 level content pack |
+| `baseoq4/pak1.pk4` | Compiled openQ4 light-grid pack (clients only) |
+| `baseoq4/pak2.pk4` | Compiled openQ4 loadscreen pack (clients only) |
 | `baseoq4/mod.json` | openQ4 game-directory manifest |
 | `baseoq4/game-sp_<arch>[.dll/.so/.dylib]` | Single-player game module |
 | `baseoq4/game-mp_<arch>[.dll/.so/.dylib]` | Multiplayer game module |
 
 - BSE (Basic Set of Effects) is linked directly into `openQ4-client_<arch>`; the dedicated server keeps a disabled/stub path.
-- `content/baseoq4/pak0/` and `content/baseoq4/pak1/` are compiled into deterministic `pak0.pk4` and `pak1.pk4` before the engine is built; the generated pack checksums are embedded into the executable so startup can reject missing or modified openQ4 runtime packs. A pack that passes is recorded under `fs_cachepath` and hashed again only when its file changes, so the first launch after a build or an install step hashes the packs it rewrote and later launches skip them ([runtime pack verification](docs/dev/runtime-pack-verification.md)).
+- `content/baseoq4/pak0/`, `pak1/` and `pak2/` are compiled into deterministic `pak0.pk4`, `pak1.pk4` and `pak2.pk4` before the engine is built, as listed in `tools/build/content_packs.json`; their sources are checked out without end-of-line conversion so every platform packs the same bytes; the generated pack checksums are embedded into the executable so startup can reject missing or modified openQ4 runtime packs. A pack that passes is recorded under `fs_cachepath` and hashed again only when its file changes, so the first launch after a build or an install step hashes the packs it rewrote and later launches skip them ([runtime pack verification](docs/dev/runtime-pack-verification.md)).
 - On Windows, the wrapper stages `OpenAL32.dll` next to the executables and rejects builds that still depend on external MSVC/UCRT runtime DLLs.
 
 ### Install directory (`.install/`)
@@ -655,7 +656,8 @@ After running the install step, `.install/` is the staged distributable package 
 ├── share/applications/         # (Linux) desktop entries
 └── baseoq4/
     ├── pak0.pk4                         # Compiled openQ4 core runtime content
-    ├── pak1.pk4                         # Compiled openQ4 level content
+    ├── pak1.pk4                         # Compiled openQ4 light grids (clients only)
+    ├── pak2.pk4                         # Compiled openQ4 loadscreens (clients only)
     ├── mod.json                         # openQ4 game-directory manifest
     ├── game-sp_<arch>[.dll/.so/.dylib]   # Single-player module
     ├── game-sp_<arch>.pdb                # (Windows) SP diagnostic symbols
@@ -666,7 +668,7 @@ After running the install step, `.install/` is the staged distributable package 
 > [!NOTE]
 > Public release packages stay on the `stable` version track while using an optimized diagnostics profile. Windows, Linux, and macOS packages use Meson `buildtype=debugoptimized` with `b_ndebug=true`, so release binaries are optimized and runtime asserts are disabled while diagnostic symbols remain available. Windows packages include matching PDB files. Linux debug info is split into separate `openq4-<version>-linux-<arch>-debugsymbols.tar.xz` assets. macOS release packaging builds both `-opengl` and `-metal` variants from the SDL3 backend so the Metal bridge remains additive. MSVC import libraries (`*.lib`) are development-only artifacts and are not required in the package.
 
-Repo-authored runtime overrides live under `content/baseoq4/pak0/` and `content/baseoq4/pak1/`. The build compiles those source-owned roots into `.install/baseoq4/pak0.pk4` and `.install/baseoq4/pak1.pk4`; `mod.json` and platform-specific game modules remain loose beside them.
+Repo-authored runtime overrides live under `content/baseoq4/pak0/`, `pak1/` and `pak2/`. The build compiles those source-owned roots into `.install/baseoq4/pak0.pk4`, `pak1.pk4` and `pak2.pk4`; `mod.json` and platform-specific game modules remain loose beside them.
 
 For macOS release artifacts, `tools/build/package_nightly.py` transforms that
 staging layout into a self-contained `openQ4.app`: `mod.json` and the PK4s move

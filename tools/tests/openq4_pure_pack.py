@@ -232,17 +232,37 @@ def validate_filesystem_pure_pack_contract() -> None:
     require(source, '#include "GameDirPolicy.h"', "portable game-directory policy integration")
     require(source, "IsOpenQ4PurePack", "filesystem pure-pack declaration")
     require(source, "ValidateOpenQ4Paks", "filesystem pack checksum declaration")
-    require(helper, "OPENQ4_GAMEDIR", "openQ4 pure-pack directory check")
-    require(helper, '"pak0.pk4"', "openQ4 pure-pack filename check")
-    require(helper, '"pak1.pk4"', "openQ4 pure-pack filename check")
-    require(helper, "IsGameDirPack( pak, OPENQ4_GAMEDIR )", "openQ4 pure-pack directory check")
-    require(checksum_validator, "OPENQ4_PAK0_MD5", "openQ4 pak0 expected checksum")
-    require(checksum_validator, "OPENQ4_PAK1_MD5", "openQ4 pak1 expected checksum")
-    require(checksum_validator, "MD5_FileChecksum", "openQ4 pak0 actual checksum")
+    table_lookup = function_body(source, "const openQ4PackTableEntry_t *idFileSystemLocal::FindOpenQ4PackTableEntry(")
+    client_only_helper = function_body(source, "bool idFileSystemLocal::IsOpenQ4ClientOnlyPack(")
+    require(source, "static const openQ4PackTableEntry_t openQ4PackTable[] = {\n\tOPENQ4_PACK_TABLE_ENTRIES\n};", "generated pack table drives the filesystem")
+    require(helper, "FindOpenQ4PackTableEntry( pak )", "openQ4 pure-pack table lookup")
+    require(helper, "!entry->clientOnly", "client-only packs stay out of the pure list")
+    require(client_only_helper, "entry->clientOnly", "client-only pack classification")
+    require(table_lookup, "IsGameDirPack( pak, OPENQ4_GAMEDIR )", "openQ4 pure-pack directory check")
+    require(table_lookup, "FS_FindOpenQ4PackTableEntry( name.c_str() )", "openQ4 pack table filename check")
+    reject(helper, '"pak1.pk4"', "pure-pack names come from the generated table")
+    require(checksum_validator, "openQ4PackTable[ i ]", "every table pack is checked")
+    require(checksum_validator, "expected.md5", "table digest is the expected checksum")
+    require(checksum_validator, "MD5_FileChecksum", "openQ4 pack actual checksum")
     require(checksum_validator, "FindGamePackByName( expected.name, OPENQ4_GAMEDIR )", "openQ4 pack lookup")
     require(checksum_validator, "checksum mismatch for %s/%s", "openQ4 pack checksum diagnostic")
-    require(startup, "ValidateOpenQ4Paks( openQ4PakErrors )", "startup pack checksum validation")
+    require(checksum_validator, "#ifdef ID_DEDICATED", "dedicated servers treat client-only packs as optional")
+    require(checksum_validator, "const bool optional = expected.clientOnly;", "dedicated optional client-only packs")
+    require(checksum_validator, "onlyClientPacks = onlyClientPacks && expected.clientOnly;", "client-only failures can wait for localization")
+    require(startup, "ValidateOpenQ4Paks( openQ4PakErrors, onlyClientPacks )", "startup pack checksum validation")
     require(startup, "openQ4 runtime content packs in '%s' are missing or modified", "startup pack checksum fatal")
+    require_order(startup, "if ( !onlyClientPacks ) {", "openQ4 runtime content packs in '%s' are missing or modified", "core pack failures stay fatal at once")
+    require(startup, "FS_RaiseDeferredContentPackFailure();", "a client-only pack failure after startup is reported at once")
+    deferred = function_body(source, "void FS_RaiseDeferredContentPackFailure(")
+    report = function_body(source, "static idStr FS_FormatOpenQ4PackProblems(")
+    require(deferred, "fs_openQ4PackProblemsMayRaise = true;", "deferred pack report arms restarts")
+    require(deferred, "common->FatalError( \"%s\", message.c_str() );", "deferred pack report is fatal")
+    for key in ("#str_231700", "#str_231704", "#str_231705", "#str_231706", "#str_231707"):
+        require(report, key, "localized content pack report")
+    require(report, "problem.pack->contentsString", "localized pack contents")
+    require(report, "PROJECT_RELEASES_URL", "pack report says where to get the pack")
+    common_source = read("src/framework/Common.cpp")
+    require_order(common_source, "InitLanguageDict( false, false );", "FS_RaiseDeferredContentPackFailure();", "client-only pack report after the language load")
     require(startup, "openQ4 runtime directory '%s' is missing a compatible mod.json", "startup mod manifest fatal")
     require(startup, "Retail Quake 4 media pk4 files must be installed in '%s', not '%s'.", "startup misplaced retail pk4 fatal")
     require(startup, "Put pak001.pk4 through pak022.pk4 in that folder", "startup retail pk4 location guidance")
@@ -992,6 +1012,7 @@ def validate_filesystem_pure_pack_contract() -> None:
     ]
     require(openq4_check, "pak->pureStatus = PURE_ALWAYS;", "openQ4 pure-pack status")
     require(openq4_check, "return PURE_ALWAYS;", "openQ4 pure-pack return")
+    require(openq4_check, "if ( IsOpenQ4ClientOnlyPack( pak ) ) {\n\t\tpak->pureStatus = PURE_NEVER;\n\t\treturn PURE_NEVER;", "client-only packs never enter a pure list")
 
 
 def validate_install_error_console_contract() -> None:
@@ -1054,7 +1075,7 @@ def validate_packager_pure_pack_contract() -> None:
 
     shutil.rmtree(work, ignore_errors=True)
     try:
-        for pak_name in ("pak0.pk4", "pak1.pk4"):
+        for pak_name in ("pak0.pk4", "pak1.pk4", "pak2.pk4"):
             for marker in ("binary.conf", "addon.conf"):
                 shutil.rmtree(work, ignore_errors=True)
                 install_game_dir = work / "baseoq4"
@@ -1082,18 +1103,18 @@ def validate_build_pak0_contract() -> None:
     validator = read("tools/validation/openq4_validate.py")
     work = ROOT / ".tmp" / "openq4-pak0-build-contract"
 
-    require(meson, "custom_target(", "Meson pak0 build target")
-    require(meson, "'openq4_pak0'", "Meson openQ4 pak0 build target name")
-    require(meson, "'openq4_pak1'", "Meson openQ4 pak1 build target name")
+    require(meson, "custom_target(", "Meson pack build target")
+    require(meson, "'content_packs.py',\n    'meson-list',", "Meson pack targets come from the content pack table")
+    require(meson, "foreach openq4_pack_row : openq4_content_pack_table", "Meson builds every table pack")
+    require(meson, "'openq4_' + openq4_pack_stem,", "Meson openQ4 pack build target name")
     require(meson, "'openq4_paks_generated_header'", "Meson generated pack checksum target name")
-    require(meson, "'openq4_pak0_source_manifest'", "Meson pak0 source manifest target")
-    require(meson, "'openq4_pak1_source_manifest'", "Meson pak1 source manifest target")
+    require(meson, "'openq4_' + openq4_pack_stem + '_source_manifest'", "Meson pack source manifest target")
     require(meson, "write_pak_manifest.py", "Meson pack source manifest refresh")
     require(meson, "build_openq4_pack.py", "Meson single-pack build script")
     require(meson, "generate_pak_header.py", "Meson pack header generation script")
     require(meson, "'openq4_paks_generated.h'", "Meson generated pack checksum header")
-    require(meson, "input: openq4_pak0_source_manifest", "Meson pak0 depends on source manifest")
-    require(meson, "input: openq4_pak1_source_manifest", "Meson pak1 depends on source manifest")
+    require(meson, "input: openq4_pack_manifest", "Meson pack depends on its source manifest")
+    require(meson, "input: openq4_pak_files", "Meson pack header reads every built pack")
     require(meson, "--manifest", "Meson pack target consumes source manifest")
     require(meson, "build_by_default: true", "Meson pack default build")
     require(meson, "build_always_stale: true", "Meson source manifests rescan pack directories")
@@ -1104,7 +1125,7 @@ def validate_build_pak0_contract() -> None:
     require(meson, "install_dir: install_game_dir", "Meson installs generated packs")
     engine_generated_headers = "openq4_engine_sources += [openq4_paks_generated_header, generated_version_header]"
     require(meson, engine_generated_headers, "engine depends on pack checksum and version headers")
-    require_order(meson, "'openq4_pak0'", "'openq4_paks_generated_header'", "packs before checksum header")
+    require_order(meson, "'openq4_' + openq4_pack_stem,", "'openq4_paks_generated_header'", "packs before checksum header")
     require_order(meson, "'openq4_paks_generated_header'", engine_generated_headers, "checksum header before engine sources")
 
     require(baseoq4_meson, "baseoq4_manifest", "loose mod.json install")
@@ -1112,12 +1133,13 @@ def validate_build_pak0_contract() -> None:
     reject(baseoq4_meson, "'openq4_defaults.cfg'", "baseoq4 loose config install")
     reject(baseoq4_meson, "'default.cfg'", "baseoq4 loose default config install")
 
-    require(pak_helper, "OPENQ4_PAK0_MD5", "generated pak0 checksum macro")
-    require(pak_helper, "OPENQ4_PAK1_MD5", "generated pak1 checksum macro")
+    require(pak_helper, 'f"#define {stem}_MD5', "generated per-pack checksum macro")
+    require(pak_helper, "OPENQ4_PACK_TABLE_ENTRIES", "generated pack table macro")
+    require(pak_helper, "load_content_pack_specs", "pack helper reads the content pack table")
     require(build_pak0, "format_openq4_paks_header", "standalone pack builder uses shared header formatter")
     require(build_pak0, "create_game_pk4", "build pak0 helper")
-    require(build_pak0, "--pak0-stage-out", "builddir direct-run pak0 staging")
-    require(build_pak0, "--pak1-stage-out", "builddir direct-run pak1 staging")
+    require(build_pak0, "OPENQ4_CONTENT_PACKS", "standalone pack builder builds every table pack")
+    require(build_pak0, "--stage-dir", "builddir direct-run pack staging")
     require(build_openq4_pack, "--pak-name", "single-pack build script pack selection")
     require(build_openq4_pack, "create_game_pk4", "single-pack build script helper")
     require(build_openq4_pack, "--manifest", "single-pack build script manifest dependency")
@@ -1135,58 +1157,38 @@ def validate_build_pak0_contract() -> None:
     require(install_guard, "assert_inside", "install guard deletion containment")
     require(install_guard, "shutil.rmtree", "install guard stale loose directory pruning")
     require(windows_runtime, "build_game_pk4s", "Windows direct-run pack staging")
-    require(windows_runtime, '"pak1.pk4"', "Windows direct-run pak1 destination")
-    require(validator, '"pak0.pk4"', "staged payload requires pak0.pk4")
-    require(validator, '"pak1.pk4"', "staged payload requires pak1.pk4")
+    require(windows_runtime, "OPENQ4_PACK_NAMES", "Windows direct-run pack destinations")
+    require(validator, "content_packs.json", "staged payload requires every table pack")
     require(validator, "STAGED_FORBIDDEN_LOOSE_GAME_PATHS", "staged payload forbids stale loose content")
     require(validator, '"openq4_defaults.cfg"', "staged payload forbids loose defaults")
     require(validator, "must live inside openQ4 PK4s", "staged payload stale loose diagnostic")
 
     shutil.rmtree(work, ignore_errors=True)
     try:
-        pak0_source_dir = work / "source" / "baseoq4" / "pak0"
-        pak1_source_dir = work / "source" / "baseoq4" / "pak1"
-        pak0_required_files = [
-            "glprogs/smaa_blend.fs",
-            "glprogs/smaa_blend.vs",
-            "glprogs/smaa_edge.fs",
-            "glprogs/smaa_edge.vs",
-            "glprogs/smaa_weights.fs",
-            "glprogs/smaa_weights.vs",
-            "materials/postprocess_openq4.mtr",
-        ]
-        pak1_required_files = [
-            "gfx/guis/loadscreens/generic.dds",
-            "gfx/guis/loadscreens/generic.tga",
-        ]
-        for relative_path in pak0_required_files:
-            write_test_file(pak0_source_dir / relative_path, f"{relative_path}\n".encode("utf-8"))
-        for relative_path in pak1_required_files:
-            write_test_file(pak1_source_dir / relative_path, f"{relative_path}\n".encode("utf-8"))
+        sys.path.insert(0, str(ROOT / "tools" / "build"))
+        from openq4_pak import OPENQ4_CONTENT_PACKS  # noqa: E402
 
-        pak0_out = work / "pak0.pk4"
-        pak1_out = work / "pak1.pk4"
+        source_root = work / "source"
+        for spec in OPENQ4_CONTENT_PACKS:
+            files = sorted(spec.required_files) or ["placeholder.txt"]
+            for relative_path in files:
+                write_test_file(source_root / spec.source / relative_path, f"{relative_path}\n".encode("utf-8"))
+
+        out_dir = work / "out"
+        stage_dir = work / "stage" / "baseoq4"
         header_out = work / "openq4_paks_generated.h"
-        pak0_stage_out = work / "stage" / "baseoq4" / "pak0.pk4"
-        pak1_stage_out = work / "stage" / "baseoq4" / "pak1.pk4"
         subprocess.run(
             [
                 sys.executable,
                 str(ROOT / "tools" / "build" / "build_pak0.py"),
-                "--pak0-source-dir",
-                str(pak0_source_dir),
-                "--pak1-source-dir",
-                str(pak1_source_dir),
-                "--pak0-out",
-                str(pak0_out),
-                "--pak1-out",
-                str(pak1_out),
+                "--source-root",
+                str(source_root),
+                "--out-dir",
+                str(out_dir),
                 "--header-out",
                 str(header_out),
-                "--pak0-stage-out",
-                str(pak0_stage_out),
-                "--pak1-stage-out",
-                str(pak1_stage_out),
+                "--stage-dir",
+                str(stage_dir),
             ],
             cwd=ROOT,
             check=True,
@@ -1194,17 +1196,21 @@ def validate_build_pak0_contract() -> None:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        pak0_digest = hashlib.md5(pak0_out.read_bytes()).hexdigest()
-        pak1_digest = hashlib.md5(pak1_out.read_bytes()).hexdigest()
         header = header_out.read_text(encoding="utf-8")
-        require(header, f'#define OPENQ4_PAK0_MD5 "{pak0_digest}"', "generated pak0 checksum header")
-        require(header, f'#define OPENQ4_PAK1_MD5 "{pak1_digest}"', "generated pak1 checksum header")
-        require(header, "#define OPENQ4_PAK0_FILE_COUNT 7", "generated pak0 file count")
-        require(header, "#define OPENQ4_PAK1_FILE_COUNT 2", "generated pak1 file count")
-        if pak0_out.read_bytes() != pak0_stage_out.read_bytes():
-            raise AssertionError("Staged pak0.pk4 does not match generated pak0.pk4")
-        if pak1_out.read_bytes() != pak1_stage_out.read_bytes():
-            raise AssertionError("Staged pak1.pk4 does not match generated pak1.pk4")
+        require(header, f"#define OPENQ4_PACK_COUNT {len(OPENQ4_CONTENT_PACKS)}", "generated pack count")
+        for spec in OPENQ4_CONTENT_PACKS:
+            built = out_dir / spec.name
+            stem = spec.macro_stem
+            digest = hashlib.md5(built.read_bytes()).hexdigest()
+            require(header, f'#define {stem}_MD5 "{digest}"', f"generated {spec.name} checksum header")
+            require(header, f"#define {stem}_FILE_COUNT {max(1, len(spec.required_files))}", f"generated {spec.name} file count")
+            require(header, f"#define {stem}_CLIENT_ONLY {int(spec.client_only)}", f"generated {spec.name} audience")
+            require(header, f'{{ "{spec.name}", {stem}_MD5,', f"generated {spec.name} table entry")
+            if built.read_bytes() != (stage_dir / spec.name).read_bytes():
+                raise AssertionError(f"Staged {spec.name} does not match the generated pack")
+        require(header, "#define OPENQ4_PAK1_CLIENT_ONLY 1", "light grids are client-only")
+        require(header, "#define OPENQ4_PAK2_CLIENT_ONLY 1", "loadscreens are client-only")
+        require(header, "#define OPENQ4_PAK0_CLIENT_ONLY 0", "core pack is for every runtime")
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -1225,12 +1231,18 @@ VERIFIED_PACK_SUPPORT = r'''
 #define OPENQ4_GAMEDIR "baseoq4"
 #define OPENQ4_PAK0_MD5 "00112233445566778899aabbccddeeff"
 #define OPENQ4_PAK1_MD5 "ffeeddccbbaa99887766554433221100"
+#define OPENQ4_PAK2_MD5 "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
+#define OPENQ4_PACK_TABLE_ENTRIES \
+	{ "pak0.pk4", OPENQ4_PAK0_MD5, 13400000, 337, false, false, "#str_231701", "core runtime content" }, \
+	{ "pak1.pk4", OPENQ4_PAK1_MD5, 96000000, 5973, true, true, "#str_231702", "light grids" }, \
+	{ "pak2.pk4", OPENQ4_PAK2_MD5, 530000000, 350, true, true, "#str_231703", "loadscreens" },
 
 class idStr {
 public:
 	idStr() {}
 	idStr( const char *text ) : s( text ? text : "" ) {}
 	idStr &operator+=( const char *text ) { s += text; return *this; }
+	idStr &operator+=( const idStr &text ) { s += text.s; return *this; }
 	const char *c_str() const { return s.c_str(); }
 	int Length() const { return static_cast<int>( s.size() ); }
 	void Clear() { s.clear(); }
@@ -1279,6 +1291,24 @@ struct idCommonStub {
 		va_end( args );
 		log += buffer;
 	}
+	void Warning( const char *fmt, ... ) {
+		char buffer[ 4096 ];
+		va_list args;
+		va_start( args, fmt );
+		vsnprintf( buffer, sizeof( buffer ), fmt, args );
+		va_end( args );
+		log += "WARNING: ";
+		log += buffer;
+	}
+};
+
+template<class T> class idList {
+public:
+	void		Clear() { items.clear(); }
+	int			Append( const T &item ) { items.push_back( item ); return static_cast<int>( items.size() ) - 1; }
+	int			Num() const { return static_cast<int>( items.size() ); }
+	const T &	operator[]( int index ) const { return items[ static_cast<size_t>( index ) ]; }
+	std::vector<T> items;
 };
 static idCommonStub commonStub;
 static idCommonStub *common = &commonStub;
@@ -1342,7 +1372,7 @@ struct idCVarStub {
 
 class idFileSystemLocal {
 public:
-	bool			ValidateOpenQ4Paks( idStr &errors );
+	bool			ValidateOpenQ4Paks( idStr &errors, bool &onlyClientPacks );
 	void			ReadVerifiedOpenQ4Paks( std::vector<verifiedOpenQ4Pak_t> &records ) {
 		recordReads++;
 		records.clear();
@@ -1392,7 +1422,9 @@ static int failures = 0;
 #define CHECK( condition, message ) \
 	do { if ( !( condition ) ) { fprintf( stderr, "FAIL line %d: %s\n", __LINE__, message ); failures++; } } while ( 0 )
 
+static const char *PAK0 = "/install/baseoq4/pak0.pk4";
 static const char *PAK1 = "/install/baseoq4/pak1.pk4";
+static const char *PAK2 = "/install/baseoq4/pak2.pk4";
 static const char *EDITED_MD5 = "0123456789abcdef0123456789abcdef";
 
 static openQ4PakStamp_t Stamp( uint64_t size, uint64_t modified, uint64_t changed, uint64_t fileId ) {
@@ -1409,15 +1441,19 @@ static openQ4PakStamp_t Stamp( uint64_t size, uint64_t modified, uint64_t change
 static void Install( idFileSystemLocal &fs, const char *root ) {
 	const std::string pak0 = std::string( root ) + "/baseoq4/pak0.pk4";
 	const std::string pak1 = std::string( root ) + "/baseoq4/pak1.pk4";
+	const std::string pak2 = std::string( root ) + "/baseoq4/pak2.pk4";
 	disk[ pak0 ] = diskPak_t{ Stamp( 8802959, 1000, 1001, 11 ), OPENQ4_PAK0_MD5, true, true, false };
-	disk[ pak1 ] = diskPak_t{ Stamp( 797821313, 2000, 2001, 22 ), OPENQ4_PAK1_MD5, true, true, false };
+	disk[ pak1 ] = diskPak_t{ Stamp( 96021313, 2000, 2001, 22 ), OPENQ4_PAK1_MD5, true, true, false };
+	disk[ pak2 ] = diskPak_t{ Stamp( 530021313, 3000, 3001, 33 ), OPENQ4_PAK2_MD5, true, true, false };
 	fs.packs.clear();
 	fs.packs.push_back( pack_t{ idStr( pak0.c_str() ), 0x7d04783a, 337 } );
-	fs.packs.push_back( pack_t{ idStr( pak1.c_str() ), static_cast<int>( 0xf1d23717u ), 6726 } );
+	fs.packs.push_back( pack_t{ idStr( pak1.c_str() ), static_cast<int>( 0xf1d23717u ), 5973 } );
+	fs.packs.push_back( pack_t{ idStr( pak2.c_str() ), static_cast<int>( 0x2a2b2c2du ), 350 } );
 }
 
 struct run_t {
 	bool		passed;
+	bool		onlyClientPacks;
 	std::string	errors;
 	int			hashes;
 	int			reads;
@@ -1432,7 +1468,9 @@ static run_t Run( idFileSystemLocal &fs ) {
 	const int writesBefore = fs.recordWrites;
 	idStr errors( "left over" );
 	run_t run;
-	run.passed = fs.ValidateOpenQ4Paks( errors );
+	bool onlyClientPacks = false;
+	run.passed = fs.ValidateOpenQ4Paks( errors, onlyClientPacks );
+	run.onlyClientPacks = onlyClientPacks;
 	run.errors = errors.c_str();
 	run.hashes = hashCalls;
 	run.reads = fs.recordReads - readsBefore;
@@ -1541,7 +1579,7 @@ static void TestValidation() {
 		idFileSystemLocal fs;
 		Install( fs, "/install" );
 		run_t first = Run( fs );
-		CHECK( first.passed && first.errors.empty() && first.hashes == 2 && first.writes == 1, "the first startup hashes both packs and records them" );
+		CHECK( first.passed && first.errors.empty() && first.hashes == 3 && first.writes == 1, "the first startup hashes every pack and records them" );
 		CHECK( Contains( first.log, "Verified pk4 /install/baseoq4/pak1.pk4: hashed in" ), "a hashed pack says so" );
 		run_t second = Run( fs );
 		CHECK( second.passed && second.hashes == 0 && second.writes == 0, "an unchanged install is not read again" );
@@ -1572,8 +1610,9 @@ static void TestValidation() {
 			CHECK( run.hashes == 1, "a changed identity hashes that pack again" );
 			if ( edited ) {
 				CHECK( !run.passed && run.writes == 0, "an edited pack fails and leaves the record alone" );
-				CHECK( Contains( run.errors, "checksum mismatch for baseoq4/pak1.pk4 (expected ffeeddccbbaa99887766554433221100, got 0123456789abcdef0123456789abcdef from /install/baseoq4/pak1.pk4)" ),
-					"the mismatch names both digests" );
+				CHECK( Contains( run.errors, "checksum mismatch for baseoq4/pak1.pk4, light grids (expected ffeeddccbbaa99887766554433221100, got 0123456789abcdef0123456789abcdef from /install/baseoq4/pak1.pk4)" ),
+					"the mismatch names the pack, what it holds and both digests" );
+				CHECK( run.onlyClientPacks, "a light-grid mismatch can wait for the localized report" );
 				CHECK( Run( fs ).hashes == 1, "and fails again at the next startup" );
 			} else {
 				CHECK( run.passed && run.writes == 1, "a re-hashed pack that matches is recorded again" );
@@ -1593,12 +1632,12 @@ static void TestValidation() {
 		}
 		FS_FormatVerifiedPaks( records, fs.recordText );
 		run_t run = Run( fs );
-		CHECK( run.passed && run.hashes == 2 && run.writes == 1, "a pack recorded with another build's digest is hashed" );
+		CHECK( run.passed && run.hashes == 3 && run.writes == 1, "a pack recorded with another build's digest is hashed" );
 		CHECK( Run( fs ).hashes == 0, "and recorded with this build's digest" );
 		disk.at( PAK1 ).md5 = EDITED_MD5;
 		FS_FormatVerifiedPaks( records, fs.recordText );
 		run = Run( fs );
-		CHECK( !run.passed && run.hashes == 2, "a record cannot vouch for a digest this build does not expect" );
+		CHECK( !run.passed && run.hashes == 3, "a record cannot vouch for a digest this build does not expect" );
 	}
 
 	{
@@ -1607,7 +1646,7 @@ static void TestValidation() {
 		Run( fs );
 		fs.fs_cacheVerifiedPaks.value = "0";
 		const run_t run = Run( fs );
-		CHECK( run.passed && run.hashes == 2 && run.reads == 0 && run.writes == 0, "fs_cacheVerifiedPaks 0 hashes both packs and leaves the record alone" );
+		CHECK( run.passed && run.hashes == 3 && run.reads == 0 && run.writes == 0, "fs_cacheVerifiedPaks 0 hashes every pack and leaves the record alone" );
 	}
 
 	{
@@ -1615,7 +1654,7 @@ static void TestValidation() {
 		Install( fs, "/install" );
 		disk.at( PAK1 ).stampable = false;
 		run_t run = Run( fs );
-		CHECK( run.passed && run.hashes == 2 && run.writes == 1, "a pack without an identity is hashed" );
+		CHECK( run.passed && run.hashes == 3 && run.writes == 1, "a pack without an identity is hashed" );
 		CHECK( Run( fs ).hashes == 1, "and never recorded" );
 	}
 
@@ -1624,7 +1663,7 @@ static void TestValidation() {
 		Install( fs, "/install" );
 		disk.at( PAK1 ).changesWhileHashed = true;
 		run_t run = Run( fs );
-		CHECK( run.passed && run.hashes == 2, "a pack that changes while it is hashed is judged by its digest" );
+		CHECK( run.passed && run.hashes == 3, "a pack that changes while it is hashed is judged by its digest" );
 		CHECK( run.writes == 1 && !Contains( fs.recordText, PAK1 ), "but gets no entry" );
 		disk.at( PAK1 ).changesWhileHashed = false;
 		CHECK( Run( fs ).hashes == 1, "but not recorded under the identity read before hashing" );
@@ -1635,10 +1674,15 @@ static void TestValidation() {
 		idFileSystemLocal fs;
 		Install( fs, "/install" );
 		Run( fs );
-		fs.packs.pop_back();
+		fs.packs.erase( fs.packs.begin() + 1 );
 		run_t run = Run( fs );
-		CHECK( !run.passed && run.writes == 0 && Contains( run.errors, "missing baseoq4/pak1.pk4 (expected checksum ffeeddccbbaa99887766554433221100)" ),
+		CHECK( !run.passed && run.writes == 0 && Contains( run.errors, "missing baseoq4/pak1.pk4, light grids (expected checksum ffeeddccbbaa99887766554433221100)" ),
 			"a missing pack fails even with a record" );
+		CHECK( run.onlyClientPacks && fs_openQ4PackProblems.Num() == 1 && fs_openQ4PackProblems[ 0 ].missing,
+			"a missing client-only pack is kept for the localized report" );
+		fs.packs.erase( fs.packs.begin() );
+		run = Run( fs );
+		CHECK( !run.passed && !run.onlyClientPacks && fs_openQ4PackProblems.Num() == 2, "a missing core pack is reported at once" );
 	}
 
 	{
@@ -1658,7 +1702,7 @@ static void TestValidation() {
 		CHECK( run.passed && run.errors.empty(), "a read-only cache path still passes good packs" );
 		CHECK( Contains( run.log, "Could not record the verified pk4 checksums in /fs_cachepath/baseoq4/generated/packs/verified.txt" ),
 			"and says where it could not record them" );
-		CHECK( Run( fs ).hashes == 2, "so they are hashed at every startup" );
+		CHECK( Run( fs ).hashes == 3, "so they are hashed at every startup" );
 	}
 
 	{
@@ -1669,7 +1713,7 @@ static void TestValidation() {
 		CHECK( run.passed && run.hashes == 0 && run.reads == 0, "a mod that names its own base checks no openQ4 packs" );
 		fs.underlay = true;
 		run = Run( fs );
-		CHECK( run.passed && run.hashes == 2, "a mod over the openQ4 runtime checks them" );
+		CHECK( run.passed && run.hashes == 3, "a mod over the openQ4 runtime checks them" );
 		fs.underlay = false;
 		fs.fs_game_base.value = "baseoq4";
 		CHECK( Run( fs ).hashes == 0, "and is recorded like any other startup" );
@@ -1682,15 +1726,48 @@ static void TestValidation() {
 		Install( direct, "/builddir" );
 		Run( staged );
 		direct.recordText = staged.recordText;
-		CHECK( Run( direct ).hashes == 2, "another runtime's packs are not vouched for by this one's" );
+		CHECK( Run( direct ).hashes == 3, "another runtime's packs are not vouched for by this one's" );
 		staged.recordText = direct.recordText;
 		CHECK( Run( staged ).hashes == 0 && Run( direct ).hashes == 0, "both runtimes keep their entries" );
 	}
 }
 
+// A dedicated server needs only the core pack.
+static void TestDedicatedServer() {
+	{
+		idFileSystemLocal fs;
+		Install( fs, "/install" );
+		fs.packs.erase( fs.packs.begin() + 1, fs.packs.end() );
+		const run_t run = Run( fs );
+		CHECK( run.passed && run.errors.empty() && run.hashes == 1, "a server starts without light grids or loadscreens" );
+		CHECK( Contains( run.log, "Client-only pk4 baseoq4/pak1.pk4 (light grids) is not installed; this server does not need it" ),
+			"and says which client packs it does not carry" );
+	}
+	{
+		idFileSystemLocal fs;
+		Install( fs, "/install" );
+		disk.at( PAK2 ).md5 = EDITED_MD5;
+		const run_t run = Run( fs );
+		CHECK( run.passed && Contains( run.log, "WARNING: Ignoring client-only pk4 that does not match this server: checksum mismatch for baseoq4/pak2.pk4" ),
+			"a stale client pack does not stop a server" );
+	}
+	{
+		idFileSystemLocal fs;
+		Install( fs, "/install" );
+		disk.at( PAK0 ).md5 = EDITED_MD5;
+		const run_t run = Run( fs );
+		CHECK( !run.passed && !run.onlyClientPacks, "a server still needs its core pack" );
+	}
+}
+
 int main() {
+	( void )fs_openQ4PackProblemsMayRaise;
 	TestRecordFormat();
+#ifdef ID_DEDICATED
+	TestDedicatedServer();
+#else
 	TestValidation();
+#endif
 	if ( failures != 0 ) {
 		fprintf( stderr, "%d verified-pack check(s) failed\n", failures );
 		return 1;
@@ -1722,6 +1799,7 @@ def validate_verified_pack_record() -> None:
         "verified-pack record switch",
     )
     require(validator, "const bool useRecord = fs_cacheVerifiedPaks.GetBool();", "record switch gate")
+    require(validator, "fs_openQ4PackProblems.Append( problem );", "pack problems kept for the localized report")
     require(validator, "const bool stamped = useRecord && FS_StampOpenQ4Pak( pack, stamp );", "identity before hashing")
     require(validator, "FS_SameOpenQ4PakStamp( recorded->stamp, stamp )", "recorded identity match")
     require(validator, "!idStr::Icmp( recorded->md5, expected.md5 )", "recorded digest must be this build's")
@@ -1729,7 +1807,7 @@ def validate_verified_pack_record() -> None:
     require_order(validator, "FS_SameOpenQ4PakStamp( recorded->stamp, stamp )", "MD5_FileChecksum(", "record consulted before hashing")
     require_order(validator, "checksum mismatch for %s/%s", "FS_RecordVerifiedPak(", "only a passing pack is recorded")
     require_order(validator, "if ( errors.Length() != 0 ) {", "WriteVerifiedOpenQ4Paks( records )", "a failed check writes no record")
-    require_order(startup, "ValidateOpenQ4Paks( openQ4PakErrors )", "openQ4 runtime content packs in '%s' are missing or modified", "pack failure stays fatal")
+    require_order(startup, "ValidateOpenQ4Paks( openQ4PakErrors, onlyClientPacks )", "openQ4 runtime content packs in '%s' are missing or modified", "pack failure stays fatal")
 
     for token, context in (
         ("GetFileInformationByHandleEx( handle, FileBasicInfo, &basic, sizeof( basic ) )", "Windows change time"),
@@ -1758,8 +1836,14 @@ def validate_verified_pack_record() -> None:
     require(writer, 'RemoveFileChecked( staged, "fs_cachepath" )', "staged record cleanup")
 
     support = "\n".join(
-        verified_pack_type(source, name) for name in ("openQ4PakStamp", "verifiedOpenQ4Pak")
+        verified_pack_type(source, name) for name in ("openQ4PakStamp", "verifiedOpenQ4Pak", "openQ4PackTableEntry")
     )
+    table_start = source.index("static const openQ4PackTableEntry_t openQ4PackTable[] = {")
+    table_end = source.index("\n", source.index("static const int openQ4PackTableCount", table_start))
+    support += "\n" + source[table_start:table_end]
+    problems_start = source.index("typedef struct openQ4PackProblem_s {")
+    problems_end = source.index("\n", source.index("static bool\t\t\t\t\t\t\tfs_openQ4PackProblemsMayRaise", problems_start))
+    problems = source[problems_start:problems_end]
     constants = "\n".join(
         line for line in source.splitlines() if line.startswith("static const") and "FS_VERIFIED_PAKS_" in line
     )
@@ -1779,7 +1863,7 @@ def validate_verified_pack_record() -> None:
         )
     )
     program_text = "\n".join(
-        (VERIFIED_PACK_SUPPORT, support, constants, helpers, VERIFIED_PACK_DISK, validator, VERIFIED_PACK_MAIN)
+        (VERIFIED_PACK_SUPPORT, support, constants, helpers, problems, VERIFIED_PACK_DISK, validator, VERIFIED_PACK_MAIN)
     )
 
     compiler = next((path for name in ("clang++", "g++", "c++") if (path := shutil.which(name))), None)
@@ -1793,6 +1877,9 @@ def validate_verified_pack_record() -> None:
         program.write_text(program_text, encoding="utf-8")
         subprocess.run([compiler, *flags, str(program), "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
+        dedicated = Path(directory) / "verified_pack_dedicated.exe"
+        subprocess.run([compiler, *flags, "-DID_DEDICATED", str(program), "-o", str(dedicated)], check=True)
+        subprocess.run([str(dedicated)], check=True)
 
 
 def validate_validation_coverage() -> None:

@@ -1472,4 +1472,12 @@
 	"#str_231680"	"Resgate Strauss"
 	"#str_231681"	"Derrote o Senhor da Dor antes que Strauss seja processado. Atire nos pontos fracos nas costas do chefe para interrompê-lo."
 	"#str_43012"	"Opções gráficas"
+	"#str_231700"	"O openQ4 não pode iniciar porque um pacote de conteúdo está ausente ou não corresponde a esta versão."
+	"#str_231701"	"conteúdo principal de execução"
+	"#str_231702"	"grades de iluminação"
+	"#str_231703"	"telas de carregamento"
+	"#str_231704"	"%s (%s) está ausente da pasta %s."
+	"#str_231705"	"%s (%s) na pasta %s não corresponde a esta versão do openQ4."
+	"#str_231706"	"Instale o pacote completo do openQ4 %s ou baixe cada pacote listado para essa versão em %s e salve-o na pasta %s com o mesmo nome."
+	"#str_231707"	"Detalhes:"
 }

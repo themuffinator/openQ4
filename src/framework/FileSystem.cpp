@@ -1462,6 +1462,33 @@ typedef struct verifiedOpenQ4Pak_s {
 	char				md5[ 33 ];
 } verifiedOpenQ4Pak_t;
 
+// One openQ4 runtime pack from tools/build/content_packs.json, as the build
+// recorded it in openq4_paks_generated.h.
+typedef struct openQ4PackTableEntry_s {
+	const char *		name;
+	const char *		md5;
+	long long			sizeBytes;
+	int					fileCount;
+	bool				clientOnly;		// presentation data a server never reads
+	bool				bulk;			// carried by full packages, not update archives
+	const char *		contentsString;	// localized description, for example "light grids"
+	const char *		contents;		// English description, for logs
+} openQ4PackTableEntry_t;
+
+static const openQ4PackTableEntry_t openQ4PackTable[] = {
+	OPENQ4_PACK_TABLE_ENTRIES
+};
+static const int openQ4PackTableCount = sizeof( openQ4PackTable ) / sizeof( openQ4PackTable[ 0 ] );
+
+static const openQ4PackTableEntry_t *FS_FindOpenQ4PackTableEntry( const char *fileName ) {
+	for ( int i = 0; i < openQ4PackTableCount; i++ ) {
+		if ( !idStr::Icmp( openQ4PackTable[ i ].name, fileName ) ) {
+			return &openQ4PackTable[ i ];
+		}
+	}
+	return NULL;
+}
+
 class idLevelLoadCacheManager;
 
 class idFileSystemLocal : public idFileSystem {
@@ -1669,11 +1696,13 @@ private:
 	bool					IsGameDirPack( const pack_t *pak, const char *gameDir ) const;
 	bool					IsBaseGamePack( const pack_t *pak ) const;
 	bool					IsOpenQ4PurePack( const pack_t *pak ) const;
+	bool					IsOpenQ4ClientOnlyPack( const pack_t *pak ) const;
+	const openQ4PackTableEntry_t *FindOpenQ4PackTableEntry( const pack_t *pak ) const;
 	pack_t *				FindGamePackByName( const char *name, const char *gameDir ) const;
 	pack_t *				FindBaseGamePackByName( const char *name ) const;
 	void					PrintContentSearchDiagnostics( void );
 	bool					FindMisplacedOfficialPaks( idStr &errors ) const;
-	bool					ValidateOpenQ4Paks( idStr &errors );
+	bool					ValidateOpenQ4Paks( idStr &errors, bool &onlyClientPacks );
 	void					ReadVerifiedOpenQ4Paks( std::vector<verifiedOpenQ4Pak_t> &records );
 	bool					WriteVerifiedOpenQ4Paks( const std::vector<verifiedOpenQ4Pak_t> &records );
 	bool					ValidateRequiredOfficialPaks( idStr &errors ) const;
@@ -1728,7 +1757,7 @@ idCVar	idFileSystemLocal::fs_caseSensitiveOS( "fs_caseSensitiveOS", "1", CVAR_SY
 #endif
 idCVar	idFileSystemLocal::fs_searchAddons( "fs_searchAddons", "0", CVAR_SYSTEM | CVAR_BOOL, "search all addon pk4s ( disables addon functionality )" );
 idCVar	idFileSystemLocal::fs_validateOfficialPaks( "fs_validateOfficialPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "verify required official q4base media pk4 checksums on startup" );
-idCVar	idFileSystemLocal::fs_cacheVerifiedPaks( "fs_cacheVerifiedPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "skip re-hashing an openQ4 runtime pack whose size, times, file id and zip directory are unchanged since it passed its checksum check; 0 hashes both packs at every startup" );
+idCVar	idFileSystemLocal::fs_cacheVerifiedPaks( "fs_cacheVerifiedPaks", "1", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "skip re-hashing an openQ4 runtime pack whose size, times, file id and zip directory are unchanged since it passed its checksum check; 0 hashes every pack at every startup" );
 idCVar	idFileSystemLocal::fs_cacheLooseDirectories( "fs_cacheLooseDirectories", "1", CVAR_SYSTEM | CVAR_BOOL, "during a level load, remember which loose search-path directories do not exist, so a lookup skips them instead of failing an open in each (case-insensitive filesystems only)" );
 
 idFileSystemLocal	fileSystemLocal;
@@ -5631,14 +5660,38 @@ idFileSystemLocal::IsOpenQ4PurePack
 ================
 */
 bool idFileSystemLocal::IsOpenQ4PurePack( const pack_t *pak ) const {
+	const openQ4PackTableEntry_t *entry = FindOpenQ4PackTableEntry( pak );
+	return entry != NULL && !entry->clientOnly;
+}
+
+/*
+================
+idFileSystemLocal::IsOpenQ4ClientOnlyPack
+
+Client-only packs (light grids, loadscreens) are presentation data: a server
+does not need them, so they stay out of every pure list and a client keeps
+reading its own copy on a pure server that has none.
+================
+*/
+bool idFileSystemLocal::IsOpenQ4ClientOnlyPack( const pack_t *pak ) const {
+	const openQ4PackTableEntry_t *entry = FindOpenQ4PackTableEntry( pak );
+	return entry != NULL && entry->clientOnly;
+}
+
+/*
+================
+idFileSystemLocal::FindOpenQ4PackTableEntry
+================
+*/
+const openQ4PackTableEntry_t *idFileSystemLocal::FindOpenQ4PackTableEntry( const pack_t *pak ) const {
 	idStr name;
 
-	if ( !IsGameDirPack( pak, OPENQ4_GAMEDIR ) ) {
-		return false;
+	if ( pak == NULL || !IsGameDirPack( pak, OPENQ4_GAMEDIR ) ) {
+		return NULL;
 	}
 
 	pak->pakFilename.ExtractFileName( name );
-	return !name.Icmp( "pak0.pk4" ) || !name.Icmp( "pak1.pk4" );
+	return FS_FindOpenQ4PackTableEntry( name.c_str() );
 }
 
 /*
@@ -5713,7 +5766,7 @@ bool idFileSystemLocal::FindMisplacedOfficialPaks( idStr &errors ) const {
 ================
 openQ4 runtime pack verification record
 
-ValidateOpenQ4Paks proves pak0.pk4 and pak1.pk4 against the MD5 digests built
+ValidateOpenQ4Paks proves every pack in the generated table against the digests built
 into this executable. pak1 is about 800 MB, and hashing it cost about 1.3 s of
 every warm launch, more from a cold disk cache, and the same again at every
 filesystem restart.
@@ -5732,7 +5785,7 @@ doubt falls back to hashing: no record, an unreadable or malformed one, another
 build's digest, a pack that could not be stamped or that changed while it was
 hashed. Only a hash ever rejects a pack. The record is a cache with the trust
 model of make and git, not a signature: whoever can rewrite it can equally
-rewrite the executable. fs_cacheVerifiedPaks 0 hashes both packs at every
+rewrite the executable. fs_cacheVerifiedPaks 0 hashes every pack at every
 startup.
 ================
 */
@@ -6008,21 +6061,103 @@ bool idFileSystemLocal::WriteVerifiedOpenQ4Paks( const std::vector<verifiedOpenQ
 
 /*
 ================
-idFileSystemLocal::ValidateOpenQ4Paks
+openQ4 content pack failures
+
+A missing or mismatched core pack (pak0) stops startup at once, in English:
+pak0 carries the string tables, so nothing localized can be trusted without it.
+A missing or mismatched client-only pack is reported once the string tables
+have loaded, so the player reads which pack is wrong, what it holds and where
+to get it in their own language. Nothing between filesystem startup and the
+language load needs those packs.
 ================
 */
-bool idFileSystemLocal::ValidateOpenQ4Paks( idStr &errors ) {
-	struct expectedOpenQ4Pak_t {
-		const char *name;
-		const char *md5;
-	};
-	static const expectedOpenQ4Pak_t expectedPaks[] = {
-		{ "pak0.pk4", OPENQ4_PAK0_MD5 },
-		{ "pak1.pk4", OPENQ4_PAK1_MD5 },
-		{ NULL, NULL }
-	};
+typedef struct openQ4PackProblem_s {
+	const openQ4PackTableEntry_t *	pack;
+	bool							missing;
+} openQ4PackProblem_t;
 
+static idList<openQ4PackProblem_t>	fs_openQ4PackProblems;
+static idStr						fs_openQ4PackProblemDetails;
+static bool							fs_openQ4PackProblemsMayRaise = false;
+
+static const char *FS_LocalizedOr( const char *key, const char *fallback ) {
+	const idLangDict *dict = common != NULL ? common->GetLanguageDict() : NULL;
+	if ( dict == NULL || dict->GetNumKeyVals() == 0 ) {
+		return fallback;
+	}
+	const char *value = dict->GetString( key );
+	return ( value == NULL || value[ 0 ] == '\0' || !idStr::Cmp( value, key ) ) ? fallback : value;
+}
+
+/*
+================
+FS_FormatOpenQ4PackProblems
+
+The player-facing report: one line per pack naming it and what it holds,
+then where to get it. The English checksum details follow for support.
+================
+*/
+static idStr FS_FormatOpenQ4PackProblems( void ) {
+	idStr message = FS_LocalizedOr( "#str_231700",
+		"openQ4 cannot start because a content pack is missing or does not match this version." );
+	message += "\n\n";
+	for ( int i = 0; i < fs_openQ4PackProblems.Num(); i++ ) {
+		const openQ4PackProblem_t &problem = fs_openQ4PackProblems[ i ];
+		const char *contents = FS_LocalizedOr( problem.pack->contentsString, problem.pack->contents );
+		if ( problem.missing ) {
+			message += va( FS_LocalizedOr( "#str_231704", "%s (%s) is missing from the %s folder." ),
+				problem.pack->name, contents, OPENQ4_GAMEDIR );
+		} else {
+			message += va( FS_LocalizedOr( "#str_231705", "%s (%s) in the %s folder does not match this version of openQ4." ),
+				problem.pack->name, contents, OPENQ4_GAMEDIR );
+		}
+		message += "\n";
+	}
+	message += "\n";
+	message += va( FS_LocalizedOr( "#str_231706",
+		"Install the full openQ4 %s package, or download each listed pack for that version from %s and save it in the %s folder under the same name." ),
+		PROJECT_VERSION, PROJECT_RELEASES_URL, OPENQ4_GAMEDIR );
+	if ( fs_openQ4PackProblemDetails.Length() ) {
+		message += "\n\n";
+		message += FS_LocalizedOr( "#str_231707", "Details:" );
+		message += "\n";
+		message += fs_openQ4PackProblemDetails;
+	}
+	return message;
+}
+
+/*
+================
+FS_RaiseDeferredContentPackFailure
+
+Called once the string tables have loaded at startup. Reports a client-only
+pack failure found by filesystem startup; from here on, a filesystem restart
+reports one at once.
+================
+*/
+void FS_RaiseDeferredContentPackFailure( void ) {
+	fs_openQ4PackProblemsMayRaise = true;
+	if ( fs_openQ4PackProblems.Num() == 0 ) {
+		return;
+	}
+	const idStr message = FS_FormatOpenQ4PackProblems();
+	common->FatalError( "%s", message.c_str() );
+}
+
+/*
+================
+idFileSystemLocal::ValidateOpenQ4Paks
+
+Checks every pack in the generated pack table against this executable's
+digest. onlyClientPacks reports whether every failure is a client-only pack,
+which can wait for the localized report.
+================
+*/
+bool idFileSystemLocal::ValidateOpenQ4Paks( idStr &errors, bool &onlyClientPacks ) {
 	errors.Clear();
+	onlyClientPacks = true;
+	fs_openQ4PackProblems.Clear();
+	fs_openQ4PackProblemDetails.Clear();
 
 	if ( idStr::Icmp( fs_game.GetString(), OPENQ4_GAMEDIR ) &&
 		 idStr::Icmp( fs_game_base.GetString(), OPENQ4_GAMEDIR ) &&
@@ -6037,13 +6172,28 @@ bool idFileSystemLocal::ValidateOpenQ4Paks( idStr &errors ) {
 		ReadVerifiedOpenQ4Paks( records );
 	}
 
-	for ( int i = 0; expectedPaks[ i ].name != NULL; i++ ) {
-		const expectedOpenQ4Pak_t &expected = expectedPaks[ i ];
+	for ( int i = 0; i < openQ4PackTableCount; i++ ) {
+		const openQ4PackTableEntry_t &expected = openQ4PackTable[ i ];
 		pack_t *pack = FindGamePackByName( expected.name, OPENQ4_GAMEDIR );
 		char actualMD5[33];
+#ifdef ID_DEDICATED
+		// A server never reads presentation packs; it runs without them and
+		// leaves any copy it has out of the pure list.
+		const bool optional = expected.clientOnly;
+#else
+		const bool optional = false;
+#endif
 
 		if ( !pack ) {
-			errors += va( "missing %s/%s (expected checksum %s)\n", OPENQ4_GAMEDIR, expected.name, expected.md5 );
+			if ( optional ) {
+				common->Printf( "Client-only pk4 %s/%s (%s) is not installed; this server does not need it\n",
+					OPENQ4_GAMEDIR, expected.name, expected.contents );
+				continue;
+			}
+			errors += va( "missing %s/%s, %s (expected checksum %s)\n", OPENQ4_GAMEDIR, expected.name, expected.contents, expected.md5 );
+			openQ4PackProblem_t problem = { &expected, true };
+			fs_openQ4PackProblems.Append( problem );
+			onlyClientPacks = onlyClientPacks && expected.clientOnly;
 			continue;
 		}
 
@@ -6058,14 +6208,23 @@ bool idFileSystemLocal::ValidateOpenQ4Paks( idStr &errors ) {
 		}
 
 		const int hashStart = Sys_Milliseconds();
-		if ( !MD5_FileChecksum( pack->pakFilename.c_str(), actualMD5 ) ) {
-			errors += va( "could not read %s for checksum validation\n", pack->pakFilename.c_str() );
-			continue;
-		}
-
-		if ( idStr::Icmp( actualMD5, expected.md5 ) ) {
-			errors += va( "checksum mismatch for %s/%s (expected %s, got %s from %s)\n",
-				OPENQ4_GAMEDIR, expected.name, expected.md5, actualMD5, pack->pakFilename.c_str() );
+		const bool hashed = MD5_FileChecksum( pack->pakFilename.c_str(), actualMD5 );
+		if ( !hashed || idStr::Icmp( actualMD5, expected.md5 ) ) {
+			idStr detail;
+			if ( hashed ) {
+				detail = va( "checksum mismatch for %s/%s, %s (expected %s, got %s from %s)\n",
+					OPENQ4_GAMEDIR, expected.name, expected.contents, expected.md5, actualMD5, pack->pakFilename.c_str() );
+			} else {
+				detail = va( "could not read %s for checksum validation\n", pack->pakFilename.c_str() );
+			}
+			if ( optional ) {
+				common->Warning( "Ignoring client-only pk4 that does not match this server: %s", detail.c_str() );
+				continue;
+			}
+			errors += detail;
+			openQ4PackProblem_t problem = { &expected, false };
+			fs_openQ4PackProblems.Append( problem );
+			onlyClientPacks = onlyClientPacks && expected.clientOnly;
 			continue;
 		}
 		common->Printf( "Verified pk4 %s: hashed in %d ms\n", pack->pakFilename.c_str(), Sys_Milliseconds() - hashStart );
@@ -6078,6 +6237,7 @@ bool idFileSystemLocal::ValidateOpenQ4Paks( idStr &errors ) {
 		}
 	}
 
+	fs_openQ4PackProblemDetails = errors;
 	if ( errors.Length() != 0 ) {
 		return false;
 	}
@@ -6328,12 +6488,23 @@ void idFileSystemLocal::Startup( void ) {
     }
 
 	idStr openQ4PakErrors;
-	if ( !ValidateOpenQ4Paks( openQ4PakErrors ) ) {
+	bool onlyClientPacks = false;
+	if ( !ValidateOpenQ4Paks( openQ4PakErrors, onlyClientPacks ) ) {
 		PrintContentSearchDiagnostics();
-		common->FatalError(
-			"openQ4 runtime content packs in '%s' are missing or modified.\n\n%s\n"
-			"Rebuild or reinstall openQ4 so '<openQ4 package root>/%s/pak0.pk4' and '<openQ4 package root>/%s/pak1.pk4' match this engine. Retail Quake 4 PK4s belong in '%s', not '%s'.",
-			OPENQ4_GAMEDIR, openQ4PakErrors.c_str(), OPENQ4_GAMEDIR, OPENQ4_GAMEDIR, BASE_GAMEDIR, OPENQ4_GAMEDIR );
+		if ( !onlyClientPacks ) {
+			idStr expectedPacks;
+			for ( int i = 0; i < openQ4PackTableCount; i++ ) {
+				expectedPacks += va( "%s'<openQ4 package root>/%s/%s'", i ? ", " : "", OPENQ4_GAMEDIR, openQ4PackTable[ i ].name );
+			}
+			common->FatalError(
+				"openQ4 runtime content packs in '%s' are missing or modified.\n\n%s\n"
+				"Rebuild or reinstall openQ4 %s so %s match this engine; packages are at %s. Retail Quake 4 PK4s belong in '%s', not '%s'.",
+				OPENQ4_GAMEDIR, openQ4PakErrors.c_str(), PROJECT_VERSION, expectedPacks.c_str(), PROJECT_RELEASES_URL, BASE_GAMEDIR, OPENQ4_GAMEDIR );
+		}
+		common->Printf( "openQ4 client content packs are missing or modified:\n%s", openQ4PakErrors.c_str() );
+		if ( fs_openQ4PackProblemsMayRaise ) {
+			FS_RaiseDeferredContentPackFailure();
+		}
 	}
 
 	if ( fs_validateOfficialPaks.GetBool() ) {
@@ -7203,6 +7374,11 @@ pureStatus_t idFileSystemLocal::GetPackStatus( pack_t *pak ) {
 	if ( IsOpenQ4PurePack( pak ) ) {
 		pak->pureStatus = PURE_ALWAYS;
 		return PURE_ALWAYS;
+	}
+	// Client-only packs never enter a pure list, and stay readable on a pure server.
+	if ( IsOpenQ4ClientOnlyPack( pak ) ) {
+		pak->pureStatus = PURE_NEVER;
+		return PURE_NEVER;
 	}
 
 	// Keep the stock Quake 4 base media in the pure list no matter their contents.

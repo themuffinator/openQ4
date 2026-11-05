@@ -1528,4 +1528,12 @@
 	"#str_231680"	"Uratuj Straussa"
 	"#str_231681"	"Pokonaj Władcę Bólu, zanim Strauss zostanie przetworzony. Strzelaj w słabe punkty na plecach bossa, aby mu przeszkodzić."
 	"#str_43012"	"Opcje graficzne"
+	"#str_231700"	"Nie można uruchomić openQ4, ponieważ brakuje pakietu zawartości lub nie pasuje on do tej wersji."
+	"#str_231701"	"podstawowa zawartość uruchomieniowa"
+	"#str_231702"	"siatki oświetlenia"
+	"#str_231703"	"ekrany ładowania"
+	"#str_231704"	"Brak %s (%s) w folderze %s."
+	"#str_231705"	"%s (%s) w folderze %s nie pasuje do tej wersji openQ4."
+	"#str_231706"	"Zainstaluj pełny pakiet openQ4 %s albo pobierz każdy wymieniony pakiet dla tej wersji z %s i zapisz go w folderze %s pod tą samą nazwą."
+	"#str_231707"	"Szczegóły:"
 }

@@ -10,7 +10,7 @@ import struct
 from pathlib import Path
 
 from game_layer import PACKAGED_LAYER_GAME_DIRS
-from openq4_pak import copy_file_if_changed
+from openq4_pak import OPENQ4_PACK_NAMES, copy_file_if_changed
 
 
 PRODUCT_NAME = "openQ4"
@@ -424,7 +424,7 @@ def stage_build_game_directory(source_root: Path, build_root: Path) -> dict[str,
     build_root = validate_runtime_directory(build_root, "build root", must_exist=True)
     build_generated_game_dir = build_root / "content" / GAME_DIR_NAME
     build_runtime_game_dir = build_root / GAME_DIR_NAME
-    build_game_pk4s = [build_root / name for name in ("pak0.pk4", "pak1.pk4")]
+    build_game_pk4s = [build_root / name for name in OPENQ4_PACK_NAMES]
     staged_file_count = 0
 
     if not build_generated_game_dir.is_dir() and not any(path.is_file() for path in build_game_pk4s):

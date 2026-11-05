@@ -1472,4 +1472,12 @@
 	"#str_231680"	"Rescata a Strauss"
 	"#str_231681"	"Derrota al Señor del Dolor antes de que procesen a Strauss. Dispara a los puntos débiles de su espalda para interrumpirlo."
 	"#str_43012"	"Opciones gráficas"
+	"#str_231700"	"openQ4 no puede iniciarse porque falta un paquete de contenido o no coincide con esta versión."
+	"#str_231701"	"contenido básico de ejecución"
+	"#str_231702"	"rejillas de iluminación"
+	"#str_231703"	"pantallas de carga"
+	"#str_231704"	"Falta %s (%s) en la carpeta %s."
+	"#str_231705"	"%s (%s) de la carpeta %s no coincide con esta versión de openQ4."
+	"#str_231706"	"Instala el paquete completo de openQ4 %s, o descarga cada paquete indicado para esa versión desde %s y guárdalo en la carpeta %s con el mismo nombre."
+	"#str_231707"	"Detalles:"
 }

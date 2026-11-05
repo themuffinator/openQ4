@@ -1481,4 +1481,12 @@
 	"#str_231680"	"Sauvez Strauss"
 	"#str_231681"	"Vainquez le Seigneur de la douleur avant la transformation de Strauss. Tirez sur les points faibles dans son dos pour l'interrompre."
 	"#str_43012"	"Options graphiques"
+	"#str_231700"	"openQ4 ne peut pas démarrer : un pack de contenu est manquant ou ne correspond pas à cette version."
+	"#str_231701"	"contenu d'exécution principal"
+	"#str_231702"	"grilles d'éclairage"
+	"#str_231703"	"écrans de chargement"
+	"#str_231704"	"%s (%s) est absent du dossier %s."
+	"#str_231705"	"%s (%s) dans le dossier %s ne correspond pas à cette version d'openQ4."
+	"#str_231706"	"Installez le paquet complet d'openQ4 %s, ou téléchargez chaque pack indiqué pour cette version depuis %s et enregistrez-le dans le dossier %s sous le même nom."
+	"#str_231707"	"Détails :"
 }

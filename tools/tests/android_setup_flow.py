@@ -81,7 +81,7 @@ public final class SetupFlowTest {
         app.assets=new AssetManager();app.assets.root=root.resolve("assets").toFile();
         Path save=app.files.toPath().resolve("saves/baseoq4/keep.save");write(save,"original-save".getBytes());
         StringBuilder manifest=new StringBuilder("openQ4-package-v1\n");
-        for(String name:List.of("mod.json","pak0.pk4","pak1.pk4")) {
+        for(String name:List.of("mod.json","pak0.pk4","pak1.pk4","pak2.pk4")) {
             byte[] data=("bundled-"+name).getBytes();write(app.assets.root.toPath().resolve("baseoq4/"+name),data);
             manifest.append(sha(data)).append('\t').append(data.length).append('\t').append(name).append('\n');
         }

@@ -54,8 +54,9 @@ openQ4/
 ├── renderer-gl_<arch>       # OpenGL renderer (.dll / .so)
 ├── renderer-vk_<arch>       # Vulkan renderer (.dll / .so / .dylib): stable on Windows, experimental elsewhere
 └── baseoq4/                 # The single openQ4 game directory
-    ├── pak0.pk4             # openQ4 runtime content
-    ├── pak1.pk4             # openQ4 level content
+    ├── pak0.pk4             # openQ4 core runtime content
+    ├── pak1.pk4             # openQ4 light grids (clients only)
+    ├── pak2.pk4             # openQ4 loadscreens (clients only)
     ├── mod.json             # Game-directory manifest
     ├── game-sp_<arch>       # Single-player module (.dll / .so / .dylib)
     └── game-mp_<arch>       # Multiplayer module (.dll / .so / .dylib)
@@ -80,7 +81,7 @@ openQ4 checks that your Quake 4 installation has legitimate, unmodified game dat
 
 `fs_validateOfficialPaks 1` (the default, set at startup) enables these checks. The [official PK4 checksum reference](docs/dev/official-pk4-checksums.md) lists the expected files.
 
-openQ4 also checks its own `baseoq4/pak0.pk4` and `pak1.pk4` against checksums built into the executable, and refuses to start if either is missing or modified. A pack that passed is remembered in `generated/packs/verified.txt` under the save path and read again only after the file changes, so later launches skip reading the 800 MB `pak1.pk4`. `+set fs_cacheVerifiedPaks 0` checks both packs at every launch. See [Runtime Pack Verification](docs/dev/runtime-pack-verification.md).
+openQ4 also checks its own `baseoq4/pak0.pk4`, `pak1.pk4` and `pak2.pk4` against checksums built into the executable, and refuses to start if one is missing or modified; for the light-grid and loadscreen packs the message is in the player's language and says where to get the pack. A dedicated server needs only `pak0.pk4`. A pack that passed is remembered in `generated/packs/verified.txt` under the save path and read again only after the file changes, so later launches skip reading the 800 MB of light grids and loadscreens. `+set fs_cacheVerifiedPaks 0` checks every pack at every launch. See [Runtime Pack Verification](docs/dev/runtime-pack-verification.md).
 
 ---
 

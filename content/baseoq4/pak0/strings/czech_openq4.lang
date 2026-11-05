@@ -1472,4 +1472,12 @@
 	"#str_231680"	"Zachraňte Strausse"
 	"#str_231681"	"Porazte Pána bolesti, než bude Strauss zpracován. Střílejte do slabých míst na jeho zádech, abyste ho přerušili."
 	"#str_43012"	"Nastavení grafiky"
+	"#str_231700"	"openQ4 nelze spustit, protože chybí balíček obsahu nebo neodpovídá této verzi."
+	"#str_231701"	"základní obsah běhového prostředí"
+	"#str_231702"	"světelné mřížky"
+	"#str_231703"	"načítací obrazovky"
+	"#str_231704"	"%s (%s) chybí ve složce %s."
+	"#str_231705"	"%s (%s) ve složce %s neodpovídá této verzi openQ4."
+	"#str_231706"	"Nainstalujte úplný balíček openQ4 %s, nebo stáhněte každý uvedený balíček pro tuto verzi z %s a uložte jej do složky %s pod stejným názvem."
+	"#str_231707"	"Podrobnosti:"
 }

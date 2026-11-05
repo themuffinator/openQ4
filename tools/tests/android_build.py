@@ -55,7 +55,7 @@ def staged_package(stage: Path, variant: str) -> tuple[dict[str, bytes], dict[st
         'android-build.json': json.dumps({'format': 1, 'variant': variant, 'abi': abi,
                                           'androidApi': 24, 'sdlVersion': '3.4.18'}).encode(),
         'baseoq4/mod.json': b'{"version":"0.14.000","requiredopenQ4Version":"0.14.000"}',
-        'baseoq4/pak0.pk4': pack.getvalue(), 'baseoq4/pak1.pk4': b'second pack',
+        'baseoq4/pak0.pk4': pack.getvalue(), 'baseoq4/pak1.pk4': b'second pack', 'baseoq4/pak2.pk4': b'third pack',
         'LICENSE': b'engine license', 'LICENSING.md': b'component licenses', 'CONTRIBUTORS.md': b'credits',
         'licenses/QUAKE-4-SDK-EULA.rtf': b'SDK EULA', 'licenses/MD4.txt': b'MD4 notice',
         'licenses/sdl3/LICENSE.txt': b'SDL', 'licenses/openal-soft/COPYING': b'OpenAL',
@@ -85,6 +85,19 @@ class AndroidBuildTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         (ROOT / '.tmp').mkdir(exist_ok=True)
+
+    def test_android_required_packs_follow_the_content_pack_table(self) -> None:
+        from android_package import content_pack_names, required_package_files
+        table = json.loads((ROOT / 'tools/build/content_packs.json').read_text(encoding='utf-8'))
+        names = tuple(pack['name'] for pack in table['packs'])
+        self.assertEqual(content_pack_names(), names)
+        self.assertEqual(required_package_files(), {'mod.json', *names})
+        java = (ROOT / 'mobile/android/app/src/main/java/com/darkmatter/openq4/PackageStorage.java').read_text(encoding='utf-8')
+        listed = '{ ' + ', '.join(f'"{name}"' for name in ('mod.json', *names)) + ' }'
+        self.assertIn(f'for (String required : new String[] {listed})', java,
+                      'PackageStorage.java must require every pack in tools/build/content_packs.json')
+        for gradle in ('mobile/android/package-manifest.gradle', 'mobile/android/app/build.gradle'):
+            self.assertIn('openQ4ContentPackNames()', (ROOT / gradle).read_text(encoding='utf-8'), gradle)
 
     def test_emulator_file_check_distinguishes_absence_from_command_failure(self) -> None:
         probe = android_emulator_smoke.Probe.__new__(android_emulator_smoke.Probe)

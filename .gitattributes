@@ -4,3 +4,7 @@
 # Meson applies dependency patches to LF files from upstream source archives.
 # Unified-diff context prefixes legitimately precede source tabs and blank lines.
 *.patch text eol=lf -whitespace
+# Runtime pack sources are packed byte for byte and every platform must build
+# identical packs, so their checkout keeps the repository bytes: no end-of-line
+# conversion, whatever core.autocrlf says.
+content/baseoq4/** -text

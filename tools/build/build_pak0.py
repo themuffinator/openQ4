@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build baseoq4/pak0.pk4, baseoq4/pak1.pk4, and the generated integrity header."""
+"""Build every openQ4 runtime pack in the content pack table and the generated integrity header.
+
+Meson builds each pack as its own target; this standalone builder does the same
+work in one process for scripts and tests that run without a Meson build.
+"""
 
 from __future__ import annotations
 
@@ -8,8 +12,7 @@ import sys
 from pathlib import Path
 
 from openq4_pak import (
-    PAK0_NAME,
-    PAK1_NAME,
+    OPENQ4_CONTENT_PACKS,
     copy_file_if_changed,
     create_game_pk4,
     format_openq4_paks_header,
@@ -19,22 +22,15 @@ from openq4_pak import (
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build the openQ4 pak0.pk4 and pak1.pk4 runtime packs and generated checksum header."
+        description="Build the openQ4 runtime packs listed in tools/build/content_packs.json and the generated checksum header."
     )
-    parser.add_argument("--pak0-source-dir", required=True, help="Source content/baseoq4/pak0 directory.")
-    parser.add_argument("--pak1-source-dir", required=True, help="Source content/baseoq4/pak1 directory.")
-    parser.add_argument("--pak0-out", required=True, help="Output pak0.pk4 path.")
-    parser.add_argument("--pak1-out", required=True, help="Output pak1.pk4 path.")
+    parser.add_argument("--source-root", required=True, help="Repository root holding each pack's source directory.")
+    parser.add_argument("--out-dir", required=True, help="Directory that receives the built packs.")
     parser.add_argument("--header-out", required=True, help="Generated C/C++ header path.")
     parser.add_argument(
-        "--pak0-stage-out",
+        "--stage-dir",
         default="",
-        help="Optional additional baseoq4/pak0.pk4 path to copy for direct builddir launches.",
-    )
-    parser.add_argument(
-        "--pak1-stage-out",
-        default="",
-        help="Optional additional baseoq4/pak1.pk4 path to copy for direct builddir launches.",
+        help="Optional baseoq4 directory that also receives a copy of every pack, for direct builddir launches.",
     )
     return parser.parse_args(argv[1:])
 
@@ -67,35 +63,30 @@ def build_pack(pak_name: str, source_dir: Path, pak_out: Path) -> object:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+    source_root = Path(args.source_root)
+    out_dir = Path(args.out_dir).resolve()
 
     try:
-        pak0_source_dir = require_pack_source_dir(Path(args.pak0_source_dir), PAK0_NAME)
-        pak1_source_dir = require_pack_source_dir(Path(args.pak1_source_dir), PAK1_NAME)
+        sources = {
+            spec.name: require_pack_source_dir(source_root / spec.source, spec.name) for spec in OPENQ4_CONTENT_PACKS
+        }
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    pak0_out = Path(args.pak0_out).resolve()
-    pak1_out = Path(args.pak1_out).resolve()
-    header_out = Path(args.header_out).resolve()
 
-    pak0_result = build_pack(PAK0_NAME, pak0_source_dir, pak0_out)
-    pak1_result = build_pack(PAK1_NAME, pak1_source_dir, pak1_out)
+    results = {}
+    for spec in OPENQ4_CONTENT_PACKS:
+        results[spec.name] = build_pack(spec.name, sources[spec.name], out_dir / spec.name)
 
-    write_text_if_changed(header_out, format_openq4_paks_header(pak0_result, pak1_result))
+    write_text_if_changed(Path(args.header_out).resolve(), format_openq4_paks_header(results))
 
-    if args.pak0_stage_out:
-        copy_if_changed(pak0_out, Path(args.pak0_stage_out).resolve())
-    if args.pak1_stage_out:
-        copy_if_changed(pak1_out, Path(args.pak1_stage_out).resolve())
+    if args.stage_dir:
+        stage_dir = Path(args.stage_dir).resolve()
+        for spec in OPENQ4_CONTENT_PACKS:
+            copy_if_changed(out_dir / spec.name, stage_dir / spec.name)
 
-    print(
-        f"built pak0.pk4: md5={pak0_result.md5_hex} "
-        f"size={pak0_result.size_bytes} files={pak0_result.added_files}"
-    )
-    print(
-        f"built pak1.pk4: md5={pak1_result.md5_hex} "
-        f"size={pak1_result.size_bytes} files={pak1_result.added_files}"
-    )
+    for name, result in results.items():
+        print(f"built {name}: md5={result.md5_hex} size={result.size_bytes} files={result.added_files}")
     return 0
 
 

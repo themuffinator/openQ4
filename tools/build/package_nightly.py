@@ -36,6 +36,7 @@ from generate_release_docs import GeneratedDocSite, generate_release_docs_site
 from gamelibs_stage_path import MANIFEST_NAME as GAMELIBS_STAGE_MANIFEST_NAME, stage_root as gamelibs_stage_root
 from game_layer import PACKAGED_LAYER_GAME_DIRS, RETIRED_LAYER_GAME_DIRS, LayerError, read_layer_mod_json
 from openq4_pak import (
+    OPENQ4_CONTENT_PACKS_BY_NAME,
     OPENQ4_PK4_FORBIDDEN_FILES,
     OPENQ4_PACK_NAMES,
     OPENQ4_REQUIRED_LOOSE_GAME_FILES,
@@ -187,8 +188,7 @@ MACOS_EXPECTED_APP_BUNDLE_FILES = (
     "Contents/Resources/openQ4.icns",
     "Contents/Resources/VERSION.txt",
     f"Contents/Resources/{GAME_DIR_NAME}/mod.json",
-    f"Contents/Resources/{GAME_DIR_NAME}/pak0.pk4",
-    f"Contents/Resources/{GAME_DIR_NAME}/pak1.pk4",
+    *(f"Contents/Resources/{GAME_DIR_NAME}/{pak_name}" for pak_name in OPENQ4_PACK_NAMES),
     "Contents/Resources/assets/splash/quake4_rt_bitmap_4001.bmp",
     "Contents/Resources/licenses/openal-soft/COPYING",
     "Contents/Resources/licenses/openal-soft/LICENSE-pffft",
@@ -2817,8 +2817,7 @@ def validate_macos_archive_contents(
         embedded_moltenvk_entry,
         embedded_openal_soft_entry,
         f"{app_bundle_prefix}Contents/Resources/{GAME_DIR_NAME}/mod.json",
-        f"{app_bundle_prefix}Contents/Resources/{GAME_DIR_NAME}/pak0.pk4",
-        f"{app_bundle_prefix}Contents/Resources/{GAME_DIR_NAME}/pak1.pk4",
+        *(f"{app_bundle_prefix}Contents/Resources/{GAME_DIR_NAME}/{pak_name}" for pak_name in OPENQ4_PACK_NAMES),
         support_info_entry,
         f"{package_prefix}{MACOS_SYMBOL_MANIFEST_NAME}",
         f"{package_prefix}VERSION.txt",
@@ -3643,8 +3642,7 @@ def validate_macos_app_bundle(package_root: Path, app_root: Path, arch: str, ver
     require_non_empty_package_file(app_version, "macOS app bundle version manifest")
     for relative_path in (
         MACOS_APP_GAME_DATA_DIR / "mod.json",
-        MACOS_APP_GAME_DATA_DIR / "pak0.pk4",
-        MACOS_APP_GAME_DATA_DIR / "pak1.pk4",
+        *(MACOS_APP_GAME_DATA_DIR / pak_name for pak_name in OPENQ4_PACK_NAMES),
         MACOS_APP_SPLASH_DIR / "quake4_rt_bitmap_4001.bmp",
     ):
         require_non_empty_package_file(app_root / relative_path, f"macOS embedded runtime file {relative_path}")
@@ -3772,8 +3770,7 @@ def create_macos_app_bundle(
     staged_mp_module = staged_game_dir / f"game-mp_{arch}.dylib"
     for path, label in (
         (staged_game_dir / "mod.json", "macOS staged game metadata"),
-        (staged_game_dir / "pak0.pk4", "macOS staged pak0"),
-        (staged_game_dir / "pak1.pk4", "macOS staged pak1"),
+        *((staged_game_dir / pak_name, f"macOS staged {pak_name}") for pak_name in OPENQ4_PACK_NAMES),
     ):
         require_non_empty_package_file(path, label)
     require_packaged_executable(staged_sp_module, "macOS staged SP game module")
@@ -4057,12 +4054,11 @@ def main(argv: list[str]) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    source_content_dir = source_root / "content" / GAME_DIR_NAME
     pk4_results = []
     for pak_name in OPENQ4_PACK_NAMES:
         game_pk4_path = package_game_dir / pak_name
         staged_game_pk4_path = install_game_dir / pak_name
-        source_pack_dir = source_content_dir / Path(pak_name).stem
+        source_pack_dir = source_root / OPENQ4_CONTENT_PACKS_BY_NAME[pak_name].source
 
         if staged_game_pk4_path.is_file():
             pk4_result = copy_game_pk4(staged_game_pk4_path, game_pk4_path, pak_name=pak_name)

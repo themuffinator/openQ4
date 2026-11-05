@@ -1,31 +1,74 @@
 # Runtime Pack Verification
 
-openQ4 ships its own runtime content in two packs, `baseoq4/pak0.pk4` (the core
-runtime: GLSL programs, fonts, strings, menus, configs) and `baseoq4/pak1.pk4`
-(level content). The build packs them deterministically and compiles their MD5
-digests into the client and the dedicated server (`OPENQ4_PAK0_MD5` and
-`OPENQ4_PAK1_MD5` in the generated `openq4_paks_generated.h`). At every
-filesystem startup `idFileSystemLocal::ValidateOpenQ4Paks`
-(`src/framework/FileSystem.cpp`) proves both packs against those digests. A
-missing or modified pack stops startup with:
+openQ4 ships its own runtime content in the packs listed in
+`tools/build/content_packs.json`:
+
+| Pack | Contents | Audience |
+| --- | --- | --- |
+| `baseoq4/pak0.pk4` | Core runtime: GLSL programs, fonts, strings, menus, configs, gameplay scripts, the `liquid_lab` map | Every client and server |
+| `baseoq4/pak1.pk4` | Light grids: `.lightgridpack`, `.lightgrid` and atlas images | Clients only |
+| `baseoq4/pak2.pk4` | Loadscreens | Clients only |
+
+The build packs each one deterministically and compiles a table of their
+names, MD5 digests, sizes and audiences into the client and the dedicated
+server (`OPENQ4_PACK_TABLE_ENTRIES` and the `OPENQ4_PAKn_*` macros in the
+generated `openq4_paks_generated.h`). At every filesystem startup
+`idFileSystemLocal::ValidateOpenQ4Paks` (`src/framework/FileSystem.cpp`) proves
+every pack in that table against its digest. The check runs when `fs_game` or
+`fs_game_base` is `baseoq4`, or when a mod runs over the openQ4 runtime underlay
+(`UsesOpenQ4RuntimeUnderlay`); a mod that names another base directory checks
+no openQ4 packs, as before.
+
+## When a pack is missing or does not match
+
+A missing or modified **core pack** stops startup at once, in English, because
+pak0 holds the string tables:
 
 ```text
 openQ4 runtime content packs in 'baseoq4' are missing or modified.
 ```
 
-followed by the reason (`missing baseoq4/pak1.pk4 (expected checksum ...)`,
-`checksum mismatch for baseoq4/pak0.pk4 (expected ..., got ... from ...)` or
-`could not read ... for checksum validation`). The check runs when `fs_game`
-or `fs_game_base` is `baseoq4`, or when a mod runs over the openQ4 runtime
-underlay (`UsesOpenQ4RuntimeUnderlay`); a mod that names another base directory
-checks no openQ4 packs, as before.
+followed by the reason (`missing baseoq4/pak0.pk4, core runtime content
+(expected checksum ...)`, `checksum mismatch for baseoq4/pak0.pk4, core runtime
+content (expected ..., got ... from ...)` or `could not read ... for checksum
+validation`) and the version and release page to reinstall from.
+
+A missing or modified **client-only pack** is reported once the string tables
+have loaded (`FS_RaiseDeferredContentPackFailure`, called by `InitGame` after the
+startup language load), in the player's language: which pack is wrong, what it
+holds, and that it comes with the full package or on its own from the release
+page under the same name (`#str_231700` to `#str_231707` in every
+`*_openq4.lang`). The English detail lines follow for support. Nothing between
+filesystem startup and the language load reads those packs. A later filesystem
+restart reports such a failure at once.
+
+The **dedicated server** treats client-only packs as optional: a server without
+pak1 and pak2 logs `Client-only pk4 baseoq4/pak1.pk4 (light grids) is not
+installed; this server does not need it` and starts, and a stale copy is only a
+warning.
+
+## Pure servers
+
+`IsOpenQ4PurePack` keeps the core pack `PURE_ALWAYS`. Client-only packs are
+`PURE_NEVER` (`IsOpenQ4ClientOnlyPack` in `GetPackStatus`): they never enter a
+pure list, so a server that does not carry them does not hide them, and a
+client keeps its own loadscreens and light grids on a pure server.
+`tools/tests/content_pack_split_smoke.py` hosts `mp/q4dm1` on a dedicated
+server that has only pak0 and joins it with a client that has all three packs;
+the client's `path` shows pak0 on the pure list and pak1 and pak2 off it, and
+the map is lit from its packed light grid.
+`tools/tests/content_pack_status_smoke.py` checks the localized report for a
+missing loadscreen pack (German), a stale light-grid pack (French) and the
+English report for a missing core pack.
 
 ## Why it was slow
 
-pak1 is about 800 MB. Hashing it ran at MD5 speed, about 600 MB/s on one
-core, so it cost about 1.3 s of every launch with a warm disk cache (more from
-a cold cache, more again in a debug build) before anything else could start.
-A filesystem restart paid it again.
+Before the split (PKG-02) pak1 was about 800 MB. Hashing it ran at MD5 speed,
+about 600 MB/s on one core, so it cost about 1.3 s of every launch with a warm
+disk cache (more from a cold cache, more again in a debug build) before anything
+else could start. A filesystem restart paid it again. The light-grid and
+loadscreen packs together are still about 800 MB, so the record below matters
+as much as before.
 
 ## The verified-pack record
 

@@ -7604,6 +7604,10 @@ void idCommonLocal::InitGame( void ) {
 	InitLanguageDict( false, false );
 	fileSystem->SetIsFileLoadingAllowed( wasFileLoadingAllowed );
 
+	// A missing or mismatched light-grid or loadscreen pack is reported here,
+	// in the player's language, rather than in English at filesystem startup.
+	FS_RaiseDeferredContentPackFailure();
+
 	bool repairedUnsetMachineSpec = false;
 	if ( com_machineSpec.GetInteger() < 0 ) {
 		Printf( "com_machineSpec is unset; detecting system quality tier.\n" );

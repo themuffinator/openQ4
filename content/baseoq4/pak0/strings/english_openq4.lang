@@ -1472,4 +1472,12 @@
 	"#str_231680"	"Rescue Strauss"
 	"#str_231681"	"Defeat the Pain Lord before Strauss is processed. Shoot the weak points on the boss's back to interrupt him."
 	"#str_43012"	"Graphics options"
+	"#str_231700"	"openQ4 cannot start because a content pack is missing or does not match this version."
+	"#str_231701"	"core runtime content"
+	"#str_231702"	"light grids"
+	"#str_231703"	"loadscreens"
+	"#str_231704"	"%s (%s) is missing from the %s folder."
+	"#str_231705"	"%s (%s) in the %s folder does not match this version of openQ4."
+	"#str_231706"	"Install the full openQ4 %s package, or download each listed pack for that version from %s and save it in the %s folder under the same name."
+	"#str_231707"	"Details:"
 }

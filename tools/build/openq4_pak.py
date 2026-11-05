@@ -6,34 +6,121 @@ from __future__ import annotations
 import filecmp
 import hashlib
 import fnmatch
+import json
 import os
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
 GAME_DIR_NAME = "baseoq4"
+CONTENT_PACKS_TABLE_PATH = Path(__file__).resolve().with_name("content_packs.json")
+CONTENT_PACK_NAME_PATTERN = re.compile(r"^pak[0-9]\.pk4$")
+CONTENT_PACK_STRING_PATTERN = re.compile(r"^#str_[0-9]{6}$")
+DETERMINISTIC_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+
+
+@dataclass(frozen=True)
+class ContentPackSpec:
+    """One openQ4 runtime content pack, as declared in content_packs.json."""
+
+    name: str
+    source: str
+    contents: str
+    contents_string: str
+    client_only: bool
+    bulk: bool
+    required_files: frozenset[str]
+
+    @property
+    def macro_stem(self) -> str:
+        return "OPENQ4_" + Path(self.name).stem.upper()
+
+
+def load_content_pack_specs(path: Path = CONTENT_PACKS_TABLE_PATH) -> tuple[ContentPackSpec, ...]:
+    """Read and validate the content pack table.
+
+    The table is the single list of openQ4 runtime packs. Every consumer, from
+    the Meson targets to the engine's generated validation table and the
+    packagers, reads it, so a pack added or retired here reaches all of them.
+    """
+
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"cannot read content pack table {path}: {exc}") from exc
+    if not isinstance(document, dict) or document.get("schema") != 1:
+        raise RuntimeError(f"content pack table {path} must be a schema 1 object")
+    raw_packs = document.get("packs")
+    if not isinstance(raw_packs, list) or not raw_packs:
+        raise RuntimeError(f"content pack table {path} lists no packs")
+
+    specs: list[ContentPackSpec] = []
+    seen_names: set[str] = set()
+    seen_sources: set[str] = set()
+    for index, raw in enumerate(raw_packs):
+        label = f"content pack table entry {index}"
+        if not isinstance(raw, dict):
+            raise RuntimeError(f"{label} is not an object")
+        name = raw.get("name")
+        source = raw.get("source")
+        contents = raw.get("contents")
+        contents_string = raw.get("contents_string")
+        client_only = raw.get("client_only")
+        bulk = raw.get("bulk")
+        required = raw.get("required_files", [])
+        if not isinstance(name, str) or not CONTENT_PACK_NAME_PATTERN.match(name):
+            # Single digits only: numbered packs load by number, but wider
+            # numerals load first, so pak10.pk4 would lose to pak9.pk4.
+            raise RuntimeError(f"{label} has an invalid pack name {name!r}; expected pak0.pk4 to pak9.pk4")
+        if name in seen_names:
+            raise RuntimeError(f"{label} repeats pack name {name}")
+        if not isinstance(source, str) or not source.startswith(f"content/{GAME_DIR_NAME}/"):
+            raise RuntimeError(f"{label} ({name}) must name a source under content/{GAME_DIR_NAME}/")
+        if source in seen_sources:
+            raise RuntimeError(f"{label} ({name}) repeats source {source}")
+        if not isinstance(contents, str) or not contents.strip():
+            raise RuntimeError(f"{label} ({name}) has no contents description")
+        if not isinstance(contents_string, str) or not CONTENT_PACK_STRING_PATTERN.match(contents_string):
+            raise RuntimeError(f"{label} ({name}) needs a #str_NNNNNN contents_string")
+        if not isinstance(client_only, bool) or not isinstance(bulk, bool):
+            raise RuntimeError(f"{label} ({name}) must set client_only and bulk to true or false")
+        if not isinstance(required, list) or not all(isinstance(item, str) and item for item in required):
+            raise RuntimeError(f"{label} ({name}) required_files must be a list of archive paths")
+        seen_names.add(name)
+        seen_sources.add(source)
+        specs.append(
+            ContentPackSpec(
+                name=name,
+                source=source,
+                contents=contents.strip(),
+                contents_string=contents_string,
+                client_only=client_only,
+                bulk=bulk,
+                required_files=frozenset(required),
+            )
+        )
+
+    if specs[0].name != "pak0.pk4" or specs[0].client_only or specs[0].bulk:
+        raise RuntimeError("the first content pack must be pak0.pk4, the core pack every package and server carries")
+    if sorted(spec.name for spec in specs) != [spec.name for spec in specs]:
+        raise RuntimeError("content packs must be listed in load order")
+    return tuple(specs)
+
+
+OPENQ4_CONTENT_PACKS = load_content_pack_specs()
+OPENQ4_CONTENT_PACKS_BY_NAME: Mapping[str, ContentPackSpec] = {spec.name: spec for spec in OPENQ4_CONTENT_PACKS}
 PAK0_NAME = "pak0.pk4"
 PAK1_NAME = "pak1.pk4"
-OPENQ4_PACK_NAMES = (PAK0_NAME, PAK1_NAME)
-DETERMINISTIC_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
-OPENQ4_PAKS_HEADER_TEMPLATE = """\
-#ifndef OPENQ4_PAKS_GENERATED_H
-#define OPENQ4_PAKS_GENERATED_H
-
-#define OPENQ4_PAK0_MD5 "{pak0_md5_hex}"
-#define OPENQ4_PAK0_SIZE_BYTES {pak0_size_bytes}
-#define OPENQ4_PAK0_FILE_COUNT {pak0_file_count}
-
-#define OPENQ4_PAK1_MD5 "{pak1_md5_hex}"
-#define OPENQ4_PAK1_SIZE_BYTES {pak1_size_bytes}
-#define OPENQ4_PAK1_FILE_COUNT {pak1_file_count}
-
-#endif
-"""
+PAK2_NAME = "pak2.pk4"
+OPENQ4_PACK_NAMES = tuple(spec.name for spec in OPENQ4_CONTENT_PACKS)
+OPENQ4_CORE_PACK_NAMES = tuple(spec.name for spec in OPENQ4_CONTENT_PACKS if not spec.bulk)
+OPENQ4_BULK_PACK_NAMES = tuple(spec.name for spec in OPENQ4_CONTENT_PACKS if spec.bulk)
+OPENQ4_CLIENT_ONLY_PACK_NAMES = tuple(spec.name for spec in OPENQ4_CONTENT_PACKS if spec.client_only)
 
 OPENQ4_EXCLUDED_DIRS = {"logs", "screenshots"}
 OPENQ4_PK4_EXCLUDED_SUFFIXES = {
@@ -46,19 +133,7 @@ OPENQ4_PK4_EXCLUDED_SUFFIXES = {
     ".ilk",
 }
 OPENQ4_REQUIRED_PK4_FILES_BY_PACK = {
-    PAK0_NAME: {
-        "glprogs/smaa_blend.fs",
-        "glprogs/smaa_blend.vs",
-        "glprogs/smaa_edge.fs",
-        "glprogs/smaa_edge.vs",
-        "glprogs/smaa_weights.fs",
-        "glprogs/smaa_weights.vs",
-        "materials/postprocess_openq4.mtr",
-    },
-    PAK1_NAME: {
-        "gfx/guis/loadscreens/generic.dds",
-        "gfx/guis/loadscreens/generic.tga",
-    },
+    spec.name: set(spec.required_files) for spec in OPENQ4_CONTENT_PACKS
 }
 OPENQ4_REQUIRED_LOOSE_GAME_FILES = {
     "mod.json",
@@ -239,15 +314,64 @@ def required_files_for_pack(pak_name: str) -> set[str]:
     return set(OPENQ4_REQUIRED_PK4_FILES_BY_PACK.get(pak_name.lower(), set()))
 
 
-def format_openq4_paks_header(pak0_result: Pk4BuildResult, pak1_result: Pk4BuildResult) -> str:
-    return OPENQ4_PAKS_HEADER_TEMPLATE.format(
-        pak0_md5_hex=pak0_result.md5_hex,
-        pak0_size_bytes=pak0_result.size_bytes,
-        pak0_file_count=pak0_result.added_files,
-        pak1_md5_hex=pak1_result.md5_hex,
-        pak1_size_bytes=pak1_result.size_bytes,
-        pak1_file_count=pak1_result.added_files,
-    )
+def _c_string(value: str) -> str:
+    if any(ch in value for ch in '"\\\n\r') or not value.isascii():
+        raise RuntimeError(f"content pack table value cannot be written as a C string: {value!r}")
+    return f'"{value}"'
+
+
+def format_openq4_paks_header(
+    results: Mapping[str, Pk4BuildResult],
+    specs: Sequence[ContentPackSpec] = OPENQ4_CONTENT_PACKS,
+) -> str:
+    """Format the engine's generated pack table.
+
+    Each pack gets OPENQ4_PAKn_* macros, and OPENQ4_PACK_TABLE_ENTRIES expands
+    to one initializer per pack, in load order, for an array of
+    { name, md5, size, file count, client-only, contents string, contents }.
+    """
+
+    missing = [spec.name for spec in specs if spec.name not in results]
+    unknown = sorted(set(results) - {spec.name for spec in specs})
+    if missing or unknown:
+        raise RuntimeError(
+            "pack header needs exactly the packs in the content pack table; "
+            f"missing {missing or 'none'}, unexpected {unknown or 'none'}"
+        )
+
+    lines = [
+        "#ifndef OPENQ4_PAKS_GENERATED_H",
+        "#define OPENQ4_PAKS_GENERATED_H",
+        "",
+        "/* Generated from tools/build/content_packs.json by generate_pak_header.py. */",
+        "",
+        f"#define OPENQ4_PACK_COUNT {len(specs)}",
+        "",
+    ]
+    for spec in specs:
+        result = results[spec.name]
+        stem = spec.macro_stem
+        lines.extend(
+            [
+                f"#define {stem}_MD5 \"{result.md5_hex}\"",
+                f"#define {stem}_SIZE_BYTES {result.size_bytes}",
+                f"#define {stem}_FILE_COUNT {result.added_files}",
+                f"#define {stem}_CLIENT_ONLY {1 if spec.client_only else 0}",
+                f"#define {stem}_BULK {1 if spec.bulk else 0}",
+                "",
+            ]
+        )
+    lines.append("#define OPENQ4_PACK_TABLE_ENTRIES \\")
+    for index, spec in enumerate(specs):
+        stem = spec.macro_stem
+        terminator = " \\" if index + 1 < len(specs) else ""
+        lines.append(
+            f"\t{{ {_c_string(spec.name)}, {stem}_MD5, {stem}_SIZE_BYTES, {stem}_FILE_COUNT, "
+            f"{stem}_CLIENT_ONLY != 0, {stem}_BULK != 0, {_c_string(spec.contents_string)}, "
+            f"{_c_string(spec.contents)} }},{terminator}"
+        )
+    lines.extend(["", "#endif", ""])
+    return "\n".join(lines)
 
 
 def _iter_pk4_entries(
@@ -285,6 +409,76 @@ def _iter_pk4_entries(
         entries.append((path, rel_posix))
 
     return entries, skipped_samples
+
+
+PACK_SOURCE_DIGEST_FORMAT = "openq4-pack-source 1"
+
+
+def git_blob_sha1_hex(path: Path) -> str:
+    """The git object id of a file's bytes, as `git hash-object` reports it.
+
+    Pack sources are checked out without end-of-line conversion (see
+    .gitattributes), so the working-tree bytes are the blob's bytes and a
+    tree listing (`git ls-tree -r`) gives the same ids without a checkout.
+    """
+
+    digest = hashlib.sha1()
+    digest.update(f"blob {path.stat().st_size}\0".encode("ascii"))
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def format_pack_source_digest(pak_name: str, entries: Sequence[tuple[str, str]], content_filters: Sequence[str] = ()) -> str:
+    """Digest a pack's sources from (archive path, git blob id) pairs.
+
+    Two source trees with the same digest pack to the same bytes with the same
+    packer, so a published pack whose recorded digest matches can be reused
+    instead of rebuilt. The digest covers the packer format, the pack name,
+    any content filters and every packed path with its content id.
+    """
+
+    digest = hashlib.sha256()
+    digest.update(f"{PACK_SOURCE_DIGEST_FORMAT}\n{pak_name}\n".encode("utf-8"))
+    for pattern in content_filters:
+        digest.update(f"filter\t{pattern}\n".encode("utf-8"))
+    for arcname, blob_id in sorted(entries, key=lambda item: item[0].lower()):
+        digest.update(f"{arcname}\t{blob_id}\n".encode("utf-8"))
+    return digest.hexdigest()
+
+
+def pack_source_digest(source_dir: Path, pak_name: str, content_filters: Sequence[str] = ()) -> tuple[str, int]:
+    """Return (source digest, packed file count) for a working-tree pack source."""
+
+    entries, _skipped = _iter_pk4_entries(source_dir, pak_name, content_filters)
+    pairs = [(arcname, git_blob_sha1_hex(path)) for path, arcname in entries]
+    return format_pack_source_digest(pak_name, pairs, content_filters), len(pairs)
+
+
+def pack_source_digest_from_tree_listing(
+    listing: str, source_prefix: str, pak_name: str, content_filters: Sequence[str] = ()
+) -> tuple[str, int]:
+    """Digest a pack source from `git ls-tree -r -z <rev> -- <source>` output.
+
+    This answers "did this pack change since that tag?" for release notes
+    without checking the tag out. The same skip rules as packing apply.
+    """
+
+    prefix = source_prefix.rstrip("/") + "/"
+    pairs: list[tuple[str, str]] = []
+    for record in listing.split("\0"):
+        if not record:
+            continue
+        meta, _tab, path = record.partition("\t")
+        fields = meta.split()
+        if len(fields) != 3 or fields[1] != "blob" or not path.startswith(prefix):
+            continue
+        relative = Path(path[len(prefix):])
+        if relative.name.lower() in OPENQ4_PK4_FORBIDDEN_FILES or _should_skip_pk4_entry(relative, content_filters):
+            continue
+        pairs.append((validate_pk4_arcname(relative.as_posix(), pak_name), fields[2]))
+    return format_pack_source_digest(pak_name, pairs, content_filters), len(pairs)
 
 
 def format_pk4_source_manifest(source_root: Path, source_dir: Path, pak_name: str) -> str:

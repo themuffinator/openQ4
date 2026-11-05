@@ -1838,113 +1838,89 @@ openq4_paks_generated_header = []
 if build_engine or build_games
   openq4_pak_script_files = files(
     'tools/build/openq4_pak.py',
+    'tools/build/content_packs.json',
   )
   openq4_pak_manifest_script_files = files(
     'tools/build/write_pak_manifest.py',
   )
 
-  openq4_pak0_source_manifest = custom_target(
-    'openq4_pak0_source_manifest',
-    output: 'pak0.sources',
-    command: [
-      py,
-      meson.project_source_root() / 'tools' / 'build' / 'write_pak_manifest.py',
-      meson.project_source_root(),
-      'pak0.pk4',
-      'content/baseoq4/pak0',
-      '@OUTPUT@',
-    ],
-    depend_files: openq4_pak_script_files + openq4_pak_manifest_script_files,
-    build_always_stale: true,
-    build_by_default: true,
-  )
-  openq4_pak1_source_manifest = custom_target(
-    'openq4_pak1_source_manifest',
-    output: 'pak1.sources',
-    command: [
-      py,
-      meson.project_source_root() / 'tools' / 'build' / 'write_pak_manifest.py',
-      meson.project_source_root(),
-      'pak1.pk4',
-      'content/baseoq4/pak1',
-      '@OUTPUT@',
-    ],
-    depend_files: openq4_pak_script_files + openq4_pak_manifest_script_files,
-    build_always_stale: true,
-    build_by_default: true,
-  )
-
-  openq4_pak0_output = custom_target(
-    'openq4_pak0',
-    input: openq4_pak0_source_manifest,
-    output: 'pak0.pk4',
-    command: [
-      py,
-      meson.project_source_root() / 'tools' / 'build' / 'build_openq4_pack.py',
-      '--pak-name',
-      'pak0.pk4',
-      '--source-dir',
-      meson.project_source_root() / 'content' / 'baseoq4' / 'pak0',
-      '--manifest',
-      '@INPUT@',
-      '--out',
-      '@OUTPUT@',
-      '--stage-out',
-      meson.current_build_dir() / 'baseoq4' / 'pak0.pk4',
-    ],
-    depend_files: openq4_pak_script_files + files(
-      'tools/build/build_openq4_pack.py',
-    ),
-    build_by_default: true,
-    install: true,
-    install_dir: install_game_dir,
-  )
-  openq4_pak1_output = custom_target(
-    'openq4_pak1',
-    input: openq4_pak1_source_manifest,
-    output: 'pak1.pk4',
-    command: [
-      py,
-      meson.project_source_root() / 'tools' / 'build' / 'build_openq4_pack.py',
-      '--pak-name',
-      'pak1.pk4',
-      '--source-dir',
-      meson.project_source_root() / 'content' / 'baseoq4' / 'pak1',
-      '--manifest',
-      '@INPUT@',
-      '--out',
-      '@OUTPUT@',
-      '--stage-out',
-      meson.current_build_dir() / 'baseoq4' / 'pak1.pk4',
-    ],
-    depend_files: openq4_pak_script_files + files(
-      'tools/build/build_openq4_pack.py',
-    ),
-    build_by_default: true,
-    install: true,
-    install_dir: install_game_dir,
-  )
+  # tools/build/content_packs.json lists the runtime packs; each gets a source
+  # manifest target and a pack target, and the generated header embeds every
+  # pack's digest into the engine.
+  openq4_content_pack_table = run_command(
+    py,
+    meson.project_source_root() / 'tools' / 'build' / 'content_packs.py',
+    'meson-list',
+    check: true,
+  ).stdout().strip().split('
+')
+  openq4_pak_header_args = []
+  foreach openq4_pack_row : openq4_content_pack_table
+    openq4_pack_fields = openq4_pack_row.strip().split('|')
+    openq4_pack_name = openq4_pack_fields[0]
+    openq4_pack_source = openq4_pack_fields[1]
+    openq4_pack_stem = openq4_pack_fields[2]
+    openq4_pack_manifest = custom_target(
+      'openq4_' + openq4_pack_stem + '_source_manifest',
+      output: openq4_pack_stem + '.sources',
+      command: [
+        py,
+        meson.project_source_root() / 'tools' / 'build' / 'write_pak_manifest.py',
+        meson.project_source_root(),
+        openq4_pack_name,
+        openq4_pack_source,
+        '@OUTPUT@',
+      ],
+      depend_files: openq4_pak_script_files + openq4_pak_manifest_script_files,
+      build_always_stale: true,
+      build_by_default: true,
+    )
+    openq4_pack_output = custom_target(
+      'openq4_' + openq4_pack_stem,
+      input: openq4_pack_manifest,
+      output: openq4_pack_name,
+      command: [
+        py,
+        meson.project_source_root() / 'tools' / 'build' / 'build_openq4_pack.py',
+        '--pak-name',
+        openq4_pack_name,
+        '--source-dir',
+        meson.project_source_root() / openq4_pack_source,
+        '--manifest',
+        '@INPUT@',
+        '--out',
+        '@OUTPUT@',
+        '--stage-out',
+        meson.current_build_dir() / 'baseoq4' / openq4_pack_name,
+      ],
+      depend_files: openq4_pak_script_files + files(
+        'tools/build/build_openq4_pack.py',
+      ),
+      build_by_default: true,
+      install: true,
+      install_dir: install_game_dir,
+    )
+    openq4_pak_files += [openq4_pack_output]
+    openq4_pak_header_args += ['--pack', openq4_pack_name + '=@INPUT' + (openq4_pak_files.length() - 1).to_string() + '@']
+  endforeach
   openq4_paks_header_output = custom_target(
     'openq4_paks_generated_header',
-    input: [openq4_pak0_output, openq4_pak1_output],
+    input: openq4_pak_files,
     output: 'openq4_paks_generated.h',
     command: [
       py,
       meson.project_source_root() / 'tools' / 'build' / 'generate_pak_header.py',
-      '--pak0',
-      '@INPUT0@',
-      '--pak1',
-      '@INPUT1@',
+    ] + openq4_pak_header_args + [
       '--header-out',
       '@OUTPUT@',
     ],
     depend_files: openq4_pak_script_files + files(
       'tools/build/generate_pak_header.py',
+      'tools/build/content_packs.json',
     ),
     build_by_default: true,
     install: false,
   )
-  openq4_pak_files = [openq4_pak0_output, openq4_pak1_output]
   openq4_paks_generated_header = [openq4_paks_header_output]
 endif
 

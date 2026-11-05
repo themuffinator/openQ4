@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #import "../../idlib/precompiled.h"
 
 #include "../posix/posix_public.h"
+#include "openq4_paks_generated.h"
 
 #import <AppKit/AppKit.h>
 #import <OpenGL/OpenGL.h>
@@ -517,8 +518,21 @@ static void Sys_CollectMacOSAppBundleRuntimeIssues( const idStr &resourceDirecto
 	missingEntries.Clear();
 	Sys_RequireMacOSPackageRootDirectory( resourceDirectory, OPENQ4_GAMEDIR, missingEntries );
 	Sys_RequireMacOSPackageRootRegularFile( resourceDirectory, OPENQ4_GAMEDIR "/mod.json", missingEntries );
-	Sys_RequireMacOSPackageRootRegularFile( resourceDirectory, OPENQ4_GAMEDIR "/pak0.pk4", missingEntries );
-	Sys_RequireMacOSPackageRootRegularFile( resourceDirectory, OPENQ4_GAMEDIR "/pak1.pk4", missingEntries );
+	// every runtime pack in the generated table (tools/build/content_packs.json)
+	struct macOSPackTableEntry_t {
+		const char *name;
+		const char *md5;
+		long long sizeBytes;
+		int fileCount;
+		bool clientOnly;
+		bool bulk;
+		const char *contentsString;
+		const char *contents;
+	};
+	static const macOSPackTableEntry_t packs[] = { OPENQ4_PACK_TABLE_ENTRIES };
+	for ( size_t i = 0; i < sizeof( packs ) / sizeof( packs[ 0 ] ); i++ ) {
+		Sys_RequireMacOSPackageRootRegularFile( resourceDirectory, va( "%s/%s", OPENQ4_GAMEDIR, packs[ i ].name ), missingEntries );
+	}
 
 	Sys_CollectMacOSGameModulePairIssues( frameworkDirectory, Sys_MacOSPackageRuntimeArchSuffix(), architectureModuleIssues );
 	if ( architectureModuleIssues.Length() == 0 ) {

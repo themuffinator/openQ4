@@ -45,6 +45,7 @@ def populate_staging(root: Path, arch: str, *, shared_value: bytes = b"same\n") 
         "baseoq4/mod.json": b"{}\n",
         "baseoq4/pak0.pk4": b"pak0\n",
         "baseoq4/pak1.pk4": b"pak1\n",
+        "baseoq4/pak2.pk4": b"pak2\n",
         "licenses/openal-soft/COPYING": b"lgpl\n",
         "licenses/openal-soft/LICENSE-pffft": b"pffft-license\n",
         "licenses/openal-soft/LICENSE-fmt": b"fmt-license\n",
