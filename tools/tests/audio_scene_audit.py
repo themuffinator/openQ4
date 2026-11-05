@@ -314,6 +314,7 @@ def launch(args, root, entries, walk=None, blocked_exits=None):
         's_noSound': '1' if getattr(args, 'silent', False) else '0', 's_muteUnfocused': '0', 'com_skipLogoVideos': '1', 'g_autoSkipCinematics': '0',
         's_numberOfSpeakers': '2', 's_openALHRTF': '0', 's_dialogueVolume': '1', 's_logSpeech': '1', 'ui_subtitles': '1',
         's_asyncSampleDecode': '1' if args.decode_mode == 'worker' else '0',
+        's_asyncStreamDecode': '1' if getattr(args, 'stream_decode', 'worker') == 'worker' else '0',
         's_decodeMemoryMB': str(args.decode_memory_mb), 's_audioMemoryMB': str(args.audio_memory_mb),
         'com_showLevelLoadTimes': '1',
         'com_skipLoadingContinue': '1', 'com_maxfps': '60', 'ui_autoJoin': '0', 'ui_retained': '1', 'sys_lang': 'english',
@@ -525,6 +526,8 @@ def main():
                         help='Replay the openings with s_noSound 1 and report process-memory and load-time differences')
     parser.add_argument('--decode-mode', choices=['worker', 'inline'], default='worker',
                         help='Pin asynchronous or main-thread sample decoding for loading comparisons')
+    parser.add_argument('--stream-decode', choices=['worker', 'inline'], default='worker',
+                        help='Decode streamed blocks on job workers (default) or on the main thread')
     parser.add_argument('--decode-memory-mb', type=int, default=64, help='Pending decode budget (16-1024 MiB)')
     parser.add_argument('--audio-memory-mb', type=int, default=256, help='Aggregate payload budget (32-2048 MiB)')
     parser.add_argument('--timeout', type=int, default=0)
@@ -653,7 +656,7 @@ def main():
     report = {
         'passed': all(checks.values()), 'checks': checks, 'totals': dict(total), 'scenes': scenes,
         'maps': maps, 'repeat': args.repeat, 'seconds_per_map': args.seconds, 'probe_interval_ms': args.interval, 'run_seconds': seconds,
-        'decode_mode': args.decode_mode, 'decode_memory_mb': args.decode_memory_mb, 'audio_memory_mb': args.audio_memory_mb,
+        'decode_mode': args.decode_mode, 'stream_decode': args.stream_decode, 'decode_memory_mb': args.decode_memory_mb, 'audio_memory_mb': args.audio_memory_mb,
         'walk': {level: [entity for _, entity in steps] for level, steps in walk.items()} if walk else None,
         'step_msec': args.step_msec if walk else None,
         'progress': args.progress, 'suppressed_level_exits': blocked_exits,

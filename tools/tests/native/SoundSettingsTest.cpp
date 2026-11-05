@@ -27,6 +27,10 @@ void operator delete(void* p,std::size_t) noexcept {std::free(p);}
 struct idCVar { int value=0; std::string text; bool GetBool() const { return value!=0; } int GetInteger() const { return value; } const char* GetString() const { return text.c_str(); } };
 idCVar s_noSound, s_useOpenAL, s_deviceName, s_useEAXReverb, s_openALHRTF, s_numberOfSpeakers, s_maxEmitterChannels, s_openALEfxDebugMode, s_outputLimiter;
 template<class T> struct List : std::vector<T> { int Num() const {return static_cast<int>(this->size());} void AddUnique(T x){if(std::find(this->begin(),this->end(),x)==this->end())this->push_back(x);} void RemoveIndex(int i){this->erase(this->begin()+i);} };
+// Released Vorbis streams are reaped at the top of the hardware update; their
+// lifecycle is qualified by audio_stream_budget.py and audio_streaming.py.
+struct idSoundOggStream { static int reaps; static void ReapReleased(bool wait){CHECK(!wait);++reaps;} };
+int idSoundOggStream::reaps=0;
 class idSoundVoice_OpenAL {
 public:
 	ALuint openalSource=0,openalDirectFilter=0,openalAuxFilter=0,openalAreaAuxFilter=0;

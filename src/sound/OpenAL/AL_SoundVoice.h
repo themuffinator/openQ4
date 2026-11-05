@@ -191,6 +191,12 @@ private:
 	// Frames per buffer for a centre-routed queue; claims a deep-queue slot while one is free.
 	int						RoutedQueueFrames( int sampleRate );
 	void					AdvanceQueuedBuffer();
+	// A streamed sample's blocks decode on job workers (idSoundOggStream). The frames
+	// one queue buffer takes at offset; opening the stream and requesting that block.
+	int						StreamBlockFrames( idSoundSample_OpenAL* sample, int offset );
+	bool					PrepareStreamBlock( idSoundSample_OpenAL* sample, int offset );
+	// The next queue buffer is still decoding: the voice is starting or refilling, not done.
+	bool					StreamBlockPending() const;
 	bool					SetNextQueuedSampleStart( idSoundSample_OpenAL* sample );
 	static bool				GetPlayableBufferRange( const idSoundSample_OpenAL* sample, int bufferNumber, int& bufferStart, int& bufferSamples, int& playableOffset, int& playableSamples );
 	void					ResetQueuedBufferState();
@@ -225,7 +231,6 @@ private:
 	idSoundSample_OpenAL*	nextQueuedSample;
 	idSoundOggStream*		oggStream;
 	idSoundSample_OpenAL*	oggStreamSample;
-	int						oggStreamOffset;
 	int						nextQueuedBuffer;
 	int						nextQueuedOffset;
 	bool					queuedBufferPlaybackActive;

@@ -37,26 +37,80 @@ idSoundSample_OpenAL
 class idSampleInfo;
 struct idSoundSampleDecode;
 class SoundVorbisStream;
+class idJobList;
+struct idJobContext;
+// What a streamed sample's load recorded about its file: the decode must agree.
+struct idSoundOggStreamShape {
+	int				channels = 0;
+	int				rate = 0;
+	unsigned int	frames = 0;
+	// A stream without length metadata: the length and last positioned page its
+	// sample's envelope pass found (SoundVorbisStream::SetCountedLength).
+	bool			countedLength = false;
+	unsigned int	pageStart = 0, pageEnd = 0, pageGranule = 0;
+};
+// One voice's cursor in a streamed Ogg. The main thread admits the stream and opens
+// its file; parsing the Vorbis headers, seeking and decoding run a block at a time on
+// a job worker, which alone touches the decoder and file while a block is pending.
 class idSoundOggStream {
 public:
+	// Interleaved samples of one queue buffer (one 4096-frame 5.1 block), which also
+	// holds a centre-routed mono block (checked against SoundQueue.h).
+	static const int BLOCK_SAMPLES = 24576;
+	enum blockState_t { BLOCK_IDLE, BLOCK_PENDING, BLOCK_READY, BLOCK_FAILED };
 	idSoundOggStream();
 	~idSoundOggStream();
-	bool Open( const char* filename );
-	bool Seek( unsigned int frame );
-	// For a stream without length metadata: the length and last positioned page its
-	// sample's envelope pass found (SoundVorbisStream::SetCountedLength).
-	bool SetCountedLength( unsigned int frames, unsigned int pageStart, unsigned int pageEnd, unsigned int granule );
-	int Read( short* pcm, int frames );
-	int Channels() const;
-	int Rate() const;
-	unsigned int Frames() const;
+	// Main thread: admission and the file open only. A failure leaves BLOCK_FAILED.
+	bool Open( const char* filename, const idSoundOggStreamShape& shape );
+	// Main thread: frees the decoder, file and reservation, joining a pending block.
+	void Close();
+	// Main thread: decode frames (at most BLOCK_SAMPLES / channels) from frame. It runs
+	// on a job worker, or here when none accepts it. False when it failed at once or a
+	// block is still outstanding.
+	bool RequestBlock( unsigned int frame, int frames );
+	// Main thread: joins a finished block without waiting.
+	blockState_t PollBlock();
+	blockState_t BlockState() const { return state; }
+	bool IsBlockPending() const { return state == BLOCK_PENDING; }
+	// A ready block: what was asked for, and the frames it holds (fewer only at a damaged end).
+	unsigned int BlockFrame() const { return requestFrame; }
+	int BlockRequestFrames() const { return requestFrames; }
+	int BlockFrames() const { return state == BLOCK_READY ? decodedFrames : 0; }
+	const short* Block() const { return state == BLOCK_READY ? block : NULL; }
+	void ConsumeBlock();
+	int Channels() const { return shape.channels; }
+	// Main thread: deletes the stream, or cancels its pending block and keeps it until
+	// the worker has let go (ReapReleased).
+	static void Release( idSoundOggStream* stream );
+	static void ReapReleased( bool wait );
+	static int ReleasedCount();
 	static void PrintMemoryInfo();
 private:
 	idSoundOggStream( const idSoundOggStream& ) = delete;
 	idSoundOggStream& operator=( const idSoundOggStream& ) = delete;
-	void Close();
+	void Decode( const idJobContext* context );
+	void DecodeBlock( const idJobContext* context );
+	void FinishBlock();
+	static void DecodeJob( const idJobContext& context );
+	enum decodeOutcome_t { DECODE_NONE, DECODE_READY, DECODE_OPEN_FAILED, DECODE_SHAPE_MISMATCH, DECODE_SEEK_FAILED, DECODE_EMPTY };
+	idStr name;
 	idFile* file;
 	SoundVorbisStream* decoder;
+	idJobList* list;
+	idSoundOggStreamShape shape;
+	blockState_t state;
+	unsigned int fileLength;
+	int requestTime;
+	// Written by the decode, read by the main thread only once it is joined.
+	bool decoderOpen;
+	decodeOutcome_t outcome;
+	int decoderError;
+	unsigned int position;
+	unsigned int requestFrame;
+	int requestFrames;
+	int decodedFrames;
+	int decodeMs;		// worker time of the last block, opening and seeking included
+	short block[BLOCK_SAMPLES];
 };
 class idSoundSample_OpenAL
 {

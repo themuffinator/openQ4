@@ -45,7 +45,7 @@ a protected master bus, streaming), not with any one game's tuning, which is not
 | Device loss | n/a (console first) | Device handling | Static voices stayed stopped after a reopen | Stopped voices restart at their offset |
 | Shakes and rumble | Amplitude data | Meter / RTPC | Game query returned 0; amplitude stubbed at 1 | Authored camera envelope with retail strength/range; separate audible rumble envelope |
 | Sample residency | Purged per level | Streaming banks | Every map's PCM kept for the session | Doom 3 purge rules restored |
-| Sample decode | Offline-encoded, loaded per level | Asynchronous loading | Decoded on the main thread as each shader parsed | Decoded on job workers during the level load (`s_asyncSampleDecode`) |
+| Sample decode | Offline-encoded, loaded per level | Asynchronous loading | Decoded on the main thread as each shader parsed | Decoded on job workers during the level load (`s_asyncSampleDecode`); streamed blocks decode on job workers during play (`s_asyncStreamDecode`) |
 | Per-voice update cost | One matrix per voice | Batched | Filters and sends re-sent by every setter (5-6 times a frame) | Once a frame (`CommitMix`) |
 
 ## What changed
@@ -248,6 +248,18 @@ since October 23 it runs on a job worker during level loads, and files without
 usable length metadata stream too (see [below](#output-changes-and-memory-pressure-october-23)).
 Whole-track `GetNonCacheData` access returns null for streamed samples instead of
 defeating the memory limit.
+
+Since 5 November each streamed block decodes on a job worker
+(`s_asyncStreamDecode`, default 1). The main thread admits the stream and opens
+its file, because the VFS open walks shared search paths and pak handles. The
+worker parses the Vorbis headers, checks them against the sample's load, seeks
+and decodes one queue buffer. The voice queues that buffer on a later update and
+requests the next one at once, so the decoder stays one block ahead. OpenAL
+calls stay on the main thread. A voice stopped while its block is decoding
+cancels the block and parks the stream until the worker lets go, without
+waiting. `s_restart` and shutdown join what is still parked. The first buffer
+arrives on the next frame instead of the same one. With no accepting worker the
+block decodes inline as before.
 
 The repository's MIT/public-domain stb_vorbis has a small read/seek/tell callback
 extension; both checked-in copies match, and Meson pins this bundled variant.

@@ -126,7 +126,19 @@ static unsigned int soundStreamRejected = 0;
 // most one 4096-frame 5.1 block, SOUND_QUEUE_BUFFER_BYTES) and conservative VFS
 // zip/inflate bookkeeping. OpenAL implementation-private overhead is separate.
 static const uint64 SOUND_STREAM_BYTES = SoundVorbisStream::ArenaBytes + sizeof( SoundVorbisStream ) +
-	SoundVorbisStream::ChunkFrames * ( 2 + 4 * 6 ) * sizeof( short ) + 128 * 1024;
+	SoundVorbisStream::ChunkFrames * ( 2 + 4 * 6 ) * sizeof( short ) + 128 * 1024 +
+	idSoundOggStream::BLOCK_SAMPLES * sizeof( short );
+static_assert( idSoundOggStream::BLOCK_SAMPLES >= SOUND_QUEUE_BUFFER_BYTES / static_cast<int>( sizeof( short ) ) &&
+	idSoundOggStream::BLOCK_SAMPLES >= SOUND_QUEUE_MAX_FRAMES, "a stream block holds one queue buffer, interleaved or centre-routed mono" );
+
+idCVar s_asyncStreamDecode( "s_asyncStreamDecode", "1", CVAR_SOUND | CVAR_BOOL,
+	"open, seek and decode streamed Ogg blocks on job workers instead of the main thread" );
+// Streams released with a block still decoding; the worker owns them until joined.
+static idList<idSoundOggStream*> soundStreamReleased;
+static unsigned int soundStreamStarts = 0, soundStreamFirstBlocks = 0, soundStreamInlineBlocks = 0, soundStreamWorkerBlocks = 0;
+static uint64 soundStreamStartWaitTotalMs = 0, soundStreamStartDecodeTotalMs = 0;
+static int soundStreamStartWaitMaxMs = 0, soundStreamStartDecodeMaxMs = 0;
+static idStr soundStreamSlowestStart;
 
 static int SoundStream_ReadAt( void* user, unsigned int offset, void* data, int bytes ) {
 	idFile* file = static_cast<idFile*>( user );
@@ -135,9 +147,18 @@ static int SoundStream_ReadAt( void* user, unsigned int offset, void* data, int 
 	return file->Read( data, bytes );
 }
 
-idSoundOggStream::idSoundOggStream() : file( NULL ), decoder( NULL ) {}
+idSoundOggStream::idSoundOggStream() : file( NULL ), decoder( NULL ), list( NULL ), state( BLOCK_IDLE ), fileLength( 0 ), requestTime( 0 ),
+	decoderOpen( false ), outcome( DECODE_NONE ), decoderError( 0 ), position( 0 ), requestFrame( 0 ), requestFrames( 0 ), decodedFrames( 0 ), decodeMs( 0 ) {}
 idSoundOggStream::~idSoundOggStream() { Close(); }
 void idSoundOggStream::Close() {
+	if( list != NULL ) {
+		// Release parks streams with an outstanding block, so this waits only for
+		// a block a worker is finishing at shutdown.
+		list->Cancel();
+		list->Wait();
+		delete list;
+		list = NULL;
+	}
 	if( decoder != NULL ) {
 		delete decoder;
 		decoder = NULL;
@@ -145,39 +166,183 @@ void idSoundOggStream::Close() {
 		SoundMemoryRelease( SOUND_STREAM_BYTES );
 	}
 	if( file != NULL ) { fileSystem->CloseFile( file ); file = NULL; }
+	state = BLOCK_IDLE; decoderOpen = false; outcome = DECODE_NONE; position = 0; decodedFrames = 0; requestTime = 0;
 }
-bool idSoundOggStream::Open( const char* filename ) {
+bool idSoundOggStream::Open( const char* filename, const idSoundOggStreamShape& expected ) {
 	Close();
+	name = filename;
+	shape = expected;
+	state = BLOCK_FAILED;
+	if( shape.channels < 1 || shape.channels > 2 || shape.rate <= 0 || shape.frames == 0 ) return false;
 	const uint64 budget = static_cast<uint64>( idMath::ClampInt( 8, 256, s_streamMemoryMB.GetInteger() ) ) * 1024 * 1024;
 	if( soundStreamBytes > budget || SOUND_STREAM_BYTES > budget - soundStreamBytes ) {
 		++soundStreamRejected;
 		return false;
 	}
+	// The VFS open stays on the main thread: it walks the shared search paths and
+	// pak handles. Reads of the opened file are independent and run with the decode.
 	file = fileSystem->OpenFileRead( filename );
-	if( file == NULL || file->Length() <= 0 ) { Close(); return false; }
-	if( !SoundMemoryAcquire( SOUND_STREAM_BYTES ) ) { Close(); ++soundStreamRejected; return false; }
+	if( file == NULL || file->Length() <= 0 ) { Close(); state = BLOCK_FAILED; return false; }
+	if( !SoundMemoryAcquire( SOUND_STREAM_BYTES ) ) { Close(); state = BLOCK_FAILED; ++soundStreamRejected; return false; }
 	decoder = new SoundVorbisStream;
 	soundStreamBytes += SOUND_STREAM_BYTES;
 	soundStreamPeakBytes = Max( soundStreamPeakBytes, soundStreamBytes );
-	if( !decoder->Open( SoundStream_ReadAt, file, file->Length() ) ) {
-		idLib::Warning( "Vorbis stream '%s' cannot open within its fixed decoder arena (error %d)", filename, decoder->Error() );
-		Close(); return false;
-	}
+	fileLength = static_cast<unsigned int>( file->Length() );
+	state = BLOCK_IDLE;
+	++soundStreamStarts;
 	return true;
 }
-bool idSoundOggStream::Seek( unsigned int frame ) { return decoder != NULL && decoder->Seek( frame ); }
-bool idSoundOggStream::SetCountedLength( unsigned int frames, unsigned int pageStart, unsigned int pageEnd, unsigned int granule ) {
-	const stb_vorbis_openq4_granule_page page = { pageStart, pageEnd, granule };
-	return decoder != NULL && decoder->SetCountedLength( frames, page );
+// Runs on a job worker, or inline. Touches only this stream's decoder, file and block.
+void idSoundOggStream::Decode( const idJobContext* context ) {
+	const int began = Sys_Milliseconds();
+	DecodeBlock( context );
+	decodeMs = Sys_Milliseconds() - began;
 }
-int idSoundOggStream::Read( short* pcm, int frames ) { return decoder != NULL ? decoder->Read( pcm, frames ) : 0; }
-int idSoundOggStream::Channels() const { return decoder != NULL ? decoder->Channels() : 0; }
-int idSoundOggStream::Rate() const { return decoder != NULL ? decoder->Rate() : 0; }
-unsigned int idSoundOggStream::Frames() const { return decoder != NULL ? decoder->Frames() : 0; }
+void idSoundOggStream::DecodeBlock( const idJobContext* context ) {
+	outcome = DECODE_NONE;
+	decodedFrames = 0;
+	if( context != NULL && context->IsCancellationRequested() ) return;
+	if( !decoderOpen ) {
+		if( !decoder->Open( SoundStream_ReadAt, file, fileLength ) ) {
+			decoderError = decoder->Error(); outcome = DECODE_OPEN_FAILED; return;
+		}
+		if( shape.countedLength ) {
+			const stb_vorbis_openq4_granule_page page = { shape.pageStart, shape.pageEnd, shape.pageGranule };
+			if( !decoder->SetCountedLength( shape.frames, page ) ) { outcome = DECODE_SHAPE_MISMATCH; return; }
+		}
+		if( decoder->Channels() != shape.channels || decoder->Rate() != shape.rate || decoder->Frames() != shape.frames ) {
+			outcome = DECODE_SHAPE_MISMATCH; return;
+		}
+		decoderOpen = true;
+		position = 0;
+	}
+	if( position != requestFrame ) {
+		if( context != NULL && context->IsCancellationRequested() ) return;
+		if( !decoder->Seek( requestFrame ) ) { outcome = DECODE_SEEK_FAILED; return; }
+		position = requestFrame;
+	}
+	int frames = 0;
+	while( frames < requestFrames ) {
+		// A cancelled block keeps an exact cursor; the next request seeks from it.
+		if( context != NULL && context->IsCancellationRequested() ) return;
+		const int count = decoder->Read( block + frames * shape.channels, Min( static_cast<int>( SoundVorbisStream::ChunkFrames ), requestFrames - frames ) );
+		if( count <= 0 ) break;
+		frames += count;
+		position += count;
+	}
+	decodedFrames = frames;
+	outcome = frames > 0 ? DECODE_READY : DECODE_EMPTY;
+}
+void idSoundOggStream::DecodeJob( const idJobContext& context ) {
+	static_cast<idSoundOggStream*>( context.data )->Decode( &context );
+}
+// Main thread, once the decode has finished or did not run.
+void idSoundOggStream::FinishBlock() {
+	switch( outcome ) {
+		case DECODE_READY:
+			state = BLOCK_READY;
+			if( requestTime != 0 ) {
+				// The wait covers the job queue and the frame that polls it; the decode
+				// covers the worker's header parse, seek and first block.
+				const int waited = Max( 0, Sys_Milliseconds() - requestTime );
+				++soundStreamFirstBlocks;
+				soundStreamStartWaitTotalMs += static_cast<uint64>( waited );
+				soundStreamStartDecodeTotalMs += static_cast<uint64>( Max( 0, decodeMs ) );
+				if( waited > soundStreamStartWaitMaxMs ) {
+					soundStreamStartWaitMaxMs = waited;
+					soundStreamSlowestStart = va( "%s at frame %u (decode %d ms)", name.c_str(), requestFrame, decodeMs );
+				}
+				soundStreamStartDecodeMaxMs = Max( soundStreamStartDecodeMaxMs, decodeMs );
+				if( s_debugHardware.GetBool() ) idLib::Printf( "Vorbis stream start: %s at frame %u waited %d ms (decode %d ms)\n", name.c_str(), requestFrame, waited, decodeMs );
+				requestTime = 0;
+			}
+			break;
+		case DECODE_NONE:
+			// Cancelled before or between codec blocks: the cursor is exact, ask again.
+			state = BLOCK_IDLE;
+			break;
+		case DECODE_OPEN_FAILED:
+			idLib::Warning( "Vorbis stream '%s' cannot open within its fixed decoder arena (error %d)", name.c_str(), decoderError );
+			state = BLOCK_FAILED;
+			break;
+		default:
+			if( s_debugHardware.GetBool() ) idLib::Printf( "Vorbis stream '%s' failed at frame %u (%d)\n", name.c_str(), requestFrame, static_cast<int>( outcome ) );
+			state = BLOCK_FAILED;
+			break;
+	}
+}
+bool idSoundOggStream::RequestBlock( unsigned int frame, int frames ) {
+	if( state == BLOCK_PENDING || state == BLOCK_FAILED || decoder == NULL ) return false;
+	if( frames < 1 || frames > BLOCK_SAMPLES / Max( 1, shape.channels ) || frame >= shape.frames ) { state = BLOCK_FAILED; return false; }
+	requestFrame = frame;
+	requestFrames = frames;
+	// A stream's first block is its voice's start: measure how long it waits.
+	if( !decoderOpen && requestTime == 0 ) requestTime = Max( 1, Sys_Milliseconds() );
+	outcome = DECODE_NONE;
+	if( s_asyncStreamDecode.GetBool() && jobSystem.IsInitialized() && !jobSystem.IsSynchronous() ) {
+		std::unique_ptr<idJobList> created = jobSystem.CreateJobList( "sound-stream-block", 1, 0, idJobPriority::HIGH );
+		if( created != nullptr && created->AddJob( &DecodeJob, this ) ) {
+			const idJobSubmitResult submitted = created->Submit();
+			if( submitted == idJobSubmitResult::ACCEPTED ) {
+				list = created.release();
+				state = BLOCK_PENDING;
+				++soundStreamWorkerBlocks;
+				return true;
+			}
+			if( submitted == idJobSubmitResult::EXECUTED_SYNCHRONOUSLY ) {
+				++soundStreamInlineBlocks;
+				FinishBlock();
+				return state != BLOCK_FAILED;
+			}
+		}
+	}
+	// No worker accepted it (disabled, synchronous, queue full or shutting down).
+	Decode( NULL );
+	++soundStreamInlineBlocks;
+	FinishBlock();
+	return state != BLOCK_FAILED;
+}
+idSoundOggStream::blockState_t idSoundOggStream::PollBlock() {
+	if( state == BLOCK_PENDING && list != NULL && list->TryWait() ) {
+		delete list;
+		list = NULL;
+		FinishBlock();
+	}
+	return state;
+}
+void idSoundOggStream::ConsumeBlock() {
+	if( state == BLOCK_READY ) state = BLOCK_IDLE;
+}
+void idSoundOggStream::Release( idSoundOggStream* stream ) {
+	if( stream == NULL ) return;
+	if( stream->list != NULL && !stream->list->TryWait() ) {
+		// Never wait for the worker here: an unstarted block is skipped, a running
+		// one stops at its next codec block, and ReapReleased frees the stream.
+		stream->list->Cancel();
+		soundStreamReleased.Append( stream );
+		return;
+	}
+	delete stream;
+}
+void idSoundOggStream::ReapReleased( bool wait ) {
+	for( int i = soundStreamReleased.Num() - 1; i >= 0; --i ) {
+		idSoundOggStream* stream = soundStreamReleased[i];
+		if( !wait && stream->list != NULL && !stream->list->TryWait() ) continue;
+		soundStreamReleased.RemoveIndex( i );
+		delete stream;
+	}
+}
+int idSoundOggStream::ReleasedCount() { return soundStreamReleased.Num(); }
 void idSoundOggStream::PrintMemoryInfo() {
 	idLib::Printf( "Vorbis streaming: reserved=%llu KiB peak=%llu KiB budget=%d MiB rejected=%u decode=%d frames\n",
 		static_cast<unsigned long long>( soundStreamBytes / 1024 ), static_cast<unsigned long long>( soundStreamPeakBytes / 1024 ),
 		s_streamMemoryMB.GetInteger(), soundStreamRejected, SoundVorbisStream::ChunkFrames );
+	idLib::Printf( "Vorbis stream blocks: worker=%u inline=%u opens=%u first-block wait avg=%.1f ms max=%d ms, decode avg=%.1f ms max=%d ms, over %u starts, released-pending=%d\n",
+		soundStreamWorkerBlocks, soundStreamInlineBlocks, soundStreamStarts,
+		soundStreamFirstBlocks ? static_cast<double>( soundStreamStartWaitTotalMs ) / soundStreamFirstBlocks : 0.0, soundStreamStartWaitMaxMs,
+		soundStreamFirstBlocks ? static_cast<double>( soundStreamStartDecodeTotalMs ) / soundStreamFirstBlocks : 0.0, soundStreamStartDecodeMaxMs,
+		soundStreamFirstBlocks, soundStreamReleased.Num() );
+	if( soundStreamSlowestStart.Length() ) idLib::Printf( "Vorbis slowest stream start: %s\n", soundStreamSlowestStart.c_str() );
 }
 
 /*

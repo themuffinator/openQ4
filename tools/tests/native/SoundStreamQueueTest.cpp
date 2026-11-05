@@ -4,7 +4,9 @@
 #include "src/sound/SoundVorbisStream.h"
 #include "src/sound/SoundSurround.h"
 #include "src/sound/SoundQueue.h"
+#include "tools/tests/native/SoundStreamJobStubs.h"
 #include <climits>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -17,7 +19,7 @@
 static void Check(bool ok, const char* reason) { if (!ok) { std::fprintf(stderr, "%s\n", reason); std::exit(1); } }
 template<class T> T Min(T a,T b) { return (std::min)(a,b); }
 template<class T> T Max(T a,T b) { return (std::max)(a,b); }
-struct idMath { static const int INT_MAX = 0x7fffffff; };
+struct idMath { static const int INT_MAX = 0x7fffffff; static int ClampInt(int a, int b, int c) { return c < a ? a : c > b ? b : c; } };
 using ALuint = unsigned;
 using byte = unsigned char;
 using ALint = int;
@@ -35,7 +37,7 @@ void alSourcei(ALuint,int property,int value) { if (property == AL_BUFFER && val
 struct idWaveFile { static const int FORMAT_PCM = 1; };
 constexpr int MAX_QUEUED_BUFFERS = 3;
 struct Debug { bool GetBool() const { return false; } } s_debugHardware;
-struct idLib { static void Printf(const char*,...) {} };
+struct idLib { static void Printf(const char*,...) {} static void Warning(const char*,...) {} };
 int alIsSource(ALuint source) { return source != 0; }
 // As OpenAL Soft: a source that has left AL_INITIAL and is not playing reports
 // every queued buffer as processed. Stopping keeps an idle source initial.
@@ -49,35 +51,51 @@ void alSourcePlay(ALuint) { sourceState = AL_PLAYING; }
 void alSourceStop(ALuint) { if (sourceState != AL_INITIAL) sourceState = AL_STOPPED; }
 void alSourceRewind(ALuint) { sourceState = AL_INITIAL; }
 void alDeleteBuffers(ALsizei, const ALuint*) {}
-template<class T> struct List : std::vector<T> { int Num() const { return static_cast<int>(this->size()); } const T* Ptr() const { return this->data(); } };
-static int alive = 0;
-struct idSoundOggStream {
-	SoundVorbisStream reader;
+template<class T> using List = idList<T>;
+// The production idSoundOggStream (@STREAM@ below) reads fixture files through
+// these, with the deferring job system of SoundStreamJobStubs.h.
+static int alive = 0;	// open stream files: a stream's decoder lives exactly as long
+using uint64 = unsigned long long;
+enum fsOrigin_t { FS_SEEK_SET };
+struct idFile {
 	std::vector<unsigned char> data;
-	idSoundOggStream() { ++alive; }
-	~idSoundOggStream() { --alive; }
-	static int ReadAt(void* user, unsigned int at, void* target, int bytes) {
-		auto& self = *static_cast<idSoundOggStream*>(user);
-		if (at > self.data.size()) return 0;
-		bytes = Min(bytes, static_cast<int>(self.data.size() - at));
-		std::memcpy(target, self.data.data() + at, bytes);
-		return bytes;
-	}
-	bool Open(const std::string& name) {
-		std::ifstream file(name, std::ios::binary);
-		data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-		return reader.Open(ReadAt, this, static_cast<unsigned int>(data.size()));
-	}
-	bool Seek(unsigned int frame) { return reader.Seek(frame); }
-	bool SetCountedLength(unsigned int frames, unsigned int start, unsigned int end, unsigned int granule) {
-		const stb_vorbis_openq4_granule_page page = {start, end, granule};
-		return reader.SetCountedLength(frames, page);
-	}
-	int Read(short* output, int frames) { return reader.Read(output, frames); }
-	int Channels() const { return reader.Channels(); }
-	int Rate() const { return reader.Rate(); }
-	unsigned int Frames() const { return reader.Frames(); }
+	int cursor = 0;
+	idFile() { ++alive; }
+	~idFile() { --alive; }
+	int Length() const { return static_cast<int>(data.size()); }
+	int Tell() const { return cursor; }
+	int Seek(long offset, fsOrigin_t) { if (offset < 0 || offset > Length()) return -1; cursor = static_cast<int>(offset); return 0; }
+	int Read(void* target, int bytes) { bytes = Min(bytes, Length() - cursor); std::memcpy(target, data.data() + cursor, bytes); cursor += bytes; return bytes; }
 };
+struct VFS {
+	idFile* OpenFileRead(const char* name) {
+		std::ifstream file(name, std::ios::binary);
+		if (!file) return nullptr;
+		idFile* opened = new idFile;
+		opened->data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+		return opened;
+	}
+	void CloseFile(idFile* file) { delete file; }
+} vfs;
+static VFS* fileSystem = &vfs;
+static uint64 memoryUsed = 0;
+static bool SoundMemoryAcquire(uint64 bytes) { memoryUsed += bytes; return true; }
+static void SoundMemoryRelease(uint64 bytes) { memoryUsed -= bytes; }
+idCVar s_streamMemoryMB("s_streamMemoryMB", "32", 0, "");
+
+// @STREAM@
+
+static std::vector<unsigned char> ReadFixture(const char* path) {
+	std::ifstream file(path, std::ios::binary);
+	return std::vector<unsigned char>(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+}
+static int ReadFixtureAt(void* user, unsigned int at, void* target, int bytes) {
+	auto& data = *static_cast<std::vector<unsigned char>*>(user);
+	if (at > data.size()) return 0;
+	bytes = Min(bytes, static_cast<int>(data.size() - at));
+	std::memcpy(target, data.data() + at, bytes);
+	return bytes;
+}
 struct idSoundSample_OpenAL {
 	struct sampleBuffer_t { int numSamples = 0; const short* buffer = nullptr; int bufferSize = 0; };
 	List<sampleBuffer_t> buffers;
@@ -86,7 +104,7 @@ struct idSoundSample_OpenAL {
 	int totalBufferSize = 0;
 	int playLength = 0, playBegin = 0, channels = 0, rate = 0;
 	bool streamed = true;
-	std::string streamName;
+	idStr streamName;
 	bool streamCountedLength = false;
 	unsigned int streamPageStart = 0, streamPageEnd = 0, streamPageGranule = 0;
 	std::vector<short> pcm;
@@ -98,15 +116,16 @@ struct idSoundSample_OpenAL {
 	const char* GetName() const { return streamName.c_str(); }
 	void Load(const char* path) {
 		streamName = path;
-		idSoundOggStream probe; Check(probe.Open(path), "fixture open");
+		std::vector<unsigned char> data = ReadFixture(path);
+		SoundVorbisStream probe; Check(probe.Open(ReadFixtureAt, &data, static_cast<unsigned int>(data.size())), "fixture open");
 		short* full = nullptr;
-		playLength = stb_vorbis_decode_memory(probe.data.data(), static_cast<int>(probe.data.size()), &channels, &rate, &full);
+		playLength = stb_vorbis_decode_memory(data.data(), static_cast<int>(data.size()), &channels, &rate, &full);
 		Check(playLength > 0, "reference PCM");
 		pcm.assign(full, full + playLength * channels); std::free(full);
 		// As LoadOggStream records a stream without length metadata.
 		if (probe.Frames() == 0) {
 			stb_vorbis_openq4_granule_page page{};
-			Check(probe.reader.FindLastGranulePage(page), "lengthless fixture has a positioned page");
+			Check(probe.FindLastGranulePage(page), "lengthless fixture has a positioned page");
 			streamCountedLength = true;
 			streamPageStart = page.page_start; streamPageEnd = page.page_end; streamPageGranule = page.granule;
 		}
@@ -133,7 +152,7 @@ public:
 	idSoundSample_OpenAL* nextQueuedSample = nullptr;
 	idSoundSample_OpenAL* oggStreamSample = nullptr;
 	idSoundOggStream* oggStream = nullptr;
-	int oggStreamOffset = 0, nextQueuedOffset = 0, nextQueuedBuffer = 0;
+	int nextQueuedOffset = 0, nextQueuedBuffer = 0;
 	ALuint openalSource = 1;
 	ALuint openalStreamingBuffer[3] = {1,2,3};
 	bool paused = true;
@@ -147,6 +166,9 @@ public:
 	int SubmitBuffer(idSoundSample_OpenAL* sample, int buffer, int offset, ALuint streamBuffer);
 	void ResetQueuedBufferState();
 	void AdvanceQueuedBuffer();
+	int StreamBlockFrames(idSoundSample_OpenAL* sample, int offset);
+	bool PrepareStreamBlock(idSoundSample_OpenAL* sample, int offset);
+	bool StreamBlockPending() const;
 	bool SetNextQueuedSampleStart(idSoundSample_OpenAL* sample);
 	static bool GetPlayableBufferRange(const idSoundSample_OpenAL*,int,int&,int&,int&,int&);
 	bool QueueNextBuffer(ALuint buffer);
@@ -168,7 +190,6 @@ struct { struct { bool IsOutputConnected() const { return outputConnected; } } h
 
 // Production statics of AL_SoundVoice.cpp that the extracted bodies use.
 static int soundDeepRoutedQueueVoices = 0;
-static short soundRoutedQueueMono[SOUND_QUEUE_MAX_FRAMES];
 static short soundRoutedQueueScratch[SOUND_QUEUE_MAX_FRAMES * 6];
 
 // @PRODUCTION@
@@ -178,7 +199,13 @@ int main(int argc, char** argv) {
 	idSoundSample_OpenAL lead, loop;
 	lead.Load(argv[1]); loop.Load(argv[2]);
 	Check(lead.channels == loop.channels && lead.rate == loop.rate, "matching queue formats");
+	// Pass 0 decodes each block inline (no accepting worker); pass 1 defers every block
+	// to a job that runs only between "frames", as the workers would.
+	for (int pass = 0; pass < 2; ++pass)
 	for (int mode = 0; mode < 10; ++mode) {
+		stubJobsSynchronous = pass == 0;
+		// Mode 7 splits the leadin into two resident buffers; every other mode has one.
+		lead.buffers.clear(); lead.buffers.push_back({lead.playLength,lead.pcm.data(),lead.totalBufferSize});
 		lead.streamed = mode != 1 && mode != 5 && mode != 7; lead.openalBuffer = lead.streamed ? 0 : 7;
 		loop.streamed = mode != 2 && mode != 6; loop.openalBuffer = loop.streamed ? 0 : 8;
 		if (mode >= 8) { lead.streamed=loop.streamed=false; lead.openalBuffer=loop.openalBuffer=0; }
@@ -205,15 +232,26 @@ int main(int argc, char** argv) {
 			SoundRouteMonoToCenter(expected.data(), static_cast<int>(expected.size()), voice.centerChannel, surround.data());
 			expected.swap(surround);
 		}
-		int calls = 0;
+		int calls = 0, waits = 0;
 		while (queued.size() < expected.size()) {
 			Check(voice.nextQueuedSample != nullptr && ++calls < 10000, "loop progress");
-			Check(voice.QueueNextBuffer((voice.centerRouting || voice.nextQueuedSample->openalBuffer==0) ? 1 + calls % 3 : 0), "queue block");
+			const size_t before = queued.size();
+			if (voice.QueueNextBuffer((voice.centerRouting || voice.nextQueuedSample->openalBuffer==0) ? 1 + calls % 3 : 0)) continue;
+			// Only a block still decoding may hold the queue back, and it queues nothing.
+			Check(pass == 1 && voice.StreamBlockPending() && queued.size() == before && voice.nextQueuedSample, "a pending block keeps the voice");
+			Check(StubRunPendingJobs() == 1, "one block decodes at a time per voice");
+			++waits;
 		}
 		Check(std::equal(expected.begin(), expected.end(), queued.begin()), "leadin/loop sample continuity");
+		Check(pass == 1 || waits == 0, "inline blocks never wait");
+		Check(pass == 0 || waits > 0 || !lead.streamed || !loop.streamed || mode >= 8, "deferred streams wait for their blocks");
 		voice.ResetQueuedBufferState();
-		Check(alive == 0, "stop releases all decoder state");
+		// A prefetched block may still be decoding: the stream waits for its worker.
+		StubRunPendingJobs();
+		idSoundOggStream::ReapReleased(false);
+		Check(alive == 0 && idSoundOggStream::ReleasedCount() == 0 && memoryUsed == 0, "stop releases all decoder state");
 	}
+	stubJobsSynchronous = true;
 	idSoundVoice_OpenAL voice;
 	lead.streamed = true; lead.openalBuffer = 0;
 	lead.buffers.clear(); lead.buffers.push_back({lead.playLength,lead.pcm.data(),lead.totalBufferSize});
@@ -324,5 +362,49 @@ int main(int argc, char** argv) {
 		Check(routed.back().RoutedQueueFrames(22050) == 7680 && routed.back().deepRoutedQueue, "freed slot is reused");
 	}
 	Check(soundDeepRoutedQueueVoices == 0, "destroyed voices return every deep slot");
-	std::puts("PASS production queue: leadin/loop, mixed static/streamed, offset, three scratch buffers, one-second depth, recycled voices, cancellation and release");
+	{
+		// A streamed voice starts without decoding on the caller: Update keeps it
+		// while its first block decodes, then queues and plays it, one block ahead.
+		stubJobsSynchronous = false;
+		lead.streamed = true; lead.openalBuffer = 0;
+		lead.buffers.clear(); lead.buffers.push_back({lead.playLength,lead.pcm.data(),lead.totalBufferSize});
+		idSoundVoice_OpenAL start;
+		start.leadinSample = &lead; start.loopingSample = &lead; start.paused = false;
+		start.FlushSourceBuffers(); start.paused = false;
+		Check(start.SetNextQueuedSampleStart(&lead), "start queue");
+		start.nextQueuedOffset = lead.playLength / 2;
+		queued.clear();
+		Check(start.Update() && start.StreamBlockPending() && sourceQueued == 0 && sourceState == AL_INITIAL, "a pending start is not a finished voice");
+		Check(start.Update() && start.StreamBlockPending() && stubPendingJobs.size() == 1, "polling a pending start submits nothing more");
+		Check(StubRunPendingJobs() == 1, "first block decodes on the worker");
+		Check(start.Update() && sourceQueued == 1 && sourceState == AL_PLAYING && start.StreamBlockPending(), "first block queued, played, next one decoding");
+		Check(std::equal(queued.begin(), queued.end(), lead.pcm.begin() + (lead.playLength / 2) * lead.channels), "a pending start begins at its exact offset");
+		StubRunPendingJobs();
+		Check(start.Update() && sourceQueued == 2, "the queue fills a block per finished job");
+		// Stopping while a block decodes neither waits nor leaks: the worker keeps the stream.
+		Check(start.StreamBlockPending(), "a refill is pending at stop");
+		const int jobsBefore = stubJobsRun;
+		start.FlushSourceBuffers();
+		Check(!start.oggStream && idSoundOggStream::ReleasedCount() == 1 && alive == 1, "a stopped voice hands its pending block to the release list");
+		StubRunPendingJobs();
+		Check(stubJobsRun == jobsBefore && stubJobsCancelled > 0, "the released block is cancelled before it runs");
+		idSoundOggStream::ReapReleased(false);
+		Check(alive == 0 && idSoundOggStream::ReleasedCount() == 0 && memoryUsed == 0, "the released stream is reaped");
+		// A stream that cannot open fails the voice, as before.
+		idSoundSample_OpenAL missing = lead; missing.streamName = "missing-fixture.ogg";
+		idSoundVoice_OpenAL broken;
+		broken.leadinSample = &missing; broken.paused = false; broken.FlushSourceBuffers(); broken.paused = false;
+		Check(broken.SetNextQueuedSampleStart(&missing), "broken queue start");
+		Check(!broken.Update() && !broken.nextQueuedSample && alive == 0, "a missing stream ends its voice");
+		// A damaged header fails on the poll after its job, not on submission.
+		idSoundSample_OpenAL wrong = lead; wrong.rate = lead.rate * 2;
+		idSoundVoice_OpenAL mismatch;
+		mismatch.leadinSample = &wrong; mismatch.paused = false; mismatch.FlushSourceBuffers(); mismatch.paused = false;
+		Check(mismatch.SetNextQueuedSampleStart(&wrong) && mismatch.Update() && mismatch.StreamBlockPending(), "the header is checked off the caller");
+		StubRunPendingJobs();
+		Check(!mismatch.Update() && !mismatch.nextQueuedSample && alive == 0, "a header that disagrees with the load ends its voice");
+		sourceState = AL_PLAYING;
+		stubJobsSynchronous = true;
+	}
+	std::puts("PASS production queue: leadin/loop, mixed static/streamed, offset, three scratch buffers, one-second depth, recycled voices, cancellation and release, inline and worker-decoded blocks, pending starts and released refills");
 }

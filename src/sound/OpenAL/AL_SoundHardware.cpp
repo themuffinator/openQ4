@@ -2086,6 +2086,9 @@ void idSoundHardware_OpenAL::Shutdown()
 	voices.Clear();
 	freeVoices.Clear();
 	zombieVoices.Clear();
+	// Voices released streams whose blocks were still decoding: join them before
+	// s_restart or shutdown closes their files and reservations.
+	idSoundOggStream::ReapReleased( true );
 
 	#if OPENQ4_OPENAL_EFX_SUPPORTED
 		// the sources are gone, so nothing still feeds the area slots
@@ -2539,6 +2542,8 @@ idSoundHardware_OpenAL::Update
 */
 void idSoundHardware_OpenAL::Update()
 {
+	// Free streams whose cancelled blocks the workers have let go of; never waits.
+	idSoundOggStream::ReapReleased( false );
 	if( openalDevice == NULL )
 	{
 		int nowTime = Sys_Milliseconds();

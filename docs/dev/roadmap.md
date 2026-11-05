@@ -537,7 +537,9 @@ not merely paperwork or a final screenshot.
   next GPU lever. Long-frame attribution (`cpu_sampler.py frames` with
   `profileFrameWork` start times) found and fixed whole-cache clears of
   mode 2's retained index streams. It also traced streamed-sound starts to the
-  main thread and window-message bursts to desktop activity; see
+  main thread, since moved to job workers under AUD-03
+  ([stream starts](presentation-owners.md#streamed-sound-starts-off-the-main-thread-5-november-2026)),
+  and window-message bursts to desktop activity; see
   [half-resolution SSAO](presentation-owners.md#half-resolution-ssao-for-quality-5-november-2026)
   and [long-frame attribution](presentation-owners.md#long-frame-attribution-5-november-2026).
   The every-frame floor stays open: about 7.7 ms of GPU work remains per frame,
@@ -3734,6 +3736,19 @@ automatically satisfied by a listening pass.
   loading-performance measurement path; target-device budgets and real mobile
   low-memory notices remain open.
   [Cancellation and loading evidence](audio-voice-evidence.md#decode-cancellation-and-loading-measurements-3-november-2026).
+  November 5: HF-07's long-frame attribution found streamed voices opening,
+  seeking and decoding on the main thread: 7.4 ms per start on average over
+  four stock openings, and up to 105 ms. Each stream block now decodes on a job
+  worker (`s_asyncStreamDecode`, default 1). The main thread keeps admission,
+  the VFS open and OpenAL. A pending block keeps its voice alive. A voice
+  stopped meanwhile cancels and parks its stream without waiting, and
+  `s_restart` and shutdown join what is parked. Native tests run the
+  production stream and voice queue against a deferring job system. With
+  workers on, airdefense1 rotations show no Vorbis work on the main thread;
+  with them off, the control does. Scene audits of four stock openings play
+  the same streams in both modes. A start is now heard one to two frames late
+  at the same position. Device and mobile qualification remain open.
+  [Stream start evidence](presentation-owners.md#streamed-sound-starts-off-the-main-thread-5-november-2026).
 - [ ] **AUD-04 — P2, implementation and qualification: surround and mod reverb.**
   Resolve `SSF_CENTER`/VO placement on 5.1 with stereo/HRTF fallback and nonzero mod
   room-rolloff unit handling. Keep stock zero-rolloff behavior intact.

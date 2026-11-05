@@ -93,7 +93,6 @@ static bool openQ4_LoadVoiceEfxProcs() {
 // AL_SoundSample.cpp's fixed reservation counts the slots and the scratch.
 static int soundDeepRoutedQueueVoices = 0;
 #if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
-static short soundRoutedQueueMono[SOUND_QUEUE_MAX_FRAMES];
 static short soundRoutedQueueScratch[SOUND_QUEUE_MAX_FRAMES * 6];
 #endif
 
@@ -198,7 +197,6 @@ idSoundVoice_OpenAL::idSoundVoice_OpenAL()
 	nextQueuedSample( NULL ),
 	oggStream( NULL ),
 	oggStreamSample( NULL ),
-	oggStreamOffset( 0 ),
 	nextQueuedBuffer( 0 ),
 	nextQueuedOffset( 0 ),
 	queuedBufferPlaybackActive( false ),
@@ -418,10 +416,10 @@ bool idSoundVoice_OpenAL::SourceHasPlayableBuffer() const
 
 void idSoundVoice_OpenAL::ResetQueuedBufferState()
 {
-	delete oggStream;
+	// A block still decoding stays with its worker; the stream is freed once it lets go.
+	idSoundOggStream::Release( oggStream );
 	oggStream = NULL;
 	oggStreamSample = NULL;
-	oggStreamOffset = 0;
 	nextQueuedSample = NULL;
 	nextQueuedBuffer = 0;
 	nextQueuedOffset = 0;
@@ -1110,6 +1108,61 @@ int idSoundVoice_OpenAL::SubmitBuffer( idSoundSample_OpenAL* sample, int bufferN
 	return audioBytes;
 }
 
+int idSoundVoice_OpenAL::StreamBlockFrames( idSoundSample_OpenAL* sample, int offset )
+{
+	// Three independent buffers of about a third of a second each, irrespective
+	// of track length; the decoder hands out at most 4096 frames per call.
+	const int channels = Max( 1, sample->NumChannels() );
+	int queueFrames = SoundQueueChunkFrames( sample->SampleRate(), channels * static_cast<int>( sizeof( short ) ) );
+	int decodeCapacity = static_cast<int>( SOUND_QUEUE_BUFFER_BYTES / sizeof( short ) ) / channels;
+#if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
+	if( centerRouting ) {
+		queueFrames = RoutedQueueFrames( sample->SampleRate() );
+		decodeCapacity = SOUND_QUEUE_MAX_FRAMES;
+	}
+#endif
+	return Min( Min( queueFrames, decodeCapacity ), sample->playLength - offset );
+}
+
+bool idSoundVoice_OpenAL::PrepareStreamBlock( idSoundSample_OpenAL* sample, int offset )
+{
+	const int frames = StreamBlockFrames( sample, offset );
+	if( frames <= 0 ) return false;
+	if( oggStream == NULL || oggStreamSample != sample ) {
+		idSoundOggStream::Release( oggStream );
+		oggStream = new idSoundOggStream;
+		oggStreamSample = sample;
+		idSoundOggStreamShape shape;
+		shape.channels = sample->NumChannels();
+		shape.rate = sample->SampleRate();
+		shape.frames = static_cast<unsigned int>( sample->playLength );
+		shape.countedLength = sample->streamCountedLength;
+		shape.pageStart = sample->streamPageStart;
+		shape.pageEnd = sample->streamPageEnd;
+		shape.pageGranule = sample->streamPageGranule;
+		if( !oggStream->Open( sample->streamName, shape ) ) return false;
+	}
+	switch( oggStream->PollBlock() ) {
+		case idSoundOggStream::BLOCK_PENDING:
+			return true;
+		case idSoundOggStream::BLOCK_FAILED:
+			return false;
+		case idSoundOggStream::BLOCK_READY:
+			if( oggStream->BlockFrame() == static_cast<unsigned int>( offset ) && oggStream->BlockRequestFrames() == frames ) return true;
+			// A block for another position (the routing changed its size): decode again.
+			oggStream->ConsumeBlock();
+			break;
+		default:
+			break;
+	}
+	return oggStream->RequestBlock( static_cast<unsigned int>( offset ), frames );
+}
+
+bool idSoundVoice_OpenAL::StreamBlockPending() const
+{
+	return nextQueuedSample != NULL && oggStream != NULL && oggStreamSample == nextQueuedSample && oggStream->IsBlockPending();
+}
+
 bool idSoundVoice_OpenAL::QueueNextBuffer( ALuint streamBuffer )
 {
 	if( nextQueuedSample == NULL )
@@ -1122,62 +1175,41 @@ bool idSoundVoice_OpenAL::QueueNextBuffer( ALuint streamBuffer )
 	}
 	if( nextQueuedSample->IsStreamed() ) {
 		idSoundSample_OpenAL* sample = nextQueuedSample;
-		if( oggStreamSample != sample ) {
-			delete oggStream;
-			oggStream = new idSoundOggStream;
-			oggStreamSample = sample;
-			oggStreamOffset = 0;
-			if( !oggStream->Open( sample->streamName ) ||
-				( sample->streamCountedLength && !oggStream->SetCountedLength( static_cast<unsigned int>( sample->playLength ),
-					sample->streamPageStart, sample->streamPageEnd, sample->streamPageGranule ) ) ||
-				oggStream->Channels() != sample->NumChannels() ||
-				oggStream->Rate() != sample->SampleRate() || oggStream->Frames() != static_cast<unsigned int>( sample->playLength ) ) {
-				ResetQueuedBufferState(); return false;
-			}
-		}
-		if( oggStreamOffset != nextQueuedOffset && !oggStream->Seek( nextQueuedOffset ) ) {
-			ResetQueuedBufferState(); return false;
-		}
-		// Three independent buffers of about a third of a second each, irrespective
-		// of track length; the decoder hands out at most 4096 frames per call.
-		short block[SOUND_QUEUE_BUFFER_BYTES / sizeof( short )];
+		// Opening, seeking and decoding run on a job worker. Until the block is
+		// ready nothing is queued; Update keeps the voice and queues it then.
+		if( !PrepareStreamBlock( sample, nextQueuedOffset ) ) { ResetQueuedBufferState(); return false; }
+		if( oggStream->BlockState() != idSoundOggStream::BLOCK_READY ) return false;
+		const short* pcm = oggStream->Block();
+		const int frames = oggStream->BlockFrames();
 		const int channels = sample->NumChannels();
-		short* decodeTarget = block;
-		int queueFrames = SoundQueueChunkFrames( sample->SampleRate(), channels * static_cast<int>( sizeof( short ) ) );
-		int decodeCapacity = static_cast<int>( sizeof( block ) / sizeof( short ) ) / Max( 1, channels );
+		if( pcm == NULL || frames <= 0 ) { ResetQueuedBufferState(); return false; }
 #if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
 		if( centerRouting ) {
-			decodeTarget = soundRoutedQueueMono;
-			queueFrames = RoutedQueueFrames( sample->SampleRate() );
-			decodeCapacity = SOUND_QUEUE_MAX_FRAMES;
-		}
-#endif
-		const int wanted = Min( queueFrames, sample->playLength - nextQueuedOffset );
-		int frames = 0;
-		while( frames < wanted && frames < decodeCapacity ) {
-			const int count = oggStream->Read( decodeTarget + frames * channels,
-				Min( SOUND_QUEUE_DECODE_FRAMES, Min( wanted, decodeCapacity ) - frames ) );
-			if( count <= 0 ) break;
-			frames += count;
-		}
-		if( frames <= 0 ) { ResetQueuedBufferState(); return false; }
-#if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
-		if( centerRouting ) {
-			SoundRouteMonoToCenter( soundRoutedQueueMono, frames, centerChannel, soundRoutedQueueScratch );
+			SoundRouteMonoToCenter( pcm, frames, centerChannel, soundRoutedQueueScratch );
 			alBufferData( streamBuffer, AL_FORMAT_51CHN16, soundRoutedQueueScratch, frames * 6 * sizeof( short ), sample->SampleRate() );
 		} else
 #endif
 		{
-			alBufferData( streamBuffer, sample->GetOpenALBufferFormat(), block, frames * channels * sizeof( short ), sample->SampleRate() );
+			alBufferData( streamBuffer, sample->GetOpenALBufferFormat(), pcm, frames * channels * sizeof( short ), sample->SampleRate() );
 		}
 		if( CheckALErrors() != AL_NO_ERROR ) { ResetQueuedBufferState(); return false; }
 		alSourceQueueBuffers( openalSource, 1, &streamBuffer );
 		if( CheckALErrors() != AL_NO_ERROR ) { ResetQueuedBufferState(); return false; }
+		oggStream->ConsumeBlock();
 		openalStreamingBufferQueued[StreamingBufferIndex( streamBuffer )] = true;
 		queuedBufferPlaybackActive = true;
 		nextQueuedOffset += frames;
-		oggStreamOffset = nextQueuedOffset;
 		if( nextQueuedOffset >= sample->playLength ) AdvanceQueuedBuffer();
+		if( nextQueuedSample != NULL && nextQueuedSample->IsStreamed() ) {
+			// Decode the following block while this one plays. A failure here
+			// surfaces at the next queue attempt, after the queued audio.
+			PrepareStreamBlock( nextQueuedSample, nextQueuedOffset );
+		} else {
+			// Ended, or looping on a resident buffer: free the decoder now.
+			idSoundOggStream::Release( oggStream );
+			oggStream = NULL;
+			oggStreamSample = NULL;
+		}
 		return true;
 	}
 
@@ -1385,7 +1417,8 @@ bool idSoundVoice_OpenAL::Update()
 		queuedBufferPlaybackActive = false;
 	}
 
-	return queuedBuffers > 0 || state == AL_PLAYING || !hadQueuedState || submittedAny;
+	// A stream whose first or next block is still decoding is starting, not finished.
+	return queuedBuffers > 0 || state == AL_PLAYING || !hadQueuedState || submittedAny || StreamBlockPending();
 }
 
 /*
@@ -1467,7 +1500,7 @@ bool idSoundVoice_OpenAL::IsPlaying()
 		return true;
 	}
 
-	return HasQueuedBufferState() && SourceHasPlayableBuffer();
+	return HasQueuedBufferState() && ( SourceHasPlayableBuffer() || StreamBlockPending() );
 
 	//XAUDIO2_VOICE_STATE state;
 	//pSourceVoice->GetState( &state );
@@ -1605,8 +1638,9 @@ bool idSoundVoice_OpenAL::UnPause()
 
 	if( !SourceHasPlayableBuffer() )
 	{
+		// A stream still decoding its block plays from Update once it is queued.
 		paused = false;
-		return false;
+		return StreamBlockPending();
 	}
 
 	alSourcePlay( openalSource );

@@ -1209,7 +1209,75 @@ causes:
 - **Streaming sound starts.** `idSoundSystemLocal::Render` opens, seeks and
   decodes the first buffer of Ogg Vorbis streams on the main thread when a
   streamed voice starts, a few milliseconds each. Moving stream preparation
-  off the main thread belongs with the audio work.
+  off the main thread belongs with the audio work. Done the same day; see
+  [streamed sound starts off the main thread](#streamed-sound-starts-off-the-main-thread-5-november-2026).
 
 Evidence is under `.tmp/hf-floor/runs/hitch1` and `hitch2`
 (`samples.json`, `frame-work.csv`, engine logs).
+
+### Streamed sound starts off the main thread, 5 November 2026
+
+The attribution's `hitch1` run caught 8 main-thread samples in Vorbis stream
+work (6 of them inside frames over 6.67 ms). All were under
+`idSoundVoice_OpenAL::QueueNextBuffer`: `SoundVorbisStream::Open`
+(`start_decoder`, Huffman setup), `stb_vorbis_seek` (`seek_to_sample_coarse`
+reading and inflating the PK4 member) and the first blocks'
+`stb_vorbis_get_samples_short_interleaved`. Steady refills decoded on the
+main thread as well.
+
+Each streamed voice's `idSoundOggStream` now decodes one queue buffer at a
+time as a HIGH-priority job (`s_asyncStreamDecode`, default 1, AUD-03). The
+main thread keeps admission, the VFS open and every OpenAL call. The worker
+parses the headers, checks them against the sample's load, applies a counted
+length, seeks and decodes. The voice queues the block on a later update and
+requests the next one at once. While a block is pending, `Update`, `UnPause`
+and `IsPlaying` report the voice as starting rather than finished, so no
+start is lost. A voice stopped or recycled meanwhile cancels its block and
+parks the stream; `idSoundHardware_OpenAL::Update` frees parked streams once
+their worker lets go, and `Shutdown` (`s_restart`, quit) joins them. With no
+accepting worker the block decodes inline, as before. Implementation:
+[audio modernization](audio-modernization.md#compressed-streaming-october-21).
+
+Windows x64, MSVC debugoptimized, `aeb14a86f` plus this change, native
+2560 x 1440 fullscreen Quality `game/airdefense1` hitch sweeps (36 s,
+`profileFrameWork 3600`) with `cpu_sampler.py record` on the main thread and
+`s_muteUnfocused 0`. Another session's full build loaded the machine for most
+runs, so frame times here are not comparable with the quiet baseline; only
+which thread does the work is measured. The first-block timing counters were
+added between runs (client SHA-256 `b77c3728…5ebf9c` for `rot-dbg` and the
+timed audit); the decode path is the same in every run. Runs are under
+`.tmp/async-stream/runs/` and `.tmp/async-stream/scene-*`.
+
+| Run | `s_asyncStreamDecode` | Stream blocks (worker / inline) | Main-thread Vorbis samples | First block: wait / decode |
+| --- | ---: | ---: | ---: | --- |
+| `rot-1` | 1 | 322 / 0 | 0 | — |
+| `rot-dbg` | 1 | 319 / 0 | 0 | 23–24 ms / 1–2 ms (2 starts) |
+| `test-async` | 1 | 14 / 0 | 0 | — |
+| `rot-0` (control) | 0 | 0 / 319 | 4, all `idSoundOggStream::Decode` under `QueueNextBuffer` | 1.5 ms on the main thread |
+| `test-inline` (control) | 0 | 0 / 54 | 3, under `QueueNextBuffer` | 2.1 ms on the main thread |
+
+`rot-1`'s only main-thread sample in any `idSoundOggStream` frame was the
+parked-stream sweep (`ReapReleased`), not decoding. No `stb_vorbis_*` or
+`SoundVorbisStream` frame appears on the main thread with workers enabled.
+
+`audio_scene_audit.py --repeat 2` over the `airdefense1`, `hangar2`, `medlabs`
+and `dispersal` openings (hidden client, 60 FPS) passes all 13 checks with
+workers and with `--stream-decode inline`. Both make 35 stream opens and play
+the same streams in every opening, including on recycled voices, and their
+residency matches within 8 KiB. Workers took 2,063 blocks and the main thread
+none. Inline, first blocks cost the main thread 7.4 ms on average and up to
+105 ms. With workers that work becomes start latency instead: 33 ms on average
+and at most 95 ms, which includes waiting for the next 60 Hz poll. A further
+single pass with worker timing (17 starts) separates the two: the worker spent
+5.1 ms on average and at most 24 ms opening, seeking and decoding a first block,
+and starts waited 23.3 ms on average. The longest wait, 68 ms, was
+`hangar2_opening` at the map's first frames. It took 8 ms on the worker; the
+rest was the length of those frames before the next poll.
+
+A start is now heard about one to two frames later than its channel's clock
+(23–33 ms on average in these runs), at the same sample position. An
+expensive first block delays that one sound rather than stalling the frame.
+The worker does not skip the block's first samples to catch up, so an onset
+is never cut. `listSounds` reports worker and inline blocks, the first-block
+wait and decode times and the slowest start, and `s_debugHardware 1` logs
+each start.

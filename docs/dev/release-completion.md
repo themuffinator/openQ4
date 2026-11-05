@@ -6,6 +6,18 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Fewer hitches when music and long lines start, 5 November 2026
+
+- Music, long dialogue and other long sounds no longer stall a frame when they
+  start, restart after a device change, or resume after loading a save. Opening
+  and decoding these tracks now happens on background worker threads. Before,
+  each start could add a few milliseconds to one frame, enough to contribute
+  to some of the 20 ms hitches seen at high frame rates.
+- These sounds start on the next frame, typically a few milliseconds later, and
+  at the same position as before. Nothing needs to be reinstalled or changed.
+  `s_asyncStreamDecode 0` restores the previous behaviour for comparison.
+- Evidence: [streamed sound starts off the main thread](presentation-owners.md#streamed-sound-starts-off-the-main-thread-5-november-2026).
+
 ## Faster ambient occlusion on Quality, 5 November 2026
 
 - On Vulkan, the Quality preset (and any setting below 32 SSAO samples) now

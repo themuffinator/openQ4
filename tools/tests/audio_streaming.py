@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 from sound_settings import body
+from audio_stream_budget import production_stream
 
 ROOT = Path(__file__).resolve().parents[2]
 CRC_TABLE = []
@@ -85,13 +86,17 @@ def main():
     production = '\n'.join(body(source, signature) for signature in [
         'void idSoundVoice_OpenAL::ResetQueuedBufferState()', 'void idSoundVoice_OpenAL::AdvanceQueuedBuffer()',
         'bool idSoundVoice_OpenAL::GetPlayableBufferRange(', 'bool idSoundVoice_OpenAL::SetNextQueuedSampleStart(',
+        'int idSoundVoice_OpenAL::StreamBlockFrames(', 'bool idSoundVoice_OpenAL::PrepareStreamBlock(',
+        'bool idSoundVoice_OpenAL::StreamBlockPending() const',
         'bool idSoundVoice_OpenAL::QueueNextBuffer(', 'bool idSoundVoice_OpenAL::Update()',
         'bool idSoundVoice_OpenAL::UsesBoundedQueue()', 'int idSoundVoice_OpenAL::SubmitBuffer(',
         'void idSoundVoice_OpenAL::DeleteStreamingBuffers()', 'int idSoundVoice_OpenAL::RoutedQueueFrames(',
         'void idSoundVoice_OpenAL::FlushSourceBuffers()', 'void idSoundVoice_OpenAL::ResetStreamingBufferQueueState()',
         'bool idSoundVoice_OpenAL::SourceHasPlayableBuffer() const'])
     queue_cpp = scratch / 'queue.cpp'
-    queue_cpp.write_text((ROOT / 'tools/tests/native/SoundStreamQueueTest.cpp').read_text().replace('// @PRODUCTION@', production))
+    declaration, stream = production_stream()
+    queue_cpp.write_text((ROOT / 'tools/tests/native/SoundStreamQueueTest.cpp').read_text()
+                         .replace('// @STREAM@', declaration + stream).replace('// @PRODUCTION@', production))
     queue_exe = scratch / ('queue.exe' if os.name == 'nt' else 'queue')
     subprocess.run([os.environ.get('CXX', 'clang++'), '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-I', str(ROOT), '-I', str(ROOT / 'subprojects/stb_vorbis'), str(queue_cpp), str(obj), '-o', str(queue_exe)], cwd=scratch, check=True)
