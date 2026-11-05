@@ -171,6 +171,7 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Opponent Weapon Style | `choiceDef` | `set_game_opponentweaponstyle_value` | `g_mpFlatOpponentWeapons` | `0 Original`, `1 Flat Color` | Client-side multiplayer option for weapons held by opponents. View weapons are never affected. |
 | Force Model | `choiceDef` | `set_game_forcemodel_value` | GUI state `ui_proskins` via `applyForceModelChoice` | `0 No`, `1 Yes` | The C++ menu adapter writes the pro-skin force-model cvars when enabled and clears `g_forceModel`, `g_forceMarineModel`, and `g_forceStroggModel` when disabled. |
 | Auto Skip Cinematics | `choiceDef` | `set_game_autoskipcinematics_value` | `g_autoSkipCinematics` | `No;Yes` | Archived SP/MP gameplay cvar. Affects future cinematics. |
+| Cinematic Shake | `choiceDef` | `set_game_cinematicshake_value` | `ui_cinematicShake` | `Off;Low;Full` (`0;0.5;1`) | Scales scripted cinematic camera shake. |
 
 ### Mouse
 
@@ -229,6 +230,7 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Pickup Messages | `choiceDef` | `set_game_hudpickups_value` | `ui_hudPickups` | `0 No`, `1 Yes` | No hides the pickup messages in the Remastered and Minimal HUD. |
 | Weapon Strip | `choiceDef` | `set_game_hudstrip_value` | `ui_hudWeaponStrip` | `0 No`, `1 Yes` | No keeps the weapon strip hidden on a weapon change in the Remastered and Minimal HUD. |
 | Reduced Flashing | `choiceDef` | `set_game_hudflash_value` | `ui_reducedFlashing` | `0 No`, `1 Yes` | Yes caps the damage direction indicator and the vehicle hit glow at 0.40, dims full-screen white flashes (teleports, spawns) and drops the death afterimage, in every HUD layout. |
+| Opaque Menu Backing | `choiceDef` | `set_game_opaquebacking_value` | `ui_retainedOpaqueBacking` | `0 No`, `1 Yes` | Yes covers the screen behind the retained menus' dialogs and pause with the stock 0.94 black scrim instead of the softened (blurred) view. |
 
 ### Corpse, Language, Console
 

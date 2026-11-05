@@ -6,6 +6,23 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Multiplayer menus and an opaque menu backing, 5 November 2026
+
+- The in-match menu's player lists now show who is dead (a skull, the row
+  dimmed), which players are bots, and each player's connection quality as
+  four bars, as the scoreboard does.
+- Kick and Ban on the Admin page ask before acting and name the player. Yes
+  removes exactly that player, even if the selection changed meanwhile.
+- The Admin page now opens with the chosen player in view on a long list.
+- The Match page lists a full 32-player server's roster, every substitute,
+  every vote option (including the new side forfeit) and 32 maps, instead of
+  sending you to the classic page part-way down.
+- French and Italian players now see the "team has too many players" and
+  "already on this team" messages in their own language.
+- Game Options > HUD gains Opaque Menu Backing: Yes draws a solid dark
+  backdrop behind menus and dialogs instead of the blurred view behind them.
+- Install the matching engine, multiplayer module and menus together.
+
 ## Faster ambient occlusion on Quality, 5 November 2026
 
 - On Vulkan, the Quality preset (and any setting below 32 SSAO samples) now

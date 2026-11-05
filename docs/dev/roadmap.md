@@ -1791,6 +1791,10 @@ Completion must advance through the existing dependencies:
   GAME, CHAPTERS and CREATE SERVER over a levelshot, through a cardless detail
   definition (`FLOW-050`). Join Game's docked detail column for expanded
   layouts and the section layout remain.
+  Progress, 5 November: Game Options > HUD gains
+  [Opaque Menu Backing](ui/retained-screens.md#opaque-menu-backing-5-november-2026),
+  the accessibility alternative to the softened backdrop, on the retained and
+  stock pages in every shipped language.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

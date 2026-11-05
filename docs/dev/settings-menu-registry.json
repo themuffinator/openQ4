@@ -3707,6 +3707,29 @@
       "accessibility": "Focusable choiceDef row. Yes caps the damage direction indicator and the vehicle hit glow at 0.40, dims full-screen white flashes and drops the death afterimage, in every HUD layout."
     },
     {
+      "id": "game.opaque_backing",
+      "pane": "Game Options",
+      "section": "HUD",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > HUD > Opaque Menu Backing",
+      "container": "set_game_opaquebacking",
+      "widgets": [
+        "set_game_opaquebacking_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_231592",
+      "choices_key": "#str_200059",
+      "values": [
+        "0",
+        "1"
+      ],
+      "target": "ui_retainedOpaqueBacking",
+      "default": "0",
+      "accessibility": "Focusable choiceDef row. Yes covers the screen behind the retained menus' dialogs and pause with the stock 0.94 black scrim instead of the softened view, for players who find the blurred backdrop distracting."
+    },
+    {
       "id": "game.auto_skip_cinematics",
       "pane": "Game Options",
       "section": "Gameplay And View",
@@ -3724,6 +3747,30 @@
       "default": "0",
       "restart_required": false,
       "accessibility": "Standard focusable choiceDef row."
+    },
+    {
+      "id": "game.cinematic_shake",
+      "pane": "Game Options",
+      "section": "Gameplay And View",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Gameplay And View > Cinematic Shake",
+      "container": "set_game_cinematicshake",
+      "widgets": [
+        "set_game_cinematicshake_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_230157",
+      "choices_key": "#str_230136",
+      "values": [
+        "0",
+        "0.5",
+        "1"
+      ],
+      "target": "ui_cinematicShake",
+      "default": "1",
+      "accessibility": "Focusable choiceDef row. Off, Low or Full scales scripted cinematic camera shake, such as the Awakening dropship's."
     },
     {
       "id": "game.gun_position",

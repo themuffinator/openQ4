@@ -118,6 +118,7 @@ SECTIONS = (
         toggle("game_pickups", "#str_231272", "ui_hudPickups"),
         toggle("game_weaponstrip", "#str_231273", "ui_hudWeaponStrip"),
         toggle("game_reducedflashing", "#str_231274", "ui_reducedFlashing"),
+        toggle("game_opaquebacking", "#str_231592", "ui_retainedOpaqueBacking"),
     )),
     ("gameplay", "#str_231544", (
         choice("game_corpsesink", "#str_229917", "g_corpseSink", "#str_229921", (0, 1, 2)),
