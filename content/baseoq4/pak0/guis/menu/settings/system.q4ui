@@ -3811,6 +3811,12 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 0]}, "block", "none"]}
   },
   {
+   "id": "tab-graphics-rail.display",
+   "node": "tab-graphics-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 0]}, "none", "block"]}
+  },
+  {
    "id": "tab-graphics-lit.display",
    "node": "tab-graphics-lit",
    "property": "display",
@@ -3823,6 +3829,12 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 1]}, "block", "none"]}
   },
   {
+   "id": "tab-screen-rail.display",
+   "node": "tab-screen-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 1]}, "none", "block"]}
+  },
+  {
    "id": "tab-screen-lit.display",
    "node": "tab-screen-lit",
    "property": "display",
@@ -3833,6 +3845,12 @@
    "node": "tab-image-active",
    "property": "display",
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 2]}, "block", "none"]}
+  },
+  {
+   "id": "tab-image-rail.display",
+   "node": "tab-image-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 2]}, "none", "block"]}
   },
   {
    "id": "tab-image-lit.display",
@@ -35165,13 +35183,40 @@
           ]
          },
          {
-          "id": "tab-baseline",
+          "id": "tab-baseline-lead",
           "type": "vector",
           "properties": {
            "position": {"type": "keyword", "value": "absolute"},
            "left": {"type": "length", "value": 12.0, "unit": "dp"},
            "top": {"type": "length", "value": 28.5, "unit": "dp"},
-           "width": {"type": "length", "value": 856.5, "unit": "dp"},
+           "width": {"type": "length", "value": 26.0, "unit": "dp"},
+           "height": {"type": "length", "value": 2, "unit": "dp"}
+          },
+          "paths": [
+           {
+            "id": "rail",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+            ],
+            "stroke": {
+             "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+             "widthDp": 1.5,
+             "minimumPixels": 1,
+             "join": "miter",
+             "cap": "butt"
+            }
+           }
+          ]
+         },
+         {
+          "id": "tab-baseline-trail",
+          "type": "vector",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 842.5, "unit": "dp"},
+           "top": {"type": "length", "value": 28.5, "unit": "dp"},
+           "width": {"type": "length", "value": 26.0, "unit": "dp"},
            "height": {"type": "length", "value": 2, "unit": "dp"}
           },
           "paths": [
@@ -35218,6 +35263,35 @@
             },
             "children": [
              {
+              "id": "tab-graphics-rail",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 28.5, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 2, "unit": "dp"},
+               "display": {"type": "keyword", "value": "block"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "rail",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
               "id": "tab-graphics-active",
               "type": "vector",
               "properties": {
@@ -35229,20 +35303,6 @@
                "display": {"type": "keyword", "value": "none"}
               },
               "paths": [
-               {
-                "id": "erase",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-                 "widthDp": 2.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
                {
                 "id": "fill",
                 "commands": [
@@ -35345,6 +35405,35 @@
             },
             "children": [
              {
+              "id": "tab-screen-rail",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 28.5, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 2, "unit": "dp"},
+               "display": {"type": "keyword", "value": "block"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "rail",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
               "id": "tab-screen-active",
               "type": "vector",
               "properties": {
@@ -35356,20 +35445,6 @@
                "display": {"type": "keyword", "value": "none"}
               },
               "paths": [
-               {
-                "id": "erase",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-                 "widthDp": 2.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
                {
                 "id": "fill",
                 "commands": [
@@ -35472,6 +35547,35 @@
             },
             "children": [
              {
+              "id": "tab-image-rail",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 28.5, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 2, "unit": "dp"},
+               "display": {"type": "keyword", "value": "block"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "rail",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
               "id": "tab-image-active",
               "type": "vector",
               "properties": {
@@ -35483,20 +35587,6 @@
                "display": {"type": "keyword", "value": "none"}
               },
               "paths": [
-               {
-                "id": "erase",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-                 "widthDp": 2.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
                {
                 "id": "fill",
                 "commands": [

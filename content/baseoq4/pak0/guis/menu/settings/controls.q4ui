@@ -760,6 +760,12 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 0]}, "block", "none"]}
   },
   {
+   "id": "tab-move-rail.display",
+   "node": "tab-move-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 0]}, "none", "block"]}
+  },
+  {
    "id": "tab-move-lit.display",
    "node": "tab-move-lit",
    "property": "display",
@@ -770,6 +776,12 @@
    "node": "tab-weapons-active",
    "property": "display",
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 1]}, "block", "none"]}
+  },
+  {
+   "id": "tab-weapons-rail.display",
+   "node": "tab-weapons-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 1]}, "none", "block"]}
   },
   {
    "id": "tab-weapons-lit.display",
@@ -784,6 +796,12 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 2]}, "block", "none"]}
   },
   {
+   "id": "tab-attack-rail.display",
+   "node": "tab-attack-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 2]}, "none", "block"]}
+  },
+  {
    "id": "tab-attack-lit.display",
    "node": "tab-attack-lit",
    "property": "display",
@@ -794,6 +812,12 @@
    "node": "tab-other-active",
    "property": "display",
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 3]}, "block", "none"]}
+  },
+  {
+   "id": "tab-other-rail.display",
+   "node": "tab-other-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "page.tab"}, 3]}, "none", "block"]}
   },
   {
    "id": "tab-other-lit.display",
@@ -22985,13 +23009,40 @@
           ]
          },
          {
-          "id": "tab-baseline",
+          "id": "tab-baseline-lead",
           "type": "vector",
           "properties": {
            "position": {"type": "keyword", "value": "absolute"},
            "left": {"type": "length", "value": 12.0, "unit": "dp"},
            "top": {"type": "length", "value": 28.5, "unit": "dp"},
-           "width": {"type": "length", "value": 856.5, "unit": "dp"},
+           "width": {"type": "length", "value": 26.0, "unit": "dp"},
+           "height": {"type": "length", "value": 2, "unit": "dp"}
+          },
+          "paths": [
+           {
+            "id": "rail",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+            ],
+            "stroke": {
+             "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+             "widthDp": 1.5,
+             "minimumPixels": 1,
+             "join": "miter",
+             "cap": "butt"
+            }
+           }
+          ]
+         },
+         {
+          "id": "tab-baseline-trail",
+          "type": "vector",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 842.5, "unit": "dp"},
+           "top": {"type": "length", "value": 28.5, "unit": "dp"},
+           "width": {"type": "length", "value": 26.0, "unit": "dp"},
            "height": {"type": "length", "value": 2, "unit": "dp"}
           },
           "paths": [
@@ -23038,6 +23089,35 @@
             },
             "children": [
              {
+              "id": "tab-move-rail",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 28.5, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 2, "unit": "dp"},
+               "display": {"type": "keyword", "value": "block"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "rail",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
               "id": "tab-move-active",
               "type": "vector",
               "properties": {
@@ -23049,20 +23129,6 @@
                "display": {"type": "keyword", "value": "none"}
               },
               "paths": [
-               {
-                "id": "erase",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-                 "widthDp": 2.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
                {
                 "id": "fill",
                 "commands": [
@@ -23165,6 +23231,35 @@
             },
             "children": [
              {
+              "id": "tab-weapons-rail",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 28.5, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 2, "unit": "dp"},
+               "display": {"type": "keyword", "value": "block"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "rail",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
               "id": "tab-weapons-active",
               "type": "vector",
               "properties": {
@@ -23176,20 +23271,6 @@
                "display": {"type": "keyword", "value": "none"}
               },
               "paths": [
-               {
-                "id": "erase",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-                 "widthDp": 2.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
                {
                 "id": "fill",
                 "commands": [
@@ -23292,6 +23373,35 @@
             },
             "children": [
              {
+              "id": "tab-attack-rail",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 28.5, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 2, "unit": "dp"},
+               "display": {"type": "keyword", "value": "block"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "rail",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
               "id": "tab-attack-active",
               "type": "vector",
               "properties": {
@@ -23303,20 +23413,6 @@
                "display": {"type": "keyword", "value": "none"}
               },
               "paths": [
-               {
-                "id": "erase",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-                 "widthDp": 2.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
                {
                 "id": "fill",
                 "commands": [
@@ -23419,6 +23515,35 @@
             },
             "children": [
              {
+              "id": "tab-other-rail",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 28.5, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 2, "unit": "dp"},
+               "display": {"type": "keyword", "value": "block"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "rail",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
               "id": "tab-other-active",
               "type": "vector",
               "properties": {
@@ -23430,20 +23555,6 @@
                "display": {"type": "keyword", "value": "none"}
               },
               "paths": [
-               {
-                "id": "erase",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-                 "widthDp": 2.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
                {
                 "id": "fill",
                 "commands": [

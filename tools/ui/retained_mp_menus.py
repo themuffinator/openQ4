@@ -253,8 +253,11 @@ def tab(doc: Document, index: int, ident: str, key: str, state: str = "card.tab"
     flare and the trailing shoulder, so the tab is as wide as its label in
     the running language plus its share of the strip's remainder. The active tab rises 30 dp with a 3 dp leading
     flare and an 18 dp 45-degree trailing shoulder, filled #5A652A from 1.00
-    at the top to 0.60 at the baseline inside a white outline, and erases the
-    strip's baseline beneath it. Inactive labels sit at 0.55 and rise to 0.85
+    at the top to 0.60 at the baseline inside a white outline, and opens into
+    the wash below: each tab draws the strip's baseline under itself only while
+    it is inactive, so nothing is painted over the active tab's foot (an
+    opaque eraser there left a seam against the translucent wash). Inactive
+    labels sit at 0.55 and rise to 0.85
     on hover; the active label is white, and focus turns a label orange.
     `state` holds the current tab's index."""
     node = f"tab-{ident}"
@@ -263,7 +266,6 @@ def tab(doc: Document, index: int, ident: str, key: str, state: str = "card.tab"
     shoulder = {"fraction": 1, "dp": -TAB_SHOULDER}
     edge = [(0, h), (TAB_FLARE, h - TAB_FLARE), (TAB_FLARE, 0), (shoulder, 0), (right, TAB_SHOULDER), (right, h)]
     silhouette = vector(f"{node}-active", {**FULL, "display": keyword("none")}, [
-        path("erase", [(0, h - 0.75), (right, h - 0.75)], closed=False, stroke=stroke(solid([0, 0, 0, 1]), 2.5)),
         path("fill", edge, fill=linear((0, 0), (0, h), [(0, rgb(TAB_GREEN, 1)), (1, rgb(TAB_GREEN, 0.6))])),
         path("outline", edge, closed=False, stroke=stroke(solid([1, 1, 1, 0.75]), 1.5)),
     ])
@@ -281,13 +283,18 @@ def tab(doc: Document, index: int, ident: str, key: str, state: str = "card.tab"
         "pressed": [(f"{node}-label", "color", colour(rgb(ORANGE)))],
         "disabled": [(f"{node}-label", "color", colour([1, 1, 1, 0.3]))],
     })
+    # The strip's baseline under this tab, while it is not the active one.
+    rail = vector(f"{node}-rail", {**absolute(left=0, top=h - 1.5, width=0, height=2), "width": length(100, "%"),
+                                   "display": keyword("block"), "pointer-events": keyword("none")},
+                  [path("rail", [(0, 0.75), ({"fraction": 1}, 0.75)], closed=False, stroke=stroke(solid([1, 1, 1, 0.75]), 1.5))])
     active = {"op": "==", "args": [{"state": state}, index]}
     doc.bind(f"{node}-active.display", f"{node}-active", "display", {"op": "select", "args": [active, "block", "none"]})
+    doc.bind(f"{node}-rail.display", f"{node}-rail", "display", {"op": "select", "args": [active, "none", "block"]})
     doc.bind(f"{node}-lit.display", f"{node}-lit", "display", {"op": "select", "args": [active, "block", "none"]})
     return group(node, {"position": keyword("relative"), "display": keyword("block"), "height": length(h),
                         "padding-left": length(TAB_FLARE + TAB_PAD), "padding-right": length(TAB_PAD + TAB_SHOULDER),
                         "flex-grow": number(1)},
-                 [silhouette, lit, text_node],
+                 [rail, silhouette, lit, text_node],
                  control={"role": "button", "label": key, "event": f"tab_{ident}", "states": ids})
 
 
@@ -308,13 +315,14 @@ def tab_strip(doc: Document, width: float, tabs: list, top: float = TAB_TOP, sta
     row = group("tabs", {**absolute(left=inner_left, top=top, width=inner_width, height=TAB_RISE),
                          "display": keyword("flex"), "flex-direction": keyword("row"), "align-items": keyword("flex-end")}, slots)
     baseline_y = top + TAB_RISE
-    baseline = vector("tab-baseline", absolute(left=STRIP_EDGE, top=baseline_y - 1.5, width=width - 2 * STRIP_EDGE, height=2), [
+    # The baseline under the keycaps; the tabs draw it under themselves.
+    baselines = [vector(f"tab-baseline-{side}", absolute(left=left, top=baseline_y - 1.5, width=inner_left - STRIP_EDGE, height=2), [
         path("rail", [(0, 0.75), ({"fraction": 1}, 0.75)], closed=False, stroke=stroke(solid([1, 1, 1, 0.75]), 1.5))])
+        for side, left in (("lead", STRIP_EDGE), ("trail", inner_left + inner_width))]
     wash = vector("tab-wash", absolute(left=STRIP_EDGE, top=baseline_y, width=width - 2 * STRIP_EDGE, height=TAB_RISE), [
         path("wash", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})],
              fill=linear((0, 0), (0, {"fraction": 1}), [(0, rgb(TAB_GREEN, 0.57)), (1, rgb(TAB_GREEN, 0.02))]))])
-    # The baseline lies under the row, so the active tab's eraser covers it.
-    return [wash, baseline, row, previous, following]
+    return [wash, *baselines, row, previous, following]
 
 
 def in_game_plate(doc: Document, ident: str, key: str, left: float, top: float, *, width: float = 300,

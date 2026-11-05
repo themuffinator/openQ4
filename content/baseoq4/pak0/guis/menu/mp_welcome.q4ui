@@ -16929,6 +16929,12 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "card.tab"}, 0]}, "block", "none"]}
   },
   {
+   "id": "tab-join-rail.display",
+   "node": "tab-join-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "card.tab"}, 0]}, "none", "block"]}
+  },
+  {
    "id": "tab-join-lit.display",
    "node": "tab-join-lit",
    "property": "display",
@@ -16939,6 +16945,12 @@
    "node": "tab-server-active",
    "property": "display",
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "card.tab"}, 1]}, "block", "none"]}
+  },
+  {
+   "id": "tab-server-rail.display",
+   "node": "tab-server-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "card.tab"}, 1]}, "none", "block"]}
   },
   {
    "id": "tab-server-lit.display",
@@ -16953,6 +16965,12 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "card.tab"}, 2]}, "block", "none"]}
   },
   {
+   "id": "tab-players-rail.display",
+   "node": "tab-players-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "card.tab"}, 2]}, "none", "block"]}
+  },
+  {
    "id": "tab-players-lit.display",
    "node": "tab-players-lit",
    "property": "display",
@@ -16963,6 +16981,12 @@
    "node": "tab-settings-active",
    "property": "display",
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "card.tab"}, 3]}, "block", "none"]}
+  },
+  {
+   "id": "tab-settings-rail.display",
+   "node": "tab-settings-rail",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "card.tab"}, 3]}, "none", "block"]}
   },
   {
    "id": "tab-settings-lit.display",
@@ -24427,13 +24451,40 @@
         ]
        },
        {
-        "id": "tab-baseline",
+        "id": "tab-baseline-lead",
         "type": "vector",
         "properties": {
          "position": {"type": "keyword", "value": "absolute"},
          "left": {"type": "length", "value": 12.0, "unit": "dp"},
          "top": {"type": "length", "value": 80.5, "unit": "dp"},
-         "width": {"type": "length", "value": 849.0, "unit": "dp"},
+         "width": {"type": "length", "value": 26.0, "unit": "dp"},
+         "height": {"type": "length", "value": 2, "unit": "dp"}
+        },
+        "paths": [
+         {
+          "id": "rail",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+          ],
+          "stroke": {
+           "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+           "widthDp": 1.5,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         }
+        ]
+       },
+       {
+        "id": "tab-baseline-trail",
+        "type": "vector",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 835.0, "unit": "dp"},
+         "top": {"type": "length", "value": 80.5, "unit": "dp"},
+         "width": {"type": "length", "value": 26.0, "unit": "dp"},
          "height": {"type": "length", "value": 2, "unit": "dp"}
         },
         "paths": [
@@ -24480,6 +24531,35 @@
           },
           "children": [
            {
+            "id": "tab-join-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 28.5, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 2, "unit": "dp"},
+             "display": {"type": "keyword", "value": "block"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
             "id": "tab-join-active",
             "type": "vector",
             "properties": {
@@ -24491,20 +24571,6 @@
              "display": {"type": "keyword", "value": "none"}
             },
             "paths": [
-             {
-              "id": "erase",
-              "commands": [
-               {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-              ],
-              "stroke": {
-               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-               "widthDp": 2.5,
-               "minimumPixels": 1,
-               "join": "miter",
-               "cap": "butt"
-              }
-             },
              {
               "id": "fill",
               "commands": [
@@ -24607,6 +24673,35 @@
           },
           "children": [
            {
+            "id": "tab-server-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 28.5, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 2, "unit": "dp"},
+             "display": {"type": "keyword", "value": "block"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
             "id": "tab-server-active",
             "type": "vector",
             "properties": {
@@ -24618,20 +24713,6 @@
              "display": {"type": "keyword", "value": "none"}
             },
             "paths": [
-             {
-              "id": "erase",
-              "commands": [
-               {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-              ],
-              "stroke": {
-               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-               "widthDp": 2.5,
-               "minimumPixels": 1,
-               "join": "miter",
-               "cap": "butt"
-              }
-             },
              {
               "id": "fill",
               "commands": [
@@ -24734,6 +24815,35 @@
           },
           "children": [
            {
+            "id": "tab-players-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 28.5, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 2, "unit": "dp"},
+             "display": {"type": "keyword", "value": "block"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
             "id": "tab-players-active",
             "type": "vector",
             "properties": {
@@ -24745,20 +24855,6 @@
              "display": {"type": "keyword", "value": "none"}
             },
             "paths": [
-             {
-              "id": "erase",
-              "commands": [
-               {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-              ],
-              "stroke": {
-               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-               "widthDp": 2.5,
-               "minimumPixels": 1,
-               "join": "miter",
-               "cap": "butt"
-              }
-             },
              {
               "id": "fill",
               "commands": [
@@ -24861,6 +24957,35 @@
           },
           "children": [
            {
+            "id": "tab-settings-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 28.5, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 2, "unit": "dp"},
+             "display": {"type": "keyword", "value": "block"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0.75]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0.75]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.75]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
             "id": "tab-settings-active",
             "type": "vector",
             "properties": {
@@ -24872,20 +24997,6 @@
              "display": {"type": "keyword", "value": "none"}
             },
             "paths": [
-             {
-              "id": "erase",
-              "commands": [
-               {"id": "p0", "op": "move", "points": [[0, 29.25]]},
-               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 29.25]]}
-              ],
-              "stroke": {
-               "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-               "widthDp": 2.5,
-               "minimumPixels": 1,
-               "join": "miter",
-               "cap": "butt"
-              }
-             },
              {
               "id": "fill",
               "commands": [
