@@ -2127,6 +2127,12 @@ static void R_ModernGLExecutor_RecordPacketFallbackBlockers( const idScenePacket
 			if ( draw.passCategory == RENDER_PASS_SHADOW_MAP && materialRecord->shadowCasterSupported ) {
 				continue;
 			}
+			// The classic-lighting corridor owns this view and reproduces the
+			// material's texture matrix exactly (REN-02).
+			if ( rg_modernClassicView != NULL && draw.viewDef == rg_modernClassicView
+					&& R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord ) ) {
+				continue;
+			}
 			const bool forwardPlusDecalFallback = R_ModernGLExecutor_DrawPacketIsForwardPlusDecal( draw, *materialRecord )
 				&& R_ModernGLExecutor_DecalFallbackAllowedForForwardPlus( *materialRecord, &draw );
 			if ( forwardPlusDecalFallback ) {
@@ -2197,7 +2203,7 @@ static bool R_ModernGLExecutor_MaterialLightingProven( const idScenePacketFrame 
 			? R_MaterialResourceTable_FindRecordForMaterial( draw.materialRecord->material ) : NULL;
 		if ( record == NULL || ( !R_MaterialResourceTable_PBRModernPathEligible( *record )
 				&& !R_MaterialResourceTable_ClassicDiffusePathEligible( *record )
-				&& !( draw.viewDef == rg_modernClassicView && R_MaterialResourceTable_ClassicFixedPathEligible( *record ) ) ) ) {
+				&& !( draw.viewDef == rg_modernClassicView && R_MaterialResourceTable_ClassicCorridorPathEligible( *record ) ) ) ) {
 			return false;
 		}
 		haveClassicDiffuse = haveClassicDiffuse || !record->hasPBR;
@@ -4769,7 +4775,7 @@ static void R_ModernGLExecutor_MaterialFlagsForCommand( const modernGLSubmitComm
 	flags[3] = materialRecord != NULL && R_MaterialResourceTable_ClassicDiffusePathEligible( *materialRecord ) ? 1.0f : 0.0f;
 	if ( rg_modernClassicExecuted && command.viewDef == rg_modernClassicView
 			&& R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind )
-			&& materialRecord != NULL && R_MaterialResourceTable_ClassicFixedPathEligible( *materialRecord ) ) { flags[3] = 2.0f; }
+			&& materialRecord != NULL && R_MaterialResourceTable_ClassicCorridorPathEligible( *materialRecord ) ) { flags[3] = 2.0f; }
 }
 
 static bool R_ModernGLExecutor_EnhancedMaterialShadingActive( void ) {
@@ -5395,7 +5401,8 @@ static bool R_ModernGLExecutor_VisibleDepthMaterialSupported( const modernGLSubm
 	if ( materialRecord == NULL
 		|| ( !shadowDepthEligible && !R_MaterialResourceTable_ClassicModernPathEligible( *materialRecord )
 			&& !R_MaterialResourceTable_PBRModernPathEligible( *materialRecord ) )
-		|| ( !shadowDepthEligible && materialRecord->fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE ) ) {
+		|| ( !shadowDepthEligible && materialRecord->fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
+			&& !R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord ) ) ) {
 		stats.visibleDepthMaterialFallbackDraws++;
 		return false;
 	}
@@ -6838,6 +6845,7 @@ static bool R_ModernGLExecutor_ForwardPlusMaterialSupported( const modernGLSubmi
 	}
 	const bool decalMaterial = command.forwardPlusDecal;
 	if ( materialRecord->fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
+		&& !R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord )
 		&& ( !decalMaterial || !R_ModernGLExecutor_DecalFallbackAllowedForForwardPlus( *materialRecord, command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL ) ) ) {
 		stats.forwardPlusMaterialFallbackDraws++;
 		return false;
@@ -6853,7 +6861,10 @@ static bool R_ModernGLExecutor_ForwardPlusMaterialSupported( const modernGLSubmi
 		&& ( materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_BLEND
 			|| materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_ADD
 			|| materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_FILTER );
-	if ( !R_ModernGLExecutor_MaterialContractPromotable( *materialRecord, allowAlphaBlend, decalMaterial, decalMaterial, decalMaterial ) ) {
+	// A corridor-only material's texture matrix belongs to the
+	// classic-lighting corridor, which reproduces it (REN-02).
+	const bool corridorOnly = R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord );
+	if ( !corridorOnly && !R_ModernGLExecutor_MaterialContractPromotable( *materialRecord, allowAlphaBlend, decalMaterial, decalMaterial, decalMaterial ) ) {
 		stats.forwardPlusMaterialFallbackDraws++;
 		return false;
 	}
@@ -7067,8 +7078,11 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 		const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
 		if ( draw == NULL || draw->geometryRecord == NULL || draw->geometryRecord->skinningMode != GEOMETRY_SKINNING_NONE
 				|| draw->geometryRecord->deformMode != GEOMETRY_DEFORM_NONE ) { return; }
-		if ( !R_MaterialResourceTable_ClassicFixedPathEligible( *material ) || command.weaponDepthHack || command.modelDepthHack != 0
+		if ( !R_MaterialResourceTable_ClassicCorridorPathEligible( *material ) || command.weaponDepthHack || command.modelDepthHack != 0
 				|| command.negativeScale || ( root != NULL && root != command.viewDef ) ) { return; }
+		// The forward pass adds baked light from the untransformed diffuse, so
+		// corridor-only materials need the grid off.
+		if ( R_MaterialResourceTable_ClassicCorridorOnly( *material ) && r_useLightGrid.GetBool() ) { return; }
 		root = command.viewDef;
 		extended = extended || !R_MaterialResourceTable_ClassicDiffusePathEligible( *material );
 	}

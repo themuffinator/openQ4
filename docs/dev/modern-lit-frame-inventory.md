@@ -175,6 +175,25 @@ overflows (`ClassicInteractionDomain.h`).
     `production-fixed-cutout-bump` / `-native` (`classic_cutout_bump`) runs
     the corridor and matches native ARB2 to a mean of 0.25 and a maximum of
     0.6 levels, with the same 5 bounded edge pixels.
+  - **Texture matrices** become the first fallback that only the corridor
+    may own (`R_MaterialResourceTable_ClassicCorridorPathEligible`, the
+    `CorridorOnly` variant). Its interaction program applies the bump,
+    diffuse and specular stage matrices as ARB2 does. Such a material now
+    gets modern commands, but a view the corridor does not own still declines
+    on the material fallback. Two exclusions apply:
+    - no texture matrix on a cutout, because the forward pass samples the
+      untransformed diffuse alpha;
+    - no light grid, because the forward pass adds baked light from the
+      untransformed diffuse.
+
+    `production-fixed-texmatrix` / `-native` (a 3x scaled bump stage)
+    matches native ARB2 to a mean of 0.25 and a maximum of 0.62 levels, and
+    the scaled bump visibly changes the surface.
+  - **Vertex colour is not claimed.** The corridor program applies stage
+    vertex colour, but the laboratory's vertex-coloured sphere renders
+    untinted under `vertexColor` on both owners. The fixture therefore does
+    not exercise interaction vertex colour yet, and that fallback still
+    keeps the frame classic.
   - The corridor itself still runs only in the laboratory linear-scene mode
     (step 3).
 
@@ -185,9 +204,11 @@ overflows (`ClassicInteractionDomain.h`).
    the stock material shapes that dominate gameplay views:
    - alpha-tested surfaces (flat-diffuse and bumped/specular cutouts are done;
      cutouts in shipped modes wait on step 3);
-   - vertex-coloured surfaces;
+   - vertex-coloured surfaces (a fixture that actually tints interactions
+     comes first);
    - condition stages;
-   - texture matrices;
+   - texture matrices on cutouts and with light grids (plain texture
+     matrices are done);
    - multi-stage materials.
 
    Each shape needs image-level parity evidence against ARB2. The classic-fixed

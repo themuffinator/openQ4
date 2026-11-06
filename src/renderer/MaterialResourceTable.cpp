@@ -2545,6 +2545,36 @@ bool R_MaterialResourceTable_ClassicFixedPathEligible( const materialResourceTab
 	return R_MaterialResourceTable_ClassicFixedMaterialEligible( record.material );
 }
 
+bool R_MaterialResourceTable_ClassicCorridorPathEligible( const materialResourceTableRecord_t &record ) {
+	// Texture matrices only for now: the corridor program also applies stage
+	// vertex colour, but no laboratory capture has yet shown interaction vertex
+	// colour on either owner, so that fallback keeps the frame classic.
+	const unsigned int corridorFallbacks = MATERIAL_RESOURCE_FALLBACK_FLAG_TEXTURE_MATRIX;
+	if ( ( record.fallbackFlags & ~corridorFallbacks ) != 0
+			|| ( record.fallbackFlags == 0 ) != ( record.fallbackReason == MATERIAL_RESOURCE_FALLBACK_NONE ) ) {
+		return false;
+	}
+	// The forward pass still samples the untransformed diffuse for a cutout's
+	// alpha, so a texture matrix stays out of cutouts.
+	if ( record.hasTextureMatrix && record.alphaTest ) { return false; }
+	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
+		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
+	if ( record.hasPBR || record.material == NULL || globalImages == NULL
+			|| ( record.materialClass != RENDER_MATERIAL_OPAQUE && !cutout )
+			|| ( record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE && !cutout )
+			|| record.hasEmissive || ( record.alphaTest && !cutout )
+			|| record.hasConditionRegisters
+			|| record.hasCustomProgram || record.hasCustomGLSL
+			|| record.hasMaterialPolygonOffset || record.hasPrivatePolygonOffset ) {
+		return false;
+	}
+	return R_MaterialResourceTable_ClassicFixedMaterialEligible( record.material );
+}
+
+bool R_MaterialResourceTable_ClassicCorridorOnly( const materialResourceTableRecord_t &record ) {
+	return record.fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE && R_MaterialResourceTable_ClassicCorridorPathEligible( record );
+}
+
 bool R_MaterialResourceTable_ClassicFixedMaterialEligible( const idMaterial *material ) {
 	if ( material == NULL || material->HasPBR()
 			|| ( material->Coverage() != MC_OPAQUE && material->Coverage() != MC_PERFORATED ) ) { return false; }
