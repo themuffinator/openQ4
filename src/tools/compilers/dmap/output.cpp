@@ -715,8 +715,9 @@ void WriteOutputFile( void ) {
 
 	sprintf( qpath, "%s." PROC_FILE_EXT, dmapGlobals.mapFileBase );
 
-	// _D3XP used fs_cdpath
-	procFile = fileSystem->OpenFileWrite( qpath, "fs_cdpath" );
+	// _D3XP used fs_cdpath; com_compilerOutput can redirect it (AASFile.cpp)
+	extern const char *Compiler_OutputBasePath( void );
+	procFile = fileSystem->OpenFileWrite( qpath, Compiler_OutputBasePath() );
 	if ( !procFile ) {
 		common->Error( "Error opening %s", qpath.c_str() );
 	}

@@ -401,6 +401,7 @@ protected:
 	void		SetDefaults			( void );
 
 	friend class idSimpleWindow;
+	friend class idLevelEditorWindow; // workspace label-fit qualification
 	friend class idUserInterfaceLocal;
 	friend class idUserInterfaceManagerLocal;
 	bool IsSimple();

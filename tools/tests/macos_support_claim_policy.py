@@ -54,7 +54,7 @@ def release_files() -> list[Path]:
 def validate_release_facing_docs() -> None:
     expected_tokens = {
         "README.md": (
-            "experimental Apple Silicon/arm64 macOS",
+            "preview Apple Silicon/arm64 macOS",
             "OpenGL/Metal bridge packages",
             "players have run them only on current macOS",
         ),

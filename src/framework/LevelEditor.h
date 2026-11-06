@@ -12,14 +12,33 @@ class idDeviceContext;
 class idRectangle;
 oq4editor::MapWorkspace &LevelEditor_Workspace();
 void LevelEditor_OpenWorkspace();
+void LevelEditor_RegisterWorkspaceCommand();
 void LevelEditor_UIFrame();
 bool LevelEditor_UIIsActive();
+// Marks the editor's on-demand declaration and model loads (entityDef
+// schemas, entity models) as tool work, like the open workspace, so they are
+// not reported as gameplay loads that missed the level precache.
+class idLevelEditorLookup {
+public:
+	idLevelEditorLookup();
+	~idLevelEditorLookup();
+	idLevelEditorLookup( const idLevelEditorLookup & ) = delete;
+	idLevelEditorLookup &operator=( const idLevelEditorLookup & ) = delete;
+};
 void LevelEditor_UIShutdown();
-void LevelEditor_DrawPreview( idDeviceContext *dc, const idRectangle &rect, int time );
 bool LevelEditor_UIInputEnabled();
-void LevelEditor_Navigate( float yaw, float pitch, float zoom );
-void LevelEditor_Pan( float x, float y );
-void LevelEditor_Pick( float x, float y, float aspect );
+
+// Views: mode -1 follows the workspace's view mode; 0 is the 3D preview,
+// 1-3 the top, front and side wireframes. Pointer positions are
+// normalized to the view rectangle, whose size is in GUI units.
+void LevelEditor_DrawView( idDeviceContext *dc, const idRectangle &rect, int time, int mode );
+void LevelEditor_ViewPress( int mode, int button, float x, float y, float width, float height, bool shift, bool ctrl );
+void LevelEditor_ViewDrag( float x, float y );
+void LevelEditor_ViewRelease( float x, float y );
+void LevelEditor_ViewCancel();
+void LevelEditor_ViewWheel( int mode, float x, float y, float width, float height, int direction );
+void LevelEditor_ViewKey( int mode, int key );
+// Splitters: 1 left dock, 2 right dock, 3 bottom dock.
 void LevelEditor_ResizePane( int pane, float delta );
 void LevelEditor_FrameSelection();
 

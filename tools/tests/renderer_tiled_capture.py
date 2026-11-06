@@ -14,11 +14,12 @@ frame (no repeated tile), and a box-filtered 2x capture must reproduce the
 window capture's structure.
 
 `post` and `restored` draw through the game-owned SMAA scene target, which
-the capture resizes to the whole capture. Both renderers apply the tile offset
-to views drawn into that target too, so the result is not a correct 2x image
-on either; it is recorded, not gated. The comparison mode requires GL and
-Vulkan to agree per tile within the existing two-display-level limit in every
-case, and `restored` to repeat `post` exactly.
+the capture resizes to the whole capture. Only views drawn to the window take
+the tile offset: the scene is drawn at the target's origin, and the view that
+composites the target to the window moves to the tile. Every case is gated the
+same way. The comparison mode requires GL and Vulkan to agree per tile within
+the existing two-display-level limit in every case, and `restored` to repeat
+`post` exactly.
 """
 import argparse
 import json
@@ -37,8 +38,8 @@ smaa = image_capture.smaa
 SIZES = ((2560, 1600), (1920, 1200))
 WINDOW = (1280, 800)
 CASES = ('direct', 'post', 'restored')
-# Cases whose independent per-backend tile checks are gated.
-GATED = ('direct',)
+# Cases whose independent per-backend tile checks are gated: all of them.
+GATED = CASES
 
 
 def tiles(image, width, height):

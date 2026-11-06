@@ -1188,6 +1188,19 @@ extern backEndState_t		backEnd;
 bool RB_ClassicFogBlend_PreflightLinearView( const viewDef_t *viewDef );
 bool RB_ClassicFogBlend_DrawLinearView( const viewDef_t *viewDef, GLuint vertexProgram, GLint mvpLocation, GLint fogLocation );
 extern idRenderSystemLocal	tr;
+
+/*
+RB_TileOffsetX / RB_TileOffsetY
+
+A larger-than-window capture (R_ReadTiledPixels) draws the frame once per
+window-sized tile with tr.viewportOffset moved to that tile. Only drawing to
+the window moves: a view drawn into a render texture (an engine scene target
+or a game-owned post target, both sized to the whole capture) is drawn at the
+texture's own origin, and whatever later composites that texture to the
+window takes the offset. Ordinary frames have a zero offset.
+*/
+ID_INLINE int RB_TileOffsetX( void ) { return backEnd.renderTexture == NULL ? tr.viewportOffset[0] : 0; }
+ID_INLINE int RB_TileOffsetY( void ) { return backEnd.renderTexture == NULL ? tr.viewportOffset[1] : 0; }
 #ifdef OPENQ4_RENDERER_VK_MODULE
 extern thread_local glconfig_t glConfig;
 #else
