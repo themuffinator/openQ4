@@ -1054,6 +1054,7 @@ public:
 
 	int						viewportOffset[2];	// for doing larger-than-window tiled renderings
 	int						tiledViewport[2];
+	int						tiledWindow[2];		// the window's size while a capture sets tiledViewport (BeginFrame)
 
 	// determines which back end to use, and if vertex programs are in use
 	backEndName_t			backEndRenderer;

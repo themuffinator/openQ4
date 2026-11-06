@@ -5954,7 +5954,9 @@ static bool VK_Exec_PrepareCopyDestination( idImage *image, int width, int heigh
 	if ( image == NULL || width <= 0 || height <= 0 ) {
 		return false;
 	}
-	if ( image->GetUploadWidth() != width || image->GetUploadHeight() != height ) {
+	if ( image->NeedsColorCopyRespecification( width, height ) ) {
+		image->RespecifyColorCopyTarget( width, height );
+	} else if ( image->GetUploadWidth() != width || image->GetUploadHeight() != height ) {
 		image->Resize( width, height );
 	}
 	entry = VK_Image_GetEntry( image->GetDeviceHandle() );

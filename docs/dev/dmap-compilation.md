@@ -195,3 +195,133 @@ limit. Windows Clang, MSVC, Clang sanitizers and Linux GCC with sanitizers pass.
 Both GitHub validation workflows and the local validation runner include it.
 `--production <file>` runs it against another revision of
 `RenderGeometryTriSurf.cpp`.
+
+## airdefense1 and core1 slow compile report (5 November 2026)
+
+The follow-up in [issue #209](https://github.com/themuffinator/openQ4/issues/209)
+changes the reported symptom from an unexplained stop to excessive compile time:
+the reporter says `airdefense1` completed after two days, the initial attempt did
+not crash, and `core1` also eventually built. These are reporter observations;
+neither run has been independently timed or qualified for gameplay.
+
+The [supplied ZIP](https://github.com/user-attachments/files/34399834/airdefense1.zip)
+contains exactly `airdefense1.map` (8,152,153 bytes) and `core1.map` (12,966,369 bytes).
+Its SHA-256 is
+`64b17d9f0c59c742c67d3ed3d814e05428ea3ea499ffb3b022e8eae15a8beae6`.
+Static inspection against `maps/game/` in the installed Quake 4 1.4.2
+`q4base/pak001.pk4` gives:
+
+| Map | Total patches, supplied / stock | Explicit 10×10 patches, supplied / stock |
+| --- | ---: | ---: |
+| `airdefense1` | 5,500 / 5,500 | 1,206 / 0 |
+| `core1` | 8,366 / 8,366 | 1,880 / 0 |
+
+Both maps retain the stock entity count and set of `.lwo`/`.ase`/`.ma` model
+references. This does not establish that the referenced assets are unmodified.
+The higher subdivision is a concrete profiling lead, not proof of the cause or
+evidence that reducing subdivision is required to compile correctly.
+
+The original log records `0.13.2-dev+g3ea033f7` and
+`dmap game/airdefense1.map`, with `hidef2kbc72/gfx.pk4` and
+`hidef2kbc72/zzzzzpak_sikk.pk4` in the search path. Shadow building takes 254.7
+seconds; the log then ends during `FixGlobalTjunctions`, after per-area
+optimization, without a `.proc` write or normal completion. It cannot locate the
+whole two-day delay, identify a hang, or qualify the later successful output.
+
+`3ea033f7` contains the allocation/list-assembly fix, the T-junction sliver guard
+and the optimizer zero-area rejection described above. Its
+`src/tools/compilers/dmap/` tree is unchanged in the reviewed checkout
+`2fdb9fe98`. It is a useful development baseline for these reports, but there is
+no measured comparison here establishing a faster or better compiler for these
+two maps. Compile completion alone does not establish rendering, collision or
+AI correctness of the rebuilt files.
+
+CORE-05 owns the remaining work: obtain the completed-run log and confirmation
+of the successful command/build and asset modifications, measure stock-asset
+stage timings and memory on both supplied maps, then profile the slow pass and
+qualify any repair. This update made no compiler change and ran no compilation
+or gameplay test. The original log, attachment and per-map hashes/comparison are
+retained locally under `.tmp/issue209/`; the source maps are investigation inputs
+and are not redistributed in Git.
+
+## Compile time on dense patches (6 November 2026)
+
+The supplied #209 maps were compiled on the Windows x64 debugoptimized build
+against the installed retail packages only (no `hidef2kbc72` overlay), with the
+main thread's stack sampled every 10-20 seconds. On the first attempt,
+`airdefense1` spent over 10 minutes in `PutPrimitivesInAreas` alone, and every
+sample was in `AddTriListToArea`. Each fix below exposed the next stage:
+
+| Stage | Cost | Change |
+|---|---|---|
+| `AddTriListToArea` | Scanned every optimize group in the area for each new triangle, then walked the matching group's list to append. A curve puts each triangle on its own plane, and each plane gets its own group. | Groups are found by key while an entity's primitives are placed, and appended at a remembered tail. |
+| `GetHashVert` | The 16x16x16 vertex bins span the whole map; dense patches put most vertexes in a few bins, and each merge scanned its bin. | An index on the snapped coordinate checks the 27 neighbors directly and takes the newest match, which is what the bin scan returned. |
+| `FixTriangleAgainstHash` | Each triangle visited every vertex in its bins, one pass over its fragment list per vertex. | Only vertexes that can reach the fragments are visited. A skipped pass only reversed the list, so a parity flag keeps the fragment order exact. |
+| `BuildLightShadows`, `CarveGroupsByLight`, `ClipTriList`, `CreateLightShadow` | Searched shadower groups by plane linearly, and appended each fragment by walking the list built so far. | Shadower groups are found by plane; appends use tails (`AppendTriList`). |
+| `WriteOutputSurfaces`, `CountUniqueShaders` | Compared every group with every later group to combine surfaces. | Groups are chained to the next compatible group in one pass. The per-light interaction lists this writer built, never wrote and never freed are gone. |
+| AAS `idBrushBSP::TryMergeLeafNodes` | Tested every portal plane of one node against every portal point of the other, and dominated AAS builds even on stock maps. | Each plane first tests the bounding box of those points, with a margin, and visits the points only when the box crosses the limit. |
+
+None of these change what is produced. The same build with each change switched
+off and on gave byte-identical `.proc` files for `airdefense1`, `core1`,
+`medlabs`, `waste`, `process2` and `hub2`, and identical AAS files for
+`airdefense1` (all five types), `hangar2`, `core2` and `storage2`; the switches
+were for this comparison only. `tools/tests/dmap_tjunction_slivers.py` now also
+checks the indexed vertex merge and fix against copies of the original bin scans
+on dense random geometry, under Clang ASan+UBSan and MSVC.
+
+| Map | Before | After |
+|---|---|---|
+| Stock `airdefense1` geometry | 25-28 s | 12-14 s |
+| Stock `airdefense1` AAS | 692 s (689 s in `aas32`) | 58 s, identical files |
+| Stock `core1`, `medlabs`, `waste`, `process2`, `hub2` geometry | 13-23 s | 10-14 s |
+| Supplied `airdefense1` (reported: about two days) | Still in `PutPrimitivesInAreas` after 10 minutes | 138-198 s geometry, 2 s collision, 64 s AAS; 1.18 GB peak working set |
+| Supplied `core1` | Not timed | 168 s geometry, 2 s collision, 10 s AAS; 1.75 GB peak |
+
+The ranges come from runs with and without an SP client sharing the machine.
+After the last change no stage dominated `core1`'s stack samples.
+
+The rebuilt supplied `airdefense1`, with its own `.map` beside the outputs, loads
+in SP gameplay with valid navigation (242 tactical features, no bad spans) and
+renders its subdivided terrain correctly in an engine capture; spawned tactical
+AI take cover and fire. Whether the reporter's two-day run used the same build,
+command and `hidef2kbc72` packages remains unconfirmed, but these maps no longer
+take long to compile with the retail packages.
+
+## Collision contents names (6 November 2026)
+
+A `.cm` file names each brush's contents in text, such as `"solid,opaque"`.
+Quake 4 1.4.2 converts between names and flags through two tables paired by
+index, and its name table has an extra `solid` entry after `largeShotClip`. Every
+later name therefore sits one slot from the flag it was meant for. Retail
+compiled and read its collision files through that pairing, so in shipped
+`.cm` files:
+
+| Name written | Contents it carries |
+|---|---|
+| `notacticalfeatures` | vehicle clip |
+| `vehicleclip` | fly clip |
+| `flyclip` | shot clip (`CONTENTS_PROJECTILE`) |
+| `shotClip` | item clip |
+| `opaque` | opaque and sight clip |
+
+Retail could not write `CONTENTS_NOTACTICALFEATURES` at all. openQ4 decoded these
+names by their spelling instead. Across the 960 shipped collision files, 700
+vehicle-clip brushes (`convoy1`, `convoy2`, `convoy2b`, `walker`) loaded as
+`notacticalfeatures` and stopped clipping vehicles. 117 shot-clip brushes,
+including in `q4dm4`, `q4dm6`, `q4ctf5` and `q4ctf7`, loaded as fly clip and let
+shots through. 22 item-clip brushes loaded as shot clip, and the `putra`
+fly-clip brush as vehicle clip.
+
+openQ4 now reads versions `"2"` and `"3"`, the ones Quake 4 and The Awakening
+wrote, through retail's pairing, falling back to openQ4's names only for names
+retail never wrote, such as the liquids in openQ4's own `liquid_lab.cm`. Its own
+compiler writes version `"4"`, which names each flag directly and so also keeps
+`notacticalfeatures`. The generated collision cache payload moved to version 2,
+so caches decoded the old way are rebuilt. A custom map compiled by an earlier
+openQ4 build whose collision uses vehicle, fly, shot or item clip should be
+recompiled; its version `"3"` file now decodes the retail way.
+
+The pairing was read from the name and flag tables in the retail `Quake4.exe`;
+the brush counts come from every `.cm` in the installed Quake 4 1.4.2 packages.
+Matching it is what lets the AAS tactical pass reproduce retail features on the
+convoy maps (see [AAS compiler](aas-compiler.md#verified-against-retail-output)).

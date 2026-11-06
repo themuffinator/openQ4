@@ -1611,7 +1611,10 @@ int idImageManager::LoadLevelImages( bool pacifier ) {
 	}
 
 	idLevelImagePrefetch prefetch;
-	const bool prefetching = image_prefetchLevelImages.GetBool() && pendingImages.Num() > 1;
+	// Without a running renderer ActuallyLoadImage reads nothing, so a dedicated
+	// server would read and discard every prefetched file (800-1,000 per stock
+	// MP map).
+	const bool prefetching = image_prefetchLevelImages.GetBool() && pendingImages.Num() > 1 && tr.IsOpenGLRunning();
 	if ( prefetching ) {
 		prefetch.Begin( pendingImages );
 	}

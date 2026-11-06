@@ -72,6 +72,10 @@ public:
 };
 
 
+// Replaces the file's tactical features (AASBuild_tactical.cpp); returns the
+// number generated, or -1 when the map's collision world is unavailable.
+int							AAS_GenerateTacticalFeatures( idAASFileLocal *file, const idMapFile *mapFile );
+
 class idAASBuild {
 
 public:
@@ -79,6 +83,7 @@ public:
 							~idAASBuild( void );
 	bool					Build( const idStr &fileName, const idAASSettings *settings );
 	bool					BuildReachability( const idStr &fileName, const idAASSettings *settings );
+	bool					BuildTactical( const idStr &fileName, const idAASSettings *settings );
 	void					Shutdown( void );
 
 private:

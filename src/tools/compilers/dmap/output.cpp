@@ -116,29 +116,71 @@ void Write1DMatrix( idFile *f, int x, float *m ) {
 	f->WriteFloatString( ") " );
 }
 
+/*
+Groups become one surface when their material and merge group match. Curved
+surfaces leave one group per plane, so an area can hold many thousands of groups;
+comparing each with every other made writing the .proc quadratic in them
+(issue #209). SurfaceBuckets chains each group to the next compatible group in
+list order, in one pass.
+*/
+static int SurfaceKey( const optimizeGroup_t *group ) {
+	const uintptr_t m = reinterpret_cast<uintptr_t>( group->material );
+	const uintptr_t g = reinterpret_cast<uintptr_t>( group->mergeGroup );
+	const unsigned int key = static_cast<unsigned int>( m >> 4 ) ^ static_cast<unsigned int>( m >> 20 )
+		^ static_cast<unsigned int>( g >> 4 ) * 2654435761u ^ static_cast<unsigned int>( g >> 20 );
+	return static_cast<int>( key & 0x7fffffffu );
+}
+
+// groups[] in list order; next[i] is the next group compatible with groups[i]
+static void SurfaceBuckets( optimizeGroup_t *list, idList<optimizeGroup_t *> &groups, idList<int> &next ) {
+	idHashIndex	lastOfKey;
+	idList<int>	last;
+
+	groups.Clear();
+	for ( optimizeGroup_t *group = list ; group ; group = group->nextGroup ) {
+		groups.Append( group );
+	}
+	next.SetNum( groups.Num() );
+	lastOfKey.Clear( 1024, groups.Num() > 0 ? groups.Num() : 1 );
+	for ( int i = 0 ; i < groups.Num() ; i++ ) {
+		next[i] = -1;
+		const int key = SurfaceKey( groups[i] );
+		int bucket;
+		for ( bucket = lastOfKey.First( key ) ; bucket != -1 ; bucket = lastOfKey.Next( bucket ) ) {
+			const optimizeGroup_t *other = groups[last[bucket]];
+			if ( other->material == groups[i]->material && other->mergeGroup == groups[i]->mergeGroup ) {
+				break;
+			}
+		}
+		if ( bucket == -1 ) {
+			bucket = last.Append( i );
+			lastOfKey.Add( key, bucket );
+		} else {
+			next[last[bucket]] = i;
+			last[bucket] = i;
+		}
+	}
+}
+
 static int CountUniqueShaders( optimizeGroup_t *groups ) {
-	optimizeGroup_t		*a, *b;
-	int					count;
+	idList<optimizeGroup_t *>	list;
+	idList<int>					next;
+	idList<bool>				counted;
+	int							count = 0;
 
-	count = 0;
-
-	for ( a = groups ; a ; a = a->nextGroup ) {
-		if ( !a->triList ) {	// ignore groups with no tris
+	// a surface is written for every bucket with at least one triangle
+	SurfaceBuckets( groups, list, next );
+	counted.AssureSize( list.Num(), false );
+	for ( int i = 0 ; i < list.Num() ; i++ ) {
+		if ( counted[i] ) {
 			continue;
 		}
-		for ( b = groups ; b != a ; b = b->nextGroup ) {
-			if ( !b->triList ) {
-				continue;
-			}
-			if ( a->material != b->material ) {
-				continue;
-			}
-			if ( a->mergeGroup != b->mergeGroup ) {
-				continue;
-			}
-			break;
+		bool hasTris = false;
+		for ( int j = i ; j != -1 ; j = next[j] ) {
+			counted[j] = true;
+			hasTris |= ( list[j]->triList != NULL );
 		}
-		if ( a == b ) {
+		if ( hasTris ) {
 			count++;
 		}
 	}
@@ -417,24 +459,6 @@ static void WriteShadowTriangles( const srfTriangles_t *tri ) {
 
 
 /*
-=======================
-GroupsAreSurfaceCompatible
-
-Planes, texcoords, and groupLights can differ,
-but the material and mergegroup must match
-=======================
-*/
-static bool GroupsAreSurfaceCompatible( const optimizeGroup_t *a, const optimizeGroup_t *b ) {
-	if ( a->material != b->material ) {
-		return false;
-	}
-	if ( a->mergeGroup != b->mergeGroup ) {
-		return false;
-	}
-	return true;
-}
-
-/*
 ====================
 WriteOutputSurfaces
 ====================
@@ -445,18 +469,10 @@ static void WriteOutputSurfaces( int entityNum, int areaNum ) {
 	int			numSurfaces;
 	idMapEntity	*entity;
 	uArea_t		*area;
-	optimizeGroup_t	*group, *groupStep;
-	int			i; // , j;
-//	int			col;
+	optimizeGroup_t	*group;
 	srfTriangles_t	*uTri;
-//	mapTri_t	*tri;
-typedef struct interactionTris_s {
-	struct interactionTris_s	*next;
-	mapTri_t	*triList;
-	mapLight_t	*light;
-} interactionTris_t;
-
-	interactionTris_t	*interactions, *checkInter; //, *nextInter;
+	idList<optimizeGroup_t *>	groups;
+	idList<int>					nextCompatible;
 
 
 	area = &dmapGlobals.uEntities[entityNum].areas[areaNum];
@@ -483,8 +499,11 @@ typedef struct interactionTris_s {
 // jmarshall end
 	}
 
+	SurfaceBuckets( area->groups, groups, nextCompatible );
+
 	surfaceNum = 0;
-	for ( group = area->groups ; group ; group = group->nextGroup ) {
+	for ( int g = 0 ; g < groups.Num() ; g++ ) {
+		group = groups[g];
 		if ( group->surfaceEmited ) {
 			continue;
 		}
@@ -494,18 +513,14 @@ typedef struct interactionTris_s {
 		// surface, even though they couldn't be merged together to save
 		// vertexes because they had different planes, texture coordinates, or lights.
 		// Different mergeGroups will stay in separate surfaces.
+		// The Quake 4 .proc carries no per-light interaction surfaces, so only
+		// the ambient triangles are gathered.
 		ambient = NULL;
 		mapTri_t **ambientTail = &ambient;
 
-		// each light that illuminates any of the groups in the surface will
-		// get its own list of indexes out of the original surface
-		interactions = NULL;
-
-		for ( groupStep = group ; groupStep ; groupStep = groupStep->nextGroup ) {
+		for ( int step = g ; step != -1 ; step = nextCompatible[step] ) {
+			optimizeGroup_t *groupStep = groups[step];
 			if ( groupStep->surfaceEmited ) {
-				continue;
-			}
-			if ( !GroupsAreSurfaceCompatible( group, groupStep ) ) {
 				continue;
 			}
 
@@ -516,24 +531,6 @@ typedef struct interactionTris_s {
 				ambientTail = &(*ambientTail)->next;
 			}
 			groupStep->surfaceEmited = true;
-
-			// duplicate it into an interaction for each groupLight
-			for ( i = 0 ; i < groupStep->numGroupLights ; i++ ) {
-				for ( checkInter = interactions ; checkInter ; checkInter = checkInter->next ) {
-					if ( checkInter->light == groupStep->groupLights[i] ) {
-						break;
-					}
-				}
-				if ( !checkInter ) {
-					// create a new interaction
-					checkInter = (interactionTris_t *)Mem_ClearedAlloc( sizeof( *checkInter ) );
-					checkInter->light = groupStep->groupLights[i];
-					checkInter->next = interactions;
-					interactions = checkInter;
-				}
-				copy = CopyTriList( groupStep->triList );
-				checkInter->triList = MergeTriLists( checkInter->triList, copy );
-			}
 		}
 
 		if ( !ambient ) {

@@ -3,7 +3,8 @@
 
 Name normalization/hash storage and engine/GPU calls are counted stand-ins.
 The actual ImageFromFile/ImageHandleDeferred/ScratchImage, sampler, options,
-scratch upload, default generation and GL/VK Resize bodies execute. Frame/depth
+scratch upload, default generation and GL/VK Resize and colour-copy
+respecification bodies execute. Frame/depth
 copy metadata prefixes execute up to a counted native-copy continuation. No device/game/input runs.
 """
 from pathlib import Path
@@ -32,6 +33,8 @@ IMAGE = r'''
  void AllocImage(const idImageOpts&,textureFilter_t,textureRepeat_t);
  void SetTexParameters(){++metadataNative;}void SetSamplerState(textureFilter_t,textureRepeat_t);
  void MakeDefault();void ResizeGL(int,int);void ResizeVK(int,int);void UploadScratch(const byte*,int,int);
+ void RespecifyColorCopyTarget(int,int);void RespecifyVK(int,int);
+ bool NeedsColorCopyRespecification(int,int)const;
  int internalFormat=10,dataFormat=0,dataType=0;bool CopyFramebuffer(int,int,int,int,int);bool CopyDepthbuffer(int,int,int,int,int);
  void GenerateImage(const byte*,int,int,textureFilter_t,textureRepeat_t,textureUsage_t){if(!R_ImagePolicyOperationAllowed())return;++metadataNative;}
  void GenerateCubeImage(const byte*[6],int,textureFilter_t,textureUsage_t){++metadataNative;}
@@ -59,6 +62,7 @@ textureUsage_t R_ImageUsageForName(const char*,textureUsage_t usage){return usag
 bool R_AllowImageDownSizeForName(const char*,bool allow){return allow;}
 void R_BindTextureForDirectAccess(int,unsigned){++metadataNative;}
 using GLenum=int;enum{RENDERER_CONTEXT_PROFILE_ES=1,GL_COLOR_ATTACHMENT0=2,GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT=3,GL_RGBA8=10,GL_RGB8,GL_RGBA,GL_RGB,GL_SRGB8_ALPHA8,GL_SRGB8,GL_RGB565,GL_RGB5_A1,GL_RGBA4,GL_UNSIGNED_BYTE,FMT_RGBA8,GL_DEPTH_COMPONENT,GL_DEPTH_COMPONENT16,GL_DEPTH_COMPONENT24,GL_DEPTH_COMPONENT32,GL_DEPTH_COMPONENT32F,GL_DEPTH24_STENCIL8,GL_DEPTH32F_STENCIL8,GL_FLOAT,FMT_DEPTH};
+bool idImage::NeedsColorCopyRespecification(int w,int h)const{return IsFileBacked()&&opts.textureType==TT_2D&&(opts.format!=FMT_RGBA8||opts.numLevels!=1||opts.width!=w||opts.height!=h);}
 struct RenderTexture{int GetNumColorImages()const{return 0;}};struct{RenderTexture* renderTexture=nullptr;}backEnd;struct{struct{int profile=0;}backendCaps;}glConfig;
 '''
 TESTS = r'''
@@ -76,6 +80,8 @@ static void Exercise(int which,bool unchanged=false){
  case 7:{static byte pixels[4096]{};image.UploadScratch(pixels,16,16);break;}
  case 8:{static byte pixels[4096]{};image.UploadScratch(pixels,16,96);break;}
  case 15:image.MakeDefault();break;
+ case 16:image.RespecifyColorCopyTarget(16,8);break;
+ case 17:image.RespecifyVK(16,8);break;
  case 9:case 10:{idImageOpts opts=image.opts;imageManager.ScratchImage("image",&opts,0,0,which==9?3:image.usage);break;}
  case 11:case 13:image.CopyFramebuffer(0,0,which==11?16:8,8,0);break;
  case 12:case 14:image.CopyDepthbuffer(0,0,which==12?16:8,8,0);break;
@@ -83,7 +89,7 @@ static void Exercise(int which,bool unchanged=false){
 }
 int main(){try{
  std::memset(&sentinel,0x6b,sizeof(sentinel));
- for(int path=0;path<16;++path){
+ for(int path=0;path<18;++path){
   Failed();image.loaded=true; // A surviving resident after another resource's refusal.
   if(path==7||path==8){image.usage=TD_LOOKUP_TABLE_RGBA;image.opts.textureType=path==8?TT_CUBIC:TT_2D;}
   if(path==9)image.scratchImage=true;
@@ -108,7 +114,7 @@ int main(){try{
  }
  // Changed metadata is refused before any field/native continuation on a
  // foreign thread during an admitted attempt, even for a persistent target.
- for(int path=0;path<16;++path){
+ for(int path=0;path<18;++path){
   Reset();if(path==7||path==8){image.usage=TD_LOOKUP_TABLE_RGBA;image.opts.textureType=path==8?TT_CUBIC:TT_2D;}
   if(path==9)image.scratchImage=true;
   if(path>=11){image.file=false;glConfig.backendCaps.profile=path==13?RENDERER_CONTEXT_PROFILE_ES:0;if(path==13)image.internalFormat=-1;}
@@ -144,6 +150,8 @@ def unit(repository, changes=None):
         methods.append(method(sources[file],signature))
     for file,name in [('OpenGL/gl_Image.cpp','ResizeGL'),('Vulkan/vk_Image.cpp','ResizeVK')]:
         methods.append(method(sources[file],'void idImage::Resize(').replace('idImage::Resize','idImage::'+name,1))
+    methods.append(method(sources['OpenGL/gl_Image.cpp'],'void idImage::RespecifyColorCopyTarget('))
+    methods.append(method(sources['Vulkan/vk_Image.cpp'],'void idImage::RespecifyColorCopyTarget(').replace('idImage::RespecifyColorCopyTarget','idImage::RespecifyVK',1))
     for signature in ['bool idImage::CopyFramebuffer(', 'bool idImage::CopyDepthbuffer(']:
         body=method(sources['Image_load.cpp'],signature)
         end=body.index('opts.height = imageHeight;')+len('opts.height = imageHeight;')
@@ -175,6 +183,8 @@ def main():
             ('sampler','Image_load.cpp','if ( !R_ImagePolicyContentMutation() ) return;\n\tfilter = tf;','filter = tf;'),
             ('resize-gl','OpenGL/gl_Image.cpp','if ( !R_ImagePolicyContentMutation() ) return;\n\topts.width = width;','opts.width = width;'),
             ('resize-vk','Vulkan/vk_Image.cpp','if ( !R_ImagePolicyContentMutation() ) return;\n\tR_RenderThread_Sync( "image" );\n\topts.width = width;','R_RenderThread_Sync( "image" );\n\topts.width = width;'),
+            ('respecify-gl','OpenGL/gl_Image.cpp','if ( width <= 0 || height <= 0 || !R_ImagePolicyContentMutation() ) return;\n\topts.format = FMT_RGBA8;','if ( width <= 0 || height <= 0 ) return;\n\topts.format = FMT_RGBA8;'),
+            ('respecify-vk','Vulkan/vk_Image.cpp','if ( width <= 0 || height <= 0 || !R_ImagePolicyContentMutation() ) return;\n\tR_RenderThread_Sync( "image" );\n\topts.format = FMT_RGBA8;','if ( width <= 0 || height <= 0 ) return;\n\tR_RenderThread_Sync( "image" );\n\topts.format = FMT_RGBA8;'),
             ('persistent-options','Image_load.cpp','if ( ( filter != tf || repeat != tr || !( opts == imgOpts ) || defaulted || !imgOpts.isPersistant ) && !R_ImagePolicyContentMutation() ) return;','if ( !imgOpts.isPersistant && !R_ImagePolicyContentMutation() ) return;'),
         ]]
     out=Path(tempfile.mkdtemp(prefix='image-metadata-',dir=root/'.tmp'));env=dict(os.environ,TEMP=str(out),TMP=str(out),TMPDIR=str(out));compiler=args.compiler or next((p for n in ['clang++','g++','c++'] if(p:=shutil.which(n))),None);assert compiler

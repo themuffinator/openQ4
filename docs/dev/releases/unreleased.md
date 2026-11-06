@@ -10,6 +10,18 @@ See [release status](../../user/release-status.md) and the
 
 ## Highlights
 
+- **Vehicle, fly, shot and item clips work as Quake 4 intended.** openQ4 read
+  the names in Quake 4's collision files literally, but Quake 4 wrote several of
+  them one slot off. The Convoy and Walker levels' vehicle clips, and the shot
+  clips in campaign maps and in multiplayer maps such as `q4dm4`, `q4dm6`,
+  `q4ctf5` and `q4ctf7`, now block what they were built to block.
+
+- **Recompiled maps keep their AI tactics.** `dmap` and `runAAS` now place the
+  cover, lean and corner positions Quake 4's enemies use to take cover and
+  fire around walls, matching 98.8% of the positions in the shipped maps.
+  `runAASTactical` adds them to an existing map's navigation. Compiling a map
+  with heavily subdivided curves is also far faster.
+
 - **Find the moments that matter in multi-view demos.** Recordings now mark
   kills, flag captures, score and round changes, timeouts and powerups, and
   server operators can add notes with `mvdMark`. Jump between them with the
@@ -344,6 +356,9 @@ See [release status](../../user/release-status.md) and the
 
 ## Upgrade Notes
 
+- If you compiled a map with an earlier openQ4 `dmap` and it uses vehicle, fly,
+  shot or item clip brushes, compile it again so its collision file records
+  them correctly.
 - Multi-view demos recorded by this build use MVD 1.3. Earlier openQ4 builds
   that play 1.2 demos still play them, without markers, keyframes or late
   joiners' names. Replace the engine and both game modules together (game API
@@ -400,6 +415,14 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- Dedicated servers change maps faster: they no longer read every texture of
+  the next map in the background only to discard it, about a quarter of each
+  map load on stock multiplayer maps.
+- Compiling a map with heavily subdivided patches, such as a reworked
+  Air Defense 1 that previously took days, now finishes in minutes. Stock maps
+  compile faster too, to identical output.
+- A navigation file with damaged tactical data loads without those positions
+  and a warning, instead of letting AI read past the end of the data.
 - On Vulkan, temporal AA keeps working while a mirror, security-camera screen
   or refraction effect is in view; it used to switch off for those frames.
   Mirrors are also drawn without temporal AA's sub-pixel jitter.
@@ -411,7 +434,6 @@ See [release status](../../user/release-status.md) and the
   the game when they first come into view. Each probe is prepared in the
   background and appears a fraction of a second later; screenshots wait for
   it. `r_pbrProbeAsyncPrefilter 0` restores the old behaviour.
-
 - A long multiplayer chat message with an icon in it no longer repeats the
   icon at the start of the next line when it wraps.
 - On a first launch that starts a map from the command line or a shortcut

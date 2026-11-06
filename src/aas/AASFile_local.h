@@ -60,6 +60,7 @@ public:
 	virtual void				PushPointIntoAreaNum( int areaNum, idVec3 &point ) const;
 	virtual bool				Trace( aasTrace_t &trace, const idVec3 &start, const idVec3 &end ) const;
 	virtual void				PrintInfo( void ) const;
+	virtual void				ClearTactical( void );
 
 public:
 	bool						Load( const idStr &fileName, unsigned int mapFileCRC );
@@ -86,6 +87,9 @@ private:
 	bool						ParseNodes( idLexer &src );
 	bool						ParsePortals( idLexer &src );
 	bool						ParseClusters( idLexer &src );
+	bool						ParseFeatureIndex( idLexer &src );
+	bool						ParseFeatures( idLexer &src );
+	void						ValidateTactical( void );
 
 private:
 	int							BoundsReachableAreaNum_r( int nodeNum, const idBounds &bounds, const int areaFlags, const int excludeTravelFlags ) const;

@@ -37,6 +37,72 @@ If you have questions concerning this license or the applicable additional terms
 
 /*
 ===============
+Area group index
+
+Curved surfaces put each triangle on its own plane, and every plane gets its own
+optimize group, so a heavily subdivided patch makes thousands of groups in one
+area. Scanning the area's group list for each new triangle, then walking the
+matching group's triangle list to append, made PutPrimitivesInAreas quadratic
+in those triangles (issue #209). While an entity's primitives are placed, its
+groups are looked up by key and appended at a remembered tail. The groups, their
+order and the order of their triangles are unchanged.
+===============
+*/
+typedef struct {
+	optimizeGroup_t *	group;
+	int					areaNum;
+	mapTri_t *			tail;		// last triangle of group->triList
+} areaGroupRef_t;
+
+static uEntity_t *				areaGroupEntity;
+static idHashIndex				areaGroupHash;
+static idList<areaGroupRef_t>	areaGroupRefs;
+
+static int AreaGroupKey( int areaNum, int planeNum, const idMaterial *material, const void *mergeGroup ) {
+	const uintptr_t m = reinterpret_cast<uintptr_t>( material );
+	const uintptr_t g = reinterpret_cast<uintptr_t>( mergeGroup );
+	const unsigned int key = static_cast<unsigned int>( areaNum ) * 92821u ^ static_cast<unsigned int>( planeNum ) * 31u
+		^ static_cast<unsigned int>( m >> 4 ) ^ static_cast<unsigned int>( m >> 20 )
+		^ static_cast<unsigned int>( g >> 4 ) ^ static_cast<unsigned int>( g >> 20 );
+	return static_cast<int>( key & 0x7fffffffu );
+}
+
+static void BeginAreaGroupIndex( uEntity_t *e ) {
+	areaGroupEntity = e;
+	areaGroupHash.Clear( 1 << 16, 1 << 12 );
+	areaGroupRefs.Clear();
+	areaGroupRefs.SetGranularity( 1 << 12 );
+}
+
+static void EndAreaGroupIndex( void ) {
+	areaGroupEntity = NULL;
+	areaGroupHash.Free();
+	areaGroupRefs.Clear();
+}
+
+static mapTri_t *LastTri( mapTri_t *list ) {
+	while ( list && list->next ) {
+		list = list->next;
+	}
+	return list;
+}
+
+static bool TexVecsMatch( const textureVectors_t *a, const textureVectors_t *b ) {
+	for ( int i = 0 ; i < 2 ; i++ ) {
+		for ( int j = 0 ; j < 3 ; j++ ) {
+			if ( idMath::Fabs( a->v[i][j] - b->v[i][j] ) > TEXTURE_VECTOR_EQUAL_EPSILON ) {
+				return false;
+			}
+		}
+		if ( idMath::Fabs( a->v[i][3] - b->v[i][3] ) > TEXTURE_OFFSET_EQUAL_EPSILON ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+===============
 AddTriListToArea
 
 The triList is appended to the apropriate optimzeGroup_t,
@@ -47,52 +113,58 @@ The entire list is assumed to come from the same planar primitive
 static void AddTriListToArea( uEntity_t *e, mapTri_t *triList, int planeNum, int areaNum, textureVectors_t *texVec ) {
 	uArea_t		*area;
 	optimizeGroup_t	*group;
-	int			i, j;
 
 	if ( !triList ) {
 		return;
 	}
 
 	area = &e->areas[areaNum];
-	for ( group = area->groups ; group ; group = group->nextGroup ) {
-		if ( group->material == triList->material
-			&& group->planeNum == planeNum
-			&& group->mergeGroup == triList->mergeGroup ) {
-			// check the texture vectors
-			for ( i = 0 ; i < 2 ; i++ ) {
-				for ( j = 0 ; j < 3 ; j++ ) {
-					if ( idMath::Fabs( texVec->v[i][j] - group->texVec.v[i][j] ) > TEXTURE_VECTOR_EQUAL_EPSILON ) {
-						break;
-					}
-				}
-				if ( j != 3 ) {
-					break;
-				}
-				if ( idMath::Fabs( texVec->v[i][3] - group->texVec.v[i][3] ) > TEXTURE_OFFSET_EQUAL_EPSILON ) {
-					break;
-				}
+
+	if ( e == areaGroupEntity ) {
+		// the index chains groups newest first, the order of the area's list,
+		// so the first match is the one the list scan below would find
+		const int key = AreaGroupKey( areaNum, planeNum, triList->material, triList->mergeGroup );
+		for ( int i = areaGroupHash.First( key ) ; i != -1 ; i = areaGroupHash.Next( i ) ) {
+			areaGroupRef_t &ref = areaGroupRefs[i];
+			group = ref.group;
+			if ( group->material == triList->material && group->planeNum == planeNum
+				&& group->mergeGroup == triList->mergeGroup && ref.areaNum == areaNum
+				&& TexVecsMatch( texVec, &group->texVec ) ) {
+				ref.tail->next = triList;
+				ref.tail = LastTri( triList );
+				return;
 			}
-			if ( i == 2 ) {
-				break;	// exact match
-			} else {
-				// different texture offsets
-				i = 1;	// just for debugger breakpoint
+		}
+	} else {
+		for ( group = area->groups ; group ; group = group->nextGroup ) {
+			if ( group->material == triList->material
+				&& group->planeNum == planeNum
+				&& group->mergeGroup == triList->mergeGroup
+				&& TexVecsMatch( texVec, &group->texVec ) ) {
+				group->triList = MergeTriLists( group->triList, triList );
+				return;
 			}
 		}
 	}
 
-	if ( !group ) {
-		group = (optimizeGroup_t *)Mem_Alloc( sizeof( *group ) );
-		memset( group, 0, sizeof( *group ) );
-		group->planeNum = planeNum;
-		group->mergeGroup = triList->mergeGroup;
-		group->material = triList->material;
-		group->nextGroup = area->groups;
-		group->texVec = *texVec;
-		area->groups = group;
-	}
+	group = (optimizeGroup_t *)Mem_Alloc( sizeof( *group ) );
+	memset( group, 0, sizeof( *group ) );
+	group->planeNum = planeNum;
+	group->mergeGroup = triList->mergeGroup;
+	group->material = triList->material;
+	group->nextGroup = area->groups;
+	group->texVec = *texVec;
+	group->triList = triList;
+	area->groups = group;
 
-	group->triList = MergeTriLists( group->triList, triList );
+	if ( e == areaGroupEntity ) {
+		areaGroupRef_t ref;
+		ref.group = group;
+		ref.areaNum = areaNum;
+		ref.tail = LastTri( triList );
+		const int index = areaGroupRefs.Append( ref );
+		areaGroupHash.Add( AreaGroupKey( areaNum, planeNum, triList->material, triList->mergeGroup ), index );
+	}
 }
 
 /*
@@ -598,6 +670,7 @@ void PutPrimitivesInAreas( uEntity_t *e ) {
 	// allocate space for surface chains for each area
 	e->areas = (uArea_t *)Mem_Alloc( e->numAreas * sizeof( e->areas[0] ) );
 	memset( e->areas, 0, e->numAreas * sizeof( e->areas[0] ) );
+	BeginAreaGroupIndex( e );
 
 	// for each primitive, clip it to the non-solid leafs
 	// and divide it into different areas
@@ -688,6 +761,8 @@ void PutPrimitivesInAreas( uEntity_t *e ) {
 			}
 		}
 	}
+
+	EndAreaGroupIndex();
 }
 
 //============================================================================
@@ -819,6 +894,15 @@ static void BuildLightShadows( uEntity_t *e, mapLight_t *light ) {
 	shadowerGroups = NULL;
 	lightOrigin = light->def.globalLightOrigin;
 
+	// There is one shadower group per plane. Finding it by plane, and appending
+	// at remembered tails, keeps a light over thousands of curved-surface
+	// planes linear instead of rescanning the groups and their lists for every
+	// fragment (issue #209). Groups and triangle order are unchanged.
+	idHashIndex					shadowerByPlane;
+	idList<optimizeGroup_t *>	shadowerList;
+	idList<mapTri_t *>			shadowerTails;
+	shadowerByPlane.Clear( 4096, 4096 );
+
 	// if the light is no-shadows, don't add any surfaces
 	// to the beam tree at all
 	if ( !light->def.parms.noShadows
@@ -845,13 +929,21 @@ static void BuildLightShadows( uEntity_t *e, mapLight_t *light ) {
 				// build up a list of the triangle fragments inside the
 				// light frustum
 				shadowers = NULL;
+				mapTri_t *shadowersLast = NULL;
 				for ( tri = group->triList ; tri ; tri = tri->next ) {
 					mapTri_t	*in, *out;
 
 					// clip it to the light frustum
 					ClipTriByLight( light, tri, &in, &out );
 					FreeTriList( out );
-					shadowers = MergeTriLists( shadowers, in );
+					if ( in ) {
+						if ( shadowersLast ) {
+							shadowersLast->next = in;
+						} else {
+							shadowers = in;
+						}
+						shadowersLast = LastTri( in );
+					}
 				}
 
 				// if we didn't get any out of this group, we don't
@@ -863,10 +955,12 @@ static void BuildLightShadows( uEntity_t *e, mapLight_t *light ) {
 				// find a group in shadowerGroups to add these to
 				// we will ignore everything but planenum, and we
 				// can merge across areas
-				optimizeGroup_t	*check;
+				optimizeGroup_t	*check = NULL;
+				int				checkIndex;
 
-				for ( check = shadowerGroups ; check ; check = check->nextGroup ) {
-					if ( check->planeNum == group->planeNum ) {
+				for ( checkIndex = shadowerByPlane.First( group->planeNum ) ; checkIndex != -1 ; checkIndex = shadowerByPlane.Next( checkIndex ) ) {
+					if ( shadowerList[checkIndex]->planeNum == group->planeNum ) {
+						check = shadowerList[checkIndex];
 						break;
 					}
 				}
@@ -876,6 +970,9 @@ static void BuildLightShadows( uEntity_t *e, mapLight_t *light ) {
 					check->triList = NULL;
 					check->nextGroup = shadowerGroups;
 					shadowerGroups = check;
+					checkIndex = shadowerList.Append( check );
+					shadowerTails.Append( NULL );
+					shadowerByPlane.Add( group->planeNum, checkIndex );
 				}
 
 				// if any surface is a shadow-casting perforated or translucent surface, we
@@ -885,7 +982,12 @@ static void BuildLightShadows( uEntity_t *e, mapLight_t *light ) {
 					hasPerforatedSurface = true;
 				}
 
-				check->triList = MergeTriLists( check->triList, shadowers );
+				if ( shadowerTails[checkIndex] ) {
+					shadowerTails[checkIndex]->next = shadowers;
+				} else {
+					check->triList = shadowers;
+				}
+				shadowerTails[checkIndex] = shadowersLast;
 			}
 		}
 	}
@@ -954,13 +1056,14 @@ static void CarveGroupsByLight( uEntity_t *e, mapLight_t *light ) {
 			// split into lists for hit-by-light, and not-hit-by-light
 			inside = NULL;
 			outside = NULL;
+			mapTri_t *insideTail = NULL, *outsideTail = NULL;
 
 			for ( tri = group->triList ; tri ; tri = tri->next ) {
 				mapTri_t	*in, *out;
 
 				ClipTriByLight( light, tri, &in, &out );
-				inside = MergeTriLists( inside, in );
-				outside = MergeTriLists( outside, out );
+				AppendTriList( &inside, &insideTail, in );
+				AppendTriList( &outside, &outsideTail, out );
 			}
 
 			if ( inside ) {

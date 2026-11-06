@@ -125,11 +125,51 @@ idCVar cm_debugCollision(	"cm_debugCollision",	"0",		CVAR_GAME | CVAR_BOOL,	"deb
 idVec4 cm_color;
 
 /*
+Quake 4 1.4.2 pairs its contents names and flags by index, but its name table
+has an extra "solid" entry after "largeShotClip", so every later name sits one
+slot away from the flag it was meant for. Retail .cm files (versions 2 and 3)
+were written and read through that pairing: "notacticalfeatures" means vehicle
+clip, "vehicleclip" fly clip, "flyclip" shot clip, "shotClip" item clip, and
+"opaque" also sets sight clip. Retail could not write CONTENTS_NOTACTICALFEATURES
+at all. These pairs reproduce retail's decoding of those files.
+*/
+static const struct {
+	const char *	name;
+	int				contents;
+} cm_retailContents[] = {
+	{ "solid",				CONTENTS_SOLID },
+	{ "opaque",				CONTENTS_OPAQUE | CONTENTS_SIGHTCLIP },
+	{ "water",				CONTENTS_WATER },
+	{ "playerclip",			CONTENTS_PLAYERCLIP },
+	{ "monsterclip",		CONTENTS_MONSTERCLIP },
+	{ "moveableclip",		CONTENTS_MOVEABLECLIP },
+	{ "ikclip",				CONTENTS_IKCLIP },
+	{ "blood",				CONTENTS_BLOOD },
+	{ "body",				CONTENTS_BODY },
+	{ "corpse",				CONTENTS_CORPSE },
+	{ "trigger",			CONTENTS_TRIGGER },
+	{ "aas_solid",			CONTENTS_AAS_SOLID },
+	{ "aas_obstacle",		CONTENTS_AAS_OBSTACLE },
+	{ "flashlight_trigger",	CONTENTS_FLASHLIGHT_TRIGGER },
+	{ "sightClip",			CONTENTS_SIGHTCLIP },
+	{ "largeShotClip",		CONTENTS_LARGESHOTCLIP },
+	{ "notacticalfeatures",	CONTENTS_VEHICLECLIP },
+	{ "vehicleclip",		CONTENTS_FLYCLIP },
+	{ "flyclip",			CONTENTS_PROJECTILE },
+	{ "shotClip",			CONTENTS_ITEMCLIP },
+	{ "itemclip",			0 },
+	{ NULL,					0 }
+};
+
+/*
 ================
 idCollisionModelManagerLocal::ContentsFromString
+
+'retailNames' selects Quake 4's name pairing (.cm versions 2 and 3); names that
+pairing never wrote, such as openQ4's liquids, keep their openQ4 meaning.
 ================
 */
-int idCollisionModelManagerLocal::ContentsFromString( const char *string ) const {
+int idCollisionModelManagerLocal::ContentsFromString( const char *string, bool retailNames ) const {
 	int i, contents = 0;
 	idLexer src( string, idStr::Length( string ), "ContentsFromString" );
 	idToken token;
@@ -137,6 +177,17 @@ int idCollisionModelManagerLocal::ContentsFromString( const char *string ) const
 	while( src.ReadToken( &token ) ) {
 		if ( token == "," ) {
 			continue;
+		}
+		if ( retailNames ) {
+			for ( i = 0; cm_retailContents[i].name != NULL; i++ ) {
+				if ( token.Icmp( cm_retailContents[i].name ) == 0 ) {
+					break;
+				}
+			}
+			if ( cm_retailContents[i].name != NULL ) {
+				contents |= cm_retailContents[i].contents;
+				continue;
+			}
 		}
 		for ( i = 1; cm_contentsNameByIndex[i] != NULL; i++ ) {
 			if ( token.Icmp( cm_contentsNameByIndex[i] ) == 0 ) {

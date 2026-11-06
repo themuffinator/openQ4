@@ -91,6 +91,9 @@ typedef struct hashVert_s {
 	struct hashVert_s	*next;
 	idVec3				v;
 	int					iv[3];
+	int					block[3];		// hash bin
+	int					blockSeq;		// creation order within the bin
+	int					cell[3];		// TJUNC_CELL_SIZE grid cell
 } hashVert_t;
 
 static idBounds	hashBounds;
@@ -98,6 +101,79 @@ static idVec3	hashScale;
 static hashVert_t	*hashVerts[HASH_BINS][HASH_BINS][HASH_BINS];
 static int		numHashVerts, numTotalVerts;
 static int		hashIntMins[3], hashIntScale[3];
+
+/*
+  Each of the 16x16x16 hash bins spans a sixteenth of the map on every axis.
+  Dense geometry, such as heavily subdivided patches, puts most of a map's
+  vertexes into a few bins, and both the vertex merge and the T-junction pass
+  scanned whole bins: the compile time grew with the square of those vertexes
+  (issue #209). Two indexes answer the same questions without scanning:
+
+  - hashVertCells finds the vertex at an exact snapped coordinate, so a merge
+    looks at the 27 neighboring coordinates instead of the whole bin.
+  - hashVertGrid buckets vertexes by TJUNC_CELL_SIZE cells, so a triangle only
+    visits the vertexes near it.
+
+  The bins, their newest-first chains and every result are unchanged; see
+  GetHashVert and FixTriangleAgainstHash for why the shortcuts are exact.
+*/
+#define	TJUNC_CELL_SIZE		16.0f
+#define	TJUNC_MAX_GRID_CELLS	64
+
+static idList<hashVert_t *>	hashVertList;		// creation order
+static idHashIndex			hashVertCells;
+static idHashIndex			hashVertGrid;
+static bool					hashVertGridBuilt;
+static int					hashBinCounts[HASH_BINS][HASH_BINS][HASH_BINS];
+
+static int TJuncKey( int x, int y, int z ) {
+	// unsigned arithmetic: the products wrap by design
+	const unsigned int key = static_cast<unsigned int>( x ) * 73856093u ^ static_cast<unsigned int>( y ) * 19349663u
+		^ static_cast<unsigned int>( z ) * 83492791u;
+	return static_cast<int>( key & 0x7fffffffu );
+}
+
+static int HashBin( int iv, int axis ) {
+	int block = ( iv - hashIntMins[axis] ) / hashIntScale[axis];
+	if ( block < 0 ) {
+		block = 0;
+	} else if ( block >= HASH_BINS ) {
+		block = HASH_BINS - 1;
+	}
+	return block;
+}
+
+static int TJuncCell( float v ) {
+	return static_cast<int>( floor( v / TJUNC_CELL_SIZE ) );
+}
+
+// a power of two near the expected number of vertexes; the optimizer hashes
+// each small group separately, so a fixed large table would dominate
+static int TJuncHashSize( int expected ) {
+	int size = 256;
+	while ( size < expected && size < ( 1 << 20 ) ) {
+		size <<= 1;
+	}
+	return size;
+}
+
+static void ClearHashVertIndexes( int expectedVerts ) {
+	memset( hashBinCounts, 0, sizeof( hashBinCounts ) );
+	hashVertList.SetGranularity( 1024 );
+	hashVertList.Clear();
+	hashVertCells.Clear( TJuncHashSize( expectedVerts ), TJuncHashSize( expectedVerts ) );
+	hashVertGrid.Free();
+	hashVertGridBuilt = false;
+}
+
+static void BuildHashVertGrid( void ) {
+	hashVertGrid.Clear( TJuncHashSize( hashVertList.Num() ), hashVertList.Num() > 0 ? hashVertList.Num() : 1 );
+	for ( int i = 0 ; i < hashVertList.Num() ; i++ ) {
+		const hashVert_t *hv = hashVertList[i];
+		hashVertGrid.Add( TJuncKey( hv->cell[0], hv->cell[1], hv->cell[2] ), i );
+	}
+	hashVertGridBuilt = true;
+}
 
 /*
 ===============
@@ -117,35 +193,38 @@ struct hashVert_s	*GetHashVert( idVec3 &v ) {
 	// snap the vert to integral values
 	for ( i = 0 ; i < 3 ; i++ ) {
 		iv[i] = floor( ( v[i] + 0.5/SNAP_FRACTIONS ) * SNAP_FRACTIONS );
-		block[i] = ( iv[i] - hashIntMins[i] ) / hashIntScale[i];
-		if ( block[i] < 0 ) {
-			block[i] = 0;
-		} else if ( block[i] >= HASH_BINS ) {
-			block[i] = HASH_BINS - 1;
-		}
+		block[i] = HashBin( iv[i], i );
 	}
 
-	// see if a vertex near enough already exists
+	// see if a vertex near enough already exists: one in the same bin whose
+	// snapped coordinates are all within one step. The bin's chain is newest
+	// first and returned the first match, so take the newest candidate. No two
+	// vertexes share a snapped coordinate, so each neighbor holds at most one.
 	// this could still fail to find a near neighbor right at the hash block boundary
-	for ( hv = hashVerts[block[0]][block[1]][block[2]] ; hv ; hv = hv->next ) {
-#if 0
-		if ( hv->iv[0] == iv[0] && hv->iv[1] == iv[1] && hv->iv[2] == iv[2] ) {
-			VectorCopy( hv->v, v );
-			return hv;
-		}
-#else
-		for ( i = 0 ; i < 3 ; i++ ) {
-			int	d;
-			d = hv->iv[i] - iv[i];
-			if ( d < -1 || d > 1 ) {
-				break;
+	int best = -1;
+	for ( int dx = -1 ; dx <= 1 ; dx++ ) {
+		for ( int dy = -1 ; dy <= 1 ; dy++ ) {
+			for ( int dz = -1 ; dz <= 1 ; dz++ ) {
+				const int c[3] = { iv[0] + dx, iv[1] + dy, iv[2] + dz };
+				if ( HashBin( c[0], 0 ) != block[0] || HashBin( c[1], 1 ) != block[1] || HashBin( c[2], 2 ) != block[2] ) {
+					continue;
+				}
+				for ( int index = hashVertCells.First( TJuncKey( c[0], c[1], c[2] ) ) ; index != -1 ; index = hashVertCells.Next( index ) ) {
+					const hashVert_t *candidate = hashVertList[index];
+					if ( candidate->iv[0] == c[0] && candidate->iv[1] == c[1] && candidate->iv[2] == c[2] ) {
+						if ( index > best ) {
+							best = index;
+						}
+						break;
+					}
+				}
 			}
 		}
-		if ( i == 3 ) {
-			VectorCopy( hv->v, v );
-			return hv;
-		}
-#endif
+	}
+	if ( best >= 0 ) {
+		hv = hashVertList[best];
+		VectorCopy( hv->v, v );
+		return hv;
 	}
 
 	// create a new one 
@@ -161,6 +240,16 @@ struct hashVert_s	*GetHashVert( idVec3 &v ) {
 	hv->v[0] = (float)iv[0] / SNAP_FRACTIONS;
 	hv->v[1] = (float)iv[1] / SNAP_FRACTIONS;
 	hv->v[2] = (float)iv[2] / SNAP_FRACTIONS;
+
+	for ( i = 0 ; i < 3 ; i++ ) {
+		hv->block[i] = block[i];
+		hv->cell[i] = TJuncCell( hv->v[i] );
+	}
+	hv->blockSeq = hashBinCounts[block[0]][block[1]][block[2]]++;
+
+	const int index = hashVertList.Append( hv );
+	hashVertCells.Add( TJuncKey( iv[0], iv[1], iv[2] ), index );
+	hashVertGridBuilt = false;
 
 	VectorCopy( hv->v, v );
 
@@ -226,9 +315,11 @@ void HashTriangles( optimizeGroup_t *groupList ) {
 	numTotalVerts = 0;
 
 	// bound all the triangles to determine the bucket size
+	int numTris = 0;
 	hashBounds.Clear();
 	for ( group = groupList ; group ; group = group->nextGroup ) {
 		for ( a = group->triList ; a ; a = a->next ) {
+			numTris++;
 			hashBounds.AddPoint( a->v[0].xyz );
 			hashBounds.AddPoint( a->v[1].xyz );
 			hashBounds.AddPoint( a->v[2].xyz );
@@ -247,6 +338,8 @@ void HashTriangles( optimizeGroup_t *groupList ) {
 			hashIntScale[i] = 1;
 		}
 	}
+
+	ClearHashVertIndexes( numTris );
 
 	// add all the points to the hash buckets
 	for ( group = groupList ; group ; group = group->nextGroup ) {
@@ -285,6 +378,11 @@ void FreeTJunctionHash( void ) {
 		}
 	}
 	memset( hashVerts, 0, sizeof( hashVerts ) );
+	memset( hashBinCounts, 0, sizeof( hashBinCounts ) );
+	hashVertList.Clear();
+	hashVertCells.Free();
+	hashVertGrid.Free();
+	hashVertGridBuilt = false;
 }
 
 
@@ -426,18 +524,96 @@ static mapTri_t *FixTriangleAgainstHashVert( const mapTri_t *a, const hashVert_t
 
 /*
 ==================
+FixListAgainstHashVert
+
+One pass of the T-junction fix: every triangle in the list is tested against
+the hashVert, and the list is rebuilt front to back, so it comes out reversed
+with each split triangle's two halves in place.
+==================
+*/
+static mapTri_t *FixListAgainstHashVert( mapTri_t *fixed, const hashVert_t *hv ) {
+	mapTri_t	*test, *next, *a;
+
+	test = fixed;
+	fixed = NULL;
+	for ( ; test ; test = next ) {
+		next = test->next;
+		a = FixTriangleAgainstHashVert( test, hv );
+		if ( a ) {
+			// cut into two triangles
+			a->next->next = fixed;
+			fixed = a;
+			FreeTri( test );
+		} else {
+			test->next = fixed;
+			fixed = test;
+		}
+	}
+	return fixed;
+}
+
+static mapTri_t *ReverseTriList( mapTri_t *list ) {
+	mapTri_t	*reversed = NULL, *next;
+
+	for ( ; list ; list = next ) {
+		next = list->next;
+		list->next = reversed;
+		reversed = list;
+	}
+	return reversed;
+}
+
+/*
+==================
+TJuncListReach
+
+The box a hashVert must be inside to split any triangle in the list: it splits
+only from within COLINEAR_EPSILON of an edge.
+==================
+*/
+static idBounds TJuncListReach( const mapTri_t *list ) {
+	idBounds	bounds;
+
+	bounds.Clear();
+	for ( ; list ; list = list->next ) {
+		bounds.AddPoint( list->v[0].xyz );
+		bounds.AddPoint( list->v[1].xyz );
+		bounds.AddPoint( list->v[2].xyz );
+	}
+	bounds.ExpandSelf( COLINEAR_EPSILON + 0.01f );
+	return bounds;
+}
+
+typedef struct {
+	const hashVert_t *	hv;
+	int					pass;		// position in the bin traversal
+} tjuncCandidate_t;
+
+static int SortTJuncCandidates( const tjuncCandidate_t *a, const tjuncCandidate_t *b ) {
+	return a->pass - b->pass;
+}
+
+/*
+==================
 FixTriangleAgainstHash
 
 Potentially splits a triangle into a list of triangles based on tjunctions
+
+Every hashVert in the bins the triangle overlaps is one pass over the growing
+list, in bin order and newest first within a bin. A hashVert outside the list's
+reach cannot split anything, so its pass only reverses the list. The passes are
+replayed with those reduced to a parity flag, applied before the next real pass
+and at the end, which gives the same triangles in the same order. The hashVerts
+that can matter come from the grid around the triangle, or for a triangle too
+large for that, from scanning the bins with the reach test.
 ==================
 */
 static mapTri_t	*FixTriangleAgainstHash( const mapTri_t *tri ) {
 	mapTri_t		*fixed;
-	mapTri_t		*a;
-	mapTri_t		*test, *next;
 	int				blocks[2][3];
 	int				i, j, k;
 	hashVert_t		*hv;
+	static int		passBase[HASH_BINS][HASH_BINS][HASH_BINS];
 
 	// if this triangle is degenerate after point snapping,
 	// do nothing (this shouldn't happen, because they should
@@ -452,29 +628,114 @@ static mapTri_t	*FixTriangleAgainstHash( const mapTri_t *tri ) {
 	fixed->next = NULL;
 
 	HashBlocksForTri( tri, blocks );
+
+	int numPasses = 0;
 	for ( i = blocks[0][0] ; i <= blocks[1][0] ; i++ ) {
 		for ( j = blocks[0][1] ; j <= blocks[1][1] ; j++ ) {
 			for ( k = blocks[0][2] ; k <= blocks[1][2] ; k++ ) {
-				for ( hv = hashVerts[i][j][k] ; hv ; hv = hv->next ) {
-					// fix all triangles in the list against this point
-					test = fixed;
-					fixed = NULL;
-					for ( ; test ; test = next ) {
-						next = test->next;
-						a = FixTriangleAgainstHashVert( test, hv );
-						if ( a ) {
-							// cut into two triangles
-							a->next->next = fixed;
-							fixed = a;
-							FreeTri( test );
-						} else {
-							test->next = fixed;
-							fixed = test;
+				passBase[i][j][k] = numPasses;
+				numPasses += hashBinCounts[i][j][k];
+			}
+		}
+	}
+
+	idBounds reach = TJuncListReach( fixed );
+	bool reversed = false;
+	int lastPass = -1;
+
+	// the grid answers for the region around the triangle; a split that grows
+	// the list past it falls back to scanning the remaining passes
+	idBounds region = reach;
+	region.ExpandSelf( 2.0f );
+	int cellMins[3], cellMaxs[3], numCells = 1;
+	for ( i = 0 ; i < 3 ; i++ ) {
+		cellMins[i] = TJuncCell( region[0][i] );
+		cellMaxs[i] = TJuncCell( region[1][i] );
+		numCells *= cellMaxs[i] - cellMins[i] + 1;
+	}
+
+	bool scan = true;
+	if ( numCells <= TJUNC_MAX_GRID_CELLS && numCells * 4 < numPasses ) {
+		if ( !hashVertGridBuilt ) {
+			BuildHashVertGrid();
+		}
+		static idList<tjuncCandidate_t> candidates;
+		candidates.SetNum( 0, false );
+		for ( int x = cellMins[0] ; x <= cellMaxs[0] ; x++ ) {
+			for ( int y = cellMins[1] ; y <= cellMaxs[1] ; y++ ) {
+				for ( int z = cellMins[2] ; z <= cellMaxs[2] ; z++ ) {
+					for ( int index = hashVertGrid.First( TJuncKey( x, y, z ) ) ; index != -1 ; index = hashVertGrid.Next( index ) ) {
+						const hashVert_t *c = hashVertList[index];
+						if ( c->cell[0] != x || c->cell[1] != y || c->cell[2] != z ) {
+							continue;
 						}
+						if ( c->block[0] < blocks[0][0] || c->block[0] > blocks[1][0]
+							|| c->block[1] < blocks[0][1] || c->block[1] > blocks[1][1]
+							|| c->block[2] < blocks[0][2] || c->block[2] > blocks[1][2] ) {
+							continue;
+						}
+						tjuncCandidate_t &candidate = candidates.Alloc();
+						candidate.hv = c;
+						candidate.pass = passBase[c->block[0]][c->block[1]][c->block[2]]
+							+ hashBinCounts[c->block[0]][c->block[1]][c->block[2]] - 1 - c->blockSeq;
 					}
 				}
 			}
 		}
+		candidates.Sort( SortTJuncCandidates );
+
+		scan = false;
+		for ( i = 0 ; i < candidates.Num() ; i++ ) {
+			const tjuncCandidate_t &candidate = candidates[i];
+			reversed ^= ( ( candidate.pass - lastPass - 1 ) & 1 ) != 0;
+			lastPass = candidate.pass;
+			if ( !reach.ContainsPoint( candidate.hv->v ) ) {
+				reversed = !reversed;
+				continue;
+			}
+			if ( reversed ) {
+				fixed = ReverseTriList( fixed );
+				reversed = false;
+			}
+			fixed = FixListAgainstHashVert( fixed, candidate.hv );
+			reach = TJuncListReach( fixed );
+			if ( !region.ContainsPoint( reach[0] ) || !region.ContainsPoint( reach[1] ) ) {
+				scan = true;
+				break;
+			}
+		}
+	}
+
+	if ( scan ) {
+		int pass = 0;
+		for ( i = blocks[0][0] ; i <= blocks[1][0] ; i++ ) {
+			for ( j = blocks[0][1] ; j <= blocks[1][1] ; j++ ) {
+				for ( k = blocks[0][2] ; k <= blocks[1][2] ; k++ ) {
+					for ( hv = hashVerts[i][j][k] ; hv ; hv = hv->next, pass++ ) {
+						if ( pass <= lastPass ) {
+							continue;
+						}
+						lastPass = pass;
+						if ( !reach.ContainsPoint( hv->v ) ) {
+							reversed = !reversed;
+							continue;
+						}
+						if ( reversed ) {
+							fixed = ReverseTriList( fixed );
+							reversed = false;
+						}
+						fixed = FixListAgainstHashVert( fixed, hv );
+						reach = TJuncListReach( fixed );
+					}
+				}
+			}
+		}
+	}
+
+	// the passes after the last one that could split
+	reversed ^= ( ( numPasses - lastPass - 1 ) & 1 ) != 0;
+	if ( reversed ) {
+		fixed = ReverseTriList( fixed );
 	}
 
 	return fixed;
@@ -589,10 +850,12 @@ void	FixGlobalTjunctions( uEntity_t *e ) {
 	numTotalVerts = 0;
 
 	// bound all the triangles to determine the bucket size
+	int numTris = 0;
 	hashBounds.Clear();
 	for ( areaNum = 0 ; areaNum < e->numAreas ; areaNum++ ) {
 		for ( group = e->areas[areaNum].groups ; group ; group = group->nextGroup ) {
 			for ( a = group->triList ; a ; a = a->next ) {
+				numTris++;
 				hashBounds.AddPoint( a->v[0].xyz );
 				hashBounds.AddPoint( a->v[1].xyz );
 				hashBounds.AddPoint( a->v[2].xyz );
@@ -612,6 +875,8 @@ void	FixGlobalTjunctions( uEntity_t *e ) {
 			hashIntScale[i] = 1;
 		}
 	}
+
+	ClearHashVertIndexes( numTris );
 
 	// add all the points to the hash buckets
 	for ( areaNum = 0 ; areaNum < e->numAreas ; areaNum++ ) {

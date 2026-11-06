@@ -1,6 +1,8 @@
 // Compile the production dmap T-junction splitter against a minimal geometry
 // shim. No renderer or proprietary map assets required.
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -94,8 +96,57 @@ public:
 			b[1][i] = v[i] > b[1][i] ? v[i] : b[1][i];
 		}
 	}
+	void ExpandSelf( float d ) {
+		for ( int i = 0; i < 3; i++ ) {
+			b[0][i] -= d;
+			b[1][i] += d;
+		}
+	}
+	bool ContainsPoint( const idVec3 &p ) const {
+		return p.x >= b[0].x && p.y >= b[0].y && p.z >= b[0].z && p.x <= b[1].x && p.y <= b[1].y && p.z <= b[1].z;
+	}
 	idVec3 &operator[]( int index ) { return b[index]; }
 	const idVec3 &operator[]( int index ) const { return b[index]; }
+};
+
+// the subset of idList and idHashIndex the indexes use, with the same semantics
+template<class T> class idList {
+public:
+	typedef int cmp_t( const T *, const T * );
+	int Num() const { return static_cast<int>( items.size() ); }
+	int Append( const T &item ) { items.push_back( item ); return Num() - 1; }
+	T &Alloc() { items.emplace_back(); return items.back(); }
+	void Clear() { items.clear(); }
+	void SetNum( int num, bool ) { items.resize( num ); }
+	void SetGranularity( int ) {}
+	void Sort( cmp_t *compare ) {
+		std::sort( items.begin(), items.end(), [compare]( const T &a, const T &b ) { return compare( &a, &b ) < 0; } );
+	}
+	T &operator[]( int index ) { return items[index]; }
+	const T &operator[]( int index ) const { return items[index]; }
+private:
+	std::vector<T> items;
+};
+class idHashIndex {
+public:
+	void Clear( int newHashSize, int ) { Free(); hashSize = newHashSize; }
+	void Free() { hash.clear(); chain.clear(); }
+	void Add( int key, int index ) {
+		if ( hash.empty() ) {
+			hash.assign( hashSize, -1 );
+		}
+		if ( index >= static_cast<int>( chain.size() ) ) {
+			chain.resize( index + 1, -1 );
+		}
+		const int h = key & ( hashSize - 1 );
+		chain[index] = hash[h];
+		hash[h] = index;
+	}
+	int First( int key ) const { return hash.empty() ? -1 : hash[key & ( hashSize - 1 )]; }
+	int Next( int index ) const { return chain[index]; }
+private:
+	int hashSize = 1024;
+	std::vector<int> hash, chain;
 };
 #define DotProduct( a, b )			( ( a )[0] * ( b )[0] + ( a )[1] * ( b )[1] + ( a )[2] * ( b )[2] )
 #define VectorSubtract( a, b, c )	( ( c )[0] = ( a )[0] - ( b )[0], ( c )[1] = ( a )[1] - ( b )[1], ( c )[2] = ( a )[2] - ( b )[2] )
@@ -212,6 +263,146 @@ static void TestThinTriangleSplitsAtEveryVertex() {
 	Require( std::fabs( result.area - 2048.0f ) < 0.01f, "splitting must preserve the thin triangle's area" );
 }
 
+/*
+The indexed merge and fix must return exactly what the original bin scans did,
+including the order of the fixed triangles. These copies of the original scans
+run against the same hash bins.
+*/
+static hashVert_t *LegacyFindHashVert( const idVec3 &v ) {
+	int iv[3], block[3], i;
+	for ( i = 0; i < 3; i++ ) {
+		iv[i] = floor( ( v[i] + 0.5 / SNAP_FRACTIONS ) * SNAP_FRACTIONS );
+		block[i] = ( iv[i] - hashIntMins[i] ) / hashIntScale[i];
+		if ( block[i] < 0 ) {
+			block[i] = 0;
+		} else if ( block[i] >= HASH_BINS ) {
+			block[i] = HASH_BINS - 1;
+		}
+	}
+	for ( hashVert_t *hv = hashVerts[block[0]][block[1]][block[2]]; hv; hv = hv->next ) {
+		for ( i = 0; i < 3; i++ ) {
+			const int d = hv->iv[i] - iv[i];
+			if ( d < -1 || d > 1 ) {
+				break;
+			}
+		}
+		if ( i == 3 ) {
+			return hv;
+		}
+	}
+	return nullptr;
+}
+
+static mapTri_t *LegacyFixTriangleAgainstHash( const mapTri_t *tri ) {
+	if ( tri->hashVert[0] == tri->hashVert[1] || tri->hashVert[0] == tri->hashVert[2] || tri->hashVert[1] == tri->hashVert[2] ) {
+		return nullptr;
+	}
+	mapTri_t *fixed = CopyMapTri( tri );
+	fixed->next = nullptr;
+	int blocks[2][3];
+	HashBlocksForTri( tri, blocks );
+	for ( int i = blocks[0][0]; i <= blocks[1][0]; i++ ) {
+		for ( int j = blocks[0][1]; j <= blocks[1][1]; j++ ) {
+			for ( int k = blocks[0][2]; k <= blocks[1][2]; k++ ) {
+				for ( hashVert_t *hv = hashVerts[i][j][k]; hv; hv = hv->next ) {
+					fixed = FixListAgainstHashVert( fixed, hv );
+				}
+			}
+		}
+	}
+	return fixed;
+}
+
+static uint32_t testSeed = 20261106;
+static float RandomUnit() {
+	testSeed = testSeed * 1664525u + 1013904223u;
+	return ( testSeed >> 8 ) / 16777216.0f;
+}
+
+// a patch-like grid of small triangles over a coarse floor, with vertexes that
+// land on each other's edges, near bin boundaries and within snapping distance
+static void BuildDenseScene( optimizeGroup_t &fine, optimizeGroup_t &coarse ) {
+	const float cell = 3.0f;
+	for ( int y = 0; y < 48; y++ ) {
+		for ( int x = 0; x < 48; x++ ) {
+			const float jitter = ( RandomUnit() - 0.5f ) * 0.05f;
+			const idVec3 a( x * cell + jitter, y * cell, 8.0f * std::sin( x * 0.2f ) );
+			const idVec3 b( ( x + 1 ) * cell, y * cell + jitter, 8.0f * std::sin( ( x + 1 ) * 0.2f ) );
+			const idVec3 c( x * cell, ( y + 1 ) * cell, 8.0f * std::sin( x * 0.2f ) );
+			AddTri( fine, a, b, c );
+			if ( ( x + y ) % 3 == 0 ) {
+				// a half-size triangle whose corners sit on its neighbor's edges
+				AddTri( fine, idVec3( x * cell + cell * 0.5f, y * cell, a.z ), b, idVec3( x * cell + cell * 0.5f, y * cell + cell * 0.5f, a.z ) );
+			}
+		}
+	}
+	for ( int i = 0; i < 6; i++ ) {
+		const float x0 = RandomUnit() * 120.0f, y0 = RandomUnit() * 120.0f;
+		AddTri( coarse, idVec3( x0, y0, 0 ), idVec3( x0 + 30.0f, y0, 0 ), idVec3( x0, y0 + 30.0f, 0 ) );
+	}
+	AddTri( coarse, idVec3( -10, -10, 0 ), idVec3( 200, -10, 0 ), idVec3( -10, 200, 0 ) );
+}
+
+static bool SameTris( const mapTri_t *a, const mapTri_t *b ) {
+	for ( ; a && b; a = a->next, b = b->next ) {
+		for ( int i = 0; i < 3; i++ ) {
+			if ( a->hashVert[i] != b->hashVert[i] || a->v[i].xyz.x != b->v[i].xyz.x || a->v[i].xyz.y != b->v[i].xyz.y
+				|| a->v[i].xyz.z != b->v[i].xyz.z ) {
+				return false;
+			}
+		}
+	}
+	return a == nullptr && b == nullptr;
+}
+
+static void TestIndexedHashMatchesBinScans() {
+	optimizeGroup_t fine, coarse;
+	BuildDenseScene( fine, coarse );
+	fine.nextGroup = &coarse;
+
+	// merging: each vertex added must find the vertex the bin scan finds
+	HashTriangles( &fine );
+	FreeTJunctionHash();
+	memset( hashVerts, 0, sizeof( hashVerts ) );
+	ClearHashVertIndexes( 0 );
+	int merged = 0, created = 0;
+	for ( optimizeGroup_t *group = &fine; group; group = group->nextGroup ) {
+		for ( mapTri_t *tri = group->triList; tri; tri = tri->next ) {
+			for ( int v = 0; v < 3; v++ ) {
+				idVec3 point = tri->v[v].xyz;
+				hashVert_t *expected = LegacyFindHashVert( point );
+				hashVert_t *got = GetHashVert( point );
+				Require( expected == nullptr || got == expected, "the indexed merge chose a different vertex than the bin scan" );
+				( expected ? merged : created )++;
+			}
+		}
+	}
+	Require( merged > 0 && created > 0, "the dense scene must exercise both merging and new vertexes" );
+	FreeTJunctionHash();
+
+	// fixing: every triangle must split into the same triangles, in the same order
+	HashTriangles( &fine );
+	int compared = 0, split = 0;
+	for ( optimizeGroup_t *group = &fine; group; group = group->nextGroup ) {
+		for ( mapTri_t *tri = group->triList; tri; tri = tri->next ) {
+			mapTri_t *expected = LegacyFixTriangleAgainstHash( tri );
+			mapTri_t *got = FixTriangleAgainstHash( tri );
+			Require( SameTris( expected, got ), "the indexed fix produced different triangles than the bin scan" );
+			compared++;
+			if ( expected && expected->next ) {
+				split++;
+			}
+			FreeTriList( expected );
+			FreeTriList( got );
+		}
+	}
+	Require( compared > 2000 && split > 50, "the dense scene must split many triangles, got " + std::to_string( split ) );
+	FreeTriList( fine.triList );
+	FreeTriList( coarse.triList );
+	FreeTJunctionHash();
+	Require( liveTris == 0 && liveHashVerts == 0, "the indexed fixer leaked triangles or hash vertexes" );
+}
+
 static void TestSliverDoesNotMultiply() {
 	// the old splitter turned each of these into thousands of overlapping slivers
 	const idVec3 collinear[] = { idVec3( 256, 0, 0 ), idVec3( 256, 1.0f / 32, 0 ), idVec3( 100, 0.0f, 0 ) };
@@ -226,6 +417,7 @@ int main() {
 		TestRealTriangleStillSplits();
 		TestThinTriangleSplitsAtEveryVertex();
 		TestSliverDoesNotMultiply();
+		TestIndexedHashMatchesBinScans();
 	} catch ( const std::exception &error ) {
 		std::fprintf( stderr, "FAIL: %s\n", error.what() );
 		return 1;

@@ -133,3 +133,78 @@ and that fixture build-layout cleanup remain separate work.
 The live multiplayer run also reports lazy precache warnings and a missing
 retail image, `models/monsters/burn_misc_sm`. They do not fail this functional
 smoke; the asset-reference/precache cleanup remains unqualified by this pass.
+
+## Follow-up: configure warnings and diagnostics, 6 November 2026
+
+CORE-04 rechecked the warnings and diagnostics listed above on fresh configures
+and live loads of the current tree.
+
+- **SDL headers.** A fresh Windows configure reproduced the include-sandbox
+  warning three times: the native queue, text collection bridge and text session
+  libraries now reach into `subprojects/packagefiles/sdl3/include`, as the four
+  native input fixtures do. Those headers declare openQ4's private SDL
+  extensions, and the bundled SDL subproject already carries them on its own
+  include path, which the libraries also receive. The overlay path is now added
+  only for a system or Android SDL.
+- **Content pack table.** The same configure warned about a newline inside a
+  string, from splitting `content_packs.py meson-list` output on a literal line
+  break; it now splits on `'\n'` and strips each row, as before.
+- **RmlUi wrap revision.** Not reproduced: a fresh configure unpacks RmlUi 6.3
+  from the package cache and applies its patches without a warning. The warning
+  belongs to build trees whose extracted subproject predates a wrap change, and
+  needs no dependency update.
+
+A fresh configure with `-Dbuild_native_tests=true` now prints no Meson warning.
+
+Diagnostics from live loads:
+
+- A dedicated `mp/q4dm1` load logged no lazy pre-cache warning. Its only warning,
+  `gfx/effects/energy_sparks/explosion_deform3 had stage with no image`, is
+  accurate: that retail stage binds only `fragmentMap` images.
+- `models/monsters/burn_misc_sm` is missing from the retail packages: the
+  shipped `materials/monsters.mtr` (pak002 and pak014) names
+  `models/monsters/burn_misc_sm.tga` in its `corpseBurnEffect` guide, and no
+  package contains that image. The warning stays.
+- Dedicated servers printed each ARB program path without ending the line,
+  because they return before GL initialization; the next message was glued to
+  it. The path is now followed by `: pending GL initialization`.
+
+Sanitizer and fuzz coverage added in this round: the dmap T-junction fixture
+now checks the indexed vertex merge and fix against the original bin scans on
+dense random geometry, and passes under Clang ASan+UBSan and MSVC (its first
+ASan run caught signed overflow in the new hash keys, now unsigned). Thirty
+seeded mutations of `core2.aas32`'s tactical sections, loaded by the dedicated
+server, were each accepted, dropped with a warning or rejected, and every run
+exited normally; see [AAS compiler](aas-compiler.md#loading-and-malformed-data).
+
+## AddressSanitizer gameplay, 6 November 2026
+
+A plain `-Db_sanitize=address` MSVC build links the engine but not the game
+modules: the linker cannot infer the sanitizer runtime for DLLs made of static
+libraries (LNK1394, with `/MT` and with `/MD`). This configuration links all of
+them:
+
+```
+tools/build/meson_setup.ps1 setup <dir> <source> --buildtype=debugoptimized
+  --wrap-mode=forcefallback -Db_sanitize=address -Db_vscrt=md
+  "-Dcpp_link_args=['/INFERASANLIBS:NO','clang_rt.asan_dynamic-x86_64.lib','clang_rt.asan_dynamic_runtime_thunk-x86_64.lib']"
+  "-Dc_link_args=[...same...]"
+```
+
+Run it with the MSVC `bin\Hostx64\x64` directory, which holds
+`clang_rt.asan_dynamic-x86_64.dll`, on `PATH`. `ASAN_OPTIONS=log_path=` must be
+relative: the colon in a drive letter is an option separator.
+
+Every run below finished with no AddressSanitizer report, against the installed
+retail packages:
+
+| Run | Result |
+|---|---|
+| Dedicated server, `mp/q4dm1`-`q4dm8` twice | 16/16 loads, exit 0, `jobsShutdown PASS` |
+| SP client, rebuilt #209 `airdefense1`, eight tactical AI fighting a god-mode player for 12 s | Loaded, AI took cover and fired, normal shutdown |
+| `dmap game/hub2`, and the supplied #209 `airdefense1` (22 minutes under ASan) | Exit 0, all outputs written |
+| `runAASTactical` on `core2` and `convoy2b` (retail collision decoding) | Exit 0 |
+| The four malformed `core2.aas32` fixtures and 30 seeded tactical-section mutations | Each accepted, dropped or rejected; exit 0 |
+
+This is Windows ASan only; a Linux ASan+UBSan gameplay build was not run,
+because it needs more free space on the system drive than the machine had.

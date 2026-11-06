@@ -62,7 +62,7 @@ exact; the estimate column is deliberately approximate.
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
-| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **45%** | 0 / 6 | Final-package lifecycle, measured loading/background work, parser and compiler coverage. |
+| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **95%** | 5 / 6 | Final-package and Linux/macOS map-tour lifecycle (CORE-01). |
 | [Developer map tools](#tool-completion-checkpoints) — TOOL | **20%** | 0 / 4 | Paused: production geometry authoring, build/play integration and reliability. |
 | [Release qualification](#release-qualification-and-completion-rules) — REL | **35%** | 0 / 4 | Exact package matrix, human/device evidence, lifecycle and promotion records. |
 | [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
@@ -96,9 +96,10 @@ The detailed task retains its full conditions and evidence links.
 - **Liquids:** the AAS water-jump flag defect is fixed and generated swim/water-jump
   links are checked. Static liquids, player/bot swimming and replicated air are
   selected scope; swimming monsters, new animations and moving volumes are deferred.
-- **Compiled geometry:** CORE-05 now reflects the repaired `hub2` sliver explosion
-  and silhouette scratch, with compile/load/save evidence. The independently
-  reported `airdefense1` compiler stop still needs its exact inputs/reproduction.
+- **Compiled geometry:** CORE-05 is closed. Besides the repaired `hub2` sliver
+  explosion and silhouette scratch, the #209 maps that took days now compile in
+  minutes to unchanged output, collision clips decode as Quake 4 wrote them, and
+  CORE-06 adds the AI's tactical features to rebuilt navigation.
 - **Saves:** v5 portable encoding and Windows/Linux cross-loads exist; legacy readers,
   Apple/ARM64 qualification and historical-mod failures keep their separate gates.
 - **Evidence limits:** the UI register remains wholly unaccepted at product level;
@@ -161,6 +162,8 @@ Locally reconciled 4 November 2026 against the evidence recorded below; this is 
 a fresh GitHub status check. These links connect the reports and contributions
 to the existing workstreams; they do not create separate schedules or promise a
 release. GitHub remains the source for subsequent discussion and PR/check state.
+The #209 entry was separately refreshed from GitHub and its supplied maps on
+5 November; the other entries retain their individual evidence dates.
 
 | Report or contribution | Owning work and remaining acceptance |
 | --- | --- |
@@ -183,7 +186,7 @@ release. GitHub remains the source for subsequent discussion and PR/check state.
 | [#201: Windows ARM64 harness cleanup PR](https://github.com/themuffinator/openQ4/pull/201) | GOV-02/CORE-04: closed on 31 October as superseded by `9fe6f4d89`, which retries short-lived Windows executable locks during fixture cleanup. Main's Windows ARM64 push verification at `b9c663758` passed `openq4-imported-game-regressions` and all 305 native tests. |
 | [#203: complete push-payload history](https://github.com/themuffinator/openQ4/pull/203) / [#205: packaged saves rejected as build 1](https://github.com/themuffinator/openQ4/issues/205) | REL-01/Q4-05/GOV-02: source review approved at `e178a61b`; the exact build-history regression and all three shallow-checkout negative controls pass on Windows. Main's payloads at `b9c663758` passed CI but still used a single-commit checkout, so they also report build 1 (the real count is 1905). #203 merged on 31 October in `18117f896`. #205 closed on 31 October: the Windows x64 payload from push verification at `f0a86b0ec` (artifact 13033914500) reports build 1920. In SP on `game/airdefense1`, its save committed with header build 1920, format 4, and loaded back into gameplay in a fresh profile. The replacement was linked from #168, #170, #183, #184 and #192. The Linux, macOS and Windows ARM64 payloads were not loaded. |
 | [#204: missing music in signed macOS 0.14.000](https://github.com/themuffinator/openQ4/issues/204) | PLAT-04/AUD-01: the report uses MacSourcePorts' signed build of withdrawn 0.14.0. The reporter recalls music and console ambience also missing in 0.13.2; their log has been requested. Their Hannibal opaque-window report matches the portal fade-distance fix `d361e62ea`, and the briefing-hologram decal report is to be filed separately. Signing does not establish a later engine revision. Preserve saves and package separation in any comparison; 0.13.2 cannot read format-4 saves. |
-| [#209: airdefense1 compilation stops](https://github.com/themuffinator/openQ4/issues/209) | CORE-05: reviewed 4 November. The supplied log confirms `3ea033f7`, which includes the earlier `hub2` compiler fixes. Shadow building finishes in 254.7 seconds and per-area optimization completes; the log ends during `FixGlobalTjunctions`, with static-model material loads and no fatal error, `.proc` write or normal completion. The exact source map, modified-asset identity, crash-versus-hang/interruption details and any crash reports have been requested. No independent reproduction or fix is established. Keep open and separate from #181, whose reporter has [confirmed the `hub2` rebuild succeeds](https://github.com/themuffinator/openQ4/issues/181#issuecomment-6572457735). |
+| [#209: airdefense1/core1 excessive compile time](https://github.com/themuffinator/openQ4/issues/209) | CORE-05: fixed locally on 6 November, not yet published. Profiling the supplied maps against the retail packages found passes that scanned per-plane curve groups, crowded vertex bins or growing triangle lists once per triangle. With indexes and tails, the supplied `airdefense1` compiles in 4-5 minutes and `core1` in about 3, and six stock maps give byte-identical `.proc` and AAS output. The rebuilt `airdefense1` loads, renders and navigates in SP. The reporter's completed-run build and `hidef2kbc72` packages remain unconfirmed; keep open for their confirmation on a published build. Separate from #181. See [compile time on dense patches](dmap-compilation.md#compile-time-on-dense-patches-6-november-2026). |
 | [rebelancap/openQ4-ios: iPhone, iPad and Apple Vision Pro port](https://github.com/rebelancap/openQ4-ios) | IOS-01 through IOS-06: a tested external port (v1.1.0), pinned to withdrawn `v0.14.000` as patches over a pristine upstream; porting from it is preferred. Integrate shared fixes on main first, then the Apple targets, crediting its author. Its user reports do not qualify the integrated build. |
 | [26 October main verification](https://github.com/themuffinator/openQ4/actions/runs/40277373140) | GOV-02/CORE-04/PLAT-04: Windows x64, Linux x64/ARM64 and three macOS jobs passed. Windows ARM64 has the failures above; macOS Intel Metal timed out in renderer-foundation self-tests. The Windows payload subsequently proved unable to save because its shallow checkout produced build 1 (#205). Preserve those failures; passing CI did not qualify packaged save/load or the failed targets. |
 | [29 October main verification](https://github.com/themuffinator/openQ4/actions/runs/40951670759) | GOV-02/CORE-04/PLAT-04: all eight push-verification jobs passed at `b9c663758`, including Windows ARM64 (305/305 native tests) and the Intel macOS OpenGL route. Its payloads still report build 1 (#205), so this run does not qualify packaged save/load. |
@@ -619,13 +622,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions and exact-package budgets. |
+| VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions beyond the Windows NVIDIA/Intel five-cycle soak, and exact-package budgets. |
 | VK-02 — Partial | Six controlled foreground samples pass the declared 28 ms presentation p99 budget on NVIDIA/Intel; failed diagnostic repeats remain retained. | Physical direct/hybrid routing, other power conditions and the broader exact-package pacing matrix. |
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
-| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform and pipeline pressure recover on NVIDIA/Intel. | Descriptor-driver failure on GPU, the unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
+| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel. | The unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
-| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed and two-cycle NVIDIA/Intel map tours pass. | Demonstrate improved tails and long-session cache plateaus in matched runs/soaks; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons and 50–200% depth/intensity views pass. | Cropped/offset/nested targets, remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views and cropped `envshot` faces pass. | Multisampling of views drawn straight to the window (GUI `renderDef`, remote captures inside an `envshot`), remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -726,6 +729,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
   recovery and all sixteen GL/Vulkan pairs within one display level.
   Descriptor-driver failure on GPU, broader lighting and mod-content
   qualification remain open.
+  Progress, 6 November: the [real-driver descriptor drill](vulkan-material-programs.md#descriptor-refusal-on-real-drivers-6-november-2026)
+  (`r_vkMaterialDescriptorPoolTest`) passes on NVIDIA and Intel. Both drivers
+  refuse over-quota authored draws, skipped redundant stages leave images
+  unchanged, and skips stop once both frame slots return to production pools.
+  Reload and restart with and without the drill recover exactly; all sixteen
+  GL/Vulkan pairs are within one display level. The descriptor-driver subpoint
+  is closed. Broader lighting/mod content and the strict lighting gate remain.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
@@ -779,6 +789,18 @@ and untested drivers remain open, with no tolerance or support-tier change.
   image slots, and report no Vulkan/validation warnings. Same-map allocation
   and process-memory growth remains recorded; these bounded tours do not
   establish long-session plateaus or promote an optimization.
+  Progress, 6 November: the [five-cycle soak](vulkan-resource-profiling.md#five-cycle-soak-6-november-2026)
+  ran 40 stops on the clean `1243eb6a` package on NVIDIA, Intel and GL, all
+  passing, with no validation messages. After the first cycle, Vulkan process
+  growth (at most 94 MiB on NVIDIA and 60 MiB on Intel over three cycles) is no
+  larger than GL's 97 MiB. Heap allocations stay 12 or 13 above resident images
+  throughout. The remaining one slot per cycle was traced, by listing every
+  image, to the retained interface's layer pool (capped at 48 slots and
+  256 MiB, with reuse and eviction) and a second loaded copy of one core1
+  objective image. Both are bounded front-end pools, not Vulkan lifetime
+  defects. This closes the long-session plateau evidence. What remains is
+  promoting an optimization with improved frame-time tails, which the
+  measured deferral decisions above do not yet justify.
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,
@@ -805,6 +827,29 @@ and untested drivers remain open, with no tolerance or support-tier change.
   34-case sequence passes at each of 0x/4x/8x MSAA from 50% through 200% scale,
   within the unchanged two-level full-frame limit and with exact reload/restart
   recovery. Actual cropped, offset and nested GPU comparisons remain open.
+  Progress, 6 November: [tiled captures](vulkan-captures.md#tiled-captures-6-november-2026)
+  larger than the window repeated one tile on Vulkan, which ignored the tile
+  viewport offset. Each view of a tiled frame now moves by the offset, and
+  view scissors are cut at the attachment edge. On NVIDIA, Vulkan places every
+  tile correctly (box-filtered correlation 0.999). 26 of 27 GL/Vulkan tile
+  comparisons are within one display level; the remaining one is an OpenGL
+  tile that repeats another. Tiling through the game-owned post-process target
+  is wrong on both backends, identically. Those OpenGL/shared tiled-capture
+  defects remain open outside this Vulkan fix.
+  Progress, 6 November (views): the [nested/cropped/offset fixture](vulkan-captures.md#nested-cropped-and-offset-views-6-november-2026)
+  found that remote-camera captures into ordinary file textures (the stock
+  `textures/common/camera1` idiom) failed on both backends. Those textures
+  are block-compressed with mips, so Vulkan blitted into BC1 and OpenGL bound
+  an incomplete framebuffer. Both now re-create such a destination as one RGBA8
+  level of the capture size, as Quake 4's `glCopyTexImage2D` did. Nested,
+  legacy-cropped nested and restarted nested views then pass on each backend
+  and match within one display level. An `envshot` under the legacy crop
+  drew each face at half size in a corner on both backends, because
+  `BeginFrame` sizes `glConfig` to the capture. The window size is now kept,
+  and non-window-sized captures skip that crop. Still open: Vulkan does not
+  multisample views drawn straight to the window, as OpenGL's 4x MSAA window
+  does: GUI `renderDef` edges (112 pixels, at most 11 levels) and a remote
+  capture inside an `envshot` face (113 edge pixels).
 
 ## Modern rendering engine
 
@@ -4383,18 +4428,19 @@ visual editor have their own active items.
 
 ### CORE completion checkpoints
 
-**Estimate: 45%; 0/6 tasks closed.** Job/loading foundations and targeted safety
-repairs exist. The old `hub2` failure is repaired, while broader compiler/runtime
-qualification remains; the map-editor pause does not pause these engine fixes.
+**Estimate: 95%; 5/6 tasks closed.** CORE-02 (not promoted), CORE-03, CORE-04,
+CORE-05 and CORE-06 are closed. CORE-01 needs its tours repeated on clean final
+packages and on Linux/macOS; the map-editor pause does not pause these engine
+fixes.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| CORE-01 — Partial | Job/runtime foundations plus GUI precache, expression-storage, coordinates and hit-map ownership fixes exist. | Refit/rerun the relevant map tours on final packages; job on/off, cancellation, budgets and dedicated shutdown on required platforms. |
-| CORE-02 — Partial | Worker DDS reading and opt-in cache experiments exist. | Cold/warm and sync/rewrite profiles; corrupt-cache fallback, bounded memory and cancel/restart/disconnect before promotion. |
-| CORE-03 — Partial foundations | Bounded jobs and audio decode/streaming offer existing scheduling infrastructure. | Profile justified decode/transcode/upload work; immutable handoff, backpressure, cancellation and main-thread adoption without unsafe shared callbacks/parsers. |
-| CORE-04 — Partial | Strict-string compliance and substantial parser/network/archive/restore hardening are implemented. | Broader sanitizer gameplay/fuzzing; reproduce current dependency/header warnings; handle actual remaining parser and missing-image diagnostics individually. |
-| CORE-05 — Partial | `hub2` sliver explosion and silhouette truncation repaired; compile/load/save and edge-builder regression evidence exist. | Broader rendering/collision/AI and memory qualification; independently reproduce #209 using exact map/assets; retain genuine compiler diagnostics. |
-| CORE-06 — Partial | Path/swim/water-jump generation exists, including MP-06's corrected liquid flag and output check. | Cover/lean/corner/pinch/vantage generation or an explicit rebuilt-map limitation; actual AI consumers and malformed/absent data. |
+| CORE-01 — Partial | GUI precache, expression-storage, coordinates and hit-map fixes; 6 November Windows development-build map tours: dedicated 24-load tours with jobs on and off and SP client tours plateau, and every run shuts down cleanly. | Repeat on clean final packages and on Linux/macOS. |
+| CORE-02 — Closed: not promoted | Current-build cold/warm tours, corrupt-cache fallback, bounded staging and map-change generations measured; the opt-in cache is slower cold (40%) and warm (7-14%), so it stays off. | — |
+| CORE-03 — Closed | SP load profiled: remaining main-thread image decode is under 5% of the load, not worth moving; dedicated servers no longer read and discard every level image prefetch (media finish 8.5 s to 1.5 s over 24 loads). | — |
+| CORE-04 — Closed | Strict strings; configure warnings fixed (RmlUi's not reproduced); diagnostics reviewed; collision contents decoding fixed; MSVC ASan gameplay (dedicated tour, SP combat, compilers, malformed and fuzzed AAS data) with no report; T-junction ASan/UBSan fixture. | — |
+| CORE-05 — Closed | `hub2` sliver and silhouette repairs; #209's maps profiled and compiling in minutes with byte-identical output; collision contents decoded as retail; rebuilt maps load, render and navigate (AI take cover) in SP with compile memory recorded. | — |
+| CORE-06 — Closed | Tactical features generated as Quake 4 does (98.8% of 7,422 retail features reproduced exactly); `runAASTactical`; rebuilt `airdefense1` AI takes cover as on retail data; malformed data dropped or rejected, fuzzed. | — |
 
 ### CORE task evidence and acceptance
 
@@ -4413,17 +4459,39 @@ qualification remains; the map-editor pause does not pause these engine fixes.
   Static fixtures with failing controls cover each; the map tours themselves
   were not rerun on main, and the tour harnesses remain to be refitted to
   main's audio interfaces.
-- [ ] **CORE-02 — P2, optimization: cache and loading promotion.** Investigate cold
+  Progress, 6 November: [map-cycle tours](parallel-job-system.md#map-cycle-and-shutdown-evidence-6-november-2026)
+  on the Windows x64 development build. The dedicated server loaded `q4dm1`-
+  `q4dm8` three times with jobs threaded and with `jobs_enable 0`: 24/24 loads
+  each, lap peaks 391/427/427 MiB, exit 0 within 0.42 s and `jobsShutdown PASS`.
+  The SP client toured four campaign maps three times, then `airdefense1`/
+  `hangar2` six times; both settle within a fixed band (the last four
+  `airdefense1` visits within 27 MiB) and shut down cleanly. Remaining: the same
+  tours on clean final packages, and on Linux and macOS.
+- [x] **CORE-02 — P2, optimization: cache and loading promotion.** Investigate cold
   load regressions, per-file Sync, cache identity and rewrite churn before enabling
   learned/generated-cache experiments. Default worker DDS reading already exists.
   Require cold/warm baselines, corrupt-cache fallback, bounded memory and cancel/
   restart/disconnect coverage; generated data remains disposable under savepath.
-- [ ] **CORE-03 — P2, implementation: justified background asset work.** Extend
+  Closed 6 November, [not promoted](loading-cache-modernization.md#current-build-measurement-and-promotion-decision-6-november-2026):
+  on three dedicated laps of eight stock maps, `com_levelLoadModernization 1`
+  took 8.5 s cold and 7.7-7.9 s warm against 6.1-7.2 s for the classic path,
+  although every warm load replayed its manifest without rejection and staging
+  stayed under 1 MiB. All 45 deliberately corrupted payloads were rebuilt from
+  source with no partial file left, and map changes closed every generation.
+  The experiment stays default-off.
+- [x] **CORE-03 — P2, implementation: justified background asset work.** Extend
   detached decode/transcode/upload scheduling and portal-aware prioritization only
   after profiling, with immutable ownership handoffs, backpressure, cancellation
   and main-thread adoption. Do not move game callbacks, GL calls or live parsers
   onto workers without a proven lifetime and thread-safety contract.
-- [ ] **CORE-04 — P2, implementation and qualification: compiler and safety debt.**
+  Closed 6 November after [profiling](parallel-job-system.md#background-asset-work-profile-6-november-2026):
+  of a 15.9 s SP `airdefense1` load, image decode left on the main thread is
+  0.72 s and GL upload 0.31 s, with the DDS reads already on workers; moving the
+  decode would save under 5% and is not justified. The profile showed dedicated
+  servers reading and discarding every prefetched level image; only a running
+  renderer now prefetches, which cut media finish from 8.5 s to 1.5 s over 24
+  dedicated loads.
+- [x] **CORE-04 — P2, implementation and qualification: compiler and safety debt.**
   Strict-string compliance is done (31 October): the sources are const-correct
   and `/Zc:strictStrings-` is removed, so MSVC enforces it. Broaden sanitizer
   gameplay and focused fuzzing for remaining parsers, event normalization and
@@ -4435,7 +4503,27 @@ qualification remains; the map-editor pause does not pause these engine fixes.
   dependency/header mismatches without updating dependencies solely to satisfy
   an obsolete warning. Recheck lazy pre-cache/missing-retail-image diagnostics
   separately.
-- [ ] **CORE-05 — P1, implementation and qualification: safe compiled geometry.**
+  Progress, 6 November ([details](core-runtime-refinements.md#follow-up-configure-warnings-and-diagnostics-6-november-2026)):
+  a fresh configure reproduced the SDL include-sandbox warning, now in three
+  engine libraries as well as the fixtures, plus a content-pack newline warning;
+  both are fixed, and a fresh configure with native tests prints no Meson
+  warning. The RmlUi wrap warning does not reproduce on a fresh configure. A
+  dedicated `q4dm1` load logs no lazy pre-cache warning; `burn_misc_sm` and the
+  `explosion_deform3` stage are genuine retail data gaps and keep their warnings;
+  dedicated program-path lines now end. Shipped `.cm` contents were decoded by
+  name although Quake 4 wrote them through a shifted table, so vehicle, fly, shot
+  and item clips loaded as the wrong contents; see
+  [collision contents names](dmap-compilation.md#collision-contents-names-6-november-2026).
+  New coverage: the T-junction fixture checks the indexed hash against the
+  original bin scans under Clang ASan+UBSan and MSVC, and 30 seeded mutations of
+  AAS tactical sections load safely. Closed with
+  [AddressSanitizer gameplay](core-runtime-refinements.md#addresssanitizer-gameplay-6-november-2026):
+  with `/INFERASANLIBS:NO` and explicit `/MD` runtime libraries an MSVC ASan
+  build links every module. A dedicated 16-load tour, SP combat on the rebuilt
+  #209 map, `dmap` of `hub2` and the #209 map, tactical generation, and all
+  malformed and fuzzed AAS inputs ran with no report. Linux ASan gameplay was
+  not run (system-drive space).
+- [x] **CORE-05 — P1, implementation and qualification: safe compiled geometry.**
   The historical `hub2` 36,635,340-index failure is repaired, not an outstanding
   request to raise the 16,777,216-index safety bound or redesign the surface format.
   [T-junction sliver repair](dmap-compilation.md#sliver-multiplication-in-t-junction-repair-31-october-2026)
@@ -4451,14 +4539,47 @@ qualification remains; the map-editor pause does not pause these engine fixes.
   Remaining: complete bounded-memory rendering, collision and actual AI behavior
   qualification, and investigate other diagnostics individually. Successful AAS
   generation and map entry alone do not prove navigation or whole-map parity.
-  Track #209's separate `airdefense1` compile against its exact map and asset
-  inputs once supplied; the log ending in global T-junction repair alone does
-  not identify a crash or establish a regression in the earlier `hub2` fixes.
-- [ ] **CORE-06 — P2, implementation and qualification: AAS tactical generation.**
+  Track #209's separate excessive compile time on the supplied `airdefense1` and
+  `core1` maps. The reporter confirms eventual completion, with two days reported
+  for `airdefense1`; the maps' increased explicit subdivision is a profiling lead.
+  Confirm the completed-run command/build and `hidef2kbc72` asset identity, then
+  measure stage timings and memory against stock assets and profile the slow pass.
+  The earlier log ending in global T-junction repair does not establish that the
+  whole delay occurs there or that the earlier `hub2` fixes regressed. See the
+  [5 November evidence](dmap-compilation.md#airdefense1-and-core1-slow-compile-report-5-november-2026).
+  Closed 6 November. Profiling the supplied #209 maps against the retail
+  packages found passes that grew with the square of a curve's triangles. dmap
+  scanned per-plane groups, crowded vertex bins and growing triangle lists once
+  per triangle, and the AAS leaf merge tested every portal plane against every
+  portal point. Indexes, list tails and a bounds test fix each pass
+  ([evidence](dmap-compilation.md#compile-time-on-dense-patches-6-november-2026)).
+  The supplied `airdefense1` now compiles in 4-5 minutes (138-198 s geometry,
+  64 s AAS, 1.18 GB peak) and `core1` in about 3 (1.75 GB). Six stock maps give
+  byte-identical `.proc` files and four identical AAS files, and stock
+  `airdefense1`'s AAS fell from 692 s to 58 s. Its rebuilt map and the supplied
+  one load in SP with valid navigation, render, and give tactical AI cover.
+  Shipped collision files now decode their clip contents as Quake 4 wrote them
+  ([collision contents names](dmap-compilation.md#collision-contents-names-6-november-2026)).
+  Compiler diagnostics such as `BuildOptTriangles: couldn't locate opposite`
+  are kept unchanged. #209 itself stays open for the reporter to confirm on a
+  published build.
+- [x] **CORE-06 — P2, implementation and qualification: AAS tactical generation.**
   Complete cover/lean/corner/pinch/vantage generation or retain an explicit
   rebuilt-map limitation; path/swim compilation already exists. Test stock/custom
   rebuilt data and actual AI consumers, including malformed or absent tactical
   data. These compiler gaps remain independent of the map-editor pause.
+  Closed 6 November ([evidence](aas-compiler.md#tactical-features)): the AAS
+  compiler places cover, lean, look-over and corner features after optimization,
+  reproducing the rules of Quake 4's own generator, and `runAASTactical`
+  regenerates them on existing files. On the retail geometry of all 28 shipped
+  `aas32` files it reproduced 7,333 of 7,422 retail features (98.8%), each with
+  retail's flags and normal; `core2`, `convoy1`, `convoy2`, `network2` and
+  `storage2` match exactly. Each area now lists only its own features, unlike
+  retail's modulo-1024 bucket quirk. A fully rebuilt `airdefense1` (242
+  features) loads in SP, and spawned tactical AI take cover at the same spot as
+  on retail data. The loader rejects truncated or negative sections and drops
+  inconsistent spans or indexes with a warning; 30 seeded mutations all load
+  safely. Pinch and vantage come only from `info_tactical_feature`, as in Quake 4.
 
 ### TOOL completion checkpoints
 

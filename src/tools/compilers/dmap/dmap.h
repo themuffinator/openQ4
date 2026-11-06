@@ -457,6 +457,7 @@ mapTri_t	*AllocTri( void );
 void		FreeTri( mapTri_t *tri );
 int			CountTriList( const mapTri_t *list );
 mapTri_t	*MergeTriLists( mapTri_t *a, mapTri_t *b );
+void		AppendTriList( mapTri_t **head, mapTri_t **tail, mapTri_t *list );
 mapTri_t	*CopyTriList( const mapTri_t *a );
 void		FreeTriList( mapTri_t *a );
 mapTri_t	*CopyMapTri( const mapTri_t *tri );

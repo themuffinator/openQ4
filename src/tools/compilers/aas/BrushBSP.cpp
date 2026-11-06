@@ -1907,6 +1907,25 @@ bool idBrushBSP::TryMergeLeafNodes( idBrushBSPPortal *portal, int side ) {
 
 		j = !i;
 
+		// The test compares every plane of one node with every point of the
+		// other node's portals, which dominated AAS builds of large maps.
+		// Most planes have all those points well in front of them; the corner
+		// of the points' bounds farthest behind a plane proves that without
+		// visiting the points. The margin keeps the shortcut to planes the
+		// point test below would pass whatever the rounding.
+		idBounds otherPoints;
+		otherPoints.Clear();
+		for ( p2 = nodes[j]->portals; p2; p2 = p2->next[s2] ) {
+			s2 = (p2->nodes[1] == nodes[j]);
+			if ( p2->nodes[!s2] == nodes[i] ) {
+				continue;
+			}
+			w = p2->winding;
+			for ( k = 0; k < w->GetNumPoints(); k++ ) {
+				otherPoints.AddPoint( (*w)[k].ToVec3() );
+			}
+		}
+
 		for ( p1 = nodes[i]->portals; p1; p1 = p1->next[s1] ) {
 			s1 = (p1->nodes[1] == nodes[i]);
 
@@ -1919,6 +1938,17 @@ bool idBrushBSP::TryMergeLeafNodes( idBrushBSPPortal *portal, int side ) {
 			}
 			else {
 				plane = p1->plane;
+			}
+
+			if ( otherPoints.IsCleared() ) {
+				continue;
+			}
+			idVec3 behind;
+			for ( k = 0; k < 3; k++ ) {
+				behind[k] = plane.Normal()[k] >= 0.0f ? otherPoints[0][k] : otherPoints[1][k];
+			}
+			if ( plane.Distance( behind ) >= -0.1f + 0.01f ) {
+				continue;
 			}
 
 			// all the non seperating portals of the other node should be at the front or on the plane
