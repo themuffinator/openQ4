@@ -6,6 +6,57 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Motion blur, temporal AA in mirrors, and Vulkan screenshots, 6 November 2026
+
+- Motion blur now works while temporal AA is on, including automatic
+  upscaling and dynamic resolution. Before, the sub-pixel jitter temporal AA
+  adds every frame looked like a camera change, so motion blur silently
+  stopped drawing on both renderers.
+- Your weapon no longer smears when you turn: it blurs only with its own
+  sway, recoil and reload animation. Characters and other skinned models blur
+  with their animation as well as their movement.
+- The blur length now follows how fast things move, not how many frames are
+  drawn, so 144 Hz and uncapped play look like 60 Hz play. Set
+  `r_motionBlurShutterMsec 0` to restore the previous behaviour, where blur
+  got shorter as the frame rate rose.
+- Cinematic camera cuts start a fresh blur instead of smearing across the cut,
+  and screenshots keep the blur. Dynamic-resolution scale changes no longer
+  interrupt it.
+- On Vulkan, temporal AA no longer switches itself off whenever a mirror,
+  security-camera screen or refraction effect is in view. Those views had
+  copied the main view's jitter, and each one reset the main view's history.
+  Mirrors are now also drawn without temporal AA's sub-pixel jitter on both
+  renderers.
+- On Vulkan, a display that stops accepting frames (switched off, or an
+  occluded window) no longer stalls the game for about half a minute per
+  frame; each frame now gives up once and tries again on the next.
+- Vulkan screenshots now include froxel fog, screen-space reflections and
+  screen-space GI exactly as displayed. Before, screenshots drew those effects
+  without the scene's depth.
+- Authored reflection probes (an experimental, default-off feature) no longer
+  pause the game when a new probe becomes resident. The half-second stall
+  first became about 85 ms with parallel filtering. Probes are now prepared
+  in the background and appear 0.15-0.37 s later, with identical lighting.
+  No gameplay frame spends more than about 3 ms on them on either renderer.
+  Screenshots wait for them. `r_pbrProbeAsyncPrefilter 0` restores the
+  previous behaviour.
+- On OpenGL with shadow maps, a mod surface whose see-through holes come from
+  a generated or missing alpha texture now falls back to the original stencil
+  shadows, as Vulkan already did, instead of casting a solid shadow while
+  reporting a mapped light. No stock material is affected.
+- The SSAO quality checks for PBR materials work again after half-resolution
+  SSAO; a handful of pixels that differ on Intel graphics are now an
+  explicitly bounded exception.
+- `rendererMotionBlurStatus` shows what motion blur is doing and why it
+  skipped a frame. `rendererTemporalPresentationStatus` now also counts how
+  every temporal AA frame resolved, with `reset` to clear both.
+- Replace the engine, renderer modules and `pak0.pk4` together.
+- Evidence: [motion blur](temporal-presentation.md#motion-blur),
+  [temporal qualification](temporal-presentation.md#validation),
+  [screen-space leaves](renderer-validation-matrix.md#frozen-same-process-leaf-and-rollback-captures-6-november-2026-ren-06),
+  [SSAO parity](renderer-validation-matrix.md#ssao-parity-controls-6-november-2026-ren-05) and
+  [probe cold misses](vulkan-probe-sources.md#cold-miss-cost-and-budget-6-november-2026-ren-06).
+
 ## Map compiler, collision and loading round (CORE), 6 November 2026
 
 - CORE-06: the AAS compiler generates Quake 4's tactical features (cover, lean,
@@ -41,6 +92,33 @@ See [player release status](../user/release-status.md).
   engine now returns free heap memory after each load. Evidence:
   [final-package qualification](parallel-job-system.md#final-package-qualification-6-november-2026).
   macOS stays with its evidence gate.
+
+## Vulkan screenshots and live camera screens, 6 November 2026
+
+- On Vulkan, a `screenshot` or `envshot` larger than the game window now
+  captures the whole picture. Before, it repeated the same window-sized corner
+  in every part of the image. Ordinary screenshots are unchanged.
+- A new developer drill, `r_vkMaterialDescriptorPoolTest`, makes the graphics
+  driver itself refuse shader resources. On NVIDIA and Intel, the affected
+  authored shader stages skip without changing the image, and rendering
+  recovers fully when the drill ends, after a shader reload and after a video
+  restart. All GL/Vulkan comparisons stay within one display level. See
+  [tiled-capture evidence](vulkan-captures.md#tiled-captures-6-november-2026) and
+  [descriptor evidence](vulkan-material-programs.md#descriptor-refusal-on-real-drivers-6-november-2026).
+- Live camera screens (a `remoteRenderMap` material that captures into an
+  ordinary texture, as the stock camera monitors do with
+  `textures/common/camera1`) showed black or old pixels on both renderers. The
+  capture could not write that texture, because it is stored compressed and
+  with mipmaps. Like the original game, the capture now replaces the texture
+  with a plain image of the camera's view, on OpenGL and Vulkan alike. See
+  [nested-view evidence](vulkan-captures.md#nested-cropped-and-offset-views-6-november-2026).
+- With the legacy `r_screenFraction` crop (`r_resolutionScaleMode 0`), an
+  `envshot` or other capture that is not window-sized now captures the full
+  view on both renderers. Before, each face was drawn at half size in one
+  corner.
+- Still open: larger-than-window captures through the game's post-process
+  path are wrong on both renderers, and OpenGL repeats one tile in the direct
+  path.
 
 ## Smaller downloads and updates, 6 November 2026
 

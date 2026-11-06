@@ -66,6 +66,25 @@ close the full custom-program, platform or promotion requirements. See
 
 ## PBR Material Laboratory
 
+### SSAO parity controls, 6 November 2026 (REN-05)
+
+The eight `ssao-*` laboratory controls failed on Vulkan on both GPUs
+(NVIDIA: native PBR "changed" 51,450 classic pixels; Intel: 59,878) since
+Vulkan SSAO began halving its resolution automatically below 32 samples (the
+laboratory uses 20). A view with native PBR's occlusion field always takes the
+full-resolution pass, while the classic-only control took the half-resolution
+one, so the check compared two different algorithms. The SSAO controls now pin
+`r_ssaoResolution 1`: NVIDIA passes 8/8 exactly. Intel Iris Xe (driver
+101.5590, `OPENQ4_LAB_VK_DEVICE=2`) reproduces the residual recorded on
+4 October: 4 isolated classic pixels and 6 debug-view pixels, where the PBR
+frame shows less occlusion at single pixels. Marking the occlusion arithmetic
+`precise` did not change them, and both passes fill depth through the same
+pipeline. The check now allows at most 8 classic and 12 debug pixels on an
+Intel Vulkan device only (`INTEL_VULKAN_SSAO_*` in
+`renderer_pbr_laboratory.py`); every other device stays exact. The half-
+resolution path itself has no matched PBR/classic control yet. lavapipe's
+one-byte scalar/texture difference was not re-run here.
+
 `renderer_pbr_preview.py` includes forty HDR-off preview and recovery controls,
 covering 50%, 75%, 125%, 150% and 200% scene scales. Its matched-backend
 comparison retains the full-frame two-byte gate. Pair it with
@@ -316,6 +335,50 @@ of a blended surface also carries the background behind it, which is why an
 absolute expectation there was wrong for both backends. Final retail gameplay/performance and
 backend/platform promotion remain separate gates.
 
+
+Matched half-resolution control: native PBR views always take the
+full-resolution pass, so half resolution reaches classic-only frames. The
+laboratory now captures `ssao-classic` and its occlusion debug view again at
+`r_ssaoResolution 2` and compares them with the full-resolution pair. OpenGL
+has a single SSAO resolution and must match exactly; it does. On Vulkan the
+half-resolution field must differ from full by at most 4 levels on average,
+with a signed bias under 1 level, and darken within 15% as many classic
+pixels:
+
+| Device | Mean difference | Signed bias | Darkened pixels, full / half |
+| --- | --- | --- | --- |
+| RTX 4060 Laptop GPU | 2.07 levels | +0.02 | 251,042 / 254,006 (+1.2%) |
+| Iris Xe (101.5590) | 2.95 levels | +0.03 | 244,971 / 250,721 (+2.3%) |
+
+Half resolution is a close, unbiased approximation on both devices: it
+softens contact edges but neither darkens nor lightens the scene.
+
+### Skin substitutions on packed MD5R, 6 November 2026 (REN-05)
+
+The laboratory fixture ships two skins for its skinned specimen: its PBR metal
+becomes a PBR dielectric (`openq4_pbr_lab/skinned_dielectric`) or a classic
+material (`openq4_pbr_lab/skinned_classic`). They are precached through
+worldspawn `skin_` keys and applied as a spawn key. The controls run on CPU
+skinning and on the packed MD5R conversion (`r_convertMD5toMD5R 1`), in fresh
+processes and in batches, on OpenGL and Vulkan:
+
+- each skin visibly changes the specimen (dielectric about 17, classic 39-43
+  levels mean in the specimen window);
+- the dielectric stays PBR-owned (4,225 ownership pixels, as unskinned), the
+  classic substitute is drawn classically (no ownership pixels);
+- packed MD5R draws both substitutions identically to CPU skinning (0.0 mean
+  difference, as unsubstituted).
+
+Mixed-material model: the fixture also ships `openq4_pbr_lab_mixed`, the same
+skinned sphere split into two meshes, PBR metal above its equator and a
+classic material below, as a mod might author one model. On CPU skinning and
+packed MD5R, on both backends, the ownership view shows PBR on the whole upper
+half of the disc (10,668 pixels) and none on the lower half, and MD5R matches
+CPU skinning exactly. OpenGL routes such a frame to its classic light loop
+rather than the modern visible path (the classic skinned part has no proven
+lighting parity there; under MD5R its stencil shadow has no vertex buffer),
+and the native PBR owner still admits the PBR part; the control requires both.
+Vulkan keeps native ownership.
 ## Automated Safe Matrix
 
 The modern-visible and low-overhead GL self-tests explicitly request a hidden
@@ -513,6 +576,35 @@ GI, or whole-frame modern lighting ownership. All leaves remain default off;
 clean committed-package, target-platform/driver, and retained visual-review
 promotion remain open. See the [user controls and limitations](../user/advanced-screen-space-lighting.md)
 and [`airdefense1` optimization evidence](airdefense1-optimization-evidence.md).
+
+#### Frozen same-process leaf and rollback captures, 6 November 2026 (REN-06)
+
+`tools/tests/renderer_screen_space_effects_qualification.py` replaces the
+separate-launch comparison with one launch per backend: `game/airdefense1`
+frozen with `g_stopTime` at the outdoor "opening" pose, HUD and view weapon
+hidden, temporal AA and motion blur off. It captures the baseline, each leaf,
+all three, all three with `r_rendererModernQuality 0`, and the baseline again,
+and excludes any pixel that differs between the two baselines.
+
+| 2560 x 1440 | Froxel | SSR | SSGI | All | Master off | GPU over base |
+| --- | --- | --- | --- | --- | --- | --- |
+| OpenGL | 4.77 M bytes | 0.10 M | 3.22 M | 6.65 M | identical | at most 0.2 ms |
+| Vulkan | 4.70 M bytes | 0.10 M | 3.19 M | 6.63 M | identical | at most 1.4 ms |
+
+Changed channel bytes against the baseline. OpenGL's two baselines are
+identical; Vulkan's differ on 10,873 scattered pixels by at most 8 levels
+(0.3%, inside the declared 1% bound), consistent with frame-indexed dithering
+in the depth-aware capture present. Delayed whole-frame GPU times are
+5.7-7.4 ms per configuration.
+
+The first Vulkan run showed SSR changing nothing, SSGI almost nothing and the
+combination equal to froxel alone, while froxel fog was far stronger than on
+OpenGL. A capture advanced the history generation and retired every depth
+stamp before its resolve, so screenshots presented the screen-space tail
+without depth. Capture frames now use the current frame's depth proof
+(`VK_TemporalPresentation_DepthCurrentForCapture`); gameplay frames were not
+affected. Not covered: other poses and maps, other GPUs and platforms, and
+review of the leaves' appearance.
 
 The same foundation case requires `rendererContractsSelfTest` and
 `rendererGpuSkinningSelfTest` to pass without a skip. The Vulkan startup case
@@ -966,6 +1058,100 @@ Nondeterministic BSE, cinematic, and MP scenes need human review in addition to 
 | `shadow-cutout-storage2` | SP | `game/storage2` | hashed-alpha cutout fence/grate caster validation at distance |
 | `shadow-character-airdefense2` | SP | `game/airdefense2` | dynamic character shadow caster and receiver validation |
 | `shadow-translucent-medlabs` | SP | `game/medlabs` | optional translucent moment caster coverage where the selected tier supports it |
+
+### Continuous-motion shadow tour, 6 November 2026 (REN-03)
+
+`tools/tests/renderer_shadow_motion_qualification.py` tours the eight matched
+`game/airdefense1` outdoor poses of `renderer_shadow_mapping_outdoor.py`
+while `benchmarkViewSweep` pans continuously, and reads every
+`r_shadowMapReport` summary (interval 15 frames). Windows x64, RTX 4060
+Laptop GPU:
+
+| Case | OpenGL (ARB2 cache estimate over 790 reports) | Vulkan (52-53 cache reports) |
+| --- | --- | --- |
+| Default budget | 5,231 passes: 2,242 fresh, 2,989 cache hits; no budget, receiver or stencil fallback, no unshadowed light | no fallback, no dropped query; slots at most 8/8 projected, 10/12 point; 94-198 MB resident |
+| Cascades (`r_shadowMapCSM`, projected CSM, 4 cascades) | 4,399 passes, 3,244 fresh; no fallback, none unshadowed | no fallback; 9/12 point slots; 102-192 MB |
+| One update per view (`r_shadowMapMaxUpdatesPerView 1`) | 994 budget-fallback passes with 0 unshadowed and 0 stencil-only: over-budget lights stay shadowed | no fallback reported; 102-180 MB |
+
+Resident megabytes follow which lights are cached at each pose; the bound is
+the fixed slot capacity, which no report exceeds. Moving casters and cutouts
+under motion are covered below; translucent and custom-receiver fixtures keep
+their own suites.
+
+Receiver images after motion (`--cases receivers`): at every tour pose the
+sweep stops, game time freezes and four engine screenshots follow - the frame
+drawn from the cache the motion left (`warm`), the same frame again (bytes that
+differ are unfrozen noise), the frame with `r_shadowMapStaticCache 0` so every
+map renders fresh (`cold`), and the frame with shadows off (the control).
+Outside the noise, warm must match cold within 0.05% of bytes; at least six
+poses must show shadows (the control changes at least 1% of bytes), so a
+missing caster could not hide.
+
+| Backend | Warm vs fresh, worst pose | Shadow control (share of bytes shadows change) |
+| --- | --- | --- |
+| OpenGL | 31 bytes (0.0003%), at most 5 levels | 10-45% on all eight poses |
+| Vulkan | 237 bytes (0.002%), at most 11 levels | 1.0-6.5%; seven of eight poses over 1% |
+
+No pose shows a stale, missing or doubled receiver after motion on either
+backend. The residual differences are isolated pixels. Vulkan's smaller
+control share is how much of each view its shadows cover, not a weaker check.
+
+Moving casters and cutouts under continuous motion
+(`renderer_shadow_mapping_maps.py --scenario`, `airdefense2`, both backends):
+
+- `door-sweep` repeats the door-projected fixture while the camera, and the
+  weapon flashlight it carries, pans 540 degrees through each of the four door
+  movements. Every paused phase then follows motion of the light, the door
+  leaves and the view. Cached shadows match the fresh render within the
+  fresh-repeat control at all six phases (worst 0.22 against 0.17 on Vulkan's
+  open phase; zero elsewhere), and the shadows-off control shows shadows at
+  every phase.
+- `caster-cycle-cutout-sweep` spawns the twelve perforated crates
+  (`textures/terminal/square_hole`) and removes them in two steps while the
+  camera turns a full 360 degrees. Each turn ends at the starting view, so the
+  exact caster and alpha counts still apply. All three turns complete, the
+  counts match, the cached flashlight depth is reused once the light rests,
+  and the cached images match fresh ones.
+- `caster-cycle-translucent` and `caster-cycle-translucent-sweep` spawn the
+  same twelve crates in stock forcefield glass (`textures/glass/forcefield`,
+  translucent coverage with no authored opt-out) with
+  `r_shadowMapTranslucentMoments 1`, still and with the camera turning.
+  OpenGL admits exactly the spawned crates as translucent casters (24, then
+  12, then none), Vulkan draws its translucent moment pass, and cached images
+  match fresh ones at every phase (worst 0.09 levels, on phases without
+  crates).
+- The caster cycles now also compare images, not only caster reports: cached
+  against fresh, judged by the fresh-repeat control as the door fixtures are.
+  The six cycles and `door-projected` pass on both backends.
+
+These fixtures had silently stopped testing the flashlight. Weapon flashlights
+take their shadow flag from `g_dynamicLightShadows` when they spawn, and its
+retail default follows `com_machineSpec`, which a fresh test profile can detect
+below 3. The runner now passes `g_dynamicLightShadows 1` at launch. Custom-GLSL
+receivers keep their stencil fallback, which is not cached, and stay in the
+authored-lighting suite. The gameplay benchmark's `shadow-translucent-medlabs`
+qualification candidate is not a working fixture: it fails stationary as well,
+because its view falls back for shadow geometry before translucent moments.
+
+Static/live composition audit (both backends agree): a projected light caches
+static depth only, keeps dynamic casters out of its cache signature and draws
+them over the restored tile each view; the opt-in shared world-interaction
+stream disables that composition. A point light never composes: any dynamic
+caster, and `r_shadowMapStaticHysteresisFrames` after the last one, defeats its
+cube cache, so the cube is rendered fresh with every caster. Neither path can
+show a stale or doubled caster; the cost is a full cube render per frame for
+point lights with moving casters (`RB_ShadowMapStaticCacheable`,
+`VK_ShadowMap_StaticCacheable`).
+
+Cutout casters whose coverage cannot be reproduced (an active alpha-test stage
+with no bindable image, or generated texture coordinates): Vulkan already
+failed such a light to the sticky stencil fallback, while OpenGL drew the
+caster as solid depth into a light still reported as mapped, so its holes cast
+shadow. OpenGL now fails the pass and takes the same fallback; retail stencil
+volumes ignore alpha, so the result matches the original game. A perforated
+caster with no active alpha stage is solid and keeps solid depth. No stock
+material or guide reaches the case (94 material files audited); mods can.
+`renderer_shadow_alpha_fallback_contract.py` pins both backends.
 
 ## Acceptance
 

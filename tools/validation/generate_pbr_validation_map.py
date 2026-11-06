@@ -26,6 +26,14 @@ CONSTANT_NORMAL_MODEL = "models/openq4/pbr_lab/sphere_constant_normal.ase"
 VERTEX_COLOR_MODEL = "models/openq4/pbr_lab/sphere_vertex_color.ase"
 SKINNING_MODEL = "openq4_pbr_lab_skinned"
 SKINNING_MESH = "models/openq4/pbr_lab/skinned.md5mesh"
+# REN-05 skin substitutions on the skinned specimen (CPU and packed MD5R): its
+# authored PBR metal becomes another PBR material, or a classic one.
+# REN-05 mixed-material model: the skinned sphere split into two meshes, PBR
+# metal above its equator and a classic material below, as a mod might author.
+MIXED_MODEL = "openq4_pbr_lab_mixed"
+MIXED_MESH = "models/openq4/pbr_lab/mixed.md5mesh"
+MIXED_SHADERS = (f"{PREFIX}/metal_3", f"{PREFIX}/classic_specular")
+SKINNING_SKINS = {"dielectric": "openq4_pbr_lab/skinned_dielectric", "classic": "openq4_pbr_lab/skinned_classic"}
 
 
 def rgba_tga(size: int, pixels: list[tuple[int, int, int, int]]) -> bytes:
@@ -145,8 +153,12 @@ def brush(lo: tuple[int, int, int], hi: tuple[int, int, int], material: str) -> 
     return '{\nbrushDef3\n{\n' + '\n'.join(f'( {a} {b} {c} {d} ) ( ( 0.0078125 0 0 ) ( 0 0.0078125 0 ) ) "{material}"' for a, b, c, d in planes) + '\n}\n}\n'
 
 
-def skinned_sphere() -> tuple[str,str,str]:
-    """Original two-joint MD5 specimen with a smooth, exact two-weight bend."""
+def skinned_sphere(shaders: tuple[str, ...] = (f'{PREFIX}/metal_3',)) -> tuple[str,str,str]:
+    """Original two-joint MD5 specimen with a smooth, exact two-weight bend.
+
+    With two shaders the rings split at the equator into two meshes that share
+    the vertices: the first shader above, the second below.
+    """
     segments,rings,radius=32,16,72
     vertices,weights,triangles=[],[],[]
     for j in range(rings+1):
@@ -166,13 +178,16 @@ def skinned_sphere() -> tuple[str,str,str]:
             # MD5 faces use the engine's clockwise convention directly.
             if j>0: triangles.append((a,b,c))
             if j<rings-1: triangles.append((b,d,c))
-    mesh=['MD5Version 10','commandline "original openQ4 PBR laboratory"','numJoints 2','numMeshes 1',
-          'joints {','"origin" -1 ( 0 0 0 ) ( 0 0 0 )','"bend" 0 ( 0 0 36 ) ( 0 0 0 )','}',
-          'mesh {',f'shader "{PREFIX}/metal_3"',f'numverts {len(vertices)}']
-    mesh += [f'vert {i} ( {u:.9g} {v:.9g} ) {first} {count}' for i,(u,v,first,count) in enumerate(vertices)]
-    mesh += [f'numtris {len(triangles)}']+[f'tri {i} {a} {b} {c}' for i,(a,b,c) in enumerate(triangles)]
-    mesh += [f'numweights {len(weights)}']+[f'weight {i} {joint} {weight:.9g} ( {x:.9g} {y:.9g} {z:.9g} )' for i,(joint,weight,x,y,z) in enumerate(weights)]
-    mesh += ['}','']
+    mesh=['MD5Version 10','commandline "original openQ4 PBR laboratory"','numJoints 2',f'numMeshes {len(shaders)}',
+          'joints {','"origin" -1 ( 0 0 0 ) ( 0 0 0 )','"bend" 0 ( 0 0 36 ) ( 0 0 0 )','}']
+    split=(rings//2)*segments*2-segments  # triangles of the upper rings (the first ring has one per quad)
+    parts=[triangles] if len(shaders)==1 else [triangles[:split], triangles[split:]]
+    for shader,part in zip(shaders,parts):
+        mesh += ['mesh {',f'shader "{shader}"',f'numverts {len(vertices)}']
+        mesh += [f'vert {i} ( {u:.9g} {v:.9g} ) {first} {count}' for i,(u,v,first,count) in enumerate(vertices)]
+        mesh += [f'numtris {len(part)}']+[f'tri {i} {a} {b} {c}' for i,(a,b,c) in enumerate(part)]
+        mesh += [f'numweights {len(weights)}']+[f'weight {i} {joint} {weight:.9g} ( {x:.9g} {y:.9g} {z:.9g} )' for i,(joint,weight,x,y,z) in enumerate(weights)]
+        mesh += ['}','']
     anim='''MD5Version 10
 commandline "original openQ4 PBR laboratory"
 numFrames 2
@@ -195,6 +210,8 @@ frame 0 { }
 frame 1 { }
 '''
     model=f'model {SKINNING_MODEL} {{\nmesh {SKINNING_MESH}\nanim idle models/openq4/pbr_lab/idle.md5anim\n}}\n'
+    if len(shaders)>1:
+        model=f'model {MIXED_MODEL} {{\nmesh {MIXED_MESH}\nanim idle models/openq4/pbr_lab/idle.md5anim\n}}\n'
     return '\n'.join(mesh),anim,model
 
 
@@ -257,6 +274,21 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     mats += [f'{PREFIX}/classic_bump\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap _white\n}}\n',
              f'{PREFIX}/classic_diffuse\n{{\nbumpmap _flat\ndiffusemap {PREFIX}/grey\nspecularmap _black\n}}\n']
     mats += [f'{PREFIX}/classic_colored\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap {PREFIX}/copper\n}}\n']
+    # REN-02: the classic cutout, a flat-bump diffuse whose stage alpha-tests.
+    mats += [f'{PREFIX}/classic_cutout\n{{\nbumpmap _flat\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\n}}\nspecularmap _black\n}}\n']
+    # Corridor-reproducible stage state: vertex colour and a texture matrix on
+    # the bump stage (REN-02). An interaction takes its vertex colour from the
+    # last diffuse or specular stage, so both stages carry it.
+    mats += [f'{PREFIX}/classic_vertex\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/grey\nvertexColor\n}}\n{{\nblend specularmap\nmap _white\nvertexColor\n}}\n}}\n']
+    # A stage expression: the specular stage is conditioned on parm7, which the
+    # specimen leaves at 0, so ARB2 skips it.
+    mats += [f'{PREFIX}/classic_condition\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\n{{\nblend specularmap\nmap _white\nif ( parm7 > 0.5 )\n}}\n}}\n']
+    # Two interaction stage sets: a bumped specular grey, then a flat dark one
+    # (dark keeps the sum inside the comparison's unclipped range).
+    mats += [f'{PREFIX}/classic_multistage\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap _white\n{{\nblend bumpmap\nmap _flat\n}}\n{{\nblend diffusemap\nmap {PREFIX}/dark\n}}\n}}\n']
+    mats += [f'{PREFIX}/classic_texmatrix\n{{\n{{\nblend bumpmap\nmap {PREFIX}/normal\nscale 3, 3\n}}\ndiffusemap {PREFIX}/grey\nspecularmap _white\n}}\n']
+    # ... and the common stock shape: a bumped, specular cutout.
+    mats += [f'{PREFIX}/classic_cutout_bump\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\n}}\nspecularmap _white\n}}\n']
     stations: list[dict] = []
     for row, metal in enumerate((0,1)):
         for col, roughness in enumerate((0.045, 0.16, 0.32, 0.5, 0.75, 1.0)):
@@ -292,7 +324,12 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     skin_mesh,skin_anim,skin_def=skinned_sphere()
     add(SKINNING_MESH,skin_mesh)
     add('models/openq4/pbr_lab/idle.md5anim',skin_anim)
-    add('def/openq4_pbr_lab.def',skin_def)
+    mixed_mesh,_,mixed_def=skinned_sphere(MIXED_SHADERS)
+    add(MIXED_MESH,mixed_mesh)
+    add('def/openq4_pbr_lab.def',skin_def+mixed_def)
+    add('skins/openq4_pbr_lab.skin',
+        f'skin {SKINNING_SKINS["dielectric"]}\n{{\n{PREFIX}/metal_3 {PREFIX}/dielectric_1\n}}\n'
+        f'skin {SKINNING_SKINS["classic"]}\n{{\n{PREFIX}/metal_3 {PREFIX}/classic_specular\n}}\n')
 
     # Two distinct native-convention cubes exercise all six orientations,
     # sub-256 source resizing, roughness filtering, overlap and edge fallback.
@@ -350,8 +387,10 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     # checks merely because another green PBR surface is visible behind it.
     level = f'Version 3\n{{\n"classname" "worldspawn"\n"mtr_local_global_test" "{PREFIX}/noself_shadow"\n' + ''.join(brush(lo,hi,f'{PREFIX}/classic_floor') for lo,hi in room) + '}\n'
     precache = f'"model_sampling_test" "{SAMPLING_MODEL}"\n"model_skinning_test" "{SKINNING_MODEL}"\n"def_skinning_test" "func_animate"\n"mtr_classic_rejection_test" "{PREFIX}/classic_specular"\n' + ''.join(f'"mtr_sampling_{name}" "{PREFIX}/sampler_{name}"\n' for name in ('nearest','linear','clamp','mips'))
-    precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored'))
+    precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored','cutout','cutout_bump','vertex','texmatrix','condition','multistage'))
     precache += f'"mtr_extreme_emissive_test" "{PREFIX}/extreme_emissive"\n'
+    precache += ''.join(f'"skin_skinning_{name}_test" "{skin}"\n' for name, skin in SKINNING_SKINS.items())
+    precache += f'"model_mixed_material_test" "{MIXED_MODEL}"\n'
     precache += f'"model_constant_normal_test" "{CONSTANT_NORMAL_MODEL}"\n"mtr_aa_normal_test" "{PREFIX}/aa_normal"\n"mtr_aa_geometric_test" "{PREFIX}/aa_geometric"\n'
     precache += ''.join(f'"mtr_{name}_test" "{PREFIX}/{name}"\n' for name in
                        ('emission_half','emission_quarter','emission_cutout','emission_mismatch','cutout_mismatch','emission_extreme_native'))

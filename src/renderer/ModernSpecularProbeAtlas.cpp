@@ -6,6 +6,8 @@
 #include "GLStateCache.h"
 #include "PBREnvironment.h"
 #include "GLPixelTransferScope.h"
+#include "ScenePackets.h"
+#include "RendererMetrics.h"
 
 /*
 ================================================================================
@@ -34,6 +36,8 @@ typedef struct modernSpecularProbeAtlasEntry_s {
 	bool			resident;
 	bool			pendingUpload;
 	bool			uploaded;
+	bool			prefilterRunning;	// prefilterJobs[slot] holds this source
+	unsigned long long prefilterStartClock;
 	modernSpecularProbeAtlasPlacement_t placement;
 } modernSpecularProbeAtlasEntry_t;
 
@@ -48,6 +52,35 @@ static std::uint64_t rg_modernSpecularProbeAtlasGeneration = 0;
 static std::uint64_t rg_modernSpecularProbeAtlasNextResidencyGeneration = 0;
 static std::uint64_t rg_modernSpecularProbeAtlasFrame = 0;
 static modernSpecularProbeAtlasStats_t rg_modernSpecularProbeAtlasStats;
+static openq4PBR::AsyncPrefilter rg_modernSpecularProbePrefilterJobs[MODERN_SPECULAR_PROBE_ATLAS_MAX_ENTRIES];
+// Finished background tiles awaiting their budgeted upload slices.
+struct modernSpecularProbePublish_t {
+	bool taken = false;
+	int nextTile = 0;
+	openq4PBR::PrefilteredTiles tiles;
+};
+static modernSpecularProbePublish_t rg_modernSpecularProbePublish[MODERN_SPECULAR_PROBE_ATLAS_MAX_ENTRIES];
+static const unsigned int MODERN_SPECULAR_PROBE_PREFILTER_WORKERS = 4;
+
+static void R_ModernSpecularProbeAtlas_CancelPrefilter( int slot ) {
+	if ( rg_modernSpecularProbePrefilterJobs[slot].Running() || rg_modernSpecularProbePublish[slot].taken ) {
+		rg_modernSpecularProbePrefilterJobs[slot].Cancel();
+		rg_modernSpecularProbeAtlasStats.prefilterCancelled++;
+	}
+	rg_modernSpecularProbePublish[slot] = modernSpecularProbePublish_t();
+}
+
+bool R_ModernSpecularProbeAtlas_CaptureFrame( const idScenePacketFrame &frame ) {
+	if ( R_PBRProbes_SettleRequested() ) {
+		return true;
+	}
+	for ( int i = 0; i < frame.NumScenes(); ++i ) {
+		if ( frame.Scene( i ).temporalCaptureFrame ) {
+			return true;
+		}
+	}
+	return false;
+}
 
 const char *ModernSpecularProbeAtlasReject_Name(
 		modernSpecularProbeAtlasReject_t reject ) {
@@ -66,6 +99,7 @@ const char *ModernSpecularProbeAtlasReject_Name(
 	case MODERN_SPECULAR_PROBE_ATLAS_REJECT_ATLAS_FULL:		return "atlas-full";
 	case MODERN_SPECULAR_PROBE_ATLAS_REJECT_SOURCE_CHANGED:	return "source-changed";
 	case MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE:return "upload-unavailable";
+	case MODERN_SPECULAR_PROBE_ATLAS_REJECT_PREFILTER_PENDING:return "prefilter-pending";
 	default:											return "unknown";
 	}
 }
@@ -86,6 +120,10 @@ static void R_ModernSpecularProbeAtlas_SetStatus( const char *status ) {
 }
 
 static void R_ModernSpecularProbeAtlas_ResetEntries( void ) {
+	// Join every background filter before its slot or the module goes away.
+	for ( int slot = 0; slot < MODERN_SPECULAR_PROBE_ATLAS_MAX_ENTRIES; ++slot ) {
+		R_ModernSpecularProbeAtlas_CancelPrefilter( slot );
+	}
 	memset( rg_modernSpecularProbeAtlasEntries, 0,
 		sizeof( rg_modernSpecularProbeAtlasEntries ) );
 	for ( int slot = 0; slot < MODERN_SPECULAR_PROBE_ATLAS_MAX_ENTRIES; ++slot ) {
@@ -99,6 +137,7 @@ static void R_ModernSpecularProbeAtlas_RefreshCounts( void ) {
 	int resident = 0;
 	int live = 0;
 	int pending = 0;
+	unsigned int running = 0;
 	for ( int slot = 0; slot < MODERN_SPECULAR_PROBE_ATLAS_MAX_ENTRIES; ++slot ) {
 		const modernSpecularProbeAtlasEntry_t &entry =
 			rg_modernSpecularProbeAtlasEntries[slot];
@@ -112,7 +151,11 @@ static void R_ModernSpecularProbeAtlas_RefreshCounts( void ) {
 		if ( entry.pendingUpload ) {
 			pending++;
 		}
+		if ( entry.prefilterRunning ) {
+			running++;
+		}
 	}
+	rg_modernSpecularProbeAtlasStats.prefilterRunning = running;
 	rg_modernSpecularProbeAtlasStats.residentEntries = resident;
 	rg_modernSpecularProbeAtlasStats.liveEntries = live;
 	rg_modernSpecularProbeAtlasStats.pendingEntries = pending;
@@ -269,19 +312,33 @@ static void R_ModernSpecularProbeAtlas_UploadTile( int cell, int level,
 		size, size, GL_RGBA, GL_FLOAT, rgba.data() );
 }
 
-template<class Sampler>
-static void R_ModernSpecularProbeAtlas_Filter( int slot, const Sampler &sample ) {
+static void R_ModernSpecularProbeAtlas_UploadTiles( int slot, const openq4PBR::PrefilteredTiles &tiles ) {
 	for ( int level = 0; level <= MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP; ++level ) {
 		const int size = MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE >> level;
-		const float roughness = static_cast<float>( level ) / MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP;
 		for ( int face = 0; face < MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT; ++face ) {
 			R_ModernSpecularProbeAtlas_UploadTile( slot * MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT + face,
-				level, size, openq4PBR::PrefilterFace( sample, face, size, roughness ) );
+				level, size, tiles.specular[ level * MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT + face ] );
 		}
 	}
 	R_ModernSpecularProbeAtlas_UploadTile( MODERN_SPECULAR_PROBE_DIFFUSE_FIRST_CELL + slot,
-		0, MODERN_SPECULAR_PROBE_DIFFUSE_SIZE,
-		openq4PBR::DiffuseIrradiance( sample, MODERN_SPECULAR_PROBE_DIFFUSE_SIZE ) );
+		0, MODERN_SPECULAR_PROBE_DIFFUSE_SIZE, tiles.diffuse );
+}
+
+static void R_ModernSpecularProbeAtlas_UploadHalfTile( int cell, int level,
+		int size, const std::vector<std::uint16_t> &rgba ) {
+	const int stride = MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE >> level;
+	glTexSubImage2D( GL_TEXTURE_2D, level,
+		( cell % MODERN_SPECULAR_PROBE_ATLAS_CELLS_PER_ROW ) * stride,
+		( cell / MODERN_SPECULAR_PROBE_ATLAS_CELLS_PER_ROW ) * stride,
+		size, size, GL_RGBA, GL_HALF_FLOAT, rgba.data() );
+}
+
+template<class Sampler>
+static void R_ModernSpecularProbeAtlas_Filter( int slot, const Sampler &sample ) {
+	// The tiles are computed in parallel and uploaded in the original order.
+	R_ModernSpecularProbeAtlas_UploadTiles( slot, openq4PBR::PrefilterTiles( sample,
+		MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE, MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP,
+		MODERN_SPECULAR_PROBE_DIFFUSE_SIZE ) );
 }
 
 void R_ModernSpecularProbeAtlas_Init( const renderBackendCaps_t &caps,
@@ -514,6 +571,8 @@ modernSpecularProbeAtlasReject_t R_ModernSpecularProbeAtlas_Acquire(
 
 	modernSpecularProbeAtlasEntry_t &entry =
 		rg_modernSpecularProbeAtlasEntries[slot];
+	// A reused slot (eviction or reload) discards any filter of its old source.
+	R_ModernSpecularProbeAtlas_CancelPrefilter( slot );
 	memset( &entry, 0, sizeof( entry ) );
 	entry.image = image;
 	entry.sourceHandle = sourceHandle;
@@ -543,12 +602,15 @@ modernSpecularProbeAtlasReject_t R_ModernSpecularProbeAtlas_Acquire(
 	return MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE;
 }
 
-void R_ModernSpecularProbeAtlas_FlushUploads( void ) {
+void R_ModernSpecularProbeAtlas_FlushUploads( bool captureFrame ) {
 	if ( !rg_modernSpecularProbeAtlasInitialized ) {
 		return;
 	}
 	R_ModernSpecularProbeAtlas_RefreshCounts();
 	if ( rg_modernSpecularProbeAtlasStats.pendingEntries == 0 ) {
+		if ( R_PBRProbes_SettleRequested() ) {
+			R_PBRProbes_SettleDone();
+		}
 		rg_modernSpecularProbeAtlasStats.frameReady =
 			rg_modernSpecularProbeAtlasStats.frameLossless;
 		return;
@@ -563,6 +625,9 @@ void R_ModernSpecularProbeAtlas_FlushUploads( void ) {
 		MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE
 			* MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE * 4];
 	idGLPixelTransferScope transfer;
+	unsigned long long flushSpent = 0;	// frame time spent reading/filtering/publishing
+	int flushTiles = 0;
+	int flushReads = 0;
 	for ( int slot = 0; slot < MODERN_SPECULAR_PROBE_ATLAS_MAX_ENTRIES; ++slot ) {
 		modernSpecularProbeAtlasEntry_t &entry =
 			rg_modernSpecularProbeAtlasEntries[slot];
@@ -573,6 +638,8 @@ void R_ModernSpecularProbeAtlas_FlushUploads( void ) {
 			R_ModernSpecularProbeAtlas_ValidateSource( entry.image );
 		if ( validation != MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE
 				|| !R_ModernSpecularProbeAtlas_FingerprintMatches( entry ) ) {
+			R_ModernSpecularProbeAtlas_CancelPrefilter( slot );
+			entry.prefilterRunning = false;
 			entry.resident = false;
 			entry.pendingUpload = false;
 			entry.uploaded = false;
@@ -583,6 +650,61 @@ void R_ModernSpecularProbeAtlas_FlushUploads( void ) {
 			continue;
 		}
 
+		openq4PBR::AsyncPrefilter &job = rg_modernSpecularProbePrefilterJobs[slot];
+		modernSpecularProbePublish_t &publish = rg_modernSpecularProbePublish[slot];
+		if ( entry.prefilterRunning ) {
+			if ( !publish.taken ) {
+				if ( !job.Ready() && !captureFrame ) {
+					continue;	// still filtering; the set keeps its fallback
+				}
+				if ( !job.Ready() ) {
+					rg_modernSpecularProbeAtlasStats.prefilterWaits++;
+				}
+				const unsigned long long takeClock = R_RendererMetrics_CpuClock();
+				publish.tiles = job.Take();
+				publish.taken = true;
+				const unsigned long long latency = takeClock - entry.prefilterStartClock;
+				rg_modernSpecularProbeAtlasStats.prefilterLatencyTotalUs += latency;
+				rg_modernSpecularProbeAtlasStats.prefilterLatencyMaxUs =
+					Max( rg_modernSpecularProbeAtlasStats.prefilterLatencyMaxUs, latency );
+			}
+			// Upload a budgeted slice; the entry stays pending until the last tile.
+			const unsigned long long sliceBegin = R_RendererMetrics_CpuClock();
+			R_GLStateCache().ActiveTextureUnit( 0 );
+			R_GLStateCache().BindTexture( 0, GL_TEXTURE_2D, rg_modernSpecularProbeAtlasTexture );
+			while ( publish.nextTile < MODERN_SPECULAR_PROBE_TILE_COUNT ) {
+				const unsigned long long spent = flushSpent + ( R_RendererMetrics_CpuClock() - sliceBegin );
+				if ( !captureFrame && flushTiles > 0 && spent >= MODERN_SPECULAR_PROBE_PUBLISH_BUDGET_US ) {
+					break;
+				}
+				int cell, level, size;
+				ModernSpecularProbeAtlas_TileTarget( slot, publish.nextTile, cell, level, size );
+				R_ModernSpecularProbeAtlas_UploadHalfTile( cell, level, size,
+					publish.nextTile < MODERN_SPECULAR_PROBE_TILE_COUNT - 1
+						? publish.tiles.specularHalf[publish.nextTile] : publish.tiles.diffuseHalf );
+				publish.nextTile++;
+				flushTiles++;
+			}
+			const unsigned long long sliceTime = R_RendererMetrics_CpuClock() - sliceBegin;
+			flushSpent += sliceTime;
+			rg_modernSpecularProbeAtlasStats.frameFilterTotalUs += sliceTime;
+			if ( publish.nextTile < MODERN_SPECULAR_PROBE_TILE_COUNT ) {
+				continue;
+			}
+			publish = modernSpecularProbePublish_t();
+			entry.prefilterRunning = false;
+			rg_modernSpecularProbeAtlasStats.prefilterPublished++;
+			rg_modernSpecularProbeAtlasStats.frameFilterCount++;
+		} else {
+		// With background filtering, a frame that has already spent its budget
+		// leaves further source reads to the next flush (one always proceeds).
+		if ( r_pbrProbeAsyncPrefilter.GetBool() && !captureFrame
+				&& ( flushTiles > 0 || flushReads > 0 )
+				&& flushSpent >= MODERN_SPECULAR_PROBE_PUBLISH_BUDGET_US ) {
+			continue;
+		}
+		flushReads++;
+		const unsigned long long readBegin = R_RendererMetrics_CpuClock();
 		openq4PBR::Cube source;
 		source.size = entry.faceSize;
 		const bool linearHDR = entry.image->GetOpts().format == FMT_RGBA16F;
@@ -611,13 +733,36 @@ void R_ModernSpecularProbeAtlas_FlushUploads( void ) {
 					color[0], color[1], color[2] };
 			}
 		}
+		{
+			const unsigned long long readTime = R_RendererMetrics_CpuClock() - readBegin;
+			flushSpent += readTime;
+			rg_modernSpecularProbeAtlasStats.sourceReads++;
+			rg_modernSpecularProbeAtlasStats.sourceReadTotalUs += readTime;
+			rg_modernSpecularProbeAtlasStats.sourceReadMaxUs =
+				Max( rg_modernSpecularProbeAtlasStats.sourceReadMaxUs, readTime );
+		}
 		if ( !sourceValid ) {
 			entry.resident = entry.pendingUpload = entry.uploaded = false;
 			R_ModernSpecularProbeAtlas_RecordReject( MODERN_SPECULAR_PROBE_ATLAS_REJECT_INVALID_STORAGE );
 			continue;
 		}
+		if ( r_pbrProbeAsyncPrefilter.GetBool() && !captureFrame
+				&& job.Start( std::move( source ), MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE,
+					MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP, MODERN_SPECULAR_PROBE_DIFFUSE_SIZE,
+					MODERN_SPECULAR_PROBE_PREFILTER_WORKERS, true ) ) {
+			entry.prefilterRunning = true;
+			entry.prefilterStartClock = R_RendererMetrics_CpuClock();
+			rg_modernSpecularProbeAtlasStats.prefilterStarted++;
+			continue;	// a later flush uploads the tiles
+		}
+		const unsigned long long filterBegin = R_RendererMetrics_CpuClock();
 		R_GLStateCache().BindTexture( 0, GL_TEXTURE_2D, rg_modernSpecularProbeAtlasTexture );
 		R_ModernSpecularProbeAtlas_Filter( slot, source );
+		const unsigned long long filterTime = R_RendererMetrics_CpuClock() - filterBegin;
+		flushSpent += filterTime;
+		rg_modernSpecularProbeAtlasStats.frameFilterTotalUs += filterTime;
+		rg_modernSpecularProbeAtlasStats.frameFilterCount++;
+		}
 
 		if ( !R_ModernSpecularProbeAtlas_FingerprintMatches( entry ) ) {
 			entry.resident = false;
@@ -635,6 +780,18 @@ void R_ModernSpecularProbeAtlas_FlushUploads( void ) {
 	}
 
 	R_GLStateCache().ActiveTextureUnit( 0 );
+	if ( captureFrame && R_PBRProbes_SettleRequested() ) {
+		R_ModernSpecularProbeAtlas_RefreshCounts();
+		if ( rg_modernSpecularProbeAtlasStats.prefilterRunning == 0 ) {
+			R_PBRProbes_SettleDone();
+		}
+	}
+	if ( !captureFrame ) {
+		// A screenshot publishes everything at once by design; it is not a
+		// gameplay frame and stays out of the frame-cost maximum.
+		rg_modernSpecularProbeAtlasStats.frameFilterMaxUs =
+			Max( rg_modernSpecularProbeAtlasStats.frameFilterMaxUs, flushSpent );
+	}
 	R_ModernSpecularProbeAtlas_RefreshCounts();
 	bool allLiveUploaded = true;
 	for ( int slot = 0; slot < MODERN_SPECULAR_PROBE_ATLAS_MAX_ENTRIES; ++slot ) {
@@ -686,7 +843,7 @@ void R_ModernSpecularProbeAtlas_PrintGfxInfo( void ) {
 	const modernSpecularProbeAtlasStats_t &stats =
 		rg_modernSpecularProbeAtlasStats;
 	common->Printf(
-		"Modern specular probe atlas: %s lastReject=%s available=%d init=%d texture=%d frameLossless=%d frameReady=%d size=%d face=%d capacity=%d resident=%d live=%d pending=%d generation=%llu/%llu acquires=%d hits=%d uploads=%d/%d reloads=%d evictions=%d rejected(output=%d null=%d unavailable=%d notLoaded=%d defaulted=%d mutable=%d notCube=%d nonSquare=%d oversized=%d storage=%d full=%d changed=%d upload=%d)\n",
+		"Modern specular probe atlas: %s lastReject=%s available=%d init=%d texture=%d frameLossless=%d frameReady=%d size=%d face=%d capacity=%d resident=%d live=%d pending=%d generation=%llu/%llu acquires=%d hits=%d uploads=%d/%d reloads=%d evictions=%d rejected(output=%d null=%d unavailable=%d notLoaded=%d defaulted=%d mutable=%d notCube=%d nonSquare=%d oversized=%d storage=%d full=%d changed=%d upload=%d) prefilterAsync=%d prefilterStarted=%u prefilterPublished=%u prefilterRunning=%u prefilterCancelled=%u prefilterWaits=%u prefilterLatencyMeanUs=%llu prefilterLatencyMaxUs=%llu frameFilterMeanUs=%llu frameFilterMaxUs=%llu sourceReads=%u sourceReadMeanUs=%llu sourceReadMaxUs=%llu\n",
 		stats.status,
 		stats.lastReject,
 		stats.available ? 1 : 0,
@@ -720,7 +877,20 @@ void R_ModernSpecularProbeAtlas_PrintGfxInfo( void ) {
 		stats.rejectedInvalidStorage,
 		stats.rejectedAtlasFull,
 		stats.rejectedSourceChanged,
-		stats.rejectedUploadUnavailable );
+		stats.rejectedUploadUnavailable,
+		r_pbrProbeAsyncPrefilter.GetBool() ? 1 : 0,
+		stats.prefilterStarted,
+		stats.prefilterPublished,
+		stats.prefilterRunning,
+		stats.prefilterCancelled,
+		stats.prefilterWaits,
+		stats.prefilterPublished > 0 ? stats.prefilterLatencyTotalUs / stats.prefilterPublished : 0ull,
+		stats.prefilterLatencyMaxUs,
+		stats.frameFilterCount > 0 ? stats.frameFilterTotalUs / stats.frameFilterCount : 0ull,
+		stats.frameFilterMaxUs,
+		stats.sourceReads,
+		stats.sourceReads > 0 ? stats.sourceReadTotalUs / stats.sourceReads : 0ull,
+		stats.sourceReadMaxUs );
 }
 
 /*

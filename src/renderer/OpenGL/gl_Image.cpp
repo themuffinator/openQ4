@@ -814,3 +814,20 @@ void idImage::Resize( int width, int height ) {
 	opts.height = height;
 	AllocImage();
 }
+
+/*
+========================
+idImage::RespecifyColorCopyTarget
+
+See NeedsColorCopyRespecification. File textures load as immutable storage,
+so the copy target gets a new texture object instead of a glTexImage2D.
+========================
+*/
+void idImage::RespecifyColorCopyTarget( int width, int height ) {
+	if ( width <= 0 || height <= 0 || !R_ImagePolicyContentMutation() ) return;
+	opts.format = FMT_RGBA8;
+	opts.numLevels = 1;
+	opts.width = width;
+	opts.height = height;
+	AllocImage();
+}

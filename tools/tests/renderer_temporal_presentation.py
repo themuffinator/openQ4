@@ -240,7 +240,34 @@ def main() -> int:
         raise AssertionError(
             "OpenGL reactive policy must see restored native view/scissor coordinates"
         )
-    gl_resolve = function_body(gl_backend, "bool RB_ResolveTemporalPresentation(")
+    # REN-04: a subview copies its parent view; it must not inherit the
+    # parent's temporal preparation (jitter, identity), or Vulkan's direct
+    # render of a mirror retires the main view's history every frame.
+    subview = read(RENDERER / "tr_subview.cpp")
+    reset = function_body(subview, "static void R_ResetSubviewTemporalState( viewDef_t *parms )")
+    for token in ("temporalPrepared = false", "temporalJitterEnabled = false"):
+        require(reset, token, "subview temporal reset")
+    if subview.count("R_ResetSubviewTemporalState( parms );") != 4:
+        raise AssertionError("every subview constructor must reset inherited temporal state")
+    vk_exec = read(RENDERER / "Vulkan" / "vk_GuiExecutor.cpp")
+    for token in ("temporalDepthStamps[ VK_TEMPORAL_DEPTH_STAMP_COUNT ]",
+                  "VK_TemporalPresentation_FindDepthStamp(",
+                  "VK_TemporalPresentation_DepthCurrentForCapture(",
+                  "vkExec.acquireTimedOut && vkExec.acquireTimeoutFrame == backEnd.frameCount"):
+        require(vk_exec, token, "Vulkan per-target depth proof and acquire-timeout latch")
+    # The public entry records the outcome (REN-04); the resolve itself is here.
+    # REN-04: every resolve, on both backends, records how it ended.
+    gl_entry = function_body(gl_backend, "bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t &command ) {")
+    require(gl_entry, "R_TemporalPresentation_RecordResolve(", "OpenGL resolve outcome record")
+    vk_entry_source = read(RENDERER / "Vulkan" / "vk_GuiExecutor.cpp")
+    vk_entry_signature = "static bool VK_TemporalPresentation_ResolveTargets(\r\n" if "\r\n" in vk_entry_source else "static bool VK_TemporalPresentation_ResolveTargets(\n"
+    vk_entry = function_body(vk_entry_source[vk_entry_source.rfind(vk_entry_signature):], vk_entry_signature)
+    require(vk_entry, "R_TemporalPresentation_RecordResolve(", "Vulkan resolve outcome record")
+    status = function_body(temporal, "void R_TemporalPresentation_PrintStatus_f(")
+    for token in ("\"reset\"", "Temporal resolve:", "Temporal view history:",
+                  "Temporal resolve fallbacks", "Temporal history invalidations"):
+        require(status, token, "cumulative temporal status")
+    gl_resolve = function_body(gl_backend, "static bool RB_ResolveTemporalPresentationRecorded(")
     for token in (
         "captureFrame",
         "RB_RenderMotionVectorBuffer(",
@@ -257,7 +284,8 @@ def main() -> int:
         "historyWeight",
         "ReactiveRegion0",
         "packetReactive",
-        "R_ScenePackets_TemporalRigidMotionEligible(",
+        # motion blur shares the exact per-surface classification (REN-08)
+        "R_ScenePackets_TemporalSurfaceMotion(",
     ):
         require(gl_backend, token, "OpenGL disocclusion/reactive resolve")
 
@@ -283,7 +311,7 @@ def main() -> int:
         "!R_TemporalPresentation_TemporalAARequested()",
     ):
         require(vk_scene_request, token, "Vulkan manual-scale temporal ownership")
-    vk_resolve_signature = "static bool VK_TemporalPresentation_ResolveTargets("
+    vk_resolve_signature = "static bool VK_TemporalPresentation_ResolveTargetsRecorded("
     vk_resolve = function_body(
         vk_gui[vk_gui.rfind(vk_resolve_signature) :], vk_resolve_signature
     )

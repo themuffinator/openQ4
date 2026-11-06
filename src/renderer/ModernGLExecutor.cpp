@@ -506,6 +506,11 @@ static GLuint rg_modernClassicProgram = 0, rg_modernClassicTexture = 0, rg_moder
 static GLint rg_modernClassicMVP = -1, rg_modernClassicParams = -1;
 static int rg_modernClassicWidth = 0, rg_modernClassicHeight = 0;
 static GLuint R_ModernGLExecutor_CompileClassicLighting( void );
+// Forward draws whose classic lighting the corridor supplies: opaque surfaces
+// and cutouts (REN-02), which share the forward shader's classic-lighting fetch.
+static bool R_ModernGLExecutor_ClassicCorridorShaderKind( const int kind ) {
+	return kind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE || kind == MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST;
+}
 static void R_ModernGLExecutor_DeleteClassicLighting( void );
 static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame &packetFrame, const modernGLExecutorStats_t &stats );
 
@@ -2122,6 +2127,12 @@ static void R_ModernGLExecutor_RecordPacketFallbackBlockers( const idScenePacket
 			if ( draw.passCategory == RENDER_PASS_SHADOW_MAP && materialRecord->shadowCasterSupported ) {
 				continue;
 			}
+			// The classic-lighting corridor owns this view and reproduces the
+			// material's vertex colour or texture matrix exactly (REN-02).
+			if ( rg_modernClassicView != NULL && draw.viewDef == rg_modernClassicView
+					&& R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord ) ) {
+				continue;
+			}
 			const bool forwardPlusDecalFallback = R_ModernGLExecutor_DrawPacketIsForwardPlusDecal( draw, *materialRecord )
 				&& R_ModernGLExecutor_DecalFallbackAllowedForForwardPlus( *materialRecord, &draw );
 			if ( forwardPlusDecalFallback ) {
@@ -2192,7 +2203,7 @@ static bool R_ModernGLExecutor_MaterialLightingProven( const idScenePacketFrame 
 			? R_MaterialResourceTable_FindRecordForMaterial( draw.materialRecord->material ) : NULL;
 		if ( record == NULL || ( !R_MaterialResourceTable_PBRModernPathEligible( *record )
 				&& !R_MaterialResourceTable_ClassicDiffusePathEligible( *record )
-				&& !( draw.viewDef == rg_modernClassicView && R_MaterialResourceTable_ClassicFixedPathEligible( *record ) ) ) ) {
+				&& !( draw.viewDef == rg_modernClassicView && R_MaterialResourceTable_ClassicCorridorPathEligible( *record ) ) ) ) {
 			return false;
 		}
 		haveClassicDiffuse = haveClassicDiffuse || !record->hasPBR;
@@ -2203,11 +2214,14 @@ static bool R_ModernGLExecutor_MaterialLightingProven( const idScenePacketFrame 
 				|| r_celShadingWorld.GetBool() || r_skipDiffuse.GetBool() ) {
 			return false;
 		}
-		// Classic ambient lights use an encoded normalization cube. This
-		// contract qualifies point/projected Lambert lighting, not that cube.
+		// Classic ambient lights use an encoded normalization cube. The forward
+		// pass qualifies point/projected Lambert lighting, not that cube; the
+		// classic-lighting corridor binds the same ambient cube ARB2 does
+		// (REN-02 step 2), so ambient lights are proven only where it owns
+		// the classic surfaces.
 		for ( int i = 0; i < R_ModernClusteredLighting_NumLightDescriptors(); ++i ) {
 			const rendererModernLightDescriptor_t *light = R_ModernClusteredLighting_LightDescriptor( i );
-			if ( light != NULL && light->type == RENDERER_MODERN_LIGHT_AMBIENT ) { return false; }
+			if ( light != NULL && light->type == RENDERER_MODERN_LIGHT_AMBIENT && rg_modernClassicView == NULL ) { return false; }
 		}
 	}
 	return haveSurface;
@@ -2234,8 +2248,11 @@ static const LightGrid *R_ModernGLExecutor_CommandBakedGrid( const modernGLSubmi
 static void R_ModernGLExecutor_PrepareBakedGrid( const idScenePacketFrame &packetFrame, const modernGLExecutorStats_t &stats ) {
 	rg_modernGLBakedGridView = NULL;
 	rg_modernGLBakedGridCommandHash.Clear();
+	// REN-02 step 3: the forward pass adds the baked term before its classic
+	// encode, which passes display-referred frames through unchanged, so the
+	// corridor no longer needs the laboratory linear scene.
 	if ( !stats.submitPlanReady || !r_useLightGrid.GetBool() || r_skipDiffuse.GetBool() || r_lightGridDebug.GetInteger() != 0
-			|| !R_ModernGLExecutor_PBRLinearSceneRequested() || stats.pipelineGBufferCommands != 0
+			|| !r_rendererModernQuality.GetBool() || stats.pipelineGBufferCommands != 0
 			|| !R_ModernGLExecutor_MaterialLightingProven( packetFrame ) ) { return; }
 	const viewDef_t *root = NULL;
 	for ( int i = 0; i < packetFrame.NumScenes(); ++i ) {
@@ -4763,8 +4780,8 @@ static void R_ModernGLExecutor_MaterialFlagsForCommand( const modernGLSubmitComm
 	flags[2] = R_ModernGLExecutor_CommandHasTextureSemantic( command, MATERIAL_RESOURCE_TEXTURE_EMISSIVE ) ? 1.0f : 0.0f;
 	flags[3] = materialRecord != NULL && R_MaterialResourceTable_ClassicDiffusePathEligible( *materialRecord ) ? 1.0f : 0.0f;
 	if ( rg_modernClassicExecuted && command.viewDef == rg_modernClassicView
-			&& command.shaderKind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE
-			&& materialRecord != NULL && R_MaterialResourceTable_ClassicFixedPathEligible( *materialRecord ) ) { flags[3] = 2.0f; }
+			&& R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind )
+			&& materialRecord != NULL && R_MaterialResourceTable_ClassicCorridorPathEligible( *materialRecord ) ) { flags[3] = 2.0f; }
 }
 
 static bool R_ModernGLExecutor_EnhancedMaterialShadingActive( void ) {
@@ -5113,7 +5130,8 @@ static bool R_ModernGLExecutor_SubmitCommand( const modernGLSubmitCommand_t &com
 
 	if ( rg_modernClassicExecuted && command.viewDef == rg_modernClassicView ) {
 		const materialResourceTableRecord_t *classicMaterial = R_ModernGLExecutor_MaterialRecordForCommand( command );
-		if ( classicMaterial != NULL && !classicMaterial->hasPBR && command.shaderKind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE ) {
+		if ( classicMaterial != NULL && !classicMaterial->hasPBR
+				&& R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) ) {
 			R_GLStateCache().BindTexture( 4, GL_TEXTURE_2D, rg_modernClassicTexture );
 			if ( glBindSampler != NULL ) { R_GLStateCache().BindSampler( 4, 0 ); }
 		}
@@ -5389,7 +5407,8 @@ static bool R_ModernGLExecutor_VisibleDepthMaterialSupported( const modernGLSubm
 	if ( materialRecord == NULL
 		|| ( !shadowDepthEligible && !R_MaterialResourceTable_ClassicModernPathEligible( *materialRecord )
 			&& !R_MaterialResourceTable_PBRModernPathEligible( *materialRecord ) )
-		|| ( !shadowDepthEligible && materialRecord->fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE ) ) {
+		|| ( !shadowDepthEligible && materialRecord->fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
+			&& !R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord ) ) ) {
 		stats.visibleDepthMaterialFallbackDraws++;
 		return false;
 	}
@@ -6832,6 +6851,7 @@ static bool R_ModernGLExecutor_ForwardPlusMaterialSupported( const modernGLSubmi
 	}
 	const bool decalMaterial = command.forwardPlusDecal;
 	if ( materialRecord->fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
+		&& !R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord )
 		&& ( !decalMaterial || !R_ModernGLExecutor_DecalFallbackAllowedForForwardPlus( *materialRecord, command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL ) ) ) {
 		stats.forwardPlusMaterialFallbackDraws++;
 		return false;
@@ -6847,7 +6867,10 @@ static bool R_ModernGLExecutor_ForwardPlusMaterialSupported( const modernGLSubmi
 		&& ( materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_BLEND
 			|| materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_ADD
 			|| materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_FILTER );
-	if ( !R_ModernGLExecutor_MaterialContractPromotable( *materialRecord, allowAlphaBlend, decalMaterial, decalMaterial, decalMaterial ) ) {
+	// A corridor-only material's vertex colour and texture matrix belong to
+	// the classic-lighting corridor, which reproduces them (REN-02).
+	const bool corridorOnly = R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord );
+	if ( !corridorOnly && !R_ModernGLExecutor_MaterialContractPromotable( *materialRecord, allowAlphaBlend, decalMaterial, decalMaterial, decalMaterial ) ) {
 		stats.forwardPlusMaterialFallbackDraws++;
 		return false;
 	}
@@ -7036,10 +7059,13 @@ static void R_ModernGLExecutor_CollectClassicInteraction( const drawInteraction_
 				|| images[i]->GetDeviceHandle() == 0 || images[i]->GetOpts().textureType != TT_2D ) { rg_modernClassicCollectValid = false; return; }
 		primitive.textures[i] = images[i]->GetDeviceHandle();
 	}
-	if ( globalImages->normalCubeMapImage == NULL || !globalImages->normalCubeMapImage->IsLoaded()
-			|| globalImages->normalCubeMapImage->IsDefaulted() || globalImages->normalCubeMapImage->GetDeviceHandle() == 0
-			|| globalImages->normalCubeMapImage->GetOpts().textureType != TT_CUBIC ) { rg_modernClassicCollectValid = false; return; }
-	primitive.textures[5] = globalImages->normalCubeMapImage->GetDeviceHandle();
+	// ARB2 draws an ambient light with the ordinary interaction program and
+	// the ambient normal cube in place of the normalization cube.
+	idImage *cube = backEnd.vLight != NULL && backEnd.vLight->lightShader != NULL && backEnd.vLight->lightShader->IsAmbientLight()
+		? globalImages->ambientNormalMap : globalImages->normalCubeMapImage;
+	if ( cube == NULL || !cube->IsLoaded() || cube->IsDefaulted() || cube->GetDeviceHandle() == 0
+			|| cube->GetOpts().textureType != TT_CUBIC ) { rg_modernClassicCollectValid = false; return; }
+	primitive.textures[5] = cube->GetDeviceHandle();
 	rg_modernClassicPrimitives.Append( primitive );
 }
 
@@ -7047,7 +7073,11 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	rg_modernClassicView = NULL;
 	rg_modernClassicExecuted = false;
 	rg_modernClassicPrimitives.SetNum( 0, false );
-	if ( !stats.submitPlanReady || !R_ModernGLExecutor_PBRLinearSceneRequested() || stats.pipelineGBufferCommands != 0
+	// REN-02 step 3: the corridor accumulates classic light exactly as ARB2
+	// writes its framebuffer, and the forward pass passes it through unchanged
+	// in a display-referred frame (decoding it only for the linear scene), so
+	// it serves both modes.
+	if ( !stats.submitPlanReady || !r_rendererModernQuality.GetBool() || stats.pipelineGBufferCommands != 0
 			|| r_multiSamples.GetInteger() > 1 || r_shadows.GetBool() || !r_useScissor.GetBool()
 			|| r_enhancedMaterials.GetBool() || r_celShading.GetBool() || r_celShadingWorld.GetBool()
 			|| rg_modernClassicProgram == 0 || r_testARBProgram.GetBool() ) { return; }
@@ -7055,14 +7085,17 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	bool extended = false;
 	for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
 		const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
-		if ( command.shaderKind != MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE ) { continue; }
+		if ( !R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) ) { continue; }
 		const materialResourceTableRecord_t *material = R_ModernGLExecutor_MaterialRecordForCommand( command );
 		if ( material == NULL || material->hasPBR ) { continue; }
 		const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
 		if ( draw == NULL || draw->geometryRecord == NULL || draw->geometryRecord->skinningMode != GEOMETRY_SKINNING_NONE
 				|| draw->geometryRecord->deformMode != GEOMETRY_DEFORM_NONE ) { return; }
-		if ( !R_MaterialResourceTable_ClassicFixedPathEligible( *material ) || command.weaponDepthHack || command.modelDepthHack != 0
+		if ( !R_MaterialResourceTable_ClassicCorridorPathEligible( *material ) || command.weaponDepthHack || command.modelDepthHack != 0
 				|| command.negativeScale || ( root != NULL && root != command.viewDef ) ) { return; }
+		// The forward pass adds baked light from the untransformed, uncoloured
+		// diffuse, so corridor-only materials need the grid off.
+		if ( R_MaterialResourceTable_ClassicCorridorOnly( *material ) && r_useLightGrid.GetBool() ) { return; }
 		root = command.viewDef;
 		extended = extended || !R_MaterialResourceTable_ClassicDiffusePathEligible( *material );
 	}
@@ -7086,7 +7119,6 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	rg_modernClassicCollectValid = backEnd.overBright == 1.0f;
 	for ( viewLight_t *light = root->viewLights; light != NULL && rg_modernClassicCollectValid; light = light->next ) {
 		if ( light->lightShader->IsFogLight() || light->lightShader->IsBlendLight() ) { continue; }
-		if ( light->lightShader->IsAmbientLight() ) { rg_modernClassicCollectValid = false; break; }
 		backEnd.vLight = light;
 		const drawSurf_t *chains[] = { light->localInteractions, light->globalInteractions, light->translucentInteractions };
 		for ( int chain = 0; chain < 3; ++chain ) {
@@ -7096,7 +7128,7 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 				for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
 					const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
 					const drawSurf_t *owner = R_ModernGLExecutor_CommandSurface( command );
-					if ( command.shaderKind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE && command.viewDef == root
+					if ( R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) && command.viewDef == root
 							&& owner != NULL && owner->space == surface->space && owner->material == surface->material
 							&& owner->geo != NULL && surface->geo != NULL && owner->geo->ambientCache != NULL
 							&& owner->geo->ambientCache == surface->geo->ambientCache ) { rg_modernClassicCollectCommand = &command; break; }
@@ -9345,7 +9377,7 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 	// the clustered build only reserved atlas cells; copy them in here, where
 	// binding textures is safe
 	R_ModernLightImageAtlas_FlushUploads();
-	R_ModernSpecularProbeAtlas_FlushUploads();
+	R_ModernSpecularProbeAtlas_FlushUploads( R_ModernSpecularProbeAtlas_CaptureFrame( packetFrame ) );
 	R_ModernGLExecutor_ClassifyModernVisibleLighting( packetFrame, rg_modernGLExecutorStats );
 	R_ModernGLExecutor_UpdateFrameUBO( rg_modernGLExecutorStats );
 	{

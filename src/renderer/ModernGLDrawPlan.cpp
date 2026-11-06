@@ -514,7 +514,7 @@ bool idModernGLDrawPlan::Build( const idScenePacketFrame &packetFrame, const idR
 			stats.materialFallbackDraws++;
 			continue;
 		}
-		if ( ( pbrModernEligible || R_MaterialResourceTable_ClassicFixedPathEligible( *materialRecord ) )
+		if ( ( pbrModernEligible || R_MaterialResourceTable_ClassicCorridorPathEligible( *materialRecord ) )
 				&& draw.passCategory == RENDER_PASS_ARB2_INTERACTION
 				&& R_ModernGLDrawPlan_PBRInteractionHasReadyClusteredOwner(
 					context, packetFrame, draw, *materialRecord ) ) {
@@ -525,7 +525,10 @@ bool idModernGLDrawPlan::Build( const idScenePacketFrame &packetFrame, const idR
 			continue;
 		}
 		const bool forwardPlusCandidate = R_ModernGLDrawPlan_ShouldUseForwardPlus( context, draw, *materialRecord, pipeline, shaderKind );
+		// Corridor-only fallbacks still get commands: the frame declines unless
+		// the classic-lighting corridor owns the view (REN-02).
 		if ( !shadowDepthEligible && materialRecord->fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
+			&& !R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord )
 			&& ( !forwardPlusCandidate || !R_ModernGLDrawPlan_MaterialFallbackAllowedForForwardPlus( draw, *materialRecord ) ) ) {
 			stats.fallbackDraws++;
 			stats.materialFallbackDraws++;

@@ -72,6 +72,7 @@ BASE = {
     'r_pbrAnalyticEnvironment': '1',
     'r_bloom': '0', 'r_ssao': '0', 'r_postAA': '0', 'r_motionBlur': '0',
     'r_ssaoRadius': '36', 'r_ssaoIntensity': '1.35', 'r_ssaoDebug': '0', 'r_ssaoMaxDistance': '220',
+    'r_ssaoResolution': '0',
     'r_hdrToneMap': '0', 'r_hdrAutoExposure': '0', 'r_hdrSceneTarget': '1',
     'r_hdrExposure': '1', 'r_hdrHighlightDesaturation': '0', 'r_hdrGamutCompression': '0',
     'r_hdrWhitePoint':'6', 'r_hdrLift':'0', 'r_hdrPostGamma':'1', 'r_hdrGain':'1',
@@ -120,8 +121,36 @@ if os.environ.get('OPENQ4_LAB_VK_DEVICE', '').strip():
 # room lies beyond SSAO's default fade distance. Every control keeps SSAO on,
 # so OpenGL draws all of them through its scene target; the unoccluded ones
 # fade it out at the nearest distance instead.
-SSAO_SETTINGS = {'r_ssao': '1', 'r_ssaoRadius': '64', 'r_ssaoIntensity': '2', 'r_ssaoMaxDistance': '2048'}
+# Full resolution: a view with native PBR's occlusion field always takes the
+# full-resolution pass (vk_PostProcess.cpp VK_Post_DrawSSAO), so its classic
+# pixels compare with a classic-only frame only when that frame does too.
+# Automatic Vulkan SSAO halves resolution below 32 samples (R_SSAOHalfResolution).
+SSAO_SETTINGS = {'r_ssao': '1', 'r_ssaoRadius': '64', 'r_ssaoIntensity': '2', 'r_ssaoMaxDistance': '2048',
+                 'r_ssaoResolution': '1'}
 SSAO_FADED = {**SSAO_SETTINGS, 'r_ssaoMaxDistance': '16'}
+# REN-05 bounded exception (6 November 2026). On Intel Iris Xe Vulkan
+# (driver 101.5590) the native-PBR field pass and the classic pass give a few
+# isolated classic pixels a different occlusion: 4 of 833,291 changed and 6
+# debug-view pixels, the same handful recorded on 4 October. NVIDIA and
+# lavapipe are exact. Making the occlusion arithmetic precise did not change
+# them, and both passes read the same prepass depth pipeline. Allow at most
+# this many on an Intel Vulkan device only; every other device stays exact.
+INTEL_VULKAN_SSAO_CLASSIC_PIXELS = 8
+INTEL_VULKAN_SSAO_DEBUG_PIXELS = 12
+# REN-02 classic cutout parity: hole-edge texels may flip between the modern
+# alpha-test shader and ARB2's depth prepass (5 of 6,073 disc pixels measured
+# on 6 November 2026, all on edges). Allow at most this many edge pixels.
+CUTOUT_EDGE_FLIP_PIXELS = 24
+# REN-05 matched half-resolution control. A view with native PBR always takes
+# the full-resolution pass, so half resolution reaches classic-only frames:
+# compare them, and their occlusion debug view, with the full-resolution ones.
+# OpenGL has one SSAO resolution and must match exactly; on Vulkan the
+# half-resolution field must stay a close, unbiased approximation.
+SSAO_HALF = {**SSAO_SETTINGS, 'r_ssaoResolution': '2'}
+# Measured 6 November 2026: RTX 4060 2.07, Iris Xe 2.95 levels; bias +0.02/+0.03.
+SSAO_HALF_DEBUG_MEAN_LEVELS = 4.0	# mean absolute debug-view difference, 8-bit levels
+SSAO_HALF_DEBUG_BIAS_LEVELS = 1.0	# mean signed difference: no systematic darkening or lightening
+SSAO_HALF_DARKENED_RATIO = 0.15		# classic darkened-pixel count may move by this share
 
 CASES = {
     'lit': {},
@@ -133,7 +162,7 @@ CASES = {
     'production-rejected-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-fixed{kind}{suffix}': {'r_rendererModernLightingParity':'0','r_hdrToneMap':'1','r_lightScale':'0.1',
           **({'r_pbrMaterials':'0','r_rendererReflectionProbes':'0'} if suffix else {})}
-       for kind in ('','-bump','-diffuse','-colored') for suffix in ('','-native')},
+       for kind in ('','-bump','-diffuse','-colored','-cutout','-cutout-bump','-vertex','-texmatrix','-condition','-multistage','-ambient','-fog') for suffix in ('','-native')},
     'production-curved': {'r_rendererModernLightingParity':'0'},
     'production-curved-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-{light}{suffix}': {'r_rendererModernLightingParity':'0',
@@ -175,6 +204,8 @@ CASES = {
     'ssao-classic': {**SSAO_SETTINGS, 'r_pbrMaterials': '0'},
     'ssao-debug': {**SSAO_SETTINGS, 'r_ssaoDebug': '1'},
     'ssao-debug-classic': {**SSAO_SETTINGS, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'},
+    'ssao-classic-half': {**SSAO_HALF, 'r_pbrMaterials': '0'},
+    'ssao-debug-classic-half': {**SSAO_HALF, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'},
     'albedo': {'r_pbrDebug': '1'},
     'normals': {'r_pbrDebug': '2'},
     **{f'normal-{name}': {'r_pbrDebug':'2'} for name in ('xyz','rg','agb','zero','flat')},
@@ -239,6 +270,22 @@ CASES = {
 }
 for restart in ('partial','full'):
     CASES[f'skin-gpu-{restart}-restart']=dict(CASES['skin-gpu'])
+# REN-02 step 3: the classic-lighting corridor in a display-referred modern
+# frame (no laboratory linear scene), compared directly with native ARB2.
+# The linear scene blends fog in linear radiance by design, so the fog control
+# is compared with ARB2 only in the display frame (`-fog-display`).
+DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage', '-ambient', '-grid', '-fog')
+# Mixed-material model (REN-05): one skinned mesh, PBR above its equator and
+# classic below, on CPU skinning and packed MD5R.
+for backend in ('cpu','md5r'):
+    for pose in ('','-ownership'):
+        CASES[f'mixed-material-{backend}{pose}']={**CASES[f'skin-{backend}'], 'r_pbrDebug':'7' if pose else '0'}
+# Skin substitutions (REN-05): the same specimen with its PBR metal swapped for
+# a PBR dielectric or a classic material, on CPU skinning and packed MD5R.
+for backend in ('cpu','md5r'):
+    for skin in ('dielectric','classic'):
+        CASES[f'skin-{backend}-{skin}']=dict(CASES[f'skin-{backend}'])
+        CASES[f'skin-{backend}-{skin}-ownership']=dict(CASES[f'skin-{backend}-ownership'])
 for suffix in ('-clear','','-double','-zero'):
     CASES['lightgrid-pbr-ibl'+suffix]={**CASES['lightgrid-pbr'+suffix], 'r_pbrIBL':'1'}
 for suffix in ('-clear','','-double','-zero','-off','-restored'):
@@ -272,6 +319,8 @@ for suffix in ('-clear','','-native','-zero','-restored'):
     CASES['production-fixed-grid'+suffix]={**CASES['production-fixed'], 'r_useLightGrid':'0' if suffix=='-clear' else '1', 'r_pbrIBL':'0',
         'r_lightGridIntensity':'0' if suffix=='-zero' else '0.2', 'r_lightGridMaxContribution':'0',
         **({'r_pbrMaterials':'0','r_rendererReflectionProbes':'0'} if suffix=='-native' else {})}
+for kind in DISPLAY_CORRIDOR_KINDS:
+    CASES[f'production-fixed{kind}-display'] = {**CASES[f'production-fixed{kind}'], 'r_pbrLinearScene': '0'}
 
 for case, reference in (('production-minimal','hdr'),('production-fixed-minimal','production-fixed')):
     CASES[case]={**CASES[reference], **{name:'0' for name in (
@@ -293,11 +342,13 @@ LEGACY_CASES.update(('production-fixed-colored-native','production-fixed-master-
 LEGACY_CASES.add('production-fixed-grid-native')
 LEGACY_CASES.update(f'production-fixed-{boundary}-native' for boundary in ('shadow','msaa'))
 LEGACY_CASES.update(f'production-{light}-native' for light in ('points','projector'))
-LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native'))
+LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native','production-fixed-cutout-native','production-fixed-cutout-bump-native','production-fixed-vertex-native','production-fixed-texmatrix-native','production-fixed-condition-native','production-fixed-multistage-native','production-fixed-ambient-native','production-fixed-fog-native'))
 LEGACY_CASES.update(f'{kind}-{mode}' for kind in ('fog','blend') for mode in ('native','off','fallback-native'))
 LEGACY_CASES.update(('lightgrid-native','lightgrid-off'))
 LEGACY_CASES.update(('lightgrid-pbr-master-off','lightgrid-pbr-native'))
-LEGACY_CASES.update(('ssao-classic','ssao-debug-classic'))
+LEGACY_CASES.update(('ssao-classic','ssao-debug-classic','ssao-classic-half','ssao-debug-classic-half'))
+# The classic skin leaves the specimen, the only PBR surface in view, classic.
+LEGACY_CASES.update(case for case in CASES if case.startswith('skin-') and '-classic' in case)
 CASE_COMMANDS = {'shader-reload':['rendererShaderLibraryReload'], 'image-reload':['reloadImages all'],
                  'partial-restart':['vid_restart partial','wait 60'], 'full-restart':['vid_restart','wait 60'],
                  # Spawned entities publish their first render definitions on
@@ -334,7 +385,7 @@ for case in ('local-global','local-global-legacy'):
         'wait 30','g_stopTime 1']
 
 SHADOW_CASES = {'shadows','static-shadows','shadows-manual-point','shadows-cache-off','shadow-moved','shadow-restored','multi-shadows','msaa-shadows'}
-SHADOW_CASES.update(case for case in CASES if case.startswith('skin-'))
+SHADOW_CASES.update(case for case in CASES if case.startswith(('skin-','mixed-material-')))
 SHADOW_CASES.add('production-shadows')
 SHADOW_CASES.add('hdr-shadows')
 
@@ -354,7 +405,7 @@ CASE_CAPTURE_EXTENTS = {}
 CASE_CAMERAS['normal-flat'] = 'station-metal_3'
 CASE_CAMERAS.update({'msaa-cutout':'station-cutout','msaa-cutout-hard':'station-cutout'})
 CASE_CAMERAS.update({case:'sampling' for case in CASES if case.startswith('sampler-')})
-CASE_CAMERAS.update({case:'sampling' for case in CASES if case.startswith('skin-')})
+CASE_CAMERAS.update({case:'sampling' for case in CASES if case.startswith(('skin-','mixed-material-'))})
 CASE_CAMERAS.update({case:'sampling' for case in CASES if case.startswith('lightgrid-pbr-normal-')})
 
 # Same original sphere, transform, camera and light for every native direct
@@ -480,6 +531,8 @@ def digest(path: Path) -> str:
 # A native pass can decline HDR while other native owners remain active.
 # These controls still require native PBR, but deliberately refuse linear exports.
 LINEAR_UNAVAILABLE_CASES: set[str] = set()
+# Display-referred corridor controls have no laboratory linear scene to capture.
+LINEAR_UNAVAILABLE_CASES.update(f'production-fixed{kind}-display' for kind in DISPLAY_CORRIDOR_KINDS)
 
 
 def capture_linear(path: Path) -> array:
@@ -915,6 +968,92 @@ def compare_skinning_captures(results: list[dict]) -> None:
         a,b=images.get('skin-gpu'),images.get(case)
         if a and b and a!=b:
             by_case[case]['failures'].append('video restart changed the frozen skinned reference image')
+    compare_skin_substitutions(by_case, images)
+
+
+def compare_mixed_material_captures(results: list[dict]) -> None:
+    """One mesh, two authored materials: each part keeps its own owner (REN-05).
+
+    The ownership view must show PBR green on the upper half of the specimen
+    and none on the lower, classic half, on CPU skinning and packed MD5R; and
+    packed MD5R must draw the model exactly like CPU skinning.
+    """
+    by_case={r['case']:r for r in results if r['case'].startswith('mixed-material-')}
+    images={name:capture_rgb(Path(r['screenshot'])) for name,r in by_case.items()}
+    for backend in ('cpu','md5r'):
+        owner=f'mixed-material-{backend}-ownership'
+        image=images.get(owner)
+        if not image: continue
+        # Inside the specimen's disc only (centre 640,400, radius about 97 px at
+        # the sampling camera): PBR stations behind it are green too.
+        def green(upper_half):
+            count=0
+            for y in range(312,489):
+                if (y < 392) != upper_half or 392 <= y <= 408: continue
+                for x in range(552,729):
+                    if (x-640)**2+(y-400)**2 <= 88*88 and image[(y*1280+x)*3:(y*1280+x)*3+3]==bytes((0,255,0)):
+                        count+=1
+            return count
+        upper, lower = green(True), green(False)
+        by_case[owner]['mixedOwnership']={'upperGreen':upper,'lowerGreen':lower}
+        if upper < 1500:
+            by_case[owner]['failures'].append(f'the PBR half lost PBR ownership ({upper} pixels)')
+        if lower > 50:
+            by_case[owner]['failures'].append(f'the classic half was drawn as PBR ({lower} pixels)')
+    for pose in ('','-ownership'):
+        cpu, md5r = images.get(f'mixed-material-cpu{pose}'), images.get(f'mixed-material-md5r{pose}')
+        if cpu and md5r:
+            error=specimen_error(cpu, md5r)
+            by_case[f'mixed-material-md5r{pose}']['md5rComparison']={'specimenError':round(error,3)}
+            if error > 0.5:
+                by_case[f'mixed-material-md5r{pose}']['failures'].append(
+                    f'packed MD5R draws the mixed-material model {error:.2f} from CPU skinning')
+
+
+def specimen_error(a: bytes, b: bytes) -> float:
+    indices=((y*1280+x)*3+c for y in range(272,529) for x in range(512,769) for c in range(3))
+    return sum(abs(a[i]-b[i]) for i in indices)/(257*257*3)
+
+
+def compare_skin_substitutions(by_case: dict, images: dict) -> None:
+    """A skin swaps the specimen's material on CPU skinning and packed MD5R alike.
+
+    Each substitution must visibly change the specimen; a PBR substitute must
+    stay PBR-owned and a classic one must be drawn classically; and packed
+    MD5R must draw each substitution like CPU skinning, no further apart than
+    the unsubstituted pair.
+    """
+    for backend in ('cpu','md5r'):
+        base=images.get(f'skin-{backend}')
+        for skin, pbr in (('dielectric', True), ('classic', False)):
+            case=f'skin-{backend}-{skin}'
+            swapped=images.get(case)
+            if base and swapped:
+                change=specimen_error(base, swapped)
+                by_case[case]['skinProof']={'specimenChange': round(change, 3)}
+                if change < 2:
+                    by_case[case]['failures'].append(f'the {skin} skin did not change the specimen')
+            owner=f'{case}-ownership'
+            if owner in by_case:
+                patch=normal_patch(Path(by_case[owner]['screenshot']))
+                green=sum(patch[i:i+3]==bytes((0,255,0)) for i in range(0,len(patch),3)) if patch else 0
+                by_case[owner]['skinOwnership']={'greenPixels': green}
+                if pbr and green < 2000:
+                    by_case[owner]['failures'].append('the PBR skin substitute lost PBR ownership')
+                if not pbr and green > 100:
+                    by_case[owner]['failures'].append('the classic skin substitute was drawn as PBR')
+    reference=(images.get('skin-cpu'), images.get('skin-md5r'))
+    if all(reference):
+        allowed=specimen_error(*reference)
+        for skin in ('dielectric','classic'):
+            cpu, md5r = images.get(f'skin-cpu-{skin}'), images.get(f'skin-md5r-{skin}')
+            if not cpu or not md5r: continue
+            error=specimen_error(cpu, md5r)
+            by_case[f'skin-md5r-{skin}']['md5rComparison']={'specimenError': round(error, 3),
+                                                            'unsubstitutedError': round(allowed, 3)}
+            if error > allowed + 0.5:
+                by_case[f'skin-md5r-{skin}']['failures'].append(
+                    f'packed MD5R draws the {skin} skin {error:.2f} from CPU skinning (unsubstituted {allowed:.2f})')
 
 
 def compare_transparency_captures(results: list[dict]) -> None:
@@ -1035,22 +1174,72 @@ def compare_ssao_captures(results: list[dict]) -> None:
     debug, debug_classic = images['ssao-debug'], images['ssao-debug-classic']
     debug_changed = sum(1 for i in range(0, len(debug), 3)
                         if any(abs(debug[c] - debug_classic[c]) > 1 for c in channels(i)))
+    def intel_vulkan(case_row) -> bool:
+        if case_row.get('backend') != 'vk' or not case_row.get('log'):
+            return False
+        try:
+            text = Path(case_row['log']).read_text(encoding='utf-8', errors='replace')
+        except OSError:
+            return False
+        return "Vulkan: driver 'Intel Corporation'" in text or 'vendorID 0x8086' in text
+
+    bounded = intel_vulkan(row)
+    classic_limit = INTEL_VULKAN_SSAO_CLASSIC_PIXELS if bounded else 0
+    debug_limit = INTEL_VULKAN_SSAO_DEBUG_PIXELS if bounded else 0
     row['ssaoComparisons'] = {'nativePixels': len(owned), 'classicPixels': len(classic),
         'directChanged': direct_changed, 'aboveUnoccluded': above, 'belowDirect': below,
         'indirectDarkened': darkened, 'classicChanged': classic_changed,
-        'classicDarkened': classic_darkened, 'debugChanged': debug_changed}
+        'classicDarkened': classic_darkened, 'debugChanged': debug_changed,
+        'intelVulkanBound': bounded and ( classic_changed > 0 or debug_changed > 0 )}
     if direct_changed:
         row['failures'].append(f'SSAO changed {direct_changed} native PBR pixels lit only directly')
     if above or below:
         row['failures'].append(f'SSAO left native PBR outside its direct/unoccluded bounds ({above} above, {below} below)')
     if darkened < 64:
         row['failures'].append(f'SSAO darkened only {darkened} native PBR pixels of indirect light')
-    if classic_changed:
+    if classic_changed > classic_limit:
         row['failures'].append(f'native PBR changed {classic_changed} classic pixels under SSAO')
     if classic_darkened < 1024:
         row['failures'].append(f'SSAO darkened only {classic_darkened} classic pixels')
-    if debug_changed:
+    if debug_changed > debug_limit:
         row['failures'].append(f'the SSAO debug view differs on {debug_changed} pixels with native PBR')
+    compare_ssao_half_resolution(by_case, images['ssao-off'])
+
+
+def compare_ssao_half_resolution(by_case: dict, unoccluded: bytes) -> None:
+    """Half-resolution SSAO approximates the full-resolution field (REN-05)."""
+    names = ('ssao-classic', 'ssao-debug-classic', 'ssao-classic-half', 'ssao-debug-classic-half')
+    if not all(name in by_case for name in names):
+        return
+    images = {name: capture_rgb(Path(by_case[name]['screenshot'])) for name in names}
+    row = by_case['ssao-classic-half']
+    if any(image is None for image in images.values()):
+        row['failures'].append('the half-resolution SSAO control is missing captures')
+        return
+    full, half = images['ssao-debug-classic'], images['ssao-debug-classic-half']
+    count = len(full)
+    mean = sum(abs(a - b) for a, b in zip(full, half)) / count
+    bias = sum(b - a for a, b in zip(full, half)) / count
+    darkened_full = sum(1 for i in range(0, count, 3)
+                        if any(images['ssao-classic'][c] + 2 <= unoccluded[c] for c in range(i, i + 3)))
+    darkened_half = sum(1 for i in range(0, count, 3)
+                        if any(images['ssao-classic-half'][c] + 2 <= unoccluded[c] for c in range(i, i + 3)))
+    ratio = abs(darkened_half - darkened_full) / max(1, darkened_full)
+    row['ssaoHalfResolution'] = {'debugMeanAbs': round(mean, 4), 'debugMeanSigned': round(bias, 4),
+                                 'classicDarkenedFull': darkened_full, 'classicDarkenedHalf': darkened_half,
+                                 'darkenedRatio': round(ratio, 4), 'identical': full == half}
+    if row.get('backend') == 'gl':
+        if full != half or images['ssao-classic'] != images['ssao-classic-half']:
+            row['failures'].append('OpenGL SSAO changed with r_ssaoResolution, which only Vulkan reads')
+        return
+    if full == half:
+        row['failures'].append('r_ssaoResolution 2 did not change the Vulkan occlusion field')
+    if mean > SSAO_HALF_DEBUG_MEAN_LEVELS:
+        row['failures'].append(f'half-resolution SSAO differs from full by {mean:.2f} levels on average')
+    if abs(bias) > SSAO_HALF_DEBUG_BIAS_LEVELS:
+        row['failures'].append(f'half-resolution SSAO is biased by {bias:.2f} levels')
+    if ratio > SSAO_HALF_DARKENED_RATIO:
+        row['failures'].append(f'half-resolution SSAO darkens {darkened_half} classic pixels, full {darkened_full}')
 
 
 def compare_native_baked_captures(results: list[dict]) -> None:
@@ -1274,7 +1463,7 @@ def compare_material_captures(results: list[dict]) -> None:
             by_case['production-curved']['classicComparison']=proof
             if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
                 by_case['production-curved']['failures'].append('curved classic surface differs from the native lighting reference')
-    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-grid'):
+    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-grid'):
         if case not in by_case or case+'-native' not in by_case: continue
         modern=by_case[case]
         pfm=Path(modern.get('linearScreenshot',''))
@@ -1295,7 +1484,25 @@ def compare_material_captures(results: list[dict]) -> None:
         settings={**BASE,**CASES[case+'-native']}
         displayed=[255*stock_display_transfer(value/255,settings) for value in encoded]
         errors=[abs(a-b) for a,b in zip(displayed,reference)]
-        proof={'samples':len(errors),'radius':44,'meanAbsoluteByteError':sum(errors)/len(errors),
+        # REN-02 cutout: the modern forward shader and ARB2's depth prepass test
+        # the same diffuse alpha in different programs, so a texel on a hole's
+        # edge can flip either way. Bound those edge flips instead of the
+        # whole-disc maximum; every other pixel keeps the 3-level limit.
+        edge_flips=0
+        if case in ('production-fixed-cutout','production-fixed-cutout-bump'):
+            kept=[]
+            for index,(x,y) in enumerate(coordinates):
+                pixel=errors[index*3:index*3+3]
+                if max(pixel)>3:
+                    level=lambda px,py: sum(native[(py*1280+px)*3:(py*1280+px)*3+3])
+                    if max(abs(level(x,y)-level(x+dx,y+dy)) for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)))>30:
+                        edge_flips+=1
+                        continue
+                kept+=pixel
+            if edge_flips>CUTOUT_EDGE_FLIP_PIXELS:
+                modern['failures'].append(f'{edge_flips} cutout edge pixels differ from the native reference (limit {CUTOUT_EDGE_FLIP_PIXELS})')
+            errors=kept
+        proof={'samples':len(errors),'radius':44,'edgeFlipPixels':edge_flips,'meanAbsoluteByteError':sum(errors)/len(errors),
                'maximumByteError':max(errors),'nativeRange':[min(reference),max(reference)],
                'encodedRange':[min(encoded),max(encoded)],'displayedRange':[min(displayed),max(displayed)],
                'comparison':'linear PFM encoded to sRGB through the stock display transfer versus native display'}
@@ -1304,9 +1511,37 @@ def compare_material_captures(results: list[dict]) -> None:
             modern['failures'].append('classic reference is clipped or lacks a useful lighting range')
         if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
             modern['failures'].append('classic interaction differs from the native lighting reference')
+    for kind in DISPLAY_CORRIDOR_KINDS:
+        case=f'production-fixed{kind}-display'; native_case=f'production-fixed{kind}-native'
+        if case not in by_case or native_case not in by_case: continue
+        a,b=(capture_rgb(Path(by_case[name]['screenshot'])) for name in (case,native_case))
+        if not a or not b:
+            by_case[case]['failures'].append('display corridor comparison inputs missing'); continue
+        pixels=[(x,y) for y in range(296,385) for x in range(663,752) if (x-707)**2+(y-340)**2<44**2]
+        errors=[]; flips=0
+        for x,y in pixels:
+            pixel=[abs(a[(y*1280+x)*3+c]-b[(y*1280+x)*3+c]) for c in range(3)]
+            if max(pixel)>3 and 'cutout' in kind:
+                level=lambda px,py: sum(b[(py*1280+px)*3:(py*1280+px)*3+3])
+                if max(abs(level(x,y)-level(x+dx,y+dy)) for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)))>30:
+                    flips+=1; continue
+            errors+=pixel
+        proof={'meanAbsoluteByteError':sum(errors)/len(errors),'maximumByteError':max(errors),'edgeFlipPixels':flips,
+               'nativeRange':[min(b[(y*1280+x)*3+c] for x,y in pixels for c in range(3)),max(b[(y*1280+x)*3+c] for x,y in pixels for c in range(3))]}
+        by_case[case]['classicDisplayComparison']=proof
+        if flips>CUTOUT_EDGE_FLIP_PIXELS:
+            by_case[case]['failures'].append(f'{flips} cutout edge pixels differ in the display frame')
+        if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
+            by_case[case]['failures'].append('display-referred classic corridor differs from native ARB2')
     for left,right,label in (('production-fixed','production-fixed-diffuse','specular'),
                              ('production-fixed-bump','production-fixed','normal'),
                              ('production-fixed-colored','production-fixed-bump','colored specular'),
+                             ('production-fixed-texmatrix','production-fixed-bump','bump texture matrix'),
+                             ('production-fixed-vertex','production-fixed-bump','vertex colour'),
+                             ('production-fixed-condition','production-fixed-bump','conditioned specular'),
+                             ('production-fixed-multistage','production-fixed-bump','second stage set'),
+                             ('production-fixed-ambient','production-fixed-bump','ambient light'),
+                             ('production-fixed-fog','production-fixed-bump','fog light'),
                              ('production-fixed-grid','production-fixed-grid-clear','baked lighting')):
         if left not in by_case or right not in by_case: continue
         paths=[Path(by_case[name].get('linearScreenshot','')) for name in (left,right)]
@@ -1736,7 +1971,9 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         if state.get('linearScene')!=('1' if linear_expected else '0'):
             failures.append('extreme emission was not composed in the committed linear HDR scene' if linear_expected
                             else 'extreme emission entered a linear scene the case did not request')
-    if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
+    if ( case.endswith('-display') and case.startswith('production-fixed') ) and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
+        failures.append('the display-referred frame did not run the classic-lighting corridor')
+    if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-fog','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('classic compatibility lighting was not submitted')
     if case.startswith('production-fixed-msaa') and not re.search(r'Renderer AA: MSAA requested=4 effective=4\b',text):
         failures.append('four-sample fallback control did not activate MSAA')
@@ -1751,7 +1988,7 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         gpu=next((line for line in telemetry if line.startswith('GPU skinning:')), '')
         if not re.search(r'\benabled=1\b',gpu) or not re.search(r'\bprepared=[1-9]\d*\b',gpu):
             failures.append('GPU skinning did not consume the specimen')
-    if case.startswith('skin-md5r'):
+    if case.startswith(('skin-md5r','mixed-material-md5r')):
         if 'MD5R model.' not in text:
             failures.append('the skinned specimen was not converted to MD5R')
         elif args.backend == 'gl' and 'runtime surfaces: packed primitive batches' not in text:
@@ -1774,7 +2011,20 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
         if not re.search(r'\bblocked=1\b', visible) or 'reason=pbr-ssao-indirect-only' not in visible:
             failures.append('the modern visible path kept an SSAO frame with PBR materials')
-    if getattr(args, 'gl_native', False) or ssao_declined:
+    # A skinned model that mixes PBR and classic surfaces has no proven classic
+    # lighting parity on the modern visible path, so OpenGL declines the frame
+    # to the light loop, whose native owner still draws the PBR part.
+    mixed_declined = (active_pbr and args.backend == 'gl' and not getattr(args, 'gl_native', False)
+                      and case.startswith('mixed-material-'))
+    if mixed_declined:
+        visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
+        # The recorded reason depends on the path (CPU skinning:
+        # lighting-parity-unproven; packed MD5R: missingVertexBuffer, or
+        # unsupportedGpuSkinning in the ownership view). The native owner's
+        # admission below is what proves the PBR part is still drawn.
+        if not re.search(r'\bexec=0\b', visible) or not re.search(r'\bblocked=1\b', visible):
+            failures.append('the modern visible path kept a mixed PBR/classic skinned frame')
+    if getattr(args, 'gl_native', False) or ssao_declined or mixed_declined:
         # The classic light loop owns PBR: prove its own telemetry instead of
         # the modern visible frame, which is deliberately off.
         native = next((line for line in telemetry if line.startswith('OpenGL: native PBR:')), '')
@@ -1801,7 +2051,7 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
         if not re.search(r'\bexec=0\b',visible) or not re.search(r'\bblocked=1\b',visible):
             failures.append('unsupported rendering contract did not retain complete classic ownership')
-    if active_pbr and args.backend == 'gl' and not getattr(args, 'gl_native', False) and not ssao_declined:
+    if active_pbr and args.backend == 'gl' and not getattr(args, 'gl_native', False) and not ssao_declined and not mixed_declined:
         ownership = next((line for line in telemetry if line.startswith('modernLightingOwnership')), '')
         if (case.startswith(('production','environment-')) or '-pbr' in case or case in ('fog-preview','blend-preview')) and not re.search(r'override=0 requested=1 materialContract=1\b',ownership):
             failures.append('production admission relied on a parity override or lacked its material contract')
@@ -2074,10 +2324,29 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             if case.startswith('production-fixed-bump'): material='classic_bump'
             if case.startswith('production-fixed-diffuse'): material='classic_diffuse'
             if case.startswith('production-fixed-colored'): material='classic_colored'
+            if case.startswith('production-fixed-cutout'): material='classic_cutout'
+            if case.startswith('production-fixed-cutout-bump'): material='classic_cutout_bump'
+            if case.startswith('production-fixed-texmatrix'): material='classic_texmatrix'
+            if case.startswith('production-fixed-vertex'): material='classic_vertex'
+            if case.startswith('production-fixed-condition'): material='classic_condition'
+            if case.startswith('production-fixed-multistage'): material='classic_multistage'
+            if case.startswith(('production-fixed-ambient','production-fixed-fog')): material='classic_bump'
             commands += ['g_stopTime 0',f'script "${removed}.remove()"','wait 3',
-                         f'spawn func_static name pbr_classic model "{lab.MODEL}" shader "{lab.PREFIX}/{material}" origin "100 160 480" solid 0',
+                         f'spawn func_static name pbr_classic model "{lab.VERTEX_COLOR_MODEL if case.startswith("production-fixed-vertex") else lab.MODEL}" shader "{lab.PREFIX}/{material}" origin "100 160 480" solid 0',
                          'wait 30','g_stopTime 1']
             scene_setups.add('classic')
+            # REN-02: a classic ambient light (step 2) or fog light (step 3)
+            # beside the fixed lights.
+            for extra, shader, color in (('ambient', 'ambient', '0.25 0.2 0.15'), ('fog', 'fog', '1 1 1')):
+                wanted = case.startswith(f'production-fixed-{extra}')
+                if wanted and f'fixed-{extra}' not in scene_setups:
+                    commands += ['g_stopTime 0',f'spawn light name fixed_{extra} texture "lights/openq4/pbr_lab/{shader}" '
+                                 f'origin "100 60 480" light_radius "400 400 400" _color "{color}" noshadows 1',
+                                 'wait 30','g_stopTime 1']
+                    scene_setups.add(f'fixed-{extra}')
+                elif not wanted and f'fixed-{extra}' in scene_setups:
+                    commands += ['g_stopTime 0',f'script "$fixed_{extra}.remove()"','wait 30','g_stopTime 1']
+                    scene_setups.discard(f'fixed-{extra}')
         if case.startswith('sampler-'):
             commands += ['g_stopTime 0']
             if 'sampler' in scene_setups:
@@ -2089,11 +2358,26 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
                          f'spawn func_static name emissive model "{lab.MODEL}" shader "{lab.PREFIX}/extreme_emissive" origin "300 160 300" solid 0',
                          'wait 30','g_stopTime 1']
             scene_setups.add('extreme-emissive')
+        if case.startswith('mixed-material-') and 'mixed' not in scene_setups:
+            commands += ['g_stopTime 0',
+                         f'spawn func_animate name pbr_mixed model "{lab.MIXED_MODEL}" anim idle origin "0 -700 380" angle 0 solid 0',
+                         'wait 30','g_stopTime 1']
+            scene_setups.add('mixed')
         if case.startswith('skin-'):
             commands += ['g_stopTime 0']
-            if 'skin' not in scene_setups:
-                commands += [f'spawn func_animate name pbr_skinned model "{lab.SKINNING_MODEL}" anim idle origin "0 -700 380" angle 0 solid 0', 'wait 30']
-                scene_setups.add('skin')
+            # A skin substitution is a spawn key (idScript reads a quoted
+            # console argument as a vector), so respawn when it changes.
+            skin=next((name for name in lab.SKINNING_SKINS if f'-{name}' in case), None)
+            wanted=f'skin:{skin}'
+            if wanted not in scene_setups:
+                if any(setup.startswith('skin:') for setup in scene_setups):
+                    commands += ['script "$pbr_skinned.remove()"','wait 3']
+                    scene_setups.difference_update({setup for setup in scene_setups if setup.startswith('skin:')})
+                spawn=f'spawn func_animate name pbr_skinned model "{lab.SKINNING_MODEL}" anim idle origin "0 -700 380" angle 0 solid 0'
+                if skin:
+                    spawn+=f' skin {lab.SKINNING_SKINS[skin]}'
+                commands += [spawn, 'wait 30']
+                scene_setups.add(wanted)
             angle='45 0 0' if case.endswith(('-bent','-normal','-ownership')) else '0 0 0'
             commands += [f'''script "$pbr_skinned.setJointAngle(1,1,'{angle}')"''','wait 30','g_stopTime 1']
         setup = 'multi' if case.startswith('multi-') else 'local-global' if case.startswith('local-global') else None
@@ -2105,6 +2389,8 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             commands += ['wait 2']
         if case.startswith('skin-md5r'):
             commands += [f'printModel {lab.SKINNING_MESH}']
+        if case.startswith('mixed-material-md5r'):
+            commands += [f'printModel {lab.MIXED_MESH}']
         commands += ['viewpos', 'gfxInfo', 'rendererMaterialResourceTableDump', f'screenshot "screenshots/{case}.tga"']
         if case=='vk-direct-emission-extreme' and args.backend=='vk':
             commands += ['rendererVulkanHDRInfo']
@@ -2234,6 +2520,8 @@ def main() -> int:
         if args.batch and any(c.startswith(prefix) for c in cases) and not all(c.startswith(prefix) for c in cases):
             parser.error(f'{prefix} cases require a separate scene from other controls')
     # The specimen converts when it loads: one conversion state per process.
+    if args.batch and len({c.startswith('mixed-material-md5r') for c in cases if c.startswith('mixed-material-')}) > 1:
+        parser.error('mixed-material-md5r cases convert the model at load; run them without other mixed-material cases')
     if args.batch and len({c.startswith('skin-md5r') for c in cases if c.startswith('skin-')}) > 1:
         parser.error('skin-md5r cases convert the specimen at load; run them without other skin- cases')
     if args.prepare: prepare(args.runtime_root,args.basepath,args.output_dir,args.timeout)
@@ -2276,6 +2564,7 @@ def main() -> int:
     compare_ibl_captures(results)
     compare_sampler_captures(results)
     compare_skinning_captures(results)
+    compare_mixed_material_captures(results)
     compare_material_captures(results)
     compare_native_baked_captures(results)
     compare_ssao_captures(results)

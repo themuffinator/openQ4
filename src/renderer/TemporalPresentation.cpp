@@ -4,6 +4,7 @@
 #include "tr_local.h"
 #include "RendererMetrics.h"
 #include "TemporalPresentation.h"
+#include "MotionBlurCore.h"
 
 idCVar r_dynamicResolutionMinScale( "r_dynamicResolutionMinScale", "50",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
@@ -130,6 +131,44 @@ static temporalScaleHistoryEntry_t rg_temporalScaleHistory[TEMPORAL_SCALE_HISTOR
 static int rg_temporalScaleHistoryCursor = 0;
 static unsigned int rg_temporalHistoryGeneration = 1;
 static idStr rg_temporalHistoryResetReason = "renderer initialization";
+
+static const int TEMPORAL_STATS_REASON_SLOTS = 12;
+static const int TEMPORAL_VIEW_RESET_COUNT = TEMPORAL_HISTORY_RESET_RESOURCE_LOSS + 1;
+
+typedef struct temporalReasonCount_s {
+	char	reason[96];
+	int		count;
+} temporalReasonCount_t;
+
+typedef struct temporalResolveStats_s {
+	int		outcomes[TEMPORAL_RESOLVE_OUTCOME_COUNT];
+	int		velocity[4];			// none-attempted, none, partial, complete
+	temporalReasonCount_t fallbacks[TEMPORAL_STATS_REASON_SLOTS];
+	temporalReasonCount_t invalidations[TEMPORAL_STATS_REASON_SLOTS];
+	int		viewResets[TEMPORAL_VIEW_RESET_COUNT];
+	int		otherReasons;			// reasons beyond the slots
+} temporalResolveStats_t;
+
+static temporalResolveStats_t rg_temporalResolveStats;
+
+static void R_TemporalPresentation_CountReason( temporalReasonCount_t *slots, const char *reason ) {
+	if ( reason == NULL || reason[0] == '\0' ) {
+		reason = "unspecified";
+	}
+	for ( int i = 0; i < TEMPORAL_STATS_REASON_SLOTS; i++ ) {
+		if ( slots[i].count == 0 ) {
+			idStr::Copynz( slots[i].reason, reason, sizeof( slots[i].reason ) );
+			slots[i].count = 1;
+			return;
+		}
+		if ( idStr::Cmp( slots[i].reason, reason ) == 0 ) {
+			slots[i].count++;
+			return;
+		}
+	}
+	rg_temporalResolveStats.otherReasons++;
+}
+
 
 // openQ4 VR: two eyes per frame would alternate one history, so every
 // history-backed feature stands down while a VR frame presents.
@@ -278,6 +317,8 @@ void R_TemporalPresentation_InvalidateHistory( const char *reason ) {
 	}
 	rg_temporalHistoryResetReason =
 		( reason != NULL && reason[0] != '\0' ) ? reason : "unspecified";
+	R_TemporalPresentation_CountReason( rg_temporalResolveStats.invalidations,
+		rg_temporalHistoryResetReason.c_str() );
 	R_TemporalPresentation_ClearViewHistory();
 }
 
@@ -490,6 +531,7 @@ void R_TemporalPresentation_PrepareView( viewDef_t *viewDef ) {
 		// A known screenshot/save-preview frame is rendered without temporal
 		// projection jitter because the backend deliberately bypasses history.
 		viewDef->temporalHistoryResetReason = TEMPORAL_HISTORY_RESET_CAPTURE;
+		rg_temporalResolveStats.viewResets[TEMPORAL_HISTORY_RESET_CAPTURE]++;
 		return;
 	}
 
@@ -544,6 +586,9 @@ void R_TemporalPresentation_PrepareView( viewDef_t *viewDef ) {
 		// remain inside the geometric translation/rotation/FOV thresholds.
 		viewDef->temporalHistoryResetReason = TEMPORAL_HISTORY_RESET_EXPLICIT_CUT;
 	}
+	// Root views only reach here (subviews return above); "none" counts reuse.
+	rg_temporalResolveStats.viewResets[idMath::ClampInt( 0, TEMPORAL_VIEW_RESET_COUNT - 1,
+		static_cast<int>( viewDef->temporalHistoryResetReason ) )]++;
 	viewDef->temporalHistoryValid =
 		viewDef->temporalHistoryResetReason == TEMPORAL_HISTORY_RESET_NONE
 		&& viewDef->temporalPreviousProjectionValid;
@@ -818,6 +863,94 @@ void R_TemporalPresentation_RecordOwnership( const temporalOwnershipStats_t &sta
 	rg_temporalOwnershipStats = stats;
 }
 
+void R_TemporalPresentation_RecordResolve( temporalResolveOutcome_t outcome,
+		const char *fallbackReason, int velocity ) {
+	if ( outcome < 0 || outcome >= TEMPORAL_RESOLVE_OUTCOME_COUNT ) {
+		return;
+	}
+	rg_temporalResolveStats.outcomes[outcome]++;
+	rg_temporalResolveStats.velocity[idMath::ClampInt( -1, 2, velocity ) + 1]++;
+	if ( outcome == TEMPORAL_RESOLVE_FALLBACK ) {
+		R_TemporalPresentation_CountReason( rg_temporalResolveStats.fallbacks, fallbackReason );
+	}
+}
+
+static void R_TemporalPresentation_PrintReasons( const char *label, const temporalReasonCount_t *slots ) {
+	idStr line;
+	for ( int i = 0; i < TEMPORAL_STATS_REASON_SLOTS && slots[i].count > 0; i++ ) {
+		line += va( "%s\"%s\"=%d", line.Length() > 0 ? " " : "", slots[i].reason, slots[i].count );
+	}
+	common->Printf( "%s: %s\n", label, line.Length() > 0 ? line.c_str() : "none" );
+}
+
+static motionBlurStats_t rg_motionBlurStats;
+static bool rg_motionBlurStatsInitialized = false;
+
+void R_TemporalPresentation_ResetMotionBlurStats( void ) {
+	memset( &rg_motionBlurStats, 0, sizeof( rg_motionBlurStats ) );
+	rg_motionBlurStats.lastFrame = -1;
+	rg_motionBlurStats.lastShutterScale = 1.0f;
+	rg_motionBlurStats.lastDisabledReason = "none";
+	rg_motionBlurStatsInitialized = true;
+}
+
+motionBlurStats_t &R_TemporalPresentation_MotionBlurStats( void ) {
+	if ( !rg_motionBlurStatsInitialized ) {
+		R_TemporalPresentation_ResetMotionBlurStats();
+	}
+	return rg_motionBlurStats;
+}
+
+float R_TemporalPresentation_MotionBlurShutterMsec( void ) {
+	return idMath::ClampFloat( 0.0f, 100.0f, r_motionBlurShutterMsec.GetFloat() );
+}
+
+bool R_TemporalPresentation_PreviousPositionsRequested( void ) {
+	if ( R_TemporalPresentation_TemporalAARequested() ) {
+		return true;
+	}
+	return r_motionBlur.GetBool() && r_motionBlurObjectVectors.GetBool()
+		&& !r_skipPostProcess.GetBool() && !R_TemporalPresentation_VRFrame();
+}
+
+void R_TemporalPresentation_PrintMotionBlurStatus_f( const idCmdArgs &args ) {
+	R_RenderThread_Sync( "motion blur stats" );
+	if ( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "reset" ) == 0 ) {
+		R_TemporalPresentation_ResetMotionBlurStats();
+		common->Printf( "Motion blur: statistics reset\n" );
+		return;
+	}
+	const motionBlurStats_t &stats = R_TemporalPresentation_MotionBlurStats();
+	common->Printf(
+		"Motion blur: requested=%d objectVectors=%d shutterMsec=%.3f taaRequested=%d mainViews=%d drawn=%d objectVectorViews=%d jitterAligned=%d subviewSkips=%d disabled=%d lastDisabled=%s\n",
+		r_motionBlur.GetBool() ? 1 : 0,
+		r_motionBlurObjectVectors.GetBool() ? 1 : 0,
+		R_TemporalPresentation_MotionBlurShutterMsec(),
+		R_TemporalPresentation_TemporalAARequested() ? 1 : 0,
+		stats.mainViews, stats.drawnViews, stats.objectVectorViews,
+		stats.jitterAlignedViews, stats.subviewSkips, stats.disabledViews,
+		stats.lastDisabledReason != NULL ? stats.lastDisabledReason : "none" );
+	idStr history;
+	for ( int i = 0; i < MOTION_BLUR_HISTORY_RESULT_COUNT; i++ ) {
+		history += va( "%s%s=%d", i > 0 ? " " : "",
+			MotionBlurCore_HistoryResultName( static_cast<motionBlurHistoryResult_t>( i ) ),
+			stats.history[i] );
+	}
+	common->Printf( "Motion blur history: %s\n", history.c_str() );
+	common->Printf(
+		"Motion blur ownership: rigid=%d posed=%d weapon=%d weaponStill=%d cameraFallback=%d\n",
+		stats.rigid, stats.posed, stats.weapon, stats.weaponStill, stats.cameraFallback );
+	common->Printf(
+		"Motion blur effective: frame=%d strength=%.3f maxPixels=%.1f samples=%d shutterScale=%.3f frameMsec=%.3f\n",
+		stats.lastFrame, stats.lastStrength, stats.lastMaxPixels, stats.lastSamples,
+		stats.lastShutterScale, stats.lastFrameMsec );
+	const float centerSamples = static_cast<float>( Max( 1, stats.centerSamples ) );
+	common->Printf(
+		"Motion blur camera: samples=%d centerPixelsPerFrame=%.4f scaledCenterPixels=%.4f\n",
+		stats.centerSamples, stats.centerPixelsSum / centerSamples,
+		stats.scaledCenterPixelsSum / centerSamples );
+}
+
 void R_TemporalPresentation_CapturePreviousPositions( srfTriangles_t *tri ) {
 	if ( tri == NULL ) {
 		return;
@@ -832,7 +965,7 @@ void R_TemporalPresentation_CapturePreviousPositions( srfTriangles_t *tri ) {
 	// frame, or the "previous" positions would span a gap.
 	const bool continuous = tri->verts != NULL && tri->numVerts > 0
 		&& tri->positionsFrame == frame - 1;
-	if ( !continuous || !R_TemporalPresentation_TemporalAARequested() ) {
+	if ( !continuous || !R_TemporalPresentation_PreviousPositionsRequested() ) {
 		tri->previousPositionsFrame = -1;
 		return;
 	}
@@ -865,7 +998,7 @@ struct vertCache_s *R_TemporalPresentation_PreviousPositionCache(
 	if ( drawSurf == NULL || drawSurf->geo == NULL || drawSurf->space == NULL
 			|| drawSurf->space->entityDef == NULL || drawSurf->material == NULL
 			|| tr.viewDef == NULL || tr.viewDef->isSubview
-			|| !R_TemporalPresentation_TemporalAARequested() ) {
+			|| !R_TemporalPresentation_PreviousPositionsRequested() ) {
 		return NULL;
 	}
 	const srfTriangles_t *tri = drawSurf->geo;
@@ -897,8 +1030,12 @@ bool R_TemporalPresentation_ScreenSpaceEffectsRequested( void ) {
 }
 
 void R_TemporalPresentation_PrintStatus_f( const idCmdArgs &args ) {
-	(void)args;
 	R_RenderThread_Sync( "temporal stats" );
+	if ( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "reset" ) == 0 ) {
+		memset( &rg_temporalResolveStats, 0, sizeof( rg_temporalResolveStats ) );
+		common->Printf( "Temporal presentation: cumulative statistics reset\n" );
+		return;
+	}
 	const temporalPresentationFrameState_t &state =
 		R_TemporalPresentation_GetFrameState();
 	common->Printf(
@@ -951,6 +1088,25 @@ void R_TemporalPresentation_PrintStatus_f( const idCmdArgs &args ) {
 		rg_temporalOwnershipStats.reactive,
 		rg_temporalOwnershipStats.missed,
 		rg_temporalOwnershipStats.complete ? 1 : 0 );
+	const temporalResolveStats_t &resolve = rg_temporalResolveStats;
+	common->Printf(
+		"Temporal resolve: history=%d seeded=%d capture=%d spatial=%d fallback=%d velocityNotAttempted=%d velocityNone=%d velocityPartial=%d velocityComplete=%d\n",
+		resolve.outcomes[TEMPORAL_RESOLVE_HISTORY], resolve.outcomes[TEMPORAL_RESOLVE_SEEDED],
+		resolve.outcomes[TEMPORAL_RESOLVE_CAPTURE], resolve.outcomes[TEMPORAL_RESOLVE_SPATIAL],
+		resolve.outcomes[TEMPORAL_RESOLVE_FALLBACK], resolve.velocity[0], resolve.velocity[1],
+		resolve.velocity[2], resolve.velocity[3] );
+	idStr viewResets;
+	for ( int i = 0; i < TEMPORAL_VIEW_RESET_COUNT; i++ ) {
+		viewResets += va( "%s%s=%d", i > 0 ? " " : "",
+			R_TemporalPresentation_HistoryResetReasonName( static_cast<temporalHistoryResetReason_t>( i ) ),
+			resolve.viewResets[i] );
+	}
+	common->Printf( "Temporal view history: %s\n", viewResets.c_str() );
+	R_TemporalPresentation_PrintReasons( "Temporal resolve fallbacks", resolve.fallbacks );
+	R_TemporalPresentation_PrintReasons( "Temporal history invalidations", resolve.invalidations );
+	if ( resolve.otherReasons > 0 ) {
+		common->Printf( "Temporal reasons beyond the table: %d\n", resolve.otherReasons );
+	}
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	extern void VK_PostProcess_PrintTemporalMotion( void );
 	VK_PostProcess_PrintTemporalMotion();

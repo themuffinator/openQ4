@@ -542,9 +542,39 @@ Run either pressure harness with `--runtime-root`, `--basepath`, `--output-dir`
 and `--backend gl|vk`; `--device` selects the Vulkan adapter. Each has a separate
 `--compare GL_REPORT VK_REPORT --output-dir ...` mode. They require the existing
 compiled original PBR laboratory runtime and keep writable fixtures in the
-isolated test profile. Descriptor-driver refusal remains a native test, not a
-GPU fault-injection qualification. Broader authored-lighting/mod content and
+isolated test profile. Descriptor-driver refusal was then a native test only;
+the GPU drill below now covers it. Broader authored-lighting/mod content and
 the existing strict five-pixel lighting mismatch remain open.
+
+## Descriptor refusal on real drivers (6 November 2026)
+
+`r_vkMaterialDescriptorPoolTest N` (developer drill, default 0) gives each
+frame slot one real descriptor pool sized for N authored draws and never
+chains a second one. Later authored draws in that frame therefore reach the
+driver's own `vkAllocateDescriptorSets` refusal rather than the renderer's
+four-pool quota. Changing the value replaces a slot's pools at its next frame
+start, after its fence; clearing it restores the production pools.
+
+`renderer_vulkan_descriptor_pressure.py` stacks 128 identical authored stages
+on one specimen and sets the drill to 32 draws. Its cases are: below the limit,
+drill, drill cleared, shader reload, video restart with the drill still set,
+and video restart with it cleared. Skipped stages must leave the image
+unchanged. The refusal diagnostic may appear only inside the two drill
+intervals. Skips must stop once both frame slots have switched back, and draws
+must resume. Reload and restart must recover exactly.
+
+The clean `1243eb6a` build passes on the RTX 4060 Laptop (591.74) and the Iris
+Xe (101.5590), with validation enabled and no validation messages. Both drivers
+refused the over-quota allocations: 3,264 skips during the drill and 3,360
+after the drill restart. Another 224 skips landed during the one-to-two-frame
+slot changeover, after which the count stayed fixed while draws resumed. Each
+adapter's eight images match its own base exactly. All sixteen GL/Vulkan pairs
+differ by at most one display level. The native resource test also executes
+the drill's pool replacement and driver-refused path against its doubles.
+Reports and engine images are in `.tmp/vk-roadmap/nov6/descriptor-{gl,nvidia,intel}/`
+and `descriptor-comparison-{nvidia,intel}/`. This closes the descriptor-driver
+failure subpoint only. It does not cover broader authored lighting, mod
+content or the strict lighting image gate.
 
 ## Dependency provenance
 

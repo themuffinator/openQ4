@@ -283,6 +283,20 @@ idCVar r_vkPBRSpecularAA( "r_vkPBRSpecularAA", "1", CVAR_RENDERER | CVAR_BOOL, "
 idCVar r_pbrGeneratedLegacyFallback( "r_pbrGeneratedLegacyFallback", "1", CVAR_RENDERER | CVAR_BOOL, "allow development-only classic fallback generation for PBR-only materials" );
 idCVar r_pbrDebug( "r_pbrDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "PBR debug view: 0=off, 1=albedo, 2=normal, 3=metallic, 4=roughness, 5=AO, 6=emissive, 7=state marker (green=PBR, magenta=contract mismatch)", 0, 7, idCmdSystem::ArgCompletion_Integer<0,7> );
 idCVar r_pbrIBL( "r_pbrIBL", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable environment reflections and diffuse from authored reflection probes for explicitly PBR-authored materials (with r_pbrAnalyticEnvironment, the laboratory studio environment)" );
+idCVar r_pbrProbeAsyncPrefilter( "r_pbrProbeAsyncPrefilter", "1", CVAR_RENDERER | CVAR_BOOL, "filter newly resident reflection probes on a background thread; the probe set keeps its analytic fallback until the result publishes on a later frame (screenshots wait for it). 0 filters on the frame that needs the probe, a stall of tens of milliseconds" );
+// `pbrProbeSettle`: the next few frames finish every background probe filter
+// as a screenshot does, ending early once nothing is pending. Tests and
+// benchmarks use it to measure the settled state without depending on thread
+// timing; the request expires so it can never pin later frames to it.
+static int r_pbrProbeSettleUntilFrame = -1;
+static const int R_PBR_PROBE_SETTLE_FRAMES = 3;
+void R_PBRProbes_RequestSettle( void ) { r_pbrProbeSettleUntilFrame = tr.frameCount + R_PBR_PROBE_SETTLE_FRAMES; }
+bool R_PBRProbes_SettleRequested( void ) { return r_pbrProbeSettleUntilFrame >= tr.frameCount; }
+void R_PBRProbes_SettleDone( void ) { r_pbrProbeSettleUntilFrame = -1; }
+static void R_PBRProbeSettle_f( const idCmdArgs &args ) {
+	( void )args;
+	R_PBRProbes_RequestSettle();
+}
 idCVar r_pbrIBLIntensity( "r_pbrIBLIntensity", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "PBR environment intensity", 0.0f, 4.0f );
 idCVar r_pbrAnalyticEnvironment( "r_pbrAnalyticEnvironment", "0", CVAR_RENDERER | CVAR_BOOL, "laboratory mode: light PBR surfaces with the analytic studio environment where no authored probe applies; 0 leaves environment lighting to authored probes, baked light grids and the map's ambient lights" );
 idCVar r_pbrInferFromLegacyMaterials( "r_pbrInferFromLegacyMaterials", "0", CVAR_RENDERER | CVAR_BOOL, "research-only legacy material reinterpretation; never used for stock rendering by default" );
@@ -327,7 +341,8 @@ idCVar r_motionBlurStrength( "r_motionBlurStrength", "0.45", CVAR_RENDERER | CVA
 idCVar r_motionBlurMaxPixels( "r_motionBlurMaxPixels", "10", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "maximum motion blur radius in pixels", 0.0f, 64.0f );
 idCVar r_motionBlurSamples( "r_motionBlurSamples", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of motion blur gather samples", 1, 16, idCmdSystem::ArgCompletion_Integer<1,16> );
 idCVar r_motionBlurDebug( "r_motionBlurDebug", "0", CVAR_RENDERER | CVAR_BOOL, "visualize motion blur vectors instead of applying blur" );
-idCVar r_motionBlurObjectVectors( "r_motionBlurObjectVectors", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include rigid-object motion vectors when r_motionBlur is enabled" );
+idCVar r_motionBlurObjectVectors( "r_motionBlurObjectVectors", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include exact object motion vectors (rigid entities, skinned models and the view weapon) when r_motionBlur is enabled" );
+idCVar r_motionBlurShutterMsec( "r_motionBlurShutterMsec", "16.667", CVAR_RENDERER | CVAR_FLOAT, "motion blur length as the motion over this many milliseconds, independent of frame rate; 0 = the motion between two presented frames (original behaviour)", 0.0f, 100.0f );
 idCVar r_forceSpecialEffects( "r_forceSpecialEffects", "0", CVAR_RENDERER | CVAR_INTEGER,
 	"force legacy special-effect bitmask for debugging (1=blur, 2=AL, 3=both)", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_hdrSceneTarget( "r_hdrSceneTarget", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "render the main scene into an HDR scene target before post-processing" );
@@ -6206,6 +6221,8 @@ void R_InitCommands( void ) {
 #endif
 	cmdSystem->AddCommand( "rendererGpuTimerSelfTest", R_RendererGpuTimerSelfTest_f, CMD_FL_RENDERER, "run renderer GPU timer query self tests" );
 	cmdSystem->AddCommand( "rendererTemporalPresentationStatus", R_TemporalPresentation_PrintStatus_f, CMD_FL_RENDERER, "report dynamic-resolution and temporal-history state" );
+	cmdSystem->AddCommand( "pbrProbeSettle", R_PBRProbeSettle_f, CMD_FL_RENDERER, "finish background reflection-probe filtering on the next frames, as a screenshot does" );
+	cmdSystem->AddCommand( "rendererMotionBlurStatus", R_TemporalPresentation_PrintMotionBlurStatus_f, CMD_FL_RENDERER, "report motion blur requested/effective settings and history decisions; \"reset\" clears the counters" );
 	cmdSystem->AddCommand( "rendererScenePacketSelfTest", R_RendererScenePacketSelfTest_f, CMD_FL_RENDERER, "run renderer front-end scene-packet self tests" );
 	cmdSystem->AddCommand( "rendererRenderGraphSelfTest", R_RendererRenderGraphSelfTest_f, CMD_FL_RENDERER, "run renderer resource-graph self tests" );
 	cmdSystem->AddCommand( "rendererRenderGraphResourceSelfTest", R_RendererRenderGraphResourceSelfTest_f, CMD_FL_RENDERER, "run renderer graph resource owner self tests" );
@@ -6285,6 +6302,8 @@ void idRenderSystemLocal::Clear( void ) {
 	viewportOffset[1] = 0;
 	tiledViewport[0] = 0;
 	tiledViewport[1] = 0;
+	tiledWindow[0] = 0;
+	tiledWindow[1] = 0;
 	backEndRenderer = BE_BAD;
 	backEndRendererHasVertexPrograms = false;
 	backEndRendererMaxLight = 1.0f;

@@ -260,6 +260,19 @@ public:
 	// done under any normal circumstances, and probably not at all on consoles.
 	void		Resize(int width, int height);
 
+	// A colour capture (RC_COPY_RENDER) into an ordinary file texture
+	// re-specifies it as one RGBA8 level of the capture size, as Quake 4's
+	// glCopyTexImage2D did. Stock remote-camera screens capture into such
+	// textures (textures/common/camera1), which load block-compressed with a
+	// mip chain that no copy can write. Generated and scratch targets keep
+	// their own storage rules.
+	bool		NeedsColorCopyRespecification( int width, int height ) const {
+		return IsFileBacked() && opts.textureType == TT_2D
+			&& ( opts.format != FMT_RGBA8 || opts.numLevels != 1
+				|| opts.width != width || opts.height != height );
+	}
+	void		RespecifyColorCopyTarget( int width, int height );
+
 	// every block-compressed format: gates the compressed upload path, the
 	// 4-pixel alignment asserts and the block-size arithmetic
 	bool		IsCompressed() const {

@@ -189,6 +189,116 @@ The stock renderer remains a numeric SDR pipeline: temporal targets preserve the
 same UNORM/code-value contract as their source, and neither resolve shader adds
 an sRGB or gamma transfer. Native UI is composed after the scene resolve.
 
+## Motion Blur
+
+Motion blur (`r_motionBlur`) is a separate consumer with its own camera
+history. It runs inside the main 3D view after SSAO and before bloom, on the
+jittered, possibly scaled scene, and so before the temporal resolve. Both
+backends route every policy decision through `src/renderer/MotionBlurCore.h`;
+OpenGL (`RB_STD_MotionBlur`) and Vulkan (`VK_Post_MotionBlur`) keep only their
+state structures and GPU work.
+
+- **History.** `MotionBlurCore_ValidateHistory` rejects the previous camera
+  after a video restart, a world/map change, a viewport change, an authored
+  camera cut (`renderView.forceUpdate` from `Camera.cpp`; screenshot frames also
+  set it, so capture frames are excluded), time running backwards, a gap over
+  100 ms, a teleport over 512 units or a projection change. A still camera is
+  rejected only without object vectors. Equal presentation times are not a
+  discontinuity: high-refresh frames can share a millisecond, and a paused game
+  keeps its history with zero motion. Subviews, portal skies and 2D views pass
+  without reading or writing the main camera's history.
+- **Temporal AA jitter.** `R_SetupProjection` records the jitter-free
+  `projectionMatrix[8]`/`[9]` in `viewDef->temporalNeutralProjectionOffset`
+  before adding the sub-pixel offset; the OpenGL direct fallback may later
+  recenter the applied matrix, so the neutral values are stored, not derived.
+  The history test compares neutral offsets, and the previous camera is
+  aligned to the current frame's applied jitter
+  (`MotionBlurCore_AlignPreviousOffsets`), so a depth-reconstructed point
+  reprojects to the current pixel plus its motion and neither frame's jitter
+  appears as velocity. Before this, every temporal AA frame read as a
+  projection change and motion blur never drew while TAA was active.
+- **Exact object vectors.** With `r_motionBlurObjectVectors 1` the velocity pass
+  uses the same per-surface classification as temporal AA
+  (`R_ScenePackets_TemporalSurfaceMotion`): rigid entities from their previous
+  model transform, posed (skinned) surfaces from previous model-space
+  positions, the view weapon with its own depth-hack projection on both frames.
+  Previous positions are captured when either consumer wants them
+  (`R_TemporalPresentation_PreviousPositionsRequested`). Surfaces without an
+  exact vector (effects, translucency, GUIs, newly visible entities) are left
+  to camera reprojection, except that a view weapon without one is written as
+  zero motion: it moves with the camera, and reprojection used to smear it
+  whenever the view turned. Motion blur's entity history is independent of
+  temporal AA's but built by the same collector.
+- **Frame-rate independence.** Velocities measure the motion between two
+  presented frames. `MotionBlurCore_ShutterScale` multiplies them by
+  `r_motionBlurShutterMsec` (16.667) over the smoothed presentation interval
+  (an exponential average of integer-millisecond `renderView.time` deltas,
+  clamped to 1/8–8x), so a camera speed blurs by the same length at 60, 144 or
+  240 Hz. `r_motionBlurShutterMsec 0` keeps the original per-frame length. The
+  scale travels in `motionBlurObjectParams.z` to `motionblur.fs` and
+  `post_motionblur.frag`; the Vulkan SPIR-V is the committed
+  `post_shaders_spv.h`.
+
+`rendererMotionBlurStatus` reports cumulative counters since the last
+`rendererMotionBlurStatus reset`: requested and drawn main views, views with an
+object-vector target, views that cancelled temporal AA jitter, subview skips,
+disabled views with the last reason, every history decision, exact rigid/
+posed/weapon surfaces, zero-motion weapon surfaces, camera-reprojection
+fallbacks, and the effective strength, length cap, samples, shutter scale and
+smoothed frame interval. Its camera line gives the mean centre-of-view
+rotation speed per frame and after the shutter scale, which is the
+frame-rate-independent input the qualification compares.
+
+### Supported combinations
+
+Motion blur is supported with temporal AA (forced or automatic), dynamic or
+manual resolution scaling, supersampling, MSAA, HDR tone mapping, bloom and
+SSAO on OpenGL and Vulkan, and with `r_vkRenderThread 1`/`2`. Below 10 FPS
+every interval exceeds the 100 ms gap and the scene stays sharp. Motion blur
+needs an offscreen scene target, so on Apple's OpenGL 2.1 compatibility profile
+it removes MSAA from the 3D scene (offscreen targets cannot be multisampled
+there; see [display settings](../user/display-settings.md#anti-aliasing-settings-new)).
+Vulkan's MSAA stops at 8x whatever the request. `r_jitter` (multi-frame
+screenshot accumulation) and `r_skipPostProcess` disable it, and the status
+command names the reason.
+
+### Motion blur qualification, 6 November 2026
+
+`tools/tests/renderer_motion_blur_qualification.py` (REN-08) is the opt-in
+runtime gate. Each case launches the staged client into `game/airdefense1`,
+pans with `benchmarkViewSweep`, and reads `rendererMotionBlurStatus`; the
+mirror case uses the Milestone D mirror fixture
+(`renderer_milestone_d_fixture.py`, `--mirror-runtime`). Windows x64, RTX 4060
+Laptop GPU, 2560 x 1440 windowed, uncapped unless stated, on a shared machine:
+
+- Reproduced before the fix: with `r_temporalAA 1` neither backend ever drew a
+  motion blur pass during a 360-degree pan.
+- All 41 backend cases pass on OpenGL and Vulkan: baseline, forced temporal AA,
+  75% automatic upscaling, HDR + bloom + SSAO + temporal AA, 150%
+  supersampling, 4x MSAA, 60 FPS and uncapped with and without the shutter,
+  `g_stopTime` pause, 8 FPS, camera-only vectors, `r_vkRenderThread` 1 and 2,
+  dynamic resolution, the mirror fixture and the weapon debug captures. Every
+  moving main view draws (400/400, 240/240), temporal AA cases cancel the
+  jitter on every drawn view, and subviews (the portal sky, the mirror) are
+  skipped every frame without resetting the history.
+- Frame-rate coherence: the shutter-scaled centre speed uncapped against 60
+  FPS is 0.990 on both backends; with `r_motionBlurShutterMsec 0` it is
+  0.42 (GL) and 0.39 (Vulkan), the original frame-rate-dependent length.
+- Weapon: in the debug view while panning, mean weapon motion is 0.25 with
+  exact ownership against 0.80 with camera-only reprojection, which smears it.
+- Expected resets, each a single frame: resuming from `g_stopTime` can step
+  presentation time back (`time-reversed`); a frame whose camera did not move
+  without object vectors is `camera-still`; at 8 FPS every interval exceeds
+  the gap limit and nothing blurs.
+- An earlier 4x MSAA GL run failed with 106 frames over 100 ms while other
+  workloads shared the GPU; the uncontended rerun passes. Dynamic-resolution
+  scale steps used to reset GL's history (2 resets); the history now keeps
+  scale-only viewport changes.
+
+Not covered: physical Linux, macOS (including the Apple GL 2.1 profile, whose
+restriction is documented rather than measured) and Android, and a human
+review of the blur's appearance on the reference display.
+
 ## Validation
 
 Dependency-light policy coverage lives in
@@ -197,6 +307,64 @@ Dependency-light policy coverage lives in
 is checked by `tools/tests/renderer_temporal_presentation.py`. Runtime acceptance
 uses windowed engine-TGA captures and mode-specific SP/MP gameplay; operating-
 system capture and injected user input are not part of the workflow.
+
+`rendererTemporalPresentationStatus` also keeps cumulative counters until
+`rendererTemporalPresentationStatus reset`. Every resolve command, on both
+backends, records how it ended: blended with history, seeded fresh history,
+capture (history untouched), spatial (temporal AA off) or fallback with a
+named reason; and whether its vector pass was complete, partial, empty or not
+attempted. Root views count each history decision (`none` is reuse), and
+every history invalidation is counted by reason.
+
+`tools/tests/renderer_temporal_qualification.py` (REN-04) is the opt-in
+runtime gate built on those counters. It launches the staged client into
+`game/airdefense1`, pans with `benchmarkViewSweep`, and takes one snapshot
+before and one after an event, on OpenGL and Vulkan. Every case requires
+history-backed resolves with complete ownership before the event, the expected
+decision for the event, history-backed resolves again afterwards and no
+unexplained fallback.
+
+Cases: native temporal AA; 75% automatic upscaling; dynamic resolution; an
+unreachable GPU target that drops the scale, then a generous one that
+recovers it; stale timing (every sample older than the accepted age, so the
+controller resets to its safe ceiling); a `g_stopTime` pause; a screenshot; a
+teleport cut; `vid_restart`; switching temporal AA off and on (the SMAA/spatial
+rollback); 4x MSAA; `r_vkRenderThread 2`; Vulkan presentation drills
+(`r_vkPresentationFailureTest` 3 withheld images, 2 surface loss, 1 device
+loss); and the Milestone D mirror fixture.
+
+The first run, 6 November 2026, reproduced three Vulkan gaps, now fixed:
+
+- **Multiple views.** A subview starts as a copy of its parent view, so it
+  inherited `temporalPrepared` and the parent's jitter; mirrors, x-ray,
+  remote-camera and refraction views were drawn jittered, and on Vulkan the
+  direct render of such a view retired the main view's history every frame.
+  On the mirror fixture all 390 resolves fell back. `tr_subview.cpp` now
+  clears the inherited temporal state (`R_ResetSubviewTemporalState`), so the
+  subview is prepared under its own identity without jitter. Vulkan also keeps
+  one depth proof per render target, as OpenGL does, instead of one shared
+  stamp.
+- **Withheld presents.** While the presentation engine withheld every image,
+  each renderer command of a frame retried the 1 s acquire: about 27 s per
+  frame, so the drill hung the harness. A timed-out acquisition now ends the
+  frame's attempts (`acquireTimedOut`); the next frame retries.
+- **Device loss.** Recovery inserts `vid_restart` at the head of the command
+  buffer, but a pending console `wait` holds the whole buffer, so in the
+  harness the renderer stayed down for the full 480-frame wait. Gameplay has
+  no pending console wait; the harness now waits frame by frame after those
+  drills. After the restart temporal AA resolves with history again.
+
+With these fixes the mirror resolves 390/390 with history and complete
+ownership on both backends; withheld presents fall back on exactly the ten
+withheld frames; surface and device loss reseed once and continue. The
+screen-space qualification below also found Vulkan capture frames presenting
+without depth; that fix keeps screenshots' screen-space effects.
+
+Not covered: a human review of visual stability (ghosting, shimmer,
+disocclusion trails) on the reference display; physical Linux, macOS and
+Android; and runtime capture of the native UI composition, which screenshots
+cannot show because capture frames bypass history (the separation is checked
+natively by `renderer_native_ui_output.py`).
 
 `rendererVulkanTemporalMotionSelfTest` numerically reads GPU velocity and resolve
 attachments for positive/negative translation, rotation, perspective interpolation, camera plus jitter,

@@ -401,6 +401,18 @@ Notes:
 - Changing `r_multiSamples` should be followed by `vid_restart`.
 - `r_postAA`, `r_msaaAlphaToCoverage`, and `r_msaaResolveDepth` can be changed at runtime, but a `vid_restart` is still safe if behavior looks stale.
 
+## Motion Blur
+
+Motion blur (`r_motionBlur 1`, on in the `ultra` preset) smears the scene along its own motion: the camera turning or moving, and moving characters, vehicles and objects. It keeps its own short history of the camera, so it works the same with or without temporal AA, resolution scaling, supersampling, MSAA, bloom, tone mapping and SSAO, on OpenGL and Vulkan.
+
+- **The same blur at any frame rate.** The blur length follows how fast things move, not how many frames you draw: by default it matches the motion of one 60 Hz frame (`r_motionBlurShutterMsec 16.667`), so 144 Hz and uncapped play look like 60 Hz play. `r_motionBlurShutterMsec 0` restores the original behaviour, where blur shrinks as the frame rate rises.
+- **Your weapon stays sharp.** The view weapon only blurs with its own animation (sway, recoil, reloads), never because you turn. Skinned characters blur with their animation as well as their movement. `r_motionBlurObjectVectors 0` blurs by camera motion alone.
+- **No blur across cuts and pauses.** Cinematic camera cuts, loading a map, `vid_restart`, resizing and teleports start a fresh history instead of smearing between unrelated views. Pausing stops the blur. Mirrors, portals, security-camera screens and portal skies never interrupt it.
+- **Below 10 FPS it switches off.** A frame that takes longer than 100 ms is treated as a discontinuity, so very slow frames are left sharp rather than smeared.
+- `r_motionBlurStrength` (0.45), `r_motionBlurMaxPixels` (10) and `r_motionBlurSamples` (8, 16 on `ultra`) tune the length multiplier, the longest smear and its quality. `r_motionBlurDebug 1` shows the motion vectors instead of the blur.
+- `rendererMotionBlurStatus` prints what motion blur actually did: how many views it drew, why any were skipped, whether temporal AA's jitter was cancelled, and the strength, length and sample count in use. `rendererMotionBlurStatus reset` clears the counters.
+- Motion blur needs an offscreen scene target, so on a Mac using OpenGL's 2.1 compatibility mode it turns MSAA off for the 3D scene (see the MSAA note above). On Vulkan, MSAA stops at 8x with or without motion blur.
+
 ## Multiplayer Visibility Effects
 
 These optional client-side cvars add player outlines, rim lighting, and bright skins in multiplayer. Defaults keep the effects off; set one or more strength values above `0` to enable them. They do not change hit detection, snapshots, or server authority.

@@ -52,6 +52,27 @@ static_assert( MODERN_SPECULAR_PROBE_DIFFUSE_FIRST_CELL + MODERN_SPECULAR_PROBE_
 static_assert( MODERN_SPECULAR_PROBE_BRDF_CELL + 1 == MODERN_SPECULAR_PROBE_ATLAS_CELLS_PER_ROW * MODERN_SPECULAR_PROBE_ATLAS_CELLS_PER_ROW,
 	"all atlas regions must fit without overlap" );
 
+// A background-filtered probe (r_pbrProbeAsyncPrefilter) publishes its tiles
+// in this order, mip-major specular faces then the diffuse tile, spending at
+// most the budget below of each frame after its first tile; the probe stays
+// invisible (the set keeps its fallback) until the last tile lands.
+static const int MODERN_SPECULAR_PROBE_TILE_COUNT =
+	( MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP + 1 ) * MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT + 1;
+static const unsigned long long MODERN_SPECULAR_PROBE_PUBLISH_BUDGET_US = 2000;
+
+// Atlas cell, mip level and edge size of a slot's tile in publishing order.
+inline void ModernSpecularProbeAtlas_TileTarget( int slot, int tile, int &cell, int &level, int &size ) {
+	if ( tile >= MODERN_SPECULAR_PROBE_TILE_COUNT - 1 ) {
+		cell = MODERN_SPECULAR_PROBE_DIFFUSE_FIRST_CELL + slot;
+		level = 0;
+		size = MODERN_SPECULAR_PROBE_DIFFUSE_SIZE;
+		return;
+	}
+	level = tile / MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT;
+	cell = slot * MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT + tile % MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT;
+	size = MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE >> level;
+}
+
 typedef enum modernSpecularProbeAtlasFace_e {
 	MODERN_SPECULAR_PROBE_FACE_POSITIVE_X = 0,
 	MODERN_SPECULAR_PROBE_FACE_NEGATIVE_X,
@@ -134,7 +155,10 @@ typedef enum modernSpecularProbeAtlasReject_e {
 	MODERN_SPECULAR_PROBE_ATLAS_REJECT_INVALID_STORAGE,
 	MODERN_SPECULAR_PROBE_ATLAS_REJECT_ATLAS_FULL,
 	MODERN_SPECULAR_PROBE_ATLAS_REJECT_SOURCE_CHANGED,
-	MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE
+	MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE,
+	// The source is resident-bound but its background prefilter has not yet
+	// published; the set keeps its analytic fallback for this frame.
+	MODERN_SPECULAR_PROBE_ATLAS_REJECT_PREFILTER_PENDING
 } modernSpecularProbeAtlasReject_t;
 
 typedef struct modernSpecularProbeAtlasStats_s {
@@ -168,6 +192,20 @@ typedef struct modernSpecularProbeAtlasStats_s {
 	int			rejectedAtlasFull;
 	int			rejectedSourceChanged;
 	int			rejectedUploadUnavailable;
+	// Background prefilter (r_pbrProbeAsyncPrefilter), cumulative since Init.
+	unsigned int prefilterStarted;
+	unsigned int prefilterPublished;
+	unsigned int prefilterCancelled;
+	unsigned int prefilterWaits;
+	unsigned int prefilterRunning;
+	unsigned long long prefilterLatencyTotalUs;
+	unsigned long long prefilterLatencyMaxUs;
+	unsigned long long frameFilterTotalUs;	// frame-thread filter/upload time per published entry
+	unsigned long long frameFilterMaxUs;	// most one non-capture flush spent filtering/uploading
+	unsigned int frameFilterCount;
+	unsigned long long sourceReadTotalUs;	// synchronous source readback per miss
+	unsigned long long sourceReadMaxUs;
+	unsigned int sourceReads;
 	std::uint64_t atlasGeneration;
 	std::uint64_t frameGeneration;
 	char		status[96];
@@ -189,8 +227,14 @@ modernSpecularProbeAtlasReject_t R_ModernSpecularProbeAtlas_Acquire(
 
 // Transfers all pending cube faces at a caller-owned synchronization point.
 // FrameReady becomes true only when every live placement is resident, uploaded,
-// and still matches its source storage generation.
-void R_ModernSpecularProbeAtlas_FlushUploads( void );
+// and still matches its source storage generation. A newly read source is
+// prefiltered on a background thread and published by a later flush, unless
+// captureFrame (a screenshot) requires the settled result now.
+void R_ModernSpecularProbeAtlas_FlushUploads( bool captureFrame );
+
+class idScenePacketFrame;
+// True when any scene of the frame is a screenshot capture.
+bool R_ModernSpecularProbeAtlas_CaptureFrame( const idScenePacketFrame &frame );
 
 const char *ModernSpecularProbeAtlasReject_Name(
 	modernSpecularProbeAtlasReject_t reject );

@@ -105,6 +105,9 @@ void main() {
 	bool objectVectorValid = motionBlurObjectParams.x > 0.5 && objectVelocity.a > 0.5;
 	bool cameraVectorValid = motionBlurObjectParams.y > 0.5;
 	vec2 velocityPixels = objectVectorValid ? objectVelocity.xy : ( cameraVectorValid ? cameraVelocityPixels : vec2( 0.0 ) );
+	// z: shutter / smoothed frame interval, so the blur length follows the
+	// camera's speed rather than the frame rate (1 = per-frame, as before).
+	velocityPixels *= ( motionBlurObjectParams.z > 0.0 ) ? motionBlurObjectParams.z : 1.0;
 	float speedPixels = length( velocityPixels );
 
 	if ( debugView ) {

@@ -144,3 +144,45 @@ image is also present in the retained failed baseline. No warnings were removed
 or converted into general clean-startup qualification. The exact measured
 package is `runtime-da0080eb.zip`, SHA-256
 `daf52c9e2804fe3536233cf34ebdf6e33a7298b4804dcd2e182df0dc9d23467e`.
+
+## Five-cycle soak (6 November 2026)
+
+The same eight-map stock ring ran for five cycles (40 stops, 600 frames per
+stop, the video restart at the fifth stop) on the clean `1243eb6a` package,
+with validation enabled, on both local Vulkan adapters and on OpenGL as the
+process-memory reference. All three runs reach all 40 stops and pass the soak
+checks. Vulkan validation reports nothing. Every run logs the same 47 unique
+stock-content warnings (normalized digest `e316f0f9…`) as the 4 November tour.
+
+| Run | Duration | Peak image slots | Process growth, 1st to 2nd visit | Process growth, 2nd to 5th visit |
+| --- | ---: | ---: | ---: | ---: |
+| RTX 4060 Laptop, 591.74 | 1,620.6 s | 2,379 / 4,096 | up to 454 MiB | up to 94 MiB |
+| Iris Xe, 101.5590 | 1,781.8 s | 2,379 / 4,096 | up to 654 MiB | up to 60 MiB |
+| OpenGL, same NVIDIA GPU | 1,340.0 s | — | up to 416 MiB | up to 97 MiB |
+
+Growth after the first cycle is small and of the same size on both renderers,
+so it does not come from the Vulkan backend. Vulkan heap allocations stay
+exactly 12 or 13 above the resident image count at every sample. Nothing
+outside images accumulates: no buffers, pools or pipelines.
+
+Resident images do not stop growing completely. Once the first cycle is over,
+every map reports one more slot per cycle, identically on both adapters (for
+example airdefense1: 2,027, 2,174, 2,176, 2,177, 2,178). A three-cycle NVIDIA
+repeat listed every image at each stop and found two sources, both front-end
+and both bounded:
+
+- **Retained-UI layer targets** (`_retainedLayerImageN`, window-sized RGBA8).
+  The retained interface keeps a slot pool for composition layers and cached
+  layers. It reuses slots of matching size first, evicts its layer cache when
+  the pool is full, and is capped at 48 slots and 256 MiB. In the repeat it
+  rose from 6 to 12 slots by the twelfth stop and then held. Trimmed slots keep
+  a 1x1 image, so the slot count never falls back.
+- **A second `gfx/objectives/core1_obj_1`.** core1 loads the objective image
+  with different sampling parameters, and that second copy stays loaded.
+  Revisits do not add more copies.
+
+On this ring the slot count therefore approaches a fixed ceiling rather than
+growing without limit. Only a run longer than the 48-slot layer cap could show
+the actual ceiling, and these runs do not reach it. The five-cycle report,
+`plateau-analysis.json` (per-visit allocations, resident slots and process
+memory) and engine logs are under `.tmp/vk-roadmap/nov6/soak5/`; the image-listing repeat is in `soak-imagelist/`.

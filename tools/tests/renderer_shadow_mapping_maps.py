@@ -17,7 +17,8 @@ import re
 import subprocess
 import sys
 
-from renderer_shadow_mapping_transitions import SCENARIO_MAPS, transition_commands, validate_transition_reports
+from renderer_shadow_mapping_transitions import (CASTER_CYCLES, SCENARIO_MAPS, transition_commands,
+                                                 validate_caster_images, validate_transition_reports)
 from renderer_shadow_mapping_movers import MOVER_SCENARIOS, validate_mover_images
 from renderer_shadow_mapping_terrain import TERRAIN_REGIONS, validate_terrain_images
 from renderer_shadow_mapping_outdoor import OUTDOOR_SCENARIO, validate_outdoor_images
@@ -135,6 +136,9 @@ def inspect_run(save: Path, code: int | str, map_name: str,
     image_metrics = {}
     if scenario in MOVER_SCENARIOS:
         image_failures, image_metrics = validate_mover_images(save)
+        failures.extend(image_failures)
+    elif scenario in CASTER_CYCLES:
+        image_failures, image_metrics = validate_caster_images(save)
         failures.extend(image_failures)
     elif scenario == OUTDOOR_SCENARIO:
         image_failures, image_metrics = validate_outdoor_images(save)
@@ -255,6 +259,10 @@ def main() -> int:
                 "r_shadowMapCSM": 1, "r_shadowMapCacheCSM": 1, "r_shadowMapStaticCache": 1,
                 "r_shadowMapMaxUpdatesPerView": 0, "r_shadowMapReport": 2,
                 "r_multiSamples": 0, "sv_cheats": 1,
+                # Weapon flashlights and projectile lights take their shadow flag
+                # when they spawn; the retail default (-1) follows com_machineSpec,
+                # which a fresh test profile may detect below 3.
+                "g_dynamicLightShadows": 1,
             }.items():
                 setting(args, key, new_value)
             if opts.basepath:

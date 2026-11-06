@@ -87,6 +87,17 @@ See [release status](../../user/release-status.md) and the
   resolution without dropping a required shadow pass. Motion blur also works
   in areas with portal skies, which previously cleared its camera history.
 
+- **Motion blur that works with temporal AA and looks the same at any frame
+  rate.** Motion blur used to switch itself off silently whenever temporal AA
+  was active, including automatic upscaling and dynamic resolution; it now
+  blurs on both renderers. Your weapon no longer smears when you turn, and
+  characters blur with their animation as well as their movement. The blur
+  length now follows how fast things move, so 144 Hz and uncapped play look
+  like 60 Hz play; `r_motionBlurShutterMsec 0` restores the old frame-rate-
+  dependent length. Cinematic cuts start a fresh blur, and screenshots keep
+  it. Replace the engine, renderer modules and `pak0.pk4` together. See
+  [display settings](../../user/display-settings.md#motion-blur).
+
 - **Find multiplayer objectives at a glance.** Flag bases, Arena CTF assault
   points and DeadZone zones now have compact HUD symbols with distance and
   directions when they are outside your view. The icons show flag availability,
@@ -417,6 +428,17 @@ See [release status](../../user/release-status.md) and the
   compile faster too, to identical output.
 - A navigation file with damaged tactical data loads without those positions
   and a warning, instead of letting AI read past the end of the data.
+- On Vulkan, temporal AA keeps working while a mirror, security-camera screen
+  or refraction effect is in view; it used to switch off for those frames.
+  Mirrors are also drawn without temporal AA's sub-pixel jitter.
+- On Vulkan, a display that stops accepting frames no longer stalls the game
+  for about half a minute per frame.
+- Vulkan screenshots now show froxel fog, screen-space reflections and
+  screen-space GI as displayed.
+- Authored reflection probes (experimental, off by default) no longer hitch
+  the game when they first come into view. Each probe is prepared in the
+  background and appears a fraction of a second later; screenshots wait for
+  it. `r_pbrProbeAsyncPrefilter 0` restores the old behaviour.
 - A long multiplayer chat message with an icon in it no longer repeats the
   icon at the start of the next line when it wraps.
 - On a first launch that starts a map from the command line or a shortcut

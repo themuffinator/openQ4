@@ -2507,11 +2507,17 @@ bool R_MaterialResourceTable_ClassicModernPathEligible( const materialResourceTa
 }
 
 bool R_MaterialResourceTable_ClassicDiffusePathEligible( const materialResourceTableRecord_t &record ) {
+	// REN-02: an alpha-tested diffuse stage is the classic cutout. The modern
+	// forward alpha-test shader discards the same texels the ARB2 depth prepass
+	// rejects (the diffuse alpha against the stage's threshold), so it joins the
+	// proven diffuse class; ClassicDiffuseMaterialEligible pins where the test lives.
+	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
+		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
 	if ( record.hasPBR || record.material == NULL || globalImages == NULL
 			|| record.fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
-			|| record.materialClass != RENDER_MATERIAL_OPAQUE
-			|| record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE
-			|| record.hasEmissive || record.alphaTest || record.hasTextureMatrix
+			|| ( record.materialClass != RENDER_MATERIAL_OPAQUE && !cutout )
+			|| ( record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE && !cutout )
+			|| record.hasEmissive || ( record.alphaTest && !cutout ) || record.hasTextureMatrix
 			|| record.hasVertexColor || record.hasConditionRegisters
 			|| record.hasCustomProgram || record.hasCustomGLSL
 			|| record.hasMaterialPolygonOffset || record.hasPrivatePolygonOffset ) {
@@ -2521,11 +2527,16 @@ bool R_MaterialResourceTable_ClassicDiffusePathEligible( const materialResourceT
 }
 
 bool R_MaterialResourceTable_ClassicFixedPathEligible( const materialResourceTableRecord_t &record ) {
+	// REN-02: as for the diffuse class, a cutout whose diffuse stage carries the
+	// alpha test qualifies. The classic-lighting corridor draws depth-equal
+	// against the alpha-tested depth prepass, exactly as ARB2's interaction does.
+	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
+		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
 	if ( record.hasPBR || record.material == NULL || globalImages == NULL
 			|| record.fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
-			|| record.materialClass != RENDER_MATERIAL_OPAQUE
-			|| record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE
-			|| record.hasEmissive || record.alphaTest || record.hasTextureMatrix
+			|| ( record.materialClass != RENDER_MATERIAL_OPAQUE && !cutout )
+			|| ( record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE && !cutout )
+			|| record.hasEmissive || ( record.alphaTest && !cutout ) || record.hasTextureMatrix
 			|| record.hasVertexColor || record.hasConditionRegisters
 			|| record.hasCustomProgram || record.hasCustomGLSL
 			|| record.hasMaterialPolygonOffset || record.hasPrivatePolygonOffset ) {
@@ -2534,26 +2545,68 @@ bool R_MaterialResourceTable_ClassicFixedPathEligible( const materialResourceTab
 	return R_MaterialResourceTable_ClassicFixedMaterialEligible( record.material );
 }
 
+bool R_MaterialResourceTable_ClassicCorridorPathEligible( const materialResourceTableRecord_t &record ) {
+	// Stage expressions (conditions, colours, matrices) are evaluated by the
+	// same RB_CreateSingleDrawInteractions call ARB2 uses to build interactions.
+	const unsigned int corridorFallbacks = MATERIAL_RESOURCE_FALLBACK_FLAG_VERTEX_COLOR
+		| MATERIAL_RESOURCE_FALLBACK_FLAG_TEXTURE_MATRIX | MATERIAL_RESOURCE_FALLBACK_FLAG_STAGE_CONDITION;
+	if ( ( record.fallbackFlags & ~corridorFallbacks ) != 0
+			|| ( record.fallbackFlags == 0 ) != ( record.fallbackReason == MATERIAL_RESOURCE_FALLBACK_NONE ) ) {
+		return false;
+	}
+	// The forward pass still samples the untransformed, uncoloured diffuse for a
+	// cutout's alpha, so neither stays in a cutout.
+	if ( ( record.hasTextureMatrix || record.hasVertexColor || record.hasConditionRegisters ) && record.alphaTest ) { return false; }
+	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
+		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
+	if ( record.hasPBR || record.material == NULL || globalImages == NULL
+			|| ( record.materialClass != RENDER_MATERIAL_OPAQUE && !cutout )
+			|| ( record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE && !cutout )
+			|| record.hasEmissive || ( record.alphaTest && !cutout )
+			|| record.hasCustomProgram || record.hasCustomGLSL
+			|| record.hasMaterialPolygonOffset || record.hasPrivatePolygonOffset ) {
+		return false;
+	}
+	return R_MaterialResourceTable_ClassicFixedMaterialEligible( record.material );
+}
+
+bool R_MaterialResourceTable_ClassicCorridorOnly( const materialResourceTableRecord_t &record ) {
+	return record.fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE && R_MaterialResourceTable_ClassicCorridorPathEligible( record );
+}
+
 bool R_MaterialResourceTable_ClassicFixedMaterialEligible( const idMaterial *material ) {
-	if ( material == NULL || material->HasPBR() || material->Coverage() != MC_OPAQUE ) { return false; }
+	if ( material == NULL || material->HasPBR()
+			|| ( material->Coverage() != MC_OPAQUE && material->Coverage() != MC_PERFORATED ) ) { return false; }
+	const bool perforated = material->Coverage() == MC_PERFORATED;
 	int counts[3] = {};
 	for ( int i = 0; i < material->GetNumStages(); ++i ) {
 		const shaderStage_t *stage = material->GetStage( i );
 		if ( stage == NULL ) { return false; }
+		// Only the diffuse stage may carry the cutout's alpha test.
+		if ( stage->hasAlphaTest && ( !perforated || stage->lighting != SL_DIFFUSE ) ) { return false; }
+		if ( perforated && stage->lighting == SL_DIFFUSE && !stage->hasAlphaTest ) { return false; }
 		const int slot = stage->lighting == SL_BUMP ? 0 : stage->lighting == SL_DIFFUSE ? 1 : stage->lighting == SL_SPECULAR ? 2 : -1;
-		if ( slot < 0 || ++counts[slot] > 1 ) { return false; }
+		if ( slot < 0 ) { return false; }
+		++counts[slot];
 	}
-	return counts[0] == 1 && counts[1] == 1;
+	// REN-02: several bump/diffuse/specular sets are fine. The corridor builds
+	// their interactions with ARB2's own RB_CreateSingleDrawInteractions, and
+	// this class only ever counts inside the corridor's view.
+	return counts[0] >= 1 && counts[1] >= 1;
 }
 
 bool R_MaterialResourceTable_ClassicDiffuseMaterialEligible( const idMaterial *material ) {
 	if ( material == NULL || material->HasPBR() || globalImages == NULL
-			|| material->Coverage() != MC_OPAQUE ) { return false; }
+			|| ( material->Coverage() != MC_OPAQUE && material->Coverage() != MC_PERFORATED ) ) { return false; }
+	const bool perforated = material->Coverage() == MC_PERFORATED;
 	int diffuseStages = 0;
 	for ( int i = 0; i < material->GetNumStages(); ++i ) {
 		const shaderStage_t *stage = material->GetStage( i );
 		if ( stage == NULL ) { return false; }
+		// Only the diffuse stage may carry the cutout's alpha test.
+		if ( stage->hasAlphaTest && ( !perforated || stage->lighting != SL_DIFFUSE ) ) { return false; }
 		if ( stage->lighting == SL_DIFFUSE ) {
+			if ( perforated && !stage->hasAlphaTest ) { return false; }
 			diffuseStages++;
 		} else if ( stage->lighting == SL_BUMP ) {
 			if ( stage->texture.image != globalImages->flatNormalMap ) { return false; }

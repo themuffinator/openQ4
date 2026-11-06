@@ -369,6 +369,9 @@ typedef struct viewDef_s {
 	idMat3				temporalPreviousViewAxis;
 	idVec4				temporalPreviousProjectInfo;
 	idVec2				temporalPreviousJitterPixels;
+	// projectionMatrix[8]/[9] before any jitter (R_SetupProjection)
+	idVec2				temporalNeutralProjectionOffset;
+	bool				temporalNeutralProjectionValid;
 	temporalHistoryResetReason_t temporalHistoryResetReason;
 	bool				temporalPrepared;
 	bool				temporalJitterEnabled;
@@ -1051,6 +1054,7 @@ public:
 
 	int						viewportOffset[2];	// for doing larger-than-window tiled renderings
 	int						tiledViewport[2];
+	int						tiledWindow[2];		// the window's size while a capture sets tiledViewport (BeginFrame)
 
 	// determines which back end to use, and if vertex programs are in use
 	backEndName_t			backEndRenderer;
@@ -1240,6 +1244,10 @@ extern idCVar r_pbrLinearScene;		// laboratory linear PBR scene instead of displ
 extern idCVar r_pbrGeneratedLegacyFallback;	// allow development-only generated classic fallbacks
 extern idCVar r_pbrDebug;				// PBR attachment/fallback debug view
 extern idCVar r_pbrIBL;				// PBR-only environment light from authored probes
+extern idCVar r_pbrProbeAsyncPrefilter;	// background prefilter for newly resident probes (REN-06)
+void R_PBRProbes_RequestSettle( void );	// pbrProbeSettle: finish pending probe filters
+bool R_PBRProbes_SettleRequested( void );
+void R_PBRProbes_SettleDone( void );
 extern idCVar r_pbrIBLIntensity;		// PBR analytic environment intensity
 extern idCVar r_pbrAnalyticEnvironment;	// laboratory: analytic studio environment under authored probes
 extern idCVar r_pbrInferFromLegacyMaterials;	// research-only classic-material inference
@@ -1264,7 +1272,8 @@ extern idCVar r_motionBlurStrength;		// motion blur strength multiplier
 extern idCVar r_motionBlurMaxPixels;	// maximum motion blur radius in pixels
 extern idCVar r_motionBlurSamples;		// motion blur gather sample count
 extern idCVar r_motionBlurDebug;		// visualize motion blur vectors
-extern idCVar r_motionBlurObjectVectors;	// include rigid-object motion vectors
+extern idCVar r_motionBlurObjectVectors;	// include exact object motion vectors (rigid, skinned, view weapon)
+extern idCVar r_motionBlurShutterMsec;	// blur length as motion over this many ms; 0 = per frame
 extern idCVar r_forceSpecialEffects;	// force legacy special-effect bitmask for debugging
 extern idCVar r_hdrSceneTarget;			// render the main scene into an HDR scene target before post-processing
 extern idCVar r_hdrToneMap;				// enable filmic tone mapping and color correction

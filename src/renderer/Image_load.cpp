@@ -1523,6 +1523,16 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 	const GLenum copyTarget = isCube
 		? GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT + cubeFace : GL_TEXTURE_2D;
 
+	// A file texture (a stock remote-camera screen) is immutable, often
+	// block-compressed storage: a blit into it leaves the framebuffer
+	// incomplete. Give it a fresh single-level RGBA8 texture of this size.
+	if ( NeedsColorCopyRespecification( imageWidth, imageHeight ) ) {
+		RespecifyColorCopyTarget( imageWidth, imageHeight );
+		if ( !IsLoaded() || opts.width != imageWidth || opts.height != imageHeight ) {
+			return false;
+		}
+	}
+
 	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetNumColorImages() > 0 );
 	const GLenum readAttachment = GL_COLOR_ATTACHMENT0;
 	bool needsStorageResize = ( opts.width != imageWidth ) || ( opts.height != imageHeight );

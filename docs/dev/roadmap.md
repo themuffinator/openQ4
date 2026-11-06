@@ -622,13 +622,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions and exact-package budgets. |
+| VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions beyond the Windows NVIDIA/Intel five-cycle soak, and exact-package budgets. |
 | VK-02 — Partial | Six controlled foreground samples pass the declared 28 ms presentation p99 budget on NVIDIA/Intel; failed diagnostic repeats remain retained. | Physical direct/hybrid routing, other power conditions and the broader exact-package pacing matrix. |
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
-| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform and pipeline pressure recover on NVIDIA/Intel. | Descriptor-driver failure on GPU, the unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
+| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel. | The unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
-| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed and two-cycle NVIDIA/Intel map tours pass. | Demonstrate improved tails and long-session cache plateaus in matched runs/soaks; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons and 50–200% depth/intensity views pass. | Cropped/offset/nested targets, remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views and cropped `envshot` faces pass. | Multisampling of views drawn straight to the window (GUI `renderDef`, remote captures inside an `envshot`), remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -729,6 +729,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
   recovery and all sixteen GL/Vulkan pairs within one display level.
   Descriptor-driver failure on GPU, broader lighting and mod-content
   qualification remain open.
+  Progress, 6 November: the [real-driver descriptor drill](vulkan-material-programs.md#descriptor-refusal-on-real-drivers-6-november-2026)
+  (`r_vkMaterialDescriptorPoolTest`) passes on NVIDIA and Intel. Both drivers
+  refuse over-quota authored draws, skipped redundant stages leave images
+  unchanged, and skips stop once both frame slots return to production pools.
+  Reload and restart with and without the drill recover exactly; all sixteen
+  GL/Vulkan pairs are within one display level. The descriptor-driver subpoint
+  is closed. Broader lighting/mod content and the strict lighting gate remain.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
@@ -782,6 +789,18 @@ and untested drivers remain open, with no tolerance or support-tier change.
   image slots, and report no Vulkan/validation warnings. Same-map allocation
   and process-memory growth remains recorded; these bounded tours do not
   establish long-session plateaus or promote an optimization.
+  Progress, 6 November: the [five-cycle soak](vulkan-resource-profiling.md#five-cycle-soak-6-november-2026)
+  ran 40 stops on the clean `1243eb6a` package on NVIDIA, Intel and GL, all
+  passing, with no validation messages. After the first cycle, Vulkan process
+  growth (at most 94 MiB on NVIDIA and 60 MiB on Intel over three cycles) is no
+  larger than GL's 97 MiB. Heap allocations stay 12 or 13 above resident images
+  throughout. The remaining one slot per cycle was traced, by listing every
+  image, to the retained interface's layer pool (capped at 48 slots and
+  256 MiB, with reuse and eviction) and a second loaded copy of one core1
+  objective image. Both are bounded front-end pools, not Vulkan lifetime
+  defects. This closes the long-session plateau evidence. What remains is
+  promoting an optimization with improved frame-time tails, which the
+  measured deferral decisions above do not yet justify.
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,
@@ -808,6 +827,29 @@ and untested drivers remain open, with no tolerance or support-tier change.
   34-case sequence passes at each of 0x/4x/8x MSAA from 50% through 200% scale,
   within the unchanged two-level full-frame limit and with exact reload/restart
   recovery. Actual cropped, offset and nested GPU comparisons remain open.
+  Progress, 6 November: [tiled captures](vulkan-captures.md#tiled-captures-6-november-2026)
+  larger than the window repeated one tile on Vulkan, which ignored the tile
+  viewport offset. Each view of a tiled frame now moves by the offset, and
+  view scissors are cut at the attachment edge. On NVIDIA, Vulkan places every
+  tile correctly (box-filtered correlation 0.999). 26 of 27 GL/Vulkan tile
+  comparisons are within one display level; the remaining one is an OpenGL
+  tile that repeats another. Tiling through the game-owned post-process target
+  is wrong on both backends, identically. Those OpenGL/shared tiled-capture
+  defects remain open outside this Vulkan fix.
+  Progress, 6 November (views): the [nested/cropped/offset fixture](vulkan-captures.md#nested-cropped-and-offset-views-6-november-2026)
+  found that remote-camera captures into ordinary file textures (the stock
+  `textures/common/camera1` idiom) failed on both backends. Those textures
+  are block-compressed with mips, so Vulkan blitted into BC1 and OpenGL bound
+  an incomplete framebuffer. Both now re-create such a destination as one RGBA8
+  level of the capture size, as Quake 4's `glCopyTexImage2D` did. Nested,
+  legacy-cropped nested and restarted nested views then pass on each backend
+  and match within one display level. An `envshot` under the legacy crop
+  drew each face at half size in a corner on both backends, because
+  `BeginFrame` sizes `glConfig` to the capture. The window size is now kept,
+  and non-window-sized captures skip that crop. Still open: Vulkan does not
+  multisample views drawn straight to the window, as OpenGL's 4x MSAA window
+  does: GUI `renderDef` edges (112 pixels, at most 11 levels) and a remote
+  capture inside an `envshot` face (113 edge pixels).
 
 ## Modern rendering engine
 
@@ -819,7 +861,7 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
 
 ### REN completion checkpoints
 
-**Estimate: 50%; 0/8 tasks closed.** PBR, temporal features and shared rendering
+**Estimate: 55%; 1/8 tasks closed.** PBR, temporal features and shared rendering
 domains already exist. Aggregate modern lighting still has
 `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; neither feature presence nor domain
 diagnostics establish whole-frame ownership or production performance.
@@ -827,13 +869,13 @@ diagnostics establish whole-frame ownership or production performance.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | REN-01 — Partial | Shared classic GUI/world/interaction/fog/deform/subview/post domains have scoped implementations and contracts. | Qualify each on fresh GL/Vulkan packages: executed ownership, matching appearance, zero-commit rollback, human review and platform breadth. |
-| REN-02 — Partial | Shared material/light contracts and corridors provide foundations. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
-| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. | Continuous-motion scenes, dynamic/cutout/custom receivers, static/live composition, bounded resources and safe retained-light fallback. |
-| REN-04 — Partial | Rigid/skinned/weapon vectors, reactive coverage, TAAU and opt-in dynamic resolution exist. | Disocclusion, failed presents, cuts, multiple views, stale timing and scale recovery; native UI isolation and immediate fallback. |
-| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. | Residual Intel/software-renderer differences, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
-| REN-06 — Partial | Probe capture/grid infrastructure and default-off froxel/SSR/SSGI leaves exist. | Source admission/storage/size limits, provenance, reload/atlas exhaustion, cold-miss budgets and combined effects with exact master-off rollback. |
+| REN-02 — Partial | Shared material/light contracts and corridors provide foundations; the remaining decline reasons are inventoried. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
+| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Physical platforms. |
+| REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
+| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. | lavapipe residual, mods authored outside the laboratory, physical Linux/Apple fallback. |
+| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
-| REN-08 — Partial | Motion blur and desktop post-processing paths exist. | Motion blur independently of TAA; skinned/weapon vectors, subviews, time gaps and HDR/bloom/SSAO/scaling combinations on each backend. |
+| REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 
 ### REN task evidence and acceptance
 
@@ -851,6 +893,38 @@ diagnostics establish whole-frame ownership or production performance.
   composition before changing parity masks, auto-promotion or core-profile defaults.
   Require meaningful visible lighting, complete stock fallback and measured CPU/GPU
   benefit. Diagnostic readiness is not proof that the new executor owns gameplay.
+  Progress, 6 November: the inventory is written
+  ([modern lit-frame inventory](modern-lit-frame-inventory.md)). No lighting
+  domain is proven by default, so every lit stock frame declines to ARB2,
+  usually as `lighting-parity-unproven`. The only per-material proof covers
+  PBR and two narrow classic classes, and every modern-path corridor runs only
+  in a laboratory mode (`r_pbrLinearScene`). The aggregate executor and the
+  REN-01 shared domains are still mutually exclusive.
+  Step 1 has begun: classic cutouts now join the proven classes and match
+  native ARB2 in the laboratory: flat-bump diffuse cutouts on the forward
+  path (`production-fixed-cutout`, mean 0.28 levels) and bumped, specular
+  cutouts through the classic-lighting corridor (`production-fixed-cutout-bump`,
+  mean 0.25), each with 5 bounded hole-edge pixels.
+  Texture-matrix and vertex-coloured materials follow as corridor-only
+  fallbacks (`production-fixed-texmatrix` and `production-fixed-vertex`,
+  both mean 0.25 levels; an interaction takes its vertex colour from the last
+  diffuse or specular stage, which the fixture now honours).
+  Stage expressions (conditions, colours, matrices) and multi-set materials
+  follow (`production-fixed-condition`, `-multistage`, mean 0.25 levels).
+  Step 1 now covers the dominant classic interaction shapes inside the
+  corridor; what remains of it is cutouts and light grids combined with
+  those fallbacks.
+  Step 3 is done: the classic-lighting and baked-grid corridors also run in
+  display-referred modern frames (`r_pbrLinearScene 0`), and the fog/blend
+  corridor already did. Every class above, the light grid and a fog light
+  match native ARB2 there (`production-fixed*-display`, byte-identical except
+  the grid's 1-level maximum).
+  Step 2 is done for corridor-owned classic surfaces: ambient lights draw
+  with ARB2's ambient normal cube there and match native ARB2
+  (`production-fixed-ambient`, byte-identical in display frames).
+  Remaining, in order: finish step 1's cutout/light-grid combinations,
+  represent stencil-fallback and multiple point shadows, reconcile the two
+  ownership models, then measure benefit before any promotion.
 - [ ] **REN-03 — P1, qualification and implementation: shadow production scope.**
   Qualify point/projected/CSM, stencil/map hybrids, moments, movers, near emitters,
   dynamic/cutout/custom receivers and constrained budgets through full scenes and
@@ -858,12 +932,59 @@ diagnostics establish whole-frame ownership or production performance.
   non-explicit-texcoord alpha cases; retain stencil fallback when coverage cannot
   be reproduced. Translucent moments already exist on Vulkan. Prove cache freshness,
   bounded memory, no missing/doubled receivers and retained light on fallback.
+  Progress, 6 November: `renderer_shadow_motion_qualification.py` tours eight
+  stock outdoor poses while panning continuously, at the default budget, with
+  cascades and with one update per view. OpenGL renders fresh maps throughout
+  with no receiver, budget or stencil fallback and no unshadowed light; the
+  constrained budget takes 994 budget fallbacks with every light still
+  shadowed. Vulkan reports no fallback or dropped query and stays inside its
+  slot capacity. See the [shadow tour](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  The dynamic-image/non-explicit-texcoord alpha audit found OpenGL drawing
+  unreproducible cutouts as solid depth; it now takes Vulkan's sticky stencil
+  fallback (no stock material reaches the case).
+  The point static/live composition audit found no defect: point lights never
+  compose (dynamic casters defeat the cube cache on both backends), projected
+  lights compose static depth with live casters.
+  Image-level receiver check after motion (`--cases receivers`): at every
+  tour pose the frame from the motion-warmed cache matches a fresh render on
+  both backends (worst 0.002% of bytes), with a shadows-off control proving the
+  poses show shadows. See [receiver images](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  Moving doors (`door-sweep`) and perforated cutout casters
+  (`caster-cycle-cutout-sweep`) now run with the camera and its flashlight
+  panning through every change, and cached shadows match fresh renders on
+  both backends; the caster cycles gained image checks. These fixtures had
+  stopped exercising the flashlight once `g_dynamicLightShadows` followed
+  machine spec; the runner now pins it. See
+  [movers and cutouts](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  Translucent casters under motion now have a fixture:
+  `caster-cycle-translucent(-sweep)` spawns stock forcefield-glass crates in
+  the flashlight with moments on; OpenGL admits exactly those casters, Vulkan
+  draws its moment pass, and cached images match fresh ones while the camera
+  turns. The gameplay benchmark's `shadow-translucent-medlabs` candidate
+  remains unusable (it falls back for shadow geometry before translucent
+  moments, stationary too). See [movers, cutouts and translucents](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  Remaining: physical-platform breadth.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
   views and retained UI. Test delayed/stale GPU timing and resolution recovery.
   Require stable quality, separate native UI, valid previous-frame identity and
   immediate current-frame/SMAA fallback. Per-eye VR temporal work remains VR-05.
+  Progress, 6 November: both backends now count how every resolve ended and why
+  history was rejected (`rendererTemporalPresentationStatus`, `reset`), and
+  `renderer_temporal_qualification.py` exercises native, TAAU and dynamic
+  resolution, scale recovery, stale timing, pause, capture, cuts, `vid_restart`,
+  SMAA rollback, MSAA, `r_vkRenderThread 2`, withheld images, surface and
+  device loss and the mirror fixture, requiring history before and after each
+  event with complete ownership. It reproduced and fixed three Vulkan gaps:
+  subviews inherited the parent's temporal preparation (mirrors, remote and
+  refraction views were jittered and retired the main history every frame),
+  withheld presents retried a 1 s acquire per command (~27 s per frame), and
+  capture frames presented screen-space effects without depth. See
+  [temporal qualification](temporal-presentation.md#validation). Remaining:
+  human review of ghosting/shimmer/disocclusion on the reference display, and
+  physical Linux/macOS/Android. Native UI separation stays covered natively;
+  capture frames cannot show it.
 - [ ] **REN-05 — P1, qualification: remaining PBR quality and portability.**
   Reproduce strict residual Intel SSAO and lavapipe scalar/texture differences and
   recorded cutout/normal diagnostic mismatches; fix or explicitly bound exceptions.
@@ -871,6 +992,27 @@ diagnostics establish whole-frame ownership or production performance.
   Linux and Apple fallback. Preserve stock appearance. Box probes, probe capture,
   animated/MD5R PBR and indirect-only SSAO are implemented and need regression
   evidence rather than another implementation phase.
+  Progress, 6 November: the SSAO laboratory controls had failed on every GPU
+  since automatic half-resolution SSAO (they compared the full-resolution field
+  pass with a half-resolution classic pass); they now pin full resolution and
+  pass exactly on NVIDIA. The Intel residual (4 classic, 6 debug pixels) is
+  reproduced, unaffected by precise arithmetic, and bounded to Intel Vulkan
+  only. See [SSAO parity](renderer-validation-matrix.md#ssao-parity-controls-6-november-2026-ren-05).
+  A matched half-resolution control now compares forced half-resolution SSAO
+  on classic-only frames with full resolution: OpenGL is exact (one
+  resolution), and Vulkan stays within 2.1 (NVIDIA) and 2.9 (Intel) levels
+  on average with no bias. See [half resolution](renderer-validation-matrix.md#ssao-parity-controls-6-november-2026-ren-05).
+  Skin substitutions on packed MD5R are qualified: laboratory skins swap the
+  skinned specimen's PBR metal for a PBR dielectric or a classic material,
+  and MD5R draws both exactly like CPU skinning on both backends, with PBR
+  ownership kept or released as authored. See [skin substitutions](renderer-validation-matrix.md#skin-substitutions-on-packed-md5r-6-november-2026-ren-05).
+  A mixed-material model (one skinned mesh, PBR above and classic below) keeps
+  each part's owner on both backends, on CPU skinning and packed MD5R; OpenGL
+  declines such frames to its light loop, whose native owner still draws the
+  PBR part. See [skin substitutions](renderer-validation-matrix.md#skin-substitutions-on-packed-md5r-6-november-2026-ren-05).
+  Remaining: lavapipe's one-byte difference (a WSL lavapipe run, blocked by
+  free space on C:, where the WSL disk lives), mods authored outside the
+  laboratory, and physical Linux/Apple.
 - [ ] **REN-06 — P2, qualification: probes, baked data and advanced effects.**
   Qualify probe capture orientation, generated-grid provenance and whether existing
   baked grids need regeneration after capture fixes. Broaden authored probe/decal
@@ -885,6 +1027,38 @@ diagnostics establish whole-frame ownership or production performance.
   readback path on source-cache misses and set cold/reload latency and memory
   budgets. Decide explicit support or exclusion for compressed, authored-HDR and
   oversized inputs; an HDR generator does not establish a general HDR loader.
+  Progress, 6 November: admission is decided - authored RGBA8/sRGB and
+  generated RGBA16F supported; compressed, oversized and authored HDR excluded
+  with cleared output - and `gfxInfo` reports source-read and prefilter time per
+  miss. The 56-control probe suite passes; a miss costs 3-6 ms to read (21 ms
+  after reload) but 0.49-0.58 s to prefilter on the CPU, against the new 4 ms
+  per-frame budget (memory: the fixed 44.7 MB atlas plus one transient source).
+  Parallel tiles (bit-identical, both backends) cut the prefilter to 84-93 ms.
+  See [probe sources](vulkan-probe-sources.md#cold-miss-cost-and-budget-6-november-2026-ren-06).
+  `renderer_screen_space_effects_qualification.py` captures each leaf, all three
+  and master-off at a frozen pose: every leaf changes the frame, master-off is
+  byte-identical to the baseline on both backends, and the combination costs at
+  most 1.4 ms. It found Vulkan screenshots presenting the leaves without depth,
+  now fixed. See [leaf captures](renderer-validation-matrix.md#frozen-same-process-leaf-and-rollback-captures-6-november-2026-ren-06).
+  The prefilter is now off the frame (`r_pbrProbeAsyncPrefilter`, default on):
+  both backends filter on a background job, Vulkan also defers its copy and
+  decode, and finished RGBA16F tiles upload within 2 ms a frame while the set
+  keeps its analytic fallback. Probe work in any gameplay frame now peaks at
+  2.1 ms (Vulkan) and 3.3 ms (OpenGL), inside the 4 ms budget; probes appear
+  0.15-0.37 s after they are needed, and screenshots wait for them. See
+  [background prefilter](vulkan-probe-sources.md#background-prefilter-6-november-2026-ren-06).
+  Probe capture orientation is qualified: the `probes-baked` control bakes two
+  probes in the game and requires GL's cube convention in the written -Y face
+  and in the reflection, and passed on both backends on 6 November. Grid
+  provenance is established: every bundled light grid is a cropped June
+  bake (37 multiplayer grids match logged 2560x1334 bakes, the June 18 batch
+  1280x720), reproduced by the unfixed build; the bake is now correct, so the
+  grids do need regenerating. Keeping them was the owner's decision on
+  5 October; re-baking (about 24 minutes a large map, replacing pak1 data)
+  waits on that decision being reversed. See
+  [release notes](release-completion.md).
+  Remaining: re-baking the bundled grids (owner decision), broader authored
+  scenes.
 - [ ] **REN-07 — P2, measured optimization: remove demonstrated CPU/GPU stalls.**
   The 28 October [preset audit](ui/performance-presets.md#preset-and-detection-audit-28-october-2026)
   adds Enhanced between Balanced and Quality and replaces host-wide memory
@@ -1229,7 +1403,7 @@ diagnostics establish whole-frame ownership or production performance.
       every-frame Quality floor, physical display/input qualification and
       Wayland/macOS runtime coverage. Do not promote the default from
       shared-machine measurements.
-- [ ] **REN-08 — P1, qualification and targeted implementation: complete post-
+- [x] **REN-08 — P1, qualification and targeted implementation: complete post-
   processing combinations.** Qualify motion blur independently of TAA: it has its
   own history, limited rigid-opaque object vectors and subview/time-gap resets;
   existing gameplay benchmarks disable it. Cover skinned/weapon motion, mirrors/
@@ -1238,6 +1412,19 @@ diagnostics establish whole-frame ownership or production performance.
   effect strength and accurate requested/effective settings. Fix reproduced gaps
   or publish precise supported combinations, including Apple GL 2.1 offscreen/MSAA
   restrictions and Vulkan's effective 8x MSAA ceiling. Preserve unchanged gameplay.
+  Completed 6 November 2026 on Windows x64 OpenGL and Vulkan. Fixed: temporal AA
+  jitter read as a projection change, so motion blur never drew with TAA;
+  rigid-only vectors smeared the view weapon and ignored skinning; blur length
+  shrank with frame rate (now `r_motionBlurShutterMsec`, 0 restores it); equal
+  presentation times, screenshots and dynamic-resolution scale steps reset the
+  history; authored cuts did not. Both backends share `MotionBlurCore.h` (native
+  test) and report `rendererMotionBlurStatus`. `renderer_motion_blur_qualification.py`
+  passes all 41 cases and the coherence, rollback and weapon checks; supported
+  combinations, Apple GL 2.1 and the Vulkan 8x ceiling are published in the
+  [player guide](../user/display-settings.md#motion-blur). Evidence:
+  [motion blur qualification](temporal-presentation.md#motion-blur-qualification-6-november-2026).
+  Physical Linux/macOS/Android runs and appearance review remain with platform
+  qualification (PLAT).
 
 ## Virtual reality
 

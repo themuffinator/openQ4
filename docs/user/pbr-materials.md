@@ -134,7 +134,12 @@ the PBR filmic curve.
 `r_pbrIBL 1` enables environment reflections and diffuse from authored probe
 lights; `r_pbrIBLIntensity` scales them. Authored probes stay opt-in
 (`r_rendererReflectionProbes 1`, default 0) because they start the modern
-scene-packet pipeline on every frame. The
+scene-packet pipeline on every frame. A probe that comes into view for the
+first time is prepared in the background, so the frame does not hitch; for a
+fraction of a second the area keeps its plain environment lighting, then the
+probe's reflections appear. Screenshots always wait for them.
+`r_pbrProbeAsyncPrefilter 0` prepares each probe on the frame that needs it
+instead (a stall of tens of milliseconds). The
 laboratory's analytic studio environment, a bright sky that lights every
 surface whether or not the map has probes, is `r_pbrAnalyticEnvironment 1`
 (default 0, not saved); use it to inspect materials, not to light a level.
