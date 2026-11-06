@@ -161,9 +161,13 @@ def main(argv: list[str]) -> int:
                 raise RuntimeError("--prebuilt-dir cannot be combined with --exclude")
             result = copy_prebuilt_pack(Path(args.prebuilt_dir).resolve(), pak_name, source_dir, pak_out)
             print(f"using prebuilt {pak_name} from {Path(args.prebuilt_dir).resolve()}")
+        elif spec.generation_commit and not args.source_root:
+            # Without the repository root there is no generation history to read;
+            # pack what the source directory holds, as a shallow checkout does.
+            print(f"warning: {pak_name} has a content generation but no --source-root; packing {source_dir} as it is",
+                  file=sys.stderr)
+            result = create_game_pk4(source_dir, pak_out, pak_name=pak_name, content_filters=args.exclude)
         elif spec.generation_commit:
-            if not args.source_root:
-                raise RuntimeError(f"{pak_name} has a content generation; pass --source-root so its history can be read")
             if args.exclude:
                 raise RuntimeError("--exclude cannot be combined with a content generation")
             from content_generations import build_content_pack

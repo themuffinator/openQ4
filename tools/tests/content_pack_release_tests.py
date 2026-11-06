@@ -404,6 +404,7 @@ class ContentPackReleaseTests(unittest.TestCase):
 
     def test_overlay_entries_are_validated(self) -> None:
         table = json.loads((BUILD / "content_packs.json").read_text(encoding="utf-8"))
+        table["packs"] = [{key: value for key, value in pack.items() if key != "generation"} for pack in table["packs"]]
         path = self.work / "content_packs.json"
         for overlay, message in (
             ({"name": "pak3.pk4", "overlay_of": "pak2.pk4"}, "has no content generation"),

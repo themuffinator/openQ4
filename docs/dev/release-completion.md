@@ -6,6 +6,39 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Smaller downloads and updates, 6 November 2026
+
+- openQ4's own content now comes in three packs: `pak0.pk4` (menus, fonts,
+  strings, shaders and the other core files, about 14 MB), `pak1.pk4` (baked
+  light grids) and `pak2.pk4` (loadscreens). The light grids and loadscreens
+  change only when they are re-baked or recaptured, so most updates leave them
+  alone.
+- Each Windows and Linux release adds an **update archive**
+  (`openq4-<version>-windows-x64-update.zip`, `...-linux-x64-update.tar.xz`)
+  holding everything except the light-grid and loadscreen packs. Extract it
+  into your openQ4 folder, replacing files. The release notes now say, pack by
+  pack, whether anything changed. A local Windows x64 candidate measured
+  841.8 MB for the full package and 54.0 MB for its update archive.
+- The light-grid pack no longer carries the loose atlas images of maps that
+  have a packed light grid. Every renderer reads the packs, including ones
+  without DXT texture support, which now decode them on the CPU. Waste
+  Processing gains a light-grid pack of its own.
+- The Windows installer downloads the light-grid and loadscreen packs only when
+  your installation lacks them or holds different ones, from this release's
+  page and checked against digests built into the installer.
+- The Linux AppImage carries update information for AppImageUpdate and other
+  zsync clients, which then download only the parts that changed.
+- A dedicated server needs only `pak0.pk4`; it starts without the light grids
+  and loadscreens, which clients keep using on pure servers.
+- If a pack is missing or does not match, openQ4 now says which one, what it
+  holds and where to get it, in your language.
+- Windows debugging symbols moved out of the player package into
+  `openq4-<version>-windows-<arch>-symbols.zip`.
+- Upgrade note: this release is a full download. Remove any `baseoq4` folder
+  left by an older openQ4 before extracting it; openQ4 ignores and names any
+  leftover `pakN.pk4` it does not use.
+- Evidence: [content pack distribution](content-pack-distribution.md#implementation-status-6-november-2026).
+
 ## Fewer hitches when music and long lines start, 5 November 2026
 
 - Music, long dialogue and other long sounds no longer stall a frame when they

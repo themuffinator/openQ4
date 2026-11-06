@@ -4060,71 +4060,72 @@ remain narrower than final-package physical-device signoff.
 
 ### PKG completion checkpoints
 
-**Estimate: 10%; 0/6 tasks closed.** Credit the distribution measurements, design
-and existing deterministic pack foundation. Existing full-release packaging is not
-completion of the proposed smaller-update delivery system.
+**Estimate: 85%; 4/6 tasks closed (6 November 2026).** PKG-01 to PKG-04 are
+implemented and proven on local candidates; their release-workflow steps first
+run with the next release. PKG-05 needs that release's measurements; PKG-06 is
+decided as a planned updater not yet started. Evidence:
+[implementation status](content-pack-distribution.md#implementation-status-6-november-2026).
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| PKG-01 — Partial analysis | Archive size/change-rate audit and current verifier constraints documented. | Update archives, separate Windows symbols, localized pack-status diagnostics; prove old-full plus update equals new-full and common bulk bytes across platforms. |
-| PKG-02 — Not started | Proposed pack allocation and dependency on PKG-01 specified. | Generated shared pack table; build/reuse by source digest; pure/client-only handling; retire old pack; verify consecutive candidates and dedicated/client behavior. |
-| PKG-03 — Partial analysis | Redundant light-grid atlases and loadscreen TGA/DDS cost measured. | Every-map packed-lighting load test, `waste` pack, renderer/texture-quality loadscreen tests and approved visual format before removal. |
-| PKG-04 — Not started | Numbered-pack precedence and overlay size/generation constraints documented. | Build/verify changed-file overlays, enforce budget and generation folding; demonstrate a one-file fix below 5 MB. |
-| PKG-05 — Not started | Candidate AppImage/installer channels identified. | zsync metadata/assets, digest-pinned selective Windows downloads and measured update traffic; optional itch.io decision. |
-| PKG-06 — Decision pending; optional P3 | HTTPS/updater/signing/storage constraints identified. | Decide secure manifest/atomic replacement/elevation, macOS/Android delivery and bulk-source storage after PKG-01 through PKG-05. |
+| PKG-01 — Complete | Rootless per-platform update archives, Windows `-symbols.zip`, `content-packs.json`, release-note pack status, localized missing/mismatched-pack report (12 languages), patch releases refuse bulk changes; `verify-update` and `verify-identity` proved on consecutive Windows candidates and wired into the release job. | None. |
+| PKG-02 — Complete | `content_packs.json` drives engine, Meson, packagers, installer, verifiers and Android; pak0/pak1/pak2 split; packs built once per release and reused by source digest; `-text` checkout makes Windows and Linux packs identical; client-only packs `PURE_NEVER` and optional on servers; retired packs skipped and deleted. | None. |
+| PKG-03 — Complete | Software DXT decode for renderers without S3TC; 51/51 packs accepted with every area resident on GL, GL software decode and Vulkan; atlases and `core2` metadata trimmed (pak1 267.5 → 96.4 MB); `waste` re-baked; loadscreen format decided: keep TGA + DDS. | None. |
+| PKG-04 — Complete | Content generations, overlays pak3–pak9 rebuilt from changed files with the base kept byte-identical from the generation's blobs, size budget, generation bump folding; one-file fix shipped as a verified 153 KB overlay. | None. |
+| PKG-05 — Implemented, measurement open | Installer downloads only missing or different bulk packs, SHA-256 and release URL compiled in; AppImages embed `gh-releases-zsync` information and publish `.zsync`; itch.io declined. | Measure update downloads for each channel on the next release (maintainer decision, 6 November). |
+| PKG-06 — Decided: plan an updater; optional P3 | Constraints recorded: signed manifest, compiled release URL, platform HTTPS client, helper-process replacement, per-user installs, Sparkle for macOS, whole-APK Android. | Implement the updater under those constraints. |
 
 ### PKG task evidence and acceptance
 
-- [ ] **PKG-01 — P1, implementation: update archives and content-pack status.**
-  Every package carries the whole `pak1.pk4` (798 MB on main, 88% of the 0.13.2
-  Windows zip), although its sources changed in only 6 of the last 15 release
-  intervals. Beside each full package, publish a per-platform update archive with
-  everything except the bulk pack(s), and move the Windows PDBs into a symbols asset
-  as Linux and macOS already do. Release notes state each content pack's status, and
-  the missing- or mismatched-pack startup error names the pack and where to get it
-  through a localised string. Patch releases do not change bulk content. Exit: the
-  release verifier proves that the previous full package plus the update archive is
-  byte-identical to the new full package, and that every platform package carries
-  the same bulk-pack bytes.
-- [ ] **PKG-02 — P1, implementation: split pak1 by change rate and audience.** Move
-  the `liquid_lab` map and the script overrides to pak0, light grids to pak1 and
-  loadscreens to pak2. A generated pack table (name, digest, size, client-only)
-  drives `ValidateOpenQ4Paks`, `IsOpenQ4PurePack`, the dedicated server's optional
-  packs, the packager, the archive verifiers and Android packaging. Build each
-  content pack once, keyed by its source-manifest hash, and reuse the published file
-  while that hash is unchanged. Client-only packs leave the server's pure list. The
-  transition release is a full download, and the installer deletes the retired pack.
-  Exit: consecutive candidates with unchanged content produce identical content
-  packs on every platform; a dedicated server starts and hosts without pak1 and
-  pak2; a client keeps its loadscreens and light grids on a pure server without them.
-- [ ] **PKG-03 — P1, decision and implementation: ship only what the runtime reads.**
-  Drop light-grid atlas TGAs for maps with a valid `.lightgridpack` (170 MB) once a
-  load test of every shipped map accepts each pack, and bake a pack for `waste`.
-  Decide the loadscreen format: DDS only saves 455 MB but needs every loadscreen
-  path on GL, Vulkan and GLES, at every texture-quality setting, to read the DDS, and
-  a visual review of DXT1 on large displays. Exit: every shipped map's lighting is
-  unchanged and every loadscreen shows in the approved format on each renderer, from
-  release packs alone.
-- [ ] **PKG-04 — P2, implementation: overlay packs.** Ship a content fix between
-  content generations as `pak3.pk4` to `pak9.pk4`; numbered packs load by number but
-  wider numerals load first, so `pak10.pk4` would lose to `pak9.pk4`. Release
-  tooling builds the overlay from the files changed since the generation, enforces a
-  size budget beyond which it proposes a new generation, and folds overlays when the
-  generation is bumped. Exit: a one-file content fix ships as a validated overlay
-  under 5 MB.
-- [ ] **PKG-05 — P2, implementation: delta-aware channels.** AppImages carry
-  `gh-releases-zsync` update information and publish `.zsync` files. The Windows
-  installer checks each content pack's SHA-256 and downloads only a missing or
-  different pack, from a release URL and digest compiled into the installer.
-  Optionally publish an itch.io channel with butler. Exit: measured update downloads
-  for one release on each channel.
-- [ ] **PKG-06 — P3, decision: in-game updater and content storage.** A built-in
-  updater needs an HTTPS client (current builds have none), a signed manifest,
-  atomic replacement of locked files, elevation for system-wide installs and a
-  security review; a network reply must never choose what is downloaded. Decide
-  after PKG-01 through PKG-05, together with content packs outside a signed macOS app
-  (or Sparkle deltas), Android asset delivery, and whether the 2.8 GB of baked
-  sources under `content/baseoq4/pak1` leave Git for digest-pinned artifacts.
+- [x] **PKG-01 — P1, implementation: update archives and content-pack status.**
+  Every Windows and Linux package has a rootless `-update` archive without the
+  bulk packs, and the Windows PDBs moved to `-symbols.zip`. `content-packs.json`
+  is published with each release, the notes gain a Content Packs section, and
+  the startup report for a missing or mismatched client-only pack is localized.
+  A release with the previous release's major.minor refuses a changed bulk pack.
+  Local Windows x64 candidates: full 841.8 MB, update 54.0 MB, symbols 88.3 MB;
+  `verify-update` reproduced all 394 files of candidate B from A plus B's update
+  archive (395 of C with C's changed standalone `pak1.pk4`), and
+  `verify-identity` matched five archives to the manifest. The release job runs
+  both before publishing.
+- [x] **PKG-02 — P1, implementation: split pak1 by change rate and audience.** Done
+  in `849a65032` and later. pak0 gained `liquid_lab` and the script overrides,
+  pak1 holds light grids and pak2 loadscreens; the generated table drives every
+  consumer. Packs are built once per release and reused by source digest; WSL
+  and Windows build identical pak0. `content_pack_split_smoke.py`: a dedicated
+  server with only pak0 hosts `mp/q4dm1`, and a joining client keeps pak1 and
+  pak2 off the pure list and lights the map from its packed grid. The engine
+  skips and names unlisted `pakN.pk4`; the installer deletes them.
+- [x] **PKG-03 — P1, decision and implementation: ship only what the runtime reads.**
+  Renderers without S3TC decode pack atlases on the CPU, so no renderer needs
+  the loose TGAs, which pak1 no longer carries (96.4 MB).
+  `lightgrid_pack_load_test.py` accepts all 51 packs with every area resident on
+  OpenGL, OpenGL with `r_lightGridSoftwareDecode 1` and Vulkan. `waste` was
+  re-baked with the shipped settings; its v4 loose grid had lit nothing. The
+  maintainer kept TGA + DDS loadscreens (6 November): DDS-only would have saved
+  455 MB but needed an engine change, because retail TGAs share 69 of the 70
+  names, and would compose wide-screen backgrounds from DXT1.
+  `loadscreen_format_audit.py` showed every reader on GL and Vulkan at normal and
+  reduced texture quality from the release packs.
+- [x] **PKG-04 — P2, implementation: overlay packs.** pak1 and pak2 record content
+  generation 1. `overlay-plan` declares an overlay for files changed since the
+  generation, within `overlay_budget_bytes` (25 MB), and proposes a new
+  generation past it or for removals; `generation-bump` folds overlays. A
+  one-file loadscreen fix shipped as a 153 KB `pak3.pk4`, verified at startup
+  and read in place of pak2's copy, with pak2 rebuilt to its published MD5.
+- [ ] **PKG-05 — P2, implementation: delta-aware channels.** Implemented: AppImages
+  carry `gh-releases-zsync` update information and publish `.zsync` files; the
+  Windows installer keeps a current pack, uses one beside `setup.exe`, or
+  downloads it from the release URL with the SHA-256 compiled in. The itch.io
+  channel was declined. Remaining exit: measured update downloads for one
+  release on each channel, taken on the next release by the maintainer's
+  choice; the installer's download path is first compiled and run there.
+- [ ] **PKG-06 — P3, decision: in-game updater and content storage.** Decided
+  6 November 2026: plan an in-game updater, built under the recorded
+  constraints (signed manifest and compiled release URL, platform HTTPS client,
+  helper-process replacement, per-user installs, Sparkle deltas on macOS,
+  whole-APK Android). Bulk sources stay in Git with this decision. Remaining:
+  the updater implementation.
 
 ## Steam integration
 

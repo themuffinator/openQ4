@@ -76,22 +76,7 @@ def light_grid_trim(arcnames: Sequence[str]) -> set[str]:
     return dropped
 
 
-def loadscreen_dds_only(arcnames: Sequence[str]) -> set[str]:
-    """Loadscreen TGAs that have a DDS beside them (the roadmap PKG-03 format decision).
-
-    Every loadscreen reader resolves the DDS when the TGA is absent: the image
-    loader for GUI materials, and the expanded-screen compositor, which decodes
-    DXT on the CPU. Opt-in per pack, since it changes what players see.
-    """
-    names = {name.lower() for name in arcnames}
-    return {
-        name for name in arcnames
-        if name.lower().startswith("gfx/guis/loadscreens/") and name.lower().endswith(".tga")
-        and name.lower()[: -len(".tga")] + ".dds" in names
-    }
-
-
-PACK_RULES = {"light-grid-trim": light_grid_trim, "loadscreen-dds-only": loadscreen_dds_only}
+PACK_RULES = {"light-grid-trim": light_grid_trim}
 
 
 def _parse_overlay_spec(raw: dict, label: str, by_name: Mapping[str, ContentPackSpec]) -> ContentPackSpec:

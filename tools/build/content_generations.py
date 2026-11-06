@@ -73,6 +73,16 @@ class GenerationDiff:
 
 
 def generation_available(source_root: Path, commit: str) -> bool:
+    """The generation commit is readable, and source_root is that repository's top level.
+
+    Pack paths in the table are relative to the repository root, so a source
+    tree that merely sits inside some checkout (a test fixture, an exported
+    tree) has no generation to compare against.
+    """
+    top = subprocess.run(["git", "-C", str(source_root), "rev-parse", "--show-toplevel"],
+                         capture_output=True, text=True, check=False)
+    if top.returncode != 0 or Path(top.stdout.strip()).resolve() != source_root.resolve():
+        return False
     completed = subprocess.run(["git", "-C", str(source_root), "cat-file", "-e", f"{commit}^{{commit}}"],
                                capture_output=True, check=False)
     return completed.returncode == 0
@@ -278,7 +288,7 @@ def effective_source_digest(
     working tree has moved on, so a published base stays reusable; an overlay
     carries the files changed since the generation.
     """
-    if not spec.generation_commit:
+    if not spec.generation_commit or not generation_available(source_root, spec.generation_commit):
         return pack_source_digest(source_root / spec.source, spec.name)
     by_name = {item.name: item for item in specs}
     base = by_name[spec.overlay_of] if spec.overlay_of else spec

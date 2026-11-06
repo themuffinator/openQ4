@@ -4,7 +4,9 @@
 > [desktop platforms and packaging](roadmap.md#desktop-platforms-and-packaging). The
 > roadmap holds their priorities and exit conditions; this page keeps the
 > measurements, constraints and design behind them. Measurements are from main at
-> `f62e521ea` and the published 0.12.0 to 0.13.2 packages.
+> `f62e521ea` and the published 0.12.0 to 0.13.2 packages. What was built on
+> 6 November 2026, and the decisions taken then, are under
+> [implementation status](#implementation-status-6-november-2026).
 
 Every openQ4 release is a full download, and almost all of it is `baseoq4/pak1.pk4`, a
 pack that changes in fewer than half of the releases. This page records the
@@ -199,3 +201,148 @@ which states each item's scope and exit condition:
 | PKG-04: overlay packs | P2 | 5 |
 | PKG-05: delta-aware channels | P2 | 6 |
 | PKG-06: in-game updater and content storage | P3 decision | Keeps the "No updater" constraint's download rule |
+
+## Implementation status, 6 November 2026
+
+PKG-01 to PKG-05 are implemented on main. What remains needs a decision or a
+published release; see the roadmap's PKG checkpoints.
+
+### Pack layout (PKG-02, PKG-03)
+
+`tools/build/content_packs.json` lists the packs; Meson, the generated engine
+table (`openq4_paks_generated.h`), the packagers, the installer, the archive
+verifiers and Android packaging all read it.
+
+| Pack | Contents | Audience | Built size |
+| --- | --- | --- | ---: |
+| `pak0.pk4` | Core runtime, the `liquid_lab` map, the `convoy2b`/`storage1` script overrides | Clients and servers | 13.7 MB |
+| `pak1.pk4` | 51 `.lightgridpack` files and their `.lightgrid` metadata | Clients | 96.4 MB (was 267.5 MB with atlases) |
+| `pak2.pk4` | Loadscreens, TGA and DXT1 DDS | Clients | 530.2 MB (format kept; see below) |
+
+- **Cross-platform bytes.** With `core.autocrlf true`, a Windows checkout packed
+  CRLF text into pak0 and pak1 while Linux packed LF, so the packs could never
+  match across platforms. Pack sources are now `-text` in `.gitattributes`.
+  pak0 built under WSL (Python 3.12, zlib 1.3) and on Windows (Python 3.11,
+  zlib 1.2.13) from the same checkout is byte-identical
+  (`09916921da985c711968ddcbd7b2f838`). Releases do not rely on that: the
+  `content_packs` job builds each pack once and every platform build compiles
+  against those files (`-Dprebuilt_content_packs`), which are copied only after
+  their SHA-256 and source digest match.
+- **Reuse.** `content_packs.py` digests pack sources by git blob id, in a working
+  tree or at any revision. `content_pack_release.py build` reuses the previous
+  release's published pack when the digest is unchanged, and records each
+  pack's MD5, SHA-256, source digest and first release in `content-packs.json`.
+- **Servers and pure play.** A dedicated server treats client-only packs as
+  optional; `content_pack_split_smoke.py` hosts `mp/q4dm1` on a server with only
+  pak0 and joins it with a full client, which keeps pak1 and pak2 off the pure
+  list (`PURE_NEVER`), lists its loadscreens and lights the map from its packed
+  light grid.
+- **Retired packs.** The engine skips any `pak0`-`pak9.pk4` in `baseoq4` that its
+  table does not list and names it; the installer deletes them.
+- **Light grids.** A renderer without S3TC decodes a pack's DXT1 atlases on the
+  CPU, so no renderer falls back to the loose TGAs. `lightgrid_pack_load_test.py`
+  accepts all 51 packs, with every area resident, on OpenGL, OpenGL with
+  `r_lightGridSoftwareDecode 1` and Vulkan, the community map pack included.
+  `waste` was re-baked with the shipped settings (3 bounces); its version-4 loose
+  grid had irradiance atlases only and lit nothing visible (a capture with it
+  matched one with `r_useLightGrid 0`). `core2.lightgrid` had no atlases at all
+  and is no longer packed.
+
+### Loadscreen format decision (PKG-03)
+
+**Decided 6 November 2026 by the maintainer: keep TGA beside DXT1 DDS.**
+pak2 stays 530 MB; it is generation-pinned, so a player downloads it once and
+update archives skip it.
+
+The evidence behind the choice (`tools/tests/loadscreen_format_audit.py`,
+`airdefense1` on OpenGL and Vulkan, each also with `image_downSize 1`,
+`image_downSizeLimit 256` and `image_picmip 2`):
+
+- GUI materials already sample the DXT1 DDS today: the renderer prefers a DDS
+  beside its TGA, and the image list shows the levelshot as `DXT1`. Only the
+  expanded background a wide window gets, composed on the CPU from the tiles,
+  reads the TGAs. Every profile showed both paths, from the packs alone.
+- A DDS-only pak2 (74.7 MB) would compose that background from decoded DXT1:
+  35 to 39 dB PSNR against the TGA on three sampled sets, with block artefacts
+  visible in dark gradients and glows at 2x zoom.
+- It would also need an engine change first. The retail paks ship TGAs under
+  69 of the 70 openQ4 loadscreen names (`pak001.pk4`, `pak019.pk4` and others),
+  and the compositor resolves `.tga` before `.dds` across every search path, so
+  without the openQ4 TGA it would compose the old retail image instead of
+  openQ4's recapture. The audit's DDS-only run did read `e3_load.tga` from the
+  retail paks.
+
+OpenGL ES was not exercised here; the kept format changes nothing for it.
+
+### Update archives and status (PKG-01)
+
+- Windows and Linux packages gain a rootless `-update` archive without the bulk
+  packs; Windows PDBs move to `-symbols.zip`. Local Windows x64 candidates:
+
+  | Candidate | Full | Update | Symbols |
+  | --- | ---: | ---: | ---: |
+  | A (old pak1 with atlases) | 841.8 MB | 54.0 MB | 88.3 MB |
+  | C (trimmed pak1, overlay demo) | 672.3 MB | 54.2 MB | 88.3 MB |
+
+- `verify-update` proved B's 394 files from A plus B's update archive, and C's
+  395 files from A plus C's update archive plus the changed standalone
+  `pak1.pk4`; pak2 is byte-identical in A and C (CRC `6a8e9cc2`).
+  `verify-identity` proved five archives carry the manifest's pack bytes.
+- A patch release refuses a changed bulk pack (`--forbid-bulk-changes`).
+- Missing or mismatched client-only packs are reported in the player's
+  language after the string tables load; `content_pack_status_smoke.py` checks
+  German and French reports, the English core-pack report and a leftover
+  `pak7.pk4`.
+
+### Overlays (PKG-04)
+
+pak1 and pak2 record content generation 1 (`3677866d6`, `849a65032`). In a
+demonstration on the real tree, one loadscreen (`generic.tga`) was edited:
+`overlay-plan --apply` declared `pak3.pk4`, the build rebuilt pak2 from the
+generation's blobs with its published MD5 (`4494b435…`) and packed the fix
+alone into a 153 KB `pak3.pk4`; the client verified pak3 at startup and read
+`generic.tga` from it (`fs_debug 1`). The edit was then reverted and
+`overlay-plan --apply` removed the overlay.
+
+### Channels (PKG-05)
+
+- The Windows installer leaves pak1 and pak2 out and, per pack, keeps a current
+  copy, uses one saved beside `setup.exe`, or downloads it from
+  `https://github.com/<repo>/releases/download/<tag>/<pack>` with the SHA-256
+  compiled in (Inno Setup verifies it). It is compiled only in the release
+  workflow; no local Inno Setup run has exercised the download path yet.
+- AppImages embed `gh-releases-zsync|<owner>|<repo>|latest|openq4-*-<arch>.AppImage.zsync`
+  and publish the `.zsync`; the packager checks the embedded string and that the
+  `.zsync` describes the image.
+- Measured update traffic per channel needs a published release built this way;
+  the maintainer chose to measure it on the next real release (6 November
+  2026). The optional itch.io channel was declined.
+
+## In-game updater and content storage (PKG-06)
+
+> **Decided 6 November 2026 by the maintainer: plan an in-game updater.** It
+> stays a future implementation item (P3), built under the constraints below.
+> The recommendation put to the maintainer was to defer it, since the update
+> archives, the installer's selective pack download and the AppImage's zsync
+> information already reduce a typical update to the binaries and any changed
+> pack without an HTTPS client in the engine.
+
+The updater must meet these constraints:
+
+| Question | Constraint |
+| --- | --- |
+| What may be downloaded | Only files named by a release manifest signed with a key whose public half is compiled into the executable, from the compiled release URL. Nothing from a master-server or game-server reply chooses a URL or a digest; the current version check stays a link to `PROJECT_RELEASES_URL`. |
+| HTTPS client | The engine has none (`ID_ENABLE_CURL` is 0). Use the platform's (WinHTTP, NSURLSession, libcurl from the system on Linux) behind one small interface, rather than vendoring a TLS stack, and review it as security-sensitive code. |
+| Replacing files | Windows cannot replace a running executable or loaded DLL: stage the update beside the install and swap it from a helper process after the game exits, keeping the old files until the new ones verify. Packs are replaced by rename after their SHA-256 matches. |
+| Elevation | The installer defaults to a per-user install (`PrivilegesRequired=lowest`), which needs none. A system-wide install under Program Files would need an elevated helper; leave those to the installer instead. |
+| macOS | The packs live inside the signed app, so any change replaces the bundle. Sparkle with binary deltas is the native route once Developer ID signing and notarization are routine; moving the packs out of the bundle would break the self-contained app and need a first-run download. |
+| Android | The APK carries every pack and updates as a whole through whatever store or sideload delivers it; Play Asset Delivery applies only to Play distribution, which openQ4 does not use. |
+
+**Bulk sources: no change with this decision.** `content/baseoq4/pak1` (1.4 GB of loose
+sources, of which the packs ship about a tenth) and `pak2` (1.5 GB) live in the
+repository, whose packed history is 1.6 GiB. Content generations (PKG-04) mean
+a release only rebuilds a bulk pack when its generation changes, and reuses the
+published bytes otherwise, so the sources are needed to rebake, not to release.
+Moving them to Git LFS would put clones and CI behind LFS bandwidth quotas;
+moving them to digest-pinned release artifacts would add a fetch step to every
+rebake. Revisit if clone size becomes a contributor problem.
