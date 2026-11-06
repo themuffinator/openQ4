@@ -6,6 +6,33 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Map compiler, collision and loading round (CORE), 6 November 2026
+
+- CORE-06: the AAS compiler generates Quake 4's tactical features (cover, lean,
+  look-over and corner positions) after optimization, and `runAASTactical`
+  regenerates them on existing files. On the shipped geometry of 28 `aas32`
+  files it reproduces 7,333 of 7,422 retail features (98.8%) with retail's
+  flags and normals. A rebuilt `airdefense1` gives tactical AI the same cover
+  choice as retail data. `Write()` now saves features and area spans; the loader
+  rejects or drops malformed tactical data. Evidence:
+  [AAS compiler](aas-compiler.md#tactical-features).
+- Collision: shipped `.cm` files are decoded through Quake 4's shifted contents
+  table, so vehicle, fly, shot and item clips load as authored. openQ4's
+  compiler writes `CM "4"`; compile custom maps with those clips again.
+  Evidence: [collision contents names](dmap-compilation.md#collision-contents-names-6-november-2026).
+- CORE-05: dmap and the AAS compiler no longer scale quadratically with
+  per-plane curve groups and dense vertex bins; stock maps compile to
+  byte-identical output, faster (`airdefense1` AAS 689 s to 56 s).
+  The supplied #209 maps compile in about 3 (`core1`) and 4-5
+  (`airdefense1`) minutes instead of days, and the rebuilt `airdefense1` loads,
+  renders and navigates in SP. Evidence:
+  [dmap compilation](dmap-compilation.md#compile-time-on-dense-patches-6-november-2026).
+- CORE-02/03: dedicated servers no longer read and discard every level image
+  prefetch (media finish 8.5 s to 1.5 s over 24 stock MP loads). The opt-in
+  level-load cache was re-measured and stays off.
+- CORE-01/04: Windows map-cycle tours with jobs on and off plateau and shut down
+  cleanly; fresh configures print no Meson warning.
+
 ## Smaller downloads and updates, 6 November 2026
 
 - openQ4's own content now comes in three packs: `pak0.pk4` (menus, fonts,

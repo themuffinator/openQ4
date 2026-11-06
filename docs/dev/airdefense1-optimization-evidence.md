@@ -491,6 +491,16 @@ pair was faster: by 0.4-3.2 s on OpenGL (median 11.1 s to 9.1 s) and 1.6-2.3 s
 on Vulkan. A fixed-tic screenshot pair matched pixel for pixel outside the
 animated sky and effects.
 
+On a dedicated server the prefetch read every predicted file and discarded it:
+without a running renderer `ActuallyLoadImage` returns before reading, so none
+was ever taken (`Image prefetch: 0 of 997 prefetched files taken` on `q4dm1`,
+and the same in every one of 24 stock-map loads). The prefetch now runs only
+with a running renderer. Across the same three laps of `mp/q4dm1`-`q4dm8` on
+the Windows x64 dedicated server (6 November 2026, CORE-03), the media-finish
+phase fell from 8,533 ms to 1,454 ms over the 24 loads, and each lap of eight
+loads from 6.1-7.2 s to 4.8-5.2 s. Clients were unaffected: the SP probe of
+`game/airdefense1` still took 1,750 of 1,750 files.
+
 ### Ranked remaining work
 
 1. **Done 2026-10-06** (see above): the timestamp probe no longer opens PK4

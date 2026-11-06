@@ -133,3 +133,46 @@ and that fixture build-layout cleanup remain separate work.
 The live multiplayer run also reports lazy precache warnings and a missing
 retail image, `models/monsters/burn_misc_sm`. They do not fail this functional
 smoke; the asset-reference/precache cleanup remains unqualified by this pass.
+
+## Follow-up: configure warnings and diagnostics, 6 November 2026
+
+CORE-04 rechecked the warnings and diagnostics listed above on fresh configures
+and live loads of the current tree.
+
+- **SDL headers.** A fresh Windows configure reproduced the include-sandbox
+  warning three times: the native queue, text collection bridge and text session
+  libraries now reach into `subprojects/packagefiles/sdl3/include`, as the four
+  native input fixtures do. Those headers declare openQ4's private SDL
+  extensions, and the bundled SDL subproject already carries them on its own
+  include path, which the libraries also receive. The overlay path is now added
+  only for a system or Android SDL.
+- **Content pack table.** The same configure warned about a newline inside a
+  string, from splitting `content_packs.py meson-list` output on a literal line
+  break; it now splits on `'\n'` and strips each row, as before.
+- **RmlUi wrap revision.** Not reproduced: a fresh configure unpacks RmlUi 6.3
+  from the package cache and applies its patches without a warning. The warning
+  belongs to build trees whose extracted subproject predates a wrap change, and
+  needs no dependency update.
+
+A fresh configure with `-Dbuild_native_tests=true` now prints no Meson warning.
+
+Diagnostics from live loads:
+
+- A dedicated `mp/q4dm1` load logged no lazy pre-cache warning. Its only warning,
+  `gfx/effects/energy_sparks/explosion_deform3 had stage with no image`, is
+  accurate: that retail stage binds only `fragmentMap` images.
+- `models/monsters/burn_misc_sm` is missing from the retail packages: the
+  shipped `materials/monsters.mtr` (pak002 and pak014) names
+  `models/monsters/burn_misc_sm.tga` in its `corpseBurnEffect` guide, and no
+  package contains that image. The warning stays.
+- Dedicated servers printed each ARB program path without ending the line,
+  because they return before GL initialization; the next message was glued to
+  it. The path is now followed by `: pending GL initialization`.
+
+Sanitizer and fuzz coverage added in this round: the dmap T-junction fixture
+now checks the indexed vertex merge and fix against the original bin scans on
+dense random geometry, and passes under Clang ASan+UBSan and MSVC (its first
+ASan run caught signed overflow in the new hash keys, now unsigned). Thirty
+seeded mutations of `core2.aas32`'s tactical sections, loaded by the dedicated
+server, were each accepted, dropped with a warning or rejected, and every run
+exited normally; see [AAS compiler](aas-compiler.md#loading-and-malformed-data).

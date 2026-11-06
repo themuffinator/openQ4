@@ -453,6 +453,33 @@ staged development package is not a clean release candidate, and there has
 been no Linux/macOS runtime qualification. Only the measurements explicitly
 recorded below may be inferred.
 
+### Current-build measurement and promotion decision (6 November 2026)
+
+CORE-02 re-measured the experiment on the Windows x64 debugoptimized build of
+this date: the dedicated server toured `mp/q4dm1` through `q4dm8` three times
+from a fresh save path, so the first lap is cold and the others warm.
+
+| Laps of eight loads (ms) | Lap 1 | Lap 2 | Lap 3 | Peak private MiB (laps) |
+|---|---:|---:|---:|---|
+| `com_levelLoadModernization 0` | 6,059 | 7,187 | 6,954 | 391 / 425 / 427 |
+| `com_levelLoadModernization 1` | 8,507 | 7,677 | 7,940 | 392 / 432 / 432 |
+
+Replay behaved as designed: every warm load matched its manifest and replayed
+64 entries with no rejection, failure or cancellation, staging stayed below
+1 MiB, and the generated tree held 60 MiB. It was still slower than the classic
+path both cold (40%) and warm (7-14%). Corrupting the warm tree, by truncating
+all 8 collision payloads, flipping bytes in all 7 world payloads and appending
+bytes to 30 model payloads, gave one further clean lap: all 45 were counted
+corrupt and rewritten from source, no `.tmp` file remained, and the server exited
+normally. Map changes inside each tour are the disconnect/restart case: every
+generation closed and the process shut down in 0.2-0.4 s.
+
+Decision: the experiment is **not promoted**. `com_levelLoadModernization`
+stays `0`, and it remains an opt-in evaluation tool. The investigation found a
+loading cost elsewhere instead: dedicated servers read and discarded every
+level image prefetch (see
+[Air Defense 1 evidence](airdefense1-optimization-evidence.md)).
+
 ### Required run identity
 
 Record these fields for every retained campaign:

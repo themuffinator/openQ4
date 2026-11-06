@@ -13,13 +13,14 @@ shipped `aas_types` entityDef declares (`aas32`, `aas48`, `aas96`, `aas250`,
 `aas128`). `dmap -noAAS <map>` skips the navigation pass; a `.reg` region compile
 always skips it, because a partial map cannot produce valid navigation.
 
-Three console commands drive the same code directly:
+Four console commands drive the same code directly:
 
 | Command | Purpose |
 |---|---|
 | `runAAS [options] <map>` | Compile every AAS type for one map. |
 | `runAASDir <folder>` | Compile every AAS type for every `.map` under `maps/<folder>`. |
 | `runReach [options] <map>` | Recompute reachability and clusters for existing AAS files. |
+| `runAASTactical <map>` | Regenerate the tactical features of the map's existing AAS files. |
 
 `runAAS`/`runReach` accept `-usePatches`, `-writeBrushMap`, `-playerFlood` and
 `-noOptimize`. These override the AAS type's shipped settings for that run; they
@@ -76,8 +77,9 @@ format and map conventions. The adaptations are:
   the file id and the first section, and uses the shared binary-capable lexer.
 - Areas are cleared before they are filled in, because Quake 4's `aasArea_t`
   carries fields this pass does not produce: `bounds`, `center` and `ceiling`
-  are derived by `idAASFileLocal::FinishAreas()` on load, and the tactical
-  feature index and runtime obstacle marker are not compiled.
+  are derived by `idAASFileLocal::FinishAreas()` on load, and the runtime
+  obstacle marker is not compiled.
+- Tactical features are generated after optimization, as described below.
 - Placeholder files are written for unused AAS types, as described above.
 
 ## Verified against retail output
@@ -135,18 +137,132 @@ warnings. `aas32` and `aas48` load as real navigation, and `aas96`, `aas250` and
 `dmap mp/liquid_lab` produces `.proc`, `.cm` and all five AAS files, with the
 `aas32` mesh built from the map's player spawns.
 
-## Not compiled: tactical features
+## Tactical features
 
-Quake 4's `aas32` settings enable `generateTacticalFeatures`, and retail `aas32`
-files carry `featureIndex`/`features` sections describing cover positions,
-lean-and-fire directions, corners, pinch points and vantage points. openQ4 does
-not generate them, and `idAASFileLocal::Write()` writes zero feature counts.
+Quake 4's `aas32` settings set `generateTacticalFeatures`, and retail `aas32`
+files carry `featureIndex`/`features` sections: cover positions, lean-and-fire
+directions, corners and look-over positions that `rvAASTacticalSensor` uses to
+choose where AI takes cover and attacks from. openQ4 generates them for every
+AAS type whose settings ask for them, after reachability, clustering and
+optimization and before the file is written. That is where Raven's compiler ran
+them. `runAASTactical <map>` regenerates them on a map's existing AAS files
+without rebuilding navigation.
 
-The consequence is bounded and does not affect pathing. `rvAASTacticalSensor`
-checks `GetNumFeatures()` before every use and takes no action when it is zero,
-so AI in a recompiled map still navigates, chases and attacks but does not pick
-cover or lean positions from the navigation mesh. Retail maps keep their shipped
-features until they are recompiled.
+`idAASSettings::FromDict()` now reads `generateTacticalFeatures`, `debugColor`
+and `debugDraw` from the AAS type's entityDef, as retail does; previously the
+shipped `aas32` request was ignored.
 
-Generating them requires reproducing Raven's feature-placement rules, which have
-no reference implementation in the Doom 3 release; that work is not scheduled.
+### Placement rules
+
+The rules reproduce the retail generator in Quake 4 1.4.2's `Toolsx86.dll`. Its
+behavior was recovered from that binary for compatibility; no Raven source is
+included.
+
+1. `info_tactical_feature` entities become features directly. Their `cover`,
+   `lean_left`, `lean_right`, `corner_left`, `corner_right`, `pinch` and
+   `vantage` keys set the flags, `angle` the facing and `height` (default 72) the
+   height; a height inside the 20-60 unit low-wall band adds cover with look-over.
+2. Areas are flooded through every reachability, starting from each entity the
+   AAS type serves (`idAASSettings::ValidEntity`, player starts when the type
+   floods from players).
+3. Every edge of a flooded area's floor face that no other floor face of the area
+   shares, and that no walk reachability crosses, is a wall edge. Areas flagged
+   `AREA_LEDGE` contribute none. Walk-off-ledge drops of 20-60 units into the
+   area, whose source lies on the wall side and whose landing point is within 3
+   units of the edge, mark that part of the wall as low.
+4. Wall edges are chained end to start, and across into walk-reachable
+   neighbors by matching end points within 2 units in 2D. Chained edges that stay
+   within 3 units of the first edge's line merge into one wall.
+5. Each wall is split into segments: low runs measured from its ledge drops, and
+   72-unit full-height runs between them. Segment ends move one bounding-box
+   radius (R, 16 units for `aas32`) away from taller neighbors, and toward a
+   joint with another wall by the sharpness of the turn.
+6. A segment at least 1.6R long gets features when it is a corner end (the
+   neighboring walls fold back around this wall within short distances and turn
+   by more than about 78 degrees), steps down more than 10 units to a neighbor, or
+   is under 60 units high. Up to 3R long, or up to 4.5R without a lean, it gets
+   one central feature. Longer segments get lean positions R from their ends and
+   one to three evenly spaced look-over positions between them.
+7. Each feature sits one unit off the wall, inside a reachable area. It needs
+   headroom from step height to 48 units without solid or
+   `notacticalfeatures` contents. Cover needs the wall to block a 3R trace at a
+   third of its height. Look-over needs a clear 7R trace 10 units above it, and a
+   lean needs the same clear trace R+5 units to that side. Cover with no
+   remaining attack option is dropped.
+
+Two retail behaviors are deliberately not reproduced. Retail indexed features
+through a 1024-bucket hash keyed on area number without checking the stored
+area, so every area also listed the features of all areas congruent to it modulo
+1024. Every shipped `aas32` with more than 1024 areas shows this: `core1` lists
+1,573 references to 472 features. openQ4 lists each area's own features, in the
+most-recent-first order retail used. Retail also fixed its visited sets at 32,000
+areas and edges; openQ4's are sized to the file. Area spans are 16-bit, so a file
+needing more than 65,535 index entries stops indexing with a warning.
+
+### Verified against retail output
+
+`runAASTactical` regenerated the features of all 28 shipped `aas32` files that
+have navigation (`tram1b` ships a placeholder), on the retail geometry and
+reachability, against the retail `.map` sources and shipped `.cm` collision. Each
+retail feature was matched to the nearest unused generated feature within 8
+units.
+
+| | Count |
+|---|---:|
+| Retail features | 7,422 |
+| Generated features | 7,418 |
+| Retail features reproduced | 7,333 (98.8%) |
+| ...within 1.5 units | 7,329 |
+| ...with identical flags and encoded normal | 7,333 |
+| Retail features not reproduced | 89 |
+| Generated features retail lacks | 85 |
+
+`core2`, `convoy1`, `convoy2`, `network2` and `storage2` match feature for
+feature. Every reproduced feature has retail's exact flags and normal; the
+residue is whole features, mostly corners around small obstacles (`mcc_1` has
+19 extra), which is where a different entity set in Raven's working map would
+change the flood. The geometry CRC covers brushes, not entities, so a shipped
+file can predate later entity edits.
+
+Reaching this parity required the collision contents fix recorded in
+[dmap compilation](dmap-compilation.md#collision-contents-names-6-november-2026):
+before it, the 700 vehicle-clip brushes in the shipped convoy and walker
+collision decoded as `notacticalfeatures`, and `convoy2b` lost 29 features.
+
+### Rebuilt maps and AI use
+
+A full `dmap game/airdefense1` from the retail source produced 242 features in
+its rebuilt `aas32` (retail ships 228 on its own geometry); the tactical pass
+took 7 ms of the 692-second AAS compile. In SP gameplay the rebuilt map loaded
+with 242 features, 242 area references and no bad spans in `aiDumpState`, which
+also confirms each area lists only its own features (the retail file has 247
+references to 228 features).
+
+`rvAITactical` monsters choose cover only from features: `idAI::MoveToCover`
+returns when the tactical sensor finds none. Eight `monster_tactical_mgun` were
+spawned in front of a god-mode player at the map start and their tactic sampled
+four times over 12 seconds:
+
+| AAS data | AI in a cover tactic | Others |
+|---|---|---|
+| Retail `airdefense1.aas32` | 1 of 8, at 718.7 units from the player | ranged |
+| Fully rebuilt by openQ4, generated features | 1 of 8, at 718.7 units | ranged |
+
+The AI took cover at the same distance on both, so the generated features feed
+the same decision. The run also exposed that `runAASTactical` wrote its file
+with a zero geometry CRC, which the game rejected as out of date; it now writes
+the map's CRC, as `runReach` does.
+
+### Loading and malformed data
+
+`idAASFileLocal::Write()` now writes each area's feature span and the two
+feature sections, omitted when a file has no features, as retail does. The loader
+parses them strictly. A truncated section or a negative count fails the load like
+any other malformed section. A feature index entry outside the features, or an
+area span past the index, would otherwise be read unchecked by the tactical
+sensor, so the file loads with a warning and without tactical features;
+navigation is unaffected. Each case was exercised with a modified `core2.aas32`.
+
+Without features `rvAASTacticalSensor` checks `GetNumFeatures()` before every use
+and takes no action, so AI still navigates, chases and attacks but picks no
+cover or lean positions from the mesh.

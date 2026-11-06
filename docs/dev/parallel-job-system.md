@@ -183,3 +183,43 @@ new consumer parity, cancellation, corruption, memory, and timing evidence is
 also still pending in
 [loading-cache-modernization.md](loading-cache-modernization.md); the integrated
 consumer is not itself a final performance or platform claim.
+
+## Map-cycle and shutdown evidence (6 November 2026)
+
+CORE-01 reran the map-cycle checks on the Windows x64 debugoptimized build with
+a harness that records the process's private bytes after each load settles and
+then quits. Each tour ran from a fresh save path against the installed retail
+packages.
+
+| Tour | Loads | Exit | Peak private MiB by lap | Jobs shutdown |
+|---|---:|---|---|---|
+| Dedicated, `mp/q4dm1`-`q4dm8` x3, `jobs_enable 1` | 24/24 | 0, 0.42 s after the last command | 391 / 427 / 427 | PASS |
+| Dedicated, same, `jobs_enable 0` | 24/24 | 0, 0.41 s | 392 / 426 / 427 | PASS |
+| SP client, airdefense1/airdefense2/hangar1/hangar2 x3 | 12/12 | 0, 2.3 s | 3,386 / 3,439 / 3,582 | PASS |
+| SP client, airdefense1/hangar2 x6 | 12/12 | 0 | airdefense1 3,381-3,514; last four 3,462-3,489 | PASS |
+
+The first lap loads each map's assets once; afterwards memory stays in a fixed
+band. On the dedicated server it moves between about 370 and 427 MiB rather than
+rising, with the same pattern whether jobs run threaded or inline. The client
+needed six laps to show it: `airdefense1` rose for two visits and then held
+within 27 MiB, and `hangar2` within 20 MiB. No run logged an error, and every
+run's last line was `jobsShutdown PASS v1 initialized=0 queued=0 running=0`.
+The SP client ran with a hidden window and OpenGL. These are local development
+runs, not release packages, and no other platform was toured.
+
+## Background asset work profile (6 November 2026)
+
+CORE-03 profiled what level-load work is left on the main thread before moving
+more of it to workers. A hidden-window SP load of `game/airdefense1` took
+15.9 s: render world 0.3, game initialization 6.3, player spawn 0.5, media
+finish 3.2 and settle 5.6. Image work in media finish was 1.6 s across 1,835
+files: timestamp probes 181 ms, generated-image reads 61 ms, decode 721 ms and
+GL upload 311 ms. One 32 MiB environment cube map was 236 ms of the decode.
+The DDS prefetch already moves the reads of 1,750 of those files to workers.
+
+Moving the remaining decode would save at most about 0.7 s, under 5% of the
+load, and would need image programs and their buffers to cross threads; it is
+not justified on this evidence. The profile did find work that was wasted
+outright: dedicated servers read every prefetched image and discarded it. Only
+a running renderer now prefetches (see
+[Air Defense 1 evidence](airdefense1-optimization-evidence.md)).
