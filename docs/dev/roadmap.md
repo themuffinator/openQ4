@@ -828,7 +828,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors and cutout casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Translucent receivers under motion; physical platforms. |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded. | lavapipe residual, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
-| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Probe capture orientation, grid provenance/regeneration and broader authored scenes. |
+| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 
@@ -955,8 +955,18 @@ diagnostics establish whole-frame ownership or production performance.
   2.1 ms (Vulkan) and 3.3 ms (OpenGL), inside the 4 ms budget; probes appear
   0.15-0.37 s after they are needed, and screenshots wait for them. See
   [background prefilter](vulkan-probe-sources.md#background-prefilter-6-november-2026-ren-06).
-  Remaining: probe capture orientation and grid provenance/regeneration,
-  broader authored scenes.
+  Probe capture orientation is qualified: the `probes-baked` control bakes two
+  probes in the game and requires GL's cube convention in the written -Y face
+  and in the reflection, and passed on both backends on 6 November. Grid
+  provenance is established: every bundled light grid is a cropped June
+  bake (37 multiplayer grids match logged 2560x1334 bakes, the June 18 batch
+  1280x720), reproduced by the unfixed build; the bake is now correct, so the
+  grids do need regenerating. Keeping them was the owner's decision on
+  5 October; re-baking (about 24 minutes a large map, replacing pak1 data)
+  waits on that decision being reversed. See
+  [release notes](release-completion.md).
+  Remaining: re-baking the bundled grids (owner decision), broader authored
+  scenes.
 - [ ] **REN-07 — P2, measured optimization: remove demonstrated CPU/GPU stalls.**
   The 28 October [preset audit](ui/performance-presets.md#preset-and-detection-audit-28-october-2026)
   adds Enhanced between Balanced and Quality and replaces host-wide memory
