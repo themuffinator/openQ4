@@ -115,6 +115,7 @@ struct vkRing_t { void* mapped=nullptr; int cursor=0; VmaAllocation allocation=n
 struct Pipeline { VkPipeline pipeline{}; };
 struct Executor {
     bool frameOpen=false,acquireWaitPending=false,displayColorMapped=false;
+    bool acquireTimedOut=false; int acquireTimeoutFrame=0;
     int frameSlot=0; uint32_t swapImageIndex=0; VkCommandBuffer cmd=handle<VkCommandBuffer>(4);
     VkImage frameImage{}; VkImageView frameImageView{}; bool framePresentable=false;
     vkRing_t vertexRings[2],indexRings[2],uniformRings[2];
@@ -359,12 +360,15 @@ int main(){
     assert(!VK_GuiExecutor_BeginFrame() && vkThreadedRecreatePending && recoverCalls==0);
     onRenderThread=false;VK_Device_CompleteThreadedRecovery();assert(recoverCalls==1);
     // An acquisition timeout acquired and signaled nothing: skip the frame,
-    // never latch, and acquire normally on the next one.
+    // never latch presentation, and acquire normally on the next one. The
+    // frame's later commands do not wait out the timeout again (REN-04).
     for(VkResult skipped:{VK_TIMEOUT,VK_NOT_READY}){
-        reset();acquireResult=skipped;baseline=snapshot();
+        reset();vkExec.acquireTimedOut=false;acquireResult=skipped;baseline=snapshot();
         assert(!VK_GuiExecutor_BeginFrame() && !vkCtx.presentationBlocked && !vkExec.frameOpen && submitCalls==0);
         assert(snapshot().outcome==RDP_ACQUIRE_FAILED);
-        acquireResult=VK_SUCCESS;open();assert(VK_GuiExecutor_SubmitFrame(true));
+        const int attempts=acquireCalls;acquireResult=VK_SUCCESS;
+        assert(!VK_GuiExecutor_BeginFrame() && acquireCalls==attempts && !vkExec.frameOpen);
+        ++backEnd.frameCount;open();assert(VK_GuiExecutor_SubmitFrame(true));
     }
     // A hidden window renders offscreen. However the presentation engine would
     // answer, nothing is acquired, withheld, waited on, signaled or presented,
