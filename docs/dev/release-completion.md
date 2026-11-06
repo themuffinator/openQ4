@@ -54,10 +54,13 @@ See [player release status](../user/release-status.md).
   with mipmaps. Like the original game, the capture now replaces the texture
   with a plain image of the camera's view, on OpenGL and Vulkan alike. See
   [nested-view evidence](vulkan-captures.md#nested-cropped-and-offset-views-6-november-2026).
+- With the legacy `r_screenFraction` crop (`r_resolutionScaleMode 0`), an
+  `envshot` or other capture that is not window-sized now captures the full
+  view on both renderers. Before, each face was drawn at half size in one
+  corner.
 - Still open: larger-than-window captures through the game's post-process
   path are wrong on both renderers, and OpenGL repeats one tile in the direct
-  path. An `envshot` under the legacy `r_screenFraction` crop draws each face
-  at half size in one corner on both renderers.
+  path.
 
 ## Smaller downloads and updates, 6 November 2026
 

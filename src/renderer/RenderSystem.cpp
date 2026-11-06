@@ -1520,8 +1520,14 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 
 	// for the larger-than-window tiled rendering screenshots
 	if ( tiledViewport[0] ) {
+		// glConfig takes the capture's size below; keep the real window's.
+		tiledWindow[0] = windowWidth;
+		tiledWindow[1] = windowHeight;
 		windowWidth = tiledViewport[0];
 		windowHeight = tiledViewport[1];
+	} else {
+		tiledWindow[0] = 0;
+		tiledWindow[1] = 0;
 	}
 
 	// openQ4 VR: a headset frame's output is the virtual screen (RenderSystem_vr.cpp)
@@ -1984,6 +1990,16 @@ bool idRenderSystemLocal::PushSceneResolutionScale( const renderView_t &renderVi
 	}
 
 	if ( legacyCrop ) {
+		// Nothing resolves the legacy crop, so a capture of any size other than
+		// the window (an envshot or probe face, a custom-size screenshot) would
+		// keep the scene in its corner: a 256x256 envshot inside a 50% crop drew
+		// every face at half size in the bottom-left. Only a window-sized capture
+		// shows what the display shows. glConfig.vidWidth is the capture's size
+		// while it renders (BeginFrame); tiledWindow is the window's.
+		if ( tiledViewport[0] != 0
+				&& ( tiledViewport[0] != tiledWindow[0] || tiledViewport[1] != tiledWindow[1] ) ) {
+			return false;
+		}
 		CropRenderSize( SCREEN_WIDTH * screenFraction / 100.0f, SCREEN_HEIGHT * screenFraction / 100.0f );
 		// resolutionScaleWidth stays 0: there is nothing for a back end to resolve
 		resolutionScaleCropActive = true;

@@ -312,9 +312,21 @@ def main() -> None:
     if "CropRenderSize(" in method(render, "void idRenderSystemLocal::BeginFrame("):
         raise AssertionError("BeginFrame must not crop the whole frame, menu included")
     crop = method(render, "bool idRenderSystemLocal::PushSceneResolutionScale( const renderView_t &renderView )")
-    for required in ("const bool legacyCrop = r_resolutionScaleMode.GetInteger() == 0;", "if ( legacyCrop ) {\n\t\tCropRenderSize("):
+    for required in ("const bool legacyCrop = r_resolutionScaleMode.GetInteger() == 0;", "if ( legacyCrop ) {\n",
+                     "\t\tCropRenderSize( SCREEN_WIDTH * screenFraction / 100.0f, SCREEN_HEIGHT * screenFraction / 100.0f );\n\t\t// resolutionScaleWidth stays 0"):
         if required not in crop:
             raise AssertionError("explicit legacy mode0 crop was changed")
+    # Nothing resolves the legacy crop, so captures sized unlike the window
+    # (envshot and probe faces, custom screenshots) must not take it.
+    legacy = crop[crop.index("if ( legacyCrop ) {\n\t\t//"):]
+    guard = "if ( tiledViewport[0] != 0\n\t\t\t\t&& ( tiledViewport[0] != tiledWindow[0] || tiledViewport[1] != tiledWindow[1] ) ) {\n\t\t\treturn false;"
+    if guard not in legacy or legacy.index(guard) > legacy.index("CropRenderSize("):
+        raise AssertionError("legacy mode0 crop must skip captures sized unlike the window")
+    # glConfig.vidWidth is the capture's size during a capture, so BeginFrame
+    # must record the window's before it resizes the frame.
+    begin = method(render, "void idRenderSystemLocal::BeginFrame(")
+    if "tiledWindow[0] = windowWidth;" not in begin or begin.index("tiledWindow[0] = windowWidth;") > begin.index("windowWidth = tiledViewport[0];"):
+        raise AssertionError("BeginFrame must keep the window size before a capture resizes it")
     method(gles, "void RB_ApplyResolutionScaleToBackBuffer( void )")
     code = assemble(draw, backend)
     variants = {"production": code}

@@ -6285,6 +6285,8 @@ void idRenderSystemLocal::Clear( void ) {
 	viewportOffset[1] = 0;
 	tiledViewport[0] = 0;
 	tiledViewport[1] = 0;
+	tiledWindow[0] = 0;
+	tiledWindow[1] = 0;
 	backEndRenderer = BE_BAD;
 	backEndRendererHasVertexPrograms = false;
 	backEndRendererMaxLight = 1.0f;

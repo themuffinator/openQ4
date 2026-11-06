@@ -628,7 +628,7 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel. | The unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
 | VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures and nested/legacy-cropped remote views pass. | GUI `renderDef` MSAA edges, the shared cropped-`envshot` defect, remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views and cropped `envshot` faces pass. | Multisampling of views drawn straight to the window (GUI `renderDef`, remote captures inside an `envshot`), remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -843,10 +843,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
   an incomplete framebuffer. Both now re-create such a destination as one RGBA8
   level of the capture size, as Quake 4's `glCopyTexImage2D` did. Nested,
   legacy-cropped nested and restarted nested views then pass on each backend
-  and match within one display level. Still open: an `envshot` under the
-  legacy crop is drawn at half size in a corner on both backends (OpenGL also
-  leaks it into other faces), and Vulkan does not antialias GUI `renderDef`
-  window edges at 4x MSAA (112 pixels, at most 11 levels).
+  and match within one display level. An `envshot` under the legacy crop
+  drew each face at half size in a corner on both backends, because
+  `BeginFrame` sizes `glConfig` to the capture. The window size is now kept,
+  and non-window-sized captures skip that crop. Still open: Vulkan does not
+  multisample views drawn straight to the window, as OpenGL's 4x MSAA window
+  does: GUI `renderDef` edges (112 pixels, at most 11 levels) and a remote
+  capture inside an `envshot` face (113 edge pixels).
 
 ## Modern rendering engine
 

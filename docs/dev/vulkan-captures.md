@@ -69,8 +69,7 @@ GL and Vulkan intensity/depth tools now cover the active viewport, and stencil
 statistics use the attachment extent. Legacy cropped, offset and nested
 viewports now have GPU comparisons (see
 [Nested, cropped and offset views](#nested-cropped-and-offset-views-6-november-2026));
-the cropped `envshot` and offset-GUI edge differences recorded there stay
-open. Setting `r_resolutionScaleMode 0` alone
+the multisampled-edge differences recorded there stay open. Setting `r_resolutionScaleMode 0` alone
 does not exercise that path when the game owns a resampled scene target.
 Vulkan's general `glReadPixels` shim always reads the frame image, not a bound
 render target as GL does. Arbitrary
@@ -167,13 +166,25 @@ comparison. The tiled-capture harness also passes on the Iris Xe
 (`.tmp/vk-roadmap/nov6/tiled-rerun/`, built from the same sources). Its GL
 comparisons fail only on the defective OpenGL tile described above.
 
-Two comparisons fail, and neither is a Vulkan parity defect:
+Two comparisons failed on `b430a18f`:
 
-- **Cropped `envshot` (shared).** Under the legacy 50% crop, both renderers
-  draw the face that sees the specimen at half size in the face's bottom-left
-  corner, as if the crop were applied twice. OpenGL also leaves the same
-  fragment in three faces that cannot see the specimen; Vulkan's are black.
-  This is an open front-end crop defect plus an OpenGL stale-pixel defect.
+- **Cropped `envshot` (shared, fixed afterwards).** Under the legacy 50%
+  crop, both renderers drew the face that sees the specimen at half size in
+  its bottom-left corner. OpenGL also left the same fragment in three faces
+  that cannot see the specimen. During any capture `BeginFrame` sizes
+  `glConfig` to the capture, so the legacy crop could not tell a 256x256 face
+  from the window and cropped it like the display. `BeginFrame` now records
+  the window's size (`tiledWindow`), and the legacy crop skips captures of any
+  other size. Its pin is in `renderer_native_ui_output.py`. On the fixed
+  build all three runs pass again, every face is full-size, and the three
+  stale OpenGL faces match Vulkan exactly. The face that sees the specimen
+  differs in 113 pixels, all on the edges of the remote image shown on the
+  screen: in this path OpenGL's capture of that view is antialiased and
+  Vulkan's is not. This is the same multisampling difference as the next
+  item. The two existing larger-than-window checks against
+  `glConfig.vidWidth` (`PushSceneResolutionScale` for the ES modes and
+  `PresentScaledScene`) compare the capture with itself for the same reason,
+  so they never refuse. They are recorded here, not changed.
 - **Offset GUI window edges.** 112 silhouette pixels differ by up to 11
   levels: at 4x MSAA OpenGL antialiases the GUI `renderDef` view's edges and
   Vulkan does not. Interiors match. OpenGL creates its window with 4x MSAA
@@ -184,7 +195,7 @@ Two comparisons fail, and neither is a Vulkan parity defect:
   open VK-07 difference.
 
 Reports and engine images: `.tmp/vk-roadmap/nov6/view-{gl,nvidia,intel}/` and
-`view-comparison*/`.
+`view-comparison*/`; the crop-fix repeat is in `envcrop/`.
 
 ## Cubemap and write-failure qualification (3 November 2026)
 
