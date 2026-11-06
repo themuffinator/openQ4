@@ -66,13 +66,124 @@ contracts pass.
 ## Remaining scope
 
 GL and Vulkan intensity/depth tools now cover the active viewport, and stencil
-statistics use the attachment extent. Actual legacy cropped, offset and nested
-viewports still need separate GPU comparisons. Setting `r_resolutionScaleMode 0` alone
+statistics use the attachment extent. Legacy cropped, offset and nested
+viewports now have GPU comparisons (see
+[Nested, cropped and offset views](#nested-cropped-and-offset-views-6-november-2026));
+the cropped `envshot` and offset-GUI edge differences recorded there stay
+open. Setting `r_resolutionScaleMode 0` alone
 does not exercise that path when the game owns a resampled scene target.
 Vulkan's general `glReadPixels` shim always reads the frame image, not a bound
 render target as GL does. Arbitrary
 nested views and the remaining debug-view combinations still need GL-contract
 comparisons; the bounded capture sequence below does not qualify them.
+
+## Tiled captures (6 November 2026)
+
+`screenshot W H` and `envshot` larger than the window render the frame once
+per window-sized tile, with `tr.viewportOffset` moved to that tile, and stitch
+the readbacks (`R_ReadTiledPixels`). OpenGL adds the offset to each view's
+viewport and scissor. Vulkan ignored it, so every tile repeated the first: a
+2560x1600 capture held the same 1280x800 image four times. The Vulkan backend
+now moves each view of a tiled frame by the offset once, before planning or
+drawing it. View-derived scissors are cut at the attachment edge, because
+Vulkan forbids negative scissor offsets; the cut rectangle covers exactly the
+same pixels. Ordinary frames have a zero offset and are unaffected.
+
+`renderer_tiled_capture.py` writes a window capture, a 2x2-tiled 2560x1600
+capture and a 1920x1200 capture with partial tiles. It uses the SMAA laboratory
+fixture without MSAA, in three cases:
+
+- `direct` draws straight into the window. Each backend must place every
+  tile's own part of the frame, and the 2x capture box-filtered to window size
+  must correlate with the window capture at 0.98 or better.
+- `post` draws through the game-owned SMAA target. Both backends offset views
+  drawn into that target too, so neither produces a correct 2x image there;
+  the case is recorded, not gated.
+- `restored` repeats `post` and must match it exactly.
+
+`--compare` checks GL against Vulkan per tile, within the existing
+two-display-level limit.
+
+On the clean `1243eb6a` build with the RTX 4060 Laptop, Vulkan passes all of
+its own checks. Its `direct` tiles all differ (4,868 to 115,776 changed
+pixels per pair), and the box-filtered correlation is 0.999. The previous
+build failed this: its four tiles were identical. OpenGL fails its own
+`direct` check: its (1280,0) tile repeats the (1280,800) tile (correlation
+0.806). Of the 27 GL/Vulkan tile comparisons, 26 differ by at most one display
+level. The one failure is that defective GL tile. In `post`, both backends
+produce the same incorrect image (three tiles identical, correlation 0.140) and
+match each other within one level. These two OpenGL/shared tiled-capture
+defects are recorded as open; they are outside the Vulkan parity fix and do
+not loosen any image gate. Reports and engine images: `.tmp/vk-roadmap/nov6/tiled-{gl,nvidia}/`
+and `tiled-comparison/`.
+
+## Nested, cropped and offset views (6 November 2026)
+
+`renderer_view_capture.py` adds six cases to the same laboratory scene at 4x
+MSAA, with only the emissive specimen lit:
+
+- `nested`: a `func_cameraview` close in front of the specimen and a flat
+  screen beside it with a `remoteRenderMap` material, so a subview is cropped,
+  captured and sampled in the main view. The screen must show the specimen's
+  cyan, and the constant-material control must not.
+- `nested-control`: the same screen with a constant material.
+- `nested-cropped`: `nested` inside the legacy 50% scene crop
+  (`r_screenFraction 50`, `r_resolutionScaleMode 0`).
+- `cropped-cube`: an `envshot` cube inside that crop.
+- `offset-gui`: a test GUI whose `renderDef` window starts away from the origin.
+- `nested-restarted`: `vid_restart`, which must reproduce `nested` exactly.
+
+Building it exposed two things:
+
+- **The screen must be flat.** As in Doom 3, precise subview culling rejects
+  any surface with a back-facing triangle, so a sphere never renders a
+  subview. Stock screens are flat patches.
+- **Captures into file textures failed on both renderers.** The stock idiom
+  captures into an ordinary texture (`map textures/common/camera1.tga`), which
+  loads block-compressed (BC1) with a mip chain. Vulkan blitted into the BC1
+  image (a validation error; the screen kept old contents), and a copy that
+  resized it kept its mip count (another validation error). OpenGL attached the
+  immutable compressed texture to a framebuffer (incomplete; the screen stayed
+  black). Quake 4's `glCopyTexImage2D` re-specified the destination as a plain
+  texture. Both backends now do the same: a colour capture into a 2D file
+  texture whose format, mip count or size does not match re-creates it as one
+  RGBA8 level of the capture size
+  (`idImage::NeedsColorCopyRespecification`/`RespecifyColorCopyTarget`).
+  Generated and scratch targets keep their existing storage rules. The image
+  policy metadata harness executes both new bodies and rejects removal of
+  either content-mutation guard.
+
+On the fixed build, both backends pass all independent checks on the RTX 4060
+Laptop. The screen shows 28,408 specimen pixels in `nested` and
+`nested-restarted` (an exact repeat), 27,808 in `nested-cropped`, and none in
+the control. GL/Vulkan comparisons of all four nested cases are within one
+display level. Neither run logs a GL error or Vulkan validation message.
+The Iris Xe also passes every independent check, with the same specimen pixel
+counts (27,810 when cropped). Against the NVIDIA OpenGL reference it differs
+only on silhouette edges, where the two vendors' 4x MSAA coverage differs, and
+in faint near-black speckle in the cropped case. OpenGL on this hybrid laptop
+runs on the NVIDIA GPU, so there is no same-vendor reference for that
+comparison. The tiled-capture harness also passes on the Iris Xe. Its GL
+comparisons fail only on the defective OpenGL tile described above.
+
+Two comparisons fail, and neither is a Vulkan parity defect:
+
+- **Cropped `envshot` (shared).** Under the legacy 50% crop, both renderers
+  draw the face that sees the specimen at half size in the face's bottom-left
+  corner, as if the crop were applied twice. OpenGL also leaves the same
+  fragment in three faces that cannot see the specimen; Vulkan's are black.
+  This is an open front-end crop defect plus an OpenGL stale-pixel defect.
+- **Offset GUI window edges.** 112 silhouette pixels differ by up to 11
+  levels: at 4x MSAA OpenGL antialiases the GUI `renderDef` view's edges and
+  Vulkan does not. Interiors match. OpenGL creates its window with 4x MSAA
+  (`actualSamples=4` in the log), so whatever it draws straight to the window,
+  GUI 3D windows included, is multisampled. Vulkan's swapchain image is
+  single-sample, and only the game's scene target carries MSAA. Matching it
+  needs a multisampled target and resolve for GUI 3D views; this remains an
+  open VK-07 difference.
+
+Reports and engine images: `.tmp/vk-roadmap/nov6/view-{gl,nvidia,intel}/` and
+`view-comparison*/`.
 
 ## Cubemap and write-failure qualification (3 November 2026)
 

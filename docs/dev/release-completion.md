@@ -35,6 +35,30 @@ See [player release status](../user/release-status.md).
   build ran dedicated and SP gameplay, both compilers and the AAS fuzz cases
   with no report.
 
+## Vulkan screenshots and live camera screens, 6 November 2026
+
+- On Vulkan, a `screenshot` or `envshot` larger than the game window now
+  captures the whole picture. Before, it repeated the same window-sized corner
+  in every part of the image. Ordinary screenshots are unchanged.
+- A new developer drill, `r_vkMaterialDescriptorPoolTest`, makes the graphics
+  driver itself refuse shader resources. On NVIDIA and Intel, the affected
+  authored shader stages skip without changing the image, and rendering
+  recovers fully when the drill ends, after a shader reload and after a video
+  restart. All GL/Vulkan comparisons stay within one display level. See
+  [tiled-capture evidence](vulkan-captures.md#tiled-captures-6-november-2026) and
+  [descriptor evidence](vulkan-material-programs.md#descriptor-refusal-on-real-drivers-6-november-2026).
+- Live camera screens (a `remoteRenderMap` material that captures into an
+  ordinary texture, as the stock camera monitors do with
+  `textures/common/camera1`) showed black or old pixels on both renderers. The
+  capture could not write that texture, because it is stored compressed and
+  with mipmaps. Like the original game, the capture now replaces the texture
+  with a plain image of the camera's view, on OpenGL and Vulkan alike. See
+  [nested-view evidence](vulkan-captures.md#nested-cropped-and-offset-views-6-november-2026).
+- Still open: larger-than-window captures through the game's post-process
+  path are wrong on both renderers, and OpenGL repeats one tile in the direct
+  path. An `envshot` under the legacy `r_screenFraction` crop draws each face
+  at half size in one corner on both renderers.
+
 ## Smaller downloads and updates, 6 November 2026
 
 - openQ4's own content now comes in three packs: `pak0.pk4` (menus, fonts,

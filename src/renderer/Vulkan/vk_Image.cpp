@@ -1376,4 +1376,14 @@ void idImage::Resize( int width, int height ) {
 	AllocImage();
 }
 
+void idImage::RespecifyColorCopyTarget( int width, int height ) {
+	if ( width <= 0 || height <= 0 || !R_ImagePolicyContentMutation() ) return;
+	R_RenderThread_Sync( "image" );
+	opts.format = FMT_RGBA8;
+	opts.numLevels = 1;
+	opts.width = width;
+	opts.height = height;
+	AllocImage();
+}
+
 #endif /* OPENQ4_RENDERER_VK_MODULE */

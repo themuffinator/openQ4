@@ -622,13 +622,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions and exact-package budgets. |
+| VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions beyond the Windows NVIDIA/Intel five-cycle soak, and exact-package budgets. |
 | VK-02 — Partial | Six controlled foreground samples pass the declared 28 ms presentation p99 budget on NVIDIA/Intel; failed diagnostic repeats remain retained. | Physical direct/hybrid routing, other power conditions and the broader exact-package pacing matrix. |
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
-| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform and pipeline pressure recover on NVIDIA/Intel. | Descriptor-driver failure on GPU, the unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
+| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel. | The unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
-| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed and two-cycle NVIDIA/Intel map tours pass. | Demonstrate improved tails and long-session cache plateaus in matched runs/soaks; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons and 50–200% depth/intensity views pass. | Cropped/offset/nested targets, remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures and nested/legacy-cropped remote views pass. | GUI `renderDef` MSAA edges, the shared cropped-`envshot` defect, remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -729,6 +729,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
   recovery and all sixteen GL/Vulkan pairs within one display level.
   Descriptor-driver failure on GPU, broader lighting and mod-content
   qualification remain open.
+  Progress, 6 November: the [real-driver descriptor drill](vulkan-material-programs.md#descriptor-refusal-on-real-drivers-6-november-2026)
+  (`r_vkMaterialDescriptorPoolTest`) passes on NVIDIA and Intel. Both drivers
+  refuse over-quota authored draws, skipped redundant stages leave images
+  unchanged, and skips stop once both frame slots return to production pools.
+  Reload and restart with and without the drill recover exactly; all sixteen
+  GL/Vulkan pairs are within one display level. The descriptor-driver subpoint
+  is closed. Broader lighting/mod content and the strict lighting gate remain.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
@@ -782,6 +789,18 @@ and untested drivers remain open, with no tolerance or support-tier change.
   image slots, and report no Vulkan/validation warnings. Same-map allocation
   and process-memory growth remains recorded; these bounded tours do not
   establish long-session plateaus or promote an optimization.
+  Progress, 6 November: the [five-cycle soak](vulkan-resource-profiling.md#five-cycle-soak-6-november-2026)
+  ran 40 stops on the clean `1243eb6a` package on NVIDIA, Intel and GL, all
+  passing, with no validation messages. After the first cycle, Vulkan process
+  growth (at most 94 MiB on NVIDIA and 60 MiB on Intel over three cycles) is no
+  larger than GL's 97 MiB. Heap allocations stay 12 or 13 above resident images
+  throughout. The remaining one slot per cycle was traced, by listing every
+  image, to the retained interface's layer pool (capped at 48 slots and
+  256 MiB, with reuse and eviction) and a second loaded copy of one core1
+  objective image. Both are bounded front-end pools, not Vulkan lifetime
+  defects. This closes the long-session plateau evidence. What remains is
+  promoting an optimization with improved frame-time tails, which the
+  measured deferral decisions above do not yet justify.
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,
@@ -808,6 +827,26 @@ and untested drivers remain open, with no tolerance or support-tier change.
   34-case sequence passes at each of 0x/4x/8x MSAA from 50% through 200% scale,
   within the unchanged two-level full-frame limit and with exact reload/restart
   recovery. Actual cropped, offset and nested GPU comparisons remain open.
+  Progress, 6 November: [tiled captures](vulkan-captures.md#tiled-captures-6-november-2026)
+  larger than the window repeated one tile on Vulkan, which ignored the tile
+  viewport offset. Each view of a tiled frame now moves by the offset, and
+  view scissors are cut at the attachment edge. On NVIDIA, Vulkan places every
+  tile correctly (box-filtered correlation 0.999). 26 of 27 GL/Vulkan tile
+  comparisons are within one display level; the remaining one is an OpenGL
+  tile that repeats another. Tiling through the game-owned post-process target
+  is wrong on both backends, identically. Those OpenGL/shared tiled-capture
+  defects remain open outside this Vulkan fix.
+  Progress, 6 November (views): the [nested/cropped/offset fixture](vulkan-captures.md#nested-cropped-and-offset-views-6-november-2026)
+  found that remote-camera captures into ordinary file textures (the stock
+  `textures/common/camera1` idiom) failed on both backends. Those textures
+  are block-compressed with mips, so Vulkan blitted into BC1 and OpenGL bound
+  an incomplete framebuffer. Both now re-create such a destination as one RGBA8
+  level of the capture size, as Quake 4's `glCopyTexImage2D` did. Nested,
+  legacy-cropped nested and restarted nested views then pass on each backend
+  and match within one display level. Still open: an `envshot` under the
+  legacy crop is drawn at half size in a corner on both backends (OpenGL also
+  leaks it into other faces), and Vulkan does not antialias GUI `renderDef`
+  window edges at 4x MSAA (112 pixels, at most 11 levels).
 
 ## Modern rendering engine
 
