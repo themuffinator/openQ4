@@ -248,6 +248,50 @@ validation messages:
 
 Reports and engine images: `.tmp/vk-roadmap/nov6/windowview/`.
 
+## Stencil debug views and the weapon depth hack (6 November 2026)
+
+`renderer_stencil_debug_capture.py` lights the original laboratory with its
+key light, which casts a stencil shadow from an occluder onto a sphere. It
+captures, on each backend:
+
+- `r_showShadowCount 1` and `2`, and `r_showLightCount 1`, `2` and `3`, the
+  last with a second light;
+- the printed stencil overdraw of the two counting modes;
+- the player's view weapon (`weaponDepthHack`) lit, and under `r_showDepth`;
+- `vid_restart partial`, which must reproduce the shadow count exactly, and
+  clearing every view, which must reproduce the scene exactly.
+
+**Defect: the scissor test at the debug tools was undefined.** The first run
+showed OpenGL counting shadow volumes only inside each shadow surface's
+scissor rectangle, as Doom 3 intends: `RB_SimpleSurfaceSetup` sets that
+scissor. Vulkan counted the infinite volumes across the whole view and printed
+3.9 against OpenGL's 1.8. The Vulkan translation of the tools assumed the
+scissor test is off when they start, because SMAA and other post passes leave
+it disabled. Without such a pass it was still on, so OpenGL's result depended
+on which passes ran before the tools. `RB_RenderDebugTools` now enables the
+test itself after setting the view scissor, and the Vulkan translation
+receives the same call. `R_ColorByStencilBuffer` still turns it off for its
+colour pass, as before.
+
+Results on `badc9343c` with this change, RTX 4060 Laptop (591.74), Vulkan
+validation enabled and no validation messages:
+
+| MSAA | Stencil views and prints | Weapon depth view | Lit scene and weapon |
+| --- | --- | --- | --- |
+| 0x | All images identical; overdraw 1.8 (shadows) and 1.1 (lights) on both | Within one level | Within two levels |
+| 4x | All images identical; the same overdraw | Within one level | 1 scene pixel (5 levels) and 20 weapon pixels (8) differ |
+
+Restart and restore recover exactly on both backends. The 4x lit-edge
+differences remain with `r_msaaAlphaToCoverage 0`, so they are not
+alpha-to-coverage patterns; they stay open with the other multisampled
+geometry-edge differences. The weapon cases skip specular: lit with specular,
+eight highlight pixels on the gun differ by three levels at 0x, which belongs
+to lighting parity rather than the depth hack.
+
+The existing 34-case depth and intensity debug sequence still passes on both backends at 0x after this change, within one display level.
+
+Reports and engine images: `.tmp/vk-roadmap/nov6/stencil/`.
+
 ## Cubemap and write-failure qualification (3 November 2026)
 
 `TakeScreenshot` now checks the filesystem's written-byte count. A failed or

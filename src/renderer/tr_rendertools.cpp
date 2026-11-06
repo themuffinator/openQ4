@@ -3266,6 +3266,12 @@ void RB_RenderDebugTools( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 		backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
 
 
+	// The tools clip to the view and to each surface's scissor (as the
+	// original backend kept the test on). Earlier passes leave the test in
+	// either state, SMAA among them disabling it, so set it here; the Vulkan
+	// translation sees the same call. R_ColorByStencilBuffer turns it off.
+	glEnable( GL_SCISSOR_TEST );
+
 	RB_ShowLightCount();
 	RB_ShowShadowCount();
 	RB_ShowTexturePolarity( drawSurfs, numDrawSurfs );

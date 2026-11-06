@@ -1476,9 +1476,9 @@ void VK_DebugTools_PrintStencilReadback( const byte *stencil, int width, int hei
 
 // OpenGL's state at RB_RenderDebugTools: the view's projection, the world
 // modelview slot free, depth testing on, front-sided culling, texturing on.
-// The scissor test is off: the post passes ahead of the tools (SMAA among
-// them) leave GL_SCISSOR_TEST disabled after the first frame, so on OpenGL
-// the tools' glScissor calls never clip anything.
+// The scissor test starts off here only until RB_RenderDebugTools enables it:
+// the passes ahead of the tools leave GL_SCISSOR_TEST in either state (SMAA
+// disables it), so the shared tools set it themselves on both backends.
 static void VK_Debug_ResetState( const viewDef_t *viewDef ) {
 	memset( &vkDbg.state, 0, sizeof( vkDbg.state ) );
 	vkDbg.state.stateBits = GLS_DEFAULT;

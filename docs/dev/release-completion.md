@@ -17,6 +17,10 @@ See [player release status](../user/release-status.md).
   vertices place them at the same depth as on OpenGL.
 - `r_vkWindowViewMultisample 0` and `r_vkDepthClipControl 0` restore the
   previous behaviour for comparison.
+- The developer view `r_showShadowCount` now counts shadow volumes inside
+  each light's scissor on both renderers, as Doom 3 did, and shows and prints
+  the same counts on OpenGL and Vulkan. Before, the result depended on which
+  post effects were on.
 - Replace the engine and renderer modules together.
 - Evidence: [depth control](vulkan-material-programs.md#clip-space-depth-control-6-november-2026-vk-04)
   and [window-view multisampling](vulkan-captures.md#window-view-multisampling-6-november-2026).

@@ -628,7 +628,7 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel; OpenGL clip-space depth through `VK_EXT_depth_clip_control` removes the three stencil pixels. | The strict lighting image gate (one point-map and one projected-map shadow-filter pixel on NVIDIA, more on Intel) and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
 | VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures) pass on NVIDIA. | Remaining stencil/clipping combinations, Intel/other-vendor MSAA edge parity and bounded deferred resources across the broader matrix. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -864,6 +864,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
   `r_vkWindowViewMultisample 0`. Capture views stay single-sample, as on
   OpenGL. Intel's multisampled edges still differ from NVIDIA's OpenGL
   reference.
+  Progress, 6 November (stencil): the [stencil debug fixture](vulkan-captures.md#stencil-debug-views-and-the-weapon-depth-hack-6-november-2026)
+  found that the debug tools started with an undefined scissor test, so
+  `r_showShadowCount` counted different areas on each backend (overdraw 1.8 on
+  OpenGL, 3.9 on Vulkan). The tools now enable it themselves. Shadow- and
+  light-count images and their printed overdraw then match exactly at 0x and
+  4x, and the weapon depth hack's depth view is within one level. At 4x, lit
+  geometry edges still differ in up to 20 pixels, by up to 8 levels.
 
 ## Modern rendering engine
 
