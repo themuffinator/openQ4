@@ -213,8 +213,20 @@ overflows (`ClassicInteractionDomain.h`).
     - `production-fixed-multistage` uses a bumped specular grey set followed
       by a flat dark set, and matches to a mean of 0.25 and a maximum of
       0.62 levels.
-  - The corridor itself still runs only in the laboratory linear-scene mode
-    (step 3).
+  - **Step 3, display-referred frames.** The classic-lighting corridor no
+    longer needs the laboratory linear scene; it now needs only
+    `r_rendererModernQuality`.
+    - It accumulates classic light the way ARB2 writes its framebuffer, and
+      the forward pass passes that through unchanged in a display frame. It
+      decodes it only for the linear scene.
+    - Each class above has a `production-fixed*-display` control
+      (`r_pbrLinearScene 0`): flat, bumped, bumped cutout, vertex colour,
+      texture matrix, condition and multi-stage. Each is a fully composed
+      modern frame (`exec=1 composed=1`, the corridor executed), and each is
+      byte-identical to native ARB2 over the specimen. The cutout keeps its 5
+      bounded hole-edge pixels.
+    - The baked-grid and linear fog/blend corridors still require the linear
+      scene.
 
 ## What REN-02 has left, in dependency order
 
@@ -236,7 +248,8 @@ overflows (`ClassicInteractionDomain.h`).
    fails the whole proof as soon as any ambient light exists.
 3. **Run the corridors in shipped modes.** Lift the `r_pbrLinearScene` and
    `r_hdrToneMap` requirement so the classic-lighting, baked-grid and fog/blend
-   corridors also run in display-referred frames.
+   corridors also run in display-referred frames. The classic-lighting
+   corridor is done; baked grid and fog/blend remain.
 4. **Shadow receivers.** Represent stencil-fallback lights, which today decline
    the whole frame, and pool more than one point cube.
 5. **Reconcile the two ownership models.** The aggregate executor and the

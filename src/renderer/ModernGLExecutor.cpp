@@ -7064,7 +7064,11 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	rg_modernClassicView = NULL;
 	rg_modernClassicExecuted = false;
 	rg_modernClassicPrimitives.SetNum( 0, false );
-	if ( !stats.submitPlanReady || !R_ModernGLExecutor_PBRLinearSceneRequested() || stats.pipelineGBufferCommands != 0
+	// REN-02 step 3: the corridor accumulates classic light exactly as ARB2
+	// writes its framebuffer, and the forward pass passes it through unchanged
+	// in a display-referred frame (decoding it only for the linear scene), so
+	// it serves both modes.
+	if ( !stats.submitPlanReady || !r_rendererModernQuality.GetBool() || stats.pipelineGBufferCommands != 0
 			|| r_multiSamples.GetInteger() > 1 || r_shadows.GetBool() || !r_useScissor.GetBool()
 			|| r_enhancedMaterials.GetBool() || r_celShading.GetBool() || r_celShadingWorld.GetBool()
 			|| rg_modernClassicProgram == 0 || r_testARBProgram.GetBool() ) { return; }

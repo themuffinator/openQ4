@@ -270,6 +270,11 @@ CASES = {
 }
 for restart in ('partial','full'):
     CASES[f'skin-gpu-{restart}-restart']=dict(CASES['skin-gpu'])
+# REN-02 step 3: the classic-lighting corridor in a display-referred modern
+# frame (no laboratory linear scene), compared directly with native ARB2.
+DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage')
+for kind in DISPLAY_CORRIDOR_KINDS:
+    CASES[f'production-fixed{kind}-display'] = {**CASES[f'production-fixed{kind}'], 'r_pbrLinearScene': '0'}
 # Mixed-material model (REN-05): one skinned mesh, PBR above its equator and
 # classic below, on CPU skinning and packed MD5R.
 for backend in ('cpu','md5r'):
@@ -1502,6 +1507,28 @@ def compare_material_captures(results: list[dict]) -> None:
             modern['failures'].append('classic reference is clipped or lacks a useful lighting range')
         if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
             modern['failures'].append('classic interaction differs from the native lighting reference')
+    for kind in DISPLAY_CORRIDOR_KINDS:
+        case=f'production-fixed{kind}-display'; native_case=f'production-fixed{kind}-native'
+        if case not in by_case or native_case not in by_case: continue
+        a,b=(capture_rgb(Path(by_case[name]['screenshot'])) for name in (case,native_case))
+        if not a or not b:
+            by_case[case]['failures'].append('display corridor comparison inputs missing'); continue
+        pixels=[(x,y) for y in range(296,385) for x in range(663,752) if (x-707)**2+(y-340)**2<44**2]
+        errors=[]; flips=0
+        for x,y in pixels:
+            pixel=[abs(a[(y*1280+x)*3+c]-b[(y*1280+x)*3+c]) for c in range(3)]
+            if max(pixel)>3 and 'cutout' in kind:
+                level=lambda px,py: sum(b[(py*1280+px)*3:(py*1280+px)*3+3])
+                if max(abs(level(x,y)-level(x+dx,y+dy)) for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)))>30:
+                    flips+=1; continue
+            errors+=pixel
+        proof={'meanAbsoluteByteError':sum(errors)/len(errors),'maximumByteError':max(errors),'edgeFlipPixels':flips,
+               'nativeRange':[min(b[(y*1280+x)*3+c] for x,y in pixels for c in range(3)),max(b[(y*1280+x)*3+c] for x,y in pixels for c in range(3))]}
+        by_case[case]['classicDisplayComparison']=proof
+        if flips>CUTOUT_EDGE_FLIP_PIXELS:
+            by_case[case]['failures'].append(f'{flips} cutout edge pixels differ in the display frame')
+        if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
+            by_case[case]['failures'].append('display-referred classic corridor differs from native ARB2')
     for left,right,label in (('production-fixed','production-fixed-diffuse','specular'),
                              ('production-fixed-bump','production-fixed','normal'),
                              ('production-fixed-colored','production-fixed-bump','colored specular'),
@@ -1938,6 +1965,8 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         if state.get('linearScene')!=('1' if linear_expected else '0'):
             failures.append('extreme emission was not composed in the committed linear HDR scene' if linear_expected
                             else 'extreme emission entered a linear scene the case did not request')
+    if ( case.endswith('-display') and case.startswith('production-fixed') ) and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
+        failures.append('the display-referred frame did not run the classic-lighting corridor')
     if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('classic compatibility lighting was not submitted')
     if case.startswith('production-fixed-msaa') and not re.search(r'Renderer AA: MSAA requested=4 effective=4\b',text):
