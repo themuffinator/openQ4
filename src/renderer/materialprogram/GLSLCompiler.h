@@ -30,6 +30,8 @@ struct UniformBlock {
     std::array<float, 16> modelViewProjectionVulkan;
     // x: one bit per texture slot whose image stores rows top-down (Vulkan
     // render targets); authored 2D coordinates are flipped for those images.
+    // y: 1 when the pipeline clips depth in OpenGL's [-w, w] range, so a
+    // displaced authored position keeps its OpenGL clip depth unchanged.
     std::array<float, 4> textureOrientation;
 };
 static_assert(sizeof(UniformBlock) == 1328, "material uniform std140 ABI");

@@ -36,6 +36,8 @@ struct vkDeviceSelection_t {
 	// consults a second, separately bounded lookup.
 	bool hasPortabilitySubset;
 	bool hasSampleLocations;
+	// VK_EXT_depth_clip_control (r_vkDepthClipControl)
+	bool hasDepthClipControl;
 	// VK_KHR_present_id and VK_KHR_present_wait (r_vkPresentTiming)
 	bool hasPresentId;
 	bool hasPresentWait;

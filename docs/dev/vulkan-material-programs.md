@@ -576,6 +576,47 @@ and `descriptor-comparison-{nvidia,intel}/`. This closes the descriptor-driver
 failure subpoint only. It does not cover broader authored lighting, mod
 content or the strict lighting image gate.
 
+## Clip-space depth control (6 November 2026, VK-04)
+
+OpenGL clips depth to [-w, w] and stores z/2w + 1/2 in the depth buffer.
+Vulkan's default clip range is [0, w], so the backend remapped every matrix it
+submitted on the CPU (`VK_FixupClipSpaceZ`), and an authored vertex shader
+that moves the position remapped it in the generated shader. Those products
+round differently from OpenGL's. In the strict lighting comparison that left
+three point-stencil background pixels failing by up to 30 levels.
+
+When the device offers `VK_EXT_depth_clip_control`, every graphics pipeline
+now clips in OpenGL's range (`negativeOneToOne`), matrices pass through
+unchanged and depth rounds as on OpenGL. The CPU-built point-shadow depth row
+follows the same convention. A displaced authored position keeps its OpenGL
+depth: the generated vertex shader skips its own remap while the uniform
+block's `textureOrientation.y` is 1. `r_vkDepthClipControl 0` (read when the
+device is created) keeps the remap for comparison. The log prints
+`Vulkan: clip-space depth [-1, 1] (VK_EXT_depth_clip_control)`, or
+`[0, 1] (remapped projections)` without it. Both qualification adapters (RTX
+4060 Laptop, NVIDIA 591.74; Iris Xe, Intel 101.5590) expose the extension.
+
+Results on `e5ad574d4` with this change, validation enabled and no
+validation messages:
+
+- Lighting: all 26 independent controls pass on each backend. On NVIDIA the
+  three stencil pixels are gone; one point-map pixel (maximum three levels)
+  and one projected-map pixel (maximum four) remain. They are single
+  shadow-filter taps at near-edge receivers and are identical with
+  `r_vkDepthClipControl 0`, so they do not come from the depth convention.
+  Intel differs from the NVIDIA GL reference in one stencil pixel (30) and
+  nine point-map and eight projected-map pixels (at most four). The strict
+  full-frame gate stays failed.
+- The first run of the authored laboratories exposed the double remap above:
+  `authored-glsl-offset` differed in 14,185 pixels by up to 174 levels and
+  `authored-reload-vertex_edit` failed too. With the shader fix, authored
+  GLSL (20 controls), live reload and repair (16) and translated ARB (15) all
+  pass within one display level.
+- The view, tiled and image capture sequences are unchanged by it.
+- The 29-map stock single-player sweep (OpenGL, NVIDIA and Intel Vulkan, Balanced preset with 2x MSAA, validation on) passes 84 of 87 runs and all 58 warning comparisons. The two failures are `mcc_2` captures on Vulkan taken 120 frames in, which land on the map's scripted fade to black. At 240 and 600 frames both renderers pass, and an older build failed the same capture on OpenGL instead.
+
+Reports and engine images: `.tmp/vk-roadmap/nov6/depthclip/`.
+
 ## Dependency provenance
 
 [glslang 16.6.0](https://github.com/KhronosGroup/glslang/tree/16.6.0) is pinned by

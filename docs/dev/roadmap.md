@@ -625,10 +625,10 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-01 — Partial | Windows x64 NVIDIA/Intel support; qualification runner records real presentation versus hidden/benchmark scope. | Physical AMD, Linux and MoltenVK SP/MP; device/surface loss, restart, long sessions beyond the Windows NVIDIA/Intel five-cycle soak, and exact-package budgets. |
 | VK-02 — Partial | Six controlled foreground samples pass the declared 28 ms presentation p99 budget on NVIDIA/Intel; failed diagnostic repeats remain retained. | Physical direct/hybrid routing, other power conditions and the broader exact-package pacing matrix. |
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
-| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel. | The unchanged strict five-pixel image failure and broader authored-lighting/mod content. |
+| VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel; OpenGL clip-space depth through `VK_EXT_depth_clip_control` removes the three stencil pixels. | The strict lighting image gate (one point-map and one projected-map shadow-filter pixel on NVIDIA, more on Intel) and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
 | VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views and cropped `envshot` faces pass. | Multisampling of views drawn straight to the window (GUI `renderDef`, remote captures inside an `envshot`), remaining stencil/clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures) pass on NVIDIA. | Remaining stencil/clipping combinations, Intel/other-vendor MSAA edge parity and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -736,6 +736,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
   Reload and restart with and without the drill recover exactly; all sixteen
   GL/Vulkan pairs are within one display level. The descriptor-driver subpoint
   is closed. Broader lighting/mod content and the strict lighting gate remain.
+  Progress, 6 November (depth): [clip-space depth control](vulkan-material-programs.md#clip-space-depth-control-6-november-2026-vk-04)
+  makes Vulkan clip and round depth as OpenGL does where `VK_EXT_depth_clip_control`
+  exists (NVIDIA and Intel here). The three point-stencil pixels of the strict
+  lighting comparison are gone on NVIDIA. One point-map and one projected-map
+  shadow-filter pixel remain, unchanged by the convention, so the gate stays
+  failed. The change exposed and fixed a second depth remap in displaced
+  authored vertex shaders; all three authored laboratories pass again.
 - [ ] **VK-05 — P1, implementation and qualification: internal HDR and complex
   view composition.** Extend complete-scene admission for remaining baked/material,
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
@@ -850,6 +857,13 @@ and untested drivers remain open, with no tolerance or support-tier change.
   multisample views drawn straight to the window, as OpenGL's 4x MSAA window
   does: GUI `renderDef` edges (112 pixels, at most 11 levels) and a remote
   capture inside an `envshot` face (113 edge pixels).
+  Progress, 6 November (MSAA): [window-view multisampling](vulkan-captures.md#window-view-multisampling-6-november-2026)
+  renders those views into a seeded, window-sized multisampled target in the
+  swapchain's row order and copies their rectangle back. On NVIDIA the whole
+  view sequence now passes, both differences included, and they return with
+  `r_vkWindowViewMultisample 0`. Capture views stay single-sample, as on
+  OpenGL. Intel's multisampled edges still differ from NVIDIA's OpenGL
+  reference.
 
 ## Modern rendering engine
 

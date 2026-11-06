@@ -116,6 +116,7 @@ VkResult CheckCandidate( const vkDeviceSelectionApi_t &api, VkSurfaceKHR surface
 		if ( std::strcmp( extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME ) == 0 ) { swapchain = true; }
 		if ( std::strcmp( extension.extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME ) == 0 ) { candidate.hasPortabilitySubset = true; }
 		if ( std::strcmp( extension.extensionName, VK_EXT_SAMPLE_LOCATIONS_EXTENSION_NAME ) == 0 ) { candidate.hasSampleLocations = true; }
+		if ( std::strcmp( extension.extensionName, VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME ) == 0 ) { candidate.hasDepthClipControl = true; }
 		if ( std::strcmp( extension.extensionName, VK_KHR_PRESENT_ID_EXTENSION_NAME ) == 0 ) { candidate.hasPresentId = true; }
 		if ( std::strcmp( extension.extensionName, VK_KHR_PRESENT_WAIT_EXTENSION_NAME ) == 0 ) { candidate.hasPresentWait = true; }
 	}

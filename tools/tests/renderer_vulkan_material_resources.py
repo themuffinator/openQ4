@@ -41,7 +41,7 @@ struct Common {
     }
     void Printf(const char *,...) {}
 } commonStore, *common=&commonStore;
-struct { VkDevice device=VK_NULL_HANDLE; VkPhysicalDeviceProperties deviceProperties={}; } vkCtx;
+struct { VkDevice device=VK_NULL_HANDLE; VkPhysicalDeviceProperties deviceProperties={}; bool depthClipNegativeOneToOne=false; } vkCtx;
 struct { bool GetBool() const { return true; } } r_vkResourceProfile;
 struct { int value=0; int GetInteger() const { return value; } } r_vkMaterialDescriptorPoolTest;
 struct { uint64_t ringBytes=0, ringAllocations=0; } vkResourceProfile;

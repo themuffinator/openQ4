@@ -82,6 +82,8 @@ static idCVar r_vkCopyResolveScratchReference( "r_vkCopyResolveScratchReference"
 	"resolve color captures through an intermediate image even when no conversion is needed" );
 static idCVar r_vkResourceProfile( "r_vkResourceProfile", "0", CVAR_RENDERER | CVAR_BOOL,
 	"count executor resource operations for rendererVulkanMemoryInfo; reset its interval with rendererVulkanMemoryInfo reset" );
+static idCVar r_vkWindowViewMultisample( "r_vkWindowViewMultisample", "1", CVAR_RENDERER | CVAR_BOOL,
+	"multisample 3D views drawn straight to the window (GUI renderDef windows, captures smaller than the window) at r_multiSamples, as OpenGL's multisampled window does" );
 
 // Opt-in operation counts, not timings. No GPU query, readback or wait is
 // introduced. These cover this executor only, not upload/shadow command buffers.
@@ -129,6 +131,9 @@ int VK_Exec_InteractionUniformAlloc( const void *data, int bytes );
 static bool VK_TemporalPresentation_DrawPendingSceneSpatial(
 	const viewDef_t *viewDef, idImage *sceneImage, vkImageEntry_t *sceneEntry,
 	idImage *depthImage, vkImageEntry_t *depthEntry );
+struct vkSceneScaleState_s;
+static bool VK_WindowView_Begin( const viewDef_t *viewDef, struct vkSceneScaleState_s &state );
+static void VK_WindowView_End( struct vkSceneScaleState_s &state );
 static bool VK_TemporalPresentation_ResolveTargets(
 	const resolveTemporalPresentationCommand_t &sourceCommand,
 	bool trackExternalHistory, bool *historyAdvanced );
@@ -577,6 +582,19 @@ typedef struct vkGuiExecutor_s {
 	const viewDef_t *	temporalSceneRoot;
 	bool				temporalScenePendingComposite;
 	bool				temporalSceneAllocationWarned;
+	// Multisampled stand-in for the window while a 3D view that would draw
+	// straight to it renders (VK_WindowView_Begin), and its single-sample
+	// resolve, which also stages the window pixels that seed it.
+	idImage *			windowViewColorImage;
+	idImage *			windowViewDepthImage;
+	idRenderTexture *	windowViewRenderTexture;
+	idImage *			windowViewResolveColorImage;
+	idImage *			windowViewResolveDepthImage;
+	idRenderTexture *	windowViewResolveRenderTexture;
+	int					windowViewWidth;
+	int					windowViewHeight;
+	int					windowViewSamples;
+	bool				windowViewWarned;
 	idImage *			temporalDirectHistoryImages[ 2 ];
 	idRenderTexture *	temporalDirectHistoryRenderTextures[ 2 ];
 	unsigned long long temporalDirectHistoryStorageGenerations[ 2 ];
@@ -640,6 +658,8 @@ typedef struct vkSceneScaleState_s {
 	bool			active;
 	bool			backendOwned;
 	bool			projectionRecentered;
+	bool			windowMultisample;	// VK_WindowView_Begin owns the target
+	int			windowRect[ 4 ];	// x, GL y, width, height
 	const viewDef_t *rootView;
 	int			nativeWidth;
 	int			nativeHeight;
@@ -676,7 +696,10 @@ static vkSharedGeometryCheckpoint_t vkSharedGeometryCheckpoint;
 // Image attachments retain the canonical GL window origin. Presentation
 // to the top-down swapchain normalizes the stored image at its consumer.
 bool VK_Exec_ActiveLowerOrigin() {
-	return vkExec.activeRenderTexture != NULL;
+	// The window-view target stands in for the window, so it keeps the
+	// swapchain's top-down rows (VK_WindowView_Begin).
+	return vkExec.activeRenderTexture != NULL
+		&& vkExec.activeRenderTexture != vkExec.windowViewRenderTexture;
 }
 
 VkFrontFace VK_Exec_CanonicalFrontFace() {
@@ -740,6 +763,13 @@ world passes. Column-major float[16]: row2 = elements 2,6,10,14.
 ====================
 */
 void VK_FixupClipSpaceZ( float dst[ 16 ], const float src[ 16 ] ) {
+	if ( vkCtx.depthClipNegativeOneToOne ) {
+		// every pipeline clips GL-convention z (VK_Exec_CreatePipeline)
+		if ( dst != src ) {
+			memcpy( dst, src, 16 * sizeof( float ) );
+		}
+		return;
+	}
 	RendererContracts_ConvertClipMatrix( dst, src,
 		RendererContracts_GLClipSpace(), RendererContracts_VulkanClipSpace() );
 }
@@ -964,6 +994,13 @@ static VkPipeline VK_Exec_CreatePipeline( VkShaderModule vertModule, VkShaderMod
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewportState.viewportCount = 1;
 	viewportState.scissorCount = 1;
+	VkPipelineViewportDepthClipControlCreateInfoEXT depthClipControl;
+	memset( &depthClipControl, 0, sizeof( depthClipControl ) );
+	depthClipControl.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_DEPTH_CLIP_CONTROL_CREATE_INFO_EXT;
+	depthClipControl.negativeOneToOne = VK_TRUE;
+	if ( vkCtx.depthClipNegativeOneToOne ) {
+		viewportState.pNext = &depthClipControl;
+	}
 
 	VkPipelineRasterizationStateCreateInfo raster;
 	memset( &raster, 0, sizeof( raster ) );
@@ -3732,6 +3769,17 @@ void VK_GuiExecutor_Shutdown( void ) {
 	vkExec.temporalSceneResolveRenderTexture = NULL;
 	vkExec.temporalSceneResolveColorImage = NULL;
 	vkExec.temporalSceneResolveDepthImage = NULL;
+	delete vkExec.windowViewRenderTexture;
+	vkExec.windowViewRenderTexture = NULL;
+	delete vkExec.windowViewResolveRenderTexture;
+	vkExec.windowViewResolveRenderTexture = NULL;
+	vkExec.windowViewColorImage = NULL;
+	vkExec.windowViewDepthImage = NULL;
+	vkExec.windowViewResolveColorImage = NULL;
+	vkExec.windowViewResolveDepthImage = NULL;
+	vkExec.windowViewWidth = 0;
+	vkExec.windowViewHeight = 0;
+	vkExec.windowViewSamples = 0;
 	if ( vkCtx.device == VK_NULL_HANDLE ) {
 		memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) );
 		memset( &vkExec, 0, sizeof( vkExec ) );
@@ -4860,6 +4908,8 @@ static void VK_TemporalPresentation_ClearScaleState( vkSceneScaleState_t &state 
 	state.active = false;
 	state.backendOwned = false;
 	state.projectionRecentered = false;
+	state.windowMultisample = false;
+	memset( state.windowRect, 0, sizeof( state.windowRect ) );
 	state.rootView = NULL;
 	state.nativeWidth = 0;
 	state.nativeHeight = 0;
@@ -5928,6 +5978,7 @@ static bool VK_TemporalPresentation_BeginView( const viewDef_t *viewDef,
 static void VK_TemporalPresentation_EndView( const viewDef_t *viewDef,
 		vkSceneScaleState_t &scaleState, bool depthComplete ) {
 	VK_TemporalPresentation_RestoreDirectProjection( scaleState, viewDef );
+	VK_WindowView_End( scaleState );
 	if ( !scaleState.active ) {
 		return;
 	}
@@ -9449,6 +9500,232 @@ static bool VK_TemporalPresentation_DrawResolvedColorToSwap(
 	}
 	return VK_TemporalPresentation_DrawResolve( NULL,
 		resolvedImage, resolvedEntry, NULL, NULL, NULL, NULL, block );
+}
+
+/*
+====================
+Window-view multisampling
+
+OpenGL creates its window with r_multiSamples samples, so every 3D view it
+draws straight to the window is antialiased: GUI renderDef windows, and
+engine captures smaller than the window (envshot faces and the remote
+cameras inside them). The swapchain is single-sample, and only the game's
+scene target carries MSAA. A view that would draw straight to the window
+therefore renders into a window-sized multisampled target instead. Its
+rectangle is first seeded with the window's pixels, because a 3D view clears
+only depth and draws over what the GUI put there. Afterwards the target is
+resolved and only that rectangle is copied back. Any refusal leaves the view
+native, exactly as before.
+
+The target keeps the swapchain's top-down rows and viewport, not the
+lower-origin convention of other offscreen targets. OpenGL's window stores
+rows top-down too, so its samples sit mirrored relative to a lower-origin
+target, and edge coverage only matches in the window's own convention.
+Scene views (a capture's own view and the portal-sky/subview contributors
+that share it) are left out: OpenGL renders a capture smaller than the
+window single-sample, and full-window scenes already use the scene target.
+====================
+*/
+static bool VK_WindowView_Refuse( const char *reason ) {
+	if ( !vkExec.windowViewWarned ) {
+		vkExec.windowViewWarned = true;
+		common->Warning( "Vulkan: window view multisampling unavailable (%s); drawing the view single-sample", reason );
+	}
+	return false;
+}
+
+static bool VK_WindowView_EnsureTargets( int width, int height, int samples ) {
+	if ( vkExec.windowViewRenderTexture != NULL && vkExec.windowViewResolveRenderTexture != NULL
+			&& vkExec.windowViewWidth == width && vkExec.windowViewHeight == height
+			&& vkExec.windowViewSamples == samples ) {
+		return true;
+	}
+	vkExec.windowViewWidth = 0;
+	vkExec.windowViewHeight = 0;
+	vkExec.windowViewSamples = 0;
+	if ( !VK_TemporalPresentation_AllocateSceneTarget( vkExec.windowViewColorImage,
+				vkExec.windowViewDepthImage, vkExec.windowViewRenderTexture,
+				"_vkWindowViewColor", "_vkWindowViewDepth", FMT_RGBA8, width, height, samples )
+			|| !VK_TemporalPresentation_AllocateSceneTarget( vkExec.windowViewResolveColorImage,
+				vkExec.windowViewResolveDepthImage, vkExec.windowViewResolveRenderTexture,
+				"_vkWindowViewResolveColor", "_vkWindowViewResolveDepth", FMT_RGBA8, width, height, 0 ) ) {
+		return VK_WindowView_Refuse( "allocation failed" );
+	}
+	if ( vkExec.windowViewColorImage->GetOpts().numMSAASamples <= 1 ) {
+		return VK_WindowView_Refuse( "no multisampled colour target" );
+	}
+	if ( vkExec.windowViewRenderTexture->GetWidth() != width
+			|| vkExec.windowViewRenderTexture->GetHeight() != height
+			|| vkExec.windowViewResolveRenderTexture->GetWidth() != width
+			|| vkExec.windowViewResolveRenderTexture->GetHeight() != height ) {
+		return VK_WindowView_Refuse( "target size mismatch" );
+	}
+	vkExec.windowViewRenderTexture->SetDebugLabel( "Vulkan window view (multisampled)" );
+	vkExec.windowViewResolveRenderTexture->SetDebugLabel( "Vulkan window view resolve" );
+	vkExec.windowViewWidth = width;
+	vkExec.windowViewHeight = height;
+	vkExec.windowViewSamples = samples;
+	return true;
+}
+
+static bool VK_WindowView_Begin( const viewDef_t *viewDef, vkSceneScaleState_t &state ) {
+	state.windowMultisample = false;
+	const int samples = r_multiSamples.GetInteger();
+	if ( !r_vkWindowViewMultisample.GetBool() || samples <= 1 || viewDef == NULL
+			|| !vkExec.frameOpen || state.active
+			|| backEnd.renderTexture != NULL || vkExec.activeRenderTexture != NULL
+			|| vkExec.temporalScenePendingComposite ) {
+		return false;
+	}
+	// The HDR scene path owns its own targets and composites to the window.
+	if ( VK_HDRScene_Requested() || VK_HDRScene_PreviewRequested( viewDef )
+			|| VK_TemporalPresentation_RootForView( viewDef ) != NULL ) {
+		return false;
+	}
+	const int width = (int)vkCtx.swapchainExtent.width;
+	const int height = (int)vkCtx.swapchainExtent.height;
+	const int x = viewDef->viewport.x1;
+	const int y = viewDef->viewport.y1;
+	const int w = viewDef->viewport.x2 - viewDef->viewport.x1 + 1;
+	const int h = viewDef->viewport.y2 - viewDef->viewport.y1 + 1;
+	// Tiles of a capture larger than the window are offset outside it.
+	if ( width <= 0 || height <= 0 || w <= 0 || h <= 0 || x < 0 || y < 0
+			|| x + w > width || y + h > height ) {
+		return false;
+	}
+	if ( !vkCtx.offscreenFrames && !vkCtx.swapchainTransferSrc ) {
+		return VK_WindowView_Refuse( "the window cannot be read" );
+	}
+	if ( vkExec.temporalResolveVertModule == VK_NULL_HANDLE
+			|| vkExec.temporalResolveFragModule == VK_NULL_HANDLE ) {
+		return VK_WindowView_Refuse( "no copy shader" );
+	}
+	VkFilter filter = VK_FILTER_NEAREST;
+	if ( !VK_TemporalPresentation_BlitSupported( vkCtx.swapchainFormat, filter )
+			|| !VK_WindowView_EnsureTargets( width, height, samples ) ) {
+		return false;
+	}
+	vkImageEntry_t *staging = NULL;
+	vkImageEntry_t *stagingDepth = NULL;
+	if ( !VK_Exec_RenderTextureEntries( vkExec.windowViewResolveRenderTexture, staging, stagingDepth )
+			|| staging == NULL || staging->samples != VK_SAMPLE_COUNT_1_BIT
+			|| ( staging->usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT ) == 0
+			|| ( staging->usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) == 0
+			|| ( staging->usage & VK_IMAGE_USAGE_SAMPLED_BIT ) == 0
+			|| !VK_TemporalPresentation_BlitSupported( staging->format, filter ) ) {
+		return VK_WindowView_Refuse( "unsupported staging image" );
+	}
+
+	// Stage the window's pixels under the view, in the window's top-down rows.
+	const int top = height - ( y + h );
+	VK_Exec_EndMainRendering();
+	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+	VK_Exec_TransitionImage( staging, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+	VkImageBlit region;
+	memset( &region, 0, sizeof( region ) );
+	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.srcSubresource.layerCount = 1;
+	region.srcOffsets[0].x = x;
+	region.srcOffsets[0].y = top;
+	region.srcOffsets[1].x = x + w;
+	region.srcOffsets[1].y = top + h;
+	region.srcOffsets[1].z = 1;
+	region.dstSubresource = region.srcSubresource;
+	region.dstOffsets[0] = region.srcOffsets[0];
+	region.dstOffsets[1] = region.srcOffsets[1];
+	vkCmdBlitImage( vkExec.cmd, vkExec.frameImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		staging->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, filter );
+	staging->everUploaded = true;
+	// top-down rows, which the copy pass writes unchanged
+	staging->materialSampleFlipY = true;
+	VK_Exec_TransitionImage( staging, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	if ( !VK_Exec_BeginMainRendering( false ) ) {
+		return VK_WindowView_Refuse( "rendering did not resume" );
+	}
+
+	// Seed every sample of the multisampled target with those pixels.
+	resolveTemporalPresentationCommand_t command;
+	memset( &command, 0, sizeof( command ) );
+	command.reactiveScale = 1.0f;
+	vkTemporalResolveBlock_t block;
+	VK_TemporalPresentation_FillResolveBlock( command, width, height,
+		false, false, false, 0, block );
+	if ( !VK_TemporalPresentation_DrawResolve( vkExec.windowViewRenderTexture,
+			vkExec.windowViewResolveRenderTexture->GetColorImage( 0 ), staging,
+			NULL, NULL, NULL, NULL, block ) ) {
+		(void)VK_Exec_SetRenderTarget( NULL );
+		return VK_WindowView_Refuse( "seeding failed" );
+	}
+	state.windowMultisample = true;
+	state.windowRect[0] = x;
+	state.windowRect[1] = y;
+	state.windowRect[2] = w;
+	state.windowRect[3] = h;
+	return true;
+}
+
+static void VK_WindowView_End( vkSceneScaleState_t &state ) {
+	if ( !state.windowMultisample ) {
+		return;
+	}
+	state.windowMultisample = false;
+	if ( !vkExec.frameOpen || vkExec.windowViewRenderTexture == NULL
+			|| vkExec.windowViewResolveRenderTexture == NULL ) {
+		return;
+	}
+	vkImageEntry_t *resolved = NULL;
+	vkImageEntry_t *resolvedDepth = NULL;
+	const bool resolvedOk = VK_Exec_ResolveRenderTargets( vkExec.windowViewRenderTexture,
+			vkExec.windowViewResolveRenderTexture, false )
+		&& VK_Exec_RenderTextureEntries( vkExec.windowViewResolveRenderTexture, resolved, resolvedDepth )
+		&& resolved != NULL && ( resolved->usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) != 0;
+	if ( !VK_Exec_SetRenderTarget( NULL ) ) {
+		return;
+	}
+	if ( !resolvedOk ) {
+		(void)VK_WindowView_Refuse( "resolve failed" );
+		return;
+	}
+	const int x = state.windowRect[0];
+	const int y = state.windowRect[1];
+	const int w = state.windowRect[2];
+	const int h = state.windowRect[3];
+	const int height = (int)vkCtx.swapchainExtent.height;
+	const int top = height - ( y + h );
+	VK_Exec_EndMainRendering();
+	VK_Exec_TransitionImage( resolved, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+	VkImageBlit region;
+	memset( &region, 0, sizeof( region ) );
+	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.srcSubresource.layerCount = 1;
+	region.srcOffsets[0].x = x;
+	region.srcOffsets[1].x = x + w;
+	if ( resolved->materialSampleFlipY ) {
+		region.srcOffsets[0].y = top;
+		region.srcOffsets[1].y = top + h;
+	} else {
+		// lower-origin rows: the blit turns them back into the window's
+		region.srcOffsets[0].y = y + h;
+		region.srcOffsets[1].y = y;
+	}
+	region.srcOffsets[1].z = 1;
+	region.dstSubresource = region.srcSubresource;
+	region.dstOffsets[0].x = x;
+	region.dstOffsets[0].y = top;
+	region.dstOffsets[1].x = x + w;
+	region.dstOffsets[1].y = top + h;
+	region.dstOffsets[1].z = 1;
+	vkCmdBlitImage( vkExec.cmd, resolved->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vkExec.frameImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_NEAREST );
+	VK_Exec_TransitionImage( resolved, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	(void)VK_Exec_BeginMainRendering( false );
 }
 
 static bool VK_TemporalPresentation_BlitColorToSwap(
@@ -14760,6 +15037,9 @@ void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef ) {
 	if ( !VK_TemporalPresentation_BeginView( viewDef, sceneScaleState ) ) {
 		VK_TemporalPresentation_RecenterDirectProjection(
 			sceneScaleState, viewDef );
+		// A view left on the single-sample window still gets the window's
+		// multisampling, as on OpenGL; a refusal keeps it native.
+		(void)VK_WindowView_Begin( viewDef, sceneScaleState );
 	}
 	const int fbHeight = VK_Exec_ActiveFramebufferHeight();
 	const int fbWidth = VK_Exec_ActiveFramebufferWidth();

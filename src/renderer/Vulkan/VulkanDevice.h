@@ -112,6 +112,11 @@ typedef struct vkDeviceContext_s {
 	// All multisample pipelines and depth-image transitions use the same pattern.
 	VkSampleCountFlags sampleLocationCounts;
 	bool				depthClampSupported;
+	// Clip-space z follows OpenGL's [-w, w] in hardware
+	// (VK_EXT_depth_clip_control negativeOneToOne on every graphics pipeline):
+	// projections are then used unmodified, and window depth rounds exactly as
+	// glDepthRange(0, 1) does. Fixed for the device lifetime.
+	bool				depthClipNegativeOneToOne;
 	bool				depthBoundsSupported;
 	// Opt-in diagnostic feature, fixed for the device lifetime.
 	bool				pipelineStatisticsEnabled;

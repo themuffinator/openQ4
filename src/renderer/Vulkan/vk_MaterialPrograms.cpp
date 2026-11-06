@@ -626,6 +626,7 @@ bool BindProgram( Program *program, idImage *const images[oq4material::MaxTextur
     }
     oq4material::UniformBlock block = uniforms;
     block.textureOrientation[0] = static_cast<float>( flipMask );
+    block.textureOrientation[1] = vkCtx.depthClipNegativeOneToOne ? 1.0f : 0.0f;
     VkPipeline pipeline = VK_Exec_AuthoredMaterialPipeline( program->identity,
         program->vertex, program->fragment, pipelineLayout, stateBits, separateColor, program->compiled.vertexInputMask );
     if ( pipeline == VK_NULL_HANDLE && ReclaimPipelineCapacity() ) {

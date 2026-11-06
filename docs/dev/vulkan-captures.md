@@ -69,7 +69,8 @@ GL and Vulkan intensity/depth tools now cover the active viewport, and stencil
 statistics use the attachment extent. Legacy cropped, offset and nested
 viewports now have GPU comparisons (see
 [Nested, cropped and offset views](#nested-cropped-and-offset-views-6-november-2026));
-the multisampled-edge differences recorded there stay open. Setting `r_resolutionScaleMode 0` alone
+their multisampled-edge differences are fixed by
+[window-view multisampling](#window-view-multisampling-6-november-2026). Setting `r_resolutionScaleMode 0` alone
 does not exercise that path when the game owns a resampled scene target.
 Vulkan's general `glReadPixels` shim always reads the frame image, not a bound
 render target as GL does. Arbitrary
@@ -181,7 +182,7 @@ Two comparisons failed on `b430a18f`:
   differs in 113 pixels, all on the edges of the remote image shown on the
   screen: in this path OpenGL's capture of that view is antialiased and
   Vulkan's is not. This is the same multisampling difference as the next
-  item. The two existing larger-than-window checks against
+  item, and has the same fix. The two existing larger-than-window checks against
   `glConfig.vidWidth` (`PushSceneResolutionScale` for the ES modes and
   `PresentScaledScene`) compare the capture with itself for the same reason,
   so they never refuse. They are recorded here, not changed.
@@ -191,11 +192,61 @@ Two comparisons failed on `b430a18f`:
   (`actualSamples=4` in the log), so whatever it draws straight to the window,
   GUI 3D windows included, is multisampled. Vulkan's swapchain image is
   single-sample, and only the game's scene target carries MSAA. Matching it
-  needs a multisampled target and resolve for GUI 3D views; this remains an
-  open VK-07 difference.
+  needs a multisampled target and resolve for GUI 3D views. Fixed by
+  [window-view multisampling](#window-view-multisampling-6-november-2026).
 
 Reports and engine images: `.tmp/vk-roadmap/nov6/view-{gl,nvidia,intel}/` and
 `view-comparison*/`; the crop-fix repeat is in `envcrop/`.
+
+## Window-view multisampling (6 November 2026)
+
+OpenGL creates its window with `r_multiSamples` samples, so whatever it draws
+straight to the window is multisampled: GUI `renderDef` windows, and remote
+camera, mirror and other capture-backed subviews before they are copied into
+their textures. The Vulkan swapchain is single-sample, and only the game's
+scene target carried MSAA, so those views were aliased: the two differences
+recorded under [nested, cropped and offset views](#nested-cropped-and-offset-views-6-november-2026).
+
+With `r_multiSamples` above 1, a 3D view that would draw straight to the
+window now renders into a window-sized multisampled target. The view's
+rectangle is first seeded with the window's pixels, because a 3D view clears
+only depth. The target is then resolved with the same box average as other
+Vulkan targets, and only that rectangle is copied back.
+
+- **Row order.** The target keeps the swapchain's top-down rows, not the
+  lower-origin convention of other offscreen targets. A lower-origin first
+  version still differed in 54 GUI edge pixels (up to six levels): OpenGL's
+  window also stores rows top-down, so its sample positions sit mirrored
+  relative to a lower-origin target.
+- **Scene views are left out.** Full-window scenes already use the scene
+  target, and OpenGL draws a capture's own view (an `envshot` face)
+  single-sample. Multisampling it made the face's directly seen specimen
+  differ in 168 edge pixels (up to 128 levels) where OpenGL is aliased.
+  Portal-sky and `SS_SUBVIEW` contributors follow their scene.
+- **Native fallbacks.** The HDR scene path, capture tiles outside the window
+  and a window the backend cannot read keep the single-sample path, as does
+  `r_vkWindowViewMultisample 0`.
+- **Cost.** Each such view adds one rectangle copy, one seed draw over the
+  target, one resolve and one rectangle copy back. The targets are allocated
+  on first use: about 41 MB at 1280x800 with 4x MSAA.
+
+Results on `e5ad574d4` with this change, validation enabled and no
+validation messages:
+
+- NVIDIA 591.74: every image and cube face of the view sequence passes.
+  `offset-gui` is within two levels (was 112 pixels, up to 11) and the
+  `envshot` face showing the remote image within one (was 113 pixels, up to
+  97). With `r_vkWindowViewMultisample 0` both old differences return
+  exactly. All 121 image-capture comparisons, including the 4x and 8x
+  cubemaps, stay within one level.
+- Intel 101.5590: the cube face passes and `offset-gui` differs from the
+  NVIDIA GL reference in 125 edge pixels by up to five levels. Its nested,
+  cropped and cube specimen-edge differences (420 pixels up to 96; about
+  2,800 up to 117) are byte-identical to the earlier Intel evidence: Intel's
+  multisampled scene edges against NVIDIA's OpenGL, not this path.
+- The 29-map stock single-player sweep (OpenGL, NVIDIA and Intel Vulkan, Balanced preset with 2x MSAA, validation on) passes 84 of 87 runs and all 58 warning comparisons. The two failures are `mcc_2` captures on Vulkan taken 120 frames in, which land on the map's scripted fade to black. At 240 and 600 frames both renderers pass, and an older build failed the same capture on OpenGL instead.
+
+Reports and engine images: `.tmp/vk-roadmap/nov6/windowview/`.
 
 ## Cubemap and write-failure qualification (3 November 2026)
 

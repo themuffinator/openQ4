@@ -6,6 +6,21 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Vulkan depth precision and antialiased GUI models, 6 November 2026
+
+- With MSAA on, Vulkan now antialiases 3D models shown inside menus and other
+  GUIs, and the pictures on live camera and mirror screens, as OpenGL always
+  has. Before, their edges were jagged on Vulkan only.
+- On graphics cards that support it (NVIDIA and Intel here), Vulkan now
+  handles depth the way OpenGL does. This removes a few single-pixel specks
+  at the edges of stencil shadows, and makes a shader mod that moves its
+  vertices place them at the same depth as on OpenGL.
+- `r_vkWindowViewMultisample 0` and `r_vkDepthClipControl 0` restore the
+  previous behaviour for comparison.
+- Replace the engine and renderer modules together.
+- Evidence: [depth control](vulkan-material-programs.md#clip-space-depth-control-6-november-2026-vk-04)
+  and [window-view multisampling](vulkan-captures.md#window-view-multisampling-6-november-2026).
+
 ## Motion blur, temporal AA in mirrors, and Vulkan screenshots, 6 November 2026
 
 - Motion blur now works while temporal AA is on, including automatic

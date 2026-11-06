@@ -401,6 +401,9 @@ void VK_Device_ServicePresentationRecovery( void ) {
 extern idCVar r_vkValidation;
 extern idCVar r_vkDevice;
 extern idCVar r_vkSampleLocations;
+static idCVar r_vkDepthClipControl( "r_vkDepthClipControl", "1", CVAR_RENDERER | CVAR_BOOL,
+	"clip-space depth in OpenGL's [-1, 1] convention through VK_EXT_depth_clip_control, so window depth rounds "
+	"as OpenGL's does; 0 remaps every projection's depth row instead. Applies when the device is created." );
 extern idCVar r_swapInterval;
 
 // Multisampled image attachments use GL window coordinates and a positive
@@ -1831,7 +1834,7 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 	// enabled when they advertise it, and their optional subset features read
 	// back through the chained feature struct. Native drivers advertise neither,
 	// and every portability capability then stays at its permissive default.
-	const char *deviceExtensions[ 5 ];
+	const char *deviceExtensions[ 6 ];
 	uint32_t deviceExtensionCount = 0;
 	deviceExtensions[ deviceExtensionCount++ ] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 	if ( r_vkSampleLocations.GetBool() && vkGetPhysicalDeviceMultisamplePropertiesEXT != NULL
@@ -1962,6 +1965,30 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 	// r_showShadows 1/3 draws the volumes as wireframe, like GLS_POLYMODE_LINE
 	features2.features.fillModeNonSolid = supported.fillModeNonSolid;
 	vkCtx.depthClampSupported = supported.depthClamp == VK_TRUE;
+
+	// OpenGL-convention clip depth in hardware. Remapping each projection's
+	// depth row reaches the same window depth but rounds differently, which
+	// flipped single shadow-boundary and depth-equal pixels against OpenGL.
+	VkPhysicalDeviceDepthClipControlFeaturesEXT depthClipFeatures;
+	memset( &depthClipFeatures, 0, sizeof( depthClipFeatures ) );
+	depthClipFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_CONTROL_FEATURES_EXT;
+	bool depthClipControl = false;
+	if ( r_vkDepthClipControl.GetBool() && selected.hasDepthClipControl ) {
+		VkPhysicalDeviceFeatures2 depthClipQuery;
+		memset( &depthClipQuery, 0, sizeof( depthClipQuery ) );
+		depthClipQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		depthClipQuery.pNext = &depthClipFeatures;
+		vkGetPhysicalDeviceFeatures2( vkCtx.physicalDevice, &depthClipQuery );
+		depthClipFeatures.pNext = NULL;
+		depthClipControl = depthClipFeatures.depthClipControl == VK_TRUE;
+	}
+	if ( depthClipControl ) {
+		deviceExtensions[ deviceExtensionCount++ ] = VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME;
+		depthClipFeatures.pNext = features2.pNext;
+		features2.pNext = &depthClipFeatures;
+	}
+	common->Printf( "Vulkan: clip-space depth %s\n", depthClipControl
+			? "[-1, 1] (VK_EXT_depth_clip_control)" : "[0, 1] (remapped projections)" );
 	vkCtx.depthBoundsSupported = supported.depthBounds == VK_TRUE;
 	vkCtx.textureCompressionBCSupported = supported.textureCompressionBC == VK_TRUE;
 	vkCtx.wideLinesSupported = supported.wideLines == VK_TRUE;
@@ -1988,6 +2015,7 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 		return false;
 	}
 	volkLoadDevice( vkCtx.device );
+	vkCtx.depthClipNegativeOneToOne = depthClipControl;
 	if ( presentTiming && vkWaitForPresentKHR != NULL ) {
 		VK_PresentTiming_Start( vkCtx.device );
 	}

@@ -350,7 +350,9 @@ std::string Wrap(const Rewrite &rewrite, bool vertex, const std::set<std::string
             result += "if (all(equal(gl_Position, oq4.modelViewProjection * oq4Position))) {\n"
                       "gl_Position = oq4.modelViewProjectionVulkan * oq4Position;\n} else ";
         }
-        result += "{ gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5; }\n";
+        // textureOrientation.y is 1 when the pipeline clips depth in OpenGL's
+        // [-w, w] range (VK_EXT_depth_clip_control); the position is then final.
+        result += "{ if (oq4.textureOrientation.y < 0.5) gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5; }\n";
     } else {
         result += R"(
 oq4AuthoredMain();

@@ -134,6 +134,16 @@ void VK_Exec_SetViewScissor( VkCommandBuffer cmd, const viewDef_t *viewDef, int 
 void VK_Exec_FreeShadowCubeSets( VkDescriptorSet sets[ VK_FRAMES_IN_FLIGHT ] );
 void VK_FixupClipSpaceZ( float dst[ 16 ], const float src[ 16 ] );
 
+// The point casters build clip z from the face projection's depth row
+// (z_clip = zA * z_eye + zB * w_eye, w_clip = -z_eye) in the same convention
+// VK_FixupClipSpaceZ applies to every other projection.
+static float VK_ShadowMap_PointDepthRowZ( float projA ) {
+	return vkCtx.depthClipNegativeOneToOne ? projA : 0.5f * ( projA - 1.0f );
+}
+static float VK_ShadowMap_PointDepthRowW( float projB ) {
+	return vkCtx.depthClipNegativeOneToOne ? projB : 0.5f * projB;
+}
+
 /*
 ====================
 Module state
@@ -5365,8 +5375,8 @@ static void VK_ShadowMap_RenderMoments( VkCommandBuffer cmd, const int slot, VkD
 				const float nearClip = 0.01f;
 				const float projA = -( farClip + nearClip ) / ( farClip - nearClip );
 				const float projB = -( 2.0f * farClip * nearClip ) / ( farClip - nearClip );
-				basePush.depthRow[ 0 ] = 0.5f * ( projA - 1.0f );
-				basePush.depthRow[ 1 ] = 0.5f * projB;
+				basePush.depthRow[ 0 ] = VK_ShadowMap_PointDepthRowZ( projA );
+				basePush.depthRow[ 1 ] = VK_ShadowMap_PointDepthRowW( projB );
 				basePush.depthRow[ 2 ] = farClip;
 				const idVec3 origin( light.pointLightOrigin[ 0 ], light.pointLightOrigin[ 1 ],
 						light.pointLightOrigin[ 2 ] );
@@ -6336,8 +6346,8 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 			const float projA = -( farClip + nearClip ) / ( farClip - nearClip );
 			const float projB = -( 2.0f * farClip * nearClip ) / ( farClip - nearClip );
 			float projRow[ 2 ];
-			projRow[ 0 ] = 0.5f * ( projA - 1.0f );
-			projRow[ 1 ] = 0.5f * projB;
+			projRow[ 0 ] = VK_ShadowMap_PointDepthRowZ( projA );
+			projRow[ 1 ] = VK_ShadowMap_PointDepthRowW( projB );
 
 			for ( int passIndex = 0 ; passIndex < VK_SHADOW_RECEIVER_PASS_COUNT ; passIndex++ ) {
 				const vkShadowReceiverPass_t receiverPass = (vkShadowReceiverPass_t)passIndex;
