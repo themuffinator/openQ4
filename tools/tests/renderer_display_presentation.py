@@ -76,6 +76,7 @@ static bool withheldOkay=true;
 static uint32_t submittedWaits=0,submittedSignals=0;
 struct Common { template<class... T> void Warning(const char*,T...){} template<class... T> void Printf(const char*,T...){} } commonObject,*common=&commonObject;
 struct { int frameCount=1; bool takingScreenshot=false; } tr;
+struct { int frameCount=1; } backEnd;
 struct viewDef_t { struct { int x1=0,y1=0,x2=255,y2=255; } viewport; };
 static bool hdrSceneRequested=false;
 static bool VK_PostProcess_HDRSceneRequested(){return hdrSceneRequested;}
