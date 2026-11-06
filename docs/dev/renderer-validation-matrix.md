@@ -1032,7 +1032,17 @@ Resident megabytes follow which lights are cached at each pose; the bound is
 the fixed slot capacity, which no report exceeds. This is counter evidence
 for stock motion, not an image comparison: the moving-caster, cutout,
 translucent and custom-receiver fixtures keep their own suites, and the
-point static/live composition and dynamic-image alpha audits remain open.
+point static/live composition audit remains open.
+
+Cutout casters whose coverage cannot be reproduced (an active alpha-test stage
+with no bindable image, or generated texture coordinates): Vulkan already
+failed such a light to the sticky stencil fallback, while OpenGL drew the
+caster as solid depth into a light still reported as mapped, so its holes cast
+shadow. OpenGL now fails the pass and takes the same fallback; retail stencil
+volumes ignore alpha, so the result matches the original game. A perforated
+caster with no active alpha stage is solid and keeps solid depth. No stock
+material or guide reaches the case (94 material files audited); mods can.
+`renderer_shadow_alpha_fallback_contract.py` pins both backends.
 
 ## Acceptance
 

@@ -37,6 +37,10 @@ See [player release status](../user/release-status.md).
   scene about six times faster: the half-second pause when a new probe
   becomes resident is now about 85 ms on both renderers, with identical
   lighting. Removing the remaining pause is still open.
+- On OpenGL with shadow maps, a mod surface whose see-through holes come from
+  a generated or missing alpha texture now falls back to the original stencil
+  shadows, as Vulkan already did, instead of casting a solid shadow while
+  reporting a mapped light. No stock material is affected.
 - The SSAO quality checks for PBR materials work again after half-resolution
   SSAO; a handful of pixels that differ on Intel graphics are now an
   explicitly bounded exception.

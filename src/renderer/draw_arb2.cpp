@@ -7182,6 +7182,30 @@ static void RB_ShadowMapDrawOpaqueCasterProgram( const srfTriangles_t *casterGeo
 	RB_DrawElementsWithCounters( casterGeo );
 }
 
+// An active alpha-test stage whose coverage the explicit-ST cutout programs
+// cannot reproduce: no bindable image, or generated (non-explicit) texture
+// coordinates. Drawing it as solid depth would shadow through its holes while
+// still claiming a mapped light; the pass fails instead, so the light takes
+// the sticky stencil fallback exactly as Vulkan does
+// (vk_ShadowMap.cpp VK_ShadowMap_PerforatedCasterSupported). REN-03.
+static bool RB_ShadowMapPerforatedCoverageUnreproducible( const drawSurf_t *surf ) {
+	if ( surf == NULL || surf->material == NULL || surf->shaderRegisters == NULL ) {
+		return false;
+	}
+	const idMaterial *shader = surf->material;
+	const float *regs = surf->shaderRegisters;
+	for ( int stage = 0; stage < shader->GetNumStages(); stage++ ) {
+		const shaderStage_t *pStage = shader->GetStage( stage );
+		if ( !pStage->hasAlphaTest || regs[ pStage->conditionRegister ] == 0 ) {
+			continue;
+		}
+		if ( !RB_ShadowMapTextureStageHasBindableImage( &pStage->texture ) || pStage->texture.texgen != TG_EXPLICIT ) {
+			return true;
+		}
+	}
+	return false;
+}
+
 static bool RB_ShadowMapCanProgramPerforatedCaster( const drawSurf_t *surf ) {
 	if ( surf == NULL || surf->material == NULL || surf->shaderRegisters == NULL ) {
 		return false;
@@ -7587,8 +7611,11 @@ static bool RB_ShadowMapDrawCasterChain( const drawSurf_t *surf, const int casca
 		if ( shader != NULL && shader->Coverage() == MC_PERFORATED ) {
 			if ( RB_ShadowMapCanProgramPerforatedCaster( surf ) ) {
 				RB_ShadowMapDrawPerforatedCasterProgram( surf, casterGeo, ac, cascadeIndex, useHashedAlpha );
+			} else if ( RB_ShadowMapPerforatedCoverageUnreproducible( surf ) ) {
+				RB_ShadowMapReportCasterSkip( surf, casterGeo, "unsupported-alpha-stencil-fallback" );
+				return false;
 			} else {
-				RB_ShadowMapReportCasterSkip( surf, casterGeo, "unsupported-alpha-texgen-solid-depth" );
+				// no alpha-test stage is active this frame: the surface is solid
 				RB_ShadowMapDrawOpaqueCasterProgram( casterGeo );
 			}
 			continue;
@@ -8031,6 +8058,9 @@ static bool RB_PointShadowMapDrawCasterChain( const drawSurf_t *surf, const floa
 		if ( shader != NULL && shader->Coverage() == MC_PERFORATED ) {
 			if ( RB_PointShadowMapCanProcessPerforatedCaster( surf ) ) {
 				RB_PointShadowMapDrawPerforatedCaster( surf, casterGeo, ac );
+			} else if ( RB_ShadowMapPerforatedCoverageUnreproducible( surf ) ) {
+				// as the projected chain: stencil fallback, not solid depth
+				return false;
 			} else {
 				RB_DrawElementsWithCounters( casterGeo );
 			}

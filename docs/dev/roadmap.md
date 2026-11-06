@@ -862,9 +862,12 @@ diagnostics establish whole-frame ownership or production performance.
   constrained budget takes 994 budget fallbacks with every light still
   shadowed. Vulkan reports no fallback or dropped query and stays inside its
   slot capacity. See the [shadow tour](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  The dynamic-image/non-explicit-texcoord alpha audit found OpenGL drawing
+  unreproducible cutouts as solid depth; it now takes Vulkan's sticky stencil
+  fallback (no stock material reaches the case).
   Remaining: image-level missing/doubled receiver checks in motion, the point
-  static/live and dynamic-image/non-explicit-texcoord alpha audits, and the
-  mover/cutout/custom-receiver fixtures under continuous motion.
+  static/live composition audit, and the mover/cutout/custom-receiver fixtures
+  under continuous motion.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
