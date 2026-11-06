@@ -1021,6 +1021,8 @@ if get_option('build_native_tests')
     'openq4-pbr-math-test',
     files('tools/tests/native/PBRMathTest.cpp'),
     include_directories: root_include_dir,
+    # PrefilterTiles and AsyncPrefilter run on std::thread.
+    dependencies: dependency('threads'),
     install: false,
   )
   test('openq4-pbr-math', openq4_pbr_math_test, timeout: 30)
