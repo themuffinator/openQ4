@@ -6365,7 +6365,7 @@ Process:
 2. When cutting a release with curated notes, save them in `docs/dev/releases/vX.Y.Z.md`; the manual release workflow will use that tracked file instead of the auto-generated history summary.
 3. If no tracked release file exists, the workflow falls back to the generated release notes from commit history.
 4. Move shipped items into a historical release section here (optional), and keep remaining work under stable IDs in `docs/dev/roadmap.md`.
-5. For macOS support claims, complete the "macOS Evidence Gate" below and keep `docs/dev/macos-signoff-evidence.md` current before promoting anything beyond experimental wording.
+5. For macOS support claims, complete the "macOS Evidence Gate" below and keep `docs/dev/macos-signoff-evidence.md` current before promoting anything beyond preview wording.
 
 ## macOS Support Claim Guard
 
