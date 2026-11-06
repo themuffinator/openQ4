@@ -335,6 +335,23 @@ of a blended surface also carries the background behind it, which is why an
 absolute expectation there was wrong for both backends. Final retail gameplay/performance and
 backend/platform promotion remain separate gates.
 
+
+Matched half-resolution control: native PBR views always take the
+full-resolution pass, so half resolution reaches classic-only frames. The
+laboratory now captures `ssao-classic` and its occlusion debug view again at
+`r_ssaoResolution 2` and compares them with the full-resolution pair. OpenGL
+has a single SSAO resolution and must match exactly; it does. On Vulkan the
+half-resolution field must differ from full by at most 4 levels on average,
+with a signed bias under 1 level, and darken within 15% as many classic
+pixels:
+
+| Device | Mean difference | Signed bias | Darkened pixels, full / half |
+| --- | --- | --- | --- |
+| RTX 4060 Laptop GPU | 2.07 levels | +0.02 | 251,042 / 254,006 (+1.2%) |
+| Iris Xe (101.5590) | 2.95 levels | +0.03 | 244,971 / 250,721 (+2.3%) |
+
+Half resolution is a close, unbiased approximation on both devices: it
+softens contact edges but neither darkens nor lightens the scene.
 ## Automated Safe Matrix
 
 The modern-visible and low-overhead GL self-tests explicitly request a hidden

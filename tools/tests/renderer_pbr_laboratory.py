@@ -137,6 +137,16 @@ SSAO_FADED = {**SSAO_SETTINGS, 'r_ssaoMaxDistance': '16'}
 # this many on an Intel Vulkan device only; every other device stays exact.
 INTEL_VULKAN_SSAO_CLASSIC_PIXELS = 8
 INTEL_VULKAN_SSAO_DEBUG_PIXELS = 12
+# REN-05 matched half-resolution control. A view with native PBR always takes
+# the full-resolution pass, so half resolution reaches classic-only frames:
+# compare them, and their occlusion debug view, with the full-resolution ones.
+# OpenGL has one SSAO resolution and must match exactly; on Vulkan the
+# half-resolution field must stay a close, unbiased approximation.
+SSAO_HALF = {**SSAO_SETTINGS, 'r_ssaoResolution': '2'}
+# Measured 6 November 2026: RTX 4060 2.07, Iris Xe 2.95 levels; bias +0.02/+0.03.
+SSAO_HALF_DEBUG_MEAN_LEVELS = 4.0	# mean absolute debug-view difference, 8-bit levels
+SSAO_HALF_DEBUG_BIAS_LEVELS = 1.0	# mean signed difference: no systematic darkening or lightening
+SSAO_HALF_DARKENED_RATIO = 0.15		# classic darkened-pixel count may move by this share
 
 CASES = {
     'lit': {},
@@ -190,6 +200,8 @@ CASES = {
     'ssao-classic': {**SSAO_SETTINGS, 'r_pbrMaterials': '0'},
     'ssao-debug': {**SSAO_SETTINGS, 'r_ssaoDebug': '1'},
     'ssao-debug-classic': {**SSAO_SETTINGS, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'},
+    'ssao-classic-half': {**SSAO_HALF, 'r_pbrMaterials': '0'},
+    'ssao-debug-classic-half': {**SSAO_HALF, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'},
     'albedo': {'r_pbrDebug': '1'},
     'normals': {'r_pbrDebug': '2'},
     **{f'normal-{name}': {'r_pbrDebug':'2'} for name in ('xyz','rg','agb','zero','flat')},
@@ -312,7 +324,7 @@ LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','p
 LEGACY_CASES.update(f'{kind}-{mode}' for kind in ('fog','blend') for mode in ('native','off','fallback-native'))
 LEGACY_CASES.update(('lightgrid-native','lightgrid-off'))
 LEGACY_CASES.update(('lightgrid-pbr-master-off','lightgrid-pbr-native'))
-LEGACY_CASES.update(('ssao-classic','ssao-debug-classic'))
+LEGACY_CASES.update(('ssao-classic','ssao-debug-classic','ssao-classic-half','ssao-debug-classic-half'))
 CASE_COMMANDS = {'shader-reload':['rendererShaderLibraryReload'], 'image-reload':['reloadImages all'],
                  'partial-restart':['vid_restart partial','wait 60'], 'full-restart':['vid_restart','wait 60'],
                  # Spawned entities publish their first render definitions on
@@ -1079,6 +1091,43 @@ def compare_ssao_captures(results: list[dict]) -> None:
         row['failures'].append(f'SSAO darkened only {classic_darkened} classic pixels')
     if debug_changed > debug_limit:
         row['failures'].append(f'the SSAO debug view differs on {debug_changed} pixels with native PBR')
+    compare_ssao_half_resolution(by_case, images['ssao-off'])
+
+
+def compare_ssao_half_resolution(by_case: dict, unoccluded: bytes) -> None:
+    """Half-resolution SSAO approximates the full-resolution field (REN-05)."""
+    names = ('ssao-classic', 'ssao-debug-classic', 'ssao-classic-half', 'ssao-debug-classic-half')
+    if not all(name in by_case for name in names):
+        return
+    images = {name: capture_rgb(Path(by_case[name]['screenshot'])) for name in names}
+    row = by_case['ssao-classic-half']
+    if any(image is None for image in images.values()):
+        row['failures'].append('the half-resolution SSAO control is missing captures')
+        return
+    full, half = images['ssao-debug-classic'], images['ssao-debug-classic-half']
+    count = len(full)
+    mean = sum(abs(a - b) for a, b in zip(full, half)) / count
+    bias = sum(b - a for a, b in zip(full, half)) / count
+    darkened_full = sum(1 for i in range(0, count, 3)
+                        if any(images['ssao-classic'][c] + 2 <= unoccluded[c] for c in range(i, i + 3)))
+    darkened_half = sum(1 for i in range(0, count, 3)
+                        if any(images['ssao-classic-half'][c] + 2 <= unoccluded[c] for c in range(i, i + 3)))
+    ratio = abs(darkened_half - darkened_full) / max(1, darkened_full)
+    row['ssaoHalfResolution'] = {'debugMeanAbs': round(mean, 4), 'debugMeanSigned': round(bias, 4),
+                                 'classicDarkenedFull': darkened_full, 'classicDarkenedHalf': darkened_half,
+                                 'darkenedRatio': round(ratio, 4), 'identical': full == half}
+    if row.get('backend') == 'gl':
+        if full != half or images['ssao-classic'] != images['ssao-classic-half']:
+            row['failures'].append('OpenGL SSAO changed with r_ssaoResolution, which only Vulkan reads')
+        return
+    if full == half:
+        row['failures'].append('r_ssaoResolution 2 did not change the Vulkan occlusion field')
+    if mean > SSAO_HALF_DEBUG_MEAN_LEVELS:
+        row['failures'].append(f'half-resolution SSAO differs from full by {mean:.2f} levels on average')
+    if abs(bias) > SSAO_HALF_DEBUG_BIAS_LEVELS:
+        row['failures'].append(f'half-resolution SSAO is biased by {bias:.2f} levels')
+    if ratio > SSAO_HALF_DARKENED_RATIO:
+        row['failures'].append(f'half-resolution SSAO darkens {darkened_half} classic pixels, full {darkened_full}')
 
 
 def compare_native_baked_captures(results: list[dict]) -> None:
