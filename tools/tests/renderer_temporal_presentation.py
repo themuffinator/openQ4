@@ -257,7 +257,8 @@ def main() -> int:
         "historyWeight",
         "ReactiveRegion0",
         "packetReactive",
-        "R_ScenePackets_TemporalRigidMotionEligible(",
+        # motion blur shares the exact per-surface classification (REN-08)
+        "R_ScenePackets_TemporalSurfaceMotion(",
     ):
         require(gl_backend, token, "OpenGL disocclusion/reactive resolve")
 

@@ -327,7 +327,8 @@ idCVar r_motionBlurStrength( "r_motionBlurStrength", "0.45", CVAR_RENDERER | CVA
 idCVar r_motionBlurMaxPixels( "r_motionBlurMaxPixels", "10", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "maximum motion blur radius in pixels", 0.0f, 64.0f );
 idCVar r_motionBlurSamples( "r_motionBlurSamples", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of motion blur gather samples", 1, 16, idCmdSystem::ArgCompletion_Integer<1,16> );
 idCVar r_motionBlurDebug( "r_motionBlurDebug", "0", CVAR_RENDERER | CVAR_BOOL, "visualize motion blur vectors instead of applying blur" );
-idCVar r_motionBlurObjectVectors( "r_motionBlurObjectVectors", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include rigid-object motion vectors when r_motionBlur is enabled" );
+idCVar r_motionBlurObjectVectors( "r_motionBlurObjectVectors", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include exact object motion vectors (rigid entities, skinned models and the view weapon) when r_motionBlur is enabled" );
+idCVar r_motionBlurShutterMsec( "r_motionBlurShutterMsec", "16.667", CVAR_RENDERER | CVAR_FLOAT, "motion blur length as the motion over this many milliseconds, independent of frame rate; 0 = the motion between two presented frames (original behaviour)", 0.0f, 100.0f );
 idCVar r_forceSpecialEffects( "r_forceSpecialEffects", "0", CVAR_RENDERER | CVAR_INTEGER,
 	"force legacy special-effect bitmask for debugging (1=blur, 2=AL, 3=both)", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 idCVar r_hdrSceneTarget( "r_hdrSceneTarget", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "render the main scene into an HDR scene target before post-processing" );
@@ -6206,6 +6207,7 @@ void R_InitCommands( void ) {
 #endif
 	cmdSystem->AddCommand( "rendererGpuTimerSelfTest", R_RendererGpuTimerSelfTest_f, CMD_FL_RENDERER, "run renderer GPU timer query self tests" );
 	cmdSystem->AddCommand( "rendererTemporalPresentationStatus", R_TemporalPresentation_PrintStatus_f, CMD_FL_RENDERER, "report dynamic-resolution and temporal-history state" );
+	cmdSystem->AddCommand( "rendererMotionBlurStatus", R_TemporalPresentation_PrintMotionBlurStatus_f, CMD_FL_RENDERER, "report motion blur requested/effective settings and history decisions; \"reset\" clears the counters" );
 	cmdSystem->AddCommand( "rendererScenePacketSelfTest", R_RendererScenePacketSelfTest_f, CMD_FL_RENDERER, "run renderer front-end scene-packet self tests" );
 	cmdSystem->AddCommand( "rendererRenderGraphSelfTest", R_RendererRenderGraphSelfTest_f, CMD_FL_RENDERER, "run renderer resource-graph self tests" );
 	cmdSystem->AddCommand( "rendererRenderGraphResourceSelfTest", R_RendererRenderGraphResourceSelfTest_f, CMD_FL_RENDERER, "run renderer graph resource owner self tests" );

@@ -44,6 +44,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ModernGLShaderLibrary.h"
 #include "RendererMetrics.h"
 #include "ScenePackets.h"
+#include "MotionBlurCore.h"
 
 #ifndef GL_FRAMEBUFFER_SRGB
 #define GL_FRAMEBUFFER_SRGB 0x8DB9
@@ -3111,6 +3112,9 @@ struct rbMotionBlurViewState_t {
 	float depthProjection[2];
 	float projectionMatrix[16];
 	float worldModelViewMatrix[16];
+	// projectInfo[2]/[3] without temporal AA jitter (MotionBlurCore.h)
+	float neutralProjectOffset[2];
+	bool forceUpdate;
 };
 
 enum rbMotionVectorUniformIndex_t {
@@ -3145,11 +3149,20 @@ static idImage *rbMotionVectorImage = NULL;
 static idRenderTexture *rbMotionVectorRenderTexture = NULL;
 static bool rbMotionVectorImageValid = false;
 
+static motionBlurShutterState_t rbMotionBlurShutter = { false, 0.0f };
+
 static void RB_ResetMotionBlurHistory( void ) {
 	rbMotionBlurHistoryValid = false;
 	rbMotionVectorImageValid = false;
 	rbMotionBlurEntityHistory.Clear();
 	rbMotionBlurNextEntityHistory.Clear();
+	MotionBlurCore_ResetShutter( rbMotionBlurShutter );
+}
+
+static void RB_MotionBlurRecordDisabled( const char *reason ) {
+	motionBlurStats_t &stats = R_TemporalPresentation_MotionBlurStats();
+	stats.disabledViews++;
+	stats.lastDisabledReason = reason;
 }
 
 static void RB_InitMotionBlurStage( void ) {
@@ -3254,24 +3267,50 @@ static bool RB_BuildMotionBlurViewState( rbMotionBlurViewState_t &state, int vie
 	state.depthProjection[1] = backEnd.viewDef->projectionMatrix[14];
 	memcpy( state.projectionMatrix, backEnd.viewDef->projectionMatrix, sizeof( state.projectionMatrix ) );
 	memcpy( state.worldModelViewMatrix, backEnd.viewDef->worldSpace.modelViewMatrix, sizeof( state.worldModelViewMatrix ) );
+	if ( backEnd.viewDef->temporalNeutralProjectionValid ) {
+		state.neutralProjectOffset[0] = backEnd.viewDef->temporalNeutralProjectionOffset.x;
+		state.neutralProjectOffset[1] = backEnd.viewDef->temporalNeutralProjectionOffset.y;
+	} else {
+		state.neutralProjectOffset[0] = state.projectInfo[2];
+		state.neutralProjectOffset[1] = state.projectInfo[3];
+	}
+	// Screenshots set forceUpdate to refresh dynamic models; only an authored
+	// camera cut (Camera.cpp) is a discontinuity.
+	state.forceUpdate = backEnd.viewDef->renderView.forceUpdate && !backEnd.viewDef->temporalCaptureFrame;
 	return true;
 }
 
-static bool RB_MotionBlurProjectionChanged( const rbMotionBlurViewState_t &current, const rbMotionBlurViewState_t &previous ) {
-	if ( idMath::Fabs( current.fovX - previous.fovX ) > 0.01f || idMath::Fabs( current.fovY - previous.fovY ) > 0.01f ) {
-		return true;
-	}
-	for ( int i = 0; i < 4; i++ ) {
-		if ( idMath::Fabs( current.projectInfo[i] - previous.projectInfo[i] ) > 0.0001f ) {
-			return true;
+static void RB_MotionBlurCameraSample( const rbMotionBlurViewState_t &state, motionBlurCameraSample_t &sample ) {
+	sample.timeMsec = state.renderTime;
+	for ( int i = 0; i < 3; i++ ) {
+		sample.origin[i] = state.viewOrigin[i];
+		for ( int j = 0; j < 3; j++ ) {
+			sample.axis[i][j] = state.viewAxis[i][j];
 		}
 	}
-	for ( int i = 0; i < 2; i++ ) {
-		if ( idMath::Fabs( current.depthProjection[i] - previous.depthProjection[i] ) > 0.0001f ) {
-			return true;
-		}
-	}
-	return false;
+	sample.fov[0] = state.fovX;
+	sample.fov[1] = state.fovY;
+	sample.projectionNeutral[0] = state.projectInfo[0];
+	sample.projectionNeutral[1] = state.projectInfo[1];
+	sample.projectionNeutral[2] = state.neutralProjectOffset[0];
+	sample.projectionNeutral[3] = state.neutralProjectOffset[1];
+	sample.depthProjection[0] = state.depthProjection[0];
+	sample.depthProjection[1] = state.depthProjection[1];
+}
+
+// The previous camera as the blur shaders consume it: its jitter-free offsets
+// plus this frame's applied jitter (MotionBlurCore_AlignPreviousOffsets).
+static bool RB_MotionBlurAlignPreviousState( const rbMotionBlurViewState_t &current,
+		const rbMotionBlurViewState_t &previous, rbMotionBlurViewState_t &aligned ) {
+	aligned = previous;
+	const float currentApplied[2] = { current.projectInfo[2], current.projectInfo[3] };
+	float offsets[2];
+	MotionBlurCore_AlignPreviousOffsets( currentApplied, current.neutralProjectOffset,
+		previous.neutralProjectOffset, offsets );
+	aligned.projectInfo[2] = aligned.projectionMatrix[8] = offsets[0];
+	aligned.projectInfo[3] = aligned.projectionMatrix[9] = offsets[1];
+	return currentApplied[0] != current.neutralProjectOffset[0]
+		|| currentApplied[1] != current.neutralProjectOffset[1];
 }
 
 static bool RB_MotionBlurObjectVectorsRequested( void ) {
@@ -3280,53 +3319,30 @@ static bool RB_MotionBlurObjectVectorsRequested( void ) {
 		&& glConfig.GLSLProgramAvailable;
 }
 
-static bool RB_MotionBlurCameraMovedEnough( const rbMotionBlurViewState_t &current, const rbMotionBlurViewState_t &previous ) {
-	if ( ( current.viewOrigin - previous.viewOrigin ).LengthSqr() >= Square( 0.10f ) ) {
-		return true;
-	}
-
-	const float axisEpsilonSqr = Square( 0.00075f );
-	for ( int i = 0; i < 3; i++ ) {
-		if ( ( current.viewAxis[i] - previous.viewAxis[i] ).LengthSqr() >= axisEpsilonSqr ) {
-			return true;
-		}
-	}
-
-	return false;
+static motionBlurHistoryResult_t RB_MotionBlurValidateHistory( const rbMotionBlurViewState_t &current,
+		const rbMotionBlurViewState_t &previous, bool allowStillCameraObjectVectors ) {
+	motionBlurHistoryContext_t context;
+	context.historyValid = rbMotionBlurHistoryValid;
+	context.videoRestarted = current.videoRestartCount != previous.videoRestartCount;
+	context.worldChanged = current.renderWorld != previous.renderWorld
+		|| current.mapName.Icmp( previous.mapName ) != 0;
+	context.viewportChanged = current.viewportWidth != previous.viewportWidth
+		|| current.viewportHeight != previous.viewportHeight;
+	context.explicitCut = current.forceUpdate;
+	context.allowStillCamera = allowStillCameraObjectVectors;
+	motionBlurCameraSample_t currentSample;
+	motionBlurCameraSample_t previousSample;
+	RB_MotionBlurCameraSample( current, currentSample );
+	RB_MotionBlurCameraSample( previous, previousSample );
+	return MotionBlurCore_ValidateHistory( context, currentSample, previousSample );
 }
 
-static bool RB_MotionBlurHistoryUsable( const rbMotionBlurViewState_t &current, const rbMotionBlurViewState_t &previous, bool allowStillCameraObjectVectors ) {
-	if ( !rbMotionBlurHistoryValid ) {
-		return false;
-	}
-	if ( r_jitter.GetBool() ) {
-		return false;
-	}
-	if ( current.videoRestartCount != previous.videoRestartCount ) {
-		return false;
-	}
-	if ( current.renderWorld != previous.renderWorld || current.mapName.Icmp( previous.mapName ) != 0 ) {
-		return false;
-	}
-	if ( current.viewportWidth != previous.viewportWidth || current.viewportHeight != previous.viewportHeight ) {
-		return false;
-	}
-	if ( current.renderTime <= previous.renderTime ) {
-		return false;
-	}
-	if ( current.renderTime - previous.renderTime > 100 ) {
-		return false;
-	}
-	if ( !allowStillCameraObjectVectors && !RB_MotionBlurCameraMovedEnough( current, previous ) ) {
-		return false;
-	}
-	if ( ( current.viewOrigin - previous.viewOrigin ).LengthSqr() > Square( 512.0f ) ) {
-		return false;
-	}
-	if ( RB_MotionBlurProjectionChanged( current, previous ) ) {
-		return false;
-	}
-	return true;
+static bool RB_MotionBlurCameraMovedEnough( const rbMotionBlurViewState_t &current, const rbMotionBlurViewState_t &previous ) {
+	motionBlurCameraSample_t currentSample;
+	motionBlurCameraSample_t previousSample;
+	RB_MotionBlurCameraSample( current, currentSample );
+	RB_MotionBlurCameraSample( previous, previousSample );
+	return MotionBlurCore_CameraMovedEnough( currentSample, previousSample );
 }
 
 static void RB_UploadMotionBlurVec4( rbMotionBlurUniformIndex_t index, const idVec3 &value ) {
@@ -3341,20 +3357,16 @@ static bool RB_EnsurePackedClassicDrawCaches( const drawSurf_t *surf, bool needs
 static void RB_BindPostProcessRenderTexture( idRenderTexture *renderTexture, int width, int height );
 static void RB_RestorePostProcessTarget( idRenderTexture *renderTexture, int viewportWidth, int viewportHeight );
 
-static bool RB_MotionVectorSurfaceEligible( const drawSurf_t *surf ) {
-	return R_ScenePackets_TemporalRigidMotionEligible( surf );
-}
-
-static bool RB_FindMotionBlurEntityHistory( const idList<rbMotionBlurEntityHistory_t> &history,
-		int entityIndex, float previousModelMatrix[16] ) {
-	for ( int i = 0; i < history.Num(); i++ ) {
-		if ( history[i].entityIndex == entityIndex ) {
-			memcpy( previousModelMatrix, history[i].modelMatrix, sizeof( history[i].modelMatrix ) );
-			return true;
-		}
-	}
-	return false;
-}
+// Which surfaces the velocity pass owns. Temporal AA owns every moving surface
+// per pixel (exact vectors or reactive coverage). Motion blur owns exact
+// vectors only - rigid entities, posed (skinned) surfaces and the view weapon -
+// and leaves every other pixel to camera reprojection, except that a view
+// weapon without an exact vector is written as "no motion": it moves with the
+// camera, so camera reprojection would smear it whenever the view turns.
+enum rbMotionVectorMode_t {
+	RB_MOTION_VECTORS_BLUR = 0,
+	RB_MOTION_VECTORS_TEMPORAL
+};
 
 // The temporal history is sorted by entity index (RB_UpdateTemporalEntityHistory).
 static bool RB_FindTemporalEntityHistory( const idList<rbMotionBlurEntityHistory_t> &history,
@@ -3377,30 +3389,43 @@ static bool RB_FindTemporalEntityHistory( const idList<rbMotionBlurEntityHistory
 	return false;
 }
 
-static void RB_StoreMotionBlurEntityHistory( idList<rbMotionBlurEntityHistory_t> &history, int entityIndex, const float modelMatrix[16] ) {
-	for ( int i = 0; i < history.Num(); i++ ) {
-		if ( history[i].entityIndex == entityIndex ) {
-			return;
-		}
-	}
+static int RB_CompareMovingEntityHistory( const void *a, const void *b ) {
+	return static_cast<const rbMotionBlurEntityHistory_t *>( a )->entityIndex
+		- static_cast<const rbMotionBlurEntityHistory_t *>( b )->entityIndex;
+}
 
-	rbMotionBlurEntityHistory_t &entry = history.Alloc();
-	entry.entityIndex = entityIndex;
-	memcpy( entry.modelMatrix, modelMatrix, sizeof( entry.modelMatrix ) );
+// Every moving entity the next frame may draw exactly (rigid or posed, the
+// view weapon included), one entry per entity, sorted for the lookups above.
+static void RB_CollectMovingEntityHistory( drawSurf_t **drawSurfs, int numDrawSurfs,
+		idList<rbMotionBlurEntityHistory_t> &history ) {
+	history.Clear();
+	for ( int i = 0; i < numDrawSurfs; i++ ) {
+		const drawSurf_t *surf = drawSurfs[i];
+		if ( surf == NULL || surf->space == NULL || surf->space->entityDef == NULL
+				|| surf->space->entityDef->index < 0
+				|| ( surf->space->entityDef->parms.hModel != NULL
+					&& surf->space->entityDef->parms.hModel->IsStaticWorldModel() ) ) {
+			continue;
+		}
+		rbMotionBlurEntityHistory_t &entry = history.Alloc();
+		entry.entityIndex = surf->space->entityDef->index;
+		memcpy( entry.modelMatrix, surf->space->modelMatrix, sizeof( entry.modelMatrix ) );
+	}
+	if ( history.Num() > 1 ) {
+		qsort( history.Ptr(), history.Num(), sizeof( rbMotionBlurEntityHistory_t ),
+			RB_CompareMovingEntityHistory );
+		int unique = 1;
+		for ( int i = 1; i < history.Num(); i++ ) {
+			if ( history[i].entityIndex != history[unique - 1].entityIndex ) {
+				history[unique++] = history[i];
+			}
+		}
+		history.SetNum( unique, false );
+	}
 }
 
 static void RB_UpdateMotionBlurEntityHistory( drawSurf_t **drawSurfs, int numDrawSurfs ) {
-	rbMotionBlurNextEntityHistory.Clear();
-	for ( int i = 0; i < numDrawSurfs; i++ ) {
-		const drawSurf_t *surf = drawSurfs[i];
-		if ( !RB_MotionVectorSurfaceEligible( surf ) ) {
-			continue;
-		}
-		RB_StoreMotionBlurEntityHistory(
-			rbMotionBlurNextEntityHistory,
-			surf->space->entityDef->index,
-			surf->space->modelMatrix );
-	}
+	RB_CollectMovingEntityHistory( drawSurfs, numDrawSurfs, rbMotionBlurNextEntityHistory );
 	rbMotionBlurEntityHistory.Swap( rbMotionBlurNextEntityHistory );
 	rbMotionBlurNextEntityHistory.Clear();
 }
@@ -3439,7 +3464,8 @@ static bool rbMotionVectorDrewSurface = false;
 static bool rbMotionVectorMissedSurface = false;
 // Temporal AA asks the pass to own every moving surface per pixel: exact
 // vectors for rigid and posed surfaces (the view weapon included), reactive
-// coverage for everything else. Motion blur keeps its rigid-only pass.
+// coverage for everything else. Motion blur uses the same exact vectors and
+// leaves the rest to camera reprojection (rbMotionVectorMode_t).
 static bool rbMotionVectorPerPixelOwnership = false;
 static int rbMotionVectorWeaponState = -1;
 static temporalOwnershipStats_t rbMotionVectorOwnership;
@@ -3490,55 +3516,70 @@ static void RB_T_RenderMotionVectorSurface( const drawSurf_t *surf ) {
 	if ( rbMotionVectorPreviousState == NULL ) {
 		return;
 	}
-	temporalSurfaceMotion_t motion = TEMPORAL_SURFACE_MOTION_NONE;
-	if ( rbMotionVectorPerPixelOwnership ) {
-		motion = R_ScenePackets_TemporalSurfaceMotion( surf );
-	} else if ( RB_MotionVectorSurfaceEligible( surf ) ) {
-		motion = TEMPORAL_SURFACE_MOTION_RIGID;
-	}
+	temporalSurfaceMotion_t motion = R_ScenePackets_TemporalSurfaceMotion( surf );
 	if ( motion == TEMPORAL_SURFACE_MOTION_NONE ) {
 		return;
 	}
+	const bool weaponDepthHack = surf->space->weaponDepthHack;
+	motionBlurStats_t *blurStats = rbMotionVectorPerPixelOwnership
+		? NULL : &R_TemporalPresentation_MotionBlurStats();
 
 	float previousModelMatrix[16];
 	// a surface that should move exactly but cannot owns no history at all
 	bool noHistory = false;
+	// motion blur: a view weapon without an exact vector does not move on screen
+	bool weaponStill = false;
 	if ( motion != TEMPORAL_SURFACE_MOTION_REACTIVE
-			&& ( rbMotionVectorEntityHistory == NULL || !( rbMotionVectorPerPixelOwnership
-				? RB_FindTemporalEntityHistory( *rbMotionVectorEntityHistory,
-					surf->space->entityDef->index, previousModelMatrix )
-				: RB_FindMotionBlurEntityHistory( *rbMotionVectorEntityHistory,
-					surf->space->entityDef->index, previousModelMatrix ) ) ) ) {
-		if ( !rbMotionVectorPerPixelOwnership ) {
-			rbMotionVectorMissedSurface = true;
-			return;
-		}
+			&& ( rbMotionVectorEntityHistory == NULL
+				|| !RB_FindTemporalEntityHistory( *rbMotionVectorEntityHistory,
+					surf->space->entityDef->index, previousModelMatrix ) ) ) {
 		// newly visible: no previous transform, so it owns no history yet
 		motion = TEMPORAL_SURFACE_MOTION_REACTIVE;
 		noHistory = true;
+	}
+	if ( blurStats != NULL && motion == TEMPORAL_SURFACE_MOTION_REACTIVE ) {
+		if ( !weaponDepthHack ) {
+			// camera reprojection covers this surface's pixels
+			blurStats->cameraFallback++;
+			return;
+		}
+		weaponStill = true;
+		motion = TEMPORAL_SURFACE_MOTION_RIGID;
 	}
 
 	const srfTriangles_t *tri = surf->geo;
 	if ( !RB_EnsurePackedClassicDrawCaches( surf, false, true ) || tri->ambientCache == NULL ) {
 		rbMotionVectorMissedSurface = true;
-		rbMotionVectorOwnership.missed++;
+		if ( blurStats != NULL ) {
+			blurStats->cameraFallback++;
+		} else {
+			rbMotionVectorOwnership.missed++;
+		}
 		return;
 	}
 
-	const bool weaponDepthHack = surf->space->weaponDepthHack;
-	if ( rbMotionVectorPerPixelOwnership ) {
-		RB_MotionVectorWeaponProjection( weaponDepthHack );
-		if ( motion == TEMPORAL_SURFACE_MOTION_REACTIVE ) {
-			rbMotionVectorOwnership.reactive++;
+	RB_MotionVectorWeaponProjection( weaponDepthHack );
+	if ( blurStats != NULL ) {
+		if ( weaponStill ) {
+			blurStats->weaponStill++;
+		} else if ( motion == TEMPORAL_SURFACE_MOTION_PREVIOUS_POSITIONS ) {
+			blurStats->posed++;
 		} else {
-			if ( motion == TEMPORAL_SURFACE_MOTION_PREVIOUS_POSITIONS ) {
-				rbMotionVectorOwnership.posed++;
-			} else {
-				rbMotionVectorOwnership.rigid++;
-			}
-			if ( weaponDepthHack ) {
-				rbMotionVectorOwnership.weapon++;
-			}
+			blurStats->rigid++;
+		}
+		if ( weaponDepthHack && !weaponStill ) {
+			blurStats->weapon++;
+		}
+	} else if ( motion == TEMPORAL_SURFACE_MOTION_REACTIVE ) {
+		rbMotionVectorOwnership.reactive++;
+	} else {
+		if ( motion == TEMPORAL_SURFACE_MOTION_PREVIOUS_POSITIONS ) {
+			rbMotionVectorOwnership.posed++;
+		} else {
+			rbMotionVectorOwnership.rigid++;
+		}
+		if ( weaponDepthHack ) {
+			rbMotionVectorOwnership.weapon++;
 		}
 	}
 	const bool previousPositions = motion == TEMPORAL_SURFACE_MOTION_PREVIOUS_POSITIONS;
@@ -3546,13 +3587,20 @@ static void RB_T_RenderMotionVectorSurface( const drawSurf_t *surf ) {
 		RB_SetMotionVectorMode( 2.0f, noHistory ? 1.0f : R_ScenePackets_TemporalSurfaceReactiveStrength( surf ) );
 		glColorMask( GL_FALSE, GL_FALSE, GL_TRUE, GL_FALSE );
 	} else {
-		float previousProjection[16];
-		float previousModelView[16];
 		float previousModelViewProjection[16];
-		RB_MotionVectorPreviousProjection( rbMotionVectorPreviousState->projectionMatrix,
-			weaponDepthHack && rbMotionVectorPerPixelOwnership, previousProjection );
-		myGlMultMatrix( previousModelMatrix, rbMotionVectorPreviousState->worldModelViewMatrix, previousModelView );
-		myGlMultMatrix( previousModelView, previousProjection, previousModelViewProjection );
+		if ( weaponStill ) {
+			// this frame's own transform: an exact, zero vector
+			float projection[16];
+			R_GetDepthHackProjectionMatrix( backEnd.viewDef, true, 0.0f, projection );
+			myGlMultMatrix( surf->space->modelViewMatrix, projection, previousModelViewProjection );
+		} else {
+			float previousProjection[16];
+			float previousModelView[16];
+			RB_MotionVectorPreviousProjection( rbMotionVectorPreviousState->projectionMatrix,
+				weaponDepthHack, previousProjection );
+			myGlMultMatrix( previousModelMatrix, rbMotionVectorPreviousState->worldModelViewMatrix, previousModelView );
+			myGlMultMatrix( previousModelView, previousProjection, previousModelViewProjection );
+		}
 
 		const int previousMatrixLocation = rbMotionVectorStage.shaderParmLocations[RB_MOTION_VECTOR_UNIFORM_PREVIOUS_MODEL_VIEW_PROJECTION];
 		if ( previousMatrixLocation >= 0 ) {
@@ -3585,10 +3633,11 @@ static void RB_T_RenderMotionVectorSurface( const drawSurf_t *surf ) {
 static bool RB_RenderMotionVectorBuffer( drawSurf_t **drawSurfs, int numDrawSurfs,
 		const rbMotionBlurViewState_t &previousState, int viewportWidth, int viewportHeight,
 		idImage *depthImage, const idList<rbMotionBlurEntityHistory_t> &entityHistory,
-		bool temporalRequested, bool *allEligibleSurfacesDrawn = NULL ) {
+		rbMotionVectorMode_t mode, bool *allEligibleSurfacesDrawn = NULL ) {
 	if ( allEligibleSurfacesDrawn != NULL ) {
 		*allEligibleSurfacesDrawn = false;
 	}
+	const bool temporalRequested = mode == RB_MOTION_VECTORS_TEMPORAL;
 	if ( !temporalRequested && !RB_MotionBlurObjectVectorsRequested() ) {
 		return false;
 	}
@@ -3655,9 +3704,7 @@ static bool RB_RenderMotionVectorBuffer( drawSurf_t **drawSurfs, int numDrawSurf
 	backEnd.currentScissor.Clear();
 	for ( int i = 0; i < numDrawSurfs; i++ ) {
 		const drawSurf_t *surf = drawSurfs[i];
-		if ( rbMotionVectorPerPixelOwnership
-				? R_ScenePackets_TemporalSurfaceMotion( surf ) == TEMPORAL_SURFACE_MOTION_NONE
-				: !RB_MotionVectorSurfaceEligible( surf ) ) {
+		if ( R_ScenePackets_TemporalSurfaceMotion( surf ) == TEMPORAL_SURFACE_MOTION_NONE ) {
 			continue;
 		}
 		if ( surf->space != backEnd.currentSpace ) {
@@ -3716,31 +3763,47 @@ static bool RB_RenderMotionVectorBuffer( drawSurf_t **drawSurfs, int numDrawSurf
 }
 
 static void RB_STD_MotionBlur( void ) {
-	if ( r_skipPostProcess.GetBool() || !r_motionBlur.GetBool() || !glConfig.GLSLProgramAvailable ) {
+	if ( !r_motionBlur.GetBool() ) {
+		RB_ResetMotionBlurHistory();
+		return;
+	}
+	if ( r_skipPostProcess.GetBool() || !glConfig.GLSLProgramAvailable ) {
+		if ( RB_IsMainMotionBlurView() ) {
+			RB_MotionBlurRecordDisabled( r_skipPostProcess.GetBool() ? "r_skipPostProcess" : "no GLSL programs" );
+		}
 		RB_ResetMotionBlurHistory();
 		return;
 	}
 
+	motionBlurStats_t &stats = R_TemporalPresentation_MotionBlurStats();
 	if ( !RB_IsMainMotionBlurView() ) {
 		// A portal sky, mirror or remote camera does not advance or invalidate
 		// the main camera's timeline. History validation handles discontinuities
 		// when the next main view arrives.
+		if ( backEnd.viewDef != NULL && backEnd.viewDef->viewEntitys != NULL ) {
+			stats.subviewSkips++;
+		}
 		return;
 	}
+	stats.mainViews++;
+	stats.lastFrame = backEnd.frameCount;
 
 	if ( !r_motionBlurDebug.GetBool() &&
 		( r_motionBlurStrength.GetFloat() <= 0.0f || r_motionBlurMaxPixels.GetFloat() <= 0.0f || r_motionBlurSamples.GetInteger() <= 0 ) ) {
+		RB_MotionBlurRecordDisabled( "zero strength, radius or samples" );
 		RB_ResetMotionBlurHistory();
 		return;
 	}
 
 	if ( r_jitter.GetBool() ) {
+		RB_MotionBlurRecordDisabled( "r_jitter" );
 		RB_ResetMotionBlurHistory();
 		return;
 	}
 
 	RB_InitMotionBlurStage();
 	if ( !R_ValidateGLSLProgram( &rbMotionBlurStage ) ) {
+		RB_MotionBlurRecordDisabled( "motion blur program unavailable" );
 		RB_ResetMotionBlurHistory();
 		return;
 	}
@@ -3748,12 +3811,14 @@ static void RB_STD_MotionBlur( void ) {
 	const int viewportWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
 	const int viewportHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
 	if ( viewportWidth <= 0 || viewportHeight <= 0 ) {
+		RB_MotionBlurRecordDisabled( "empty viewport" );
 		RB_ResetMotionBlurHistory();
 		return;
 	}
 
 	rbMotionBlurViewState_t currentState;
 	if ( !RB_BuildMotionBlurViewState( currentState, viewportWidth, viewportHeight ) ) {
+		RB_MotionBlurRecordDisabled( "degenerate projection" );
 		RB_ResetMotionBlurHistory();
 		return;
 	}
@@ -3761,7 +3826,17 @@ static void RB_STD_MotionBlur( void ) {
 	const rbMotionBlurViewState_t previousState = rbMotionBlurHistory;
 	const bool objectVectorsRequested = RB_MotionBlurObjectVectorsRequested();
 	const bool cameraMovedEnough = rbMotionBlurHistoryValid && RB_MotionBlurCameraMovedEnough( currentState, previousState );
-	const bool historyUsable = RB_MotionBlurHistoryUsable( currentState, previousState, objectVectorsRequested );
+	const motionBlurHistoryResult_t historyResult =
+		RB_MotionBlurValidateHistory( currentState, previousState, objectVectorsRequested );
+	stats.history[historyResult]++;
+	const bool historyUsable = historyResult == MOTION_BLUR_HISTORY_USABLE;
+	if ( historyUsable ) {
+		MotionBlurCore_UpdateShutter( rbMotionBlurShutter,
+			currentState.renderTime - previousState.renderTime );
+	} else if ( historyResult != MOTION_BLUR_HISTORY_CAMERA_STILL ) {
+		// a still camera keeps the frame interval; a discontinuity does not
+		MotionBlurCore_ResetShutter( rbMotionBlurShutter );
+	}
 	rbMotionBlurHistory = currentState;
 	rbMotionBlurHistoryValid = true;
 
@@ -3776,11 +3851,17 @@ static void RB_STD_MotionBlur( void ) {
 	idImage *sceneImage = globalImages->currentRenderImage;
 	idImage *depthImage = globalImages->currentDepthImage;
 	if ( sceneImage == NULL || depthImage == NULL ) {
+		RB_MotionBlurRecordDisabled( "scene or depth capture unavailable" );
 		RB_ResetMotionBlurHistory();
 		return;
 	}
 
 	RB_LogComment( "---------- RB_STD_MotionBlur ----------\n" );
+
+	// Temporal AA jitters this frame's projection; cancel it out of the
+	// previous camera so neither the history test nor the vectors see it.
+	rbMotionBlurViewState_t alignedPreviousState;
+	const bool jitterAligned = RB_MotionBlurAlignPreviousState( currentState, previousState, alignedPreviousState );
 
 	RB_CaptureCurrentRenderImage( viewportWidth, viewportHeight );
 	if ( !backEnd.currentDepthCopied ) {
@@ -3788,10 +3869,12 @@ static void RB_STD_MotionBlur( void ) {
 	}
 	rbMotionVectorImageValid = false;
 	if ( objectVectorsRequested ) {
-		RB_RenderMotionVectorBuffer( drawSurfs, numDrawSurfs, previousState,
-			viewportWidth, viewportHeight, depthImage, rbMotionBlurEntityHistory, false );
+		RB_RenderMotionVectorBuffer( drawSurfs, numDrawSurfs, alignedPreviousState,
+			viewportWidth, viewportHeight, depthImage, rbMotionBlurEntityHistory, RB_MOTION_VECTORS_BLUR );
 	}
 	RB_UpdateMotionBlurEntityHistory( drawSurfs, numDrawSurfs );
+	const float shutterScale = MotionBlurCore_ShutterScale( rbMotionBlurShutter,
+		R_TemporalPresentation_MotionBlurShutterMsec() );
 
 	const int textureWidth = sceneImage->GetOpts().width;
 	const int textureHeight = sceneImage->GetOpts().height;
@@ -3854,7 +3937,7 @@ static void RB_STD_MotionBlur( void ) {
 		glUniform4fvARB( rbMotionBlurStage.shaderParmLocations[RB_MOTION_BLUR_UNIFORM_CURRENT_RECONSTRUCT_INFO], 1, currentState.reconstructInfo );
 	}
 	if ( rbMotionBlurStage.shaderParmLocations[RB_MOTION_BLUR_UNIFORM_PREVIOUS_PROJECT_INFO] >= 0 ) {
-		glUniform4fvARB( rbMotionBlurStage.shaderParmLocations[RB_MOTION_BLUR_UNIFORM_PREVIOUS_PROJECT_INFO], 1, previousState.projectInfo );
+		glUniform4fvARB( rbMotionBlurStage.shaderParmLocations[RB_MOTION_BLUR_UNIFORM_PREVIOUS_PROJECT_INFO], 1, alignedPreviousState.projectInfo );
 	}
 	if ( rbMotionBlurStage.shaderParmLocations[RB_MOTION_BLUR_UNIFORM_DEPTH_PROJECTION] >= 0 ) {
 		glUniform2fvARB( rbMotionBlurStage.shaderParmLocations[RB_MOTION_BLUR_UNIFORM_DEPTH_PROJECTION], 1, currentState.depthProjection );
@@ -3876,7 +3959,7 @@ static void RB_STD_MotionBlur( void ) {
 		const GLfloat objectParams[4] = {
 			rbMotionVectorImageValid ? 1.0f : 0.0f,
 			cameraMovedEnough ? 1.0f : 0.0f,
-			0.0f,
+			shutterScale,
 			0.0f
 		};
 		glUniform4fvARB( rbMotionBlurStage.shaderParmLocations[RB_MOTION_BLUR_UNIFORM_OBJECT_PARAMS], 1, objectParams );
@@ -3896,6 +3979,29 @@ static void RB_STD_MotionBlur( void ) {
 	// The destination changed after the pre-blur capture. Let any later pass that
 	// samples the current scene take a fresh copy of the blurred image.
 	backEnd.currentRenderCopied = false;
+	stats.drawnViews++;
+	if ( rbMotionVectorImageValid ) {
+		stats.objectVectorViews++;
+	}
+	if ( jitterAligned ) {
+		stats.jitterAlignedViews++;
+	}
+	{
+		motionBlurCameraSample_t currentSample;
+		motionBlurCameraSample_t previousSample;
+		RB_MotionBlurCameraSample( currentState, currentSample );
+		RB_MotionBlurCameraSample( previousState, previousSample );
+		const float centerPixels = MotionBlurCore_CenterRotationPixels( currentSample, previousSample,
+			static_cast<float>( viewportWidth ), static_cast<float>( viewportHeight ) );
+		stats.centerSamples++;
+		stats.centerPixelsSum += centerPixels;
+		stats.scaledCenterPixelsSum += centerPixels * shutterScale;
+	}
+	stats.lastShutterScale = shutterScale;
+	stats.lastFrameMsec = rbMotionBlurShutter.valid ? rbMotionBlurShutter.smoothedFrameMsec : 0.0f;
+	stats.lastStrength = params[0];
+	stats.lastMaxPixels = params[1];
+	stats.lastSamples = static_cast<int>( params[2] );
 	static bool logged = false;
 	if ( !logged ) {
 		logged = true;
@@ -5795,41 +5901,13 @@ static void RB_RejectTemporalHistoryWrite(
 	rbTemporalResolveRejectedGeneration = command.historyGeneration;
 }
 
-static int RB_CompareTemporalEntityHistory( const void *a, const void *b ) {
-	return static_cast<const rbMotionBlurEntityHistory_t *>( a )->entityIndex
-		- static_cast<const rbMotionBlurEntityHistory_t *>( b )->entityIndex;
-}
-
 static void RB_UpdateTemporalEntityHistory( const viewDef_t *viewDef,
 		unsigned int generation ) {
-	rbTemporalNextEntityHistory.Clear();
 	if ( viewDef != NULL ) {
-		// Every moving entity the next frame may draw exactly (rigid or posed,
-		// the view weapon included). Kept sorted for the per-surface lookups.
-		for ( int i = 0; i < viewDef->numDrawSurfs; i++ ) {
-			const drawSurf_t *surf = viewDef->drawSurfs[i];
-			if ( surf == NULL || surf->space == NULL || surf->space->entityDef == NULL
-					|| surf->space->entityDef->index < 0
-					|| ( surf->space->entityDef->parms.hModel != NULL
-						&& surf->space->entityDef->parms.hModel->IsStaticWorldModel() ) ) {
-				continue;
-			}
-			rbMotionBlurEntityHistory_t &entry = rbTemporalNextEntityHistory.Alloc();
-			entry.entityIndex = surf->space->entityDef->index;
-			memcpy( entry.modelMatrix, surf->space->modelMatrix, sizeof( entry.modelMatrix ) );
-		}
-		if ( rbTemporalNextEntityHistory.Num() > 1 ) {
-			qsort( rbTemporalNextEntityHistory.Ptr(), rbTemporalNextEntityHistory.Num(),
-				sizeof( rbMotionBlurEntityHistory_t ), RB_CompareTemporalEntityHistory );
-			int unique = 1;
-			for ( int i = 1; i < rbTemporalNextEntityHistory.Num(); i++ ) {
-				if ( rbTemporalNextEntityHistory[i].entityIndex
-						!= rbTemporalNextEntityHistory[unique - 1].entityIndex ) {
-					rbTemporalNextEntityHistory[unique++] = rbTemporalNextEntityHistory[i];
-				}
-			}
-			rbTemporalNextEntityHistory.SetNum( unique, false );
-		}
+		RB_CollectMovingEntityHistory( viewDef->drawSurfs, viewDef->numDrawSurfs,
+			rbTemporalNextEntityHistory );
+	} else {
+		rbTemporalNextEntityHistory.Clear();
 	}
 	rbTemporalEntityHistory.Swap( rbTemporalNextEntityHistory );
 	rbTemporalNextEntityHistory.Clear();
@@ -6097,7 +6175,7 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 			velocityValid = RB_RenderMotionVectorBuffer(
 				command.viewDef->drawSurfs, command.viewDef->numDrawSurfs,
 				previousState, sceneWidth, sceneHeight, depthImage,
-				rbTemporalEntityHistory, true, &velocityComplete );
+				rbTemporalEntityHistory, RB_MOTION_VECTORS_TEMPORAL, &velocityComplete );
 			backEnd.viewDef = const_cast<viewDef_t *>( savedViewDef );
 		}
 	}

@@ -1052,6 +1052,13 @@ void R_SetupProjection( void ) {
 	width = xmax - xmin;
 	height = ymax - ymin;
 
+	// Post effects with their own camera history (motion blur) compare and
+	// reproject without the sub-pixel jitter; the backend may also recenter
+	// the applied offsets, so record the jitter-free values explicitly.
+	tr.viewDef->temporalNeutralProjectionOffset.Set(
+		( xmax + xmin ) / width, ( ymax + ymin ) / height );
+	tr.viewDef->temporalNeutralProjectionValid = true;
+
 	jitterx = jitterx * width / ( tr.viewDef->viewport.x2 - tr.viewDef->viewport.x1 + 1 );
 	xmin += jitterx;
 	xmax += jitterx;

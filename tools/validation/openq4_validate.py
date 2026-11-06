@@ -732,6 +732,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "renderer_screenshot_readback.py",
         root / "tools" / "tests" / "renderer_supersampling_safety.py",
         root / "tools" / "tests" / "renderer_temporal_presentation.py",
+        root / "tools" / "tests" / "renderer_motion_blur_contract.py",
         root / "tools" / "tests" / "renderer_texture_filter.py",
         root / "tools" / "tests" / "renderer_vulkan_decal_compatibility.py",
         root / "tools" / "tests" / "renderer_vulkan_gui_residency.py",

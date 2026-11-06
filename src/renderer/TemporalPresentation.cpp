@@ -4,6 +4,7 @@
 #include "tr_local.h"
 #include "RendererMetrics.h"
 #include "TemporalPresentation.h"
+#include "MotionBlurCore.h"
 
 idCVar r_dynamicResolutionMinScale( "r_dynamicResolutionMinScale", "50",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
@@ -818,6 +819,74 @@ void R_TemporalPresentation_RecordOwnership( const temporalOwnershipStats_t &sta
 	rg_temporalOwnershipStats = stats;
 }
 
+static motionBlurStats_t rg_motionBlurStats;
+static bool rg_motionBlurStatsInitialized = false;
+
+void R_TemporalPresentation_ResetMotionBlurStats( void ) {
+	memset( &rg_motionBlurStats, 0, sizeof( rg_motionBlurStats ) );
+	rg_motionBlurStats.lastFrame = -1;
+	rg_motionBlurStats.lastShutterScale = 1.0f;
+	rg_motionBlurStats.lastDisabledReason = "none";
+	rg_motionBlurStatsInitialized = true;
+}
+
+motionBlurStats_t &R_TemporalPresentation_MotionBlurStats( void ) {
+	if ( !rg_motionBlurStatsInitialized ) {
+		R_TemporalPresentation_ResetMotionBlurStats();
+	}
+	return rg_motionBlurStats;
+}
+
+float R_TemporalPresentation_MotionBlurShutterMsec( void ) {
+	return idMath::ClampFloat( 0.0f, 100.0f, r_motionBlurShutterMsec.GetFloat() );
+}
+
+bool R_TemporalPresentation_PreviousPositionsRequested( void ) {
+	if ( R_TemporalPresentation_TemporalAARequested() ) {
+		return true;
+	}
+	return r_motionBlur.GetBool() && r_motionBlurObjectVectors.GetBool()
+		&& !r_skipPostProcess.GetBool() && !R_TemporalPresentation_VRFrame();
+}
+
+void R_TemporalPresentation_PrintMotionBlurStatus_f( const idCmdArgs &args ) {
+	R_RenderThread_Sync( "motion blur stats" );
+	if ( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "reset" ) == 0 ) {
+		R_TemporalPresentation_ResetMotionBlurStats();
+		common->Printf( "Motion blur: statistics reset\n" );
+		return;
+	}
+	const motionBlurStats_t &stats = R_TemporalPresentation_MotionBlurStats();
+	common->Printf(
+		"Motion blur: requested=%d objectVectors=%d shutterMsec=%.3f taaRequested=%d mainViews=%d drawn=%d objectVectorViews=%d jitterAligned=%d subviewSkips=%d disabled=%d lastDisabled=%s\n",
+		r_motionBlur.GetBool() ? 1 : 0,
+		r_motionBlurObjectVectors.GetBool() ? 1 : 0,
+		R_TemporalPresentation_MotionBlurShutterMsec(),
+		R_TemporalPresentation_TemporalAARequested() ? 1 : 0,
+		stats.mainViews, stats.drawnViews, stats.objectVectorViews,
+		stats.jitterAlignedViews, stats.subviewSkips, stats.disabledViews,
+		stats.lastDisabledReason != NULL ? stats.lastDisabledReason : "none" );
+	idStr history;
+	for ( int i = 0; i < MOTION_BLUR_HISTORY_RESULT_COUNT; i++ ) {
+		history += va( "%s%s=%d", i > 0 ? " " : "",
+			MotionBlurCore_HistoryResultName( static_cast<motionBlurHistoryResult_t>( i ) ),
+			stats.history[i] );
+	}
+	common->Printf( "Motion blur history: %s\n", history.c_str() );
+	common->Printf(
+		"Motion blur ownership: rigid=%d posed=%d weapon=%d weaponStill=%d cameraFallback=%d\n",
+		stats.rigid, stats.posed, stats.weapon, stats.weaponStill, stats.cameraFallback );
+	common->Printf(
+		"Motion blur effective: frame=%d strength=%.3f maxPixels=%.1f samples=%d shutterScale=%.3f frameMsec=%.3f\n",
+		stats.lastFrame, stats.lastStrength, stats.lastMaxPixels, stats.lastSamples,
+		stats.lastShutterScale, stats.lastFrameMsec );
+	const float centerSamples = static_cast<float>( Max( 1, stats.centerSamples ) );
+	common->Printf(
+		"Motion blur camera: samples=%d centerPixelsPerFrame=%.4f scaledCenterPixels=%.4f\n",
+		stats.centerSamples, stats.centerPixelsSum / centerSamples,
+		stats.scaledCenterPixelsSum / centerSamples );
+}
+
 void R_TemporalPresentation_CapturePreviousPositions( srfTriangles_t *tri ) {
 	if ( tri == NULL ) {
 		return;
@@ -832,7 +901,7 @@ void R_TemporalPresentation_CapturePreviousPositions( srfTriangles_t *tri ) {
 	// frame, or the "previous" positions would span a gap.
 	const bool continuous = tri->verts != NULL && tri->numVerts > 0
 		&& tri->positionsFrame == frame - 1;
-	if ( !continuous || !R_TemporalPresentation_TemporalAARequested() ) {
+	if ( !continuous || !R_TemporalPresentation_PreviousPositionsRequested() ) {
 		tri->previousPositionsFrame = -1;
 		return;
 	}
@@ -865,7 +934,7 @@ struct vertCache_s *R_TemporalPresentation_PreviousPositionCache(
 	if ( drawSurf == NULL || drawSurf->geo == NULL || drawSurf->space == NULL
 			|| drawSurf->space->entityDef == NULL || drawSurf->material == NULL
 			|| tr.viewDef == NULL || tr.viewDef->isSubview
-			|| !R_TemporalPresentation_TemporalAARequested() ) {
+			|| !R_TemporalPresentation_PreviousPositionsRequested() ) {
 		return NULL;
 	}
 	const srfTriangles_t *tri = drawSurf->geo;

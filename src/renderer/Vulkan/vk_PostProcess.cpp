@@ -55,6 +55,7 @@
 #include "../HDRExposureCore.h"
 #include "../ModernGLExecutor.h"
 #include "../TemporalPresentation.h"
+#include "../MotionBlurCore.h"
 
 #undef snprintf
 #undef vsnprintf
@@ -224,6 +225,8 @@ typedef struct vkPostMotionViewState_s {
 	float						depthProjection[ 2 ];
 	float						projectionMatrix[ 16 ];
 	float						worldModelViewMatrix[ 16 ];
+	float						neutralProjectOffset[ 2 ];	// projectInfo[2]/[3] without TAA jitter
+	bool						forceUpdate;
 } vkPostMotionViewState_t;
 
 typedef struct vkPostMotionEntityHistory_s {
@@ -481,11 +484,20 @@ static void VK_Post_DestroyModule( VkShaderModule &module ) {
 void VK_SceneEffects_Shutdown( void );
 void VK_DebugTools_Shutdown( void );
 
+static motionBlurShutterState_t vkPostMotionShutter = { false, 0.0f };
+
 static void VK_Post_ResetMotionBlurHistory( void ) {
 	vkPostScene.motionHistoryValid = false;
 	vkPostScene.motionVectorValid = false;
 	vkPostMotionEntityHistory.Clear();
 	vkPostMotionNextEntityHistory.Clear();
+	MotionBlurCore_ResetShutter( vkPostMotionShutter );
+}
+
+static void VK_Post_MotionBlurRecordDisabled( const char *reason ) {
+	motionBlurStats_t &stats = R_TemporalPresentation_MotionBlurStats();
+	stats.disabledViews++;
+	stats.lastDisabledReason = reason;
 }
 
 void VK_PostProcess_ResetTemporalMotion( void ) {
@@ -1733,112 +1745,86 @@ static bool VK_Post_BuildMotionViewState( const viewDef_t *viewDef, vkPostMotion
 	state.depthProjection[ 1 ] = viewDef->projectionMatrix[ 14 ];
 	memcpy( state.projectionMatrix, viewDef->projectionMatrix, sizeof( state.projectionMatrix ) );
 	memcpy( state.worldModelViewMatrix, viewDef->worldSpace.modelViewMatrix, sizeof( state.worldModelViewMatrix ) );
+	if ( viewDef->temporalNeutralProjectionValid ) {
+		state.neutralProjectOffset[ 0 ] = viewDef->temporalNeutralProjectionOffset.x;
+		state.neutralProjectOffset[ 1 ] = viewDef->temporalNeutralProjectionOffset.y;
+	} else {
+		state.neutralProjectOffset[ 0 ] = state.projectInfo[ 2 ];
+		state.neutralProjectOffset[ 1 ] = state.projectInfo[ 3 ];
+	}
+	// Screenshots set forceUpdate to refresh dynamic models; only an authored
+	// camera cut (Camera.cpp) is a discontinuity.
+	state.forceUpdate = viewDef->renderView.forceUpdate && !viewDef->temporalCaptureFrame;
 	return true;
 }
 
-// RB_MotionBlurProjectionChanged
-static bool VK_Post_MotionProjectionChanged( const vkPostMotionViewState_t &current,
-		const vkPostMotionViewState_t &previous ) {
-	if ( idMath::Fabs( current.fovX - previous.fovX ) > 0.01f || idMath::Fabs( current.fovY - previous.fovY ) > 0.01f ) {
-		return true;
-	}
-	for ( int i = 0; i < 4; i++ ) {
-		if ( idMath::Fabs( current.projectInfo[ i ] - previous.projectInfo[ i ] ) > 0.0001f ) {
-			return true;
+static void VK_Post_MotionCameraSample( const vkPostMotionViewState_t &state, motionBlurCameraSample_t &sample ) {
+	sample.timeMsec = state.renderTime;
+	for ( int i = 0; i < 3; i++ ) {
+		sample.origin[ i ] = state.viewOrigin[ i ];
+		for ( int j = 0; j < 3; j++ ) {
+			sample.axis[ i ][ j ] = state.viewAxis[ i ][ j ];
 		}
 	}
-	for ( int i = 0; i < 2; i++ ) {
-		if ( idMath::Fabs( current.depthProjection[ i ] - previous.depthProjection[ i ] ) > 0.0001f ) {
-			return true;
-		}
-	}
-	return false;
+	sample.fov[ 0 ] = state.fovX;
+	sample.fov[ 1 ] = state.fovY;
+	sample.projectionNeutral[ 0 ] = state.projectInfo[ 0 ];
+	sample.projectionNeutral[ 1 ] = state.projectInfo[ 1 ];
+	sample.projectionNeutral[ 2 ] = state.neutralProjectOffset[ 0 ];
+	sample.projectionNeutral[ 3 ] = state.neutralProjectOffset[ 1 ];
+	sample.depthProjection[ 0 ] = state.depthProjection[ 0 ];
+	sample.depthProjection[ 1 ] = state.depthProjection[ 1 ];
 }
 
 // RB_MotionBlurCameraMovedEnough
 static bool VK_Post_MotionCameraMovedEnough( const vkPostMotionViewState_t &current,
 		const vkPostMotionViewState_t &previous ) {
-	if ( ( current.viewOrigin - previous.viewOrigin ).LengthSqr() >= Square( 0.10f ) ) {
-		return true;
-	}
-	const float axisEpsilonSqr = Square( 0.00075f );
-	for ( int i = 0; i < 3; i++ ) {
-		if ( ( current.viewAxis[ i ] - previous.viewAxis[ i ] ).LengthSqr() >= axisEpsilonSqr ) {
-			return true;
-		}
-	}
-	return false;
+	motionBlurCameraSample_t currentSample;
+	motionBlurCameraSample_t previousSample;
+	VK_Post_MotionCameraSample( current, currentSample );
+	VK_Post_MotionCameraSample( previous, previousSample );
+	return MotionBlurCore_CameraMovedEnough( currentSample, previousSample );
 }
 
-// RB_MotionBlurHistoryUsable
-static bool VK_Post_MotionHistoryUsable( const vkPostMotionViewState_t &current,
+// RB_MotionBlurValidateHistory
+static motionBlurHistoryResult_t VK_Post_MotionValidateHistory( const vkPostMotionViewState_t &current,
 		const vkPostMotionViewState_t &previous, bool allowStillCameraObjectVectors ) {
-	if ( !vkPostScene.motionHistoryValid || r_jitter.GetBool() ) {
-		return false;
-	}
-	if ( current.videoRestartCount != previous.videoRestartCount ) {
-		return false;
-	}
-	if ( current.renderWorld != previous.renderWorld || current.mapName.Icmp( previous.mapName ) != 0 ) {
-		return false;
-	}
-	if ( current.viewportWidth != previous.viewportWidth || current.viewportHeight != previous.viewportHeight ) {
-		return false;
-	}
-	if ( current.renderTime <= previous.renderTime || current.renderTime - previous.renderTime > 100 ) {
-		return false;
-	}
-	if ( !allowStillCameraObjectVectors && !VK_Post_MotionCameraMovedEnough( current, previous ) ) {
-		return false;
-	}
-	if ( ( current.viewOrigin - previous.viewOrigin ).LengthSqr() > Square( 512.0f ) ) {
-		return false;
-	}
-	return !VK_Post_MotionProjectionChanged( current, previous );
+	motionBlurHistoryContext_t context;
+	context.historyValid = vkPostScene.motionHistoryValid;
+	context.videoRestarted = current.videoRestartCount != previous.videoRestartCount;
+	context.worldChanged = current.renderWorld != previous.renderWorld
+		|| current.mapName.Icmp( previous.mapName ) != 0;
+	context.viewportChanged = current.viewportWidth != previous.viewportWidth
+		|| current.viewportHeight != previous.viewportHeight;
+	context.explicitCut = current.forceUpdate;
+	context.allowStillCamera = allowStillCameraObjectVectors;
+	motionBlurCameraSample_t currentSample;
+	motionBlurCameraSample_t previousSample;
+	VK_Post_MotionCameraSample( current, currentSample );
+	VK_Post_MotionCameraSample( previous, previousSample );
+	return MotionBlurCore_ValidateHistory( context, currentSample, previousSample );
 }
 
-static bool VK_Post_FindMotionEntityHistory( const idList<vkPostMotionEntityHistory_t> &history,
-		const idRenderEntityLocal *entity, float previousModelMatrix[ 16 ] ) {
-	for ( int i = 0; i < history.Num(); i++ ) {
-		if ( history[ i ].entityIndex == entity->index && history[ i ].model == entity->parms.hModel ) {
-			memcpy( previousModelMatrix, history[ i ].modelMatrix, sizeof( float ) * 16 );
-			return true;
-		}
-	}
-	return false;
+// RB_MotionBlurAlignPreviousState: the previous camera with this frame's jitter
+static bool VK_Post_MotionAlignPreviousState( const vkPostMotionViewState_t &current,
+		const vkPostMotionViewState_t &previous, vkPostMotionViewState_t &aligned ) {
+	aligned = previous;
+	const float currentApplied[ 2 ] = { current.projectInfo[ 2 ], current.projectInfo[ 3 ] };
+	float offsets[ 2 ];
+	MotionBlurCore_AlignPreviousOffsets( currentApplied, current.neutralProjectOffset,
+		previous.neutralProjectOffset, offsets );
+	aligned.projectInfo[ 2 ] = aligned.projectionMatrix[ 8 ] = offsets[ 0 ];
+	aligned.projectInfo[ 3 ] = aligned.projectionMatrix[ 9 ] = offsets[ 1 ];
+	return currentApplied[ 0 ] != current.neutralProjectOffset[ 0 ]
+		|| currentApplied[ 1 ] != current.neutralProjectOffset[ 1 ];
 }
 
-// RB_UpdateMotionBlurEntityHistory: the first eligible surface of each entity
-static void VK_Post_UpdateMotionEntityHistory( const viewDef_t *viewDef,
-		idList<vkPostMotionEntityHistory_t> &history, idList<vkPostMotionEntityHistory_t> &nextHistory ) {
-	nextHistory.Clear();
-	for ( int i = 0; i < viewDef->numDrawSurfs; i++ ) {
-		const drawSurf_t *surf = viewDef->drawSurfs[ i ];
-		if ( !R_ScenePackets_TemporalRigidMotionEligible( surf ) ) {
-			continue;
-		}
-		const int entityIndex = surf->space->entityDef->index;
-		bool known = false;
-		for ( int j = 0; j < nextHistory.Num(); j++ ) {
-			if ( nextHistory[ j ].entityIndex == entityIndex ) {
-				known = true;
-				break;
-			}
-		}
-		if ( known ) {
-			continue;
-		}
-		vkPostMotionEntityHistory_t &entry = nextHistory.Alloc();
-		entry.entityIndex = entityIndex;
-		entry.model = surf->space->entityDef->parms.hModel;
-		memcpy( entry.modelMatrix, surf->space->modelMatrix, sizeof( entry.modelMatrix ) );
-	}
-	history.Swap( nextHistory );
-	nextHistory.Clear();
-}
+static void VK_Post_UpdateTemporalMotionEntityHistory( const viewDef_t *viewDef,
+		idList<vkPostMotionEntityHistory_t> &history, idList<vkPostMotionEntityHistory_t> &nextHistory );
 
+// RB_UpdateMotionBlurEntityHistory: every moving entity, as temporal AA keeps
 static void VK_Post_UpdateMotionEntityHistory( const viewDef_t *viewDef ) {
-	VK_Post_UpdateMotionEntityHistory( viewDef, vkPostMotionEntityHistory, vkPostMotionNextEntityHistory );
+	VK_Post_UpdateTemporalMotionEntityHistory( viewDef, vkPostMotionEntityHistory, vkPostMotionNextEntityHistory );
 }
 
 static int VK_Post_CompareMotionEntityHistory( const void *a, const void *b ) {
@@ -1965,6 +1951,11 @@ static bool VK_Post_RenderMotionVectors( const viewDef_t *viewDef, const vkPostM
 		idImage *&vectorImage, idRenderTexture *&vectorTarget,
 		int width, int height, bool temporal, bool &complete ) {
 	complete = false;
+	// Motion blur (temporal == false) draws the same exact vectors as temporal
+	// AA - rigid, posed and view-weapon surfaces - and leaves every other pixel
+	// to camera reprojection; a view weapon without one is written as zero
+	// motion, since camera reprojection would smear it whenever the view turns.
+	motionBlurStats_t *blurStats = temporal ? NULL : &R_TemporalPresentation_MotionBlurStats();
 	const int sceneCubeFace = VK_Exec_ActiveCubeFace();
 	const VkShaderModule vertModule = VK_Post_SceneModule( VK_POST_MODULE_MOTION_VECTORS_VERT );
 	const VkShaderModule fragModule = VK_Post_SceneModule( VK_POST_MODULE_MOTION_VECTORS_FRAG );
@@ -1993,17 +1984,17 @@ static bool VK_Post_RenderMotionVectors( const viewDef_t *viewDef, const vkPostM
 			GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO, VK_EXTRA_VERTEX_POSITION, 0 );
 	// Temporal AA owns every moving surface per pixel: posed surfaces add a
 	// previous-position stream, everything without exact motion marks the blue
-	// reactive channel only. Motion blur keeps the rigid-only pass.
+	// reactive channel only. Motion blur shares the exact pipelines only.
 	VkPipeline previousPipeline = VK_NULL_HANDLE;
 	VkPipeline reactivePipeline = VK_NULL_HANDLE;
+	const VkShaderModule previousVertModule = VK_Post_SceneModule( VK_POST_MODULE_MOTION_VECTORS_PREVIOUS_VERT );
+	if ( previousVertModule != VK_NULL_HANDLE ) {
+		previousPipeline = VK_Exec_ExtraPipeline( VK_POST_MOTION_VECTORS_PREVIOUS, previousVertModule, fragModule,
+			GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO, VK_EXTRA_VERTEX_POSITION_PREVIOUS, 0 );
+	}
 	if ( temporal ) {
-		const VkShaderModule previousVertModule = VK_Post_SceneModule( VK_POST_MODULE_MOTION_VECTORS_PREVIOUS_VERT );
 		const VkShaderModule reactiveVertModule = VK_Post_SceneModule( VK_POST_MODULE_MOTION_VECTORS_REACTIVE_VERT );
 		const VkShaderModule reactiveFragModule = VK_Post_SceneModule( VK_POST_MODULE_MOTION_VECTORS_REACTIVE_FRAG );
-		if ( previousVertModule != VK_NULL_HANDLE ) {
-			previousPipeline = VK_Exec_ExtraPipeline( VK_POST_MOTION_VECTORS_PREVIOUS, previousVertModule, fragModule,
-				GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO, VK_EXTRA_VERTEX_POSITION_PREVIOUS, 0 );
-		}
 		if ( reactiveVertModule != VK_NULL_HANDLE && reactiveFragModule != VK_NULL_HANDLE ) {
 			reactivePipeline = VK_Exec_ExtraPipeline( VK_POST_MOTION_VECTORS_REACTIVE, reactiveVertModule, reactiveFragModule,
 				GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_REDMASK | GLS_GREENMASK | GLS_ALPHAMASK,
@@ -2044,42 +2035,55 @@ static bool VK_Post_RenderMotionVectors( const viewDef_t *viewDef, const vkPostM
 		ownership.frameNumber = backEnd.frameCount;
 		for ( int i = 0; i < viewDef->numDrawSurfs; i++ ) {
 			const drawSurf_t *surf = viewDef->drawSurfs[ i ];
-			temporalSurfaceMotion_t motion = TEMPORAL_SURFACE_MOTION_NONE;
-			if ( temporal ) {
-				motion = R_ScenePackets_TemporalSurfaceMotion( surf );
-			} else if ( R_ScenePackets_TemporalRigidMotionEligible( surf ) ) {
-				motion = TEMPORAL_SURFACE_MOTION_RIGID;
-			}
+			temporalSurfaceMotion_t motion = R_ScenePackets_TemporalSurfaceMotion( surf );
 			if ( motion == TEMPORAL_SURFACE_MOTION_NONE ) {
 				continue;
 			}
 			if ( temporal && motion != TEMPORAL_SURFACE_MOTION_REACTIVE ) { ++vkTemporalMotionEligible; }
 			// a surface that should move exactly but cannot owns no history at all
 			bool noHistory = false;
+			bool weaponStill = false;
 			float previousModelMatrix[ 16 ];
-			if ( motion != TEMPORAL_SURFACE_MOTION_REACTIVE && !( temporal
-					? VK_Post_FindTemporalMotionEntityHistory( entityHistory, surf->space->entityDef, previousModelMatrix )
-					: VK_Post_FindMotionEntityHistory( entityHistory, surf->space->entityDef, previousModelMatrix ) ) ) {
-				if ( !temporal ) {
-					complete = false;
-					continue;
-				}
+			if ( motion != TEMPORAL_SURFACE_MOTION_REACTIVE
+					&& !VK_Post_FindTemporalMotionEntityHistory( entityHistory, surf->space->entityDef, previousModelMatrix ) ) {
 				// newly visible: no previous transform, so it owns no history yet
 				motion = TEMPORAL_SURFACE_MOTION_REACTIVE;
 				noHistory = true;
 			}
 			const srfTriangles_t *tri = surf->geo;
+			if ( blurStats != NULL && motion == TEMPORAL_SURFACE_MOTION_REACTIVE ) {
+				if ( !surf->space->weaponDepthHack ) {
+					// camera reprojection covers this surface's pixels
+					blurStats->cameraFallback++;
+					continue;
+				}
+				weaponStill = true;
+				motion = TEMPORAL_SURFACE_MOTION_RIGID;
+			}
 			if ( tri->ambientCache == NULL || tri->indexes == NULL
 					|| !VK_Exec_BindTriGeometry( cmd, slot, tri ) ) {
 				complete = false;
-				ownership.missed++;
+				if ( blurStats != NULL ) {
+					blurStats->cameraFallback++;
+				} else {
+					ownership.missed++;
+				}
 				continue;
 			}
 			if ( motion == TEMPORAL_SURFACE_MOTION_PREVIOUS_POSITIONS
 					&& ( previousPipeline == VK_NULL_HANDLE
 						|| !VK_Exec_BindPreviousPositions( cmd, slot, surf ) ) ) {
-				motion = TEMPORAL_SURFACE_MOTION_REACTIVE;
-				noHistory = true;
+				if ( blurStats != NULL ) {
+					if ( !surf->space->weaponDepthHack ) {
+						blurStats->cameraFallback++;
+						continue;
+					}
+					weaponStill = true;
+					motion = TEMPORAL_SURFACE_MOTION_RIGID;
+				} else {
+					motion = TEMPORAL_SURFACE_MOTION_REACTIVE;
+					noHistory = true;
+				}
 			}
 			const VkPipeline wantedPipeline = motion == TEMPORAL_SURFACE_MOTION_REACTIVE ? reactivePipeline
 				: ( motion == TEMPORAL_SURFACE_MOTION_PREVIOUS_POSITIONS ? previousPipeline : pipeline );
@@ -2088,7 +2092,18 @@ static bool VK_Post_RenderMotionVectors( const viewDef_t *viewDef, const vkPostM
 				ownership.missed++;
 				continue;
 			}
-			if ( motion == TEMPORAL_SURFACE_MOTION_REACTIVE ) {
+			if ( blurStats != NULL ) {
+				if ( weaponStill ) {
+					blurStats->weaponStill++;
+				} else if ( motion == TEMPORAL_SURFACE_MOTION_PREVIOUS_POSITIONS ) {
+					blurStats->posed++;
+				} else {
+					blurStats->rigid++;
+				}
+				if ( surf->space->weaponDepthHack && !weaponStill ) {
+					blurStats->weapon++;
+				}
+			} else if ( motion == TEMPORAL_SURFACE_MOTION_REACTIVE ) {
 				ownership.reactive++;
 			} else {
 				if ( motion == TEMPORAL_SURFACE_MOTION_PREVIOUS_POSITIONS ) {
@@ -2107,7 +2122,7 @@ static bool VK_Post_RenderMotionVectors( const viewDef_t *viewDef, const vkPostM
 				boundPipeline = wantedPipeline;
 			}
 			// the view weapon is drawn into depth range 0..0.5
-			const bool wantWeaponRange = temporal && surf->space->weaponDepthHack;
+			const bool wantWeaponRange = surf->space->weaponDepthHack;
 			if ( wantWeaponRange != weaponDepthRange ) {
 				weaponDepthRange = wantWeaponRange;
 				viewport.maxDepth = wantWeaponRange ? 0.5f : 1.0f;
@@ -2162,9 +2177,14 @@ static bool VK_Post_RenderMotionVectors( const viewDef_t *viewDef, const vkPostM
 			// ignores, so last frame's plain projection still matches.
 			vkPostMotionVectorPush_t push;
 			VK_BuildSurfMVP( viewDef, surf, push.currentMvp );
-			float previousModelView[ 16 ];
-			myGlMultMatrix( previousModelMatrix, previous.worldModelViewMatrix, previousModelView );
-			myGlMultMatrix( previousModelView, previous.projectionMatrix, push.previousMvp );
+			if ( weaponStill ) {
+				// this frame's own transform: an exact, zero vector
+				memcpy( push.previousMvp, push.currentMvp, sizeof( push.previousMvp ) );
+			} else {
+				float previousModelView[ 16 ];
+				myGlMultMatrix( previousModelMatrix, previous.worldModelViewMatrix, previousModelView );
+				myGlMultMatrix( previousModelView, previous.projectionMatrix, push.previousMvp );
+			}
 			vkCmdPushConstants( cmd, layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 					0, sizeof( push ), &push );
 			vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
@@ -2250,24 +2270,39 @@ static void VK_Post_CopyVec3( float out[ 4 ], const idVec3 &value ) {
 
 // Returns true when it drew into the scene.
 static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *sceneTarget ) {
-	if ( r_skipPostProcess.GetBool() || !r_motionBlur.GetBool() ) {
+	if ( !r_motionBlur.GetBool() ) {
 		VK_Post_ResetMotionBlurHistory();
 		return false;
 	}
+	if ( r_skipPostProcess.GetBool() ) {
+		if ( VK_Post_IsMainMotionBlurView( viewDef ) ) {
+			VK_Post_MotionBlurRecordDisabled( "r_skipPostProcess" );
+		}
+		VK_Post_ResetMotionBlurHistory();
+		return false;
+	}
+	motionBlurStats_t &stats = R_TemporalPresentation_MotionBlurStats();
 	if ( !VK_Post_IsMainMotionBlurView( viewDef ) ) {
 		// Subviews have independent cameras and must not invalidate the main
 		// camera's timeline. Its world, time, projection and restart checks
 		// below reject discontinuities when the next main view arrives.
+		if ( viewDef != NULL && viewDef->viewEntitys != NULL ) {
+			stats.subviewSkips++;
+		}
 		return false;
 	}
+	stats.mainViews++;
+	stats.lastFrame = backEnd.frameCount;
 	vkGpuPhaseScope timing( VK_Exec_ActiveCmd(), VK_GPU_PHASE_MOTION );
 	if ( !r_motionBlurDebug.GetBool() && ( r_motionBlurStrength.GetFloat() <= 0.0f
 			|| r_motionBlurMaxPixels.GetFloat() <= 0.0f || r_motionBlurSamples.GetInteger() <= 0 ) ) {
+		VK_Post_MotionBlurRecordDisabled( "zero strength, radius or samples" );
 		VK_Post_ResetMotionBlurHistory();
 		return false;
 	}
 	const VkShaderModule fragModule = VK_Post_SceneModule( VK_POST_MODULE_MOTION_BLUR );
 	if ( r_jitter.GetBool() || fragModule == VK_NULL_HANDLE ) {
+		VK_Post_MotionBlurRecordDisabled( r_jitter.GetBool() ? "r_jitter" : "motion blur program unavailable" );
 		VK_Post_ResetMotionBlurHistory();
 		return false;
 	}
@@ -2275,6 +2310,7 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 	const int height = VK_Post_ViewHeight( viewDef );
 	vkPostMotionViewState_t currentState;
 	if ( width <= 0 || height <= 0 || !VK_Post_BuildMotionViewState( viewDef, currentState, width, height ) ) {
+		VK_Post_MotionBlurRecordDisabled( width <= 0 || height <= 0 ? "empty viewport" : "degenerate projection" );
 		VK_Post_ResetMotionBlurHistory();
 		return false;
 	}
@@ -2283,7 +2319,16 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 	const bool objectVectorsRequested = r_motionBlurObjectVectors.GetBool();
 	const bool cameraMovedEnough = vkPostScene.motionHistoryValid
 		&& VK_Post_MotionCameraMovedEnough( currentState, previousState );
-	const bool historyUsable = VK_Post_MotionHistoryUsable( currentState, previousState, objectVectorsRequested );
+	const motionBlurHistoryResult_t historyResult =
+		VK_Post_MotionValidateHistory( currentState, previousState, objectVectorsRequested );
+	stats.history[ historyResult ]++;
+	const bool historyUsable = historyResult == MOTION_BLUR_HISTORY_USABLE;
+	if ( historyUsable ) {
+		MotionBlurCore_UpdateShutter( vkPostMotionShutter, currentState.renderTime - previousState.renderTime );
+	} else if ( historyResult != MOTION_BLUR_HISTORY_CAMERA_STILL ) {
+		// a still camera keeps the frame interval; a discontinuity does not
+		MotionBlurCore_ResetShutter( vkPostMotionShutter );
+	}
 	vkPostMotionHistory = currentState;
 	vkPostScene.motionHistoryValid = true;
 	if ( !historyUsable ) {
@@ -2295,13 +2340,18 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 	idImage *depthImage = VK_Post_FinalDepth( viewDef );
 	idImage *scene = VK_Post_CaptureScene( viewDef );
 	if ( depthImage == NULL || scene == NULL ) {
+		VK_Post_MotionBlurRecordDisabled( "scene or depth capture unavailable" );
 		VK_Post_ResetMotionBlurHistory();
 		return false;
 	}
+	// Temporal AA jitters this frame's projection; cancel it out of the
+	// previous camera so neither the history test nor the vectors see it.
+	vkPostMotionViewState_t alignedPreviousState;
+	const bool jitterAligned = VK_Post_MotionAlignPreviousState( currentState, previousState, alignedPreviousState );
 	vkPostScene.motionVectorValid = false;
 	if ( objectVectorsRequested ) {
 		bool complete = false;
-		vkPostScene.motionVectorValid = VK_Post_RenderMotionVectors( viewDef, previousState, depthImage, sceneTarget,
+		vkPostScene.motionVectorValid = VK_Post_RenderMotionVectors( viewDef, alignedPreviousState, depthImage, sceneTarget,
 			vkPostMotionEntityHistory, vkPostScene.motionVectorImage, vkPostScene.motionVectorTarget,
 			width, height, false, complete );
 	}
@@ -2309,6 +2359,8 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 	if ( VK_Exec_ActiveRenderTexture() != sceneTarget ) {
 		return false;
 	}
+	const float shutterScale = MotionBlurCore_ShutterScale( vkPostMotionShutter,
+		R_TemporalPresentation_MotionBlurShutterMsec() );
 
 	vkPostMotionBlurBlock_t block;
 	memset( &block, 0, sizeof( block ) );
@@ -2317,7 +2369,7 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 	block.texInfo[ 2 ] = (float)width;
 	block.texInfo[ 3 ] = (float)height;
 	memcpy( block.currentReconstructInfo, currentState.reconstructInfo, sizeof( block.currentReconstructInfo ) );
-	memcpy( block.previousProjectInfo, previousState.projectInfo, sizeof( block.previousProjectInfo ) );
+	memcpy( block.previousProjectInfo, alignedPreviousState.projectInfo, sizeof( block.previousProjectInfo ) );
 	block.depthInfo[ 0 ] = currentState.depthProjection[ 0 ];
 	block.depthInfo[ 1 ] = currentState.depthProjection[ 1 ];
 	VK_Post_CopyVec3( block.currentViewOrigin, currentState.viewOrigin );
@@ -2332,6 +2384,7 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 	block.motionBlurParams[ 3 ] = r_motionBlurDebug.GetBool() ? 1.0f : 0.0f;
 	block.motionBlurObjectParams[ 0 ] = vkPostScene.motionVectorValid ? 1.0f : 0.0f;
 	block.motionBlurObjectParams[ 1 ] = cameraMovedEnough ? 1.0f : 0.0f;
+	block.motionBlurObjectParams[ 2 ] = shutterScale;
 
 	idImage *velocity = vkPostScene.motionVectorValid ? vkPostScene.motionVectorImage : globalImages->blackImage;
 	const VkDescriptorSet sets[ 3 ] = {
@@ -2340,7 +2393,31 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 	const int uniformOffset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
 	const VkPipeline pipeline = VK_Exec_PostPipeline( VK_POST_MOTION_BLUR, vkPost.fullscreenVert, fragModule,
 			GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
-	return VK_Post_DrawSceneRect( viewDef, pipeline, sets, 3, uniformOffset );
+	const bool drew = VK_Post_DrawSceneRect( viewDef, pipeline, sets, 3, uniformOffset );
+	if ( drew ) {
+		stats.drawnViews++;
+		if ( vkPostScene.motionVectorValid ) {
+			stats.objectVectorViews++;
+		}
+		if ( jitterAligned ) {
+			stats.jitterAlignedViews++;
+		}
+		motionBlurCameraSample_t currentSample;
+		motionBlurCameraSample_t previousSample;
+		VK_Post_MotionCameraSample( currentState, currentSample );
+		VK_Post_MotionCameraSample( previousState, previousSample );
+		const float centerPixels = MotionBlurCore_CenterRotationPixels( currentSample, previousSample,
+			(float)width, (float)height );
+		stats.centerSamples++;
+		stats.centerPixelsSum += centerPixels;
+		stats.scaledCenterPixelsSum += centerPixels * shutterScale;
+		stats.lastShutterScale = shutterScale;
+		stats.lastFrameMsec = vkPostMotionShutter.valid ? vkPostMotionShutter.smoothedFrameMsec : 0.0f;
+		stats.lastStrength = block.motionBlurParams[ 0 ];
+		stats.lastMaxPixels = block.motionBlurParams[ 1 ];
+		stats.lastSamples = (int)block.motionBlurParams[ 2 ];
+	}
+	return drew;
 }
 
 // ---- bloom, tone map and grade (RB_STD_Bloom) ----

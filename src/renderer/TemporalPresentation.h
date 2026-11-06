@@ -111,6 +111,17 @@ const char *R_TemporalPresentation_HistoryResetReasonName(
 
 void R_TemporalPresentation_PrintStatus_f( const idCmdArgs &args );
 
+// Motion blur keeps its own camera history, independent of temporal AA, but
+// shares the posed-surface previous positions above. Capture them when either
+// consumer wants exact skinned motion.
+bool R_TemporalPresentation_PreviousPositionsRequested( void );
+// Cumulative per-view motion blur counters written by the active backend.
+struct motionBlurStats_t &R_TemporalPresentation_MotionBlurStats( void );
+void R_TemporalPresentation_ResetMotionBlurStats( void );
+// r_motionBlurShutterMsec, clamped; 0 keeps the original per-frame blur length.
+float R_TemporalPresentation_MotionBlurShutterMsec( void );
+void R_TemporalPresentation_PrintMotionBlurStatus_f( const idCmdArgs &args );
+
 #endif /* !__TEMPORAL_PRESENTATION_H__ */
 
 void R_TemporalPresentation_SubmitFrame( void );
