@@ -80,6 +80,30 @@ mapTri_t	*MergeTriLists( mapTri_t *a, mapTri_t *b ) {
 	return a;
 }
 
+/*
+===============
+AppendTriList
+
+MergeTriLists( *head, list ) for a list whose last triangle is *tail, without
+walking it. Loops that append per triangle would otherwise rescan everything
+gathered so far, which made large surfaces quadratic (issue #209).
+===============
+*/
+void AppendTriList( mapTri_t **head, mapTri_t **tail, mapTri_t *list ) {
+	if ( !list ) {
+		return;
+	}
+	if ( *tail ) {
+		(*tail)->next = list;
+	} else {
+		*head = list;
+	}
+	while ( list->next ) {
+		list = list->next;
+	}
+	*tail = list;
+}
+
 
 /*
 ===============
@@ -361,16 +385,17 @@ void	ClipTriList( const mapTri_t *list, const idPlane &plane, float epsilon,
 
 	*front = NULL;
 	*back = NULL;
+	mapTri_t *frontTail = NULL, *backTail = NULL;
 
 	for ( tri = list ; tri ; tri = tri->next ) {
 		w = WindingForTri( tri );
 		w->Split( plane, epsilon, &frontW, &backW );
 
 		newList = WindingToTriList( frontW, tri );
-		*front = MergeTriLists( *front, newList );
+		AppendTriList( front, &frontTail, newList );
 
 		newList = WindingToTriList( backW, tri );
-		*back = MergeTriLists( *back, newList );
+		AppendTriList( back, &backTail, newList );
 
 		delete w;
 	}

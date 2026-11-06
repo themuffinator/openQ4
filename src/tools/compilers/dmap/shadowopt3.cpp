@@ -1229,8 +1229,9 @@ srfTriangles_t *CreateLightShadow( optimizeGroup_t *shadowerGroups, const mapLig
 	mapTri_t	*combined;
 
 	combined = NULL;
+	mapTri_t *combinedTail = NULL;
 	for ( optimizeGroup_t *group = shadowerGroups ; group ; group = group->nextGroup ) {
-		combined = MergeTriLists( combined, CopyTriList( group->triList ) );
+		AppendTriList( &combined, &combinedTail, CopyTriList( group->triList ) );
 	}
 
 	if ( !combined ) {
