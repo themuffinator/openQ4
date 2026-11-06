@@ -506,6 +506,11 @@ static GLuint rg_modernClassicProgram = 0, rg_modernClassicTexture = 0, rg_moder
 static GLint rg_modernClassicMVP = -1, rg_modernClassicParams = -1;
 static int rg_modernClassicWidth = 0, rg_modernClassicHeight = 0;
 static GLuint R_ModernGLExecutor_CompileClassicLighting( void );
+// Forward draws whose classic lighting the corridor supplies: opaque surfaces
+// and cutouts (REN-02), which share the forward shader's classic-lighting fetch.
+static bool R_ModernGLExecutor_ClassicCorridorShaderKind( const int kind ) {
+	return kind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE || kind == MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST;
+}
 static void R_ModernGLExecutor_DeleteClassicLighting( void );
 static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame &packetFrame, const modernGLExecutorStats_t &stats );
 
@@ -4763,7 +4768,7 @@ static void R_ModernGLExecutor_MaterialFlagsForCommand( const modernGLSubmitComm
 	flags[2] = R_ModernGLExecutor_CommandHasTextureSemantic( command, MATERIAL_RESOURCE_TEXTURE_EMISSIVE ) ? 1.0f : 0.0f;
 	flags[3] = materialRecord != NULL && R_MaterialResourceTable_ClassicDiffusePathEligible( *materialRecord ) ? 1.0f : 0.0f;
 	if ( rg_modernClassicExecuted && command.viewDef == rg_modernClassicView
-			&& command.shaderKind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE
+			&& R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind )
 			&& materialRecord != NULL && R_MaterialResourceTable_ClassicFixedPathEligible( *materialRecord ) ) { flags[3] = 2.0f; }
 }
 
@@ -5113,7 +5118,8 @@ static bool R_ModernGLExecutor_SubmitCommand( const modernGLSubmitCommand_t &com
 
 	if ( rg_modernClassicExecuted && command.viewDef == rg_modernClassicView ) {
 		const materialResourceTableRecord_t *classicMaterial = R_ModernGLExecutor_MaterialRecordForCommand( command );
-		if ( classicMaterial != NULL && !classicMaterial->hasPBR && command.shaderKind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE ) {
+		if ( classicMaterial != NULL && !classicMaterial->hasPBR
+				&& R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) ) {
 			R_GLStateCache().BindTexture( 4, GL_TEXTURE_2D, rg_modernClassicTexture );
 			if ( glBindSampler != NULL ) { R_GLStateCache().BindSampler( 4, 0 ); }
 		}
@@ -7055,7 +7061,7 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	bool extended = false;
 	for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
 		const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
-		if ( command.shaderKind != MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE ) { continue; }
+		if ( !R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) ) { continue; }
 		const materialResourceTableRecord_t *material = R_ModernGLExecutor_MaterialRecordForCommand( command );
 		if ( material == NULL || material->hasPBR ) { continue; }
 		const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
@@ -7096,7 +7102,7 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 				for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
 					const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
 					const drawSurf_t *owner = R_ModernGLExecutor_CommandSurface( command );
-					if ( command.shaderKind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE && command.viewDef == root
+					if ( R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) && command.viewDef == root
 							&& owner != NULL && owner->space == surface->space && owner->material == surface->material
 							&& owner->geo != NULL && surface->geo != NULL && owner->geo->ambientCache != NULL
 							&& owner->geo->ambientCache == surface->geo->ambientCache ) { rg_modernClassicCollectCommand = &command; break; }

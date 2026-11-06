@@ -2527,11 +2527,16 @@ bool R_MaterialResourceTable_ClassicDiffusePathEligible( const materialResourceT
 }
 
 bool R_MaterialResourceTable_ClassicFixedPathEligible( const materialResourceTableRecord_t &record ) {
+	// REN-02: as for the diffuse class, a cutout whose diffuse stage carries the
+	// alpha test qualifies. The classic-lighting corridor draws depth-equal
+	// against the alpha-tested depth prepass, exactly as ARB2's interaction does.
+	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
+		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
 	if ( record.hasPBR || record.material == NULL || globalImages == NULL
 			|| record.fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
-			|| record.materialClass != RENDER_MATERIAL_OPAQUE
-			|| record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE
-			|| record.hasEmissive || record.alphaTest || record.hasTextureMatrix
+			|| ( record.materialClass != RENDER_MATERIAL_OPAQUE && !cutout )
+			|| ( record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE && !cutout )
+			|| record.hasEmissive || ( record.alphaTest && !cutout ) || record.hasTextureMatrix
 			|| record.hasVertexColor || record.hasConditionRegisters
 			|| record.hasCustomProgram || record.hasCustomGLSL
 			|| record.hasMaterialPolygonOffset || record.hasPrivatePolygonOffset ) {
@@ -2541,11 +2546,16 @@ bool R_MaterialResourceTable_ClassicFixedPathEligible( const materialResourceTab
 }
 
 bool R_MaterialResourceTable_ClassicFixedMaterialEligible( const idMaterial *material ) {
-	if ( material == NULL || material->HasPBR() || material->Coverage() != MC_OPAQUE ) { return false; }
+	if ( material == NULL || material->HasPBR()
+			|| ( material->Coverage() != MC_OPAQUE && material->Coverage() != MC_PERFORATED ) ) { return false; }
+	const bool perforated = material->Coverage() == MC_PERFORATED;
 	int counts[3] = {};
 	for ( int i = 0; i < material->GetNumStages(); ++i ) {
 		const shaderStage_t *stage = material->GetStage( i );
 		if ( stage == NULL ) { return false; }
+		// Only the diffuse stage may carry the cutout's alpha test.
+		if ( stage->hasAlphaTest && ( !perforated || stage->lighting != SL_DIFFUSE ) ) { return false; }
+		if ( perforated && stage->lighting == SL_DIFFUSE && !stage->hasAlphaTest ) { return false; }
 		const int slot = stage->lighting == SL_BUMP ? 0 : stage->lighting == SL_DIFFUSE ? 1 : stage->lighting == SL_SPECULAR ? 2 : -1;
 		if ( slot < 0 || ++counts[slot] > 1 ) { return false; }
 	}

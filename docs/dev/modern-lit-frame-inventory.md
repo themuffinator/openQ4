@@ -167,16 +167,24 @@ overflows (`ClassicInteractionDomain.h`).
   - The exception is 5 of 6,073 pixels on hole edges, where the two programs
     evaluate the same threshold differently. The control allows at most 24
     such edge pixels.
-  - Stock cutouts mostly carry bump or specular maps, so they still need the
-    fixed classes below.
+  - **Bumped, specular cutouts** (the common stock shape) join the classic
+    fixed class the same day. The classic-lighting corridor now also takes
+    alpha-tested forward draws. It draws depth-equal against the alpha-tested
+    depth prepass, as ARB2's interaction does, and the forward alpha-test
+    shader reads the corridor's lighting like the opaque one.
+    `production-fixed-cutout-bump` / `-native` (`classic_cutout_bump`) runs
+    the corridor and matches native ARB2 to a mean of 0.25 and a maximum of
+    0.6 levels, with the same 5 bounded edge pixels.
+  - The corridor itself still runs only in the laboratory linear-scene mode
+    (step 3).
 
 ## What REN-02 has left, in dependency order
 
 1. **Prove the interaction domain on stock content outside the laboratory.**
    Extend `MaterialLightingProven` beyond the flat-diffuse and fixed classes to
    the stock material shapes that dominate gameplay views:
-   - alpha-tested surfaces with bump and specular maps (flat-diffuse cutouts
-     are done);
+   - alpha-tested surfaces (flat-diffuse and bumped/specular cutouts are done;
+     cutouts in shipped modes wait on step 3);
    - vertex-coloured surfaces;
    - condition stages;
    - texture matrices;

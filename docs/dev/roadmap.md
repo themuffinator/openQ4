@@ -900,11 +900,14 @@ diagnostics establish whole-frame ownership or production performance.
   PBR and two narrow classic classes, and every modern-path corridor runs only
   in a laboratory mode (`r_pbrLinearScene`). The aggregate executor and the
   REN-01 shared domains are still mutually exclusive.
-  Step 1 has begun: classic cutouts (an alpha-tested flat-bump diffuse) now
-  join the proven diffuse class and match native ARB2 in the laboratory
-  (`production-fixed-cutout`, mean 0.28 levels, 5 bounded hole-edge pixels).
+  Step 1 has begun: classic cutouts now join the proven classes and match
+  native ARB2 in the laboratory: flat-bump diffuse cutouts on the forward
+  path (`production-fixed-cutout`, mean 0.28 levels) and bumped, specular
+  cutouts through the classic-lighting corridor (`production-fixed-cutout-bump`,
+  mean 0.25), each with 5 bounded hole-edge pixels.
   Remaining, in order: prove interaction parity for the other dominant stock
-  material shapes (bumped/specular cutouts first), qualify ambient lights, run the corridors in shipped modes,
+  material shapes (vertex colours, condition stages, texture matrices,
+  multi-stage), qualify ambient lights, run the corridors in shipped modes,
   represent stencil-fallback and multiple point shadows, reconcile the two
   ownership models, then measure benefit before any promotion.
 - [ ] **REN-03 — P1, qualification and implementation: shadow production scope.**

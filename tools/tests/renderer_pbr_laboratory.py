@@ -162,7 +162,7 @@ CASES = {
     'production-rejected-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-fixed{kind}{suffix}': {'r_rendererModernLightingParity':'0','r_hdrToneMap':'1','r_lightScale':'0.1',
           **({'r_pbrMaterials':'0','r_rendererReflectionProbes':'0'} if suffix else {})}
-       for kind in ('','-bump','-diffuse','-colored','-cutout') for suffix in ('','-native')},
+       for kind in ('','-bump','-diffuse','-colored','-cutout','-cutout-bump') for suffix in ('','-native')},
     'production-curved': {'r_rendererModernLightingParity':'0'},
     'production-curved-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-{light}{suffix}': {'r_rendererModernLightingParity':'0',
@@ -335,7 +335,7 @@ LEGACY_CASES.update(('production-fixed-colored-native','production-fixed-master-
 LEGACY_CASES.add('production-fixed-grid-native')
 LEGACY_CASES.update(f'production-fixed-{boundary}-native' for boundary in ('shadow','msaa'))
 LEGACY_CASES.update(f'production-{light}-native' for light in ('points','projector'))
-LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native','production-fixed-cutout-native'))
+LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native','production-fixed-cutout-native','production-fixed-cutout-bump-native'))
 LEGACY_CASES.update(f'{kind}-{mode}' for kind in ('fog','blend') for mode in ('native','off','fallback-native'))
 LEGACY_CASES.update(('lightgrid-native','lightgrid-off'))
 LEGACY_CASES.update(('lightgrid-pbr-master-off','lightgrid-pbr-native'))
@@ -1454,7 +1454,7 @@ def compare_material_captures(results: list[dict]) -> None:
             by_case['production-curved']['classicComparison']=proof
             if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
                 by_case['production-curved']['failures'].append('curved classic surface differs from the native lighting reference')
-    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-grid'):
+    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-cutout-bump','production-fixed-grid'):
         if case not in by_case or case+'-native' not in by_case: continue
         modern=by_case[case]
         pfm=Path(modern.get('linearScreenshot',''))
@@ -1480,7 +1480,7 @@ def compare_material_captures(results: list[dict]) -> None:
         # edge can flip either way. Bound those edge flips instead of the
         # whole-disc maximum; every other pixel keeps the 3-level limit.
         edge_flips=0
-        if case=='production-fixed-cutout':
+        if case in ('production-fixed-cutout','production-fixed-cutout-bump'):
             kept=[]
             for index,(x,y) in enumerate(coordinates):
                 pixel=errors[index*3:index*3+3]
@@ -1934,7 +1934,7 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         if state.get('linearScene')!=('1' if linear_expected else '0'):
             failures.append('extreme emission was not composed in the committed linear HDR scene' if linear_expected
                             else 'extreme emission entered a linear scene the case did not request')
-    if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
+    if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('classic compatibility lighting was not submitted')
     if case.startswith('production-fixed-msaa') and not re.search(r'Renderer AA: MSAA requested=4 effective=4\b',text):
         failures.append('four-sample fallback control did not activate MSAA')
@@ -2286,6 +2286,7 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             if case.startswith('production-fixed-diffuse'): material='classic_diffuse'
             if case.startswith('production-fixed-colored'): material='classic_colored'
             if case.startswith('production-fixed-cutout'): material='classic_cutout'
+            if case.startswith('production-fixed-cutout-bump'): material='classic_cutout_bump'
             commands += ['g_stopTime 0',f'script "${removed}.remove()"','wait 3',
                          f'spawn func_static name pbr_classic model "{lab.MODEL}" shader "{lab.PREFIX}/{material}" origin "100 160 480" solid 0',
                          'wait 30','g_stopTime 1']
