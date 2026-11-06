@@ -17,14 +17,20 @@ SCENARIO_MAPS = {
     # REN-03: the cutout cycle while the camera, and the flashlight it carries,
     # pans a full turn through every spawn and removal.
     "caster-cycle-cutout-sweep": "airdefense2",
+    # REN-03: translucent casters (stock forcefield glass, translucent coverage
+    # without an authored opt-out) with moments on, still and while turning.
+    "caster-cycle-translucent": "airdefense2",
+    "caster-cycle-translucent-sweep": "airdefense2",
     "resource-cycle": "airdefense2",
     "cascade-motion": "q4dm9",
     "emitter-lift": "storage2",
 }
 SCENARIO_MAPS.update({scenario: "airdefense2" for scenario in MOVER_SCENARIOS})
 SCENARIO_MAPS[OUTDOOR_SCENARIO] = "airdefense1"
-CASTER_CYCLES = ("caster-cycle", "caster-cycle-point", "caster-cycle-cutout", "caster-cycle-cutout-sweep")
 CUTOUT_CYCLES = ("caster-cycle-cutout", "caster-cycle-cutout-sweep")
+TRANSLUCENT_CYCLES = ("caster-cycle-translucent", "caster-cycle-translucent-sweep")
+CASTER_CYCLES = ("caster-cycle", "caster-cycle-point") + CUTOUT_CYCLES + TRANSLUCENT_CYCLES
+TRANSLUCENT_MATERIAL = "textures/glass/forcefield"
 # A whole turn in game time ends at the starting yaw, so the paused comparisons
 # keep the cycle's original view. Game time can run slower than the wall clock
 # in a hidden window, so the wait is generous; the light then rests 60 frames
@@ -80,8 +86,10 @@ def transition_commands(scenario: str) -> tuple[list[str], tuple[str, ...]]:
             commands.append("testFlashlight 1")
         # A static entity with perforated coverage must stay live in shadow
         # depth even after its transform has settled. Use a shipped material.
-        material = (" shader textures/terminal/square_hole"
-                    if scenario in CUTOUT_CYCLES else "")
+        material = (" shader textures/terminal/square_hole" if scenario in CUTOUT_CYCLES
+                    else f" shader {TRANSLUCENT_MATERIAL}" if scenario in TRANSLUCENT_CYCLES else "")
+        if scenario in TRANSLUCENT_CYCLES:
+            commands.append("r_shadowMapTranslucentMoments 1")
         cached_and_fresh("empty")
         commands.append("g_stopTime 0")
         # Deliberately overlapping stock models in a lit retail corridor;
@@ -168,10 +176,11 @@ def validate_transition_reports(scenario: str | None, text: str) -> list[str]:
         return validate_outdoor_reports(text)
     if scenario in MOVER_SCENARIOS:
         return validate_mover_reports(scenario, text)
-    if scenario not in ("caster-cycle",) + CUTOUT_CYCLES:
+    if scenario not in ("caster-cycle",) + CUTOUT_CYCLES + TRANSLUCENT_CYCLES:
         return []
     failures = []
     latest = None
+    translucent = None
     cache_reused = False
     seen = set()
     additions = {"empty": 0, "twelve": 24, "six": 12, "removed": 0}
@@ -181,6 +190,8 @@ def validate_transition_reports(scenario: str | None, text: str) -> list[str]:
                 match = re.search(r"casters\(total=(\d+) alpha=(\d+)", line)
                 if match:
                     latest = tuple(map(int, match.groups()))
+                moments = re.search(r"\btrans=(\d+)", line)
+                translucent = int(moments[1]) if moments else None
             elif line.startswith("SM pass light["):
                 match = re.search(r"casters\(static=(\d+) dynamic=(\d+) alpha=(\d+)", line)
                 if match:
@@ -202,8 +213,15 @@ def validate_transition_reports(scenario: str | None, text: str) -> list[str]:
             if (scenario in CUTOUT_CYCLES and phase[1] in ("twelve", "six")
                     and phase[2] == "cached" and not cache_reused):
                 failures.append(f"{phase[1]}_cached: opaque flashlight depth was not reused")
+            # OpenGL reports translucent casters on its light line; they must be
+            # exactly the spawned crates.
+            if scenario in TRANSLUCENT_CYCLES and translucent is not None and translucent != extra:
+                failures.append(f"{phase[1]}_{phase[2]}: {translucent} translucent casters, expected {extra}")
     if len(seen) != 12:
         failures.append(f"Only {len(seen)}/12 caster transition phases were reported")
+    if scenario in TRANSLUCENT_CYCLES and "Vulkan shadow cache:" in text and \
+            "first translucent shadow moment pass" not in text:
+        failures.append("Vulkan never drew a translucent shadow moment pass for the crates")
     if scenario.endswith("-sweep"):
         turns = re.findall(r"benchmarkViewSweep: complete, 360\.0 degrees", text)
         if len(turns) != 3:

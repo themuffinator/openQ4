@@ -870,7 +870,7 @@ diagnostics establish whole-frame ownership or production performance.
 | --- | --- | --- |
 | REN-01 — Partial | Shared classic GUI/world/interaction/fog/deform/subview/post domains have scoped implementations and contracts. | Qualify each on fresh GL/Vulkan packages: executed ownership, matching appearance, zero-commit rollback, human review and platform breadth. |
 | REN-02 — Partial | Shared material/light contracts and corridors provide foundations. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
-| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors and cutout casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Translucent receivers under motion; physical platforms. |
+| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Physical platforms. |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions on packed MD5R match CPU skinning. | lavapipe residual, mixed-material mods beyond the laboratory, physical Linux/Apple fallback. |
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
@@ -924,16 +924,14 @@ diagnostics establish whole-frame ownership or production performance.
   stopped exercising the flashlight once `g_dynamicLightShadows` followed
   machine spec; the runner now pins it. See
   [movers and cutouts](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
-  Translucent shadows have no passing stock fixture to put in motion: the
-  `shadow-translucent-medlabs` qualification candidate
-  (`renderer_gameplay_benchmark.py --pacing-only --shadow-presets translucent
-  --set-cvar r_rendererSharedWorldInteraction=1`) fails stationary as well as
-  with a 360-degree sweep on 6 November. On OpenGL the shared interaction
-  stream falls back for shadow geometry before reaching the translucent-moment
-  stage, and Vulkan reports no named fallback. It needs a fixed camera on a
-  translucent caster (or a laboratory fixture) before motion can be judged.
-  Remaining: that translucent fixture, then its motion run, and the
-  physical-platform breadth that every REN item shares.
+  Translucent casters under motion now have a fixture:
+  `caster-cycle-translucent(-sweep)` spawns stock forcefield-glass crates in
+  the flashlight with moments on; OpenGL admits exactly those casters, Vulkan
+  draws its moment pass, and cached images match fresh ones while the camera
+  turns. The gameplay benchmark's `shadow-translucent-medlabs` candidate
+  remains unusable (it falls back for shadow geometry before translucent
+  moments, stationary too). See [movers, cutouts and translucents](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  Remaining: physical-platform breadth.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple

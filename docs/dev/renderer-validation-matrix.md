@@ -1100,16 +1100,26 @@ Moving casters and cutouts under continuous motion
   exact caster and alpha counts still apply. All three turns complete, the
   counts match, the cached flashlight depth is reused once the light rests,
   and the cached images match fresh ones.
+- `caster-cycle-translucent` and `caster-cycle-translucent-sweep` spawn the
+  same twelve crates in stock forcefield glass (`textures/glass/forcefield`,
+  translucent coverage with no authored opt-out) with
+  `r_shadowMapTranslucentMoments 1`, still and with the camera turning.
+  OpenGL admits exactly the spawned crates as translucent casters (24, then
+  12, then none), Vulkan draws its translucent moment pass, and cached images
+  match fresh ones at every phase (worst 0.09 levels, on phases without
+  crates).
 - The caster cycles now also compare images, not only caster reports: cached
   against fresh, judged by the fresh-repeat control as the door fixtures are.
-  The four cycles and `door-projected` pass on both backends.
+  The six cycles and `door-projected` pass on both backends.
 
 These fixtures had silently stopped testing the flashlight. Weapon flashlights
 take their shadow flag from `g_dynamicLightShadows` when they spawn, and its
 retail default follows `com_machineSpec`, which a fresh test profile can detect
 below 3. The runner now passes `g_dynamicLightShadows 1` at launch. Custom-GLSL
 receivers keep their stencil fallback, which is not cached, and stay in the
-authored-lighting suite.
+authored-lighting suite. The gameplay benchmark's `shadow-translucent-medlabs`
+qualification candidate is not a working fixture: it fails stationary as well,
+because its view falls back for shadow geometry before translucent moments.
 
 Static/live composition audit (both backends agree): a projected light caches
 static depth only, keeps dynamic casters out of its cache signature and draws
