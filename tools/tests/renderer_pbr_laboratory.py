@@ -266,6 +266,11 @@ CASES = {
 }
 for restart in ('partial','full'):
     CASES[f'skin-gpu-{restart}-restart']=dict(CASES['skin-gpu'])
+# Mixed-material model (REN-05): one skinned mesh, PBR above its equator and
+# classic below, on CPU skinning and packed MD5R.
+for backend in ('cpu','md5r'):
+    for pose in ('','-ownership'):
+        CASES[f'mixed-material-{backend}{pose}']={**CASES[f'skin-{backend}'], 'r_pbrDebug':'7' if pose else '0'}
 # Skin substitutions (REN-05): the same specimen with its PBR metal swapped for
 # a PBR dielectric or a classic material, on CPU skinning and packed MD5R.
 for backend in ('cpu','md5r'):
@@ -369,7 +374,7 @@ for case in ('local-global','local-global-legacy'):
         'wait 30','g_stopTime 1']
 
 SHADOW_CASES = {'shadows','static-shadows','shadows-manual-point','shadows-cache-off','shadow-moved','shadow-restored','multi-shadows','msaa-shadows'}
-SHADOW_CASES.update(case for case in CASES if case.startswith('skin-'))
+SHADOW_CASES.update(case for case in CASES if case.startswith(('skin-','mixed-material-')))
 SHADOW_CASES.add('production-shadows')
 SHADOW_CASES.add('hdr-shadows')
 
@@ -389,7 +394,7 @@ CASE_CAPTURE_EXTENTS = {}
 CASE_CAMERAS['normal-flat'] = 'station-metal_3'
 CASE_CAMERAS.update({'msaa-cutout':'station-cutout','msaa-cutout-hard':'station-cutout'})
 CASE_CAMERAS.update({case:'sampling' for case in CASES if case.startswith('sampler-')})
-CASE_CAMERAS.update({case:'sampling' for case in CASES if case.startswith('skin-')})
+CASE_CAMERAS.update({case:'sampling' for case in CASES if case.startswith(('skin-','mixed-material-'))})
 CASE_CAMERAS.update({case:'sampling' for case in CASES if case.startswith('lightgrid-pbr-normal-')})
 
 # Same original sphere, transform, camera and light for every native direct
@@ -951,6 +956,45 @@ def compare_skinning_captures(results: list[dict]) -> None:
         if a and b and a!=b:
             by_case[case]['failures'].append('video restart changed the frozen skinned reference image')
     compare_skin_substitutions(by_case, images)
+
+
+def compare_mixed_material_captures(results: list[dict]) -> None:
+    """One mesh, two authored materials: each part keeps its own owner (REN-05).
+
+    The ownership view must show PBR green on the upper half of the specimen
+    and none on the lower, classic half, on CPU skinning and packed MD5R; and
+    packed MD5R must draw the model exactly like CPU skinning.
+    """
+    by_case={r['case']:r for r in results if r['case'].startswith('mixed-material-')}
+    images={name:capture_rgb(Path(r['screenshot'])) for name,r in by_case.items()}
+    for backend in ('cpu','md5r'):
+        owner=f'mixed-material-{backend}-ownership'
+        image=images.get(owner)
+        if not image: continue
+        # Inside the specimen's disc only (centre 640,400, radius about 97 px at
+        # the sampling camera): PBR stations behind it are green too.
+        def green(upper_half):
+            count=0
+            for y in range(312,489):
+                if (y < 392) != upper_half or 392 <= y <= 408: continue
+                for x in range(552,729):
+                    if (x-640)**2+(y-400)**2 <= 88*88 and image[(y*1280+x)*3:(y*1280+x)*3+3]==bytes((0,255,0)):
+                        count+=1
+            return count
+        upper, lower = green(True), green(False)
+        by_case[owner]['mixedOwnership']={'upperGreen':upper,'lowerGreen':lower}
+        if upper < 1500:
+            by_case[owner]['failures'].append(f'the PBR half lost PBR ownership ({upper} pixels)')
+        if lower > 50:
+            by_case[owner]['failures'].append(f'the classic half was drawn as PBR ({lower} pixels)')
+    for pose in ('','-ownership'):
+        cpu, md5r = images.get(f'mixed-material-cpu{pose}'), images.get(f'mixed-material-md5r{pose}')
+        if cpu and md5r:
+            error=specimen_error(cpu, md5r)
+            by_case[f'mixed-material-md5r{pose}']['md5rComparison']={'specimenError':round(error,3)}
+            if error > 0.5:
+                by_case[f'mixed-material-md5r{pose}']['failures'].append(
+                    f'packed MD5R draws the mixed-material model {error:.2f} from CPU skinning')
 
 
 def specimen_error(a: bytes, b: bytes) -> float:
@@ -1883,7 +1927,7 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         gpu=next((line for line in telemetry if line.startswith('GPU skinning:')), '')
         if not re.search(r'\benabled=1\b',gpu) or not re.search(r'\bprepared=[1-9]\d*\b',gpu):
             failures.append('GPU skinning did not consume the specimen')
-    if case.startswith('skin-md5r'):
+    if case.startswith(('skin-md5r','mixed-material-md5r')):
         if 'MD5R model.' not in text:
             failures.append('the skinned specimen was not converted to MD5R')
         elif args.backend == 'gl' and 'runtime surfaces: packed primitive batches' not in text:
@@ -1906,7 +1950,20 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
         if not re.search(r'\bblocked=1\b', visible) or 'reason=pbr-ssao-indirect-only' not in visible:
             failures.append('the modern visible path kept an SSAO frame with PBR materials')
-    if getattr(args, 'gl_native', False) or ssao_declined:
+    # A skinned model that mixes PBR and classic surfaces has no proven classic
+    # lighting parity on the modern visible path, so OpenGL declines the frame
+    # to the light loop, whose native owner still draws the PBR part.
+    mixed_declined = (active_pbr and args.backend == 'gl' and not getattr(args, 'gl_native', False)
+                      and case.startswith('mixed-material-'))
+    if mixed_declined:
+        visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
+        # The recorded reason depends on the path (CPU skinning:
+        # lighting-parity-unproven; packed MD5R: missingVertexBuffer, or
+        # unsupportedGpuSkinning in the ownership view). The native owner's
+        # admission below is what proves the PBR part is still drawn.
+        if not re.search(r'\bexec=0\b', visible) or not re.search(r'\bblocked=1\b', visible):
+            failures.append('the modern visible path kept a mixed PBR/classic skinned frame')
+    if getattr(args, 'gl_native', False) or ssao_declined or mixed_declined:
         # The classic light loop owns PBR: prove its own telemetry instead of
         # the modern visible frame, which is deliberately off.
         native = next((line for line in telemetry if line.startswith('OpenGL: native PBR:')), '')
@@ -1933,7 +1990,7 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
         visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
         if not re.search(r'\bexec=0\b',visible) or not re.search(r'\bblocked=1\b',visible):
             failures.append('unsupported rendering contract did not retain complete classic ownership')
-    if active_pbr and args.backend == 'gl' and not getattr(args, 'gl_native', False) and not ssao_declined:
+    if active_pbr and args.backend == 'gl' and not getattr(args, 'gl_native', False) and not ssao_declined and not mixed_declined:
         ownership = next((line for line in telemetry if line.startswith('modernLightingOwnership')), '')
         if (case.startswith(('production','environment-')) or '-pbr' in case or case in ('fog-preview','blend-preview')) and not re.search(r'override=0 requested=1 materialContract=1\b',ownership):
             failures.append('production admission relied on a parity override or lacked its material contract')
@@ -2221,6 +2278,11 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
                          f'spawn func_static name emissive model "{lab.MODEL}" shader "{lab.PREFIX}/extreme_emissive" origin "300 160 300" solid 0',
                          'wait 30','g_stopTime 1']
             scene_setups.add('extreme-emissive')
+        if case.startswith('mixed-material-') and 'mixed' not in scene_setups:
+            commands += ['g_stopTime 0',
+                         f'spawn func_animate name pbr_mixed model "{lab.MIXED_MODEL}" anim idle origin "0 -700 380" angle 0 solid 0',
+                         'wait 30','g_stopTime 1']
+            scene_setups.add('mixed')
         if case.startswith('skin-'):
             commands += ['g_stopTime 0']
             # A skin substitution is a spawn key (idScript reads a quoted
@@ -2247,6 +2309,8 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             commands += ['wait 2']
         if case.startswith('skin-md5r'):
             commands += [f'printModel {lab.SKINNING_MESH}']
+        if case.startswith('mixed-material-md5r'):
+            commands += [f'printModel {lab.MIXED_MESH}']
         commands += ['viewpos', 'gfxInfo', 'rendererMaterialResourceTableDump', f'screenshot "screenshots/{case}.tga"']
         if case=='vk-direct-emission-extreme' and args.backend=='vk':
             commands += ['rendererVulkanHDRInfo']
@@ -2376,6 +2440,8 @@ def main() -> int:
         if args.batch and any(c.startswith(prefix) for c in cases) and not all(c.startswith(prefix) for c in cases):
             parser.error(f'{prefix} cases require a separate scene from other controls')
     # The specimen converts when it loads: one conversion state per process.
+    if args.batch and len({c.startswith('mixed-material-md5r') for c in cases if c.startswith('mixed-material-')}) > 1:
+        parser.error('mixed-material-md5r cases convert the model at load; run them without other mixed-material cases')
     if args.batch and len({c.startswith('skin-md5r') for c in cases if c.startswith('skin-')}) > 1:
         parser.error('skin-md5r cases convert the specimen at load; run them without other skin- cases')
     if args.prepare: prepare(args.runtime_root,args.basepath,args.output_dir,args.timeout)
@@ -2418,6 +2484,7 @@ def main() -> int:
     compare_ibl_captures(results)
     compare_sampler_captures(results)
     compare_skinning_captures(results)
+    compare_mixed_material_captures(results)
     compare_material_captures(results)
     compare_native_baked_captures(results)
     compare_ssao_captures(results)

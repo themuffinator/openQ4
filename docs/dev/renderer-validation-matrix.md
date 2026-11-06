@@ -368,6 +368,17 @@ processes and in batches, on OpenGL and Vulkan:
   classic substitute is drawn classically (no ownership pixels);
 - packed MD5R draws both substitutions identically to CPU skinning (0.0 mean
   difference, as unsubstituted).
+
+Mixed-material model: the fixture also ships `openq4_pbr_lab_mixed`, the same
+skinned sphere split into two meshes, PBR metal above its equator and a
+classic material below, as a mod might author one model. On CPU skinning and
+packed MD5R, on both backends, the ownership view shows PBR on the whole upper
+half of the disc (10,668 pixels) and none on the lower half, and MD5R matches
+CPU skinning exactly. OpenGL routes such a frame to its classic light loop
+rather than the modern visible path (the classic skinned part has no proven
+lighting parity there; under MD5R its stencil shadow has no vertex buffer),
+and the native PBR owner still admits the PBR part; the control requires both.
+Vulkan keeps native ownership.
 ## Automated Safe Matrix
 
 The modern-visible and low-overhead GL self-tests explicitly request a hidden
