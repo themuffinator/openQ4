@@ -93,9 +93,10 @@ def unexpected(log: str, expected: list[str]) -> list[str]:
 
 def latency(log: str) -> dict:
     result = {}
-    for name, samples, last, peak, mean, budget, verdict in re.findall(
-            r"editor latency: (\w+) samples=(\d+) last=([\d.]+)ms max=([\d.]+)ms mean=([\d.]+)ms budget=(\d+)ms (\w+)", log):
-        result[name] = {"samples": int(samples), "max": float(peak), "mean": float(mean), "budget": int(budget), "verdict": verdict}
+    for name, samples, last, peak, mean, p95, budget, judged, verdict in re.findall(
+            r"editor latency: (\w+) samples=(\d+) last=([\d.]+)ms max=([\d.]+)ms mean=([\d.]+)ms p95=([\d.]+)ms budget=(\d+)ms\((\w+)\) (\w+)", log):
+        result[name] = {"samples": int(samples), "max": float(peak), "mean": float(mean), "p95": float(p95), "budget": int(budget),
+                        "judged": judged, "verdict": verdict}
     return result
 
 
@@ -149,10 +150,9 @@ def workspace_phase(args: argparse.Namespace, runtime: Path, root: Path, rendere
         "echo AUTH_ORGANISE_END",
         # Rename with reference repair; prefab save and insert.
         "echo AUTH_RENAME_BEGIN",
-        'editorExperimentalWorkspace field ed_filter "trigger_once_51"', "editorExperimentalWorkspace action filter",
-        "editorExperimentalWorkspace field edBrowser_sel_0 0", "editorExperimentalWorkspace action select",
-        "editorExperimentalWorkspace field ed_rename harness_trigger", "editorExperimentalWorkspace action rename",
-        "mapEdit refs harness_trigger", "mapEdit undo", "echo AUTH_RENAME_END",
+        "mapEdit select name:npc_redshirt_1", "mapEdit refs npc_redshirt_1",
+        "editorExperimentalWorkspace field ed_rename harness_redshirt", "editorExperimentalWorkspace action rename",
+        "mapEdit refs harness_redshirt", "mapEdit undo", "echo AUTH_RENAME_END",
         "echo AUTH_PREFAB_BEGIN",
         "editorExperimentalWorkspace field ed_prefab harness_prefab", "editorExperimentalWorkspace action prefabSave",
         "editorExperimentalWorkspace action prefabInsert", "mapEdit selection", "echo AUTH_PREFAB_END",
@@ -162,6 +162,8 @@ def workspace_phase(args: argparse.Namespace, runtime: Path, root: Path, rendere
         "echo AUTH_VALIDATE_END",
         # Docking and tabs.
         "echo AUTH_DOCK_BEGIN", "editorExperimentalWorkspace action dock_problems_left", "editorExperimentalWorkspace action dock_inspector_left",
+        "editorExperimentalWorkspace action dock_tools_left", "editorExperimentalWorkspace action dock_inspector_hidden",
+        "editorExperimentalWorkspace action dock_tools_right", "editorExperimentalWorkspace action dock_inspector_right",
         "editorExperimentalWorkspace action tab_browser", "editorExperimentalWorkspace action quad", "wait 2",
         'screenshot "screenshots/auth-docked.tga"', "editorExperimentalWorkspace fit verbose", "editorExperimentalWorkspace status",
         "editorExperimentalWorkspace action panels", "editorExperimentalWorkspace action quad", "editorExperimentalWorkspace action mode_0",
@@ -178,7 +180,9 @@ def workspace_phase(args: argparse.Namespace, runtime: Path, root: Path, rendere
         "editorExperimentalWorkspace event move 166 220", "editorExperimentalWorkspace event key mouse1 1",
         "editorExperimentalWorkspace event move 186 220", "editorExperimentalWorkspace event key mouse1 0", "editorExperimentalWorkspace status",
         "editorExperimentalWorkspace action panels", "echo AUTH_EVENTS_END",
-        # Property edit, undo/redo, save copy and save (backup), as before.
+        # Property edit, undo/redo, save copy and save (backup), on the
+        # untouched source: discard the tool edits above first.
+        "mapEdit reload discard", "editorExperimental",
         'editorExperimentalWorkspace field ed_filter "info_player_start"', "editorExperimentalWorkspace action filter",
         "editorExperimentalWorkspace field edBrowser_sel_0 0", "editorExperimentalWorkspace action select",
         "editorExperimentalWorkspace field ed_key _editor_authoring_test", "editorExperimentalWorkspace field ed_value one",
@@ -245,14 +249,17 @@ def workspace_phase(args: argparse.Namespace, runtime: Path, root: Path, rendere
     check("editor layer: harness_layer entities=1 hidden=0" in organise and "editor layer: harness_layer entities=1 hidden=1" in organise,
           "layer assignment or hiding failed")
     rename = between(log, "AUTH_RENAME_BEGIN", "AUTH_RENAME_END")
-    check(re.search(r"editor reference: \d+ target", rename), "rename did not repair the reference")
+    references = re.findall(r"editor reference: (\d+ \w+)", rename)
+    half = len(references) // 2
+    check(half > 0 and len(references) % 2 == 0 and references[:half] == references[half:],
+          f"rename did not repair every reference: {references}")
     prefab = between(log, "AUTH_PREFAB_BEGIN", "AUTH_PREFAB_END")
     check((game / "prefabs/harness_prefab.map").is_file() and "editor selected:" in prefab, "prefab save/insert failed")
     validate = between(log, "AUTH_VALIDATE_BEGIN", "AUTH_VALIDATE_END")
     counts = re.search(r"editor diagnostics: errors=(\d+) warnings=(\d+) info=(\d+)", validate)
     check(counts and "editor selected:" in validate, "validation did not link a problem to the source")
     dock = between(log, "AUTH_DOCK_BEGIN", "AUTH_DOCK_END")
-    check("problems=left" in dock and "inspector=left" in dock and "problems=bottom" in dock, "docking did not move and reset panels")
+    check("browser=left;inspector=right;tools=right;problems=left;" in dock and "problems=bottom" in dock, "docking did not move and reset panels")
     fits = re.findall(r"editor fit: language=(\w+) checked=(\d+) overflows=(\d+)", log)
     check(fits and all(int(o) == 0 and int(c) > 40 for _, c, o in fits), f"workspace labels overflow: {fits}")
     events = between(log, "AUTH_EVENTS_BEGIN", "AUTH_EVENTS_END")
@@ -279,7 +286,8 @@ def workspace_phase(args: argparse.Namespace, runtime: Path, root: Path, rendere
     code, log2 = launch(runtime, out, settings(out, args.assets, renderer), "authoring_reopen.cfg", 240)
     check(code == 0, f"reopen client exited {code}")
     restored = camera(between(log2, "AUTH_REOPEN_BEGIN", "AUTH_REOPEN_END"))
-    check("editor view state restored: maps/game/airdefense1.map mode=2" in log2 and persist and restored and persist[-1] == restored[-1],
+    # The workspace left in 3D after the restart checks; the camera is the one set before.
+    check("editor view state restored: maps/game/airdefense1.map mode=0" in log2 and persist and restored and persist[-1] == restored[-1],
           f"camera not restored: {persist} vs {restored}")
     images = sorted(str(p) for p in (game / "screenshots").glob("auth-*.tga"))
     return {"renderer": renderer, "latency": timings, "fit": fits, "diagnostics": counts.groups() if counts else None,

@@ -12,17 +12,28 @@
 #include <string>
 #include <vector>
 
-struct SDL_Process;
+class idLevelEditorChild;
 
 // Shared state of the experimental editor: the console adapter and the
 // graphical workspace drive the same selection, tools, build and play.
 class idLevelEditorSession {
 public:
+	// Single operations are judged by their worst case. Views redraw every
+	// frame and the first frames after a restart or a new material load
+	// textures, so their budget applies to the 95th percentile.
 	struct Latency {
 		const char *name = "";
 		double budgetMs = 0, lastMs = 0, maxMs = 0, totalMs = 0;
 		int samples = 0;
-		void Add( double ms ) { lastMs = ms; maxMs = ms > maxMs ? ms : maxMs; totalMs += ms; ++samples; }
+		bool percentile = false;
+		std::vector<float> recent; // ring of the latest 4096 samples
+		void Add( double ms ) {
+			lastMs = ms; maxMs = ms > maxMs ? ms : maxMs; totalMs += ms;
+			if ( recent.size() < 4096 ) { recent.push_back( static_cast<float>( ms ) ); }
+			else { recent[static_cast<std::size_t>( samples ) % recent.size()] = static_cast<float>( ms ); }
+			++samples;
+		}
+		double Percentile( double fraction ) const;
 	};
 	// refresh: from a document change to the workspace showing it (panels
 	// and the re-tessellated preview chunks).
@@ -96,7 +107,7 @@ private:
 	std::uint64_t builtRevision = 0;
 	bool viewLoaded = false, assetIndexStarted = false, buildReported = true, externalChange = false;
 	unsigned lastExternalCheck = 0;
-	SDL_Process *play = nullptr;
+	std::unique_ptr<idLevelEditorChild> play;
 	int playExit = 0;
 	std::map<std::string, std::unique_ptr<oq4editor::ClassSchema>> schemas;
 	std::vector<std::string> modelFiles, mapFiles;

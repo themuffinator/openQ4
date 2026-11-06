@@ -3,10 +3,19 @@
 #include "LevelEditor.h"
 #include "LevelEditorSession.h"
 
+#if defined( USE_SDL3 )
 #include <SDL3/SDL_process.h>
+#elif !defined( _WIN32 )
+#include <signal.h>
+#include <spawn.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+extern char **environ;
+#endif
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <cmath>
 #include <cstdlib>
 #include <limits>
@@ -128,36 +137,80 @@ private:
 	EngineMapStorage &storage;
 };
 
-class SdlProcess final : public BuildProcess {
+}
+
+// A child engine process. Clients use SDL3's process API (Windows, Linux,
+// macOS); dedicated servers built without SDL3 use posix_spawn on POSIX.
+class idLevelEditorChild {
 public:
-	~SdlProcess() override { Kill(); Release(); }
-	bool Start( const std::vector<std::string> &arguments, std::string &error ) override {
+	~idLevelEditorChild() { Kill(); Release(); }
+	bool Start( const std::vector<std::string> &arguments, std::string &error ) {
 		Release();
 		std::vector<const char *> argv;
 		for ( const auto &argument : arguments ) { argv.push_back( argument.c_str() ); }
 		argv.push_back( nullptr );
+#if defined( USE_SDL3 )
 		process = SDL_CreateProcess( argv.data(), false );
 		if ( !process ) { error = std::string( "could not start " ) + arguments.front() + ": " + SDL_GetError(); return false; }
+#elif !defined( _WIN32 )
+		const int result = posix_spawnp( &pid, argv[0], nullptr, nullptr, const_cast<char *const *>( argv.data() ), environ );
+		if ( result != 0 ) { pid = -1; error = std::string( "could not start " ) + arguments.front() + ": " + strerror( result ); return false; }
+#else
+		error = "this build cannot start child processes";
+		return false;
+#endif
 		exited = false;
 		return true;
 	}
-	bool Running( int &exitCode ) override {
-		if ( !process ) { exitCode = code; return false; }
-		if ( !exited ) { exited = SDL_WaitProcess( process, false, &code ); }
+	bool Running( int &exitCode ) {
+		if ( !exited ) {
+#if defined( USE_SDL3 )
+			exited = !process || SDL_WaitProcess( process, false, &code );
+#elif !defined( _WIN32 )
+			int status = 0;
+			const pid_t done = pid > 0 ? waitpid( pid, &status, WNOHANG ) : pid;
+			if ( done == pid || done < 0 ) { exited = true; code = done < 0 ? -1 : WIFEXITED( status ) ? WEXITSTATUS( status ) : -1; }
+#else
+			exited = true;
+#endif
+		}
 		exitCode = code;
 		return !exited;
 	}
-	void Kill() override {
-		if ( process && !exited ) {
-			SDL_KillProcess( process, true );
-			exited = SDL_WaitProcess( process, true, &code );
-		}
+	void Kill() {
+		if ( exited ) { return; }
+#if defined( USE_SDL3 )
+		if ( process ) { SDL_KillProcess( process, true ); exited = SDL_WaitProcess( process, true, &code ); }
+#elif !defined( _WIN32 )
+		if ( pid > 0 ) { kill( pid, SIGKILL ); int status = 0; waitpid( pid, &status, 0 ); code = -1; exited = true; }
+#endif
 	}
 private:
-	void Release() { if ( process ) { SDL_DestroyProcess( process ); process = nullptr; } }
+	void Release() {
+#if defined( USE_SDL3 )
+		if ( process ) { SDL_DestroyProcess( process ); process = nullptr; }
+#elif !defined( _WIN32 )
+		pid = -1;
+#endif
+	}
+#if defined( USE_SDL3 )
 	SDL_Process *process = nullptr;
+#elif !defined( _WIN32 )
+	pid_t pid = -1;
+#endif
 	bool exited = true;
 	int code = 0;
+};
+
+namespace {
+
+class ChildBuildProcess final : public BuildProcess {
+public:
+	bool Start( const std::vector<std::string> &arguments, std::string &error ) override { return child.Start( arguments, error ); }
+	bool Running( int &exitCode ) override { return child.Running( exitCode ); }
+	void Kill() override { child.Kill(); }
+private:
+	idLevelEditorChild child;
 };
 
 EngineMapStorage editorStorage;
@@ -216,6 +269,7 @@ idLevelEditorSession::idLevelEditorSession() {
 	// primitives) on the qualification machine; see level-editor-modernization.md.
 	const double budgets[LATENCY_COUNT] = { 6000, 100, 16, 16, 16, 250, 100 };
 	for ( int i = 0; i < LATENCY_COUNT; ++i ) { latency[i].name = names[i]; latency[i].budgetMs = budgets[i]; }
+	latency[LATENCY_VIEW3D].percentile = latency[LATENCY_ORTHO].percentile = true;
 	editor.IsEntityKey = [this]( const std::string &classname, const std::string &key ) {
 		const ClassSchema *schema = Schema( classname );
 		const PropertySpec *spec = schema ? schema->Find( key ) : nullptr;
@@ -224,7 +278,7 @@ idLevelEditorSession::idLevelEditorSession() {
 }
 
 idLevelEditorSession::~idLevelEditorSession() {
-	if ( play ) { SDL_KillProcess( play, true ); SDL_WaitProcess( play, true, &playExit ); SDL_DestroyProcess( play ); play = nullptr; }
+	play.reset(); // kills a play test still running
 }
 
 MapWorkspace &idLevelEditorSession::Workspace() {
@@ -403,7 +457,7 @@ bool idLevelEditorSession::StartBuild( bool aas, std::string &error ) {
 	request.timeoutMs = static_cast<unsigned>( editorExperimental_buildTimeout.GetInteger() ) * 1000u;
 	CompileIndex index;
 	index.Build( ws.Document() );
-	build.reset( new MapBuild( buildStorage, std::make_unique<SdlProcess>() ) );
+	build.reset( new MapBuild( buildStorage, std::make_unique<ChildBuildProcess>() ) );
 	if ( !build->Start( request, index, static_cast<unsigned>( Sys_Milliseconds() ), error ) ) { return false; }
 	builtPath = ws.Path();
 	builtRevision = ws.Document().Revision();
@@ -418,9 +472,8 @@ void idLevelEditorSession::CancelBuild() {
 
 bool idLevelEditorSession::Playing() {
 	if ( !play ) { return false; }
-	if ( SDL_WaitProcess( play, false, &playExit ) ) {
-		SDL_DestroyProcess( play );
-		play = nullptr;
+	if ( !play->Running( playExit ) ) {
+		play.reset();
 		common->Printf( "editor play finished: exit=%d\n", playExit );
 		if ( *editorExperimental_onPlayDone.GetString() ) { cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "%s\n", editorExperimental_onPlayDone.GetString() ) ); }
 		return false;
@@ -456,11 +509,8 @@ bool idLevelEditorSession::Play( std::string &error ) {
 		args.insert( args.end(), { "+devmap", name } );
 	}
 	SaveViewState();
-	std::vector<const char *> argv;
-	for ( const auto &arg : args ) { argv.push_back( arg.c_str() ); }
-	argv.push_back( nullptr );
-	play = SDL_CreateProcess( argv.data(), false );
-	if ( !play ) { error = std::string( "could not start the play client: " ) + SDL_GetError(); return false; }
+	play = std::make_unique<idLevelEditorChild>();
+	if ( !play->Start( args, error ) ) { play.reset(); error = "could not start the play client: " + error; return false; }
 	common->Printf( "editor play started: %s in %s (%zu arguments)\n", name.c_str(), args[0].c_str(), args.size() );
 	return true;
 }
@@ -502,11 +552,20 @@ void idLevelEditorSession::StartAssetIndex() {
 		{ AssetIndex::Map, files( mapFiles, "maps", { ".map" } ) } } );
 }
 
+double idLevelEditorSession::Latency::Percentile( double fraction ) const {
+	if ( recent.empty() ) { return 0; }
+	std::vector<float> sorted = recent;
+	std::sort( sorted.begin(), sorted.end() );
+	return sorted[( std::min )( sorted.size() - 1, static_cast<std::size_t>( fraction * ( sorted.size() - 1 ) + 0.5 ) )];
+}
+
 void idLevelEditorSession::PrintLatency() const {
 	for ( const auto &entry : latency ) {
-		common->Printf( "editor latency: %s samples=%d last=%.2fms max=%.2fms mean=%.2fms budget=%.0fms %s\n", entry.name, entry.samples,
-			entry.lastMs, entry.maxMs, entry.samples ? entry.totalMs / entry.samples : 0.0, entry.budgetMs,
-			entry.samples == 0 ? "unmeasured" : entry.maxMs <= entry.budgetMs ? "within" : "over" );
+		const double p95 = entry.Percentile( 0.95 );
+		const double judged = entry.percentile ? p95 : entry.maxMs;
+		common->Printf( "editor latency: %s samples=%d last=%.2fms max=%.2fms mean=%.2fms p95=%.2fms budget=%.0fms(%s) %s\n", entry.name, entry.samples,
+			entry.lastMs, entry.maxMs, entry.samples ? entry.totalMs / entry.samples : 0.0, p95, entry.budgetMs, entry.percentile ? "p95" : "max",
+			entry.samples == 0 ? "unmeasured" : judged <= entry.budgetMs ? "within" : "over" );
 	}
 }
 
@@ -657,12 +716,25 @@ bool ResolveEntity( const std::string &text, EntityId &id ) {
 	auto &s = LevelEditor_Session();
 	if ( text == "world" ) { id = s.Document().Entities().empty() ? 0 : s.Document().Entities().front().id; return id != 0; }
 	if ( text == "selected" ) { id = s.PrimaryEntity(); return id != 0; }
+	if ( text.compare( 0, 5, "name:" ) == 0 ) {
+		for ( const auto &entity : s.Document().Entities() ) {
+			if ( EqualNoCase( entity.Value( "name" ), text.substr( 5 ) ) ) { id = entity.id; return true; }
+		}
+		return false;
+	}
 	return ParseEntityId( text.c_str(), id );
 }
 
 // "<handle>" or "<handle>:<primitive>"
 bool ParseItem( const char *text, SelectionItem &item ) {
 	std::string value = text ? text : "";
+	if ( value.compare( 0, 5, "name:" ) == 0 ) {
+		// Entity names may contain anything but quotes: no primitive suffix.
+		EntityId id;
+		if ( !ResolveEntity( value, id ) ) { return false; }
+		item = { id, WholeEntity };
+		return true;
+	}
 	const auto colon = value.find( ':' );
 	EntityId id;
 	if ( !ResolveEntity( value.substr( 0, colon ), id ) ) { return false; }
@@ -702,7 +774,7 @@ const char *helpText =
 	"mapEdit set <handle> <key> <value> | unset <handle> <key>\n"
 	"mapEdit create <classname> <name> | delete <handle> | undo | redo\n"
 	"mapEdit save [map] | savecopy <new-map> | autosave | recover [map] | reload [discard] | external\n"
-	"Selections: <handle> selects an entity, <handle>:<n> its nth primitive; 'world' and 'selected' name handles.\n"
+	"Selections: <handle> selects an entity, <handle>:<n> its nth primitive; 'world', 'selected' and 'name:<name>' name handles.\n"
 	"mapEdit select <item>... | add <item>... | none | selection\n"
 	"mapEdit move <x> <y> <z> | rotate <axis 0-2> <degrees> | scale <x> <y> <z> | snap | grid <units> | texlock <0|1>\n"
 	"mapEdit brush <x1> <y1> <z1> <x2> <y2> <z2> [material] | patch <x1> <y1> <z1> <x2> <y2> <z2> [material]\n"

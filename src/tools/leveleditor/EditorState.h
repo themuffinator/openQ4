@@ -14,9 +14,10 @@
 
 namespace oq4editor {
 
-// Docked panels in the 640x480 GUI space. The browser and inspector need a
-// tall column; the problems/build panel also fits under the views. Panels
-// sharing a dock become tabs. Layouts persist as a compact string.
+// Docked panels in the 640x480 GUI space. The browser, inspector and tools
+// need a tall column; the problems/build panel also fits under the views.
+// Up to two panels share a dock as tabs, so every title keeps its width in
+// every language. Layouts persist as a compact string.
 class DockLayout {
 public:
 	enum Panel { Browser, Inspector, Tools, Problems, PanelCount };
@@ -27,7 +28,9 @@ public:
 		PanelPlacement panels[PanelCount];
 		Rect views, leftSplitter, rightSplitter, bottomSplitter;
 	};
-	static constexpr float MinSide = 130, MaxSide = 230, MinBottom = 70, MaxBottom = 180;
+	static constexpr float MinSide = 130, MaxSide = 230, MinBottom = 80, MaxBottom = 180;
+	static constexpr int MaxPerDock = 2;
+	static constexpr float TabHeight = 28; // title line plus the active tab's dock buttons
 
 	DockLayout();
 	static const char *PanelName( Panel panel );

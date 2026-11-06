@@ -17,7 +17,7 @@ windowDef heading { rect (8),(3),(150),(22) noevents 1 text "#str_42900" font "f
 windowDef experimental { rect (160),(7),(100),(16) noevents 1 text "#str_42946" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 0.890,0.537,0,1 }
 windowDef document { rect (264),(7),(268),(16) noevents 1 text "gui::ed_title" font "fonts/lowpixel" textspacing -1 textscale .16 forecolor 0.72,0.76,0.63,1 }
 windowDef dirty { rect (536),(7),(96),(16) noevents 1 text "gui::ed_dirty" font "fonts/lowpixel" textspacing -1 textscale .16 forecolor 0.890,0.537,0,1 }
-windowDef file_new { rect (8.0),(26),(51.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_new { rect (8.0),(26),(49.2),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_new";
@@ -33,9 +33,9 @@ windowDef file_new { rect (8.0),(26),(51.8),(22) noevents "gui::ed_confirm" back
   transition "file_new_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction new"; } }
-windowDef file_new_label { rect (8.0)+10,(26)+3,(51.8)-12,(22) noevents 1 text "#str_42901" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_new_label { rect (8.0)+10,(26)+3,(49.2)-12,(22) noevents 1 text "#str_42901" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
 windowDef file_new_corner { rect (8.0)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_open { rect (63.8),(26),(51.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_open { rect (61.2),(26),(49.2),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_open";
@@ -51,9 +51,9 @@ windowDef file_open { rect (63.8),(26),(51.8),(22) noevents "gui::ed_confirm" ba
   transition "file_open_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction open"; } }
-windowDef file_open_label { rect (63.8)+10,(26)+3,(51.8)-12,(22) noevents 1 text "#str_42902" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_open_corner { rect (63.8)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_save { rect (119.6),(26),(51.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_open_label { rect (61.2)+10,(26)+3,(49.2)-12,(22) noevents 1 text "#str_42902" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_open_corner { rect (61.2)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_save { rect (114.3),(26),(56.5),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_save";
@@ -69,9 +69,9 @@ windowDef file_save { rect (119.6),(26),(51.8),(22) noevents "gui::ed_confirm" b
   transition "file_save_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction save"; } }
-windowDef file_save_label { rect (119.6)+10,(26)+3,(51.8)-12,(22) noevents 1 text "#str_42903" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_save_corner { rect (119.6)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_copy { rect (175.4),(26),(67.3),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_save_label { rect (114.3)+10,(26)+3,(56.5)-12,(22) noevents 1 text "#str_42903" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_save_corner { rect (114.3)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_copy { rect (174.8),(26),(71.3),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_copy";
@@ -87,9 +87,9 @@ windowDef file_copy { rect (175.4),(26),(67.3),(22) noevents "gui::ed_confirm" b
   transition "file_copy_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction copy"; } }
-windowDef file_copy_label { rect (175.4)+10,(26)+3,(67.3)-12,(22) noevents 1 text "#str_42907" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_copy_corner { rect (175.4)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_undo { rect (246.7),(26),(51.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_copy_label { rect (174.8)+10,(26)+3,(71.3)-12,(22) noevents 1 text "#str_42907" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_copy_corner { rect (174.8)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_undo { rect (250.1),(26),(59.0),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_undo";
@@ -105,9 +105,9 @@ windowDef file_undo { rect (246.7),(26),(51.8),(22) noevents "gui::ed_confirm" b
   transition "file_undo_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction undo"; } }
-windowDef file_undo_label { rect (246.7)+10,(26)+3,(51.8)-12,(22) noevents 1 text "#str_42904" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_undo_corner { rect (246.7)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_redo { rect (302.5),(26),(51.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_undo_label { rect (250.1)+10,(26)+3,(59.0)-12,(22) noevents 1 text "#str_42904" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_undo_corner { rect (250.1)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_redo { rect (313.1),(26),(59.0),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_redo";
@@ -123,9 +123,9 @@ windowDef file_redo { rect (302.5),(26),(51.8),(22) noevents "gui::ed_confirm" b
   transition "file_redo_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction redo"; } }
-windowDef file_redo_label { rect (302.5)+10,(26)+3,(51.8)-12,(22) noevents 1 text "#str_42905" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_redo_corner { rect (302.5)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_build { rect (358.2),(26),(51.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_redo_label { rect (313.1)+10,(26)+3,(59.0)-12,(22) noevents 1 text "#str_42905" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_redo_corner { rect (313.1)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_build { rect (376.1),(26),(49.2),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_build";
@@ -141,9 +141,9 @@ windowDef file_build { rect (358.2),(26),(51.8),(22) noevents "gui::ed_confirm" 
   transition "file_build_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction build"; } }
-windowDef file_build_label { rect (358.2)+10,(26)+3,(51.8)-12,(22) noevents 1 text "#str_42947" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_build_corner { rect (358.2)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_play { rect (414.0),(26),(51.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_build_label { rect (376.1)+10,(26)+3,(49.2)-12,(22) noevents 1 text "#str_42947" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_build_corner { rect (376.1)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_play { rect (429.2),(26),(49.2),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_play";
@@ -159,9 +159,9 @@ windowDef file_play { rect (414.0),(26),(51.8),(22) noevents "gui::ed_confirm" b
   transition "file_play_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction play"; } }
-windowDef file_play_label { rect (414.0)+10,(26)+3,(51.8)-12,(22) noevents 1 text "#str_42948" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_play_corner { rect (414.0)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_stop { rect (469.8),(26),(51.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_play_label { rect (429.2)+10,(26)+3,(49.2)-12,(22) noevents 1 text "#str_42948" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_play_corner { rect (429.2)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_stop { rect (482.4),(26),(49.2),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_stop";
@@ -177,9 +177,9 @@ windowDef file_stop { rect (469.8),(26),(51.8),(22) noevents "gui::ed_confirm" b
   transition "file_stop_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction stop"; } }
-windowDef file_stop_label { rect (469.8)+10,(26)+3,(51.8)-12,(22) noevents 1 text "#str_42949" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_stop_corner { rect (469.8)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef file_hide { rect (525.6),(26),(98.4),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef file_stop_label { rect (482.4)+10,(26)+3,(49.2)-12,(22) noevents 1 text "#str_42949" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_stop_corner { rect (482.4)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_hide { rect (535.5),(26),(88.5),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "file_hide";
@@ -195,8 +195,8 @@ windowDef file_hide { rect (525.6),(26),(98.4),(22) noevents "gui::ed_confirm" b
   transition "file_hide_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction hide"; } }
-windowDef file_hide_label { rect (525.6)+10,(26)+3,(98.4)-12,(22) noevents 1 text "#str_42906" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
-windowDef file_hide_corner { rect (525.6)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef file_hide_label { rect (535.5)+10,(26)+3,(88.5)-12,(22) noevents 1 text "#str_42906" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
+windowDef file_hide_corner { rect (535.5)+3,(26)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
 windowDef path_label { rect (8),(53),(36),(18) noevents 1 text "#str_42933" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 0.72,0.76,0.63,1 }
 editDef ed_path { rect (46),(52),(484),(20)
  text "gui::ed_path" noevents "gui::ed_confirm" maxchars 220 font "fonts/lowpixel" textspacing -1 textscale .16
@@ -400,10 +400,10 @@ windowDef view_panels { rect (566.0),(76),(58.0),(22) noevents "gui::ed_confirm"
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction panels"; } }
 windowDef view_panels_label { rect (566.0)+10,(76)+3,(58.0)-12,(22) noevents 1 text "#str_42960" font "fonts/lowpixel" textspacing -1 textscale 0.15 forecolor 1,1,1,0.8 }
 windowDef view_panels_corner { rect (566.0)+3,(76)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef lock_state { rect (8),(100),(116),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,(0.3+0.5*"gui::ed_lock")
+windowDef lock_state { rect (8),(100),(80),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,(0.3+0.5*"gui::ed_lock")
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction lock"; } }
-windowDef lock_state_label { rect (18),(103),(104),(22) noevents 1 text "gui::ed_lockText" font "fonts/lowpixel" textspacing -1 textscale .15 forecolor 1,1,1,0.8 }
-windowDef edit_brush { rect (128),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef lock_state_label { rect (16),(103),(70),(22) noevents 1 text "gui::ed_lockText" font "fonts/lowpixel" textspacing -1 textscale .14 forecolor 1,1,1,0.8 }
+windowDef edit_brush { rect (92.0),(100),(45.0),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_brush";
@@ -419,9 +419,9 @@ windowDef edit_brush { rect (128),(100),(51.5556),(22) noevents "gui::ed_confirm
   transition "edit_brush_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction brush"; } }
-windowDef edit_brush_label { rect (128)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42961" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_brush_corner { rect (128)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef edit_patch { rect (183.556),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef edit_brush_label { rect (92.0)+10,(100)+3,(45.0)-12,(22) noevents 1 text "#str_42961" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_brush_corner { rect (92.0)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_patch { rect (141.0),(100),(45.0),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_patch";
@@ -437,9 +437,9 @@ windowDef edit_patch { rect (183.556),(100),(51.5556),(22) noevents "gui::ed_con
   transition "edit_patch_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction patch"; } }
-windowDef edit_patch_label { rect (183.556)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42962" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_patch_corner { rect (183.556)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef edit_duplicate { rect (239.111),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef edit_patch_label { rect (141.0)+10,(100)+3,(45.0)-12,(22) noevents 1 text "#str_42962" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_patch_corner { rect (141.0)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_duplicate { rect (189.9),(100),(60.8),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_duplicate";
@@ -455,9 +455,9 @@ windowDef edit_duplicate { rect (239.111),(100),(51.5556),(22) noevents "gui::ed
   transition "edit_duplicate_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction duplicate"; } }
-windowDef edit_duplicate_label { rect (239.111)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42963" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_duplicate_corner { rect (239.111)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef edit_remove { rect (294.667),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef edit_duplicate_label { rect (189.9)+10,(100)+3,(60.8)-12,(22) noevents 1 text "#str_42963" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_duplicate_corner { rect (189.9)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_remove { rect (254.8),(100),(52.9),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_remove";
@@ -473,9 +473,9 @@ windowDef edit_remove { rect (294.667),(100),(51.5556),(22) noevents "gui::ed_co
   transition "edit_remove_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction remove"; } }
-windowDef edit_remove_label { rect (294.667)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42919" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_remove_corner { rect (294.667)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef edit_group { rect (350.222),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef edit_remove_label { rect (254.8)+10,(100)+3,(52.9)-12,(22) noevents 1 text "#str_42919" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_remove_corner { rect (254.8)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_group { rect (311.7),(100),(52.9),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_group";
@@ -491,9 +491,9 @@ windowDef edit_group { rect (350.222),(100),(51.5556),(22) noevents "gui::ed_con
   transition "edit_group_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction group"; } }
-windowDef edit_group_label { rect (350.222)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42964" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_group_corner { rect (350.222)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef edit_ungroup { rect (405.778),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef edit_group_label { rect (311.7)+10,(100)+3,(52.9)-12,(22) noevents 1 text "#str_42964" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_group_corner { rect (311.7)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_ungroup { rect (368.6),(100),(63.5),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_ungroup";
@@ -509,9 +509,9 @@ windowDef edit_ungroup { rect (405.778),(100),(51.5556),(22) noevents "gui::ed_c
   transition "edit_ungroup_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction ungroup"; } }
-windowDef edit_ungroup_label { rect (405.778)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42965" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_ungroup_corner { rect (405.778)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef edit_rotateCcw { rect (461.333),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef edit_ungroup_label { rect (368.6)+10,(100)+3,(63.5)-12,(22) noevents 1 text "#str_42965" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_ungroup_corner { rect (368.6)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_rotateCcw { rect (436.1),(100),(63.5),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_rotateCcw";
@@ -527,9 +527,9 @@ windowDef edit_rotateCcw { rect (461.333),(100),(51.5556),(22) noevents "gui::ed
   transition "edit_rotateCcw_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction rotateCcw"; } }
-windowDef edit_rotateCcw_label { rect (461.333)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42966" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_rotateCcw_corner { rect (461.333)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef edit_rotateCw { rect (516.889),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef edit_rotateCcw_label { rect (436.1)+10,(100)+3,(63.5)-12,(22) noevents 1 text "#str_42966" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_rotateCcw_corner { rect (436.1)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_rotateCw { rect (503.6),(100),(63.5),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_rotateCw";
@@ -545,9 +545,9 @@ windowDef edit_rotateCw { rect (516.889),(100),(51.5556),(22) noevents "gui::ed_
   transition "edit_rotateCw_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction rotateCw"; } }
-windowDef edit_rotateCw_label { rect (516.889)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42967" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_rotateCw_corner { rect (516.889)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef edit_snap { rect (572.444),(100),(51.5556),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef edit_rotateCw_label { rect (503.6)+10,(100)+3,(63.5)-12,(22) noevents 1 text "#str_42967" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_rotateCw_corner { rect (503.6)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_snap { rect (571.1),(100),(52.9),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "edit_snap";
@@ -563,8 +563,8 @@ windowDef edit_snap { rect (572.444),(100),(51.5556),(22) noevents "gui::ed_conf
   transition "edit_snap_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction snap"; } }
-windowDef edit_snap_label { rect (572.444)+10,(100)+3,(51.5556)-12,(22) noevents 1 text "#str_42968" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef edit_snap_corner { rect (572.444)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef edit_snap_label { rect (571.1)+10,(100)+3,(52.9)-12,(22) noevents 1 text "#str_42968" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef edit_snap_corner { rect (571.1)+3,(100)+(22)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
 windowDef view_frame_body { rect ("gui::ed_view_x")+4,("gui::ed_view_y")+4,("gui::ed_view_w")-8,("gui::ed_view_h")-8 noevents 1 background "gfx/guis/mainmenu/screen" matcolor 0.09,0.11,0.07,0.88 }
 windowDef view_frame_grad { rect ("gui::ed_view_x")+4,("gui::ed_view_y")+4,("gui::ed_view_w")-8,("gui::ed_view_h")-8 noevents 1 background "gfx/guis/mainmenu/bg_darkgrad" matcolor 0.545,0.588,0.294,0.14 }
 windowDef view_frame_top { rect ("gui::ed_view_x"),("gui::ed_view_y"),("gui::ed_view_w"),(16) noevents 1 background "gfx/guis/mainmenu/tooltip_edge" matcolor 1,1,1,0.95 }
@@ -580,7 +580,7 @@ editorViewDef rightSplitter { rect ("gui::ed_rsplit_x"),("gui::ed_rsplit_y"),("g
 editorViewDef bottomSplitter { rect ("gui::ed_bsplit_x"),("gui::ed_bsplit_y"),("gui::ed_bsplit_w"),("gui::ed_bsplit_h") splitter 3 visible "gui::ed_bsplit_vis" noevents "gui::ed_confirm" backcolor 0.545,0.588,0.294,0.12 }
 windowDef browserTab { rect ("gui::ed_browser_tab_x"),("gui::ed_browser_tab_y"),("gui::ed_browser_tab_w"),("gui::ed_browser_tab_h") visible "gui::ed_browser_tab_vis"
 windowDef browserTab_back { rect 0,0,("gui::ed_browser_tab_w")-1,("gui::ed_browser_tab_h") noevents 1 background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,(0.25+0.4*"gui::ed_browser_active") }
-windowDef browserTab_title { rect (0),(0),(("gui::ed_browser_tab_w")-"gui::ed_browser_active"*37),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef browserTab_title { rect (0),(0),(("gui::ed_browser_tab_w")-1),(16) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "browserTab_title";
@@ -596,17 +596,17 @@ windowDef browserTab_title { rect (0),(0),(("gui::ed_browser_tab_w")-"gui::ed_br
   transition "browserTab_title_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction tab_browser"; } }
-windowDef browserTab_title_label { rect (0)+10,(0)+3,(("gui::ed_browser_tab_w")-"gui::ed_browser_active"*37)-12,(18) noevents 1 text "#str_43133" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
-windowDef browserTab_title_corner { rect (0)+3,(0)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef browserTab_left { rect (("gui::ed_browser_tab_w")-36),(3),(11),(13) visible "gui::ed_browser_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef browserTab_title_label { rect (0)+10,(0)+3,(("gui::ed_browser_tab_w")-1)-12,(16) noevents 1 text "#str_43133" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
+windowDef browserTab_title_corner { rect (0)+3,(0)+(16)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef browserTab_left { rect (("gui::ed_browser_tab_w")-39),(16),(12),(12) visible "gui::ed_browser_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_browser_left"; } }
-windowDef browserTab_left_label { rect (("gui::ed_browser_tab_w")-36)+2,(1),(11)-1,(14) visible "gui::ed_browser_active" noevents 1 text "#str_42939" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef browserTab_right { rect (("gui::ed_browser_tab_w")-24),(3),(11),(13) visible "gui::ed_browser_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef browserTab_left_label { rect (("gui::ed_browser_tab_w")-39)+3,(14),(12)-2,(13) visible "gui::ed_browser_active" noevents 1 text "#str_42939" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef browserTab_right { rect (("gui::ed_browser_tab_w")-26),(16),(12),(12) visible "gui::ed_browser_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_browser_right"; } }
-windowDef browserTab_right_label { rect (("gui::ed_browser_tab_w")-24)+2,(1),(11)-1,(14) visible "gui::ed_browser_active" noevents 1 text "#str_42940" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef browserTab_hidden { rect (("gui::ed_browser_tab_w")-12),(3),(11),(13) visible "gui::ed_browser_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef browserTab_right_label { rect (("gui::ed_browser_tab_w")-26)+3,(14),(12)-2,(13) visible "gui::ed_browser_active" noevents 1 text "#str_42940" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef browserTab_hidden { rect (("gui::ed_browser_tab_w")-13),(16),(12),(12) visible "gui::ed_browser_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_browser_hidden"; } }
-windowDef browserTab_hidden_label { rect (("gui::ed_browser_tab_w")-12)+2,(1),(11)-1,(14) visible "gui::ed_browser_active" noevents 1 text "#str_42996" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
+windowDef browserTab_hidden_label { rect (("gui::ed_browser_tab_w")-13)+3,(14),(12)-2,(13) visible "gui::ed_browser_active" noevents 1 text "#str_42996" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
 }
 windowDef browserPanel { rect ("gui::ed_browser_x"),("gui::ed_browser_y"),("gui::ed_browser_w"),("gui::ed_browser_h") visible "gui::ed_browser_vis"
 windowDef browser_frame_body { rect (0)+4,(0)+4,("gui::ed_browser_w")-8,("gui::ed_browser_h")-8 noevents 1 background "gfx/guis/mainmenu/screen" matcolor 0.09,0.11,0.07,0.88 }
@@ -614,7 +614,7 @@ windowDef browser_frame_grad { rect (0)+4,(0)+4,("gui::ed_browser_w")-8,("gui::e
 windowDef browser_frame_top { rect (0),(0),("gui::ed_browser_w"),(16) noevents 1 background "gfx/guis/mainmenu/tooltip_edge" matcolor 1,1,1,0.95 }
 windowDef browser_frame_mid { rect (0),(0)+16,("gui::ed_browser_w"),("gui::ed_browser_h")-32 noevents 1 background "gfx/guis/mainmenu/tooltip_mid" matcolor 1,1,1,0.95 }
 windowDef browser_frame_btm { rect (0),(0)+("gui::ed_browser_h")-16,("gui::ed_browser_w"),(16) noevents 1 background "gfx/guis/mainmenu/tooltip_edge" matscalex -1 matscaley -1 matcolor 1,1,1,0.95 }
-windowDef browse_entities { rect (4+0*(("gui::ed_browser_w")-8)/3),(4),((("gui::ed_browser_w")-8)/3-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef browse_entities { rect (4+0*(("gui::ed_browser_w")-8)/2),(4),((("gui::ed_browser_w")-8)/2-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "browse_entities";
@@ -630,9 +630,9 @@ windowDef browse_entities { rect (4+0*(("gui::ed_browser_w")-8)/3),(4),((("gui::
   transition "browse_entities_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction browse_0"; } }
-windowDef browse_entities_label { rect (4+0*(("gui::ed_browser_w")-8)/3)+10,(4)+3,((("gui::ed_browser_w")-8)/3-2)-12,(18) noevents 1 text "#str_42908" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef browse_entities_corner { rect (4+0*(("gui::ed_browser_w")-8)/3)+3,(4)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef browse_maps { rect (4+1*(("gui::ed_browser_w")-8)/3),(4),((("gui::ed_browser_w")-8)/3-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef browse_entities_label { rect (4+0*(("gui::ed_browser_w")-8)/2)+10,(4)+3,((("gui::ed_browser_w")-8)/2-2)-12,(18) noevents 1 text "#str_42908" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef browse_entities_corner { rect (4+0*(("gui::ed_browser_w")-8)/2)+3,(4)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef browse_maps { rect (4+1*(("gui::ed_browser_w")-8)/2),(4),((("gui::ed_browser_w")-8)/2-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "browse_maps";
@@ -648,9 +648,9 @@ windowDef browse_maps { rect (4+1*(("gui::ed_browser_w")-8)/3),(4),((("gui::ed_b
   transition "browse_maps_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction browse_1"; } }
-windowDef browse_maps_label { rect (4+1*(("gui::ed_browser_w")-8)/3)+10,(4)+3,((("gui::ed_browser_w")-8)/3-2)-12,(18) noevents 1 text "#str_42909" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef browse_maps_corner { rect (4+1*(("gui::ed_browser_w")-8)/3)+3,(4)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef browse_classes { rect (4+2*(("gui::ed_browser_w")-8)/3),(4),((("gui::ed_browser_w")-8)/3-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef browse_maps_label { rect (4+1*(("gui::ed_browser_w")-8)/2)+10,(4)+3,((("gui::ed_browser_w")-8)/2-2)-12,(18) noevents 1 text "#str_42909" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef browse_maps_corner { rect (4+1*(("gui::ed_browser_w")-8)/2)+3,(4)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef browse_classes { rect (4+0*(("gui::ed_browser_w")-8)/2),(24),((("gui::ed_browser_w")-8)/2-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "browse_classes";
@@ -666,9 +666,9 @@ windowDef browse_classes { rect (4+2*(("gui::ed_browser_w")-8)/3),(4),((("gui::e
   transition "browse_classes_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction browse_2"; } }
-windowDef browse_classes_label { rect (4+2*(("gui::ed_browser_w")-8)/3)+10,(4)+3,((("gui::ed_browser_w")-8)/3-2)-12,(18) noevents 1 text "#str_42910" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef browse_classes_corner { rect (4+2*(("gui::ed_browser_w")-8)/3)+3,(4)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef browse_materials { rect (4+0*(("gui::ed_browser_w")-8)/3),(24),((("gui::ed_browser_w")-8)/3-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef browse_classes_label { rect (4+0*(("gui::ed_browser_w")-8)/2)+10,(24)+3,((("gui::ed_browser_w")-8)/2-2)-12,(18) noevents 1 text "#str_42910" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef browse_classes_corner { rect (4+0*(("gui::ed_browser_w")-8)/2)+3,(24)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef browse_materials { rect (4+1*(("gui::ed_browser_w")-8)/2),(24),((("gui::ed_browser_w")-8)/2-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "browse_materials";
@@ -684,9 +684,9 @@ windowDef browse_materials { rect (4+0*(("gui::ed_browser_w")-8)/3),(24),((("gui
   transition "browse_materials_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction browse_3"; } }
-windowDef browse_materials_label { rect (4+0*(("gui::ed_browser_w")-8)/3)+10,(24)+3,((("gui::ed_browser_w")-8)/3-2)-12,(18) noevents 1 text "#str_42969" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef browse_materials_corner { rect (4+0*(("gui::ed_browser_w")-8)/3)+3,(24)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef browse_models { rect (4+1*(("gui::ed_browser_w")-8)/3),(24),((("gui::ed_browser_w")-8)/3-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef browse_materials_label { rect (4+1*(("gui::ed_browser_w")-8)/2)+10,(24)+3,((("gui::ed_browser_w")-8)/2-2)-12,(18) noevents 1 text "#str_42969" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef browse_materials_corner { rect (4+1*(("gui::ed_browser_w")-8)/2)+3,(24)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef browse_models { rect (4+0*(("gui::ed_browser_w")-8)/2),(44),((("gui::ed_browser_w")-8)/2-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "browse_models";
@@ -702,9 +702,9 @@ windowDef browse_models { rect (4+1*(("gui::ed_browser_w")-8)/3),(24),((("gui::e
   transition "browse_models_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction browse_4"; } }
-windowDef browse_models_label { rect (4+1*(("gui::ed_browser_w")-8)/3)+10,(24)+3,((("gui::ed_browser_w")-8)/3-2)-12,(18) noevents 1 text "#str_42970" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef browse_models_corner { rect (4+1*(("gui::ed_browser_w")-8)/3)+3,(24)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef browse_sounds { rect (4+2*(("gui::ed_browser_w")-8)/3),(24),((("gui::ed_browser_w")-8)/3-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef browse_models_label { rect (4+0*(("gui::ed_browser_w")-8)/2)+10,(44)+3,((("gui::ed_browser_w")-8)/2-2)-12,(18) noevents 1 text "#str_42970" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef browse_models_corner { rect (4+0*(("gui::ed_browser_w")-8)/2)+3,(44)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef browse_sounds { rect (4+1*(("gui::ed_browser_w")-8)/2),(44),((("gui::ed_browser_w")-8)/2-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "browse_sounds";
@@ -720,14 +720,14 @@ windowDef browse_sounds { rect (4+2*(("gui::ed_browser_w")-8)/3),(24),((("gui::e
   transition "browse_sounds_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction browse_5"; } }
-windowDef browse_sounds_label { rect (4+2*(("gui::ed_browser_w")-8)/3)+10,(24)+3,((("gui::ed_browser_w")-8)/3-2)-12,(18) noevents 1 text "#str_42971" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef browse_sounds_corner { rect (4+2*(("gui::ed_browser_w")-8)/3)+3,(24)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-editDef ed_filter { rect (6),(46),(("gui::ed_browser_w")-12),(18)
+windowDef browse_sounds_label { rect (4+1*(("gui::ed_browser_w")-8)/2)+10,(44)+3,((("gui::ed_browser_w")-8)/2-2)-12,(18) noevents 1 text "#str_42971" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef browse_sounds_corner { rect (4+1*(("gui::ed_browser_w")-8)/2)+3,(44)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+editDef ed_filter { rect (6),(66),(("gui::ed_browser_w")-12),(18)
  text "gui::ed_filter" noevents "gui::ed_confirm" maxchars 120 font "fonts/lowpixel" textspacing -1 textscale .16
  forecolor 1,1,1,0.9 backcolor 0.035,0.045,0.025,0.95 bordercolor 0.3,0.34,0.15,0.5 bordersize 1
  onEnter { set "cmd" "editorExperimentalAction filter"; } }
-windowDef filter_hint { rect (6),(65),(("gui::ed_browser_w")-12),(13) noevents 1 text "#str_42929" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 0.72,0.76,0.63,1 }
-listDef edBrowser { rect (6),(80),(("gui::ed_browser_w")-12),(("gui::ed_browser_h")-80-24)
+windowDef filter_hint { rect (6),(85),(("gui::ed_browser_w")-12),(13) noevents 1 text "#str_42929" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 0.72,0.76,0.63,1 }
+listDef edBrowser { rect (6),(100),(("gui::ed_browser_w")-12),(("gui::ed_browser_h")-100-24)
  listname edBrowser noevents "gui::ed_confirm" itemheight 14 scrollbar 1 maxitems 65536
  font "fonts/lowpixel" textspacing -1 textscale .15 forecolor 0.92,0.94,0.88,1 hovercolor 1,0.66,0.18,1
  backgroundHover "gfx/guis/mainmenu/bg_hover" backgroundLine "gfx/guis/mainmenu/bg_line"
@@ -739,7 +739,7 @@ windowDef browser_count { rect (6),(("gui::ed_browser_h")-18),(("gui::ed_browser
 }
 windowDef inspectorTab { rect ("gui::ed_inspector_tab_x"),("gui::ed_inspector_tab_y"),("gui::ed_inspector_tab_w"),("gui::ed_inspector_tab_h") visible "gui::ed_inspector_tab_vis"
 windowDef inspectorTab_back { rect 0,0,("gui::ed_inspector_tab_w")-1,("gui::ed_inspector_tab_h") noevents 1 background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,(0.25+0.4*"gui::ed_inspector_active") }
-windowDef inspectorTab_title { rect (0),(0),(("gui::ed_inspector_tab_w")-"gui::ed_inspector_active"*37),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef inspectorTab_title { rect (0),(0),(("gui::ed_inspector_tab_w")-1),(16) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "inspectorTab_title";
@@ -755,17 +755,17 @@ windowDef inspectorTab_title { rect (0),(0),(("gui::ed_inspector_tab_w")-"gui::e
   transition "inspectorTab_title_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction tab_inspector"; } }
-windowDef inspectorTab_title_label { rect (0)+10,(0)+3,(("gui::ed_inspector_tab_w")-"gui::ed_inspector_active"*37)-12,(18) noevents 1 text "#str_42911" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
-windowDef inspectorTab_title_corner { rect (0)+3,(0)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef inspectorTab_left { rect (("gui::ed_inspector_tab_w")-36),(3),(11),(13) visible "gui::ed_inspector_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef inspectorTab_title_label { rect (0)+10,(0)+3,(("gui::ed_inspector_tab_w")-1)-12,(16) noevents 1 text "#str_42911" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
+windowDef inspectorTab_title_corner { rect (0)+3,(0)+(16)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef inspectorTab_left { rect (("gui::ed_inspector_tab_w")-39),(16),(12),(12) visible "gui::ed_inspector_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_inspector_left"; } }
-windowDef inspectorTab_left_label { rect (("gui::ed_inspector_tab_w")-36)+2,(1),(11)-1,(14) visible "gui::ed_inspector_active" noevents 1 text "#str_42939" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef inspectorTab_right { rect (("gui::ed_inspector_tab_w")-24),(3),(11),(13) visible "gui::ed_inspector_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef inspectorTab_left_label { rect (("gui::ed_inspector_tab_w")-39)+3,(14),(12)-2,(13) visible "gui::ed_inspector_active" noevents 1 text "#str_42939" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef inspectorTab_right { rect (("gui::ed_inspector_tab_w")-26),(16),(12),(12) visible "gui::ed_inspector_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_inspector_right"; } }
-windowDef inspectorTab_right_label { rect (("gui::ed_inspector_tab_w")-24)+2,(1),(11)-1,(14) visible "gui::ed_inspector_active" noevents 1 text "#str_42940" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef inspectorTab_hidden { rect (("gui::ed_inspector_tab_w")-12),(3),(11),(13) visible "gui::ed_inspector_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef inspectorTab_right_label { rect (("gui::ed_inspector_tab_w")-26)+3,(14),(12)-2,(13) visible "gui::ed_inspector_active" noevents 1 text "#str_42940" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef inspectorTab_hidden { rect (("gui::ed_inspector_tab_w")-13),(16),(12),(12) visible "gui::ed_inspector_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_inspector_hidden"; } }
-windowDef inspectorTab_hidden_label { rect (("gui::ed_inspector_tab_w")-12)+2,(1),(11)-1,(14) visible "gui::ed_inspector_active" noevents 1 text "#str_42996" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
+windowDef inspectorTab_hidden_label { rect (("gui::ed_inspector_tab_w")-13)+3,(14),(12)-2,(13) visible "gui::ed_inspector_active" noevents 1 text "#str_42996" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
 }
 windowDef inspectorPanel { rect ("gui::ed_inspector_x"),("gui::ed_inspector_y"),("gui::ed_inspector_w"),("gui::ed_inspector_h") visible "gui::ed_inspector_vis"
 windowDef inspector_frame_body { rect (0)+4,(0)+4,("gui::ed_inspector_w")-8,("gui::ed_inspector_h")-8 noevents 1 background "gfx/guis/mainmenu/screen" matcolor 0.09,0.11,0.07,0.88 }
@@ -856,7 +856,7 @@ windowDef refs { rect (6),(("gui::ed_inspector_h")-22),(("gui::ed_inspector_w")-
 }
 windowDef toolsTab { rect ("gui::ed_tools_tab_x"),("gui::ed_tools_tab_y"),("gui::ed_tools_tab_w"),("gui::ed_tools_tab_h") visible "gui::ed_tools_tab_vis"
 windowDef toolsTab_back { rect 0,0,("gui::ed_tools_tab_w")-1,("gui::ed_tools_tab_h") noevents 1 background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,(0.25+0.4*"gui::ed_tools_active") }
-windowDef toolsTab_title { rect (0),(0),(("gui::ed_tools_tab_w")-"gui::ed_tools_active"*37),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef toolsTab_title { rect (0),(0),(("gui::ed_tools_tab_w")-1),(16) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "toolsTab_title";
@@ -872,17 +872,17 @@ windowDef toolsTab_title { rect (0),(0),(("gui::ed_tools_tab_w")-"gui::ed_tools_
   transition "toolsTab_title_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction tab_tools"; } }
-windowDef toolsTab_title_label { rect (0)+10,(0)+3,(("gui::ed_tools_tab_w")-"gui::ed_tools_active"*37)-12,(18) noevents 1 text "#str_42972" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
-windowDef toolsTab_title_corner { rect (0)+3,(0)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef toolsTab_left { rect (("gui::ed_tools_tab_w")-36),(3),(11),(13) visible "gui::ed_tools_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef toolsTab_title_label { rect (0)+10,(0)+3,(("gui::ed_tools_tab_w")-1)-12,(16) noevents 1 text "#str_42972" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
+windowDef toolsTab_title_corner { rect (0)+3,(0)+(16)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef toolsTab_left { rect (("gui::ed_tools_tab_w")-39),(16),(12),(12) visible "gui::ed_tools_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_tools_left"; } }
-windowDef toolsTab_left_label { rect (("gui::ed_tools_tab_w")-36)+2,(1),(11)-1,(14) visible "gui::ed_tools_active" noevents 1 text "#str_42939" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef toolsTab_right { rect (("gui::ed_tools_tab_w")-24),(3),(11),(13) visible "gui::ed_tools_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef toolsTab_left_label { rect (("gui::ed_tools_tab_w")-39)+3,(14),(12)-2,(13) visible "gui::ed_tools_active" noevents 1 text "#str_42939" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef toolsTab_right { rect (("gui::ed_tools_tab_w")-26),(16),(12),(12) visible "gui::ed_tools_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_tools_right"; } }
-windowDef toolsTab_right_label { rect (("gui::ed_tools_tab_w")-24)+2,(1),(11)-1,(14) visible "gui::ed_tools_active" noevents 1 text "#str_42940" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef toolsTab_hidden { rect (("gui::ed_tools_tab_w")-12),(3),(11),(13) visible "gui::ed_tools_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef toolsTab_right_label { rect (("gui::ed_tools_tab_w")-26)+3,(14),(12)-2,(13) visible "gui::ed_tools_active" noevents 1 text "#str_42940" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef toolsTab_hidden { rect (("gui::ed_tools_tab_w")-13),(16),(12),(12) visible "gui::ed_tools_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_tools_hidden"; } }
-windowDef toolsTab_hidden_label { rect (("gui::ed_tools_tab_w")-12)+2,(1),(11)-1,(14) visible "gui::ed_tools_active" noevents 1 text "#str_42996" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
+windowDef toolsTab_hidden_label { rect (("gui::ed_tools_tab_w")-13)+3,(14),(12)-2,(13) visible "gui::ed_tools_active" noevents 1 text "#str_42996" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
 }
 windowDef toolsPanel { rect ("gui::ed_tools_x"),("gui::ed_tools_y"),("gui::ed_tools_w"),("gui::ed_tools_h") visible "gui::ed_tools_vis"
 windowDef tools_frame_body { rect (0)+4,(0)+4,("gui::ed_tools_w")-8,("gui::ed_tools_h")-8 noevents 1 background "gfx/guis/mainmenu/screen" matcolor 0.09,0.11,0.07,0.88 }
@@ -890,17 +890,17 @@ windowDef tools_frame_grad { rect (0)+4,(0)+4,("gui::ed_tools_w")-8,("gui::ed_to
 windowDef tools_frame_top { rect (0),(0),("gui::ed_tools_w"),(16) noevents 1 background "gfx/guis/mainmenu/tooltip_edge" matcolor 1,1,1,0.95 }
 windowDef tools_frame_mid { rect (0),(0)+16,("gui::ed_tools_w"),("gui::ed_tools_h")-32 noevents 1 background "gfx/guis/mainmenu/tooltip_mid" matcolor 1,1,1,0.95 }
 windowDef tools_frame_btm { rect (0),(0)+("gui::ed_tools_h")-16,("gui::ed_tools_w"),(16) noevents 1 background "gfx/guis/mainmenu/tooltip_edge" matscalex -1 matscaley -1 matcolor 1,1,1,0.95 }
-windowDef class_label { rect (6),(4),(46),(18) noevents 1 text "#str_42916" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
-editDef ed_class { rect (54),(4),(("gui::ed_tools_w")-60),(18)
+windowDef class_label { rect (6),(2),(46),(18) noevents 1 text "#str_42916" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
+editDef ed_class { rect (54),(2),(("gui::ed_tools_w")-60),(18)
  text "gui::ed_class" noevents "gui::ed_confirm" maxchars 256 font "fonts/lowpixel" textspacing -1 textscale .16
  forecolor 1,1,1,0.9 backcolor 0.035,0.045,0.025,0.95 bordercolor 0.3,0.34,0.15,0.5 bordersize 1
  onEnter { set "cmd" "editorExperimentalAction create"; } }
-windowDef name_label { rect (6),(24),(46),(18) noevents 1 text "#str_42917" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
-editDef ed_name { rect (54),(24),(("gui::ed_tools_w")-60),(18)
+windowDef name_label { rect (6),(22),(46),(18) noevents 1 text "#str_42917" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
+editDef ed_name { rect (54),(22),(("gui::ed_tools_w")-60),(18)
  text "gui::ed_name" noevents "gui::ed_confirm" maxchars 256 font "fonts/lowpixel" textspacing -1 textscale .16
  forecolor 1,1,1,0.9 backcolor 0.035,0.045,0.025,0.95 bordercolor 0.3,0.34,0.15,0.5 bordersize 1
  onEnter { set "cmd" "editorExperimentalAction create"; } }
-windowDef create { rect (6),(46),((("gui::ed_tools_w")-16)/2),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef create { rect (6),(42),((("gui::ed_tools_w")-16)/2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "create";
@@ -916,9 +916,9 @@ windowDef create { rect (6),(46),((("gui::ed_tools_w")-16)/2),(20) noevents "gui
   transition "create_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction create"; } }
-windowDef create_label { rect (6)+10,(46)+3,((("gui::ed_tools_w")-16)/2)-12,(20) noevents 1 text "#str_42918" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 1,1,1,0.8 }
-windowDef create_corner { rect (6)+3,(46)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef delete { rect (10+(("gui::ed_tools_w")-16)/2),(46),((("gui::ed_tools_w")-16)/2),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef create_label { rect (6)+10,(42)+3,((("gui::ed_tools_w")-16)/2)-12,(18) noevents 1 text "#str_42918" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 1,1,1,0.8 }
+windowDef create_corner { rect (6)+3,(42)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef delete { rect (10+(("gui::ed_tools_w")-16)/2),(42),((("gui::ed_tools_w")-16)/2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "delete";
@@ -934,14 +934,14 @@ windowDef delete { rect (10+(("gui::ed_tools_w")-16)/2),(46),((("gui::ed_tools_w
   transition "delete_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction delete"; } }
-windowDef delete_label { rect (10+(("gui::ed_tools_w")-16)/2)+10,(46)+3,((("gui::ed_tools_w")-16)/2)-12,(20) noevents 1 text "#str_42919" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 1,1,1,0.8 }
-windowDef delete_corner { rect (10+(("gui::ed_tools_w")-16)/2)+3,(46)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef material_label { rect (6),(74),(("gui::ed_tools_w")-12),(14) noevents 1 text "#str_42985" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
-editDef ed_material { rect (6),(89),(("gui::ed_tools_w")-12),(18)
+windowDef delete_label { rect (10+(("gui::ed_tools_w")-16)/2)+10,(42)+3,((("gui::ed_tools_w")-16)/2)-12,(18) noevents 1 text "#str_42919" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 1,1,1,0.8 }
+windowDef delete_corner { rect (10+(("gui::ed_tools_w")-16)/2)+3,(42)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef material_label { rect (6),(64),(46),(18) noevents 1 text "#str_42985" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
+editDef ed_material { rect (54),(64),(("gui::ed_tools_w")-60),(18)
  text "gui::ed_material" noevents "gui::ed_confirm" maxchars 256 font "fonts/lowpixel" textspacing -1 textscale .16
  forecolor 1,1,1,0.9 backcolor 0.035,0.045,0.025,0.95 bordercolor 0.3,0.34,0.15,0.5 bordersize 1
  onEnter { set "cmd" "editorExperimentalAction material"; } }
-windowDef apply_material { rect (6),(110),(("gui::ed_tools_w")-12),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef apply_material { rect (6),(84),(("gui::ed_tools_w")-12),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "apply_material";
@@ -957,14 +957,14 @@ windowDef apply_material { rect (6),(110),(("gui::ed_tools_w")-12),(20) noevents
   transition "apply_material_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction material"; } }
-windowDef apply_material_label { rect (6)+10,(110)+3,(("gui::ed_tools_w")-12)-12,(20) noevents 1 text "#str_42986" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 1,1,1,0.8 }
-windowDef apply_material_corner { rect (6)+3,(110)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef layer_label { rect (6),(136),(46),(18) noevents 1 text "#str_42974" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
-editDef ed_layer { rect (54),(136),(("gui::ed_tools_w")-60),(18)
+windowDef apply_material_label { rect (6)+10,(84)+3,(("gui::ed_tools_w")-12)-12,(18) noevents 1 text "#str_42986" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 1,1,1,0.8 }
+windowDef apply_material_corner { rect (6)+3,(84)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef layer_label { rect (6),(106),(46),(18) noevents 1 text "#str_42974" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
+editDef ed_layer { rect (54),(106),(("gui::ed_tools_w")-60),(18)
  text "gui::ed_layer" noevents "gui::ed_confirm" maxchars 64 font "fonts/lowpixel" textspacing -1 textscale .16
  forecolor 1,1,1,0.9 backcolor 0.035,0.045,0.025,0.95 bordercolor 0.3,0.34,0.15,0.5 bordersize 1
  onEnter { set "cmd" "editorExperimentalAction layer"; } }
-windowDef set_layer { rect (6),(157),(("gui::ed_tools_w")-12),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef set_layer { rect (6),(126),(("gui::ed_tools_w")-12),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "set_layer";
@@ -980,9 +980,9 @@ windowDef set_layer { rect (6),(157),(("gui::ed_tools_w")-12),(20) noevents "gui
   transition "set_layer_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction layer"; } }
-windowDef set_layer_label { rect (6)+10,(157)+3,(("gui::ed_tools_w")-12)-12,(20) noevents 1 text "#str_42975" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 1,1,1,0.8 }
-windowDef set_layer_corner { rect (6)+3,(157)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-listDef edLayers { rect (6),(180),(("gui::ed_tools_w")-12),(("gui::ed_tools_h")-180-92)
+windowDef set_layer_label { rect (6)+10,(126)+3,(("gui::ed_tools_w")-12)-12,(18) noevents 1 text "#str_42975" font "fonts/lowpixel" textspacing -1 textscale 0.16 forecolor 1,1,1,0.8 }
+windowDef set_layer_corner { rect (6)+3,(126)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+listDef edLayers { rect (6),(148),(("gui::ed_tools_w")-12),(("gui::ed_tools_h")-148-80)
  listname edLayers noevents "gui::ed_confirm" itemheight 14 scrollbar 1 maxitems 65536
  font "fonts/lowpixel" textspacing -1 textscale .15 forecolor 0.92,0.94,0.88,1 hovercolor 1,0.66,0.18,1
  backgroundHover "gfx/guis/mainmenu/bg_hover" backgroundLine "gfx/guis/mainmenu/bg_line"
@@ -990,84 +990,48 @@ listDef edLayers { rect (6),(180),(("gui::ed_tools_w")-12),(("gui::ed_tools_h")-
  onAction { set "cmd" "editorExperimentalAction layerSelect"; }
  onSelChange { set "cmd" "editorExperimentalAction layerSelect"; }
  onEnter { set "cmd" "editorExperimentalAction layerSelect"; } }
-windowDef layerHide { rect (6+0*(("gui::ed_tools_w")-12)/4),(("gui::ed_tools_h")-88),((("gui::ed_tools_w")-12)/4-2),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef layerVisibility { rect (6+0*(("gui::ed_tools_w")-12)/2),(("gui::ed_tools_h")-76),((("gui::ed_tools_w")-12)/2-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
-   stoptransitions "layerHide";
-   set "layerHide::matcolor_w" "1";
-   transition "layerHide_label::forecolor" "$desktop::white_8" "$desktop::orange" "0";
-   transition "layerHide_corner::matcolor" "$desktop::orange_4" "$desktop::orange" "0";
+   stoptransitions "layerVisibility";
+   set "layerVisibility::matcolor_w" "1";
+   transition "layerVisibility_label::forecolor" "$desktop::white_8" "$desktop::orange" "0";
+   transition "layerVisibility_corner::matcolor" "$desktop::orange_4" "$desktop::orange" "0";
    set "cmd" "play main_menu_mouseover";
   }
  }
  onMouseExit {
-  transition "layerHide::matcolor_w" "1" "0.62" "300";
-  transition "layerHide_label::forecolor" "$desktop::orange" "$desktop::white_8" "300";
-  transition "layerHide_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
+  transition "layerVisibility::matcolor_w" "1" "0.62" "300";
+  transition "layerVisibility_label::forecolor" "$desktop::orange" "$desktop::white_8" "300";
+  transition "layerVisibility_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
- onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction layerHide"; } }
-windowDef layerHide_label { rect (6+0*(("gui::ed_tools_w")-12)/4)+10,(("gui::ed_tools_h")-88)+3,((("gui::ed_tools_w")-12)/4-2)-12,(20) noevents 1 text "#str_43131" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
-windowDef layerHide_corner { rect (6+0*(("gui::ed_tools_w")-12)/4)+3,(("gui::ed_tools_h")-88)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef layerShow { rect (6+1*(("gui::ed_tools_w")-12)/4),(("gui::ed_tools_h")-88),((("gui::ed_tools_w")-12)/4-2),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+ onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction layerVisibility"; } }
+windowDef layerVisibility_label { rect (6+0*(("gui::ed_tools_w")-12)/2)+10,(("gui::ed_tools_h")-76)+3,((("gui::ed_tools_w")-12)/2-2)-12,(18) noevents 1 text "#str_43135" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
+windowDef layerVisibility_corner { rect (6+0*(("gui::ed_tools_w")-12)/2)+3,(("gui::ed_tools_h")-76)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef layerLocking { rect (6+1*(("gui::ed_tools_w")-12)/2),(("gui::ed_tools_h")-76),((("gui::ed_tools_w")-12)/2-2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
-   stoptransitions "layerShow";
-   set "layerShow::matcolor_w" "1";
-   transition "layerShow_label::forecolor" "$desktop::white_8" "$desktop::orange" "0";
-   transition "layerShow_corner::matcolor" "$desktop::orange_4" "$desktop::orange" "0";
+   stoptransitions "layerLocking";
+   set "layerLocking::matcolor_w" "1";
+   transition "layerLocking_label::forecolor" "$desktop::white_8" "$desktop::orange" "0";
+   transition "layerLocking_corner::matcolor" "$desktop::orange_4" "$desktop::orange" "0";
    set "cmd" "play main_menu_mouseover";
   }
  }
  onMouseExit {
-  transition "layerShow::matcolor_w" "1" "0.62" "300";
-  transition "layerShow_label::forecolor" "$desktop::orange" "$desktop::white_8" "300";
-  transition "layerShow_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
+  transition "layerLocking::matcolor_w" "1" "0.62" "300";
+  transition "layerLocking_label::forecolor" "$desktop::orange" "$desktop::white_8" "300";
+  transition "layerLocking_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
- onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction layerShow"; } }
-windowDef layerShow_label { rect (6+1*(("gui::ed_tools_w")-12)/4)+10,(("gui::ed_tools_h")-88)+3,((("gui::ed_tools_w")-12)/4-2)-12,(20) noevents 1 text "#str_42977" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
-windowDef layerShow_corner { rect (6+1*(("gui::ed_tools_w")-12)/4)+3,(("gui::ed_tools_h")-88)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef layerLock { rect (6+2*(("gui::ed_tools_w")-12)/4),(("gui::ed_tools_h")-88),((("gui::ed_tools_w")-12)/4-2),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
- onMouseEnter {
-  if ( "gui::ed_confirm" == 0 ) {
-   stoptransitions "layerLock";
-   set "layerLock::matcolor_w" "1";
-   transition "layerLock_label::forecolor" "$desktop::white_8" "$desktop::orange" "0";
-   transition "layerLock_corner::matcolor" "$desktop::orange_4" "$desktop::orange" "0";
-   set "cmd" "play main_menu_mouseover";
-  }
- }
- onMouseExit {
-  transition "layerLock::matcolor_w" "1" "0.62" "300";
-  transition "layerLock_label::forecolor" "$desktop::orange" "$desktop::white_8" "300";
-  transition "layerLock_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
- }
- onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction layerLock"; } }
-windowDef layerLock_label { rect (6+2*(("gui::ed_tools_w")-12)/4)+10,(("gui::ed_tools_h")-88)+3,((("gui::ed_tools_w")-12)/4-2)-12,(20) noevents 1 text "#str_43132" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
-windowDef layerLock_corner { rect (6+2*(("gui::ed_tools_w")-12)/4)+3,(("gui::ed_tools_h")-88)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef layerUnlock { rect (6+3*(("gui::ed_tools_w")-12)/4),(("gui::ed_tools_h")-88),((("gui::ed_tools_w")-12)/4-2),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
- onMouseEnter {
-  if ( "gui::ed_confirm" == 0 ) {
-   stoptransitions "layerUnlock";
-   set "layerUnlock::matcolor_w" "1";
-   transition "layerUnlock_label::forecolor" "$desktop::white_8" "$desktop::orange" "0";
-   transition "layerUnlock_corner::matcolor" "$desktop::orange_4" "$desktop::orange" "0";
-   set "cmd" "play main_menu_mouseover";
-  }
- }
- onMouseExit {
-  transition "layerUnlock::matcolor_w" "1" "0.62" "300";
-  transition "layerUnlock_label::forecolor" "$desktop::orange" "$desktop::white_8" "300";
-  transition "layerUnlock_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
- }
- onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction layerUnlock"; } }
-windowDef layerUnlock_label { rect (6+3*(("gui::ed_tools_w")-12)/4)+10,(("gui::ed_tools_h")-88)+3,((("gui::ed_tools_w")-12)/4-2)-12,(20) noevents 1 text "#str_42979" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
-windowDef layerUnlock_corner { rect (6+3*(("gui::ed_tools_w")-12)/4)+3,(("gui::ed_tools_h")-88)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef prefab_label { rect (6),(("gui::ed_tools_h")-64),(46),(18) noevents 1 text "#str_42980" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
-editDef ed_prefab { rect (54),(("gui::ed_tools_h")-64),(("gui::ed_tools_w")-60),(18)
+ onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction layerLocking"; } }
+windowDef layerLocking_label { rect (6+1*(("gui::ed_tools_w")-12)/2)+10,(("gui::ed_tools_h")-76)+3,((("gui::ed_tools_w")-12)/2-2)-12,(18) noevents 1 text "#str_43136" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
+windowDef layerLocking_corner { rect (6+1*(("gui::ed_tools_w")-12)/2)+3,(("gui::ed_tools_h")-76)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef prefab_label { rect (6),(("gui::ed_tools_h")-54),(46),(18) noevents 1 text "#str_42980" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 0.72,0.76,0.63,1 }
+editDef ed_prefab { rect (54),(("gui::ed_tools_h")-54),(("gui::ed_tools_w")-60),(18)
  text "gui::ed_prefab" noevents "gui::ed_confirm" maxchars 120 font "fonts/lowpixel" textspacing -1 textscale .16
  forecolor 1,1,1,0.9 backcolor 0.035,0.045,0.025,0.95 bordercolor 0.3,0.34,0.15,0.5 bordersize 1
  onEnter { set "cmd" "editorExperimentalAction prefabSave"; } }
-windowDef prefab_save { rect (6),(("gui::ed_tools_h")-42),((("gui::ed_tools_w")-16)/2),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef prefab_save { rect (6),(("gui::ed_tools_h")-32),((("gui::ed_tools_w")-16)/2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "prefab_save";
@@ -1083,9 +1047,9 @@ windowDef prefab_save { rect (6),(("gui::ed_tools_h")-42),((("gui::ed_tools_w")-
   transition "prefab_save_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction prefabSave"; } }
-windowDef prefab_save_label { rect (6)+10,(("gui::ed_tools_h")-42)+3,((("gui::ed_tools_w")-16)/2)-12,(20) noevents 1 text "#str_42981" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef prefab_save_corner { rect (6)+3,(("gui::ed_tools_h")-42)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef prefab_insert { rect (10+(("gui::ed_tools_w")-16)/2),(("gui::ed_tools_h")-42),((("gui::ed_tools_w")-16)/2),(20) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef prefab_save_label { rect (6)+10,(("gui::ed_tools_h")-32)+3,((("gui::ed_tools_w")-16)/2)-12,(18) noevents 1 text "#str_42981" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef prefab_save_corner { rect (6)+3,(("gui::ed_tools_h")-32)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef prefab_insert { rect (10+(("gui::ed_tools_w")-16)/2),(("gui::ed_tools_h")-32),((("gui::ed_tools_w")-16)/2),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "prefab_insert";
@@ -1101,12 +1065,12 @@ windowDef prefab_insert { rect (10+(("gui::ed_tools_w")-16)/2),(("gui::ed_tools_
   transition "prefab_insert_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction prefabInsert"; } }
-windowDef prefab_insert_label { rect (10+(("gui::ed_tools_w")-16)/2)+10,(("gui::ed_tools_h")-42)+3,((("gui::ed_tools_w")-16)/2)-12,(20) noevents 1 text "#str_42982" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
-windowDef prefab_insert_corner { rect (10+(("gui::ed_tools_w")-16)/2)+3,(("gui::ed_tools_h")-42)+(20)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef prefab_insert_label { rect (10+(("gui::ed_tools_w")-16)/2)+10,(("gui::ed_tools_h")-32)+3,((("gui::ed_tools_w")-16)/2)-12,(18) noevents 1 text "#str_42982" font "fonts/lowpixel" textspacing -1 textscale 0.14 forecolor 1,1,1,0.8 }
+windowDef prefab_insert_corner { rect (10+(("gui::ed_tools_w")-16)/2)+3,(("gui::ed_tools_h")-32)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
 }
 windowDef problemsTab { rect ("gui::ed_problems_tab_x"),("gui::ed_problems_tab_y"),("gui::ed_problems_tab_w"),("gui::ed_problems_tab_h") visible "gui::ed_problems_tab_vis"
 windowDef problemsTab_back { rect 0,0,("gui::ed_problems_tab_w")-1,("gui::ed_problems_tab_h") noevents 1 background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,(0.25+0.4*"gui::ed_problems_active") }
-windowDef problemsTab_title { rect (0),(0),(("gui::ed_problems_tab_w")-"gui::ed_problems_active"*49),(18) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
+windowDef problemsTab_title { rect (0),(0),(("gui::ed_problems_tab_w")-1),(16) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.62
  onMouseEnter {
   if ( "gui::ed_confirm" == 0 ) {
    stoptransitions "problemsTab_title";
@@ -1122,20 +1086,20 @@ windowDef problemsTab_title { rect (0),(0),(("gui::ed_problems_tab_w")-"gui::ed_
   transition "problemsTab_title_corner::matcolor" "$desktop::orange" "$desktop::orange_4" "300";
  }
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction tab_problems"; } }
-windowDef problemsTab_title_label { rect (0)+10,(0)+3,(("gui::ed_problems_tab_w")-"gui::ed_problems_active"*49)-12,(18) noevents 1 text "#str_42973" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
-windowDef problemsTab_title_corner { rect (0)+3,(0)+(18)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
-windowDef problemsTab_left { rect (("gui::ed_problems_tab_w")-48),(3),(11),(13) visible "gui::ed_problems_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef problemsTab_title_label { rect (0)+10,(0)+3,(("gui::ed_problems_tab_w")-1)-12,(16) noevents 1 text "#str_42973" font "fonts/lowpixel" textspacing -1 textscale 0.13 forecolor 1,1,1,0.8 }
+windowDef problemsTab_title_corner { rect (0)+3,(0)+(16)/2-3,(6),(6) noevents 1 background "gfx/guis/mainmenu/corner" matcolor 0.890,0.537,0,0.4 }
+windowDef problemsTab_left { rect (("gui::ed_problems_tab_w")-52),(16),(12),(12) visible "gui::ed_problems_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_problems_left"; } }
-windowDef problemsTab_left_label { rect (("gui::ed_problems_tab_w")-48)+2,(1),(11)-1,(14) visible "gui::ed_problems_active" noevents 1 text "#str_42939" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef problemsTab_right { rect (("gui::ed_problems_tab_w")-36),(3),(11),(13) visible "gui::ed_problems_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef problemsTab_left_label { rect (("gui::ed_problems_tab_w")-52)+3,(14),(12)-2,(13) visible "gui::ed_problems_active" noevents 1 text "#str_42939" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef problemsTab_right { rect (("gui::ed_problems_tab_w")-39),(16),(12),(12) visible "gui::ed_problems_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_problems_right"; } }
-windowDef problemsTab_right_label { rect (("gui::ed_problems_tab_w")-36)+2,(1),(11)-1,(14) visible "gui::ed_problems_active" noevents 1 text "#str_42940" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef problemsTab_bottom { rect (("gui::ed_problems_tab_w")-24),(3),(11),(13) visible "gui::ed_problems_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef problemsTab_right_label { rect (("gui::ed_problems_tab_w")-39)+3,(14),(12)-2,(13) visible "gui::ed_problems_active" noevents 1 text "#str_42940" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef problemsTab_bottom { rect (("gui::ed_problems_tab_w")-26),(16),(12),(12) visible "gui::ed_problems_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_problems_bottom"; } }
-windowDef problemsTab_bottom_label { rect (("gui::ed_problems_tab_w")-24)+2,(1),(11)-1,(14) visible "gui::ed_problems_active" noevents 1 text "#str_42995" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
-windowDef problemsTab_hidden { rect (("gui::ed_problems_tab_w")-12),(3),(11),(13) visible "gui::ed_problems_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
+windowDef problemsTab_bottom_label { rect (("gui::ed_problems_tab_w")-26)+3,(14),(12)-2,(13) visible "gui::ed_problems_active" noevents 1 text "#str_42995" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
+windowDef problemsTab_hidden { rect (("gui::ed_problems_tab_w")-13),(16),(12),(12) visible "gui::ed_problems_active" noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5
  onAction { set "cmd" "play main_menu_selection ; editorExperimentalAction dock_problems_hidden"; } }
-windowDef problemsTab_hidden_label { rect (("gui::ed_problems_tab_w")-12)+2,(1),(11)-1,(14) visible "gui::ed_problems_active" noevents 1 text "#str_42996" font "fonts/lowpixel" textspacing -1 textscale .13 forecolor 1,1,1,0.85 }
+windowDef problemsTab_hidden_label { rect (("gui::ed_problems_tab_w")-13)+3,(14),(12)-2,(13) visible "gui::ed_problems_active" noevents 1 text "#str_42996" font "fonts/lowpixel" textspacing -1 textscale .12 forecolor 1,1,1,0.85 }
 }
 windowDef problemsPanel { rect ("gui::ed_problems_x"),("gui::ed_problems_y"),("gui::ed_problems_w"),("gui::ed_problems_h") visible "gui::ed_problems_vis"
 windowDef problems_frame_body { rect (0)+4,(0)+4,("gui::ed_problems_w")-8,("gui::ed_problems_h")-8 noevents 1 background "gfx/guis/mainmenu/screen" matcolor 0.09,0.11,0.07,0.88 }

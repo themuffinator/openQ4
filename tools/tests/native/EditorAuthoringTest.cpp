@@ -567,10 +567,19 @@ static void Layout() {
 		!result.panels[DockLayout::Tools].visible && result.panels[DockLayout::Tools].tabVisible, "default docks show the browser, inspector and problems, tools as a tab" );
 	Expect( Near( result.views.x, 8 + 154 + 8 ) && Near( result.views.w, 624 - 154 - 188 - 16 ) && result.views.h < 330, "views fill the centre above the problems dock" );
 	Expect( !layout.Move( DockLayout::Inspector, DockLayout::Bottom ), "tall panels cannot dock at the bottom" );
-	Expect( layout.Move( DockLayout::Tools, DockLayout::Left ) && layout.Move( DockLayout::Inspector, DockLayout::Left ), "dock tools and inspector left" );
+	Expect( !layout.Move( DockLayout::Tools, DockLayout::Right ) || layout.DockOf( DockLayout::Tools ) == DockLayout::Right, "moving within a dock is a no-op" );
+	Expect( layout.Move( DockLayout::Tools, DockLayout::Left ), "dock tools left" );
+	Expect( !layout.Move( DockLayout::Problems, DockLayout::Left ), "a side dock holds at most two panels" );
+	Expect( layout.Move( DockLayout::Browser, DockLayout::Hidden ) && layout.Move( DockLayout::Inspector, DockLayout::Left ), "dock inspector left" );
+	layout.Toggle( DockLayout::Browser );
+	Expect( layout.DockOf( DockLayout::Browser ) == DockLayout::Hidden, "a panel cannot return to a full dock" );
+	layout.Move( DockLayout::Tools, DockLayout::Right );
+	layout.Toggle( DockLayout::Browser );
 	result = layout.Compute( { 8, 108, 624, 330 } );
-	Expect( result.panels[DockLayout::Inspector].visible && !result.panels[DockLayout::Browser].visible && result.panels[DockLayout::Browser].tabVisible, "shared dock becomes tabs" );
-	Expect( Near( result.views.w, 624 - 154 - 8 ), "empty right dock gives the views its width" );
+	Expect( result.panels[DockLayout::Browser].visible && !result.panels[DockLayout::Inspector].visible && result.panels[DockLayout::Inspector].tabVisible &&
+		Near( result.panels[DockLayout::Inspector].tab.w, 77 ), "shared dock becomes tabs" );
+	Expect( layout.Move( DockLayout::Tools, DockLayout::Hidden ) && Near( layout.Compute( { 8, 108, 624, 330 } ).views.w, 624 - 154 - 8 ), "empty right dock gives the views its width" );
+	result = layout.Compute( { 8, 108, 624, 330 } );
 	layout.Activate( DockLayout::Browser );
 	layout.Toggle( DockLayout::Problems );
 	layout.Resize( DockLayout::Left, 500 );
@@ -579,7 +588,8 @@ static void Layout() {
 	Expect( restored.Parse( text ) && restored.Serialize() == text && restored.Size( DockLayout::Left ) == DockLayout::MaxSide, "layout persists and clamps" );
 	restored.Toggle( DockLayout::Problems );
 	Expect( restored.DockOf( DockLayout::Problems ) == DockLayout::Bottom, "a hidden panel returns to its last dock" );
-	Expect( !restored.Parse( "inspector=bottom;" ) && !restored.Parse( "garbage" ) && restored.Serialize() != "", "invalid layouts are rejected without change" );
+	Expect( !restored.Parse( "inspector=bottom;" ) && !restored.Parse( "garbage" ) && !restored.Parse( "browser=left;inspector=left;tools=left;" ) &&
+		restored.Serialize() != "", "invalid and over-full layouts are rejected without change" );
 	ViewState view;
 	view.target = Vec3( 1, 2, 3 ); view.yaw = 90; view.mode = 1; view.quad = true; view.grid = 16; view.textureLock = false;
 	view.hiddenLayers.insert( "detail" ); view.selection = { "3", "0:12" };

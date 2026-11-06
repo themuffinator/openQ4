@@ -63,7 +63,6 @@ private:
 idLevelEditorSession &S() { return LevelEditor_Session(); }
 const char *Tr( const char *key ) { return common->GetLanguageDict()->GetString( key ); }
 void Message( const char *key ) { workspaceGui->SetStateString( "ed_message", Tr( key ) ); }
-void MessageText( const std::string &text ) { workspaceGui->SetStateString( "ed_message", text.c_str() ); }
 void Result( bool ok, const std::string &error ) {
 	Message( ok ? "#str_42926" : "#str_42927" );
 	if ( !ok ) { common->Printf( "editor workspace rejected: %s\n", error.c_str() ); }
@@ -592,13 +591,14 @@ void Action( const std::string &action ) {
 		const bool ok = s.editor.SetLayer( document, s.selection, workspaceGui->GetStateString( "ed_layer" ), layered, error );
 		if ( ok ) { s.selection = layered; }
 		ToolResult( ok, error );
-	} else if ( verb == "layerHide" || verb == "layerShow" || verb == "layerLock" || verb == "layerUnlock" ) {
+	} else if ( verb == "layerHide" || verb == "layerShow" || verb == "layerLock" || verb == "layerUnlock" || verb == "layerVisibility" || verb == "layerLocking" ) {
 		const int row = workspaceGui->GetStateInt( "edLayers_sel_0", "-1" );
 		const std::string layer = row >= 0 && row < static_cast<int>( layerRows.size() ) ? layerRows[row] : workspaceGui->GetStateString( "ed_layer" );
 		if ( !layer.empty() ) {
-			if ( verb == "layerHide" ) { s.view.hiddenLayers.insert( layer ); }
-			else if ( verb == "layerShow" ) { s.view.hiddenLayers.erase( layer ); }
-			else if ( verb == "layerLock" ) { s.view.lockedLayers.insert( layer ); }
+			const bool hidden = s.view.hiddenLayers.count( layer ) != 0, locked = s.view.lockedLayers.count( layer ) != 0;
+			if ( verb == "layerHide" || ( verb == "layerVisibility" && !hidden ) ) { s.view.hiddenLayers.insert( layer ); }
+			else if ( verb == "layerShow" || verb == "layerVisibility" ) { s.view.hiddenLayers.erase( layer ); }
+			else if ( verb == "layerLock" || ( verb == "layerLocking" && !locked ) ) { s.view.lockedLayers.insert( layer ); }
 			else { s.view.lockedLayers.erase( layer ); }
 			s.selection.erase( std::remove_if( s.selection.begin(), s.selection.end(), [&]( const SelectionItem &item ) { return !s.Selectable( item ); } ), s.selection.end() );
 			Refresh( true );

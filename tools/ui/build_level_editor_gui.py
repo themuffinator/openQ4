@@ -80,7 +80,7 @@ def listdef(name: str, x: str, y: str, w: str, h: str, action: str) -> str:
     )
 
 
-def toolbar(row: str, y: int, items: list[tuple], start: float = 8, span: float = 616) -> str:
+def toolbar(row: str, y: int, items: list[tuple], start: float = 8, span: float = 616, scale: float = 0.15) -> str:
     """Buttons share the row by weight (an optional fourth tuple member)."""
     out = ''
     weights = [item[3] if len(item) > 3 else 1.0 for item in items]
@@ -88,7 +88,7 @@ def toolbar(row: str, y: int, items: list[tuple], start: float = 8, span: float 
     x = start
     for (name, text, action, *_), weight in zip(items, weights):
         width = unit * weight
-        out += button(f'{row}_{name}', f'{x:.1f}', str(y), f'{width:.1f}', '22', text, action, 0.15)
+        out += button(f'{row}_{name}', f'{x:.1f}', str(y), f'{width:.1f}', '22', text, action, scale)
         x += width + 4
     return out
 
@@ -104,16 +104,17 @@ def panel(name: str, title: str, docks: list[str], body: str) -> str:
     glyph = {'left': '#str_42939', 'right': '#str_42940', 'bottom': '#str_42995', 'hidden': '#str_42996'}
     # Only the active tab carries the dock controls, so shared docks keep
     # room for their titles.
-    small = 11
+    # The title spans the tab; the active tab adds its dock buttons on a
+    # second line, so titles keep their width however a dock is shared.
+    small = 12
     active = f'"gui::ed_{name}_active"'
-    tab_w = f'({tab[2]})-{active}*{len(controls) * (small + 1) + 1}'
-    out += button(f'{name}Tab_title', '0', '0', tab_w, '18', title, f'tab_{name}', 0.13)
+    out += button(f'{name}Tab_title', '0', '0', f'({tab[2]})-1', '16', title, f'tab_{name}', 0.13)
     for i, dock in enumerate(controls):
         x = f'({tab[2]})-{(len(controls) - i) * (small + 1)}'
         out += (
-            f'windowDef {name}Tab_{dock} {{ rect ({x}),(3),({small}),(13) visible {active} noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5\n'
+            f'windowDef {name}Tab_{dock} {{ rect ({x}),(16),({small}),(12) visible {active} noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,0.5\n'
             f' onAction {{ set "cmd" "play main_menu_selection ; editorExperimentalAction dock_{name}_{dock}"; }} }}\n'
-            f'windowDef {name}Tab_{dock}_label {{ rect ({x})+2,(1),({small})-1,(14) visible {active} noevents 1 text "{glyph[dock]}" {FONT} textscale .13 forecolor 1,1,1,0.85 }}\n'
+            f'windowDef {name}Tab_{dock}_label {{ rect ({x})+3,(14),({small})-2,(13) visible {active} noevents 1 text "{glyph[dock]}" {FONT} textscale .12 forecolor 1,1,1,0.85 }}\n'
         )
     out += '}\n'
     box = f'"gui::ed_{name}_x"', f'"gui::ed_{name}_y"', f'"gui::ed_{name}_w"', f'"gui::ed_{name}_h"'
@@ -129,11 +130,12 @@ def browser() -> str:
     modes = [('entities', '#str_42908'), ('maps', '#str_42909'), ('classes', '#str_42910'),
              ('materials', '#str_42969'), ('models', '#str_42970'), ('sounds', '#str_42971')]
     for i, (name, text) in enumerate(modes):
-        col, row = i % 3, i // 3
-        out += button(f'browse_{name}', f'4+{col}*((@W)-8)/3', f'{4 + row * 20}', '((@W)-8)/3-2', '18', text, f'browse_{i}', 0.14)
-    out += edit('ed_filter', '6', '46', '(@W)-12', '18', 'ed_filter', 120, 'filter')
-    out += label('filter_hint', '6', '65', '(@W)-12', '13', '#str_42929', 0.13)
-    out += listdef('edBrowser', '6', '80', '(@W)-12', '(@H)-80-24', 'select')
+        # Two per row: asset words are long in several languages.
+        col, row = i % 2, i // 2
+        out += button(f'browse_{name}', f'4+{col}*((@W)-8)/2', f'{4 + row * 20}', '((@W)-8)/2-2', '18', text, f'browse_{i}', 0.14)
+    out += edit('ed_filter', '6', '66', '(@W)-12', '18', 'ed_filter', 120, 'filter')
+    out += label('filter_hint', '6', '85', '(@W)-12', '13', '#str_42929', 0.13)
+    out += listdef('edBrowser', '6', '100', '(@W)-12', '(@H)-100-24', 'select')
     out += f'windowDef browser_count {{ rect (6),((@H)-18),((@W)-12),(14) noevents 1 text "gui::ed_browserCount" {FONT} textscale .14 forecolor {MUTED} }}\n'
     return out
 
@@ -157,26 +159,26 @@ def inspector() -> str:
 
 def tools() -> str:
     out = ''
-    rows = [('class', '#str_42916', 'ed_class', 'create'), ('name', '#str_42917', 'ed_name', 'create')]
-    for i, (name, text, var, action) in enumerate(rows):
-        y = 4 + i * 20
+    rows = [('class', '#str_42916', 'ed_class', 'create', 2), ('name', '#str_42917', 'ed_name', 'create', 22)]
+    for name, text, var, action, y in rows:
         out += label(f'{name}_label', '6', str(y), '46', '18', text, 0.14)
         out += edit(f'ed_{name}', '54', str(y), '(@W)-60', '18', var, 256, action)
-    out += button('create', '6', '46', '((@W)-16)/2', '20', '#str_42918', 'create')
-    out += button('delete', '10+((@W)-16)/2', '46', '((@W)-16)/2', '20', '#str_42919', 'delete')
-    out += label('material_label', '6', '74', '(@W)-12', '14', '#str_42985', 0.14)
-    out += edit('ed_material', '6', '89', '(@W)-12', '18', 'ed_material', 256, 'material')
-    out += button('apply_material', '6', '110', '(@W)-12', '20', '#str_42986', 'material')
-    out += label('layer_label', '6', '136', '46', '18', '#str_42974', 0.14)
-    out += edit('ed_layer', '54', '136', '(@W)-60', '18', 'ed_layer', 64, 'layer')
-    out += button('set_layer', '6', '157', '(@W)-12', '20', '#str_42975', 'layer')
-    out += listdef('edLayers', '6', '180', '(@W)-12', '(@H)-180-92', 'layerSelect')
-    for i, (name, text) in enumerate([('layerHide', '#str_43131'), ('layerShow', '#str_42977'), ('layerLock', '#str_43132'), ('layerUnlock', '#str_42979')]):
-        out += button(f'{name}', f'6+{i}*((@W)-12)/4', '(@H)-88', '((@W)-12)/4-2', '20', text, name, 0.13)
-    out += label('prefab_label', '6', '(@H)-64', '46', '18', '#str_42980', 0.14)
-    out += edit('ed_prefab', '54', '(@H)-64', '(@W)-60', '18', 'ed_prefab', 120, 'prefabSave')
-    out += button('prefab_save', '6', '(@H)-42', '((@W)-16)/2', '20', '#str_42981', 'prefabSave', 0.14)
-    out += button('prefab_insert', '10+((@W)-16)/2', '(@H)-42', '((@W)-16)/2', '20', '#str_42982', 'prefabInsert', 0.14)
+    out += button('create', '6', '42', '((@W)-16)/2', '18', '#str_42918', 'create')
+    out += button('delete', '10+((@W)-16)/2', '42', '((@W)-16)/2', '18', '#str_42919', 'delete')
+    out += label('material_label', '6', '64', '46', '18', '#str_42985', 0.14)
+    out += edit('ed_material', '54', '64', '(@W)-60', '18', 'ed_material', 256, 'material')
+    out += button('apply_material', '6', '84', '(@W)-12', '18', '#str_42986', 'material')
+    out += label('layer_label', '6', '106', '46', '18', '#str_42974', 0.14)
+    out += edit('ed_layer', '54', '106', '(@W)-60', '18', 'ed_layer', 64, 'layer')
+    out += button('set_layer', '6', '126', '(@W)-12', '18', '#str_42975', 'layer')
+    out += listdef('edLayers', '6', '148', '(@W)-12', '(@H)-148-80', 'layerSelect')
+    # Toggles for the selected layer row (or the layer field).
+    for i, (name, text) in enumerate([('layerVisibility', '#str_43135'), ('layerLocking', '#str_43136')]):
+        out += button(f'{name}', f'6+{i}*((@W)-12)/2', '(@H)-76', '((@W)-12)/2-2', '18', text, name, 0.13)
+    out += label('prefab_label', '6', '(@H)-54', '46', '18', '#str_42980', 0.14)
+    out += edit('ed_prefab', '54', '(@H)-54', '(@W)-60', '18', 'ed_prefab', 120, 'prefabSave')
+    out += button('prefab_save', '6', '(@H)-32', '((@W)-16)/2', '18', '#str_42981', 'prefabSave', 0.14)
+    out += button('prefab_insert', '10+((@W)-16)/2', '(@H)-32', '((@W)-16)/2', '18', '#str_42982', 'prefabInsert', 0.14)
     return out
 
 
@@ -227,10 +229,10 @@ def build() -> str:
     out += label('experimental', '160', '7', '100', '16', '#str_42946', 0.16, ORANGE)
     out += f'windowDef document {{ rect (264),(7),(268),(16) noevents 1 text "gui::ed_title" {FONT} textscale .16 forecolor 0.72,0.76,0.63,1 }}\n'
     out += f'windowDef dirty {{ rect (536),(7),(96),(16) noevents 1 text "gui::ed_dirty" {FONT} textscale .16 forecolor {ORANGE} }}\n'
-    out += toolbar('file', 26, [('new', '#str_42901', 'new'), ('open', '#str_42902', 'open'), ('save', '#str_42903', 'save'),
-                               ('copy', '#str_42907', 'copy', 1.3), ('undo', '#str_42904', 'undo'), ('redo', '#str_42905', 'redo'),
+    out += toolbar('file', 26, [('new', '#str_42901', 'new'), ('open', '#str_42902', 'open'), ('save', '#str_42903', 'save', 1.15),
+                               ('copy', '#str_42907', 'copy', 1.45), ('undo', '#str_42904', 'undo', 1.2), ('redo', '#str_42905', 'redo', 1.2),
                                ('build', '#str_42947', 'build'), ('play', '#str_42948', 'play'), ('stop', '#str_42949', 'stop'),
-                               ('hide', '#str_42906', 'hide', 1.9)])
+                               ('hide', '#str_42906', 'hide', 1.8)])
     out += label('path_label', '8', '53', '36', '18', '#str_42933', 0.15)
     out += edit('ed_path', '46', '52', '484', '20', 'ed_path', 220, 'open')
     out += button('close_map', '536', '51', '88', '22', '#str_42937', 'close', 0.15)
@@ -238,14 +240,15 @@ def build() -> str:
                                ('side', '#str_42953', 'mode_3'), ('quad', '#str_42955', 'quad'), ('gridDown', '#str_42956', 'gridDown'),
                                ('gridUp', '#str_42957', 'gridUp'), ('validate', '#str_42959', 'validate'), ('frame', '#str_42930', 'frame'),
                                ('panels', '#str_42960', 'panels')])
-    out += f'windowDef lock_state {{ rect (8),(100),(116),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,(0.3+0.5*"gui::ed_lock")\n onAction {{ set "cmd" "play main_menu_selection ; editorExperimentalAction lock"; }} }}\n'
-    out += f'windowDef lock_state_label {{ rect (18),(103),(104),(22) noevents 1 text "gui::ed_lockText" {FONT} textscale .15 forecolor 1,1,1,0.8 }}\n'
-    edit_tools = [('brush', '#str_42961', 'brush'), ('patch', '#str_42962', 'patch'), ('duplicate', '#str_42963', 'duplicate'),
-                  ('remove', '#str_42919', 'remove'), ('group', '#str_42964', 'group'), ('ungroup', '#str_42965', 'ungroup'),
-                  ('rotateCcw', '#str_42966', 'rotateCcw'), ('rotateCw', '#str_42967', 'rotateCw'), ('snap', '#str_42968', 'snap')]
-    width = (616 - 120 - 4 * (len(edit_tools) - 1)) / len(edit_tools)
-    for i, (name, text, action) in enumerate(edit_tools):
-        out += button(f'edit_{name}', f'{128 + i * (width + 4):g}', '100', f'{width:g}', '22', text, action, 0.14)
+    out += f'windowDef lock_state {{ rect (8),(100),(80),(22) noevents "gui::ed_confirm" background "gfx/guis/mainmenu/b6_light" matcolor 0.545,0.588,0.294,(0.3+0.5*"gui::ed_lock")\n onAction {{ set "cmd" "play main_menu_selection ; editorExperimentalAction lock"; }} }}\n'
+    out += f'windowDef lock_state_label {{ rect (16),(103),(70),(22) noevents 1 text "gui::ed_lockText" {FONT} textscale .14 forecolor 1,1,1,0.8 }}\n'
+    # Weighted by the longest translations (see the fit phase of
+    # tools/tests/level_editor_authoring.py).
+    out += toolbar('edit', 100, [('brush', '#str_42961', 'brush', 0.85), ('patch', '#str_42962', 'patch', 0.85),
+                                ('duplicate', '#str_42963', 'duplicate', 1.15), ('remove', '#str_42919', 'remove'),
+                                ('group', '#str_42964', 'group'), ('ungroup', '#str_42965', 'ungroup', 1.2),
+                                ('rotateCcw', '#str_42966', 'rotateCcw', 1.2), ('rotateCw', '#str_42967', 'rotateCw', 1.2),
+                                ('snap', '#str_42968', 'snap')], start=92, span=532, scale=0.14)
     out += views()
     out += panel('browser', '#str_43133', ['left', 'right'], browser())
     out += panel('inspector', '#str_42911', ['left', 'right'], inspector())

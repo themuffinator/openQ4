@@ -33,7 +33,7 @@ DockLayout::DockLayout() {
 	docks[Inspector] = lastDock[Inspector] = Right;
 	docks[Tools] = lastDock[Tools] = Right;
 	docks[Problems] = lastDock[Problems] = Bottom;
-	sizes[Left] = 154; sizes[Right] = 188; sizes[Bottom] = 92; sizes[Hidden] = 0;
+	sizes[Left] = 154; sizes[Right] = 188; sizes[Bottom] = 100; sizes[Hidden] = 0;
 	active[Left] = Browser; active[Right] = Inspector; active[Bottom] = Problems; active[Hidden] = Browser;
 }
 
@@ -62,6 +62,11 @@ void DockLayout::FixActive() {
 
 bool DockLayout::Move( Panel panel, Dock dock ) {
 	if ( !Allowed( panel, dock ) ) { return false; }
+	if ( dock != Hidden && docks[panel] != dock ) {
+		int sharing = 0;
+		for ( int p = 0; p < PanelCount; ++p ) { if ( docks[p] == dock ) { ++sharing; } }
+		if ( sharing >= MaxPerDock ) { return false; }
+	}
 	if ( dock != Hidden ) { lastDock[panel] = dock; active[dock] = panel; }
 	docks[panel] = dock;
 	FixActive();
@@ -97,6 +102,8 @@ std::string DockLayout::Serialize() const {
 
 bool DockLayout::Parse( const std::string &text ) {
 	DockLayout parsed;
+	for ( int p = 0; p < PanelCount; ++p ) { parsed.docks[p] = Hidden; } // assigned below, then validated
+	bool assigned[PanelCount] = {};
 	std::stringstream stream( text );
 	std::string item;
 	bool any = false;
@@ -119,6 +126,7 @@ bool DockLayout::Parse( const std::string &text ) {
 			Dock remembered;
 			if ( !dockOf( value.substr( 0, slash ), dock ) || !Allowed( panel, dock ) ) { return false; }
 			parsed.docks[panel] = dock;
+			assigned[panel] = true;
 			if ( dock != Hidden ) { parsed.lastDock[panel] = dock; }
 			else if ( slash != std::string::npos && dockOf( value.substr( slash + 1 ), remembered ) && remembered != Hidden && Allowed( panel, remembered ) ) {
 				parsed.lastDock[panel] = remembered;
@@ -135,6 +143,13 @@ bool DockLayout::Parse( const std::string &text ) {
 		}
 	}
 	if ( !any ) { return false; }
+	const DockLayout defaults;
+	int perDock[DockCount] = {};
+	for ( int p = 0; p < PanelCount; ++p ) {
+		if ( !assigned[p] ) { parsed.docks[p] = defaults.docks[p]; }
+		++perDock[parsed.docks[p]];
+	}
+	for ( int d = 0; d < Hidden; ++d ) { if ( perDock[d] > MaxPerDock ) { return false; } }
 	parsed.FixActive();
 	*this = parsed;
 	return true;
@@ -165,10 +180,10 @@ DockLayout::Result DockLayout::Compute( const Rect &area ) const {
 		if ( dock == Hidden ) { continue; }
 		const Rect &r = dockRect[dock];
 		const float tabW = r.w / static_cast<float>( count[dock] );
-		placement.tab = { r.x + tabW * slot[dock]++, r.y, tabW, 18 };
+		placement.tab = { r.x + tabW * slot[dock]++, r.y, tabW, TabHeight };
 		placement.tabVisible = true;
 		placement.visible = active[dock] == p;
-		placement.rect = { r.x, r.y + 20, r.w, r.h - 20 };
+		placement.rect = { r.x, r.y + TabHeight + 2, r.w, r.h - TabHeight - 2 };
 	}
 	return result;
 }
