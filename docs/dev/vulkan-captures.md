@@ -153,7 +153,7 @@ Building it exposed two things:
   policy metadata harness executes both new bodies and rejects removal of
   either content-mutation guard.
 
-On the fixed build, both backends pass all independent checks on the RTX 4060
+On the clean `b430a18f` build, both backends pass all independent checks on the RTX 4060
 Laptop. The screen shows 28,408 specimen pixels in `nested` and
 `nested-restarted` (an exact repeat), 27,808 in `nested-cropped`, and none in
 the control. GL/Vulkan comparisons of all four nested cases are within one
@@ -163,7 +163,8 @@ counts (27,810 when cropped). Against the NVIDIA OpenGL reference it differs
 only on silhouette edges, where the two vendors' 4x MSAA coverage differs, and
 in faint near-black speckle in the cropped case. OpenGL on this hybrid laptop
 runs on the NVIDIA GPU, so there is no same-vendor reference for that
-comparison. The tiled-capture harness also passes on the Iris Xe. Its GL
+comparison. The tiled-capture harness also passes on the Iris Xe
+(`.tmp/vk-roadmap/nov6/tiled-rerun/`, built from the same sources). Its GL
 comparisons fail only on the defective OpenGL tile described above.
 
 Two comparisons fail, and neither is a Vulkan parity defect:
