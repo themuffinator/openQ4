@@ -628,7 +628,7 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel; OpenGL clip-space depth through `VK_EXT_depth_clip_control` removes the three stencil pixels. | The strict lighting image gate (one point-map and one projected-map shadow-filter pixel on NVIDIA, more on Intel) and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
 | VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. Tiled (larger-than-window) captures, direct and through the game-owned post target, pass on OpenGL and on Vulkan with NVIDIA and Intel. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -841,8 +841,14 @@ and untested drivers remain open, with no tolerance or support-tier change.
   tile correctly (box-filtered correlation 0.999). 26 of 27 GL/Vulkan tile
   comparisons are within one display level; the remaining one is an OpenGL
   tile that repeats another. Tiling through the game-owned post-process target
-  is wrong on both backends, identically. Those OpenGL/shared tiled-capture
-  defects remain open outside this Vulkan fix.
+  is wrong on both backends, identically.
+  Progress, 6 November (tiled, closed): both backends offset views drawn
+  *into* a render texture as well as views drawn to the window. Now only window
+  draws take the tile offset; a view drawn into a target sized to the capture
+  stays at the target's origin, and its composite moves instead. OpenGL and
+  Vulkan (NVIDIA and Intel) now pass the gated `direct`, `post` and `restored`
+  cases (box-filtered correlation 0.999 direct, 0.9998 post), and all 27
+  GL/Vulkan tile comparisons on each device are within one display level.
   Progress, 6 November (views): the [nested/cropped/offset fixture](vulkan-captures.md#nested-cropped-and-offset-views-6-november-2026)
   found that remote-camera captures into ordinary file textures (the stock
   `textures/common/camera1` idiom) failed on both backends. Those textures

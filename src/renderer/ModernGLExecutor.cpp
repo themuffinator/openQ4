@@ -3434,8 +3434,8 @@ static void R_ModernGLExecutor_SetSubmitScissor( const modernGLSubmitCommand_t &
 		return;
 	}
 
-	const int viewportOffsetX = useLegacyViewportOffset ? tr.viewportOffset[0] : 0;
-	const int viewportOffsetY = useLegacyViewportOffset ? tr.viewportOffset[1] : 0;
+	const int viewportOffsetX = useLegacyViewportOffset ? RB_TileOffsetX() : 0;
+	const int viewportOffsetY = useLegacyViewportOffset ? RB_TileOffsetY() : 0;
 	R_GLStateCache().SetViewport(
 		viewportOffsetX + viewDef->viewport.x1,
 		viewportOffsetY + viewDef->viewport.y1,
@@ -8004,8 +8004,8 @@ static void R_ModernGLExecutor_RestoreLegacyViewRect( const viewDef_t *viewDef )
 	if ( viewDef == NULL ) {
 		return;
 	}
-	const int viewportX = tr.viewportOffset[0] + viewDef->viewport.x1;
-	const int viewportY = tr.viewportOffset[1] + viewDef->viewport.y1;
+	const int viewportX = RB_TileOffsetX() + viewDef->viewport.x1;
+	const int viewportY = RB_TileOffsetY() + viewDef->viewport.y1;
 	R_GLStateCache().SetViewport(
 		viewportX,
 		viewportY,
@@ -9865,10 +9865,11 @@ void R_ModernGLExecutor_RecordLegacyPassSkipped( renderPassCategory_t category )
 	R_ModernGLExecutor_UpdatePassOwnershipCounts( rg_modernGLExecutorStats );
 }
 
-static void R_ModernGLExecutor_VisibleTargetRect( bool useViewRect, int &x, int &y, int &width, int &height ) {
+// A tiled capture moves only what is drawn to the window (RB_TileOffsetX).
+static void R_ModernGLExecutor_VisibleTargetRect( bool useViewRect, bool toWindow, int &x, int &y, int &width, int &height ) {
 	if ( useViewRect && backEnd.viewDef != NULL ) {
-		x = tr.viewportOffset[0] + backEnd.viewDef->viewport.x1;
-		y = tr.viewportOffset[1] + backEnd.viewDef->viewport.y1;
+		x = ( toWindow ? tr.viewportOffset[0] : 0 ) + backEnd.viewDef->viewport.x1;
+		y = ( toWindow ? tr.viewportOffset[1] : 0 ) + backEnd.viewDef->viewport.y1;
 		width = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
 		height = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
 	} else {
@@ -10165,7 +10166,7 @@ static bool R_ModernGLExecutor_ComposeVisibleSceneToTarget(
 	int targetY = 0;
 	int targetWidth = 0;
 	int targetHeight = 0;
-	R_ModernGLExecutor_VisibleTargetRect( useViewRect, targetX, targetY, targetWidth, targetHeight );
+	R_ModernGLExecutor_VisibleTargetRect( useViewRect, targetFramebuffer == 0, targetX, targetY, targetWidth, targetHeight );
 
 	if ( useGpuTimer ) {
 		R_RendererMetrics_BeginGpuTimer( RENDERER_GPU_TIMER_MODERN_COMPOSITE );

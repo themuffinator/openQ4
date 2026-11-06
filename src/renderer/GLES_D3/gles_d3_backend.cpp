@@ -222,14 +222,14 @@ view clears neither depth nor stencil and disables both tests.
 static void RB_GLESD3_BeginDrawingView( void ) {
 	const viewDef_t *viewDef = backEnd.viewDef;
 
-	glViewport( tr.viewportOffset[0] + viewDef->viewport.x1,
-		tr.viewportOffset[1] + viewDef->viewport.y1,
+	glViewport( RB_TileOffsetX() + viewDef->viewport.x1,
+		RB_TileOffsetY() + viewDef->viewport.y1,
 		viewDef->viewport.x2 + 1 - viewDef->viewport.x1,
 		viewDef->viewport.y2 + 1 - viewDef->viewport.y1 );
 
 	// the scissor may be smaller than the viewport for subviews
-	glScissor( tr.viewportOffset[0] + viewDef->viewport.x1 + viewDef->scissor.x1,
-		tr.viewportOffset[1] + viewDef->viewport.y1 + viewDef->scissor.y1,
+	glScissor( RB_TileOffsetX() + viewDef->viewport.x1 + viewDef->scissor.x1,
+		RB_TileOffsetY() + viewDef->viewport.y1 + viewDef->scissor.y1,
 		viewDef->scissor.x2 + 1 - viewDef->scissor.x1,
 		viewDef->scissor.y2 + 1 - viewDef->scissor.y1 );
 	backEnd.currentScissor = viewDef->scissor;

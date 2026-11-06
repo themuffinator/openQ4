@@ -117,6 +117,11 @@ See [player release status](../user/release-status.md).
 - On Vulkan, a `screenshot` or `envshot` larger than the game window now
   captures the whole picture. Before, it repeated the same window-sized corner
   in every part of the image. Ordinary screenshots are unchanged.
+- A `screenshot` larger than the game window is now correct on OpenGL and
+  Vulkan with anti-aliasing (SMAA) on, too. Before, most of the picture came
+  out black or as repeated copies of one part, and on OpenGL one corner could
+  repeat another even with anti-aliasing off. See
+  [tiled-capture evidence](vulkan-captures.md#tiled-captures-6-november-2026).
 - A new developer drill, `r_vkMaterialDescriptorPoolTest`, makes the graphics
   driver itself refuse shader resources. On NVIDIA and Intel, the affected
   authored shader stages skip without changing the image, and rendering
