@@ -81,7 +81,7 @@ def test_vulkan_capture_resumes_the_acquired_back_buffer() -> None:
     executor_cpp = read("src/renderer/Vulkan/vk_GuiExecutor.cpp")
     require(
         backend_cpp,
-        "if ( !tr.takingScreenshot )",
+        "if ( !R_SubmittedTakingScreenshot() )",
         "Vulkan swap-buffer screenshot presentation gate",
     )
     read_pixels_start = executor_cpp.index("bool VK_GuiExecutor_ReadPixels")
@@ -89,7 +89,7 @@ def test_vulkan_capture_resumes_the_acquired_back_buffer() -> None:
     require_order(
         executor_cpp[read_pixels_start:submit_start],
         (
-            "const bool resumeAfterReadback = tr.takingScreenshot;",
+            "const bool resumeAfterReadback = R_SubmittedTakingScreenshot();",
             "VK_GuiExecutor_SubmitFrame( !resumeAfterReadback )",
             "VK_Exec_BeginMainRendering( true );",
         ),
