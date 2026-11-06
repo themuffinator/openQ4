@@ -89,9 +89,26 @@ def validate_release_note() -> None:
     require(source, "real page-lock and unlock calls", "release completion notes")
 
 
+def validate_level_load_heap_release() -> None:
+    posix = read("src/sys/posix/posix_main.cpp")
+    body = function_body(posix, "void Sys_ReleaseFreeHeapMemory( void ) {")
+    require(body, "#if defined( __GLIBC__ )", "POSIX heap release")
+    require(body, "malloc_trim( 0 );", "POSIX heap release")
+    require(posix, "#include <malloc.h>", "POSIX heap release include")
+    windows = read("src/sys/win32/win_shared.cpp")
+    require(windows, "void Sys_ReleaseFreeHeapMemory(void) {", "Windows heap release")
+    require(read("src/sys/sys_public.h"), "void			Sys_ReleaseFreeHeapMemory( void );", "heap release declaration")
+    session = read("src/framework/Session.cpp")
+    settle = session.find("settleMsec = Sys_Milliseconds() - phaseStart;")
+    release = session.find("Sys_ReleaseFreeHeapMemory();")
+    if settle == -1 or release == -1 or release < settle:
+        raise AssertionError("level load must release free heap memory after the settle frames")
+
+
 def main() -> None:
     validate_posix_page_locking()
     validate_ram_total_helpers()
+    validate_level_load_heap_release()
     validate_release_note()
     print("posix_memory_management: ok")
 

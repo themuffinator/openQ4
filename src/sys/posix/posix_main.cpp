@@ -54,6 +54,10 @@ If you have questions concerning this license or the applicable additional terms
 #include <sys/random.h>
 #endif
 
+#if defined( __GLIBC__ )
+#include <malloc.h>
+#endif
+
 #if defined( MACOS_X )
 #include <mach/mach.h>
 #include <sys/sysctl.h>
@@ -987,6 +991,23 @@ const char *Sys_FPU_GetState( void ) {
 }
 
 void Sys_FPU_SetPrecision( int precision ) {
+}
+
+/*
+================
+Sys_ReleaseFreeHeapMemory
+
+glibc gives each thread that allocates its own malloc arena and keeps memory
+freed into an arena for reuse. Level loads allocate on the job workers and free
+on the main thread, so without a trim a Linux client grew by about 60 MiB on
+every map change and never levelled off. malloc_trim returns the free pages of
+every arena. Other C libraries return memory themselves.
+================
+*/
+void Sys_ReleaseFreeHeapMemory( void ) {
+#if defined( __GLIBC__ )
+	malloc_trim( 0 );
+#endif
 }
 
 /*

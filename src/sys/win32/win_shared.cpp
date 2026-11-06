@@ -409,6 +409,16 @@ bool Sys_GetProcessMemoryUsage( unsigned long long &privateBytes, unsigned long 
 
 /*
 ================
+Sys_ReleaseFreeHeapMemory
+
+The Windows heap decommits free memory itself; level loads level off without help.
+================
+*/
+void Sys_ReleaseFreeHeapMemory(void) {
+}
+
+/*
+================
 Sys_LockMemory
 ================
 */

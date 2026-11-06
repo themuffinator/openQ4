@@ -385,6 +385,10 @@ void			Sys_GetExeLaunchMemoryStatus( sysMemoryStats_t &stats );
 // and resident set, in bytes; false where the OS reports neither
 bool			Sys_GetProcessMemoryUsage( unsigned long long &privateBytes, unsigned long long &residentBytes );
 
+// returns heap memory the allocator holds free to the OS; called after a level
+// load, where it is most worth its cost. A no-op where the allocator does this itself.
+void			Sys_ReleaseFreeHeapMemory( void );
+
 // lock and unlock memory
 bool			Sys_LockMemory( void *ptr, int bytes );
 bool			Sys_UnlockMemory( void *ptr, int bytes );

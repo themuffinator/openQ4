@@ -7641,6 +7641,12 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	}
 	settleMsec = Sys_Milliseconds() - phaseStart;
 
+	// hand back what the load allocated and freed (on glibc it sits in the job
+	// workers' malloc arenas) before play starts
+	phaseStart = Sys_Milliseconds();
+	Sys_ReleaseFreeHeapMemory();
+	const int heapReleaseMsec = Sys_Milliseconds() - phaseStart;
+
 	common->Printf ("-----------------------------------\n");
 
 	int	msec = Sys_Milliseconds() - start;
@@ -7678,6 +7684,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 				settleFrameMsec[8],
 				settleFrameMsec[9] );
 		}
+		common->Printf( "Map heap release: %d msec\n", heapReleaseMsec );
 	}
 
 	// let the game trigger interaction generation after the first game frame
