@@ -150,8 +150,8 @@ slime and lava splashes played, but nothing showed in any entry frame.
 `slime_pool.fx` is one flat 30-unit surface quad that fades in, and
 `putra/acid_splash.fx` is a drip-sized splash with 3- to 6-unit lines. The
 shared liquid definition now uses player-scale stock effects for player and
-monster entries: `mapobjects/tube_goo_splash.fx` for slime (green goo spray,
-splash lines and a spreading surface stain) and `levels/waste/wastesplash.fx`
+monster entries: `levels/tram/pipesplash.fx` for slime (green bubble burst,
+shockwave and drifting green steam) and `levels/waste/wastesplash.fx`
 for lava (dark-red spray and steam). Projectile crossings keep their separate,
 smaller `fx_impact_*` effects.
 
@@ -172,6 +172,19 @@ and inspected captures show:
   near the head can be told from the underwater material's own specks, which
   remain in a control capture with effect rendering off. Effect logging, not
   the capture, establishes that the trail plays.
+
+On 6 November the slime entry moved from `tube_goo_splash` to
+`levels/tram/pipesplash.fx`. The retail `tube_goo_splash` stain names the decal
+material `textures/decals/goospread`, which no Quake 4 PK4 ships (only
+`goospread2` exists). Because the liquid definition is precached, every map load
+logged a missing-image warning. That failed the renderer harnesses that require
+a clean log. Every material `pipesplash` uses ships with the game. The rerun
+(`.tmp/mp-side/liquid-goo/report.json`, SHA-256
+`26bf1658fd932373ee2c0b8ddedc603beed792916bb13bedf660f6ce263984be`; client
+`1e686197…1a04`, `pak0.pk4` `e4d5f8a8…1b23`, OpenGL) plays `pipesplash` on slime
+entry and exit and logs no `goospread` warning, where the r5 log had two. Its
+entry captures show a drifting green steam burst over the crossing point. The
+bubble burst is hard to tell apart from the bright slime surface.
 
 The hazard pools are 64 units deep over a raised floor, so a standing player is
 neck-deep, not submerged, and has no bubble trail there. Wading has no visual

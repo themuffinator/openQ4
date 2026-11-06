@@ -120,8 +120,9 @@ entityDef liquid_openq4
 	"snd_leave_slime"			"ambient_water_splash_small"
 	"snd_under_slime"			"player_sounds_water"
 	"snd_clear_slime"			"player_sounds_medlabs_gasp"
-	// player-scale: the flat slime_pool quad was invisible on entry
-	"fx_splash_slime"			"effects/mapobjects/tube_goo_splash.fx"
+	// player-scale: the flat slime_pool quad was invisible on entry. Not tube_goo_splash:
+	// its surface stain names textures/decals/goospread, which retail never shipped
+	"fx_splash_slime"			"effects/levels/tram/pipesplash.fx"
 
 	// drowning: a gasp each time the lungs give out
 	"snd_drown"					"player_sounds_medlabs_gasp"

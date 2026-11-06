@@ -150,7 +150,7 @@ def main() -> int:
         body = log.partition(f"LIQUID_FX_DROP {liquid}")[2].partition("LIQUID_FX_DROP ")[0]
         names = re.findall(r"Playing effect: (\S+)", body)
         played[liquid] = sorted(set(names))
-        splash = {"water": "splash_lrg", "slime": "tube_goo_splash", "lava": "wastesplash"}[liquid]
+        splash = {"water": "splash_lrg", "slime": "pipesplash", "lava": "wastesplash"}[liquid]
         if not any(splash in name for name in names):
             failures.append(f"{liquid}: the splash effect was not played")
         if deep and not any("recomp_bubble" in name for name in names):

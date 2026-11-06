@@ -3416,7 +3416,7 @@ Completion substeps:
   effect logging. The water splash and head bubble trail play and the splash
   shows. The slime and lava splashes played but could not be seen: the shared
   definition used a flat surface quad and a drip-sized effect. They now use
-  player-scale stock effects (`tube_goo_splash`, `wastesplash`), and both show
+  player-scale stock effects (`pipesplash`, `wastesplash`), and both show
   in the rebuilt package. Wading has no visual effect, only its moving sound.
   Remaining: swimming under player control, wade sound and a by-eye pass at
   play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)).
