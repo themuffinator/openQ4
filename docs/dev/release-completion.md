@@ -2438,15 +2438,16 @@ completed release material here and publish curated notes in `releases/`.
 
 - [x] AUD-06/07: `openq4_killHostiles` and `audio_scene_audit.py --fight` let the
   progression audit win the fights scripts wait on; all 42 campaign maps ran
-  (1,967 steps, 989 kills) with no mute leak or untranscribed cue, reaching 86
+  (1,967 steps, 1,052 kills) with no mute leak or untranscribed cue, reaching 88
   dialogue lines no earlier report had.
 - [x] A full client entity table no longer ends the level with "cannot load
   collision model" (both game libraries); found on `airdefense2`.
 - [x] The audit now reports a dead player and a map that ends inside its own
   scene, matches its markers after unterminated script output, and removes
-  failed-objective entities in its disposable session.
-- Evidence and remaining gates (vehicle-teleport deaths in `walker` and
-  `m07_race`, ordered human play, physical devices):
+  failed-objective entities in its disposable session. The `teleport` cheat
+  moves a driver's vehicle with it.
+- Evidence and remaining gates (the probe player's death at `walker`'s step 11,
+  ordered human play, physical devices):
   [fights in the progression audit](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
 
 ## Audio progression-audit recovery, 26 October 2026

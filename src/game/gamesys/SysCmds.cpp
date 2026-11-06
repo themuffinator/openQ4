@@ -1917,6 +1917,16 @@ void Cmd_Teleport_f( const idCmdArgs &args ) {
 	angles.yaw = ent->GetPhysics()->GetAxis()[ 0 ].ToYaw();
 	origin = ent->GetPhysics()->GetOrigin();
 
+	// openQ4: a driver's position follows its vehicle, so teleporting only the
+	// player left the vehicle behind and the separated driver died (walker,
+	// The Awakening's speeder races). Move the vehicle with its driver instead.
+	if ( player->IsInVehicle() && player->GetVehicleController().GetVehicle() ) {
+		rvVehicle *vehicle = player->GetVehicleController().GetVehicle();
+		vehicle->Teleport( origin, angles, ent );
+		gameLocal.Printf( "teleport: moved vehicle '%s' with its driver\n", vehicle->GetName() );
+		return;
+	}
+
 	player->Teleport( origin, angles, ent );
 }
 

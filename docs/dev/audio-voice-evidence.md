@@ -1516,12 +1516,17 @@ completes all 40 steps with no error.
   marker began mid-line and two probes merged; its routing check failed although
   every source was attributed. The harness's own markers are now matched
   anywhere on a line.
-- Teleporting the player while it drives a vehicle killed it in `walker` (step
-  11) and `m07_race` (step 10): teleporting moves the driver, not the vehicle.
-  The game then ended the level. A dead player's refused commands are now
-  reported per map (`player_dead_at_step`, check `player_survives`), and a map
-  that shuts down inside its own scene counts as an unexpected level change.
-  Both maps remain failed after those steps; their earlier steps are counted.
+- The player died in `walker` (step 11) and `m07_race` (step 10), and the game
+  then ended the level. A dead player's refused commands are now reported per
+  map (`player_dead_at_step`, check `player_survives`), and a map that shuts down
+  inside its own scene counts as an unexpected level change. In `m07_race` the
+  player was riding a speeder: the `teleport` cheat moved only the driver, who
+  died apart from the vehicle. It now moves the vehicle with its driver, and
+  `m07_race` then completes all 55 steps. That change does not help everywhere:
+  in `m07_race1`, which had completed, the speeder teleported into a pipe was
+  destroyed at step 6 and the player died. In `walker` the player was on foot
+  (no vehicle teleport ran) and still dies at step 11; the cause is not
+  identified. `walker`'s later steps remain uncovered.
 - Awakening's race maps fail an objective when a lockdown gate closes before the
   player reaches it. A teleport route cannot keep that pace, and the failed
   mission ended `m07_race1` and `m07_race2` partway. Like level exits,
@@ -1531,24 +1536,28 @@ completes all 40 steps with no error.
 ### Results
 
 Every group's report keeps its own failed checks. Four of the nine groups passed
-as run (`stock-02`, `stock-03`, `stock-05`, `awakening-00`). The `stock-rerun`
-and `awakening-race` reports still fail, on `walker` and `m07_race` losing the
-player; their other four maps complete every step. The totals below take each map from its
-latest run: `airdefense2`, `walker` and `process2` from `stock-rerun`, and the
-three race maps from `awakening-race`; every other map from its group.
+as run (`stock-02`, `stock-03`, `stock-05`, `awakening-00`); every rerun report
+still fails on the one map in it that lost the player. The totals below take
+each map from its latest run that completed every step (no dead player, no
+early map end, a kill pass per step), and otherwise from its latest run, in the
+order sweep groups, then `stock-rerun` and `awakening-race`, then the
+vehicle-teleport reruns `vehicle-stock` and `vehicle-awakening`. That takes
+`process2`, `m07_race1` and `m07_race2` from the first reruns, `airdefense2`,
+`walker` and `m07_race` from the vehicle-teleport reruns, and every other map
+from its group.
 
 | Measure | Stock (29 maps) | Awakening (13 maps) |
 | --- | ---: | ---: |
 | Planned teleport steps | 1,362 | 605 |
-| Targets absent when visited | 110 | 31 |
-| Hostiles killed / survived / protected | 679 / 24 / 75 | 310 / 7 / 14 |
-| Dialogue starts | 971 | 434 |
-| Distinct dialogue shaders / with transcripts | 637 / 359 | 347 / 313 |
-| Not reached by any earlier retained walk or progression report | 55 (35 transcribed) | 31 (30 transcribed) |
-| Distinct dialogue shaders, all retained reports | 954 | 590 |
+| Targets absent when visited | 110 | 35 |
+| Hostiles killed / survived / protected | 680 / 24 / 75 | 372 / 11 / 16 |
+| Dialogue starts | 973 | 445 |
+| Distinct dialogue shaders / with transcripts | 637 / 359 | 356 / 320 |
+| Not reached by any earlier retained walk or progression report | 55 (35 transcribed) | 33 (30 transcribed) |
+| Distinct dialogue shaders, all retained reports | 954 | 592 |
 | Full/muted probe pairs | 1,855 | 826 |
 | Mute leaks / cues without a transcript | 0 / 0 | 0 / 0 |
-| Maps that lost the player (vehicle teleport) | 1 (`walker`) | 1 (`m07_race`) |
+| Maps that lost the player | 1 (`walker`, step 11) | 0 |
 
 The newly reached lines cluster where fights gate the script: `mcc_2` (20),
 `tram1` (12), `storage2` (10), `core2` (7), and Awakening's `m04_prison` and
@@ -1557,12 +1566,13 @@ The earlier corpus comes from `--walk` runs and eight progression maps, so these
 counts combine the effect of the fights with that of running progression on
 every map; this round did not run a fightless control. Protected AI are the
 scripted-invulnerable harvesters, the gladiator, iron maidens and Makron
-phases; survivors are the convoy's ground vehicles (23) and one Makron phase.
+phases; survivors are convoy ground vehicles (23 in Convoy, 4 in the Awakening
+races), Awakening's pain lord (7 passes) and one Makron phase.
 
 Declared or flagged speech always followed Dialogue Volume, muting it silenced
 every dialogue voice while effects continued, and every cue shown had a
 transcript. No mute leak, misrouted line or untranscribed cue appeared anywhere.
-The overlay showed 323 transcribed lines while they played. Two transcribed lines
+The overlay showed 330 transcribed lines while they played. Two transcribed lines
 were heard with a subtitle slot free and no cue, both in their last moments:
 `hub1`'s `vo_1_2_14_52_1` voice had already stopped and was being retired, and
 `m04_prison`'s `vo_tak_dekletmstrg` was 4.06 s into its 4.32 s sample. Cues
@@ -1577,11 +1587,12 @@ Reports, console output, engine logs, the census, `final-compare.json` (the
 per-map selection and comparison) and `evidence-manifest.json` (executable,
 game-library and harness hashes per run) are under `.tmp/aud-fight/` in the
 AUD worktree. The stock groups and `awakening-00` ran build `53adceae3f9511de…`,
-the later groups and both reruns the fixed build `1eed5d0d49e2ba59…` (Windows
-x64, debugoptimized, OpenAL Soft wave output, hidden windowed SP). A report's
+the later groups and the first reruns the client-entity fix `1eed5d0d49e2ba59…`,
+and the vehicle-teleport reruns `5203ee4494a142eb…` (Windows x64,
+debugoptimized, OpenAL Soft wave output, hidden windowed SP). A report's
 harness hash is read when it is written, so `awakening-00`'s names a harness
-edited while it ran. `stock-rerun` predates the shutdown check; its `walker`
-death is caught by the player check.
+edited while it ran. `stock-rerun` predates the shutdown check, which is why
+its own report does not list `walker`'s early end; the selected `walker` run has it.
 
 These are still routing probes, not a playthrough: nothing is aimed, dodged or
 driven, teleports can telefrag actors and script null-entity warnings remain.
