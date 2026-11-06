@@ -28,6 +28,7 @@ SUPPORT = r'''
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <mutex>
 #include <set>
 using VmaAllocation = void *;
 template<class T> T Max(T a,T b) { return std::max(a,b); }
@@ -42,6 +43,7 @@ struct Common {
 } commonStore, *common=&commonStore;
 struct { VkDevice device=VK_NULL_HANDLE; VkPhysicalDeviceProperties deviceProperties={}; } vkCtx;
 struct { bool GetBool() const { return true; } } r_vkResourceProfile;
+struct { int value=0; int GetInteger() const { return value; } } r_vkMaterialDescriptorPoolTest;
 struct { uint64_t ringBytes=0, ringAllocations=0; } vkResourceProfile;
 struct idImage { unsigned handle=1; unsigned GetDeviceHandle() const { return handle; } } white, sampled{2};
 struct { idImage *whiteImage=&white; } imageManager;
@@ -54,7 +56,7 @@ struct drawInteraction_t {};
 bool failPool=false, failSets=false, failReset=false, failPipeline=false, failShader=false;
 bool resident=true, scopeOpen=true;
 uint64_t nextHandle=10;
-int creates=0, resets=0, allocations=0, updates=0, binds=0, pipelineRequests=0;
+int creates=0, resets=0, allocations=0, updates=0, binds=0, pipelineRequests=0, destroyedPools=0, refusedByDriver=0;
 struct Pool { unsigned capacity=0,used=0; };
 std::map<VkDescriptorPool,Pool> driverPools;
 VkResult vkCreateDescriptorSetLayout(VkDevice,const VkDescriptorSetLayoutCreateInfo *info,const VkAllocationCallbacks *,VkDescriptorSetLayout *out) {
@@ -76,6 +78,9 @@ VkResult vkCreateDescriptorPool(VkDevice,const VkDescriptorPoolCreateInfo *info,
     assert(info->pPoolSizes[1].descriptorCount==info->pPoolSizes[0].descriptorCount*oq4material::MaxTextures);
     *out=++nextHandle;driverPools[*out]={info->maxSets,0};return VK_SUCCESS;
 }
+void vkDestroyDescriptorPool(VkDevice,VkDescriptorPool pool,const VkAllocationCallbacks *) {
+    assert(driverPools.erase(pool)==1);++destroyedPools;
+}
 VkResult vkResetDescriptorPool(VkDevice,VkDescriptorPool pool,VkDescriptorPoolResetFlags) {
     ++resets;assert(driverPools.count(pool));if(failReset)return VK_ERROR_OUT_OF_DEVICE_MEMORY;
     driverPools.at(pool).used=0;return VK_SUCCESS;
@@ -84,7 +89,9 @@ VkResult vkAllocateDescriptorSets(VkDevice,const VkDescriptorSetAllocateInfo *in
     ++allocations;assert(info->descriptorSetCount==2 && driverPools.count(info->descriptorPool));
     if(failSets)return VK_ERROR_OUT_OF_POOL_MEMORY;
     auto &pool=driverPools.at(info->descriptorPool);
-    assert(pool.used+2<=pool.capacity);pool.used+=2;
+    // A full pool refuses as a driver does, without writing the sets.
+    if(pool.used+2>pool.capacity) { ++refusedByDriver;return VK_ERROR_OUT_OF_POOL_MEMORY; }
+    pool.used+=2;
     out[0]=++nextHandle;out[1]=++nextHandle;return VK_SUCCESS;
 }
 void vkUpdateDescriptorSets(VkDevice,unsigned count,const VkWriteDescriptorSet *writes,unsigned,const VkCopyDescriptorSet *) {
@@ -107,6 +114,7 @@ struct {
     int numProgramPipelines=0;vkProgramPipeline_t programPipelines[VK_MAX_PROGRAM_PIPELINES]={};
 } vkExec;
 int VK_Exec_ActiveFrameSlot() { return vkExec.frameSlot; }
+std::mutex diagnosticMutex;
 std::set<std::string> diagnostics;
 int suppressedDiagnostics=0,peakDraws=0;
 uint64_t frameSerial=1;
@@ -153,8 +161,8 @@ idImage *images[oq4material::MaxTextures]={};
 Program program;
 void Reset(int capacity=VK_UNIFORM_RING_BYTES) {
     failPool=failSets=failReset=failPipeline=failShader=false;resident=scopeOpen=true;
-    reclaimIdentity=-1;
-    creates=resets=allocations=updates=binds=pipelineRequests=0;
+    reclaimIdentity=-1;r_vkMaterialDescriptorPoolTest.value=0;
+    creates=resets=allocations=updates=binds=pipelineRequests=destroyedPools=refusedByDriver=0;
     driverPools.clear();diagnostics.clear();commonStore={};imageEntry={};livePipelines.clear();destroyedPipelines=0;
     currentTarget={};currentTarget.colorCount=1;currentTarget.colorFormats[0]=VK_FORMAT_R8G8B8A8_UNORM;
     currentTarget.depthFormat=VK_FORMAT_D24_UNORM_S8_UINT;currentTarget.samples=VK_SAMPLE_COUNT_1_BIT;
@@ -220,6 +228,22 @@ int main() {
     failReset=true;NextFrame(0);const int resetAllocations=allocations;
     assert(!Bind() && program.lastSkip=="frame descriptor pool reset failed" && allocations==resetAllocations);
     failReset=false;NextFrame(0);assert(Bind());
+
+    // r_vkMaterialDescriptorPoolTest: one unchained pool per slot, refused
+    // by the driver once full, then the production pools on the next frame.
+    Reset();r_vkMaterialDescriptorPoolTest.value=4;NextFrame(0);
+    assert(framePools[0].poolDraws==4 && framePools[0].created==0);
+    for(int i=0;i<4;++i)assert(Bind());
+    const int drillCursor=ring.cursor;
+    for(int i=0;i<500;++i)assert(!Bind());
+    assert(refusedByDriver==500 && creates==1 && framePools[0].created==1 && framePools[0].draws==4);
+    assert(ring.cursor==drillCursor && program.lastSkip=="material descriptor allocation failed" && commonStore.warnings==1);
+    NextFrame(0);for(int i=0;i<4;++i)assert(Bind());assert(!Bind() && creates==1);
+    r_vkMaterialDescriptorPoolTest.value=0;NextFrame(0);
+    assert(destroyedPools==1 && framePools[0].poolDraws==MaxDrawsPerPool && framePools[0].created==0);
+    for(int i=0;i<MaxDrawsPerPool+8;++i)assert(Bind());
+    assert(framePools[0].created==2 && refusedByDriver==501);Guards();
+    std::printf("Descriptor drill: driver refusals=%d, recovered draws=%d\n",refusedByDriver,framePools[0].draws);
 
     Reset();failPool=true;assert(!Bind() && creates==1 && framePools[0].created==0 && ring.cursor==0);
     failPool=false;assert(Bind());
@@ -321,7 +345,7 @@ def run(output):
     proof=dict(status='pass' if all(row['returncode']==0 for row in results) else 'fail',results=results,
                inputs={str(path.relative_to(ROOT)):hashlib.sha256(path.read_bytes()).hexdigest() for path in paths},
                harnessSHA256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-               scope='Production binding, ring, descriptor-pool and pipeline-cache functions with counted driver doubles; no GPU qualification. Descriptor quota uses a larger host-side test ring to isolate that limit.')
+               scope='Production binding, ring, descriptor-pool (including the r_vkMaterialDescriptorPoolTest drill) and pipeline-cache functions with counted driver doubles; no GPU qualification. Descriptor quota uses a larger host-side test ring to isolate that limit.')
     shutil.copy2(__file__,output/'harness.py')
     (output/'report.json').write_text(json.dumps(proof,indent=2)+'\n')
     return int(proof['status']!='pass')

@@ -299,7 +299,7 @@ static void VK_Debug_SetScissor( VkCommandBuffer cmd ) {
 		rect.extent.width = (uint32_t)vkDbg.fbWidth;
 		rect.extent.height = (uint32_t)vkDbg.fbHeight;
 	}
-	vkCmdSetScissor( cmd, 0, 1, &rect );
+	vkCmdSetScissorClamped( cmd, 0, 1, &rect );
 }
 
 // GL_Cull on the view's negative-height viewport, with the mirror swap

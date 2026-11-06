@@ -2133,7 +2133,7 @@ static bool VK_Post_RenderMotionVectors( const viewDef_t *viewDef, const vkPostM
 				scissor.extent.width = (uint32_t)( x2 - x1 );
 				scissor.extent.height = (uint32_t)( y2 - y1 );
 			}
-			vkCmdSetScissor( cmd, 0, 1, &scissor );
+			vkCmdSetScissorClamped( cmd, 0, 1, &scissor );
 
 			switch ( surf->material->GetCullType() ) {
 				case CT_TWO_SIDED:

@@ -154,6 +154,57 @@ The front-end keys nearly all behavior off glConfig; describe the Vulkan
 device conservatively so CPU-side logic stays on portable paths.
 ====================
 */
+/*
+====================
+VK_Backend_ApplyTileOffset
+
+A larger-than-window capture (R_ReadTiledPixels) renders the whole capture
+once per tile with tr.viewportOffset moved to the tile, and reads the window
+back. OpenGL adds that offset to every view's glViewport/glScissor. Vulkan's
+executor builds its viewports and scissors from viewDef->viewport in many
+places, so the frame's views are moved by the offset once, here, before any
+of them is planned or drawn; every tile then shows its own part of the
+capture instead of repeating the first. Scissors cut at the attachment edge
+(vkCmdSetScissorClamped). Ordinary frames have a zero offset and are
+untouched.
+====================
+*/
+static void VK_Backend_ApplyTileOffset( const emptyCommand_t *cmds ) {
+	const int offsetX = tr.viewportOffset[ 0 ];
+	const int offsetY = tr.viewportOffset[ 1 ];
+	if ( offsetX == 0 && offsetY == 0 ) {
+		return;
+	}
+	// A view can be named by more than one command; move each one once.
+	static const int maxViews = 256;
+	const viewDef_t *moved[ maxViews ];
+	int numMoved = 0;
+	for ( ; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
+		if ( cmds->commandId != RC_DRAW_VIEW ) {
+			continue;
+		}
+		viewDef_t *viewDef = ( (const drawSurfsCommand_t *)cmds )->viewDef;
+		if ( viewDef == NULL ) {
+			continue;
+		}
+		bool seen = false;
+		for ( int i = 0; i < numMoved && !seen; ++i ) {
+			seen = moved[ i ] == viewDef;
+		}
+		if ( seen ) {
+			continue;
+		}
+		if ( numMoved == maxViews ) {
+			break;
+		}
+		moved[ numMoved++ ] = viewDef;
+		viewDef->viewport.x1 += offsetX;
+		viewDef->viewport.x2 += offsetX;
+		viewDef->viewport.y1 += offsetY;
+		viewDef->viewport.y2 += offsetY;
+	}
+}
+
 static void VK_FillGLConfigFromDevice( void ) {
 	static char vendorString[ 128 ];
 	static char rendererString[ 256 ];
@@ -712,6 +763,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	backEnd.postProcessSMAAQuality = tr.postProcessSMAAQuality;
 	}
 	const classicSubviewDomainView_t *pendingSharedSubview = NULL;
+	VK_Backend_ApplyTileOffset( cmds );
 	VK_PostProcess_PlanPortalSkyMask( cmds );
 
 	for ( ; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
