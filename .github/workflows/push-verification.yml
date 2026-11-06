@@ -413,6 +413,7 @@ jobs:
             tools/tests/renderer_temporal_presentation.py \
             tools/tests/renderer_motion_blur_contract.py \
             tools/tests/renderer_shadow_alpha_fallback_contract.py \
+            tools/tests/renderer_pbr_probe_prefilter_contract.py \
             tools/tests/renderer_motion_blur_qualification.py \
             tools/tests/renderer_temporal_qualification.py \
             tools/tests/renderer_screen_space_effects_qualification.py \
@@ -933,6 +934,7 @@ jobs:
           python tools/tests/renderer_temporal_presentation.py
           python tools/tests/renderer_motion_blur_contract.py
           python tools/tests/renderer_shadow_alpha_fallback_contract.py
+          python tools/tests/renderer_pbr_probe_prefilter_contract.py
           python tools/tests/renderer_native_ui_output.py
           python tools/tests/renderer_mp_flat_items.py
           python tools/tests/renderer_pbr_materials.py

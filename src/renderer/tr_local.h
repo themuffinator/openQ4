@@ -1243,6 +1243,10 @@ extern idCVar r_pbrLinearScene;		// laboratory linear PBR scene instead of displ
 extern idCVar r_pbrGeneratedLegacyFallback;	// allow development-only generated classic fallbacks
 extern idCVar r_pbrDebug;				// PBR attachment/fallback debug view
 extern idCVar r_pbrIBL;				// PBR-only environment light from authored probes
+extern idCVar r_pbrProbeAsyncPrefilter;	// background prefilter for newly resident probes (REN-06)
+void R_PBRProbes_RequestSettle( void );	// pbrProbeSettle: finish pending probe filters
+bool R_PBRProbes_SettleRequested( void );
+void R_PBRProbes_SettleDone( void );
 extern idCVar r_pbrIBLIntensity;		// PBR analytic environment intensity
 extern idCVar r_pbrAnalyticEnvironment;	// laboratory: analytic studio environment under authored probes
 extern idCVar r_pbrInferFromLegacyMaterials;	// research-only classic-material inference

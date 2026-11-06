@@ -75,12 +75,65 @@ atlas plus one in-flight source. Every (mip, face) tile is independent, so
 both backends (`vk_PBRProbes.cpp`, `ModernSpecularProbeAtlas.cpp`) now compute
 them in parallel and upload them in the original order; the native
 `openq4-pbr-math` test requires the result to equal the serial filter exactly,
-and the authored-probe suites still pass (Vulkan 56/56, OpenGL 50/50). **The
-prefilter still misses the budget**: a newly resident or evicted authored
-source stalls about 85 ms instead of half a second. Meeting the budget needs
-the prefilter off the frame (an asynchronous job whose result publishes on a
-later frame, with the set's analytic fallback meanwhile) or on the GPU;
-reducing sample counts would change the GL-matched result and is not the fix.
+and the authored-probe suites still pass (Vulkan 56/56, OpenGL 50/50). That
+alone still stalled a newly resident source about 85 ms; the background
+prefilter below meets the budget. Reducing sample counts would have changed
+the GL-matched result and was not the fix.
+
+## Background prefilter, 6 November 2026 (REN-06)
+
+`r_pbrProbeAsyncPrefilter` (default 1) moves a cache miss off the frame that
+takes it. Stages, each on a later frame than the last:
+
+1. **Read.** OpenGL reads the six faces synchronously (`glGetTexImage`, about
+   1.4 ms). Vulkan records the copy into the frame's open upload batch without
+   submitting or waiting; the frame's own submission carries it.
+2. **Collect (Vulkan).** Once a later batch has retired it, or its fence reports
+   signalled, the encoded texels are copied out and the buffer is released. A
+   source whose stamp changed meanwhile is dropped.
+3. **Filter.** A background job (`openq4PBR::AsyncPrefilter`, four tile
+   workers) decodes the texels (Vulkan), prefilters every tile and packs it to
+   RGBA16F. The result equals the synchronous filter bit for bit.
+4. **Publish.** The finished tiles upload in a fixed order
+   (`ModernSpecularProbeAtlas_TileTarget`), spending at most
+   `MODERN_SPECULAR_PROBE_PUBLISH_BUDGET_US` (2 ms) of each frame after its first
+   tile; source reads share that budget, so further misses wait a frame. Packing
+   on the job matters: the drivers' own float-to-half conversion cost 3-6 ms
+   per 256-texel tile on OpenGL.
+
+Until the last tile lands the slot is unpublished and the whole set keeps its
+analytic fallback (`MODERN_SPECULAR_PROBE_ATLAS_REJECT_PREFILTER_PENDING`
+on Vulkan, `pendingUpload` on OpenGL), the same whole-set rule as any other
+miss. A slot reassigned or reloaded mid-job, an atlas reload, a source
+change, a failed upload or renderer shutdown joins or discards the job and
+releases any in-flight readback (deferred to the frame slot while its batch is
+busy). Screenshot frames finish every pending stage at once, so captures show
+the settled probes; `pbrProbeSettle` does the same for the next few frames
+(it expires), which the probe suite uses before reading telemetry. With the
+cvar at 0 a miss filters synchronously on its frame, as before.
+
+`gfxInfo` reports `prefilterStarted`, `Published`, `Pending`/`Running`,
+`Cancelled`, `Waits` (capture waits), the start-to-publish latency, and the most
+probe work any non-capture frame did (`publishFrameMaxUs` on Vulkan,
+`frameFilterMaxUs` with `sourceRead*` on OpenGL).
+
+Measured on the authored-probe suites (`renderer_vulkan_pbr_probes.py`, RTX
+4060 Laptop GPU, debugoptimized; Vulkan 56/56, OpenGL 50/50, each also requiring
+that the background path ran):
+
+| | Vulkan | OpenGL |
+| --- | --- | --- |
+| Most probe work in one gameplay frame | 2.1 ms | 3.3 ms |
+| Probe visible after first need | 0.15-0.31 s | 0.14-0.37 s |
+| Frame-thread publish per probe (spread over frames) | about 12 ms | about 11 ms |
+
+Both meet the 4 ms budget. Screenshot and settle frames are excluded from the
+frame maximum by design; a Vulkan read straight after an image reload still
+waits for that reload's uploads (up to 34 ms), but only a capture does that
+synchronously. `renderer-vk-clear-startup` and
+`renderer-vk-probe-source-lifecycle` still pass with the same source-test
+counts after the read was split. Not covered: other GPUs and platforms, and a
+quiet-machine distribution of frame times rather than these maxima.
 
 ## Transfer ownership
 

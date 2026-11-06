@@ -407,6 +407,10 @@ See [release status](../../user/release-status.md) and the
   for about half a minute per frame.
 - Vulkan screenshots now show froxel fog, screen-space reflections and
   screen-space GI as displayed.
+- Authored reflection probes (experimental, off by default) no longer hitch
+  the game when they first come into view. Each probe is prepared in the
+  background and appears a fraction of a second later; screenshots wait for
+  it. `r_pbrProbeAsyncPrefilter 0` restores the old behaviour.
 
 - A long multiplayer chat message with an icon in it no longer repeats the
   icon at the start of the next line when it wraps.

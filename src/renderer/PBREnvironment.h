@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <memory>
 #include <cstdint>
 #include <cstring>
 #include <system_error>
@@ -169,6 +170,9 @@ inline std::vector<float> DiffuseIrradiance(const Sampler &sample, int size, int
 struct PrefilteredTiles {
     std::vector<std::vector<float>> specular;
     std::vector<float> diffuse;
+    // RGBA16F bit patterns after PackTilesHalf; the float tiles are released.
+    std::vector<std::vector<std::uint16_t>> specularHalf;
+    std::vector<std::uint16_t> diffuseHalf;
 };
 template<class Sampler>
 inline PrefilteredTiles PrefilterTiles(const Sampler &sample, int faceSize, int maxMip, int diffuseSize,
@@ -198,6 +202,85 @@ inline PrefilteredTiles PrefilterTiles(const Sampler &sample, int faceSize, int 
     for (std::thread &thread : threads) { thread.join(); }
     return out;
 }
+inline std::vector<std::uint16_t> HalfTile(const std::vector<float> &rgba) {
+    std::vector<std::uint16_t> half(rgba.size());
+    for (size_t i = 0; i < rgba.size(); ++i) { half[i] = RadianceHalf(rgba[i]); }
+    return half;
+}
+// Converts every tile to the atlas' RGBA16F storage, so a background job leaves
+// the frame thread only the upload (the drivers' own float conversion costs
+// milliseconds per 256-texel tile).
+inline void PackTilesHalf(PrefilteredTiles &tiles) {
+    tiles.specularHalf.resize(tiles.specular.size());
+    for (size_t i = 0; i < tiles.specular.size(); ++i) { tiles.specularHalf[i] = HalfTile(tiles.specular[i]); }
+    tiles.diffuseHalf = HalfTile(tiles.diffuse);
+    tiles.specular.clear();
+    tiles.diffuse.clear();
+}
+// One probe source's PrefilterTiles on a background thread, so a cache miss
+// publishes on a later frame instead of stalling the one that took it (REN-06:
+// about 85 ms even with parallel tiles, against a 4 ms budget). The job owns
+// its source, and its result equals the synchronous filter. StartFrom also
+// moves producing the source (decoding the read texels) onto the thread; a
+// producer that returns false leaves Failed() set and no tiles. Owners must
+// Wait() before unloading the module that runs it; destruction joins as a
+// last resort.
+class AsyncPrefilter {
+public:
+    AsyncPrefilter() = default;
+    AsyncPrefilter(const AsyncPrefilter &) = delete;
+    AsyncPrefilter &operator=(const AsyncPrefilter &) = delete;
+    ~AsyncPrefilter() { Wait(); }
+    // False when no thread could be started; the caller filters synchronously.
+    template<class Producer>
+    bool StartFrom(Producer produce, int faceSize, int maxMip, int diffuseSize, unsigned maxWorkers,
+            bool packHalf = false) {
+        Wait();
+        cube = Cube();
+        result = PrefilteredTiles();
+        failed = false;
+        done.store(false, std::memory_order_relaxed);
+        try {
+            worker = std::thread([this, produce, faceSize, maxMip, diffuseSize, maxWorkers, packHalf]() mutable {
+                if (produce(cube)) {
+                    result = PrefilterTiles(cube, faceSize, maxMip, diffuseSize, maxWorkers);
+                    if (packHalf) { PackTilesHalf(result); }
+                } else {
+                    failed = true;
+                }
+                done.store(true, std::memory_order_release);
+            });
+        } catch (const std::system_error &) {
+            return false;
+        }
+        return true;
+    }
+    bool Start(Cube source, int faceSize, int maxMip, int diffuseSize, unsigned maxWorkers,
+            bool packHalf = false) {
+        auto owned = std::make_shared<Cube>(std::move(source));
+        return StartFrom([owned](Cube &out) { out = std::move(*owned); return true; },
+            faceSize, maxMip, diffuseSize, maxWorkers, packHalf);
+    }
+    bool Running() const { return worker.joinable(); }
+    bool Ready() const { return worker.joinable() && done.load(std::memory_order_acquire); }
+    void Wait() { if (worker.joinable()) { worker.join(); } }
+    // After Take: the producer rejected its source, so the tiles are empty.
+    bool Failed() const { return failed; }
+    // Joins (blocking only when not Ready) and hands over the tiles.
+    PrefilteredTiles Take() {
+        Wait();
+        cube = Cube();
+        return std::move(result);
+    }
+    // Discards a job whose source or slot is no longer wanted.
+    void Cancel() { Wait(); cube = Cube(); result = PrefilteredTiles(); failed = false; }
+private:
+    Cube cube;
+    PrefilteredTiles result;
+    bool failed = false;
+    std::atomic<bool> done{false};
+    std::thread worker;
+};
 inline std::array<float, 2> IntegrateBRDF(float NoV, float roughness, int samples = 256) {
     NoV = PBRClamp(NoV, 0.0001f, 1);
     roughness = PBRRoughness(roughness);

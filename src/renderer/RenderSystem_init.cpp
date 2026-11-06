@@ -283,6 +283,20 @@ idCVar r_vkPBRSpecularAA( "r_vkPBRSpecularAA", "1", CVAR_RENDERER | CVAR_BOOL, "
 idCVar r_pbrGeneratedLegacyFallback( "r_pbrGeneratedLegacyFallback", "1", CVAR_RENDERER | CVAR_BOOL, "allow development-only classic fallback generation for PBR-only materials" );
 idCVar r_pbrDebug( "r_pbrDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "PBR debug view: 0=off, 1=albedo, 2=normal, 3=metallic, 4=roughness, 5=AO, 6=emissive, 7=state marker (green=PBR, magenta=contract mismatch)", 0, 7, idCmdSystem::ArgCompletion_Integer<0,7> );
 idCVar r_pbrIBL( "r_pbrIBL", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable environment reflections and diffuse from authored reflection probes for explicitly PBR-authored materials (with r_pbrAnalyticEnvironment, the laboratory studio environment)" );
+idCVar r_pbrProbeAsyncPrefilter( "r_pbrProbeAsyncPrefilter", "1", CVAR_RENDERER | CVAR_BOOL, "filter newly resident reflection probes on a background thread; the probe set keeps its analytic fallback until the result publishes on a later frame (screenshots wait for it). 0 filters on the frame that needs the probe, a stall of tens of milliseconds" );
+// `pbrProbeSettle`: the next few frames finish every background probe filter
+// as a screenshot does, ending early once nothing is pending. Tests and
+// benchmarks use it to measure the settled state without depending on thread
+// timing; the request expires so it can never pin later frames to it.
+static int r_pbrProbeSettleUntilFrame = -1;
+static const int R_PBR_PROBE_SETTLE_FRAMES = 3;
+void R_PBRProbes_RequestSettle( void ) { r_pbrProbeSettleUntilFrame = tr.frameCount + R_PBR_PROBE_SETTLE_FRAMES; }
+bool R_PBRProbes_SettleRequested( void ) { return r_pbrProbeSettleUntilFrame >= tr.frameCount; }
+void R_PBRProbes_SettleDone( void ) { r_pbrProbeSettleUntilFrame = -1; }
+static void R_PBRProbeSettle_f( const idCmdArgs &args ) {
+	( void )args;
+	R_PBRProbes_RequestSettle();
+}
 idCVar r_pbrIBLIntensity( "r_pbrIBLIntensity", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "PBR environment intensity", 0.0f, 4.0f );
 idCVar r_pbrAnalyticEnvironment( "r_pbrAnalyticEnvironment", "0", CVAR_RENDERER | CVAR_BOOL, "laboratory mode: light PBR surfaces with the analytic studio environment where no authored probe applies; 0 leaves environment lighting to authored probes, baked light grids and the map's ambient lights" );
 idCVar r_pbrInferFromLegacyMaterials( "r_pbrInferFromLegacyMaterials", "0", CVAR_RENDERER | CVAR_BOOL, "research-only legacy material reinterpretation; never used for stock rendering by default" );
@@ -6207,6 +6221,7 @@ void R_InitCommands( void ) {
 #endif
 	cmdSystem->AddCommand( "rendererGpuTimerSelfTest", R_RendererGpuTimerSelfTest_f, CMD_FL_RENDERER, "run renderer GPU timer query self tests" );
 	cmdSystem->AddCommand( "rendererTemporalPresentationStatus", R_TemporalPresentation_PrintStatus_f, CMD_FL_RENDERER, "report dynamic-resolution and temporal-history state" );
+	cmdSystem->AddCommand( "pbrProbeSettle", R_PBRProbeSettle_f, CMD_FL_RENDERER, "finish background reflection-probe filtering on the next frames, as a screenshot does" );
 	cmdSystem->AddCommand( "rendererMotionBlurStatus", R_TemporalPresentation_PrintMotionBlurStatus_f, CMD_FL_RENDERER, "report motion blur requested/effective settings and history decisions; \"reset\" clears the counters" );
 	cmdSystem->AddCommand( "rendererScenePacketSelfTest", R_RendererScenePacketSelfTest_f, CMD_FL_RENDERER, "run renderer front-end scene-packet self tests" );
 	cmdSystem->AddCommand( "rendererRenderGraphSelfTest", R_RendererRenderGraphSelfTest_f, CMD_FL_RENDERER, "run renderer resource-graph self tests" );

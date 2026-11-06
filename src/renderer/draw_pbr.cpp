@@ -1010,7 +1010,7 @@ void RB_GLPBR_PrepareFrame( const idScenePacketFrame &frame ) {
 			g_glPBRProbeViews.clear();	// the whole set falls back to the analytic environment
 		}
 	}
-	R_ModernSpecularProbeAtlas_FlushUploads();
+	R_ModernSpecularProbeAtlas_FlushUploads( R_ModernSpecularProbeAtlas_CaptureFrame( frame ) );
 	if ( !g_glPBRProbeViews.empty() && !R_ModernSpecularProbeAtlas_FrameReady() ) {
 		g_glPBRProbeViews.clear();
 	}

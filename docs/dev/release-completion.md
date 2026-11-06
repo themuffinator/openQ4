@@ -33,10 +33,13 @@ See [player release status](../user/release-status.md).
 - Vulkan screenshots now include froxel fog, screen-space reflections and
   screen-space GI exactly as displayed. Before, screenshots drew those effects
   without the scene's depth.
-- Authored reflection probes (an experimental, default-off feature) enter the
-  scene about six times faster: the half-second pause when a new probe
-  becomes resident is now about 85 ms on both renderers, with identical
-  lighting. Removing the remaining pause is still open.
+- Authored reflection probes (an experimental, default-off feature) no longer
+  pause the game when a new probe becomes resident. The half-second stall
+  first became about 85 ms with parallel filtering. Probes are now prepared
+  in the background and appear 0.15-0.37 s later, with identical lighting.
+  No gameplay frame spends more than about 3 ms on them on either renderer.
+  Screenshots wait for them. `r_pbrProbeAsyncPrefilter 0` restores the
+  previous behaviour.
 - On OpenGL with shadow maps, a mod surface whose see-through holes come from
   a generated or missing alpha texture now falls back to the original stencil
   shadows, as Vulkan already did, instead of casting a solid shadow while

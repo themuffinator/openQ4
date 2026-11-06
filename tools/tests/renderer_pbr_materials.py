@@ -519,7 +519,7 @@ def test_scene_packet_and_resource_table_drive_the_guarded_visible_path() -> Non
         "R_ModernSpecularProbeAtlas_Init( caps, features )",
         "R_ModernSpecularProbeAtlas_Shutdown()",
         "R_ModernSpecularProbeAtlas_BeginFrame( pbrEnvironmentRequested )",
-        "R_ModernSpecularProbeAtlas_FlushUploads()",
+        "R_ModernSpecularProbeAtlas_FlushUploads( R_ModernSpecularProbeAtlas_CaptureFrame( packetFrame ) )",
         "R_ModernSpecularProbeAtlas_Ready()",
         "R_ModernGLExecutor_ShadowSlotPlaceholderTexture( GL_TEXTURE_2D )",
         "R_ModernSpecularProbeAtlas_PrintGfxInfo()",

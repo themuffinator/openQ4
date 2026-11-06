@@ -140,61 +140,114 @@ static void VK_ProbeSource_RecordCopy( VkCommandBuffer cmd, void *user ) {
 	vkCmdPipelineBarrier2( cmd, &dependency );
 }
 
-modernSpecularProbeAtlasReject_t VK_ProbeSource_Read( const idImage *image,
-		openq4PBR::Cube &cube, vkProbeSourceStamp_t &stamp ) {
-	cube = openq4PBR::Cube();
-	stamp = {};
+// The batch that recorded this read's copy is still open or still executing.
+static bool VK_ProbeSource_BatchBusy( const vkProbeSourceRead_t &read ) {
+	return vkCtx.uploadBatchSerial == read.batch && ( vkCtx.uploadBatchOpen || vkCtx.uploadBatchInFlight );
+}
+
+void VK_ProbeSource_CancelRead( vkProbeSourceRead_t &read ) {
+	if ( read.buffer != VK_NULL_HANDLE && vkCtx.allocator != NULL ) {
+		if ( VK_ProbeSource_BatchBusy( read ) ) {
+			// The copy is recorded or executing; retire the buffer with the frame
+			// slot (whose flush submits an open batch first).
+			VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, read.buffer, read.allocation );
+		} else {
+			vmaDestroyBuffer( vkCtx.allocator, read.buffer, read.allocation );
+		}
+	}
+	read = vkProbeSourceRead_t();
+}
+
+modernSpecularProbeAtlasReject_t VK_ProbeSource_BeginRead( const idImage *image, vkProbeSourceRead_t &read ) {
+	VK_ProbeSource_CancelRead( read );
 	vkImageEntry_t *entry;
 	const modernSpecularProbeAtlasReject_t validation = VK_ProbeSource_Validate( image, entry );
 	if ( validation != MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE ) { return validation; }
-	const vkProbeSourceStamp_t expected = VK_ProbeSource_Stamp( image, *entry );
-	const bool hdr = entry->format == VK_FORMAT_R16G16B16A16_SFLOAT;
-	const int pixelsPerFace = entry->width * entry->height;
+	read.stamp = VK_ProbeSource_Stamp( image, *entry );
+	read.hdr = entry->format == VK_FORMAT_R16G16B16A16_SFLOAT;
 	VkBufferCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	info.size = VkDeviceSize( pixelsPerFace ) * 6 * ( hdr ? 8 : 4 );
+	info.size = VkDeviceSize( entry->width * entry->height ) * 6 * ( read.hdr ? 8 : 4 );
 	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	VmaAllocationCreateInfo create = {};
 	create.usage = VMA_MEMORY_USAGE_AUTO;
 	create.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	VkBuffer buffer = VK_NULL_HANDLE;
-	VmaAllocation allocation = NULL;
 	VmaAllocationInfo mapped = {};
-	if ( vmaCreateBuffer( vkCtx.allocator, &info, &create, &buffer, &allocation, &mapped ) != VK_SUCCESS ) {
+	if ( vmaCreateBuffer( vkCtx.allocator, &info, &create, &read.buffer, &read.allocation, &mapped ) != VK_SUCCESS ) {
+		read = vkProbeSourceRead_t();
 		return MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE;
 	}
-	if ( mapped.pMappedData == NULL ) {
-		vmaDestroyBuffer( vkCtx.allocator, buffer, allocation );
+	read.mapped = mapped.pMappedData;
+	if ( read.mapped == NULL ) {
+		VK_ProbeSource_CancelRead( read );
 		return MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE;
 	}
-	vkProbeSourceCopy_t copy = { entry->image, buffer, uint32_t( entry->width ), 0 };
+	vkProbeSourceCopy_t copy = { entry->image, read.buffer, uint32_t( entry->width ), 0 };
 	// Same graphics queue as image uploads and scene submission. Appending the
 	// read after pending uploads avoids reading unsubmitted or stale source data.
 	// This readback owns its host buffer; the upload batch must not free it.
-	if ( !VK_Device_BatchedUpload( VK_ProbeSource_RecordCopy, &copy, VK_NULL_HANDLE, NULL, 0 ) ) {
-		vmaDestroyBuffer( vkCtx.allocator, buffer, allocation );
+	// The copy joins the open batch, which the frame submits with its own
+	// uploads; flushing it here would make the frame's next upload wait for it.
+	if ( !VK_Device_BatchedUpload( VK_ProbeSource_RecordCopy, &copy, VK_NULL_HANDLE, NULL, 0, &read.batch )
+			|| !VK_ProbeSource_BatchBusy( read ) ) {
+		VK_ProbeSource_CancelRead( read );
 		return MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE;
 	}
-	VK_Device_FlushUploadBatch();
-	if ( !vkCtx.uploadBatchInFlight ) {
-		vmaDestroyBuffer( vkCtx.allocator, buffer, allocation );
+	read.active = true;
+	return MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE;
+}
+
+modernSpecularProbeAtlasReject_t VK_ProbeSource_CollectRead( const idImage *image, vkProbeSourceRead_t &read,
+		std::vector<std::uint8_t> &encoded, bool wait ) {
+	encoded.clear();
+	if ( !read.active || vkCtx.presentationBlocked ) {
+		VK_ProbeSource_CancelRead( read );
 		return MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE;
 	}
-	if ( vkWaitForFences( vkCtx.device, 1, &vkCtx.uploadFence, VK_TRUE, UINT64_MAX ) != VK_SUCCESS ) {
-		VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, buffer, allocation );
+	// Opening a newer batch waits the previous one, so another serial (or our
+	// batch neither open nor in flight) means the copy has completed.
+	if ( vkCtx.uploadBatchSerial == read.batch && vkCtx.uploadBatchOpen ) {
+		if ( !wait ) { return MODERN_SPECULAR_PROBE_ATLAS_REJECT_PREFILTER_PENDING; }
+		VK_Device_FlushUploadBatch();
+	}
+	if ( vkCtx.uploadBatchSerial == read.batch && vkCtx.uploadBatchInFlight ) {
+		if ( !wait && vkGetFenceStatus( vkCtx.device, vkCtx.uploadFence ) != VK_SUCCESS ) {
+			return MODERN_SPECULAR_PROBE_ATLAS_REJECT_PREFILTER_PENDING;
+		}
+		VK_Device_WaitUploadBatch();
+	}
+	if ( vkCtx.presentationBlocked || VK_ProbeSource_BatchBusy( read ) ) {
+		VK_ProbeSource_CancelRead( read );
 		return MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE;
 	}
-	VK_Device_WaitUploadBatch();
 	modernSpecularProbeAtlasReject_t result = MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE;
-	if ( vmaInvalidateAllocation( vkCtx.allocator, allocation, 0, VK_WHOLE_SIZE ) != VK_SUCCESS ) {
+	if ( vmaInvalidateAllocation( vkCtx.allocator, read.allocation, 0, VK_WHOLE_SIZE ) != VK_SUCCESS ) {
 		result = MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE;
+	} else if ( !VK_ProbeSource_Matches( image, read.stamp ) ) {
+		result = MODERN_SPECULAR_PROBE_ATLAS_REJECT_SOURCE_CHANGED;
+	} else {
+		const size_t bytes = size_t( read.stamp.faceSize ) * read.stamp.faceSize * 6 * ( read.hdr ? 8 : 4 );
+		encoded.resize( bytes );
+		memcpy( encoded.data(), read.mapped, bytes );
 	}
+	vmaDestroyBuffer( vkCtx.allocator, read.buffer, read.allocation );
+	read.buffer = VK_NULL_HANDLE;
+	read.allocation = NULL;
+	read.mapped = NULL;
+	read.active = false;
+	return result;
+}
+
+bool VK_ProbeSource_Decode( const std::vector<std::uint8_t> &encoded, bool hdr, int faceSize, openq4PBR::Cube &cube ) {
+	cube = openq4PBR::Cube();
+	const int pixelsPerFace = faceSize * faceSize;
+	if ( faceSize <= 0 || encoded.size() != size_t( pixelsPerFace ) * 6 * ( hdr ? 8 : 4 ) ) { return false; }
 	openq4PBR::Cube candidate;
-	candidate.size = expected.faceSize;
-	const byte *bytes = static_cast<const byte *>( mapped.pMappedData );
-	for ( int face = 0; face < 6 && result == MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE; ++face ) {
+	candidate.size = faceSize;
+	const std::uint8_t *bytes = encoded.data();
+	for ( int face = 0; face < 6; ++face ) {
 		candidate.faces[face].resize( pixelsPerFace );
-		for ( int pixel = 0; pixel < pixelsPerFace && result == MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE; ++pixel ) {
+		for ( int pixel = 0; pixel < pixelsPerFace; ++pixel ) {
 			float color[3] = {};
 			for ( int component = 0; component < 3; ++component ) {
 				const int index = ( face * pixelsPerFace + pixel ) * 4 + component;
@@ -202,10 +255,7 @@ modernSpecularProbeAtlasReject_t VK_ProbeSource_Read( const idImage *image,
 					unsigned short bits;
 					memcpy( &bits, bytes + index * 2, sizeof( bits ) );
 					float value;
-					if ( !HDRExposure_DecodeHalf( bits, value ) ) {
-						result = MODERN_SPECULAR_PROBE_ATLAS_REJECT_INVALID_STORAGE;
-						break;
-					}
+					if ( !HDRExposure_DecodeHalf( bits, value ) ) { return false; }
 					color[component] = Max( 0.0f, value );
 				} else {
 					color[component] = openq4PBRMath::PBRSRGBToLinear( bytes[index] / 255.0f );
@@ -214,11 +264,27 @@ modernSpecularProbeAtlasReject_t VK_ProbeSource_Read( const idImage *image,
 			candidate.faces[face][pixel] = { color[0], color[1], color[2] };
 		}
 	}
-	vmaDestroyBuffer( vkCtx.allocator, buffer, allocation );
-	if ( result != MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE ) { return result; }
-	if ( !VK_ProbeSource_Matches( image, expected ) ) { return MODERN_SPECULAR_PROBE_ATLAS_REJECT_SOURCE_CHANGED; }
 	std::swap( cube, candidate );
-	stamp = expected;
+	return true;
+}
+
+modernSpecularProbeAtlasReject_t VK_ProbeSource_Read( const idImage *image,
+		openq4PBR::Cube &cube, vkProbeSourceStamp_t &stamp ) {
+	cube = openq4PBR::Cube();
+	stamp = {};
+	vkProbeSourceRead_t read;
+	modernSpecularProbeAtlasReject_t result = VK_ProbeSource_BeginRead( image, read );
+	if ( result != MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE ) { return result; }
+	std::vector<std::uint8_t> encoded;
+	result = VK_ProbeSource_CollectRead( image, read, encoded, true );
+	if ( result != MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE ) { return result; }
+	openq4PBR::Cube candidate;
+	if ( !VK_ProbeSource_Decode( encoded, read.hdr, read.stamp.faceSize, candidate ) ) {
+		return MODERN_SPECULAR_PROBE_ATLAS_REJECT_INVALID_STORAGE;
+	}
+	if ( !VK_ProbeSource_Matches( image, read.stamp ) ) { return MODERN_SPECULAR_PROBE_ATLAS_REJECT_SOURCE_CHANGED; }
+	std::swap( cube, candidate );
+	stamp = read.stamp;
 	return MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE;
 }
 

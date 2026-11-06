@@ -83,6 +83,45 @@ static void EnvironmentTests() {
         }
         Require(tiles.diffuse == DiffuseIrradiance(cube, 8), "parallel diffuse tile matches exactly");
     }
+    // The background job (REN-06) owns a copy of its source and publishes the
+    // same tiles; a cancelled job leaves nothing behind and the job is reusable.
+    {
+        const PrefilteredTiles serial = PrefilterTiles(cube, 16, 4, 8, 1);
+        AsyncPrefilter job;
+        Require(!job.Running() && !job.Ready(), "an idle job is neither running nor ready");
+        Cube copy = cube;
+        Require(job.Start(std::move(copy), 16, 4, 8, 3), "background prefilter starts");
+        Require(job.Running(), "a started job is running until taken");
+        const PrefilteredTiles async = job.Take();
+        Require(!job.Running() && !job.Ready(), "a taken job is idle");
+        Require(async.specular == serial.specular && async.diffuse == serial.diffuse,
+            "background prefilter tiles match the synchronous filter exactly");
+        Require(job.Start(Cube(cube), 16, 4, 8, 2), "a finished job can be reused");
+        job.Cancel();
+        Require(!job.Running(), "a cancelled job is idle");
+        Require(job.Start(Cube(cube), 16, 4, 8, 2), "a cancelled job can be reused");
+        while (!job.Ready()) { std::this_thread::yield(); }
+        Require(job.Take().diffuse == serial.diffuse, "a reused job publishes its own source");
+        // Packed jobs hand over exactly the RGBA16F patterns of the float tiles.
+        Require(job.Start(Cube(cube), 16, 4, 8, 2, true), "a packing job starts");
+        const PrefilteredTiles packed = job.Take();
+        Require(packed.specular.empty() && packed.diffuse.empty() && packed.specularHalf.size() == serial.specular.size(),
+            "a packed job releases its float tiles");
+        for (size_t i = 0; i < serial.specular.size(); ++i) {
+            Require(packed.specularHalf[i] == HalfTile(serial.specular[i]), "packed specular tiles match RadianceHalf");
+        }
+        Require(packed.diffuseHalf == HalfTile(serial.diffuse), "packed diffuse tile matches RadianceHalf");
+        // A producer runs on the job: one that rejects its source leaves no tiles.
+        Require(job.StartFrom([](Cube &) { return false; }, 16, 4, 8, 2, true), "a rejecting producer starts");
+        const PrefilteredTiles rejected = job.Take();
+        Require(job.Failed() && rejected.specularHalf.empty() && rejected.specular.empty(),
+            "a rejected source publishes nothing");
+        Require(job.StartFrom([&cube](Cube &out) { out = cube; return true; }, 16, 4, 8, 2),
+            "a producing job starts");
+        const PrefilteredTiles produced = job.Take();
+        Require(!job.Failed() && produced.specular == serial.specular && produced.diffuse == serial.diffuse,
+            "a produced source filters exactly like the synchronous path");
+    }
     const auto smoothBRDF = IntegrateBRDF(1, 0.045f, 4096);
     Require(smoothBRDF[0] > 0.99f && smoothBRDF[1] < 0.001f, "split-sum mirror reference");
     const auto roughBRDF = IntegrateBRDF(1, 1, 4096);

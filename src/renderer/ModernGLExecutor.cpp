@@ -9345,7 +9345,7 @@ void R_ModernGLExecutor_PrepareFrame( const idScenePacketFrame &packetFrame, con
 	// the clustered build only reserved atlas cells; copy them in here, where
 	// binding textures is safe
 	R_ModernLightImageAtlas_FlushUploads();
-	R_ModernSpecularProbeAtlas_FlushUploads();
+	R_ModernSpecularProbeAtlas_FlushUploads( R_ModernSpecularProbeAtlas_CaptureFrame( packetFrame ) );
 	R_ModernGLExecutor_ClassifyModernVisibleLighting( packetFrame, rg_modernGLExecutorStats );
 	R_ModernGLExecutor_UpdateFrameUBO( rg_modernGLExecutorStats );
 	{

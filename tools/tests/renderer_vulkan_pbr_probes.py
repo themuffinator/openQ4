@@ -124,6 +124,10 @@ def configure(manifest: dict, samples: int, backend: str, selected: set[str] | N
         if bake: commands += ['wait 10',f'bakeReflectionProbes {bake}']
         commands += ['wait 30','g_stopTime 1']
         if boundary: commands += lab.CASE_COMMANDS[boundary]
+        # Newly resident probes filter on a background thread
+        # (r_pbrProbeAsyncPrefilter); settle them so the telemetry and image
+        # describe the published set, not the thread timing.
+        commands += ['pbrProbeSettle','wait 2']
         previous_count=len(sources)
         previous_markers=tuple(MARKERS) if markers else ()
         settings={'r_rendererReflectionProbes':str(int(enabled)), 'r_pbrIBL':'1', 'r_pbrIBLIntensity':'0.35',
@@ -346,6 +350,15 @@ def inspect(report: dict, profile: dict, backend: str, samples: int) -> dict:
                 failures.append(f'probes-baked: blue marker misplaced in the {where}: {blue}')
     if 'probes-ao-zero' in patches and max(patches['probes-ao-zero'])>1:
         failures.append('AO zero retained indirect light')
+    # The background prefilter (REN-06) carried the run: its cumulative
+    # counters show filters started and published off the frame thread.
+    atlas_prefix='Vulkan PBR probes:' if backend=='vk' else 'Modern specular probe atlas:'
+    last=[l for name in profile for l in rows.get(name,{}).get('telemetry',[]) if l.startswith(atlas_prefix)]
+    prefilter=dict(re.findall(r'(prefilter\w+)=(\d+)',last[-1])) if last else {}
+    checks['backgroundPrefilter']=prefilter
+    if len(profile)>1 and (prefilter.get('prefilterAsync')!='1' or int(prefilter.get('prefilterStarted','0'))<1
+            or int(prefilter.get('prefilterPublished','0'))<1):
+        failures.append(f'background prefilter did not run: {prefilter}')
     return {'status':'fail' if failures else 'pass','failures':failures,'telemetry':states,'imageChecks':checks}
 
 
