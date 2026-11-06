@@ -482,6 +482,8 @@ idCVar af_showInertia(				"af_showInertia",			"0",			CVAR_GAME | CVAR_BOOL, "sho
 idCVar af_showVelocity(				"af_showVelocity",			"0",			CVAR_GAME | CVAR_BOOL, "show the velocity of each body" );
 idCVar af_showActive(				"af_showActive",			"0",			CVAR_GAME | CVAR_BOOL, "show tree-like structures of articulated figures not at rest" );
 idCVar af_testSolid(				"af_testSolid",				"1",			CVAR_GAME | CVAR_BOOL, "test for bodies initially stuck in solid" );
+idCVar g_enhancedPhysics(			"g_enhancedPhysics",		"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "enhanced rigid-body and ragdoll physics (0 = legacy simulation); applies at the next map load" );
+idCVar si_enhancedPhysics(			"si_enhancedPhysics",		"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM | CVAR_BOOL, "physics mode the server committed for the current map; clients and demo playback follow it" );
 
 idCVar rb_showTimings(				"rb_showTimings",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid body cpu usage" );
 idCVar rb_showBodies(				"rb_showBodies",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid bodies" );

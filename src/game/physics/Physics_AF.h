@@ -987,6 +987,10 @@ private:
 	void					Rest( void );
 	void					AddPushVelocity( const idVec6 &pushVelocity );
 	void					DebugDraw( void );
+// openQ4 BEGIN: physics mode dispatch and telemetry (PHYS-01)
+							// the unchanged legacy simulation, run when g_enhancedPhysics was 0 at map load
+	bool					EvaluateLegacy( int timeStepMSec, int endTimeMSec );
+// openQ4 END
 };
 
 #endif /* !__PHYSICS_AF_H__ */

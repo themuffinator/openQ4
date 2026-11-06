@@ -3,6 +3,7 @@
 #pragma hdrstop
 
 #include "../Game_local.h"
+#include "../../game/physics/PhysicsTelemetry.h"
 
 CLASS_DECLARATION( idPhysics_Base, idPhysics_RigidBody )
 END_CLASS
@@ -881,14 +882,14 @@ const idBounds &idPhysics_RigidBody::GetAbsBounds( int id ) const {
 
 /*
 ================
-idPhysics_RigidBody::Evaluate
+idPhysics_RigidBody::EvaluateLegacy
 
   Evaluate the impulse based rigid body physics.
   When a collision occurs an impulse is applied at the moment of impact and a
   small bounded amount of the remaining time is processed within the same step.
 ================
 */
-bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec ) {
+bool idPhysics_RigidBody::EvaluateLegacy( int timeStepMSec, int endTimeMSec ) {
 	rigidBodyPState_t next, impactState;
 	idAngles angles;
 	trace_t collision;
@@ -1158,6 +1159,32 @@ bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec ) {
 
 /*
 ================
+idPhysics_RigidBody::Evaluate
+
+  openQ4: dispatches to the physics mode committed at map load and records
+  per-frame telemetry while physicsStats is recording.
+================
+*/
+bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec ) {
+	OpenQ4Physics::ScopedEvaluation telemetry( OpenQ4Physics::EVAL_RIGID_BODY );
+	const bool wasAtRest = current.atRest >= 0;
+	const bool moved = telemetry.Moved( EvaluateLegacy( timeStepMSec, endTimeMSec ) );
+	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
+		OpenQ4Physics::GetTelemetry().NoteLinearSpeed( ( inverseMass * current.i.linearMomentum ).Length() );
+		if ( !wasAtRest && current.atRest >= 0 ) {
+			OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SLEEPS );
+		}
+		const double elapsed = telemetry.ElapsedMs();
+		if ( elapsed > 10.0 ) {
+			gameLocal.Printf( "PHYSICS_SLOW rigid entity=%s class=%s ms=%.2f contacts=%d time=%d\n",
+				self ? self->name.c_str() : "?", self ? self->GetClassname() : "?", elapsed, contacts.Num(), gameLocal.time );
+		}
+	}
+	return moved;
+}
+
+/*
+================
 idPhysics_RigidBody::UpdateTime
 ================
 */
@@ -1204,6 +1231,10 @@ void idPhysics_RigidBody::ApplyImpulse( const int id, const idVec3 &point, const
 	current.i.linearMomentum += impulse;
 	current.i.angularMomentum += ( point - ( current.i.position + centerOfMass * current.i.orientation ) ).Cross( impulse );
 	Activate();
+	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
+		const float magnitude = impulse.Length();
+		OpenQ4Physics::GetTelemetry().NoteImpulse( magnitude, magnitude * inverseMass, false );
+	}
 }
 
 /*

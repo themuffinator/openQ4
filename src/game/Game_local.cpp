@@ -2,6 +2,7 @@
 
 
 #include "Game_local.h"
+#include "physics/PhysicsTelemetry.h"
 #include "awakening/MissionScripts.h"
 #include "awakening/ContentRepairs.h"
 
@@ -721,6 +722,7 @@ void idGameLocal::Clear( void ) {
 	isMultiplayer = false;
 	isServer = false;
 	isClient = false;
+	enhancedPhysics = false;
 	mpInteractionsGenerated = false;
 	realClientTime = 0;
 	isNewFrame = true;
@@ -1763,6 +1765,19 @@ void idGameLocal::SetServerInfo( const idDict &_serverInfo ) {
 }
 
 /*
+===========
+idGameLocal::LatchPhysicsMode
+
+openQ4: the physics mode is fixed for the lifetime of a map, so a change to
+g_enhancedPhysics never switches solvers under bodies that are in motion.
+===========
+*/
+void idGameLocal::LatchPhysicsMode( void ) {
+	enhancedPhysics = g_enhancedPhysics.GetBool();
+	Printf( "physics: %s simulation\n", enhancedPhysics ? "enhanced" : "legacy" );
+}
+
+/*
 ============idGameLocal::LoadMap
 
 Initializes all map variables common to both save games and spawned games.
@@ -1798,6 +1813,9 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	// these can changed based upon sp / mp
 	mHz = common->GetUserCmdHz();
 	msec = common->GetUserCmdMSec();
+
+	// openQ4: commit the physics mode before any entity spawns
+	LatchPhysicsMode();
 
 	if ( !sameMap || ( mapFile && mapFile->NeedsReload() ) ) {
 		// load the .map file
@@ -4373,6 +4391,8 @@ void idGameLocal::MenuFrame( void ) { }
 =========*/
 // RAVEN BEGIN
  gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEditors, bool lastCatchupFrame, int serverGameFrame ) {
+	// openQ4: one physics telemetry sample per game frame (no-op unless physicsStats is recording)
+	OpenQ4Physics::GetTelemetry().FrameTick( framenum + 1 );
 	idEntity *	ent;
 	int			num;
 	float		ms;

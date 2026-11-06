@@ -3,6 +3,7 @@
 #pragma hdrstop
 
 #include "../Game_local.h"
+#include "../../game/physics/PhysicsTelemetry.h"
 
 CLASS_DECLARATION( idPhysics_Base, idPhysics_AF )
 END_CLASS
@@ -6260,10 +6261,10 @@ const idBounds &idPhysics_AF::GetAbsBounds( int id ) const {
 
 /*
 ================
-idPhysics_AF::Evaluate
+idPhysics_AF::EvaluateLegacy
 ================
 */
-bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
+bool idPhysics_AF::EvaluateLegacy( int timeStepMSec, int endTimeMSec ) {
 	float timeStep;
 
 	if ( timeScaleRampStart < MS2SEC( endTimeMSec ) && timeScaleRampEnd > MS2SEC( endTimeMSec ) ) {
@@ -6477,6 +6478,41 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 #endif
 
 	return true;
+}
+
+/*
+================
+idPhysics_AF::Evaluate
+
+  openQ4: dispatches to the physics mode committed at map load and records
+  per-frame telemetry while physicsStats is recording.
+================
+*/
+bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
+	OpenQ4Physics::ScopedEvaluation telemetry( OpenQ4Physics::EVAL_ARTICULATED );
+	const bool wasAtRest = current.atRest >= 0;
+	const bool moved = telemetry.Moved( EvaluateLegacy( timeStepMSec, endTimeMSec ) );
+	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
+		float peak = 0.0f;
+		for ( int i = 0; i < bodies.Num(); i++ ) {
+			peak = Max( peak, bodies[i]->current->spatialVelocity.SubVec3( 0 ).Length() );
+		}
+		OpenQ4Physics::GetTelemetry().NoteLinearSpeed( peak );
+		if ( !wasAtRest && current.atRest >= 0 ) {
+			OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SLEEPS );
+		}
+		const double elapsed = telemetry.ElapsedMs();
+		if ( elapsed > 10.0 ) {
+			int rows = 0;
+			for ( int i = 0; i < auxiliaryConstraints.Num(); i++ ) {
+				rows += auxiliaryConstraints[i]->J1.GetNumRows();
+			}
+			gameLocal.Printf( "PHYSICS_SLOW af entity=%s class=%s ms=%.2f bodies=%d constraints=%d contacts=%d auxRows=%d peak=%.1f time=%d\n",
+				self ? self->name.c_str() : "?", self ? self->GetClassname() : "?", elapsed, bodies.Num(), constraints.Num(),
+				contacts.Num(), rows, peak, gameLocal.time );
+		}
+	}
+	return moved;
 }
 
 /*
@@ -7529,6 +7565,10 @@ void idPhysics_AF::ApplyImpulse( const int id, const idVec3 &point, const idVec3
 	bodies[id]->current->spatialVelocity.SubVec3(0) += bodies[id]->invMass * impulse;
 	bodies[id]->current->spatialVelocity.SubVec3(1) += invWorldInertiaTensor * (point - bodies[id]->current->worldOrigin).Cross( impulse );
 	Activate();
+	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
+		const float magnitude = impulse.Length();
+		OpenQ4Physics::GetTelemetry().NoteImpulse( magnitude, magnitude * bodies[id]->invMass, false );
+	}
 }
 
 /*

@@ -4800,6 +4800,10 @@ static void Cmd_TestWeaponWheel_f( const idCmdArgs &args ) {
 	if ( player ) player->DebugWeaponWheel( args );
 }
 
+// openQ4: physicsStats / physicsDigest (PHYS-01)
+#include "../physics/PhysicsTelemetry.h"
+#include "../physics/PhysicsCommands.inl"
+
 /*
 =================
 idGameLocal::InitConsoleCommands
@@ -4827,6 +4831,12 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "testM01Feedback", Awakening_TestM01Feedback_f, CMD_FL_GAME|CMD_FL_CHEAT,
 		"report M01 feedback ownership, or skip through the normal cinematic path" );
 	cmdSystem->AddCommand( "listEntities",			Cmd_EntityList_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"lists game entities" );
+	cmdSystem->AddCommand( "physicsStats",			Cmd_PhysicsStats_f,			CMD_FL_GAME,				"records per-frame physics CPU time: start [label] | stop | report" );
+	cmdSystem->AddCommand( "physicsDigest",			Cmd_PhysicsDigest_f,		CMD_FL_GAME,				"prints a hash of all rigid body and articulated figure states [verbose]" );
+	cmdSystem->AddCommand( "physicsSpawn",			Cmd_PhysicsSpawn_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"spawns physics workload entities around the player" );
+	cmdSystem->AddCommand( "physicsRadiusDamage",	Cmd_PhysicsRadiusDamage_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"radius damage and push ahead of the player" );
+	cmdSystem->AddCommand( "physicsImpulse",		Cmd_PhysicsImpulse_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"applies an impulse to an entity" );
+	cmdSystem->AddCommand( "physicsDamage",			Cmd_PhysicsDamage_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"damages entities by name prefix with a damage def" );
 	cmdSystem->AddCommand( "listClientEntities",	Cmd_ClientEntityList_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists client entities" );
 	cmdSystem->AddCommand( "listActiveEntities",	Cmd_ActiveEntityList_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists active game entities" );
 	cmdSystem->AddCommand( "listMonsters",			idAI::List_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"lists monsters" );

@@ -224,6 +224,8 @@ extern idCVar	af_showInertia;
 extern idCVar	af_showVelocity;
 extern idCVar	af_showActive;
 extern idCVar	af_testSolid;
+extern idCVar	g_enhancedPhysics;
+extern idCVar	si_enhancedPhysics;
 
 extern idCVar	rb_showTimings;
 extern idCVar	rb_showBodies;

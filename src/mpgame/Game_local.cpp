@@ -2,6 +2,7 @@
 #pragma hdrstop
 
 #include "Game_local.h"
+#include "../game/physics/PhysicsTelemetry.h"
 
 #include "../idlib/NumericString.h"
 #include "../sys/AutoVersion.h"
@@ -437,6 +438,7 @@ void idGameLocal::Clear( void ) {
 	classicRuleset = false;
 	isServer = false;
 	isClient = false;
+	enhancedPhysics = false;
 	isTVClient = false;
 	realClientTime = 0;
 	isNewFrame = true;
@@ -1607,6 +1609,28 @@ void idGameLocal::SetServerInfo( const idDict &_serverInfo ) {
 }
 
 /*
+===========
+idGameLocal::LatchPhysicsMode
+
+openQ4: the physics mode is fixed for the lifetime of a map. The server (and a
+local game) commits g_enhancedPhysics and publishes it as si_enhancedPhysics;
+clients and MVD playback follow the published value, so every peer simulates
+networked bodies and client-local corpses in the same mode whatever their own
+setting is.
+===========
+*/
+void idGameLocal::LatchPhysicsMode( void ) {
+	if ( isClient ) {
+		enhancedPhysics = serverInfo.GetBool( "si_enhancedPhysics", "0" );
+	} else {
+		enhancedPhysics = g_enhancedPhysics.GetBool();
+		si_enhancedPhysics.SetBool( enhancedPhysics );
+		serverInfo.SetBool( "si_enhancedPhysics", enhancedPhysics );
+	}
+	Printf( "physics: %s simulation%s\n", enhancedPhysics ? "enhanced" : "legacy", isClient ? " (from server)" : "" );
+}
+
+/*
 ===================
 idGameLocal::LoadMap
 
@@ -1726,6 +1750,9 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	// these can changed based upon sp / mp
 	mHz = common->GetUserCmdHz();
 	msec = common->GetUserCmdMSec();
+
+	// openQ4: commit the physics mode before any entity spawns
+	LatchPhysicsMode();
 
 	if ( !sameMap || ( mapFile && mapFile->NeedsReload() ) ) {
 		// load the .map file
@@ -4354,6 +4381,8 @@ idGameLocal::RunFrame
 */
 // RAVEN BEGIN
 gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEditors, bool lastCatchupFrame, int serverGameFrame ) {
+	// openQ4: one physics telemetry sample per game frame (no-op unless physicsStats is recording)
+	OpenQ4Physics::GetTelemetry().FrameTick( framenum + 1 );
 	idEntity *	ent;
 	int			num;
 	float		ms;

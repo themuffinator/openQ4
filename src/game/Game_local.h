@@ -548,6 +548,9 @@ public:
 	bool					isMultiplayer;			// set if the game is run in multiplayer mode
 	bool					isServer;				// set if the game is run for a dedicated or listen server
 	bool					isClient;				// set if the game is run for a client
+// openQ4: physics mode committed at map load from g_enhancedPhysics; multiplayer
+// clients and demo playback take the server's si_enhancedPhysics instead
+	bool					enhancedPhysics;
 	bool					mpInteractionsGenerated; // true once interactions are generated after the first game frame
 													// discriminates between the RunFrame path and the ClientPrediction path
 													// NOTE: on a listen server, isClient is false
@@ -800,6 +803,8 @@ public:
 
 							// Initializes all map variables common to both save games and spawned games
 	void					LoadMap( const char *mapName, int randseed );
+							// openQ4: commits the physics mode for the map being loaded
+	void					LatchPhysicsMode( void );
 
 	void					LocalMapRestart( int instance = -1 );
 	void					MapRestart( int instance = -1 );
