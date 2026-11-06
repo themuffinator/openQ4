@@ -51,7 +51,9 @@ If you have questions concerning this license or the applicable additional terms
 
 #define CM_FILE_EXT			"cm"
 #define CM_FILEID			"CM"
-#define CM_FILEVERSION		"3"
+// "4" is openQ4's; it differs from Quake 4's "3" only in naming contents by
+// their own flags (see cm_retailContents in CollisionModel_debug.cpp).
+#define CM_FILEVERSION		"4"
 
 
 /*
@@ -528,7 +530,7 @@ void idCollisionModelManagerLocal::ParsePolygons( Lexer *src, idCollisionModelLo
 idCollisionModelManagerLocal::ParseBrushes
 ================
 */
-void idCollisionModelManagerLocal::ParseBrushes( Lexer *src, idCollisionModelLocal *model ) {
+void idCollisionModelManagerLocal::ParseBrushes( Lexer *src, idCollisionModelLocal *model, bool retailContentsNames ) {
 	cm_brush_t *b;
 	int i, numPlanes;
 	idVec3 normal;
@@ -578,7 +580,7 @@ void idCollisionModelManagerLocal::ParseBrushes( Lexer *src, idCollisionModelLoc
 			b->contents = token.GetIntValue();		// old .cm files use a single integer
 			b->primitiveNum = 0;
 		} else {
-			b->contents = ContentsFromString( token );
+			b->contents = ContentsFromString( token, retailContentsNames );
 			// Quake 4 .cm brush entries may optionally include a primitive number on the same line.
 			// Only consume a token if it appears before a line break to avoid eating the next brush count.
 			if ( src->ReadTokenOnLine( &token ) && token.type == TT_NUMBER ) {
@@ -599,7 +601,7 @@ void idCollisionModelManagerLocal::ParseBrushes( Lexer *src, idCollisionModelLoc
 idCollisionModelManagerLocal::ParseCollisionModel
 ================
 */
-bool idCollisionModelManagerLocal::ParseCollisionModel( Lexer *src, const char *fileName, unsigned int mapFileCRC ) {
+bool idCollisionModelManagerLocal::ParseCollisionModel( Lexer *src, const char *fileName, unsigned int mapFileCRC, bool retailContentsNames ) {
 	idCollisionModelLocal *model;
 	idToken token;
 	idStr fullModelName;
@@ -669,7 +671,7 @@ bool idCollisionModelManagerLocal::ParseCollisionModel( Lexer *src, const char *
 		}
 
 		if ( token == "brushes" ) {
-			ParseBrushes( src, model );
+			ParseBrushes( src, model, retailContentsNames );
 			continue;
 		}
 
@@ -732,6 +734,8 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 		delete src;
 		return false;
 	}
+	// Quake 4's own versions name contents through its shifted table
+	const bool retailContentsNames = ( token != CM_FILEVERSION );
 
 	if ( !src->ExpectTokenType( TT_NUMBER, TT_INTEGER, &token ) ) {
 		common->Warning( "%s has no map file CRC", fileName.c_str() );
@@ -753,7 +757,7 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 		}
 
 		if ( token == "collisionModel" ) {
-			if ( !ParseCollisionModel( src, name, mapFileCRC ) ) {
+			if ( !ParseCollisionModel( src, name, mapFileCRC, retailContentsNames ) ) {
 				delete src;
 				return false;
 			}
@@ -783,7 +787,7 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, uns
 
 namespace {
 	static const unsigned int CM_GENERATED_CACHE_MAGIC = 0x434d514fU; // "OQMC"
-	static const unsigned int CM_GENERATED_CACHE_PAYLOAD_VERSION = 1;
+	static const unsigned int CM_GENERATED_CACHE_PAYLOAD_VERSION = 2;
 	static const unsigned int CM_GENERATED_CACHE_FLAGS = 0;
 	static const int CM_CACHE_MAX_STRING = 4096;
 	static const int CM_CACHE_MAX_VERTICES = 1 << 22;
