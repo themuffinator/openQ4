@@ -266,6 +266,12 @@ CASES = {
 }
 for restart in ('partial','full'):
     CASES[f'skin-gpu-{restart}-restart']=dict(CASES['skin-gpu'])
+# Skin substitutions (REN-05): the same specimen with its PBR metal swapped for
+# a PBR dielectric or a classic material, on CPU skinning and packed MD5R.
+for backend in ('cpu','md5r'):
+    for skin in ('dielectric','classic'):
+        CASES[f'skin-{backend}-{skin}']=dict(CASES[f'skin-{backend}'])
+        CASES[f'skin-{backend}-{skin}-ownership']=dict(CASES[f'skin-{backend}-ownership'])
 for suffix in ('-clear','','-double','-zero'):
     CASES['lightgrid-pbr-ibl'+suffix]={**CASES['lightgrid-pbr'+suffix], 'r_pbrIBL':'1'}
 for suffix in ('-clear','','-double','-zero','-off','-restored'):
@@ -325,6 +331,8 @@ LEGACY_CASES.update(f'{kind}-{mode}' for kind in ('fog','blend') for mode in ('n
 LEGACY_CASES.update(('lightgrid-native','lightgrid-off'))
 LEGACY_CASES.update(('lightgrid-pbr-master-off','lightgrid-pbr-native'))
 LEGACY_CASES.update(('ssao-classic','ssao-debug-classic','ssao-classic-half','ssao-debug-classic-half'))
+# The classic skin leaves the specimen, the only PBR surface in view, classic.
+LEGACY_CASES.update(case for case in CASES if case.startswith('skin-') and '-classic' in case)
 CASE_COMMANDS = {'shader-reload':['rendererShaderLibraryReload'], 'image-reload':['reloadImages all'],
                  'partial-restart':['vid_restart partial','wait 60'], 'full-restart':['vid_restart','wait 60'],
                  # Spawned entities publish their first render definitions on
@@ -942,6 +950,53 @@ def compare_skinning_captures(results: list[dict]) -> None:
         a,b=images.get('skin-gpu'),images.get(case)
         if a and b and a!=b:
             by_case[case]['failures'].append('video restart changed the frozen skinned reference image')
+    compare_skin_substitutions(by_case, images)
+
+
+def specimen_error(a: bytes, b: bytes) -> float:
+    indices=((y*1280+x)*3+c for y in range(272,529) for x in range(512,769) for c in range(3))
+    return sum(abs(a[i]-b[i]) for i in indices)/(257*257*3)
+
+
+def compare_skin_substitutions(by_case: dict, images: dict) -> None:
+    """A skin swaps the specimen's material on CPU skinning and packed MD5R alike.
+
+    Each substitution must visibly change the specimen; a PBR substitute must
+    stay PBR-owned and a classic one must be drawn classically; and packed
+    MD5R must draw each substitution like CPU skinning, no further apart than
+    the unsubstituted pair.
+    """
+    for backend in ('cpu','md5r'):
+        base=images.get(f'skin-{backend}')
+        for skin, pbr in (('dielectric', True), ('classic', False)):
+            case=f'skin-{backend}-{skin}'
+            swapped=images.get(case)
+            if base and swapped:
+                change=specimen_error(base, swapped)
+                by_case[case]['skinProof']={'specimenChange': round(change, 3)}
+                if change < 2:
+                    by_case[case]['failures'].append(f'the {skin} skin did not change the specimen')
+            owner=f'{case}-ownership'
+            if owner in by_case:
+                patch=normal_patch(Path(by_case[owner]['screenshot']))
+                green=sum(patch[i:i+3]==bytes((0,255,0)) for i in range(0,len(patch),3)) if patch else 0
+                by_case[owner]['skinOwnership']={'greenPixels': green}
+                if pbr and green < 2000:
+                    by_case[owner]['failures'].append('the PBR skin substitute lost PBR ownership')
+                if not pbr and green > 100:
+                    by_case[owner]['failures'].append('the classic skin substitute was drawn as PBR')
+    reference=(images.get('skin-cpu'), images.get('skin-md5r'))
+    if all(reference):
+        allowed=specimen_error(*reference)
+        for skin in ('dielectric','classic'):
+            cpu, md5r = images.get(f'skin-cpu-{skin}'), images.get(f'skin-md5r-{skin}')
+            if not cpu or not md5r: continue
+            error=specimen_error(cpu, md5r)
+            by_case[f'skin-md5r-{skin}']['md5rComparison']={'specimenError': round(error, 3),
+                                                            'unsubstitutedError': round(allowed, 3)}
+            if error > allowed + 0.5:
+                by_case[f'skin-md5r-{skin}']['failures'].append(
+                    f'packed MD5R draws the {skin} skin {error:.2f} from CPU skinning (unsubstituted {allowed:.2f})')
 
 
 def compare_transparency_captures(results: list[dict]) -> None:
@@ -2168,9 +2223,19 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             scene_setups.add('extreme-emissive')
         if case.startswith('skin-'):
             commands += ['g_stopTime 0']
-            if 'skin' not in scene_setups:
-                commands += [f'spawn func_animate name pbr_skinned model "{lab.SKINNING_MODEL}" anim idle origin "0 -700 380" angle 0 solid 0', 'wait 30']
-                scene_setups.add('skin')
+            # A skin substitution is a spawn key (idScript reads a quoted
+            # console argument as a vector), so respawn when it changes.
+            skin=next((name for name in lab.SKINNING_SKINS if f'-{name}' in case), None)
+            wanted=f'skin:{skin}'
+            if wanted not in scene_setups:
+                if any(setup.startswith('skin:') for setup in scene_setups):
+                    commands += ['script "$pbr_skinned.remove()"','wait 3']
+                    scene_setups.difference_update({setup for setup in scene_setups if setup.startswith('skin:')})
+                spawn=f'spawn func_animate name pbr_skinned model "{lab.SKINNING_MODEL}" anim idle origin "0 -700 380" angle 0 solid 0'
+                if skin:
+                    spawn+=f' skin {lab.SKINNING_SKINS[skin]}'
+                commands += [spawn, 'wait 30']
+                scene_setups.add(wanted)
             angle='45 0 0' if case.endswith(('-bent','-normal','-ownership')) else '0 0 0'
             commands += [f'''script "$pbr_skinned.setJointAngle(1,1,'{angle}')"''','wait 30','g_stopTime 1']
         setup = 'multi' if case.startswith('multi-') else 'local-global' if case.startswith('local-global') else None

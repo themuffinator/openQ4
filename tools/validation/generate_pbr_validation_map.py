@@ -26,6 +26,9 @@ CONSTANT_NORMAL_MODEL = "models/openq4/pbr_lab/sphere_constant_normal.ase"
 VERTEX_COLOR_MODEL = "models/openq4/pbr_lab/sphere_vertex_color.ase"
 SKINNING_MODEL = "openq4_pbr_lab_skinned"
 SKINNING_MESH = "models/openq4/pbr_lab/skinned.md5mesh"
+# REN-05 skin substitutions on the skinned specimen (CPU and packed MD5R): its
+# authored PBR metal becomes another PBR material, or a classic one.
+SKINNING_SKINS = {"dielectric": "openq4_pbr_lab/skinned_dielectric", "classic": "openq4_pbr_lab/skinned_classic"}
 
 
 def rgba_tga(size: int, pixels: list[tuple[int, int, int, int]]) -> bytes:
@@ -293,6 +296,9 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     add(SKINNING_MESH,skin_mesh)
     add('models/openq4/pbr_lab/idle.md5anim',skin_anim)
     add('def/openq4_pbr_lab.def',skin_def)
+    add('skins/openq4_pbr_lab.skin',
+        f'skin {SKINNING_SKINS["dielectric"]}\n{{\n{PREFIX}/metal_3 {PREFIX}/dielectric_1\n}}\n'
+        f'skin {SKINNING_SKINS["classic"]}\n{{\n{PREFIX}/metal_3 {PREFIX}/classic_specular\n}}\n')
 
     # Two distinct native-convention cubes exercise all six orientations,
     # sub-256 source resizing, roughness filtering, overlap and edge fallback.
@@ -352,6 +358,7 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     precache = f'"model_sampling_test" "{SAMPLING_MODEL}"\n"model_skinning_test" "{SKINNING_MODEL}"\n"def_skinning_test" "func_animate"\n"mtr_classic_rejection_test" "{PREFIX}/classic_specular"\n' + ''.join(f'"mtr_sampling_{name}" "{PREFIX}/sampler_{name}"\n' for name in ('nearest','linear','clamp','mips'))
     precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored'))
     precache += f'"mtr_extreme_emissive_test" "{PREFIX}/extreme_emissive"\n'
+    precache += ''.join(f'"skin_skinning_{name}_test" "{skin}"\n' for name, skin in SKINNING_SKINS.items())
     precache += f'"model_constant_normal_test" "{CONSTANT_NORMAL_MODEL}"\n"mtr_aa_normal_test" "{PREFIX}/aa_normal"\n"mtr_aa_geometric_test" "{PREFIX}/aa_geometric"\n'
     precache += ''.join(f'"mtr_{name}_test" "{PREFIX}/{name}"\n' for name in
                        ('emission_half','emission_quarter','emission_cutout','emission_mismatch','cutout_mismatch','emission_extreme_native'))

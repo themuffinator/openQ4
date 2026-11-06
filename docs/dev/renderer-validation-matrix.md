@@ -352,6 +352,22 @@ pixels:
 
 Half resolution is a close, unbiased approximation on both devices: it
 softens contact edges but neither darkens nor lightens the scene.
+
+### Skin substitutions on packed MD5R, 6 November 2026 (REN-05)
+
+The laboratory fixture ships two skins for its skinned specimen: its PBR metal
+becomes a PBR dielectric (`openq4_pbr_lab/skinned_dielectric`) or a classic
+material (`openq4_pbr_lab/skinned_classic`). They are precached through
+worldspawn `skin_` keys and applied as a spawn key. The controls run on CPU
+skinning and on the packed MD5R conversion (`r_convertMD5toMD5R 1`), in fresh
+processes and in batches, on OpenGL and Vulkan:
+
+- each skin visibly changes the specimen (dielectric about 17, classic 39-43
+  levels mean in the specimen window);
+- the dielectric stays PBR-owned (4,225 ownership pixels, as unskinned), the
+  classic substitute is drawn classically (no ownership pixels);
+- packed MD5R draws both substitutions identically to CPU skinning (0.0 mean
+  difference, as unsubstituted).
 ## Automated Safe Matrix
 
 The modern-visible and low-overhead GL self-tests explicitly request a hidden

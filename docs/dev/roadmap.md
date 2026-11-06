@@ -827,7 +827,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-02 — Partial | Shared material/light contracts and corridors provide foundations. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
 | REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors and cutout casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Translucent receivers under motion; physical platforms. |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
-| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded. | lavapipe residual, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
+| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions on packed MD5R match CPU skinning. | lavapipe residual, mixed-material mods beyond the laboratory, physical Linux/Apple fallback. |
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
@@ -919,8 +919,12 @@ diagnostics establish whole-frame ownership or production performance.
   on classic-only frames with full resolution: OpenGL is exact (one
   resolution), and Vulkan stays within 2.1 (NVIDIA) and 2.9 (Intel) levels
   on average with no bias. See [half resolution](renderer-validation-matrix.md#ssao-parity-controls-6-november-2026-ren-05).
-  Remaining: lavapipe's one-byte difference, mixed-material mods, packed-MD5R
-  skin substitutions and physical Linux/Apple.
+  Skin substitutions on packed MD5R are qualified: laboratory skins swap the
+  skinned specimen's PBR metal for a PBR dielectric or a classic material,
+  and MD5R draws both exactly like CPU skinning on both backends, with PBR
+  ownership kept or released as authored. See [skin substitutions](renderer-validation-matrix.md#skin-substitutions-on-packed-md5r-6-november-2026-ren-05).
+  Remaining: lavapipe's one-byte difference (WSL lavapipe run), authored
+  mixed-material mods beyond the laboratory, and physical Linux/Apple.
 - [ ] **REN-06 — P2, qualification: probes, baked data and advanced effects.**
   Qualify probe capture orientation, generated-grid provenance and whether existing
   baked grids need regeneration after capture fixes. Broaden authored probe/decal
