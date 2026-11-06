@@ -2128,7 +2128,7 @@ static void R_ModernGLExecutor_RecordPacketFallbackBlockers( const idScenePacket
 				continue;
 			}
 			// The classic-lighting corridor owns this view and reproduces the
-			// material's texture matrix exactly (REN-02).
+			// material's vertex colour or texture matrix exactly (REN-02).
 			if ( rg_modernClassicView != NULL && draw.viewDef == rg_modernClassicView
 					&& R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord ) ) {
 				continue;
@@ -6861,8 +6861,8 @@ static bool R_ModernGLExecutor_ForwardPlusMaterialSupported( const modernGLSubmi
 		&& ( materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_BLEND
 			|| materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_ADD
 			|| materialRecord->blendMode == MATERIAL_RESOURCE_BLEND_FILTER );
-	// A corridor-only material's texture matrix belongs to the
-	// classic-lighting corridor, which reproduces it (REN-02).
+	// A corridor-only material's vertex colour and texture matrix belong to
+	// the classic-lighting corridor, which reproduces them (REN-02).
 	const bool corridorOnly = R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord );
 	if ( !corridorOnly && !R_ModernGLExecutor_MaterialContractPromotable( *materialRecord, allowAlphaBlend, decalMaterial, decalMaterial, decalMaterial ) ) {
 		stats.forwardPlusMaterialFallbackDraws++;
@@ -7080,8 +7080,8 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 				|| draw->geometryRecord->deformMode != GEOMETRY_DEFORM_NONE ) { return; }
 		if ( !R_MaterialResourceTable_ClassicCorridorPathEligible( *material ) || command.weaponDepthHack || command.modelDepthHack != 0
 				|| command.negativeScale || ( root != NULL && root != command.viewDef ) ) { return; }
-		// The forward pass adds baked light from the untransformed diffuse, so
-		// corridor-only materials need the grid off.
+		// The forward pass adds baked light from the untransformed, uncoloured
+		// diffuse, so corridor-only materials need the grid off.
 		if ( R_MaterialResourceTable_ClassicCorridorOnly( *material ) && r_useLightGrid.GetBool() ) { return; }
 		root = command.viewDef;
 		extended = extended || !R_MaterialResourceTable_ClassicDiffusePathEligible( *material );

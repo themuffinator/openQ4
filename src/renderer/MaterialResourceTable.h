@@ -413,10 +413,10 @@ bool R_MaterialResourceTable_ClassicModernPathEligible( const materialResourceTa
 // independently qualified lighting owner.
 bool R_MaterialResourceTable_ClassicDiffusePathEligible( const materialResourceTableRecord_t &record );
 bool R_MaterialResourceTable_ClassicFixedPathEligible( const materialResourceTableRecord_t &record );
-// REN-02: the classic fixed class plus the fallback the classic-lighting
-// corridor reproduces exactly (stage texture matrices, which its interaction
-// program applies as ARB2 does). Only that corridor may own such a draw;
-// CorridorOnly is true when it is the only modern owner.
+// REN-02: the classic fixed class plus the two fallbacks the classic-lighting
+// corridor reproduces exactly (stage vertex colour and texture matrices, which
+// its interaction program applies as ARB2 does). Only that corridor may own
+// such a draw; CorridorOnly is true when it is the only modern owner.
 bool R_MaterialResourceTable_ClassicCorridorPathEligible( const materialResourceTableRecord_t &record );
 bool R_MaterialResourceTable_ClassicCorridorOnly( const materialResourceTableRecord_t &record );
 bool R_MaterialResourceTable_ClassicFixedMaterialEligible( const idMaterial *material );

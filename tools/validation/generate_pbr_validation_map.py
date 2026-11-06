@@ -276,7 +276,10 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     mats += [f'{PREFIX}/classic_colored\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap {PREFIX}/copper\n}}\n']
     # REN-02: the classic cutout, a flat-bump diffuse whose stage alpha-tests.
     mats += [f'{PREFIX}/classic_cutout\n{{\nbumpmap _flat\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\n}}\nspecularmap _black\n}}\n']
-    # Corridor-reproducible stage state: a texture matrix on the bump stage (REN-02).
+    # Corridor-reproducible stage state: vertex colour and a texture matrix on
+    # the bump stage (REN-02). An interaction takes its vertex colour from the
+    # last diffuse or specular stage, so both stages carry it.
+    mats += [f'{PREFIX}/classic_vertex\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/grey\nvertexColor\n}}\n{{\nblend specularmap\nmap _white\nvertexColor\n}}\n}}\n']
     mats += [f'{PREFIX}/classic_texmatrix\n{{\n{{\nblend bumpmap\nmap {PREFIX}/normal\nscale 3, 3\n}}\ndiffusemap {PREFIX}/grey\nspecularmap _white\n}}\n']
     # ... and the common stock shape: a bumped, specular cutout.
     mats += [f'{PREFIX}/classic_cutout_bump\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\n}}\nspecularmap _white\n}}\n']
@@ -378,7 +381,7 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     # checks merely because another green PBR surface is visible behind it.
     level = f'Version 3\n{{\n"classname" "worldspawn"\n"mtr_local_global_test" "{PREFIX}/noself_shadow"\n' + ''.join(brush(lo,hi,f'{PREFIX}/classic_floor') for lo,hi in room) + '}\n'
     precache = f'"model_sampling_test" "{SAMPLING_MODEL}"\n"model_skinning_test" "{SKINNING_MODEL}"\n"def_skinning_test" "func_animate"\n"mtr_classic_rejection_test" "{PREFIX}/classic_specular"\n' + ''.join(f'"mtr_sampling_{name}" "{PREFIX}/sampler_{name}"\n' for name in ('nearest','linear','clamp','mips'))
-    precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored','cutout','cutout_bump','texmatrix'))
+    precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored','cutout','cutout_bump','vertex','texmatrix'))
     precache += f'"mtr_extreme_emissive_test" "{PREFIX}/extreme_emissive"\n'
     precache += ''.join(f'"skin_skinning_{name}_test" "{skin}"\n' for name, skin in SKINNING_SKINS.items())
     precache += f'"model_mixed_material_test" "{MIXED_MODEL}"\n'

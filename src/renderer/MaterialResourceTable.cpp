@@ -2546,17 +2546,14 @@ bool R_MaterialResourceTable_ClassicFixedPathEligible( const materialResourceTab
 }
 
 bool R_MaterialResourceTable_ClassicCorridorPathEligible( const materialResourceTableRecord_t &record ) {
-	// Texture matrices only for now: the corridor program also applies stage
-	// vertex colour, but no laboratory capture has yet shown interaction vertex
-	// colour on either owner, so that fallback keeps the frame classic.
-	const unsigned int corridorFallbacks = MATERIAL_RESOURCE_FALLBACK_FLAG_TEXTURE_MATRIX;
+	const unsigned int corridorFallbacks = MATERIAL_RESOURCE_FALLBACK_FLAG_VERTEX_COLOR | MATERIAL_RESOURCE_FALLBACK_FLAG_TEXTURE_MATRIX;
 	if ( ( record.fallbackFlags & ~corridorFallbacks ) != 0
 			|| ( record.fallbackFlags == 0 ) != ( record.fallbackReason == MATERIAL_RESOURCE_FALLBACK_NONE ) ) {
 		return false;
 	}
-	// The forward pass still samples the untransformed diffuse for a cutout's
-	// alpha, so a texture matrix stays out of cutouts.
-	if ( record.hasTextureMatrix && record.alphaTest ) { return false; }
+	// The forward pass still samples the untransformed, uncoloured diffuse for a
+	// cutout's alpha, so neither stays in a cutout.
+	if ( ( record.hasTextureMatrix || record.hasVertexColor ) && record.alphaTest ) { return false; }
 	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
 		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
 	if ( record.hasPBR || record.material == NULL || globalImages == NULL

@@ -175,7 +175,7 @@ overflows (`ClassicInteractionDomain.h`).
     `production-fixed-cutout-bump` / `-native` (`classic_cutout_bump`) runs
     the corridor and matches native ARB2 to a mean of 0.25 and a maximum of
     0.6 levels, with the same 5 bounded edge pixels.
-  - **Texture matrices** become the first fallback that only the corridor
+  - **Texture matrices and vertex colour** become the fallbacks that only the corridor
     may own (`R_MaterialResourceTable_ClassicCorridorPathEligible`, the
     `CorridorOnly` variant). Its interaction program applies the bump,
     diffuse and specular stage matrices as ARB2 does. Such a material now
@@ -189,11 +189,16 @@ overflows (`ClassicInteractionDomain.h`).
     `production-fixed-texmatrix` / `-native` (a 3x scaled bump stage)
     matches native ARB2 to a mean of 0.25 and a maximum of 0.62 levels, and
     the scaled bump visibly changes the surface.
-  - **Vertex colour is not claimed.** The corridor program applies stage
-    vertex colour, but the laboratory's vertex-coloured sphere renders
-    untinted under `vertexColor` on both owners. The fixture therefore does
-    not exercise interaction vertex colour yet, and that fallback still
-    keeps the frame classic.
+  - **Vertex colour** follows once the fixture was right. An interaction
+    takes its vertex colour from the last diffuse or specular stage it
+    processes, so a `vertexColor` diffuse followed by a plain `specularmap`
+    renders untinted. That is the engine's own rule, which the first fixture
+    tripped over. `classic_vertex` carries `vertexColor` on both stages of the
+    vertex-coloured sphere. `production-fixed-vertex` / `-native` then shows
+    the tint (native range 0-148 against 0-176 untinted) and matches native
+    ARB2 to a mean of 0.25 and a maximum of 0.56 levels. Vertex colour is not
+    accepted on cutouts or with a light grid, for the same reasons as texture
+    matrices.
   - The corridor itself still runs only in the laboratory linear-scene mode
     (step 3).
 
@@ -204,8 +209,8 @@ overflows (`ClassicInteractionDomain.h`).
    the stock material shapes that dominate gameplay views:
    - alpha-tested surfaces (flat-diffuse and bumped/specular cutouts are done;
      cutouts in shipped modes wait on step 3);
-   - vertex-coloured surfaces (a fixture that actually tints interactions
-     comes first);
+   - vertex colours on cutouts and with light grids (plain vertex-coloured
+     surfaces are done);
    - condition stages;
    - texture matrices on cutouts and with light grids (plain texture
      matrices are done);

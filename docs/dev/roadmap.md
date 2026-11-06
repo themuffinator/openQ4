@@ -905,13 +905,12 @@ diagnostics establish whole-frame ownership or production performance.
   path (`production-fixed-cutout`, mean 0.28 levels) and bumped, specular
   cutouts through the classic-lighting corridor (`production-fixed-cutout-bump`,
   mean 0.25), each with 5 bounded hole-edge pixels.
-  Texture-matrix materials follow as the first corridor-only fallback
-  (`production-fixed-texmatrix`, mean 0.25 levels). Vertex colour is not yet
-  claimed: the laboratory's vertex-coloured sphere renders untinted under
-  `vertexColor` on both owners.
+  Texture-matrix and vertex-coloured materials follow as corridor-only
+  fallbacks (`production-fixed-texmatrix` and `production-fixed-vertex`,
+  both mean 0.25 levels; an interaction takes its vertex colour from the last
+  diffuse or specular stage, which the fixture now honours).
   Remaining, in order: prove interaction parity for the other dominant stock
-  material shapes (vertex colours, condition stages, multi-stage), qualify
-  ambient lights, run the corridors in shipped modes,
+  material shapes (condition stages, multi-stage), qualify ambient lights, run the corridors in shipped modes,
   represent stencil-fallback and multiple point shadows, reconcile the two
   ownership models, then measure benefit before any promotion.
 - [ ] **REN-03 — P1, qualification and implementation: shadow production scope.**
