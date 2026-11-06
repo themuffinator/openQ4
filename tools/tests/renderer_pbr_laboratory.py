@@ -162,7 +162,7 @@ CASES = {
     'production-rejected-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-fixed{kind}{suffix}': {'r_rendererModernLightingParity':'0','r_hdrToneMap':'1','r_lightScale':'0.1',
           **({'r_pbrMaterials':'0','r_rendererReflectionProbes':'0'} if suffix else {})}
-       for kind in ('','-bump','-diffuse','-colored','-cutout','-cutout-bump','-vertex','-texmatrix','-condition','-multistage') for suffix in ('','-native')},
+       for kind in ('','-bump','-diffuse','-colored','-cutout','-cutout-bump','-vertex','-texmatrix','-condition','-multistage','-ambient') for suffix in ('','-native')},
     'production-curved': {'r_rendererModernLightingParity':'0'},
     'production-curved-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-{light}{suffix}': {'r_rendererModernLightingParity':'0',
@@ -272,7 +272,7 @@ for restart in ('partial','full'):
     CASES[f'skin-gpu-{restart}-restart']=dict(CASES['skin-gpu'])
 # REN-02 step 3: the classic-lighting corridor in a display-referred modern
 # frame (no laboratory linear scene), compared directly with native ARB2.
-DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage')
+DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage', '-ambient')
 for kind in DISPLAY_CORRIDOR_KINDS:
     CASES[f'production-fixed{kind}-display'] = {**CASES[f'production-fixed{kind}'], 'r_pbrLinearScene': '0'}
 # Mixed-material model (REN-05): one skinned mesh, PBR above its equator and
@@ -340,7 +340,7 @@ LEGACY_CASES.update(('production-fixed-colored-native','production-fixed-master-
 LEGACY_CASES.add('production-fixed-grid-native')
 LEGACY_CASES.update(f'production-fixed-{boundary}-native' for boundary in ('shadow','msaa'))
 LEGACY_CASES.update(f'production-{light}-native' for light in ('points','projector'))
-LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native','production-fixed-cutout-native','production-fixed-cutout-bump-native','production-fixed-vertex-native','production-fixed-texmatrix-native','production-fixed-condition-native','production-fixed-multistage-native'))
+LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native','production-fixed-cutout-native','production-fixed-cutout-bump-native','production-fixed-vertex-native','production-fixed-texmatrix-native','production-fixed-condition-native','production-fixed-multistage-native','production-fixed-ambient-native'))
 LEGACY_CASES.update(f'{kind}-{mode}' for kind in ('fog','blend') for mode in ('native','off','fallback-native'))
 LEGACY_CASES.update(('lightgrid-native','lightgrid-off'))
 LEGACY_CASES.update(('lightgrid-pbr-master-off','lightgrid-pbr-native'))
@@ -529,6 +529,8 @@ def digest(path: Path) -> str:
 # A native pass can decline HDR while other native owners remain active.
 # These controls still require native PBR, but deliberately refuse linear exports.
 LINEAR_UNAVAILABLE_CASES: set[str] = set()
+# Display-referred corridor controls have no laboratory linear scene to capture.
+LINEAR_UNAVAILABLE_CASES.update(f'production-fixed{kind}-display' for kind in DISPLAY_CORRIDOR_KINDS)
 
 
 def capture_linear(path: Path) -> array:
@@ -1459,7 +1461,7 @@ def compare_material_captures(results: list[dict]) -> None:
             by_case['production-curved']['classicComparison']=proof
             if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
                 by_case['production-curved']['failures'].append('curved classic surface differs from the native lighting reference')
-    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-grid'):
+    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-grid'):
         if case not in by_case or case+'-native' not in by_case: continue
         modern=by_case[case]
         pfm=Path(modern.get('linearScreenshot',''))
@@ -1536,6 +1538,7 @@ def compare_material_captures(results: list[dict]) -> None:
                              ('production-fixed-vertex','production-fixed-bump','vertex colour'),
                              ('production-fixed-condition','production-fixed-bump','conditioned specular'),
                              ('production-fixed-multistage','production-fixed-bump','second stage set'),
+                             ('production-fixed-ambient','production-fixed-bump','ambient light'),
                              ('production-fixed-grid','production-fixed-grid-clear','baked lighting')):
         if left not in by_case or right not in by_case: continue
         paths=[Path(by_case[name].get('linearScreenshot','')) for name in (left,right)]
@@ -1967,7 +1970,7 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
                             else 'extreme emission entered a linear scene the case did not request')
     if ( case.endswith('-display') and case.startswith('production-fixed') ) and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('the display-referred frame did not run the classic-lighting corridor')
-    if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
+    if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('classic compatibility lighting was not submitted')
     if case.startswith('production-fixed-msaa') and not re.search(r'Renderer AA: MSAA requested=4 effective=4\b',text):
         failures.append('four-sample fallback control did not activate MSAA')
@@ -2324,10 +2327,21 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             if case.startswith('production-fixed-vertex'): material='classic_vertex'
             if case.startswith('production-fixed-condition'): material='classic_condition'
             if case.startswith('production-fixed-multistage'): material='classic_multistage'
+            if case.startswith('production-fixed-ambient'): material='classic_bump'
             commands += ['g_stopTime 0',f'script "${removed}.remove()"','wait 3',
                          f'spawn func_static name pbr_classic model "{lab.VERTEX_COLOR_MODEL if case.startswith("production-fixed-vertex") else lab.MODEL}" shader "{lab.PREFIX}/{material}" origin "100 160 480" solid 0',
                          'wait 30','g_stopTime 1']
             scene_setups.add('classic')
+            # REN-02 step 2: a classic ambient light beside the fixed lights.
+            wants_ambient = case.startswith('production-fixed-ambient')
+            if wants_ambient and 'fixed-ambient' not in scene_setups:
+                commands += ['g_stopTime 0','spawn light name fixed_ambient texture "lights/openq4/pbr_lab/ambient" '
+                             'origin "100 60 480" light_radius "400 400 400" _color "0.25 0.2 0.15" noshadows 1',
+                             'wait 30','g_stopTime 1']
+                scene_setups.add('fixed-ambient')
+            elif not wants_ambient and 'fixed-ambient' in scene_setups:
+                commands += ['g_stopTime 0','script "$fixed_ambient.remove()"','wait 30','g_stopTime 1']
+                scene_setups.discard('fixed-ambient')
         if case.startswith('sampler-'):
             commands += ['g_stopTime 0']
             if 'sampler' in scene_setups:

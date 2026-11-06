@@ -227,6 +227,17 @@ overflows (`ClassicInteractionDomain.h`).
       bounded hole-edge pixels.
     - The baked-grid and linear fog/blend corridors still require the linear
       scene.
+  - **Step 2, ambient lights.** ARB2 never binds its separate ambient
+    program. An ambient light uses the ordinary interaction program, with the
+    ambient normal cube where the normalization cube usually goes.
+    - The corridor now does the same (`R_ModernGLExecutor_CollectClassicInteraction`)
+      and no longer rejects ambient lights.
+    - The proof accepts an ambient light where the corridor owns the classic
+      surfaces. The forward pass alone still does not qualify the cube.
+    - `production-fixed-ambient` adds a classic ambient light to the fixed
+      scene (15 interactions instead of 12). It matches native ARB2 to a mean
+      of 0.25 levels in the linear scene and byte for byte in a display frame
+      (`-display`).
 
 ## What REN-02 has left, in dependency order
 
@@ -245,7 +256,9 @@ overflows (`ClassicInteractionDomain.h`).
    Each shape needs image-level parity evidence against ARB2. The classic-fixed
    class must also count outside the corridor view.
 2. **Qualify ambient lights.** This covers the normalization cube, which today
-   fails the whole proof as soon as any ambient light exists.
+   fails the whole proof as soon as any ambient light exists. Done for classic
+   surfaces the corridor owns; ambient light on PBR surfaces is a PBR parity
+   question outside this proof.
 3. **Run the corridors in shipped modes.** Lift the `r_pbrLinearScene` and
    `r_hdrToneMap` requirement so the classic-lighting, baked-grid and fog/blend
    corridors also run in display-referred frames. The classic-lighting

@@ -2214,11 +2214,14 @@ static bool R_ModernGLExecutor_MaterialLightingProven( const idScenePacketFrame 
 				|| r_celShadingWorld.GetBool() || r_skipDiffuse.GetBool() ) {
 			return false;
 		}
-		// Classic ambient lights use an encoded normalization cube. This
-		// contract qualifies point/projected Lambert lighting, not that cube.
+		// Classic ambient lights use an encoded normalization cube. The forward
+		// pass qualifies point/projected Lambert lighting, not that cube; the
+		// classic-lighting corridor binds the same ambient cube ARB2 does
+		// (REN-02 step 2), so ambient lights are proven only where it owns
+		// the classic surfaces.
 		for ( int i = 0; i < R_ModernClusteredLighting_NumLightDescriptors(); ++i ) {
 			const rendererModernLightDescriptor_t *light = R_ModernClusteredLighting_LightDescriptor( i );
-			if ( light != NULL && light->type == RENDERER_MODERN_LIGHT_AMBIENT ) { return false; }
+			if ( light != NULL && light->type == RENDERER_MODERN_LIGHT_AMBIENT && rg_modernClassicView == NULL ) { return false; }
 		}
 	}
 	return haveSurface;
@@ -7053,10 +7056,13 @@ static void R_ModernGLExecutor_CollectClassicInteraction( const drawInteraction_
 				|| images[i]->GetDeviceHandle() == 0 || images[i]->GetOpts().textureType != TT_2D ) { rg_modernClassicCollectValid = false; return; }
 		primitive.textures[i] = images[i]->GetDeviceHandle();
 	}
-	if ( globalImages->normalCubeMapImage == NULL || !globalImages->normalCubeMapImage->IsLoaded()
-			|| globalImages->normalCubeMapImage->IsDefaulted() || globalImages->normalCubeMapImage->GetDeviceHandle() == 0
-			|| globalImages->normalCubeMapImage->GetOpts().textureType != TT_CUBIC ) { rg_modernClassicCollectValid = false; return; }
-	primitive.textures[5] = globalImages->normalCubeMapImage->GetDeviceHandle();
+	// ARB2 draws an ambient light with the ordinary interaction program and
+	// the ambient normal cube in place of the normalization cube.
+	idImage *cube = backEnd.vLight != NULL && backEnd.vLight->lightShader != NULL && backEnd.vLight->lightShader->IsAmbientLight()
+		? globalImages->ambientNormalMap : globalImages->normalCubeMapImage;
+	if ( cube == NULL || !cube->IsLoaded() || cube->IsDefaulted() || cube->GetDeviceHandle() == 0
+			|| cube->GetOpts().textureType != TT_CUBIC ) { rg_modernClassicCollectValid = false; return; }
+	primitive.textures[5] = cube->GetDeviceHandle();
 	rg_modernClassicPrimitives.Append( primitive );
 }
 
@@ -7110,7 +7116,6 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	rg_modernClassicCollectValid = backEnd.overBright == 1.0f;
 	for ( viewLight_t *light = root->viewLights; light != NULL && rg_modernClassicCollectValid; light = light->next ) {
 		if ( light->lightShader->IsFogLight() || light->lightShader->IsBlendLight() ) { continue; }
-		if ( light->lightShader->IsAmbientLight() ) { rg_modernClassicCollectValid = false; break; }
 		backEnd.vLight = light;
 		const drawSurf_t *chains[] = { light->localInteractions, light->globalInteractions, light->translucentInteractions };
 		for ( int chain = 0; chain < 3; ++chain ) {
