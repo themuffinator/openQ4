@@ -165,7 +165,11 @@ scripted-sequence test but cannot establish static indoor coverage.
 
 The stock `second` entry starts on a moving lift. A 360-frame settling probe
 still moves 68.7 world units during sampling; 720 settling frames reaches the
-stationary landing. The reference script and map were checked byte-for-byte
+stationary landing on a development build. The lift rises in game time, not
+frames: on the optimized 0.14.1 release package at a 240 fps cap, 720 frames
+cover only 3 s and both backends sampled the lift still rising at about 147
+units/s (6 November 2026). Contract `stock-entry-view-v2` therefore follows the
+frame wait with `waitMsec 6000`, and replay requires both. The reference script and map were checked byte-for-byte
 against the installed retail PK4 entries before defining this case.
 
 The harness preserves `sp-storage1` as an explicit first-entry case and adds

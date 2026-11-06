@@ -172,6 +172,10 @@ REQUIRED_SCENES: dict[str, dict[str, Any]] = {
         "entityFilter": "second",
         "viewPolicy": "static-endpoints",
         "minimumSettleFrames": 720,
+        # Frames alone under-settle a fast build: the lift rises in game time,
+        # and 720 frames at a 240 fps cap is only 3 s. Real time follows the
+        # frame wait so the camera has docked before sampling on any build.
+        "minimumSettleMsec": 6000,
     },
     "sp-airdefense1": {
         "mode": "SP",
@@ -1022,12 +1026,13 @@ def scene_view_contract(case_id: str) -> dict[str, Any] | None:
     if not scene.get("entityFilter"):
         return None
     return {
-        "contractId": "stock-entry-view-v1",
+        "contractId": "stock-entry-view-v2",
         "map": scene["map"],
         "entityFilter": scene["entityFilter"],
         "path": scene["path"],
         "viewPolicy": scene["viewPolicy"],
         "minimumSettleFrames": scene.get("minimumSettleFrames", 0),
+        "minimumSettleMsec": scene.get("minimumSettleMsec", 0),
         # viewpos rounds each coordinate/angle to one decimal place. Allow
         # small view bob, but reject an unsettled lift or scripted flight.
         "maxPositionDelta": 1.0 if scene["viewPolicy"] == "static-endpoints" else None,
@@ -1411,6 +1416,7 @@ class BenchmarkConfigEvidence:
     commands: tuple[str, ...]
     capture_mode: str
     settle_frames: int
+    settle_msec: int
     sample_kind: str
     sample_value: int
     role: str
@@ -1489,6 +1495,11 @@ def parse_benchmark_config(text: str) -> BenchmarkConfigEvidence:
         raise ValueError("generated benchmark config has an invalid settle command")
     settle_frames = int(settle_match.group(1))
     cursor += 1
+    settle_msec = 0
+    settle_msec_match = re.fullmatch(r"waitMsec ([1-9][0-9]*)", lines[cursor] if cursor < len(lines) else "")
+    if settle_msec_match is not None:
+        settle_msec = int(settle_msec_match.group(1))
+        cursor += 1
     fixed_before_exec = ["god", "notarget", EXEC_COMMANDS_BEGIN]
     if lines[cursor : cursor + len(fixed_before_exec)] != fixed_before_exec:
         raise ValueError("generated benchmark config pre-exec scaffold differs")
@@ -1575,6 +1586,7 @@ def parse_benchmark_config(text: str) -> BenchmarkConfigEvidence:
         commands=commands,
         capture_mode=capture_mode,
         settle_frames=settle_frames,
+        settle_msec=settle_msec,
         sample_kind=sample_kind,
         sample_value=sample_value,
         role=role,
@@ -1763,9 +1775,10 @@ def build_scripted_capture_lines(
     ]
     for name, value in extra_cvars:
         lines.append(f"set {name} {value}")
+    lines += [POST_MAP_CVARS_END, f"wait {max(1, settle_frames)}"]
+    if scene_contract and scene_contract.get("minimumSettleMsec", 0) > 0:
+        lines.append(f"waitMsec {scene_contract['minimumSettleMsec']}")
     lines += [
-        POST_MAP_CVARS_END,
-        f"wait {max(1, settle_frames)}",
         "god",
         "notarget",
         EXEC_COMMANDS_BEGIN,
@@ -5572,7 +5585,13 @@ def verify_benchmark_report(
                             expected_settle_frames = max(
                                 expected_settle_frames, scene_contract["minimumSettleFrames"]
                             )
-                        if config_evidence.settle_frames != expected_settle_frames:
+                        expected_settle_msec = (
+                            scene_contract.get("minimumSettleMsec", 0) if scene_contract else 0
+                        )
+                        if (
+                            config_evidence.settle_frames != expected_settle_frames
+                            or config_evidence.settle_msec != expected_settle_msec
+                        ):
                             failures.append(
                                 f"{case_id}/{role_name}: benchmark config settle interval differs"
                             )

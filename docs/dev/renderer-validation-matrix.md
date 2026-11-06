@@ -836,8 +836,9 @@ documented in the GPU-animation guide.
 Storage1 has two separate required cases. `sp-storage1` explicitly selects
 `game/storage1 first` and retains the drop-pod sequence. Its endpoint poses are
 recorded without claiming a static camera. `sp-storage1-second` explicitly
-selects `game/storage1 second`, waits at least 720 settling frames, and checks
-both sampling endpoints against the settled lift view: origin
+selects `game/storage1 second`, waits at least 720 settling frames followed by
+6000 real milliseconds (contract `stock-entry-view-v2`), and checks both
+sampling endpoints against the settled lift view: origin
 `(-2592, 2504, 4.2)`, angles `(0, 90, 0)`. Position must remain within one world
 unit and angles within one degree, including the difference between endpoints.
 The stock simulation keeps running; the harness does not teleport or freeze it.

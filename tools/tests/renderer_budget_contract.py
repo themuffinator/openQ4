@@ -1171,6 +1171,8 @@ def test_scene_views(base: Path) -> None:
         evidence = harness.parse_benchmark_config(cfg)
         assert evidence.entity_filter == expected_filter and evidence.scene_map == "game/storage1"
         assert evidence.settle_frames == expected_settle
+        assert evidence.settle_msec == (6000 if expected_filter == "second" else 0)
+        assert harness.parse_benchmark_config(cfg.replace("waitMsec 6000\n", "")).settle_msec == 0
         for mutation in (
             cfg.replace(f"echo {harness.VIEW_END}\n", ""),
             cfg.replace(f"echo {harness.VIEW_BEGIN}\n", f"echo {harness.VIEW_BEGIN}\n" * 2),
