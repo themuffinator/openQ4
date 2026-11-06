@@ -117,11 +117,12 @@ struct Executor {
     bool frameOpen=false,acquireWaitPending=false,displayColorMapped=false;
     bool acquireTimedOut=false; int acquireTimeoutFrame=0;
     int frameSlot=0; uint32_t swapImageIndex=0; VkCommandBuffer cmd=handle<VkCommandBuffer>(4);
-    VkImage frameImage{}; VkImageView frameImageView{}; bool framePresentable=false;
+    VkImage frameImage{}; VkImageView frameImageView{}; bool framePresentable=false,windowless=false;
     vkRing_t vertexRings[2],indexRings[2],uniformRings[2];
     int temporalNativeWidth=0,temporalNativeHeight=0,temporalHistoryGenerationSeen=0;
     VkFormat temporalSwapchainFormat=VK_FORMAT_UNDEFINED,pipelineTargetFormat=VK_FORMAT_R8G8B8A8_UNORM;
-    VkPipeline casterPipeline[2]{},pointCasterPipeline[2]{},displayColorPipeline{};
+    VkPipeline casterPipeline[2]{},pointCasterPipeline[2]{},displayColorPipeline{},displayColorVRPipelines[2]{};
+    VkFormat displayColorVRFormat=VK_FORMAT_UNDEFINED; unsigned displayColorVRMapped=0;
     VkDescriptorPool descriptorPool{}; VkDescriptorSet retiredSets[2][4]{}; int numRetiredSets[2]{};
     void *activeRenderTexture=nullptr,*activeColorEntry=nullptr,*activeDepthEntry=nullptr;
     void *activeColorEntries[4]{};VkImageView activeColorAttachmentViews[4]{};int activeCubeFace=0;
@@ -129,6 +130,12 @@ struct Executor {
     int vertMemo[2]{},idxMemo[2]{},gpuSkinningMemo[2]{};
 PIPELINE_FIELDS
 } vkExec;
+// an eye or the VR virtual screen as the default output; every frame opens on
+// the window, and without a VR frame never without it
+static bool vkExecVROutputActive=false;
+static VkExtent2D VK_Exec_DefaultExtent(){return vkCtx.swapchainExtent;}
+static bool VK_VR_FrameMayOpenWithoutWindow(bool* forced){if(forced)*forced=false;return false;}
+static bool VK_VR_BindWindowStandIn(){assert(!"no VR frame opens without its window here");return false;}
 static bool VK_GuiExecutor_FrameIsOpen(){return vkExec.frameOpen;}
 // Save-preview ownership is covered by the checkpoint capture fixtures.
 static void VK_ConsumeSavePreview(int){}

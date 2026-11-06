@@ -202,6 +202,10 @@ typedef struct vkRing_s {
 typedef struct vkPipelineTarget_s {
 	bool                hdrAccumulation;
 	bool                lowerOrigin;
+	// the OpenXR virtual screen, a layer the compositor blends with
+	// premultiplied alpha: "over" blends accumulate coverage in alpha and every
+	// other blend leaves it, as R_PremultipliedDefaultTargetBound does for GL
+	bool				premultipliedAlpha;
 	uint32_t			colorCount;
 	VkFormat			colorFormats[ VK_MAX_COLOR_ATTACHMENTS ];
 	VkFormat			depthFormat;
@@ -464,6 +468,14 @@ typedef struct vkGuiExecutor_s {
 	VkPipeline			displayColorPipeline;
 	idImage *			displayColorSourceImages[ VK_FRAMES_IN_FLIGHT ];
 	bool				displayColorMapped;
+	// OpenXR targets (vk_VRPresentation.cpp) get their own mapping as the
+	// frame leaves each one: an opaque-eye and a premultiplied-screen
+	// pipeline in the targets' format, per-slot copies per target, and the
+	// targets mapped this frame
+	VkPipeline			displayColorVRPipelines[ 2 ];
+	VkFormat			displayColorVRFormat;
+	idImage *			displayColorVRSourceImages[ VK_FRAMES_IN_FLIGHT ][ VK_EXEC_VR_TARGETS ];
+	unsigned int		displayColorVRMapped;
 	bool				displayColorMappingWarned;
 	VkDescriptorSetLayout setLayout;
 	VkDescriptorSetLayout uboSetLayout;		// one dynamic uniform buffer (interaction block ring)
@@ -551,6 +563,10 @@ typedef struct vkGuiExecutor_s {
 	VkImage				frameImage;
 	VkImageView			frameImageView;
 	bool				framePresentable;
+	// a VR frame opened without the window's image (minimized, occluded, out
+	// of date, r_vkVRWindowlessTest): frameImage is null, nothing binds, copies
+	// or presents the window, and only VR targets are drawn into
+	bool				windowless;
 	VkCommandBuffer		cmd;
 	float				clearColor[ 4 ];
 	int					boundVertexOffset;	// binding-0 ring offset of the last VK_Exec_BindTriGeometry
@@ -706,13 +722,60 @@ VkFrontFace VK_Exec_CanonicalFrontFace() {
 	return VK_Exec_ActiveLowerOrigin() ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
 }
 
+/*
+====================
+Default output
+
+What the executor treats as the window: the frame's image (a swapchain
+image, or this slot's offscreen image while the window is hidden) with this
+slot's depth image, or, while a VR frame renders into an eye or the virtual
+screen, that target's images (vk_VRPresentation.cpp). Everything that draws
+to, copies from or reads back "the back buffer" goes through these; acquire,
+the mirror and present always use the frame's own image.
+====================
+*/
+static vkExecDefaultOutput_t	vkExecVROutput;
+static bool						vkExecVROutputActive = false;
+
+static VkImage VK_Exec_DefaultColorImage( void ) {
+	return vkExecVROutputActive ? vkExecVROutput.color : vkExec.frameImage;
+}
+
+static VkImageView VK_Exec_DefaultColorView( void ) {
+	return vkExecVROutputActive ? vkExecVROutput.colorView : vkExec.frameImageView;
+}
+
+static VkFormat VK_Exec_DefaultColorFormat( void ) {
+	return vkExecVROutputActive ? vkExecVROutput.colorFormat : vkCtx.swapchainFormat;
+}
+
+static VkImage VK_Exec_DefaultDepthImage( void ) {
+	return vkExecVROutputActive ? vkExecVROutput.depth : vkCtx.depthImages[ vkExec.frameSlot ];
+}
+
+static VkImageView VK_Exec_DefaultDepthView( void ) {
+	return vkExecVROutputActive ? vkExecVROutput.depthView : vkCtx.depthViews[ vkExec.frameSlot ];
+}
+
+static VkExtent2D VK_Exec_DefaultExtent( void ) {
+	return vkExecVROutputActive ? vkExecVROutput.extent : vkCtx.swapchainExtent;
+}
+
+// VR targets and hidden-window offscreen images are always created as
+// transfer sources; a swapchain may not be, and a windowless VR frame has none
+static bool VK_Exec_DefaultTransferSrc( void ) {
+	return vkExecVROutputActive
+		|| ( !vkExec.windowless && ( vkCtx.offscreenFrames || vkCtx.swapchainTransferSrc ) );
+}
+
 static vkPipelineTarget_t VK_Exec_SwapchainPipelineTarget( void ) {
 	vkPipelineTarget_t target = {};
 	target.colorCount = 1;
-	target.colorFormats[ 0 ] = vkCtx.swapchainFormat;
+	target.colorFormats[ 0 ] = VK_Exec_DefaultColorFormat();
 	target.depthFormat = vkCtx.depthFormat;
 	target.stencilFormat = vkCtx.depthFormat;
 	target.samples = VK_SAMPLE_COUNT_1_BIT;
+	target.premultipliedAlpha = vkExecVROutputActive && vkExecVROutput.premultipliedAlpha;
 	return target;
 }
 
@@ -744,6 +807,7 @@ static vkPipelineTarget_t VK_Exec_CurrentPipelineTarget( void ) {
 
 static bool VK_Exec_PipelineTargetsMatch( const vkPipelineTarget_t &a, const vkPipelineTarget_t &b ) {
 	return a.hdrAccumulation == b.hdrAccumulation && a.lowerOrigin == b.lowerOrigin
+			&& a.premultipliedAlpha == b.premultipliedAlpha
 			&& a.colorCount == b.colorCount
 			&& memcmp( a.colorFormats, b.colorFormats, a.colorCount * sizeof( VkFormat ) ) == 0
 			&& a.depthFormat == b.depthFormat
@@ -1051,6 +1115,14 @@ static VkPipeline VK_Exec_CreatePipeline( VkShaderModule vertModule, VkShaderMod
 		blendAttachment.srcAlphaBlendFactor = (blendBits & GLS_ALPHA_COVERAGE) ? VK_BLEND_FACTOR_ONE : srcFactor;
 		blendAttachment.dstAlphaBlendFactor = (blendBits & GLS_ALPHA_COVERAGE) ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : dstFactor;
 		blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		if ( target.premultipliedAlpha && !( blendBits & GLS_ALPHA_COVERAGE ) ) {
+			// "over" accumulates the layer's coverage; additive glows and
+			// modulation light or tint the world behind it instead of covering it
+			const bool over = dstFactor == VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
+				&& ( srcFactor == VK_BLEND_FACTOR_SRC_ALPHA || srcFactor == VK_BLEND_FACTOR_ONE );
+			blendAttachment.srcAlphaBlendFactor = over ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ZERO;
+			blendAttachment.dstAlphaBlendFactor = over ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : VK_BLEND_FACTOR_ONE;
+		}
 	}
 
 	VkPipelineColorBlendStateCreateInfo blendState;
@@ -3866,6 +3938,13 @@ void VK_GuiExecutor_Shutdown( void ) {
 	if ( vkExec.displayColorPipeline != VK_NULL_HANDLE ) {
 		vkDestroyPipeline( vkCtx.device, vkExec.displayColorPipeline, NULL );
 	}
+	for ( VkPipeline &pipeline : vkExec.displayColorVRPipelines ) {
+		if ( pipeline != VK_NULL_HANDLE ) {
+			vkDestroyPipeline( vkCtx.device, pipeline, NULL );
+			pipeline = VK_NULL_HANDLE;
+		}
+	}
+	vkExec.displayColorVRFormat = VK_FORMAT_UNDEFINED;
 	if ( vkExec.displayColorFragModule != VK_NULL_HANDLE ) {
 		vkDestroyShaderModule( vkCtx.device, vkExec.displayColorFragModule, NULL );
 	}
@@ -4130,19 +4209,28 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 		}
 		return false;
 	}
+	// A VR frame renders into its own targets, so it goes on without the
+	// window when the window cannot present (minimized, occluded, out of
+	// date) and loses only its mirror; the headset must not freeze.
+	bool windowlessForced = false;
+	const bool mayGoWithoutWindow = VK_VR_FrameMayOpenWithoutWindow( &windowlessForced );
+	bool windowUsable = !windowlessForced;
 	// a failed mid-run recreate tears the swapchain down entirely; keep
 	// retrying until a usable swapchain (with depth images) exists
-	if ( vkCtx.swapchain == VK_NULL_HANDLE || vkCtx.depthImages[ vkCtx.frameSlot ] == VK_NULL_HANDLE
-			|| vkCtx.surfaceLost ) {
+	if ( windowUsable && ( vkCtx.swapchain == VK_NULL_HANDLE || vkCtx.depthImages[ vkCtx.frameSlot ] == VK_NULL_HANDLE
+			|| vkCtx.surfaceLost ) ) {
 		if ( !VK_Device_RecreateSwapchain()
 				|| vkCtx.swapchain == VK_NULL_HANDLE || vkCtx.depthImages[ vkCtx.frameSlot ] == VK_NULL_HANDLE ) {
-			return false;
+			if ( !mayGoWithoutWindow || vkCtx.presentationBlocked ) {
+				return false;
+			}
+			windowUsable = false;
 		}
 	}
 	const bool temporalOutputKnown = vkExec.temporalNativeWidth > 0
 		&& vkExec.temporalNativeHeight > 0
 		&& vkExec.temporalSwapchainFormat != VK_FORMAT_UNDEFINED;
-	if ( temporalOutputKnown
+	if ( windowUsable && temporalOutputKnown
 			&& ( vkExec.temporalNativeWidth != (int)vkCtx.swapchainExtent.width
 				|| vkExec.temporalNativeHeight != (int)vkCtx.swapchainExtent.height
 				|| vkExec.temporalSwapchainFormat != vkCtx.swapchainFormat ) ) {
@@ -4151,11 +4239,13 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 		vkExec.temporalHistoryGenerationSeen =
 			R_TemporalPresentation_HistoryGeneration();
 	}
-	vkExec.temporalNativeWidth = (int)vkCtx.swapchainExtent.width;
-	vkExec.temporalNativeHeight = (int)vkCtx.swapchainExtent.height;
-	vkExec.temporalSwapchainFormat = vkCtx.swapchainFormat;
+	if ( windowUsable ) {
+		vkExec.temporalNativeWidth = (int)vkCtx.swapchainExtent.width;
+		vkExec.temporalNativeHeight = (int)vkCtx.swapchainExtent.height;
+		vkExec.temporalSwapchainFormat = vkCtx.swapchainFormat;
+	}
 	// swapchain format changes (rare) invalidate the pipeline set
-	if ( vkExec.pipelineTargetFormat != vkCtx.swapchainFormat ) {
+	if ( windowUsable && vkExec.pipelineTargetFormat != vkCtx.swapchainFormat ) {
 		const VkResult idle = vkDeviceWaitIdle( vkCtx.device );
 		if ( idle != VK_SUCCESS ) { VK_Device_BlockPresentation( RDP_WAIT_FAILED, idle, "pipeline retirement" ); return false; }
 		for ( int i = 0; i < vkExec.numPipelines; i++ ) {
@@ -4214,6 +4304,13 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 			vkDestroyPipeline( vkCtx.device, vkExec.displayColorPipeline, NULL );
 			vkExec.displayColorPipeline = VK_NULL_HANDLE;
 		}
+		for ( VkPipeline &pipeline : vkExec.displayColorVRPipelines ) {
+			if ( pipeline != VK_NULL_HANDLE ) {
+				vkDestroyPipeline( vkCtx.device, pipeline, NULL );
+				pipeline = VK_NULL_HANDLE;
+			}
+		}
+		vkExec.displayColorVRFormat = VK_FORMAT_UNDEFINED;
 		vkExec.pipelineTargetFormat = vkCtx.swapchainFormat;
 	}
 
@@ -4260,9 +4357,12 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	// something else forced a rebuild. Do it before the acquire, where the old
 	// swapchain is not yet in use this frame. A hidden window's unused
 	// swapchain follows too, so it reports the interval it was asked for.
-	if ( VK_Device_RequestedSwapInterval() != vkCtx.swapInterval ) {
+	if ( windowUsable && VK_Device_RequestedSwapInterval() != vkCtx.swapInterval ) {
 		if ( !VK_Device_RecreateSwapchain() ) {
-			return false;
+			if ( !mayGoWithoutWindow || vkCtx.presentationBlocked ) {
+				return false;
+			}
+			windowUsable = false;
 		}
 	}
 
@@ -4272,48 +4372,73 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	const bool presentable = !vkCtx.offscreenFrames;
 	uint32_t imageIndex = 0;
 	VkResult res = VK_SUCCESS;
-	if ( presentable ) {
+	if ( presentable && windowUsable ) {
 		if ( !VK_Device_ServiceWithheldImages() ) {
-			return false;
+			if ( !mayGoWithoutWindow || vkCtx.presentationBlocked ) {
+				return false;
+			}
+			windowUsable = false;
 		}
+	}
+	if ( presentable && windowUsable ) {
 		// A presentation engine that withholds images (an occluded Wayland
 		// window with FIFO, a compositor stall) must not block the game loop
 		// forever. A timeout acquires nothing and signals nothing, so the frame is
 		// simply skipped and retried; normal acquisition returns well within it.
-		const uint64_t acquireTimeout = 1000000000ull;
+		// A VR frame does not wait for the window at all: the headset paces it.
+		const uint64_t acquireTimeout = mayGoWithoutWindow ? 0ull : 1000000000ull;
 		const unsigned long long acquireBegin = timingEnabled ? R_RendererMetrics_CpuClock() : 0;
 		res = vkAcquireNextImageKHR( vkCtx.device, vkCtx.swapchain, acquireTimeout,
 				vkCtx.acquireSemaphores[ slot ], VK_NULL_HANDLE, &imageIndex );
 		R_RendererMetrics_EndWaitPhase( RENDERER_WAIT_SWAPCHAIN_IMAGE, acquireBegin );
 		if ( res == VK_ERROR_OUT_OF_DATE_KHR ) {
 			if ( !VK_Device_RecreateSwapchain() ) {
+				if ( !mayGoWithoutWindow || vkCtx.presentationBlocked ) {
+					return false;
+				}
+				windowUsable = false;
+			} else {
+				const unsigned long long retryBegin = timingEnabled ? R_RendererMetrics_CpuClock() : 0;
+				res = vkAcquireNextImageKHR( vkCtx.device, vkCtx.swapchain, acquireTimeout,
+						vkCtx.acquireSemaphores[ slot ], VK_NULL_HANDLE, &imageIndex );
+				R_RendererMetrics_EndWaitPhase( RENDERER_WAIT_SWAPCHAIN_IMAGE, retryBegin );
+			}
+		}
+	}
+	if ( presentable && windowUsable ) {
+		if ( res == VK_TIMEOUT || res == VK_NOT_READY ) {
+			if ( !mayGoWithoutWindow ) {
+				R_DisplayPresentationFailed( RDP_ACQUIRE_FAILED, (int32_t)res );
+				vkExec.acquireTimedOut = true;
+				vkExec.acquireTimeoutFrame = backEnd.frameCount;
 				return false;
 			}
-			const unsigned long long retryBegin = timingEnabled ? R_RendererMetrics_CpuClock() : 0;
-			res = vkAcquireNextImageKHR( vkCtx.device, vkCtx.swapchain, acquireTimeout,
-					vkCtx.acquireSemaphores[ slot ], VK_NULL_HANDLE, &imageIndex );
-			R_RendererMetrics_EndWaitPhase( RENDERER_WAIT_SWAPCHAIN_IMAGE, retryBegin );
-		}
-		if ( res == VK_TIMEOUT || res == VK_NOT_READY ) {
-			R_DisplayPresentationFailed( RDP_ACQUIRE_FAILED, (int32_t)res );
-			vkExec.acquireTimedOut = true;
-			vkExec.acquireTimeoutFrame = backEnd.frameCount;
-			return false;
-		}
-		if ( res == VK_ERROR_SURFACE_LOST_KHR ) {
+			// the window has no image ready; the headset does not wait for it
+			windowUsable = false;
+		} else if ( res == VK_ERROR_SURFACE_LOST_KHR ) {
 			// Nothing was acquired; rebuild the surface and retry next frame.
 			R_DisplayPresentationFailed( RDP_ACQUIRE_FAILED, (int32_t)res );
 			(void)VK_Device_RecoverSurface();
-			return false;
-		}
-		if ( res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR ) {
-			if ( res == VK_ERROR_DEVICE_LOST ) VK_Device_BlockPresentation( RDP_ACQUIRE_FAILED, res, "frame acquire" );
-			else R_DisplayPresentationFailed( RDP_ACQUIRE_FAILED, (int32_t)res );
-			return false;
+			if ( !mayGoWithoutWindow || vkCtx.presentationBlocked ) {
+				return false;
+			}
+			windowUsable = false;
+		} else if ( res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR ) {
+			if ( res == VK_ERROR_DEVICE_LOST ) {
+				VK_Device_BlockPresentation( RDP_ACQUIRE_FAILED, res, "frame acquire" );
+				return false;
+			}
+			R_DisplayPresentationFailed( RDP_ACQUIRE_FAILED, (int32_t)res );
+			if ( !mayGoWithoutWindow ) {
+				return false;
+			}
+			windowUsable = false;
 		}
 	}
-	const VkImage frameImage = presentable ? vkCtx.swapchainImages[ imageIndex ] : vkCtx.offscreenImages[ slot ];
-	const VkImageView frameImageView = presentable ? vkCtx.swapchainViews[ imageIndex ] : vkCtx.offscreenViews[ slot ];
+	const VkImage frameImage = !windowUsable ? VK_NULL_HANDLE
+		: presentable ? vkCtx.swapchainImages[ imageIndex ] : vkCtx.offscreenImages[ slot ];
+	const VkImageView frameImageView = !windowUsable ? VK_NULL_HANDLE
+		: presentable ? vkCtx.swapchainViews[ imageIndex ] : vkCtx.offscreenViews[ slot ];
 
 	VkCommandBuffer cmd = vkCtx.commandBuffers[ slot ];
 	VkCommandBufferBeginInfo cbbi;
@@ -4367,29 +4492,44 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
 	dep.imageMemoryBarrierCount = 2;
 	dep.pImageMemoryBarriers = toAttachment;
-	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
-	vkCmdPipelineBarrier2( cmd, &dep );
+	if ( windowUsable ) {
+		if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
+		vkCmdPipelineBarrier2( cmd, &dep );
+	}
 
 	vkExec.frameSlot = slot;
 	vkExec.swapImageIndex = imageIndex;
 	vkExec.frameImage = frameImage;
 	vkExec.frameImageView = frameImageView;
-	vkExec.framePresentable = presentable;
+	vkExec.framePresentable = presentable && windowUsable;
+	vkExec.windowless = !windowUsable;
 	vkExec.cmd = cmd;
+	// every frame opens on the window; a VR frame then moves to its targets
+	vkExecVROutputActive = false;
 	vkExec.activeRenderTexture = NULL;
 	vkExec.activeCubeFace = 0;
 	memset( vkExec.activeColorEntries, 0, sizeof( vkExec.activeColorEntries ) );
 	vkExec.activeDepthEntry = NULL;
 	memset( vkExec.activeColorAttachmentViews, 0, sizeof( vkExec.activeColorAttachmentViews ) );
 	vkExec.activeColorAttachmentViews[ 0 ] = frameImageView;
-	vkExec.activeDepthAttachmentView = vkCtx.depthViews[ slot ];
+	vkExec.activeDepthAttachmentView = windowUsable ? vkCtx.depthViews[ slot ] : VK_NULL_HANDLE;
 	vkExec.activeExtent = vkCtx.swapchainExtent;
 	vkExec.activePipelineTarget = VK_Exec_SwapchainPipelineTarget();
 	vkExec.frameOpen = true;
-	// An offscreen frame acquired nothing, so its submission waits on nothing.
-	vkExec.acquireWaitPending = presentable;
+	// An offscreen or windowless frame acquired nothing, so its submission
+	// waits on nothing.
+	vkExec.acquireWaitPending = presentable && windowUsable;
 	vkExec.displayColorMapped = false;
-	VK_Exec_BeginMainRendering( true );
+	vkExec.displayColorVRMapped = 0;
+	if ( windowUsable ) {
+		VK_Exec_BeginMainRendering( true );
+	} else {
+		static bool reported = false;
+		if ( !reported ) {
+			common->Printf( "Vulkan: a VR frame went on without the window's image (the mirror waits for it)\n" );
+			reported = true;
+		}
+	}
 
 	vkExec.vertexRings[ slot ].cursor = 0;
 	vkExec.indexRings[ slot ].cursor = 0;
@@ -4404,6 +4544,15 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	memset( vkExec.idxMemo, 0, sizeof( vkExec.idxMemo ) );
 	memset( vkExec.gpuSkinningMemo, 0, sizeof( vkExec.gpuSkinningMemo ) );
 	vkSharedGeometryCheckpoint.active = false;
+	// What a windowless VR frame draws before its first target switch lands
+	// on the virtual screen, as an ordinary frame's lands on the window.
+	if ( !windowUsable && !VK_VR_BindWindowStandIn() ) {
+		static bool warned = false;
+		if ( !warned ) {
+			common->Warning( "Vulkan: a windowless VR frame has no virtual screen to draw into" );
+			warned = true;
+		}
+	}
 	return true;
 }
 
@@ -4435,7 +4584,7 @@ static void VK_Exec_BarrierActiveTargetForLoad( void ) {
 		barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 		barrier.oldLayout = barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.image = entry != NULL ? entry->image : vkExec.frameImage;
+		barrier.image = entry != NULL ? entry->image : VK_Exec_DefaultColorImage();
 		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		barrier.subresourceRange.baseArrayLayer = entry != NULL && entry->isCube ? (uint32_t)vkExec.activeCubeFace : 0;
 		barrier.subresourceRange.levelCount = barrier.subresourceRange.layerCount = 1;
@@ -4450,7 +4599,7 @@ static void VK_Exec_BarrierActiveTargetForLoad( void ) {
 		barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		barrier.oldLayout = barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.image = entry != NULL ? entry->image : vkCtx.depthImages[ vkExec.frameSlot ];
+		barrier.image = entry != NULL ? entry->image : VK_Exec_DefaultDepthImage();
 		barrier.subresourceRange.aspectMask = entry != NULL ? entry->aspectMask
 				: VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		barrier.subresourceRange.baseArrayLayer = entry != NULL && entry->isCube ? (uint32_t)vkExec.activeCubeFace : 0;
@@ -4661,7 +4810,7 @@ static void VK_Exec_TransitionSwapchain( VkImageLayout oldLayout, VkImageLayout 
 	VK_Exec_LayoutAccess( newLayout, barrier.dstStageMask, barrier.dstAccessMask );
 	barrier.oldLayout = oldLayout;
 	barrier.newLayout = newLayout;
-	barrier.image = vkExec.frameImage;
+	barrier.image = VK_Exec_DefaultColorImage();
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	barrier.subresourceRange.levelCount = 1;
 	barrier.subresourceRange.layerCount = 1;
@@ -4686,7 +4835,7 @@ static void VK_Exec_TransitionSwapchainDepth( VkImageLayout oldLayout, VkImageLa
 	VK_Exec_LayoutAccess( newLayout, barrier.dstStageMask, barrier.dstAccessMask );
 	barrier.oldLayout = oldLayout;
 	barrier.newLayout = newLayout;
-	barrier.image = vkCtx.depthImages[ vkExec.frameSlot ];
+	barrier.image = VK_Exec_DefaultDepthImage();
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 	barrier.subresourceRange.levelCount = 1;
 	barrier.subresourceRange.layerCount = 1;
@@ -4747,6 +4896,10 @@ bool VK_Exec_SetRenderTarget( idRenderTexture *renderTexture, int cubeFace, bool
 	if ( !VK_GuiExecutor_BeginFrame() ) {
 		return false;
 	}
+	// a windowless VR frame has no window to bind, only its VR targets
+	if ( renderTexture == NULL && vkExec.windowless && !vkExecVROutputActive ) {
+		return false;
+	}
 	vkRenderTargetAttachments_t attachments = {};
 	if ( renderTexture != NULL ) {
 		if ( !renderTexture->EnsureDeviceHandle()
@@ -4755,9 +4908,9 @@ bool VK_Exec_SetRenderTarget( idRenderTexture *renderTexture, int cubeFace, bool
 		}
 	} else {
 		attachments.colorCount = 1;
-		attachments.colorViews[ 0 ] = vkExec.frameImageView;
-		attachments.depthView = vkCtx.depthViews[ vkExec.frameSlot ];
-		attachments.extent = vkCtx.swapchainExtent;
+		attachments.colorViews[ 0 ] = VK_Exec_DefaultColorView();
+		attachments.depthView = VK_Exec_DefaultDepthView();
+		attachments.extent = VK_Exec_DefaultExtent();
 		attachments.samples = VK_SAMPLE_COUNT_1_BIT;
 	}
 	// A target object can gain attachments or have its images reallocated
@@ -4800,10 +4953,48 @@ bool VK_Exec_SetRenderTarget( idRenderTexture *renderTexture, int cubeFace, bool
 		vkExec.activePipelineTarget.samples = attachments.samples;
 		VK_Exec_TransitionActiveTargetToAttachments();
 	} else {
-		vkExec.activeExtent = vkCtx.swapchainExtent;
+		vkExec.activeExtent = VK_Exec_DefaultExtent();
 		vkExec.activePipelineTarget = VK_Exec_SwapchainPipelineTarget();
 	}
 	return VK_Exec_BeginMainRendering( false );
+}
+
+/*
+====================
+VK_Exec_SetDefaultOutput
+
+OpenXR: an eye or the virtual screen becomes the window for what follows
+(vk_VRPresentation.cpp), or NULL the swapchain image again. The scope that
+records into the old output ends; the default target is then bound on the new
+one, its contents loaded.
+====================
+*/
+bool VK_Exec_SetDefaultOutput( const vkExecDefaultOutput_t *output ) {
+	if ( !vkExec.frameOpen ) {
+		return false;
+	}
+	if ( vkExec.activeRenderTexture == NULL ) {
+		VK_Exec_EndMainRendering();
+	}
+	if ( output != NULL ) {
+		vkExecVROutput = *output;
+		vkExecVROutputActive = true;
+	} else {
+		vkExecVROutputActive = false;
+	}
+	return VK_Exec_SetRenderTarget( NULL );
+}
+
+VkImage VK_Exec_SwapchainImage( void ) {
+	return vkExec.frameOpen && !vkExec.windowless ? vkExec.frameImage : VK_NULL_HANDLE;
+}
+
+VkCommandBuffer VK_Exec_SuspendRendering( void ) {
+	if ( !vkExec.frameOpen || vkExec.cmd == VK_NULL_HANDLE ) {
+		return VK_NULL_HANDLE;
+	}
+	VK_Exec_EndMainRendering();
+	return vkExec.cmd;
 }
 
 int VK_Exec_ActiveFramebufferWidth( void ) {
@@ -4988,8 +5179,8 @@ static bool VK_TemporalPresentation_RootCoversNativeOutput(
 	const int width = rootView->viewport.x2 - rootView->viewport.x1 + 1;
 	const int height = rootView->viewport.y2 - rootView->viewport.y1 + 1;
 	return rootView->viewport.x1 == 0 && rootView->viewport.y1 == 0
-		&& width == (int)vkCtx.swapchainExtent.width
-		&& height == (int)vkCtx.swapchainExtent.height;
+		&& width == (int)VK_Exec_DefaultExtent().width
+		&& height == (int)VK_Exec_DefaultExtent().height;
 }
 
 // Direct engine captures (envshot/probe faces) do not pass through the game's
@@ -5001,8 +5192,8 @@ static bool VK_TemporalPresentation_HDRCaptureInFrame( const viewDef_t *view ) {
 	return tr.takingScreenshot && VK_PostProcess_HDRSceneRequested() && view != NULL
 		&& view->viewport.x1 >= 0 && view->viewport.y1 >= 0
 		&& view->viewport.x2 >= view->viewport.x1 && view->viewport.y2 >= view->viewport.y1
-		&& view->viewport.x2 < (int)vkCtx.swapchainExtent.width
-		&& view->viewport.y2 < (int)vkCtx.swapchainExtent.height;
+		&& view->viewport.x2 < (int)VK_Exec_DefaultExtent().width
+		&& view->viewport.y2 < (int)VK_Exec_DefaultExtent().height;
 }
 
 // Every opt-in shared adapter that the 3D walk gates on a native scene.
@@ -5024,8 +5215,8 @@ static bool VK_TemporalPresentation_BackendSceneRequested(
 	const temporalPresentationFrameState_t &presentation =
 		R_TemporalPresentation_GetFrameState();
 	if ( presentation.frameNumber != backEnd.frameCount
-			|| presentation.nativeWidth != (int)vkCtx.swapchainExtent.width
-			|| presentation.nativeHeight != (int)vkCtx.swapchainExtent.height
+			|| presentation.nativeWidth != (int)VK_Exec_DefaultExtent().width
+			|| presentation.nativeHeight != (int)VK_Exec_DefaultExtent().height
 			|| presentation.sceneWidth <= 0 || presentation.sceneHeight <= 0 ) {
 		return false;
 	}
@@ -5421,7 +5612,7 @@ static bool VK_TemporalPresentation_BlitSupported( VkFormat sourceFormat,
 	vkGetPhysicalDeviceFormatProperties( vkCtx.physicalDevice,
 		sourceFormat, &sourceProperties );
 	vkGetPhysicalDeviceFormatProperties( vkCtx.physicalDevice,
-		vkCtx.swapchainFormat, &destinationProperties );
+		VK_Exec_DefaultColorFormat(), &destinationProperties );
 	if ( ( sourceProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT ) == 0
 			|| ( destinationProperties.optimalTilingFeatures
 				& VK_FORMAT_FEATURE_BLIT_DST_BIT ) == 0 ) {
@@ -5676,8 +5867,8 @@ static bool VK_TemporalPresentation_ResolvePendingSceneTemporal(
 	if ( viewDef == NULL || !presentation.temporalAARequested || captureFrame ) {
 		return false;
 	}
-	const int outputWidth = static_cast<int>( vkCtx.swapchainExtent.width );
-	const int outputHeight = static_cast<int>( vkCtx.swapchainExtent.height );
+	const int outputWidth = static_cast<int>( VK_Exec_DefaultExtent().width );
+	const int outputHeight = static_cast<int>( VK_Exec_DefaultExtent().height );
 	if ( outputWidth <= 0 || outputHeight <= 0
 			|| !VK_TemporalPresentation_EnsureDirectHistoryTargets(
 				outputWidth, outputHeight ) ) {
@@ -5873,12 +6064,12 @@ static bool VK_TemporalPresentation_CompositePendingScene( void ) {
 	region.srcOffsets[1].z = 1;
 	region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	region.dstSubresource.layerCount = 1;
-	region.dstOffsets[1].x = static_cast<int32_t>( vkCtx.swapchainExtent.width );
-	region.dstOffsets[1].y = static_cast<int32_t>( vkCtx.swapchainExtent.height );
+	region.dstOffsets[1].x = static_cast<int32_t>( VK_Exec_DefaultExtent().width );
+	region.dstOffsets[1].y = static_cast<int32_t>( VK_Exec_DefaultExtent().height );
 	region.dstOffsets[1].z = 1;
 	vkCmdBlitImage( vkExec.cmd, sceneColor->image,
 		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		vkExec.frameImage,
+		VK_Exec_DefaultColorImage(),
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, filter );
 
 	VK_Exec_TransitionImage( sceneColor, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
@@ -5916,8 +6107,8 @@ static bool VK_TemporalPresentation_BeginView( const viewDef_t *viewDef,
 			R_TemporalPresentation_GetFrameState();
 		if ( presentation.frameNumber != backEnd.frameCount
 				|| !VK_TemporalPresentation_RootCoversNativeOutput( rootView )
-				|| presentation.nativeWidth != (int)vkCtx.swapchainExtent.width
-				|| presentation.nativeHeight != (int)vkCtx.swapchainExtent.height
+				|| presentation.nativeWidth != (int)VK_Exec_DefaultExtent().width
+				|| presentation.nativeHeight != (int)VK_Exec_DefaultExtent().height
 				|| presentation.sceneWidth != (int)vkExec.activeExtent.width
 				|| presentation.sceneHeight != (int)vkExec.activeExtent.height ) {
 			return false;
@@ -5938,8 +6129,8 @@ static bool VK_TemporalPresentation_BeginView( const viewDef_t *viewDef,
 				|| vkExec.temporalResolveFragModule == VK_NULL_HANDLE
 				|| VK_TemporalPresentation_GetResolvePipeline() == VK_NULL_HANDLE ) { return false; }
 		captureScene = true;
-		targetWidth = (int)vkCtx.swapchainExtent.width;
-		targetHeight = (int)vkCtx.swapchainExtent.height;
+		targetWidth = (int)VK_Exec_DefaultExtent().width;
+		targetHeight = (int)VK_Exec_DefaultExtent().height;
 	}
 	if ( !VK_TemporalPresentation_EnsureSceneTarget(
 				targetWidth, targetHeight ) ) {
@@ -6045,15 +6236,15 @@ bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 		if ( vkExec.activeRenderTexture != NULL && sourceEntry == NULL ) {
 			return false;
 		}
-		sourceImage = sourceEntry != NULL ? sourceEntry->image : vkCtx.depthImages[ vkExec.frameSlot ];
+		sourceImage = sourceEntry != NULL ? sourceEntry->image : VK_Exec_DefaultDepthImage();
 		sourceFormat = sourceEntry != NULL ? sourceEntry->format : vkCtx.depthFormat;
 	} else {
 		sourceEntry = vkExec.activeRenderTexture != NULL ? vkExec.activeColorEntries[ 0 ] : NULL;
 		if ( vkExec.activeRenderTexture != NULL && sourceEntry == NULL ) {
 			return false;
 		}
-		sourceImage = sourceEntry != NULL ? sourceEntry->image : vkExec.frameImage;
-		sourceFormat = sourceEntry != NULL ? sourceEntry->format : vkCtx.swapchainFormat;
+		sourceImage = sourceEntry != NULL ? sourceEntry->image : VK_Exec_DefaultColorImage();
+		sourceFormat = sourceEntry != NULL ? sourceEntry->format : VK_Exec_DefaultColorFormat();
 	}
 	const uint32_t sourceLayer = sourceEntry != NULL && sourceEntry->isCube
 			? (uint32_t)vkExec.activeCubeFace : 0;
@@ -6066,7 +6257,7 @@ bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 	const bool resolveDepthSource = copyDepth && sourceEntry != NULL
 		&& sourceEntry->samples != VK_SAMPLE_COUNT_1_BIT;
 	if ( sourceImage == VK_NULL_HANDLE
-			|| ( sourceEntry == NULL && !copyDepth && !vkCtx.swapchainTransferSrc )
+			|| ( sourceEntry == NULL && !copyDepth && !VK_Exec_DefaultTransferSrc() )
 			|| ( sourceEntry != NULL && ( sourceEntry->usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) == 0 )
 			|| ( resolveDepthSource && VK_Exec_DepthResolveMode() == VK_RESOLVE_MODE_NONE ) ) {
 		return false;
@@ -6122,7 +6313,7 @@ bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 	} else if ( sourceEntry != NULL ) {
 		VK_Exec_TransitionImage( sourceEntry, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
 	} else if ( !copyDepth ) {
-		if ( !vkCtx.swapchainTransferSrc ) {
+		if ( !VK_Exec_DefaultTransferSrc() ) {
 			VK_Exec_BeginMainRendering( false );
 			return false;
 		}
@@ -6879,7 +7070,7 @@ bool VK_Exec_QueueStencilReadback( int mode, const char **failure ) {
 	if ( depthEntry == NULL ) {
 		VK_Exec_TransitionSwapchainDepth( VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
-		VK_Exec_CopyStencilToBuffer( vkCtx.depthImages[ slot ], readback->buffer, width, height );
+		VK_Exec_CopyStencilToBuffer( VK_Exec_DefaultDepthImage(), readback->buffer, width, height );
 		VK_Exec_TransitionSwapchainDepth( VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 	} else if ( depthEntry->samples == VK_SAMPLE_COUNT_1_BIT ) {
@@ -7155,8 +7346,25 @@ static bool VK_DisplayColorMapping_Failed( const char *reason ) {
 }
 
 static VkPipeline VK_DisplayColorMapping_GetPipeline( void ) {
-	if ( vkExec.displayColorPipeline != VK_NULL_HANDLE ) {
-		return vkExec.displayColorPipeline;
+	// a VR target's pipeline follows its format and alpha compositing
+	VkPipeline *cached = &vkExec.displayColorPipeline;
+	if ( vkExecVROutputActive ) {
+		if ( vkExec.displayColorVRFormat != vkExecVROutput.colorFormat ) {
+			for ( VkPipeline &pipeline : vkExec.displayColorVRPipelines ) {
+				if ( pipeline != VK_NULL_HANDLE ) {
+					// a new session's swapchains have another format; the frame
+					// draws all its targets in one, so only earlier frames used it
+					(void)vkQueueWaitIdle( vkCtx.graphicsQueue );
+					vkDestroyPipeline( vkCtx.device, pipeline, NULL );
+					pipeline = VK_NULL_HANDLE;
+				}
+			}
+			vkExec.displayColorVRFormat = vkExecVROutput.colorFormat;
+		}
+		cached = &vkExec.displayColorVRPipelines[ vkExecVROutput.premultipliedAlpha ? 1 : 0 ];
+	}
+	if ( *cached != VK_NULL_HANDLE ) {
+		return *cached;
 	}
 	if ( vkExec.displayColorFragModule == VK_NULL_HANDLE ) {
 		VkShaderModuleCreateInfo info;
@@ -7172,11 +7380,11 @@ static VkPipeline VK_DisplayColorMapping_GetPipeline( void ) {
 	VkPipelineVertexInputStateCreateInfo vertexInput;
 	memset( &vertexInput, 0, sizeof( vertexInput ) );
 	vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vkExec.displayColorPipeline = VK_Exec_CreatePipeline(
+	*cached = VK_Exec_CreatePipeline(
 		vkExec.temporalResolveVertModule, vkExec.displayColorFragModule,
 		&vertexInput, GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO,
 		vkExec.pipelineLayout, false, false, VK_Exec_SwapchainPipelineTarget() );
-	return vkExec.displayColorPipeline;
+	return *cached;
 }
 
 // Final display correction is deliberately independent of scene post effects.
@@ -7185,11 +7393,25 @@ static VkPipeline VK_DisplayColorMapping_GetPipeline( void ) {
 static bool VK_DisplayColorMapping_Apply( void ) {
 	const float brightness = idMath::ClampFloat( 0.0f, 16.0f, r_brightness.GetFloat() );
 	const float gamma = Max( r_gamma.GetFloat(), 0.001f );
-	if ( vkExec.displayColorMapped || ( idMath::Fabs( brightness - 1.0f ) <= 0.0001f
+	// A VR eye or virtual screen stands in for the window and is mapped once,
+	// as the frame leaves it (vk_VRPresentation.cpp) or a capture reads it, as
+	// OpenGL's VR targets are; the window then holds only the mirror of
+	// mapped targets
+	const int vrTarget = vkExecVROutputActive ? vkExecVROutput.vrTarget : -1;
+	// a windowless VR frame presents no window
+	if ( vrTarget < 0 && vkExec.windowless ) {
+		return true;
+	}
+	const bool mapped = vrTarget >= 0 ? ( vkExec.displayColorVRMapped & ( 1u << vrTarget ) ) != 0
+		: vkExec.displayColorMapped;
+	if ( mapped || ( idMath::Fabs( brightness - 1.0f ) <= 0.0001f
 			&& idMath::Fabs( gamma - 1.0f ) <= 0.0001f ) ) {
 		return true;
 	}
-	if ( !vkExec.frameOpen || !vkCtx.swapchainTransferSrc ) {
+	if ( vkExecVROutputActive && ( vrTarget < 0 || vrTarget >= VK_EXEC_VR_TARGETS ) ) {
+		return VK_DisplayColorMapping_Failed( "unknown VR target" );
+	}
+	if ( !vkExec.frameOpen || !VK_Exec_DefaultTransferSrc() ) {
 		return VK_DisplayColorMapping_Failed( "swapchain copy unavailable" );
 	}
 	if ( vkExec.temporalScenePendingComposite
@@ -7203,14 +7425,17 @@ static bool VK_DisplayColorMapping_Apply( void ) {
 	if ( pipeline == VK_NULL_HANDLE ) {
 		return VK_DisplayColorMapping_Failed( "display shader/pipeline unavailable" );
 	}
-	const int width = (int)vkCtx.swapchainExtent.width;
-	const int height = (int)vkCtx.swapchainExtent.height;
-	idImage *&source = vkExec.displayColorSourceImages[ vkExec.frameSlot ];
+	const int width = (int)VK_Exec_DefaultExtent().width;
+	const int height = (int)VK_Exec_DefaultExtent().height;
+	idImage *&source = vrTarget >= 0 ? vkExec.displayColorVRSourceImages[ vkExec.frameSlot ][ vrTarget ]
+		: vkExec.displayColorSourceImages[ vkExec.frameSlot ];
 	if ( source == NULL || !source->IsLoaded() ) {
 		idImageOpts opts;
 		opts.width = width; opts.height = height; opts.format = FMT_RGBA8;
 		opts.numLevels = 1; opts.numMSAASamples = 0; opts.isPersistant = true;
-		source = globalImages->ScratchImage( va( "_vkDisplayColorSource%d", vkExec.frameSlot ),
+		source = globalImages->ScratchImage( vrTarget >= 0
+				? va( "_vkDisplayColorVRSource%d_%d", vkExec.frameSlot, vrTarget )
+				: va( "_vkDisplayColorSource%d", vkExec.frameSlot ),
 			&opts, TF_NEAREST, TR_CLAMP, TD_DEFAULT );
 	}
 	if ( source == NULL ) {
@@ -7234,7 +7459,7 @@ static bool VK_DisplayColorMapping_Apply( void ) {
 	viewport.width = (float)width; viewport.height = (float)height; viewport.maxDepth = 1.0f;
 	VkRect2D scissor;
 	memset( &scissor, 0, sizeof( scissor ) );
-	scissor.extent = vkCtx.swapchainExtent;
+	scissor.extent = VK_Exec_DefaultExtent();
 	vkCmdSetViewport( vkExec.cmd, 0, 1, &viewport );
 	vkCmdSetScissor( vkExec.cmd, 0, 1, &scissor );
 	vkCmdSetDepthTestEnable( vkExec.cmd, VK_FALSE );
@@ -7252,9 +7477,32 @@ static bool VK_DisplayColorMapping_Apply( void ) {
 	vkCmdPushConstants( vkExec.cmd, vkExec.pipelineLayout,
 		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( mapping ), mapping );
 	vkCmdDraw( vkExec.cmd, 3, 1, 0, 0 );
-	vkExec.displayColorMapped = true;
+	if ( vrTarget >= 0 ) {
+		vkExec.displayColorVRMapped |= 1u << vrTarget;
+	} else {
+		vkExec.displayColorMapped = true;
+	}
 	vkExec.displayColorMappingWarned = false;
 	return true;
+}
+
+/*
+====================
+VK_Exec_MapDefaultOutputColor / VK_Exec_MarkWindowColorMapped
+
+OpenXR: a VR target is finished with the display mapping that the window
+otherwise gets at present. The window then holds only the mirror of finished
+targets, so it is not mapped a second time.
+====================
+*/
+bool VK_Exec_MapDefaultOutputColor( void ) {
+	return VK_DisplayColorMapping_Apply();
+}
+
+void VK_Exec_MarkWindowColorMapped( void ) {
+	if ( vkExec.frameOpen ) {
+		vkExec.displayColorMapped = true;
+	}
 }
 
 /*
@@ -7285,16 +7533,17 @@ bool RB_RequestSavePreview() {
 }
 
 void RB_QueueSavePreview() {
-	if ( vkSavePreview.state != 1 || !vkExec.frameOpen ) return;
+	if ( vkSavePreview.state != 1 || !vkExec.frameOpen || VK_Exec_DefaultColorImage() == VK_NULL_HANDLE ) return;
 	vkSavePreview.state = -1;
-	vkSavePreview.width = (int)vkCtx.swapchainExtent.width;
-	vkSavePreview.height = (int)vkCtx.swapchainExtent.height;
+	vkSavePreview.width = (int)VK_Exec_DefaultExtent().width;
+	vkSavePreview.height = (int)VK_Exec_DefaultExtent().height;
 	const int64 pixels = (int64)vkSavePreview.width * vkSavePreview.height;
 	if ( pixels <= 0 || pixels > 33554432 ) return;
-	vkSavePreview.bgra = vkCtx.swapchainFormat == VK_FORMAT_B8G8R8A8_UNORM ||
-		vkCtx.swapchainFormat == VK_FORMAT_B8G8R8A8_SRGB;
-	if ( !vkSavePreview.bgra && vkCtx.swapchainFormat != VK_FORMAT_R8G8B8A8_UNORM &&
-		vkCtx.swapchainFormat != VK_FORMAT_R8G8B8A8_SRGB ) return;
+	const VkFormat previewFormat = VK_Exec_DefaultColorFormat();
+	vkSavePreview.bgra = previewFormat == VK_FORMAT_B8G8R8A8_UNORM ||
+		previewFormat == VK_FORMAT_B8G8R8A8_SRGB;
+	if ( !vkSavePreview.bgra && previewFormat != VK_FORMAT_R8G8B8A8_UNORM &&
+		previewFormat != VK_FORMAT_R8G8B8A8_SRGB ) return;
 	VkBufferCreateInfo buffer = {};
 	buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	buffer.size = (VkDeviceSize)pixels * 4;
@@ -7314,7 +7563,7 @@ void RB_QueueSavePreview() {
 	copy.imageExtent.width = vkSavePreview.width;
 	copy.imageExtent.height = vkSavePreview.height;
 	copy.imageExtent.depth = 1;
-	vkCmdCopyImageToBuffer( vkExec.cmd, vkExec.frameImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	vkCmdCopyImageToBuffer( vkExec.cmd, VK_Exec_DefaultColorImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		vkSavePreview.buffer, 1, &copy );
 	VkBufferMemoryBarrier2 barrier = {};
 	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -7379,9 +7628,10 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 		common->Warning( "Vulkan: glReadPixels has no rendered frame to read" );
 		return false;
 	}
-	// Hidden-window frames render into per-slot offscreen images, which always
-	// allow transfer reads, whatever the unused swapchain's surface supports.
-	if ( !VK_GuiExecutor_BeginFrame() || ( !vkCtx.offscreenFrames && !vkCtx.swapchainTransferSrc ) ) {
+	// Hidden-window frames render into per-slot offscreen images, and VR frames
+	// into their own targets, which always allow transfer reads, whatever the
+	// unused swapchain's surface supports.
+	if ( !VK_GuiExecutor_BeginFrame() || !VK_Exec_DefaultTransferSrc() ) {
 		return false;
 	}
 	VK_TemporalPresentation_ObserveHistoryAndCapture();
@@ -7396,21 +7646,22 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 	// The caller sizes and strides its buffer from the rectangle it asked for.
 	// A rectangle the frame no longer covers (the window resized under the
 	// capture) cannot be clipped without skewing every row, so it fails.
-	const int framebufferWidth = (int)vkCtx.swapchainExtent.width;
-	const int framebufferHeight = (int)vkCtx.swapchainExtent.height;
+	const int framebufferWidth = (int)VK_Exec_DefaultExtent().width;
+	const int framebufferHeight = (int)VK_Exec_DefaultExtent().height;
 	if ( x < 0 || y < 0 || width > framebufferWidth || height > framebufferHeight
 			|| x > framebufferWidth - width || y > framebufferHeight - height ) {
 		common->Warning( "Vulkan: glReadPixels rectangle %d,%d %dx%d is outside the %dx%d frame",
 				x, y, width, height, framebufferWidth, framebufferHeight );
 		return false;
 	}
-	const bool bgra = vkCtx.swapchainFormat == VK_FORMAT_B8G8R8A8_UNORM
-			|| vkCtx.swapchainFormat == VK_FORMAT_B8G8R8A8_SRGB;
-	const bool rgba = vkCtx.swapchainFormat == VK_FORMAT_R8G8B8A8_UNORM
-			|| vkCtx.swapchainFormat == VK_FORMAT_R8G8B8A8_SRGB;
+	const VkFormat framebufferFormat = VK_Exec_DefaultColorFormat();
+	const bool bgra = framebufferFormat == VK_FORMAT_B8G8R8A8_UNORM
+			|| framebufferFormat == VK_FORMAT_B8G8R8A8_SRGB;
+	const bool rgba = framebufferFormat == VK_FORMAT_R8G8B8A8_UNORM
+			|| framebufferFormat == VK_FORMAT_R8G8B8A8_SRGB;
 	if ( !bgra && !rgba ) {
 		common->Warning( "Vulkan: screenshot readback does not support swapchain format %d",
-				(int)vkCtx.swapchainFormat );
+				(int)framebufferFormat );
 		return false;
 	}
 	// Capture the same final pixels that ordinary presentation displays. A
@@ -7452,7 +7703,7 @@ bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixel
 	copy.imageExtent.width = (uint32_t)width;
 	copy.imageExtent.height = (uint32_t)height;
 	copy.imageExtent.depth = 1;
-	vkCmdCopyImageToBuffer( vkExec.cmd, vkExec.frameImage,
+	vkCmdCopyImageToBuffer( vkExec.cmd, VK_Exec_DefaultColorImage(),
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readbackBuffer, 1, &copy );
 
 	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -9137,8 +9388,8 @@ static void VK_TemporalPresentation_FillResolveBlock(
 		bool velocityValid = false, bool perPixelOwnership = false ) {
 	memset( &block, 0, sizeof( block ) );
 	const viewDef_t *viewDef = command.viewDef;
-	const int outputWidth = Max( 1, (int)vkCtx.swapchainExtent.width );
-	const int outputHeight = Max( 1, (int)vkCtx.swapchainExtent.height );
+	const int outputWidth = Max( 1, (int)VK_Exec_DefaultExtent().width );
+	const int outputHeight = Max( 1, (int)VK_Exec_DefaultExtent().height );
 	block.sceneOutputExtent[0] = 1.0f / Max( 1, sceneWidth );
 	block.sceneOutputExtent[1] = 1.0f / Max( 1, sceneHeight );
 	block.sceneOutputExtent[2] = (float)outputWidth;
@@ -9409,8 +9660,8 @@ static bool VK_TemporalPresentation_DrawScaledScene( const viewDef_t *viewDef,
 	const int mode = idMath::ClampInt( 0, 3, r_resolutionScaleMode.GetInteger() );
 	if ( ( mode != 2 && mode != 3 ) || viewDef->temporalJitterEnabled
 			|| R_TemporalPresentation_ScreenSpaceEffectsRequested()
-			|| ( sceneEntry->width == (int)vkCtx.swapchainExtent.width
-				&& sceneEntry->height == (int)vkCtx.swapchainExtent.height ) ) {
+			|| ( sceneEntry->width == (int)VK_Exec_DefaultExtent().width
+				&& sceneEntry->height == (int)VK_Exec_DefaultExtent().height ) ) {
 		return false;
 	}
 	return VK_TemporalPresentation_PresentScaledImage( sceneImage, sceneEntry,
@@ -9571,8 +9822,9 @@ static bool VK_WindowView_EnsureTargets( int width, int height, int samples ) {
 static bool VK_WindowView_Begin( const viewDef_t *viewDef, vkSceneScaleState_t &state ) {
 	state.windowMultisample = false;
 	const int samples = r_multiSamples.GetInteger();
+	// A VR eye or virtual screen standing in for the window keeps one sample.
 	if ( !r_vkWindowViewMultisample.GetBool() || samples <= 1 || viewDef == NULL
-			|| !vkExec.frameOpen || state.active
+			|| !vkExec.frameOpen || state.active || vkExecVROutputActive || vkExec.windowless
 			|| backEnd.renderTexture != NULL || vkExec.activeRenderTexture != NULL
 			|| vkExec.temporalScenePendingComposite ) {
 		return false;
@@ -9732,8 +9984,8 @@ static bool VK_TemporalPresentation_BlitColorToSwap(
 		vkImageEntry_t *sourceEntry, int width, int height ) {
 	if ( sourceEntry == NULL || sourceEntry->samples != VK_SAMPLE_COUNT_1_BIT
 			|| ( sourceEntry->usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) == 0
-			|| width != (int)vkCtx.swapchainExtent.width
-			|| height != (int)vkCtx.swapchainExtent.height
+			|| width != (int)VK_Exec_DefaultExtent().width
+			|| height != (int)VK_Exec_DefaultExtent().height
 			|| !VK_Exec_SetRenderTarget( NULL ) ) {
 		return false;
 	}
@@ -9760,7 +10012,7 @@ static bool VK_TemporalPresentation_BlitColorToSwap(
 	region.dstOffsets[1].z = 1;
 	vkCmdBlitImage( vkExec.cmd, sourceEntry->image,
 		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		vkExec.frameImage,
+		VK_Exec_DefaultColorImage(),
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, filter );
 	VK_Exec_TransitionImage( sourceEntry,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
@@ -9867,8 +10119,8 @@ static bool VK_TemporalPresentation_ResolveTargetsRecorded(
 
 	const int sceneWidth = sceneEntry->width;
 	const int sceneHeight = sceneEntry->height;
-	const int outputWidth = (int)vkCtx.swapchainExtent.width;
-	const int outputHeight = (int)vkCtx.swapchainExtent.height;
+	const int outputWidth = (int)VK_Exec_DefaultExtent().width;
+	const int outputHeight = (int)VK_Exec_DefaultExtent().height;
 	const bool presentationMatches = command.presentation.frameNumber
 			== backEnd.frameCount
 		&& command.presentation.outputWidth == outputWidth

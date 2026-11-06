@@ -82,10 +82,25 @@ struct {
     VkPipeline displayColorPipeline=0;
     idImage* displayColorSourceImages[2]={};
     bool displayColorMapped=false,displayColorMappingWarned=false;
+    VkPipeline displayColorVRPipelines[2]={};
+    int displayColorVRFormat=0;
+    idImage* displayColorVRSourceImages[2][3]={};
+    unsigned displayColorVRMapped=0;
+    bool windowless=false;
     bool frameOpen=true,temporalScenePendingComposite=false,mainScopeOpen=true;
     int frameSlot=0,cmd=1,pipelineLayout=7;
 } vkExec;
-struct { int device=1; bool swapchainTransferSrc=true,depthBoundsSupported=true,presentationBlocked=false; VkExtent2D swapchainExtent; } vkCtx;
+struct { int device=1,graphicsQueue=5; bool swapchainTransferSrc=true,depthBoundsSupported=true,presentationBlocked=false; VkExtent2D swapchainExtent; } vkCtx;
+// The default output: the window, or a VR eye or virtual screen standing in
+// for it (vk_VRPresentation.cpp), mapped once as the frame leaves it.
+constexpr int VK_EXEC_VR_TARGETS=3;
+struct { int colorFormat=44; bool premultipliedAlpha=false; int vrTarget=0; } vkExecVROutput;
+static bool vkExecVROutputActive=false;
+static VkExtent2D VK_Exec_DefaultExtent(){return vkCtx.swapchainExtent;}
+static bool VK_Exec_DefaultTransferSrc(){return vkExecVROutputActive||(!vkExec.windowless&&vkCtx.swapchainTransferSrc);}
+int queueIdles=0,pipelineDestroys=0;
+int vkQueueWaitIdle(int){++queueIdles;return VK_SUCCESS;}
+void vkDestroyPipeline(int,VkPipeline,void*){++pipelineDestroys;}
 struct CVar {float value=1;float GetFloat()const{return value;}} r_brightness,r_gamma;
 namespace idMath {
 float ClampFloat(float a,float b,float v){return std::clamp(v,a,b);}
@@ -99,6 +114,7 @@ struct Common {void Warning(const char*,const char*){++warnings;}} commonObject;
 Common* common=&commonObject;
 std::map<std::string,idImage> images;
 const char* va(const char* format,int slot){static char name[80];std::snprintf(name,sizeof(name),format,slot);return name;}
+const char* va(const char* format,int slot,int target){static char name[80];std::snprintf(name,sizeof(name),format,slot,target);return name;}
 struct Images {
     idImage* ScratchImage(const char* name,idImageOpts* opts,int filter,int repeat,int usage) {
         calls.push_back("image");++imageCreates;
@@ -206,6 +222,35 @@ int main(){
     NewComposition();original=pixels;vkCtx.swapchainTransferSrc=false;
     assert(!VK_DisplayColorMapping_Apply() && SamePixels(original));
     vkCtx.swapchainTransferSrc=true;assert(VK_DisplayColorMapping_Apply());
+    // VR targets stand in for the window: each is mapped once, with its own
+    // copy and a pipeline for its format and alpha, independently of the window.
+    {
+        NewComposition();original=pixels;r_brightness.value=1.5f;r_gamma.value=1.2f;
+        const int pipelinesBefore=pipelineCreates,imagesBefore=imageCreates;
+        vkExecVROutputActive=true;vkExecVROutput.vrTarget=1;vkExecVROutput.premultipliedAlpha=false;
+        assert(VK_DisplayColorMapping_Apply());CheckMapping(original,1.5f,1.2f);
+        const auto eye=pixels;const int count=draws;
+        assert(VK_DisplayColorMapping_Apply() && draws==count && SamePixels(eye));
+        assert(vkExec.displayColorVRMapped==2u && !vkExec.displayColorMapped);
+        assert(pipelineCreates==pipelinesBefore+1 && imageCreates==imagesBefore+1);
+        // the virtual screen: premultiplied, a second pipeline and copy
+        pixels=original;vkExecVROutput.vrTarget=0;vkExecVROutput.premultipliedAlpha=true;
+        assert(VK_DisplayColorMapping_Apply() && draws==count+1);CheckMapping(original,1.5f,1.2f);
+        assert(pipelineCreates==pipelinesBefore+2 && imageCreates==imagesBefore+2 && vkExec.displayColorVRMapped==3u);
+        assert(vkExec.displayColorVRSourceImages[0][0]!=vkExec.displayColorVRSourceImages[0][1]);
+        // a new session's swapchain format retires the old target pipelines
+        vkExec.displayColorVRMapped=0;vkExecVROutput.colorFormat=37;pixels=original;
+        assert(VK_DisplayColorMapping_Apply() && pipelineDestroys==2 && queueIdles>=1 && pipelineCreates==pipelinesBefore+3);
+        vkExecVROutput.colorFormat=44;
+        // an unknown target index is refused, never mapped
+        pixels=original;vkExec.displayColorVRMapped=0;vkExecVROutput.vrTarget=VK_EXEC_VR_TARGETS;warnings=0;
+        assert(!VK_DisplayColorMapping_Apply() && SamePixels(original) && vkExec.displayColorVRMapped==0u);
+        vkExecVROutput.vrTarget=0;vkExecVROutputActive=false;vkExec.displayColorMappingWarned=false;
+        // the window still maps once, and a windowless VR frame has no window to map
+        pixels=original;assert(VK_DisplayColorMapping_Apply() && vkExec.displayColorMapped);
+        NewComposition();original=pixels;vkExec.windowless=true;{const int none=draws;
+        assert(VK_DisplayColorMapping_Apply() && SamePixels(original) && draws==none);}vkExec.windowless=false;
+    }
     // A capture's resumed clear starts fresh; stale descriptors/push state
     // cannot turn a new composition into a second mapping of the old image.
     NewComposition();original=pixels;r_brightness.value=1.25f;r_gamma.value=1.6f;

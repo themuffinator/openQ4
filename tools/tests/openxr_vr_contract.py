@@ -6,6 +6,12 @@ Pins what keeps VR safe to ship without a headset in CI:
   on Windows and Linux; dedicated servers and the test runtime never install it;
 - the renderer and game ABIs grew append-only (render API 21, game API 50)
   and renderView_t's off-axis fields default to a symmetric view;
+- on Vulkan (render API 32) the runtime creates the renderer's instance and
+  device (XR_KHR_vulkan_enable2), the session binds that device, the renderer
+  copies its own targets into the swapchain images and waits for its GPU work
+  before the engine destroys a swapchain, and the test runtime speaks it too;
+- an OpenGL renderer on EGL (native Wayland, render API 32) binds through
+  XR_MNDX_egl_enable, which the test runtime speaks on Linux;
 - engines without OpenXR, and dedicated servers, run the null VR system;
 - controller input enters through the gamepad key path, never synthesised OS
   input, and every action name the runtime shows is localised;
@@ -68,11 +74,17 @@ def check_build() -> None:
 
 def check_abi() -> None:
     api = read("src/renderer/RenderModuleAPI.h")
-    require(api, "#define RENDER_API_VERSION\t\t\t31", "renderer module ABI v31")
-    require(api, "void\t\t\t( *RendererDeviceEvent )( int event );\t// renderDeviceEvent_t",
+    require(api, "#define RENDER_API_VERSION			32", "renderer module ABI v32")
+    require(api, "void			( *RendererDeviceEvent )( int event );	// renderDeviceEvent_t",
             "the device lifetime service retains its signature")
-    if api.index("( *RendererDeviceEvent )") > api.index("( *TakeFrameInputClocks )"):
+    services = api[api.index("typedef struct renderModuleServices_s {"):api.index("} renderModuleServices_t;")]
+    slots = re.findall(r"\(\s*\*(\w+)\s*\)", services)
+    # the device lifetime service precedes the frame timing services, and the
+    # Vulkan VR services close the table in the order they were appended
+    if slots.index("RendererDeviceEvent") > slots.index("TakeFrameInputClocks"):
         raise AssertionError("frame timing services must append after the device lifetime service")
+    if slots[-3:] != ["CreateVulkanInstanceForVR", "GetVulkanPhysicalDeviceForVR", "CreateVulkanDeviceForVR"]:
+        raise AssertionError(f"the Vulkan VR services must close renderModuleServices_t in order, found {slots[-3:]}")
 
     render_system = read("src/renderer/RenderSystem.h")
     anchor = "virtual void ResetRetainedFontCache() = 0;"
@@ -115,6 +127,69 @@ def check_abi() -> None:
     require(read("src/framework/Common.cpp"), "gameImport.vrSystem\t\t\t\t\t= ::vrSystem;", "the engine exports its VR system")
 
 
+def check_vulkan() -> None:
+    openxr = read("src/sys/openxr/OpenXRSystem.cpp")
+    require(openxr, '#define VR_VULKAN_ENABLE2_EXTENSION_NAME\t"XR_KHR_vulkan_enable2"',
+            "the engine asks the runtime for XR_KHR_vulkan_enable2")
+    require(openxr, "vulkanBinding.type = XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR;", "a Vulkan session binds the renderer's device")
+    require(openxr, "if ( binding.vkDevice == NULL || binding.vkDevice != vulkanDevice || vulkanCreator != instance ) {",
+            "only a device the runtime created is bound")
+    require(openxr, '\tcmdSystem->BufferCommandText( CMD_EXEC_INSERT, "vid_restart\\n" );',
+            "a device made before VR asked restarts the renderer once")
+    # OpenXR destroys no swapchain while submitted commands still use its images
+    require(openxr, "\tReleaseRendererImages();\n\tDestroySwapchain( screenSwapchain );",
+            "a resized virtual screen waits for the renderer before its old swapchain goes")
+    require(openxr, "\tReleaseRendererImages();\n\tDestroyActions();", "a closing session waits for the renderer")
+    require(read("src/renderer/RenderSystem_vr.cpp"), "\t\tR_VR_BackendReleaseImages();",
+            "the renderer honours the release request")
+
+    device = read("src/renderer/Vulkan/VulkanDevice.cpp")
+    require(device, "R_RendererModule_CreateVulkanInstanceForVR( (void *)vkGetInstanceProcAddr, &ici, &created, &result )",
+            "the Vulkan instance is offered to the VR runtime")
+    require(device, "R_RendererModule_CreateVulkanDeviceForVR( (void *)vkGetInstanceProcAddr, (void *)vkCtx.physicalDevice,",
+            "the Vulkan device is offered to the VR runtime")
+    require(device, "R_RendererModule_GetVulkanPhysicalDeviceForVR( (void *)vkCtx.instance, &physical )",
+            "the renderer runs on the GPU the runtime names")
+
+    present = read("src/renderer/Vulkan/vk_VRPresentation.cpp")
+    for token in ("binding.kind = RENDER_VR_BINDING_VULKAN;", "vkCmdCopyImage( cmd, target.color, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,",
+                  "VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,",
+                  "output.premultipliedAlpha = index == 0;", "vkQueueWaitIdle( vkCtx.graphicsQueue );"):
+        require(present, token, "the Vulkan backend presents to OpenXR")
+    executor = read("src/renderer/Vulkan/vk_GuiExecutor.cpp")
+    require(executor, "bool VK_Exec_SetDefaultOutput( const vkExecDefaultOutput_t *output ) {",
+            "an eye or the virtual screen stands in for the Vulkan window")
+    require(executor, "if ( target.premultipliedAlpha && !( blendBits & GLS_ALPHA_COVERAGE ) ) {",
+            "the virtual screen blends like GL's premultiplied default target")
+
+    runtime = read("tools/tests/openxr/OpenXRTestRuntime.cpp")
+    for token in ("XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME,", "TR_EXT_ENTRY( xrCreateVulkanDeviceKHR, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ),",
+                  "#define VK_NO_PROTOTYPES"):
+        require(runtime, token, "the test runtime speaks XR_KHR_vulkan_enable2 through the application's loader")
+    require(read("tools/tests/openxr_vr_smoke.py"), 'parser.add_argument("--render-api", choices=("gl", "vulkan"), default="gl")',
+            "the VR smoke runs on either renderer")
+
+
+def check_egl() -> None:
+    render_system = read("src/renderer/RenderSystem.h")
+    kinds = render_system[render_system.index("RENDER_VR_BINDING_NONE = 0,"):render_system.index("} renderVRBindingKind_t;")]
+    if not kinds.rstrip().split("\n")[-1].lstrip().startswith("RENDER_VR_BINDING_EGL"):
+        raise AssertionError("renderVRBindingKind_t grows at the end; EGL is its newest kind")
+    require(render_system, "void *\t\t\t\t\teglGetProcAddress;", "the binding carries EGL's loader")
+    gl = read("src/renderer/OpenGL/gl_VRPresentation.cpp")
+    require(gl, "binding.kind = RENDER_VR_BINDING_EGL;", "an OpenGL context on EGL reports an EGL binding")
+    require(gl, "return R_VR_QueryEGLBinding( binding );", "a context with no GLX binding falls back to EGL")
+    openxr = read("src/sys/openxr/OpenXRSystem.cpp")
+    require(openxr, '#define VR_EGL_ENABLE_EXTENSION_NAME\t\t"XR_MNDX_egl_enable"',
+            "the engine asks the runtime for XR_MNDX_egl_enable")
+    require(openxr, "eglBinding.type = XR_TYPE_GRAPHICS_BINDING_EGL_MNDX;", "an EGL context binds through XR_MNDX_egl_enable")
+    require(openxr, "if ( binding.kind == RENDER_VR_BINDING_EGL && !haveEGL ) {",
+            "a runtime without XR_MNDX_egl_enable gets a clear warning, not a failed session")
+    runtime = read("tools/tests/openxr/OpenXRTestRuntime.cpp")
+    require(runtime, "\tTR_MNDX_EGL_ENABLE_EXTENSION_NAME,", "the test runtime offers XR_MNDX_egl_enable on Linux")
+    require(runtime, 'bindingName = "opengl_egl";', "the test runtime reports an EGL session")
+
+
 def check_engine() -> None:
     system = read("src/framework/VRSystem.cpp")
     require(system, "#if defined( OPENQ4_OPENXR )\nidVRSystem *vrSystem = VR_GetOpenXRSystem();",
@@ -131,6 +206,11 @@ def check_engine() -> None:
     require(player, '( IsInVehicle() && !cvarSystem->GetCVarBool( "vr_vehicleStereo" ) )',
             "single player vehicles render in stereo unless vr_vehicleStereo is off")
     require(player, "seat->GetVRSeat( origin );", "a vehicle seat puts the eye on its turret's axis")
+    # world GUIs, characters and usable things answer the weapon hand where it points
+    require(player, "start = GetEyePosition();\n\t// openQ4 VR: the weapon hand points at world GUIs",
+            "the focus trace starts where the weapon hand aims")
+    require(player, "\tGetVRAimOrigin( start );\n\tend = start + viewAngles.ToForward() * 768.0f;",
+            "the focus trace runs from the weapon hand along its aim")
     require(read("src/game/vehicle/VehicleParts.cpp"), "vrDriver->GetVRVehicleAim( vrSeatAim, vrWorldAim )",
             "a turret driven in VR follows the head without dropping rotation")
     require(read("src/mpgame/Player.cpp"), "|| pm_thirdPerson.GetBool() || IsInVehicle() ) {",
@@ -159,7 +239,7 @@ def check_engine() -> None:
             raise AssertionError(f"OpenXR input must not synthesise OS input ({banned})")
     require(openxr, "Sys_PostVRControllerKey( key, down );", "controller buttons take the gamepad key path")
     require(openxr, "createInfo.applicationInfo.apiVersion = XR_API_VERSION_1_0;", "the instance asks for OpenXR 1.0")
-    require(openxr, "XR_KHR_OPENGL_ENABLE_EXTENSION_NAME", "the session binds OpenGL")
+    require(openxr, "XR_KHR_OPENGL_ENABLE_EXTENSION_NAME", "the session binds OpenGL or Vulkan")
     for token in vrActionTokens():
         require(openxr, token, "OpenXR action names are localised")
 
@@ -210,6 +290,8 @@ def check_documents() -> None:
 def main() -> int:
     check_build()
     check_abi()
+    check_vulkan()
+    check_egl()
     check_engine()
     check_strings()
     check_documents()

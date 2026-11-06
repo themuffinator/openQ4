@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """Exercise XR loss and recovery during windowed gameplay without controller input.
 
-Uses the existing test runtime through a process-local loader manifest. Captures
-come only from the engine screenshot command. No system runtime registration or
-keyboard/mouse/controller input is changed or synthesized.
+Uses the existing test runtime through a process-local loader manifest. Desktop
+captures come from the engine screenshot command. On OpenGL the eye captures
+are the engine's own eye render textures; the Vulkan backend keeps its eye
+targets to itself, so there the test runtime captures the eye images the
+engine submitted, synchronised by marker files the engine writes with condump.
+With --render-api vulkan the runtime also creates the renderer's instance and
+device, and --validation fails the run on any Khronos validation message. No
+system runtime registration or keyboard/mouse/controller input is changed or
+synthesized.
 """
 from __future__ import annotations
 
@@ -36,7 +42,14 @@ def main() -> int:
     parser.add_argument("--mode", choices=("SP", "MP"), default="SP")
     parser.add_argument("--port", type=int, default=29104)
     parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--render-api", choices=("gl", "vulkan"), default="gl")
+    parser.add_argument("--validation", action="store_true", help="Vulkan: fail on Khronos validation messages")
+    parser.add_argument("--windowless", action="store_true",
+                        help="Vulkan: VR frames open without the window's image (r_vkVRWindowlessTest)")
     args = parser.parse_args()
+    vulkan = args.render_api == "vulkan"
+    if (args.validation or args.windowless) and not vulkan:
+        parser.error("--validation and --windowless need --render-api vulkan")
     if args.fault != "none" and not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*:[1-9][0-9]*:[a-z]+", args.fault):
         parser.error("fault must be call:positive-occurrence:value or none")
     runtime, output, manifest = args.runtime_dir.resolve(), args.output_dir.resolve(), args.manifest.resolve()
@@ -48,9 +61,31 @@ def main() -> int:
     game = save / "baseoq4"
     game.mkdir(parents=True)
     arm, receipt, xr_log = game / "xr_fault_arm.txt", output / "fault.once", output / "xr.jsonl"
+    # Vulkan eye captures: the runtime writes the submitted eye images when the
+    # engine's marker files appear
+    eye_marks = {"restart": game / "xr_capture_restart.txt", "after_capture": game / "xr_capture_after.txt"}
+    eye_prefix = {name: output / f"rt_{name}" for name in eye_marks}
+    if vulkan:
+        (output / "xr_script.txt").write_text(
+            "".join(f"when {eye_marks[name]} capture {eye_prefix[name]}\n" for name in eye_marks), encoding="utf-8")
+    # Vulkan: the first VR start restarts the renderer once, so the runtime
+    # creates its device, before anything is armed; vr_restart then keeps the
+    # instance that made it. A new instance after instance or runtime loss
+    # restarts the renderer again. The validation layer slows stereo frames
+    # several times, so the waits that need frames to pass grow with it.
+    instance_fault = args.fault.endswith((":instance", ":runtime"))
+    slow = vulkan and args.validation
+    auto_wait = 6000 if slow else 3500
+    restart_wait = (7000 if instance_fault else 4000) if vulkan else 1800
+    if slow and args.fault.endswith(":tracking"):
+        # the runtime reports 90 frames of lost tracking; let them pass first
+        restart_wait += 12000
+    capture_wait = 1500 if slow else 300
     commands = ["waitMsec 1500", "god", "notarget", "getviewpos", "echo XR_FAULT_GAMEPLAY_BEGIN"]
     if args.mode == "MP":
         commands += ["openq4_reportMPState", "openq4_assertMPGameplayView"]
+    if vulkan:
+        commands += ["vr_enable 1", "vr_restart", "waitMsec 6000", "echo XR_FAULT_VULKAN_DEVICE", "vr_status"]
     if args.creation_fault:
         commands += ["condump xr_fault_arm.txt"]
     commands += ["vr_enable 1", "vr_restart", "waitMsec 500" if args.creation_fault else "waitMsec 2000",
@@ -58,13 +93,18 @@ def main() -> int:
     if not args.creation_fault:
         commands += ["condump xr_fault_arm.txt"]
     commands += ["waitMsec 700", "echo XR_FAULT_AFTER", "vr_status", 'screenshot "screenshots/xr_fallback.tga"',
-                 "waitMsec 3500", "echo XR_FAULT_AUTO", "vr_status", "vr_restart", "waitMsec 1800",
-                 "echo XR_FAULT_RESTART", "vr_status", "getviewpos",
-                 'screenshot image _vrEyeColor0 "screenshots/xr_left.tga"',
-                 'screenshot image _vrEyeColor1 "screenshots/xr_right.tga"',
-                 'screenshot "screenshots/xr_restart.tga"', "waitMsec 250",
-                 'screenshot image _vrEyeColor0 "screenshots/xr_after_capture.tga"',
-                 "vr_enable 0", "waitMsec 500", "echo XR_FAULT_DESKTOP", "vr_status",
+                 f"waitMsec {auto_wait}", "echo XR_FAULT_AUTO", "vr_status", "vr_restart", f"waitMsec {restart_wait}",
+                 "echo XR_FAULT_RESTART", "vr_status", "getviewpos"]
+    if vulkan:
+        commands += ["condump xr_capture_restart.txt", f"waitMsec {capture_wait}",
+                     'screenshot "screenshots/xr_restart.tga"', "waitMsec 250",
+                     "condump xr_capture_after.txt", f"waitMsec {capture_wait}"]
+    else:
+        commands += ['screenshot image _vrEyeColor0 "screenshots/xr_left.tga"',
+                     'screenshot image _vrEyeColor1 "screenshots/xr_right.tga"',
+                     'screenshot "screenshots/xr_restart.tga"', "waitMsec 250",
+                     'screenshot image _vrEyeColor0 "screenshots/xr_after_capture.tga"']
+    commands += ["vr_enable 0", "waitMsec 500", "echo XR_FAULT_DESKTOP", "vr_status",
                  'screenshot "screenshots/xr_desktop.tga"']
     if args.mode == "MP":
         commands += ["openq4_reportMPState", "openq4_assertMPGameplayView"]
@@ -77,7 +117,7 @@ def main() -> int:
         "sys_consoleWindow": "0", "in_tty": "0", "in_mouse": "0", "in_joystick": "0", "s_noSound": "1",
         "r_fullscreen": "0", "r_fullscreenDesktop": "0", "r_borderless": "0", "r_borderlessDefaultMigrated": "1",
         "r_hiddenWindow": "1", "r_mode": "-1", "r_customWidth": "640", "r_customHeight": "480",
-        "r_windowWidth": "640", "r_windowHeight": "480", "r_renderApi": "gl", "r_swapInterval": "0",
+        "r_windowWidth": "640", "r_windowHeight": "480", "r_renderApi": args.render_api, "r_swapInterval": "0",
         "com_maxfps": "60", "ui_retained": "1", "ui_autoJoin": "1", "com_skipLoadingContinue": "1",
         "g_autoSkipCinematics": "1", "g_openQ4Storage1NoDropPodState": "1", "com_loadingContinueAutoAdvance": "1",
         "logFile": "2", "logFileName": "logs/openq4.log", "developer": "1", "vr_enable": "0", "vr_debug": "1",
@@ -85,6 +125,9 @@ def main() -> int:
         "g_autoExecAfterMapLoad": "xr_fault.cfg", "g_autoExecAfterMapLoadDelayMs": "500",
         "net_port": str(args.port), "net_enableIPv6": "0",
     }
+    if vulkan:
+        settings.update(r_vkValidation="1" if args.validation else "0",
+                        r_vkVRWindowlessTest="1" if args.windowless else "0")
     if args.mode == "MP":
         settings.update(net_allowCheats="1", sv_cheats="1", net_ip="127.0.0.1", net_serverDedicated="0",
                         net_LANServer="1", si_pure="0", si_maxPlayers="4", bot_minPlayers="0")
@@ -99,19 +142,24 @@ def main() -> int:
                        OPENQ4_XR_TEST_FAULT_AFTER=str(arm), OPENQ4_XR_TEST_FAULT_ONCE=str(receipt))
     if args.fault != "none":
         environment["OPENQ4_XR_TEST_FAULT"] = args.fault
+    if vulkan:
+        environment["OPENQ4_XR_TEST_SCRIPT"] = str(output / "xr_script.txt")
     sources = ["src/sys/openxr/OpenXRSystem.cpp", "src/game/PlayerView.cpp", "src/mpgame/PlayerView.cpp",
                "src/renderer/RenderSystem_vr.cpp", "src/renderer/OpenGL/gl_VRPresentation.cpp",
+               "src/renderer/Vulkan/vk_VRPresentation.cpp", "src/renderer/Vulkan/vk_GuiExecutor.cpp",
                "tools/tests/openxr/OpenXRTestRuntime.cpp",
                "tools/tests/openxr_lifecycle_runtime.py"]
     report = {"status": "fail", "mode": args.mode, "fault": args.fault, "creation_fault": args.creation_fault,
+              "render_api": args.render_api, "validation": args.validation, "windowless": args.windowless,
               "source": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "source_sha256": {name: digest(ROOT / name) for name in sources},
               "command": command, "test_runtime": str(runtime_library), "captures": {}, "failures": [],
-              "runtime_sha256": {str(path.relative_to(ROOT)): digest(path) for path in
+              "runtime_sha256": {(str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)): digest(path) for path in
                                  [executable, runtime_library, runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4",
                                   *sorted((runtime / "baseoq4").glob("game-*.dll" if os.name == "nt" else "game-*.so"))]},
               "input": "all test-runtime controller actions inactive; physical input disabled; no input injection",
-              "capture": "engine screenshot; hidden 640x480 GL window; simulated XR, no physical-headset claim"}
+              "capture": f"engine screenshot{'' if not vulkan else ' plus test-runtime eye captures'}; "
+                         f"hidden 640x480 {args.render_api} window; simulated XR, no physical-headset claim"}
     startup = None
     if os.name == "nt":
         startup = subprocess.STARTUPINFO()
@@ -133,6 +181,20 @@ def main() -> int:
         report["failures"].append("engine did not exit cleanly")
     if re.search(r"FATAL ERROR|Unknown command", log):
         report["failures"].append("engine reported a fatal error or unknown fixture command")
+    if vulkan:
+        if "OpenXR: the runtime created the Vulkan renderer's device" not in log:
+            report["failures"].append("the XR runtime did not create the Vulkan renderer's device")
+        ready = log.split("XR_FAULT_VULKAN_DEVICE", 1)[-1].split("XR_FAULT_BEFORE", 1)[0]
+        if "running, focused" not in ready:
+            report["failures"].append("the Vulkan session did not run on the runtime-made device before the fault")
+        if args.validation:
+            if "Vulkan: validation enabled" not in log:
+                report["failures"].append("the Vulkan validation layer was not active")
+            messages = [line for line in log.splitlines() if "VUID" in line or "Validation Error" in line]
+            if messages:
+                report["failures"].append("Vulkan validation reported: " + " | ".join(messages[:5]))
+        if args.windowless and "Vulkan: a VR frame went on without the window's image" not in log:
+            report["failures"].append("no VR frame opened without the window's image")
     for marker in ("XR_FAULT_GAMEPLAY_BEGIN", "XR_FAULT_AFTER", "XR_FAULT_RESTART", "XR_FAULT_DESKTOP", "XR_FAULT_GAMEPLAY_END"):
         if marker not in log:
             report["failures"].append("missing " + marker)
@@ -166,12 +228,17 @@ def main() -> int:
             report["failures"].append("invalid tracking did not fall back to the virtual screen")
     if args.mode == "MP" and len(re.findall(r"^MP_PLAYER slot=0 [^\n]*ingame=1", log, re.M)) < 2:
         report["failures"].append("MP gameplay was not preserved")
-    for name in ("before", "fallback", "restart", "desktop", "left", "right", "after_capture"):
-        path = game / f"screenshots/xr_{name}.tga"
+    captures = {name: game / f"screenshots/xr_{name}.tga" for name in ("before", "fallback", "restart", "desktop")}
+    if vulkan:
+        captures.update(left=Path(f"{eye_prefix['restart']}_left.tga"), right=Path(f"{eye_prefix['restart']}_right.tga"),
+                        after_capture=Path(f"{eye_prefix['after_capture']}_left.tga"))
+    else:
+        captures.update({name: game / f"screenshots/xr_{name}.tga" for name in ("left", "right", "after_capture")})
+    for name, path in captures.items():
         if path.is_file():
             report["captures"][name] = {"path": str(path), "sha256": digest(path)}
         else:
-            report["failures"].append("missing engine capture " + name)
+            report["failures"].append("missing capture " + name)
     report["status"] = "fail" if report["failures"] else "pass"
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({key: report[key] for key in ("status", "fault", "exit_code", "failures")}, indent=2))

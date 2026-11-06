@@ -91,7 +91,12 @@
 // 29 - Owned read-only rendering-device inventory, callable on the live module.
 // 30 - Main-thread input-clock handoff and completed-frame latency receipts.
 // 31 - Join submitted rendering before engine-side renderer CVar mutation.
-#define RENDER_API_VERSION			31
+// 32 - OpenXR on Vulkan: the services create the Vulkan module's instance
+//      and device through the XR runtime, renderVRGraphicsBinding_t carries
+//      the Vulkan device and renderVRFrame_t the VkImage swapchain images.
+//      renderVRGraphicsBinding_t also carries an EGL context (an OpenGL
+//      renderer on native Wayland) for XR_MNDX_egl_enable.
+#define RENDER_API_VERSION			32
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
@@ -162,6 +167,22 @@ typedef struct renderModuleServices_s {
 	// backend supplies the successful swap's clock, never the handoff time. ---
 	void			( *TakeFrameInputClocks )( double &look, double &flash );
 	void			( *RecordFrameInputToSwap )( double look, double flash, double swap );
+
+	// --- version 32: OpenXR on Vulkan. XR_KHR_vulkan_enable2 has the runtime
+	// create the instance and the device of the renderer it presents for, on
+	// the GPU the headset is attached to. The Vulkan module offers each
+	// creation here first. True means the engine handled it for VR and
+	// *outResult holds the VkResult; false means VR does not want this
+	// renderer (VR off, no runtime or headset, no Vulkan support) and the
+	// module creates the object itself. Handles are opaque so this header
+	// stays Vulkan-free: getInstanceProcAddr is PFN_vkGetInstanceProcAddr and
+	// createInfo a VkInstanceCreateInfo or VkDeviceCreateInfo ---
+	bool			( *CreateVulkanInstanceForVR )( void *getInstanceProcAddr, const void *createInfo,
+													void **outInstance, int *outResult );
+	// the physical device the runtime renders for, on an instance it created
+	bool			( *GetVulkanPhysicalDeviceForVR )( void *instance, void **outPhysicalDevice );
+	bool			( *CreateVulkanDeviceForVR )( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo,
+												  void **outDevice, int *outResult );
 } renderModuleServices_t;
 
 typedef enum {

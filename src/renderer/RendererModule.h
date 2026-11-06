@@ -171,4 +171,15 @@ bool	R_RendererModule_QueryLightGridLoad( renderLightGridLoadReceipt_t &receipt,
 // services table.
 void	R_RendererModule_RendererDeviceEvent( int event );
 
+// OpenXR on Vulkan (render API 32): the Vulkan renderer offers the creation of
+// its instance, physical device choice and device to the engine's VR system,
+// which makes them through the XR runtime when VR wants this renderer. False
+// leaves the object to the renderer. Module builds forward these through the
+// services table.
+bool	R_RendererModule_CreateVulkanInstanceForVR( void *getInstanceProcAddr, const void *createInfo,
+												  void **outInstance, int *outResult );
+bool	R_RendererModule_GetVulkanPhysicalDeviceForVR( void *instance, void **outPhysicalDevice );
+bool	R_RendererModule_CreateVulkanDeviceForVR( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo,
+												void **outDevice, int *outResult );
+
 #endif /* !__RENDERERMODULE_H__ */

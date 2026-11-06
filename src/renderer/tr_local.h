@@ -1170,9 +1170,18 @@ public:
 };
 
 // OpenXR presentation backend. OpenGL/gl_VRPresentation.cpp implements it for
-// the desktop GL module; every other build reports that it cannot present.
+// the desktop GL module and Vulkan/vk_VRPresentation.cpp for the Vulkan
+// module; every other build reports that it cannot present.
 bool	R_VR_BackendCanPresent( void );
 bool	R_VR_QueryGraphicsBinding( renderVRGraphicsBinding_t &binding );
+// Vulkan keeps its own eye and virtual-screen targets instead of the front
+// end's render textures (tr.vrTargets): it prepares them for each frame,
+// clearing frame.stereo when the eyes cannot be presented, and false skips
+// the frame's VR presentation
+bool	R_VR_BackendOwnsTargets( void );
+bool	R_VR_BackendPrepareTargets( renderVRFrame_t &frame );
+// the swapchains are about to be destroyed: wait until the GPU is done with their images
+void	R_VR_BackendReleaseImages( void );
 void	RB_VR_BeginBackEnd( void );
 void	RB_VR_SetTarget( const void *data );
 bool	RB_VR_PresentFrame( void );

@@ -12,7 +12,9 @@
 	and back, switching the extent everything downstream reads (glConfig
 	sizes, crop 0, the 2D viewport, the presentation state the game sizes its
 	targets from) and queueing RC_VR_TARGET so the backend switches in command
-	order. The backend half is OpenGL/gl_VRPresentation.cpp.
+	order. The backend halves are OpenGL/gl_VRPresentation.cpp, which renders
+	into the render textures below, and Vulkan/vk_VRPresentation.cpp, which
+	keeps its own targets.
 	See docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md.
 
 ===============================================================================
@@ -126,11 +128,32 @@ idRenderSystemLocal::SetVRFrame
 ====================
 */
 void idRenderSystemLocal::SetVRFrame( const renderVRFrame_t *frame ) {
+	// the backend reads the frame's images and waits on its queue; a Vulkan
+	// render thread must be done with the previous frame first
+	R_RenderThread_Sync( "vr frame" );
 	memset( &vrFrame, 0, sizeof( vrFrame ) );
+	if ( frame != NULL && frame->releaseImages && glConfig.isInitialized ) {
+		// the engine is about to destroy swapchains this renderer drew into
+		R_VR_BackendReleaseImages();
+	}
 	if ( frame == NULL || !frame->active || !glConfig.isInitialized || !R_VR_BackendCanPresent() ) {
 		return;
 	}
-	if ( frame->screenImage == 0 || !R_VR_TargetSizeValid( frame->screenWidth, frame->screenHeight ) ) {
+	if ( !R_VR_TargetSizeValid( frame->screenWidth, frame->screenHeight ) ) {
+		return;
+	}
+	if ( R_VR_BackendOwnsTargets() ) {
+		// the backend's own stand-ins for the window (Vulkan)
+		renderVRFrame_t prepared = *frame;
+		if ( prepared.stereo && !R_VR_TargetSizeValid( prepared.eyeWidth, prepared.eyeHeight ) ) {
+			prepared.stereo = false;
+		}
+		if ( R_VR_BackendPrepareTargets( prepared ) ) {
+			vrFrame = prepared;
+		}
+		return;
+	}
+	if ( frame->screenImage == 0 ) {
 		return;
 	}
 	if ( R_VR_EnsureTarget( 0, frame->screenWidth, frame->screenHeight ) == NULL ) {

@@ -8,6 +8,7 @@
 #include "../ui/SettingsService.h"
 #include "../framework/RenderDoc.h"
 #include "../framework/CVarCompletionSnapshot.h"
+#include "../framework/VRSystemLocal.h"
 #include "../bse/BSEInterface.h"
 
 #include <cstring>
@@ -237,6 +238,19 @@ static void RM_Services_RendererDeviceEvent( int event ) {
 
 void Usercmd_TakeFrameInputClocks( double &lookSampleClock, double &flashPressClock );
 void Common_RecordFrameInputToSwap( double lookSampleClock, double flashPressClock, double swapClock );
+static bool RM_Services_CreateVulkanInstanceForVR( void *getInstanceProcAddr, const void *createInfo,
+		void **outInstance, int *outResult ) {
+	return R_RendererModule_CreateVulkanInstanceForVR( getInstanceProcAddr, createInfo, outInstance, outResult );
+}
+
+static bool RM_Services_GetVulkanPhysicalDeviceForVR( void *instance, void **outPhysicalDevice ) {
+	return R_RendererModule_GetVulkanPhysicalDeviceForVR( instance, outPhysicalDevice );
+}
+
+static bool RM_Services_CreateVulkanDeviceForVR( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo,
+		void **outDevice, int *outResult ) {
+	return R_RendererModule_CreateVulkanDeviceForVR( getInstanceProcAddr, physicalDevice, createInfo, outDevice, outResult );
+}
 
 static const renderModuleServices_t rm_services = {
 	RM_Services_Printf,
@@ -259,6 +273,9 @@ static const renderModuleServices_t rm_services = {
 	RM_Services_RendererDeviceEvent,
 	Usercmd_TakeFrameInputClocks,
 	Common_RecordFrameInputToSwap,
+	RM_Services_CreateVulkanInstanceForVR,
+	RM_Services_GetVulkanPhysicalDeviceForVR,
+	RM_Services_CreateVulkanDeviceForVR,
 };
 
 /*
@@ -1142,6 +1159,28 @@ void R_RendererModule_RendererDeviceEvent( int event ) {
 	} else if ( event == RENDER_DEVICE_STOPPING ) {
 		vrSystem->RendererStopping();
 	}
+}
+
+/*
+====================
+R_RendererModule_CreateVulkanInstanceForVR
+
+OpenXR on Vulkan: the runtime creates the Vulkan renderer's instance and
+device (src/sys/openxr), so the session can bind to them.
+====================
+*/
+bool R_RendererModule_CreateVulkanInstanceForVR( void *getInstanceProcAddr, const void *createInfo,
+		void **outInstance, int *outResult ) {
+	return VR_CreateVulkanInstance( getInstanceProcAddr, createInfo, outInstance, outResult );
+}
+
+bool R_RendererModule_GetVulkanPhysicalDeviceForVR( void *instance, void **outPhysicalDevice ) {
+	return VR_GetVulkanPhysicalDevice( instance, outPhysicalDevice );
+}
+
+bool R_RendererModule_CreateVulkanDeviceForVR( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo,
+		void **outDevice, int *outResult ) {
+	return VR_CreateVulkanDevice( getInstanceProcAddr, physicalDevice, createInfo, outDevice, outResult );
 }
 
 void R_RendererModule_PublishLightGridLoadReceipt( const renderLightGridLoadReceipt_t *receipt ) {

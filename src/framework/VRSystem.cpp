@@ -21,7 +21,7 @@
 #include "VRSystemLocal.h"
 
 idCVar vr_enable( "vr_enable", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
-	"play in virtual reality through the system's OpenXR runtime (OpenGL renderer); applies on vr_restart" );
+	"play in virtual reality through the system's OpenXR runtime (OpenGL or Vulkan renderer); applies on vr_restart" );
 idCVar vr_renderScale( "vr_renderScale", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"multiplier on the headset's recommended per-eye resolution; applies on vr_restart", 0.5f, 2.0f );
 idCVar vr_worldScale( "vr_worldScale", "39.37", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
@@ -124,6 +124,30 @@ idVRSystem *vrSystem = VR_GetOpenXRSystem();
 #else
 static idVRSystemNull vrSystemNull;
 idVRSystem *vrSystem = &vrSystemNull;
+
+// without OpenXR the Vulkan renderer always creates its own instance and device
+bool VR_CreateVulkanInstance( void *getInstanceProcAddr, const void *createInfo, void **outInstance, int *outResult ) {
+	(void)getInstanceProcAddr;
+	(void)createInfo;
+	(void)outInstance;
+	(void)outResult;
+	return false;
+}
+
+bool VR_GetVulkanPhysicalDevice( void *instance, void **outPhysicalDevice ) {
+	(void)instance;
+	(void)outPhysicalDevice;
+	return false;
+}
+
+bool VR_CreateVulkanDevice( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo, void **outDevice, int *outResult ) {
+	(void)getInstanceProcAddr;
+	(void)physicalDevice;
+	(void)createInfo;
+	(void)outDevice;
+	(void)outResult;
+	return false;
+}
 #endif
 
 bool VR_HasInputFocus( void ) {

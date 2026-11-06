@@ -2,11 +2,12 @@
 //
 // openQ4 OpenXR test runtime.
 //
-// A minimal OpenXR 1.0 runtime with XR_KHR_opengl_enable, loaded through the
-// standard Khronos loader by pointing XR_RUNTIME_JSON at the manifest the build
-// writes next to this library. It exists so the engine's VR path can be run,
-// inspected and captured on a machine with no headset and without changing any
-// system-wide OpenXR runtime registration.
+// A minimal OpenXR 1.0 runtime with XR_KHR_opengl_enable and
+// XR_KHR_vulkan_enable2, loaded through the standard Khronos loader by
+// pointing XR_RUNTIME_JSON at the manifest the build writes next to this
+// library. It exists so the engine's VR path can be run, inspected and
+// captured on a machine with no headset and without changing any system-wide
+// OpenXR runtime registration.
 //
 // It simulates one stereo head-mounted display and two tracked controllers.
 // Poses and input come from an optional script; submitted frames are validated
@@ -21,6 +22,11 @@
 //   OPENQ4_XR_TEST_FAULT    "call:occurrence:value" (e.g. xrWaitSwapchainImage:2:timeout)
 //   OPENQ4_XR_TEST_FAULT_AFTER optional existing-file marker before counting calls
 //   OPENQ4_XR_TEST_FAULT_ONCE optional receipt prevents reinjection after loader restart
+//   OPENQ4_XR_TEST_VK_DEVICE  index of the Vulkan physical device the "headset"
+//                           renders with (default: the first discrete GPU)
+//   OPENQ4_XR_TEST_VK_FORMATS comma-separated VkFormat values the swapchains
+//                           offer, in order (default 43,50,37,44: RGBA and
+//                           BGRA, sRGB first)
 //
 // Script lines are "<frame> <command> [arguments]", where frame counts
 // completed xrEndFrame calls and a command takes effect when that many frames
@@ -53,7 +59,14 @@
 #include <GL/gl.h>
 #endif
 
+// Vulkan only through the application's loader: every entry point comes from
+// the vkGetInstanceProcAddr it hands xrCreateVulkanInstanceKHR, so the runtime
+// links no Vulkan library
+#define VK_NO_PROTOTYPES
+#include <vulkan/vulkan.h>
+
 #define XR_USE_GRAPHICS_API_OPENGL
+#define XR_USE_GRAPHICS_API_VULKAN
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <openxr/openxr_loader_negotiation.h>
@@ -77,6 +90,10 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+#if defined( __linux__ )
+#include <dlfcn.h>
+#endif
 
 #if defined( _WIN32 )
 #define TR_EXPORT extern "C" __declspec( dllexport )
@@ -347,7 +364,10 @@ struct TRSpace : TRHandle {
 struct TRSwapchain : TRHandle {
 	TRSession *			session;
 	XrSwapchainCreateInfo info;
-	std::vector<GLuint>	textures;
+	uint32_t			imageCount;
+	std::vector<GLuint>	textures;			// OpenGL sessions
+	std::vector<VkImage> vkImages;			// Vulkan sessions, with their memory
+	std::vector<VkDeviceMemory> vkMemory;
 	uint32_t			nextAcquire;
 	std::deque<uint32_t> acquired;		// acquired, in order; front is the one waited/released next
 	bool				waited;
@@ -387,8 +407,47 @@ struct HandInput {
 	float	stickX, stickY;
 };
 
+// Device entry points of a Vulkan session, from the application's loader.
+struct VulkanFns {
+	PFN_vkGetDeviceProcAddr					GetDeviceProcAddr = nullptr;
+	PFN_vkGetPhysicalDeviceMemoryProperties	GetPhysicalDeviceMemoryProperties = nullptr;
+	PFN_vkGetDeviceQueue					GetDeviceQueue = nullptr;
+	PFN_vkCreateImage						CreateImage = nullptr;
+	PFN_vkDestroyImage						DestroyImage = nullptr;
+	PFN_vkGetImageMemoryRequirements		GetImageMemoryRequirements = nullptr;
+	PFN_vkAllocateMemory					AllocateMemory = nullptr;
+	PFN_vkFreeMemory						FreeMemory = nullptr;
+	PFN_vkBindImageMemory					BindImageMemory = nullptr;
+	PFN_vkCreateBuffer						CreateBuffer = nullptr;
+	PFN_vkDestroyBuffer						DestroyBuffer = nullptr;
+	PFN_vkGetBufferMemoryRequirements		GetBufferMemoryRequirements = nullptr;
+	PFN_vkBindBufferMemory					BindBufferMemory = nullptr;
+	PFN_vkMapMemory							MapMemory = nullptr;
+	PFN_vkUnmapMemory						UnmapMemory = nullptr;
+	PFN_vkCreateCommandPool					CreateCommandPool = nullptr;
+	PFN_vkDestroyCommandPool				DestroyCommandPool = nullptr;
+	PFN_vkAllocateCommandBuffers			AllocateCommandBuffers = nullptr;
+	PFN_vkFreeCommandBuffers				FreeCommandBuffers = nullptr;
+	PFN_vkBeginCommandBuffer				BeginCommandBuffer = nullptr;
+	PFN_vkEndCommandBuffer					EndCommandBuffer = nullptr;
+	PFN_vkCmdPipelineBarrier				CmdPipelineBarrier = nullptr;
+	PFN_vkCmdCopyImageToBuffer				CmdCopyImageToBuffer = nullptr;
+	PFN_vkQueueSubmit						QueueSubmit = nullptr;
+	PFN_vkQueueWaitIdle						QueueWaitIdle = nullptr;
+};
+
 struct TRSession : TRHandle {
 	TRInstance *		instance;
+	// a Vulkan session: the application's device and the queue the binding names
+	bool				vulkan;
+	VulkanFns			vk;
+	VkPhysicalDevice	vkPhysicalDevice;
+	VkDevice			vkDevice;
+	VkQueue				vkQueue;
+	VkCommandPool		vkCommandPool;
+	VkBuffer			vkReadback;			// host-visible capture buffer, grown on demand
+	VkDeviceMemory		vkReadbackMemory;
+	VkDeviceSize		vkReadbackSize;
 	XrSessionState		state;
 	bool				running;
 	bool				exitRequested;
@@ -426,6 +485,11 @@ struct TRInstance : TRHandle {
 	std::map<std::string, XrPath> pathIds;
 	bool				graphicsRequirementsQueried;
 	bool				profileChangedPending;
+	// what xrCreateVulkanInstanceKHR and friends made for the application
+	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = nullptr;
+	VkInstance			vkInstance = VK_NULL_HANDLE;
+	VkPhysicalDevice	vkPhysicalDevice = VK_NULL_HANDLE;
+	VkDevice			vkDevice = VK_NULL_HANDLE;
 };
 
 struct RuntimeGlobals {
@@ -899,12 +963,224 @@ bool WriteTga( const std::string &path, int width, int height, const std::vector
 	return true;
 }
 
+/*
+===============================================================================
+
+	Vulkan (XR_KHR_vulkan_enable2)
+
+	Swapchain images are device-local images on the application's device,
+	handed over in COLOR_ATTACHMENT_OPTIMAL. Captures copy them back on the
+	application's queue, which the binding names; the runtime touches it only
+	inside the application's own OpenXR calls, on its thread.
+
+===============================================================================
+*/
+
+bool LoadVulkanFns( PFN_vkGetInstanceProcAddr getInstanceProcAddr, VkInstance instance, VkDevice device, VulkanFns &fns ) {
+	fns.GetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>( getInstanceProcAddr( instance, "vkGetDeviceProcAddr" ) );
+	fns.GetPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(
+		getInstanceProcAddr( instance, "vkGetPhysicalDeviceMemoryProperties" ) );
+	if ( fns.GetDeviceProcAddr == nullptr || fns.GetPhysicalDeviceMemoryProperties == nullptr ) {
+		return false;
+	}
+#define TR_VK_DEVICE( name ) \
+	fns.name = reinterpret_cast<PFN_vk##name>( fns.GetDeviceProcAddr( device, "vk" #name ) ); \
+	if ( fns.name == nullptr ) { return false; }
+	TR_VK_DEVICE( GetDeviceQueue )
+	TR_VK_DEVICE( CreateImage )
+	TR_VK_DEVICE( DestroyImage )
+	TR_VK_DEVICE( GetImageMemoryRequirements )
+	TR_VK_DEVICE( AllocateMemory )
+	TR_VK_DEVICE( FreeMemory )
+	TR_VK_DEVICE( BindImageMemory )
+	TR_VK_DEVICE( CreateBuffer )
+	TR_VK_DEVICE( DestroyBuffer )
+	TR_VK_DEVICE( GetBufferMemoryRequirements )
+	TR_VK_DEVICE( BindBufferMemory )
+	TR_VK_DEVICE( MapMemory )
+	TR_VK_DEVICE( UnmapMemory )
+	TR_VK_DEVICE( CreateCommandPool )
+	TR_VK_DEVICE( DestroyCommandPool )
+	TR_VK_DEVICE( AllocateCommandBuffers )
+	TR_VK_DEVICE( FreeCommandBuffers )
+	TR_VK_DEVICE( BeginCommandBuffer )
+	TR_VK_DEVICE( EndCommandBuffer )
+	TR_VK_DEVICE( CmdPipelineBarrier )
+	TR_VK_DEVICE( CmdCopyImageToBuffer )
+	TR_VK_DEVICE( QueueSubmit )
+	TR_VK_DEVICE( QueueWaitIdle )
+#undef TR_VK_DEVICE
+	return true;
+}
+
+uint32_t VulkanMemoryType( const TRSession *session, uint32_t typeBits, VkMemoryPropertyFlags wanted ) {
+	VkPhysicalDeviceMemoryProperties properties = {};
+	session->vk.GetPhysicalDeviceMemoryProperties( session->vkPhysicalDevice, &properties );
+	for ( uint32_t i = 0; i < properties.memoryTypeCount; ++i ) {
+		if ( ( typeBits & ( 1u << i ) ) != 0 && ( properties.memoryTypes[i].propertyFlags & wanted ) == wanted ) {
+			return i;
+		}
+	}
+	return UINT32_MAX;
+}
+
+// Records one command buffer, runs it on the application's queue and waits:
+// everything the application submitted earlier has finished with it.
+template<typename Record>
+bool VulkanSubmitOnce( const TRSession *session, Record record ) {
+	VkCommandBufferAllocateInfo allocateInfo = {};
+	allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocateInfo.commandPool = session->vkCommandPool;
+	allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocateInfo.commandBufferCount = 1;
+	VkCommandBuffer cmd = VK_NULL_HANDLE;
+	if ( session->vk.AllocateCommandBuffers( session->vkDevice, &allocateInfo, &cmd ) != VK_SUCCESS ) {
+		return false;
+	}
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	VkResult result = session->vk.BeginCommandBuffer( cmd, &beginInfo );
+	if ( result == VK_SUCCESS ) {
+		record( cmd );
+		result = session->vk.EndCommandBuffer( cmd );
+	}
+	if ( result == VK_SUCCESS ) {
+		VkSubmitInfo submit = {};
+		submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submit.commandBufferCount = 1;
+		submit.pCommandBuffers = &cmd;
+		result = session->vk.QueueSubmit( session->vkQueue, 1, &submit, VK_NULL_HANDLE );
+		if ( result == VK_SUCCESS ) {
+			result = session->vk.QueueWaitIdle( session->vkQueue );
+		}
+	}
+	session->vk.FreeCommandBuffers( session->vkDevice, session->vkCommandPool, 1, &cmd );
+	return result == VK_SUCCESS;
+}
+
+void VulkanImageBarrier( const TRSession *session, VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
+		VkPipelineStageFlags srcStage, VkAccessFlags srcAccess, VkPipelineStageFlags dstStage, VkAccessFlags dstAccess ) {
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.srcAccessMask = srcAccess;
+	barrier.dstAccessMask = dstAccess;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.layerCount = 1;
+	session->vk.CmdPipelineBarrier( cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier );
+}
+
+bool VulkanFormatIsBGRA( int64_t format ) {
+	return format == VK_FORMAT_B8G8R8A8_SRGB || format == VK_FORMAT_B8G8R8A8_UNORM;
+}
+
+// Copies one image back through the capture buffer. The application left it
+// in COLOR_ATTACHMENT_OPTIMAL at release, and gets it back that way. Rows come
+// out bottom-up and in RGBA order, as the GL readback gives them.
+bool ReadVulkanSwapchainImage( const TRSwapchain *swapchain, int index, const XrRect2Di &rect, std::vector<uint8_t> &out, int &width, int &height ) {
+	TRSession *session = swapchain->session;
+	const int fullWidth = static_cast<int>( swapchain->info.width );
+	const int fullHeight = static_cast<int>( swapchain->info.height );
+	const VkDeviceSize bytes = static_cast<VkDeviceSize>( fullWidth ) * fullHeight * 4;
+	if ( session->vkReadbackSize < bytes ) {
+		if ( session->vkReadback != VK_NULL_HANDLE ) {
+			session->vk.DestroyBuffer( session->vkDevice, session->vkReadback, nullptr );
+			session->vk.FreeMemory( session->vkDevice, session->vkReadbackMemory, nullptr );
+			session->vkReadback = VK_NULL_HANDLE;
+			session->vkReadbackMemory = VK_NULL_HANDLE;
+			session->vkReadbackSize = 0;
+		}
+		VkBufferCreateInfo bufferInfo = {};
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferInfo.size = bytes;
+		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		if ( session->vk.CreateBuffer( session->vkDevice, &bufferInfo, nullptr, &session->vkReadback ) != VK_SUCCESS ) {
+			session->vkReadback = VK_NULL_HANDLE;
+			return false;
+		}
+		VkMemoryRequirements requirements = {};
+		session->vk.GetBufferMemoryRequirements( session->vkDevice, session->vkReadback, &requirements );
+		VkMemoryAllocateInfo allocateInfo = {};
+		allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocateInfo.allocationSize = requirements.size;
+		allocateInfo.memoryTypeIndex = VulkanMemoryType( session, requirements.memoryTypeBits,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+		if ( allocateInfo.memoryTypeIndex == UINT32_MAX
+				|| session->vk.AllocateMemory( session->vkDevice, &allocateInfo, nullptr, &session->vkReadbackMemory ) != VK_SUCCESS
+				|| session->vk.BindBufferMemory( session->vkDevice, session->vkReadback, session->vkReadbackMemory, 0 ) != VK_SUCCESS ) {
+			session->vk.DestroyBuffer( session->vkDevice, session->vkReadback, nullptr );
+			if ( session->vkReadbackMemory != VK_NULL_HANDLE ) {
+				session->vk.FreeMemory( session->vkDevice, session->vkReadbackMemory, nullptr );
+			}
+			session->vkReadback = VK_NULL_HANDLE;
+			session->vkReadbackMemory = VK_NULL_HANDLE;
+			return false;
+		}
+		session->vkReadbackSize = bytes;
+	}
+
+	const VkImage image = swapchain->vkImages[static_cast<size_t>( index )];
+	const bool copied = VulkanSubmitOnce( session, [&]( VkCommandBuffer cmd ) {
+		VulkanImageBarrier( session, cmd, image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT );
+		VkBufferImageCopy region = {};
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.imageSubresource.layerCount = 1;
+		region.imageExtent.width = static_cast<uint32_t>( fullWidth );
+		region.imageExtent.height = static_cast<uint32_t>( fullHeight );
+		region.imageExtent.depth = 1;
+		session->vk.CmdCopyImageToBuffer( cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, session->vkReadback, 1, &region );
+		VulkanImageBarrier( session, cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT );
+	} );
+	if ( !copied ) {
+		return false;
+	}
+	void *mapped = nullptr;
+	if ( session->vk.MapMemory( session->vkDevice, session->vkReadbackMemory, 0, bytes, 0, &mapped ) != VK_SUCCESS || mapped == nullptr ) {
+		return false;
+	}
+	const uint8_t *full = static_cast<const uint8_t *>( mapped );
+	const int x0 = std::max( 0, rect.offset.x );
+	const int y0 = std::max( 0, rect.offset.y );
+	width = std::min( rect.extent.width, fullWidth - x0 );
+	height = std::min( rect.extent.height, fullHeight - y0 );
+	if ( width <= 0 || height <= 0 ) {
+		session->vk.UnmapMemory( session->vkDevice, session->vkReadbackMemory );
+		return false;
+	}
+	const bool bgra = VulkanFormatIsBGRA( swapchain->info.format );
+	out.resize( static_cast<size_t>( width ) * height * 4 );
+	for ( int row = 0; row < height; ++row ) {
+		// Vulkan rows run top-down; the output is bottom-up like GL's
+		const uint8_t *src = &full[( static_cast<size_t>( y0 + height - 1 - row ) * fullWidth + x0 ) * 4];
+		uint8_t *dst = &out[static_cast<size_t>( row ) * width * 4];
+		for ( int x = 0; x < width; ++x ) {
+			dst[x * 4 + 0] = src[x * 4 + ( bgra ? 2 : 0 )];
+			dst[x * 4 + 1] = src[x * 4 + 1];
+			dst[x * 4 + 2] = src[x * 4 + ( bgra ? 0 : 2 )];
+			dst[x * 4 + 3] = src[x * 4 + 3];
+		}
+	}
+	session->vk.UnmapMemory( session->vkDevice, session->vkReadbackMemory );
+	return true;
+}
+
 // Reads one swapchain image back with the GL state the application had left
 // intact: the 2D binding of the active unit, both pixel buffer bindings and
 // the pack alignment are restored.
 bool ReadSwapchainImage( const TRSwapchain *swapchain, int index, const XrRect2Di &rect, std::vector<uint8_t> &out, int &width, int &height ) {
-	if ( index < 0 || index >= static_cast<int>( swapchain->textures.size() ) ) {
+	if ( index < 0 || index >= static_cast<int>( swapchain->imageCount ) ) {
 		return false;
+	}
+	if ( swapchain->session->vulkan ) {
+		return ReadVulkanSwapchainImage( swapchain, index, rect, out, width, height );
 	}
 	const int fullWidth = static_cast<int>( swapchain->info.width );
 	const int fullHeight = static_cast<int>( swapchain->info.height );
@@ -1113,15 +1389,42 @@ void AdvanceScript( TRSession *session ) {
 ===============================================================================
 */
 
+// XR_MNDX_egl_enable, declared without EGL headers: XrGraphicsBindingEGLMNDX
+// carries the getProcAddress function, then EGLDisplay, EGLConfig and
+// EGLContext pointers.
+#define TR_MNDX_EGL_ENABLE_EXTENSION_NAME "XR_MNDX_egl_enable"
+const uint32_t TR_MNDX_EGL_ENABLE_SPEC_VERSION = 2;
+
+struct TREGLBinding {
+	XrStructureType	type;
+	const void *	next;
+	void *			getProcAddress;
+	void *			display;
+	void *			config;
+	void *			context;
+};
+
 const char *const SUPPORTED_EXTENSIONS[] = {
 	XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
+	XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME,
 	XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME,
+#if defined( __linux__ )
+	TR_MNDX_EGL_ENABLE_EXTENSION_NAME,
+#endif
 };
 
 uint32_t ExtensionVersion( const char *name ) {
 	if ( std::strcmp( name, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME ) == 0 ) {
 		return XR_KHR_opengl_enable_SPEC_VERSION;
 	}
+	if ( std::strcmp( name, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ) == 0 ) {
+		return XR_KHR_vulkan_enable2_SPEC_VERSION;
+	}
+#if defined( __linux__ )
+	if ( std::strcmp( name, TR_MNDX_EGL_ENABLE_EXTENSION_NAME ) == 0 ) {
+		return TR_MNDX_EGL_ENABLE_SPEC_VERSION;
+	}
+#endif
 	if ( std::strcmp( name, XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME ) == 0 ) {
 		return XR_KHR_composition_layer_cylinder_SPEC_VERSION;
 	}
@@ -1463,6 +1766,175 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetOpenGLGraphicsRequirementsKHR( XrInstance
 /*
 ===============================================================================
 
+	API: XR_KHR_vulkan_enable2
+
+	The runtime creates the application's instance and device through the
+	application's own loader, as real runtimes do, and names the GPU the
+	simulated headset renders with.
+
+===============================================================================
+*/
+
+TRInstance *GetVulkanInstance( XrInstance handle, XrSystemId systemId, XrResult &result ) {
+	TRInstance *instance = GetInstance( handle );
+	result = XR_SUCCESS;
+	if ( instance == nullptr ) {
+		result = XR_ERROR_HANDLE_INVALID;
+	} else if ( !InstanceHasExtension( instance, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ) ) {
+		result = XR_ERROR_FUNCTION_UNSUPPORTED;
+	} else if ( systemId != TR_SYSTEM_ID ) {
+		result = XR_ERROR_SYSTEM_INVALID;
+	}
+	return result == XR_SUCCESS ? instance : nullptr;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetVulkanGraphicsRequirements2KHR( XrInstance handle, XrSystemId systemId, XrGraphicsRequirementsVulkanKHR *requirements ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	XrResult result = XR_SUCCESS;
+	TRInstance *instance = GetVulkanInstance( handle, systemId, result );
+	if ( instance == nullptr ) {
+		return result;
+	}
+	if ( requirements == nullptr || requirements->type != XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR ) {
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	requirements->minApiVersionSupported = XR_MAKE_VERSION( 1, 0, 0 );
+	requirements->maxApiVersionSupported = XR_MAKE_VERSION( 1, 3, 0 );
+	instance->graphicsRequirementsQueried = true;
+	return XR_SUCCESS;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateVulkanInstanceKHR( XrInstance handle, const XrVulkanInstanceCreateInfoKHR *createInfo,
+		VkInstance *vulkanInstance, VkResult *vulkanResult ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	if ( createInfo == nullptr || vulkanInstance == nullptr || vulkanResult == nullptr || createInfo->type != XR_TYPE_VULKAN_INSTANCE_CREATE_INFO_KHR
+			|| createInfo->pfnGetInstanceProcAddr == nullptr || createInfo->vulkanCreateInfo == nullptr ) {
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	XrResult result = XR_SUCCESS;
+	TRInstance *instance = GetVulkanInstance( handle, createInfo->systemId, result );
+	if ( instance == nullptr ) {
+		return result;
+	}
+	if ( !instance->graphicsRequirementsQueried ) {
+		return XR_ERROR_GRAPHICS_REQUIREMENTS_CALL_MISSING;
+	}
+	PFN_vkCreateInstance createInstance = reinterpret_cast<PFN_vkCreateInstance>(
+		createInfo->pfnGetInstanceProcAddr( VK_NULL_HANDLE, "vkCreateInstance" ) );
+	if ( createInstance == nullptr ) {
+		return XR_ERROR_RUNTIME_FAILURE;
+	}
+	*vulkanResult = createInstance( createInfo->vulkanCreateInfo, createInfo->vulkanAllocator, vulkanInstance );
+	const VkApplicationInfo *application = createInfo->vulkanCreateInfo->pApplicationInfo;
+	Log( "{\"event\":\"create_vulkan_instance\",\"result\":%d,\"api_major\":%u,\"api_minor\":%u,\"extensions\":%u,\"layers\":%u}",
+		static_cast<int>( *vulkanResult ),
+		application != nullptr ? VK_API_VERSION_MAJOR( application->apiVersion ) : 1u,
+		application != nullptr ? VK_API_VERSION_MINOR( application->apiVersion ) : 0u,
+		createInfo->vulkanCreateInfo->enabledExtensionCount, createInfo->vulkanCreateInfo->enabledLayerCount );
+	if ( *vulkanResult == VK_SUCCESS ) {
+		instance->vkGetInstanceProcAddr = createInfo->pfnGetInstanceProcAddr;
+		instance->vkInstance = *vulkanInstance;
+		instance->vkPhysicalDevice = VK_NULL_HANDLE;
+		instance->vkDevice = VK_NULL_HANDLE;
+	}
+	return XR_SUCCESS;
+}
+
+// The GPU the simulated headset renders with: OPENQ4_XR_TEST_VK_DEVICE, or the
+// first discrete GPU, or the first integrated one, or the first device.
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetVulkanGraphicsDevice2KHR( XrInstance handle, const XrVulkanGraphicsDeviceGetInfoKHR *getInfo,
+		VkPhysicalDevice *vulkanPhysicalDevice ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	if ( getInfo == nullptr || vulkanPhysicalDevice == nullptr || getInfo->type != XR_TYPE_VULKAN_GRAPHICS_DEVICE_GET_INFO_KHR ) {
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	XrResult result = XR_SUCCESS;
+	TRInstance *instance = GetVulkanInstance( handle, getInfo->systemId, result );
+	if ( instance == nullptr ) {
+		return result;
+	}
+	if ( getInfo->vulkanInstance == VK_NULL_HANDLE || getInfo->vulkanInstance != instance->vkInstance ) {
+		Log( "{\"event\":\"vulkan_device_rejected\",\"reason\":\"instance not created by xrCreateVulkanInstanceKHR\"}" );
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	PFN_vkEnumeratePhysicalDevices enumerate = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(
+		instance->vkGetInstanceProcAddr( instance->vkInstance, "vkEnumeratePhysicalDevices" ) );
+	PFN_vkGetPhysicalDeviceProperties properties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(
+		instance->vkGetInstanceProcAddr( instance->vkInstance, "vkGetPhysicalDeviceProperties" ) );
+	if ( enumerate == nullptr || properties == nullptr ) {
+		return XR_ERROR_RUNTIME_FAILURE;
+	}
+	uint32_t count = 0;
+	if ( enumerate( instance->vkInstance, &count, nullptr ) != VK_SUCCESS || count == 0 ) {
+		return XR_ERROR_RUNTIME_FAILURE;
+	}
+	std::vector<VkPhysicalDevice> devices( count );
+	if ( enumerate( instance->vkInstance, &count, devices.data() ) != VK_SUCCESS ) {
+		return XR_ERROR_RUNTIME_FAILURE;
+	}
+	int chosen = -1;
+	const char *forced = std::getenv( "OPENQ4_XR_TEST_VK_DEVICE" );
+	if ( forced != nullptr && forced[0] != '\0' ) {
+		chosen = std::atoi( forced );
+		if ( chosen < 0 || chosen >= static_cast<int>( count ) ) {
+			return XR_ERROR_RUNTIME_FAILURE;
+		}
+	}
+	const VkPhysicalDeviceType preference[] = { VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU };
+	for ( VkPhysicalDeviceType type : preference ) {
+		for ( uint32_t i = 0; i < count && chosen < 0; ++i ) {
+			VkPhysicalDeviceProperties p = {};
+			properties( devices[i], &p );
+			if ( p.deviceType == type ) {
+				chosen = static_cast<int>( i );
+			}
+		}
+	}
+	if ( chosen < 0 ) {
+		chosen = 0;
+	}
+	VkPhysicalDeviceProperties p = {};
+	properties( devices[static_cast<size_t>( chosen )], &p );
+	instance->vkPhysicalDevice = devices[static_cast<size_t>( chosen )];
+	*vulkanPhysicalDevice = instance->vkPhysicalDevice;
+	Log( "{\"event\":\"vulkan_device\",\"index\":%d,\"name\":\"%s\"}", chosen, JsonEscape( p.deviceName ).c_str() );
+	return XR_SUCCESS;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateVulkanDeviceKHR( XrInstance handle, const XrVulkanDeviceCreateInfoKHR *createInfo,
+		VkDevice *vulkanDevice, VkResult *vulkanResult ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	if ( createInfo == nullptr || vulkanDevice == nullptr || vulkanResult == nullptr || createInfo->type != XR_TYPE_VULKAN_DEVICE_CREATE_INFO_KHR
+			|| createInfo->pfnGetInstanceProcAddr == nullptr || createInfo->vulkanCreateInfo == nullptr ) {
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	XrResult result = XR_SUCCESS;
+	TRInstance *instance = GetVulkanInstance( handle, createInfo->systemId, result );
+	if ( instance == nullptr ) {
+		return result;
+	}
+	if ( createInfo->vulkanPhysicalDevice == VK_NULL_HANDLE || createInfo->vulkanPhysicalDevice != instance->vkPhysicalDevice ) {
+		Log( "{\"event\":\"create_vulkan_device_rejected\",\"reason\":\"not the device xrGetVulkanGraphicsDevice2KHR named\"}" );
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	PFN_vkCreateDevice createDevice = reinterpret_cast<PFN_vkCreateDevice>(
+		createInfo->pfnGetInstanceProcAddr( instance->vkInstance, "vkCreateDevice" ) );
+	if ( createDevice == nullptr ) {
+		return XR_ERROR_RUNTIME_FAILURE;
+	}
+	*vulkanResult = createDevice( createInfo->vulkanPhysicalDevice, createInfo->vulkanCreateInfo, createInfo->vulkanAllocator, vulkanDevice );
+	Log( "{\"event\":\"create_vulkan_device\",\"result\":%d,\"extensions\":%u,\"queue_families\":%u}",
+		static_cast<int>( *vulkanResult ), createInfo->vulkanCreateInfo->enabledExtensionCount,
+		createInfo->vulkanCreateInfo->queueCreateInfoCount );
+	if ( *vulkanResult == VK_SUCCESS ) {
+		instance->vkDevice = *vulkanDevice;
+	}
+	return XR_SUCCESS;
+}
+
+/*
+===============================================================================
+
 	API: session
 
 ===============================================================================
@@ -1508,11 +1980,50 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateSession( XrInstance handle, const XrSe
 			bindingName = "opengl_wayland";
 			break;
 		}
+		if ( binding->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR ) {
+			bindingName = "vulkan";
+			break;
+		}
+		if ( binding->type == XR_TYPE_GRAPHICS_BINDING_EGL_MNDX ) {
+			bindingName = "opengl_egl";
+			break;
+		}
 		binding = binding->next;
 	}
 	if ( binding == nullptr ) {
-		Log( "{\"event\":\"create_session_rejected\",\"reason\":\"no OpenGL graphics binding\"}" );
+		Log( "{\"event\":\"create_session_rejected\",\"reason\":\"no OpenGL or Vulkan graphics binding\"}" );
 		return XR_ERROR_GRAPHICS_DEVICE_INVALID;
+	}
+	if ( binding->type == XR_TYPE_GRAPHICS_BINDING_EGL_MNDX ) {
+		// the binding names the context current on this thread, as the GL binding rule has it
+		const TREGLBinding *egl = reinterpret_cast<const TREGLBinding *>( binding );
+		bool current = false;
+#if defined( __linux__ )
+		void *library = dlopen( "libEGL.so.1", RTLD_NOW | RTLD_NOLOAD );
+		typedef void *( *getCurrent_t )( void );
+		getCurrent_t getCurrentContext = library != nullptr
+			? reinterpret_cast<getCurrent_t>( dlsym( library, "eglGetCurrentContext" ) ) : nullptr;
+		current = getCurrentContext != nullptr && egl->context != nullptr && getCurrentContext() == egl->context;
+		if ( library != nullptr ) {
+			dlclose( library );
+		}
+#endif
+		if ( !InstanceHasExtension( instance, TR_MNDX_EGL_ENABLE_EXTENSION_NAME ) || !InstanceHasExtension( instance, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME )
+				|| egl->getProcAddress == nullptr || egl->display == nullptr || egl->config == nullptr || !current ) {
+			Log( "{\"event\":\"create_session_rejected\",\"reason\":\"binding is not the current EGL context\"}" );
+			return XR_ERROR_GRAPHICS_DEVICE_INVALID;
+		}
+	}
+	const XrGraphicsBindingVulkanKHR *vulkanBinding = nullptr;
+	if ( binding->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR ) {
+		vulkanBinding = reinterpret_cast<const XrGraphicsBindingVulkanKHR *>( binding );
+		// XR_KHR_vulkan_enable2: only the objects the runtime created may be bound
+		if ( !InstanceHasExtension( instance, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ) || vulkanBinding->instance == VK_NULL_HANDLE
+				|| vulkanBinding->instance != instance->vkInstance || vulkanBinding->physicalDevice != instance->vkPhysicalDevice
+				|| vulkanBinding->device == VK_NULL_HANDLE || vulkanBinding->device != instance->vkDevice ) {
+			Log( "{\"event\":\"create_session_rejected\",\"reason\":\"Vulkan binding names objects the runtime did not create\"}" );
+			return XR_ERROR_GRAPHICS_DEVICE_INVALID;
+		}
 	}
 #if defined( _WIN32 )
 	if ( binding->type == XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR ) {
@@ -1528,6 +2039,34 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateSession( XrInstance handle, const XrSe
 	created->magic = MAGIC_SESSION;
 	G().liveHandles[ created ] = MAGIC_SESSION;
 	created->instance = instance;
+	created->vulkan = false;
+	created->vkPhysicalDevice = VK_NULL_HANDLE;
+	created->vkDevice = VK_NULL_HANDLE;
+	created->vkQueue = VK_NULL_HANDLE;
+	created->vkCommandPool = VK_NULL_HANDLE;
+	created->vkReadback = VK_NULL_HANDLE;
+	created->vkReadbackMemory = VK_NULL_HANDLE;
+	created->vkReadbackSize = 0;
+	if ( vulkanBinding != nullptr ) {
+		created->vulkan = true;
+		created->vkPhysicalDevice = vulkanBinding->physicalDevice;
+		created->vkDevice = vulkanBinding->device;
+		bool ready = LoadVulkanFns( instance->vkGetInstanceProcAddr, vulkanBinding->instance, vulkanBinding->device, created->vk );
+		if ( ready ) {
+			created->vk.GetDeviceQueue( created->vkDevice, vulkanBinding->queueFamilyIndex, vulkanBinding->queueIndex, &created->vkQueue );
+			VkCommandPoolCreateInfo poolInfo = {};
+			poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+			poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+			poolInfo.queueFamilyIndex = vulkanBinding->queueFamilyIndex;
+			ready = created->vkQueue != VK_NULL_HANDLE
+				&& created->vk.CreateCommandPool( created->vkDevice, &poolInfo, nullptr, &created->vkCommandPool ) == VK_SUCCESS;
+		}
+		if ( !ready ) {
+			delete created;
+			Log( "{\"event\":\"create_session_rejected\",\"reason\":\"Vulkan device unusable\"}" );
+			return XR_ERROR_GRAPHICS_DEVICE_INVALID;
+		}
+	}
 	created->state = XR_SESSION_STATE_UNKNOWN;
 	created->running = false;
 	created->exitRequested = false;
@@ -1561,6 +2100,19 @@ void DestroySwapchainLocked( TRSwapchain *swapchain ) {
 	if ( !swapchain->textures.empty() ) {
 		glDeleteTextures( static_cast<GLsizei>( swapchain->textures.size() ), swapchain->textures.data() );
 	}
+	// OpenXR requires the application's commands on these images to have
+	// completed; a Vulkan validation layer reports any that have not
+	const TRSession *session = swapchain->session;
+	for ( size_t i = 0; i < swapchain->vkImages.size(); ++i ) {
+		if ( swapchain->vkImages[i] != VK_NULL_HANDLE ) {
+			session->vk.DestroyImage( session->vkDevice, swapchain->vkImages[i], nullptr );
+		}
+	}
+	for ( size_t i = 0; i < swapchain->vkMemory.size(); ++i ) {
+		if ( swapchain->vkMemory[i] != VK_NULL_HANDLE ) {
+			session->vk.FreeMemory( session->vkDevice, swapchain->vkMemory[i], nullptr );
+		}
+	}
 	G().liveHandles.erase( swapchain );
 	swapchain->magic = 0;
 	delete swapchain;
@@ -1574,6 +2126,17 @@ void DestroySessionLocked( TRSession *session ) {
 	}
 	for ( TRSwapchain *swapchain : session->swapchains ) {
 		DestroySwapchainLocked( swapchain );
+	}
+	if ( session->vulkan ) {
+		if ( session->vkReadback != VK_NULL_HANDLE ) {
+			session->vk.DestroyBuffer( session->vkDevice, session->vkReadback, nullptr );
+		}
+		if ( session->vkReadbackMemory != VK_NULL_HANDLE ) {
+			session->vk.FreeMemory( session->vkDevice, session->vkReadbackMemory, nullptr );
+		}
+		if ( session->vkCommandPool != VK_NULL_HANDLE ) {
+			session->vk.DestroyCommandPool( session->vkDevice, session->vkCommandPool, nullptr );
+		}
 	}
 	session->instance->session = nullptr;
 	// drop queued events that name this session
@@ -1834,17 +2397,105 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrDestroySpace( XrSpace handle ) {
 ===============================================================================
 */
 
-const std::vector<int64_t> &SwapchainFormats() {
-	static const std::vector<int64_t> formats = { GL_SRGB8_ALPHA8, GL_RGBA8, GL_RGBA16F };
+const std::vector<int64_t> &VulkanSwapchainFormats() {
+	static std::vector<int64_t> formats;
+	if ( formats.empty() ) {
+		const char *list = std::getenv( "OPENQ4_XR_TEST_VK_FORMATS" );
+		if ( list != nullptr && list[0] != '\0' ) {
+			std::stringstream stream( list );
+			std::string item;
+			while ( std::getline( stream, item, ',' ) ) {
+				const long long value = std::atoll( item.c_str() );
+				if ( value > 0 ) {
+					formats.push_back( value );
+				}
+			}
+		}
+		if ( formats.empty() ) {
+			formats = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM };
+		}
+	}
 	return formats;
+}
+
+// Device-local images on the application's device, in COLOR_ATTACHMENT_OPTIMAL
+// as an application finds them after xrWaitSwapchainImage. They are always
+// transfer sources so captures can read them back.
+bool CreateVulkanSwapchainImages( TRSwapchain *swapchain ) {
+	const TRSession *session = swapchain->session;
+	const XrSwapchainCreateInfo &info = swapchain->info;
+	VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	if ( info.usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT ) {
+		usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	}
+	if ( info.usageFlags & XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT ) {
+		usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	}
+	if ( info.usageFlags & XR_SWAPCHAIN_USAGE_SAMPLED_BIT ) {
+		usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+	}
+	if ( info.usageFlags & XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT ) {
+		usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+	}
+	swapchain->vkImages.assign( swapchain->imageCount, VK_NULL_HANDLE );
+	swapchain->vkMemory.assign( swapchain->imageCount, VK_NULL_HANDLE );
+	for ( uint32_t i = 0; i < swapchain->imageCount; ++i ) {
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		if ( info.usageFlags & XR_SWAPCHAIN_USAGE_MUTABLE_FORMAT_BIT ) {
+			imageInfo.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+		}
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = static_cast<VkFormat>( info.format );
+		imageInfo.extent.width = info.width;
+		imageInfo.extent.height = info.height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = usage;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		if ( session->vk.CreateImage( session->vkDevice, &imageInfo, nullptr, &swapchain->vkImages[i] ) != VK_SUCCESS ) {
+			swapchain->vkImages[i] = VK_NULL_HANDLE;
+			return false;
+		}
+		VkMemoryRequirements requirements = {};
+		session->vk.GetImageMemoryRequirements( session->vkDevice, swapchain->vkImages[i], &requirements );
+		VkMemoryAllocateInfo allocateInfo = {};
+		allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocateInfo.allocationSize = requirements.size;
+		allocateInfo.memoryTypeIndex = VulkanMemoryType( session, requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		if ( allocateInfo.memoryTypeIndex == UINT32_MAX
+				|| session->vk.AllocateMemory( session->vkDevice, &allocateInfo, nullptr, &swapchain->vkMemory[i] ) != VK_SUCCESS ) {
+			swapchain->vkMemory[i] = VK_NULL_HANDLE;
+			return false;
+		}
+		if ( session->vk.BindImageMemory( session->vkDevice, swapchain->vkImages[i], swapchain->vkMemory[i], 0 ) != VK_SUCCESS ) {
+			return false;
+		}
+	}
+	return VulkanSubmitOnce( session, [&]( VkCommandBuffer cmd ) {
+		for ( VkImage image : swapchain->vkImages ) {
+			VulkanImageBarrier( session, cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT );
+		}
+	} );
+}
+
+const std::vector<int64_t> &SwapchainFormats( const TRSession *session ) {
+	static const std::vector<int64_t> formats = { GL_SRGB8_ALPHA8, GL_RGBA8, GL_RGBA16F };
+	return session->vulkan ? VulkanSwapchainFormats() : formats;
 }
 
 XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateSwapchainFormats( XrSession handle, uint32_t capacity, uint32_t *countOutput, int64_t *formats ) {
 	std::lock_guard<std::recursive_mutex> guard( G().lock );
-	if ( GetSession( handle ) == nullptr ) {
+	TRSession *session = GetSession( handle );
+	if ( session == nullptr ) {
 		return XR_ERROR_HANDLE_INVALID;
 	}
-	return TwoCall( capacity, countOutput, formats, SwapchainFormats() );
+	return TwoCall( capacity, countOutput, formats, SwapchainFormats( session ) );
 }
 
 XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateSwapchain( XrSession handle, const XrSwapchainCreateInfo *createInfo, XrSwapchain *swapchain ) {
@@ -1857,7 +2508,7 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateSwapchain( XrSession handle, const XrS
 	if ( createInfo == nullptr || swapchain == nullptr || createInfo->type != XR_TYPE_SWAPCHAIN_CREATE_INFO ) {
 		return XR_ERROR_VALIDATION_FAILURE;
 	}
-	const std::vector<int64_t> &formats = SwapchainFormats();
+	const std::vector<int64_t> &formats = SwapchainFormats( session );
 	if ( std::find( formats.begin(), formats.end(), createInfo->format ) == formats.end() ) {
 		return XR_ERROR_SWAPCHAIN_FORMAT_UNSUPPORTED;
 	}
@@ -1880,6 +2531,20 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateSwapchain( XrSession handle, const XrS
 	created->nextAcquire = 0;
 	created->waited = false;
 	created->lastReleased = -1;
+	created->imageCount = TR_SWAPCHAIN_LENGTH;
+	if ( session->vulkan ) {
+		if ( !CreateVulkanSwapchainImages( created ) ) {
+			DestroySwapchainLocked( created );
+			Log( "{\"event\":\"create_swapchain_rejected\",\"reason\":\"vulkan image creation failed\"}" );
+			return XR_ERROR_RUNTIME_FAILURE;
+		}
+		session->swapchains.push_back( created );
+		*swapchain = reinterpret_cast<XrSwapchain>( created );
+		Log( "{\"event\":\"create_swapchain\",\"format\":%lld,\"width\":%u,\"height\":%u,\"usage\":%llu,\"api\":\"vulkan\"}",
+			static_cast<long long>( createInfo->format ), createInfo->width, createInfo->height,
+			static_cast<unsigned long long>( createInfo->usageFlags ) );
+		return XR_SUCCESS;
+	}
 	created->textures.resize( TR_SWAPCHAIN_LENGTH );
 
 	// The application's context is current on this thread (OpenGL binding
@@ -1947,12 +2612,22 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateSwapchainImages( XrSwapchain handle
 		}
 		return FaultResult();
 	}
-	*countOutput = static_cast<uint32_t>( swapchain->textures.size() );
+	*countOutput = swapchain->imageCount;
 	if ( capacity == 0 ) {
 		return XR_SUCCESS;
 	}
-	if ( capacity < swapchain->textures.size() ) {
+	if ( capacity < swapchain->imageCount ) {
 		return XR_ERROR_SIZE_INSUFFICIENT;
+	}
+	if ( swapchain->session->vulkan ) {
+		XrSwapchainImageVulkanKHR *vk = reinterpret_cast<XrSwapchainImageVulkanKHR *>( images );
+		for ( size_t i = 0; i < swapchain->vkImages.size(); ++i ) {
+			if ( vk[i].type != XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR ) {
+				return XR_ERROR_VALIDATION_FAILURE;
+			}
+			vk[i].image = swapchain->vkImages[i];
+		}
+		return XR_SUCCESS;
 	}
 	XrSwapchainImageOpenGLKHR *gl = reinterpret_cast<XrSwapchainImageOpenGLKHR *>( images );
 	for ( size_t i = 0; i < swapchain->textures.size(); ++i ) {
@@ -1975,13 +2650,13 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrAcquireSwapchainImage( XrSwapchain handle, c
 	if ( index == nullptr || ( acquireInfo != nullptr && acquireInfo->type != XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO ) ) {
 		return XR_ERROR_VALIDATION_FAILURE;
 	}
-	if ( swapchain->acquired.size() >= swapchain->textures.size() ) {
+	if ( swapchain->acquired.size() >= swapchain->imageCount ) {
 		return XR_ERROR_CALL_ORDER_INVALID;
 	}
 	*index = swapchain->nextAcquire;
 	swapchain->acquired.push_back( swapchain->nextAcquire );
-	swapchain->nextAcquire = ( swapchain->nextAcquire + 1 ) % static_cast<uint32_t>( swapchain->textures.size() );
-	if ( inject ) *index = G().faultValue == "large" ? UINT32_MAX : static_cast<uint32_t>( swapchain->textures.size() );
+	swapchain->nextAcquire = ( swapchain->nextAcquire + 1 ) % swapchain->imageCount;
+	if ( inject ) *index = G().faultValue == "large" ? UINT32_MAX : swapchain->imageCount;
 	return XR_SUCCESS;
 }
 
@@ -2879,6 +3554,10 @@ const FunctionEntry FUNCTIONS[] = {
 	TR_ENTRY( xrApplyHapticFeedback ),
 	TR_ENTRY( xrStopHapticFeedback ),
 	TR_EXT_ENTRY( xrGetOpenGLGraphicsRequirementsKHR, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME ),
+	TR_EXT_ENTRY( xrGetVulkanGraphicsRequirements2KHR, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ),
+	TR_EXT_ENTRY( xrCreateVulkanInstanceKHR, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ),
+	TR_EXT_ENTRY( xrGetVulkanGraphicsDevice2KHR, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ),
+	TR_EXT_ENTRY( xrCreateVulkanDeviceKHR, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ),
 };
 
 XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetInstanceProcAddr( XrInstance instance, const char *name, PFN_xrVoidFunction *function ) {

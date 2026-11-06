@@ -24,11 +24,26 @@
 #endif
 
 // Presentation needs desktop GL: the module that owns a WGL or GLX context.
-// The GLES module, the static renderer of dedicated and macOS builds, and the
-// Vulkan module (renderer/Vulkan stubs) never present to OpenXR.
+// The GLES module and the static renderer of dedicated and macOS builds never
+// present to OpenXR; the Vulkan module has its own backend
+// (Vulkan/vk_VRPresentation.cpp).
 #if defined( OPENQ4_RENDERER_GL_MODULE ) && !defined( OPENQ4_RENDERER_GLES_MODULE )
 #define OPENQ4_VR_GL_PRESENTATION 1
 #endif
+
+// GL presents through the front end's render textures (tr.vrTargets), and its
+// driver retires deleted textures itself.
+bool R_VR_BackendOwnsTargets( void ) {
+	return false;
+}
+
+bool R_VR_BackendPrepareTargets( renderVRFrame_t &frame ) {
+	(void)frame;
+	return false;
+}
+
+void R_VR_BackendReleaseImages( void ) {
+}
 
 #if defined( OPENQ4_VR_GL_PRESENTATION )
 
@@ -85,6 +100,64 @@ static void *R_VR_GLXSymbol( const char *name ) {
 }
 #endif
 
+#if defined( __linux__ )
+// EGL as well, which SDL loads for native Wayland, possibly as a local library.
+static void *R_VR_EGLSymbol( const char *name ) {
+	static void *library = dlopen( "libEGL.so.1", RTLD_NOW | RTLD_NOLOAD );
+	void *symbol = dlsym( RTLD_DEFAULT, name );
+	if ( symbol == NULL && library != NULL ) {
+		symbol = dlsym( library, name );
+	}
+	return symbol;
+}
+
+/*
+====================
+R_VR_QueryEGLBinding
+
+An OpenGL context on EGL (SDL on native Wayland): XR_MNDX_egl_enable binds
+its display, config and context.
+====================
+*/
+static bool R_VR_QueryEGLBinding( renderVRGraphicsBinding_t &binding ) {
+	typedef void *( *getCurrent_t )( void );
+	typedef unsigned int ( *queryContext_t )( void *display, void *context, int attribute, int *value );
+	typedef unsigned int ( *chooseConfig_t )( void *display, const int *attributes, void **configs, int size, int *count );
+	const int eglConfigId = 0x3028;		// EGL_CONFIG_ID
+	const int eglNone = 0x3038;			// EGL_NONE
+
+	getCurrent_t getCurrentDisplay = (getCurrent_t)R_VR_EGLSymbol( "eglGetCurrentDisplay" );
+	getCurrent_t getCurrentContext = (getCurrent_t)R_VR_EGLSymbol( "eglGetCurrentContext" );
+	queryContext_t queryContext = (queryContext_t)R_VR_EGLSymbol( "eglQueryContext" );
+	chooseConfig_t chooseConfig = (chooseConfig_t)R_VR_EGLSymbol( "eglChooseConfig" );
+	void *getProcAddress = R_VR_EGLSymbol( "eglGetProcAddress" );
+	if ( getCurrentDisplay == NULL || getCurrentContext == NULL || queryContext == NULL || chooseConfig == NULL
+			|| getProcAddress == NULL ) {
+		return false;
+	}
+	binding.eglDisplay = getCurrentDisplay();
+	binding.eglContext = getCurrentContext();
+	if ( binding.eglDisplay == NULL || binding.eglContext == NULL ) {
+		return false;
+	}
+	int configId = 0;
+	if ( !queryContext( binding.eglDisplay, binding.eglContext, eglConfigId, &configId ) ) {
+		return false;
+	}
+	// EGL_CONFIG_ID alone selects exactly that config
+	const int attributes[] = { eglConfigId, configId, eglNone };
+	void *config = NULL;
+	int count = 0;
+	if ( !chooseConfig( binding.eglDisplay, attributes, &config, 1, &count ) || count < 1 || config == NULL ) {
+		return false;
+	}
+	binding.eglConfig = config;
+	binding.eglGetProcAddress = getProcAddress;
+	binding.kind = RENDER_VR_BINDING_EGL;
+	return true;
+}
+#endif
+
 bool R_VR_QueryGraphicsBinding( renderVRGraphicsBinding_t &binding ) {
 	memset( &binding, 0, sizeof( binding ) );
 	if ( !R_VR_BackendCanPresent() ) {
@@ -118,7 +191,7 @@ bool R_VR_QueryGraphicsBinding( renderVRGraphicsBinding_t &binding ) {
 	xFree_t xFree = (xFree_t)dlsym( RTLD_DEFAULT, "XFree" );
 	if ( getCurrentContext == NULL || getCurrentDisplay == NULL || getCurrentDrawable == NULL
 			|| queryContext == NULL || chooseFBConfig == NULL || getFBConfigAttrib == NULL ) {
-		return false;
+		return R_VR_QueryEGLBinding( binding );
 	}
 
 	// an EGL context (native Wayland) leaves these empty: no Xlib binding
@@ -126,7 +199,10 @@ bool R_VR_QueryGraphicsBinding( renderVRGraphicsBinding_t &binding ) {
 	binding.glxDisplay = getCurrentDisplay();
 	binding.glxDrawable = getCurrentDrawable();
 	if ( binding.glxContext == NULL || binding.glxDisplay == NULL || binding.glxDrawable == 0 ) {
-		return false;
+		binding.glxContext = NULL;
+		binding.glxDisplay = NULL;
+		binding.glxDrawable = 0;
+		return R_VR_QueryEGLBinding( binding );
 	}
 
 	int configId = 0, screen = 0;

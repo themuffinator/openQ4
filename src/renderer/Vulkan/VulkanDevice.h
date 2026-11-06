@@ -101,6 +101,10 @@ typedef struct vkDeviceContext_s {
 	bool				surfaceLost;
 
 	VkInstance			instance;
+	// OpenXR's runtime created the instance and the device (render API 32
+	// module services), on the GPU the headset renders with
+	bool				instanceFromVR;
+	bool				deviceFromVR;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VkSurfaceKHR		surface;
 	VkPhysicalDevice	physicalDevice;

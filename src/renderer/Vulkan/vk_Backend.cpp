@@ -700,6 +700,8 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	if ( !glConfig.isInitialized ) {
 		return;
 	}
+	// a VR frame moves onto its targets with RC_VR_TARGET (vk_VRPresentation.cpp)
+	RB_VR_BeginBackEnd();
 
 	R_ClassicGuiDomain_ResetFrame();
 	R_ClassicCinematicPostDomain_ResetFrame();
@@ -898,6 +900,9 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 				backEnd.postProcessSMAAQuality =
 						((const setPostProcessSMAAQualityCommand_t *)cmds)->quality;
 				break;
+			case RC_VR_TARGET:
+				RB_VR_SetTarget( cmds );
+				break;
 			case RC_COPY_RENDER: {
 				const copyRenderCommand_t *cmd = (const copyRenderCommand_t *)cmds;
 				const bool sharedCaptureMatches = pendingSharedSubview != NULL
@@ -961,8 +966,12 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 				// the result. CRT runs here whether or not this frame is a
 				// capture; the display mapping that applies r_brightness/r_gamma
 				// follows exactly once, in VK_GuiExecutor_EndFrameAndPresent or
-				// VK_GuiExecutor_ReadPixels.
-				VK_PostProcess_ApplyBackBuffer();
+				// VK_GuiExecutor_ReadPixels. A VR frame gives each of its
+				// targets both as the frame leaves it, then copies them out and
+				// mirrors one into the window (vk_VRPresentation.cpp).
+				if ( !RB_VR_PresentFrame() ) {
+					VK_PostProcess_ApplyBackBuffer();
+				}
 				R_RendererMetrics_EndPresentPhase( RENDERER_PRESENT_FINAL_POST, postBegin );
 				// CaptureRenderToFile flushes a cropped save-preview frame with
 				// R_SubmittedTakingScreenshot() set. Match RB_SwapBuffers: retain that

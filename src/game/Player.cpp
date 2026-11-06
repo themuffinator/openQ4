@@ -7564,6 +7564,11 @@ void idPlayer::UpdateFocus( void ) {
 	oldTalkCursor = talkCursor;
 	talkCursor = 0;
 	start = GetEyePosition();
+	// openQ4 VR: the weapon hand points at world GUIs, characters and usable
+	// things from where it aims, so a GUI's cursor lands where the laser does
+	// rather than a forearm away from it (single player; multiplayer keeps the
+	// eye, which the server can trace)
+	GetVRAimOrigin( start );
 	end = start + viewAngles.ToForward() * 768.0f;
 
  	// player identification -> names to the hud
@@ -8098,6 +8103,9 @@ void idPlayer::UpdateFocus( void ) {
 
 				ui->SetStateString( "player_health", va("%i", health ) );
 				ui->SetStateString( "player_armor", va( "%i%%", inventory.armor ) );
+				if ( vrSystem != NULL && vrSystem->IsActive() && cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+					gameLocal.Printf( "VR GUI focus %s at %.2f %.2f\n", ent->GetName(), pt.x, pt.y );
+				}
 
 				kv = ent->spawnArgs.MatchPrefix( "gui_", NULL );
 				while ( kv ) {

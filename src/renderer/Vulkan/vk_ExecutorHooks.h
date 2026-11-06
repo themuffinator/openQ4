@@ -41,6 +41,42 @@ static const int VK_EXTRA_KIND_SCENE_BASE = 32;
 static const int VK_EXTRA_KIND_DEBUG_BASE = 64;
 static const int VK_EXTRA_KIND_EXECUTOR_BASE = 96;
 
+// OpenXR (vk_VRPresentation.cpp): an eye or the virtual screen stands in for
+// the window while a VR frame renders into it, so everything that draws to,
+// copies from or reads back the back buffer uses its images instead. The
+// caller owns them and keeps them in COLOR_ATTACHMENT_OPTIMAL and
+// DEPTH_STENCIL_ATTACHMENT_OPTIMAL while they are the output; depth has
+// vkCtx.depthFormat, like the window's. NULL returns to the swapchain image.
+// The frame must be open; the default target is bound afterwards.
+static const int VK_EXEC_VR_TARGETS = 3;	// virtual screen, left eye, right eye
+typedef struct vkExecDefaultOutput_s {
+	VkImage				color;
+	VkImageView			colorView;
+	VkFormat			colorFormat;
+	VkImage				depth;
+	VkImageView			depthView;
+	VkExtent2D			extent;
+	bool				premultipliedAlpha;	// composited as a premultiplied-alpha layer
+	int					vrTarget;			// 0 virtual screen, 1/2 eyes (< VK_EXEC_VR_TARGETS)
+} vkExecDefaultOutput_t;
+bool				VK_Exec_SetDefaultOutput( const vkExecDefaultOutput_t *output );
+// r_brightness/r_gamma on the default output, once per frame for each VR
+// target; the window's mapping at present is then skipped for its mirror
+bool				VK_Exec_MapDefaultOutputColor( void );
+void				VK_Exec_MarkWindowColorMapped( void );
+// the frame's acquired swapchain image (the VR mirror draws into it)
+VkImage				VK_Exec_SwapchainImage( void );
+// Ends the rendering scope so transfers and barriers can be recorded, and
+// returns the frame's command buffer (VK_NULL_HANDLE without an open frame).
+// The next target bind or clear resumes rendering.
+VkCommandBuffer		VK_Exec_SuspendRendering( void );
+// vk_VRPresentation.cpp: a VR frame renders into its own targets, so it may
+// open without the window's image (minimized, occluded, out of date);
+// *forced reports the r_vkVRWindowlessTest drill
+bool				VK_VR_FrameMayOpenWithoutWindow( bool *forced );
+// ...and the virtual screen stands in for the window such a frame lacks
+bool				VK_VR_BindWindowStandIn( void );
+
 VkCommandBuffer		VK_Exec_ActiveCmd( void );
 int					VK_Exec_ActiveFrameSlot( void );
 bool				VK_GuiExecutor_FrameIsOpen( void );

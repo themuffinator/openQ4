@@ -50,7 +50,14 @@ struct Common {
     void Printf(const char*,...) {}
 } commonObject;
 Common* common=&commonObject;
-struct Renderer { int clears=0; void SetVRFrame(const void*) { ++clears; } } renderer;
+struct renderVRFrame_t { bool releaseImages; };
+struct vrVulkanSwapchainImage_t { XrStructureType type; void* next; uint64_t image; };
+// a release frame must precede every swapchain destruction (OpenXR image
+// ownership on Vulkan); the harness counts both
+struct Renderer {
+    int clears=0,releases=0;
+    void SetVRFrame(const renderVRFrame_t* frame) { ++clears; if(frame!=nullptr && frame->releaseImages) ++releases; }
+} renderer;
 Renderer* renderSystem=&renderer;
 int pointerLeaves=0,keyReleases=0;
 bool Sys_PostVRPointer(bool active,float,float) { assert(!active); ++pointerLeaves; return false; }
@@ -89,7 +96,11 @@ XRAPI_ATTR XrResult XRAPI_CALL xrEnumerateSwapchainImages(XrSwapchain chain,uint
     rt.Get(chain);
     if(++rt.enumerates==rt.failEnumerateAt) return rt.failure;
     *count=capacity ? rt.secondCount : rt.count;
-    if(capacity) {
+    if(capacity && out[0].type==XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR) {
+        // VkImage handles are 64-bit on every platform
+        auto images=reinterpret_cast<vrVulkanSwapchainImage_t*>(out);
+        for(uint32_t i=0;i<capacity;++i) images[i].image=rt.zeroImage ? 0 : 0x100000000ull+i;
+    } else if(capacity) {
         auto images=reinterpret_cast<XrSwapchainImageOpenGLKHR*>(out);
         for(uint32_t i=0;i<capacity;++i) images[i].image=rt.zeroImage ? 0 : 100+i;
     }
@@ -124,6 +135,7 @@ XRAPI_ATTR XrResult XRAPI_CALL xrDestroyInstance(XrInstance) {
     assert(rt.instance && !rt.session); ++rt.destroyInstances; rt.instance=false; return XR_SUCCESS;
 }
 }
+enum vrGraphicsApi_t { VR_GRAPHICS_NONE, VR_GRAPHICS_OPENGL, VR_GRAPHICS_VULKAN };
 class idVRSystemOpenXR {
 public:
     enum recovery_t { RECOVERY_NONE, RECOVERY_SESSION, RECOVERY_INSTANCE };
@@ -131,7 +143,7 @@ public:
     struct swapchain_t {
         XrSwapchain handle=XR_NULL_HANDLE;
         int width=0,height=0;
-        idList<uint32_t> images;
+        idList<uint64_t> images;
         uint32_t acquiredIndex=0;
         bool acquired=false;
     } eyeSwapchains[2],screenSwapchain;
@@ -142,6 +154,10 @@ public:
     XrSpace localSpace=XR_NULL_HANDLE,viewSpace=XR_NULL_HANDLE;
     XrPath handPaths[2]={};
     PFN_xrGetOpenGLGraphicsRequirementsKHR getGLRequirements=nullptr;
+    void *getVulkanRequirements=nullptr,*createVulkanInstance=nullptr,*getVulkanDevice=nullptr,*createVulkanDevice=nullptr;
+    XrInstance vulkanCreator=XR_NULL_HANDLE,vulkanRestartFor=XR_NULL_HANDLE;
+    int graphicsApi=VR_GRAPHICS_OPENGL;
+    bool haveEGL=false;
     bool frameOpen=true,frameShouldRender=true,rendererReady=true;
     bool sessionRunning=true,sessionFocused=true,viewsValid=true;
     bool inputValid=true,bodyYawValid=true,twoHanded=true,runtimeStopped=false;
@@ -159,7 +175,7 @@ public:
     bool Check(XrResult,const char*);
     bool CheckFrame(XrResult,const char*);
     bool RecoverIfNeeded();
-    void DestroySession(); void DestroyInstance();
+    void DestroySession(); void DestroyInstance(); void ReleaseRendererImages();
     bool CreateSwapchain(swapchain_t&,int,int);
     void DestroySwapchain(swapchain_t&);
     bool ResizeScreenSwapchain(); bool AcquireImages(); void ReleaseImages();
@@ -236,6 +252,20 @@ void run(const std::string& test) {
         idVRSystemOpenXR::swapchain_t local;
         assert(!app.CreateSwapchain(local,1000,600));
         assert(local.handle==XR_NULL_HANDLE && rt.chains.size()==3);
+    } else if(test=="vulkan_images") {
+        app.graphicsApi=VR_GRAPHICS_VULKAN;
+        idVRSystemOpenXR::swapchain_t local;
+        assert(app.CreateSwapchain(local,1000,600) && local.images.Num()==3);
+        for(int i=0;i<3;++i) assert(local.images[i]==0x100000000ull+i);
+        app.DestroySwapchain(local);
+        rt.zeroImage=true;
+        assert(!app.CreateSwapchain(local,1000,600) && local.handle==XR_NULL_HANDLE);
+        rt.zeroImage=false;
+        // the renderer waits for its GPU work before any swapchain goes
+        const int before=renderer.releases;
+        assert(app.ResizeScreenSwapchain() && renderer.releases==before+1);
+        app.DestroySession();
+        assert(renderer.releases==before+2 && app.graphicsApi==VR_GRAPHICS_NONE);
     } else if(test=="instance_loss" || test=="session_pending") {
         assert(app.AcquireImages());
         app.frame.active=app.frame.stereo=true;
@@ -260,12 +290,13 @@ int main(int argc,char** argv) {
 '''
 CASES = ("normal", "teardown", "input_teardown", "partial_acquire", "wait_loss", "wait_timeout", "wait_error",
          "release_loss", "release_error", "index_large", "index_end", "resize_loss", "resize_failure",
-         "count_large", "count_zero", "count_changed", "image_zero", "instance_loss", "session_pending")
+         "count_large", "count_zero", "count_changed", "image_zero", "instance_loss", "session_pending",
+         "vulkan_images")
 
 
 def source() -> str:
     code = (ROOT / "src/sys/openxr/OpenXRSystem.cpp").read_text(encoding="utf-8")
-    methods = ["bool Check", "void DestroySession", "void DestroyInstance", "bool CreateSwapchain",
+    methods = ["bool Check", "void DestroySession", "void ReleaseRendererImages", "void DestroyInstance", "bool CreateSwapchain",
                "void DestroySwapchain", "bool ResizeScreenSwapchain", "bool AcquireImages", "void ReleaseImages"]
     result = SUPPORT
     for method in methods:

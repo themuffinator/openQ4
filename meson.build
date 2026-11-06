@@ -3903,6 +3903,8 @@ if build_openxr
   openxr_test_runtime = shared_module(
     'openq4-xr-test-runtime',
     files('tools/tests/openxr/OpenXRTestRuntime.cpp'),
+    # XR_KHR_vulkan_enable2 through the application's loader: headers only
+    include_directories: include_directories('src/external/vulkan/include'),
     dependencies: [openxr_headers_dep] + openxr_test_runtime_gl_deps,
     name_prefix: '',
     gnu_symbol_visibility: 'hidden',

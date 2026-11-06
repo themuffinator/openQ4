@@ -9,9 +9,14 @@ OpenXR registration is read or changed. No keyboard or mouse input is
 synthesised: console commands drive the game, and the runtime's frame script
 is synchronised to them through marker files the engine writes with condump.
 
+With --render-api vulkan the client runs the Vulkan renderer: the runtime
+creates its instance and device (XR_KHR_vulkan_enable2), the session binds
+them, and --validation turns the Khronos validation layer on and fails on any
+message it reports. Every other check is the same.
+
 Checks:
-- the session binds the renderer's OpenGL context and presents loading as a
-  quad layer before gameplay;
+- the session binds the renderer's OpenGL context, or the Vulkan device the
+  runtime created, and presents loading as a quad layer before gameplay;
 - gameplay submits a stereo projection layer plus the HUD quad, both eyes are
   lit and differ (parallax), and a scripted head turn changes what they see;
 - with game time stopped, the weapon hand's aim marker (vr_aimLaser) is the
@@ -35,6 +40,9 @@ Checks:
   crouch) and raising it stands the body again;
 - the off-hand stick walks the body where the head faces, and with
   vr_moveDirection 1 where the off hand points;
+- a world GUI (airdefense1's exit panel, never clicked) takes focus where the
+  weapon hand points, with its cursor where the hand's ray meets it, while
+  the eye's ray along the same aim passes over the panel;
 - a stick snap turn turns the body by vr_snapTurnAngle and a controller
   trigger press reaches the binding system;
 - the controller's menu button opens the pause menu on an opaque, world-locked
@@ -90,6 +98,13 @@ VEHICLE_ORIGIN = "10094 -6825 60"
 # Where the stick walks start: the smoke's standing spot near airdefense1's
 # start, facing the battlefield (x y z yaw, as getviewpos prints it).
 STICK_WALK_POSE = "10310.89 -6950.34 6.96 150.7"
+# airdefense1's one interactive world GUI is its exit panel, a 26-unit screen
+# at x 8367.875 facing west with its centre at y -3488, z 80. The eye goes
+# 29.5 units above that centre and the hand 0.75 m (29.5 units) below the head,
+# 0.2 m right of it, both aiming level and due east: only the hand's ray meets
+# the panel, at its centre. Nothing clicks it, since it ends the level.
+GUI_POSE = "8320 -3480.1 109.5 0"
+GUI_HAND_POSE = "0.2 0.85 -0.35 0 0 0"
 
 
 def read_events(path: Path) -> list[dict]:
@@ -159,7 +174,14 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--map", default="game/airdefense1")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--render-api", choices=("gl", "vulkan"), default="gl")
+    parser.add_argument("--validation", action="store_true",
+                        help="Vulkan: run with the Khronos validation layer and fail on its messages")
+    parser.add_argument("--eye-size", default="1200x1320",
+                        help="the simulated headset's eye size; smaller keeps a slow GPU above the 10 fps "
+                             "the comfort vignette's turn rate needs (each frame's turn step stops at 0.1 s)")
     options = parser.parse_args(argv)
+    vulkan = options.render_api == "vulkan"
     from PIL import Image, ImageChops, ImageStat
 
     staged = options.runtime_dir.resolve()
@@ -174,7 +196,7 @@ def main(argv: list[str] | None = None) -> None:
     output = (options.output_dir or ROOT / ".tmp/openxr-vr-smoke").resolve()
     if output == staged or staged in output.parents or output in staged.parents:
         parser.error("output and staged runtime directories must not overlap")
-    profile = output / "sp"
+    profile = output / ( "sp-vulkan" if vulkan else "sp" )
     game = profile / "baseoq4"
     game.mkdir(parents=True, exist_ok=True)
     for stale in list(game.glob("vr_marker_*.txt")) + list(profile.glob("xr_*.tga")) + list(profile.glob("xr_*.png")):
@@ -221,6 +243,8 @@ def main(argv: list[str] | None = None) -> None:
         f"when {marker('offhand_left')} hand left -0.2 1.25 -0.35 90 0 0",
         f"when {marker('stick_hand')} stick left 0 1",
         f"when {marker('stick_hand_stop')} stick left 0 0",
+        f"when {marker('gui_point')} hand right {GUI_HAND_POSE}",
+        f"when {marker('gui_done')} hand right 0.2 1.25 -0.35 0 0 0",
         f"when {marker('turn')} head 40 0 0",
         f"when {marker('turned')} capture {profile / 'xr_turned'}",
         f"when {marker('snap')} head 0 0 0",
@@ -299,7 +323,11 @@ def main(argv: list[str] | None = None) -> None:
         "vr_moveDirection 1", "condump vr_marker_offhand_left.txt", f"setviewpos {STICK_WALK_POSE}", "waitMsec 500",
         "echo VR_STICK_HAND", "getviewpos", "condump vr_marker_stick_hand.txt", "waitMsec 600",
         "condump vr_marker_stick_hand_stop.txt", "waitMsec 600", "echo VR_STICK_HAND_DONE", "getviewpos",
-        "vr_moveDirection 0", "noclip", f"setviewpos {STICK_WALK_POSE}", "waitMsec 500",
+        # a world GUI answers the weapon hand where it points, as the laser
+        # does, not the eye a forearm above it
+        "vr_moveDirection 0", f"setviewpos {GUI_POSE}", "condump vr_marker_gui_point.txt", "waitMsec 900",
+        "echo VR_GUI_POINTED", "condump vr_marker_gui_done.txt", "waitMsec 300",
+        "noclip", f"setviewpos {STICK_WALK_POSE}", "waitMsec 500",
         "condump vr_marker_turn.txt", "waitMsec 700",
         "condump vr_marker_turned.txt", "waitMsec 700",
         "echo VR_SNAP_BEFORE", "vr_status",
@@ -354,7 +382,11 @@ def main(argv: list[str] | None = None) -> None:
         "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1",
         "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_turnMode": "0", "vr_snapTurnAngle": "45",
         "vr_screenDistance": "2.5", "vr_screenWidth": str(SCREEN_WIDTH_M), "vr_leftHanded": "0",
+        # after the launch configuration's own r_renderApi, so this one wins
+        "r_renderApi": options.render_api,
     }
+    if vulkan:
+        settings["r_vkValidation"] = "1" if options.validation else "0"
     for key, value in settings.items():
         args += ["+set", key, value]
     args += ["+map", options.map]
@@ -366,7 +398,7 @@ def main(argv: list[str] | None = None) -> None:
         "XR_RUNTIME_JSON": str(manifest),
         "OPENQ4_XR_TEST_LOG": str(xr_log),
         "OPENQ4_XR_TEST_SCRIPT": str(profile / "xr_script.txt"),
-        "OPENQ4_XR_TEST_EYE_SIZE": "1200x1320",
+        "OPENQ4_XR_TEST_EYE_SIZE": options.eye_size,
         "OPENQ4_XR_TEST_RATE": "90",
     })
     startup = None
@@ -396,7 +428,23 @@ def main(argv: list[str] | None = None) -> None:
     assert not re.search(r"FATAL|ERROR:|OpenXR: .* failed|Unknown command", text), "errors in the log"
 
     sessions = [e for e in events if e.get("event") == "create_session"]
-    assert sessions and sessions[0].get("binding", "").startswith("opengl_"), sessions
+    if vulkan:
+        assert re.search(r"Vulkan: device \d+ '", text), "the Vulkan renderer did not start"
+        # the runtime made the renderer's instance and device, and the session binds that device
+        assert [e.get("result") for e in events if e.get("event") == "create_vulkan_instance"][:1] == [0], \
+            "the runtime did not create the Vulkan instance"
+        assert [e.get("result") for e in events if e.get("event") == "create_vulkan_device"][:1] == [0], \
+            "the runtime did not create the Vulkan device"
+        assert "OpenXR: the runtime created the Vulkan renderer's device" in text, "the renderer made its own device"
+        assert sessions and sessions[0].get("binding") == "vulkan", sessions
+        assert any(e.get("event") == "create_swapchain" and e.get("api") == "vulkan" for e in events), \
+            "no Vulkan swapchain was created"
+        if options.validation:
+            assert "Vulkan: validation enabled" in text, "the validation layer was not active"
+            messages = [line for line in text.splitlines() if "VUID" in line or "Validation Error" in line]
+            assert not messages, "Vulkan validation reported:\n" + "\n".join(messages[:10])
+    else:
+        assert sessions and sessions[0].get("binding", "").startswith("opengl_"), sessions
     assert any(e.get("event") == "begin_session" for e in events), "xrBeginSession never ran"
     # the runtime's binding UI shows these names: they come from the language table
     localized = sorted(e["localized"] for e in events if e.get("event") == "create_action")
@@ -495,6 +543,15 @@ def main(argv: list[str] | None = None) -> None:
     assert abs(hand_off - 90.0) < 25.0, \
         f"with vr_moveDirection 1 the stick should walk where the off hand points, 90 degrees left, not {hand_off:.0f}"
 
+    # a world GUI takes focus where the weapon hand points: the eye's ray from
+    # the same aim passes over the exit panel, the hand's meets its centre
+    gui_focus = re.search(r"VR GUI focus func_static_53425 at (\d+\.\d+) (\d+\.\d+)",
+                          text.partition("VR_STICK_HAND_DONE")[2].partition("VR_GUI_POINTED")[0])
+    assert gui_focus, "pointing the weapon hand at airdefense1's exit panel did not focus it"
+    gui_cursor = (float(gui_focus.group(1)), float(gui_focus.group(2)))
+    assert all(abs(c - 0.5) < 0.15 for c in gui_cursor), \
+        f"the exit panel's cursor should sit where the hand points, at its centre, not {gui_cursor}"
+
     # a shot pulses the weapon hand, and only it (a hit would pulse both, for 90 ms)
     pulses = [e for e in events if e.get("event") == "haptic" and e.get("duration_ns") == 40_000_000]
     assert pulses, "firing the weapon did not vibrate a controller"
@@ -545,10 +602,11 @@ def main(argv: list[str] | None = None) -> None:
     assert any(e.get("event") == "haptic" and e.get("hand") == "/user/hand/left" and e.get("duration_ns") == 20_000_000
                for e in events), "taking the foregrip did not buzz the off hand"
     for eye in ("left", "right"):
-        box, _ = changed_box(image("xr_two_off", eye), image("xr_two_dot", eye))
+        two_dot = image("xr_two_dot", eye)
+        box, _ = changed_box(image("xr_two_off", eye), two_dot)
         assert box is not None, f"the two-handed aim marker changed nothing in the {eye} eye"
         x, y = (box[0] + box[2] - 1) / 2.0, (box[1] + box[3] - 1) / 2.0
-        _, two_y = eye_tangents(eye, x, y, 1200, 1320)
+        _, two_y = eye_tangents(eye, x, y, two_dot.width, two_dot.height)
         assert two_y > dots[eye][1] + 0.05, \
             f"holding the gun in both hands should raise the {eye} eye's aim ({dots[eye][1]:.3f} to {two_y:.3f})"
 
@@ -650,10 +708,10 @@ def main(argv: list[str] | None = None) -> None:
     for name in ("off", "dot", "beam"):
         for eye in ("left", "right"):
             image(f"xr_laser_{name}", eye).save(profile / f"xr_laser_{name}_{eye}.png")
-    print(f"OpenXR VR smoke: PASS (eye difference {eye_difference:.2f}, head turn {turn_difference:.2f}, "
+    print(f"OpenXR VR smoke ({options.render_api}): PASS (eye difference {eye_difference:.2f}, head turn {turn_difference:.2f}, "
           f"HUD coverage {covered:.3f}, aim marker at {marker_depth:.2f} m, left hand's dot "
           f"{min(left_handed_shift):.0f} px left, stick walks {head_off:.0f} and {hand_off:.0f} degrees off the facing, "
-          f"pointer at {px},{py}, "
+          f"exit panel cursor at {gui_cursor[0]:.2f},{gui_cursor[1]:.2f}, pointer at {px},{py}, "
           f"walker cockpit turned {cockpit_turn:.1f}); evidence={profile}")
 
 

@@ -405,7 +405,9 @@ typedef struct renderPresentationState_s {
 	present into. While a VR frame is open the frame's output is the virtual
 	screen (menus, HUD, console, cinematics); the game moves its first-person
 	3D pass to an eye with SetVRRenderTarget. Swapchain images are only blit
-	destinations, so the runtime's formats never reach the render pipeline.
+	or copy destinations, so the runtime's formats never reach the render
+	pipeline. A Vulkan renderer's instance and device are created by the
+	runtime (XR_KHR_vulkan_enable2), through the module services.
 	See docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md.
 
 ===============================================================================
@@ -414,7 +416,9 @@ typedef struct renderPresentationState_s {
 typedef enum {
 	RENDER_VR_BINDING_NONE = 0,
 	RENDER_VR_BINDING_WGL,			// wglDC/wglContext
-	RENDER_VR_BINDING_GLX			// glx* (Xlib)
+	RENDER_VR_BINDING_GLX,			// glx* (Xlib)
+	RENDER_VR_BINDING_VULKAN,		// vk* (XR_KHR_vulkan_enable2; render API 32)
+	RENDER_VR_BINDING_EGL			// egl* (XR_MNDX_egl_enable; render API 32)
 } renderVRBindingKind_t;
 
 typedef struct renderVRGraphicsBinding_s {
@@ -427,6 +431,23 @@ typedef struct renderVRGraphicsBinding_s {
 	void *					glxContext;			// GLXContext
 	void *					glxFBConfig;		// GLXFBConfig
 	unsigned int			glxVisualId;
+	// Vulkan (render API 32): the device the runtime created for the renderer
+	// (renderModuleServices_t::CreateVulkanDeviceForVR) and the queue it
+	// submits on
+	void *					vkInstance;			// VkInstance
+	void *					vkPhysicalDevice;	// VkPhysicalDevice
+	void *					vkDevice;			// VkDevice
+	unsigned int			vkQueueFamilyIndex;
+	unsigned int			vkQueueIndex;
+	// the VkFormat of the renderer's window: swapchains in the same channel
+	// order let the eyes share the window's pipelines
+	int						vkColorFormat;
+	// EGL (render API 32): an OpenGL context on EGL, as SDL makes on native
+	// Wayland, for runtimes with XR_MNDX_egl_enable
+	void *					eglDisplay;			// EGLDisplay
+	void *					eglConfig;			// EGLConfig
+	void *					eglContext;			// EGLContext
+	void *					eglGetProcAddress;	// eglGetProcAddress
 } renderVRGraphicsBinding_t;
 
 // Mirror shown in the desktop window while a VR frame presents.
@@ -444,6 +465,16 @@ typedef struct renderVRFrame_s {
 	int						screenWidth, screenHeight;
 	unsigned int			screenImage;		// GL name of this frame's virtual-screen swapchain image
 	int						mirror;				// renderVRMirror_t
+	// Vulkan (render API 32): VkImage handles of this frame's swapchain images,
+	// which wait in VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL and must be left
+	// there, and the VkFormat every one of them has
+	unsigned long long		vkEyeImages[2];
+	unsigned long long		vkScreenImage;
+	int						vkImageFormat;
+	// (render API 32) set on an inactive frame before swapchains are
+	// destroyed: OpenXR requires every submitted command that uses their
+	// images to have completed, so the renderer waits for its GPU work
+	bool					releaseImages;
 } renderVRFrame_t;
 
 typedef struct renderVRFrameResult_s {
@@ -787,8 +818,8 @@ public:
 	// --- OpenXR presentation (appended slots; render API 21, game API 50) ---
 
 	// Native handles of the current rendering context for an XR graphics
-	// binding. False when the backend cannot present to OpenXR (Vulkan, GLES,
-	// or no context).
+	// binding. False when the backend cannot present to OpenXR (GLES, or no
+	// context or device).
 	virtual bool			GetVRGraphicsBinding( renderVRGraphicsBinding_t &binding ) = 0;
 
 	// Presentation targets for the next BeginFrame..EndFrame only; NULL or an

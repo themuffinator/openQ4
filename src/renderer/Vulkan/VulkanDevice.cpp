@@ -588,6 +588,61 @@ bool VK_Device_InitLoader( void ) {
 
 /*
 ====================
+VK_Device_CreateInstance / VK_Device_CreateLogicalDevice
+
+OpenXR on Vulkan (XR_KHR_vulkan_enable2): while VR wants this renderer, the
+runtime creates the instance and the device from the renderer's create
+infos, adding the extensions it needs, so the session can bind to them
+(vk_VRPresentation.cpp). Otherwise the renderer creates them itself.
+====================
+*/
+static VkResult VK_Device_CreateInstance( const VkInstanceCreateInfo &ici ) {
+	void *created = NULL;
+	int result = VK_SUCCESS;
+	if ( R_RendererModule_CreateVulkanInstanceForVR( (void *)vkGetInstanceProcAddr, &ici, &created, &result ) ) {
+		vkCtx.instance = (VkInstance)created;
+		vkCtx.instanceFromVR = result == VK_SUCCESS && created != NULL;
+		return (VkResult)result;
+	}
+	vkCtx.instanceFromVR = false;
+	return vkCreateInstance( &ici, NULL, &vkCtx.instance );
+}
+
+static VkResult VK_Device_CreateLogicalDevice( const VkDeviceCreateInfo &dci, bool forVR ) {
+	if ( forVR ) {
+		void *created = NULL;
+		int result = VK_SUCCESS;
+		if ( R_RendererModule_CreateVulkanDeviceForVR( (void *)vkGetInstanceProcAddr, (void *)vkCtx.physicalDevice,
+				&dci, &created, &result ) ) {
+			vkCtx.device = (VkDevice)created;
+			vkCtx.deviceFromVR = result == VK_SUCCESS && created != NULL;
+			return (VkResult)result;
+		}
+	}
+	vkCtx.deviceFromVR = false;
+	return vkCreateDevice( vkCtx.physicalDevice, &dci, NULL, &vkCtx.device );
+}
+
+// The enumeration index of a physical device, -1 when it is not listed.
+static int VK_Device_PhysicalDeviceIndex( VkPhysicalDevice physicalDevice ) {
+	uint32_t count = 0;
+	if ( vkEnumeratePhysicalDevices( vkCtx.instance, &count, NULL ) != VK_SUCCESS || count == 0 || count > 64 ) {
+		return -1;
+	}
+	VkPhysicalDevice devices[64];
+	if ( vkEnumeratePhysicalDevices( vkCtx.instance, &count, devices ) != VK_SUCCESS ) {
+		return -1;
+	}
+	for ( uint32_t i = 0; i < count; i++ ) {
+		if ( devices[i] == physicalDevice ) {
+			return (int)i;
+		}
+	}
+	return -1;
+}
+
+/*
+====================
 VK_Device_FindInstanceExtensions
 
 Vulkan Portability negotiation. VK_KHR_portability_enumeration is a *loader*
@@ -1683,7 +1738,7 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 		ici.ppEnabledLayerNames = &validationLayer;
 	}
 
-	VkResult res = vkCreateInstance( &ici, NULL, &vkCtx.instance );
+	VkResult res = VK_Device_CreateInstance( ici );
 	if ( res != VK_SUCCESS && wantValidation ) {
 		common->Warning( "Vulkan: instance creation with validation failed (%d); retrying without", (int)res );
 		ici.enabledLayerCount = 0;
@@ -1694,7 +1749,7 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 			ici.enabledExtensionCount = (uint32_t)extensions.Num();
 			ici.ppEnabledExtensionNames = extensions.Ptr();
 		}
-		res = vkCreateInstance( &ici, NULL, &vkCtx.instance );
+		res = VK_Device_CreateInstance( ici );
 	}
 	if ( res != VK_SUCCESS ) {
 		common->Warning( "Vulkan: vkCreateInstance failed (%d)", (int)res );
@@ -1744,18 +1799,42 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 		vkGetPhysicalDeviceFormatProperties, vkGetPhysicalDeviceMemoryProperties, vkGetPhysicalDeviceProperties2
 	};
 	vkDeviceSelection_t selected = {};
-	const int forcedDevice = r_vkDevice.GetInteger();
+	const vkDeviceRejection_t reportSkipped = []( uint32_t index, const VkPhysicalDeviceProperties &properties,
+			const char *reason, VkResult result, void * ) {
+		common->Printf( "Vulkan: skipping device %u '%s' (API %u.%u.%u, descriptor sets %u): %s (%d)\n",
+				index, properties.deviceName, VK_API_VERSION_MAJOR( properties.apiVersion ),
+				VK_API_VERSION_MINOR( properties.apiVersion ), VK_API_VERSION_PATCH( properties.apiVersion ),
+				properties.limits.maxBoundDescriptorSets, reason, (int)result );
+	};
+	int forcedDevice = r_vkDevice.GetInteger();
 	const char *preferredDevice = cvarSystem->GetCVarString("r_bootRenderDevice");
+	// OpenXR: the headset renders with the GPU its runtime names
+	int vrDevice = -1;
+	if ( vkCtx.instanceFromVR ) {
+		void *physical = NULL;
+		if ( R_RendererModule_GetVulkanPhysicalDeviceForVR( (void *)vkCtx.instance, &physical ) && physical != NULL ) {
+			vrDevice = VK_Device_PhysicalDeviceIndex( (VkPhysicalDevice)physical );
+		}
+		if ( vrDevice >= 0 ) {
+			if ( forcedDevice >= 0 && forcedDevice != vrDevice ) {
+				common->Printf( "Vulkan: r_vkDevice %d is ignored while VR runs on the headset's device %d\n", forcedDevice, vrDevice );
+			}
+			forcedDevice = vrDevice;
+		} else {
+			common->Warning( "Vulkan: the VR runtime named no usable device; VR stays off on the device chosen instead" );
+		}
+	}
 	attempt.automatic = forcedDevice < 0 && idStr::Cmp(preferredDevice,"auto")==0;
 	res = VK_SelectPhysicalDevice( selectionApi, vkCtx.instance, vkCtx.surface,
-			forcedDevice, selected,
-			[]( uint32_t index, const VkPhysicalDeviceProperties &properties,
-					const char *reason, VkResult result, void * ) {
-				common->Printf( "Vulkan: skipping device %u '%s' (API %u.%u.%u, descriptor sets %u): %s (%d)\n",
-						index, properties.deviceName, VK_API_VERSION_MAJOR( properties.apiVersion ),
-						VK_API_VERSION_MINOR( properties.apiVersion ), VK_API_VERSION_PATCH( properties.apiVersion ),
-						properties.limits.maxBoundDescriptorSets, reason, (int)result );
-			}, NULL, firstCandidate, preferredDevice );
+			forcedDevice, selected, reportSkipped, NULL, firstCandidate, preferredDevice );
+	if ( res != VK_SUCCESS && vrDevice >= 0 ) {
+		common->Warning( "Vulkan: the headset's device %d cannot run the renderer; VR stays off on the device chosen instead", vrDevice );
+		vrDevice = -1;
+		forcedDevice = r_vkDevice.GetInteger();
+		attempt.automatic = forcedDevice < 0 && idStr::Cmp(preferredDevice,"auto")==0;
+		res = VK_SelectPhysicalDevice( selectionApi, vkCtx.instance, vkCtx.surface,
+				forcedDevice, selected, reportSkipped, NULL, firstCandidate, preferredDevice );
+	}
 	if ( res != VK_SUCCESS ) {
 		if ( firstCandidate > 0 ) {
 			common->Warning( "Vulkan: no further compatible physical device after rank %u (result=%d)",
@@ -2008,7 +2087,7 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 	dci.enabledExtensionCount = deviceExtensionCount;
 	dci.ppEnabledExtensionNames = deviceExtensions;
 
-	res = vkCreateDevice( vkCtx.physicalDevice, &dci, NULL, &vkCtx.device );
+	res = VK_Device_CreateLogicalDevice( dci, vrDevice >= 0 );
 	if ( res != VK_SUCCESS ) {
 		common->Warning( "Vulkan: vkCreateDevice failed (%d)", (int)res );
 		VK_Device_Shutdown();

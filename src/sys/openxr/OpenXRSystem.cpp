@@ -58,6 +58,88 @@ typedef struct vrXlibGraphicsBinding_s {
 	void *					glxContext;
 } vrXlibGraphicsBinding_t;
 
+// XR_KHR_vulkan_enable2, declared without Vulkan headers like the Xlib binding
+// above: the engine passes the renderer's Vulkan objects through without
+// using them. Dispatchable handles (VkInstance, VkPhysicalDevice, VkDevice)
+// are pointers and VkImage a 64-bit handle; VkResult is a 32-bit enum. The
+// layouts are XrGraphicsBindingVulkanKHR's, XrSwapchainImageVulkanKHR's,
+// XrGraphicsRequirementsVulkanKHR's, XrVulkanInstanceCreateInfoKHR's,
+// XrVulkanDeviceCreateInfoKHR's and XrVulkanGraphicsDeviceGetInfoKHR's.
+#define VR_VULKAN_ENABLE2_EXTENSION_NAME	"XR_KHR_vulkan_enable2"
+
+typedef struct vrVulkanGraphicsBinding_s {
+	XrStructureType			type;
+	const void *			next;
+	void *					instance;
+	void *					physicalDevice;
+	void *					device;
+	uint32_t				queueFamilyIndex;
+	uint32_t				queueIndex;
+} vrVulkanGraphicsBinding_t;
+
+typedef struct vrVulkanSwapchainImage_s {
+	XrStructureType			type;
+	void *					next;
+	uint64_t				image;
+} vrVulkanSwapchainImage_t;
+
+typedef struct vrVulkanRequirements_s {
+	XrStructureType			type;
+	void *					next;
+	XrVersion				minApiVersionSupported;
+	XrVersion				maxApiVersionSupported;
+} vrVulkanRequirements_t;
+
+typedef struct vrVulkanInstanceCreateInfo_s {
+	XrStructureType			type;
+	const void *			next;
+	XrSystemId				systemId;
+	XrFlags64				createFlags;
+	void *					pfnGetInstanceProcAddr;
+	const void *			vulkanCreateInfo;
+	const void *			vulkanAllocator;
+} vrVulkanInstanceCreateInfo_t;
+
+typedef struct vrVulkanDeviceCreateInfo_s {
+	XrStructureType			type;
+	const void *			next;
+	XrSystemId				systemId;
+	XrFlags64				createFlags;
+	void *					pfnGetInstanceProcAddr;
+	void *					vulkanPhysicalDevice;
+	const void *			vulkanCreateInfo;
+	const void *			vulkanAllocator;
+} vrVulkanDeviceCreateInfo_t;
+
+typedef struct vrVulkanDeviceGetInfo_s {
+	XrStructureType			type;
+	const void *			next;
+	XrSystemId				systemId;
+	void *					vulkanInstance;
+} vrVulkanDeviceGetInfo_t;
+
+typedef XrResult ( XRAPI_PTR *vrGetVulkanRequirements_t )( XrInstance instance, XrSystemId systemId, vrVulkanRequirements_t *requirements );
+typedef XrResult ( XRAPI_PTR *vrCreateVulkanInstance_t )( XrInstance instance, const vrVulkanInstanceCreateInfo_t *createInfo,
+	void **vulkanInstance, int32_t *vulkanResult );
+typedef XrResult ( XRAPI_PTR *vrGetVulkanDevice_t )( XrInstance instance, const vrVulkanDeviceGetInfo_t *getInfo, void **vulkanPhysicalDevice );
+typedef XrResult ( XRAPI_PTR *vrCreateVulkanDevice_t )( XrInstance instance, const vrVulkanDeviceCreateInfo_t *createInfo,
+	void **vulkanDevice, int32_t *vulkanResult );
+
+// XR_MNDX_egl_enable, declared without EGL headers: XrGraphicsBindingEGLMNDX's
+// layout, PFN_xrEglGetProcAddressMNDX then EGLDisplay, EGLConfig and
+// EGLContext pointers. It binds an OpenGL context on EGL (SDL on native
+// Wayland) and uses XR_KHR_opengl_enable's requirements and images.
+#define VR_EGL_ENABLE_EXTENSION_NAME		"XR_MNDX_egl_enable"
+
+typedef struct vrEGLGraphicsBinding_s {
+	XrStructureType			type;
+	const void *			next;
+	void *					getProcAddress;
+	void *					display;
+	void *					config;
+	void *					context;
+} vrEGLGraphicsBinding_t;
+
 #ifndef GL_SRGB8_ALPHA8
 #define GL_SRGB8_ALPHA8		0x8C43
 #endif
@@ -65,9 +147,25 @@ typedef struct vrXlibGraphicsBinding_s {
 #define GL_RGBA8			0x8058
 #endif
 
+// VkFormat values for the swapchain, in order of preference: sRGB, so the
+// compositor reads the engine's gamma-encoded bytes as they are
+static const int64_t VR_VK_FORMAT_R8G8B8A8_UNORM	= 37;
+static const int64_t VR_VK_FORMAT_R8G8B8A8_SRGB		= 43;
+static const int64_t VR_VK_FORMAT_B8G8R8A8_UNORM	= 44;
+static const int64_t VR_VK_FORMAT_B8G8R8A8_SRGB		= 50;
+
+enum vrGraphicsApi_t {
+	VR_GRAPHICS_NONE,
+	VR_GRAPHICS_OPENGL,
+	VR_GRAPHICS_VULKAN
+};
+
 static const int VR_SCREEN_WIDTH = 1920;
 static const int VR_SCREEN_HEIGHT = 1080;
 static const int VR_SYSTEM_RETRY_MSEC = 3000;
+// how long a queued renderer restart may wait behind a running script before
+// the session retry counts it as failed
+static const int VR_RESTART_PENDING_MSEC = 60000;
 static const int VR_INPUT_CRITICAL_SECTION = CRITICAL_SECTION_TWO;
 static const uint32_t VR_MAX_SWAPCHAIN_IMAGES = 64;
 static const XrDuration VR_IMAGE_WAIT_NSEC = 100000000; // 100 ms, then recover on the desktop
@@ -221,12 +319,17 @@ public:
 	void					RequestRecenter( void ) { recenterRequested = true; }
 	void					PrintStatus( void ) const;
 
+	// OpenXR on Vulkan: the renderer's instance, physical device and device
+	bool					CreateVulkanInstance( void *getInstanceProcAddr, const void *createInfo, void **outInstance, int *outResult );
+	bool					GetVulkanPhysicalDevice( void *vulkanInstanceHandle, void **outPhysicalDevice );
+	bool					CreateVulkanDevice( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo, void **outDevice, int *outResult );
+
 private:
 	struct swapchain_t {
 		XrSwapchain			handle;
 		int					width;
 		int					height;
-		idList<uint32_t>	images;
+		idList<uint64_t>	images;			// GL texture names or VkImage handles
 		uint32_t			acquiredIndex;
 		bool				acquired;
 	};
@@ -259,6 +362,10 @@ private:
 	void					StartIfRequested( void );
 	void					PollEvents( void );
 	void					HandleSessionState( XrSessionState state );
+	bool					PrepareVulkanSystem( void );
+	void					RequestVulkanRendererRestart( void );
+	bool					SelectSwapchainFormat( int rendererVulkanFormat );
+	void					ReleaseRendererImages( void );
 
 	// per frame
 	void					LocateFrame( XrTime time );
@@ -287,6 +394,20 @@ private:
 	XrSpace					viewSpace;
 	XrEnvironmentBlendMode	blendMode;
 	PFN_xrGetOpenGLGraphicsRequirementsKHR getGLRequirements;
+	bool					haveEGL;			// XR_MNDX_egl_enable is enabled
+	vrGetVulkanRequirements_t getVulkanRequirements;	// XR_KHR_vulkan_enable2, when the runtime has it
+	vrCreateVulkanInstance_t createVulkanInstance;
+	vrGetVulkanDevice_t		getVulkanDevice;
+	vrCreateVulkanDevice_t	createVulkanDevice;
+	int						graphicsApi;		// vrGraphicsApi_t of the session
+	// the Vulkan objects this instance's runtime created for the renderer; a
+	// session binds only to a device the runtime made
+	void *					vulkanInstance;
+	void *					vulkanPhysicalDevice;
+	void *					vulkanDevice;
+	XrInstance				vulkanCreator;		// the XR instance that made them
+	XrInstance				vulkanRestartFor;	// renderer restart already asked for this XR instance
+	int						vulkanRestartQueued;	// when it was queued, until the renderer stops; 0 none
 	bool					sessionRunning;
 	bool					sessionFocused;
 	bool					rendererReady;
@@ -435,6 +556,18 @@ idVRSystemOpenXR::idVRSystemOpenXR( void ) {
 	viewSpace = XR_NULL_HANDLE;
 	blendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 	getGLRequirements = NULL;
+	haveEGL = false;
+	getVulkanRequirements = NULL;
+	createVulkanInstance = NULL;
+	getVulkanDevice = NULL;
+	createVulkanDevice = NULL;
+	graphicsApi = VR_GRAPHICS_NONE;
+	vulkanInstance = NULL;
+	vulkanPhysicalDevice = NULL;
+	vulkanDevice = NULL;
+	vulkanCreator = XR_NULL_HANDLE;
+	vulkanRestartFor = XR_NULL_HANDLE;
+	vulkanRestartQueued = 0;
 	sessionRunning = false;
 	sessionFocused = false;
 	rendererReady = false;
@@ -548,6 +681,8 @@ void idVRSystemOpenXR::RendererStopping( void ) {
 	// the swapchain images live in this context's share group
 	DestroySession();
 	rendererReady = false;
+	// a queued restart is under way
+	vulkanRestartQueued = 0;
 }
 
 bool idVRSystemOpenXR::IsPacing( void ) const {
@@ -570,6 +705,7 @@ void idVRSystemOpenXR::PrintStatus( void ) const {
 	common->Printf( "  session: %s, state %d, %s\n", session != XR_NULL_HANDLE ? "created" : "none",
 		static_cast<int>( sessionState ), sessionRunning ? ( sessionFocused ? "running, focused" : "running" ) : "not running" );
 	if ( session != XR_NULL_HANDLE ) {
+		common->Printf( "  graphics: %s\n", graphicsApi == VR_GRAPHICS_VULKAN ? "Vulkan" : "OpenGL" );
 		common->Printf( "  eyes: %dx%d (recommended %dx%d), virtual screen %dx%d, format 0x%llx\n",
 			eyeSwapchains[0].width, eyeSwapchains[0].height, recommendedEyeWidth, recommendedEyeHeight,
 			screenSwapchain.width, screenSwapchain.height, static_cast<unsigned long long>( swapchainFormat ) );
@@ -680,21 +816,41 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 	if ( XR_FAILED( result ) || extensionCount != static_cast<uint32_t>( extensions.Num() ) ) {
 		return false;
 	}
+	// every graphics API the runtime and the renderers share: the renderer
+	// running when the session opens picks its binding
 	bool haveOpenGL = false;
+	bool haveVulkan = false;
+	bool haveEGLBinding = false;
 	for ( int i = 0; XR_SUCCEEDED( result ) && i < extensions.Num(); i++ ) {
 		if ( idStr::Cmp( extensions[i].extensionName, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME ) == 0 ) {
 			haveOpenGL = true;
+		} else if ( idStr::Cmp( extensions[i].extensionName, VR_VULKAN_ENABLE2_EXTENSION_NAME ) == 0 ) {
+			haveVulkan = true;
+		} else if ( idStr::Cmp( extensions[i].extensionName, VR_EGL_ENABLE_EXTENSION_NAME ) == 0 ) {
+			haveEGLBinding = true;
 		}
 	}
-	if ( !haveOpenGL ) {
+	if ( !haveOpenGL && !haveVulkan ) {
 		if ( !startFailureLogged ) {
-			common->Warning( "OpenXR: the active runtime does not support OpenGL (%s); VR stays off", XR_KHR_OPENGL_ENABLE_EXTENSION_NAME );
+			common->Warning( "OpenXR: the active runtime supports neither OpenGL (%s) nor Vulkan (%s); VR stays off",
+				XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, VR_VULKAN_ENABLE2_EXTENSION_NAME );
 			startFailureLogged = true;
 		}
 		return false;
 	}
 
-	const char *enabledExtensions[] = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME };
+	const char *enabledExtensions[3];
+	uint32_t enabledCount = 0;
+	if ( haveOpenGL ) {
+		enabledExtensions[enabledCount++] = XR_KHR_OPENGL_ENABLE_EXTENSION_NAME;
+		// an OpenGL context on EGL (native Wayland) binds through it
+		if ( haveEGLBinding ) {
+			enabledExtensions[enabledCount++] = VR_EGL_ENABLE_EXTENSION_NAME;
+		}
+	}
+	if ( haveVulkan ) {
+		enabledExtensions[enabledCount++] = VR_VULKAN_ENABLE2_EXTENSION_NAME;
+	}
 	XrInstanceCreateInfo createInfo;
 	memset( &createInfo, 0, sizeof( createInfo ) );
 	createInfo.type = XR_TYPE_INSTANCE_CREATE_INFO;
@@ -703,7 +859,7 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 	idStr::Copynz( createInfo.applicationInfo.engineName, "openQ4", sizeof( createInfo.applicationInfo.engineName ) );
 	createInfo.applicationInfo.engineVersion = 1;
 	createInfo.applicationInfo.apiVersion = XR_API_VERSION_1_0;
-	createInfo.enabledExtensionCount = 1;
+	createInfo.enabledExtensionCount = enabledCount;
 	createInfo.enabledExtensionNames = enabledExtensions;
 	if ( !Check( xrCreateInstance( &createInfo, &instance ), "xrCreateInstance" ) ) {
 		instance = XR_NULL_HANDLE;
@@ -726,12 +882,35 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 	}
 
 	PFN_xrVoidFunction function = NULL;
-	if ( !Check( xrGetInstanceProcAddr( instance, "xrGetOpenGLGraphicsRequirementsKHR", &function ), "xrGetInstanceProcAddr( xrGetOpenGLGraphicsRequirementsKHR )" ) ) {
-		DestroyInstance();
-		return false;
+	if ( haveOpenGL ) {
+		if ( !Check( xrGetInstanceProcAddr( instance, "xrGetOpenGLGraphicsRequirementsKHR", &function ), "xrGetInstanceProcAddr( xrGetOpenGLGraphicsRequirementsKHR )" ) ) {
+			DestroyInstance();
+			return false;
+		}
+		getGLRequirements = reinterpret_cast<PFN_xrGetOpenGLGraphicsRequirementsKHR>( function );
+		haveEGL = haveEGLBinding;
 	}
-	getGLRequirements = reinterpret_cast<PFN_xrGetOpenGLGraphicsRequirementsKHR>( function );
-	common->Printf( "OpenXR: runtime %s\n", runtimeName.c_str() );
+	if ( haveVulkan ) {
+		PFN_xrVoidFunction functions[4] = { NULL, NULL, NULL, NULL };
+		const char *const names[4] = { "xrGetVulkanGraphicsRequirements2KHR", "xrCreateVulkanInstanceKHR",
+			"xrGetVulkanGraphicsDevice2KHR", "xrCreateVulkanDeviceKHR" };
+		bool resolved = true;
+		for ( int i = 0; i < 4; i++ ) {
+			resolved = resolved && Check( xrGetInstanceProcAddr( instance, names[i], &functions[i] ), names[i] ) && functions[i] != NULL;
+		}
+		if ( resolved ) {
+			getVulkanRequirements = reinterpret_cast<vrGetVulkanRequirements_t>( functions[0] );
+			createVulkanInstance = reinterpret_cast<vrCreateVulkanInstance_t>( functions[1] );
+			getVulkanDevice = reinterpret_cast<vrGetVulkanDevice_t>( functions[2] );
+			createVulkanDevice = reinterpret_cast<vrCreateVulkanDevice_t>( functions[3] );
+		} else if ( !haveOpenGL || instance == XR_NULL_HANDLE ) {
+			DestroyInstance();
+			return false;
+		}
+	}
+	common->Printf( "OpenXR: runtime %s (%s%s%s%s)\n", runtimeName.c_str(), getGLRequirements != NULL ? "OpenGL" : "",
+		haveEGL ? " on GLX or EGL" : "",
+		getGLRequirements != NULL && getVulkanRequirements != NULL ? ", " : "", getVulkanRequirements != NULL ? "Vulkan" : "" );
 	systemUnavailableLogged = false;
 	nextSystemRetryTime = 0;
 	return true;
@@ -746,6 +925,14 @@ void idVRSystemOpenXR::DestroyInstance( void ) {
 	}
 	systemId = XR_NULL_SYSTEM_ID;
 	getGLRequirements = NULL;
+	haveEGL = false;
+	getVulkanRequirements = NULL;
+	createVulkanInstance = NULL;
+	getVulkanDevice = NULL;
+	createVulkanDevice = NULL;
+	// the renderer keeps its Vulkan objects; they belong to no runtime now
+	vulkanCreator = XR_NULL_HANDLE;
+	vulkanRestartFor = XR_NULL_HANDLE;
 	for ( int i = 0; i < VR_NUM_HANDS; i++ ) {
 		handPaths[i] = XR_NULL_PATH;
 	}
@@ -800,6 +987,179 @@ bool idVRSystemOpenXR::AcquireSystem( void ) {
 }
 
 /*
+===============================================================================
+
+	OpenXR on Vulkan
+
+	XR_KHR_vulkan_enable2 has the runtime create the renderer's instance and
+	device: it adds the extensions it needs and picks the GPU the headset is
+	attached to. The Vulkan renderer offers both creations here while it
+	starts (renderModuleServices_t, render API 32). When VR is enabled and a
+	headset is there they go through the runtime, and the session later binds
+	to that device. A device made before the headset appeared, or for an
+	earlier runtime instance, cannot be bound: the renderer is restarted once
+	so the runtime can make it.
+
+===============================================================================
+*/
+
+/*
+====================
+idVRSystemOpenXR::PrepareVulkanSystem
+
+An instance whose runtime supports Vulkan, and its headset. Runs while the
+renderer starts, before the per-frame start, so it creates both on the spot.
+====================
+*/
+bool idVRSystemOpenXR::PrepareVulkanSystem( void ) {
+	if ( !vr_enable.GetBool() || runtimeStopped ) {
+		return false;
+	}
+	if ( instance == XR_NULL_HANDLE && !CreateInstance() ) {
+		return false;
+	}
+	if ( createVulkanInstance == NULL ) {
+		static bool warned = false;
+		if ( !warned ) {
+			common->Warning( "OpenXR: the active runtime does not support Vulkan (%s); VR needs r_renderApi gl with it",
+				VR_VULKAN_ENABLE2_EXTENSION_NAME );
+			warned = true;
+		}
+		return false;
+	}
+	// a headset that is not there yet is asked for again by the frame loop
+	nextSystemRetryTime = 0;
+	return AcquireSystem();
+}
+
+bool idVRSystemOpenXR::CreateVulkanInstance( void *getInstanceProcAddr, const void *createInfo, void **outInstance, int *outResult ) {
+	if ( getInstanceProcAddr == NULL || createInfo == NULL || outInstance == NULL || outResult == NULL || !PrepareVulkanSystem() ) {
+		return false;
+	}
+	vrVulkanRequirements_t requirements;
+	memset( &requirements, 0, sizeof( requirements ) );
+	requirements.type = XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR;
+	if ( !Check( getVulkanRequirements( instance, systemId, &requirements ), "xrGetVulkanGraphicsRequirements2KHR" ) ) {
+		return false;
+	}
+	common->Printf( "OpenXR: the runtime creates the Vulkan renderer's instance (it supports Vulkan %u.%u to %u.%u)\n",
+		static_cast<unsigned>( XR_VERSION_MAJOR( requirements.minApiVersionSupported ) ),
+		static_cast<unsigned>( XR_VERSION_MINOR( requirements.minApiVersionSupported ) ),
+		static_cast<unsigned>( XR_VERSION_MAJOR( requirements.maxApiVersionSupported ) ),
+		static_cast<unsigned>( XR_VERSION_MINOR( requirements.maxApiVersionSupported ) ) );
+
+	vrVulkanInstanceCreateInfo_t info;
+	memset( &info, 0, sizeof( info ) );
+	info.type = XR_TYPE_VULKAN_INSTANCE_CREATE_INFO_KHR;
+	info.systemId = systemId;
+	info.pfnGetInstanceProcAddr = getInstanceProcAddr;
+	info.vulkanCreateInfo = createInfo;
+	void *created = NULL;
+	int32_t vulkanResult = 0;
+	if ( !Check( createVulkanInstance( instance, &info, &created, &vulkanResult ), "xrCreateVulkanInstanceKHR" ) ) {
+		// the renderer makes its own instance; VR then stays off on it
+		return false;
+	}
+	*outInstance = created;
+	*outResult = static_cast<int>( vulkanResult );
+	if ( vulkanResult == 0 && created != NULL ) {
+		vulkanInstance = created;
+		vulkanPhysicalDevice = NULL;
+		vulkanDevice = NULL;
+		vulkanCreator = instance;
+	}
+	return true;
+}
+
+bool idVRSystemOpenXR::GetVulkanPhysicalDevice( void *vulkanInstanceHandle, void **outPhysicalDevice ) {
+	if ( vulkanInstanceHandle == NULL || outPhysicalDevice == NULL || vulkanInstanceHandle != vulkanInstance
+			|| vulkanCreator == XR_NULL_HANDLE || vulkanCreator != instance || getVulkanDevice == NULL ) {
+		return false;
+	}
+	vrVulkanDeviceGetInfo_t getInfo;
+	memset( &getInfo, 0, sizeof( getInfo ) );
+	getInfo.type = XR_TYPE_VULKAN_GRAPHICS_DEVICE_GET_INFO_KHR;
+	getInfo.systemId = systemId;
+	getInfo.vulkanInstance = vulkanInstanceHandle;
+	void *physicalDevice = NULL;
+	if ( !Check( getVulkanDevice( instance, &getInfo, &physicalDevice ), "xrGetVulkanGraphicsDevice2KHR" ) || physicalDevice == NULL ) {
+		return false;
+	}
+	vulkanPhysicalDevice = physicalDevice;
+	*outPhysicalDevice = physicalDevice;
+	return true;
+}
+
+bool idVRSystemOpenXR::CreateVulkanDevice( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo, void **outDevice, int *outResult ) {
+	if ( getInstanceProcAddr == NULL || physicalDevice == NULL || createInfo == NULL || outDevice == NULL || outResult == NULL
+			|| physicalDevice != vulkanPhysicalDevice || vulkanCreator == XR_NULL_HANDLE || vulkanCreator != instance
+			|| createVulkanDevice == NULL ) {
+		return false;
+	}
+	vrVulkanDeviceCreateInfo_t info;
+	memset( &info, 0, sizeof( info ) );
+	info.type = XR_TYPE_VULKAN_DEVICE_CREATE_INFO_KHR;
+	info.systemId = systemId;
+	info.pfnGetInstanceProcAddr = getInstanceProcAddr;
+	info.vulkanPhysicalDevice = physicalDevice;
+	info.vulkanCreateInfo = createInfo;
+	void *created = NULL;
+	int32_t vulkanResult = 0;
+	if ( !Check( createVulkanDevice( instance, &info, &created, &vulkanResult ), "xrCreateVulkanDeviceKHR" ) ) {
+		return false;
+	}
+	*outDevice = created;
+	*outResult = static_cast<int>( vulkanResult );
+	if ( vulkanResult == 0 && created != NULL ) {
+		vulkanDevice = created;
+		common->Printf( "OpenXR: the runtime created the Vulkan renderer's device\n" );
+	}
+	return true;
+}
+
+/*
+====================
+idVRSystemOpenXR::RequestVulkanRendererRestart
+
+Once per runtime instance: a renderer whose device a restart cannot route
+through the runtime (the runtime refused it) must not restart forever. The
+restart goes ahead of whatever the command buffer holds, but a script that
+is waiting holds the buffer, so until the renderer stops the session retry
+leaves it alone.
+====================
+*/
+void idVRSystemOpenXR::RequestVulkanRendererRestart( void ) {
+	if ( vulkanRestartQueued != 0 && Sys_Milliseconds() - vulkanRestartQueued < VR_RESTART_PENDING_MSEC ) {
+		return;
+	}
+	vulkanRestartQueued = 0;
+	if ( vulkanRestartFor == instance ) {
+		static XrInstance warnedFor = XR_NULL_HANDLE;
+		if ( warnedFor != instance ) {
+			common->Warning( "OpenXR: the runtime did not create the Vulkan renderer's device; VR stays off (vr_restart tries again)" );
+			warnedFor = instance;
+		}
+		return;
+	}
+	vulkanRestartFor = instance;
+	vulkanRestartQueued = Max( 1, Sys_Milliseconds() );
+	common->Printf( "OpenXR: restarting the Vulkan renderer so the runtime can create its device for the headset\n" );
+	cmdSystem->BufferCommandText( CMD_EXEC_INSERT, "vid_restart\n" );
+}
+
+bool VR_CreateVulkanInstance( void *getInstanceProcAddr, const void *createInfo, void **outInstance, int *outResult ) {
+	return vrOpenXR != NULL && vrOpenXR->CreateVulkanInstance( getInstanceProcAddr, createInfo, outInstance, outResult );
+}
+
+bool VR_GetVulkanPhysicalDevice( void *instance, void **outPhysicalDevice ) {
+	return vrOpenXR != NULL && vrOpenXR->GetVulkanPhysicalDevice( instance, outPhysicalDevice );
+}
+
+bool VR_CreateVulkanDevice( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo, void **outDevice, int *outResult ) {
+	return vrOpenXR != NULL && vrOpenXR->CreateVulkanDevice( getInstanceProcAddr, physicalDevice, createInfo, outDevice, outResult );
+}
+
+/*
 ====================
 idVRSystemOpenXR::CreateSession
 ====================
@@ -809,30 +1169,9 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 	if ( !renderSystem->GetVRGraphicsBinding( binding ) ) {
 		static bool warned = false;
 		if ( !warned ) {
-			common->Warning( "OpenXR: VR needs the OpenGL renderer (r_renderApi gl)%s; VR stays off",
-#if defined( __linux__ )
-				" on an X11 or XWayland GLX context (on Wayland, start with OPENQ4_FORCE_X11=1)"
-#else
-				""
-#endif
-				);
+			common->Warning( "OpenXR: VR needs the OpenGL or the Vulkan renderer (r_renderApi gl or vulkan); VR stays off" );
 			warned = true;
 		}
-		return false;
-	}
-
-	XrGraphicsRequirementsOpenGLKHR requirements;
-	memset( &requirements, 0, sizeof( requirements ) );
-	requirements.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR;
-	if ( getGLRequirements == NULL || !Check( getGLRequirements( instance, systemId, &requirements ), "xrGetOpenGLGraphicsRequirementsKHR" ) ) {
-		return false;
-	}
-	const XrVersion contextVersion = XR_MAKE_VERSION( binding.glMajor, binding.glMinor, 0 );
-	if ( contextVersion < requirements.minApiVersionSupported ) {
-		common->Warning( "OpenXR: the runtime needs OpenGL %u.%u, the renderer's context is %d.%d; VR stays off",
-			static_cast<unsigned>( XR_VERSION_MAJOR( requirements.minApiVersionSupported ) ),
-			static_cast<unsigned>( XR_VERSION_MINOR( requirements.minApiVersionSupported ) ),
-			binding.glMajor, binding.glMinor );
 		return false;
 	}
 
@@ -842,24 +1181,108 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 	createInfo.systemId = systemId;
 #if defined( _WIN32 )
 	XrGraphicsBindingOpenGLWin32KHR win32Binding;
-	memset( &win32Binding, 0, sizeof( win32Binding ) );
-	win32Binding.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR;
-	win32Binding.hDC = static_cast<HDC>( binding.wglDC );
-	win32Binding.hGLRC = static_cast<HGLRC>( binding.wglContext );
-	createInfo.next = &win32Binding;
 #else
 	vrXlibGraphicsBinding_t xlibBinding;
-	memset( &xlibBinding, 0, sizeof( xlibBinding ) );
-	xlibBinding.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_XLIB_KHR;
-	xlibBinding.xDisplay = binding.glxDisplay;
-	xlibBinding.visualid = binding.glxVisualId;
-	xlibBinding.glxFBConfig = binding.glxFBConfig;
-	xlibBinding.glxDrawable = binding.glxDrawable;
-	xlibBinding.glxContext = binding.glxContext;
-	createInfo.next = &xlibBinding;
+	vrEGLGraphicsBinding_t eglBinding;
 #endif
+	vrVulkanGraphicsBinding_t vulkanBinding;
+
+	if ( binding.kind == RENDER_VR_BINDING_VULKAN ) {
+		if ( getVulkanRequirements == NULL ) {
+			static bool warned = false;
+			if ( !warned ) {
+				common->Warning( "OpenXR: the active runtime does not support Vulkan (%s); VR needs r_renderApi gl with it",
+					VR_VULKAN_ENABLE2_EXTENSION_NAME );
+				warned = true;
+			}
+			return false;
+		}
+		if ( binding.vkDevice == NULL || binding.vkDevice != vulkanDevice || vulkanCreator != instance ) {
+			// the renderer made its device before VR asked for one, or for an
+			// earlier runtime instance; only a device the runtime creates binds
+			RequestVulkanRendererRestart();
+			return false;
+		}
+		// the requirements call must precede the session on this instance
+		vrVulkanRequirements_t requirements;
+		memset( &requirements, 0, sizeof( requirements ) );
+		requirements.type = XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR;
+		if ( !Check( getVulkanRequirements( instance, systemId, &requirements ), "xrGetVulkanGraphicsRequirements2KHR" ) ) {
+			return false;
+		}
+		memset( &vulkanBinding, 0, sizeof( vulkanBinding ) );
+		vulkanBinding.type = XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR;
+		vulkanBinding.instance = binding.vkInstance;
+		vulkanBinding.physicalDevice = binding.vkPhysicalDevice;
+		vulkanBinding.device = binding.vkDevice;
+		vulkanBinding.queueFamilyIndex = binding.vkQueueFamilyIndex;
+		vulkanBinding.queueIndex = binding.vkQueueIndex;
+		createInfo.next = &vulkanBinding;
+		graphicsApi = VR_GRAPHICS_VULKAN;
+	} else {
+		XrGraphicsRequirementsOpenGLKHR requirements;
+		memset( &requirements, 0, sizeof( requirements ) );
+		requirements.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR;
+		if ( getGLRequirements == NULL ) {
+			static bool warned = false;
+			if ( !warned ) {
+				common->Warning( "OpenXR: the active runtime does not support OpenGL (%s); VR needs r_renderApi vulkan with it",
+					XR_KHR_OPENGL_ENABLE_EXTENSION_NAME );
+				warned = true;
+			}
+			return false;
+		}
+		if ( binding.kind == RENDER_VR_BINDING_EGL && !haveEGL ) {
+			static bool warned = false;
+			if ( !warned ) {
+				common->Warning( "OpenXR: the OpenGL renderer runs on EGL (native Wayland) and the active runtime cannot bind it (%s); "
+					"use r_renderApi vulkan, or start openQ4 with OPENQ4_FORCE_X11=1", VR_EGL_ENABLE_EXTENSION_NAME );
+				warned = true;
+			}
+			return false;
+		}
+		if ( !Check( getGLRequirements( instance, systemId, &requirements ), "xrGetOpenGLGraphicsRequirementsKHR" ) ) {
+			return false;
+		}
+		const XrVersion contextVersion = XR_MAKE_VERSION( binding.glMajor, binding.glMinor, 0 );
+		if ( contextVersion < requirements.minApiVersionSupported ) {
+			common->Warning( "OpenXR: the runtime needs OpenGL %u.%u, the renderer's context is %d.%d; VR stays off",
+				static_cast<unsigned>( XR_VERSION_MAJOR( requirements.minApiVersionSupported ) ),
+				static_cast<unsigned>( XR_VERSION_MINOR( requirements.minApiVersionSupported ) ),
+				binding.glMajor, binding.glMinor );
+			return false;
+		}
+#if defined( _WIN32 )
+		memset( &win32Binding, 0, sizeof( win32Binding ) );
+		win32Binding.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR;
+		win32Binding.hDC = static_cast<HDC>( binding.wglDC );
+		win32Binding.hGLRC = static_cast<HGLRC>( binding.wglContext );
+		createInfo.next = &win32Binding;
+#else
+		if ( binding.kind == RENDER_VR_BINDING_EGL ) {
+			memset( &eglBinding, 0, sizeof( eglBinding ) );
+			eglBinding.type = XR_TYPE_GRAPHICS_BINDING_EGL_MNDX;
+			eglBinding.getProcAddress = binding.eglGetProcAddress;
+			eglBinding.display = binding.eglDisplay;
+			eglBinding.config = binding.eglConfig;
+			eglBinding.context = binding.eglContext;
+			createInfo.next = &eglBinding;
+		} else {
+			memset( &xlibBinding, 0, sizeof( xlibBinding ) );
+			xlibBinding.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_XLIB_KHR;
+			xlibBinding.xDisplay = binding.glxDisplay;
+			xlibBinding.visualid = binding.glxVisualId;
+			xlibBinding.glxFBConfig = binding.glxFBConfig;
+			xlibBinding.glxDrawable = binding.glxDrawable;
+			xlibBinding.glxContext = binding.glxContext;
+			createInfo.next = &xlibBinding;
+		}
+#endif
+		graphicsApi = VR_GRAPHICS_OPENGL;
+	}
 	if ( !Check( xrCreateSession( instance, &createInfo, &session ), "xrCreateSession" ) ) {
 		session = XR_NULL_HANDLE;
+		graphicsApi = VR_GRAPHICS_NONE;
 		return false;
 	}
 	sessionState = XR_SESSION_STATE_UNKNOWN;
@@ -934,27 +1357,7 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 		return false;
 	}
 
-	// swapchain format: sRGB so the compositor reads the engine's gamma-encoded pixels as they are
-	uint32_t formatCount = 0;
-	swapchainFormat = 0;
-	if ( Check( xrEnumerateSwapchainFormats( session, 0, &formatCount, NULL ), "xrEnumerateSwapchainFormats" ) && formatCount > 0 && formatCount <= 256 ) {
-		idList<int64_t> formats;
-		formats.SetNum( static_cast<int>( formatCount ) );
-		if ( Check( xrEnumerateSwapchainFormats( session, formatCount, &formatCount, formats.Ptr() ), "xrEnumerateSwapchainFormats" ) && formatCount == static_cast<uint32_t>( formats.Num() ) ) {
-			for ( int i = 0; i < formats.Num() && swapchainFormat == 0; i++ ) {
-				if ( formats[i] == GL_SRGB8_ALPHA8 ) {
-					swapchainFormat = formats[i];
-				}
-			}
-			for ( int i = 0; i < formats.Num() && swapchainFormat == 0; i++ ) {
-				if ( formats[i] == GL_RGBA8 ) {
-					swapchainFormat = formats[i];
-					common->Warning( "OpenXR: the runtime offers no sRGB swapchain format; colours may look washed out" );
-				}
-			}
-		}
-	}
-	if ( swapchainFormat == 0 ) {
+	if ( !SelectSwapchainFormat( binding.vkColorFormat ) ) {
 		common->Warning( "OpenXR: the runtime offers no usable 8-bit colour swapchain format" );
 		DestroySession();
 		return false;
@@ -1012,9 +1415,7 @@ void idVRSystemOpenXR::DestroySession( void ) {
 		pointerOnScreen = false;
 		Sys_PostVRPointer( false, 0.0f, 0.0f );
 	}
-	if ( rendererReady && renderSystem != NULL ) {
-		renderSystem->SetVRFrame( NULL );
-	}
+	ReleaseRendererImages();
 	DestroyActions();
 	for ( int i = 0; i < VR_NUM_EYES; i++ ) {
 		DestroySwapchain( eyeSwapchains[i] );
@@ -1037,6 +1438,7 @@ void idVRSystemOpenXR::DestroySession( void ) {
 	sessionRunning = false;
 	sessionFocused = false;
 	sessionState = XR_SESSION_STATE_UNKNOWN;
+	graphicsApi = VR_GRAPHICS_NONE;
 	viewsValid = false;
 	interactionProfile.Clear();
 
@@ -1044,6 +1446,26 @@ void idVRSystemOpenXR::DestroySession( void ) {
 		UpdateKey( i, heldKeys[i], false );
 	}
 	twoHanded = false;
+}
+
+/*
+====================
+idVRSystemOpenXR::ReleaseRendererImages
+
+Before swapchains are destroyed: OpenXR requires every submitted graphics
+command that uses their images to have completed. A Vulkan renderer may
+still have frames in flight, so it waits for them; the frame it presents
+is cleared as SetVRFrame( NULL ) would.
+====================
+*/
+void idVRSystemOpenXR::ReleaseRendererImages( void ) {
+	if ( !rendererReady || renderSystem == NULL ) {
+		return;
+	}
+	renderVRFrame_t release;
+	memset( &release, 0, sizeof( release ) );
+	release.releaseImages = true;
+	renderSystem->SetVRFrame( &release );
 }
 
 bool idVRSystemOpenXR::CreateSwapchain( swapchain_t &swapchain, int width, int height ) {
@@ -1072,29 +1494,100 @@ bool idVRSystemOpenXR::CreateSwapchain( swapchain_t &swapchain, int width, int h
 		DestroySwapchain( swapchain );
 		return false;
 	}
+	// a bounded count was checked above; each image must be filled and real
 	const uint32_t capacity = imageCount;
-	idList<XrSwapchainImageOpenGLKHR> images;
-	images.SetNum( static_cast<int>( imageCount ) );
-	for ( int i = 0; i < images.Num(); i++ ) {
-		images[i].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
-		images[i].next = NULL;
-		images[i].image = 0;
-	}
-	if ( !Check( xrEnumerateSwapchainImages( swapchain.handle, capacity, &imageCount,
-			reinterpret_cast<XrSwapchainImageBaseHeader *>( images.Ptr() ) ), "xrEnumerateSwapchainImages" ) || imageCount != capacity ) {
-		DestroySwapchain( swapchain );
-		return false;
-	}
-	for ( int i = 0; i < images.Num(); i++ ) {
-		if ( images[i].image == 0 ) {
+	if ( graphicsApi == VR_GRAPHICS_VULKAN ) {
+		idList<vrVulkanSwapchainImage_t> images;
+		images.SetNum( static_cast<int>( imageCount ) );
+		for ( int i = 0; i < images.Num(); i++ ) {
+			images[i].type = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
+			images[i].next = NULL;
+			images[i].image = 0;
+		}
+		if ( !Check( xrEnumerateSwapchainImages( swapchain.handle, capacity, &imageCount,
+				reinterpret_cast<XrSwapchainImageBaseHeader *>( images.Ptr() ) ), "xrEnumerateSwapchainImages" ) || imageCount != capacity ) {
 			DestroySwapchain( swapchain );
 			return false;
 		}
-		swapchain.images.Append( images[i].image );
+		for ( int i = 0; i < images.Num(); i++ ) {
+			if ( images[i].image == 0 ) {
+				DestroySwapchain( swapchain );
+				return false;
+			}
+			swapchain.images.Append( images[i].image );
+		}
+	} else {
+		idList<XrSwapchainImageOpenGLKHR> images;
+		images.SetNum( static_cast<int>( imageCount ) );
+		for ( int i = 0; i < images.Num(); i++ ) {
+			images[i].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
+			images[i].next = NULL;
+			images[i].image = 0;
+		}
+		if ( !Check( xrEnumerateSwapchainImages( swapchain.handle, capacity, &imageCount,
+				reinterpret_cast<XrSwapchainImageBaseHeader *>( images.Ptr() ) ), "xrEnumerateSwapchainImages" ) || imageCount != capacity ) {
+			DestroySwapchain( swapchain );
+			return false;
+		}
+		for ( int i = 0; i < images.Num(); i++ ) {
+			if ( images[i].image == 0 ) {
+				DestroySwapchain( swapchain );
+				return false;
+			}
+			swapchain.images.Append( images[i].image );
+		}
 	}
 	swapchain.width = width;
 	swapchain.height = height;
 	return true;
+}
+
+/*
+====================
+idVRSystemOpenXR::SelectSwapchainFormat
+
+sRGB, so the compositor reads the engine's gamma-encoded bytes as they are:
+the renderer copies its targets into the images without converting them.
+A Vulkan renderer's eyes share its window's pipelines when the images have the
+window's channel order.
+====================
+*/
+bool idVRSystemOpenXR::SelectSwapchainFormat( int rendererVulkanFormat ) {
+	swapchainFormat = 0;
+	uint32_t formatCount = 0;
+	if ( !Check( xrEnumerateSwapchainFormats( session, 0, &formatCount, NULL ), "xrEnumerateSwapchainFormats" )
+			|| formatCount == 0 || formatCount > 256 ) {
+		return false;
+	}
+	idList<int64_t> formats;
+	formats.SetNum( static_cast<int>( formatCount ) );
+	if ( !Check( xrEnumerateSwapchainFormats( session, formatCount, &formatCount, formats.Ptr() ), "xrEnumerateSwapchainFormats" )
+			|| formatCount != static_cast<uint32_t>( formats.Num() ) ) {
+		return false;
+	}
+	const int64_t glPreferred[] = { GL_SRGB8_ALPHA8, GL_RGBA8 };
+	const bool windowBGRA = rendererVulkanFormat == VR_VK_FORMAT_B8G8R8A8_UNORM || rendererVulkanFormat == VR_VK_FORMAT_B8G8R8A8_SRGB;
+	const int64_t vulkanPreferred[] = {
+		windowBGRA ? VR_VK_FORMAT_B8G8R8A8_SRGB : VR_VK_FORMAT_R8G8B8A8_SRGB,
+		windowBGRA ? VR_VK_FORMAT_R8G8B8A8_SRGB : VR_VK_FORMAT_B8G8R8A8_SRGB,
+		windowBGRA ? VR_VK_FORMAT_B8G8R8A8_UNORM : VR_VK_FORMAT_R8G8B8A8_UNORM,
+		windowBGRA ? VR_VK_FORMAT_R8G8B8A8_UNORM : VR_VK_FORMAT_B8G8R8A8_UNORM };
+	const bool vulkan = graphicsApi == VR_GRAPHICS_VULKAN;
+	const int64_t *preferred = vulkan ? vulkanPreferred : glPreferred;
+	const int numPreferred = vulkan ? 4 : 2;
+	const int numSRGB = vulkan ? 2 : 1;
+	for ( int p = 0; p < numPreferred && swapchainFormat == 0; p++ ) {
+		for ( int i = 0; i < formats.Num(); i++ ) {
+			if ( formats[i] == preferred[p] ) {
+				swapchainFormat = formats[i];
+				if ( p >= numSRGB ) {
+					common->Warning( "OpenXR: the runtime offers no sRGB swapchain format; colours may look washed out" );
+				}
+				break;
+			}
+		}
+	}
+	return swapchainFormat != 0;
 }
 
 void idVRSystemOpenXR::DestroySwapchain( swapchain_t &swapchain ) {
@@ -1240,7 +1733,13 @@ void idVRSystemOpenXR::StartIfRequested( void ) {
 		vr_renderScale.ClearModified();
 		if ( !vr_enable.GetBool() || restart ) {
 			DestroySession();
-			DestroyInstance();
+			// the instance whose runtime made the Vulkan renderer's device stays
+			// for a restart: a new one could bind only after a renderer restart
+			const bool keepForVulkan = vr_enable.GetBool() && !runtimeStopped
+				&& vulkanCreator != XR_NULL_HANDLE && vulkanCreator == instance;
+			if ( !keepForVulkan ) {
+				DestroyInstance();
+			}
 		}
 		runtimeStopped = false;
 		startFailureLogged = false;
@@ -1975,6 +2474,7 @@ bool idVRSystemOpenXR::ResizeScreenSwapchain( void ) {
 		screenResizeFailedHeight = height;
 		return recovery == RECOVERY_NONE && screenSwapchain.handle != XR_NULL_HANDLE;
 	}
+	ReleaseRendererImages();
 	DestroySwapchain( screenSwapchain );
 	screenSwapchain.handle = resized.handle;
 	screenSwapchain.width = resized.width;
@@ -2223,12 +2723,21 @@ void idVRSystemOpenXR::BeginFrame( void ) {
 	renderFrame.stereo = viewsValid;
 	renderFrame.eyeWidth = eyeSwapchains[0].width;
 	renderFrame.eyeHeight = eyeSwapchains[0].height;
-	for ( int i = 0; i < VR_NUM_EYES; i++ ) {
-		renderFrame.eyeImages[i] = eyeSwapchains[i].images[ static_cast<int>( eyeSwapchains[i].acquiredIndex ) ];
-	}
+	const uint64_t screenImage = screenSwapchain.images[ static_cast<int>( screenSwapchain.acquiredIndex ) ];
 	renderFrame.screenWidth = screenSwapchain.width;
 	renderFrame.screenHeight = screenSwapchain.height;
-	renderFrame.screenImage = screenSwapchain.images[ static_cast<int>( screenSwapchain.acquiredIndex ) ];
+	if ( graphicsApi == VR_GRAPHICS_VULKAN ) {
+		for ( int i = 0; i < VR_NUM_EYES; i++ ) {
+			renderFrame.vkEyeImages[i] = eyeSwapchains[i].images[ static_cast<int>( eyeSwapchains[i].acquiredIndex ) ];
+		}
+		renderFrame.vkScreenImage = screenImage;
+		renderFrame.vkImageFormat = static_cast<int>( swapchainFormat );
+	} else {
+		for ( int i = 0; i < VR_NUM_EYES; i++ ) {
+			renderFrame.eyeImages[i] = static_cast<unsigned int>( eyeSwapchains[i].images[ static_cast<int>( eyeSwapchains[i].acquiredIndex ) ] );
+		}
+		renderFrame.screenImage = static_cast<unsigned int>( screenImage );
+	}
 	renderFrame.mirror = idMath::ClampInt( RENDER_VR_MIRROR_NONE, RENDER_VR_MIRROR_SCREEN, vr_mirror.GetInteger() );
 	renderSystem->SetVRFrame( &renderFrame );
 

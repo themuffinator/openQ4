@@ -44,4 +44,15 @@ extern idCVar vr_debug;
 // The OpenXR implementation, when the client was built with it (OPENQ4_OPENXR).
 idVRSystem *		VR_GetOpenXRSystem( void );
 
+// OpenXR on Vulkan (XR_KHR_vulkan_enable2): the runtime creates the Vulkan
+// renderer's instance and device, on the headset's GPU. The renderer module
+// offers each creation through its services. False when VR does not want this
+// renderer (VR off, no runtime or headset, no Vulkan support), and the module
+// creates the object itself; true hands back the VkResult in *outResult.
+bool				VR_CreateVulkanInstance( void *getInstanceProcAddr, const void *createInfo,
+											 void **outInstance, int *outResult );
+bool				VR_GetVulkanPhysicalDevice( void *instance, void **outPhysicalDevice );
+bool				VR_CreateVulkanDevice( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo,
+										   void **outDevice, int *outResult );
+
 #endif /* !__VRSYSTEMLOCAL_H__ */

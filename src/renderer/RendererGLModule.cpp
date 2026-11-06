@@ -447,6 +447,30 @@ void R_RendererModule_RendererDeviceEvent( int event ) {
 	}
 }
 
+// OpenXR on Vulkan (render API 32): the runtime creates the instance and device.
+bool R_RendererModule_CreateVulkanInstanceForVR( void *getInstanceProcAddr, const void *createInfo,
+		void **outInstance, int *outResult ) {
+	if ( rgm_services != NULL && rgm_services->CreateVulkanInstanceForVR != NULL ) {
+		return rgm_services->CreateVulkanInstanceForVR( getInstanceProcAddr, createInfo, outInstance, outResult );
+	}
+	return false;
+}
+
+bool R_RendererModule_GetVulkanPhysicalDeviceForVR( void *instance, void **outPhysicalDevice ) {
+	if ( rgm_services != NULL && rgm_services->GetVulkanPhysicalDeviceForVR != NULL ) {
+		return rgm_services->GetVulkanPhysicalDeviceForVR( instance, outPhysicalDevice );
+	}
+	return false;
+}
+
+bool R_RendererModule_CreateVulkanDeviceForVR( void *getInstanceProcAddr, void *physicalDevice, const void *createInfo,
+		void **outDevice, int *outResult ) {
+	if ( rgm_services != NULL && rgm_services->CreateVulkanDeviceForVR != NULL ) {
+		return rgm_services->CreateVulkanDeviceForVR( getInstanceProcAddr, physicalDevice, createInfo, outDevice, outResult );
+	}
+	return false;
+}
+
 #if defined( OPENQ4_RENDERER_GL_MODULE ) || defined( OPENQ4_RENDERER_GLES_MODULE )
 /*
 ====================

@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--map", default="mp/q4dm1")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--render-api", choices=("gl", "vulkan"), default="gl")
     options = parser.parse_args(argv)
 
     staged = options.runtime_dir.resolve()
@@ -68,7 +69,7 @@ def main(argv: list[str] | None = None) -> None:
     output = (options.output_dir or ROOT / ".tmp/openxr-vr-mp-smoke").resolve()
     if output == staged or staged in output.parents or output in staged.parents:
         parser.error("output and staged runtime directories must not overlap")
-    profile = output / "mp"
+    profile = output / ( "mp-vulkan" if options.render_api == "vulkan" else "mp" )
     game = profile / "baseoq4"
     game.mkdir(parents=True, exist_ok=True)
     for stale in game.glob("vr_marker_*.txt"):
@@ -117,6 +118,11 @@ def main(argv: list[str] | None = None) -> None:
         "com_skipLoadingContinue": "1", "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1",
         "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_roomScale": "1",
         "net_serverDedicated": "0", "si_gameType": "DM", "sv_cheats": "1", "net_serverAllowServerMod": "0",
+        # the listen server and its one client stay on loopback, without a
+        # master-server heartbeat
+        "net_ip": "127.0.0.1", "net_LANServer": "1",
+        # after the launch configuration's own r_renderApi, so this one wins
+        "r_renderApi": options.render_api,
     }
     for key, value in settings.items():
         args += ["+set", key, value]
@@ -167,7 +173,7 @@ def main(argv: list[str] | None = None) -> None:
         f"a 0.5 m step should walk the body after the head through the usercmd, leaving it within 6 units, not {walked:.1f}"
     assert abs(leaned - walked - STEP_UNITS) < 1.5, \
         f"with vr_roomScale 0 another 0.5 m step should stay a {STEP_UNITS:.1f}-unit lean, moved {leaned - walked:.1f}"
-    print(f"OpenXR VR multiplayer smoke: PASS (room-scale walk left the head {walked:.1f} units out, "
+    print(f"OpenXR VR multiplayer smoke ({options.render_api}): PASS (room-scale walk left the head {walked:.1f} units out, "
           f"lean {leaned - walked:.1f}); evidence={profile}")
 
 
