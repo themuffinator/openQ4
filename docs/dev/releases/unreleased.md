@@ -404,6 +404,11 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- On Linux, a long single-player session no longer grows the game's memory use
+  with every level change. Memory the game had already freed stayed reserved,
+  about 60 MB per level, so a session that visited many levels could use
+  gigabytes more than it needed. It is now returned after each level loads,
+  which takes a few hundredths of a second.
 - Dedicated servers change maps faster: they no longer read every texture of
   the next map in the background only to discard it, about a quarter of each
   map load on stock multiplayer maps.
