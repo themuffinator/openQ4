@@ -914,15 +914,16 @@ diagnostics establish whole-frame ownership or production performance.
   Step 1 now covers the dominant classic interaction shapes inside the
   corridor; what remains of it is cutouts and light grids combined with
   those fallbacks.
-  Step 3 has begun: the classic-lighting corridor also runs in
-  display-referred modern frames (`r_pbrLinearScene 0`), and every class above
-  is byte-identical to native ARB2 there (`production-fixed*-display`).
+  Step 3 is done: the classic-lighting and baked-grid corridors also run in
+  display-referred modern frames (`r_pbrLinearScene 0`), and the fog/blend
+  corridor already did. Every class above, the light grid and a fog light
+  match native ARB2 there (`production-fixed*-display`, byte-identical except
+  the grid's 1-level maximum).
   Step 2 is done for corridor-owned classic surfaces: ambient lights draw
   with ARB2's ambient normal cube there and match native ARB2
   (`production-fixed-ambient`, byte-identical in display frames).
   Remaining, in order: finish step 1's cutout/light-grid combinations,
-  the baked-grid and fog/blend corridors in display frames, represent
-  stencil-fallback and multiple point shadows, reconcile the two
+  represent stencil-fallback and multiple point shadows, reconcile the two
   ownership models, then measure benefit before any promotion.
 - [ ] **REN-03 — P1, qualification and implementation: shadow production scope.**
   Qualify point/projected/CSM, stencil/map hybrids, moments, movers, near emitters,

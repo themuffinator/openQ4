@@ -30,9 +30,11 @@ Function names are given instead of line numbers, which drift.
   - enhanced materials;
   - cel shading;
   - `r_skipDiffuse`.
-- **Every modern-path corridor runs only in a laboratory mode.** All three need
-  `PBRLinearSceneRequested`, that is `r_pbrMaterials`, `r_hdrToneMap 1` and
-  `r_pbrLinearScene 1` (the last two default 0):
+- **Every modern-path corridor ran only in a laboratory mode** (corrected
+  6 November: fog/blend never did, and classic lighting and baked grid no
+  longer do; see Progress). The classic-lighting and baked-grid corridors
+  needed `PBRLinearSceneRequested`, that is `r_pbrMaterials`, `r_hdrToneMap 1`
+  and `r_pbrLinearScene 1` (the last two default 0):
   - the classic-lighting corridor (`R_ModernGLExecutor_PrepareClassicLighting`):
     one root view, no MSAA, no shadows, no ambient lights;
   - the baked light-grid corridor;
@@ -225,8 +227,17 @@ overflows (`ClassicInteractionDomain.h`).
       modern frame (`exec=1 composed=1`, the corridor executed), and each is
       byte-identical to native ARB2 over the specimen. The cutout keeps its 5
       bounded hole-edge pixels.
-    - The baked-grid and linear fog/blend corridors still require the linear
-      scene.
+    - The baked-grid corridor no longer requires the linear scene either.
+      The forward pass adds the baked term before its classic encode.
+      `production-fixed-grid-display` is a composed modern frame within
+      1 level of native ARB2 (mean 0.018).
+    - The fog/blend corridor never required the linear scene; only this
+      inventory said it did (`R_ModernGLExecutor_PrepareLinearFogBlend`
+      checks modern quality and PBR materials). `production-fixed-fog-display`
+      adds a fog light to the fixed scene. It is a composed modern frame with
+      22 fog draws, byte-identical to native ARB2. In the linear scene, fog
+      blends in linear radiance by design, so that mode is not compared with
+      ARB2.
   - **Step 2, ambient lights.** ARB2 never binds its separate ambient
     program. An ambient light uses the ordinary interaction program, with the
     ambient normal cube where the normalization cube usually goes.
@@ -261,8 +272,8 @@ overflows (`ClassicInteractionDomain.h`).
    question outside this proof.
 3. **Run the corridors in shipped modes.** Lift the `r_pbrLinearScene` and
    `r_hdrToneMap` requirement so the classic-lighting, baked-grid and fog/blend
-   corridors also run in display-referred frames. The classic-lighting
-   corridor is done; baked grid and fog/blend remain.
+   corridors also run in display-referred frames. Done for all three
+   (classic lighting, baked grid, fog/blend), each matching native ARB2.
 4. **Shadow receivers.** Represent stencil-fallback lights, which today decline
    the whole frame, and pool more than one point cube.
 5. **Reconcile the two ownership models.** The aggregate executor and the

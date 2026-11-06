@@ -2248,8 +2248,11 @@ static const LightGrid *R_ModernGLExecutor_CommandBakedGrid( const modernGLSubmi
 static void R_ModernGLExecutor_PrepareBakedGrid( const idScenePacketFrame &packetFrame, const modernGLExecutorStats_t &stats ) {
 	rg_modernGLBakedGridView = NULL;
 	rg_modernGLBakedGridCommandHash.Clear();
+	// REN-02 step 3: the forward pass adds the baked term before its classic
+	// encode, which passes display-referred frames through unchanged, so the
+	// corridor no longer needs the laboratory linear scene.
 	if ( !stats.submitPlanReady || !r_useLightGrid.GetBool() || r_skipDiffuse.GetBool() || r_lightGridDebug.GetInteger() != 0
-			|| !R_ModernGLExecutor_PBRLinearSceneRequested() || stats.pipelineGBufferCommands != 0
+			|| !r_rendererModernQuality.GetBool() || stats.pipelineGBufferCommands != 0
 			|| !R_ModernGLExecutor_MaterialLightingProven( packetFrame ) ) { return; }
 	const viewDef_t *root = NULL;
 	for ( int i = 0; i < packetFrame.NumScenes(); ++i ) {
