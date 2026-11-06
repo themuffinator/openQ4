@@ -19,10 +19,10 @@ multiplayer and audio are furthest along among the unfinished workstreams. Full
 campaign progression, physical-device qualification, rendering performance and the
 UI toolkit/editor/corpus remain major completion gates.
 
-| Progress measure, 4 November 2026 | Current result | Meaning |
+| Progress measure, 6 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **16 / 115 (13.9%)** | **99 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-08, not partial substeps. |
-| Estimated category progress | **18 categories: 1 at 100%, 15 partial, 2 at 0%** | Includes one paused category (map tools); the detailed estimates follow. |
+| Formally closed roadmap tasks | **31 / 115 (27.0%)** | **84 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-08, not partial substeps. |
+| Estimated category progress | **18 categories: 3 at 100%, 13 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
@@ -63,7 +63,7 @@ exact; the estimate column is deliberately approximate.
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
 | [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **100%** | 6 / 6 | None; macOS evidence stays with the platform gate. |
-| [Developer map tools](#tool-completion-checkpoints) — TOOL | **20%** | 0 / 4 | Paused: production geometry authoring, build/play integration and reliability. |
+| [Developer map tools](#tool-completion-checkpoints) — TOOL | **100%** | 4 / 4 | None; macOS evidence stays with the platform gate. |
 | [Release qualification](#release-qualification-and-completion-rules) — REL | **35%** | 0 / 4 | Exact package matrix, human/device evidence, lifecycle and promotion records. |
 | [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
 
@@ -85,8 +85,8 @@ The detailed task retains its full conditions and evidence links.
   scope. It cannot substitute for physical interaction, sustained performance or
   an ordered playthrough. A code fix still needs its applicable acceptance tests.
 - Preserve deliberate scope boundaries: MP-05's selected demo scope, VR-06's active
-  GL lifecycle scope, optional Q4-06/VR-05/PKG-06/IOS-06 work, the map-editor pause
-  and the deferred real-WAN/cross-architecture MP peer gates.
+  GL lifecycle scope, optional Q4-06/VR-05/PKG-06/IOS-06 work, the level editor's
+  experimental label and the deferred real-WAN/cross-architecture MP peer gates.
 
 ### Status reconciliation in this review
 
@@ -216,7 +216,7 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope and REN-01 through REN-08 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items (TOOL-01 through TOOL-04 closed 6 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
 | 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
@@ -4485,17 +4485,15 @@ Sources: [job service](parallel-job-system.md), [loading caches](loading-cache-m
 [runtime refinements](core-runtime-refinements.md), [map workspace](level-editor-modernization.md),
 [AAS compiler](aas-compiler.md), [dmap](dmap-compilation.md).
 
-The broader map-editor implementation remains **paused** as recorded in its
-reference. TOOL-01 through TOOL-04 preserve the outstanding scope; this planning
-consolidation does not resume it. Compiler/runtime compatibility fixes and the UI
-visual editor have their own active items.
+The map-editor work resumed on 6 November 2026 and TOOL-01 through TOOL-04 are
+closed; the editor stays labelled experimental. Compiler/runtime compatibility
+fixes and the UI visual editor have their own items.
 
 ### CORE completion checkpoints
 
 **Estimate: 100%; 6/6 tasks closed.** CORE-01, CORE-02 (not promoted), CORE-03,
 CORE-04, CORE-05 and CORE-06 are closed. macOS, a preview platform, is qualified
-through its own evidence gate rather than CORE-01. The map-editor pause does not
-pause these engine fixes.
+through its own evidence gate rather than CORE-01.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
@@ -4662,42 +4660,99 @@ pause these engine fixes.
 
 ### TOOL completion checkpoints
 
-**Estimate: 20%; 0/4 tasks closed; broader implementation paused.** Existing
-transactional document/persistence and experimental source-view work is retained.
-These substeps describe the remaining scope and do not authorize resuming it.
-The UI visual editor is a separate active UI-06 obligation.
+**Estimate: 100%; 4/4 tasks closed.** Work resumed on 6 November 2026 and the
+[level editor](level-editor-modernization.md) now authors, builds and plays
+Quake 4 maps. It stays labelled experimental; the legacy Radiant source remains
+unbuilt and separate, and the UI visual editor is a separate UI-06 obligation.
+macOS, a preview platform, is qualified through its own evidence gate.
 
-| Task / state | Completed points and evidence | Remaining completion subpoints when resumed |
+| Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| TOOL-01 — Partial; paused | Document service, source preview, entity/property browser and basic graphical workspace exist. | Docking, orthographic/persistent views, richer previews, typed properties/diagnostics and localized high-DPI/input/backend qualification. |
-| TOOL-02 — Partial foundations; paused | Lossless source retention, point-entity edits, undo and atomic/conflict-aware persistence exist. | Brush/patch geometry adapters, transforms/snapping/texture lock, per-gesture undo, layers/groups/prefabs/reference repair and bounded asynchronous indexing. |
-| TOOL-03 — Not integrated; paused | Native dmap/AAS commands exist separately from the workspace. | Build progress/cancel/linked diagnostics, preserved old output, isolated play sandbox and editor restoration; stock/custom round trips and rebuilt AI. |
-| TOOL-04 — Partial foundations; paused | Document save/conflict/recovery rules have scoped evidence. | Full authoring I/O failure, external edits, repeated undo, restart/render-switch/platform tests and latency budgets; reproduce disappearing workspace labels. |
+| TOOL-01 — Closed | Docked, tabbed and resizable panels with persisted layout; 3D plus top/front/side wireframe views and quad; per-map camera and view state; static entity models; typed inspector from entityDef `editor_*` declarations; source-linked diagnostics; all labels fit in 12 languages at 720p, 1080p and 2160p; GL and Vulkan. | — |
+| TOOL-02 — Closed | Lossless brushDef3/patch adapters; grid, snap, move, turn, scale and texture lock; one undo step per gesture or tool; groups, layers, prefabs, duplicate, reference-repairing rename; bounded background asset index; all 543,372 retail primitives round-trip. | — |
+| TOOL-03 — Closed | Sandboxed child-process builds with progress, cancel and linked diagnostics; outputs published only after a whole successful build; isolated play client; editor state kept; authored and stock maps built and played with AI on the rebuilt navigation. | — |
+| TOOL-04 — Closed | Fault-injected storage and builds, external-edit detection, atomic saves, recovery, randomized undo/redo, renderer switch and resized restart, Windows and Linux runs, declared latency budgets met; the old restart label defect no longer reproduces. | — |
 
 ### TOOL task evidence and acceptance
 
-- [ ] **TOOL-01 — P2, implementation: complete the map workspace.** Build on the
+- [x] **TOOL-01 — P2, implementation: complete the map workspace.** Build on the
   existing transactional document service and source preview. Add docking,
   orthographic views/camera persistence, richer entity/model previews, typed
   properties and linked diagnostics. Qualify localized responsive layouts, native
   input/high DPI and desktop backends. This is not restored MFC Radiant.
-- [ ] **TOOL-02 — P2, implementation: geometry and asset authoring.** Add lossless
+  Closed 6 November ([workspace](level-editor-modernization.md#milestone-4-the-docked-workspace-tool-01),
+  [evidence](level-editor-modernization.md#qualification-evidence-6-november-2026)):
+  Panels dock left, right or (Problems) under the views, two to a
+  dock as tabs, resize and persist in `editorExperimental_layout`. Top, front
+  and side wireframes drawn through the GUI device context join the 3D view,
+  alone or as a quad; each map's cameras, view mode, grid, texture lock, layers
+  and selection persist. Point entities show their static models, loaded
+  within a per-frame budget; the inspector types properties from entityDef
+  `editor_*` declarations and refuses ill-typed values, and validation links
+  each problem to its entity or primitive. Every label fits in all 12
+  languages at 1280x720, 1920x1080 and 2538x1312 in two layouts (the first
+  runs found wrapping in nine languages). OpenGL and Vulkan pass the workspace
+  phase, including a renderer switch and a resized restart; input is driven
+  through engine events into the workspace GUI, and a physical pointer and
+  keyboard pass remains the owner's hands-on check.
+- [x] **TOOL-02 — P2, implementation: geometry and asset authoring.** Add lossless
   brush/patch adapters, grid/snapping/transforms, texture locking, one undo action
   per gesture, layers/groups/prefabs and safe rename/reference repair. Make asset
   indexing asynchronous and bounded. Test cancellation, mixed selections, large
   maps and preservation of untouched source.
-- [ ] **TOOL-03 — P2, implementation: build and play workflow.** Integrate dmap/AAS
+  Closed 6 November ([geometry](level-editor-modernization.md#milestone-3-geometry-and-asset-authoring-tool-02)):
+  Lossless `brushDef3`/patch adapters rewrite only changed numbers;
+  all 543,372 primitives of the 79 retail maps serialize byte for byte and every
+  valid one survives locked transforms (five degenerate retail brushes are
+  reported). Move, turn, scale and snap act on mixed selections with per-face
+  texture lock; grouped transactions make each gesture or tool one undo step,
+  and a cancelled gesture restores the exact revision. `func_group` groups,
+  `editor_layer` layers, prefabs that rename collisions and keep their links,
+  duplicates whose links follow the copies, and renames that repair `target`,
+  `bind` and entityDef-declared references. Asset names are indexed a bounded
+  slice per frame, with cancellation and size limits. On a 20,000-brush map,
+  turning 5,000 brushes and 1,000 entities is one 146-227 ms step.
+- [x] **TOOL-03 — P2, implementation: build and play workflow.** Integrate dmap/AAS
   progress, cancellation and source-linked diagnostics with an isolated play
   sandbox and editor-state restoration. Preserve previous playable output on
   failure. Consume CORE-05/CORE-06 compiler capabilities and qualify stock/custom map
   round trips and AI use of rebuilt data.
-- [ ] **TOOL-04 — P2, qualification: authoring reliability.** Cover forced I/O
+  Closed 6 November ([build and play](level-editor-modernization.md#milestone-5-build-and-play-tool-03)):
+  Builds run the dedicated server as a child process (SDL3, or
+  `posix_spawn` where the Linux dedicated server has no SDL3) against a sandbox
+  save path; `com_compilerOutput` keeps `.proc`/`.aas` there. Progress, cancel
+  and diagnostics are mapped through `idMapFile::Resolve`'s renumbering to the
+  source brush. Outputs replace the previous set only after a whole successful
+  build, with rollback; leaks, errors, timeouts, cancels and hung compilers
+  leave it untouched. Play starts an isolated client with the sandbox as its
+  profile while the editor keeps its state. A room authored only with editor
+  commands built (navigation with 5 areas and 8 reachabilities) and its
+  marines walked about 200 and 150 units around a pillar; stock `airdefense1`
+  was edited, rebuilt (1,170 areas, 242 tactical features) and played with
+  tactical AI taking cover. Two engine defects found on the way are fixed: a
+  leak in a map whose folder was not beside the engine aborted `dmap`, and the
+  dedicated server then hung in shutdown.
+- [x] **TOOL-04 — P2, qualification: authoring reliability.** Cover forced I/O
   failure, external edits, atomic saves, recovery, repeated undo/redo, renderer
   switches and Windows/Linux/macOS workflows. Declare startup/edit/selection/view
   latency budgets. Keep the known unbuilt legacy Radiant defects distinct from
   the supported experimental workspace and the separate UI visual editor.
   Reproduce and fix workspace labels disappearing after full video restart on
   GL/Vulkan; Vulkan reactivation helping one run does not close both backends.
+  Closed 6 November ([qualification](level-editor-modernization.md#milestone-6-qualification-tool-04)):
+  Fault-injected storage covers short writes, sync, backup and
+  promotion failures and conflicts (2,938 document checks), and build staging
+  and promotion failures roll back; external edits are detected while a map
+  is open; 2,000 randomized edits and gestures undo to the original bytes.
+  The workspace phase covers a renderer switch, a resized restart, view state
+  across a client restart and the declared budgets on `airdefense1`: startup
+  6 s, edit 100 ms, selection 16 ms, view drawing 16 ms at the 95th percentile
+  and validation 250 ms, all met on both backends. Windows is qualified end to
+  end; Linux passes the native suites under GCC and Clang sanitizers and the
+  build-and-play phase on a GCC build under Xvfb; macOS is qualified through the platform evidence gate.
+  The restart label defect no longer reproduces with the old or the new
+  editor on either backend. Legacy Radiant defects stay recorded as unbuilt
+  source, apart from this editor and the UI visual editor.
 
 ## Deferred design decisions
 

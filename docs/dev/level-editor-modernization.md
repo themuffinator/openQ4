@@ -311,7 +311,105 @@ for the stock `airdefense1` source (2,195 entities, 11,793 primitives):
 | view3d, ortho | 16 ms | drawing one 3D or orthographic view |
 | validate | 250 ms | a full validation pass |
 
-{{EVIDENCE}}
+## Qualification evidence (6 November 2026)
+
+The workspace phase ran on commit `33bab5d93`; the build, fit and stock phases
+ran on `267d39920`, which differs only by the orthographic view cache. Both
+were built `debugoptimized` with MSVC and staged into `.install/`, used the stock Steam Quake 4 1.4.2 assets, isolated save paths
+under `.tmp/` and no keyboard or mouse input. `level_editor_authoring.py`
+checks that the staged runtime is unchanged by each phase.
+
+**Native suites.** `openq4-editor-authoring` passes 458 checks with the 79
+retail `.map` sources from the installed PK4s: all 543,372 primitives (345,655
+brushes, 197,717 patches) parse and serialize byte for byte, and every valid
+one survives a locked translation and its inverse. Five retail primitives are
+invalid and are reported rather than moved (`q4cmp2` primitives 445, 448 and
+449 have all-zero planes; `q4cmp6` 506 and `q4dm3` 1250 enclose no volume).
+Rotating 5,000 brushes and 1,000 entities of a 20,000-brush map takes
+146-227 ms as one undo step; 2,000 randomized edits, gestures and undo/redo
+return to the original bytes. The suite covers texture lock, transactions,
+mixed selections, every tool, validation, compile numbering, build promotion
+with injected failures, layouts, view state, the asset index and external
+edits. `openq4-editor-document` still passes its 2,938 checks. On Linux (WSL,
+Ubuntu 24.04) both pass under GCC 13 and Clang 18 with AddressSanitizer and
+UndefinedBehaviorSanitizer, without warnings.
+
+**Workspace (`--phase workspace`, OpenGL and Vulkan).** On `airdefense1` the
+phase drives the typed inspector (rejecting `noshadows "yes"`), an ortho
+drag-move that undoes exactly as one step, Ctrl-drag brush creation, a
+locked turn and snap, duplicate, group, layer hiding, a reference-repairing
+rename (all four `target` references follow the new name), prefab save and insert, validation with a problem linked
+to its source, docking moves the two-panel limit refuses, engine events into
+the workspace GUI (a 3D click selection, wheel zoom and a splitter drag),
+view-state persistence across a client restart, detection of an external
+edit, and a dirty document that survives a renderer switch and a resize to
+1600x900; it ends in SP gameplay of the saved map. Measured on that map:
+
+| Measure | Budget | OpenGL | Vulkan |
+| --- | --- | --- | --- |
+| startup (worst) | 6,000 ms | 2,053 ms | 883 ms |
+| edit (worst) | 100 ms | 1.8 ms | 4.2 ms |
+| select (worst) | 16 ms | 1.4 ms | 4.5 ms |
+| view3d (95th percentile) | 16 ms | 6.0 ms (worst 277 ms) | 5.5 ms (worst 468 ms) |
+| ortho (95th percentile) | 16 ms | 4.4 ms (worst 8.1 ms) | 5.5 ms (worst 8.8 ms) |
+| validate (worst) | 250 ms | 56 ms | 127 ms |
+
+The worst 3D frames are the first after the renderer switch and restart, which
+load textures. A full refresh after an edit measured 21.8 ms in an earlier run;
+the final run's edits fell while the preview was still streaming in and were
+not sampled. A concurrent Linux build once pushed the ortho 95th percentile to
+47 ms before the view cache, which now redraws only on change.
+
+**Localized fit (`--phase fit`).** Every visible workspace label measured in
+all 12 languages at 1280x720, 1920x1080 and 2538x1312 (the largest window the
+desktop allows), in the default and an alternate layout, with no overflow
+(72 measurements of 57 to 59 labels each checks). The first runs found wrapping labels in nine languages,
+which led to two-panel docks, two-line tabs, weighted toolbar widths and
+shorter Russian, Ukrainian, Turkish, Hungarian and Polish strings.
+
+**Build and play (`--phase build`).** A map authored only with `mapEdit`
+commands (a room of six brushes, a pillar, a player start, a light and two
+Strogg marines) builds in the sandboxed dedicated server: seven outputs
+(`.proc`, `.cm`, five `.aas*`), with the `aas32` file holding 5
+areas and 8 reachabilities. The isolated play client loads it, and
+the marines walk about 200 and 150 units around the pillar on the rebuilt
+navigation. The editor's workspace state is identical before and after the
+play test, and the play client wrote only into the sandbox. Removing the
+ceiling makes the next build fail as a leak, and a cancelled build stops
+after 1.5 s; both leave the seven published files byte for byte unchanged.
+
+**Stock round trip (`--phase stock`).** `airdefense1` is opened, edited, saved
+and rebuilt in 51 s of geometry, 1 s of collision and 183 s of navigation, then played: the rebuilt `aas32` has
+1,170 areas and 242 tactical features with no bad
+feature spans, eight spawned `monster_tactical_mgun` use it, and one takes
+cover, as on retail data in [CORE-06](aas-compiler.md#rebuilt-maps-and-ai-use).
+
+**Restart labels.** The 24 September defect (labels vanishing after a full
+`vid_restart`) does not reproduce: with the old editor from the current
+`main` package and with the new workspace, on OpenGL and Vulkan, a resize to
+1600x900 and restart leaves no label pixel changed between the settled
+restart capture and a reopened workspace. Its cause in the old build was not
+identified; the fit check now runs after every restart in the workspace phase.
+
+**Linux.** On Ubuntu 24.04 under WSL, a GCC 13 debug build of the editor
+sources of `267d39920` passes both editor suites under Meson, and the build
+phase passes under Xvfb with Mesa's llvmpipe. The Linux dedicated server compiles
+the authored map (seven outputs, 5 areas, 8 reachabilities), the isolated Linux
+play client loads it, the marines walk about 220 and 175 units around the
+pillar, and the leaking and cancelled builds leave the outputs unchanged. The runtime ran with its
+retail packs and save paths in RAM, because the WSL disk image lives on a
+nearly full system drive. The first Linux build showed that the dedicated
+server, built without SDL3, could not use SDL's process API; it now starts the
+child with `posix_spawn`.
+
+**macOS** is a preview platform without project hardware and is qualified
+through the [macOS evidence gate](macos-signoff-evidence.md); the editor uses
+only SDL3, the GUI and the filesystem layer there.
+
+**Remaining owner check.** Engine events exercise the workspace's own input
+handling, not a physical pointer or keyboard. A hands-on pass (click, drag,
+wheel, arrow keys and Delete in each view; dragging splitters; typing in the
+fields) is the owner's, as for the other tracks' human checks.
 
 ## Earlier validation (24 September 2026)
 
