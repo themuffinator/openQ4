@@ -14,6 +14,15 @@ a constrained atlas may fall back but must keep every light shadowed by the
 stencil path; on Vulkan no fallback, no dropped GPU query and bounded,
 stable resident shadow memory. Stock-only motion is used: the movers,
 cutout and translucent receiver fixtures remain in their own suites.
+
+The `receivers` case adds an image check: at every tour pose it stops the
+sweep, freezes game time and captures the frame with the cache the motion left
+behind (`warm`), the same frame again (pixels that differ are unfrozen noise),
+and the frame with the static cache off so every shadow map renders fresh
+(`cold`). Outside the noise, warm and cold must match: a stale, missing or
+doubled caster from motion would change receivers between them. A fourth
+capture with shadows off is the sensitivity control: the tour must show
+visible shadows, so a missing caster could not hide.
 """
 
 from __future__ import annotations
@@ -61,6 +70,7 @@ class Case:
     cvars: dict[str, str] = field(default_factory=dict)
     backends: tuple[str, ...] = ("gl", "vk")
     constrained: bool = False
+    images: bool = False
 
 
 CASES = [
@@ -69,16 +79,34 @@ CASES = [
          cvars={"r_shadowMapCSM": "1", "r_shadowMapProjectedCSM": "1", "r_shadowMapCascadeCount": "4"}),
     Case("constrained", "one shadow-map update per view forces budget fallback; lights must stay shadowed",
          cvars={"r_shadowMapMaxUpdatesPerView": "1"}, constrained=True),
+    Case("receivers", "receivers after motion match a fresh render at every tour pose",
+         cvars={"g_showHud": "0", "ui_showGun": "0"}, images=True),
 ]
+# Receiver images: bytes outside the noise mask that may differ between the
+# warm and fresh captures (a stale or doubled caster changes far more).
+RECEIVER_TOLERANCE = 0.0005
+# Sensitivity control: bytes that turning shadows off changes, at least this
+# fraction on most tour poses, so the comparison has receivers to judge.
+SHADOW_SIGNAL = 0.01
+SHADOW_SIGNAL_POSES = 6
+SWEEP = "benchmarkViewSweep 1440 24000"
 
 
 def build_cfg(case: Case) -> str:
     cvars = dict(SHADOWS)
     cvars.update(case.cvars)
     lines = ["god", "notarget", "noclip"] + [f"set {k} {v}" for k, v in cvars.items()]
-    lines += ["wait 60", "benchmarkViewSweep 1440 24000"]
-    for pose in TOUR:
+    lines += ["wait 60", SWEEP]
+    for index, pose in enumerate(TOUR):
         lines += [f"setviewpos {pose}", "wait 90"]
+        if case.images:
+            lines += ["benchmarkViewSweep 0 0", f"setviewpos {pose}", "g_stopTime 1", "wait 3",
+                      f"screenshot screenshots/warm{index}.tga", "wait 3",
+                      f"screenshot screenshots/again{index}.tga",
+                      "set r_shadowMapStaticCache 0", "wait 10",
+                      f"screenshot screenshots/cold{index}.tga",
+                      "set r_shadows 0", "wait 10", f"screenshot screenshots/unshadowed{index}.tga",
+                      "set r_shadows 1", "set r_shadowMapStaticCache 1", "g_stopTime 0", SWEEP]
     lines += ["wait 10", "quit"]
     return "\n".join(lines) + "\n"
 
@@ -162,6 +190,43 @@ def evaluate(case: Case, backend: str, data: dict) -> list[str]:
     return problems
 
 
+def load_rgb(path: Path):
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    if not path.is_file():
+        return None
+    image = Image.open(path).convert("RGB")
+    return image.size, image.tobytes()
+
+
+def compare_receivers(shots: Path) -> tuple[list[dict], list[str]]:
+    rows, problems = [], []
+    for index in range(len(TOUR)):
+        warm, again, cold, unshadowed = (load_rgb(shots / f"{name}{index}.tga")
+                                         for name in ("warm", "again", "cold", "unshadowed"))
+        if None in (warm, again, cold, unshadowed) or not (warm[0] == again[0] == cold[0] == unshadowed[0]):
+            problems.append(f"pose {index}: missing or mismatched captures (Pillow required)")
+            continue
+        noise = {i for i, (a, b) in enumerate(zip(warm[1], again[1])) if a != b}
+        changed = [abs(a - b) for i, (a, b) in enumerate(zip(warm[1], cold[1])) if a != b and i not in noise]
+        fraction = len(changed) / len(warm[1])
+        signal = sum(1 for i, (a, b) in enumerate(zip(cold[1], unshadowed[1])) if a != b and i not in noise)
+        rows.append({"pose": index, "noiseBytes": len(noise), "changedBytes": len(changed),
+                     "changedFraction": round(fraction, 6), "maxAbs": max(changed, default=0),
+                     "shadowSignalFraction": round(signal / len(warm[1]), 4)})
+        if len(noise) > 0.01 * len(warm[1]):
+            problems.append(f"pose {index}: {len(noise)} bytes not frozen between identical captures")
+        if fraction > RECEIVER_TOLERANCE:
+            problems.append(f"pose {index}: receivers after motion differ from a fresh render "
+                            f"({len(changed)} bytes, max {max(changed)})")
+    signalled = sum(1 for row in rows if row["shadowSignalFraction"] >= SHADOW_SIGNAL)
+    if rows and signalled < SHADOW_SIGNAL_POSES:
+        problems.append(f"only {signalled} poses show shadows (control); the image check cannot judge receivers")
+    return rows, problems
+
+
 def run(runtime: Path, output: Path, backend: str, case: Case, timeout: int) -> dict:
     run_dir = output / f"{backend}-{case.name}"
     if run_dir.exists():
@@ -193,9 +258,13 @@ def run(runtime: Path, output: Path, backend: str, case: Case, timeout: int) -> 
     problems = [] if exit_code == 0 else [f"exit code {exit_code}"]
     problems += [f"log: {l.strip()}" for l in text.splitlines() if any(p.search(l) for p in FAILURE_PATTERNS)][:5]
     problems += evaluate(case, backend, data)
+    receivers = []
+    if case.images:
+        receivers, image_problems = compare_receivers(game_dir / "screenshots")
+        problems += image_problems
     return {"backend": backend, "case": case.name, "seconds": round(time.time() - started, 1),
             "log": str(log_path), "reports": {k: len(v) for k, v in data.items()},
-            "problems": problems, "pass": not problems, "data": data}
+            "receivers": receivers, "problems": problems, "pass": not problems, "data": data}
 
 
 def main() -> int:

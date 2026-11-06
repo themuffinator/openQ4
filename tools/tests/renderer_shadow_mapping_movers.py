@@ -3,18 +3,24 @@
 Uses stock entities/models, game-console commands, and engine screenshots.
 Fixed simulation tics make a paused pose comparable across cached/fresh depth.
 Live captures and door diagnostics separately establish that motion occurred.
+`door-sweep` repeats door-projected while the camera, and the flashlight it
+carries, pans continuously through every door movement (REN-03): each paused
+comparison then follows motion of the light, the casters and the view.
 """
 
 import re
 from pathlib import Path
 
 
-MOVER_SCENARIOS = ("door-portal", "door-projected", "door-point", "door-budget")
+MOVER_SCENARIOS = ("door-portal", "door-projected", "door-point", "door-budget", "door-sweep")
+# The camera pans this far per door movement in door-sweep (game time).
+SWEEP_DEGREES, SWEEP_MSEC = 540, 4000
 PHASES = ("closed", "opening", "reversing", "reclosed", "open", "returned")
 
 
 def mover_commands(scenario: str) -> tuple[list[str], tuple[str, ...]]:
     portal = scenario == "door-portal"
+    sweep = scenario == "door-sweep"
     door = "func_door_63" if portal else "shadow_door_left"
     pose = "-620 1776 288 0 0 0" if portal else "-1000 1568 84 0 -90 0"
     away = "-1000 1568 84 0 -90 0" if portal else "-620 1776 288 0 0 0"
@@ -55,12 +61,18 @@ def mover_commands(scenario: str) -> tuple[list[str], tuple[str, ...]]:
                          f"r_shadowMapMaxUpdatesPerView {budget}", "wait 6"])
 
     def move(label: str, action: str, ticks: int, live: bool = False) -> None:
-        commands.extend(["g_stopTime 0", f"testDoor {door} {action}", f"wait {ticks}"])
+        commands.append("g_stopTime 0")
+        if sweep:
+            commands.append(f"benchmarkViewSweep {SWEEP_DEGREES} {SWEEP_MSEC}")
+        commands.extend([f"testDoor {door} {action}", f"wait {ticks}"])
         if live:
             # Do not stop simulation until this render-target capture finishes.
             commands.extend([f"testDoor {door}", f"echo SHADOW_MOTION_{label}",
                              f"screenshot screenshots/{label}_live.tga", "wait 1"])
             captures.append(label + "_live")
+        if sweep:
+            # Stop panning and return to the comparison pose on the same tic.
+            commands.extend(["benchmarkViewSweep 0 0", "setviewpos " + pose])
         commands.append("g_stopTime 1")
         if label == "opening":
             commands.append("g_presentationClockCapture 24")

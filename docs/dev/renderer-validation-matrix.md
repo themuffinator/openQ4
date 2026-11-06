@@ -1029,9 +1029,54 @@ Laptop GPU:
 | One update per view (`r_shadowMapMaxUpdatesPerView 1`) | 994 budget-fallback passes with 0 unshadowed and 0 stencil-only: over-budget lights stay shadowed | no fallback reported; 102-180 MB |
 
 Resident megabytes follow which lights are cached at each pose; the bound is
-the fixed slot capacity, which no report exceeds. This is counter evidence
-for stock motion, not an image comparison: the moving-caster, cutout,
-translucent and custom-receiver fixtures keep their own suites.
+the fixed slot capacity, which no report exceeds. Moving casters and cutouts
+under motion are covered below; translucent and custom-receiver fixtures keep
+their own suites.
+
+Receiver images after motion (`--cases receivers`): at every tour pose the
+sweep stops, game time freezes and four engine screenshots follow - the frame
+drawn from the cache the motion left (`warm`), the same frame again (bytes that
+differ are unfrozen noise), the frame with `r_shadowMapStaticCache 0` so every
+map renders fresh (`cold`), and the frame with shadows off (the control).
+Outside the noise, warm must match cold within 0.05% of bytes; at least six
+poses must show shadows (the control changes at least 1% of bytes), so a
+missing caster could not hide.
+
+| Backend | Warm vs fresh, worst pose | Shadow control (share of bytes shadows change) |
+| --- | --- | --- |
+| OpenGL | 31 bytes (0.0003%), at most 5 levels | 10-45% on all eight poses |
+| Vulkan | 237 bytes (0.002%), at most 11 levels | 1.0-6.5%; seven of eight poses over 1% |
+
+No pose shows a stale, missing or doubled receiver after motion on either
+backend. The residual differences are isolated pixels. Vulkan's smaller
+control share is how much of each view its shadows cover, not a weaker check.
+
+Moving casters and cutouts under continuous motion
+(`renderer_shadow_mapping_maps.py --scenario`, `airdefense2`, both backends):
+
+- `door-sweep` repeats the door-projected fixture while the camera, and the
+  weapon flashlight it carries, pans 540 degrees through each of the four door
+  movements. Every paused phase then follows motion of the light, the door
+  leaves and the view. Cached shadows match the fresh render within the
+  fresh-repeat control at all six phases (worst 0.22 against 0.17 on Vulkan's
+  open phase; zero elsewhere), and the shadows-off control shows shadows at
+  every phase.
+- `caster-cycle-cutout-sweep` spawns the twelve perforated crates
+  (`textures/terminal/square_hole`) and removes them in two steps while the
+  camera turns a full 360 degrees. Each turn ends at the starting view, so the
+  exact caster and alpha counts still apply. All three turns complete, the
+  counts match, the cached flashlight depth is reused once the light rests,
+  and the cached images match fresh ones.
+- The caster cycles now also compare images, not only caster reports: cached
+  against fresh, judged by the fresh-repeat control as the door fixtures are.
+  The four cycles and `door-projected` pass on both backends.
+
+These fixtures had silently stopped testing the flashlight. Weapon flashlights
+take their shadow flag from `g_dynamicLightShadows` when they spawn, and its
+retail default follows `com_machineSpec`, which a fresh test profile can detect
+below 3. The runner now passes `g_dynamicLightShadows 1` at launch. Custom-GLSL
+receivers keep their stencil fallback, which is not cached, and stay in the
+authored-lighting suite.
 
 Static/live composition audit (both backends agree): a projected light caches
 static depth only, keeps dynamic casters out of its cache signature and draws

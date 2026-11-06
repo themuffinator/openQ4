@@ -825,10 +825,10 @@ diagnostics establish whole-frame ownership or production performance.
 | --- | --- | --- |
 | REN-01 — Partial | Shared classic GUI/world/interaction/fog/deform/subview/post domains have scoped implementations and contracts. | Qualify each on fresh GL/Vulkan packages: executed ownership, matching appearance, zero-commit rollback, human review and platform breadth. |
 | REN-02 — Partial | Shared material/light contracts and corridors provide foundations. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
-| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Image-level receiver checks in motion; mover/cutout/custom-receiver fixtures under continuous motion. |
+| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors and cutout casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Translucent receivers under motion; physical platforms. |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO; the Intel residual is reproduced and explicitly bounded. | lavapipe residual, a half-resolution parity control, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
-| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold-miss cost measured and budgeted; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Prefilter cold misses (~85 ms after parallel tiles) off the frame to meet the 4 ms budget; probe capture orientation, grid provenance/regeneration and broader authored scenes. |
+| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Probe capture orientation, grid provenance/regeneration and broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 
@@ -868,8 +868,19 @@ diagnostics establish whole-frame ownership or production performance.
   The point static/live composition audit found no defect: point lights never
   compose (dynamic casters defeat the cube cache on both backends), projected
   lights compose static depth with live casters.
-  Remaining: image-level missing/doubled receiver checks in motion and the
-  mover/cutout/custom-receiver fixtures under continuous motion.
+  Image-level receiver check after motion (`--cases receivers`): at every
+  tour pose the frame from the motion-warmed cache matches a fresh render on
+  both backends (worst 0.002% of bytes), with a shadows-off control proving the
+  poses show shadows. See [receiver images](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  Moving doors (`door-sweep`) and perforated cutout casters
+  (`caster-cycle-cutout-sweep`) now run with the camera and its flashlight
+  panning through every change, and cached shadows match fresh renders on
+  both backends; the caster cycles gained image checks. These fixtures had
+  stopped exercising the flashlight once `g_dynamicLightShadows` followed
+  machine spec; the runner now pins it. See
+  [movers and cutouts](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  Remaining: translucent receivers under motion and the physical-platform
+  breadth that every REN item shares.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
@@ -933,8 +944,15 @@ diagnostics establish whole-frame ownership or production performance.
   byte-identical to the baseline on both backends, and the combination costs at
   most 1.4 ms. It found Vulkan screenshots presenting the leaves without depth,
   now fixed. See [leaf captures](renderer-validation-matrix.md#frozen-same-process-leaf-and-rollback-captures-6-november-2026-ren-06).
-  Remaining: move the prefilter off the frame to meet the budget, probe capture
-  orientation and grid provenance/regeneration, broader authored scenes.
+  The prefilter is now off the frame (`r_pbrProbeAsyncPrefilter`, default on):
+  both backends filter on a background job, Vulkan also defers its copy and
+  decode, and finished RGBA16F tiles upload within 2 ms a frame while the set
+  keeps its analytic fallback. Probe work in any gameplay frame now peaks at
+  2.1 ms (Vulkan) and 3.3 ms (OpenGL), inside the 4 ms budget; probes appear
+  0.15-0.37 s after they are needed, and screenshots wait for them. See
+  [background prefilter](vulkan-probe-sources.md#background-prefilter-6-november-2026-ren-06).
+  Remaining: probe capture orientation and grid provenance/regeneration,
+  broader authored scenes.
 - [ ] **REN-07 — P2, measured optimization: remove demonstrated CPU/GPU stalls.**
   The 28 October [preset audit](ui/performance-presets.md#preset-and-detection-audit-28-october-2026)
   adds Enhanced between Balanced and Quality and replaces host-wide memory
