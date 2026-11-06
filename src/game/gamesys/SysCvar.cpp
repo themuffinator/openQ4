@@ -375,6 +375,17 @@ idCVar af_showVelocity(				"af_showVelocity",			"0",			CVAR_GAME | CVAR_BOOL, "s
 idCVar af_showActive(				"af_showActive",			"0",			CVAR_GAME | CVAR_BOOL, "show tree-like structures of articulated figures not at rest" );
 idCVar af_testSolid(				"af_testSolid",				"1",			CVAR_GAME | CVAR_BOOL, "test for bodies initially stuck in solid" );
 idCVar g_enhancedPhysics(			"g_enhancedPhysics",		"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "enhanced rigid-body and ragdoll physics (0 = legacy simulation); applies at the next map load" );
+idCVar rb_enhancedIterations(		"rb_enhancedIterations",	"8",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: contact solver iterations per rigid-body step", 1, 64 );
+idCVar rb_enhancedMargin(			"rb_enhancedMargin",		"1",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: speculative contact distance beyond the step's motion" );
+idCVar rb_enhancedFrictionScale(	"rb_enhancedFrictionScale",	"12",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: Coulomb friction per unit of a body's contact friction (clamped to 0.05..1.2)" );
+idCVar rb_enhancedRollingFriction(	"rb_enhancedRollingFriction","0.01",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: rolling resistance per unit of normal impulse and lever arm" );
+idCVar rb_enhancedSpinningFriction(	"rb_enhancedSpinningFriction","0.02",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: resistance to spinning about a contact normal" );
+idCVar rb_enhancedRotationSweep(	"rb_enhancedRotationSweep",	"0.25",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: a step that turns a body's extent by more than this is swept for collisions" );
+idCVar rb_enhancedPersistFrames(	"rb_enhancedPersistFrames",	"8",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: steps a static contact stays in the manifold without being swept again", 0, 64 );
+idCVar rb_enhancedSleepSpeed(		"rb_enhancedSleepSpeed",	"3",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: linear speed below which a supported body counts as quiet" );
+idCVar rb_enhancedSleepAngularSpeed("rb_enhancedSleepAngularSpeed","0.15",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: angular speed below which a supported body counts as quiet" );
+idCVar rb_enhancedSleepFrames(		"rb_enhancedSleepFrames",	"20",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: quiet steps before a rigid body sleeps", 1, 600 );
+idCVar rb_enhancedDebug(			"rb_enhancedDebug",			"",				CVAR_GAME | CVAR_CHEAT, "enhanced physics: name of a rigid body whose steps are printed" );
 
 idCVar rb_showTimings(				"rb_showTimings",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid body cpu usage" );
 idCVar rb_showBodies(				"rb_showBodies",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid bodies" );

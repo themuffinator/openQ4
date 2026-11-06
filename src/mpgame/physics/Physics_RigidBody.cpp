@@ -507,6 +507,10 @@ idPhysics_RigidBody::idPhysics_RigidBody( void ) {
 	hasMaster = false;
 	isOrientated = false;
 
+	enhancedEligibility = -1;
+	enhancedQuietFrames = 0;
+	enhancedNumCached = 0;
+
 #ifdef RB_TIMINGS
 	lastTimerReset = 0;
 #endif
@@ -811,6 +815,12 @@ idPhysics_RigidBody::Activate
 ================
 */
 void idPhysics_RigidBody::Activate( void ) {
+	// openQ4: a body woken from rest counts its quiet steps again (enhanced
+	// sleeping); nudges while it is already awake do not restart the count
+	if ( current.atRest >= 0 ) {
+		OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_WAKES );
+		enhancedQuietFrames = 0;
+	}
 	current.atRest = -1;
 	self->BecomeActive( TH_PHYSICS );
 }
@@ -1168,9 +1178,14 @@ idPhysics_RigidBody::Evaluate
 bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	OpenQ4Physics::ScopedEvaluation telemetry( OpenQ4Physics::EVAL_RIGID_BODY );
 	const bool wasAtRest = current.atRest >= 0;
-	const bool moved = telemetry.Moved( EvaluateLegacy( timeStepMSec, endTimeMSec ) );
+	const bool moved = telemetry.Moved( UsesEnhancedPhysics() ? EvaluateEnhanced( timeStepMSec, endTimeMSec ) : EvaluateLegacy( timeStepMSec, endTimeMSec ) );
 	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
-		OpenQ4Physics::GetTelemetry().NoteLinearSpeed( ( inverseMass * current.i.linearMomentum ).Length() );
+		const float speed = ( inverseMass * current.i.linearMomentum ).Length();
+		OpenQ4Physics::GetTelemetry().NoteLinearSpeed( speed );
+		if ( speed > 2000.0f ) {
+			gameLocal.Printf( "PHYSICS_FAST rigid entity=%s class=%s speed=%.1f mass=%.2f time=%d\n",
+				self ? self->name.c_str() : "?", self ? self->GetClassname() : "?", speed, mass, gameLocal.time );
+		}
 		if ( !wasAtRest && current.atRest >= 0 ) {
 			OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SLEEPS );
 		}
@@ -1785,3 +1800,6 @@ void idPhysics_RigidBody::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 // RAVEN END
 	}
 }
+
+// openQ4: enhanced rigid bodies (PHYS-02)
+#include "../../game/physics/EnhancedRigidBody.inl"

@@ -202,6 +202,7 @@ struct rigidSolverSettings_t {
 	float	slop;				// penetration tolerated without correction (units)
 	float	recoveryRate;		// fraction of the penetration removed per step
 	float	maxRecoverySpeed;	// cap on the correction speed (units per second)
+	float	deepPenetration;	// overlap beyond this is corrected by position only (units)
 	float	warmStart;			// fraction of last step's impulses applied up front
 };
 
@@ -224,6 +225,8 @@ struct rigidContact_t {
 	Mat3	otherInvInertia;	// world space
 	Vec3	otherR;				// contact point relative to the other body's centre of mass
 	Vec3	otherVelocity;		// velocity of the other body at the contact point
+	bool	otherSleeping;		// the other body is dynamic but at rest
+	bool	newContact;			// not carried over from the last step: only a new touch bounces
 	// warm start in, accumulated impulses out (normal, two tangents, two rolling, spin)
 	float	impulse[6];
 	float	pseudoImpulse;
@@ -235,6 +238,8 @@ struct rigidContact_t {
 	float	angularMass[3];		// rolling about tangent[0], tangent[1], spinning about normal
 	float	velocityBias;		// speculative approach allowance or bounce target
 	float	approachSpeed;		// normal speed before the solve (negative when closing)
+	bool	sharesMass;			// solved as a two-body contact: the caller must apply the reaction
+	bool	velocityRows;		// false for deep overlap: position recovery only
 };
 
 inline float EffectiveMass( const rigidBody_t &body, const rigidContact_t &c, const Vec3 &direction, bool withOther ) {
@@ -285,20 +290,28 @@ inline void SolveRigidContacts( rigidBody_t &body, rigidContact_t *contacts, int
 		// speculative allowance: a body may close a gap but never pass through it
 		const bool impact = c.approachSpeed < -s.bounceThreshold && c.separation + c.approachSpeed * dt <= s.slop;
 
-		// An impact against another dynamic body shares the impulse by both masses.
-		// Resting and slow contacts treat the other body as fixed and hand it the
-		// reaction afterwards (shock propagation), which keeps stacks from sinking
-		// and sliding while the bodies are solved one at a time.
-		c.normalMass = EffectiveMass( body, c, c.normal, impact );
-		c.tangentMass[0] = EffectiveMass( body, c, c.tangent[0], impact );
-		c.tangentMass[1] = EffectiveMass( body, c, c.tangent[1], impact );
+		// A contact with another dynamic body shares the impulse by both masses and
+		// the caller hands the other body the reaction, which conserves momentum and
+		// never adds energy. A sleeping body that only carries a resting load is
+		// treated as fixed and left asleep, so supports stay quiet under stacks.
+		// Treating an awake light body as fixed and then giving it the full reaction
+		// would amplify energy by the mass ratio, so that is never done.
+		c.sharesMass = c.otherInvMass > 0.0f && ( !c.otherSleeping || impact );
+		// Bodies that start deeply inside one another (spawned overlapping) have no
+		// meaningful contact normal: push them apart by position only.
+		c.velocityRows = c.separation >= -s.deepPenetration;
+		c.normalMass = c.velocityRows ? EffectiveMass( body, c, c.normal, c.sharesMass ) : 0.0f;
+		c.tangentMass[0] = c.velocityRows ? EffectiveMass( body, c, c.tangent[0], c.sharesMass ) : 0.0f;
+		c.tangentMass[1] = c.velocityRows ? EffectiveMass( body, c, c.tangent[1], c.sharesMass ) : 0.0f;
 		c.angularMass[0] = AngularMass( body, c.tangent[0] );
 		c.angularMass[1] = AngularMass( body, c.tangent[1] );
 		c.angularMass[2] = AngularMass( body, c.normal );
-		if ( impact && s.restitution > 0.0f ) {
+		if ( impact && c.newContact && s.restitution > 0.0f ) {
 			c.velocityBias = -s.restitution * c.approachSpeed;
-		} else if ( c.separation > 0.0f ) {
-			c.velocityBias = -c.separation * invDt;
+		} else if ( c.separation > s.slop ) {
+			// close the gap down to the slop; a body resting within the slop does not
+			// free-fall into it (that turned resting props into endless micro-bounces)
+			c.velocityBias = -( c.separation - s.slop ) * invDt;
 		} else {
 			c.velocityBias = 0.0f;
 		}
@@ -322,6 +335,10 @@ inline void SolveRigidContacts( rigidBody_t &body, rigidContact_t *contacts, int
 	for ( int iteration = 0; iteration < s.iterations; iteration++ ) {
 		for ( int i = 0; i < count; i++ ) {
 			rigidContact_t &c = contacts[i];
+
+			if ( !c.velocityRows ) {
+				continue;
+			}
 
 			// rolling and spinning resistance, bounded by the normal impulse
 			{
@@ -380,13 +397,17 @@ inline void SolveRigidContacts( rigidBody_t &body, rigidContact_t *contacts, int
 		for ( int iteration = 0; iteration < s.iterations; iteration++ ) {
 			for ( int i = 0; i < count; i++ ) {
 				rigidContact_t &c = contacts[i];
-				if ( c.separation >= -s.slop || c.normalMass <= 0.0f ) {
+				if ( c.separation >= -s.slop ) {
+					continue;
+				}
+				const float pseudoMass = c.velocityRows ? c.normalMass : EffectiveMass( body, c, c.normal, false );
+				if ( pseudoMass <= 0.0f ) {
 					continue;
 				}
 				const float target = MinF( s.recoveryRate * ( -c.separation - s.slop ) * invDt, s.maxRecoverySpeed );
 				const float speed = ( body.pseudoLinear + body.pseudoAngular.Cross( c.r ) ).Dot( c.normal );
 				const float previous = c.pseudoImpulse;
-				const float value = MaxF( previous + ( target - speed ) * c.normalMass, 0.0f );
+				const float value = MaxF( previous + ( target - speed ) * pseudoMass, 0.0f );
 				c.pseudoImpulse = value;
 				const Vec3 impulse = c.normal * ( value - previous );
 				body.pseudoLinear += impulse * body.invMass;
@@ -451,6 +472,8 @@ inline Vec3 ContactImpulse( const rigidContact_t &c ) {
 struct cachedContact_t {
 	Vec3	point;
 	Vec3	normal;
+	Vec3	localPoint;			// the contact in the other body's frame (its origin and axis
+	Vec3	localNormal;		// when it was cached), so the plane moves with a moving body
 	int		entityNum;
 	int		id;
 	int		body;				// articulated figure body index (0 for rigid bodies)
@@ -509,6 +532,52 @@ inline float PlaneSeparation( const float *vertices, int count, const Vec3 &norm
 	return lowest;
 }
 
+// Gap for one contact of a translation sweep. A sweep reports where a feature of
+// the moving body met a surface, after travelling some distance along the sweep
+// direction. The body vertex that produced a vertex contact lies on the line
+// back from the contact point along the sweep, so the vertex nearest that line
+// (ahead of the point) gives the gap exactly. Edge contacts land near the line
+// too; when no vertex is close, the lowest vertex within reach of the point is
+// used. A plane alone is not enough: for a long body resting on a curved or
+// faceted surface the lowest vertex overall can belong to a different contact.
+inline float SweptContactSeparation( const float *vertices, int count, const Vec3 &normal, const Vec3 &point,
+									const Vec3 &sweepDir, float reach ) {
+	if ( count <= 0 ) {
+		return 0.0f;
+	}
+	const float planeDist = normal.Dot( point );
+	int best = -1;
+	float bestError = 1e30f;
+	for ( int i = 0; i < count; i++ ) {
+		const Vec3 rel = Vec3( vertices + i * 3 ) - point;
+		const float travel = -rel.Dot( sweepDir );			// distance along the sweep to reach the point
+		if ( travel < -0.5f ) {
+			continue;										// past the point already: not the leading feature
+		}
+		const float error = ( rel + sweepDir * travel ).LengthSqr();
+		if ( error < bestError ) {
+			bestError = error;
+			best = i;
+		}
+	}
+	const float edgeTolerance = MaxF( 1.0f, 0.1f * reach );
+	if ( best >= 0 && bestError <= edgeTolerance * edgeTolerance ) {
+		return normal.Dot( Vec3( vertices + best * 3 ) ) - planeDist;
+	}
+	// fallback: the lowest vertex near the contact point
+	float lowest = 1e30f;
+	for ( int i = 0; i < count; i++ ) {
+		const Vec3 v( vertices + i * 3 );
+		if ( ( v - point ).LengthSqr() <= reach * reach ) {
+			lowest = MinF( lowest, normal.Dot( v ) - planeDist );
+		}
+	}
+	if ( lowest < 1e29f ) {
+		return lowest;
+	}
+	return PlaneSeparation( vertices, count, normal, point );
+}
+
 // Index of the vertex lowest above a plane (normal, point on it), or -1.
 inline int LowestVertex( const float *vertices, int count, const Vec3 &normal, const Vec3 &point, float &height ) {
 	int best = -1;
@@ -530,16 +599,26 @@ inline int LowestVertex( const float *vertices, int count, const Vec3 &normal, c
 // touched. Returns true and fills point/separation when the contact survives.
 inline bool RenewPersistentContact( const float *vertices, int count, const Vec3 &normal, const Vec3 &cachedPoint,
 									float margin, float maxDrift, Vec3 &point, float &separation ) {
-	float height;
-	const int lowest = LowestVertex( vertices, count, normal, cachedPoint, height );
+	// the lowest vertex whose foot on the plane stays near where the contact was
+	const float planeDist = normal.Dot( cachedPoint );
+	float height = 1e30f;
+	int lowest = -1;
+	for ( int i = 0; i < count; i++ ) {
+		const Vec3 v( vertices + i * 3 );
+		const float h = normal.Dot( v ) - planeDist;
+		const Vec3 foot = v - normal * h;
+		if ( ( foot - cachedPoint ).LengthSqr() > maxDrift * maxDrift ) {
+			continue;
+		}
+		if ( h < height ) {
+			height = h;
+			lowest = i;
+		}
+	}
 	if ( lowest < 0 || height > margin || height < -margin * 4.0f ) {
 		return false;
 	}
-	const Vec3 vertex( vertices + lowest * 3 );
-	point = vertex - normal * height;
-	if ( ( point - cachedPoint ).LengthSqr() > maxDrift * maxDrift ) {
-		return false;
-	}
+	point = Vec3( vertices + lowest * 3 ) - normal * height;
 	separation = height;
 	return true;
 }

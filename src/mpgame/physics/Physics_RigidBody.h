@@ -2,6 +2,8 @@
 #ifndef __PHYSICS_RIGIDBODY_H__
 #define __PHYSICS_RIGIDBODY_H__
 
+#include "../../game/physics/EnhancedSolver.h"
+
 /*
 ===================================================================================
 
@@ -168,9 +170,20 @@ private:
 	bool					TestIfAtRest( void ) const;
 	void					Rest( void );
 	void					DebugDraw( void );
-// openQ4 BEGIN: physics mode dispatch and telemetry (PHYS-01)
+// openQ4 BEGIN: physics mode dispatch and telemetry (PHYS-01), enhanced rigid bodies (PHYS-02)
 							// the unchanged legacy simulation, run when g_enhancedPhysics was 0 at map load
 	bool					EvaluateLegacy( int timeStepMSec, int endTimeMSec );
+							// enhanced simulation for passive bodies (EnhancedRigidBody.inl)
+	bool					EvaluateEnhanced( int timeStepMSec, int endTimeMSec );
+	bool					UsesEnhancedPhysics( void ) const;
+
+	// transient enhanced state: never saved or networked; a loaded or newly
+	// spawned body starts with an empty manifold and rebuilds it in one step
+	static const int		ENHANCED_CACHE_SIZE = 16;
+	mutable int				enhancedEligibility;		// -1 not yet known, 0 legacy only, 1 enhanced when the map uses it
+	int						enhancedQuietFrames;		// consecutive quiet steps toward sleep
+	int						enhancedNumCached;
+	OpenQ4Physics::cachedContact_t enhancedCache[ENHANCED_CACHE_SIZE];	// last step's contacts and impulses
 // openQ4 END
 };
 

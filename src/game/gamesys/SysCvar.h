@@ -212,6 +212,17 @@ extern idCVar	af_showVelocity;
 extern idCVar	af_showActive;
 extern idCVar	af_testSolid;
 extern idCVar	g_enhancedPhysics;
+extern idCVar	rb_enhancedIterations;
+extern idCVar	rb_enhancedMargin;
+extern idCVar	rb_enhancedFrictionScale;
+extern idCVar	rb_enhancedRollingFriction;
+extern idCVar	rb_enhancedSpinningFriction;
+extern idCVar	rb_enhancedRotationSweep;
+extern idCVar	rb_enhancedPersistFrames;
+extern idCVar	rb_enhancedSleepSpeed;
+extern idCVar	rb_enhancedSleepAngularSpeed;
+extern idCVar	rb_enhancedSleepFrames;
+extern idCVar	rb_enhancedDebug;
 
 extern idCVar	rb_showTimings;
 extern idCVar	rb_showBodies;

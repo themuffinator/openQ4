@@ -81,8 +81,8 @@ static void Cmd_PhysicsDigest_f( const idCmdArgs &args ) {
 			}
 			if ( verbose ) {
 				const unsigned long long hash = (unsigned long long)one.Hash();
-				gameLocal.Printf( "PHYSICS_DIGEST_ENTITY %d %s %s %08x%08x\n", i, ent->name.c_str(), physics->GetClassname(),
-					(unsigned int)( hash >> 32 ), (unsigned int)( hash & 0xffffffffu ) );
+				gameLocal.Printf( "PHYSICS_DIGEST_ENTITY %d %s %s %08x%08x origin=%s rest=%d\n", i, ent->name.c_str(), physics->GetClassname(),
+					(unsigned int)( hash >> 32 ), (unsigned int)( hash & 0xffffffffu ), physics->GetOrigin().ToString( 2 ), physics->IsAtRest() ? 1 : 0 );
 			}
 		}
 	}
@@ -116,7 +116,7 @@ static void Cmd_PhysicsDigest_f( const idCmdArgs &args ) {
 // Workload tools for the physics harness (cheats): they stage repeatable scenes
 // without any player input.
 //
-//   physicsSpawn <entityDef> <count> <ring|line|grid|stack> <distance> [height] [step]
+//   physicsSpawn <entityDef> <count> <ring|line|grid|stack> <distance> [height] [step] [key value]...
 //       spawns entities named phys_<n> around or ahead of the local player
 //   physicsRadiusDamage <damageDef> <forward> [up] [power]
 //       radius damage and push at a point ahead of the local player
@@ -171,22 +171,27 @@ static void Cmd_PhysicsSpawn_f( const idCmdArgs &args ) {
 			gameLocal.Printf( "unknown layout '%s'\n", layout );
 			return;
 		}
-		// keep the placement in the open: pull it back from any wall between the
-		// player and the target so nothing starts embedded in the world
-		bool clipped = false;
+		// keep placements in the open: one behind a wall (seen from the player) or
+		// inside another body is skipped, never moved, so no two workload bodies
+		// start embedded in each other or in the world
 		if ( idStr::Icmp( layout, "stack" ) ) {
 			trace_t tr;
 			const idVec3 start = base + idVec3( 0.0f, 0.0f, Max( height, 24.0f ) );
 			idVec3 end = origin;
 			end.z = start.z;
 			gameLocal.TracePoint( player, tr, start, end, MASK_SOLID, player );
-			if ( tr.fraction < 1.0f ) {
-				idVec3 dir = end - start;
-				const float length = dir.Normalize();
-				const float keep = Max( 0.0f, length * tr.fraction - 48.0f );
-				origin = start + dir * keep;
-				origin.z = base.z + height;
-				clipped = true;
+			// only the static world blocks: bodies this command spawned a moment ago
+			// (or monsters walking past) are not walls
+			bool blocked = tr.fraction < 1.0f;
+			if ( blocked && tr.c.entityNum != ENTITYNUM_WORLD ) {
+				const idEntity *hit = gameLocal.entities[tr.c.entityNum];
+				const idPhysics *hitPhysics = hit ? hit->GetPhysics() : NULL;
+				blocked = !hitPhysics || hitPhysics->IsType( idPhysics_Static::GetClassType() ) ||
+							hitPhysics->IsType( idPhysics_StaticMulti::GetClassType() ) || hitPhysics->IsType( idPhysics_Parametric::GetClassType() );
+			}
+			if ( blocked ) {
+				gameLocal.Printf( "PHYSICS_SPAWN_SKIPPED %s %s blocked\n", defName, origin.ToString( 1 ) );
+				continue;
 			}
 		}
 		idDict dict;
@@ -195,9 +200,13 @@ static void Cmd_PhysicsSpawn_f( const idCmdArgs &args ) {
 		dict.Set( "name", name.c_str() );
 		dict.Set( "origin", origin.ToString() );
 		dict.SetFloat( "angle", facing );
+		// trailing "key value" pairs become spawn keys ("nodrop 1" lets a stack fall into place)
+		for ( int arg = 7; arg + 1 < args.Argc(); arg += 2 ) {
+			dict.Set( args.Argv( arg ), args.Argv( arg + 1 ) );
+		}
 		idEntity *ent = NULL;
 		if ( gameLocal.SpawnEntityDef( dict, &ent ) && ent ) {
-			gameLocal.Printf( "PHYSICS_SPAWN %s %s %s%s\n", name.c_str(), defName, origin.ToString( 1 ), clipped ? " clipped" : "" );
+			gameLocal.Printf( "PHYSICS_SPAWN %s %s %s\n", name.c_str(), defName, origin.ToString( 1 ) );
 		}
 	}
 }

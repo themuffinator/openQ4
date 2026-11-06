@@ -79,11 +79,14 @@ WORKLOADS: dict[str, dict] = {
             "god", "notarget", "killMonsters",
             "@wait 30",
             "physicsStats start sp_explosion",
-            "physicsSpawn moveable_crate1_small 9 grid 96 8 40",
-            "physicsSpawn moveable_barrel_medium1a 6 ring 112 8",
-            "physicsSpawn moveable_explodingbarrel 1 line 128 8",
+            # crates in a 3 x 3 grid ahead, barrels in a ring, an exploding barrel
+            # behind the player; a placement a wall blocks is skipped, never moved
+            "physicsSpawn moveable_crate1_small 9 grid 48 8 56",
+            "physicsSpawn moveable_barrel_medium1a 6 ring 190 8",
+            "physicsSpawn moveable_explodingbarrel 1 line -80 8",
             "@wait 120", "@digest",
-            "physicsRadiusDamage damage_rocketSplash 160 16",
+            # a rocket-sized splash in the grid; it also sets off the exploding barrel
+            "physicsRadiusDamage damage_rocketSplash 104 16",
             "@wait 30", "@digest",
             "@wait 270", "@digest",
             "@wait 600", "@digest",
@@ -111,6 +114,24 @@ WORKLOADS: dict[str, dict] = {
             "physicsStats stop",
         ],
     },
+    # Stacks on a flat hangar floor: they must stand still after the nudge.
+    "sp-flatstacks": {
+        "map": "game/hangar1",
+        "steps": [
+            "god", "notarget", "killMonsters",
+            "@wait 30",
+            "physicsStats start sp_flatstacks",
+            "physicsSpawn moveable_crate1_small 5 stack 72 16 34",
+            "physicsSpawn moveable_barrel_medium1a 4 stack -72 16 50",
+            "@wait 60",
+            "physicsImpulse phys_0 0 0 2000",
+            "physicsImpulse phys_5 0 0 6000",
+            "@wait 60", "@digest",
+            "@wait 480", "@digest",
+            "@wait 600", "@digest",
+            "physicsStats stop",
+        ],
+    },
     # Resting stacks and piles: a tower of crates and a pile of barrels that must
     # settle and stay still (resting jitter, sliding, endless twitching).
     "sp-stacks": {
@@ -119,9 +140,14 @@ WORKLOADS: dict[str, dict] = {
             "god", "notarget", "killMonsters",
             "@wait 30",
             "physicsStats start sp_stacks",
-            "physicsSpawn moveable_crate1_small 5 stack 128 16 34",
-            "physicsSpawn moveable_barrel_medium1a 4 stack 96 16 50",
-            "@wait 120", "@digest",
+            # each body drops onto the one below (drop-to-floor placement), then a
+            # nudge on the bottom crate and barrel wakes the stacks to settle again
+            "physicsSpawn moveable_crate1_small 5 stack 64 16 34",
+            "physicsSpawn moveable_barrel_medium1a 4 stack -64 16 50",
+            "@wait 60",
+            "physicsImpulse phys_0 0 0 2000",
+            "physicsImpulse phys_5 0 0 6000",
+            "@wait 60", "@digest",
             "@wait 480", "@digest",
             "@wait 600", "@digest",
             "physicsStats stop",
@@ -172,7 +198,7 @@ def build_cfg(workload: dict, verbose_digest: bool = False) -> list[str]:
 
 def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int) -> dict:
     workload = WORKLOADS[name]
-    save_root = task_path(args.save_root) / f"{name}-{mode}-{run_index}"
+    save_root = task_path(args.save_root) / f"{name}-{mode}-{run_index}{'-' + args.map.replace('/', '_') if args.map else ''}"
     game_root = save_root / "baseoq4"
     game_root.mkdir(parents=True, exist_ok=True)
     cfg_name = "physics_workload.cfg"
@@ -217,7 +243,7 @@ def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int)
     for extra in args.set or []:
         key, _, value = extra.partition("=")
         command += ["+set", key, value]
-    command += ["+spawnServer" if multiplayer else "+map", workload["map"]]
+    command += ["+spawnServer" if multiplayer else "+map", args.map or workload["map"]]
     options: dict = {}
     if os.name == "nt":
         startup = subprocess.STARTUPINFO()
@@ -249,7 +275,7 @@ def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int)
         "latched_mode": latched.group(1) if latched else None,
         "stats": stats[-1] if stats else None, "digests": digests,
         "spawns": len(re.findall(r"^PHYSICS_SPAWN ", log, re.M)),
-        "clipped_spawns": len(re.findall(r"^PHYSICS_SPAWN .* clipped$", log, re.M)),
+        "skipped_spawns": len(re.findall(r"^PHYSICS_SPAWN_SKIPPED ", log, re.M)),
         "log": str(log_path),
     }
     result["passed"] = bool(code == 0 and result["done"] and not errors and result["stats"]
@@ -294,6 +320,7 @@ def main() -> int:
     parser.add_argument("--renderer", choices=("gl", "vulkan"), default="gl")
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--port", type=int, default=28977, help="loopback port for multiplayer workloads")
+    parser.add_argument("--map", help="run the workloads on this map instead of their own (probing)")
     parser.add_argument("--set", action="append", help="extra cvar KEY=VALUE for every run")
     parser.add_argument("--verbose-digest", action="store_true", help="also print per-entity digests")
     parser.add_argument("--output", type=Path, help="write the JSON results here (under .tmp)")

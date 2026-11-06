@@ -147,6 +147,7 @@ struct Scene {
 		settings.slop = 0.1f;
 		settings.recoveryRate = 0.4f;
 		settings.maxRecoverySpeed = 40.0f;
+		settings.deepPenetration = 4.0f;
 		settings.warmStart = 0.85f;
 		sleep.linearSpeed = 1.5f;
 		sleep.angularSpeed = 0.05f;
@@ -195,8 +196,9 @@ struct Scene {
 				c.separation = h0;
 				if ( f.owner >= 0 ) {
 					const Body &o = bodies[f.owner];
-					c.otherInvMass = o.asleep ? 0.0f : 1.0f / o.mass;
-					c.otherInvInertia = o.asleep ? Mat3::Zero() : o.InvInertiaWorld().ToSolver();
+					c.otherInvMass = 1.0f / o.mass;
+					c.otherInvInertia = o.InvInertiaWorld().ToSolver();
+					c.otherSleeping = o.asleep;
 					c.otherR = c.point - o.x;
 					c.otherVelocity = o.v + o.w.Cross( c.otherR );
 				}
@@ -255,6 +257,7 @@ struct Scene {
 				contactKey_t key{ contacts[i].point, contacts[i].normal, (int)owners[i].x, 0, 0 };
 				const int match = MatchCachedContact( key, b.cache.data(), (int)b.cache.size(), 2.0f );
 				if ( match >= 0 ) std::memcpy( contacts[i].impulse, b.cache[match].impulse, sizeof( contacts[i].impulse ) );
+				contacts[i].newContact = match < 0;
 			}
 			rigidBody_t rb;
 			rb.invMass = 1.0f / b.mass;
@@ -270,7 +273,8 @@ struct Scene {
 			for ( int i = 0; i < n; i++ ) {
 				const int owner = (int)owners[i].x;
 				if ( contacts[i].normal.z > 0.7f && contacts[i].impulse[0] > 0.0f ) supported = true;
-				if ( owner >= 0 && !bodies[owner].asleep ) {
+				if ( owner >= 0 && contacts[i].sharesMass ) {
+					if ( bodies[owner].asleep ) { bodies[owner].asleep = false; bodies[owner].quiet = 0; }
 					Body &o = bodies[owner];
 					const Vec3 J = ContactImpulse( contacts[i] ) * -1.0f;
 					o.v += J * ( 1.0f / o.mass );
@@ -402,7 +406,7 @@ static void TestSolverNeverAddsEnergy() {
 	float worstGain = 0.0f;
 	rigidSolverSettings_t s;
 	s.timeStep = 0.016f; s.iterations = 8; s.friction = 0.8f; s.rollingFriction = 0.05f; s.spinningFriction = 0.1f;
-	s.restitution = 0.0f; s.bounceThreshold = 20.0f; s.slop = 0.1f; s.recoveryRate = 0.4f; s.maxRecoverySpeed = 40.0f; s.warmStart = 0.0f;
+	s.restitution = 0.0f; s.bounceThreshold = 20.0f; s.slop = 0.1f; s.recoveryRate = 0.4f; s.maxRecoverySpeed = 40.0f; s.deepPenetration = 4.0f; s.warmStart = 0.0f;
 	for ( int trial = 0; trial < 20000; trial++ ) {
 		Body b = MakeBox( Vec3( 4 + 12 * std::fabs( u( rng ) ), 4 + 12 * std::fabs( u( rng ) ), 4 + 12 * std::fabs( u( rng ) ) ), 5 + 50 * std::fabs( u( rng ) ), Vec3() );
 		b.R = AxisAngle( Vec3( u( rng ), u( rng ), u( rng ) ), 3.0f * u( rng ) );
@@ -509,6 +513,27 @@ static void TestImpulseGuard() {
 	std::printf( "impulse guard: checks passed\n" );
 }
 
+static void TestSweptSeparation() {
+	// a long bar (64 x 4 x 4) tilted so its left end is 0.5 above the floor and its right end 6 above:
+	// a contact under the left end must report 0.5, not the lowest vertex of the whole body
+	Body bar = MakeBox( Vec3( 32, 2, 2 ), 10.0f, Vec3( 0, 0, 0 ) );
+	bar.R = AxisAngle( Vec3( 0, 1, 0 ), -std::atan2( 5.5f, 64.0f ) );
+	float verts[24];
+	bar.Vertices( verts );
+	float lowestZ = 1e9f; for ( int i = 0; i < 8; i++ ) lowestZ = MinF( lowestZ, verts[i * 3 + 2] );
+	for ( int i = 0; i < 8; i++ ) verts[i * 3 + 2] += 0.5f - lowestZ;	// lift so the lowest corner is 0.5 up
+	// the right end's lowest corner
+	int rightLow = -1; for ( int i = 0; i < 8; i++ ) if ( verts[i * 3] > 0 && ( rightLow < 0 || verts[i * 3 + 2] < verts[rightLow * 3 + 2] ) ) rightLow = i;
+	const Vec3 down( 0, 0, -1 ), up( 0, 0, 1 );
+	// a floor contact under the right end, as a downward sweep would report it
+	const Vec3 point( verts[rightLow * 3], verts[rightLow * 3 + 1], 0.0f );
+	const float swept = SweptContactSeparation( verts, 8, up, point, down, 33.0f );
+	const float global = PlaneSeparation( verts, 8, up, point );
+	CHECK( std::fabs( swept - verts[rightLow * 3 + 2] ) < 1e-3f, "swept separation %.3f, want %.3f", swept, verts[rightLow * 3 + 2] );
+	CHECK( std::fabs( global - 0.5f ) < 1e-3f, "plane separation %.3f", global );
+	std::printf( "swept separation: right-end contact %.3f (plane estimate %.3f)\n", swept, global );
+}
+
 static void TestSleepCounter() {
 	sleepSettings_t s{ 1.5f, 0.05f, 10 };
 	int quiet = 0;
@@ -552,6 +577,7 @@ static void TestTelemetry() {
 int main() {
 	TestTelemetry();
 	TestSleepCounter();
+	TestSweptSeparation();
 	TestImpulseGuard();
 	TestBoxedPGS();
 	TestSolverNeverAddsEnergy();
