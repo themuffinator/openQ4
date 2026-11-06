@@ -16,7 +16,7 @@ evidence. The current in-tree engine/game/renderer contracts take precedence.
 | `65aa9bd88` Quest | Android activity/manifest, loader initialization, GLES stereo and optional test runtime; generated headset manifest and payload flags | Optional standalone flavor only after lifecycle safety and variant-specific APK verification. Debug XR runtime must be impossible in published APKs |
 | `9dcd121da` hand GUI pointing | `idPlayer::UpdateFocus` starts the focus trace at `GetVRAimOrigin`; debug coordinates aid alignment | Reconcile SP and MP aim/focus with current retained/world GUI ownership; never double-apply physical motion or silently alter authoritative weapon traces |
 
-The active Vulkan VR presentation is still a stub; active PC OpenXR is GL.
+On 18 October the active Vulkan VR presentation was still a stub and active PC OpenXR was GL; the 6 November integration below supersedes that.
 Archived happy-path captures do not close current VR-02 or VR-06.
 
 The stage-one `OpenXRSystem.cpp` had the source-derived cycle `Check(SESSION_LOST)` →
@@ -100,6 +100,112 @@ VR-01 must carry these guarantees into any later Vulkan/EGL/Quest integration;
 none is promoted by this GL result. VR-02 still owns real headset/controller,
 focus, comfort and pacing evidence. The Linux syntax/native checks do not establish
 Linux GL runtime or headset support. No frame-time or audible-device claim is made.
+
+## Vulkan, EGL and world-GUI XR integration, 6 November 2026
+
+VR-01 integrates the selected archived changes against the current renderer
+module ABI (render API 32) rather than replaying them; VR-03 and VR-05 land on
+top. Commits: `f6034967f` (Vulkan, desktop-independent submission, EGL and
+world-GUI pointing), `244cb2457` (settings tabs take the pointer), `b8995be28`
+(play spaces) and the VR-05/VR-04 commit that follows them.
+
+- **Vulkan device ownership.** With `XR_KHR_vulkan_enable2` the runtime creates
+  the `VkInstance` and `VkDevice` through three render-module services, on the
+  physical device the runtime names; the renderer restarts once on the first
+  Vulkan VR start to adopt them. Eye swapchain images are the executor's
+  default output for each VR target, with display colour mapping per target.
+- **Submission without the desktop.** A VR frame opens on a stand-in when the
+  desktop swapchain is minimized, out of date or absent; the headset keeps
+  receiving frames and only the mirror waits.
+- **EGL.** On Wayland, OpenGL binds through `XR_MNDX_egl_enable` with SDL's EGL
+  display, config and context; X11 keeps GLX.
+- **World GUIs.** Single-player focus traces start at the VR aim origin, so the
+  weapon hand points at door panels and lift screens.
+- **VR-06 carried forward.** Both graphics APIs bound image counts before
+  allocation, check filled counts and indices, release renderer images before a
+  swapchain is destroyed and defer retirement through `Check`.
+- **Settings tabs.** Each settings page's full-size group sat above its tab
+  strip, so RmlUi's topmost-box hit test gave every tab click to the page; the
+  generator now orders the strip after the pages and `settings_menu_coverage.py`
+  guards it.
+- **Play spaces (VR-03).** `vr_playSpace` picks STAGE, then LOCAL_FLOOR, then
+  LOCAL with a warning; standing height is measured from the floor and kept
+  across recentering; `vr_calibrateHeight` measures again.
+- **Per-eye TAA (VR-05).** See the roadmap entry. Two faults found on the way:
+  the backend read one temporal frame state per frame, which the front end last
+  wrote for the virtual screen, so every eye's backend check failed; each
+  `RC_VR_TARGET` now carries its target's state. And Vulkan found a portal
+  sky's root through the frame's one primary view (the right eye), so with the
+  backend owning eye scenes the left eye lost its sky; the portal-sky pairing
+  from the command list now names each eye's main view.
+
+Evidence, all against the OpenXR test runtime with physical input disabled and
+no input injection; Vulkan smokes with validation enabled. Build
+`0.13.2-dev+gb8995be2` plus the uncommitted VR-05/VR-04 changes, identified by
+these SHA-256s: client `aa189f6e314256550af77caa70e8f43358b35d282b95e3507692b14babdcfc9b`,
+`renderer-gl` `0f6b4e83dbacddcb3bba6f23640eeabf6b093c2e7f80bf98d367641c7d2448b8`,
+`renderer-vk` `170af8194ca3f3cc4ad409205115fe431d6f79de2a3be7513d00b0450c991932`,
+SP module `8233d793322e9bd38a3b12561b1c38bf4546ddeee35483962b233788680a9c60`,
+MP module `fed11fd5c2c646409815411c0faf6b32a1c0e80ebbcec68d5639490b90f90983`,
+test runtime `361d9a40313abe515ab57436a9358668aede2a5734249d722f36d8c719aab630`.
+
+The qualification batch passes 51 of 51 (`.tmp/stage-vr/2026-11-06/final/summary.json`,
+SHA-256 `33ffc4d30e3614e092bd1dc1e4bb7416a883ebaea86f49c15a5f22d81bd9605e`):
+GL and Vulkan SP, menu and MP smokes; GL and Vulkan play-space smokes; the
+per-eye TAA smoke in SP and MP on both APIs (240 of 240 resolves from history,
+no resets or fallbacks); both stereo-cost runs; seven GL lifecycle cases; and 30
+Vulkan lifecycle cases with validation, covering partial acquisition, wait,
+release, frame, view, space and action failures, creation faults, malformed
+image counts, windowless frames and MP. One Vulkan case (`acquire-2-end`)
+first failed with `FATAL: Out of memory` while a WSL build held the machine's
+commit charge (4.8 GB free); rerun alone with 14.6 GB free it passes. Both runs
+are kept (`acquire-2-end.oom*`).
+
+Linux, WSL snapshot `af19bc5` of the same tree, release build, software
+drivers (lavapipe, llvmpipe): the lifecycle runtime passes on a headless
+native-Wayland compositor with Vulkan and with OpenGL bound through EGL
+(`opengl_egl`), and on X11 (Xvfb) with Vulkan and with GLX (`opengl_xlib`).
+Evidence: `.tmp/stage-vr/2026-11-06/linux-probe.tar` (SHA-256
+`d5142ed670f824b7e0e927d6675afe0409321fcf3c085da6e27d133a45c78f62`); client
+`e4606c207d06af3fe76846f18da26b2eaa09bb1970c61fad16a331d3f6d85272`.
+
+Static checks: `openxr_vr_contract.py` (now including VR-05),
+`openxr_lifecycle.py` (20 production-method cases, Vulkan images included),
+`vk_display_color_mapping.py`, `renderer_display_presentation.py`,
+`renderer_temporal_presentation.py`, `renderer_render_thread_runtime.py` and
+the other suites that extract the touched code pass.
+
+Not established here: any headset, runtime other than the test runtime,
+physical tracking, readability, comfort or frame pacing (the
+[VR-02 checklist](vr-headset-qualification.md)), and Quest standalone, which
+waits on AND-05.
+
+### Stereo frame cost (VR-04)
+
+`openxr_vr_stereo_cost.py`, airdefense1 with game time stopped, 200 frames per
+phase, unpaced test runtime, two 1440x1600 eyes against a 1920x1080 window
+(milliseconds; "stereo" is the first VR session, "warm" a second one after
+`vr_restart`):
+
+| API | Phase | CPU p50 / p95 / p99 | GPU p50 / p95 | Draws | Lights |
+| --- | --- | --- | --- | ---: | ---: |
+| OpenGL | flat | 6.51 / 8.56 / 10.73 | 4.56 / 6.41 | 1,046 | 30 |
+| OpenGL | stereo | 9.48 / 12.04 / 13.37 | 7.76 / 11.93 | 1,442 | 62 |
+| OpenGL | warm | 17.66 / 31.60 / 35.68 | 11.93 / 21.82 | 1,442 | 62 |
+| Vulkan | flat | 5.65 / 9.53 / 17.06 | 3.05 / 4.90 | 1,040 | 30 |
+| Vulkan | stereo | 12.49 / 15.14 / 16.56 | 12.93 / 15.00 | 1,442 | 62 |
+| Vulkan | warm | 10.32 / 13.25 / 15.05 | 10.54 / 13.30 | 1,442 | 62 |
+
+Uploads stay flat (588 to 611 KB on OpenGL), so dynamic geometry is already
+built once per frame; entities, lights and surfaces double as each eye culls
+for itself, which VR-04 requires. Two eyes carry 2.2 times the flat pixels.
+The desktop was shared with other openQ4 clients during the run: OpenGL's warm
+phase doubled with no change in work, so these tails are a simulated baseline,
+not a budget result. Against the headset intervals (11.1 ms at 90 Hz, 13.9 ms
+at 72 Hz) the cleaner phases sit above a 90 Hz p95 and inside 72 Hz on this
+GPU. Headset tails, from the same script with `--system-runtime`, decide
+whether a sharing change is needed (checklist 2.2). Reports:
+`.tmp/stage-vr/2026-11-06/final/cost-{gl,vk}/*/report.json`.
 
 ## Android selection and package matrix
 

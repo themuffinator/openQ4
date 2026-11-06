@@ -400,6 +400,57 @@ static int vkTemporalMotionDrawn = 0;
 static bool vkTemporalMotionComplete = false;
 static unsigned long long vkTemporalMotionCompletedViews = 0;
 
+/*
+====================
+Temporal motion history slots (VR-05)
+
+Each VR eye reprojects from its own previous frame: the camera and
+rigid-object timelines above belong to the active history slot
+(viewDef_t::temporalHistorySlot), and the other slot's wait here, trading
+places when a view of the other eye resolves. The vector image itself is
+rebuilt for each resolve and needs no slot.
+====================
+*/
+typedef struct vkTemporalMotionSlot_s {
+	vkPostMotionViewState_t viewHistory;
+	idList<vkPostMotionEntityHistory_t> entityHistory;
+	unsigned int		generation;
+	unsigned long long	viewIdentity;
+	int					frame;
+} vkTemporalMotionSlot_t;
+static vkTemporalMotionSlot_t vkTemporalMotionStoredSlot;
+static int vkTemporalMotionActiveSlot = 0;
+static bool vkTemporalMotionStoredSlotInitialized = false;
+
+static void VK_PostProcess_SelectTemporalMotionSlot( int slot ) {
+	slot = slot == 1 ? 1 : 0;
+	vkTemporalMotionSlot_t &other = vkTemporalMotionStoredSlot;
+	if ( !vkTemporalMotionStoredSlotInitialized ) {
+		memset( &other.viewHistory, 0, sizeof( other.viewHistory ) );
+		other.generation = 0;
+		other.viewIdentity = 0;
+		other.frame = -1;
+		vkTemporalMotionStoredSlotInitialized = true;
+	}
+	if ( slot == vkTemporalMotionActiveSlot ) {
+		return;
+	}
+	const vkPostMotionViewState_t savedView = vkTemporalMotionViewHistory;
+	vkTemporalMotionViewHistory = other.viewHistory;
+	other.viewHistory = savedView;
+	vkTemporalMotionEntityHistory.Swap( other.entityHistory );
+	const unsigned int savedGeneration = vkTemporalMotionGeneration;
+	vkTemporalMotionGeneration = other.generation;
+	other.generation = savedGeneration;
+	const unsigned long long savedIdentity = vkTemporalMotionViewIdentity;
+	vkTemporalMotionViewIdentity = other.viewIdentity;
+	other.viewIdentity = savedIdentity;
+	const int savedFrame = vkTemporalMotionFrame;
+	vkTemporalMotionFrame = other.frame;
+	other.frame = savedFrame;
+	vkTemporalMotionActiveSlot = slot;
+}
+
 void VK_PostProcess_PrintTemporalMotion( void ) {
 	common->Printf( "Vulkan temporal motion: frame=%d generation=%u eligible=%d drawn=%d complete=%d completedViews=%llu\n",
 		vkTemporalMotionFrame, vkTemporalMotionGeneration, vkTemporalMotionEligible,
@@ -551,7 +602,11 @@ void VK_PostProcess_Shutdown( void ) {
 	delete vkTemporalMotionTarget;
 	vkTemporalMotionTarget = NULL;
 	vkTemporalMotionImage = NULL;
+	// both eyes' timelines
 	VK_PostProcess_ResetTemporalMotion();
+	VK_PostProcess_SelectTemporalMotionSlot( vkTemporalMotionActiveSlot ^ 1 );
+	VK_PostProcess_ResetTemporalMotion();
+	VK_PostProcess_SelectTemporalMotionSlot( 0 );
 	vkTemporalMotionCompletedViews = 0;
 	memset( &vkPostScene, 0, sizeof( vkPostScene ) );
 	vkPostScene.finalDepthFrame = -1;
@@ -1301,12 +1356,15 @@ typedef struct vkPortalSkyPair_s {
 } vkPortalSkyPair_t;
 static vkPortalSkyPair_t vkPortalSkyPairs[ VK_PORTAL_SKY_MASK_MAX ];
 static int vkPortalSkyPairCount = 0;
+static bool vkPortalSkyMaskPlanned = false;
 
+// The pairs also name each backdrop's main view for the temporal scene owner
+// (VK_PostProcess_PortalSkyMainView): a VR frame has a main view per eye, so
+// the frame's one primary view cannot stand for both, and they are planned
+// with the mask switched off too.
 void VK_PostProcess_PlanPortalSkyMask( const emptyCommand_t *cmds ) {
 	vkPortalSkyPairCount = 0;
-	if ( !r_vkPortalSkyMask.GetBool() || r_skipPostProcess.GetBool() ) {
-		return;
-	}
+	vkPortalSkyMaskPlanned = r_vkPortalSkyMask.GetBool() && !r_skipPostProcess.GetBool();
 	const idRenderTexture *target = NULL;
 	for ( const emptyCommand_t *cmd = cmds; cmd != NULL; cmd = (const emptyCommand_t *)cmd->next ) {
 		if ( cmd->commandId == RC_SET_RENDERTEXTURE ) {
@@ -1421,14 +1479,17 @@ static bool VK_Post_DrawSkyMask( const viewDef_t *portal, idImage *worldDepth ) 
 	return true;
 }
 
-bool VK_PostProcess_PortalSkyMask( const viewDef_t *portal ) {
-	const viewDef_t *mainView = NULL;
+const viewDef_t *VK_PostProcess_PortalSkyMainView( const viewDef_t *portal ) {
 	for ( int i = 0; i < vkPortalSkyPairCount; i++ ) {
 		if ( vkPortalSkyPairs[ i ].portal == portal ) {
-			mainView = vkPortalSkyPairs[ i ].mainView;
-			break;
+			return vkPortalSkyPairs[ i ].mainView;
 		}
 	}
+	return NULL;
+}
+
+bool VK_PostProcess_PortalSkyMask( const viewDef_t *portal ) {
+	const viewDef_t *mainView = vkPortalSkyMaskPlanned ? VK_PostProcess_PortalSkyMainView( portal ) : NULL;
 	if ( mainView == NULL || !mainView->viewport.Equals( portal->viewport ) || !VK_Post_EnsureModules() ) {
 		return false;
 	}
@@ -2210,6 +2271,7 @@ idImage *VK_PostProcess_TemporalMotionVectors( const viewDef_t *viewDef,
 		idImage *depthImage, int width, int height, unsigned int generation,
 		bool useHistory, bool &complete ) {
 	complete = false;
+	VK_PostProcess_SelectTemporalMotionSlot( viewDef != NULL ? viewDef->temporalHistorySlot : 0 );
 	vkTemporalMotionEligible = vkTemporalMotionDrawn = 0;
 	vkTemporalMotionComplete = false;
 	if ( !useHistory || viewDef == NULL || depthImage == NULL || R_SubmittedTakingScreenshot()
@@ -2235,6 +2297,7 @@ idImage *VK_PostProcess_TemporalMotionVectors( const viewDef_t *viewDef,
 
 void VK_PostProcess_CommitTemporalMotion( const viewDef_t *viewDef,
 		int width, int height, unsigned int generation ) {
+	VK_PostProcess_SelectTemporalMotionSlot( viewDef != NULL ? viewDef->temporalHistorySlot : 0 );
 	if ( viewDef == NULL || R_SubmittedTakingScreenshot() || viewDef->temporalCaptureFrame
 			|| generation != R_TemporalPresentation_HistoryGeneration()
 			|| !VK_Post_BuildMotionViewState( viewDef, vkTemporalMotionViewHistory, width, height ) ) {

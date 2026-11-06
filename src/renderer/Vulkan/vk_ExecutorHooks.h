@@ -155,6 +155,8 @@ void VK_PostProcess_BeginView( const viewDef_t *viewDef );
 // main view's world depth and keep the backdrop to the pixels it leaves far.
 void VK_PostProcess_PlanPortalSkyMask( const emptyCommand_t *cmds );
 bool VK_PostProcess_PortalSkyMask( const viewDef_t *portalView );
+// the main view the planned command list draws after this portal-sky backdrop, or NULL
+const viewDef_t *VK_PostProcess_PortalSkyMainView( const viewDef_t *portalView );
 bool VK_Exec_DrawWorldDepth( const viewDef_t *viewDef, bool ( *accept )( const drawSurf_t *surf ) );
 
 // TAA transform history is independent of motion blur. Commit only after the

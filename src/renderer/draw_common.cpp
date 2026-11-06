@@ -3149,6 +3149,78 @@ static idImage *rbMotionVectorImage = NULL;
 static idRenderTexture *rbMotionVectorRenderTexture = NULL;
 static bool rbMotionVectorImageValid = false;
 
+/*
+====================
+Temporal history slots (VR-05)
+
+A VR frame resolves temporal AA once per eye. Each eye keeps its own history
+in its slot (viewDef_t::temporalHistorySlot): the backend-owned history images
+and their continuity, the rigid-object transform timeline the velocity pass
+reprojects from, and the write guards of the last resolve. The globals hold
+the active slot; the other slot waits here and trades places with them when
+a resolve for it arrives. Flat rendering only ever uses slot 0.
+====================
+*/
+typedef struct rbTemporalSlotState_s {
+	idImage *			backendImages[2];
+	idRenderTexture *	backendTargets[2];
+	int					backendWidth;
+	int					backendHeight;
+	int					backendReadIndex;
+	int					backendFrame;
+	int					backendContextGeneration;
+	unsigned int		backendGeneration;
+	unsigned long long	backendViewIdentity;
+	bool				backendValid;
+	idList<rbMotionBlurEntityHistory_t> entityHistory;
+	unsigned int		entityGeneration;
+	unsigned long long	entityViewIdentity;
+	int					entityFrame;
+	int					writeFrame;
+	idRenderTexture *	writeTarget;
+	bool				needsReprime;
+	unsigned int		rejectedGeneration;
+} rbTemporalSlotState_t;
+
+static rbTemporalSlotState_t rbTemporalStoredSlot = { { NULL, NULL }, { NULL, NULL }, 0, 0, 0, -1, -1, 0, 0, false,
+	idList<rbMotionBlurEntityHistory_t>(), 0, 0, -1, -1, NULL, false, 0 };
+static int rbTemporalActiveSlot = 0;
+
+template<typename T> static void RB_SwapTemporalValue( T &a, T &b ) {
+	const T saved = a;
+	a = b;
+	b = saved;
+}
+
+static void RB_SelectTemporalHistorySlot( int slot ) {
+	slot = slot == 1 ? 1 : 0;
+	if ( slot == rbTemporalActiveSlot ) {
+		return;
+	}
+	rbTemporalSlotState_t &other = rbTemporalStoredSlot;
+	for ( int i = 0; i < 2; i++ ) {
+		RB_SwapTemporalValue( rbBackendTemporalHistoryImages[i], other.backendImages[i] );
+		RB_SwapTemporalValue( rbBackendTemporalHistoryTargets[i], other.backendTargets[i] );
+	}
+	RB_SwapTemporalValue( rbBackendTemporalHistoryWidth, other.backendWidth );
+	RB_SwapTemporalValue( rbBackendTemporalHistoryHeight, other.backendHeight );
+	RB_SwapTemporalValue( rbBackendTemporalHistoryReadIndex, other.backendReadIndex );
+	RB_SwapTemporalValue( rbBackendTemporalHistoryFrame, other.backendFrame );
+	RB_SwapTemporalValue( rbBackendTemporalHistoryContextGeneration, other.backendContextGeneration );
+	RB_SwapTemporalValue( rbBackendTemporalHistoryGeneration, other.backendGeneration );
+	RB_SwapTemporalValue( rbBackendTemporalHistoryViewIdentity, other.backendViewIdentity );
+	RB_SwapTemporalValue( rbBackendTemporalHistoryValid, other.backendValid );
+	rbTemporalEntityHistory.Swap( other.entityHistory );
+	RB_SwapTemporalValue( rbTemporalEntityHistoryGeneration, other.entityGeneration );
+	RB_SwapTemporalValue( rbTemporalEntityHistoryViewIdentity, other.entityViewIdentity );
+	RB_SwapTemporalValue( rbTemporalEntityHistoryFrame, other.entityFrame );
+	RB_SwapTemporalValue( rbTemporalResolveHistoryWriteFrame, other.writeFrame );
+	RB_SwapTemporalValue( rbTemporalResolveHistoryWriteTarget, other.writeTarget );
+	RB_SwapTemporalValue( rbTemporalResolveNeedsReprime, other.needsReprime );
+	RB_SwapTemporalValue( rbTemporalResolveRejectedGeneration, other.rejectedGeneration );
+	rbTemporalActiveSlot = slot;
+}
+
 static motionBlurShutterState_t rbMotionBlurShutter = { false, 0.0f };
 
 static void RB_ResetMotionBlurHistory( void ) {
@@ -6251,6 +6323,7 @@ static bool RB_ResolveTemporalPresentationRecorded( const resolveTemporalPresent
 }
 
 bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t &command ) {
+	RB_SelectTemporalHistorySlot( command.viewDef != NULL ? command.viewDef->temporalHistorySlot : 0 );
 	rbTemporalResolveRecord_t record = { TEMPORAL_RESOLVE_FALLBACK, "unrecorded", -1 };
 	const bool presented = RB_ResolveTemporalPresentationRecorded( command, record );
 	if ( presented ) {
@@ -6264,6 +6337,32 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 }
 
 static void RB_ResetBackendTemporalHistory( bool destroyResources ) {
+	if ( destroyResources ) {
+		// the waiting eye's history goes too
+		rbTemporalSlotState_t &other = rbTemporalStoredSlot;
+		for ( int i = 0; i < 2; i++ ) {
+			if ( other.backendTargets[i] != NULL ) {
+				tr.DestroyRenderTexture( other.backendTargets[i] );
+				other.backendTargets[i] = NULL;
+			}
+			other.backendImages[i] = NULL;
+		}
+		other.backendWidth = other.backendHeight = 0;
+		other.backendReadIndex = 0;
+		other.backendFrame = -1;
+		other.backendContextGeneration = -1;
+		other.backendGeneration = 0;
+		other.backendViewIdentity = 0;
+		other.backendValid = false;
+		other.entityHistory.Clear();
+		other.entityGeneration = 0;
+		other.entityViewIdentity = 0;
+		other.entityFrame = -1;
+		other.writeFrame = -1;
+		other.writeTarget = NULL;
+		other.needsReprime = false;
+		other.rejectedGeneration = 0;
+	}
 	rbBackendTemporalHistoryReadIndex = 0;
 	rbBackendTemporalHistoryFrame = -1;
 	rbBackendTemporalHistoryGeneration = 0;
@@ -6315,8 +6414,9 @@ static bool RB_EnsureBackendTemporalHistory( int width, int height,
 				|| rbBackendTemporalHistoryWidth != width
 				|| rbBackendTemporalHistoryHeight != height
 				|| rbBackendTemporalHistoryContextGeneration != tr.glContextGeneration ) {
+			// slot 1 (a VR frame's right eye) keeps images of its own
 			rbBackendTemporalHistoryImages[i] = globalImages->ScratchImage(
-				i == 0 ? "_backendTemporalHistory0" : "_backendTemporalHistory1",
+				va( "_backendTemporalHistory%d", rbTemporalActiveSlot * 2 + i ),
 				&opts, TF_LINEAR, TR_CLAMP, TD_DEFAULT );
 		}
 		if ( rbBackendTemporalHistoryImages[i] == NULL ) {
@@ -6328,7 +6428,7 @@ static bool RB_EnsureBackendTemporalHistory( int width, int height,
 				rbBackendTemporalHistoryImages[i], NULL );
 			if ( rbBackendTemporalHistoryTargets[i] != NULL ) {
 				rbBackendTemporalHistoryTargets[i]->SetDebugLabel(
-					i == 0 ? "backend temporal history 0" : "backend temporal history 1" );
+					va( "backend temporal history %d", rbTemporalActiveSlot * 2 + i ) );
 			}
 		} else if ( rbBackendTemporalHistoryTargets[i]->GetWidth() != width
 				|| rbBackendTemporalHistoryTargets[i]->GetHeight() != height ) {
@@ -6375,6 +6475,7 @@ static bool RB_PresentBackendTemporalScene( void ) {
 			|| backEnd.viewDef == NULL || backEnd.viewDef->viewEntitys == NULL ) {
 		return false;
 	}
+	RB_SelectTemporalHistorySlot( backEnd.viewDef->temporalHistorySlot );
 
 	const temporalPresentationFrameState_t &frame =
 		R_TemporalPresentation_GetFrameState();

@@ -635,8 +635,9 @@ typedef struct vkGuiExecutor_s {
 	unsigned int		temporalHistoryGenerationSeen;
 	int				temporalCaptureInvalidatedFrame;
 	int				temporalSceneCompositeInvalidatedFrame;
-	idRenderTexture *	temporalHistoryTargets[ 2 ];
-	unsigned long long temporalHistoryStorageGenerations[ 2 ];
+	// the game's history ping-pong: two images, or two per eye in VR (VR-05)
+	idRenderTexture *	temporalHistoryTargets[ 4 ];
+	unsigned long long temporalHistoryStorageGenerations[ 4 ];
 	const viewDef_t *	pendingSpecialEffectsView;
 	int					pendingSpecialEffectsMask;
 	specialEffectsState_t pendingSpecialEffects;
@@ -656,6 +657,22 @@ typedef struct vkGuiExecutor_s {
 } vkGuiExecutor_t;
 
 static vkGuiExecutor_t vkExec;
+// VR-05: the waiting eye's direct temporal history (VK_TemporalPresentation_SelectDirectHistorySlot)
+typedef struct vkDirectHistorySlot_s {
+	idImage *			images[ 2 ];
+	idRenderTexture *	renderTextures[ 2 ];
+	unsigned long long	storageGenerations[ 2 ];
+	int					width;
+	int					height;
+	int					readIndex;
+	int					frame;
+	unsigned int		generation;
+	unsigned long long	viewIdentity;
+	bool				valid;
+	bool				allocationWarned;
+} vkDirectHistorySlot_t;
+static vkDirectHistorySlot_t vkDirectHistoryStoredSlot = { { NULL, NULL }, { NULL, NULL }, { 0, 0 }, 0, 0, 0, -1, 0, 0, false, false };
+static int vkDirectHistoryActiveSlot = 0;
 
 // Native PBR preparation may allocate image sets but never bind them. Retain
 // both cache and retirement ownership until the complete view can commit.
@@ -3824,7 +3841,16 @@ void VK_GuiExecutor_Shutdown( void ) {
 			vkExec.temporalDirectHistoryRenderTextures[i] = NULL;
 		}
 		vkExec.temporalDirectHistoryImages[i] = NULL;
+		// the waiting VR eye's history
+		delete vkDirectHistoryStoredSlot.renderTextures[i];
+		vkDirectHistoryStoredSlot.renderTextures[i] = NULL;
+		vkDirectHistoryStoredSlot.images[i] = NULL;
+		vkDirectHistoryStoredSlot.storageGenerations[i] = 0;
 	}
+	vkDirectHistoryStoredSlot.width = vkDirectHistoryStoredSlot.height = 0;
+	vkDirectHistoryStoredSlot.readIndex = 0;
+	vkDirectHistoryStoredSlot.frame = -1;
+	vkDirectHistoryStoredSlot.valid = false;
 	if ( vkExec.temporalSceneRenderTexture != NULL ) {
 		if ( backEnd.renderTexture == vkExec.temporalSceneRenderTexture ) {
 			backEnd.renderTexture = NULL;
@@ -5144,7 +5170,12 @@ static const viewDef_t *VK_TemporalPresentation_RootForView(
 	}
 
 	if ( ( viewDef->renderFlags & RF_PORTAL_SKY ) != 0 ) {
-		const viewDef_t *rootView = R_SubmittedPrimaryView();
+		// the main view that follows the backdrop on its target: in VR each
+		// eye's, which the frame's one primary view is not
+		const viewDef_t *rootView = VK_PostProcess_PortalSkyMainView( viewDef );
+		if ( rootView == NULL ) {
+			rootView = R_SubmittedPrimaryView();
+		}
 		return rootView != viewDef
 			&& VK_TemporalPresentation_IsMainSceneView( rootView )
 			&& VK_TemporalPresentation_ViewMatchesRoot( viewDef, rootView )
@@ -5749,6 +5780,46 @@ static bool VK_TemporalPresentation_EnsureSceneTarget( int width, int height ) {
 	return true;
 }
 
+/*
+====================
+Direct temporal history slots (VR-05)
+
+A VR frame resolves the backend's own temporal scene once per eye (the
+multiplayer path), each eye from its own history: vkExec's direct-history
+fields belong to the active slot (viewDef_t::temporalHistorySlot), and the
+other slot's wait here, trading places when the other eye resolves. Flat
+rendering only ever uses slot 0.
+====================
+*/
+
+template<typename T> static void VK_SwapDirectHistoryValue( T &a, T &b ) {
+	const T saved = a;
+	a = b;
+	b = saved;
+}
+
+static void VK_TemporalPresentation_SelectDirectHistorySlot( int slot ) {
+	slot = slot == 1 ? 1 : 0;
+	if ( slot == vkDirectHistoryActiveSlot ) {
+		return;
+	}
+	vkDirectHistorySlot_t &other = vkDirectHistoryStoredSlot;
+	for ( int i = 0; i < 2; ++i ) {
+		VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryImages[i], other.images[i] );
+		VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryRenderTextures[i], other.renderTextures[i] );
+		VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryStorageGenerations[i], other.storageGenerations[i] );
+	}
+	VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryWidth, other.width );
+	VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryHeight, other.height );
+	VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryReadIndex, other.readIndex );
+	VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryFrame, other.frame );
+	VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryGeneration, other.generation );
+	VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryViewIdentity, other.viewIdentity );
+	VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryValid, other.valid );
+	VK_SwapDirectHistoryValue( vkExec.temporalDirectHistoryAllocationWarned, other.allocationWarned );
+	vkDirectHistoryActiveSlot = slot;
+}
+
 static void VK_TemporalPresentation_ResetDirectHistory(
 		const char *reason, bool invalidateSharedGeneration ) {
 	const unsigned int generation =
@@ -5803,9 +5874,9 @@ static bool VK_TemporalPresentation_EnsureDirectHistoryTargets(
 		}
 		if ( target == NULL ) {
 			if ( image == NULL ) {
-				image = globalImages->ScratchImage( i == 0
-					? "_vkTemporalDirectHistory0"
-					: "_vkTemporalDirectHistory1",
+				// a VR frame's right eye keeps images of its own
+				image = globalImages->ScratchImage(
+					va( "_vkTemporalDirectHistory%d", vkDirectHistoryActiveSlot * 2 + i ),
 					&opts, TF_LINEAR, TR_CLAMP, TD_DEFAULT );
 			} else if ( image->GetUploadWidth() != width
 					|| image->GetUploadHeight() != height ) {
@@ -5815,9 +5886,8 @@ static bool VK_TemporalPresentation_EnsureDirectHistoryTargets(
 				target = tr.CreateRenderTexture( image, NULL );
 			}
 			if ( target != NULL ) {
-				target->SetDebugLabel( i == 0
-					? "Vulkan direct temporal history 0 (native)"
-					: "Vulkan direct temporal history 1 (native)" );
+				target->SetDebugLabel( va( "Vulkan direct temporal history %d (native)",
+					vkDirectHistoryActiveSlot * 2 + i ) );
 			}
 		}
 
@@ -5867,6 +5937,7 @@ static bool VK_TemporalPresentation_ResolvePendingSceneTemporal(
 	if ( viewDef == NULL || !presentation.temporalAARequested || captureFrame ) {
 		return false;
 	}
+	VK_TemporalPresentation_SelectDirectHistorySlot( viewDef->temporalHistorySlot );
 	const int outputWidth = static_cast<int>( VK_Exec_DefaultExtent().width );
 	const int outputHeight = static_cast<int>( VK_Exec_DefaultExtent().height );
 	if ( outputWidth <= 0 || outputHeight <= 0
@@ -9355,7 +9426,8 @@ static bool VK_TemporalPresentation_TrackHistoryTarget(
 	idImage *image = target->GetColorImage( 0 );
 	const unsigned long long generation =
 		static_cast<unsigned long long>( image->GetStorageGeneration() );
-	for ( int i = 0; i < 2; ++i ) {
+	const int tracked = (int)( sizeof( vkExec.temporalHistoryTargets ) / sizeof( vkExec.temporalHistoryTargets[0] ) );
+	for ( int i = 0; i < tracked; ++i ) {
 		if ( vkExec.temporalHistoryTargets[i] == target ) {
 			if ( vkExec.temporalHistoryStorageGenerations[i] == generation ) {
 				return false;
@@ -9364,19 +9436,22 @@ static bool VK_TemporalPresentation_TrackHistoryTarget(
 			return true;
 		}
 	}
-	for ( int i = 0; i < 2; ++i ) {
+	for ( int i = 0; i < tracked; ++i ) {
 		if ( vkExec.temporalHistoryTargets[i] == NULL ) {
 			vkExec.temporalHistoryTargets[i] = target;
 			vkExec.temporalHistoryStorageGenerations[i] = generation;
 			return false;
 		}
 	}
-	// The public contract is a two-image ping-pong. Seeing a third owner means
-	// the native history allocation was replaced without a module restart.
+	// The public contract is a two-image ping-pong (one per eye in VR). Seeing
+	// another owner means the native history allocation was replaced without a
+	// module restart.
+	for ( int i = 0; i < tracked; ++i ) {
+		vkExec.temporalHistoryTargets[i] = NULL;
+		vkExec.temporalHistoryStorageGenerations[i] = 0;
+	}
 	vkExec.temporalHistoryTargets[0] = target;
 	vkExec.temporalHistoryStorageGenerations[0] = generation;
-	vkExec.temporalHistoryTargets[1] = NULL;
-	vkExec.temporalHistoryStorageGenerations[1] = 0;
 	return true;
 }
 

@@ -1056,7 +1056,10 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 			eyeView.fov_x = RAD2DEG( 2.0f * idMath::ATan( idMath::Tan( DEG2RAD( eyeView.fov_x * 0.5f ) ) * zoomScale ) );
 			eyeView.fov_y = RAD2DEG( 2.0f * idMath::ATan( idMath::Tan( DEG2RAD( eyeView.fov_y * 0.5f ) ) * zoomScale ) );
 		}
+		// each eye's scene chain reprojects from its own temporal history (VR-05)
+		gameLocal.SelectTemporalHistorySlot( eye );
 		SingleView( hud, &eyeView, RF_NO_GUI | RF_PRIMARY_VIEW );
+		gameLocal.SelectTemporalHistorySlot( 0 );
 		VR_DrawComfortVignette( eyeView, vignette, vignetteMaterial );
 		if ( drawAimMarker ) {
 			VR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );

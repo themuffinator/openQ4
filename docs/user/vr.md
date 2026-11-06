@@ -13,32 +13,36 @@ multiplayer, and needs no extra content beyond your Quake 4 install.
 
 ## What you need
 
-- A PC VR headset and an **OpenXR runtime that supports OpenGL**, set as the
-  system's active OpenXR runtime:
+- A PC VR headset and an **OpenXR runtime that supports OpenGL or Vulkan**,
+  set as the system's active OpenXR runtime:
   - **SteamVR** (Valve Index, HTC Vive, Pimax, Bigscreen and many others);
   - the **Meta Quest Link** PC app for Quest headsets over Link or Air Link;
   - **Monado** on Linux.
 
   Windows Mixed Reality's own runtime does not support OpenGL. On a WMR
   headset, run the game through SteamVR instead.
-- The **OpenGL renderer**, which is the default. VR does not start while
-  `r_renderApi` is `vulkan`.
-- On Linux, a GLX context: on an X11 desktop this is automatic; on a Wayland
-  desktop, start openQ4 with the environment variable `OPENQ4_FORCE_X11=1` so
-  it runs through XWayland.
+- Either renderer: **OpenGL** (the default) or **Vulkan** (`r_renderApi
+  vulkan`). On Vulkan the runtime picks the GPU your headset is attached to,
+  so turning VR on for the first time restarts the renderer once.
+- On Linux, either renderer works on an X11 desktop. On a Wayland desktop,
+  use Vulkan, or OpenGL with a runtime that can bind it there (Monado can;
+  SteamVR cannot, so with SteamVR start openQ4 with the environment variable
+  `OPENQ4_FORCE_X11=1` to run it through XWayland).
 
 ## Turning VR on
 
 1. Start your headset and its OpenXR runtime (for example SteamVR).
-2. In openQ4, open **Settings > Game Options**, pick **VR** under Section,
-   and set **VR Mode** to Enabled. VR starts at once. From the console,
-   `vr_enable 1` does the same.
+2. In openQ4, open **Settings > Game Options**, choose the **Virtual
+   Reality** tab, and set **VR Mode** to Enabled. VR starts at once. From the
+   console, `vr_enable 1` does the same.
 
    The setting is saved, so the next launch starts in VR on its own. You can
    also launch with `+set vr_enable 1`.
 
-The same section sets aiming, turning, movement, the laser sight,
-vibration, the two-handed grip, the comfort vignette and physical crouching.
+The same tab sets aiming, turning, movement, the laser sight, vibration, the
+two-handed grip, the comfort vignette, physical crouching and the play space.
+In the headset, point at a tab and pull the trigger to open it, or squeeze
+the weapon-hand grip to step to the next tab.
 
 When VR is on, the desktop window shows what your left eye sees. To turn VR
 off again, set VR Mode back to Disabled (you can point at it in the headset),
@@ -62,11 +66,16 @@ runtime waits for `vr_restart`. This recovery has been checked with a simulated
 OpenXR runtime; real-headset qualification remains open.
 
 The ordinary `screenshot` command captures a desktop view during VR gameplay.
-For a developer capture of the last rendered eye, use
+On OpenGL, for a developer capture of the last rendered eye, use
 `screenshot image _vrEyeColor0 "screenshots/vr-left.tga"` or `_vrEyeColor1` for the
 right eye. These are engine render-target captures.
 Use `screenshot image _vrScreenColor "screenshots/vr-hud.tga"` to capture the
-separate HUD surface.
+separate HUD surface. The Vulkan renderer keeps its eye targets to itself, so
+those image names exist only on OpenGL.
+
+If the desktop window is minimized or hidden behind the headset's own
+display, the headset keeps rendering; only the desktop mirror waits for the
+window to come back.
 
 ## Controls
 
@@ -84,8 +93,8 @@ can rebind them in the controls menu like any gamepad button.
 | B | Crouch | Back |
 | X | Reload | - |
 | Y | Flashlight | - |
-| Off-hand grip | Weapon wheel, or hold the gun in both hands | - |
-| Weapon-hand grip | Last weapon | - |
+| Off-hand grip | Weapon wheel, or hold the gun in both hands | Previous tab |
+| Weapon-hand grip | Last weapon | Next tab |
 | Off-hand stick click | Run / walk | - |
 | Menu button | Menu | Close menu |
 
@@ -96,6 +105,12 @@ Menus open on a floating screen in front of you, and the game world stays
 around you while the game is paused. Point your weapon-hand controller at the
 screen: a dot shows where it points, and the trigger clicks there like a
 mouse. The sticks and the A and B buttons also work in menus.
+
+Screens in the world, such as door panels, lift calls and terminals, answer
+your weapon hand the same way in single player: point at one, and its cursor
+appears where your laser meets it. Characters you can talk to and things you
+can use take focus where you point, too. In multiplayer the server decides
+what you are looking at, so there they follow your view instead.
 
 You aim with the controller in your weapon hand, and the gun follows it. A
 red laser dot sits where your shots will land, at the real distance of what
@@ -167,7 +182,33 @@ You can change these settings:
 | `vr_headOffsetLimit` | 16 | how far you can lean from your character before the view stops (game units) |
 
 Use `vr_recenter` to make your current position and direction the front. It
-helps to bind it to a key, for example `bind F12 vr_recenter`.
+helps to bind it to a key, for example `bind F12 vr_recenter`. Your
+headset's own recenter (for example holding the Oculus button) does the same.
+
+### Seated or standing
+
+**Play Space** in the Virtual Reality tab (`vr_playSpace`) decides where your
+height is measured from:
+
+- **Standing** measures your height from the floor your headset knows. Your
+  character's eyes stand for your eyes when you stand up straight, so
+  recentering while you crouch, sit or lean only turns and moves the front:
+  it never moves the floor. openQ4 learns your standing eye height the first
+  time it recenters; to measure it again, stand up straight and enter
+  `vr_calibrateHeight`, or set it in metres with `vr_standingHeight`.
+- **Seated** measures your height from where you recentered: wherever your
+  head is then becomes standing height, which suits playing in a chair.
+- **Automatic**, the default, stands when your headset knows where the
+  floor is and sits when it doesn't.
+
+If you choose Standing and your runtime knows no floor, openQ4 says so and
+plays seated. `vr_status` shows the play space in use, your standing eye
+height and the size of your play area.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `vr_playSpace` | 0 | 0 automatic, 1 seated, 2 standing |
+| `vr_standingHeight` | 0 | standing play: your eye height above the floor in metres; 0 learns it at the next recenter |
 
 ## Display
 
@@ -193,8 +234,12 @@ remain at HUD depth. `hud_objectiveMarkers 0` hides them. Their projection and
 gameplay rendering have automated coverage through a simulated OpenXR runtime;
 real-headset readability and comfort still need testing.
 
-Temporal anti-aliasing and dynamic resolution switch themselves off in VR.
-Use MSAA (`r_multiSamples`) or SMAA instead.
+Temporal anti-aliasing works in VR when you ask for it with `r_temporalAA 1`:
+each eye keeps its own history, so edges settle in both eyes without the
+eyes blurring into each other, and a fast head turn starts the history again
+instead of smearing. The automatic setting (`r_temporalAA 2`) leaves it off in
+VR, because the headset already renders at its own resolution. Dynamic
+resolution stays off in VR. MSAA (`r_multiSamples`) and SMAA work as well.
 
 ## Weapon position
 
@@ -246,9 +291,15 @@ and resolution openQ4 is using. `vr_debug 1` logs session events.
 - **"no runtime is available"**: no OpenXR runtime is installed or active.
   Set one as active in its own settings, for example in SteamVR under
   Settings > OpenXR.
-- **"does not support OpenGL"**: the active runtime can't render OpenGL games.
-  Switch to SteamVR or Meta Quest Link.
-- **"VR needs the OpenGL renderer"**: set `r_renderApi gl` and restart. On a
-  Linux Wayland desktop, also start openQ4 with `OPENQ4_FORCE_X11=1`.
+- **"supports neither OpenGL nor Vulkan"**: the active runtime can't render
+  either. Switch to SteamVR or Meta Quest Link.
+- **"does not support Vulkan"** or **"does not support OpenGL"**: switch
+  `r_renderApi` to the other renderer and restart.
+- **"cannot bind it ... native Wayland"**: your runtime can't use OpenGL on a
+  Wayland desktop. Use `r_renderApi vulkan`, or start openQ4 with
+  `OPENQ4_FORCE_X11=1`.
+- **"the runtime did not create the Vulkan renderer's device"**: the runtime
+  refused to make the Vulkan device for your headset, so VR stays off;
+  `vr_restart` tries again.
 - **The image looks washed out**: the runtime didn't offer an sRGB image
   format. Report your headset and runtime.

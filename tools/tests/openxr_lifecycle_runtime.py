@@ -85,7 +85,9 @@ def main() -> int:
     if args.mode == "MP":
         commands += ["openq4_reportMPState", "openq4_assertMPGameplayView"]
     if vulkan:
-        commands += ["vr_enable 1", "vr_restart", "waitMsec 6000", "echo XR_FAULT_VULKAN_DEVICE", "vr_status"]
+        # the renderer restart itself takes seconds; then the session needs frames
+        commands += ["vr_enable 1", "vr_restart", "waitMsec 6000", "wait 10", "waitMsec 4000",
+                     "echo XR_FAULT_VULKAN_DEVICE", "vr_status"]
     if args.creation_fault:
         commands += ["condump xr_fault_arm.txt"]
     commands += ["vr_enable 1", "vr_restart", "waitMsec 500" if args.creation_fault else "waitMsec 2000",
@@ -93,8 +95,11 @@ def main() -> int:
     if not args.creation_fault:
         commands += ["condump xr_fault_arm.txt"]
     commands += ["waitMsec 700", "echo XR_FAULT_AFTER", "vr_status", 'screenshot "screenshots/xr_fallback.tga"',
-                 f"waitMsec {auto_wait}", "echo XR_FAULT_AUTO", "vr_status", "vr_restart", f"waitMsec {restart_wait}",
-                 "echo XR_FAULT_RESTART", "vr_status", "getviewpos"]
+                 f"waitMsec {auto_wait}", "echo XR_FAULT_AUTO", "vr_status", "vr_restart", f"waitMsec {restart_wait}"]
+    if vulkan:
+        # a renderer restart blocks the wait above; the session needs frames after it
+        commands += ["wait 10", "waitMsec 3000"]
+    commands += ["echo XR_FAULT_RESTART", "vr_status", "getviewpos"]
     if vulkan:
         commands += ["condump xr_capture_restart.txt", f"waitMsec {capture_wait}",
                      'screenshot "screenshots/xr_restart.tga"', "waitMsec 250",

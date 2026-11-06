@@ -170,10 +170,25 @@ static void R_TemporalPresentation_CountReason( temporalReasonCount_t *slots, co
 }
 
 
-// openQ4 VR: two eyes per frame would alternate one history, so every
-// history-backed feature stands down while a VR frame presents.
+// openQ4 VR: dynamic resolution, screen-space effects and motion blur stand
+// down while a VR frame presents. Temporal AA keeps one history per eye
+// (VR-05): each eye's view mixes its eye into its identity, so it keeps its
+// own camera and object history, and backends keep its images and velocity
+// state in its history slot (viewDef_t::temporalHistorySlot). Automatic TAA
+// (r_temporalAA 2) only follows a below-native scene, which VR never renders,
+// so a headset gets TAA with r_temporalAA 1.
 static bool R_TemporalPresentation_VRFrame( void ) {
 	return tr.vrFrame.active;
+}
+
+// The eye the front end renders this VR frame's view for, -1 otherwise.
+static int R_TemporalPresentation_VREye( void ) {
+	return tr.vrFrame.active && tr.vrFrame.stereo && ( tr.vrFrontEndTarget == 0 || tr.vrFrontEndTarget == 1 )
+		? tr.vrFrontEndTarget : -1;
+}
+
+int R_TemporalPresentation_HistorySlot( void ) {
+	return R_TemporalPresentation_VREye() == 1 ? 1 : 0;
 }
 
 static advancedScreenSpaceConfig_t R_TemporalPresentation_BuildAdvancedScreenSpaceConfig( void ) {
@@ -413,6 +428,11 @@ unsigned long long R_TemporalPresentation_ViewIdentity(
 		( viewDef->isSubview ? 1u : 0u )
 		| ( viewDef->isMirror ? 2u : 0u )
 		| ( viewDef->isXraySubview ? 4u : 0u ) );
+	// each VR eye is its own camera; flat views keep their identity unchanged
+	const int vrEye = R_TemporalPresentation_VREye();
+	if ( vrEye >= 0 ) {
+		identity = TemporalHistoryCore_MixIdentity( identity, 0x56520000u | static_cast<unsigned int>( vrEye ) );
+	}
 
 	const viewDef_t *cursor = viewDef;
 	int depth = 0;
@@ -506,6 +526,7 @@ void R_TemporalPresentation_PrepareView( viewDef_t *viewDef ) {
 	viewDef->temporalPrepared = true;
 	viewDef->temporalViewIdentity = R_TemporalPresentation_ViewIdentity( viewDef );
 	viewDef->temporalHistoryGeneration = rg_temporalHistoryGeneration;
+	viewDef->temporalHistorySlot = R_TemporalPresentation_HistorySlot();
 	viewDef->temporalJitterIndex = tr.frameCount & 7;
 	viewDef->temporalJitterPixels.Zero();
 	viewDef->temporalPreviousViewOrigin.Zero();
@@ -663,8 +684,7 @@ void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
 
 	const bool dynamicResolutionRequested = r_rendererDynamicResolution.GetBool()
 		&& !R_TemporalPresentation_VRFrame();
-	const bool temporalAARequested = R_TemporalPresentation_TemporalAAWanted()
-		&& !R_TemporalPresentation_VRFrame();
+	const bool temporalAARequested = R_TemporalPresentation_TemporalAAWanted();
 	if ( dynamicResolutionRequested != rg_dynamicResolutionEnabledLastFrame ) {
 		R_RendererMetrics_ResetGpuFrameTiming( dynamicResolutionRequested
 			? "dynamic resolution enabled" : "dynamic resolution disabled" );
@@ -826,6 +846,10 @@ static bool R_TemporalPresentation_AutomaticTemporalAAWanted( void ) {
 		return false;
 	}
 #endif
+	// a VR frame renders native eyes without dynamic resolution
+	if ( R_TemporalPresentation_VRFrame() ) {
+		return false;
+	}
 	if ( r_rendererDynamicResolution.GetBool() ) {
 		return true;
 	}
@@ -846,7 +870,7 @@ static bool R_TemporalPresentation_TemporalAAWanted( void ) {
 }
 
 bool R_TemporalPresentation_TemporalAARequested( void ) {
-	return R_TemporalPresentation_TemporalAAWanted() && !R_TemporalPresentation_VRFrame();
+	return R_TemporalPresentation_TemporalAAWanted();
 }
 
 float R_TemporalPresentation_EffectReactiveStrength( void ) {
@@ -1012,7 +1036,7 @@ struct vertCache_s *R_TemporalPresentation_PreviousPositionCache(
 		tri->numVerts * static_cast<int>( sizeof( idVec3 ) ) );
 }
 
-void R_TemporalPresentation_SetVRExtent( int width, int height ) {
+void R_TemporalPresentation_SetVRTargetState( int width, int height, bool temporalAA ) {
 	R_TemporalPresentation_CurrentFrame().nativeWidth = Max( 1, width );
 	R_TemporalPresentation_CurrentFrame().nativeHeight = Max( 1, height );
 	R_TemporalPresentation_CurrentFrame().sceneWidth = R_TemporalPresentation_CurrentFrame().nativeWidth;
@@ -1021,7 +1045,14 @@ void R_TemporalPresentation_SetVRExtent( int width, int height ) {
 	R_TemporalPresentation_CurrentFrame().effectiveScalePercent = 100;
 	R_TemporalPresentation_CurrentFrame().dynamicResolutionRequested = false;
 	R_TemporalPresentation_CurrentFrame().dynamicResolutionActive = false;
-	R_TemporalPresentation_CurrentFrame().temporalAARequested = false;
+	R_TemporalPresentation_CurrentFrame().temporalAARequested = temporalAA;
+}
+
+void R_TemporalPresentation_SetVRExtent( int width, int height ) {
+	// an eye resolves temporal AA from its own history (VR-05); the virtual
+	// screen carries no 3D scene to resolve
+	R_TemporalPresentation_SetVRTargetState( width, height,
+		R_TemporalPresentation_VREye() >= 0 && R_TemporalPresentation_TemporalAAWanted() );
 }
 
 bool R_TemporalPresentation_ScreenSpaceEffectsRequested( void ) {

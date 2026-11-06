@@ -349,7 +349,7 @@ See [release status](../../user/release-status.md) and the
 - Bots account for their health and armour before taking drops or jump pads, and check the ground beyond a touchdown before continuing. Running jumps check their current position and momentum against the player's collision shape, and bots avoid walking through jump pads that have no safe landing route.
 - **German menus and gameplay text are now available.** Choose **Deutsch** in Settings > Game Options > Language for translated settings, objectives, terminals, Arena Campaign, demos and multiplayer controls.
 - **Five more languages: Brazilian Portuguese, Czech, Hungarian, Turkish and Ukrainian.** Choose **Português (Brasil)**, **Čeština**, **Magyar**, **Türkçe** or **Українська** in Settings > Game Options > Language. Each translates the same menus, settings, objectives, terminals, Arena Campaign, demos and multiplayer messages as German. On its first launch openQ4 picks your system language. See the [languages guide](../../user/languages.md).
-- **Play in VR (experimental).** With a PC VR headset and SteamVR, Meta Quest Link or Monado, enter `vr_enable 1` and `vr_restart` to play the campaign or multiplayer in stereo at your headset's resolution. Look around with your head, aim and shoot with a motion controller while a laser dot shows where your shots land and the controllers vibrate as you fire and take hits, and point at menus to click them; each gun sits full size in your hand, gripped where its own model holds it and pointing along the laser, and you can steady it by holding the foregrip with your other hand; the HUD floats in view, and menus, loading screens and cinematics appear on a floating screen. You can walk around your room and your character steps with you, in multiplayer too, and crouching in your room crouches your character. Snap turning, a comfort vignette that darkens the edges of your view while the stick moves or turns you, and other comfort settings are on by default. See the [VR guide](../../user/vr.md).
+- **Play in VR (experimental).** With a PC VR headset and SteamVR, Meta Quest Link or Monado, on the OpenGL or Vulkan renderer, enter `vr_enable 1` and `vr_restart` to play the campaign or multiplayer in stereo at your headset's resolution. Look around with your head, aim and shoot with a motion controller while a laser dot shows where your shots land and the controllers vibrate as you fire and take hits, and point at menus to click them; each gun sits full size in your hand, gripped where its own model holds it and pointing along the laser, and you can steady it by holding the foregrip with your other hand; the HUD floats in view, and menus, loading screens and cinematics appear on a floating screen. You can walk around your room and your character steps with you, in multiplayer too, and crouching in your room crouches your character; play standing or seated, with your height measured from the floor or from where you recentered. Snap turning, a comfort vignette that darkens the edges of your view while the stick moves or turns you, and other comfort settings are on by default. See the [VR guide](../../user/vr.md).
 - **Cleaner, more complete text.** The scalable fonts now draw symbols Quake 4's fonts never had, such as ½, ², º, ± and the non-breaking space, instead of question marks. Accents no longer run into capital letters in terminal and console text, and every accented letter keeps Quake 4's own lettering. Console text has clean edges instead of stepped ones, and no longer shows the German **ß** as **á**.
 - **Effects closer to the original.** Particle effects now spawn, move, fade and draw as they do in the original Quake 4. Electrical arcs regain their bright, forked look. Steam and smoke placed in maps are already flowing when you first see them. Long-running effects no longer slow down or fade early.
 - **Rooms sound the way Quake 4's level designers set them up.** Every map's rooms, corridors and outdoor areas get their own reverb again, as the original game did with EAX sound hardware: a tiled washroom rings, a hangar booms, and a firefight in the hall next door sounds like that hall, coming from its doorway. Closed doors muffle the sounds behind them, radio chatter stays dry, and voice-over sits back in the mix. Until now openQ4 played no reverb at all. It is on by default (`s_useEAXReverb`) wherever OpenAL Soft is in use; see [Room Reverb](../../user/gameplay-settings.md#room-reverb).
@@ -410,7 +410,7 @@ See [release status](../../user/release-status.md) and the
 - Update the complete openQ4 package, including its bundled data. German text also works with English retail assets.
 - For German campaign voices and subtitles, install the complete retail German language pack and restart the game. Numbered language patches alone do not contain the complete dialogue; English dialogue remains the fallback when German assets are absent.
 - Brazilian Portuguese, Czech, Hungarian, Turkish and Ukrainian are text-only. Quake 4 never had voice packs for them, so characters speak English.
-- VR needs the OpenGL renderer and an OpenXR runtime that supports OpenGL, such as SteamVR, Meta Quest Link or Monado. Windows Mixed Reality headsets work through SteamVR. On a Linux Wayland desktop, start openQ4 with `OPENQ4_FORCE_X11=1`. VR is new and has not yet been confirmed on headset hardware, so please report how it runs on yours. It is off unless you turn it on.
+- VR works on the OpenGL or the Vulkan renderer with an OpenXR runtime that supports it, such as SteamVR, Meta Quest Link or Monado. Windows Mixed Reality headsets work through SteamVR. On Vulkan, turning VR on the first time restarts the renderer once so the runtime can pick your headset's GPU. On a Linux Wayland desktop, use Vulkan, or OpenGL with a runtime that supports it there (Monado does; with SteamVR start openQ4 with `OPENQ4_FORCE_X11=1`). VR is new and has not yet been confirmed on headset hardware, so please report how it runs on yours. It is off unless you turn it on.
 - Czech, Hungarian, Turkish and Ukrainian always use openQ4's scalable fonts. They ignore `r_useTrueTypeFonts 0`, because Quake 4's original bitmap fonts lack their letters. Chat and the console cannot yet type Cyrillic letters, or the Czech, Hungarian and Turkish letters outside the Western European set.
 
 ## Change Log
@@ -532,6 +532,34 @@ See [release status](../../user/release-status.md) and the
   scroll with the mouse wheel, your weapon-change buttons or the right stick,
   and a count shows how many players are further down. Weapon changes while
   you hold it work as before when everyone fits.
+
+- VR now runs on the Vulkan renderer too. The OpenXR runtime creates the
+  renderer's device on the GPU your headset uses, and the headset keeps
+  rendering while the desktop window is minimized or covered. On a Linux
+  Wayland desktop, OpenGL VR binds through EGL where the runtime supports it.
+
+- Standing and seated VR play spaces (**Play Space** in the Virtual Reality
+  tab, `vr_playSpace`). Standing play measures your height from the floor, so
+  recentering while you crouch or sit no longer shifts your standing height;
+  `vr_calibrateHeight` measures it again. Seated play measures from where you
+  recentered, as before. Automatic picks standing when your headset knows the
+  floor.
+
+- In single player, door panels, lift calls and other screens in the world
+  answer the VR weapon hand where it points, with their cursor where the laser
+  meets them.
+
+- Temporal anti-aliasing in VR: set `r_temporalAA 1` and each eye smooths its
+  edges from its own previous frames, in single player and multiplayer, on
+  OpenGL and Vulkan. A fast head turn starts afresh instead of smearing. The
+  automatic setting still leaves it off in VR.
+
+- On Vulkan, the sky and distant scenery behind a level (its portal sky) no
+  longer go missing from the left eye in VR.
+
+- The tabs at the top of the settings pages respond to the mouse and the VR
+  pointer again; clicking one used to do nothing. In VR, the weapon-hand and
+  off-hand grips also step between tabs.
 
 - VR settings have their own section in Settings > Game Options, so you can
   switch VR on and set aiming, turning, movement, the laser sight,

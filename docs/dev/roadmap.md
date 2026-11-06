@@ -51,7 +51,7 @@ exact; the estimate column is deliberately approximate.
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
-| [Virtual reality](#virtual-reality) — VR | **35%** | 1 / 6 | Vulkan/EGL/Quest integration, floor calibration and real-headset gameplay. |
+| [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; Quest waits on AND-05. |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **55%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, editable layouts and Quest. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
@@ -200,8 +200,8 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | Game time | Ordinary game code advances in 16 ms steps. Network game timestamps deliberately use that same clock while scheduling uses the exact 60 Hz ladder. Do not apply a global 16-to-16.667 ms conversion as a presentation fix. |
 | Vulkan | Stable supported on Windows x64 following the October NVIDIA/Intel qualification; experimental on Linux and macOS. The user-requested 28 October GPU policy makes fresh desktop `best` prefer compatible high-performance Vulkan hardware with OpenGL fallback; saved explicit choices persist. Android keeps GLES. This does not expand hardware qualification. Historical failed runs remain evidence for their specific builds and conditions. |
 | Modern rendering | Native GL/Vulkan PBR is default-on for authored PBR materials; stock materials stay classic. Shared classic rendering domains exist but remain default-off. Aggregate modern-visible lighting still has `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; these are different promotion decisions. |
-| Temporal rendering | Automatic TAAU supports subnative bilinear/bicubic scaling and dynamic resolution on eligible desktop GL/Vulkan paths; crop/nearest modes and VR are excluded. Rigid, skinned and first-person weapon motion vectors and reactive effect coverage exist. Dynamic resolution and GPU skinning remain opt-in. GLES has no temporal resolve. |
-| VR | The active source implements OpenGL PC OpenXR, stereo, tracked input, room scale, crouch, two-handed aiming, haptics, comfort controls and vehicle views. Vulkan/EGL/Quest work is recoverable from archived history, not active implementation. Real-headset qualification remains open. |
+| Temporal rendering | Automatic TAAU supports subnative bilinear/bicubic scaling and dynamic resolution on eligible desktop GL/Vulkan paths; crop/nearest modes are excluded, and VR takes only explicit per-eye TAA (`r_temporalAA 1`), without dynamic resolution. Rigid, skinned and first-person weapon motion vectors and reactive effect coverage exist. Dynamic resolution and GPU skinning remain opt-in. GLES has no temporal resolve. |
+| VR | The active source implements PC OpenXR on OpenGL (GLX/WGL, and EGL on Wayland) and Vulkan, headset submission without desktop presentation, stereo, tracked input, room scale, standing/seated play spaces, crouch, two-handed aiming, world-GUI pointing, per-eye TAA, haptics, comfort controls and vehicle views, all qualified on the simulated runtime. Quest standalone waits on AND-05; real-headset qualification remains open ([checklist](vr-headset-qualification.md)). |
 | Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Onboarding/import/export, touch and several lifecycle repairs are integrated with scoped S25/emulator evidence. Remaining host/layout work and physical device/lifecycle breadth stay open under AND-01 through AND-05. |
 | UI | Many retained screens and HUDs now run by default. The register preserves 352 rows, 312 active requirements and 40 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
 | Retail and Awakening | Canonical SP/MP sources and BSE are in-tree. Awakening is additive SP content under `q4xbase`, not a separate multiplayer module. Retail decl/BSE audits, stock transition chains and selected Awakening-state probes have scoped evidence; full playthroughs remain open. Saves now write portable v5 with Windows/Linux cross-load evidence while retaining legacy readers; other target qualification remains Q4-06/Q4-07. |
@@ -232,7 +232,7 @@ to a final project-wide phase. Important dependencies are:
 | --- | --- |
 | Full UI migration/cutover | UI-10 refreshed inventory and resolved scope; a real SYSTEM editor round trip and RmlUi decision at `GATE-003`; shared toolkit/editor qualification at `GATE-004`; UI-11 evidence-controlled acceptance. Working screens may continue to improve before full-product acceptance. |
 | Remote-player smoothing or lag-compensation promotion | HF-01 and MP-07 must define the displayed remote pose, extrapolation and server rewind together. Do not enable both corrections independently. |
-| Vulkan/Quest VR integration | VR-06 fault-safe lifecycle and current renderer/module contracts; Android variants also need AND-01 packaging/verifier work. Existing GL headset qualification can proceed independently. |
+| Quest VR integration | VR-01's PC Vulkan/EGL integration and VR-06 lifecycle are in place; the standalone flavor needs AND-01 packaging/verifier work and the AND-05 distribution decision. PC headset qualification (VR-02) can proceed independently. |
 | Android sustained operation | AND-02 includes AUD-03/CORE-03 aggregate memory and cancellation behavior, not only renderer FPS. |
 | Modern-renderer promotion | Each REN-01 shared-domain gate is separate from REN-02 aggregate visible-lighting ownership. Keep their defaults and rollback decisions independent. |
 | Content pack split, trim and overlays (PKG-02 through PKG-04) | PKG-01's verifier first proves identical bulk-pack bytes across platforms and consecutive candidates. Client-only packs need their pure-server exemption before the dedicated server drops them. |
@@ -990,7 +990,7 @@ diagnostics establish whole-frame ownership or production performance.
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
   views and retained UI. Test delayed/stale GPU timing and resolution recovery.
   Require stable quality, separate native UI, valid previous-frame identity and
-  immediate current-frame/SMAA fallback. Per-eye VR temporal work remains VR-05.
+  immediate current-frame/SMAA fallback. Per-eye VR temporal AA is VR-05's (closed).
   Progress, 6 November: both backends now count how every resolve ended and why
   history was rejected (`rendererTemporalPresentationStatus`, `reset`), and
   `renderer_temporal_qualification.py` exercises native, TAAU and dynamic
@@ -1455,22 +1455,24 @@ Sources: [OpenXR implementation history](archive/2026-10-18/plans/2026-10-02-ope
 
 ### VR completion checkpoints
 
-**Estimate: 35%; 1/6 tasks closed.** Credit the active desktop OpenGL path and
-its fault handling. Archived backends and synthetic stereo results do not qualify
-a headset, its comfort, or standalone Quest.
+**Estimate: 75%; 4/6 tasks closed.** Credit the OpenGL and Vulkan PC paths,
+their fault handling, play spaces and per-eye TAA on the simulated runtime.
+Synthetic stereo results do not qualify a headset, its comfort, its frame
+budget or standalone Quest; those are the [headset checklist](vr-headset-qualification.md)
+and AND-05.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| VR-01 — Partial | Archived-change inventory and recovery/dependency review complete. | Integrate selected Vulkan/EGL/Quest/world-GUI changes against current APIs; test GPU ownership, restart/loss and headset submission without desktop presentation. |
-| VR-02 — Partial | Active GL stereo, tracking/input, room scale, aiming, haptics and comfort controls provide the testable implementation. | Real-headset combat, refresh/latency, controls, collision, vehicles, HUD/world-GUI readability and recovery. |
-| VR-03 — Not started | Existing room-scale/crouch behavior is a foundation, not a completed space-calibration contract. | Define LOCAL/STAGE/floor fallback, recenter and seated/standing transitions; verify body alignment without double movement. |
-| VR-04 — Not started | No accepted hardware stereo-cost baseline closes this task. | Profile both-eye CPU/GPU tails; share view-independent work while preserving per-eye culling and exactly-once effects. |
-| VR-05 — Decision pending; optional P3 | Temporal features remain excluded in VR. | Select per-eye history/reset/scale and interaction scope; design, implement and qualify only that approved scope. |
+| VR-01 — Closed (PC scope) | Vulkan (runtime-created device), desktop-independent submission, Wayland EGL and SP world-GUI pointing integrated at render API 32 with VR-06's guarantees; GL/Vulkan SP/MP/menu smokes, the Vulkan fault matrix and Linux Wayland/X11 bindings pass on the simulated runtime. | Quest standalone moved to AND-05 by decision; physical headsets are VR-02. |
+| VR-02 — Partial | GL and Vulkan stereo, tracking/input, room scale, play spaces, aiming, haptics, world GUIs, per-eye TAA and comfort controls provide the testable implementation; the [headset checklist](vr-headset-qualification.md) is ready to run. | Run the checklist on each available PC runtime/headset: combat, refresh/latency, controls, collision, vehicles, HUD/world-GUI readability and recovery. |
+| VR-03 — Closed | STAGE/LOCAL_FLOOR/LOCAL selection with warned fallback, floor-referenced standing height, recentering, calibration and live seated/standing changes pass natively and on the simulated runtime (GL/Vulkan). | Physical body alignment is checklist section 4 (VR-02). |
+| VR-04 — Partial | `openxr_vr_stereo_cost.py` records flat/stereo/warm-stereo CPU, build, submit and GPU tails; the simulated baseline on this GPU is recorded below. Uploads and dynamic geometry are already shared; culling, lights and draws are per eye as required. | Headset tails against the refresh budgets (checklist 2.2), and sharing work where those tails show a view-independent cost. |
+| VR-05 — Closed (approved scope) | Decision: per-eye TAA only. Each eye has its own view identity, history images, motion vectors and resets in the SP game chain and both backends' own temporal scenes; dynamic resolution stays off in VR. SP/MP GL/Vulkan pass the simulated-runtime smoke. | Headset comfort is checklist section 7; hand presence and physical-object interaction need their own designs. |
 | VR-06 — Closed | Active GL teardown/ownership repair passes native failure cases and simulated-runtime SP/MP gameplay. | Carry guarantees into VR-01 backends; physical controller/headset validation remains VR-02. |
 
 ### VR task evidence and acceptance
 
-- [ ] **VR-01 — P1, integration: review recoverable Vulkan/EGL/Quest changes.**
+- [x] **VR-01 — P1, integration: review recoverable Vulkan/EGL/Quest changes.**
   Review `archive/worktree-wtq-quest-vr`, especially `0d83c14c4` (Vulkan),
   `f98a1d247` (headset rendering without desktop presentation), `4b5e0c4f9`
   (Wayland/EGL), `65aa9bd88` (Quest) and `9dcd121da` (world-GUI pointing).
@@ -1482,26 +1484,63 @@ a headset, its comfort, or standalone Quest.
   native-Wayland Vulkan/EGL and the appropriate GLX fallback independently.
   Carry VR-06's lifecycle guarantees into each recovered backend/host change.
   Stage-one scope/recovery review is complete in the
-  [XR/Android recovery review](platform-recovery-review.md); integration remains open.
+  [XR/Android recovery review](platform-recovery-review.md).
+  Complete for the PC scope, 6 November (`f6034967f`, `244cb2457` and the VR-05
+  commit): the runtime creates Vulkan's instance and device through
+  `XR_KHR_vulkan_enable2` (render API 32), eye images are the executor's output
+  per VR target, a frame opens without a desktop swapchain, OpenGL binds through
+  EGL on Wayland and GLX on X11, and single-player focus starts at the VR aim.
+  VR-06's bounded counts, index checks and deferred retirement cover Vulkan.
+  GL and Vulkan (validation on) SP, MP and menu smokes, the play-space and
+  per-eye TAA smokes, the Vulkan fault matrix (windowless included) and Linux
+  native-Wayland Vulkan/EGL and X11 Vulkan/GLX runs pass on the simulated
+  runtime; see the [integration evidence](platform-recovery-review.md#vulkan-egl-and-world-gui-xr-integration-6-november-2026).
+  Quest (`65aa9bd88`) is not integrated: by decision it waits on AND-05's
+  distribution decision. Physical headsets remain VR-02.
 - [ ] **VR-02 — P1, qualification: real headset gameplay and comfort.** Qualify
   available PC runtimes/headsets for refresh pacing, tracking latency, aim/grip,
   handedness, two-hand weapons, haptics, room-scale collision/MP prediction, crouch,
   seated vehicles, zoom, menus/HUD/world GUI and loss/reconnect. Exercise full combat
   and camera transitions. Synthetic stereo/test-runtime success cannot establish
   physical tracking, readable UI or comfort.
-- [ ] **VR-03 — P2, implementation: standing space and floor calibration.** Define
+  The [headset checklist](vr-headset-qualification.md) covers every point above
+  on both renderers, plus the hardware halves of VR-01 and VR-03 through VR-05.
+- [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and
   room-scale bounds without double-applying physical movement.
+  Complete in `b8995be28`: `vr_playSpace` chooses STAGE, then LOCAL_FLOOR, then
+  LOCAL (warning when standing play falls back); standing play measures height
+  from the floor so a crouched or seated recenter keeps it, `vr_calibrateHeight`
+  measures it again, and a change applies between frames. The choice is pure
+  math with native tests, and `openxr_vr_playspace_smoke.py` passes on GL and
+  Vulkan with the runtime offering every space combination. Physical alignment
+  is checklist section 4.
 - [ ] **VR-04 — P2, measured optimization: stereo frame cost.** Profile two-eye
   front-end work, shadows, particles, UI and loading on actual hardware. Share
   view-independent work while preserving eye-specific culling/pose/output and
   exactly-once effect servicing. Establish headset-specific CPU/GPU tail budgets.
-- [ ] **VR-05 — P3, decision and implementation: per-eye temporal features and
+  Simulated baseline, 6 November (`openxr_vr_stereo_cost.py`, airdefense1, two
+  1440x1600 eyes against a 1920x1080 window, unpaced runtime): see the
+  [measurement](platform-recovery-review.md#stereo-frame-cost-vr-04). The
+  budgets are the headset's frame interval: 11.1 ms at 90 Hz, 12.5 ms at 80 Hz,
+  13.9 ms at 72 Hz, for both the CPU and the GPU p95. This shared desktop is too
+  noisy to attribute a sharing change; headset tails (checklist 2.2) decide it.
+- [x] **VR-05 — P3, decision and implementation: per-eye temporal features and
   further interaction.** TAA/dynamic resolution require independent eye histories,
   motion vectors, resets and scale control before enablement. Hand presence and
   physical-object interaction require separate gameplay/comfort designs. Quest
   distribution and device qualification also depend on AND-01 through AND-05.
+  Decided 6 November: per-eye TAA only; dynamic resolution stays off in VR, and
+  hand presence/physical interaction are not in scope. `r_temporalAA 1` resolves
+  each eye from its own history: the eye is mixed into its view identity, and the
+  game's history ping-pong, OpenGL's and Vulkan's backend history images,
+  velocity/entity history and Vulkan motion vectors keep a slot per eye. Each VR
+  target command carries its temporal state to the backend, and Vulkan pairs a
+  portal sky with its own eye's main view. Automatic TAA stays off in VR.
+  `openxr_vr_temporal_smoke.py` passes SP and MP on GL and Vulkan: every resolve
+  keeps history, no per-view resets or fallbacks, parallax and convergence hold,
+  and a head turn does not smear. Headset comfort is checklist section 7.
 - [x] **VR-06 — P1, implementation and qualification: fault-safe XR ownership.**
   Reproduce the current `Check` → `DestroySession` → `ReleaseImages` teardown
   re-entry risk in `OpenXRSystem.cpp`: session loss can be reported before
@@ -1539,7 +1578,7 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
 | AND-02 — Partial | GLES3 build/package infrastructure and narrow S25/emulator gameplay evidence exist. | Physical Adreno/Mali and API breadth; SP/MP transitions, device input/audio, thermal/storage/aggregate memory and sustained performance. |
 | AND-03 — Partial | Verified package repair/import, localized setup, settings return, control/interface setup and save/log export implemented; scoped device round trips pass. | Release-signing continuity; cloud/removable providers; interrupted-process recovery; physical setup/accessibility and upgrade matrix. |
 | AND-04 — Partial | Touch presets, UI/text sizing, retained safe areas and HUD safe-area positioning exist. | Device-based presets and GLES limits; keyboard/touch targets, full overlay editing, cutouts/gesture bars/folds/multi-window qualification. |
-| AND-05 — Not integrated | Quest recovery sources are identified under VR-01/AND-01. | Dedicated verified flavor, installation/assets, stereo/controller UI, comfort/session recovery and sustained thermal/refresh budgets; distribution decision. |
+| AND-05 — Not integrated | Quest recovery sources are identified under VR-01/AND-01; the archived Quest change (`65aa9bd88`) moved here from VR-01 on 6 November, on top of the integrated PC Vulkan/EGL XR path. | Dedicated verified flavor, installation/assets, stereo/controller UI, comfort/session recovery and sustained thermal/refresh budgets; distribution decision. |
 
 ### AND task evidence and acceptance
 

@@ -363,6 +363,9 @@ typedef struct viewDef_s {
 	// same jitter, cut, generation, and per-view history identity.
 	unsigned long long	temporalViewIdentity;
 	unsigned int		temporalHistoryGeneration;
+	// which history a backend keeps for this view: 0, or 1 for a VR frame's
+	// right eye, so each eye reprojects from its own previous frame (VR-05)
+	int				temporalHistorySlot;
 	int				temporalJitterIndex;
 	idVec2				temporalJitterPixels;
 	idVec3				temporalPreviousViewOrigin;
@@ -551,6 +554,9 @@ typedef struct {
 	renderCommand_t		commandId, *next;
 	int		target;
 	int		width, height;
+	// the target's temporal frame state, restored when the backend reaches it:
+	// the front end rewrites the frame's one state for every target (VR-05)
+	bool	temporalAA;
 } vrTargetCommand_t;
 
 typedef struct {

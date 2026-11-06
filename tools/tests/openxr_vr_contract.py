@@ -204,6 +204,39 @@ def check_play_space() -> None:
     require(read("tools/tests/openxr/OpenXRTestRuntime.cpp"), "OPENQ4_XR_TEST_SPACES", "the test runtime can withhold floor-level spaces")
 
 
+def check_temporal() -> None:
+    # VR-05: each eye keeps its own temporal history
+    temporal = read("src/renderer/TemporalPresentation.cpp")
+    require(temporal, "identity = TemporalHistoryCore_MixIdentity( identity, 0x56520000u | static_cast<unsigned int>( vrEye ) );",
+            "an eye's view mixes its eye into its temporal identity")
+    require(temporal, "R_TemporalPresentation_VREye() >= 0 && R_TemporalPresentation_TemporalAAWanted() );",
+            "an eye requests temporal AA as asked; the virtual screen never does")
+    require(read("src/renderer/RenderSystem_vr.cpp"),
+            "cmd->temporalAA = R_TemporalPresentation_GetFrameState().temporalAARequested;",
+            "a VR target command carries its target's temporal request to the backend")
+    for backend in ("src/renderer/OpenGL/gl_VRPresentation.cpp", "src/renderer/Vulkan/vk_VRPresentation.cpp"):
+        require(read(backend), "R_TemporalPresentation_SetVRTargetState( cmd->width, cmd->height, cmd->temporalAA );",
+                f"{backend} restores the target's temporal state when the frame reaches it")
+    require(read("src/renderer/draw_common.cpp"),
+            "RB_SelectTemporalHistorySlot( command.viewDef != NULL ? command.viewDef->temporalHistorySlot : 0 );",
+            "OpenGL resolves each eye from its own history images")
+    vulkan = read("src/renderer/Vulkan/vk_GuiExecutor.cpp")
+    require(vulkan, "VK_TemporalPresentation_SelectDirectHistorySlot( viewDef->temporalHistorySlot );",
+            "Vulkan's own temporal scene keeps a history per eye")
+    require(vulkan, "const viewDef_t *rootView = VK_PostProcess_PortalSkyMainView( viewDef );",
+            "a portal sky belongs to its own eye's main view")
+    require(read("src/renderer/Vulkan/vk_PostProcess.cpp"),
+            "VK_PostProcess_SelectTemporalMotionSlot( viewDef != NULL ? viewDef->temporalHistorySlot : 0 );",
+            "Vulkan keeps motion-vector history per eye")
+    game = read("src/game/PlayerView.cpp")
+    require(game, "\t\tgameLocal.SelectTemporalHistorySlot( eye );\n\t\tSingleView( hud, &eyeView, RF_NO_GUI | RF_PRIMARY_VIEW );",
+            "the single-player scene chain swaps in each eye's history")
+    require(read("src/game/Game_render.cpp"), "gameRender.temporalHistorySlot * 2 + i,",
+            "the game allocates history images per eye")
+    require(read("tools/tests/openxr_vr_temporal_smoke.py"), "each eye should resolve from its own history",
+            "the simulated-runtime smoke qualifies per-eye history")
+
+
 def check_engine() -> None:
     system = read("src/framework/VRSystem.cpp")
     require(system, "#if defined( OPENQ4_OPENXR )\nidVRSystem *vrSystem = VR_GetOpenXRSystem();",
@@ -236,7 +269,9 @@ def check_engine() -> None:
     require(read("src/game/PlayerView.cpp"), 'cvarSystem->SetCVarBool( "vr_hudOnSight", player->IsInVehicle() );',
             "a vehicle seat in stereo asks for the HUD on the line of sight")
     for module in ("src/game/PlayerView.cpp", "src/mpgame/PlayerView.cpp"):
-        require(read(module), "\t\tSingleView( hud, &eyeView, RF_NO_GUI | RF_PRIMARY_VIEW );\n"
+        # (single player's scene chain keeps each eye's temporal history apart, VR-05)
+        slot_restore = "\t\tgameLocal.SelectTemporalHistorySlot( 0 );\n" if module.startswith("src/game/") else ""
+        require(read(module), "\t\tSingleView( hud, &eyeView, RF_NO_GUI | RF_PRIMARY_VIEW );\n" + slot_restore +
                               "\t\tVR_DrawComfortVignette( eyeView, vignette, vignetteMaterial );\n\t\tif ( drawAimMarker ) {\n"
                               "\t\t\tVR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );\n\t\t}\n\t\tScreenFade();",
                 f"{module} vignettes and marks the aim in each eye over its 3D pass, under its fade")
@@ -307,6 +342,7 @@ def main() -> int:
     check_vulkan()
     check_egl()
     check_play_space()
+    check_temporal()
     check_engine()
     check_strings()
     check_documents()

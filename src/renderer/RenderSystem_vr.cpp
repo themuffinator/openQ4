@@ -254,6 +254,7 @@ static void R_VR_AddTargetCommand( int target, int width, int height ) {
 	cmd->target = target;
 	cmd->width = width;
 	cmd->height = height;
+	cmd->temporalAA = R_TemporalPresentation_GetFrameState().temporalAARequested;
 	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
 		R_ScenePackets_AddRenderTargetOp();
 	}
@@ -287,9 +288,10 @@ bool idRenderSystemLocal::SetVRRenderTarget( int eye ) {
 
 	const int width = eye < 0 ? vrFrame.screenWidth : vrFrame.eyeWidth;
 	const int height = eye < 0 ? vrFrame.screenHeight : vrFrame.eyeHeight;
+	// the temporal frame state that follows the extent reads which target this is
+	vrFrontEndTarget = eye;
 	ApplyVRTargetExtent( width, height );
 	R_VR_AddTargetCommand( eye, width, height );
-	vrFrontEndTarget = eye;
 	if ( eye >= 0 ) {
 		vrFrameResult.eyeRendered[eye] = true;
 	}

@@ -33,6 +33,9 @@ To use temporal AA at native resolution too, in place of SMAA:
 r_temporalAA 1
 ```
 
+In VR, `r_temporalAA 1` gives each eye its own history; automatic mode and
+dynamic resolution stay off there. See the [VR guide](vr.md#display).
+
 ## What moves correctly
 
 Every moving thing on screen is tracked to the pixel. The world and doors,

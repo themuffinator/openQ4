@@ -908,6 +908,11 @@ void idGameLocal::ShutdownGameRenderSystem( void ) {
 			renderSystem->DestroyRenderTexture( gameRender.temporalHistoryRT[i] );
 			gameRender.temporalHistoryRT[i] = NULL;
 		}
+		// the other VR eye's history
+		if ( gameRender.storedTemporalHistoryRT[i] != NULL ) {
+			renderSystem->DestroyRenderTexture( gameRender.storedTemporalHistoryRT[i] );
+			gameRender.storedTemporalHistoryRT[i] = NULL;
+		}
 	}
 
 	if ( gameRender.forwardRenderPassRT != NULL ) {
@@ -939,6 +944,13 @@ void idGameLocal::ShutdownGameRenderSystem( void ) {
 	gameRender.temporalHistoryReadIndex = 0;
 	gameRender.temporalHistoryGeneration = 0;
 	gameRender.temporalHistoryValid = false;
+	gameRender.temporalHistorySlot = 0;
+	gameRender.storedTemporalHistoryRT[0] = gameRender.storedTemporalHistoryRT[1] = NULL;
+	gameRender.storedTemporalHistoryWidth = 0;
+	gameRender.storedTemporalHistoryHeight = 0;
+	gameRender.storedTemporalHistoryReadIndex = 0;
+	gameRender.storedTemporalHistoryGeneration = 0;
+	gameRender.storedTemporalHistoryValid = false;
 	gameRender.videoRestartCount = ( renderSystem != NULL ) ? renderSystem->GetVideoRestartCount() : 0;
 	gameRender.postAAWarningState = OPENQ4_POST_AA_WARNING_NONE;
 }
@@ -1068,8 +1080,9 @@ static bool openQ4_SynchronizeTemporalHistory(
 		}
 		if ( history == NULL ) {
 			resourcesChanged = true;
+			// a VR frame's right eye keeps images of its own (VR-05)
 			history = openQ4_CreateTemporalHistoryRenderTarget(
-				i,
+				gameRender.temporalHistorySlot * 2 + i,
 				presentation.outputWidth,
 				presentation.outputHeight );
 		}
@@ -1357,6 +1370,44 @@ void idGameLocal::ResizeRenderTextures(int width, int height) {
 
 	gameRender.renderTargetWidth = width;
 	gameRender.renderTargetHeight = height;
+}
+
+/*
+====================
+idGameLocal::SelectTemporalHistorySlot
+
+openQ4 VR-05: a VR frame renders each eye through the same scene chain, and
+temporal AA reprojects each from its own previous frame. The history the
+active slot renders with lives in gameRender's temporalHistory fields; the
+other slot's waits in its stored fields, and the two trade places here.
+====================
+*/
+void idGameLocal::SelectTemporalHistorySlot( int slot ) {
+	slot = slot == 1 ? 1 : 0;
+	if ( slot == gameRender.temporalHistorySlot ) {
+		return;
+	}
+	for ( int i = 0; i < 2; ++i ) {
+		idRenderTexture *saved = gameRender.temporalHistoryRT[i];
+		gameRender.temporalHistoryRT[i] = gameRender.storedTemporalHistoryRT[i];
+		gameRender.storedTemporalHistoryRT[i] = saved;
+	}
+	const int savedWidth = gameRender.temporalHistoryWidth;
+	const int savedHeight = gameRender.temporalHistoryHeight;
+	const int savedReadIndex = gameRender.temporalHistoryReadIndex;
+	const unsigned int savedGeneration = gameRender.temporalHistoryGeneration;
+	const bool savedValid = gameRender.temporalHistoryValid;
+	gameRender.temporalHistoryWidth = gameRender.storedTemporalHistoryWidth;
+	gameRender.temporalHistoryHeight = gameRender.storedTemporalHistoryHeight;
+	gameRender.temporalHistoryReadIndex = gameRender.storedTemporalHistoryReadIndex;
+	gameRender.temporalHistoryGeneration = gameRender.storedTemporalHistoryGeneration;
+	gameRender.temporalHistoryValid = gameRender.storedTemporalHistoryValid;
+	gameRender.storedTemporalHistoryWidth = savedWidth;
+	gameRender.storedTemporalHistoryHeight = savedHeight;
+	gameRender.storedTemporalHistoryReadIndex = savedReadIndex;
+	gameRender.storedTemporalHistoryGeneration = savedGeneration;
+	gameRender.storedTemporalHistoryValid = savedValid;
+	gameRender.temporalHistorySlot = slot;
 }
 
 /*

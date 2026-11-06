@@ -419,6 +419,16 @@ struct rvmGameRender_t {
 	bool temporalHistoryValid;
 	int videoRestartCount;
 	int postAAWarningState;
+	// openQ4 VR-05: each VR eye keeps its own temporal history. The fields above
+	// belong to temporalHistorySlot (1 = the right eye); the other slot's wait
+	// here (idGameLocal::SelectTemporalHistorySlot).
+	int temporalHistorySlot;
+	idRenderTexture* storedTemporalHistoryRT[2];
+	int storedTemporalHistoryWidth;
+	int storedTemporalHistoryHeight;
+	int storedTemporalHistoryReadIndex;
+	unsigned int storedTemporalHistoryGeneration;
+	bool storedTemporalHistoryValid;
 };
 // jmarshall end
 
@@ -1360,6 +1370,9 @@ public:
 	int						GetCurrentDemoProtocol( void ) { return demo_protocol; }
 // jmarshall
 	void					RenderScene(const renderView_t* view, idRenderWorld* renderWorld, idCamera* portalSky, int renderFlags = RF_NORMAL);
+	// openQ4 VR-05: the temporal history the next scene renders with: 0, or 1
+	// for a VR frame's right eye
+	void					SelectTemporalHistorySlot( int slot );
 	bool					BuildPortalSkyRenderView( const renderView_t *view, renderView_t *portalSkyView, idRenderWorld *renderWorld = NULL ) const;
 private:	
 	void					ResizeRenderTextures(int width, int height);

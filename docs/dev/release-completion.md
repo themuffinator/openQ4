@@ -2796,6 +2796,24 @@ completed release material here and publish curated notes in `releases/`.
 
 ## Unreleased corrections after the withdrawn 0.14.000 build
 
+- [x] Integrate the selected archived VR work against the current renderer
+  (VR-01): Vulkan stereo with the runtime creating the device through
+  `XR_KHR_vulkan_enable2` (render API 32), headset submission with no desktop
+  presentation, OpenGL binding through EGL on Wayland (`XR_MNDX_egl_enable`)
+  and single-player world-GUI pointing from the VR weapon hand. VR-06's bounded
+  image counts, idempotent teardown and deferred retirement now cover Vulkan.
+  Also fixed: the settings tabs never received the mouse or VR pointer, because
+  every page's full-size group sat above the tab strip. Standing and seated
+  play spaces (VR-03): STAGE, LOCAL_FLOOR or LOCAL by `vr_playSpace`, standing
+  height from the floor, `vr_calibrateHeight`, a localized **Play Space** row.
+  Per-eye temporal AA (VR-05, `r_temporalAA 1`): eye-specific view identity and
+  history in the game chain and both backends, with each VR target's temporal
+  state carried to the backend; Vulkan's portal sky now finds its own eye's
+  main view. Stereo frame cost is measured on the simulated runtime (VR-04).
+  [Simulated-runtime evidence](platform-recovery-review.md#vulkan-egl-and-world-gui-xr-integration-6-november-2026);
+  headset qualification is the [VR-02 checklist](vr-headset-qualification.md),
+  and Quest waits on AND-05.
+
 - [x] Recover safely when a damaged save fails partway through physics or
   vehicle data. Partial physics state no longer points cleanup at another
   entity or indexes unset contacts, and failed vehicle-part reads release their

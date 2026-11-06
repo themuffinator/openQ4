@@ -11,6 +11,7 @@
 // See docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md.
 
 #include "../tr_local.h"
+#include "../TemporalPresentation.h"
 
 #if defined( OPENQ4_RENDERER_GL_MODULE ) && defined( _WIN32 )
 #include <windows.h>
@@ -319,6 +320,7 @@ void RB_VR_SetTarget( const void *data ) {
 	R_SetDefaultRenderTargetPremultiplied( cmd->target < 0 );
 	glConfig.vidWidth = cmd->width;
 	glConfig.vidHeight = cmd->height;
+	R_TemporalPresentation_SetVRTargetState( cmd->width, cmd->height, cmd->temporalAA );
 	backEnd.renderTexture = NULL;
 	backEnd.feedbackRenderTexture = NULL;
 	idRenderTexture::BindNull();

@@ -34,6 +34,7 @@
 #pragma hdrstop
 
 #include "../tr_local.h"
+#include "../TemporalPresentation.h"
 #include "volk.h"
 #include "vk_mem_alloc.h"
 #include "VulkanDevice.h"
@@ -413,6 +414,7 @@ void RB_VR_SetTarget( const void *data ) {
 	rb_vrTarget = cmd->target;
 	glConfig.vidWidth = cmd->width;
 	glConfig.vidHeight = cmd->height;
+	R_TemporalPresentation_SetVRTargetState( cmd->width, cmd->height, cmd->temporalAA );
 	backEnd.renderTexture = NULL;
 	backEnd.feedbackRenderTexture = NULL;
 
