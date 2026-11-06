@@ -17328,6 +17328,9 @@ void R_LoadARBProgram( int progIndex ) {
 	}
 
 	if ( !glConfig.isInitialized ) {
+		// end the line the path started; dedicated servers parse materials
+		// without ever initializing GL
+		common->Printf( ": pending GL initialization\n" );
 		RB_SetARBProgramFailure( prog, "pending GL initialization" );
 		return;
 	}

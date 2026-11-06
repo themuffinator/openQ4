@@ -1855,8 +1855,7 @@ if build_engine or build_games
     meson.project_source_root() / 'tools' / 'build' / 'content_packs.py',
     'meson-list',
     check: true,
-  ).stdout().strip().split('
-')
+  ).stdout().strip().split('\n')
   openq4_pak_header_args = []
   # A release passes -Dprebuilt_content_packs=<dir>: every platform then copies
   # the release's single build of each pack instead of repacking it.
@@ -2569,8 +2568,15 @@ endif
 if build_engine or get_option('build_native_tests')
   text_ingress_args = []
   text_ingress_headers = []
+  # openQ4's private SDL extension headers. The bundled SDL subproject carries
+  # them on its own include path; a system or Android SDL needs the overlay's
+  # copy, which Meson reports as reaching into the subproject directory.
+  sdl3_openq4_extension_includes = []
   if build_engine and use_sdl3_backend
     text_ingress_headers = [sdl3_dep.partial_dependency(compile_args: true, includes: true)]
+    if host_system == 'android' or sdl3_dep.type_name() != 'internal'
+      sdl3_openq4_extension_includes = [include_directories('subprojects/packagefiles/sdl3/include')]
+    endif
     if cpp.compiles('''
       #if !defined(OPENQ4_SDL3_TEXT_PROVENANCE) || OPENQ4_SDL3_TEXT_PROVENANCE != 1
       #error No verified private provider capability
@@ -2595,7 +2601,7 @@ if build_engine or get_option('build_native_tests')
         'src/sys/sdl3/NativeEventDisposition.cpp'),
       files('src/ui/application/NativeTextCollectionCoordinator.cpp'),
       files('src/ui/application/ManagedNativeTextOwner.cpp'),
-      include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
+      include_directories: [root_include_dir] + sdl3_openq4_extension_includes,
       dependencies: [openq4_retained_dep] + text_ingress_headers,
       cpp_args: ['-DUSE_SDL3'], pic: true, install: false)
     native_queue_dep = declare_dependency(link_with: native_queue_library)
@@ -2604,7 +2610,7 @@ if build_engine or get_option('build_native_tests')
       # Exact store/provider collection adapter; creation never enables input.
       windows_collection_bridge_library = static_library('openq4-windows-text-collection-bridge',
         files('src/sys/sdl3/WindowsTextCollectionBridge.cpp'),
-        include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
+        include_directories: [root_include_dir] + sdl3_openq4_extension_includes,
         dependencies: [openq4_windows_text_store_dep, openq4_retained_dep] + text_ingress_headers,
         cpp_args: ['-DUSE_SDL3'], install: false)
       windows_collection_bridge_dep = declare_dependency(link_with: windows_collection_bridge_library)
@@ -2614,7 +2620,7 @@ if build_engine or get_option('build_native_tests')
       windows_text_session_sdk_deps = [windows_ole_dep, cc.find_library('uuid', required: true)]
       windows_text_session_library = static_library('openq4-windows-text-session',
         files('src/sys/sdl3/WindowsTextSession.cpp', 'src/sys/sdl3/WindowsNativeInputRouteSource.cpp'),
-        include_directories: [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')],
+        include_directories: [root_include_dir] + sdl3_openq4_extension_includes,
         dependencies: [windows_collection_bridge_dep, openq4_windows_text_store_dep, openq4_retained_dep, native_queue_dep] + text_ingress_headers + windows_text_session_sdk_deps,
         cpp_args: ['-DUSE_SDL3'], install: false)
       windows_text_session_dep = declare_dependency(link_with: windows_text_session_library, dependencies: windows_text_session_sdk_deps)
@@ -2622,7 +2628,7 @@ if build_engine or get_option('build_native_tests')
     endif
   endif
   if get_option('build_native_tests') and build_engine and use_sdl3_backend
-    text_ingress_test_headers = [root_include_dir, include_directories('subprojects/packagefiles/sdl3/include')]
+    text_ingress_test_headers = [root_include_dir] + sdl3_openq4_extension_includes
     android_console_source = custom_target(
       'openq4-android-console-source',
       output: 'AndroidConsoleInput.cpp',
