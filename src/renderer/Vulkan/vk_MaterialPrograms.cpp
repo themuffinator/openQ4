@@ -16,6 +16,13 @@
 #include <string>
 #include <vector>
 
+// Developer drill for the descriptor-refusal path on a real driver: frame
+// slots create one real pool sized for this many authored draws and never
+// chain another, so later draws in the frame reach the driver's own
+// VK_ERROR_OUT_OF_POOL_MEMORY. 0 keeps the production chained pools.
+static idCVar r_vkMaterialDescriptorPoolTest( "r_vkMaterialDescriptorPoolTest", "0", CVAR_RENDERER | CVAR_INTEGER,
+	"authored-material descriptor drill: one unchained pool of this many draws per frame slot (0 = production pools)", 0, 2048 );
+
 namespace {
 constexpr int MaxPrograms = 256;
 // Authored draws per frame slot: descriptor pools of MaxDrawsPerPool sets are
@@ -70,6 +77,9 @@ struct FramePools {
     int created = 0;
     int draws = 0;
     bool ready = false;
+    // Draws each pool was created for. Below MaxDrawsPerPool the slot is in
+    // the r_vkMaterialDescriptorPoolTest drill: one pool, never chained.
+    int poolDraws = MaxDrawsPerPool;
 };
 FramePools framePools[VK_FRAMES_IN_FLIGHT];
 int peakDraws = 0;
@@ -430,14 +440,18 @@ bool CreateModule( const std::vector<uint32_t> &code, VkShaderModule &module ) {
 // current pool is full; NULL past MaxPoolsPerSlot.
 VkDescriptorPool DrawPool( int slot ) {
     FramePools &frame = framePools[slot];
-    const int index = frame.draws / MaxDrawsPerPool;
+    const bool drill = frame.poolDraws < MaxDrawsPerPool;
+    // The drill keeps allocating from its single full pool, so the refusal
+    // comes from the driver rather than from this quota.
+    const int index = drill ? 0 : frame.draws / MaxDrawsPerPool;
     if ( index >= MaxPoolsPerSlot ) { return VK_NULL_HANDLE; }
     if ( index >= frame.created ) {
-        VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MaxDrawsPerPool},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxDrawsPerPool * oq4material::MaxTextures}};
+        const uint32_t draws = static_cast<uint32_t>( frame.poolDraws );
+        VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, draws},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, draws * oq4material::MaxTextures}};
         VkDescriptorPoolCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        info.maxSets = MaxDrawsPerPool * 2; info.poolSizeCount = 2; info.pPoolSizes = sizes;
+        info.maxSets = draws * 2; info.poolSizeCount = 2; info.pPoolSizes = sizes;
         if ( vkCreateDescriptorPool( vkCtx.device, &info, NULL, &frame.pools[index] ) != VK_SUCCESS ) { return VK_NULL_HANDLE; }
         frame.created = index + 1;
     }
@@ -564,6 +578,17 @@ void VK_MaterialPrograms_BeginFrame( int slot ) {
     peakDraws = Max( peakDraws, frame.draws );
     frame.draws = 0;
     frame.ready = true;
+    // Entering or leaving the descriptor drill replaces this slot's pools;
+    // nothing in flight references them once its fence has been waited.
+    const int test = r_vkMaterialDescriptorPoolTest.GetInteger();
+    const int poolDraws = test > 0 && test < MaxDrawsPerPool ? test : MaxDrawsPerPool;
+    if ( poolDraws != frame.poolDraws ) {
+        for ( int i = 0; i < frame.created; ++i ) { vkDestroyDescriptorPool( vkCtx.device, frame.pools[i], NULL ); frame.pools[i] = VK_NULL_HANDLE; }
+        frame.created = 0;
+        frame.poolDraws = poolDraws;
+        common->Printf( "Vulkan: authored descriptor pools for frame slot %d now hold %d draws%s\n", slot, poolDraws,
+            poolDraws < MaxDrawsPerPool ? " (r_vkMaterialDescriptorPoolTest, unchained)" : "" );
+    }
     for ( int i = 0; i < frame.created; ++i ) {
         if ( vkResetDescriptorPool( vkCtx.device, frame.pools[i], 0 ) != VK_SUCCESS ) { frame.ready = false; }
     }

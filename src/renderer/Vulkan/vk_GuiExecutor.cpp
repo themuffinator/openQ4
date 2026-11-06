@@ -8480,7 +8480,7 @@ static void VK_Exec_SetScissorRect( VkCommandBuffer cmd, const viewDef_t *viewDe
 		scissor.extent.width = (uint32_t)( x1 - x0 );
 		scissor.extent.height = (uint32_t)( y1 - y0 );
 	}
-	vkCmdSetScissor( cmd, 0, 1, &scissor );
+	vkCmdSetScissorClamped( cmd, 0, 1, &scissor );
 }
 
 // Per-surface scissor: viewport base + drawSurf scissor (GL bottom-left).
@@ -10873,7 +10873,7 @@ static void VK_Exec_SetSpecialEffectsViewport( const viewDef_t *viewDef ) {
 			viewDef->scissor.x2 - viewDef->scissor.x1 + 1 );
 	scissor.extent.height = (uint32_t)Max( 0,
 			viewDef->scissor.y2 - viewDef->scissor.y1 + 1 );
-	vkCmdSetScissor( vkExec.cmd, 0, 1, &scissor );
+	vkCmdSetScissorClamped( vkExec.cmd, 0, 1, &scissor );
 }
 
 static void VK_Exec_InitSpecialEffectsPushConstants(
@@ -13166,7 +13166,7 @@ static bool VK_ClassicGui_DrawOwnedViewForScope( const viewDef_t *viewDef,
 		const vkClassicGuiDrawPlan_t &drawPlan =
 			vkClassicGuiDrawPlans[ drawIndex ];
 		VK_ClassicGui_BindPreparedGeometry( cmd, slot, drawPlan );
-		vkCmdSetScissor( cmd, 0, 1, &drawPlan.scissor );
+		vkCmdSetScissorClamped( cmd, 0, 1, &drawPlan.scissor );
 		for ( int localPass = 0; localPass < drawPlan.passCount; ++localPass ) {
 			const vkClassicGuiPassPlan_t &passPlan =
 				vkClassicGuiPassPlans[ drawPlan.firstPass + localPass ];
@@ -13979,7 +13979,7 @@ static void VK_ClassicWorldAmbient_DrawPhase(
 		vkCmdBindIndexBuffer( cmd, vkExec.indexRings[slot].buffer,
 			static_cast<VkDeviceSize>( drawPlan.indexOffset ),
 			VK_INDEX_TYPE_UINT32 );
-		vkCmdSetScissor( cmd, 0, 1, &drawPlan.scissor );
+		vkCmdSetScissorClamped( cmd, 0, 1, &drawPlan.scissor );
 		for ( int localPass = 0; localPass < drawPlan.passCount; ++localPass ) {
 			const vkClassicWorldAmbientPassPlan_t &passPlan =
 				prepared.passes[ drawPlan.firstPass + localPass ];

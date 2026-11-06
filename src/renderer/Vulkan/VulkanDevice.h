@@ -34,6 +34,34 @@ struct renderWindowServices_s;
 // per-slot frame synchronization (frames in flight)
 static const int VK_FRAMES_IN_FLIGHT = 2;
 
+// vkCmdSetScissor for view-derived rectangles. A tiled capture shifts its
+// views by tr.viewportOffset, as OpenGL does, so their rectangles can start
+// left of or above the attachment; Vulkan forbids negative scissor offsets,
+// so the part outside is cut off, which rasterizes exactly the same pixels.
+static inline void vkCmdSetScissorClamped( VkCommandBuffer cmd, uint32_t firstScissor,
+		uint32_t scissorCount, const VkRect2D *scissors ) {
+	VkRect2D clamped[ 4 ];
+	if ( scissorCount == 0 || scissorCount > 4 ) {
+		vkCmdSetScissor( cmd, firstScissor, scissorCount, scissors );
+		return;
+	}
+	for ( uint32_t i = 0; i < scissorCount; ++i ) {
+		VkRect2D rect = scissors[ i ];
+		if ( rect.offset.x < 0 ) {
+			const uint32_t cut = static_cast<uint32_t>( -static_cast<int64_t>( rect.offset.x ) );
+			rect.extent.width = rect.extent.width > cut ? rect.extent.width - cut : 0;
+			rect.offset.x = 0;
+		}
+		if ( rect.offset.y < 0 ) {
+			const uint32_t cut = static_cast<uint32_t>( -static_cast<int64_t>( rect.offset.y ) );
+			rect.extent.height = rect.extent.height > cut ? rect.extent.height - cut : 0;
+			rect.offset.y = 0;
+		}
+		clamped[ i ] = rect;
+	}
+	vkCmdSetScissor( cmd, firstScissor, scissorCount, clamped );
+}
+
 // Explicit startup fault injection, inactive during normal rendering.
 bool VK_Device_InjectStartupFailure( int stage );
 

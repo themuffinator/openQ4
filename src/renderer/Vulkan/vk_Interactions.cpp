@@ -1674,7 +1674,7 @@ static void VK_ClassicInteraction_DrawReceiverRange(
 		}
 		VK_Exec_BindPreparedTriGeometry( prepared.cmd, prepared.frameSlot,
 			plan.vertexOffset, plan.indexOffset );
-		vkCmdSetScissor( prepared.cmd, 0, 1, &plan.scissor );
+		vkCmdSetScissorClamped( prepared.cmd, 0, 1, &plan.scissor );
 		vkCmdSetCullMode( prepared.cmd, plan.cullMode );
 		vkCmdSetDepthCompareOp( prepared.cmd, plan.depthCompare );
 		vkCmdSetDepthBiasEnable( prepared.cmd,
@@ -1749,7 +1749,7 @@ static void VK_ClassicInteraction_DrawShadowRange(
 		const classicInteractionDomainShadowCaster_t &caster = *plan.caster;
 		VK_Exec_BindPreparedTriGeometry( cmd, prepared.frameSlot,
 			plan.vertexOffset, plan.indexOffset );
-		vkCmdSetScissor( cmd, 0, 1, &plan.scissor );
+		vkCmdSetScissorClamped( cmd, 0, 1, &plan.scissor );
 		if ( useDepthBounds ) {
 			vkCmdSetDepthBounds( cmd, caster.depthMin, caster.depthMax );
 		}
@@ -6723,7 +6723,7 @@ void VK_ClassicFogBlend_DrawOwnedView( const viewDef_t *viewDef ) {
 		const vkClassicFogBlendDrawPlan_t &plan = prepared.draws[ drawIndex ];
 		VK_Exec_BindPreparedTriGeometry( prepared.cmd, prepared.frameSlot,
 			plan.vertexOffset, plan.indexOffset );
-		vkCmdSetScissor( prepared.cmd, 0, 1, &plan.scissor );
+		vkCmdSetScissorClamped( prepared.cmd, 0, 1, &plan.scissor );
 		vkCmdSetDepthCompareOp( prepared.cmd, plan.depthCompare );
 		vkCmdSetCullMode( prepared.cmd, plan.cullMode );
 		vkCmdBindPipeline( prepared.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
