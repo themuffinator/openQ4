@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <unordered_map>
 
 namespace {
 constexpr int LexerFlags = LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES | LEXFL_NOFATALERRORS;
@@ -166,103 +167,252 @@ bool AppendMarker( Surfaces &surfaces, std::size_t &vertexCount ) {
 }
 }
 
+namespace {
+
+// The model a point entity shows: its own "model" key, unless that names
+// its inline brush model, otherwise (resolved later, see UpgradeModels) the
+// model its entityDef declares. "@" marks the deferred entityDef lookup.
+std::string PointModel( const oq4editor::Entity &entity ) {
+	const std::string own = entity.Value( "model" );
+	if ( !own.empty() && !oq4editor::EqualNoCase( own, entity.Value( "name" ) ) ) { return own; }
+	const std::string classname = entity.Value( "classname" );
+	return classname.empty() ? std::string() : "@" + classname;
+}
+
+std::string DefinitionModel( const std::string &classname ) {
+	const idDecl *decl = declManager->FindType( DECL_ENTITYDEF, classname.c_str(), false );
+	if ( !decl || decl->GetState() == DS_DEFAULTED ) { return {}; }
+	return static_cast<const idDeclEntityDef *>( decl )->dict.GetString( "model" );
+}
+
+idMat3 EntityAxis( const oq4editor::Entity &entity ) {
+	idMat3 axis;
+	const std::string rotation = entity.Value( "rotation" );
+	float m[9];
+	if ( !rotation.empty() && sscanf( rotation.c_str(), "%f %f %f %f %f %f %f %f %f", &m[0], &m[1], &m[2], &m[3], &m[4], &m[5], &m[6], &m[7], &m[8] ) == 9 ) {
+		axis = idMat3( m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8] );
+		return axis;
+	}
+	float yaw = 0;
+	sscanf( entity.Value( "angle" ).c_str(), "%f", &yaw );
+	return idAngles( 0, std::isfinite( yaw ) ? yaw : 0, 0 ).ToMat3();
+}
+
+}
+
+struct CachedMesh {
+	Surfaces surfaces;
+	std::size_t vertices = 0;
+	int references = 0; // chunk records assembled from this tessellation
+	bool ok = false, done = false;
+};
+struct idLevelEditorPreview::MeshCache { std::unordered_map<std::string, CachedMesh> meshes; };
+
+idLevelEditorPreview::idLevelEditorPreview() : cache( std::make_unique<MeshCache>() ) {}
 idLevelEditorPreview::~idLevelEditorPreview() { Clear(); }
 void idLevelEditorPreview::Clear() {
 	for ( auto &[id, record] : records ) { Release( record ); }
 	if ( world ) { renderSystem->FreeRenderWorld( world ); world = nullptr; }
-	records.clear(); bounds.Clear(); lightHandle = -1; skipped = triangles = 0; selected = 0;
+	records.clear(); bounds.Clear(); lightHandle = -1; skipped = triangles = models = 0; selected.clear();
+	if ( cache ) { cache->meshes.clear(); }
 }
 void idLevelEditorPreview::Release( Record &record ) {
+	if ( cache ) {
+		for ( const auto &text : record.primitives ) {
+			const auto found = cache->meshes.find( record.prefix + text );
+			if ( found != cache->meshes.end() && --found->second.references <= 0 ) { cache->meshes.erase( found ); }
+		}
+	}
 	if ( record.handle >= 0 ) { world->FreeEntityDef( record.handle ); }
-	if ( record.entity.hModel ) { renderModelManager->FreeModel( record.entity.hModel ); }
+	if ( record.entity.hModel && record.ownsModel ) { renderModelManager->FreeModel( record.entity.hModel ); }
+	if ( !record.ownsModel ) { --models; }
 	record = Record();
 }
 
 void idLevelEditorPreview::Tint( Record &record, bool isSelected ) {
-	const idVec3 color = isSelected && record.primitives.empty() ? idVec3( 1.0f, 0.55f, 0.05f ) : record.color;
+	const idVec3 color = isSelected && record.primitives.empty() && record.ownsModel ? idVec3( 1.0f, 0.55f, 0.05f ) : record.color;
 	for ( int i = 0; i < 3; ++i ) { record.entity.shaderParms[i] = color[i]; }
 	record.entity.shaderParms[3] = 1.0f;
 	record.entity.outlineColor = isSelected ? idVec4( 1.0f, 0.55f, 0.05f, 1.0f ) : vec4_zero;
 	record.entity.outlineWidth = 2.0f;
 }
 
-void idLevelEditorPreview::Rebuild( const oq4editor::MapDocument &document ) {
+bool idLevelEditorPreview::Rebuild( const oq4editor::MapDocument &document, const std::function<bool( const oq4editor::Entity & )> &hidden, double budgetMs ) {
 	const int startTime = Sys_Milliseconds();
+	bool complete = true;
 	if ( !world ) { world = renderSystem->AllocRenderWorld(); world->InitFromMap( nullptr ); }
-	// Compare exact primitive bytes, not a lossy hash or all entity properties.
-	// Changing a key/value or selecting an entity must not rebuild a whole map.
-	std::map<oq4editor::EntityId, const oq4editor::Entity *> sources;
-	for ( const auto &entity : document.Entities() ) { sources[entity.id] = &entity; }
+	// Entities are split into chunks of primitives, each its own render
+	// entity, and every primitive's tessellation is cached by its exact
+	// source bytes. Opening a map can therefore spread its work over frames,
+	// and editing one world brush re-tessellates that brush and reassembles
+	// one chunk instead of the whole world.
+	auto &meshes = cache->meshes;
+	std::set<Key> live;
+	bounds.Clear(); skipped = triangles = 0;
+	int rebuilt = 0, tessellated = 0;
+	std::size_t vertexCount = 0;
+	for ( const auto &sourceEntity : document.Entities() ) {
+		if ( hidden && hidden( sourceEntity ) ) { continue; }
+		const bool isWorld = sourceEntity.id == document.Entities().front().id;
+		const idVec3 origin = isWorld ? vec3_origin : Origin( sourceEntity );
+		const idVec3 color = sourceEntity.primitiveCount ? idVec3( 1, 1, 1 ) : MarkerColor( sourceEntity );
+		const std::string modelName = sourceEntity.primitiveCount || isWorld ? std::string() : PointModel( sourceEntity );
+		const idMat3 axis = sourceEntity.primitiveCount || isWorld ? mat3_identity : EntityAxis( sourceEntity );
+		const std::size_t primitives = sourceEntity.primitiveRanges.size();
+		const std::size_t chunks = primitives == 0 ? ( isWorld ? 0 : 1 ) : ( primitives + ChunkPrimitives - 1 ) / ChunkPrimitives;
+		const std::string prefix = va( "%d|%g %g %g|", document.Version(), origin.x, origin.y, origin.z );
+		for ( std::size_t chunk = 0; chunk < chunks; ++chunk ) {
+			const Key key = MakeKey( sourceEntity.id, chunk );
+			live.insert( key );
+			Record &record = records[key];
+			const std::size_t first = chunk * ChunkPrimitives, last = ( std::min )( primitives, first + ChunkPrimitives );
+			bool changed = record.version != document.Version() || record.primitives.size() != last - first || record.modelName != modelName;
+			for ( std::size_t i = first; !changed && i < last; ++i ) {
+				const auto &range = sourceEntity.primitiveRanges[i];
+				if ( sourceEntity.source.compare( range.first, range.second - range.first, record.primitives[i - first] ) != 0 ) { changed = true; }
+			}
+			if ( !record.primitives.empty() && record.entity.origin != origin ) { changed = true; }
+			if ( !changed ) {
+				triangles += record.triangles; skipped += record.skipped; vertexCount += record.vertices;
+				if ( record.handle >= 0 ) {
+					if ( record.entity.origin != origin || record.color != color || record.axis != axis ) {
+						record.entity.origin = origin; record.color = color;
+						record.axis = axis; record.entity.axis = record.ownsModel ? mat3_identity : axis;
+						Tint( record, selected.count( sourceEntity.id ) != 0 );
+						world->UpdateEntityDef( record.handle, &record.entity );
+					}
+					bounds.AddBounds( record.entity.bounds.Rotate( record.entity.axis ) + record.entity.origin );
+				}
+				continue;
+			}
+			// Tessellate what the cache lacks, within the frame budget. A
+			// chunk that cannot finish keeps its previous model for now; once
+			// the budget is spent, remaining chunks are not even inspected.
+			const bool spent = budgetMs > 0 && tessellated > 0 && Sys_Milliseconds() - startTime >= budgetMs;
+			bool ready = !spent;
+			if ( spent ) {
+				complete = false;
+				triangles += record.triangles; skipped += record.skipped; vertexCount += record.vertices;
+				if ( record.handle >= 0 ) { bounds.AddBounds( record.entity.bounds.Rotate( record.entity.axis ) + record.entity.origin ); }
+				continue;
+			}
+			std::vector<std::string> texts;
+			for ( std::size_t i = first; i < last; ++i ) {
+				const auto &range = sourceEntity.primitiveRanges[i];
+				texts.push_back( sourceEntity.source.substr( range.first, range.second - range.first ) );
+				auto &mesh = meshes[prefix + texts.back()];
+				if ( mesh.done ) { continue; }
+				if ( budgetMs > 0 && tessellated > 0 && Sys_Milliseconds() - startTime >= budgetMs ) { ready = false; continue; }
+				std::size_t count = 0;
+				mesh.ok = AppendPrimitive( texts.back(), origin, document.Version(), mesh.surfaces, count );
+				mesh.vertices = count;
+				mesh.done = true;
+				++tessellated;
+			}
+			if ( ready && primitives == 0 && budgetMs > 0 && tessellated > 0 && Sys_Milliseconds() - startTime >= budgetMs ) { ready = false; }
+			if ( !ready ) {
+				complete = false;
+				triangles += record.triangles; skipped += record.skipped; vertexCount += record.vertices;
+				if ( record.handle >= 0 ) { bounds.AddBounds( record.entity.bounds.Rotate( record.entity.axis ) + record.entity.origin ); }
+				continue;
+			}
+			const bool tinted = selected.count( sourceEntity.id ) != 0;
+			// Reference the new tessellations before releasing the old ones,
+			// so primitives the chunk keeps are not evicted.
+			for ( const auto &text : texts ) { ++meshes[prefix + text].references; }
+			Release( record ); ++rebuilt;
+			if ( primitives == 0 ) { ++tessellated; }
+			record.version = document.Version(); record.entity.origin = origin; record.prefix = prefix;
+			record.modelName = modelName; record.axis = axis; record.primitives = std::move( texts );
+			Surfaces surfaces;
+			std::size_t vertices = 0;
+			for ( const auto &text : record.primitives ) {
+				const auto &mesh = meshes[prefix + text];
+				if ( !mesh.ok || vertexCount + vertices + mesh.vertices > MaxPreviewVertices ) { ++record.skipped; continue; }
+				for ( const auto &[part, piece] : mesh.surfaces ) {
+					Mesh &target = Batch( surfaces, part.material );
+					const int base = static_cast<int>( target.verts.size() );
+					target.verts.insert( target.verts.end(), piece.verts.begin(), piece.verts.end() );
+					for ( const int index : piece.indexes ) { target.indexes.push_back( base + index ); }
+				}
+				vertices += mesh.vertices;
+			}
+			if ( primitives == 0 && !AppendMarker( surfaces, vertices ) ) { ++record.skipped; }
+			record.vertices = vertices; vertexCount += vertices; skipped += record.skipped;
+			if ( surfaces.empty() ) { continue; }
+			idRenderModel *model = renderModelManager->AllocModel();
+			// Owned exclusively by this preview: never register or replace _areaN
+			// models in the global model catalog used by the running game.
+			model->InitEmpty( va( "_editor_entity_%llu_%zu", static_cast<unsigned long long>( sourceEntity.id ), chunk ) );
+			int surfaceId = 0;
+			for ( auto &[part, mesh] : surfaces ) {
+				if ( mesh.indexes.empty() ) { continue; }
+				modelSurface_t surface = {};
+				surface.id = surfaceId++; surface.shader = part.material;
+				surface.geometry = model->AllocSurfaceTriangles( static_cast<int>( mesh.verts.size() ), static_cast<int>( mesh.indexes.size() ) );
+				surface.geometry->numVerts = static_cast<int>( mesh.verts.size() );
+				surface.geometry->numIndexes = static_cast<int>( mesh.indexes.size() );
+				for ( std::size_t i = 0; i < mesh.verts.size(); ++i ) { surface.geometry->verts[i] = mesh.verts[i]; }
+				for ( std::size_t i = 0; i < mesh.indexes.size(); ++i ) { surface.geometry->indexes[i] = mesh.indexes[i]; }
+				record.triangles += surface.geometry->numIndexes / 3;
+				model->AddSurface( surface );
+			}
+			if ( !surfaceId ) { renderModelManager->FreeModel( model ); continue; }
+			model->FinishSurfaces(); triangles += record.triangles;
+			record.entity.hModel = model; record.entity.axis.Identity(); record.entity.origin = origin;
+			record.entity.bounds = model->Bounds(); record.entity.noShadow = true;
+			record.color = color; Tint( record, tinted );
+			record.handle = world->AddEntityDef( &record.entity );
+			bounds.AddBounds( record.entity.bounds + origin );
+		}
+	}
 	for ( auto it = records.begin(); it != records.end(); ) {
-		if ( sources.find( it->first ) == sources.end() ) { Release( it->second ); it = records.erase( it ); }
+		if ( !live.count( it->first ) ) { Release( it->second ); it = records.erase( it ); }
 		else { ++it; }
 	}
-	bounds.Clear(); skipped = triangles = 0;
-	std::size_t vertexCount = 0;
-	for ( const auto &[id, record] : records ) { vertexCount += record.vertices; }
-	int rebuilt = 0;
-	for ( const auto &sourceEntity : document.Entities() ) {
-		const idVec3 origin = sourceEntity.id == document.Entities().front().id ? vec3_origin : Origin( sourceEntity );
-		const idVec3 color = sourceEntity.primitiveCount ? idVec3( 1, 1, 1 ) : MarkerColor( sourceEntity );
-		Record &record = records[sourceEntity.id];
-		bool changed = record.version != document.Version() || record.primitives.size() != sourceEntity.primitiveRanges.size();
-		if ( !changed ) {
-			for ( std::size_t i = 0; i < record.primitives.size(); ++i ) {
-				const auto &range = sourceEntity.primitiveRanges[i];
-				if ( sourceEntity.source.compare( range.first, range.second - range.first, record.primitives[i] ) != 0 ) { changed = true; break; }
-			}
-		}
-		if ( !record.primitives.empty() && record.entity.origin != origin ) { changed = true; }
-		if ( !changed ) {
-			triangles += record.triangles; skipped += record.skipped;
-			if ( record.handle >= 0 ) {
-				if ( record.entity.origin != origin || record.color != color ) {
-					record.entity.origin = origin; record.color = color; Tint( record, sourceEntity.id == selected );
-					world->UpdateEntityDef( record.handle, &record.entity );
-				}
-				bounds.AddBounds( record.entity.bounds + origin );
-			}
-			continue;
-		}
-		vertexCount -= record.vertices; Release( record ); ++rebuilt;
-		record.version = document.Version(); record.entity.origin = origin;
-		const std::size_t beforeVertices = vertexCount;
-		Surfaces surfaces;
-		for ( const auto &range : sourceEntity.primitiveRanges ) {
-			record.primitives.push_back( sourceEntity.source.substr( range.first, range.second - range.first ) );
-			if ( !AppendPrimitive( record.primitives.back(), origin, document.Version(), surfaces, vertexCount ) ) { ++record.skipped; }
-		}
-		if ( !sourceEntity.primitiveCount && sourceEntity.id != document.Entities().front().id && !AppendMarker( surfaces, vertexCount ) ) { ++record.skipped; }
-		record.vertices = vertexCount - beforeVertices; skipped += record.skipped;
-		if ( surfaces.empty() ) { continue; }
-		idRenderModel *model = renderModelManager->AllocModel();
-		// Owned exclusively by this preview: never register or replace _areaN
-		// models in the global model catalog used by the running game.
-		model->InitEmpty( va( "_editor_entity_%llu", static_cast<unsigned long long>( sourceEntity.id ) ) );
-		int surfaceId = 0;
-		for ( auto &[key, mesh] : surfaces ) {
-			if ( mesh.indexes.empty() ) { continue; }
-			modelSurface_t surface = {};
-			surface.id = surfaceId++; surface.shader = key.material;
-			surface.geometry = model->AllocSurfaceTriangles( static_cast<int>( mesh.verts.size() ), static_cast<int>( mesh.indexes.size() ) );
-			surface.geometry->numVerts = static_cast<int>( mesh.verts.size() );
-			surface.geometry->numIndexes = static_cast<int>( mesh.indexes.size() );
-			for ( std::size_t i = 0; i < mesh.verts.size(); ++i ) { surface.geometry->verts[i] = mesh.verts[i]; }
-			for ( std::size_t i = 0; i < mesh.indexes.size(); ++i ) { surface.geometry->indexes[i] = mesh.indexes[i]; }
-			record.triangles += surface.geometry->numIndexes / 3;
-			model->AddSurface( surface );
-		}
-		if ( !surfaceId ) { renderModelManager->FreeModel( model ); continue; }
-		model->FinishSurfaces(); triangles += record.triangles;
-		record.entity.hModel = model; record.entity.axis.Identity(); record.entity.origin = origin;
-		record.entity.bounds = model->Bounds(); record.entity.noShadow = true;
-		record.color = color; Tint( record, sourceEntity.id == selected );
-		record.handle = world->AddEntityDef( &record.entity );
-		bounds.AddBounds( record.entity.bounds + origin );
+	if ( complete ) {
+		// Every chunk is assembled: unreferenced tessellations are stale.
+		for ( auto it = meshes.begin(); it != meshes.end(); ) { it = it->second.references > 0 ? std::next( it ) : meshes.erase( it ); }
 	}
 	if ( bounds.IsCleared() ) { bounds = idBounds( idVec3( -64, -64, -64 ), idVec3( 64, 64, 64 ) ); }
-	common->Printf( "editor preview: entities=%d triangles=%d skipped=%d\n", Entities(), triangles, skipped );
-	common->Printf( "editor preview update: rebuilt=%d elapsed=%dms\n", rebuilt, Sys_Milliseconds() - startTime );
+	if ( complete ) {
+		common->Printf( "editor preview: entities=%d triangles=%d skipped=%d\n", Entities(), triangles, skipped );
+	}
+	common->Printf( "editor preview update: rebuilt=%d tessellated=%d elapsed=%dms complete=%d\n", rebuilt, tessellated, Sys_Milliseconds() - startTime, complete );
+	return complete;
+}
+
+int idLevelEditorPreview::PendingModels() const {
+	int pending = 0;
+	for ( const auto &[id, record] : records ) { if ( !record.modelName.empty() && !record.modelTried ) { ++pending; } }
+	return pending;
+}
+
+int idLevelEditorPreview::UpgradeModels( double budgetMs ) {
+	if ( !world ) { return 0; }
+	const double start = Sys_Milliseconds();
+	int upgraded = 0;
+	for ( auto &[id, record] : records ) {
+		if ( record.modelName.empty() || record.modelTried || record.handle < 0 ) { continue; }
+		if ( Sys_Milliseconds() - start >= budgetMs ) { break; }
+		record.modelTried = true;
+		const std::string name = record.modelName[0] == '@' ? DefinitionModel( record.modelName.substr( 1 ) ) : record.modelName;
+		if ( name.empty() ) { continue; }
+		idRenderModel *model = renderModelManager->CheckModel( name.c_str() );
+		// Skinned models need an animation pose the editor does not run; they
+		// keep their marker. Static meshes render as the game shows them.
+		if ( !model || model->IsDefaultModel() || model->IsDynamicModel() != DM_STATIC || model->NumSurfaces() == 0 ) { continue; }
+		if ( record.ownsModel && record.entity.hModel ) { renderModelManager->FreeModel( record.entity.hModel ); }
+		record.entity.hModel = model;
+		record.ownsModel = false;
+		record.entity.axis = record.axis;
+		record.entity.bounds = model->Bounds();
+		record.color = idVec3( 1, 1, 1 );
+		Tint( record, selected.count( KeyEntity( id ) ) != 0 );
+		world->UpdateEntityDef( record.handle, &record.entity );
+		++models; ++upgraded;
+	}
+	return upgraded;
 }
 
 int idLevelEditorPreview::Entities() const {
@@ -271,53 +421,70 @@ int idLevelEditorPreview::Entities() const {
 	return count;
 }
 
+void idLevelEditorPreview::FocusBounds( const idBounds &focus ) {
+	if ( focus.IsCleared() ) { return; }
+	camera.target = focus.GetCenter();
+	camera.distance = idMath::ClampFloat( 96.0f, 60000.0f, ( focus[1] - focus[0] ).Length() * 0.8f + 64.0f );
+}
+
 void idLevelEditorPreview::Focus( oq4editor::EntityId id ) {
-	idBounds focus = bounds;
-	const auto found = records.find( id );
-	if ( found != records.end() && found->second.handle >= 0 ) { focus = found->second.entity.bounds + found->second.entity.origin; }
-	target = focus.GetCenter();
-	distance = idMath::ClampFloat( 96.0f, 60000.0f, ( focus[1] - focus[0] ).Length() * 0.8f + 64.0f );
+	idBounds focus;
+	focus.Clear();
+	for ( auto it = records.lower_bound( MakeKey( id, 0 ) ); it != records.end() && KeyEntity( it->first ) == id; ++it ) {
+		if ( it->second.handle >= 0 ) { focus.AddBounds( it->second.entity.bounds.Rotate( it->second.entity.axis ) + it->second.entity.origin ); }
+	}
+	FocusBounds( focus.IsCleared() ? bounds : focus );
 }
 void idLevelEditorPreview::Orbit( float yawDelta, float pitchDelta, float zoom ) {
-	yaw = idMath::AngleNormalize360( yaw + yawDelta ); pitch = idMath::ClampFloat( -85.0f, 85.0f, pitch + pitchDelta );
-	distance = idMath::ClampFloat( 32.0f, 60000.0f, distance * zoom );
+	camera.yaw = idMath::AngleNormalize360( camera.yaw + yawDelta ); camera.pitch = idMath::ClampFloat( -85.0f, 85.0f, camera.pitch + pitchDelta );
+	camera.distance = idMath::ClampFloat( 32.0f, 60000.0f, camera.distance * zoom );
 }
-void idLevelEditorPreview::Select( oq4editor::EntityId id ) {
-	if ( id == selected ) { return; }
-	for ( auto changed : { selected, id } ) {
-		const auto found = records.find( changed );
-		if ( found == records.end() || found->second.handle < 0 ) { continue; }
-		auto &record = found->second;
-		Tint( record, changed == id );
-		world->UpdateEntityDef( record.handle, &record.entity );
+void idLevelEditorPreview::SetCamera( const Camera &value ) {
+	camera.target = value.target;
+	camera.yaw = idMath::AngleNormalize360( value.yaw );
+	camera.pitch = idMath::ClampFloat( -85.0f, 85.0f, value.pitch );
+	camera.distance = idMath::ClampFloat( 32.0f, 60000.0f, value.distance );
+}
+void idLevelEditorPreview::SetSelection( const std::set<oq4editor::EntityId> &whole ) {
+	if ( whole == selected ) { return; }
+	std::set<oq4editor::EntityId> changed;
+	for ( const auto id : selected ) { if ( !whole.count( id ) ) { changed.insert( id ); } }
+	for ( const auto id : whole ) { if ( !selected.count( id ) ) { changed.insert( id ); } }
+	selected = whole;
+	for ( const auto id : changed ) {
+		for ( auto it = records.lower_bound( MakeKey( id, 0 ) ); it != records.end() && KeyEntity( it->first ) == id; ++it ) {
+			if ( it->second.handle < 0 ) { continue; }
+			Tint( it->second, selected.count( id ) != 0 );
+			world->UpdateEntityDef( it->second.handle, &it->second.entity );
+		}
 	}
-	selected = id;
 }
 
 void idLevelEditorPreview::Pan( float x, float y ) {
-	const idMat3 axis = idAngles( pitch, yaw, 0 ).ToMat3();
-	target += ( axis[1] * x + axis[2] * y ) * distance * 1.53465f;
+	const idMat3 axis = idAngles( camera.pitch, camera.yaw, 0 ).ToMat3();
+	camera.target += ( axis[1] * x + axis[2] * y ) * camera.distance * 1.53465f;
 }
 
-oq4editor::EntityId idLevelEditorPreview::Pick( float x, float y, float aspect ) const {
+void idLevelEditorPreview::Ray( float x, float y, float aspect, idVec3 &start, idVec3 &direction ) const {
+	const idMat3 axis = idAngles( camera.pitch, camera.yaw, 0 ).ToMat3();
+	start = camera.target - axis[0] * camera.distance;
+	direction = axis[0] + axis[1] * ( ( 1.0f - 2.0f * x ) * 0.767327f ) + axis[2] * ( ( 1.0f - 2.0f * y ) * 0.767327f / aspect );
+	direction.Normalize();
+}
+
+oq4editor::EntityId idLevelEditorPreview::Pick( float x, float y, float aspect, float *fraction ) const {
 	if ( !world || aspect <= 0 ) { return 0; }
-	const idMat3 axis = idAngles( pitch, yaw, 0 ).ToMat3();
-	const idVec3 start = target - axis[0] * distance;
-	idVec3 ray = axis[0] + axis[1] * ( ( 1.0f - 2.0f * x ) * 0.767327f ) + axis[2] * ( ( 1.0f - 2.0f * y ) * 0.767327f / aspect );
-	ray.Normalize();
+	idVec3 start, ray;
+	Ray( x, y, aspect, start, ray );
 	const idVec3 end = start + ray * 2000000.0f;
 	float nearest = 1.0f;
 	oq4editor::EntityId hit = 0;
 	for ( const auto &[id, record] : records ) {
-		if ( record.handle < 0 || !( record.entity.bounds + record.entity.origin ).LineIntersection( start, end ) ) { continue; }
-		if ( record.primitives.empty() ) {
-			float scale;
-			if ( ( record.entity.bounds + record.entity.origin ).RayIntersection( start, end - start, scale ) && scale >= 0 && scale < nearest ) { nearest = scale; hit = id; }
-			continue;
-		}
+		if ( record.handle < 0 || !record.primitives.empty() || record.ownsModel ) { continue; }
 		modelTrace_t trace = {};
-		if ( world->ModelTrace( trace, record.handle, start, end, 0.0f ) && trace.fraction < nearest ) { nearest = trace.fraction; hit = id; }
+		if ( world->ModelTrace( trace, record.handle, start, end, 0.0f ) && trace.fraction < nearest ) { nearest = trace.fraction; hit = KeyEntity( id ); }
 	}
+	if ( fraction ) { *fraction = nearest; }
 	return hit;
 }
 
@@ -334,10 +501,15 @@ void idLevelEditorPreview::Draw( idDeviceContext *dc, const idRectangle &rect, i
 	view.y = idMath::Ftoi( ( engineWindowState.uiViewportY + y * sy ) * 480.0f / engineWindowState.vidHeight );
 	view.width = Max( 1, idMath::Ftoi( width * sx * 640.0f / engineWindowState.vidWidth ) );
 	view.height = Max( 1, idMath::Ftoi( height * sy * 480.0f / engineWindowState.vidHeight ) );
-	view.viewaxis = idAngles( pitch, yaw, 0 ).ToMat3();
-	view.vieworg = target - view.viewaxis[0] * distance;
+	view.viewaxis = idAngles( camera.pitch, camera.yaw, 0 ).ToMat3();
+	view.vieworg = camera.target - view.viewaxis[0] * camera.distance;
 	view.time = time;
 	for ( int i = 0; i < 4; ++i ) { view.shaderParms[i] = 1.0f; }
+	projection.origin = view.vieworg;
+	projection.axis = view.viewaxis;
+	projection.tanX = tan( view.fov_x * idMath::M_DEG2RAD * 0.5f );
+	projection.tanY = tan( view.fov_y * idMath::M_DEG2RAD * 0.5f );
+	projection.valid = true;
 	renderLight_t light = {}; light.axis.Identity(); light.origin = view.vieworg;
 	light.pointLight = true; light.noShadows = true;
 	light.lightRadius.Set( 65536, 65536, 65536 );

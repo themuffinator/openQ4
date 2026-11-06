@@ -32,6 +32,16 @@ If you have questions concerning this license or the applicable additional terms
 #include "AASFile.h"
 #include "AASFile_local.h"
 
+// Compilers write beside the engine (fs_cdpath) by default. The level
+// editor's sandboxed build process sets fs_savepath so its outputs stay in
+// the sandbox until the whole build has succeeded.
+static idCVar com_compilerOutput( "com_compilerOutput", "fs_cdpath", CVAR_SYSTEM,
+	"where dmap and AAS write .proc and .aas files: fs_cdpath (beside the engine) or fs_savepath" );
+
+const char *Compiler_OutputBasePath( void ) {
+	return idStr::Icmp( com_compilerOutput.GetString(), "fs_savepath" ) == 0 ? "fs_savepath" : "fs_cdpath";
+}
+
 
 /*
 ===============================================================================
@@ -695,7 +705,7 @@ bool idAASFileLocal::Write( const idStr &fileName, unsigned int mapFileCRC ) {
 	name = fileName;
 	crc = mapFileCRC;
 
-	aasFile = fileSystem->OpenFileWrite( fileName, "fs_cdpath" );
+	aasFile = fileSystem->OpenFileWrite( fileName, Compiler_OutputBasePath() );
 	if ( !aasFile ) {
 		common->Error( "Error opening %s", fileName.c_str() );
 		return false;
