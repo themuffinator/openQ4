@@ -392,13 +392,17 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
         doc.session("back", f"{prefix}Back")
     doc.state.update({TAB_STATE: {"type": "number", "initial": 0}, LEAVING_STATE: {"type": "number", "initial": -1}})
     width = U * CONTENT_W
-    chrome, pages, firsts = [], [], []
+    chrome, pages, firsts, above = [], [], [], []
     if tabbed:
         strip = tab_strip(doc, width, [(ident, key, None) for ident, key, _columns in tabs], top=0, state=TAB_STATE)
-        chrome.append(group(f"{prefix}-strip", absolute(left=U * CONTENT_LEFT, top=U * STRIP_TOP, width=width, height=2 * TAB_RISE),
-                            strip))
+        # The strip follows the pages in the tree: each page is a full-size
+        # group, and a later group's box takes the pointer's hits over earlier
+        # controls, so a strip under the pages left its tabs dead to the mouse
+        # and the VR pointer. They never overlap on screen.
+        above.append(group(f"{prefix}-strip", absolute(left=U * CONTENT_LEFT, top=U * STRIP_TOP, width=width, height=2 * TAB_RISE),
+                           strip))
         # The tabs keep their size in the strip's slots at any text size.
-        fixed_text(doc, chrome[-1])
+        fixed_text(doc, above[-1])
     else:
         # The header band stands behind the columns' headings; the tall
         # column's headings stand in its rows instead.
@@ -512,7 +516,7 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
         back = page_prompts(doc, back_id or f"{prefix}_back", event=back_event)
     if body is not None:
         pages = [group(body, FULL, pages)]
-    return subpage_document(doc, prefix, CRUMB, title_key, firsts[0], [*chrome, *pages, *footer, back], list(overlays),
+    return subpage_document(doc, prefix, CRUMB, title_key, firsts[0], [*chrome, *pages, *above, *footer, back], list(overlays),
                             stretch=tuple(scrollers), activate=activate(steps) if activate else steps,
                             backing_node=settings_backing(f"{prefix}-backing"))
 

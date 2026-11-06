@@ -1060,8 +1060,38 @@ def validate_dedicated_conversion() -> None:
     require(create, "!sys_consoleWindow.GetBool() && !s_consoleWindow.quitOnClose", "POSIX dedicated console window")
 
 
+def check_retained_tab_strips_take_the_pointer() -> None:
+    """A retained group placed after a control takes the pointer's hits over it
+    (RmlUi returns the topmost box), and each settings tab page is a full-size
+    group. The tab strip must therefore follow every page of its sub-page, or
+    its tabs are dead to the mouse and the VR pointer."""
+    for page, name in (("game", "game"), ("controls", "controls"), ("system", "settings")):
+        text = read(ROOT / f"content/baseoq4/pak0/guis/menu/settings/{page}.q4ui")
+        document = json.loads("\n".join(line for line in text.split("\n") if not line.startswith("//")))
+        found = {}
+
+        def walk(node, path=()):
+            if isinstance(node, dict):
+                ident = node.get("id", "")
+                if ident == f"{name}-strip" or ident.startswith(f"{name}-page-"):
+                    found[ident] = path
+                for position, child in enumerate(node.get("children", [])):
+                    walk(child, path + (position,))
+
+        walk(document["root"])
+        strip = found.get(f"{name}-strip")
+        pages = [path for ident, path in found.items() if ident != f"{name}-strip"]
+        if strip is None or not pages:
+            raise AssertionError(f"{page}.q4ui: no tab strip or tab pages found")
+        # later in tree order, and not inside a page: drawn above every page
+        for path in pages:
+            if strip[:len(path)] == path or strip < path:
+                raise AssertionError(f"{page}.q4ui: the tab strip must follow every tab page in the tree")
+
+
 def main() -> None:
     validate_settings_registry()
+    check_retained_tab_strips_take_the_pointer()
 
     mainmenu = read(ROOT / "content/baseoq4/pak0/guis/mainmenu.gui")
     controls_gui = read(ROOT / "content/baseoq4/pak0/guis/menu/settings/controls.gui")

@@ -3,15 +3,14 @@
 runtime (requires Pillow, a staged client built with OpenXR, and retail assets).
 
 The runtime's scripted weapon hand opens the pause menu, then points and clicks
-its way to Settings > Game Options, steps the section selector to Virtual
-Reality, and clicks the Laser Sight value. The setting must change from the
-dot to the dot and beam, which only happens if the section scrolled into view
-and the pointer's click reached its row. Nothing synthesises keyboard or mouse
-input: console commands write marker files, and the runtime acts on them.
+its way to Settings > Game Options, opens its Virtual Reality tab, and clicks
+the Laser Sight value. The setting must change from the dot to the dot and
+beam, which only happens if the tab opened and the pointer's click reached its
+row. Nothing synthesises keyboard or mouse input: console commands write
+marker files, and the runtime acts on them.
 
-The pointer positions come from the menus' 640x480 layout. The virtual screen
-takes the window's shape (16:9 here), and stock GUIs draw their canvas into
-the centred 4:3 part of it.
+The pointer positions are fractions of the 16:9 virtual screen, measured on
+its captures of the retained pages (ui_retained 1, the launch default).
 """
 from __future__ import annotations
 
@@ -43,11 +42,11 @@ def hand_pointing_at(u: float, v: float) -> str:
 # where to click
 PAUSE_SETTINGS = (0.231, 0.723)                 # the retained pause menu's Settings row
 NAV_GAME_OPTIONS = canvas_to_screen(105, 227)   # Settings' left-hand Game Options button
-SECTION_CHOICE = canvas_to_screen(204 + 154 + 60, 112)  # the section selector's value
-# with Virtual Reality scrolled to the top, Laser Sight is the eighth row
-LASER_ROW_CANVAS_Y = 128 + ( 1619 - 1433 ) + 12.5
-LASER_VALUE = canvas_to_screen(204 + 240 + 60, LASER_ROW_CANVAS_Y)
-SECTION_CLICKS = 6
+VR_TAB = (0.746, 0.116)                         # Game Options' VIRTUAL REALITY tab
+LASER_VALUE = (0.707, 0.256)                    # the Laser Sight row's value on that tab
+LASER_BEAM = (0.707, 0.356)                     # "Dot and Beam", third in the list it unfolds
+SECTION_CLICKS = 1                              # the tab
+LIST_CLICKS = 2                                 # the list, then its option
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -60,6 +59,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--language", default="english", help="sys_lang, to check that translations fit")
+    parser.add_argument("--render-api", choices=("gl", "vulkan"), default="gl")
     options = parser.parse_args(argv)
     from PIL import Image
 
@@ -75,7 +75,7 @@ def main(argv: list[str] | None = None) -> None:
     output = (options.output_dir or ROOT / ".tmp/openxr-vr-menu-smoke").resolve()
     if output == staged or staged in output.parents or output in staged.parents:
         parser.error("output and staged runtime directories must not overlap")
-    profile = output / "sp"
+    profile = output / ( "sp-vulkan" if options.render_api == "vulkan" else "sp" )
     game = profile / "baseoq4"
     game.mkdir(parents=True, exist_ok=True)
     for stale in list(game.glob("vr_marker_*.txt")) + list(profile.glob("xr_*.tga")) + list(profile.glob("xr_*.png")):
@@ -91,9 +91,11 @@ def main(argv: list[str] | None = None) -> None:
         f"when {marker('menu_up')} button left menu 0",
         f"when {marker('to_settings')} hand right {hand_pointing_at(*PAUSE_SETTINGS)}",
         f"when {marker('to_game')} hand right {hand_pointing_at(*NAV_GAME_OPTIONS)}",
-        f"when {marker('to_section')} hand right {hand_pointing_at(*SECTION_CHOICE)}",
+        f"when {marker('to_section')} hand right {hand_pointing_at(*VR_TAB)}",
         f"when {marker('vr_section')} capture {profile / 'xr_vr_section'}",
         f"when {marker('to_laser')} hand right {hand_pointing_at(*LASER_VALUE)}",
+        f"when {marker('laser_open')} capture {profile / 'xr_laser_open'}",
+        f"when {marker('to_beam')} hand right {hand_pointing_at(*LASER_BEAM)}",
         f"when {marker('laser_set')} capture {profile / 'xr_laser_set'}",
     ]
     commands = [
@@ -117,6 +119,8 @@ def main(argv: list[str] | None = None) -> None:
         click(f"section{step}")
     commands += ["condump vr_marker_vr_section.txt", "waitMsec 600", "condump vr_marker_to_laser.txt", "waitMsec 900"]
     click("laser")
+    commands += ["condump vr_marker_laser_open.txt", "waitMsec 600", "condump vr_marker_to_beam.txt", "waitMsec 900"]
+    click("beam")
     commands += ["condump vr_marker_laser_set.txt", "waitMsec 600",
                  "echo VR_MENU_LASER", "vr_aimLaser", "echo VR_MENU_SMOKE_COMPLETE", "quit"]
     (profile / "xr_script.txt").write_text("\n".join(script) + "\n", encoding="utf-8")
@@ -139,6 +143,8 @@ def main(argv: list[str] | None = None) -> None:
         "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1", "sys_lang": options.language,
         "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_screenDistance": "2.5",
         "vr_screenWidth": str(SCREEN_WIDTH_M), "vr_leftHanded": "0",
+        # after the launch configuration's own r_renderApi, so this one wins
+        "r_renderApi": options.render_api,
     }
     for key, value in settings.items():
         args += ["+set", key, value]
@@ -172,19 +178,20 @@ def main(argv: list[str] | None = None) -> None:
     assert "VR_MENU_SMOKE_COMPLETE" in text, "script did not complete"
     assert not re.search(r"FATAL|ERROR:|OpenXR: .* failed|Unknown command", text), "errors in the log"
     clicks = text.count("OpenXR: MOUSE1 down")
-    assert clicks == 3 + SECTION_CLICKS, f"expected {3 + SECTION_CLICKS} pointer clicks on menus, saw {clicks}"
+    expected = 2 + SECTION_CLICKS + LIST_CLICKS
+    assert clicks == expected, f"expected {expected} pointer clicks on menus, saw {clicks}"
     laser = re.search(r'"vr_aimLaser" is:"(\d)"', text.partition("VR_MENU_LASER")[2])
     assert laser, "vr_aimLaser was not reported"
     assert laser.group(1) == "2", \
         f"clicking Laser Sight in the Virtual Reality section should step it from 1 to 2, it is {laser.group(1)}"
 
     # settings pages are opaque, so the world stops rendering and the screen is the only layer
-    for name in ("xr_vr_section", "xr_laser_set"):
+    for name in ("xr_vr_section", "xr_laser_open", "xr_laser_set"):
         quads = sorted(profile.glob(f"{name}_quad*.tga"))
         assert quads, f"no virtual-screen capture for {name}"
         with Image.open(quads[-1]) as screen:
             screen.convert("RGB").save(profile / f"{name}_screen.png")
-    print(f"OpenXR VR menu smoke: PASS (Laser Sight stepped to dot and beam through the pointer); evidence={profile}")
+    print(f"OpenXR VR menu smoke ({options.render_api}): PASS (Laser Sight stepped to dot and beam through the pointer); evidence={profile}")
 
 
 if __name__ == "__main__":
