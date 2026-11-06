@@ -26,10 +26,16 @@
       "contents_string": "#str_231702",
       "client_only": true,
       "bulk": true,
-      "rules": ["light-grid-trim"],
+      "rules": [
+        "light-grid-trim"
+      ],
       "required_files": [
         "maps/mp/q4dm1.lightgridpack"
-      ]
+      ],
+      "generation": {
+        "number": 1,
+        "commit": "3677866d62dd9d4f47be54c860e7f7dd0c8fe16c"
+      }
     },
     {
       "name": "pak2.pk4",
@@ -41,7 +47,11 @@
       "required_files": [
         "gfx/guis/loadscreens/generic.dds",
         "gfx/guis/loadscreens/generic.tga"
-      ]
+      ],
+      "generation": {
+        "number": 1,
+        "commit": "849a65032b97be8c0635e2889e90da0773b388aa"
+      }
     }
   ]
 }
