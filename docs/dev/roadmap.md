@@ -924,8 +924,16 @@ diagnostics establish whole-frame ownership or production performance.
   stopped exercising the flashlight once `g_dynamicLightShadows` followed
   machine spec; the runner now pins it. See
   [movers and cutouts](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
-  Remaining: translucent receivers under motion and the physical-platform
-  breadth that every REN item shares.
+  Translucent shadows have no passing stock fixture to put in motion: the
+  `shadow-translucent-medlabs` qualification candidate
+  (`renderer_gameplay_benchmark.py --pacing-only --shadow-presets translucent
+  --set-cvar r_rendererSharedWorldInteraction=1`) fails stationary as well as
+  with a 360-degree sweep on 6 November. On OpenGL the shared interaction
+  stream falls back for shadow geometry before reaching the translucent-moment
+  stage, and Vulkan reports no named fallback. It needs a fixed camera on a
+  translucent caster (or a laboratory fixture) before motion can be judged.
+  Remaining: that translucent fixture, then its motion run, and the
+  physical-platform breadth that every REN item shares.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
