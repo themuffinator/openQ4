@@ -825,7 +825,7 @@ diagnostics establish whole-frame ownership or production performance.
 | --- | --- | --- |
 | REN-01 — Partial | Shared classic GUI/world/interaction/fog/deform/subview/post domains have scoped implementations and contracts. | Qualify each on fresh GL/Vulkan packages: executed ownership, matching appearance, zero-commit rollback, human review and platform breadth. |
 | REN-02 — Partial | Shared material/light contracts and corridors provide foundations. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
-| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light. | Image-level receiver checks in motion, dynamic/cutout/custom receivers, static/live composition and dynamic-image alpha audits. |
+| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Image-level receiver checks in motion; mover/cutout/custom-receiver fixtures under continuous motion. |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO; the Intel residual is reproduced and explicitly bounded. | lavapipe residual, a half-resolution parity control, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold-miss cost measured and budgeted; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Prefilter cold misses (~85 ms after parallel tiles) off the frame to meet the 4 ms budget; probe capture orientation, grid provenance/regeneration and broader authored scenes. |
@@ -865,9 +865,11 @@ diagnostics establish whole-frame ownership or production performance.
   The dynamic-image/non-explicit-texcoord alpha audit found OpenGL drawing
   unreproducible cutouts as solid depth; it now takes Vulkan's sticky stencil
   fallback (no stock material reaches the case).
-  Remaining: image-level missing/doubled receiver checks in motion, the point
-  static/live composition audit, and the mover/cutout/custom-receiver fixtures
-  under continuous motion.
+  The point static/live composition audit found no defect: point lights never
+  compose (dynamic casters defeat the cube cache on both backends), projected
+  lights compose static depth with live casters.
+  Remaining: image-level missing/doubled receiver checks in motion and the
+  mover/cutout/custom-receiver fixtures under continuous motion.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple

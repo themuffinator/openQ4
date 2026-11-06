@@ -1031,8 +1031,17 @@ Laptop GPU:
 Resident megabytes follow which lights are cached at each pose; the bound is
 the fixed slot capacity, which no report exceeds. This is counter evidence
 for stock motion, not an image comparison: the moving-caster, cutout,
-translucent and custom-receiver fixtures keep their own suites, and the
-point static/live composition audit remains open.
+translucent and custom-receiver fixtures keep their own suites.
+
+Static/live composition audit (both backends agree): a projected light caches
+static depth only, keeps dynamic casters out of its cache signature and draws
+them over the restored tile each view; the opt-in shared world-interaction
+stream disables that composition. A point light never composes: any dynamic
+caster, and `r_shadowMapStaticHysteresisFrames` after the last one, defeats its
+cube cache, so the cube is rendered fresh with every caster. Neither path can
+show a stale or doubled caster; the cost is a full cube render per frame for
+point lights with moving casters (`RB_ShadowMapStaticCacheable`,
+`VK_ShadowMap_StaticCacheable`).
 
 Cutout casters whose coverage cannot be reproduced (an active alpha-test stage
 with no bindable image, or generated texture coordinates): Vulkan already
