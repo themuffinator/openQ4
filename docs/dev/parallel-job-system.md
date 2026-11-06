@@ -207,6 +207,79 @@ run's last line was `jobsShutdown PASS v1 initialized=0 queued=0 running=0`.
 The SP client ran with a hidden window and OpenGL. These are local development
 runs, not release packages, and no other platform was toured.
 
+## Final-package qualification (6 November 2026)
+
+CORE-01 repeated the checks on release-style packages built from clean source
+at `00f4b4003` the way `manual-release.yml` builds them (`debugoptimized`,
+`b_ndebug=true`, forced fallback dependencies, stable track, version 0.14.1)
+and packed by `package_release.py`. Each package's `VERSION.txt` records that
+commit with `openq4_dirty=false`. They were extracted and run in place, against
+the installed retail packages, which stayed read-only.
+
+| Package | SHA-256 |
+|---|---|
+| `openq4-0.14.1-windows-x64.zip` | `5dc827ebbd58b86f5711f9081b58af47536aec793dcc239c2f4cf8ef60e04db5` |
+| `openq4-0.14.1-linux-x64.tar.xz` | `f7b5d6e16194f61c4c3c3df80444d45f74a4f12d8a7549a20ec7adb3744be933` |
+
+Windows x64 ran on the development machine; Linux x64 ran on Ubuntu under WSL,
+the client under Xvfb with Mesa llvmpipe. Memory is private bytes on Windows
+and anonymous resident plus swapped memory on Linux, at each load's settle.
+
+| Check | Windows x64 | Linux x64 |
+|---|---|---|
+| Dedicated `q4dm1`-`q4dm8` x3, `jobs_enable 1` | 24/24, lap peaks 389/423/421 MiB, exit 0.42 s after the last command | 24/24, 118/120/120 MiB, exit 0.2 s |
+| Same, `jobs_enable 0` | 24/24, 390/423/424 MiB | 24/24, 118/120/120 MiB |
+| Dedicated starts and quits | 5/5 exit 0, one synchronous self-test and one shutdown pass each; 5 packaged smokes pass | 5/5, the same; packaged smoke passes |
+| SP campaign `mcc_2`-`storage1`-`storage2`-`storage1`-`tram1` | OpenGL jobs on and off and Vulkan jobs on: 5/5 loads each | Jobs on and off: 5/5 each |
+| SP `airdefense1`/`hangar2` tour | 6 laps, peaks 3,338-3,449 MiB, last four laps within 30 MiB | 8 laps, 1,815-1,917 MiB (see below) |
+| Jobs on/off parity, `game/storage1` | Four runs (on, off, both repeated): identical view, identical 2,837-line entity list | — |
+
+Every run exited 0 with no logged error, and every run's last job line was
+`jobsShutdown PASS v1 initialized=0 queued=0 running=0`. Every client log
+records the effects system starting (`BSE Init`) and no dedicated log does:
+the dedicated server kept its effects runtime disabled. The parity screenshots
+are not byte-identical, but two runs with the same setting differ as much as jobs on
+and off do (mean difference 3.2-4.5 against 5.9). The differences lie in the
+animated smoke over the drop zone; the lift and player model match.
+
+The Linux tours found a memory defect the Windows runs could not show. With
+jobs on, every `airdefense1`/`hangar2` load added about 60 MiB: 2,370 MiB on
+the first lap, 3,125 MiB by the eighth and still rising, against a flat
+1,800-1,894 MiB with `jobs_enable 0`. Job workers allocate from their own glibc
+heap arenas and the main thread frees that memory, so glibc kept the pages. The
+engine now hands free heap memory back to the system after each level load
+(`Sys_ReleaseFreeHeapMemory`, `malloc_trim` on glibc, nothing on Windows,
+whose heap does this itself). The release costs 21-31 ms per load and is
+reported by `com_showLevelLoadTimes`; with it, the same eight-lap tour peaks at
+1,815-1,917 MiB, level with jobs off, and load times are unchanged.
+
+Renderer budgets ran on the Windows package with the required benchmark
+profile:
+
+| Backend | Result |
+|---|---|
+| OpenGL | 9/9 required cases within budget. `storage2` and `medlabs` exceeded it while other clients shared the machine (CPU p95 28 and 58 ms) and pass on a quiet rerun (CPU p95 3.8 and 4.1 ms). |
+| Vulkan | 9/9 required cases within budget. |
+
+The optimized package exposed a timing assumption in `sp-storage1-second`:
+720 settling frames at a 240 fps cap are only 3 s of game time, so both
+backends sampled the starting lift still rising. The scene contract now also
+waits 6 s of real time (`stock-entry-view-v2`), and the case passes on both
+backends.
+
+The [retail baseline](stock-asset-baseline.md) ran the Windows package against a
+view of the 40 retail PK4s alone, bound to a manifest approved in a separate dry
+run. SP capture on `storage1`, save and load, demo playback and the `q4dm1`
+listen server and client all pass, within their per-map budgets on a quiet
+machine; the engine screenshots show the expected scenes. A first attempt on
+the shared machine failed only the server's p99 (154 ms): its
+p50 stayed at 6-8 ms while isolated frames reached 150 ms, and the rerun's p99
+was 9.8 ms.
+
+macOS is a preview platform without maintainer hardware or retail assets on
+continuous integration; its evidence comes from reporters through the macOS
+evidence gate in [release completion](release-completion.md), not from CORE-01.
+
 ## Background asset work profile (6 November 2026)
 
 CORE-03 profiled what level-load work is left on the main thread before moving

@@ -62,7 +62,7 @@ exact; the estimate column is deliberately approximate.
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
-| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **95%** | 5 / 6 | Final-package and Linux/macOS map-tour lifecycle (CORE-01). |
+| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **100%** | 6 / 6 | None; macOS evidence stays with the platform gate. |
 | [Developer map tools](#tool-completion-checkpoints) — TOOL | **20%** | 0 / 4 | Paused: production geometry authoring, build/play integration and reliability. |
 | [Release qualification](#release-qualification-and-completion-rules) — REL | **35%** | 0 / 4 | Exact package matrix, human/device evidence, lifecycle and promotion records. |
 | [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
@@ -4284,14 +4284,14 @@ visual editor have their own active items.
 
 ### CORE completion checkpoints
 
-**Estimate: 95%; 5/6 tasks closed.** CORE-02 (not promoted), CORE-03, CORE-04,
-CORE-05 and CORE-06 are closed. CORE-01 needs its tours repeated on clean final
-packages and on Linux/macOS; the map-editor pause does not pause these engine
-fixes.
+**Estimate: 100%; 6/6 tasks closed.** CORE-01, CORE-02 (not promoted), CORE-03,
+CORE-04, CORE-05 and CORE-06 are closed. macOS, a preview platform, is qualified
+through its own evidence gate rather than CORE-01. The map-editor pause does not
+pause these engine fixes.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| CORE-01 — Partial | GUI precache, expression-storage, coordinates and hit-map fixes; 6 November Windows development-build map tours: dedicated 24-load tours with jobs on and off and SP client tours plateau, and every run shuts down cleanly. | Repeat on clean final packages and on Linux/macOS. |
+| CORE-01 — Closed | GUI precache, expression-storage, coordinates and hit-map fixes; clean 0.14.1 Windows x64 and Linux x64 packages pass dedicated and SP tours with jobs on and off, jobs parity, dedicated exits, renderer budgets on both backends and the retail baseline; Linux jobs-on level-change memory growth fixed. | — |
 | CORE-02 — Closed: not promoted | Current-build cold/warm tours, corrupt-cache fallback, bounded staging and map-change generations measured; the opt-in cache is slower cold (40%) and warm (7-14%), so it stays off. | — |
 | CORE-03 — Closed | SP load profiled: remaining main-thread image decode is under 5% of the load, not worth moving; dedicated servers no longer read and discard every level image prefetch (media finish 8.5 s to 1.5 s over 24 loads). | — |
 | CORE-04 — Closed | Strict strings; configure warnings fixed (RmlUi's not reproduced); diagnostics reviewed; collision contents decoding fixed; MSVC ASan gameplay (dedicated tour, SP combat, compilers, malformed and fuzzed AAS data) with no report; T-junction ASan/UBSan fixture. | — |
@@ -4300,7 +4300,7 @@ fixes.
 
 ### CORE task evidence and acceptance
 
-- [ ] **CORE-01 — P1, qualification: foundation final-package evidence.** Repeat
+- [x] **CORE-01 — P1, qualification: foundation final-package evidence.** Repeat
   job on/off, renderer-budget, retail baseline, map-cycle/cancellation and
   deterministic dedicated shutdown checks on clean committed final packages and
   required platforms. Keep installed content read-only and dedicated BSE disabled.
@@ -4321,8 +4321,23 @@ fixes.
   each, lap peaks 391/427/427 MiB, exit 0 within 0.42 s and `jobsShutdown PASS`.
   The SP client toured four campaign maps three times, then `airdefense1`/
   `hangar2` six times; both settle within a fixed band (the last four
-  `airdefense1` visits within 27 MiB) and shut down cleanly. Remaining: the same
-  tours on clean final packages, and on Linux and macOS.
+  `airdefense1` visits within 27 MiB) and shut down cleanly.
+  Closed 6 November on [clean final packages](parallel-job-system.md#final-package-qualification-6-november-2026):
+  0.14.1 Windows x64 and Linux x64 packages built from `00f4b4003` as the
+  release workflow builds them, recording `openq4_dirty=false`. On both, the
+  dedicated 24-load tours with jobs on and off, five starts and quits each with
+  one synchronous self-test, the SP campaign with jobs on and off and the
+  `airdefense1`/`hangar2` tours plateau and end in `jobsShutdown PASS`, and the
+  dedicated server never starts its effects runtime. Four `storage1` runs give
+  identical game state with jobs on and off. All nine required renderer-budget
+  cases pass on OpenGL and Vulkan, and the retail baseline passes its SP
+  capture, demo playback, save and load and multiplayer server and client. The Linux tours
+  found SP memory rising about 60 MiB per level change with jobs on, because
+  glibc kept the worker heap arenas; the engine now returns free heap memory
+  after each load, and the eight-lap tour stays level with jobs off. A fast
+  package also exposed a frame-counted lift settle in `sp-storage1-second`,
+  which now waits in real time as well. macOS, a preview platform, is qualified
+  through the macOS evidence gate.
 - [x] **CORE-02 — P2, optimization: cache and loading promotion.** Investigate cold
   load regressions, per-file Sync, cache identity and rewrite churn before enabling
   learned/generated-cache experiments. Default worker DDS reading already exists.

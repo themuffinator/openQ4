@@ -34,6 +34,13 @@ See [player release status](../user/release-status.md).
   cleanly; fresh configures print no Meson warning; an MSVC AddressSanitizer
   build ran dedicated and SP gameplay, both compilers and the AAS fuzz cases
   with no report.
+- CORE-01 closed on clean 0.14.1 release-style Windows x64 and Linux x64
+  packages: dedicated and SP map tours, jobs on/off parity, dedicated exits and
+  smokes, renderer budgets on both backends and the retail baseline. The Linux
+  tours found SP memory rising about 60 MB per level change with jobs on; the
+  engine now returns free heap memory after each load. Evidence:
+  [final-package qualification](parallel-job-system.md#final-package-qualification-6-november-2026).
+  macOS stays with its evidence gate.
 
 ## Smaller downloads and updates, 6 November 2026
 
