@@ -256,7 +256,22 @@ What each file is for:
 - `env/maps/.../area*_lightgrid_pos.tga`
   Loose fallback/debug compact per-probe relocation offsets so runtime visibility checks use the actual baked probe positions instead of ideal grid centers.
 
-openQ4 loads these files automatically when the corresponding map is loaded. A valid `.lightgridpack` wins; the loose `.lightgrid` and TGA files remain useful for inspection, compatibility, and fallback.
+openQ4 loads these files automatically when the corresponding map is loaded. A valid `.lightgridpack` wins on every renderer: one that cannot sample DXT textures (OpenGL ES without S3TC, as on most Mali and PowerVR GPUs) decodes the pack's DXT irradiance atlases on the CPU, so it never needs the loose TGAs. `r_lightGridSoftwareDecode 1` forces that path on any renderer for testing.
+
+The bundled light-grid pack (`baseoq4/pak1.pk4`) therefore carries only each map's `.lightgridpack` and `.lightgrid`; the loose atlas TGAs of packed maps stay in the source tree (`content/baseoq4/pak1/env/`) for inspection, and a `.lightgrid` without a pack or atlases (which cannot light anything) is not packed either.
+
+### Checking packs
+
+`lightGridPackTest` loads every map's `.lightgridpack` (or only the maps you name) exactly as a map load does, uploads each area's atlases and prints one line per map and a summary:
+
+```text
+LIGHTGRID_PACK_TEST maps/mp/q4dm1 accepted areas=52 chunks=156/156 resident=52/52 decode=gpu
+LIGHTGRID_PACK_TEST_DONE tested=51 accepted=51 rejected=0 loose_only=1
+```
+
+`tools/tests/lightgrid_pack_load_test.py` runs it on OpenGL, on OpenGL with software decoding and on Vulkan; `+set fs_searchAddons 1` includes the community map pack's maps when it is installed.
+
+`lightGridPackLoose <map>` packs a map's existing loose bake (its `.lightgrid` plus the atlas TGAs under `env/<map>/` in the save path) into a `.lightgridpack` without baking again. A version-4 bake that wrote only irradiance atlases packs into irradiance-only chunks, which the runtime treats exactly as it treats those loose files.
 
 ## Typical Workflows
 

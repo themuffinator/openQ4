@@ -22,6 +22,7 @@ GNU General Public License for more details.
 #include "tr_local.h"
 #include "RendererModule.h"
 #include "RendererUpload.h"
+#include "../imagetools/DXT/DXTCodec.h"
 #if !defined( _WIN32 )
 #include <unistd.h>
 #endif
@@ -1827,8 +1828,23 @@ static bool LightGrid_WritePackFileInternal( idFile *file, const idRenderWorldLo
 	return true;
 }
 
-static bool LightGrid_WriteLightGridPackFile( const idRenderWorldLocal &world, const char *name, const lightGridBakeOptions_t &options, const lightGridBakeFileStats_t &stats ) {
+static bool LightGrid_SavePathAtlasExists( const char *baseName, int areaIndex, int kind ) {
+	const idStr sourceName = va( "env/%s/area%i_lightgrid_%s.tga", baseName, areaIndex, LightGrid_PackChunkSourceSuffix( kind ) );
+	idFile *file = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( sourceName.c_str(), "fs_savepath" ) );
+	if ( file == NULL ) {
+		return false;
+	}
+	fileSystem->CloseFile( file );
+	return true;
+}
+
+// onlyExistingAtlases packs the atlases a loose bake has and skips the rest: a
+// version-4 bake wrote irradiance atlases only, and the runtime treats an area
+// without visibility or probe-position atlases exactly as it treats that bake.
+static bool LightGrid_WriteLightGridPackFile( const idRenderWorldLocal &world, const char *name, const lightGridBakeOptions_t &options, const lightGridBakeFileStats_t &stats, bool onlyExistingAtlases = false ) {
 	(void)options;
+	idStr atlasBaseName = name;
+	atlasBaseName.StripFileExtension();
 
 	idStr fileName = name;
 	fileName.SetFileExtension( "lightgridpack" );
@@ -1845,9 +1861,16 @@ static bool LightGrid_WriteLightGridPackFile( const idRenderWorldLocal &world, c
 			continue;
 		}
 
+		if ( onlyExistingAtlases && !LightGrid_SavePathAtlasExists( atlasBaseName.c_str(), areaIndex, LIGHTGRID_PACK_CHUNK_IRRADIANCE ) ) {
+			continue;
+		}
 		LightGrid_AppendPackChunk( chunks, areaIndex, LIGHTGRID_PACK_CHUNK_IRRADIANCE, LightGrid_GetAtlasWidth( lightGrid ), LightGrid_GetAtlasHeight( lightGrid ) );
-		LightGrid_AppendPackChunk( chunks, areaIndex, LIGHTGRID_PACK_CHUNK_VISIBILITY, LightGrid_GetAtlasWidth( lightGrid ), LightGrid_GetAtlasHeight( lightGrid ) );
-		LightGrid_AppendPackChunk( chunks, areaIndex, LIGHTGRID_PACK_CHUNK_PROBE, LightGrid_GetProbePositionAtlasWidth( lightGrid ), LightGrid_GetProbePositionAtlasHeight( lightGrid ) );
+		if ( !onlyExistingAtlases || LightGrid_SavePathAtlasExists( atlasBaseName.c_str(), areaIndex, LIGHTGRID_PACK_CHUNK_VISIBILITY ) ) {
+			LightGrid_AppendPackChunk( chunks, areaIndex, LIGHTGRID_PACK_CHUNK_VISIBILITY, LightGrid_GetAtlasWidth( lightGrid ), LightGrid_GetAtlasHeight( lightGrid ) );
+		}
+		if ( !onlyExistingAtlases || LightGrid_SavePathAtlasExists( atlasBaseName.c_str(), areaIndex, LIGHTGRID_PACK_CHUNK_PROBE ) ) {
+			LightGrid_AppendPackChunk( chunks, areaIndex, LIGHTGRID_PACK_CHUNK_PROBE, LightGrid_GetProbePositionAtlasWidth( lightGrid ), LightGrid_GetProbePositionAtlasHeight( lightGrid ) );
+		}
 	}
 
 	const int packStart = Sys_Milliseconds();
@@ -2439,7 +2462,13 @@ static bool LightGrid_AssignPackChunk( idRenderWorldLocal *world, const char *pa
 	return *image != NULL;
 }
 
-bool idRenderWorldLocal::LoadLightGridPackFile( const char *name ) {
+bool idRenderWorldLocal::LoadLightGridPackFile( const char *name, int *chunkCountOut, int *assignedChunksOut ) {
+	if ( chunkCountOut != NULL ) {
+		*chunkCountOut = 0;
+	}
+	if ( assignedChunksOut != NULL ) {
+		*assignedChunksOut = 0;
+	}
 	const int start = Sys_Milliseconds();
 	ReleaseLightGridPack();
 	idFile *file = fileSystem->OpenFileRead( name );
@@ -2494,10 +2523,8 @@ bool idRenderWorldLocal::LoadLightGridPackFile( const char *name ) {
 	const bool checkFormats = tr.IsOpenGLRunning();
 	int assignedChunks = 0;
 	for ( int i = 0; i < chunks.Num(); i++ ) {
-		if ( checkFormats && ( chunks[i].format == FMT_DXT1 || chunks[i].format == FMT_DXT5 ) && !glConfig.textureCompressionAvailable ) {
-			common->Warning( "%s contains compressed light-grid chunks but this renderer does not support texture compression", name );
-			return false;
-		}
+		// DXT chunks are decoded on the CPU where the GPU cannot sample them
+		// (LightGrid_LoadPackedImageRef), so a pack never depends on loose atlases.
 		if ( checkFormats && chunks[i].format == FMT_BC7 && !glConfig.bptcTextureCompressionAvailable ) {
 			common->Warning( "%s contains BC7 light-grid chunks but this renderer does not support BPTC texture compression", name );
 			return false;
@@ -2508,6 +2535,12 @@ bool idRenderWorldLocal::LoadLightGridPackFile( const char *name ) {
 	}
 
 	lightGridAvailabilityFrame = -1;
+	if ( chunkCountOut != NULL ) {
+		*chunkCountOut = chunkCount;
+	}
+	if ( assignedChunksOut != NULL ) {
+		*assignedChunksOut = assignedChunks;
+	}
 	common->DPrintf(
 		"Loaded light-grid pack %s: %i areas, %i/%i chunks, settings 0x%08x in %.3fs\n",
 		name,
@@ -2658,10 +2691,12 @@ static lightGridPackedImageLoadResult_t LightGrid_LoadPackedImageRef( idRenderWo
 		common->Warning( "LightGrid pack: invalid image header for %s", image->GetName() );
 		return LIGHTGRID_PACKED_IMAGE_LOAD_FAILED;
 	}
-	if ( ( header.format == FMT_DXT1 || header.format == FMT_DXT5 ) && !glConfig.textureCompressionAvailable ) {
-		common->Warning( "LightGrid pack: %s requires compressed texture support", image->GetName() );
-		return LIGHTGRID_PACKED_IMAGE_LOAD_FAILED;
-	}
+	// Irradiance atlases are DXT1 in every shipped pack. A renderer that cannot
+	// sample DXT (OpenGL ES without S3TC, most Mali and PowerVR GPUs) gets them
+	// decoded here, as retail DDS images are, instead of falling back to loose
+	// atlas TGAs that release packs no longer carry.
+	const bool dxtChunk = header.format == FMT_DXT1 || header.format == FMT_DXT5;
+	const bool decodeDXT = dxtChunk && ( !glConfig.textureCompressionAvailable || r_lightGridSoftwareDecode.GetBool() );
 	if ( header.format == FMT_BC7 && !glConfig.bptcTextureCompressionAvailable ) {
 		common->Warning( "LightGrid pack: %s requires BC7/BPTC texture support", image->GetName() );
 		return LIGHTGRID_PACKED_IMAGE_LOAD_FAILED;
@@ -2669,8 +2704,8 @@ static lightGridPackedImageLoadResult_t LightGrid_LoadPackedImageRef( idRenderWo
 
 	idImageOpts opts;
 	opts.textureType = static_cast<textureType_t>( header.textureType );
-	opts.format = static_cast<textureFormat_t>( header.format );
-	opts.colorFormat = static_cast<textureColor_t>( header.colorFormat );
+	opts.format = decodeDXT ? FMT_RGBA8 : static_cast<textureFormat_t>( header.format );
+	opts.colorFormat = decodeDXT ? CFM_DEFAULT : static_cast<textureColor_t>( header.colorFormat );
 	opts.width = header.width;
 	opts.height = header.height;
 	opts.numLevels = header.numLevels;
@@ -2679,7 +2714,27 @@ static lightGridPackedImageLoadResult_t LightGrid_LoadPackedImageRef( idRenderWo
 	const int imageCount = packedImage.NumImages();
 	for ( int i = 0; i < imageCount; i++ ) {
 		const bimageImage_t &img = packedImage.GetImageHeader( i );
-		image->SubImageUpload( img.level, 0, 0, img.destZ, img.width, img.height, packedImage.GetImageData( i ) );
+		if ( !decodeDXT ) {
+			image->SubImageUpload( img.level, 0, 0, img.destZ, img.width, img.height, packedImage.GetImageData( i ) );
+			continue;
+		}
+		// DXT stores whole 4x4 blocks, so decode at the padded size and upload
+		// the level's real rectangle.
+		const int paddedWidth = Max( 4, ( img.width + 3 ) & ~3 );
+		const int paddedHeight = Max( 4, ( img.height + 3 ) & ~3 );
+		idTempArray<byte> decoded( paddedWidth * paddedHeight * 4 );
+		idDxtDecoder decoder;
+		if ( header.format == FMT_DXT1 ) {
+			decoder.DecompressImageDXT1( packedImage.GetImageData( i ), decoded.Ptr(), paddedWidth, paddedHeight );
+		} else {
+			decoder.DecompressImageDXT5( packedImage.GetImageData( i ), decoded.Ptr(), paddedWidth, paddedHeight );
+		}
+		if ( paddedWidth != img.width ) {
+			for ( int y = 1; y < img.height; y++ ) {
+				memmove( decoded.Ptr() + y * img.width * 4, decoded.Ptr() + y * paddedWidth * 4, img.width * 4 );
+			}
+		}
+		image->SubImageUpload( img.level, 0, 0, img.destZ, img.width, img.height, decoded.Ptr() );
 	}
 	return ( image->IsLoaded() && !image->IsDefaulted() ) ? LIGHTGRID_PACKED_IMAGE_LOAD_MATERIALIZED : LIGHTGRID_PACKED_IMAGE_LOAD_FAILED;
 }
@@ -3975,4 +4030,201 @@ bool R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char 
 		readbackPool.DrainedReadbacks(),
 		totalMsec * 0.001f );
 	return true;
+}
+
+/*
+===================
+LightGrid_NormalizeTestMapName
+
+"q4dm1", "mp/q4dm1" and "maps/mp/q4dm1.map" all name maps/mp/q4dm1.
+===================
+*/
+static idStr LightGrid_NormalizeTestMapName( const char *name ) {
+	idStr map = name;
+	map.BackSlashesToSlashes();
+	map.StripFileExtension();
+	if ( idStr::Icmpn( map.c_str(), "maps/", 5 ) != 0 ) {
+		map = idStr( "maps/" ) + map;
+	}
+	return map;
+}
+
+/*
+===================
+R_LightGridPackTest_f
+
+lightGridPackTest [map ...]
+
+The load test that lets the release light-grid pack drop the loose atlas
+images (roadmap PKG-03). For each map - every map with a .lightgridpack under
+maps/ when none is named - it builds a render world from the map exactly as a
+map load does, then loads the map's pack through the same loader and reports
+whether the pack fits this build of the map and gives every atlas it lists a
+chunk. One line per map, then a summary:
+
+  LIGHTGRID_PACK_TEST maps/mp/q4dm1 accepted areas=23 chunks=69/69
+  LIGHTGRID_PACK_TEST maps/mp/q4xdm13 rejected reason=...
+  LIGHTGRID_PACK_TEST_DONE tested=50 accepted=50 rejected=0
+
+A loose .lightgrid beside a pack is never needed once its pack is accepted;
+a map with only loose data is reported too, so a release knows what it would
+lose by dropping it.
+===================
+*/
+void R_LightGridPackTest_f( const idCmdArgs &args ) {
+	idStrList maps;
+	if ( args.Argc() > 1 ) {
+		for ( int i = 1; i < args.Argc(); i++ ) {
+			maps.AddUnique( LightGrid_NormalizeTestMapName( args.Argv( i ) ) );
+		}
+	} else {
+		idFileList *files = fileSystem->ListFilesTree( "maps", ".lightgridpack", true );
+		for ( int i = 0; i < files->GetNumFiles(); i++ ) {
+			maps.AddUnique( LightGrid_NormalizeTestMapName( files->GetFile( i ) ) );
+		}
+		fileSystem->FreeFileList( files );
+		idFileList *loose = fileSystem->ListFilesTree( "maps", ".lightgrid", true );
+		for ( int i = 0; i < loose->GetNumFiles(); i++ ) {
+			maps.AddUnique( LightGrid_NormalizeTestMapName( loose->GetFile( i ) ) );
+		}
+		fileSystem->FreeFileList( loose );
+	}
+
+	idRenderWorldLocal *world = static_cast<idRenderWorldLocal *>( renderSystem->AllocRenderWorld() );
+	int accepted = 0;
+	int rejected = 0;
+	int looseOnly = 0;
+	for ( int i = 0; i < maps.Num(); i++ ) {
+		const idStr &map = maps[ i ];
+		idStr proc = map;
+		proc.SetFileExtension( "proc" );
+		idStr pack = map;
+		pack.SetFileExtension( "lightgridpack" );
+		idStr loose = map;
+		loose.SetFileExtension( "lightgrid" );
+		const bool hasPack = fileSystem->ReadFile( pack.c_str(), NULL ) >= 0;
+
+		if ( fileSystem->ReadFile( proc.c_str(), NULL ) < 0 ) {
+			common->Printf( "LIGHTGRID_PACK_TEST %s rejected reason=no-map (%s is not installed)\n", map.c_str(), proc.c_str() );
+			rejected++;
+			continue;
+		}
+		if ( !world->InitFromMap( map.c_str() ) ) {
+			common->Printf( "LIGHTGRID_PACK_TEST %s rejected reason=map-load\n", map.c_str() );
+			rejected++;
+			continue;
+		}
+		if ( !hasPack ) {
+			LightGrid_ClearAreas( world );
+			const bool looseFits = world->LoadLightGridFile( loose.c_str() );
+			common->Printf( "LIGHTGRID_PACK_TEST %s loose-only metadata=%s\n", map.c_str(), looseFits ? "fits" : "rejected" );
+			looseOnly++;
+			continue;
+		}
+		if ( LightGrid_LayeredBelowMap( pack.c_str(), LightGrid_GameDirRank( proc.c_str() ), map.c_str() ) ) {
+			common->Printf( "LIGHTGRID_PACK_TEST %s rejected reason=layered-below-map\n", map.c_str() );
+			rejected++;
+			continue;
+		}
+		int chunks = 0;
+		int assigned = 0;
+		const bool loaded = world->LoadLightGridPackFile( pack.c_str(), &chunks, &assigned );
+		// With a device, every area's atlases are also uploaded, as streaming
+		// would upload them; that is where a renderer without S3TC decodes them.
+		int gridAreas = 0;
+		int residentAreas = 0;
+		if ( loaded && tr.IsOpenGLRunning() ) {
+			for ( int area = 0; area < world->numPortalAreas; area++ ) {
+				const LightGrid &lightGrid = world->portalAreas[ area ].lightGrid;
+				if ( !LightGrid_PackedImageRefIsValid( lightGrid.packedIrradianceImage ) ) {
+					continue;
+				}
+				gridAreas++;
+				world->EnsureLightGridAreaImages( area );
+				if ( LightGrid_PackedImagesAreResident( lightGrid ) ) {
+					residentAreas++;
+				}
+				// release the area again, as residency purging would, so a run
+				// over every map never holds more than one area's atlases
+				idImage *images[] = { lightGrid.irradianceImage, lightGrid.visibilityImage, lightGrid.probeImage };
+				for ( idImage *image : images ) {
+					if ( image != NULL && image->IsLoaded() ) {
+						image->PurgeImage();
+					}
+				}
+			}
+		}
+		const bool uploaded = !tr.IsOpenGLRunning() || residentAreas == gridAreas;
+		if ( loaded && chunks > 0 && assigned == chunks && uploaded ) {
+			common->Printf( "LIGHTGRID_PACK_TEST %s accepted areas=%i chunks=%i/%i resident=%i/%i decode=%s\n", map.c_str(),
+				world->numPortalAreas, assigned, chunks, residentAreas, gridAreas,
+				( !glConfig.textureCompressionAvailable || r_lightGridSoftwareDecode.GetBool() ) ? "software" : "gpu" );
+			accepted++;
+		} else if ( loaded && chunks > 0 && assigned == chunks ) {
+			common->Printf( "LIGHTGRID_PACK_TEST %s rejected reason=upload areas=%i chunks=%i/%i resident=%i/%i\n", map.c_str(),
+				world->numPortalAreas, assigned, chunks, residentAreas, gridAreas );
+			rejected++;
+		} else {
+			common->Printf( "LIGHTGRID_PACK_TEST %s rejected reason=%s areas=%i chunks=%i/%i\n", map.c_str(),
+				loaded ? "missing-chunks" : "pack-load", world->numPortalAreas, assigned, chunks );
+			rejected++;
+		}
+	}
+	world->InitFromMap( NULL );
+	renderSystem->FreeRenderWorld( world );
+	common->Printf( "LIGHTGRID_PACK_TEST_DONE tested=%i accepted=%i rejected=%i loose_only=%i\n",
+		accepted + rejected + looseOnly, accepted, rejected, looseOnly );
+}
+
+/*
+===================
+R_LightGridPackLoose_f
+
+lightGridPackLoose <map>
+
+Packs a map's existing loose light grid - its .lightgrid metadata and the atlas
+TGAs under env/<map>/ in the save path - into <map>.lightgridpack in the save
+path, without baking, so the pack carries the bake that is already shipped
+(roadmap PKG-03, for maps baked before packs existed). The atlases are
+compressed exactly as a bake's are.
+===================
+*/
+void R_LightGridPackLoose_f( const idCmdArgs &args ) {
+	if ( args.Argc() != 2 ) {
+		common->Printf( "usage: lightGridPackLoose <map>\n" );
+		return;
+	}
+	const idStr map = LightGrid_NormalizeTestMapName( args.Argv( 1 ) );
+	idStr loose = map;
+	loose.SetFileExtension( "lightgrid" );
+
+	idRenderWorldLocal *world = static_cast<idRenderWorldLocal *>( renderSystem->AllocRenderWorld() );
+	bool packed = false;
+	if ( !world->InitFromMap( map.c_str() ) ) {
+		common->Printf( "LIGHTGRID_PACK_LOOSE %s failed reason=map-load\n", map.c_str() );
+	} else {
+		LightGrid_ClearAreas( world );
+		if ( !world->LoadLightGridFile( loose.c_str() ) ) {
+			common->Printf( "LIGHTGRID_PACK_LOOSE %s failed reason=no-loose-grid (%s does not fit this map)\n", map.c_str(), loose.c_str() );
+		} else {
+			lightGridBakeFileStats_t stats;
+			LightGrid_InitBakeFileStats( stats );
+			for ( int areaIndex = 0; areaIndex < world->numPortalAreas; areaIndex++ ) {
+				LightGrid_AddAreaFileStats( stats, world->portalAreas[ areaIndex ].lightGrid );
+			}
+			int fileVersion = 0;
+			int headerVersion = 0;
+			uint32_t settingsHash = 0;
+			if ( LightGrid_ReadFileBakeStatsHash( loose.c_str(), fileVersion, headerVersion, settingsHash ) ) {
+				stats.settingsHash = settingsHash;
+			}
+			lightGridBakeOptions_t options;
+			memset( &options, 0, sizeof( options ) );
+			packed = LightGrid_WriteLightGridPackFile( *world, map.c_str(), options, stats, true );
+			common->Printf( "LIGHTGRID_PACK_LOOSE %s %s settings=0x%08x valid_probes=%i\n", map.c_str(),
+				packed ? "packed" : "failed reason=write", static_cast<unsigned int>( stats.settingsHash ), stats.validProbes );
+		}
+	}
+	world->InitFromMap( NULL );
+	renderSystem->FreeRenderWorld( world );
 }

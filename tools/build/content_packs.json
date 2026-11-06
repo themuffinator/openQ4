@@ -26,6 +26,7 @@
       "contents_string": "#str_231702",
       "client_only": true,
       "bulk": true,
+      "rules": ["light-grid-trim"],
       "required_files": [
         "maps/mp/q4dm1.lightgridpack"
       ]

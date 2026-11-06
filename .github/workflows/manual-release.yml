@@ -619,11 +619,16 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+    env:
+      # A bulk pack's base is built from its content generation's commit.
+      OPENQ4_REQUIRE_CONTENT_GENERATIONS: "1"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # Content generations pin bulk packs to earlier commits.
+          fetch-depth: 0
           ref: ${{ needs.metadata.outputs.openq4_source_sha }}
 
       - name: Setup Python
@@ -813,7 +818,8 @@ jobs:
               libxxf86vm-dev \
               weston \
               xauth \
-              xvfb; then
+              xvfb \
+              zsync; then
               exit 0
             fi
 
@@ -1474,9 +1480,11 @@ jobs:
             --appimagetool "${appimagetool}" \
             --runtime-file "${runtime_file}" \
             --work-root "${RUNNER_TEMP}" \
+            --update-information "gh-releases-zsync|${GITHUB_REPOSITORY%%/*}|${GITHUB_REPOSITORY##*/}|latest|openq4-*${{ matrix.package_suffix }}-${appimage_arch}.AppImage.zsync" \
             --output "${appimage_path}"
 
           echo "appimage_path=${appimage_path}" >> "${GITHUB_OUTPUT}"
+          echo "appimage_zsync_path=${appimage_path}.zsync" >> "${GITHUB_OUTPUT}"
 
       - name: Validate Linux AppImage under Wayland and X11
         if: matrix.platform == 'linux' && inputs.generate_linux_arm64_evidence_candidate == false
@@ -1696,7 +1704,9 @@ jobs:
             --version-tag "${{ needs.metadata.outputs.version_tag }}" `
             --arch "${{ matrix.binary_arch }}" `
             --source-root "${env:GITHUB_WORKSPACE}" `
-            --output-dir "${env:RUNNER_TEMP}"
+            --output-dir "${env:RUNNER_TEMP}" `
+            --content-packs-manifest (Join-Path $env:RUNNER_TEMP "content-packs/content-packs.json") `
+            --content-pack-base-url "https://github.com/${env:GITHUB_REPOSITORY}/releases/download/${{ needs.metadata.outputs.release_tag }}/"
 
           $installerPath = Join-Path $env:RUNNER_TEMP "openq4-${{ needs.metadata.outputs.version_tag }}-windows-${{ matrix.binary_arch }}-setup.exe"
           if (-not (Test-Path -LiteralPath $installerPath)) {
@@ -2172,7 +2182,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: openq4-release-${{ needs.metadata.outputs.version_tag }}-linux-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-appimage
-          path: ${{ steps.appimage.outputs.appimage_path }}
+          path: |
+            ${{ steps.appimage.outputs.appimage_path }}
+            ${{ steps.appimage.outputs.appimage_zsync_path }}
           if-no-files-found: error
 
       - name: Upload Windows installer
@@ -2283,6 +2295,7 @@ jobs:
             "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64-update.tar.xz"
             "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64-debugsymbols.tar.xz"
             "openq4-${{ needs.metadata.outputs.version_tag }}-x86_64.AppImage"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-x86_64.AppImage.zsync"
             "openq4-${{ needs.metadata.outputs.version_tag }}-content-packs.json"
           )
           # The bulk content packs are published under their runtime names.
@@ -2297,6 +2310,7 @@ jobs:
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-update.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-debugsymbols.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-preview-aarch64.AppImage"
+              "openq4-${{ needs.metadata.outputs.version_tag }}-preview-aarch64.AppImage.zsync"
             )
           else
             expected+=(
@@ -2304,6 +2318,7 @@ jobs:
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-update.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-debugsymbols.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-aarch64.AppImage"
+              "openq4-${{ needs.metadata.outputs.version_tag }}-aarch64.AppImage.zsync"
             )
           fi
           if [ "${{ needs.metadata.outputs.macos_signed_release_enabled }}" = "true" ]; then
@@ -2577,6 +2592,7 @@ jobs:
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-update.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-debugsymbols.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-aarch64.AppImage"
+                "openq4-${{ needs.metadata.outputs.version_tag }}-aarch64.AppImage.zsync"
               )
             else
               stale_linux_arm64_assets=(
@@ -2584,6 +2600,7 @@ jobs:
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-update.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-debugsymbols.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-preview-aarch64.AppImage"
+                "openq4-${{ needs.metadata.outputs.version_tag }}-preview-aarch64.AppImage.zsync"
               )
             fi
             mapfile -t existing_release_assets < <(

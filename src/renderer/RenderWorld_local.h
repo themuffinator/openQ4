@@ -354,7 +354,8 @@ public:
 	void					TrimLightGridPack();
 	bool					AnyLightGridAvailable();
 	bool					LoadLightGridFile( const char *name, bool osPath = false );	// osPath: name is an OS path, not a game path
-	bool					LoadLightGridPackFile( const char *name );
+	// chunkCount/assignedChunks, when given, report the pack's chunk directory and how many found an atlas
+	bool					LoadLightGridPackFile( const char *name, int *chunkCount = NULL, int *assignedChunks = NULL );
 	bool					ParseLightGridPoints( idLexer *src );
 	bool					ParseLightGridVisibility( idLexer *src );
 	void					WriteLightGridsToFile( const char *name ) const;

@@ -53,8 +53,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional options:"; Flags: unchecked
 Name: "protocol"; Description: "Register openq4:// browser links"; GroupDescription: "Browser integration:"; Flags: unchecked
 
+[InstallDelete]
+; PDBs older packages installed (symbols are now a separate download), and any
+; openQ4 pack this version does not use: the engine skips them, so remove them.
+@@INSTALL_DELETE@@
+
 [Files]
-Source: "{#PackageSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageSource}\*"; DestDir: "{app}"; Excludes: "@@FILES_EXCLUDES@@"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[UninstallDelete]
+@@UNINSTALL_DELETE@@
 
 [Registry]
 Root: HKA; Subkey: "{#MyAppInstallRegKey}"; ValueType: string; ValueName: "InstallDir"; ValueData: "{app}"; Flags: uninsdeletekeyifempty
@@ -126,6 +134,8 @@ begin
     'Setup will reuse that install location unless you choose a different folder.';
 end;
 
+@@CONTENT_PACK_CODE@@
+
 procedure InitializeWizard;
 var
   ExistingInstallSummary: String;
@@ -134,10 +144,20 @@ begin
   if ExistingInstallSummary <> '' then
     WizardForm.WelcomeLabel2.Caption :=
       WizardForm.WelcomeLabel2.Caption + #13#10#13#10 + ExistingInstallSummary;
+  InitializeContentPacks;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = wpReady then
+    Result := FetchContentPacks;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if (CurStep = ssInstall) and (not WizardIsTaskSelected('protocol')) then
     RegDeleteKeyIncludingSubkeys(HKEY_AUTO, openQ4ProtocolRegKey);
+  if CurStep = ssPostInstall then
+    InstallContentPacks;
 end;

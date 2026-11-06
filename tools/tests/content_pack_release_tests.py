@@ -101,7 +101,7 @@ class ContentPackReleaseTests(unittest.TestCase):
         source = self.work / "source"
         make_sources(source)
         self.build(source, self.work / "r1", "0.20.0")
-        write(source / openq4_pak.OPENQ4_CONTENT_PACKS_BY_NAME["pak1.pk4"].source / "maps/mp/extra.lightgrid", "rebake\n")
+        write(source / openq4_pak.OPENQ4_CONTENT_PACKS_BY_NAME["pak1.pk4"].source / "maps/mp/extra.lightgridpack", "rebake\n")
         result = run(BUILD / "content_pack_release.py", "build", "--source-root", source, "--out-dir", self.work / "r2",
                      "--version-tag", "0.20.1", "--previous-manifest", self.work / "r1" / "content-packs.json",
                      "--previous-packs-dir", self.work / "r1", "--forbid-bulk-changes")
@@ -192,7 +192,7 @@ class ContentPackReleaseTests(unittest.TestCase):
         result = run(*args)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(out.read_bytes(), (self.work / "r1" / "pak1.pk4").read_bytes())
-        write(source / spec.source / "maps/mp/extra.lightgrid", "changed\n")
+        write(source / spec.source / "maps/mp/extra.lightgridpack", "changed\n")
         result = run(*args)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("was built from other sources", result.stderr)
@@ -250,6 +250,170 @@ class ContentPackReleaseTests(unittest.TestCase):
         verify_offset = workflow.index("- name: Verify content packs and update archives")
         self.assertLess(workflow.index("- name: Verify platform archives"), verify_offset)
         self.assertLess(verify_offset, workflow.index("- name: Create or update release"))
+
+    def test_installer_downloads_only_missing_or_different_bulk_packs(self) -> None:
+        installer = load("build_windows_installer_under_test", BUILD / "build_windows_installer.py")
+        package = self.work / "package"
+        source = self.work / "source"
+        make_sources(source)
+        manifest = self.build(source, self.work / "r1", "0.20.0")
+        for pack in manifest["packs"]:
+            write(package / "baseoq4" / pack["name"], (self.work / "r1" / pack["name"]).read_bytes())
+        base_url = installer.validate_content_pack_base_url("https://github.com/themuffinator/openQ4/releases/download/v0.20.0")
+        packs = installer.read_download_packs(self.work / "r1" / "content-packs.json", package, base_url)
+        self.assertEqual([pack["name"] for pack in packs], list(openq4_pak.OPENQ4_BULK_PACK_NAMES))
+        template = (BUILD / "openQ4Installer.iss.in").read_text(encoding="utf-8")
+        script = installer.render_installer_script(
+            template, package_dir=package, output_dir=self.work / "out", version="0.20.0", version_tag="0.20.0",
+            arch="x64", setup_icon_file=self.work / "icon.ico", download_packs=packs)
+        self.assertNotIn("@@", script)
+        self.assertIn('Excludes: "\\baseoq4\\pak1.pk4,\\baseoq4\\pak2.pk4"', script)
+        for pack in packs:
+            self.assertIn(f"'{pack['sha256']}'", script, "each download is pinned to its SHA-256")
+            self.assertIn(f"'https://github.com/themuffinator/openQ4/releases/download/v0.20.0/{pack['name']}'", script)
+            self.assertIn(f'[UninstallDelete]\nType: files; Name: "{{app}}\\baseoq4\\pak1.pk4"', script)
+        self.assertIn("ContentPackDownloadPage.Add(ContentPackUrl(I), ContentPackName(I) + '.download', ContentPackSha256(I));", script)
+        self.assertIn("if ContentPackMatches(ContentPackTarget(I), ContentPackSha256(I)) then", script, "a current pack is kept")
+        self.assertIn("ExpandConstant('{app}\\baseoq4\\')", script)
+        self.assertIn('Type: files; Name: "{app}\\baseoq4\\pak9.pk4"', script, "retired packs are deleted")
+        self.assertNotIn('Name: "{app}\\baseoq4\\pak1.pk4"\n[Files]', script)
+        self.assertIn('Type: files; Name: "{app}\\*.pdb"', script)
+        # Without a manifest the installer embeds every pack, as before.
+        embedded = installer.render_installer_script(
+            template, package_dir=package, output_dir=self.work / "out", version="0.20.0", version_tag="0.20.0",
+            arch="x64", setup_icon_file=self.work / "icon.ico")
+        self.assertIn('Excludes: ""', embedded)
+        self.assertNotIn("TDownloadWizardPage", embedded)
+        for bad in ("http://example.com/", "file:///c:/packs/", "https://example.com/a b/"):
+            with self.assertRaises(ValueError):
+                installer.validate_content_pack_base_url(bad)
+        installer.validate_content_pack_base_url("http://127.0.0.1:8765/")
+        (package / "baseoq4" / "pak2.pk4").write_bytes(b"other bytes")
+        with self.assertRaises(RuntimeError):
+            installer.read_download_packs(self.work / "r1" / "content-packs.json", package, base_url)
+
+    def test_appimage_update_information_names_its_zsync(self) -> None:
+        sys.path.insert(0, str(ROOT))
+        appimage = load("package_linux_appimage_under_test", BUILD / "package_linux_appimage.py")
+        good = "gh-releases-zsync|themuffinator|openQ4|latest|openq4-*-x86_64.AppImage.zsync"
+        self.assertEqual(appimage.validate_update_information(good, "openq4-0.20.0-x86_64.AppImage"), good)
+        with self.assertRaises(appimage.AppImageError):
+            appimage.validate_update_information(good, "openq4-0.20.0-aarch64.AppImage")
+        with self.assertRaises(appimage.AppImageError):
+            appimage.validate_update_information("zsync|https://example.com/x.zsync", "openq4-0.20.0-x86_64.AppImage")
+        image = self.work / "openq4-0.20.0-x86_64.AppImage"
+        write(image, b"\x7fELF" + good.encode() + b"payload")
+        import hashlib
+        write(Path(str(image) + ".zsync"),
+              f"zsync: 0.6.2\nFilename: {image.name}\nLength: {image.stat().st_size}\nSHA-1: "
+              f"{hashlib.sha1(image.read_bytes()).hexdigest()}\n\nblocks".encode())
+        appimage.validate_embedded_update_information(image, good)
+        workflow = (ROOT / ".github/workflows/manual-release.yml").read_text(encoding="utf-8")
+        self.assertIn('--update-information "gh-releases-zsync|${GITHUB_REPOSITORY%%/*}|${GITHUB_REPOSITORY##*/}|latest|', workflow)
+        self.assertIn("-x86_64.AppImage.zsync\"", workflow)
+
+    def test_one_file_fix_ships_as_a_small_overlay_and_the_base_keeps_its_bytes(self) -> None:
+        import content_generations as generations
+        import random
+
+        repo = self.work / "repo"
+        repo.mkdir()
+        git = lambda *args: subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+        git("init", "-q")
+        git("config", "user.email", "test@example.invalid")
+        git("config", "user.name", "test")
+        source = repo / "content/baseoq4/pak2/gfx/guis/loadscreens"
+        rng = random.Random(4)
+        for name in ("generic.dds", "generic.tga", "a.tga", "b.tga"):
+            write(source / name, bytes(rng.randrange(256) for _ in range(256 * 1024)))
+        git("add", "-A")
+        git("commit", "-q", "-m", "generation 1")
+        commit = git("rev-parse", "HEAD")
+        base = openq4_pak.ContentPackSpec(
+            name="pak2.pk4", source="content/baseoq4/pak2", contents="loadscreens", contents_string="#str_231703",
+            client_only=True, bulk=True, required_files=frozenset(), generation_number=1, generation_commit=commit)
+        overlay = openq4_pak.ContentPackSpec(
+            name="pak3.pk4", source=base.source, contents="loadscreens update", contents_string="#str_231703",
+            client_only=True, bulk=False, required_files=frozenset(), overlay_of="pak2.pk4",
+            generation_number=1, generation_commit=commit)
+
+        published = self.work / "published-pak2.pk4"
+        generations.build_content_pack(repo, base, published, specs=[base])
+        # One file changes after the generation was published.
+        write(source / "a.tga", bytes(rng.randrange(256) for _ in range(1024 * 1024)))
+        plan = generations.plan_overlays(repo, [base], 25_000_000)[0]
+        self.assertEqual((plan["action"], plan["changed"], plan["added"], plan["removed"]), ("overlay", ["gfx/guis/loadscreens/a.tga"], [], []))
+        with self.assertRaises(generations.GenerationError):
+            generations.build_content_pack(repo, base, self.work / "x.pk4", specs=[base])  # no overlay declared yet
+        rebuilt = self.work / "pak2.pk4"
+        fix = self.work / "pak3.pk4"
+        generations.build_content_pack(repo, base, rebuilt, specs=[base, overlay])
+        generations.build_content_pack(repo, overlay, fix, specs=[base, overlay])
+        self.assertEqual(rebuilt.read_bytes(), published.read_bytes(), "the base keeps its published bytes")
+        with zipfile.ZipFile(fix) as handle:
+            self.assertEqual(handle.namelist(), ["gfx/guis/loadscreens/a.tga"])
+            self.assertEqual(handle.read("gfx/guis/loadscreens/a.tga"), (source / "a.tga").read_bytes())
+        self.assertLess(fix.stat().st_size, 5 * 1000 * 1000, "a one-file fix ships under 5 MB")
+        self.assertEqual(generations.effective_source_digest(repo, base, [base, overlay]),
+                         (openq4_pak.format_pack_source_digest("pak2.pk4", list(generations.generation_listing(repo, base, commit).items())), 4))
+
+        # Over budget, or a removal, needs a new generation instead.
+        self.assertEqual(generations.plan_overlays(repo, [base], 1000)[0]["action"], "new-generation")
+        (source / "b.tga").unlink()
+        self.assertEqual(generations.plan_overlays(repo, [base], 25_000_000)[0]["action"], "new-generation")
+        with self.assertRaises(generations.GenerationError):
+            generations.build_content_pack(repo, overlay, fix, specs=[base, overlay])
+
+        # generation-bump records the new commit and folds the overlay.
+        git("add", "-A")
+        git("commit", "-q", "-m", "generation 2")
+        table = json.loads((BUILD / "content_packs.json").read_text(encoding="utf-8"))
+        for pack in table["packs"]:
+            if pack["name"] == "pak2.pk4":
+                pack["generation"] = {"number": 1, "commit": commit}
+        table["packs"].append({"name": "pak3.pk4", "overlay_of": "pak2.pk4"})
+        table_path = self.work / "content_packs.json"
+        table_path.write_text(json.dumps(table), encoding="utf-8")
+        self.assertEqual([spec.name for spec in openq4_pak.load_content_pack_specs(table_path)][-1], "pak3.pk4")
+        result = run(BUILD / "content_pack_release.py", "generation-bump", "--table", table_path, "--source-root", repo,
+                     "--pack", "pak2.pk4")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("folded pak3.pk4", result.stdout)
+        bumped = json.loads(table_path.read_text(encoding="utf-8"))
+        self.assertEqual(next(p for p in bumped["packs"] if p["name"] == "pak2.pk4")["generation"],
+                         {"number": 2, "commit": git("rev-parse", "HEAD")})
+        self.assertFalse(any(p.get("overlay_of") for p in bumped["packs"]))
+
+    def test_light_grid_trim_drops_what_the_runtime_never_reads(self) -> None:
+        names = [
+            "maps/mp/q4dm1.lightgridpack", "maps/mp/q4dm1.lightgrid",
+            "env/maps/mp/q4dm1/area0_lightgrid_amb.tga", "env/maps/mp/q4dm1/area0_lightgrid_vis.tga",
+            "maps/game/waste.lightgrid", "env/maps/game/waste/area0_lightgrid_amb.tga",
+            "maps/game/core2.lightgrid",
+        ]
+        self.assertEqual(openq4_pak.light_grid_trim(names), {
+            "env/maps/mp/q4dm1/area0_lightgrid_amb.tga", "env/maps/mp/q4dm1/area0_lightgrid_vis.tga",
+            "maps/game/core2.lightgrid",
+        })
+        self.assertEqual(openq4_pak.OPENQ4_CONTENT_PACKS_BY_NAME["pak1.pk4"].rules, ("light-grid-trim",))
+        # The rule is part of the source digest, so changing it never reuses an old pack.
+        import hashlib
+        expected = hashlib.sha256(
+            f"{openq4_pak.PACK_SOURCE_DIGEST_FORMAT}\npak1.pk4\nrule\tlight-grid-trim\na\tb\n".encode("utf-8")).hexdigest()
+        self.assertEqual(openq4_pak.format_pack_source_digest("pak1.pk4", [("a", "b")]), expected)
+
+    def test_overlay_entries_are_validated(self) -> None:
+        table = json.loads((BUILD / "content_packs.json").read_text(encoding="utf-8"))
+        path = self.work / "content_packs.json"
+        for overlay, message in (
+            ({"name": "pak3.pk4", "overlay_of": "pak2.pk4"}, "has no content generation"),
+            ({"name": "pak2.pk4", "overlay_of": "pak1.pk4"}, "pak3.pk4 to pak9.pk4"),
+            ({"name": "pak4.pk4", "overlay_of": "pak0.pk4"}, "bulk pack"),
+        ):
+            path.write_text(json.dumps(dict(table, packs=table["packs"] + [overlay])), encoding="utf-8")
+            with self.assertRaises(RuntimeError) as caught:
+                openq4_pak.load_content_pack_specs(path)
+            self.assertIn(message, str(caught.exception))
 
     def test_release_asset_names_admit_standalone_packs(self) -> None:
         verifier = load("verify_release_asset_set_under_test", BUILD / "verify_release_asset_set.py")

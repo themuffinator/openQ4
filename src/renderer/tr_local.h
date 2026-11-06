@@ -47,6 +47,8 @@ class idRenderWorldLocal;
 void					R_SetDefaultLightGridBakeOptions( lightGridBakeOptions_t &options );
 bool					R_BakeCurrentLightGrids( const lightGridBakeOptions_t &options, const char *jobName = NULL );
 bool					R_LightGridFileMatchesBakeOptions( const char *name, const lightGridBakeOptions_t &options, const idRenderWorldLocal *world );
+void					R_LightGridPackTest_f( const idCmdArgs &args );
+void					R_LightGridPackLoose_f( const idCmdArgs &args );
 bool					R_LightGridPackFileMatchesBakeOptions( const char *name, const lightGridBakeOptions_t &options, const idRenderWorldLocal *world );
 
 // everything that is needed by the backend needs
@@ -1558,6 +1560,7 @@ extern idCVar r_lightGridDepthBiasFactor;	// polygon offset factor for light-gri
 extern idCVar r_lightGridDepthBiasUnits;	// polygon offset units for light-grid overlay
 extern idCVar r_lightGridDepthTolerance;	// depth texture tolerance for light-grid receiver clipping
 extern idCVar r_lightGridPortalBlend;	// world-unit blend radius for light-grid sampling across visible portal boundaries
+extern idCVar r_lightGridSoftwareDecode;	// decode DXT light-grid pack atlases on the CPU, as renderers without S3TC must
 extern idCVar r_lightGridPreload;		// preload all light-grid atlases during map load instead of streaming visible areas
 extern idCVar r_lightGridResidencyFrames;	// keep light-grid atlases resident after visible/neighbor use; 0 disables runtime purging
 extern idCVar r_lightGridBakeWorkers;	// worker thread count for CPU probe integration (-1 = disabled, 0 = auto)

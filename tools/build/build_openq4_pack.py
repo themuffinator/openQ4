@@ -11,13 +11,17 @@ import time
 from pathlib import Path
 
 from openq4_pak import (
+    OPENQ4_CONTENT_PACKS,
+    OPENQ4_CONTENT_PACKS_BY_NAME,
     OPENQ4_PACK_NAMES,
+    ContentPackSpec,
     Pk4BuildResult,
     advance_mtime_ns,
     copy_file_if_changed,
     create_game_pk4,
     inspect_game_pk4,
     pack_source_digest,
+    write_pk4_from_entries,
 )
 
 
@@ -35,6 +39,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--stage-out",
         default="",
         help="Optional additional baseoq4/<pak>.pk4 path to copy for direct builddir launches.",
+    )
+    parser.add_argument(
+        "--source-root",
+        default="",
+        help=(
+            "Repository root. Needed for a pack with a content generation "
+            "(tools/build/content_packs.json) or an overlay: its git history holds "
+            "the generation's sources."
+        ),
     )
     parser.add_argument(
         "--prebuilt-dir",
@@ -106,7 +119,13 @@ def copy_prebuilt_pack(prebuilt_dir: Path, pak_name: str, source_dir: Path, pak_
         raise RuntimeError(f"prebuilt {pak_name} is missing or not a regular file: {prebuilt}")
     if sha256_hex(prebuilt) != record["sha256"]:
         raise RuntimeError(f"prebuilt {pak_name} does not have the SHA-256 its manifest records")
-    digest, _count = pack_source_digest(source_dir, pak_name)
+    spec = OPENQ4_CONTENT_PACKS_BY_NAME[pak_name]
+    if spec.generation_commit:
+        from content_generations import effective_source_digest
+
+        digest, _count = effective_source_digest(source_dir.parents[len(Path(spec.source).parts) - 1], spec)
+    else:
+        digest, _count = pack_source_digest(source_dir, pak_name)
     if digest != record["source_digest"]:
         raise RuntimeError(
             f"prebuilt {pak_name} was built from other sources (source digest {record['source_digest']}, "
@@ -136,11 +155,20 @@ def main(argv: list[str]) -> int:
             return 1
 
     try:
+        spec = OPENQ4_CONTENT_PACKS_BY_NAME[pak_name]
         if args.prebuilt_dir:
             if args.exclude:
                 raise RuntimeError("--prebuilt-dir cannot be combined with --exclude")
             result = copy_prebuilt_pack(Path(args.prebuilt_dir).resolve(), pak_name, source_dir, pak_out)
             print(f"using prebuilt {pak_name} from {Path(args.prebuilt_dir).resolve()}")
+        elif spec.generation_commit:
+            if not args.source_root:
+                raise RuntimeError(f"{pak_name} has a content generation; pass --source-root so its history can be read")
+            if args.exclude:
+                raise RuntimeError("--exclude cannot be combined with a content generation")
+            from content_generations import build_content_pack
+
+            result = build_content_pack(Path(args.source_root).resolve(), spec, pak_out)
         else:
             result = create_game_pk4(source_dir, pak_out, pak_name=pak_name, content_filters=args.exclude)
     except (OSError, ValueError, KeyError, RuntimeError) as exc:

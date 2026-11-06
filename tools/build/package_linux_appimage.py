@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import os
 import re
@@ -432,6 +433,46 @@ def validate_type2_appimage(path: Path, arch: str) -> Path:
     return path
 
 
+UPDATE_INFORMATION_RE = re.compile(
+    r"gh-releases-zsync\|[A-Za-z0-9_.-]+\|[A-Za-z0-9_.-]+\|latest\|[A-Za-z0-9_.*+-]+\.AppImage\.zsync"
+)
+
+
+def validate_update_information(value: str, appimage_name: str) -> str:
+    """AppImage update information: the GitHub release channel and the .zsync it reads.
+
+    AppImageUpdate and other zsync clients download only the blocks of the
+    published AppImage that differ from the local one (roadmap PKG-05).
+    """
+    if UPDATE_INFORMATION_RE.fullmatch(value) is None:
+        raise AppImageError(f"invalid AppImage update information: {value!r}")
+    pattern = value.rsplit("|", 1)[1]
+    if not fnmatch.fnmatchcase(appimage_name + ".zsync", pattern):
+        raise AppImageError(f"update information pattern {pattern!r} does not match {appimage_name}.zsync")
+    return value
+
+
+def validate_embedded_update_information(path: Path, value: str) -> Path:
+    """The runtime carries the update information, and the .zsync describes this image."""
+    with path.open("rb") as handle:
+        prefix = handle.read(4 * 1024 * 1024)
+    if value.encode("ascii") not in prefix:
+        raise AppImageError(f"Linux AppImage does not embed its update information: {path}")
+    zsync = path.with_name(path.name + ".zsync")
+    zsync = require_regular_file(zsync, "AppImage .zsync metadata")
+    header = zsync.read_bytes()[:4096].split(b"\n\n", 1)[0].decode("ascii", "replace")
+    fields = dict(line.split(": ", 1) for line in header.splitlines() if ": " in line)
+    if fields.get("Filename") != path.name or fields.get("Length") != str(path.stat().st_size):
+        raise AppImageError(f"{zsync.name} does not describe {path.name}: {fields}")
+    sha1 = hashlib.sha1()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            sha1.update(chunk)
+    if fields.get("SHA-1") != sha1.hexdigest():
+        raise AppImageError(f"{zsync.name} records another image's SHA-1")
+    return zsync
+
+
 def extract_appimage(appimage: Path, destination: Path) -> Path:
     destination.mkdir(parents=True, exist_ok=False)
     env = os.environ.copy()
@@ -498,6 +539,9 @@ def build_appimage(args: argparse.Namespace) -> Path:
     output = Path(args.output).resolve(strict=False)
     if output.name != expected_name:
         raise AppImageError(f"AppImage output must be named {expected_name!r}, got {output.name!r}")
+    update_information = (
+        validate_update_information(args.update_information, expected_name) if args.update_information else ""
+    )
     if output.exists() or output.is_symlink():
         raise AppImageError(f"AppImage output already exists: {output}")
     if is_relative_to(output, package_root):
@@ -581,6 +625,9 @@ def build_appimage(args: argparse.Namespace) -> Path:
 
         appimagetool_env = tool_env.copy()
         appimagetool_env["ARCH"] = appimage_arch(arch)
+        # With update information appimagetool embeds it in the runtime and
+        # writes <output>.zsync beside the image.
+        update_arguments = ["--updateinformation", update_information] if update_information else []
         run_checked(
             [
                 str(appimagetool),
@@ -588,6 +635,7 @@ def build_appimage(args: argparse.Namespace) -> Path:
                 "zstd",
                 "--runtime-file",
                 str(runtime_file),
+                *update_arguments,
                 str(appdir),
                 str(output),
             ],
@@ -598,6 +646,8 @@ def build_appimage(args: argparse.Namespace) -> Path:
 
         os.chmod(output, 0o755)
         validate_type2_appimage(output, arch)
+        if update_information:
+            validate_embedded_update_information(output, update_information)
         extracted = extract_appimage(output, temp_root / "extract")
         validate_appdir(
             extracted,
@@ -623,6 +673,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--runtime-file", required=True, help="Pinned type-2 AppImage runtime prefix")
     parser.add_argument("--work-root", required=True, help="Existing directory for isolated temporary work")
     parser.add_argument("--output", required=True, help="Final .AppImage output path")
+    parser.add_argument(
+        "--update-information",
+        default="",
+        help="gh-releases-zsync update information to embed; also writes <output>.zsync",
+    )
     return parser.parse_args(argv)
 
 

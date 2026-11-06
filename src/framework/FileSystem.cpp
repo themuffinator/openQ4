@@ -5351,6 +5351,17 @@ void idFileSystemLocal::AddGameDirectory( const char *path, const char *dir ) {
 			common->Printf( "Ignoring unneeded game binary pk4 %s\n", BuildOSPath( path, dir, pakfiles[ i ] ) );
 			continue;
 		}
+		// pak0.pk4 to pak9.pk4 in baseoq4 are openQ4's own packs. One this build's
+		// pack table does not list was retired or left by another release (an
+		// update archive cannot delete files), and mounting it would override
+		// current content, so it is skipped.
+		numberedPakName_t numberedPak;
+		if ( !idStr::Icmp( dir, OPENQ4_GAMEDIR ) && FS_ParseNumberedPakName( pakfiles[ i ].c_str(), numberedPak ) &&
+			 numberedPak.digitCount == 1 && FS_FindOpenQ4PackTableEntry( pakfiles[ i ].c_str() ) == NULL ) {
+			common->Warning( "Ignoring %s: this version of openQ4 does not use it. It was left by another release and can be deleted.",
+				BuildOSPath( path, dir, pakfiles[ i ] ) );
+			continue;
+		}
 
 		pakfile = BuildOSPath( path, dir, pakfiles[i] );
 		pak = LoadZipFile( pakfile );

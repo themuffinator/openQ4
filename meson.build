@@ -1898,6 +1898,8 @@ if build_engine or build_games
         '@OUTPUT@',
         '--stage-out',
         meson.current_build_dir() / 'baseoq4' / openq4_pack_name,
+        '--source-root',
+        meson.project_source_root(),
       ] + openq4_prebuilt_pack_args,
       depend_files: openq4_pak_script_files + files(
         'tools/build/build_openq4_pack.py',

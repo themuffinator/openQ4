@@ -655,6 +655,7 @@ idCVar r_lightGridDepthBiasFactor( "r_lightGridDepthBiasFactor", "0", CVAR_RENDE
 idCVar r_lightGridDepthBiasUnits( "r_lightGridDepthBiasUnits", "0", CVAR_RENDERER | CVAR_FLOAT, "fallback polygon offset units for depth-tested baked light-grid overlay receivers", -4096.0f, 4096.0f );
 idCVar r_lightGridDepthTolerance( "r_lightGridDepthTolerance", "0.005", CVAR_RENDERER | CVAR_FLOAT, "normalized depth tolerance for clipping baked light-grid receivers against captured scene depth", 0.0f, 0.1f );
 idCVar r_lightGridPortalBlend( "r_lightGridPortalBlend", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "world-unit radius for blending indirect light grids across visible portal boundaries; 0 disables", 0.0f, 256.0f );
+idCVar r_lightGridSoftwareDecode( "r_lightGridSoftwareDecode", "0", CVAR_RENDERER | CVAR_BOOL, "decode DXT-compressed light-grid pack atlases in software even where the GPU samples DXT; renderers without S3TC always do, so 1 tests that path" );
 idCVar r_lightGridPreload( "r_lightGridPreload", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "preload every light-grid atlas while loading a map; 0 streams visible areas on demand, 1 avoids area-transition uploads at the cost of longer map loads and more VRAM" );
 idCVar r_lightGridResidencyFrames( "r_lightGridResidencyFrames", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "frames to keep light-grid atlases resident after visible/neighbor use; 0 disables runtime purging", 0, 3600, idCmdSystem::ArgCompletion_Integer<0,3600> );
 idCVar r_lightGridBakeWorkers( "r_lightGridBakeWorkers", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "worker threads for light-grid probe integration (-1 = disabled, 0 = auto, 1..8 = explicit)", -1, 8, idCmdSystem::ArgCompletion_Integer<-1,8> );
@@ -6156,6 +6157,8 @@ R_InitCommands
 =================
 */
 void R_InitCommands( void ) {
+	cmdSystem->AddCommand( "lightGridPackTest", R_LightGridPackTest_f, CMD_FL_RENDERER, "loads every map's .lightgridpack (or the named maps') as a map load does and reports whether each is accepted with all its chunks" );
+	cmdSystem->AddCommand( "lightGridPackLoose", R_LightGridPackLoose_f, CMD_FL_RENDERER, "packs a map's existing loose .lightgrid and save-path atlases into a .lightgridpack without baking" );
 	cmdSystem->AddCommand( "sizeUp", R_SizeUp_f, CMD_FL_RENDERER, "makes the rendered view larger" );
 	cmdSystem->AddCommand( "sizeDown", R_SizeDown_f, CMD_FL_RENDERER, "makes the rendered view smaller" );
 	cmdSystem->AddCommand( "reloadGuis", R_ReloadGuis_f, CMD_FL_RENDERER, "reloads guis" );

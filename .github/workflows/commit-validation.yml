@@ -76,6 +76,7 @@ jobs:
             tools/build/build_openq4_pack.py \
             tools/build/content_packs.py \
             tools/build/content_pack_release.py \
+            tools/build/content_generations.py \
             tools/build/build_pak0.py \
             tools/build/build_windows_installer.py \
             tools/build/check_staged_content_edits.py \
@@ -234,6 +235,7 @@ jobs:
             tools/tests/mp_lan_reconnect_smoke.py \
             tools/tests/content_pack_split_smoke.py \
             tools/tests/content_pack_status_smoke.py \
+            tools/tests/lightgrid_pack_load_test.py \
             tools/tests/mp_mod_admission_smoke.py \
             tools/tests/mp_retail_protocol_smoke.py \
             tools/tests/openxr_lifecycle_runtime.py \

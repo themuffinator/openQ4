@@ -50,7 +50,7 @@ def link_or_copy(source: Path, destination: Path) -> None:
         shutil.copy2(source, destination)
 
 
-def stage(package: Path, runtime: Path, drop: str | None, stale: str | None) -> None:
+def stage(package: Path, runtime: Path, drop: str | None, stale: str | None, leftover: str | None = None) -> None:
     if runtime.exists():
         for path in sorted(runtime.rglob("*"), reverse=True):
             if path.is_symlink():
@@ -73,11 +73,16 @@ def stage(package: Path, runtime: Path, drop: str | None, stale: str | None) -> 
                     archive.writestr("readme.txt", "a pack from another openQ4 release\n")
                 continue
             link_or_copy(source, runtime / "baseoq4" / source.name)
+    if leftover:
+        # A retired or old overlay pack an update archive could not delete.
+        with zipfile.ZipFile(runtime / "baseoq4" / leftover, "w") as archive:
+            archive.writestr("strings/english_zz_leftover.lang", '{\n\t"#str_231700"\t"LEFTOVER PACK WAS MOUNTED"\n}\n')
 
 
-def run_case(args, label: str, language: str, drop: str | None, stale: str | None) -> dict:
+def run_case(args, label: str, language: str, drop: str | None, stale: str | None,
+             leftover: str | None = None, quit_after_start: bool = False) -> dict:
     runtime = args.runtime.resolve()
-    stage(args.runtime_dir.resolve(), runtime, drop, stale)
+    stage(args.runtime_dir.resolve(), runtime, drop, stale, leftover)
     home = args.output_dir.resolve() / label
     log = home / "baseoq4" / "logs" / "openq4.log"
     home.mkdir(parents=True)
@@ -88,6 +93,8 @@ def run_case(args, label: str, language: str, drop: str | None, stale: str | Non
         "in_mouse": "0", "in_joystick": "0", "win_allowMultipleInstances" if os.name == "nt" else "sys_allowMultipleInstances": "1",
     }
     command = [str(runtime / f"openQ4-client_x64{SUFFIX}")] + [p for k, v in cvars.items() for p in ("+set", k, v)]
+    if quit_after_start:
+        command += ["+echo", "PACK_STATUS_STARTED", "+quit"]
     process = subprocess.Popen(command, cwd=runtime, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     text = ""
@@ -105,7 +112,9 @@ def run_case(args, label: str, language: str, drop: str | None, stale: str | Non
             process.kill()
         process.wait()
     fatal = text[text.find(FATAL_MARKER) + 1:] if FATAL_MARKER in text else ""
-    return {"label": label, "language": language, "dropped": drop, "stale": stale, "fatal": fatal[:4000]}
+    return {"label": label, "language": language, "dropped": drop, "stale": stale, "leftover": leftover,
+            "fatal": fatal[:4000], "started": "PACK_STATUS_STARTED" in text,
+            "pack_lines": [line for line in text.splitlines() if ".pk4" in line and "baseoq4" in line][:20]}
 
 
 def main() -> int:
@@ -125,13 +134,14 @@ def main() -> int:
         run_case(args, "german-missing-loadscreens", "german", "pak2.pk4", None),
         run_case(args, "french-stale-light-grids", "french", None, "pak1.pk4"),
         run_case(args, "english-missing-core", "english", "pak0.pk4", None),
+        run_case(args, "english-leftover-overlay", "english", None, None, leftover="pak7.pk4", quit_after_start=True),
     ]
 
     def expect(case: dict, needle: str, what: str) -> None:
         if needle not in case["fatal"]:
             failures.append(f"{case['label']}: missing {what}: {needle!r}")
 
-    german, french, core = cases
+    german, french, core, leftover = cases
     expect(german, lang_value("german", "#str_231700"), "German headline")
     expect(german, lang_value("german", "#str_231704") % ("pak2.pk4", lang_value("german", loadscreens.contents_string), "baseoq4"),
            "German missing-pack line")
@@ -141,6 +151,12 @@ def main() -> int:
            "French mismatched-pack line")
     expect(core, "openQ4 runtime content packs in 'baseoq4' are missing or modified", "core-pack English report")
     expect(core, "missing baseoq4/pak0.pk4, core runtime content", "core-pack detail")
+    if leftover["fatal"] or not leftover["started"]:
+        failures.append(f"english-leftover-overlay: a leftover pack must not stop startup: {leftover['fatal'][:300]}")
+    if not any("Ignoring" in line and "pak7.pk4" in line and "does not use it" in line for line in leftover["pack_lines"]):
+        failures.append("english-leftover-overlay: the leftover pak7.pk4 was not reported as ignored")
+    if any("Loaded pk4" in line and "pak7.pk4" in line for line in leftover["pack_lines"]):
+        failures.append("english-leftover-overlay: the leftover pak7.pk4 was mounted")
     report = {"status": "fail" if failures else "pass", "cases": cases, "failures": failures}
     (args.output_dir.resolve() / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({"status": report["status"], "failures": failures}, indent=2))

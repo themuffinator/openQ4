@@ -11,6 +11,11 @@ Subcommands:
   verify-update    prove previous full package + update archive (+ any changed
                    bulk pack published on its own) == new full package
   verify-identity  prove every package carries the manifest's pack bytes
+  overlay-plan     what each generation-pinned pack needs: nothing, an overlay
+                   (pak3-pak9) carrying the files changed since its generation, or
+                   a new generation; --apply updates content_packs.json
+  generation-bump  start a new content generation for a pack at a commit, folding
+                   its overlay into it
 
 content-packs.json is published with every release. It records, per pack, the
 name, what it holds, its audience, size, MD5 (the digest compiled into the
@@ -34,7 +39,16 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Iterable
 
+from content_generations import (
+    GenerationError,
+    build_content_pack,
+    effective_source_digest,
+    git,
+    next_free_overlay_name,
+    plan_overlays,
+)
 from openq4_pak import (
+    CONTENT_PACKS_TABLE_PATH,
     GAME_DIR_NAME,
     OPENQ4_BULK_PACK_NAMES,
     OPENQ4_CONTENT_PACKS,
@@ -43,7 +57,8 @@ from openq4_pak import (
     create_game_pk4,
     file_md5_hex,
     inspect_game_pk4,
-    pack_source_digest,
+    load_content_pack_specs,
+    load_overlay_budget_bytes,
 )
 
 MANIFEST_SCHEMA = 1
@@ -101,7 +116,7 @@ def reusable_packs(source_root: Path, previous: dict | None) -> dict[str, dict]:
         record = previous_packs.get(spec.name)
         if record is None:
             continue
-        digest, _count = pack_source_digest(source_root / spec.source, spec.name)
+        digest, _count = effective_source_digest(source_root, spec)
         if digest == record["source_digest"]:
             reusable[spec.name] = record
     return reusable
@@ -128,8 +143,7 @@ def command_build(args: argparse.Namespace) -> int:
 
     packs = []
     for spec in OPENQ4_CONTENT_PACKS:
-        source_dir = source_root / spec.source
-        source_digest, file_count = pack_source_digest(source_dir, spec.name)
+        source_digest, file_count = effective_source_digest(source_root, spec)
         destination = out_dir / spec.name
         record = previous_packs.get(spec.name)
         reused_from = None
@@ -139,7 +153,7 @@ def command_build(args: argparse.Namespace) -> int:
                 copy_file_if_changed(candidate, destination)
                 reused_from = record.get("first_published") or previous.get("version_tag")
         if reused_from is None:
-            result = create_game_pk4(source_dir, destination, pak_name=spec.name)
+            result = build_content_pack(source_root, spec, destination)
             if result.missing_required:
                 raise RuntimeError(f"{spec.name} is missing required files: {', '.join(result.missing_required)}")
         inspected = inspect_game_pk4(destination, pak_name=spec.name)
@@ -430,6 +444,79 @@ def command_verify_identity(args: argparse.Namespace) -> int:
     return int(bool(failures))
 
 
+# --- overlays and generations (PKG-04) ---------------------------------------
+
+
+def write_table(path: Path, document: dict) -> None:
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+
+def command_overlay_plan(args: argparse.Namespace) -> int:
+    table_path = Path(args.table).resolve()
+    source_root = Path(args.source_root).resolve()
+    specs = load_content_pack_specs(table_path)
+    budget = load_overlay_budget_bytes(table_path)
+    plans = plan_overlays(source_root, specs, budget)
+    for plan in plans:
+        overlay = ", ".join(plan["overlays"]) or "none"
+        print(f"{plan['pack']} generation {plan['generation']} ({plan['commit'][:12]}): {plan['action']}; "
+              f"{len(plan['changed'])} changed, {len(plan['added'])} added, {len(plan['removed'])} removed, "
+              f"{plan['overlay_bytes']} overlay bytes of {budget}; overlay {overlay}"
+              + (f"; {plan['reason']}" if plan["reason"] else ""))
+    if args.report:
+        Path(args.report).write_text(json.dumps({"budget_bytes": budget, "plans": plans}, indent=2) + "\n", encoding="utf-8")
+    if not args.apply:
+        return 1 if any(plan["action"] == "new-generation" for plan in plans) else 0
+
+    document = json.loads(table_path.read_text(encoding="utf-8"))
+    packs = document["packs"]
+    used = {pack["name"] for pack in packs}
+    changed_table = False
+    for plan in plans:
+        if plan["action"] == "new-generation":
+            print(f"error: {plan['pack']} needs a new generation ({plan['reason']}); run generation-bump", file=sys.stderr)
+            return 1
+        existing = [pack for pack in packs if pack.get("overlay_of") == plan["pack"]]
+        if plan["action"] == "none" and existing:
+            for pack in existing:
+                packs.remove(pack)
+                print(f"removed {pack['name']}: {plan['pack']} matches its generation again")
+            changed_table = True
+        elif plan["action"] == "overlay" and not existing:
+            name = next_free_overlay_name(used)
+            used.add(name)
+            packs.append({"name": name, "overlay_of": plan["pack"]})
+            print(f"added {name}: overlay of {plan['pack']} carrying {len(plan['changed']) + len(plan['added'])} file(s)")
+            changed_table = True
+    if changed_table:
+        packs.sort(key=lambda pack: pack["name"])
+        write_table(table_path, document)
+        load_content_pack_specs(table_path)
+    return 0
+
+
+def command_generation_bump(args: argparse.Namespace) -> int:
+    table_path = Path(args.table).resolve()
+    source_root = Path(args.source_root).resolve()
+    document = json.loads(table_path.read_text(encoding="utf-8"))
+    packs = document["packs"]
+    record = next((pack for pack in packs if pack.get("name") == args.pack and "overlay_of" not in pack), None)
+    if record is None or not record.get("bulk"):
+        raise RuntimeError(f"{args.pack} is not a bulk pack in {table_path}")
+    commit = str(git(source_root, "rev-parse", "--verify", f"{args.commit}^{{commit}}")).strip()
+    dirty = str(git(source_root, "status", "--porcelain", "--", record["source"])).strip()
+    if dirty and args.commit == "HEAD":
+        raise RuntimeError(f"{record['source']} has uncommitted changes; commit them before starting a generation from HEAD")
+    previous = record.get("generation", {}).get("number", 0)
+    record["generation"] = {"number": previous + 1, "commit": commit}
+    folded = [pack["name"] for pack in packs if pack.get("overlay_of") == args.pack]
+    document["packs"] = [pack for pack in packs if pack.get("overlay_of") != args.pack]
+    write_table(table_path, document)
+    load_content_pack_specs(table_path)
+    print(f"{args.pack}: generation {previous + 1} at {commit}" + (f"; folded {', '.join(folded)}" if folded else ""))
+    return 0
+
+
 # --- main -------------------------------------------------------------------
 
 
@@ -472,6 +559,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     identity.add_argument("--archive", action="append", default=[], help="a package archive, APK or directory")
     identity.add_argument("--pack-file", action="append", default=[], metavar="NAME=PATH")
     identity.add_argument("--report", default="")
+    overlay = sub.add_parser("overlay-plan")
+    overlay.add_argument("--source-root", default=".")
+    overlay.add_argument("--table", default=str(CONTENT_PACKS_TABLE_PATH))
+    overlay.add_argument("--apply", action="store_true", help="add or remove overlay entries in the table")
+    overlay.add_argument("--report", default="")
+
+    bump = sub.add_parser("generation-bump")
+    bump.add_argument("--source-root", default=".")
+    bump.add_argument("--table", default=str(CONTENT_PACKS_TABLE_PATH))
+    bump.add_argument("--pack", required=True)
+    bump.add_argument("--commit", default="HEAD")
     return parser.parse_args(argv[1:])
 
 
@@ -483,10 +581,12 @@ def main(argv: list[str]) -> int:
         "notes": command_notes,
         "verify-update": command_verify_update,
         "verify-identity": command_verify_identity,
+        "overlay-plan": command_overlay_plan,
+        "generation-bump": command_generation_bump,
     }
     try:
         return handlers[args.command](args)
-    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile, tarfile.TarError) as exc:
+    except (OSError, RuntimeError, ValueError, GenerationError, zipfile.BadZipFile, tarfile.TarError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
