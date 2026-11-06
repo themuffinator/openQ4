@@ -6,8 +6,11 @@
 #include "PBRMath.h"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <system_error>
+#include <thread>
 #include <vector>
 
 namespace openq4PBR {
@@ -157,6 +160,43 @@ inline std::vector<float> DiffuseIrradiance(const Sampler &sample, int size, int
         Store(rgba, y*size+x, sum*(1.0f/samples));
     }
     return rgba;
+}
+// Every prefiltered (mip, face) tile of a probe, index mip * 6 + face, and its
+// diffuse irradiance tile. Tiles are independent and each is exactly the
+// PrefilterFace / DiffuseIrradiance result, so spreading them over worker
+// threads changes only how long a probe-source cache miss takes (REN-06: about
+// 0.5 s serially). The sampler must be safe to read concurrently.
+struct PrefilteredTiles {
+    std::vector<std::vector<float>> specular;
+    std::vector<float> diffuse;
+};
+template<class Sampler>
+inline PrefilteredTiles PrefilterTiles(const Sampler &sample, int faceSize, int maxMip, int diffuseSize,
+        unsigned maxWorkers = 8) {
+    PrefilteredTiles out;
+    const int specularCount = (maxMip + 1) * 6;
+    out.specular.resize(specularCount);
+    std::atomic<int> next(0);
+    const auto work = [&]() {
+        for (int task = next++; task <= specularCount; task = next++) {
+            if (task == specularCount) {
+                out.diffuse = DiffuseIrradiance(sample, diffuseSize);
+                continue;
+            }
+            const int level = task / 6;
+            out.specular[task] = PrefilterFace(sample, task % 6, faceSize >> level,
+                maxMip > 0 ? float(level) / maxMip : 0.0f);
+        }
+    };
+    unsigned workers = std::thread::hardware_concurrency();
+    workers = (std::max)(1u, (std::min)(workers, maxWorkers));
+    std::vector<std::thread> threads;
+    for (unsigned i = 1; i < workers; ++i) {
+        try { threads.emplace_back(work); } catch (const std::system_error &) { break; }
+    }
+    work();
+    for (std::thread &thread : threads) { thread.join(); }
+    return out;
 }
 inline std::array<float, 2> IntegrateBRDF(float NoV, float roughness, int samples = 256) {
     NoV = PBRClamp(NoV, 0.0001f, 1);

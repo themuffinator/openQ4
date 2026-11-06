@@ -828,7 +828,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light. | Image-level receiver checks in motion, dynamic/cutout/custom receivers, static/live composition and dynamic-image alpha audits. |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO; the Intel residual is reproduced and explicitly bounded. | lavapipe residual, a half-resolution parity control, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
-| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold-miss cost measured and budgeted; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Prefilter cold misses (~0.5 s) off the frame to meet the 4 ms budget; probe capture orientation, grid provenance/regeneration and broader authored scenes. |
+| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold-miss cost measured and budgeted; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Prefilter cold misses (~85 ms after parallel tiles) off the frame to meet the 4 ms budget; probe capture orientation, grid provenance/regeneration and broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 
@@ -921,6 +921,7 @@ diagnostics establish whole-frame ownership or production performance.
   miss. The 56-control probe suite passes; a miss costs 3-6 ms to read (21 ms
   after reload) but 0.49-0.58 s to prefilter on the CPU, against the new 4 ms
   per-frame budget (memory: the fixed 44.7 MB atlas plus one transient source).
+  Parallel tiles (bit-identical, both backends) cut the prefilter to 84-93 ms.
   See [probe sources](vulkan-probe-sources.md#cold-miss-cost-and-budget-6-november-2026-ren-06).
   `renderer_screen_space_effects_qualification.py` captures each leaf, all three
   and master-off at a frozen pose: every leaf changes the frame, master-off is

@@ -271,17 +271,19 @@ static void R_ModernSpecularProbeAtlas_UploadTile( int cell, int level,
 
 template<class Sampler>
 static void R_ModernSpecularProbeAtlas_Filter( int slot, const Sampler &sample ) {
+	// The tiles are computed in parallel and uploaded in the original order.
+	const openq4PBR::PrefilteredTiles tiles = openq4PBR::PrefilterTiles( sample,
+		MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE, MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP,
+		MODERN_SPECULAR_PROBE_DIFFUSE_SIZE );
 	for ( int level = 0; level <= MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP; ++level ) {
 		const int size = MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE >> level;
-		const float roughness = static_cast<float>( level ) / MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP;
 		for ( int face = 0; face < MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT; ++face ) {
 			R_ModernSpecularProbeAtlas_UploadTile( slot * MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT + face,
-				level, size, openq4PBR::PrefilterFace( sample, face, size, roughness ) );
+				level, size, tiles.specular[ level * MODERN_SPECULAR_PROBE_ATLAS_FACE_COUNT + face ] );
 		}
 	}
 	R_ModernSpecularProbeAtlas_UploadTile( MODERN_SPECULAR_PROBE_DIFFUSE_FIRST_CELL + slot,
-		0, MODERN_SPECULAR_PROBE_DIFFUSE_SIZE,
-		openq4PBR::DiffuseIrradiance( sample, MODERN_SPECULAR_PROBE_DIFFUSE_SIZE ) );
+		0, MODERN_SPECULAR_PROBE_DIFFUSE_SIZE, tiles.diffuse );
 }
 
 void R_ModernSpecularProbeAtlas_Init( const renderBackendCaps_t &caps,

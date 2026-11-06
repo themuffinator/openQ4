@@ -72,6 +72,17 @@ static void EnvironmentTests() {
     const auto rough = PrefilterFace(impulse, 4, 9, 0.8f, 1024);
     Require(sharp[40*4] == 1 && rough[40*4] < 0.1f && rough[40*4] > 0.001f, "roughness filters the source highlight");
     Require(rough[38*4] > sharp[38*4], "roughness broadens the highlight");
+    // The parallel tile builder (REN-06) returns exactly the serial results,
+    // whatever the worker count; the gradient cube above is the source.
+    for (unsigned workers : {1u, 3u, 8u}) {
+        const PrefilteredTiles tiles = PrefilterTiles(cube, 16, 4, 8, workers);
+        Require(tiles.specular.size() == 30, "one tile per mip and face");
+        for (int level = 0; level <= 4; ++level) for (int face = 0; face < 6; ++face) {
+            Require(tiles.specular[level*6+face] == PrefilterFace(cube, face, 16 >> level, level / 4.0f),
+                "parallel prefilter tiles match the serial filter exactly");
+        }
+        Require(tiles.diffuse == DiffuseIrradiance(cube, 8), "parallel diffuse tile matches exactly");
+    }
     const auto smoothBRDF = IntegrateBRDF(1, 0.045f, 4096);
     Require(smoothBRDF[0] > 0.99f && smoothBRDF[1] < 0.001f, "split-sum mirror reference");
     const auto roughBRDF = IntegrateBRDF(1, 1, 4096);

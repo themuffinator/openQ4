@@ -33,6 +33,10 @@ See [player release status](../user/release-status.md).
 - Vulkan screenshots now include froxel fog, screen-space reflections and
   screen-space GI exactly as displayed. Before, screenshots drew those effects
   without the scene's depth.
+- Authored reflection probes (an experimental, default-off feature) enter the
+  scene about six times faster: the half-second pause when a new probe
+  becomes resident is now about 85 ms on both renderers, with identical
+  lighting. Removing the remaining pause is still open.
 - The SSAO quality checks for PBR materials work again after half-resolution
   SSAO; a handful of pixels that differ on Intel graphics are now an
   explicitly bounded exception.

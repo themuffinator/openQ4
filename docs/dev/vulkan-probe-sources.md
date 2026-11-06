@@ -60,7 +60,8 @@ debugoptimized build) passes and records 21 misses:
 | Stage | Mean | Maximum |
 | --- | --- | --- |
 | Source read (copy after pending uploads, fence wait, decode) | 2.9-5.9 ms | 21.3 ms after image reload |
-| CPU prefilter (7 mips x 6 faces, 128 GGX samples) and tile uploads | 489-538 ms | 577 ms |
+| CPU prefilter (7 mips x 6 faces, 128 GGX samples) and tile uploads, serial | 489-538 ms | 577 ms |
+| The same with the tiles spread over up to 8 threads (`openq4PBR::PrefilterTiles`) | 84-87 ms | 93 ms |
 
 Memory: the atlas is a fixed 2048 x 2048 RGBA16F image with 7 mips
 (about 44.7 MB) for 8 residents plus the analytic slot. A miss adds a
@@ -70,11 +71,15 @@ completes.
 
 Budget: a cold or reload miss may add at most 4 ms to the frame that takes it
 on the reference desktop, and residency may not hold more than the fixed
-atlas plus one in-flight source. **The current prefilter misses the latency
-budget by two orders of magnitude**: every newly resident or evicted authored
-source stalls about half a second. The read itself fits. Meeting the budget
-needs the prefilter off the frame (an asynchronous job whose result publishes
-on a later frame, with the set's analytic fallback meanwhile) or on the GPU;
+atlas plus one in-flight source. Every (mip, face) tile is independent, so
+both backends (`vk_PBRProbes.cpp`, `ModernSpecularProbeAtlas.cpp`) now compute
+them in parallel and upload them in the original order; the native
+`openq4-pbr-math` test requires the result to equal the serial filter exactly,
+and the authored-probe suites still pass (Vulkan 56/56, OpenGL 50/50). **The
+prefilter still misses the budget**: a newly resident or evicted authored
+source stalls about 85 ms instead of half a second. Meeting the budget needs
+the prefilter off the frame (an asynchronous job whose result publishes on a
+later frame, with the set's analytic fallback meanwhile) or on the GPU;
 reducing sample counts would change the GL-matched result and is not the fix.
 
 ## Transfer ownership

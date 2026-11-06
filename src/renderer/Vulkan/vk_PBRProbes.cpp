@@ -227,17 +227,19 @@ static modernSpecularProbeAtlasReject_t VK_PBRProbes_Acquire( const idImage *ima
 		const unsigned long long filterBegin = R_RendererMetrics_CpuClock();
 		if ( resident.valid && resident.source != image ) { ++evictions; }
 		resident.valid = false;
+		const openq4PBR::PrefilteredTiles tiles = openq4PBR::PrefilterTiles( cube,
+			MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE, MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP,
+			MODERN_SPECULAR_PROBE_DIFFUSE_SIZE );
 		for ( int level = 0; level <= MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP; ++level ) {
 			const int size = MODERN_SPECULAR_PROBE_ATLAS_FACE_SIZE >> level;
 			for ( int face = 0; face < 6; ++face ) {
-				if ( !VK_PBRProbes_UploadTile( atlas, slot * 6 + face, level, size,
-						openq4PBR::PrefilterFace( cube, face, size, float( level ) / MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP ) ) ) {
+				if ( !VK_PBRProbes_UploadTile( atlas, slot * 6 + face, level, size, tiles.specular[ level * 6 + face ] ) ) {
 					return MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE;
 				}
 			}
 		}
 		if ( !VK_PBRProbes_UploadTile( atlas, MODERN_SPECULAR_PROBE_DIFFUSE_FIRST_CELL + slot, 0,
-				MODERN_SPECULAR_PROBE_DIFFUSE_SIZE, openq4PBR::DiffuseIrradiance( cube, MODERN_SPECULAR_PROBE_DIFFUSE_SIZE ) ) ) {
+				MODERN_SPECULAR_PROBE_DIFFUSE_SIZE, tiles.diffuse ) ) {
 			return MODERN_SPECULAR_PROBE_ATLAS_REJECT_UPLOAD_UNAVAILABLE;
 		}
 		if ( !VK_ProbeSource_Matches( image, stamp ) ) { return MODERN_SPECULAR_PROBE_ATLAS_REJECT_SOURCE_CHANGED; }
