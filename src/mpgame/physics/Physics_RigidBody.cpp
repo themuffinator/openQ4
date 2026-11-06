@@ -1180,6 +1180,9 @@ bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	const bool wasAtRest = current.atRest >= 0;
 	const bool moved = telemetry.Moved( UsesEnhancedPhysics() ? EvaluateEnhanced( timeStepMSec, endTimeMSec ) : EvaluateLegacy( timeStepMSec, endTimeMSec ) );
 	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
+		if ( self && self->entityNumber == ENTITYNUM_CLIENT ) {
+			OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_CLIENT_RIGID );
+		}
 		const float speed = ( inverseMass * current.i.linearMomentum ).Length();
 		OpenQ4Physics::GetTelemetry().NoteLinearSpeed( speed );
 		if ( speed > 2000.0f ) {

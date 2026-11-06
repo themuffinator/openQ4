@@ -2,6 +2,8 @@
 #ifndef __PHYSICS_AF_H__
 #define __PHYSICS_AF_H__
 
+#include "../../game/physics/EnhancedSolver.h"
+
 /*
 ===================================================================================
 
@@ -108,6 +110,7 @@ protected:
 	idVecX					s;							// temp solution
 	idVecX					lm;							// lagrange multipliers
 	int						firstIndex;					// index of the first constraint row in the lcp matrix
+	int						enhancedSolvedFrame;		// openQ4: game frame whose enhanced solve set lm (warm start), transient
 
 	struct constraintFlags_s {
 		bool				allowPrimary		: 1;	// true if the constraint can be used as a primary constraint
@@ -476,6 +479,8 @@ public:
 							~idAFConstraint_Contact( void );
 	void					Setup( idAFBody *b1, idAFBody *b2, contactInfo_t &c );
 	const contactInfo_t &	GetContact( void ) const { return contact; }
+							// openQ4: the friction rows of this contact (warm starting), NULL until first used
+	idAFConstraint_ContactFriction *GetFrictionConstraint( void ) const { return fc; }
 	virtual void			DebugDraw( void );
 	virtual void			Translate( const idVec3 &translation );
 	virtual void			Rotate( const idRotation &rotation );
@@ -686,6 +691,7 @@ private:
 	int						numResponses;				// number of response forces
 	int						maxAuxiliaryIndex;			// largest index of an auxiliary constraint constraining this body
 	int						maxSubTreeAuxiliaryIndex;	// largest index of an auxiliary constraint constraining this body or one of it's children
+	idVec6					enhancedPseudoVelocity;		// openQ4: position-only recovery velocity of the current enhanced step
 
 	struct bodyFlags_s {
 		bool				clipMaskSet			: 1;	// true if this body has a clip mask set
@@ -987,9 +993,26 @@ private:
 	void					Rest( void );
 	void					AddPushVelocity( const idVec6 &pushVelocity );
 	void					DebugDraw( void );
-// openQ4 BEGIN: physics mode dispatch and telemetry (PHYS-01)
+// openQ4 BEGIN: physics mode dispatch and telemetry (PHYS-01), enhanced figures (PHYS-03)
 							// the unchanged legacy simulation, run when g_enhancedPhysics was 0 at map load
 	bool					EvaluateLegacy( int timeStepMSec, int endTimeMSec );
+							// the enhanced simulation (EnhancedArticulated.inl)
+	bool					EvaluateEnhanced( int timeStepMSec, int endTimeMSec );
+	bool					EvaluateContactsEnhanced( float timeStep );
+	void					SetupContactConstraintsEnhanced( float timeStep );
+	void					AuxiliaryForcesEnhanced( float timeStep );
+	void					EvolveEnhanced( float timeStep, float energyBefore );
+	void					CheckForCollisionsEnhanced( float timeStep );
+	void					CacheEnhancedContacts( void );
+	void					ApplyImpulseEnhanced( const int id, const idVec3 &point, const idVec3 &impulse );
+	float					EnhancedKineticEnergy( const bool next ) const;
+
+	// transient enhanced state: never saved or networked; rebuilt in one step
+	idList<float>			enhancedSeparation;			// gap of each contact this step
+	idList<int>				enhancedContactAge;			// 0 when swept this step, else steps carried in the manifold
+	idList<float>			enhancedReach;				// speculative contact reach of each body this step
+	idList<OpenQ4Physics::cachedContact_t> enhancedCache;	// last step's contacts and multipliers
+	int						enhancedQuietFrames;		// consecutive quiet steps toward sleep
 // openQ4 END
 };
 

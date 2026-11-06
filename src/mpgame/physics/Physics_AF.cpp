@@ -8,6 +8,10 @@
 CLASS_DECLARATION( idPhysics_Base, idPhysics_AF )
 END_CLASS
 
+// openQ4: set while an enhanced step builds its responses, so every body records
+// its response to every auxiliary row (legacy's symmetry shortcut skips some)
+static bool afEnhancedFullResponses = false;
+
 const float ERROR_REDUCTION					= 0.5f;
 const float ERROR_REDUCTION_MAX				= 256.0f;
 const float LIMIT_ERROR_REDUCTION			= 0.3f;
@@ -72,6 +76,7 @@ idAFConstraint::idAFConstraint( void ) {
 	boxIndex[5]			= -1;
 
 	firstIndex			= 0;
+	enhancedSolvedFrame	= 0;
 
 	memset( &fl, 0, sizeof( fl ) );
 }
@@ -4129,6 +4134,7 @@ void idAFBody::Init( void ) {
 	numResponses				= 0;
 	maxAuxiliaryIndex			= 0;
 	maxSubTreeAuxiliaryIndex	= 0;
+	enhancedPseudoVelocity.Zero();
 
 	memset( &fl, 0, sizeof( fl ) );
 
@@ -4582,7 +4588,7 @@ void idAFTree::Solve( int auxiliaryIndex ) const {
 		}
 	}
 
-	bool useSymmetry = af_useSymmetry.GetBool();
+	bool useSymmetry = af_useSymmetry.GetBool() && !afEnhancedFullResponses;
 
 	// from the root down towards the leaves
 	for ( i = 0; i < sortedBodies.Num(); i++ ) {
@@ -4699,7 +4705,7 @@ void idAFTree::Response( const idAFConstraint *constraint, int row, int auxiliar
 	// solve for primary constraints
 	Solve( auxiliaryIndex );
 
-	bool useSymmetry = af_useSymmetry.GetBool();
+	bool useSymmetry = af_useSymmetry.GetBool() && !afEnhancedFullResponses;
 
 	// store body forces in response to the constraint force
 	idVecX force;
@@ -6057,6 +6063,9 @@ idPhysics_AF::Activate
 void idPhysics_AF::Activate( void ) {
 	// if the articulated figure was at rest
 	if ( current.atRest >= 0 ) {
+		// openQ4: a figure woken from rest counts its quiet steps again (enhanced sleeping)
+		OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_WAKES );
+		enhancedQuietFrames = 0;
 		// normally gravity is added at the end of a simulation frame
 		// if the figure was at rest add gravity here so it is applied this simulation frame
 		AddGravity();
@@ -6491,7 +6500,7 @@ idPhysics_AF::Evaluate
 bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 	OpenQ4Physics::ScopedEvaluation telemetry( OpenQ4Physics::EVAL_ARTICULATED );
 	const bool wasAtRest = current.atRest >= 0;
-	const bool moved = telemetry.Moved( EvaluateLegacy( timeStepMSec, endTimeMSec ) );
+	const bool moved = telemetry.Moved( gameLocal.enhancedPhysics ? EvaluateEnhanced( timeStepMSec, endTimeMSec ) : EvaluateLegacy( timeStepMSec, endTimeMSec ) );
 	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
 		float peak = 0.0f;
 		for ( int i = 0; i < bodies.Num(); i++ ) {
@@ -6758,6 +6767,8 @@ idPhysics_AF::idPhysics_AF( void ) {
 // rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
 	fastEval = false;
 // RAVEN END
+
+	enhancedQuietFrames = 0;
 
 #ifdef AF_TIMINGS
 	lastTimerReset = 0;
@@ -7561,6 +7572,11 @@ void idPhysics_AF::ApplyImpulse( const int id, const idVec3 &point, const idVec3
 	if ( noImpact || impulse.LengthSqr() < Square( impulseThreshold ) ) {
 		return;
 	}
+	// openQ4: the enhanced impulse guard (PHYS-04)
+	if ( gameLocal.enhancedPhysics ) {
+		ApplyImpulseEnhanced( id, point, impulse );
+		return;
+	}
 	idMat3 invWorldInertiaTensor = bodies[id]->current->worldAxis.Transpose() * bodies[id]->inverseInertiaTensor * bodies[id]->current->worldAxis;
 	bodies[id]->current->spatialVelocity.SubVec3(0) += bodies[id]->invMass * impulse;
 	bodies[id]->current->spatialVelocity.SubVec3(1) += invWorldInertiaTensor * (point - bodies[id]->current->worldOrigin).Cross( impulse );
@@ -8185,3 +8201,6 @@ void idPhysics_AF::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	}
 	UpdateClipModels();
 }
+
+// openQ4: enhanced articulated figures (PHYS-03)
+#include "../../game/physics/EnhancedArticulated.inl"

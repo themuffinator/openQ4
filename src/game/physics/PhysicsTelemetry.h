@@ -36,6 +36,7 @@ enum counter_t {
 	COUNTER_SWEPT,				// enhanced swept (continuous) collision tests
 	COUNTER_ENERGY_CLAMPS,		// enhanced solver steps whose kinetic energy had to be limited
 	COUNTER_SOLVER_FALLBACKS,	// enhanced articulated steps that fell back to the legacy LCP
+	COUNTER_CLIENT_RIGID,		// rigid-body evaluations of client-side debris (brass, gibs)
 	COUNTER_COUNT
 };
 
@@ -231,14 +232,14 @@ public:
 			"\"rigid\":{\"total_ms\":%.4f,\"p50_ms\":%.5f,\"p95_ms\":%.5f,\"p99_ms\":%.5f,\"max_ms\":%.5f,\"evaluations\":%lld,\"moved\":%lld},"
 			"\"af\":{\"total_ms\":%.4f,\"p50_ms\":%.5f,\"p95_ms\":%.5f,\"p99_ms\":%.5f,\"max_ms\":%.5f,\"evaluations\":%lld,\"moved\":%lld},"
 			"\"peak_speed\":%.2f,\"impulses\":%lld,\"impulse_clamps\":%lld,\"max_impulse\":%.1f,\"peak_impulse_dv\":%.2f,"
-			"\"sleeps\":%lld,\"wakes\":%lld,\"swept\":%lld,\"energy_clamps\":%lld,\"solver_fallbacks\":%lld}\n",
+			"\"sleeps\":%lld,\"wakes\":%lld,\"swept\":%lld,\"energy_clamps\":%lld,\"solver_fallbacks\":%lld,\"client_rigid\":%lld}\n",
 			label, mode ? mode : "", all.frames,
 			all.totalMs, all.meanMs, all.p50Ms, all.p95Ms, all.p99Ms, all.maxMs, all.maxFrame,
 			rb.totalMs, rb.p50Ms, rb.p95Ms, rb.p99Ms, rb.maxMs, evaluations[EVAL_RIGID_BODY], moved[EVAL_RIGID_BODY],
 			af.totalMs, af.p50Ms, af.p95Ms, af.p99Ms, af.maxMs, evaluations[EVAL_ARTICULATED], moved[EVAL_ARTICULATED],
 			peakSpeed, counters[COUNTER_IMPULSES], counters[COUNTER_IMPULSE_CLAMPS], maxImpulse, peakImpulseDeltaV,
 			counters[COUNTER_SLEEPS], counters[COUNTER_WAKES], counters[COUNTER_SWEPT], counters[COUNTER_ENERGY_CLAMPS],
-			counters[COUNTER_SOLVER_FALLBACKS] );
+			counters[COUNTER_SOLVER_FALLBACKS], counters[COUNTER_CLIENT_RIGID] );
 		print( line );
 	}
 

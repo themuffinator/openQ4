@@ -386,6 +386,23 @@ idCVar rb_enhancedSleepSpeed(		"rb_enhancedSleepSpeed",	"3",			CVAR_GAME | CVAR_
 idCVar rb_enhancedSleepAngularSpeed("rb_enhancedSleepAngularSpeed","0.15",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: angular speed below which a supported body counts as quiet" );
 idCVar rb_enhancedSleepFrames(		"rb_enhancedSleepFrames",	"20",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: quiet steps before a rigid body sleeps", 1, 600 );
 idCVar rb_enhancedDebug(			"rb_enhancedDebug",			"",				CVAR_GAME | CVAR_CHEAT, "enhanced physics: name of a rigid body whose steps are printed" );
+idCVar af_enhancedIterations(		"af_enhancedIterations",	"12",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: Gauss-Seidel iterations over an articulated figure's auxiliary rows", 1, 200 );
+idCVar af_enhancedTolerance(		"af_enhancedTolerance",		"0.0001",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: relative change that ends the articulated-figure iterations early" );
+idCVar af_enhancedFallbackError(	"af_enhancedFallbackError",	"0.05",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: relative error above which the exact legacy LCP solves the step instead" );
+idCVar af_enhancedWarmStart(		"af_enhancedWarmStart",		"0.85",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: fraction of last step's multipliers that starts the solve" );
+idCVar af_enhancedMargin(			"af_enhancedMargin",		"1",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: speculative contact reach beyond a body's motion" );
+idCVar af_enhancedSlop(				"af_enhancedSlop",			"0.25",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: overlap or gap treated as touching (units)" );
+idCVar af_enhancedRecoveryRate(		"af_enhancedRecoveryRate",	"0.4",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: fraction of an overlap removed per step" );
+idCVar af_enhancedMaxRecovery(		"af_enhancedMaxRecovery",	"60",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on position-only recovery speed for overlap and violated limits" );
+idCVar af_enhancedMaxJointCorrection("af_enhancedMaxJointCorrection","32",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on joint error correction speed (legacy allows 256)" );
+idCVar af_enhancedRotationSweep(	"af_enhancedRotationSweep",	"2",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: a body that turns its extent by more than this in a step is swept" );
+idCVar af_enhancedPersistFrames(	"af_enhancedPersistFrames",	"8",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: steps a static contact stays in a figure's manifold without being swept again", 0, 64 );
+idCVar af_enhancedSleepSpeed(		"af_enhancedSleepSpeed",	"4",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: linear speed below which every body of a figure counts as quiet" );
+idCVar af_enhancedSleepAngularSpeed("af_enhancedSleepAngularSpeed","0.2",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: angular speed below which every body of a figure counts as quiet" );
+idCVar af_enhancedSleepFrames(		"af_enhancedSleepFrames",	"30",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: quiet steps before a figure that may rest goes to sleep", 1, 600 );
+idCVar af_enhancedImpulseGuard(		"af_enhancedImpulseGuard",	"300",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: largest velocity change one hit gives the struck body before the rest of its momentum is spread over the figure" );
+idCVar af_enhancedInheritTime(		"af_enhancedInheritTime",	"32",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: ms of animation a new ragdoll takes its joint velocities from (when its def sets no velocityTime)", 0, 500 );
+idCVar af_enhancedMaxInheritSpeed(	"af_enhancedMaxInheritSpeed","400",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on the speed a new ragdoll body inherits" );
 
 idCVar rb_showTimings(				"rb_showTimings",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid body cpu usage" );
 idCVar rb_showBodies(				"rb_showBodies",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid bodies" );

@@ -1860,6 +1860,9 @@ bool idActor::StartRagdoll( void ) {
 		return true;
 	}
 
+	// openQ4: the motion a ragdoll inherits in enhanced physics (PHYS-03)
+	const idVec3 inheritedVelocity = GetPhysics()->GetLinearVelocity();
+
 	// Raise the origin up 5 units to help ensure the ragdoll doesnt start in the ground
 	GetPhysics()->SetOrigin( GetPhysics()->GetOrigin() + GetPhysics()->GetGravityNormal() * -5.0f );
 	UpdateModelTransform();
@@ -1867,7 +1870,7 @@ bool idActor::StartRagdoll( void ) {
 	// disable the monster bounding box
 	GetPhysics()->DisableClip();
 
-	af.StartFromCurrentPose( spawnArgs.GetInt( "velocityTime", "0" ) );
+	af.StartFromCurrentPoseForDeath( spawnArgs.GetInt( "velocityTime", "0" ), inheritedVelocity );
 
 	slomoStart = MS2SEC( gameLocal.time ) + spawnArgs.GetFloat( "ragdoll_slomoStart", "-1.6" );
 	slomoEnd = MS2SEC( gameLocal.time ) + spawnArgs.GetFloat( "ragdoll_slomoEnd", "0.8" );

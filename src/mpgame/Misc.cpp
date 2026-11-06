@@ -1791,11 +1791,14 @@ bool idAnimated::StartRagdoll( void ) {
 		return true;
 	}
 
+	// openQ4: the motion a ragdoll inherits in enhanced physics (PHYS-03)
+	const idVec3 inheritedVelocity = GetPhysics()->GetLinearVelocity();
+
 	// disable any collision model used
 	GetPhysics()->DisableClip();
 
 	// start using the AF
-	af.StartFromCurrentPose( spawnArgs.GetInt( "velocityTime", "0" ) );
+	af.StartFromCurrentPoseForDeath( spawnArgs.GetInt( "velocityTime", "0" ), inheritedVelocity );
 	
 	return true;
 }
