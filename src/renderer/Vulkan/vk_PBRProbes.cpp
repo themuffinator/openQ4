@@ -11,6 +11,7 @@
 #include "vk_Image.h"
 #include "vk_ExecutorHooks.h"
 #include "VulkanDevice.h"
+#include "../RendererMetrics.h"
 
 #undef snprintf
 #undef vsnprintf
@@ -144,6 +145,10 @@ static int activeSlot = -1;
 static bool packetResourceFailure;
 static rendererClusteredLightingStats_t probeStats;
 static unsigned int uploads, cacheHits, evictions, sourceRejects, resourceRejects;
+// Source-cache misses (REN-06): the synchronous readback through the upload
+// batch, then CPU prefiltering and the atlas tile uploads. Microseconds.
+static unsigned int missReads;
+static unsigned long long missReadTotal, missReadMax, missFilterTotal, missFilterMax;
 
 idImage *VK_PBRProbes_Atlas() {
 	return globalImages != NULL
@@ -216,8 +221,10 @@ static modernSpecularProbeAtlasReject_t VK_PBRProbes_Acquire( const idImage *ima
 	if ( !resident.valid || resident.source != image || !VK_ProbeSource_Matches( image, resident.stamp ) ) {
 		openq4PBR::Cube cube;
 		vkProbeSourceStamp_t stamp;
+		const unsigned long long readBegin = R_RendererMetrics_CpuClock();
 		const modernSpecularProbeAtlasReject_t reject = VK_ProbeSource_Read( image, cube, stamp );
 		if ( reject != MODERN_SPECULAR_PROBE_ATLAS_REJECT_NONE ) { return reject; }
+		const unsigned long long filterBegin = R_RendererMetrics_CpuClock();
 		if ( resident.valid && resident.source != image ) { ++evictions; }
 		resident.valid = false;
 		for ( int level = 0; level <= MODERN_SPECULAR_PROBE_ATLAS_MAX_MIP; ++level ) {
@@ -240,6 +247,12 @@ static modernSpecularProbeAtlasReject_t VK_PBRProbes_Acquire( const idImage *ima
 		if ( resident.residency == 0 ) { resident.residency = ++residencyGeneration; }
 		resident.valid = true;
 		++uploads;
+		const unsigned long long filterEnd = R_RendererMetrics_CpuClock();
+		++missReads;
+		missReadTotal += filterBegin - readBegin;
+		missReadMax = Max( missReadMax, filterBegin - readBegin );
+		missFilterTotal += filterEnd - filterBegin;
+		missFilterMax = Max( missFilterMax, filterEnd - filterBegin );
 	}
 	resident.lastUsedFrame = frameGeneration;
 	if ( !ModernSpecularProbeAtlas_BuildPlacement( slot, resident.stamp.faceSize, *placement ) ) {
@@ -397,10 +410,12 @@ void VK_PBRProbes_Shutdown() {
 }
 
 void VK_PBRProbes_PrintGfxInfo() {
-	common->Printf( "Vulkan PBR probes: records=%d references=%d views=%d ready=%d resourceFailure=%d uploads=%u hits=%u evictions=%u sourceRejects=%u resourceRejects=%u\n",
+	common->Printf( "Vulkan PBR probes: records=%d references=%d views=%d ready=%d resourceFailure=%d uploads=%u hits=%u evictions=%u sourceRejects=%u resourceRejects=%u missReads=%u missReadMeanUs=%llu missReadMaxUs=%llu missFilterMeanUs=%llu missFilterMaxUs=%llu\n",
 		probeStats.probeCount, probeStats.probeReferences, int( activeViews.size() ),
 		probeStats.probeFrameReady ? 1 : 0, packetResourceFailure ? 1 : 0,
-		uploads, cacheHits, evictions, sourceRejects, resourceRejects );
+		uploads, cacheHits, evictions, sourceRejects, resourceRejects, missReads,
+		missReads > 0 ? missReadTotal / missReads : 0ull, missReadMax,
+		missReads > 0 ? missFilterTotal / missReads : 0ull, missFilterMax );
 }
 
 #endif

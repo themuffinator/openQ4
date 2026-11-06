@@ -385,6 +385,15 @@ typedef struct vkGpuSkinningDispatch_s {
 	uint32_t	jointCount;
 } vkGpuSkinningDispatch_t;
 
+static const int VK_TEMPORAL_DEPTH_STAMP_COUNT = 16;
+typedef struct vkTemporalDepthStamp_s {
+	idRenderTexture *	target;
+	unsigned long long	storageGeneration;
+	int					frame;
+	unsigned int		historyGeneration;
+	bool				valid;
+} vkTemporalDepthStamp_t;
+
 typedef struct vkGuiExecutor_s {
 	bool				initialized;
 
@@ -579,11 +588,16 @@ typedef struct vkGuiExecutor_s {
 	unsigned long long temporalDirectHistoryViewIdentity;
 	bool				temporalDirectHistoryValid;
 	bool				temporalDirectHistoryAllocationWarned;
-	idRenderTexture *	temporalDepthStampTarget;
-	unsigned long long temporalDepthStampStorageGeneration;
-	int				temporalDepthStampFrame;
-	unsigned int		temporalDepthStampHistoryGeneration;
-	bool				temporalDepthStampValid;
+	// One proof per render target that its depth is this frame's, as OpenGL
+	// keeps (draw_common.cpp RB_StampTemporalDepthResolved). A single shared
+	// stamp let a later resolve of another target - a mirror or remote view's
+	// own capture - retire the root scene's proof, so every temporal resolve
+	// of that frame fell back to a spatial present.
+	vkTemporalDepthStamp_t	temporalDepthStamps[ VK_TEMPORAL_DEPTH_STAMP_COUNT ];
+	int				temporalDepthStampReplacement;
+	// backEnd.frameCount whose image acquisition timed out (acquireTimedOut)
+	int				acquireTimeoutFrame;
+	bool			acquireTimedOut;
 	unsigned int		temporalHistoryGenerationSeen;
 	int				temporalCaptureInvalidatedFrame;
 	int				temporalSceneCompositeInvalidatedFrame;
@@ -3664,7 +3678,8 @@ static bool VK_GuiExecutor_Init( void ) {
 	vkExec.clearColor[ 3 ] = 1.0f;
 	vkExec.temporalSceneFrame = -1;
 	vkExec.temporalDirectHistoryFrame = -1;
-	vkExec.temporalDepthStampFrame = -1;
+	memset( vkExec.temporalDepthStamps, 0, sizeof( vkExec.temporalDepthStamps ) );
+	vkExec.temporalDepthStampReplacement = 0;
 	vkExec.temporalDirectHistoryGeneration =
 		R_TemporalPresentation_HistoryGeneration();
 	vkExec.temporalCaptureInvalidatedFrame = -1;
@@ -4043,6 +4058,15 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	if ( vkExec.frameOpen ) {
 		return true;
 	}
+	// A presentation engine that timed out handing over an image this frame
+	// (a display that is off, an occluded FIFO window) will not hand one to the
+	// frame's next command either. Each command used to wait out the whole
+	// acquire timeout again: about 27 s per frame in r_vkPresentationFailureTest
+	// 3. Skip the rest of the frame and retry on the next one.
+	if ( vkExec.acquireTimedOut && vkExec.acquireTimeoutFrame == backEnd.frameCount ) {
+		return false;
+	}
+	vkExec.acquireTimedOut = false;
 	if ( !vkCtx.initialized ) {
 		if ( !loggedNotInitialized ) {
 			loggedNotInitialized = true;
@@ -4224,6 +4248,8 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 		}
 		if ( res == VK_TIMEOUT || res == VK_NOT_READY ) {
 			R_DisplayPresentationFailed( RDP_ACQUIRE_FAILED, (int32_t)res );
+			vkExec.acquireTimedOut = true;
+			vkExec.acquireTimeoutFrame = backEnd.frameCount;
 			return false;
 		}
 		if ( res == VK_ERROR_SURFACE_LOST_KHR ) {
@@ -5223,6 +5249,12 @@ static void VK_TemporalPresentation_RestoreDirectProjection(
 	state.projectionRecentered = false;
 }
 
+static void VK_TemporalPresentation_RetireDepthStamps( void ) {
+	for ( int i = 0; i < VK_TEMPORAL_DEPTH_STAMP_COUNT; i++ ) {
+		vkExec.temporalDepthStamps[ i ].valid = false;
+	}
+}
+
 static void VK_TemporalPresentation_ObserveHistoryAndCapture( void ) {
 	const unsigned int historyGeneration =
 		R_TemporalPresentation_HistoryGeneration();
@@ -5234,7 +5266,7 @@ static void VK_TemporalPresentation_ObserveHistoryAndCapture( void ) {
 		vkExec.temporalDirectHistoryGeneration = historyGeneration;
 		vkExec.temporalDirectHistoryValid = false;
 		vkExec.temporalDirectHistoryFrame = -1;
-		vkExec.temporalDepthStampValid = false;
+		VK_TemporalPresentation_RetireDepthStamps();
 	}
 	if ( R_SubmittedTakingScreenshot()
 			&& vkExec.temporalCaptureInvalidatedFrame != backEnd.frameCount ) {
@@ -5246,36 +5278,86 @@ static void VK_TemporalPresentation_ObserveHistoryAndCapture( void ) {
 			vkExec.temporalHistoryGenerationSeen;
 		vkExec.temporalDirectHistoryValid = false;
 		vkExec.temporalDirectHistoryFrame = -1;
-		vkExec.temporalDepthStampValid = false;
+		// The capture retires history through the generation above. This
+		// frame's depth stays complete: a capture presents it spatially, with
+		// the screen-space effects that read it (VK_TemporalPresentation_DepthCurrentForCapture).
 		vkExec.temporalCaptureInvalidatedFrame = backEnd.frameCount;
 	}
 }
 
+static vkTemporalDepthStamp_t *VK_TemporalPresentation_FindDepthStamp(
+		const idRenderTexture *target, bool allocate ) {
+	if ( target == NULL ) {
+		return NULL;
+	}
+	int free = -1;
+	for ( int i = 0; i < VK_TEMPORAL_DEPTH_STAMP_COUNT; i++ ) {
+		if ( vkExec.temporalDepthStamps[ i ].target == target ) {
+			return &vkExec.temporalDepthStamps[ i ];
+		}
+		if ( free < 0 && vkExec.temporalDepthStamps[ i ].target == NULL ) {
+			free = i;
+		}
+	}
+	if ( !allocate ) {
+		return NULL;
+	}
+	if ( free < 0 ) {
+		free = vkExec.temporalDepthStampReplacement;
+		vkExec.temporalDepthStampReplacement =
+			( vkExec.temporalDepthStampReplacement + 1 ) % VK_TEMPORAL_DEPTH_STAMP_COUNT;
+	}
+	vkTemporalDepthStamp_t &stamp = vkExec.temporalDepthStamps[ free ];
+	memset( &stamp, 0, sizeof( stamp ) );
+	stamp.target = const_cast<idRenderTexture *>( target );
+	stamp.frame = -1;
+	return &stamp;
+}
+
+// Records whether this frame's depth in target is complete. A failure retires
+// only that target's proof; other targets keep theirs.
 static void VK_TemporalPresentation_StampDepth(
 		idRenderTexture *target, bool success ) {
-	vkExec.temporalDepthStampTarget = target;
-	vkExec.temporalDepthStampFrame = backEnd.frameCount;
-	vkExec.temporalDepthStampHistoryGeneration =
-		R_TemporalPresentation_HistoryGeneration();
-	vkExec.temporalDepthStampStorageGeneration = 0;
-	vkExec.temporalDepthStampValid = false;
-	if ( !success || target == NULL || target->GetDepthImage() == NULL ) {
+	vkTemporalDepthStamp_t *stamp = VK_TemporalPresentation_FindDepthStamp( target, true );
+	if ( stamp == NULL ) {
 		return;
 	}
-	vkExec.temporalDepthStampStorageGeneration =
-		static_cast<unsigned long long>(
-			target->GetDepthImage()->GetStorageGeneration() );
-	vkExec.temporalDepthStampValid = true;
+	stamp->frame = backEnd.frameCount;
+	stamp->historyGeneration = R_TemporalPresentation_HistoryGeneration();
+	stamp->storageGeneration = 0;
+	stamp->valid = false;
+	if ( !success || target->GetDepthImage() == NULL ) {
+		return;
+	}
+	stamp->storageGeneration = static_cast<unsigned long long>(
+		target->GetDepthImage()->GetStorageGeneration() );
+	stamp->valid = true;
+}
+
+// A capture frame advances the history generation before its resolve, so it
+// cannot pass the generation check, yet its depth is this frame's and the
+// spatial present's screen-space effects need it (as OpenGL's capture path).
+static bool VK_TemporalPresentation_DepthCurrentForCapture(
+		idRenderTexture *target, idImage *depthImage ) {
+	const vkTemporalDepthStamp_t *found = VK_TemporalPresentation_FindDepthStamp( target, false );
+	return found != NULL && depthImage != NULL && found->valid
+		&& found->frame == backEnd.frameCount
+		&& found->storageGeneration
+			== static_cast<unsigned long long>( depthImage->GetStorageGeneration() );
 }
 
 static bool VK_TemporalPresentation_DepthStampMatches(
 		idRenderTexture *target, idImage *depthImage,
 		unsigned int historyGeneration ) {
-	return vkExec.temporalDepthStampValid && target != NULL
-		&& depthImage != NULL && vkExec.temporalDepthStampTarget == target
-		&& vkExec.temporalDepthStampFrame == backEnd.frameCount
-		&& vkExec.temporalDepthStampHistoryGeneration == historyGeneration
-		&& vkExec.temporalDepthStampStorageGeneration
+	const vkTemporalDepthStamp_t *found = VK_TemporalPresentation_FindDepthStamp( target, false );
+	if ( found == NULL || depthImage == NULL ) {
+		return false;
+	}
+	const int temporalDepthStampFrame = found->frame;
+	return found->valid
+		&& temporalDepthStampFrame == backEnd.frameCount
+		&& found->historyGeneration == historyGeneration
+		&& found->storageGeneration
 			== static_cast<unsigned long long>(
 				depthImage->GetStorageGeneration() );
 }
@@ -5665,8 +5747,10 @@ static bool VK_TemporalPresentation_CompositePendingScene( void ) {
 	const viewDef_t *sceneRoot = vkExec.temporalSceneRoot;
 	const bool depthReady = sceneDepth != NULL
 		&& ( sceneDepth->usage & VK_IMAGE_USAGE_SAMPLED_BIT ) != 0
-		&& VK_TemporalPresentation_DepthStampMatches( sampledTarget,
-			sampledTarget->GetDepthImage(), R_TemporalPresentation_HistoryGeneration() );
+		&& ( R_SubmittedTakingScreenshot()
+			? VK_TemporalPresentation_DepthCurrentForCapture( sampledTarget, sampledTarget->GetDepthImage() )
+			: VK_TemporalPresentation_DepthStampMatches( sampledTarget,
+				sampledTarget->GetDepthImage(), R_TemporalPresentation_HistoryGeneration() ) );
 	// Let the resolver validate the exact depth-success stamp. A missing or
 	// stale depth image is a spatial/no-write result that must advance the
 	// shared invalidation generation rather than silently bypassing ownership.
@@ -9424,9 +9508,17 @@ static void VK_TemporalPresentation_InvalidateAcceptedNoWrite(
 		R_TemporalPresentation_HistoryGeneration();
 }
 
-static bool VK_TemporalPresentation_ResolveTargets(
+// How one resolve ended, for rendererTemporalPresentationStatus.
+struct vkTemporalResolveRecord_t {
+	temporalResolveOutcome_t	outcome;
+	const char *				reason;
+	int							velocity;
+};
+
+static bool VK_TemporalPresentation_ResolveTargetsRecorded(
 		const resolveTemporalPresentationCommand_t &sourceCommand,
-		bool trackExternalHistory, bool *historyAdvanced ) {
+		bool trackExternalHistory, bool *historyAdvanced,
+		vkTemporalResolveRecord_t &record ) {
 	if ( historyAdvanced != NULL ) {
 		*historyAdvanced = false;
 	}
@@ -9448,14 +9540,18 @@ static bool VK_TemporalPresentation_ResolveTargets(
 			sceneImage, sceneEntry ) ) {
 		VK_TemporalPresentation_InvalidateAcceptedNoWrite( command,
 			"Vulkan temporal scene color is unavailable" );
+		record.outcome = TEMPORAL_RESOLVE_FALLBACK;
+		record.reason = "scene color unavailable";
 		return false;
 	}
 	const bool depthResident = VK_TemporalPresentation_GetDepthTarget(
 		command.sceneDepthTarget, depthImage, depthEntry );
 	const bool depthReady = depthResident
-		&& VK_TemporalPresentation_DepthStampMatches(
-			command.sceneDepthTarget, depthImage,
-			command.historyGeneration );
+		&& ( command.captureFrame
+			? VK_TemporalPresentation_DepthCurrentForCapture( command.sceneDepthTarget, depthImage )
+			: VK_TemporalPresentation_DepthStampMatches(
+				command.sceneDepthTarget, depthImage,
+				command.historyGeneration ) );
 	const bool writeReady = !command.captureFrame
 		&& VK_TemporalPresentation_GetColorTarget( command.historyWriteTarget,
 			historyWriteImage, historyWriteEntry );
@@ -9536,6 +9632,18 @@ static bool VK_TemporalPresentation_ResolveTargets(
 		VK_TemporalPresentation_InvalidateAcceptedNoWrite( command, depthReady
 			? "Vulkan temporal history write unavailable"
 			: "Vulkan temporal depth is not current" );
+		if ( command.captureFrame ) {
+			record.outcome = TEMPORAL_RESOLVE_CAPTURE;
+			record.reason = NULL;
+		} else if ( !command.presentation.temporalAARequested ) {
+			record.outcome = TEMPORAL_RESOLVE_SPATIAL;
+			record.reason = NULL;
+		} else {
+			record.outcome = TEMPORAL_RESOLVE_FALLBACK;
+			record.reason = !depthReady ? "scene depth not current"
+				: ( !presentationMatches ? "presentation extent changed"
+					: ( !generationMatches ? "history generation changed" : "history target unavailable" ) );
+		}
 		vkTemporalResolveBlock_t spatialBlock;
 		VK_TemporalPresentation_FillResolveBlock( command, sceneWidth,
 			sceneHeight, false, depthReady, true, 0, spatialBlock );
@@ -9572,6 +9680,8 @@ static bool VK_TemporalPresentation_ResolveTargets(
 		// history. The game will reject this generation on the next frame.
 		VK_TemporalPresentation_InvalidateAcceptedNoWrite( command,
 			"Vulkan temporal resolve execution failed" );
+		record.outcome = TEMPORAL_RESOLVE_FALLBACK;
+		record.reason = "resolve pass failed";
 		vkTemporalResolveBlock_t spatialBlock;
 		VK_TemporalPresentation_FillResolveBlock( command, sceneWidth,
 			sceneHeight, false, depthReady, true, 0, spatialBlock );
@@ -9583,6 +9693,11 @@ static bool VK_TemporalPresentation_ResolveTargets(
 	// Model transforms and color history now describe the same completed draw.
 	VK_PostProcess_CommitTemporalMotion( command.viewDef, sceneWidth, sceneHeight,
 		command.historyGeneration );
+	record.outcome = !command.presentation.temporalAARequested ? TEMPORAL_RESOLVE_SPATIAL
+		: ( historyValid ? TEMPORAL_RESOLVE_HISTORY : TEMPORAL_RESOLVE_SEEDED );
+	record.reason = NULL;
+	record.velocity = !historyValid ? -1
+		: ( velocityImage == NULL ? 0 : ( velocityComplete ? 2 : 1 ) );
 	const int debugMode = idMath::ClampInt( 0, 3, command.debugMode );
 	if ( debugMode != 0 ) {
 		vkTemporalResolveBlock_t debugBlock;
@@ -9612,17 +9727,35 @@ static bool VK_TemporalPresentation_ResolveTargets(
 	return presented;
 }
 
+static bool VK_TemporalPresentation_ResolveTargets(
+		const resolveTemporalPresentationCommand_t &sourceCommand,
+		bool trackExternalHistory, bool *historyAdvanced ) {
+	vkTemporalResolveRecord_t record = { TEMPORAL_RESOLVE_FALLBACK, "unrecorded", -1 };
+	const bool presented = VK_TemporalPresentation_ResolveTargetsRecorded(
+		sourceCommand, trackExternalHistory, historyAdvanced, record );
+	if ( presented ) {
+		R_TemporalPresentation_RecordResolve( record.outcome, record.reason, record.velocity );
+	} else {
+		R_TemporalPresentation_RecordResolve( TEMPORAL_RESOLVE_FALLBACK,
+			record.outcome == TEMPORAL_RESOLVE_FALLBACK && record.reason != NULL
+				? record.reason : "present failed", record.velocity );
+	}
+	return presented;
+}
+
 bool VK_GuiExecutor_ResolveTemporalPresentation(
 		const resolveTemporalPresentationCommand_t &sourceCommand ) {
 	if ( !VK_GuiExecutor_BeginFrame() ) {
 		VK_TemporalPresentation_InvalidateAcceptedNoWrite( sourceCommand,
 			"Vulkan temporal frame is unavailable" );
+		R_TemporalPresentation_RecordResolve( TEMPORAL_RESOLVE_FALLBACK, "frame unavailable", -1 );
 		return false;
 	}
 	if ( vkExec.temporalScenePendingComposite
 			&& !VK_TemporalPresentation_CompositePendingScene() ) {
 		VK_TemporalPresentation_InvalidateAcceptedNoWrite( sourceCommand,
 			"Vulkan temporal scene composite blocked command execution" );
+		R_TemporalPresentation_RecordResolve( TEMPORAL_RESOLVE_FALLBACK, "scene composite blocked", -1 );
 		return false;
 	}
 	VK_TemporalPresentation_ObserveHistoryAndCapture();

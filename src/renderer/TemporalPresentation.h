@@ -103,6 +103,21 @@ typedef struct temporalOwnershipStats_s {
 } temporalOwnershipStats_t;
 
 void R_TemporalPresentation_RecordOwnership( const temporalOwnershipStats_t &stats );
+
+// How each temporal-resolve command ended, counted cumulatively for the REN-04
+// qualification (rendererTemporalPresentationStatus; "reset" clears them).
+typedef enum {
+	TEMPORAL_RESOLVE_HISTORY = 0,	// blended with valid history and wrote the next one
+	TEMPORAL_RESOLVE_SEEDED,		// wrote fresh history without reading any
+	TEMPORAL_RESOLVE_CAPTURE,		// screenshot or save preview: spatial, history untouched
+	TEMPORAL_RESOLVE_SPATIAL,		// temporal AA off: scaling or screen-space present only
+	TEMPORAL_RESOLVE_FALLBACK,		// temporal AA on, presented spatially (reason recorded)
+	TEMPORAL_RESOLVE_OUTCOME_COUNT
+} temporalResolveOutcome_t;
+
+// velocity: -1 = no vector pass, 0 = none drawn, 1 = partial, 2 = complete
+void R_TemporalPresentation_RecordResolve( temporalResolveOutcome_t outcome,
+	const char *fallbackReason, int velocity );
 void R_TemporalPresentation_FinalizeViewProjection( struct viewDef_s *viewDef );
 unsigned long long R_TemporalPresentation_ViewIdentity(
 	const struct viewDef_s *viewDef );

@@ -63,6 +63,21 @@ static ID_INLINE void R_SyncSubviewTime( viewDef_t *parms ) {
 	parms->floatTime = parms->renderView.time * 0.001f;
 }
 
+// A subview starts as a copy of its parent view, temporal metadata included.
+// Inheriting temporalPrepared made R_TemporalPresentation_PrepareView skip the
+// subview, so mirrors, x-ray, remote and refraction views were drawn with the
+// parent's temporal AA jitter; on Vulkan their direct render then retired the
+// main view's history every frame. Clear it so the subview's own projection
+// setup prepares it, unjittered, under its own identity (REN-04).
+static void R_ResetSubviewTemporalState( viewDef_t *parms ) {
+	parms->temporalPrepared = false;
+	parms->temporalJitterEnabled = false;
+	parms->temporalJitterPixels.Zero();
+	parms->temporalHistoryValid = false;
+	parms->temporalPreviousProjectionValid = false;
+	parms->temporalNeutralProjectionValid = false;
+}
+
 
 /*
 =================
@@ -265,6 +280,7 @@ static viewDef_t *R_MirrorViewBySurface( drawSurf_t *drawSurf ) {
 	parms->isSubview = true;
 	parms->isMirror = true;
 	R_SyncSubviewTime( parms );
+	R_ResetSubviewTemporalState( parms );
 
 	// create plane axis for the portal we are seeing
 	R_PlaneForSurface( drawSurf->geo, originalPlane );
@@ -320,6 +336,7 @@ static viewDef_t *R_XrayViewBySurface( drawSurf_t *drawSurf ) {
 	parms->isSubview = true;
 	parms->isXraySubview = true;
 	R_SyncSubviewTime( parms );
+	R_ResetSubviewTemporalState( parms );
 
 	return parms;
 }
@@ -354,6 +371,7 @@ static void R_RemoteRender( drawSurf_t *surf, textureStage_t *stage ) {
 	parms->renderView = *surf->space->entityDef->parms.remoteRenderView;
 	parms->renderView.viewID = 0;	// clear to allow player bodies to show up, and suppress view weapons
 	R_SyncSubviewTime( parms );
+	R_ResetSubviewTemporalState( parms );
 	parms->initialViewAreaOrigin = parms->renderView.vieworg;
 
 	tr.CropRenderSize( stage->width, stage->height, true );
@@ -502,6 +520,7 @@ static void R_RefractionRender( drawSurf_t *surf, textureStage_t *stage, idScree
 	parms->isSubview = true;
 	parms->isMirror = false;
 	R_SyncSubviewTime( parms );
+	R_ResetSubviewTemporalState( parms );
 	parms->initialViewAreaOrigin = parms->renderView.vieworg;
 
 	tr.CropRenderSize( stage->width, stage->height, true );

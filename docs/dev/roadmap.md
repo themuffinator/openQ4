@@ -816,7 +816,7 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
 
 ### REN completion checkpoints
 
-**Estimate: 50%; 0/8 tasks closed.** PBR, temporal features and shared rendering
+**Estimate: 55%; 1/8 tasks closed.** PBR, temporal features and shared rendering
 domains already exist. Aggregate modern lighting still has
 `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; neither feature presence nor domain
 diagnostics establish whole-frame ownership or production performance.
@@ -825,12 +825,12 @@ diagnostics establish whole-frame ownership or production performance.
 | --- | --- | --- |
 | REN-01 — Partial | Shared classic GUI/world/interaction/fog/deform/subview/post domains have scoped implementations and contracts. | Qualify each on fresh GL/Vulkan packages: executed ownership, matching appearance, zero-commit rollback, human review and platform breadth. |
 | REN-02 — Partial | Shared material/light contracts and corridors provide foundations. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
-| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. | Continuous-motion scenes, dynamic/cutout/custom receivers, static/live composition, bounded resources and safe retained-light fallback. |
-| REN-04 — Partial | Rigid/skinned/weapon vectors, reactive coverage, TAAU and opt-in dynamic resolution exist. | Disocclusion, failed presents, cuts, multiple views, stale timing and scale recovery; native UI isolation and immediate fallback. |
-| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. | Residual Intel/software-renderer differences, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
-| REN-06 — Partial | Probe capture/grid infrastructure and default-off froxel/SSR/SSGI leaves exist. | Source admission/storage/size limits, provenance, reload/atlas exhaustion, cold-miss budgets and combined effects with exact master-off rollback. |
+| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light. | Image-level receiver checks in motion, dynamic/cutout/custom receivers, static/live composition and dynamic-image alpha audits. |
+| REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
+| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO; the Intel residual is reproduced and explicitly bounded. | lavapipe residual, a half-resolution parity control, mixed-material mods, skin substitutions and physical Linux/Apple fallback. |
+| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold-miss cost measured and budgeted; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Prefilter cold misses (~0.5 s) off the frame to meet the 4 ms budget; probe capture orientation, grid provenance/regeneration and broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
-| REN-08 — Partial | Motion blur and desktop post-processing paths exist. | Motion blur independently of TAA; skinned/weapon vectors, subviews, time gaps and HDR/bloom/SSAO/scaling combinations on each backend. |
+| REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 
 ### REN task evidence and acceptance
 
@@ -855,12 +855,37 @@ diagnostics establish whole-frame ownership or production performance.
   non-explicit-texcoord alpha cases; retain stencil fallback when coverage cannot
   be reproduced. Translucent moments already exist on Vulkan. Prove cache freshness,
   bounded memory, no missing/doubled receivers and retained light on fallback.
+  Progress, 6 November: `renderer_shadow_motion_qualification.py` tours eight
+  stock outdoor poses while panning continuously, at the default budget, with
+  cascades and with one update per view. OpenGL renders fresh maps throughout
+  with no receiver, budget or stencil fallback and no unshadowed light; the
+  constrained budget takes 994 budget fallbacks with every light still
+  shadowed. Vulkan reports no fallback or dropped query and stays inside its
+  slot capacity. See the [shadow tour](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
+  Remaining: image-level missing/doubled receiver checks in motion, the point
+  static/live and dynamic-image/non-explicit-texcoord alpha audits, and the
+  mover/cutout/custom-receiver fixtures under continuous motion.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
   views and retained UI. Test delayed/stale GPU timing and resolution recovery.
   Require stable quality, separate native UI, valid previous-frame identity and
   immediate current-frame/SMAA fallback. Per-eye VR temporal work remains VR-05.
+  Progress, 6 November: both backends now count how every resolve ended and why
+  history was rejected (`rendererTemporalPresentationStatus`, `reset`), and
+  `renderer_temporal_qualification.py` exercises native, TAAU and dynamic
+  resolution, scale recovery, stale timing, pause, capture, cuts, `vid_restart`,
+  SMAA rollback, MSAA, `r_vkRenderThread 2`, withheld images, surface and
+  device loss and the mirror fixture, requiring history before and after each
+  event with complete ownership. It reproduced and fixed three Vulkan gaps:
+  subviews inherited the parent's temporal preparation (mirrors, remote and
+  refraction views were jittered and retired the main history every frame),
+  withheld presents retried a 1 s acquire per command (~27 s per frame), and
+  capture frames presented screen-space effects without depth. See
+  [temporal qualification](temporal-presentation.md#validation). Remaining:
+  human review of ghosting/shimmer/disocclusion on the reference display, and
+  physical Linux/macOS/Android. Native UI separation stays covered natively;
+  capture frames cannot show it.
 - [ ] **REN-05 — P1, qualification: remaining PBR quality and portability.**
   Reproduce strict residual Intel SSAO and lavapipe scalar/texture differences and
   recorded cutout/normal diagnostic mismatches; fix or explicitly bound exceptions.
@@ -868,6 +893,14 @@ diagnostics establish whole-frame ownership or production performance.
   Linux and Apple fallback. Preserve stock appearance. Box probes, probe capture,
   animated/MD5R PBR and indirect-only SSAO are implemented and need regression
   evidence rather than another implementation phase.
+  Progress, 6 November: the SSAO laboratory controls had failed on every GPU
+  since automatic half-resolution SSAO (they compared the full-resolution field
+  pass with a half-resolution classic pass); they now pin full resolution and
+  pass exactly on NVIDIA. The Intel residual (4 classic, 6 debug pixels) is
+  reproduced, unaffected by precise arithmetic, and bounded to Intel Vulkan
+  only. See [SSAO parity](renderer-validation-matrix.md#ssao-parity-controls-6-november-2026-ren-05).
+  Remaining: lavapipe's one-byte difference, a matched half-resolution control,
+  mixed-material mods, packed-MD5R skin substitutions and physical Linux/Apple.
 - [ ] **REN-06 — P2, qualification: probes, baked data and advanced effects.**
   Qualify probe capture orientation, generated-grid provenance and whether existing
   baked grids need regeneration after capture fixes. Broaden authored probe/decal
@@ -882,6 +915,20 @@ diagnostics establish whole-frame ownership or production performance.
   readback path on source-cache misses and set cold/reload latency and memory
   budgets. Decide explicit support or exclusion for compressed, authored-HDR and
   oversized inputs; an HDR generator does not establish a general HDR loader.
+  Progress, 6 November: admission is decided - authored RGBA8/sRGB and
+  generated RGBA16F supported; compressed, oversized and authored HDR excluded
+  with cleared output - and `gfxInfo` reports source-read and prefilter time per
+  miss. The 56-control probe suite passes; a miss costs 3-6 ms to read (21 ms
+  after reload) but 0.49-0.58 s to prefilter on the CPU, against the new 4 ms
+  per-frame budget (memory: the fixed 44.7 MB atlas plus one transient source).
+  See [probe sources](vulkan-probe-sources.md#cold-miss-cost-and-budget-6-november-2026-ren-06).
+  `renderer_screen_space_effects_qualification.py` captures each leaf, all three
+  and master-off at a frozen pose: every leaf changes the frame, master-off is
+  byte-identical to the baseline on both backends, and the combination costs at
+  most 1.4 ms. It found Vulkan screenshots presenting the leaves without depth,
+  now fixed. See [leaf captures](renderer-validation-matrix.md#frozen-same-process-leaf-and-rollback-captures-6-november-2026-ren-06).
+  Remaining: move the prefilter off the frame to meet the budget, probe capture
+  orientation and grid provenance/regeneration, broader authored scenes.
 - [ ] **REN-07 — P2, measured optimization: remove demonstrated CPU/GPU stalls.**
   The 28 October [preset audit](ui/performance-presets.md#preset-and-detection-audit-28-october-2026)
   adds Enhanced between Balanced and Quality and replaces host-wide memory
@@ -1226,7 +1273,7 @@ diagnostics establish whole-frame ownership or production performance.
       every-frame Quality floor, physical display/input qualification and
       Wayland/macOS runtime coverage. Do not promote the default from
       shared-machine measurements.
-- [ ] **REN-08 — P1, qualification and targeted implementation: complete post-
+- [x] **REN-08 — P1, qualification and targeted implementation: complete post-
   processing combinations.** Qualify motion blur independently of TAA: it has its
   own history, limited rigid-opaque object vectors and subview/time-gap resets;
   existing gameplay benchmarks disable it. Cover skinned/weapon motion, mirrors/
@@ -1235,6 +1282,19 @@ diagnostics establish whole-frame ownership or production performance.
   effect strength and accurate requested/effective settings. Fix reproduced gaps
   or publish precise supported combinations, including Apple GL 2.1 offscreen/MSAA
   restrictions and Vulkan's effective 8x MSAA ceiling. Preserve unchanged gameplay.
+  Completed 6 November 2026 on Windows x64 OpenGL and Vulkan. Fixed: temporal AA
+  jitter read as a projection change, so motion blur never drew with TAA;
+  rigid-only vectors smeared the view weapon and ignored skinning; blur length
+  shrank with frame rate (now `r_motionBlurShutterMsec`, 0 restores it); equal
+  presentation times, screenshots and dynamic-resolution scale steps reset the
+  history; authored cuts did not. Both backends share `MotionBlurCore.h` (native
+  test) and report `rendererMotionBlurStatus`. `renderer_motion_blur_qualification.py`
+  passes all 41 cases and the coherence, rollback and weapon checks; supported
+  combinations, Apple GL 2.1 and the Vulkan 8x ceiling are published in the
+  [player guide](../user/display-settings.md#motion-blur). Evidence:
+  [motion blur qualification](temporal-presentation.md#motion-blur-qualification-6-november-2026).
+  Physical Linux/macOS/Android runs and appearance review remain with platform
+  qualification (PLAT).
 
 ## Virtual reality
 

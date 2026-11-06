@@ -66,6 +66,25 @@ close the full custom-program, platform or promotion requirements. See
 
 ## PBR Material Laboratory
 
+### SSAO parity controls, 6 November 2026 (REN-05)
+
+The eight `ssao-*` laboratory controls failed on Vulkan on both GPUs
+(NVIDIA: native PBR "changed" 51,450 classic pixels; Intel: 59,878) since
+Vulkan SSAO began halving its resolution automatically below 32 samples (the
+laboratory uses 20). A view with native PBR's occlusion field always takes the
+full-resolution pass, while the classic-only control took the half-resolution
+one, so the check compared two different algorithms. The SSAO controls now pin
+`r_ssaoResolution 1`: NVIDIA passes 8/8 exactly. Intel Iris Xe (driver
+101.5590, `OPENQ4_LAB_VK_DEVICE=2`) reproduces the residual recorded on
+4 October: 4 isolated classic pixels and 6 debug-view pixels, where the PBR
+frame shows less occlusion at single pixels. Marking the occlusion arithmetic
+`precise` did not change them, and both passes fill depth through the same
+pipeline. The check now allows at most 8 classic and 12 debug pixels on an
+Intel Vulkan device only (`INTEL_VULKAN_SSAO_*` in
+`renderer_pbr_laboratory.py`); every other device stays exact. The half-
+resolution path itself has no matched PBR/classic control yet. lavapipe's
+one-byte scalar/texture difference was not re-run here.
+
 `renderer_pbr_preview.py` includes forty HDR-off preview and recovery controls,
 covering 50%, 75%, 125%, 150% and 200% scene scales. Its matched-backend
 comparison retains the full-frame two-byte gate. Pair it with
@@ -513,6 +532,35 @@ GI, or whole-frame modern lighting ownership. All leaves remain default off;
 clean committed-package, target-platform/driver, and retained visual-review
 promotion remain open. See the [user controls and limitations](../user/advanced-screen-space-lighting.md)
 and [`airdefense1` optimization evidence](airdefense1-optimization-evidence.md).
+
+#### Frozen same-process leaf and rollback captures, 6 November 2026 (REN-06)
+
+`tools/tests/renderer_screen_space_effects_qualification.py` replaces the
+separate-launch comparison with one launch per backend: `game/airdefense1`
+frozen with `g_stopTime` at the outdoor "opening" pose, HUD and view weapon
+hidden, temporal AA and motion blur off. It captures the baseline, each leaf,
+all three, all three with `r_rendererModernQuality 0`, and the baseline again,
+and excludes any pixel that differs between the two baselines.
+
+| 2560 x 1440 | Froxel | SSR | SSGI | All | Master off | GPU over base |
+| --- | --- | --- | --- | --- | --- | --- |
+| OpenGL | 4.77 M bytes | 0.10 M | 3.22 M | 6.65 M | identical | at most 0.2 ms |
+| Vulkan | 4.70 M bytes | 0.10 M | 3.19 M | 6.63 M | identical | at most 1.4 ms |
+
+Changed channel bytes against the baseline. OpenGL's two baselines are
+identical; Vulkan's differ on 10,873 scattered pixels by at most 8 levels
+(0.3%, inside the declared 1% bound), consistent with frame-indexed dithering
+in the depth-aware capture present. Delayed whole-frame GPU times are
+5.7-7.4 ms per configuration.
+
+The first Vulkan run showed SSR changing nothing, SSGI almost nothing and the
+combination equal to froxel alone, while froxel fog was far stronger than on
+OpenGL. A capture advanced the history generation and retired every depth
+stamp before its resolve, so screenshots presented the screen-space tail
+without depth. Capture frames now use the current frame's depth proof
+(`VK_TemporalPresentation_DepthCurrentForCapture`); gameplay frames were not
+affected. Not covered: other poses and maps, other GPUs and platforms, and
+review of the leaves' appearance.
 
 The same foundation case requires `rendererContractsSelfTest` and
 `rendererGpuSkinningSelfTest` to pass without a skip. The Vulkan startup case
@@ -965,6 +1013,26 @@ Nondeterministic BSE, cinematic, and MP scenes need human review in addition to 
 | `shadow-cutout-storage2` | SP | `game/storage2` | hashed-alpha cutout fence/grate caster validation at distance |
 | `shadow-character-airdefense2` | SP | `game/airdefense2` | dynamic character shadow caster and receiver validation |
 | `shadow-translucent-medlabs` | SP | `game/medlabs` | optional translucent moment caster coverage where the selected tier supports it |
+
+### Continuous-motion shadow tour, 6 November 2026 (REN-03)
+
+`tools/tests/renderer_shadow_motion_qualification.py` tours the eight matched
+`game/airdefense1` outdoor poses of `renderer_shadow_mapping_outdoor.py`
+while `benchmarkViewSweep` pans continuously, and reads every
+`r_shadowMapReport` summary (interval 15 frames). Windows x64, RTX 4060
+Laptop GPU:
+
+| Case | OpenGL (ARB2 cache estimate over 790 reports) | Vulkan (52-53 cache reports) |
+| --- | --- | --- |
+| Default budget | 5,231 passes: 2,242 fresh, 2,989 cache hits; no budget, receiver or stencil fallback, no unshadowed light | no fallback, no dropped query; slots at most 8/8 projected, 10/12 point; 94-198 MB resident |
+| Cascades (`r_shadowMapCSM`, projected CSM, 4 cascades) | 4,399 passes, 3,244 fresh; no fallback, none unshadowed | no fallback; 9/12 point slots; 102-192 MB |
+| One update per view (`r_shadowMapMaxUpdatesPerView 1`) | 994 budget-fallback passes with 0 unshadowed and 0 stencil-only: over-budget lights stay shadowed | no fallback reported; 102-180 MB |
+
+Resident megabytes follow which lights are cached at each pose; the bound is
+the fixed slot capacity, which no report exceeds. This is counter evidence
+for stock motion, not an image comparison: the moving-caster, cutout,
+translucent and custom-receiver fixtures keep their own suites, and the
+point static/live composition and dynamic-image alpha audits remain open.
 
 ## Acceptance
 

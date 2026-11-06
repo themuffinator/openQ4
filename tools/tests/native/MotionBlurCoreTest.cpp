@@ -128,6 +128,16 @@ static void TestHistoryPolicy() {
 	Check( MotionBlurCore_ValidateHistory( viewport, current, previous ) == MOTION_BLUR_HISTORY_VIEWPORT_CHANGED,
 		"a viewport change must reset" );
 
+	// Dynamic resolution changes the scene extent without changing its shape.
+	Check( !MotionBlurCore_ViewportChanged( 1872, 1048, 2560, 1440 ),
+		"an aligned scene-scale change must keep the history" );
+	Check( !MotionBlurCore_ViewportChanged( 1280, 720, 2560, 1440 ),
+		"a half-scale scene must keep the history" );
+	Check( MotionBlurCore_ViewportChanged( 1920, 1440, 2560, 1440 ),
+		"a change of aspect ratio must reset" );
+	Check( MotionBlurCore_ViewportChanged( 0, 720, 1280, 720 ),
+		"an empty viewport must reset" );
+
 	for ( int i = 0; i < MOTION_BLUR_HISTORY_RESULT_COUNT; i++ ) {
 		const char *name = MotionBlurCore_HistoryResultName( static_cast<motionBlurHistoryResult_t>( i ) );
 		Check( name != NULL && name[0] != '\0' && std::string( name ) != "unknown",

@@ -52,6 +52,7 @@ class Case:
     sweep_msec: int = 6000
     frames: int = 400
     after: list[str] = field(default_factory=list)
+    setup: list[str] = field(default_factory=list)
     launch: dict[str, str] = field(default_factory=dict)
     backends: tuple[str, ...] = ("gl", "vk")
     # expectations
@@ -90,14 +91,19 @@ CASES: list[Case] = [
          cvars={"r_motionBlurShutterMsec": "0"}, maxfps="60", sweep_degrees="30", frames=240),
     Case("cap-uncapped-per-frame", "uncapped with the original per-frame length",
          cvars={"r_motionBlurShutterMsec": "0"}, maxfps="0", sweep_degrees="30", frames=240),
+    # Resuming can step presentation time back by part of a tic; one frame then
+    # restarts the history instead of blurring across it.
     Case("pause", "g_stopTime freezes presentation time mid-pan",
          after=["wait 60", "g_stopTime 1", "wait 120", "g_stopTime 0"], frames=120,
-         min_drawn_ratio=0.95),
+         min_drawn_ratio=0.95, allowed_resets=("first-sample", "time-reversed")),
     Case("slow-frames", "8 FPS: every interval exceeds the 100 ms gap limit",
          maxfps="8", frames=40, min_drawn_ratio=0.0, allowed_resets=("first-sample", "time-gap"),
          max_resets=1000, dominant_reset="time-gap"),
+    # Without object vectors a frame in which the camera did not move has
+    # nothing to blur and is reported as camera-still.
     Case("camera-only", "object vectors off: camera reprojection only",
-         cvars={"r_motionBlurObjectVectors": "0"}, object_vectors=False),
+         cvars={"r_motionBlurObjectVectors": "0"}, object_vectors=False,
+         allowed_resets=("first-sample", "camera-still")),
     Case("render-thread-1", "Vulkan backend overlap (r_vkRenderThread 1)",
          launch={"r_vkRenderThread": "1"}, backends=("vk",)),
     Case("render-thread-2", "Vulkan full front-end overlap (r_vkRenderThread 2)",
@@ -105,7 +111,8 @@ CASES: list[Case] = [
     Case("dynamic-resolution", "dynamic resolution with automatic temporal upscaling",
          cvars={"r_temporalAA": "2", "r_rendererDynamicResolution": "1"}, taa_aligned=True),
     Case("mirror", "the mirror fixture's subview renders before every main view",
-         mirror=True, sweep_degrees="40", sweep_msec=8000, frames=300, require_actors=False,
+         mirror=True, sweep_degrees="20", sweep_msec=8000, frames=300, require_actors=False,
+         setup=["noclip", "setviewpos 0 -384 96 0 90 0"],
          allowed_resets=("first-sample", "camera-still"), max_resets=40),
     Case("weapon-exact", "debug vectors with exact weapon ownership",
          cvars={"r_motionBlurDebug": "1"}, after=["wait 90", "screenshot screenshots/weapon.tga"],
@@ -113,7 +120,7 @@ CASES: list[Case] = [
     Case("weapon-camera", "debug vectors with camera-only reprojection",
          cvars={"r_motionBlurDebug": "1", "r_motionBlurObjectVectors": "0"},
          after=["wait 90", "screenshot screenshots/weapon.tga"], frames=60, object_vectors=False,
-         screenshot="weapon.tga"),
+         screenshot="weapon.tga", allowed_resets=("first-sample", "camera-still")),
 ]
 
 
@@ -159,6 +166,7 @@ def launch_case(runtime: Path, output: Path, backend: str, case: Case, timeout: 
     cvars.update(case.cvars)
     lines = ["god", "notarget"]
     lines += [f"set {name} {value}" for name, value in cvars.items()]
+    lines += case.setup
     lines += ["wait 120", "rendererMotionBlurStatus reset",
               f"benchmarkViewSweep {case.sweep_degrees} {case.sweep_msec}"]
     lines += case.after
@@ -208,6 +216,20 @@ def launch_case(runtime: Path, output: Path, backend: str, case: Case, timeout: 
         "exitCode": exit_code,
         "seconds": round(time.time() - started, 1),
         "log": str(log_path),
+        "status": parse_status(log_text),
+        "failures": [line for line in log_text.splitlines()
+                     if any(pattern.search(line) for pattern in FAILURE_PATTERNS)],
+        "screenshot": str(game_dir / "screenshots" / case.screenshot) if case.screenshot else None,
+    }
+
+
+def reevaluate_case(output: Path, backend: str, case: Case) -> dict:
+    game_dir = output / f"{backend}-{case.name}" / "baseoq4"
+    log_path = game_dir / "logs" / "motionblur.log"
+    log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
+    return {
+        "backend": backend, "case": case.name, "description": case.description,
+        "exitCode": 0 if log_text else "missing log", "seconds": 0, "log": str(log_path),
         "status": parse_status(log_text),
         "failures": [line for line in log_text.splitlines()
                      if any(pattern.search(line) for pattern in FAILURE_PATTERNS)],
@@ -267,7 +289,8 @@ def evaluate(case: Case, result: dict) -> list[str]:
     return problems
 
 
-def weapon_black_fraction(path: str | None) -> float | None:
+def weapon_motion(path: str | None) -> float | None:
+    """Mean debug-view motion magnitude (blue channel) over the view weapon."""
     if not path or not Path(path).is_file():
         return None
     try:
@@ -278,8 +301,7 @@ def weapon_black_fraction(path: str | None) -> float | None:
     width, height = image.size
     box = image.crop((int(width * 0.62), int(height * 0.70), int(width * 0.76), int(height * 0.95)))
     pixels = list(box.getdata())
-    black = sum(1 for r, g, b in pixels if r < 12 and g < 12 and b < 12)
-    return black / max(1, len(pixels))
+    return sum(b for _, _, b in pixels) / (255.0 * max(1, len(pixels)))
 
 
 def cross_checks(results: dict[tuple[str, str], dict]) -> list[dict]:
@@ -307,13 +329,13 @@ def cross_checks(results: dict[tuple[str, str], dict]) -> list[dict]:
                 "value": round(ratio, 4), "pass": ratio < 0.8,
                 "detail": f"r_motionBlurShutterMsec 0 keeps the frame-rate-dependent length: ratio {ratio:.3f}",
             })
-        exact = weapon_black_fraction((results.get((backend, "weapon-exact")) or {}).get("screenshot"))
-        camera = weapon_black_fraction((results.get((backend, "weapon-camera")) or {}).get("screenshot"))
+        exact = weapon_motion((results.get((backend, "weapon-exact")) or {}).get("screenshot"))
+        camera = weapon_motion((results.get((backend, "weapon-camera")) or {}).get("screenshot"))
         if exact is not None and camera is not None:
             checks.append({
                 "backend": backend, "check": "weapon-not-smeared",
-                "value": round(exact - camera, 4), "pass": exact >= camera + 0.15,
-                "detail": f"zero-motion weapon pixels: exact {exact:.3f} vs camera-only {camera:.3f}",
+                "value": round(exact, 4), "pass": camera >= 0.3 and exact <= 0.5 * camera,
+                "detail": f"mean weapon motion while panning: exact {exact:.3f} vs camera-only {camera:.3f}",
             })
     return checks
 
@@ -328,6 +350,8 @@ def main() -> int:
     parser.add_argument("--mirror-runtime", type=Path, default=None,
                         help="runtime staged by renderer_milestone_d_fixture.py; enables the mirror case")
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--reevaluate", action="store_true",
+                        help="score the logs already in --output-dir again without launching")
     args = parser.parse_args()
 
     if args.list:
@@ -355,7 +379,10 @@ def main() -> int:
                     print(f"SKIP {backend:2} {case.name:24} needs --mirror-runtime", flush=True)
                     continue
                 case_runtime = args.mirror_runtime.resolve()
-            result = launch_case(case_runtime, output, backend, case, args.timeout)
+            if args.reevaluate:
+                result = reevaluate_case(output, backend, case)
+            else:
+                result = launch_case(case_runtime, output, backend, case, args.timeout)
             result["problems"] = evaluate(case, result)
             result["pass"] = not result["problems"]
             failed |= not result["pass"]

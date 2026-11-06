@@ -32,6 +32,51 @@ generation, upload generation and face dimensions. An in-place image upload
 invalidates the old stamp even when allocation and handle remain unchanged.
 Consumers must verify `VK_ProbeSource_Matches` before publishing filtered data.
 
+## Admission decisions, 6 November 2026 (REN-06)
+
+- **Supported:** authored RGBA8 and sRGB RGBA8 cubemaps (the material loader's
+  uncompressed `TD_HIGH_QUALITY` request) and renderer-generated RGBA16F
+  cubemaps, square, up to 256 texels per face.
+- **Excluded, explicitly:** compressed probe sources (BC1-BC7) are rejected as
+  `MODERN_SPECULAR_PROBE_ATLAS_REJECT_INVALID_STORAGE`; author probes
+  uncompressed. Sources over 256 texels per face are rejected as
+  `..._REJECT_OVERSIZED`, not downsampled. Authored HDR cubemaps are not a
+  supported input: the loader requests RGBA8, so authored high-range data is
+  quantised before it reaches the reader. The RGBA16F path exists for the
+  renderer's own generators and is not a general HDR loader.
+
+Every exclusion clears the output and stamp (regression controls below), and
+the probe falls back with the rest of its set.
+
+## Cold-miss cost and budget, 6 November 2026 (REN-06)
+
+`gfxInfo` now reports source-cache misses on the `Vulkan PBR probes:` line:
+`missReads`, and the mean and maximum microseconds of the synchronous source
+read (`missRead*`) and of the CPU prefilter plus atlas tile uploads
+(`missFilter*`). The 56-control authored-probe suite
+(`renderer_vulkan_pbr_probes.py --backend vk`, RTX 4060 Laptop GPU,
+debugoptimized build) passes and records 21 misses:
+
+| Stage | Mean | Maximum |
+| --- | --- | --- |
+| Source read (copy after pending uploads, fence wait, decode) | 2.9-5.9 ms | 21.3 ms after image reload |
+| CPU prefilter (7 mips x 6 faces, 128 GGX samples) and tile uploads | 489-538 ms | 577 ms |
+
+Memory: the atlas is a fixed 2048 x 2048 RGBA16F image with 7 mips
+(about 44.7 MB) for 8 residents plus the analytic slot. A miss adds a
+transient host readback buffer of up to 3.1 MB (256-texel RGBA16F faces) and a
+CPU cube of about 4.7 MB plus prefilter scratch, released when the miss
+completes.
+
+Budget: a cold or reload miss may add at most 4 ms to the frame that takes it
+on the reference desktop, and residency may not hold more than the fixed
+atlas plus one in-flight source. **The current prefilter misses the latency
+budget by two orders of magnitude**: every newly resident or evicted authored
+source stalls about half a second. The read itself fits. Meeting the budget
+needs the prefilter off the frame (an asynchronous job whose result publishes
+on a later frame, with the set's analytic fallback meanwhile) or on the GPU;
+reducing sample counts would change the GL-matched result and is not the fix.
+
 ## Transfer ownership
 
 A cache miss appends the six-face copy after pending image uploads on the

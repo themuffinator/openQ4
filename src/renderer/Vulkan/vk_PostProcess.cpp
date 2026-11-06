@@ -1794,8 +1794,8 @@ static motionBlurHistoryResult_t VK_Post_MotionValidateHistory( const vkPostMoti
 	context.videoRestarted = current.videoRestartCount != previous.videoRestartCount;
 	context.worldChanged = current.renderWorld != previous.renderWorld
 		|| current.mapName.Icmp( previous.mapName ) != 0;
-	context.viewportChanged = current.viewportWidth != previous.viewportWidth
-		|| current.viewportHeight != previous.viewportHeight;
+	context.viewportChanged = MotionBlurCore_ViewportChanged( current.viewportWidth, current.viewportHeight,
+		previous.viewportWidth, previous.viewportHeight );
 	context.explicitCut = current.forceUpdate;
 	context.allowStillCamera = allowStillCameraObjectVectors;
 	motionBlurCameraSample_t currentSample;

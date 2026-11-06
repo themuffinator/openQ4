@@ -70,6 +70,20 @@ inline const char *MotionBlurCore_HistoryResultName( motionBlurHistoryResult_t r
 	}
 }
 
+// Reprojection works in normalised view coordinates and the vectors are
+// measured in the current viewport's pixels, so a scene-scale change (dynamic
+// or manual resolution scaling) keeps the history; only a change of shape
+// does not.
+inline bool MotionBlurCore_ViewportChanged( int currentWidth, int currentHeight,
+		int previousWidth, int previousHeight ) {
+	if ( currentWidth <= 0 || currentHeight <= 0 || previousWidth <= 0 || previousHeight <= 0 ) {
+		return true;
+	}
+	const float currentAspect = static_cast<float>( currentWidth ) / static_cast<float>( currentHeight );
+	const float previousAspect = static_cast<float>( previousWidth ) / static_cast<float>( previousHeight );
+	return std::fabs( currentAspect - previousAspect ) > 0.01f * previousAspect;
+}
+
 inline float MotionBlurCore_DistanceSquared( const float a[3], const float b[3] ) {
 	const float x = a[0] - b[0];
 	const float y = a[1] - b[1];

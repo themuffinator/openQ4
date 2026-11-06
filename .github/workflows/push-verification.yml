@@ -413,6 +413,9 @@ jobs:
             tools/tests/renderer_temporal_presentation.py \
             tools/tests/renderer_motion_blur_contract.py \
             tools/tests/renderer_motion_blur_qualification.py \
+            tools/tests/renderer_temporal_qualification.py \
+            tools/tests/renderer_screen_space_effects_qualification.py \
+            tools/tests/renderer_shadow_motion_qualification.py \
             tools/tests/renderer_native_ui_output.py \
             tools/tests/renderer_mp_flat_items.py \
             tools/tests/renderer_pbr_materials.py \

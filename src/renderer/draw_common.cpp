@@ -3326,8 +3326,8 @@ static motionBlurHistoryResult_t RB_MotionBlurValidateHistory( const rbMotionBlu
 	context.videoRestarted = current.videoRestartCount != previous.videoRestartCount;
 	context.worldChanged = current.renderWorld != previous.renderWorld
 		|| current.mapName.Icmp( previous.mapName ) != 0;
-	context.viewportChanged = current.viewportWidth != previous.viewportWidth
-		|| current.viewportHeight != previous.viewportHeight;
+	context.viewportChanged = MotionBlurCore_ViewportChanged( current.viewportWidth, current.viewportHeight,
+		previous.viewportWidth, previous.viewportHeight );
 	context.explicitCut = current.forceUpdate;
 	context.allowStillCamera = allowStillCameraObjectVectors;
 	motionBlurCameraSample_t currentSample;
@@ -6040,7 +6040,15 @@ static bool RB_DrawTemporalResolvePass( const resolveTemporalPresentationCommand
 	return true;
 }
 
-bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t &command ) {
+// How one resolve ended, for rendererTemporalPresentationStatus.
+struct rbTemporalResolveRecord_t {
+	temporalResolveOutcome_t	outcome;
+	const char *				reason;
+	int							velocity;
+};
+
+static bool RB_ResolveTemporalPresentationRecorded( const resolveTemporalPresentationCommand_t &command,
+		rbTemporalResolveRecord_t &record ) {
 	rbTemporalResolveHistoryWriteFrame = -1;
 	rbTemporalResolveHistoryWriteTarget = NULL;
 	const int sceneWidth = command.presentation.sceneWidth;
@@ -6059,6 +6067,8 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 			|| outputWidth != glConfig.vidWidth || outputHeight != glConfig.vidHeight
 			|| !RB_TemporalColorTargetMatches( command.sceneColorTarget, sceneWidth, sceneHeight ) ) {
 		RB_RejectTemporalHistoryWrite( command );
+		record.outcome = TEMPORAL_RESOLVE_FALLBACK;
+		record.reason = "invalid command or scene target";
 		return sceneImage != NULL
 			? RB_PresentTemporalSpatialFallback( sceneImage, outputWidth, outputHeight, spatialJitter )
 			: false;
@@ -6080,6 +6090,8 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 	// history. Recenter the already-jittered scene during the spatial present.
 	if ( captureFrame ) {
 		RB_ClearTemporalEntityHistory();
+		record.outcome = TEMPORAL_RESOLVE_CAPTURE;
+		record.reason = NULL;
 		if ( RB_DrawTemporalResolvePass( command, sceneImage, depthImage, NULL, NULL,
 				NULL, NULL, false, false, true, preserveFarDepth, 0 ) ) {
 			return true;
@@ -6095,11 +6107,15 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 			command.sceneDepthTarget, command.presentation.frameNumber,
 			command.historyGeneration ) ) {
 		RB_RejectTemporalHistoryWrite( command );
+		record.outcome = TEMPORAL_RESOLVE_FALLBACK;
+		record.reason = "scene depth not current";
 		return RB_PresentTemporalSpatialFallback( sceneImage,
 			outputWidth, outputHeight, spatialJitter, depthImage, preserveFarDepth );
 	}
 	if ( !command.presentation.temporalAARequested ) {
 		RB_ClearTemporalEntityHistory();
+		record.outcome = TEMPORAL_RESOLVE_SPATIAL;
+		record.reason = NULL;
 		if ( RB_DrawTemporalResolvePass( command, sceneImage, depthImage,
 				NULL, NULL, NULL, NULL, false, false, false,
 				preserveFarDepth, 0 ) ) {
@@ -6145,6 +6161,8 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 
 	if ( !canWriteHistory || !RB_EnsureTemporalResolveProgram() ) {
 		RB_RejectTemporalHistoryWrite( command );
+		record.outcome = TEMPORAL_RESOLVE_FALLBACK;
+		record.reason = canWriteHistory ? "resolve program unavailable" : "history target unavailable";
 		if ( AdvancedScreenSpaceCore_Requested( command.advancedScreenSpace )
 				&& RB_DrawTemporalResolvePass( command, sceneImage, depthImage,
 					NULL, NULL, NULL, NULL, false, false, true,
@@ -6166,7 +6184,8 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 
 	bool velocityValid = false;
 	bool velocityComplete = false;
-	if ( useHistory && depthImage != NULL && transformHistoryMatches ) {
+	const bool velocityAttempted = useHistory && depthImage != NULL && transformHistoryMatches;
+	if ( velocityAttempted ) {
 		rbMotionBlurViewState_t previousState;
 		if ( RB_BuildTemporalPreviousMotionState( command.viewDef,
 				sceneWidth, sceneHeight, previousState ) ) {
@@ -6205,6 +6224,8 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 			command.historyWriteTarget, &motionPolicy,
 			useHistory, velocityValid, false, false, 0 ) ) {
 		RB_RejectTemporalHistoryWrite( command );
+		record.outcome = TEMPORAL_RESOLVE_FALLBACK;
+		record.reason = "resolve pass failed";
 		return RB_PresentTemporalSpatialFallback( sceneImage,
 			outputWidth, outputHeight, spatialJitter,
 			depthImage, preserveFarDepth );
@@ -6213,6 +6234,9 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 	rbTemporalResolveHistoryWriteTarget = command.historyWriteTarget;
 	rbTemporalResolveNeedsReprime = false;
 	rbTemporalResolveRejectedGeneration = 0;
+	record.outcome = useHistory ? TEMPORAL_RESOLVE_HISTORY : TEMPORAL_RESOLVE_SEEDED;
+	record.reason = NULL;
+	record.velocity = !velocityAttempted ? -1 : ( !velocityValid ? 0 : ( velocityComplete ? 2 : 1 ) );
 
 	const int debugMode = idMath::ClampInt( 0, 3, command.debugMode );
 	if ( debugMode > 0 && RB_DrawTemporalResolvePass( command, sceneImage, depthImage,
@@ -6224,6 +6248,19 @@ bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t 
 	return RB_PresentTemporalSpatialFallback( historyWriteImage,
 		outputWidth, outputHeight, idVec2( 0.0f, 0.0f ),
 		depthImage, preserveFarDepth, R_TemporalPresentation_PresentSharpness() );
+}
+
+bool RB_ResolveTemporalPresentation( const resolveTemporalPresentationCommand_t &command ) {
+	rbTemporalResolveRecord_t record = { TEMPORAL_RESOLVE_FALLBACK, "unrecorded", -1 };
+	const bool presented = RB_ResolveTemporalPresentationRecorded( command, record );
+	if ( presented ) {
+		R_TemporalPresentation_RecordResolve( record.outcome, record.reason, record.velocity );
+	} else {
+		R_TemporalPresentation_RecordResolve( TEMPORAL_RESOLVE_FALLBACK,
+			record.outcome == TEMPORAL_RESOLVE_FALLBACK && record.reason != NULL
+				? record.reason : "present failed", record.velocity );
+	}
+	return presented;
 }
 
 static void RB_ResetBackendTemporalHistory( bool destroyResources ) {
