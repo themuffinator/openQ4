@@ -199,6 +199,20 @@ overflows (`ClassicInteractionDomain.h`).
     ARB2 to a mean of 0.25 and a maximum of 0.56 levels. Vertex colour is not
     accepted on cutouts or with a light grid, for the same reasons as texture
     matrices.
+  - **Stage expressions and multiple stage sets** follow.
+    - The `stageCondition` fallback (`mNumStageOps > 0`) counts every
+      per-stage expression: conditions, colours and matrix expressions. The
+      corridor builds its interactions through ARB2's own
+      `RB_CreateSingleDrawInteractions`, so those expressions are evaluated
+      identically, and the fallback joins the corridor-only set.
+    - The classic fixed class now accepts more than one bump/diffuse/specular
+      set. This class only ever counts inside the corridor's view.
+    - `production-fixed-condition` uses a specular stage conditioned on
+      `parm7 > 0.5`, left at 0, so ARB2 skips it (native range 0-62). The
+      modern frame matches to a mean of 0.25 and a maximum of 0.55 levels.
+    - `production-fixed-multistage` uses a bumped specular grey set followed
+      by a flat dark set, and matches to a mean of 0.25 and a maximum of
+      0.62 levels.
   - The corridor itself still runs only in the laboratory linear-scene mode
     (step 3).
 
@@ -211,10 +225,10 @@ overflows (`ClassicInteractionDomain.h`).
      cutouts in shipped modes wait on step 3);
    - vertex colours on cutouts and with light grids (plain vertex-coloured
      surfaces are done);
-   - condition stages;
+   - stage expressions and multi-stage sets on cutouts and with light grids
+     (plain ones are done);
    - texture matrices on cutouts and with light grids (plain texture
      matrices are done);
-   - multi-stage materials.
 
    Each shape needs image-level parity evidence against ARB2. The classic-fixed
    class must also count outside the corridor view.

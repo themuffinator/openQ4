@@ -909,8 +909,13 @@ diagnostics establish whole-frame ownership or production performance.
   fallbacks (`production-fixed-texmatrix` and `production-fixed-vertex`,
   both mean 0.25 levels; an interaction takes its vertex colour from the last
   diffuse or specular stage, which the fixture now honours).
-  Remaining, in order: prove interaction parity for the other dominant stock
-  material shapes (condition stages, multi-stage), qualify ambient lights, run the corridors in shipped modes,
+  Stage expressions (conditions, colours, matrices) and multi-set materials
+  follow (`production-fixed-condition`, `-multistage`, mean 0.25 levels).
+  Step 1 now covers the dominant classic interaction shapes inside the
+  corridor; what remains of it is cutouts and light grids combined with
+  those fallbacks.
+  Remaining, in order: finish step 1's cutout/light-grid combinations,
+  qualify ambient lights, run the corridors in shipped modes,
   represent stencil-fallback and multiple point shadows, reconcile the two
   ownership models, then measure benefit before any promotion.
 - [ ] **REN-03 — P1, qualification and implementation: shadow production scope.**
