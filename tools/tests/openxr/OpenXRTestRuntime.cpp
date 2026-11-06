@@ -24,6 +24,10 @@
 //   OPENQ4_XR_TEST_FAULT_ONCE optional receipt prevents reinjection after loader restart
 //   OPENQ4_XR_TEST_VK_DEVICE  index of the Vulkan physical device the "headset"
 //                           renders with (default: the first discrete GPU)
+//   OPENQ4_XR_TEST_SPACES   comma-separated floor-level reference spaces offered
+//                           besides VIEW and LOCAL: stage, local_floor (which
+//                           also offers XR_EXT_local_floor), or none
+//                           (default: stage)
 //   OPENQ4_XR_TEST_VK_FORMATS comma-separated VkFormat values the swapchains
 //                           offer, in order (default 43,50,37,44: RGBA and
 //                           BGRA, sRGB first)
@@ -516,6 +520,9 @@ struct RuntimeGlobals {
 	int						faultOccurrence = 1, faultCalls = 0;
 	bool					faultFired = false;
 	int						trackingInvalidFrames = 0;
+	// floor-level reference spaces offered (OPENQ4_XR_TEST_SPACES)
+	bool					offerStage = true;
+	bool					offerLocalFloor = false;
 };
 
 RuntimeGlobals &G() {
@@ -666,6 +673,11 @@ void InitGlobals() {
 		std::getline( input, g.faultValue );
 		g.faultOccurrence = std::max( 1, std::atoi( occurrence.c_str() ) );
 	}
+	if ( const char *spaces = std::getenv( "OPENQ4_XR_TEST_SPACES" ) ) {
+		const std::string list = std::string( "," ) + spaces + ",";
+		g.offerStage = list.find( ",stage," ) != std::string::npos;
+		g.offerLocalFloor = list.find( ",local_floor," ) != std::string::npos;
+	}
 	if ( const char *path = std::getenv( "OPENQ4_XR_TEST_FAULT_AFTER" ) ) g.faultAfter = path;
 	if ( const char *path = std::getenv( "OPENQ4_XR_TEST_FAULT_ONCE" ) ) g.faultOnce = path;
 	Log( "{\"event\":\"runtime_loaded\",\"eye_width\":%d,\"eye_height\":%d,\"rate\":%.1f}", g.eyeWidth, g.eyeHeight, g.refreshRate );
@@ -779,6 +791,9 @@ Pose StagePoseOfReference( XrReferenceSpaceType type ) {
 			local.p = V( 0.0f, 1.6f, 0.0f );
 			return local;
 		}
+		case XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT:
+			// LOCAL's origin dropped to the floor
+			return PIdentity();
 		case XR_REFERENCE_SPACE_TYPE_STAGE:
 		default:
 			return PIdentity();
@@ -1408,6 +1423,7 @@ const char *const SUPPORTED_EXTENSIONS[] = {
 	XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
 	XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME,
 	XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME,
+	XR_EXT_LOCAL_FLOOR_EXTENSION_NAME,	// only while OPENQ4_XR_TEST_SPACES offers local_floor
 #if defined( __linux__ )
 	TR_MNDX_EGL_ENABLE_EXTENSION_NAME,
 #endif
@@ -1419,6 +1435,9 @@ uint32_t ExtensionVersion( const char *name ) {
 	}
 	if ( std::strcmp( name, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ) == 0 ) {
 		return XR_KHR_vulkan_enable2_SPEC_VERSION;
+	}
+	if ( std::strcmp( name, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME ) == 0 ) {
+		return XR_EXT_local_floor_SPEC_VERSION;
 	}
 #if defined( __linux__ )
 	if ( std::strcmp( name, TR_MNDX_EGL_ENABLE_EXTENSION_NAME ) == 0 ) {
@@ -1439,6 +1458,9 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateInstanceExtensionProperties( const 
 	}
 	std::vector<XrExtensionProperties> values;
 	for ( const char *name : SUPPORTED_EXTENSIONS ) {
+		if ( std::strcmp( name, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME ) == 0 && !G().offerLocalFloor ) {
+			continue;
+		}
 		XrExtensionProperties p = {};
 		p.type = XR_TYPE_EXTENSION_PROPERTIES;
 		std::snprintf( p.extensionName, sizeof( p.extensionName ), "%s", name );
@@ -2247,8 +2269,14 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateReferenceSpaces( XrSession handle, 
 	if ( GetSession( handle ) == nullptr ) {
 		return XR_ERROR_HANDLE_INVALID;
 	}
-	return TwoCall( capacity, countOutput, spaces, std::vector<XrReferenceSpaceType>{
-		XR_REFERENCE_SPACE_TYPE_VIEW, XR_REFERENCE_SPACE_TYPE_LOCAL, XR_REFERENCE_SPACE_TYPE_STAGE } );
+	std::vector<XrReferenceSpaceType> offered{ XR_REFERENCE_SPACE_TYPE_VIEW, XR_REFERENCE_SPACE_TYPE_LOCAL };
+	if ( G().offerStage ) {
+		offered.push_back( XR_REFERENCE_SPACE_TYPE_STAGE );
+	}
+	if ( G().offerLocalFloor && InstanceHasExtension( GetSession( handle )->instance, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME ) ) {
+		offered.push_back( XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT );
+	}
+	return TwoCall( capacity, countOutput, spaces, offered );
 }
 
 XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateReferenceSpace( XrSession handle, const XrReferenceSpaceCreateInfo *createInfo, XrSpace *space ) {
@@ -2260,10 +2288,15 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateReferenceSpace( XrSession handle, cons
 	if ( createInfo == nullptr || space == nullptr || createInfo->type != XR_TYPE_REFERENCE_SPACE_CREATE_INFO ) {
 		return XR_ERROR_VALIDATION_FAILURE;
 	}
-	if ( createInfo->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_VIEW && createInfo->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_LOCAL
-		&& createInfo->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_STAGE ) {
+	const bool offered = createInfo->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_VIEW
+		|| createInfo->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL
+		|| ( createInfo->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE && G().offerStage )
+		|| ( createInfo->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT && G().offerLocalFloor
+			&& InstanceHasExtension( session->instance, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME ) );
+	if ( !offered ) {
 		return XR_ERROR_REFERENCE_SPACE_UNSUPPORTED;
 	}
+	Log( "{\"event\":\"create_reference_space\",\"type\":%d}", static_cast<int>( createInfo->referenceSpaceType ) );
 	if ( !PoseValid( createInfo->poseInReferenceSpace ) ) {
 		return XR_ERROR_POSE_INVALID;
 	}
@@ -2289,7 +2322,7 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetReferenceSpaceBoundsRect( XrSession handl
 	if ( bounds == nullptr ) {
 		return XR_ERROR_VALIDATION_FAILURE;
 	}
-	if ( type == XR_REFERENCE_SPACE_TYPE_STAGE ) {
+	if ( type == XR_REFERENCE_SPACE_TYPE_STAGE && G().offerStage ) {
 		bounds->width = 2.0f;
 		bounds->height = 2.0f;
 		return XR_SUCCESS;

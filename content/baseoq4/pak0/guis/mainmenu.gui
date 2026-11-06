@@ -16722,6 +16722,8 @@ windowDef Desktop
 			set "set_game_vr_vignette_hover::visible" "1" ;
 			set "set_game_vr_physicalcrouch::visible" "1" ;
 			set "set_game_vr_physicalcrouch_hover::visible" "1" ;
+			set "set_game_vr_playspace::visible" "1" ;
+			set "set_game_vr_playspace_hover::visible" "1" ;
 			set "set_game_freelook_value::noevents" "0" ;
 			set "set_game_autoreload::noevents" "0" ;
 			set "set_game_autoswitch::noevents" "0" ;
@@ -16801,6 +16803,7 @@ windowDef Desktop
 			set "set_game_vr_twohanded::noevents" "0" ;
 			set "set_game_vr_vignette::noevents" "0" ;
 			set "set_game_vr_physicalcrouch::noevents" "0" ;
+			set "set_game_vr_playspace::noevents" "0" ;
 	
 
 		}
@@ -16973,6 +16976,8 @@ windowDef Desktop
 			set "set_game_vr_vignette_hover::visible" "0" ;
 			set "set_game_vr_physicalcrouch::visible" "0" ;
 			set "set_game_vr_physicalcrouch_hover::visible" "0" ;
+			set "set_game_vr_playspace::visible" "0" ;
+			set "set_game_vr_playspace_hover::visible" "0" ;
 			set "set_game_freelook_value::noevents" "1" ;
 			set "set_game_autoreload::noevents" "1" ;
 			set "set_game_autoswitch::noevents" "1" ;
@@ -17052,6 +17057,7 @@ windowDef Desktop
 			set "set_game_vr_twohanded::noevents" "1" ;
 			set "set_game_vr_vignette::noevents" "1" ;
 			set "set_game_vr_physicalcrouch::noevents" "1" ;
+			set "set_game_vr_playspace::noevents" "1" ;
 			set "set_game_scroll_thumb::visible" "0" ;
 			set "set_game_scroll_thumb::noevents" "1" ;
 		}
@@ -19256,6 +19262,7 @@ windowDef Desktop
 				set "set_game_vr_twohanded_background::matcolor_w" "0.4" ;
 				set "set_game_vr_vignette_background::matcolor_w" "0.4" ;
 				set "set_game_vr_physicalcrouch_background::matcolor_w" "0.4" ;
+				set "set_game_vr_playspace_background::matcolor_w" "0.4" ;
 				if ( "gui::g_crosshairCustom" == 1 ) {
 					set "set_game_previewxhair_background::matcolor" "$desktop::corner" ;
 					set "set_game_previewxhair_description::forecolor" "$desktop::white_8" ;				

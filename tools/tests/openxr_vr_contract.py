@@ -190,6 +190,20 @@ def check_egl() -> None:
     require(runtime, 'bindingName = "opengl_egl";', "the test runtime reports an EGL session")
 
 
+def check_play_space() -> None:
+    openxr = read("src/sys/openxr/OpenXRSystem.cpp")
+    require(openxr, "const vrPlaySpaceChoice_t choice = VR_ChoosePlaySpace( vr_playSpace.GetInteger(), haveStage, haveFloor );",
+            "the base space follows vr_playSpace and what the runtime offers")
+    require(openxr, '#define VR_LOCAL_FLOOR_EXTENSION_NAME\t\t"XR_EXT_local_floor"', "standing play can use LOCAL_FLOOR")
+    require(openxr, "recenterPose.position.y = VR_StandingReference( standingPlay, head.pose.position.y, vr_standingHeight.GetFloat(), learned );",
+            "a recentre in standing play keeps the floor")
+    require(openxr, "if ( vr_playSpace.IsModified() && !CreateBaseSpace() ) {", "a play-space change takes effect between frames")
+    require(openxr, '"vr_calibrateHeight"', "the standing height can be measured again")
+    require(read("src/framework/VRMathCore.h"), "inline vrPlaySpaceChoice_t VR_ChoosePlaySpace( int mode, bool haveStage, bool haveLocalFloor ) {",
+            "the play-space choice is pure, natively tested math")
+    require(read("tools/tests/openxr/OpenXRTestRuntime.cpp"), "OPENQ4_XR_TEST_SPACES", "the test runtime can withhold floor-level spaces")
+
+
 def check_engine() -> None:
     system = read("src/framework/VRSystem.cpp")
     require(system, "#if defined( OPENQ4_OPENXR )\nidVRSystem *vrSystem = VR_GetOpenXRSystem();",
@@ -292,6 +306,7 @@ def main() -> int:
     check_abi()
     check_vulkan()
     check_egl()
+    check_play_space()
     check_engine()
     check_strings()
     check_documents()

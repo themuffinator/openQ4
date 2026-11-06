@@ -80,7 +80,7 @@
 					noclip	0
 					windowDef set_game_content
 					{
-						rect	-24,-41,640,2162
+						rect	-24,-41,640,2186
 						visible	1
 
 	//--------------------------------------------------------------//
@@ -4429,6 +4429,48 @@
 					}
 				}
 	//==============================================================//
+	// Settings->Game Options->Play Space
+	//==============================================================//
+
+				windowDef set_game_vr_playspace
+				{
+					rect	228,2123,403,25
+					visible	1
+
+					windowDef set_game_vr_playspace_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_vr_playspace_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_231760"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_vr_playspace_value
+					{
+							rect	240,3,162,18
+							visible	1
+							forecolor	1,0.745,0.137,0.8
+							cvar	vr_playSpace
+							textscale	0.24
+							font	"fonts/lowpixel"
+							choices	"#str_231761"
+							values	"0;1;2"
+							choiceType	1
+
+							onAction {
+								set "cmd" "play main_menu_selection" ;
+							}
+					}
+				}
+	//==============================================================//
 				#include "guis/menu/settings/game_hovers.gui"
 					}
 				}
@@ -4440,7 +4482,7 @@
 					forecolor	1,1,1,0.8
 					matcolor	1,1,1,0.4
 					low	0
-					high	77
+					high	78
 					step	1
 					vertical	1
 					scrollbar	1

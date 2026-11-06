@@ -131,6 +131,11 @@ typedef XrResult ( XRAPI_PTR *vrCreateVulkanDevice_t )( XrInstance instance, con
 // Wayland) and uses XR_KHR_opengl_enable's requirements and images.
 #define VR_EGL_ENABLE_EXTENSION_NAME		"XR_MNDX_egl_enable"
 
+// XR_EXT_local_floor: LOCAL with its origin dropped to the floor, for standing
+// play on a runtime without a STAGE space (vr_playSpace)
+#define VR_LOCAL_FLOOR_EXTENSION_NAME		"XR_EXT_local_floor"
+static const XrReferenceSpaceType VR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR = static_cast<XrReferenceSpaceType>( 1000426000 );
+
 typedef struct vrEGLGraphicsBinding_s {
 	XrStructureType			type;
 	const void *			next;
@@ -317,6 +322,7 @@ public:
 
 	void					RequestRestart( void ) { restartRequested = true; }
 	void					RequestRecenter( void ) { recenterRequested = true; }
+	void					RequestCalibrateHeight( void ) { calibrateRequested = true; }
 	void					PrintStatus( void ) const;
 
 	// OpenXR on Vulkan: the renderer's instance, physical device and device
@@ -365,6 +371,7 @@ private:
 	bool					PrepareVulkanSystem( void );
 	void					RequestVulkanRendererRestart( void );
 	bool					SelectSwapchainFormat( int rendererVulkanFormat );
+	bool					CreateBaseSpace( void );
 	void					ReleaseRendererImages( void );
 
 	// per frame
@@ -390,8 +397,16 @@ private:
 	XrSystemId				systemId;
 	XrSession				session;
 	XrSessionState			sessionState;
+	// the base space every pose and layer is tracked in: LOCAL for seated
+	// play, STAGE or LOCAL_FLOOR for standing play (vr_playSpace)
 	XrSpace					localSpace;
 	XrSpace					viewSpace;
+	XrReferenceSpaceType	baseSpaceType;
+	bool					haveLocalFloor;		// XR_EXT_local_floor is enabled
+	bool					standingPlay;		// heights are measured from the base space's floor
+	bool					playSpaceFallback;	// standing play was asked for and the runtime knows no floor
+	bool					stageBoundsValid;
+	XrExtent2Df				stageBounds;		// the STAGE play area, metres
 	XrEnvironmentBlendMode	blendMode;
 	PFN_xrGetOpenGLGraphicsRequirementsKHR getGLRequirements;
 	bool					haveEGL;			// XR_MNDX_egl_enable is enabled
@@ -413,6 +428,7 @@ private:
 	bool					rendererReady;
 	bool					restartRequested;
 	bool					recenterRequested;
+	bool					calibrateRequested;	// vr_calibrateHeight: measure the standing eye height now
 	bool					systemUnavailableLogged;
 	bool					startFailureLogged;	// "no runtime" style warnings print once per start
 	bool					runtimeStopped;		// the runtime ended VR: wait for vr_restart
@@ -445,8 +461,11 @@ private:
 	bool					viewsValid;
 	openq4::PresentationFrameDelta frameDelta;
 	vrFrameState_t			frame;
-	XrPosef					recenterPose;		// tracking origin in the runtime's LOCAL space (yaw only)
-	XrPosef					screenAnchor;		// virtual screen centre in LOCAL space
+	// tracking origin in the base space (yaw only); its height is the head's
+	// at the recentre in seated play and the standing eye height above the
+	// floor in standing play
+	XrPosef					recenterPose;
+	XrPosef					screenAnchor;		// virtual screen centre in the base space
 	bool					screenAnchored;
 	bool					lastFrameHud;
 	int						screenResizeFailedWidth;
@@ -606,6 +625,13 @@ idVRSystemOpenXR::idVRSystemOpenXR( void ) {
 	frameDelta.Reset();
 	memset( &frame, 0, sizeof( frame ) );
 	recenterPose = VR_IdentityPose();
+	baseSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+	haveLocalFloor = false;
+	standingPlay = false;
+	playSpaceFallback = false;
+	stageBoundsValid = false;
+	stageBounds.width = stageBounds.height = 0.0f;
+	calibrateRequested = false;
 	screenAnchor = VR_IdentityPose();
 	screenAnchored = false;
 	lastFrameHud = false;
@@ -651,6 +677,13 @@ static void VR_Recenter_f( const idCmdArgs &args ) {
 	}
 }
 
+static void VR_CalibrateHeight_f( const idCmdArgs &args ) {
+	(void)args;
+	if ( vrOpenXR != NULL ) {
+		vrOpenXR->RequestCalibrateHeight();
+	}
+}
+
 static void VR_Status_f( const idCmdArgs &args ) {
 	(void)args;
 	if ( vrOpenXR != NULL ) {
@@ -661,6 +694,8 @@ static void VR_Status_f( const idCmdArgs &args ) {
 void idVRSystemOpenXR::Init( void ) {
 	cmdSystem->AddCommand( "vr_restart", VR_Restart_f, CMD_FL_SYSTEM, "restarts the OpenXR session, applying vr_enable and vr_renderScale" );
 	cmdSystem->AddCommand( "vr_recenter", VR_Recenter_f, CMD_FL_SYSTEM, "makes the current head position and heading the VR origin" );
+	cmdSystem->AddCommand( "vr_calibrateHeight", VR_CalibrateHeight_f, CMD_FL_SYSTEM,
+		"standing play: stand up straight; your eye height becomes vr_standingHeight and the VR origin is recentred" );
 	cmdSystem->AddCommand( "vr_status", VR_Status_f, CMD_FL_SYSTEM, "prints the OpenXR runtime, session and tracking state" );
 	vr_enable.ClearModified();
 }
@@ -670,6 +705,7 @@ void idVRSystemOpenXR::Shutdown( void ) {
 	DestroyInstance();
 	cmdSystem->RemoveCommand( "vr_restart" );
 	cmdSystem->RemoveCommand( "vr_recenter" );
+	cmdSystem->RemoveCommand( "vr_calibrateHeight" );
 	cmdSystem->RemoveCommand( "vr_status" );
 }
 
@@ -710,6 +746,15 @@ void idVRSystemOpenXR::PrintStatus( void ) const {
 			eyeSwapchains[0].width, eyeSwapchains[0].height, recommendedEyeWidth, recommendedEyeHeight,
 			screenSwapchain.width, screenSwapchain.height, static_cast<unsigned long long>( swapchainFormat ) );
 		common->Printf( "  interaction profile: %s\n", interactionProfile.Length() ? interactionProfile.c_str() : "<none>" );
+		const char *const baseName = baseSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE ? "STAGE"
+			: baseSpaceType == VR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR ? "LOCAL_FLOOR" : "LOCAL";
+		if ( standingPlay ) {
+			common->Printf( "  play space: standing on %s, standing eye height %.2f m%s\n", baseName, recenterPose.position.y,
+				stageBoundsValid ? va( ", play area %.2f x %.2f m", stageBounds.width, stageBounds.height ) : "" );
+		} else {
+			common->Printf( "  play space: seated on %s, origin %.2f m%s\n", baseName, recenterPose.position.y,
+				playSpaceFallback ? " (standing asked for; the runtime knows no floor)" : "" );
+		}
 		common->Printf( "  frame %d, head %s ( %.1f %.1f %.1f ), body yaw %.2f%s\n", frame.frameNumber, frame.head.valid ? "tracked" : "lost",
 			frame.head.origin.x, frame.head.origin.y, frame.head.origin.z, bodyYaw, bodyYawValid ? "" : " (not yet driving input)" );
 	}
@@ -821,6 +866,7 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 	bool haveOpenGL = false;
 	bool haveVulkan = false;
 	bool haveEGLBinding = false;
+	bool haveLocalFloorExtension = false;
 	for ( int i = 0; XR_SUCCEEDED( result ) && i < extensions.Num(); i++ ) {
 		if ( idStr::Cmp( extensions[i].extensionName, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME ) == 0 ) {
 			haveOpenGL = true;
@@ -828,6 +874,8 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 			haveVulkan = true;
 		} else if ( idStr::Cmp( extensions[i].extensionName, VR_EGL_ENABLE_EXTENSION_NAME ) == 0 ) {
 			haveEGLBinding = true;
+		} else if ( idStr::Cmp( extensions[i].extensionName, VR_LOCAL_FLOOR_EXTENSION_NAME ) == 0 ) {
+			haveLocalFloorExtension = true;
 		}
 	}
 	if ( !haveOpenGL && !haveVulkan ) {
@@ -839,7 +887,7 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 		return false;
 	}
 
-	const char *enabledExtensions[3];
+	const char *enabledExtensions[4];
 	uint32_t enabledCount = 0;
 	if ( haveOpenGL ) {
 		enabledExtensions[enabledCount++] = XR_KHR_OPENGL_ENABLE_EXTENSION_NAME;
@@ -850,6 +898,10 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 	}
 	if ( haveVulkan ) {
 		enabledExtensions[enabledCount++] = VR_VULKAN_ENABLE2_EXTENSION_NAME;
+	}
+	// standing play's floor where the runtime has no STAGE
+	if ( haveLocalFloorExtension ) {
+		enabledExtensions[enabledCount++] = VR_LOCAL_FLOOR_EXTENSION_NAME;
 	}
 	XrInstanceCreateInfo createInfo;
 	memset( &createInfo, 0, sizeof( createInfo ) );
@@ -865,6 +917,7 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 		instance = XR_NULL_HANDLE;
 		return false;
 	}
+	haveLocalFloor = haveLocalFloorExtension;
 
 	XrInstanceProperties properties;
 	memset( &properties, 0, sizeof( properties ) );
@@ -926,6 +979,7 @@ void idVRSystemOpenXR::DestroyInstance( void ) {
 	systemId = XR_NULL_SYSTEM_ID;
 	getGLRequirements = NULL;
 	haveEGL = false;
+	haveLocalFloor = false;
 	getVulkanRequirements = NULL;
 	createVulkanInstance = NULL;
 	getVulkanDevice = NULL;
@@ -1287,16 +1341,16 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 	}
 	sessionState = XR_SESSION_STATE_UNKNOWN;
 
-	// spaces: LOCAL carries tracking, projection and the virtual screen; VIEW the HUD
+	// spaces: the base space (vr_playSpace) carries tracking, projection and
+	// the virtual screen; VIEW the HUD
+	if ( !CreateBaseSpace() ) {
+		DestroySession();
+		return false;
+	}
 	XrReferenceSpaceCreateInfo spaceInfo;
 	memset( &spaceInfo, 0, sizeof( spaceInfo ) );
 	spaceInfo.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO;
 	spaceInfo.poseInReferenceSpace = VR_IdentityPose();
-	spaceInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
-	if ( !Check( xrCreateReferenceSpace( session, &spaceInfo, &localSpace ), "xrCreateReferenceSpace( LOCAL )" ) ) {
-		DestroySession();
-		return false;
-	}
 	spaceInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
 	if ( !Check( xrCreateReferenceSpace( session, &spaceInfo, &viewSpace ), "xrCreateReferenceSpace( VIEW )" ) ) {
 		DestroySession();
@@ -1446,6 +1500,86 @@ void idVRSystemOpenXR::DestroySession( void ) {
 		UpdateKey( i, heldKeys[i], false );
 	}
 	twoHanded = false;
+}
+
+/*
+====================
+idVRSystemOpenXR::CreateBaseSpace
+
+The reference space vr_playSpace asks for (VR_ChoosePlaySpace): seated play
+on LOCAL, standing play on STAGE, else LOCAL_FLOOR, else head-relative LOCAL
+with a warning. Replaces the current base space, so it runs only between
+frames, and recentres: the new origin starts under the head, so the body
+neither jumps nor walks the difference a second time.
+====================
+*/
+bool idVRSystemOpenXR::CreateBaseSpace( void ) {
+	vr_playSpace.ClearModified();
+	bool haveStage = false;
+	bool haveFloor = false;
+	uint32_t count = 0;
+	if ( Check( xrEnumerateReferenceSpaces( session, 0, &count, NULL ), "xrEnumerateReferenceSpaces" ) && count > 0 && count <= 64 ) {
+		XrReferenceSpaceType types[64];
+		if ( Check( xrEnumerateReferenceSpaces( session, count, &count, types ), "xrEnumerateReferenceSpaces" ) && count <= 64 ) {
+			for ( uint32_t i = 0; i < count; i++ ) {
+				haveStage = haveStage || types[i] == XR_REFERENCE_SPACE_TYPE_STAGE;
+				haveFloor = haveFloor || ( haveLocalFloor && types[i] == VR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR );
+			}
+		}
+	}
+	if ( recovery != RECOVERY_NONE ) {
+		return false;
+	}
+	const vrPlaySpaceChoice_t choice = VR_ChoosePlaySpace( vr_playSpace.GetInteger(), haveStage, haveFloor );
+	XrReferenceSpaceType type = choice.space == VR_BASE_SPACE_STAGE ? XR_REFERENCE_SPACE_TYPE_STAGE
+		: choice.space == VR_BASE_SPACE_LOCAL_FLOOR ? VR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR : XR_REFERENCE_SPACE_TYPE_LOCAL;
+	bool standing = choice.standing;
+	XrReferenceSpaceCreateInfo spaceInfo;
+	memset( &spaceInfo, 0, sizeof( spaceInfo ) );
+	spaceInfo.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO;
+	spaceInfo.poseInReferenceSpace = VR_IdentityPose();
+	spaceInfo.referenceSpaceType = type;
+	XrSpace created = XR_NULL_HANDLE;
+	if ( !Check( xrCreateReferenceSpace( session, &spaceInfo, &created ), "xrCreateReferenceSpace( base )" ) ) {
+		if ( recovery != RECOVERY_NONE || type == XR_REFERENCE_SPACE_TYPE_LOCAL ) {
+			return false;
+		}
+		// a floor-level space the runtime listed and would not make
+		type = XR_REFERENCE_SPACE_TYPE_LOCAL;
+		standing = false;
+		spaceInfo.referenceSpaceType = type;
+		created = XR_NULL_HANDLE;
+		if ( !Check( xrCreateReferenceSpace( session, &spaceInfo, &created ), "xrCreateReferenceSpace( LOCAL )" ) ) {
+			return false;
+		}
+	}
+	if ( localSpace != XR_NULL_HANDLE ) {
+		xrDestroySpace( localSpace );
+	}
+	localSpace = created;
+	baseSpaceType = type;
+	standingPlay = standing;
+	playSpaceFallback = choice.fallback || ( choice.standing && !standing );
+	stageBoundsValid = false;
+	if ( type == XR_REFERENCE_SPACE_TYPE_STAGE ) {
+		XrExtent2Df bounds;
+		bounds.width = bounds.height = 0.0f;
+		if ( xrGetReferenceSpaceBoundsRect( session, XR_REFERENCE_SPACE_TYPE_STAGE, &bounds ) == XR_SUCCESS
+				&& bounds.width > 0.0f && bounds.height > 0.0f ) {
+			stageBounds = bounds;
+			stageBoundsValid = true;
+		}
+	}
+	recenterRequested = true;
+	screenAnchored = false;
+	const char *const baseName = type == XR_REFERENCE_SPACE_TYPE_STAGE ? "STAGE"
+		: type == VR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR ? "LOCAL_FLOOR" : "LOCAL";
+	common->Printf( "OpenXR: play space %s on %s\n", standingPlay ? "standing" : "seated", baseName );
+	if ( playSpaceFallback ) {
+		common->Warning( "OpenXR: the runtime offers no floor-level space (STAGE or %s); standing play measures your height "
+			"from where you recentre, as seated play does", VR_LOCAL_FLOOR_EXTENSION_NAME );
+	}
+	return true;
 }
 
 /*
@@ -1963,16 +2097,37 @@ void idVRSystemOpenXR::LocateFrame( XrTime time ) {
 		head.pose.position.x = head.pose.position.y = head.pose.position.z = 0.0f;
 	}
 
-	if ( recenterRequested && headValid ) {
+	if ( ( recenterRequested || calibrateRequested ) && headValid ) {
 		recenterPose.orientation = VR_YawOnly( head.pose.orientation );
 		recenterPose.position = head.pose.position;
+		// standing play keeps the floor: the origin stands at the standing eye
+		// height wherever the head is, so a recentre while crouched or seated
+		// does not lift the floor
+		if ( calibrateRequested ) {
+			if ( standingPlay ) {
+				vr_standingHeight.SetFloat( idMath::ClampFloat( VR_STANDING_HEIGHT_MIN, VR_STANDING_HEIGHT_MAX, head.pose.position.y ) );
+				common->Printf( "OpenXR: standing eye height calibrated to %.2f m\n", vr_standingHeight.GetFloat() );
+			} else {
+				common->Printf( "OpenXR: seated play takes your height from the recentre\n" );
+			}
+		}
+		bool learned = false;
+		recenterPose.position.y = VR_StandingReference( standingPlay, head.pose.position.y, vr_standingHeight.GetFloat(), learned );
+		if ( learned ) {
+			vr_standingHeight.SetFloat( recenterPose.position.y );
+			common->Printf( "OpenXR: standing eye height learned as %.2f m (vr_calibrateHeight measures it again)\n",
+				recenterPose.position.y );
+		}
+		vr_standingHeight.ClearModified();
 		recenterRequested = false;
+		calibrateRequested = false;
 		screenAnchored = false;
 		Sys_EnterCriticalSection( VR_INPUT_CRITICAL_SECTION );
 		bodyYawValid = false;
 		Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
 		if ( vr_debug.GetInteger() > 0 ) {
-			common->Printf( "OpenXR: recentred at ( %.2f %.2f %.2f )\n", head.pose.position.x, head.pose.position.y, head.pose.position.z );
+			common->Printf( "OpenXR: recentred at ( %.2f %.2f %.2f ), origin height %.2f m\n", head.pose.position.x, head.pose.position.y,
+				head.pose.position.z, recenterPose.position.y );
 		}
 	}
 
@@ -2667,6 +2822,15 @@ void idVRSystemOpenXR::BeginFrame( void ) {
 	}
 	if ( RecoverIfNeeded() || session == XR_NULL_HANDLE || !sessionRunning ) {
 		return;
+	}
+	// a changed play space takes effect between frames, recentred
+	if ( vr_playSpace.IsModified() && !CreateBaseSpace() ) {
+		RecoverIfNeeded();
+		return;
+	}
+	if ( vr_standingHeight.IsModified() ) {
+		vr_standingHeight.ClearModified();
+		recenterRequested = true;
 	}
 
 	XrFrameWaitInfo waitInfo;

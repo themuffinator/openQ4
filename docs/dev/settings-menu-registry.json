@@ -4331,6 +4331,30 @@
       "accessibility": "Focusable choiceDef row. Crouching in the room crouches the character."
     },
     {
+      "id": "game.vr_playspace",
+      "pane": "Game Options",
+      "section": "Virtual Reality",
+      "path": "Settings > Game Options > Virtual Reality > Play Space",
+      "source": "game",
+      "container": "set_game_vr_playspace",
+      "widgets": [
+        "set_game_vr_playspace_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_231760",
+      "choices_key": "#str_231761",
+      "values": [
+        "0",
+        "1",
+        "2"
+      ],
+      "target_type": "cvar",
+      "target": "vr_playSpace",
+      "default": "0",
+      "restart_required": false,
+      "accessibility": "Focusable choiceDef row. Seated play measures height from where the player recentred; standing play measures it from the floor."
+    },
+    {
       "id": "audio.subtitles",
       "pane": "Audio",
       "section": "Subtitles",

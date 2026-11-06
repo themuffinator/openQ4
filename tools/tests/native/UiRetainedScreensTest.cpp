@@ -302,7 +302,8 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","cl_player_ou
 	"ui_hudSafeInset","g_objectivesToggle","ui_hudOpacity","ui_hudDamageDirection","ui_hudPickups","ui_hudWeaponStrip",
 	"ui_reducedFlashing","ui_retainedOpaqueBacking","g_corpseSink","con_allowConsole","g_autoSkipCinematics","ui_cinematicShake","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
 	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
-	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch"};
+	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch",
+	"vr_playSpace"};
 
 static void CheckSessionActions(const Document& document) {
 	for (const auto& [id,action] : document.Model().actions) {

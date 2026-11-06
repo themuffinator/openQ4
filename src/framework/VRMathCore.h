@@ -421,6 +421,87 @@ inline bool VR_PhysicalCrouch( float headDropMetres, bool crouching ) {
 
 /*
 ====================
+Play space (vr_playSpace)
+
+Seated play measures the head from where it was recentred: the head's
+height at the recentre becomes the game's standing eye. Standing play
+measures it from the floor of a floor-level reference space (STAGE, or
+XR_EXT_local_floor's LOCAL_FLOOR) against the player's standing eye height,
+so recentring turns and moves the origin but never moves the floor: a
+recentre while crouched, sitting or leaning keeps the standing height. A
+runtime with neither floor-level space leaves standing play head-relative,
+as seated play is. Auto stands when a floor is known and sits otherwise.
+====================
+*/
+enum vrPlaySpaceMode_t {
+	VR_PLAY_SPACE_AUTO = 0,
+	VR_PLAY_SPACE_SEATED = 1,
+	VR_PLAY_SPACE_STANDING = 2
+};
+
+enum vrBaseSpace_t {
+	VR_BASE_SPACE_LOCAL = 0,		// head-height origin, no floor
+	VR_BASE_SPACE_LOCAL_FLOOR,		// XR_EXT_local_floor: LOCAL with its origin on the floor
+	VR_BASE_SPACE_STAGE				// the room's floor-level play area
+};
+
+typedef struct vrPlaySpaceChoice_s {
+	vrBaseSpace_t	space;
+	bool			standing;		// heights measured from the floor
+	bool			fallback;		// standing was asked for and no floor is known
+} vrPlaySpaceChoice_t;
+
+inline vrPlaySpaceChoice_t VR_ChoosePlaySpace( int mode, bool haveStage, bool haveLocalFloor ) {
+	vrPlaySpaceChoice_t choice;
+	choice.space = VR_BASE_SPACE_LOCAL;
+	choice.standing = false;
+	choice.fallback = false;
+	if ( mode == VR_PLAY_SPACE_SEATED ) {
+		return choice;
+	}
+	if ( haveStage ) {
+		choice.space = VR_BASE_SPACE_STAGE;
+	} else if ( haveLocalFloor ) {
+		choice.space = VR_BASE_SPACE_LOCAL_FLOOR;
+	} else {
+		choice.fallback = mode == VR_PLAY_SPACE_STANDING;
+		return choice;
+	}
+	choice.standing = true;
+	return choice;
+}
+
+// The plausible range of a standing eye height, in metres.
+static const float VR_STANDING_HEIGHT_MIN = 0.8f;
+static const float VR_STANDING_HEIGHT_MAX = 2.3f;
+
+/*
+====================
+VR_StandingReference
+
+The height, in the base space's metres, that the game's standing eye stands
+for. Head-relative play (no floor) takes the head's height at the recentre.
+Standing play takes the calibrated standing eye height (vr_standingHeight);
+an uncalibrated one (outside the plausible range, 0 by default) is learned
+from the head at this recentre, clamped to the plausible range, and *learned
+reports that the caller should store it.
+====================
+*/
+inline float VR_StandingReference( bool standing, float headHeight, float calibrated, bool &learned ) {
+	learned = false;
+	if ( !standing ) {
+		return headHeight;
+	}
+	if ( calibrated >= VR_STANDING_HEIGHT_MIN && calibrated <= VR_STANDING_HEIGHT_MAX ) {
+		return calibrated;
+	}
+	learned = true;
+	return headHeight < VR_STANDING_HEIGHT_MIN ? VR_STANDING_HEIGHT_MIN
+		: headHeight > VR_STANDING_HEIGHT_MAX ? VR_STANDING_HEIGHT_MAX : headHeight;
+}
+
+/*
+====================
 Two-handed aim
 
 The off hand steadies the gun when its palm closes in front of the weapon

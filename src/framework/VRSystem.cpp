@@ -78,6 +78,12 @@ idCVar vr_hapticStrength( "vr_hapticStrength", "1", CVAR_SYSTEM | CVAR_ARCHIVE |
 	"controller vibration strength, from 0 (off) to 1", 0.0f, 1.0f );
 idCVar vr_aimLaser( "vr_aimLaser", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
 	"while aiming with the controller: 0 = no marker, 1 = a dot where the shot lands, 2 = the dot and a laser beam", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar vr_playSpace( "vr_playSpace", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
+	"0 = standing when the headset knows your floor, else seated; 1 = seated, heights from where you recentred; "
+	"2 = standing, heights from the floor (seated when the runtime knows no floor)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar vr_standingHeight( "vr_standingHeight", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
+	"standing play: your eye height above the floor in metres, which your character's eye stands for; 0 = learn it at "
+	"the next recentre (vr_calibrateHeight measures it now)", 0.0f, 2.5f );
 idCVar vr_debug( "vr_debug", "0", CVAR_SYSTEM | CVAR_INTEGER,
 	"1 = log OpenXR session and frame events, 2 = also log every submitted frame", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 

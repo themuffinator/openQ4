@@ -265,6 +265,7 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Two-Handed Grip | `choiceDef` | `set_game_vr_twohanded_value` | `vr_twoHanded` | `Disabled;Enabled` | The off-hand grip on the gun's foregrip holds it in both hands; elsewhere it opens the weapon wheel. |
 | Comfort Vignette | `choiceDef` | `set_game_vr_vignette_value` | `vr_comfortVignette` | `0 Off`, `0.5 Low`, `1 Full` | Darkens the edges of each eye while the stick moves or smoothly turns the player. |
 | Physical Crouch | `choiceDef` | `set_game_vr_physicalcrouch_value` | `vr_physicalCrouch` | `Disabled;Enabled` | Crouching in the room crouches the character. |
+| Play Space | `choiceDef` | `set_game_vr_playspace_value` | `vr_playSpace` | `0 Automatic`, `1 Seated`, `2 Standing` | Seated play measures height from where the player recentred; standing play from the floor, against the standing eye height (`vr_standingHeight`, learned at the first recentre or measured by `vr_calibrateHeight`). Automatic stands when the headset knows the floor. |
 
 ## System
 

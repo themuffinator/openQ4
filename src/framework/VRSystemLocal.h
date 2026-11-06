@@ -39,6 +39,8 @@ extern idCVar vr_physicalCrouch;
 extern idCVar vr_roomScale;
 extern idCVar vr_hapticStrength;
 extern idCVar vr_aimLaser;
+extern idCVar vr_playSpace;
+extern idCVar vr_standingHeight;
 extern idCVar vr_debug;
 
 // The OpenXR implementation, when the client was built with it (OPENQ4_OPENXR).

@@ -366,7 +366,8 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"vr_turnMode",{0,0,1,true,{},{0,1}}},{"vr_snapTurnAngle",{0,30,90,true,{},{30,45,60,90}}},
 		{"vr_moveDirection",{0,0,1,true,{},{0,1}}},{"vr_roomScale",{0,0,1,true,{},{0,1}}},{"vr_aimLaser",{0,0,2,true,{},{0,1,2}}},
 		{"vr_hapticStrength",{2,0,0,false,{"0","0.5","1"}}},{"vr_twoHanded",{0,0,1,true,{},{0,1}}},
-		{"vr_comfortVignette",{2,0,0,false,{"0","0.5","1"}}},{"vr_physicalCrouch",{0,0,1,true,{},{0,1}}}};
+		{"vr_comfortVignette",{2,0,0,false,{"0","0.5","1"}}},{"vr_physicalCrouch",{0,0,1,true,{},{0,1}}},
+		{"vr_playSpace",{0,0,2,true,{},{0,1,2}}}};
 	const auto found = settings.find(cvar);
 	return found == settings.end() ? nullptr : &found->second;
 }

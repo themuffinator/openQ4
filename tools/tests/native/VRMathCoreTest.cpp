@@ -209,6 +209,28 @@ static void TestPhysicalCrouch( void ) {
 	Check( !VR_PhysicalCrouch( 0.25f, true ), "rising past 30 cm stands again" );
 }
 
+static void TestPlaySpace( void ) {
+	vrPlaySpaceChoice_t c = VR_ChoosePlaySpace( VR_PLAY_SPACE_AUTO, true, true );
+	Check( c.space == VR_BASE_SPACE_STAGE && c.standing && !c.fallback, "auto stands on the stage when the runtime has one" );
+	c = VR_ChoosePlaySpace( VR_PLAY_SPACE_AUTO, false, true );
+	Check( c.space == VR_BASE_SPACE_LOCAL_FLOOR && c.standing, "auto stands on LOCAL_FLOOR without a stage" );
+	c = VR_ChoosePlaySpace( VR_PLAY_SPACE_AUTO, false, false );
+	Check( c.space == VR_BASE_SPACE_LOCAL && !c.standing && !c.fallback, "auto sits when no floor is known, and that is no fallback" );
+	c = VR_ChoosePlaySpace( VR_PLAY_SPACE_STANDING, false, false );
+	Check( c.space == VR_BASE_SPACE_LOCAL && !c.standing && c.fallback, "standing without a floor falls back to head-relative play" );
+	c = VR_ChoosePlaySpace( VR_PLAY_SPACE_SEATED, true, true );
+	Check( c.space == VR_BASE_SPACE_LOCAL && !c.standing && !c.fallback, "seated stays head-relative on LOCAL even with a stage" );
+	c = VR_ChoosePlaySpace( 7, true, false );
+	Check( c.space == VR_BASE_SPACE_STAGE && c.standing, "an unknown mode behaves as auto" );
+
+	bool learned = true;
+	Check( VR_StandingReference( false, 1.15f, 1.7f, learned ) == 1.15f && !learned, "seated play takes the head at the recentre" );
+	Check( VR_StandingReference( true, 1.15f, 1.7f, learned ) == 1.7f && !learned, "a calibrated standing height outlives a seated recentre" );
+	Check( VR_StandingReference( true, 1.62f, 0.0f, learned ) == 1.62f && learned, "an uncalibrated standing height is learned from the head" );
+	Check( VR_StandingReference( true, 0.3f, 0.0f, learned ) == VR_STANDING_HEIGHT_MIN && learned, "a head on the floor learns no implausible height" );
+	Check( VR_StandingReference( true, 2.9f, 5.0f, learned ) == VR_STANDING_HEIGHT_MAX && learned, "an implausible calibration is learned again, clamped" );
+}
+
 static void TestTwoHandedAim( void ) {
 	const float upm = 40.0f;	// units per metre
 	const vrVec3_t palm = VR_Vec3( 10.0f, -8.0f, -14.0f );
@@ -302,6 +324,7 @@ int main() {
 	TestRotationBetween();
 	TestTwoHandedAim();
 	TestPhysicalCrouch();
+	TestPlaySpace();
 	TestRoomScaleWalkInput();
 	TestComfortVignette();
 	TestZoomScale();

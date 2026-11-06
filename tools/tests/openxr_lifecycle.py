@@ -157,7 +157,7 @@ public:
     void *getVulkanRequirements=nullptr,*createVulkanInstance=nullptr,*getVulkanDevice=nullptr,*createVulkanDevice=nullptr;
     XrInstance vulkanCreator=XR_NULL_HANDLE,vulkanRestartFor=XR_NULL_HANDLE;
     int graphicsApi=VR_GRAPHICS_OPENGL;
-    bool haveEGL=false;
+    bool haveLocalFloor=false,haveEGL=false;
     bool frameOpen=true,frameShouldRender=true,rendererReady=true;
     bool sessionRunning=true,sessionFocused=true,viewsValid=true;
     bool inputValid=true,bodyYawValid=true,twoHanded=true,runtimeStopped=false;
