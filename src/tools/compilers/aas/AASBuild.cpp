@@ -819,6 +819,12 @@ bool idAASBuild::Build( const idStr &fileName, const idAASSettings *settings ) {
 		file->Optimize();
 	}
 
+	// place cover and attack positions on the finished navigation, as Quake 4
+	// does for the types whose settings ask for them
+	if ( aasSettings->generateTacticalFeatures ) {
+		AAS_GenerateTacticalFeatures( file, mapFile );
+	}
+
 	// write the file
 	name.SetFileExtension( aasSettings->fileExtension );
 	file->Write( name, mapFile->GetGeometryCRC() );
@@ -885,6 +891,57 @@ bool idAASBuild::BuildReachability( const idStr &fileName, const idAASSettings *
 	common->Printf( "%6d seconds to calculate reachability\n", (Sys_Milliseconds() - startTime) / 1000 );
 
 	return true;
+}
+
+/*
+============
+idAASBuild::BuildTactical
+
+Regenerates the tactical features of an existing AAS file without rebuilding
+its navigation.
+============
+*/
+bool idAASBuild::BuildTactical( const idStr &fileName, const idAASSettings *settings ) {
+	idMapFile * mapFile;
+	idStr name;
+
+	Shutdown();
+
+	aasSettings = settings;
+
+	name = fileName;
+	name.SetFileExtension( "map" );
+
+	mapFile = new idMapFile;
+	if ( !mapFile->Parse( name ) ) {
+		delete mapFile;
+		common->Warning( "Couldn't load map file: '%s'", name.c_str() );
+		return false;
+	}
+
+	mapFile->Resolve();
+
+	file = new idAASFileLocal();
+
+	name.SetFileExtension( aasSettings->fileExtension );
+	if ( !file->Load( name, 0 ) ) {
+		delete mapFile;
+		common->Warning( "Couldn't load AAS file: '%s'", name.c_str() );
+		return false;
+	}
+
+	file->settings = *aasSettings;
+
+	// Load( name, 0 ) skips the CRC check and so records none; the file keeps
+	// matching the map it was compiled from
+	const bool generated = AAS_GenerateTacticalFeatures( file, mapFile ) >= 0;
+	if ( generated ) {
+		file->Write( name, mapFile->GetGeometryCRC() );
+	}
+
+	delete mapFile;
+
+	return generated;
 }
 
 /*
@@ -1088,6 +1145,60 @@ void RunAASDir_f( const idCmdArgs &args ) {
 	}
 
 	fileSystem->FreeFileList( mapFiles );
+
+	common->SetRefreshOnPrint( false );
+	common->PrintWarnings();
+}
+
+/*
+============
+RunAASTactical_f
+============
+*/
+void RunAASTactical_f( const idCmdArgs &args ) {
+	idAASBuild aas;
+	idAASSettings settings;
+	int numBuilt = 0;
+
+	if ( args.Argc() <= 1 ) {
+		common->Printf( "runAASTactical <mapfile>\n"
+					"regenerates the tactical features of the map's existing AAS files\n" );
+		return;
+	}
+
+	common->ClearWarnings( "calculating AAS tactical features" );
+	common->SetRefreshOnPrint( true );
+
+	const idDict *dict = AAS_GetTypesDict();
+	if ( !dict ) {
+		common->Warning( "Unable to find entityDef for 'aas_types'" );
+	} else {
+		const idStr mapName = AAS_NormalizeMapName( args.Argv( args.Argc() - 1 ) );
+
+		for ( const idKeyValue *kv = dict->MatchPrefix( "type" ); kv != NULL; kv = dict->MatchPrefix( "type", kv ) ) {
+			const idDict *settingsDict = AAS_GetSettingsDict( kv->GetValue() );
+
+			if ( !settingsDict ) {
+				common->Warning( "Unable to find '%s' in def/aas.def", kv->GetValue().c_str() );
+				continue;
+			}
+
+			settings = idAASSettings();
+			settings.FromDict( kv->GetValue(), settingsDict );
+			if ( !settings.generateTacticalFeatures ) {
+				continue;
+			}
+
+			if ( numBuilt++ ) {
+				common->Printf( "=======================================================\n" );
+			}
+			aas.BuildTactical( mapName, &settings );
+		}
+
+		if ( !numBuilt ) {
+			common->Printf( "no AAS type in 'aas_types' generates tactical features\n" );
+		}
+	}
 
 	common->SetRefreshOnPrint( false );
 	common->PrintWarnings();

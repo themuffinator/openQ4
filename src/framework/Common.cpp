@@ -5995,6 +5995,7 @@ void idCommonLocal::InitCommands( void ) {
 	cmdSystem->AddCommand( "runAAS", RunAAS_f, CMD_FL_TOOL, "compiles AAS files for a map", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "runAASDir", RunAASDir_f, CMD_FL_TOOL, "compiles AAS files for all maps in a folder", idCmdSystem::ArgCompletion_MapName );
 	cmdSystem->AddCommand( "runReach", RunReach_f, CMD_FL_TOOL, "calculates reachability for an AAS file", idCmdSystem::ArgCompletion_MapName );
+	cmdSystem->AddCommand( "runAASTactical", RunAASTactical_f, CMD_FL_TOOL, "calculates tactical features for an AAS file", idCmdSystem::ArgCompletion_MapName );
 
 #ifdef ID_ALLOW_TOOLS
 	// compilers	

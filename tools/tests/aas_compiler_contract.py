@@ -16,6 +16,7 @@ COMPILER_SOURCES = (
     "src/tools/compilers/aas/AASBuild_ledge.cpp",
     "src/tools/compilers/aas/AASBuild_local.h",
     "src/tools/compilers/aas/AASBuild_merge.cpp",
+    "src/tools/compilers/aas/AASBuild_tactical.cpp",
     "src/tools/compilers/aas/AASCluster.cpp",
     "src/tools/compilers/aas/AASCluster.h",
     "src/tools/compilers/aas/AASReach.cpp",
@@ -138,7 +139,7 @@ def validate_command_wiring() -> None:
 
     # Map authors get the AAS compiler from any build that has dmap, not only
     # from an ID_ALLOW_TOOLS editor build.
-    for command in ("runAAS", "runAASDir", "runReach"):
+    for command in ("runAAS", "runAASDir", "runReach", "runAASTactical"):
         registration = common.find(f'cmdSystem->AddCommand( "{command}", ')
         if registration < 0:
             raise AssertionError(f"Missing {command} command registration in Common.cpp")
@@ -158,6 +159,112 @@ def validate_output_paths_are_reported() -> None:
     require(read("src/tools/compilers/dmap/output.cpp"), "procFile->GetFullPath()", ".proc writer")
     require(read("src/cm/CollisionModel_files.cpp"), "fp->GetFullPath()", ".cm writer")
     require(read("src/aas/AASFile.cpp"), "aasFile->GetFullPath()", "AAS writer")
+
+
+def validate_tactical_features() -> None:
+    build = read("src/tools/compilers/aas/AASBuild.cpp")
+    body = function_body(
+        build,
+        "bool idAASBuild::Build( const idStr &fileName, const idAASSettings *settings )",
+        "AAS build",
+    )
+    # Quake 4 places features on the finished, optimized navigation and only for
+    # the types whose settings ask for them (aas32).
+    optimize = body.find("file->Optimize();")
+    generate = body.find("AAS_GenerateTacticalFeatures( file, mapFile );")
+    write = body.find("file->Write( name, mapFile->GetGeometryCRC() );")
+    if not 0 <= optimize < generate < write:
+        raise AssertionError("AAS build must generate tactical features after Optimize() and before Write()")
+    require(body, "if ( aasSettings->generateTacticalFeatures ) {", "AAS build")
+    tactical_rebuild = function_body(
+        build, "bool idAASBuild::BuildTactical( const idStr &fileName, const idAASSettings *settings )", "AAS tactical rebuild"
+    )
+    # The file is loaded without a CRC check, which records none; it must be
+    # written with the map's geometry CRC or the game rejects it as out of date.
+    require(tactical_rebuild, "file->Write( name, mapFile->GetGeometryCRC() );", "AAS tactical rebuild")
+    require(read("src/tools/compilers/compiler_public.h"), "void RunAASTactical_f( const idCmdArgs &args );", "compiler_public.h")
+
+    tactical = read("src/tools/compilers/aas/AASBuild_tactical.cpp")
+    for token in (
+        "int AAS_GenerateTacticalFeatures( idAASFileLocal *file, const idMapFile *mapFile )",
+        "collisionModelManager->FreeMap( mapFile->GetName() );",
+        "CONTENTS_NOTACTICALFEATURES",
+        "info_tactical_feature",
+        "file->ClearTactical();",
+    ):
+        require(tactical, token, "AAS tactical generator")
+    # Retail's 1024-bucket area hash listed features under unrelated areas; each
+    # area must list only its own.
+    forbid(tactical, "idHashIndex", "AAS tactical generator")
+
+    aas = read("src/aas/AASFile.cpp")
+    writer = function_body(aas, "bool idAASFileLocal::Write( const idStr &fileName, unsigned int mapFileCRC )", "AAS writer")
+    require(writer, "areas[i].numFeatures, areas[i].firstFeature, num );", "AAS writer")
+    require(writer, r'aasFile->WriteFloatString( "featureIndex %d {\n", featureIndexes.Num() );', "AAS writer")
+    require(writer, r'aasFile->WriteFloatString( "features %d {\n", features.Num() );', "AAS writer")
+    loader = function_body(aas, "bool idAASFileLocal::Load( const idStr &fileName, unsigned int mapFileCRC )", "AAS loader")
+    require(loader, "if ( !ParseFeatureIndex( src ) ) { return false; }", "AAS loader")
+    require(loader, "if ( !ParseFeatures( src ) ) { return false; }", "AAS loader")
+    require(loader, "ValidateTactical();", "AAS loader")
+    validate = function_body(aas, "void idAASFileLocal::ValidateTactical( void )", "AAS tactical validation")
+    require(validate, "ClearTactical();", "AAS tactical validation")
+
+
+RETAIL_CONTENTS_PAIRS = (
+    # Quake 4 1.4.2's name table has an extra "solid" after "largeShotClip", so
+    # every later name decodes to the flag one slot on; shipped .cm files were
+    # written and are read through these pairs.
+    ("solid", "CONTENTS_SOLID"),
+    ("opaque", "CONTENTS_OPAQUE | CONTENTS_SIGHTCLIP"),
+    ("water", "CONTENTS_WATER"),
+    ("playerclip", "CONTENTS_PLAYERCLIP"),
+    ("monsterclip", "CONTENTS_MONSTERCLIP"),
+    ("moveableclip", "CONTENTS_MOVEABLECLIP"),
+    ("ikclip", "CONTENTS_IKCLIP"),
+    ("blood", "CONTENTS_BLOOD"),
+    ("body", "CONTENTS_BODY"),
+    ("corpse", "CONTENTS_CORPSE"),
+    ("trigger", "CONTENTS_TRIGGER"),
+    ("aas_solid", "CONTENTS_AAS_SOLID"),
+    ("aas_obstacle", "CONTENTS_AAS_OBSTACLE"),
+    ("flashlight_trigger", "CONTENTS_FLASHLIGHT_TRIGGER"),
+    ("sightClip", "CONTENTS_SIGHTCLIP"),
+    ("largeShotClip", "CONTENTS_LARGESHOTCLIP"),
+    ("notacticalfeatures", "CONTENTS_VEHICLECLIP"),
+    ("vehicleclip", "CONTENTS_FLYCLIP"),
+    ("flyclip", "CONTENTS_PROJECTILE"),
+    ("shotClip", "CONTENTS_ITEMCLIP"),
+    ("itemclip", "0"),
+)
+
+
+def validate_collision_contents_names() -> None:
+    import re
+
+    debug = read("src/cm/CollisionModel_debug.cpp")
+    start = debug.find("cm_retailContents[] = {")
+    if start < 0:
+        raise AssertionError("Missing the retail .cm contents pairing")
+    table = debug[start : debug.find("};", start)]
+    pairs = tuple(
+        (name, flags.strip())
+        for name, flags in re.findall(r'\{\s*"([^"]+)",\s*([^}]+?)\s*\}', table)
+    )
+    if pairs != RETAIL_CONTENTS_PAIRS:
+        raise AssertionError(f"Retail .cm contents pairing changed: {pairs}")
+
+    files = read("src/cm/CollisionModel_files.cpp")
+    require(files, '#define CM_FILEVERSION\t\t"4"', "collision file version")
+    loader = function_body(
+        files,
+        "bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char *name, unsigned int mapFileCRC )",
+        "collision file loader",
+    )
+    # Quake 4's own versions ("2", "3") use the shifted pairing; openQ4's "4" does not.
+    require(loader, "const bool retailContentsNames = ( token != CM_FILEVERSION );", "collision file loader")
+    require(files, "b->contents = ContentsFromString( token, retailContentsNames );", "collision brush parser")
+    # Caches decoded the old way must not be reused.
+    require(files, "CM_GENERATED_CACHE_PAYLOAD_VERSION = 2;", "generated collision cache")
 
 
 def validate_ci_wiring() -> None:
@@ -182,6 +289,8 @@ def main() -> None:
     validate_command_wiring()
     validate_dmap_runs_aas()
     validate_output_paths_are_reported()
+    validate_tactical_features()
+    validate_collision_contents_names()
     validate_ci_wiring()
     print("aas_compiler_contract: ok")
 
