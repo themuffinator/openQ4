@@ -6,6 +6,30 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Level editor completion (TOOL-01 to TOOL-04), 6 November 2026
+
+- [x] The experimental level editor (`editorExperimental`) now edits brushes
+  and patches as well as entities, with lossless `brushDef3`/patch adapters,
+  transforms with texture lock, one undo step per gesture, groups, layers,
+  prefabs, reference-repairing rename and a bounded background asset index; a
+  docked workspace with 3D and top/front/side views, per-map view state, entity
+  models, a typed inspector and source-linked validation; and sandboxed
+  builds whose outputs replace the playable files only after a whole
+  successful compile, with an isolated play client. Two engine defects found on
+  the way are fixed: a leak in a map whose folder did not exist beside the
+  engine aborted `dmap` (its `.lin` trail used `fopen` there), and the
+  dedicated server then hung in shutdown, which builds now detect.
+  On Windows, OpenGL and Vulkan, `level_editor_authoring.py` qualifies the
+  workspace, every label in 12 languages at three sizes, an editor-authored map
+  built and played with AI on its rebuilt navigation, a leaking and a cancelled
+  build that leave the previous outputs untouched, and a stock `airdefense1`
+  round trip with tactical AI; the native suites pass all 543,372 retail
+  primitives, also under Linux GCC and Clang sanitizers. Declared latency
+  budgets are met. The build-and-play phase also passes on Linux; macOS is
+  covered by its preview evidence gate.
+  See [the editor reference](level-editor-modernization.md) and the
+  [user guide](../user/level-editor.md).
+
 ## Vulkan depth precision and antialiased GUI models, 6 November 2026
 
 - With MSAA on, Vulkan now antialiases 3D models shown inside menus and other

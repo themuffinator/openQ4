@@ -30,6 +30,9 @@ public:
 	bool Close( bool discard, std::string &error );
 	bool Save( const std::string &requestedPath, bool copy, std::string &error );
 	bool Recover( const std::string &requestedPath, std::string &error );
+	// Compares the file on disk with the bytes last read or saved. A change
+	// means another program edited the map; saving over it is refused.
+	bool ExternalChange( bool &changed, std::string &error );
 	bool AutoSave( std::string &error );
 	std::string RecoveryPath() const;
 	static bool MapPath( const std::string &requestedPath, std::string &normalized, std::string &error );

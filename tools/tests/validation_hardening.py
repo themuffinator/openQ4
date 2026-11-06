@@ -737,7 +737,7 @@ def validate_validation_wiring() -> None:
         "german_localization_smoke.py",
         "localization_smoke.py",
         "level_editor_runtime.py",
-        "level_editor_workspace.py",
+        "level_editor_authoring.py",
         "mp_bot_gameplay_smoke.py",
         "renderer_classic_colors.py",
         "renderer_font_reload.py",
