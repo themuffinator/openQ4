@@ -34,6 +34,7 @@ std::set<std::string> displayedHidden;
 Selection displayedSelection;
 std::size_t displayedDiagnostics = static_cast<std::size_t>( -1 );
 int displayedBuildState = -1, displayedBuildPercent = -1, displayedIndex = -1;
+bool displayedExternal = false;
 bool switchingWorkspace = false, displayedDirty = false, startupPending = false, previewBuilding = false;
 double previewStarted = 0;
 int browserMode = 0;
@@ -739,7 +740,10 @@ void LevelEditor_UIFrame() {
 		workspaceGui->StateChanged( common->GetPresentationTime() );
 	}
 	if ( changed || displayedPath != workspace.Path() || displayedDirty != workspace.Document().IsDirty() || !preview || displayedHidden != s.view.hiddenLayers ) {
+		const bool edit = changed && preview && !previewBuilding && displayedPath == workspace.Path();
+		const double started = LevelEditor_Milliseconds();
 		Refresh( changed || !preview || displayedHidden != s.view.hiddenLayers );
+		if ( edit ) { s.latency[idLevelEditorSession::LATENCY_REFRESH].Add( LevelEditor_Milliseconds() - started ); }
 	} else if ( !( displayedSelection == s.selection ) ) {
 		displayedSelection = s.selection; Inspector( true ); KeyType(); if ( preview ) { preview->SetSelection( WholeSelection() ); }
 		workspaceGui->StateChanged( common->GetPresentationTime() );
@@ -751,12 +755,19 @@ void LevelEditor_UIFrame() {
 		if ( build && !build->Active() && build->GetState() != MapBuild::State::Idle ) { s.Validate(); Problems(); }
 		workspaceGui->StateChanged( common->GetPresentationTime() );
 	}
+	if ( s.ExternalChange() != displayedExternal ) {
+		displayedExternal = s.ExternalChange();
+		if ( displayedExternal ) { Message( "#str_43134" ); workspaceGui->StateChanged( common->GetPresentationTime() ); }
+	}
 	if ( browserMode != 0 && displayedIndex != static_cast<int>( s.assets.GetStats().entries ) ) { Browser(); workspaceGui->StateChanged( common->GetPresentationTime() ); }
 	if ( preview && preview->PendingModels() > 0 && preview->UpgradeModels( editorExperimental_modelBudget.GetFloat() ) > 0 ) {
 		workspaceGui->SetStateString( "ed_previewStatus", va( Tr( "#str_42925" ), preview->Triangles(), preview->Skipped() ) );
 	}
 }
-bool LevelEditor_UIIsActive() { return switchingWorkspace || ( workspaceGui && session->GetActiveGUI() == workspaceGui ); }
+static int editorLookupDepth = 0;
+idLevelEditorLookup::idLevelEditorLookup() { ++editorLookupDepth; }
+idLevelEditorLookup::~idLevelEditorLookup() { --editorLookupDepth; }
+bool LevelEditor_UIIsActive() { return switchingWorkspace || editorLookupDepth > 0 || ( workspaceGui && session->GetActiveGUI() == workspaceGui ); }
 void LevelEditor_UIShutdown() {
 	if ( preview ) { SyncCameraToView(); }
 	preview.reset(); workspaceGui = nullptr; displayedRevision = 0; displayedDirty = false; switchingWorkspace = false; browserMode = 0;
@@ -777,8 +788,11 @@ void LevelEditor_DrawView( idDeviceContext *dc, const idRectangle &rect, int tim
 		views::DrawLabel( dc, rect, Tr( "#str_42950" ) );
 		s.latency[idLevelEditorSession::LATENCY_VIEW3D].Add( LevelEditor_Milliseconds() - started );
 	} else {
+		// Parsing changed primitives is document work, not drawing.
+		s.Geometry();
+		const double drawStart = LevelEditor_Milliseconds();
 		views::DrawOrtho( dc, rect, mode, s, gesture.kind == Gesture::Rubber && gesture.mode == mode ? overlay : views::Overlay() );
-		s.latency[idLevelEditorSession::LATENCY_ORTHO].Add( LevelEditor_Milliseconds() - started );
+		s.latency[idLevelEditorSession::LATENCY_ORTHO].Add( LevelEditor_Milliseconds() - drawStart );
 	}
 	if ( startupPending && preview ) {
 		startupPending = false;
@@ -798,6 +812,22 @@ void LevelEditor_ViewPress( int requestedMode, int button, float x, float y, flo
 	if ( button == 2 ) { gesture.kind = gesture.mode == 0 && !shift ? Gesture::Orbit : Gesture::Pan; return; }
 	if ( button != 1 ) { return; }
 	gesture.kind = Gesture::Pending;
+	// In a flat view, pressing inside the selection's outline drags the
+	// selection even when other geometry lies above it.
+	auto &s = S();
+	if ( gesture.mode != 0 && !s.selection.empty() && !shift && !ctrl ) {
+		const auto frame = views::Frame( gesture.mode, s.view, width, height );
+		const Vec3 point = frame.ToWorld( gesture.startX, gesture.startY );
+		const double slack = 3 * s.view.orthoScale;
+		for ( const auto &item : s.selection ) {
+			Vec3 mins, maxs;
+			if ( !s.editor.Bounds( s.Document(), { item }, mins, maxs ) ) { continue; }
+			const double u = point.Dot( frame.right ), v = point.Dot( frame.up );
+			const double u0 = ( std::min )( mins.Dot( frame.right ), maxs.Dot( frame.right ) ) - slack, u1 = ( std::max )( mins.Dot( frame.right ), maxs.Dot( frame.right ) ) + slack;
+			const double v0 = ( std::min )( mins.Dot( frame.up ), maxs.Dot( frame.up ) ) - slack, v1 = ( std::max )( mins.Dot( frame.up ), maxs.Dot( frame.up ) ) + slack;
+			if ( u >= u0 && u <= u1 && v >= v0 && v <= v1 ) { gesture.hit = item; gesture.hitValid = true; return; }
+		}
+	}
 	gesture.hitValid = PickAt( gesture.mode, gesture.startX, gesture.startY, width, height, gesture.hit );
 }
 

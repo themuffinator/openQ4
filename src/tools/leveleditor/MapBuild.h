@@ -52,6 +52,9 @@ public:
 	enum class State { Idle, Running, Succeeded, Failed, Cancelled };
 	static constexpr std::size_t MaxDiagnostics = 512;
 	static constexpr std::size_t MaxOutputBytes = 512u * 1024u * 1024u;
+	// After a compiler error the child gets this long to exit on its own
+	// before the build stops it (a fatal error can leave a server waiting).
+	static constexpr unsigned ErrorExitMs = 15000;
 
 	MapBuild( BuildFiles &files, std::unique_ptr<BuildProcess> process ) : storage( files ), child( std::move( process ) ) {}
 	bool Start( const BuildRequest &request, const CompileIndex &index, unsigned nowMs, std::string &error );
@@ -87,7 +90,8 @@ private:
 	std::vector<Diagnostic> diagnostics;
 	std::vector<std::string> outputs;
 	std::size_t logOffset = 0;
-	unsigned startMs = 0, lastPollMs = 0;
+	unsigned startMs = 0, lastPollMs = 0, lastOutputMs = 0;
+	bool sawError = false;
 	float progress = 0;
 	bool geometryDone = false, leaked = false, aasStarted = false;
 };

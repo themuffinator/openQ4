@@ -100,6 +100,17 @@ bool MapWorkspace::Save( const std::string &requestedPath, bool copy, std::strin
 	return true;
 }
 
+bool MapWorkspace::ExternalChange( bool &changed, std::string &error ) {
+	error.clear();
+	changed = false;
+	if ( !document.IsOpen() || path.empty() ) { return true; }
+	std::string current;
+	bool exists = false;
+	if ( !storage.Read( path, current, exists, error ) ) { return false; }
+	changed = exists != baselineExists || current != baseline;
+	return true;
+}
+
 std::string MapWorkspace::RecoveryPath() const {
 	return "editor_experimental/recovery/" + ( path.empty() ? "unnamed.map" : path );
 }

@@ -82,7 +82,7 @@ bool MapBuild::Start( const BuildRequest &input, const CompileIndex &index, unsi
 	request = input;
 	compileIndex = index;
 	diagnostics.clear(); outputs.clear(); failure.clear(); partialLine.clear();
-	logOffset = 0; progress = 0; geometryDone = leaked = aasStarted = false;
+	logOffset = 0; progress = 0; geometryDone = leaked = aasStarted = sawError = false;
 	ClearSandbox();
 	const std::string sandboxMap = request.sandbox + "/baseoq4/" + request.mapPath;
 	if ( !storage.WriteAndSync( sandboxMap, request.mapText, error ) ) { error = "could not prepare the build sandbox: " + error; return false; }
@@ -94,7 +94,7 @@ bool MapBuild::Start( const BuildRequest &input, const CompileIndex &index, unsi
 	}
 	state = State::Running;
 	stage = "starting";
-	startMs = lastPollMs = nowMs;
+	startMs = lastPollMs = lastOutputMs = nowMs;
 	return true;
 }
 
@@ -107,6 +107,7 @@ void MapBuild::Consume( const std::string &line ) {
 	Diagnostic diagnostic;
 	if ( !ParseCompilerLine( line, compileIndex, diagnostic ) ) { return; }
 	if ( diagnostic.code == "leak" ) { leaked = true; }
+	if ( diagnostic.severity == Diagnostic::Severity::Error ) { sawError = true; }
 	for ( const auto &existing : diagnostics ) { if ( existing.message == diagnostic.message ) { return; } }
 	if ( diagnostics.size() < MaxDiagnostics ) { diagnostics.push_back( diagnostic ); }
 }
@@ -173,6 +174,7 @@ void MapBuild::Poll( unsigned nowMs ) {
 		std::string text;
 		if ( !storage.ReadFrom( LogPath(), logOffset, 262144, text ) || text.empty() ) { break; }
 		logOffset += text.size();
+		lastOutputMs = nowMs;
 		partialLine += text;
 		std::size_t newline;
 		while ( ( newline = partialLine.find( '\n' ) ) != std::string::npos ) {
@@ -185,6 +187,9 @@ void MapBuild::Poll( unsigned nowMs ) {
 		if ( ElapsedMs( nowMs ) > request.timeoutMs ) {
 			child->Kill();
 			Finish( State::Failed, "the compiler exceeded its time limit" );
+		} else if ( ( sawError || leaked ) && nowMs - lastOutputMs > ErrorExitMs ) {
+			child->Kill();
+			Finish( State::Failed, leaked ? "the map leaks: the void is reachable from an entity" : "the compiler stopped after an error" );
 		}
 		return;
 	}

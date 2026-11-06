@@ -18,6 +18,12 @@ static idCVar editorExperimental_playArgs( "editorExperimental_playArgs", "", CV
 	"extra command-line arguments for the editor's isolated play-test client" );
 static idCVar editorExperimental_buildTimeout( "editorExperimental_buildTimeout", "3600", CVAR_TOOL | CVAR_ARCHIVE | CVAR_INTEGER,
 	"seconds before an editor build is stopped", 30, 86400 );
+static idCVar editorExperimental_onBuildDone( "editorExperimental_onBuildDone", "", CVAR_TOOL,
+	"console command run when an editor build finishes (automation)" );
+static idCVar editorExperimental_onPlayDone( "editorExperimental_onPlayDone", "", CVAR_TOOL,
+	"console command run when the editor's play-test client exits (automation)" );
+static idCVar editorExperimental_externalCheckSeconds( "editorExperimental_externalCheckSeconds", "3", CVAR_TOOL | CVAR_INTEGER,
+	"seconds between checks for edits made to the open map by other programs (0 disables)", 0, 600 );
 static idCVar editorExperimental_indexBudget( "editorExperimental_indexBudget", "2", CVAR_TOOL | CVAR_FLOAT,
 	"milliseconds per frame the editor may spend indexing asset names", 0.25f, 16.0f );
 
@@ -205,10 +211,10 @@ std::string LowerCopy( std::string text ) {
 }
 
 idLevelEditorSession::idLevelEditorSession() {
-	const char *names[LATENCY_COUNT] = { "startup", "edit", "select", "view3d", "ortho", "validate" };
+	const char *names[LATENCY_COUNT] = { "startup", "edit", "select", "view3d", "ortho", "validate", "refresh" };
 	// Budgets for the stock airdefense1 source (2,195 entities, 11,793
 	// primitives) on the qualification machine; see level-editor-modernization.md.
-	const double budgets[LATENCY_COUNT] = { 6000, 100, 16, 16, 16, 250 };
+	const double budgets[LATENCY_COUNT] = { 6000, 100, 16, 16, 16, 250, 100 };
 	for ( int i = 0; i < LATENCY_COUNT; ++i ) { latency[i].name = names[i]; latency[i].budgetMs = budgets[i]; }
 	editor.IsEntityKey = [this]( const std::string &classname, const std::string &key ) {
 		const ClassSchema *schema = Schema( classname );
@@ -328,6 +334,7 @@ const ClassSchema *idLevelEditorSession::Schema( const std::string &classname ) 
 	auto schema = std::make_unique<ClassSchema>();
 	// Parsing an entityDef reads its text only; models and sounds it names
 	// are not loaded.
+	idLevelEditorLookup lookup;
 	const idDecl *decl = declManager->FindType( DECL_ENTITYDEF, classname.c_str(), false );
 	const idDeclEntityDef *def = decl ? static_cast<const idDeclEntityDef *>( decl ) : nullptr;
 	if ( def && def->GetState() != DS_DEFAULTED ) {
@@ -357,7 +364,9 @@ ValidatorOptions idLevelEditorSession::ValidationOptions() {
 			if ( type == PropertyType::Sound ) { return assets.Contains( AssetIndex::Sound, name ) || name.find( '/' ) != std::string::npos; }
 			if ( type == PropertyType::Model ) {
 				// Models may name a file or a model declaration.
-				return assets.Contains( AssetIndex::Model, name ) || declManager->FindType( DECL_MODELDEF, name.c_str(), false ) != NULL;
+				if ( assets.Contains( AssetIndex::Model, name ) ) { return true; }
+				idLevelEditorLookup lookup;
+				return declManager->FindType( DECL_MODELDEF, name.c_str(), false ) != NULL;
 			}
 			return true;
 		};
@@ -413,6 +422,7 @@ bool idLevelEditorSession::Playing() {
 		SDL_DestroyProcess( play );
 		play = nullptr;
 		common->Printf( "editor play finished: exit=%d\n", playExit );
+		if ( *editorExperimental_onPlayDone.GetString() ) { cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "%s\n", editorExperimental_onPlayDone.GetString() ) ); }
 		return false;
 	}
 	return true;
@@ -427,8 +437,19 @@ bool idLevelEditorSession::Play( std::string &error ) {
 	// its configuration, saves and logs never touch the editor's.
 	args.insert( args.end(), { "+set", "fs_savepath", buildStorage.OSPath( build->SandboxRoot() ),
 		"+set", "logFile", "2", "+set", "logFileName", "logs/editor_play.log" } );
-	idCmdArgs extra( editorExperimental_playArgs.GetString(), false );
-	for ( int i = 0; i < extra.Argc(); ++i ) { args.push_back( extra.Argv( i ) ); }
+	// Split on whitespace with double quotes grouping, as a command line
+	// would; the console tokenizer would break "+set" into two tokens.
+	std::string current;
+	bool quoted = false, any = false;
+	for ( const char c : std::string( editorExperimental_playArgs.GetString() ) ) {
+		if ( c == '"' ) { quoted = !quoted; any = true; continue; }
+		if ( !quoted && ( c == ' ' || c == '\t' ) ) {
+			if ( any ) { args.push_back( current ); current.clear(); any = false; }
+			continue;
+		}
+		current += c; any = true;
+	}
+	if ( any ) { args.push_back( current ); }
 	if ( name.compare( 0, 3, "mp/" ) == 0 ) {
 		args.insert( args.end(), { "+set", "si_map", name, "+spawnServer" } );
 	} else {
@@ -440,7 +461,7 @@ bool idLevelEditorSession::Play( std::string &error ) {
 	argv.push_back( nullptr );
 	play = SDL_CreateProcess( argv.data(), false );
 	if ( !play ) { error = std::string( "could not start the play client: " ) + SDL_GetError(); return false; }
-	common->Printf( "editor play started: %s in %s\n", name.c_str(), args[0].c_str() );
+	common->Printf( "editor play started: %s in %s (%zu arguments)\n", name.c_str(), args[0].c_str(), args.size() );
 	return true;
 }
 
@@ -557,6 +578,18 @@ void idLevelEditorSession::Frame() {
 			// The running engine may hold the previous outputs' contents.
 			common->Printf( "editor build published: %s\n", builtPath.c_str() );
 		}
+		if ( *editorExperimental_onBuildDone.GetString() ) { cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "%s\n", editorExperimental_onBuildDone.GetString() ) ); }
+	}
+	const unsigned now = static_cast<unsigned>( Sys_Milliseconds() );
+	const int externalSeconds = editorExperimental_externalCheckSeconds.GetInteger();
+	if ( workspace && externalSeconds > 0 && !workspace->Path().empty() && now - lastExternalCheck >= static_cast<unsigned>( externalSeconds ) * 1000u ) {
+		lastExternalCheck = now;
+		bool changed = false;
+		std::string error;
+		if ( workspace->ExternalChange( changed, error ) && changed != externalChange ) {
+			externalChange = changed;
+			if ( changed ) { common->Printf( "editor external change: %s was modified by another program\n", workspace->Path().c_str() ); }
+		}
 	}
 	Playing();
 	if ( assetIndexStarted && !assets.Complete() ) {
@@ -567,6 +600,18 @@ void idLevelEditorSession::Frame() {
 			common->Printf( "editor asset index: entries=%zu bytes=%zu steps=%zu truncated=%d\n", stats.entries, stats.bytes, stats.steps, stats.truncated );
 		}
 	}
+}
+
+bool idLevelEditorSession::Reload( bool discard, std::string &error ) {
+	MapWorkspace &ws = Workspace();
+	if ( ws.Path().empty() ) { error = "the document has no file to reload"; return false; }
+	SaveViewState();
+	const std::string path = ws.Path();
+	if ( !ws.Open( path, error, discard ) ) { return false; }
+	externalChange = false;
+	viewLoaded = false;
+	SyncDocument();
+	return true;
 }
 
 void idLevelEditorSession::Shutdown() {
@@ -606,12 +651,21 @@ bool ParseEntityId( const char *text, EntityId &id ) {
 	return id != 0;
 }
 
+// Handles are session-local; scripts can also name "world" (worldspawn)
+// and "selected" (the first selected entity).
+bool ResolveEntity( const std::string &text, EntityId &id ) {
+	auto &s = LevelEditor_Session();
+	if ( text == "world" ) { id = s.Document().Entities().empty() ? 0 : s.Document().Entities().front().id; return id != 0; }
+	if ( text == "selected" ) { id = s.PrimaryEntity(); return id != 0; }
+	return ParseEntityId( text.c_str(), id );
+}
+
 // "<handle>" or "<handle>:<primitive>"
 bool ParseItem( const char *text, SelectionItem &item ) {
 	std::string value = text ? text : "";
 	const auto colon = value.find( ':' );
 	EntityId id;
-	if ( !ParseEntityId( value.substr( 0, colon ).c_str(), id ) ) { return false; }
+	if ( !ResolveEntity( value.substr( 0, colon ), id ) ) { return false; }
 	item = { id, WholeEntity };
 	if ( colon != std::string::npos ) {
 		const std::string primitive = value.substr( colon + 1 );
@@ -647,15 +701,15 @@ const char *helpText =
 	"mapEdit entities [filter] | get <handle>\n"
 	"mapEdit set <handle> <key> <value> | unset <handle> <key>\n"
 	"mapEdit create <classname> <name> | delete <handle> | undo | redo\n"
-	"mapEdit save [map] | savecopy <new-map> | autosave | recover [map]\n"
-	"Selections: <handle> selects an entity, <handle>:<n> its nth primitive.\n"
+	"mapEdit save [map] | savecopy <new-map> | autosave | recover [map] | reload [discard] | external\n"
+	"Selections: <handle> selects an entity, <handle>:<n> its nth primitive; 'world' and 'selected' name handles.\n"
 	"mapEdit select <item>... | add <item>... | none | selection\n"
 	"mapEdit move <x> <y> <z> | rotate <axis 0-2> <degrees> | scale <x> <y> <z> | snap | grid <units> | texlock <0|1>\n"
 	"mapEdit brush <x1> <y1> <z1> <x2> <y2> <z2> [material] | patch <x1> <y1> <z1> <x2> <y2> <z2> [material]\n"
 	"mapEdit duplicate [x y z] | remove | group | ungroup | material <name>\n"
 	"mapEdit layer <name|-> | layers | hidelayer <name> | showlayer <name> | locklayer <name> | unlocklayer <name>\n"
 	"mapEdit rename <handle> <name> | refs <name> | prefab save <file> | prefab insert <file> <x> <y> <z>\n"
-	"mapEdit validate | build [noaas] | buildstatus | cancel | play | playstatus\n"
+	"mapEdit validate | build [noaas] | buildstatus | cancel | outputs | play | playstatus\n"
 	"mapEdit index | find <entitydef|material|model|sound|map> <filter> | latency\n"
 	"Writes go to fs_savepath/baseoq4; builds compile the saved map in a sandbox and publish beside it.\n";
 
@@ -679,7 +733,7 @@ void EditorCommand( const idCmdArgs &args ) {
 	std::string error;
 	bool result = false;
 	EntityId id = 0;
-	if ( args.Argc() > 2 ) { ParseEntityId( args.Argv(2), id ); }
+	if ( args.Argc() > 2 ) { ResolveEntity( args.Argv(2), id ); }
 	const double start = LevelEditor_Milliseconds();
 	if ( command == "new" && args.Argc() == 2 ) { result = workspace.New( error ); }
 	else if ( command == "open" && args.Argc() == 3 ) { result = workspace.Open( args.Argv(2), error ); }
@@ -720,6 +774,13 @@ void EditorCommand( const idCmdArgs &args ) {
 	else if ( command == "savecopy" && args.Argc() == 3 ) { result = workspace.Save( args.Argv(2), true, error ); }
 	else if ( command == "autosave" && args.Argc() == 2 ) { result = workspace.AutoSave( error ); }
 	else if ( command == "recover" && args.Argc() <= 3 ) { result = workspace.Recover( args.Argc() == 3 ? args.Argv(2) : "", error ); }
+	else if ( command == "reload" && ( args.Argc() == 2 || ( args.Argc() == 3 && idStr::Cmp( args.Argv(2), "discard" ) == 0 ) ) ) {
+		result = s.Reload( args.Argc() == 3, error );
+	} else if ( command == "external" && args.Argc() == 2 ) {
+		bool changed = false;
+		result = workspace.ExternalChange( changed, error );
+		if ( result ) { common->Printf( "editor external: changed=%d\n", changed ); return; }
+	}
 	else if ( ( command == "select" || command == "add" ) && args.Argc() >= 3 ) {
 		if ( command == "select" ) { s.ClearSelection(); }
 		result = true;
@@ -865,6 +926,30 @@ void EditorCommand( const idCmdArgs &args ) {
 			return;
 		}
 	} else if ( command == "latency" && args.Argc() == 2 ) { s.PrintLatency(); return; }
+	else if ( command == "outputs" && args.Argc() == 2 ) {
+		// Compiler outputs beside the saved map, with content hashes, so a
+		// failed or cancelled build can be shown to have left them alone.
+		const std::string path = workspace.Path();
+		if ( path.empty() ) { error = "the document has no saved path"; }
+		else {
+			const auto slash = path.rfind( '/' );
+			const std::string directory = path.substr( 0, slash ), base = path.substr( slash + 1, path.size() - slash - 5 );
+			int count = 0;
+			for ( const auto &file : buildStorage.List( directory, base + "." ) ) {
+				const std::string extension = file.substr( base.size() + 1 );
+				if ( extension != "proc" && extension != "cm" && extension.compare( 0, 3, "aas" ) != 0 ) { continue; }
+				std::string text;
+				bool exists = false;
+				if ( !buildStorage.Read( directory + "/" + file, text, exists, error ) || !exists ) { continue; }
+				std::uint64_t hash = 1469598103934665603ULL;
+				for ( const unsigned char c : text ) { hash = ( hash ^ c ) * 1099511628211ULL; }
+				common->Printf( "editor output: %s/%s bytes=%zu fnv=%016llx\n", directory.c_str(), file.c_str(), text.size(), static_cast<unsigned long long>( hash ) );
+				++count;
+			}
+			common->Printf( "editor outputs: %d\n", count );
+			return;
+		}
+	}
 	else { error = "invalid arguments; use 'editorExperimental help'"; }
 	if ( !result ) { common->Printf( "editor rejected: %s\n", error.c_str() ); return; }
 	s.PruneSelection();
@@ -874,9 +959,9 @@ void EditorCommand( const idCmdArgs &args ) {
 
 void EditorComplete( const idCmdArgs &args, void( *callback )( const char *s ) ) {
 	static const char *commands[] = { "help", "new", "open", "close", "status", "entities", "get", "set", "unset", "create", "delete", "undo", "redo",
-		"save", "savecopy", "autosave", "recover", "select", "add", "none", "selection", "move", "rotate", "scale", "snap", "grid", "texlock",
+		"save", "savecopy", "autosave", "recover", "reload", "external", "select", "add", "none", "selection", "move", "rotate", "scale", "snap", "grid", "texlock",
 		"brush", "patch", "duplicate", "remove", "group", "ungroup", "material", "layer", "layers", "hidelayer", "showlayer", "locklayer",
-		"unlocklayer", "rename", "refs", "prefab", "validate", "build", "buildstatus", "cancel", "play", "playstatus", "index", "find", "latency", NULL };
+		"unlocklayer", "rename", "refs", "prefab", "validate", "build", "buildstatus", "cancel", "outputs", "play", "playstatus", "index", "find", "latency", NULL };
 	if ( args.Argc() <= 2 ) {
 		for ( int i = 0; commands[i]; ++i ) { callback( va( "%s %s", args.Argv(0), commands[i] ) ); }
 	} else if ( idStr::Icmp( args.Argv(1), "open" ) == 0 ) {

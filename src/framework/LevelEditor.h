@@ -15,6 +15,16 @@ void LevelEditor_OpenWorkspace();
 void LevelEditor_RegisterWorkspaceCommand();
 void LevelEditor_UIFrame();
 bool LevelEditor_UIIsActive();
+// Marks the editor's on-demand declaration and model loads (entityDef
+// schemas, entity models) as tool work, like the open workspace, so they are
+// not reported as gameplay loads that missed the level precache.
+class idLevelEditorLookup {
+public:
+	idLevelEditorLookup();
+	~idLevelEditorLookup();
+	idLevelEditorLookup( const idLevelEditorLookup & ) = delete;
+	idLevelEditorLookup &operator=( const idLevelEditorLookup & ) = delete;
+};
 void LevelEditor_UIShutdown();
 bool LevelEditor_UIInputEnabled();
 

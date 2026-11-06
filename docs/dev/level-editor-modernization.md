@@ -1,10 +1,11 @@
 # Level editor modernization
 
-This is an implementation and evidence reference. The [development roadmap](roadmap.md#engine-loading-safety-and-developer-tools),
-TOOL-01 through TOOL-04, is the sole active planning location. The user's earlier
-pause of broader editor modernization remains in effect; consolidating the plan
-does not authorize resuming implementation. The recorded milestones, limitations
-and validation below retain their original scope.
+This is the implementation and evidence reference for the experimental level
+editor. The [development roadmap](roadmap.md#engine-loading-safety-and-developer-tools),
+TOOL-01 through TOOL-04, is the planning location. Work resumed on
+6 November 2026 and closed all four items; milestones 1 and 2 below record the
+earlier, initial scope, and milestones 3 to 6 the completion. The user guide is
+[level editor](../user/level-editor.md).
 
 Target: a modern, integrated authoring environment at an idStudio-like standard.
 This describes the desired product standard, not compatibility with proprietary
@@ -38,8 +39,8 @@ and an engine-native graphical workspace share commands and transactions.
 The legacy Radiant source, startup dispatch and `editor` registration remain
 unchanged. Restoring its existing tool build is outside this milestone.
 The experiment has separate GUI assets, `editorExperimental_*` settings and
-an `editor_experimental/recovery/` directory. The broader modernization is paused
-after these milestones at the user's request; further features require resuming.
+an `editor_experimental/` directory for recovery files, view state and the
+build sandbox.
 
 ## Milestone 1: document and persistence service
 
@@ -75,13 +76,13 @@ rejected before mutation. Structural parsing validates document boundaries and
 balanced primitive delimiters; it does **not** validate convex geometry, material
 existence, patch dimensions, entity definitions or gameplay references. Those
 remain compiler/validator responsibilities. Changing a geometry entity's origin
-through a raw property is blocked until a geometry-aware transform exists.
+through a raw property stays blocked; the transform tools move it together with
+the geometry (milestone 3).
 
-The service does not yet offer brush/patch editing, transform
-widgets, rename/reference repair, prefab instances, multi-document
-workspaces, an asynchronous build manager or a separate play sandbox. Entity
-handles are session-local and are not serialized into stock maps. History is
-memory-only. Current source limits and conservative filename rules are initial
+Milestones 3 and 5 added brush/patch editing, transforms, rename/reference
+repair, prefabs and the build manager with its play sandbox. Multi-document
+workspaces remain out of scope. Entity handles are session-local and are not
+serialized into stock maps. History is memory-only. Current source limits and conservative filename rules are initial
 bounds, not claims of unlimited production-map support. File conflict checks
 are optimistic; they do not acquire an interprocess lock against external writers.
 
@@ -123,50 +124,202 @@ pointer was uninitialized, so destruction could attempt to close an invalid
 file. The constructor now uses the normal initialization path, and text errors
 honor the delegated lexer's nonfatal policy and error state.
 
-This is still an **initial workspace**, not the completed idStudio-standard
-milestone. Pane resizing is not docking. Geometry creation/transforms, actual
-entity-model previews, orthographic views, camera persistence, typed properties, scene layers,
-asynchronous indexing/builds, a play sandbox and full diagnostics are pending.
-The first source preview build is synchronous. High-DPI, native mouse/keyboard
-interaction, complete localized/responsive toolbar layouts and Linux/macOS
-graphical operation still need qualification. Compact toolbar text has been
-reduced to fit the English Save copy label at the tested sizes; other languages
-still need visual qualification.
+Milestone 4 replaced this initial workspace: its fixed panes became docked
+panels, its single preview became 3D, top, front and side views, and its
+synchronous first build became a time-sliced, cached one.
 
-## Historical implementation sequence
+## Milestone 3: geometry and asset authoring (TOOL-02)
 
-The sequence below records the earlier proposal, not a second active backlog.
-Its outstanding scope is carried by TOOL-01 through TOOL-04 in the roadmap and
-remains paused until the user resumes it.
+The portable core in `src/tools/leveleditor/` gained typed geometry adapters
+and the editing commands built on them. It still has no dependency on the
+engine, so the native suites compile it alone.
 
-1. **Complete the workspace.** Build on the integrated browser, inspector and
-   source viewport: add docking, richer asset previews and linked diagnostics,
-   reduce initial-load stalls, and qualify native input/high DPI and the other
-   desktop platforms. Preserve layout per user through engine GUI/SDL3 events,
-   with no WGL/global-window dependencies. Keep stock art and localization.
-2. **Selection and geometry tools.** Add typed brush/patch adapters that preserve
-   untouched source. Implement picking, orthographic and 3D views, grid/snapping,
-   transform previews and one undo transaction per completed gesture. Test
-   texture locking, mixed primitive selections, cancellation and large maps.
-3. **Asset and entity workflows.** Add asynchronous material/model/entity-def
-   search and previews, typed property validation, safe entity rename with
-   reference updates, layers/visibility, groups and prefab workflows. Asset
-   indexing must not block frame presentation or eagerly load all GPU resources.
-4. **Build, diagnostics and play.** Run dmap/AAS through a job manager with
-   progress, cancellation and entity/primitive-linked diagnostics. Use isolated
-   runtime state for play testing, restore editor camera/selection on exit, and
-   keep a failed build from replacing the previous playable output.
-5. **Production qualification.** Exercise retail SP/MP round trips, large maps,
-   forced I/O failures, external edits, recovery, repeated undo/redo, renderer
-   switches and Windows/Linux/macOS workflows. Record startup, selection,
-   viewport and edit latency budgets before describing the editor as ready for
-   production. Graphical interaction requires separately authorized manual or
-   automated input tests.
+- **Lossless adapters** (`MapGeometry`). `Primitive::Parse` reads `brushDef3`,
+  `patchDef2` and `patchDef3` and records the byte span of every number.
+  `Serialize` rewrites only numbers whose value changed, with the shortest
+  fixed-point spelling of the same float (the map lexer reads no exponents),
+  and keeps comments, spacing, number spelling and material text. A changed
+  value whose float is unchanged keeps its original spelling. `brushDef`,
+  `brushDef2` and Quake 3 brushes stay opaque: preserved, reported, and refused
+  by transforms, so a mixed transform fails before changing anything.
+- **Coordinates follow `idMapFile`.** `brushDef3` planes are stored relative to
+  the entity's `origin`; patch control points are stored in world space (the
+  loader subtracts the origin). Moving an entity with an origin therefore keeps
+  its brush planes, moves its patches, and updates `origin`.
+- **Transforms and texture lock.** Planes move by the inverse transpose; faces
+  keep their outward orientation, and mirroring is refused because it would
+  invert faces. Texture lock solves each row of the 2x3 texture matrix from
+  three points on the face, in the new face's `ComputeAxisBase` frame (mirrored
+  exactly, including its float cleaning), so every corner keeps its texture
+  coordinate; the shift stays within half a repeat of the original. Without
+  lock the texture stays in world space, as Radiant does. Exact quarter turns
+  keep axial planes exact; four locked quarter turns restore planes and
+  matrices. Point entities turn `angle`, or `rotation` for other axes,
+  `angles` about Z, and a light's projection vectors; scaling scales an
+  axis-aligned light's radius.
+- **Grouped undo** (`MapDocument`). `BeginTransaction`/`CommitTransaction` make
+  any number of edits one undo step; `RevertTransaction` discards the pending
+  edits but keeps the transaction open, so a drag re-applies its total offset
+  on every pointer move without drift; `CancelTransaction` restores the exact
+  revision, so a cancelled gesture leaves a clean document clean. Undo and
+  redo refuse to run inside an open transaction. Primitive edits
+  (`SetPrimitive`, `SetPrimitives`, `AddPrimitive`, `RemovePrimitive`) and
+  `InsertEntity` validate balanced source blocks and keep the cached primitive
+  ranges in step with a full re-parse. `SetPrimitives` rewrites many primitives
+  of one entity in one linear pass and records only their spans: rotating
+  5,000 brushes of a 20,000-brush map is one 146 ms step with a compact undo
+  record (one rewrite per brush would copy the 10 MB worldspawn 5,000 times).
+- **Editing tools** (`MapEditing`). Mixed selections of point entities,
+  geometry entities and individual primitives transform together;
+  `Snap`, box brush and flat patch creation in world coordinates (converted to
+  entity space), `Duplicate` (copies keep their links to one another, with
+  fresh numbered names), `Delete`, `SetMaterial`, `Group`/`Ungroup`
+  (`func_group`, which `idMapFile::Resolve` merges into worldspawn for compiles,
+  re-expressing origins when needed), `SetLayer` (the `editor_layer` key; world
+  primitives join a new layered group), `References` and `Rename` (updates
+  `target*`, `bind`, `killtarget`, `cameraTarget`, `enemy`, `focus` and
+  entityDef-declared entity keys in one step), and prefabs (`ExportPrefab`
+  centres the selection on its base; `InsertPrefab` renames colliding names
+  inside the prefab first, so its own references follow). Every command
+  validates its whole result before its first change.
+- **Geometry cache and picking.** `MapGeometryCache` keeps parsed primitives,
+  face polygons and bounds keyed by exact source bytes and entity origin;
+  views and picking read it without re-lexing the map. Rays hit brushes as
+  exact convex intersections of their outward planes, patches by their control
+  net and point entities as 16-unit boxes.
+- **Asset index** (`EditorState`). `AssetIndex` catalogues entityDef, material,
+  sound, model and map names from pluggable sources a bounded number of items
+  per step, de-duplicates without case, stops at 262,144 names or 16 MiB, cuts
+  off sources that repeat themselves, and can be cancelled. The engine steps it
+  for at most `editorExperimental_indexBudget` (2 ms) per frame and lists each
+  file tree once, on its first poll.
 
-Each milestone must deliver a usable end-to-end workflow. A panel mockup or a
-menu-only startup does not satisfy the graphical milestone.
+## Milestone 4: the docked workspace (TOOL-01)
 
-## Validation
+The workspace GUI is generated by `tools/ui/build_level_editor_gui.py`
+(`--check` verifies the committed file). It keeps Quake 4's stock menu art and
+every label is a `#str` entry in all thirteen openQ4 language tables.
+
+- **Docking.** `DockLayout` places the Browser, Inspector, Tools and Problems
+  panels left, right, under the views (Problems only; the others need a full
+  column) or hidden. Panels sharing a dock become tabs; only the active tab
+  carries the dock controls, so shared docks keep room for titles. Docks
+  resize between 130-230 (sides) and 70-180 (bottom) GUI units and the layout
+  persists in `editorExperimental_layout`. Panels are GUI containers whose
+  rectangles the engine publishes as `gui::ed_<panel>_*` state, so one set of
+  windows works in every dock.
+- **Views.** The 3D preview plus top, front and side orthographic views, alone
+  or as a quad. The orthographic views are 2D wireframes drawn through the GUI
+  device context in batched quads, so both renderer backends draw them the
+  same way and no renderer projection change was needed. They draw a grid that
+  stays at least 6 px apart with every eighth line brighter, world axes,
+  bounds boxes for primitives under 5 px and nothing below 0.75 px, and stop
+  outlining at 300,000 lines. Selections are orange; in 3D their primitives
+  are drawn as a projected wireframe over the rendered view. Line quads are
+  emitted with both windings because GUI surfaces are back-face culled.
+- **Gestures.** One controller (`LevelEditor_View*`) serves the GUI widget and
+  the scripted `editorExperimentalWorkspace view` commands: click selection
+  (Shift toggles), drag-move on the grid as one transaction, Ctrl-drag brush
+  creation, pan, orbit, cursor-anchored zoom, arrow-key nudges and Delete.
+  Hidden and locked layers are excluded from picking. A pick combines the
+  geometry cache's ray with the preview's model traces for entity models.
+- **Camera and view persistence.** `ViewState` stores the 3D camera, the
+  orthographic centre and scale, view mode, quad flag, grid, texture lock,
+  hidden and locked layers and the selection (as document indexes, since
+  handles are session-local) in `editor_experimental/views/<map>.map.view`,
+  written atomically on save, on leaving the workspace and before a play test.
+- **Richer previews.** Point entities show their static entity models, taken
+  from their `model` key or their entityDef. The entityDef lookup and the model
+  load happen in `UpgradeModels` within `editorExperimental_modelBudget`
+  (3 ms) per frame; skinned models keep their marker. 296 of airdefense1's
+  point entities show models.
+- **Chunked, cached preview.** Each entity's primitives form chunks of 128,
+  each its own render entity, and every primitive's tessellation is cached by
+  its source bytes, origin and map version with reference counts. Opening a map
+  tessellates within a 12 ms budget per frame (the old single-pass build took
+  4.7-5.4 s for airdefense1's worldspawn alone, so one-entity slicing could not
+  help); a world brush edit re-tessellates that brush and reassembles one chunk.
+- **Typed inspector and linked diagnostics.** `MapValidator` reads entityDef
+  `editor_var`, `editor_bool`, `editor_int`, `editor_float`, `editor_vector`,
+  `editor_color`, `editor_model`, `editor_mat`/`editor_material`, `editor_snd`
+  and `editor_gui` declarations plus well-known keys. The inspector shows each
+  property's type, the class usage and the key's description, and refuses an
+  ill-typed value (console edits stay raw). Validation reports duplicate names,
+  missing targets, unknown classes, ill-typed values, malformed origins,
+  missing assets once the index is complete (brush entities naming their own
+  inline model are not missing), unreadable, degenerate and legacy primitives,
+  and a missing SP player start, each linked to its entity or primitive.
+  Selecting a problem selects and frames its source.
+- **External edits.** `MapWorkspace::ExternalChange` compares the file with the
+  bytes last read or saved. The session checks every
+  `editorExperimental_externalCheckSeconds` (3 s), reports a change once, and
+  `mapEdit reload [discard]` reopens the file.
+- **Label fit.** `editorExperimentalWorkspace fit` measures every visible
+  single-line label with its font, scale and spacing against its rectangle, and
+  every wrapped label's lines against its height, skipping data bound to
+  `gui::` state, edit fields and lists.
+
+## Milestone 5: build and play (TOOL-03)
+
+`MapBuild` runs the compile in a child engine process through the SDL3 process
+API (Windows, Linux and macOS), preferring the dedicated server beside the
+client so no window opens.
+
+- The child gets the build sandbox (`editor_experimental/build`) as its whole
+  save path, holding only the saved map, and `com_compilerOutput fs_savepath`
+  so `dmap` and AAS write `.proc` and `.aas*` there instead of beside the
+  engine (`fs_cdpath`, still the default). `.cm` already follows the save
+  path. The editor tails the child's `logFile` for progress (stage markers from
+  `LoadDMapFile` to `seconds to create AAS`, monotonic) and diagnostics.
+- `CompileIndex` maps the compiler's entity and primitive numbers back to the
+  document through `idMapFile::Resolve`'s renumbering: `func_group` primitives
+  join worldspawn after its own, and `removeEntities` classes vanish. Warnings
+  such as `brush primitive 2 on entity 0 is degenerate` therefore select the
+  exact brush, even inside a group.
+- Success requires exit code 0, the geometry pass, no leak and a `.proc`. Only
+  then are all outputs staged beside the saved map, the previous outputs
+  (including ones this build no longer produces) set aside, and the new ones
+  published; any failure restores the previous set. A leak, a compiler error,
+  a timeout (`editorExperimental_buildTimeout`), a cancel or a child that goes
+  silent for 15 s after an error leaves the previous outputs untouched.
+- **Play** launches the client with the sandbox as its whole profile: its
+  configuration, saves, logs and caches stay there. SP maps use `devmap`; maps
+  under `mp/` use `spawnServer`. The editor process keeps its document,
+  selection and cameras, saves its view state first, and notes when the test
+  ends. `editorExperimental_onBuildDone` and `editorExperimental_onPlayDone`
+  run a console command at those transitions, for automation.
+
+The harness exposed two engine defects, both fixed. `dmap` wrote its leak
+trail with `fopen` beside the engine and raised a fatal error when the map's
+folder did not exist there, so any leak in a new folder aborted the compile; it
+now uses the filesystem writer (creating the folder, following
+`com_compilerOutput`) and only warns if it cannot write. After that fatal
+error the dedicated server also stopped responding in shutdown, which the
+build manager now detects and ends.
+
+## Milestone 6: qualification (TOOL-04)
+
+Latency budgets are declared in the session and reported by `mapEdit latency`
+for the stock `airdefense1` source (2,195 entities, 11,793 primitives):
+
+| Measure | Budget | Meaning |
+| --- | --- | --- |
+| startup | 6,000 ms | open to the first rendered workspace frame |
+| edit | 100 ms | applying a transform or property edit to the document |
+| refresh | 100 ms | from a document change to the workspace showing it |
+| select | 16 ms | a pick or browser selection |
+| view3d, ortho | 16 ms | drawing one 3D or orthographic view |
+| validate | 250 ms | a full validation pass |
+
+{{EVIDENCE}}
+
+## Earlier validation (24 September 2026)
+
+This records the initial milestones' qualification; the old
+`level_editor_workspace.py` harness it names was replaced by
+`level_editor_authoring.py`, and the restart label defect it records no longer
+reproduces (see milestone 6).
+
 
 `openq4-editor-document` compiles the production portable document and workspace
 with deterministic fault-injected storage. It covers byte-exact round trips,

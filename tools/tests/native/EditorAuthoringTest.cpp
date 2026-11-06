@@ -518,6 +518,25 @@ static void Builds() {
 		Expect( build.Start( request, index, 300, error ), "a cancelled build can restart" );
 	}
 	{
+		// A child that reports an error and then never exits is stopped.
+		FakeFiles files;
+		class Stuck : public FakeProcess {
+		public:
+			using FakeProcess::FakeProcess;
+			bool Running( int &code ) override { if ( calls++ == 0 ) { FakeProcess::Running( code ); } return !killedNow && ( code = 0, true ); }
+			void Kill() override { killedNow = true; FakeProcess::Kill(); }
+			int calls = 0;
+			bool killedNow = false;
+		};
+		auto process = std::make_unique<Stuck>( files, std::vector<std::string>{ "ERROR: Couldn't open maps/custom/room.lin" }, outputs, 0 );
+		Stuck *child = process.get();
+		MapBuild build( files, std::move( process ) );
+		build.Start( request, index, 0, error );
+		unsigned t = 0;
+		for ( t = 100; build.Active() && t < 60000; t += 100 ) { build.Poll( t ); }
+		Expect( child->killedNow && build.GetState() == MapBuild::State::Failed && t < 20000, "a compiler stuck after an error is stopped promptly" );
+	}
+	{
 		FakeFiles files;
 		std::vector<std::string> endless( 100000, "working" );
 		request.timeoutMs = 1000;
@@ -587,6 +606,36 @@ static void Layout() {
 	index.Step( 10 );
 	index.Cancel();
 	Expect( index.Complete() && index.GetStats().cancelled, "indexing can be cancelled" );
+}
+
+class WorkspaceFiles : public MapStorage {
+public:
+	std::map<std::string, std::string> files;
+	bool Read( const std::string &path, std::string &text, bool &exists, std::string & ) override {
+		const auto it = files.find( path ); exists = it != files.end(); text = exists ? it->second : ""; return true;
+	}
+	bool WriteAndSync( const std::string &path, const std::string &text, std::string & ) override { files[path] = text; return true; }
+	bool Promote( const std::string &from, const std::string &to, std::string & ) override { files[to] = files[from]; files.erase( from ); return true; }
+	void Remove( const std::string &path ) override { files.erase( path ); }
+};
+
+static void ExternalEdits() {
+	WorkspaceFiles files;
+	files.files["maps/room.map"] = MapWith( box, "" );
+	MapWorkspace workspace( files );
+	std::string error;
+	bool changed = true;
+	Expect( workspace.Open( "room", error ) && workspace.ExternalChange( changed, error ) && !changed, "freshly opened map is unchanged on disk" );
+	files.files["maps/room.map"] += "// edited elsewhere\n";
+	Expect( workspace.ExternalChange( changed, error ) && changed, "another program's edit is detected while open" );
+	MapEditor editor;
+	editor.Transform( workspace.Document(), { { workspace.Document().Entities()[0].id, 0 } }, Affine::Translation( Vec3( 8, 0, 0 ) ), true, error );
+	Expect( !workspace.Save( "", false, error ) && files.files["maps/room.map"].find( "edited elsewhere" ) != std::string::npos, "saving over an external edit is refused" );
+	Expect( workspace.Save( "room_mine", false, error ) && !workspace.Document().IsDirty(), "the work can be saved to a new path" );
+	Expect( workspace.ExternalChange( changed, error ) && !changed, "after saving, the new path is the baseline" );
+	files.files.erase( "maps/room_mine.map" );
+	Expect( workspace.ExternalChange( changed, error ) && changed, "deletion by another program is detected" );
+	Expect( workspace.Open( "room", error, true ) && workspace.Document().Serialize().find( "edited elsewhere" ) != std::string::npos, "reload picks up the external version" );
 }
 
 static void LargeMapsAndStress() {
@@ -725,6 +774,7 @@ int main( int argc, char **argv ) {
 	timed( "validation", Validation );
 	timed( "builds", Builds );
 	timed( "layout", Layout );
+	timed( "external", ExternalEdits );
 	timed( "large", LargeMapsAndStress );
 	StockMaps( argc, argv );
 	std::printf( "editor authoring: %d checks, %d failures\n", checks, failures );

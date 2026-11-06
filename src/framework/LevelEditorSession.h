@@ -24,7 +24,9 @@ public:
 		int samples = 0;
 		void Add( double ms ) { lastMs = ms; maxMs = ms > maxMs ? ms : maxMs; totalMs += ms; ++samples; }
 	};
-	enum LatencyKind { LATENCY_STARTUP, LATENCY_EDIT, LATENCY_SELECT, LATENCY_VIEW3D, LATENCY_ORTHO, LATENCY_VALIDATE, LATENCY_COUNT };
+	// refresh: from a document change to the workspace showing it (panels
+	// and the re-tessellated preview chunks).
+	enum LatencyKind { LATENCY_STARTUP, LATENCY_EDIT, LATENCY_SELECT, LATENCY_VIEW3D, LATENCY_ORTHO, LATENCY_VALIDATE, LATENCY_REFRESH, LATENCY_COUNT };
 
 	idLevelEditorSession();
 	~idLevelEditorSession();
@@ -77,6 +79,8 @@ public:
 	bool Play( std::string &error );
 	bool Playing();
 	int LastPlayExit() const { return playExit; }
+	bool ExternalChange() const { return externalChange; }
+	bool Reload( bool discard, std::string &error );
 
 	void StartAssetIndex();
 	bool AssetIndexStarted() const { return assetIndexStarted; }
@@ -90,7 +94,8 @@ private:
 	std::unique_ptr<oq4editor::MapBuild> build;
 	std::string builtPath, viewPath;
 	std::uint64_t builtRevision = 0;
-	bool viewLoaded = false, assetIndexStarted = false, buildReported = true;
+	bool viewLoaded = false, assetIndexStarted = false, buildReported = true, externalChange = false;
+	unsigned lastExternalCheck = 0;
 	SDL_Process *play = nullptr;
 	int playExit = 0;
 	std::map<std::string, std::unique_ptr<oq4editor::ClassSchema>> schemas;

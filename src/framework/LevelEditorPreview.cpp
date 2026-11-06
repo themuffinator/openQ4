@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "LevelEditor.h"
 #include "LevelEditorPreview.h"
 #include "../ui/DeviceContext.h"
 #include <cmath>
@@ -180,6 +181,7 @@ std::string PointModel( const oq4editor::Entity &entity ) {
 }
 
 std::string DefinitionModel( const std::string &classname ) {
+	idLevelEditorLookup lookup;
 	const idDecl *decl = declManager->FindType( DECL_ENTITYDEF, classname.c_str(), false );
 	if ( !decl || decl->GetState() == DS_DEFAULTED ) { return {}; }
 	return static_cast<const idDeclEntityDef *>( decl )->dict.GetString( "model" );
@@ -398,6 +400,7 @@ int idLevelEditorPreview::UpgradeModels( double budgetMs ) {
 		record.modelTried = true;
 		const std::string name = record.modelName[0] == '@' ? DefinitionModel( record.modelName.substr( 1 ) ) : record.modelName;
 		if ( name.empty() ) { continue; }
+		idLevelEditorLookup lookup;
 		idRenderModel *model = renderModelManager->CheckModel( name.c_str() );
 		// Skinned models need an animation pose the editor does not run; they
 		// keep their marker. Static meshes render as the game shows them.
