@@ -19,8 +19,9 @@ Function names are given instead of line numbers, which drift.
   interaction draw in a non-sidecar 3D view must then be in one of these
   classes:
   - **PBR modern-ready:** an authored BRDF with no PBR fallback.
-  - **Classic diffuse:** opaque, a single diffuse stage, a flat bump map and a
-    black specular map.
+  - **Classic diffuse:** a single diffuse stage, a flat bump map and a black
+    specular map, either opaque or a cutout whose alpha test sits on that
+    diffuse stage (added 6 November, see below).
   - **Classic fixed:** bump, diffuse and at most one specular stage. This class
     counts only inside the classic-lighting corridor view.
 
@@ -152,12 +153,30 @@ overflows (`ClassicInteractionDomain.h`).
   verifies the claims behind them, so the evidence must come from qualification,
   not from setting the cvar.
 
+## Progress
+
+- **6 November 2026, classic cutouts.** An alpha-tested classic diffuse stage
+  (flat bump, black specular) now joins the proven diffuse class
+  (`R_MaterialResourceTable_ClassicDiffusePathEligible`). The modern forward
+  alpha-test shader discards the texels ARB2's depth prepass rejects.
+  - The laboratory pair `production-fixed-cutout` / `-native` (fixture
+    material `classic_cutout`) shows a modern-owned frame with the material
+    contract proven.
+  - It matches native ARB2 to a mean of 0.28 and a maximum of 1.6 levels over
+    the specimen disc. The opaque diffuse proof reads 0.30 and 2.4.
+  - The exception is 5 of 6,073 pixels on hole edges, where the two programs
+    evaluate the same threshold differently. The control allows at most 24
+    such edge pixels.
+  - Stock cutouts mostly carry bump or specular maps, so they still need the
+    fixed classes below.
+
 ## What REN-02 has left, in dependency order
 
 1. **Prove the interaction domain on stock content outside the laboratory.**
    Extend `MaterialLightingProven` beyond the flat-diffuse and fixed classes to
    the stock material shapes that dominate gameplay views:
-   - alpha-tested surfaces;
+   - alpha-tested surfaces with bump and specular maps (flat-diffuse cutouts
+     are done);
    - vertex-coloured surfaces;
    - condition stages;
    - texture matrices;

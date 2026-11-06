@@ -137,6 +137,10 @@ SSAO_FADED = {**SSAO_SETTINGS, 'r_ssaoMaxDistance': '16'}
 # this many on an Intel Vulkan device only; every other device stays exact.
 INTEL_VULKAN_SSAO_CLASSIC_PIXELS = 8
 INTEL_VULKAN_SSAO_DEBUG_PIXELS = 12
+# REN-02 classic cutout parity: hole-edge texels may flip between the modern
+# alpha-test shader and ARB2's depth prepass (5 of 6,073 disc pixels measured
+# on 6 November 2026, all on edges). Allow at most this many edge pixels.
+CUTOUT_EDGE_FLIP_PIXELS = 24
 # REN-05 matched half-resolution control. A view with native PBR always takes
 # the full-resolution pass, so half resolution reaches classic-only frames:
 # compare them, and their occlusion debug view, with the full-resolution ones.
@@ -158,7 +162,7 @@ CASES = {
     'production-rejected-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-fixed{kind}{suffix}': {'r_rendererModernLightingParity':'0','r_hdrToneMap':'1','r_lightScale':'0.1',
           **({'r_pbrMaterials':'0','r_rendererReflectionProbes':'0'} if suffix else {})}
-       for kind in ('','-bump','-diffuse','-colored') for suffix in ('','-native')},
+       for kind in ('','-bump','-diffuse','-colored','-cutout') for suffix in ('','-native')},
     'production-curved': {'r_rendererModernLightingParity':'0'},
     'production-curved-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-{light}{suffix}': {'r_rendererModernLightingParity':'0',
@@ -331,7 +335,7 @@ LEGACY_CASES.update(('production-fixed-colored-native','production-fixed-master-
 LEGACY_CASES.add('production-fixed-grid-native')
 LEGACY_CASES.update(f'production-fixed-{boundary}-native' for boundary in ('shadow','msaa'))
 LEGACY_CASES.update(f'production-{light}-native' for light in ('points','projector'))
-LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native'))
+LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native','production-fixed-cutout-native'))
 LEGACY_CASES.update(f'{kind}-{mode}' for kind in ('fog','blend') for mode in ('native','off','fallback-native'))
 LEGACY_CASES.update(('lightgrid-native','lightgrid-off'))
 LEGACY_CASES.update(('lightgrid-pbr-master-off','lightgrid-pbr-native'))
@@ -1450,7 +1454,7 @@ def compare_material_captures(results: list[dict]) -> None:
             by_case['production-curved']['classicComparison']=proof
             if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
                 by_case['production-curved']['failures'].append('curved classic surface differs from the native lighting reference')
-    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-grid'):
+    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-grid'):
         if case not in by_case or case+'-native' not in by_case: continue
         modern=by_case[case]
         pfm=Path(modern.get('linearScreenshot',''))
@@ -1471,7 +1475,25 @@ def compare_material_captures(results: list[dict]) -> None:
         settings={**BASE,**CASES[case+'-native']}
         displayed=[255*stock_display_transfer(value/255,settings) for value in encoded]
         errors=[abs(a-b) for a,b in zip(displayed,reference)]
-        proof={'samples':len(errors),'radius':44,'meanAbsoluteByteError':sum(errors)/len(errors),
+        # REN-02 cutout: the modern forward shader and ARB2's depth prepass test
+        # the same diffuse alpha in different programs, so a texel on a hole's
+        # edge can flip either way. Bound those edge flips instead of the
+        # whole-disc maximum; every other pixel keeps the 3-level limit.
+        edge_flips=0
+        if case=='production-fixed-cutout':
+            kept=[]
+            for index,(x,y) in enumerate(coordinates):
+                pixel=errors[index*3:index*3+3]
+                if max(pixel)>3:
+                    level=lambda px,py: sum(native[(py*1280+px)*3:(py*1280+px)*3+3])
+                    if max(abs(level(x,y)-level(x+dx,y+dy)) for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)))>30:
+                        edge_flips+=1
+                        continue
+                kept+=pixel
+            if edge_flips>CUTOUT_EDGE_FLIP_PIXELS:
+                modern['failures'].append(f'{edge_flips} cutout edge pixels differ from the native reference (limit {CUTOUT_EDGE_FLIP_PIXELS})')
+            errors=kept
+        proof={'samples':len(errors),'radius':44,'edgeFlipPixels':edge_flips,'meanAbsoluteByteError':sum(errors)/len(errors),
                'maximumByteError':max(errors),'nativeRange':[min(reference),max(reference)],
                'encodedRange':[min(encoded),max(encoded)],'displayedRange':[min(displayed),max(displayed)],
                'comparison':'linear PFM encoded to sRGB through the stock display transfer versus native display'}
@@ -2263,6 +2285,7 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             if case.startswith('production-fixed-bump'): material='classic_bump'
             if case.startswith('production-fixed-diffuse'): material='classic_diffuse'
             if case.startswith('production-fixed-colored'): material='classic_colored'
+            if case.startswith('production-fixed-cutout'): material='classic_cutout'
             commands += ['g_stopTime 0',f'script "${removed}.remove()"','wait 3',
                          f'spawn func_static name pbr_classic model "{lab.MODEL}" shader "{lab.PREFIX}/{material}" origin "100 160 480" solid 0',
                          'wait 30','g_stopTime 1']

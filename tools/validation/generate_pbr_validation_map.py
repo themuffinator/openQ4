@@ -274,6 +274,8 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     mats += [f'{PREFIX}/classic_bump\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap _white\n}}\n',
              f'{PREFIX}/classic_diffuse\n{{\nbumpmap _flat\ndiffusemap {PREFIX}/grey\nspecularmap _black\n}}\n']
     mats += [f'{PREFIX}/classic_colored\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap {PREFIX}/copper\n}}\n']
+    # REN-02: the classic cutout, a flat-bump diffuse whose stage alpha-tests.
+    mats += [f'{PREFIX}/classic_cutout\n{{\nbumpmap _flat\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\n}}\nspecularmap _black\n}}\n']
     stations: list[dict] = []
     for row, metal in enumerate((0,1)):
         for col, roughness in enumerate((0.045, 0.16, 0.32, 0.5, 0.75, 1.0)):
@@ -372,7 +374,7 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     # checks merely because another green PBR surface is visible behind it.
     level = f'Version 3\n{{\n"classname" "worldspawn"\n"mtr_local_global_test" "{PREFIX}/noself_shadow"\n' + ''.join(brush(lo,hi,f'{PREFIX}/classic_floor') for lo,hi in room) + '}\n'
     precache = f'"model_sampling_test" "{SAMPLING_MODEL}"\n"model_skinning_test" "{SKINNING_MODEL}"\n"def_skinning_test" "func_animate"\n"mtr_classic_rejection_test" "{PREFIX}/classic_specular"\n' + ''.join(f'"mtr_sampling_{name}" "{PREFIX}/sampler_{name}"\n' for name in ('nearest','linear','clamp','mips'))
-    precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored'))
+    precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored','cutout'))
     precache += f'"mtr_extreme_emissive_test" "{PREFIX}/extreme_emissive"\n'
     precache += ''.join(f'"skin_skinning_{name}_test" "{skin}"\n' for name, skin in SKINNING_SKINS.items())
     precache += f'"model_mixed_material_test" "{MIXED_MODEL}"\n'

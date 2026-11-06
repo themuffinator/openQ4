@@ -2507,11 +2507,17 @@ bool R_MaterialResourceTable_ClassicModernPathEligible( const materialResourceTa
 }
 
 bool R_MaterialResourceTable_ClassicDiffusePathEligible( const materialResourceTableRecord_t &record ) {
+	// REN-02: an alpha-tested diffuse stage is the classic cutout. The modern
+	// forward alpha-test shader discards the same texels the ARB2 depth prepass
+	// rejects (the diffuse alpha against the stage's threshold), so it joins the
+	// proven diffuse class; ClassicDiffuseMaterialEligible pins where the test lives.
+	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
+		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
 	if ( record.hasPBR || record.material == NULL || globalImages == NULL
 			|| record.fallbackReason != MATERIAL_RESOURCE_FALLBACK_NONE
-			|| record.materialClass != RENDER_MATERIAL_OPAQUE
-			|| record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE
-			|| record.hasEmissive || record.alphaTest || record.hasTextureMatrix
+			|| ( record.materialClass != RENDER_MATERIAL_OPAQUE && !cutout )
+			|| ( record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE && !cutout )
+			|| record.hasEmissive || ( record.alphaTest && !cutout ) || record.hasTextureMatrix
 			|| record.hasVertexColor || record.hasConditionRegisters
 			|| record.hasCustomProgram || record.hasCustomGLSL
 			|| record.hasMaterialPolygonOffset || record.hasPrivatePolygonOffset ) {
@@ -2548,12 +2554,16 @@ bool R_MaterialResourceTable_ClassicFixedMaterialEligible( const idMaterial *mat
 
 bool R_MaterialResourceTable_ClassicDiffuseMaterialEligible( const idMaterial *material ) {
 	if ( material == NULL || material->HasPBR() || globalImages == NULL
-			|| material->Coverage() != MC_OPAQUE ) { return false; }
+			|| ( material->Coverage() != MC_OPAQUE && material->Coverage() != MC_PERFORATED ) ) { return false; }
+	const bool perforated = material->Coverage() == MC_PERFORATED;
 	int diffuseStages = 0;
 	for ( int i = 0; i < material->GetNumStages(); ++i ) {
 		const shaderStage_t *stage = material->GetStage( i );
 		if ( stage == NULL ) { return false; }
+		// Only the diffuse stage may carry the cutout's alpha test.
+		if ( stage->hasAlphaTest && ( !perforated || stage->lighting != SL_DIFFUSE ) ) { return false; }
 		if ( stage->lighting == SL_DIFFUSE ) {
+			if ( perforated && !stage->hasAlphaTest ) { return false; }
 			diffuseStages++;
 		} else if ( stage->lighting == SL_BUMP ) {
 			if ( stage->texture.image != globalImages->flatNormalMap ) { return false; }
