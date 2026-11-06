@@ -2405,6 +2405,21 @@ completed release material here and publish curated notes in `releases/`.
   and adapter harnesses, and in-game Settings and Load Game captures. Candidate
   player wording is in [baseline refinements](releases/baseline-refinements.md).
 
+## Audio progression audit with fights, 6 November 2026
+
+- [x] AUD-06/07: `openq4_killHostiles` and `audio_scene_audit.py --fight` let the
+  progression audit win the fights scripts wait on; all 42 campaign maps ran
+  (1,967 steps, 989 kills) with no mute leak or untranscribed cue, reaching 86
+  dialogue lines no earlier report had.
+- [x] A full client entity table no longer ends the level with "cannot load
+  collision model" (both game libraries); found on `airdefense2`.
+- [x] The audit now reports a dead player and a map that ends inside its own
+  scene, matches its markers after unterminated script output, and removes
+  failed-objective entities in its disposable session.
+- Evidence and remaining gates (vehicle-teleport deaths in `walker` and
+  `m07_race`, ordered human play, physical devices):
+  [fights in the progression audit](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
+
 ## Audio progression-audit recovery, 26 October 2026
 
 - [x] AUD-06/07: preserve the unfinished progression run's failures and distinguish

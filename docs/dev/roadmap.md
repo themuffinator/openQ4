@@ -3860,8 +3860,8 @@ automatically satisfied by a listening pass.
 | AUD-03 — Partial | Aggregate payload budgets/backpressure, bounded compressed streaming, recycled-source fix and exactly-once low-memory trim implemented; Windows/Linux measurements recorded. | Real mobile OS low-memory callbacks, device/provider process-memory budgets, thermal/loading/cancellation behavior and device breadth. |
 | AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio. | Physical surround outputs and real endpoint/layout transitions; preserve positional mix and stock zero-rolloff behavior. |
 | AUD-05 — Partial | Consent/PTT/capture pipeline, codec/transport/moderation and bounded playback pass multi-process Windows/Linux and clock/loss tests. | Physical microphone/capture hotplug, independent-machine clocks and OS/device breadth. Existing 1:59:29 run is not a two-hour pass; cancelled rerun is not silently reinstated. |
-| AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit and extensive scripted-scene mute/save checks exist. | Ordered movement/combat-dependent scenes and physical listening/device checks; retain effects/music separation. |
-| AUD-07 — Partial | Playback-driven captions, fallback/mapping policy, portrait overlap and real save/load checks implemented. | Missing transcripts remain explicit; full gameplay-order/locale corpus and physical stereo-HUD readability. Available mappings do not mean every line is captioned. |
+| AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit, extensive scripted-scene mute/save checks and a 42-map progression sweep with fights (989 kills, no mute leak) exist. | Ordered human play past the two vehicle maps teleports cannot drive, and physical listening/device checks; retain effects/music separation. |
+| AUD-07 — Partial | Playback-driven captions, fallback/mapping policy, portrait overlap, real save/load checks and the fight-gated scene corpus (1,544 distinct lines across retained reports, no untranscribed cue) implemented. | Missing transcripts remain explicit; ordered human play and physical stereo-HUD readability. Installed transcripts are English only. Available mappings do not mean every line is captioned. |
 
 ### AUD task evidence and acceptance
 
@@ -4153,6 +4153,17 @@ automatically satisfied by a listening pass.
   as failures. Attempts and missing entities remain explicit; these probes do not
   replace an ordered playthrough or physical listening.
   [Progression-audit evidence](audio-voice-evidence.md#progression-audit-recovery-26-october-2026).
+  November 6: the progression audit now fights. `openq4_killHostiles` kills the AI
+  fighting the player through ordinary damage halfway through each step, so the
+  conversations scripts hold until a fight is won run too. All 42 maps ran
+  (1,967 steps, 989 kills): 1,405 dialogue starts, no mute leak in 2,681 muted
+  probes, effects continuing, and 86 lines no earlier report reached. The sweep
+  found a level-ending defect inherited from the SDK, now fixed: a full client
+  entity table turned a refused debris piece into a fatal "cannot load collision
+  model" error (`airdefense2`'s second trench). Teleporting a vehicle driver kills
+  the player in `walker` and `m07_race`, so their later steps remain uncovered.
+  This is still not an ordered playthrough; physical devices remain open.
+  [Fight evidence](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
 - [ ] **AUD-07 — P1, decision, implementation and qualification: dialogue subtitles.**
   Address [#186](https://github.com/themuffinator/openQ4/issues/186) with UI-02/UI-04.
   Inventory dialogue-to-text/localization data available from installed assets and
@@ -4213,6 +4224,15 @@ automatically satisfied by a listening pass.
   Interrupted map chains are not accepted as full scene coverage. Complete
   gameplay-order coverage and physical stereo-HUD placement remain open.
   [Progression-audit evidence](audio-voice-evidence.md#progression-audit-recovery-26-october-2026).
+  November 6: with fights, the 42-map progression sweep starts 984 distinct
+  dialogue lines (672 transcribed); every cue shown had a transcript. Two
+  transcribed lines were heard without a cue, both at their very end: one voice
+  already stopped, one 4.06 s into a 4.32 s line whose cue had ended with its
+  logical playback. Across every retained
+  report the corpus is now 1,544 distinct lines (954 stock, 590 Awakening). The
+  installed game has English transcripts only, which the player guide states;
+  ordered human play and physical stereo-HUD placement remain open.
+  [Fight evidence](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
 
 ## Desktop platforms and packaging
 

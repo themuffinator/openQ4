@@ -2109,6 +2109,81 @@ void Cmd_OpenQ4LaunchTestProjectile_f( const idCmdArgs &args ) {
 
 /*
 ==================
+Cmd_OpenQ4KillHostiles_f
+
+openq4_killHostiles [all]
+
+Kills every living, visible AI on another team than the player that is
+fighting (has an enemy), as if the player had won the fight: the damage comes
+from the player through the ordinary damage path, so death animations, death
+targets and the scripts that wait on those deaths run as they do in play.
+"all" also takes hostiles that have not engaged yet. AI that cannot take damage
+or are scripted not to die are left alone and counted. For headless campaign
+progression tests; prints one line per AI and a summary.
+==================
+*/
+void Cmd_OpenQ4KillHostiles_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	const bool all = args.Argc() > 1 && !idStr::Icmp( args.Argv( 1 ), "all" );
+	const char *damageDefName = "damage_suicide";
+	if ( !gameLocal.FindEntityDefDict( damageDefName, false ) ) {
+		gameLocal.Printf( "openq4_killHostiles: damage def '%s' not found\n", damageDefName );
+		return;
+	}
+
+	// Collect first: deaths spawn and remove entities (gibs, drops, effects).
+	idList< idEntityPtr<idEntity> > targets;
+	int protectedCount = 0;
+	for ( idEntity *ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
+		if ( !ent->IsType( idAI::GetClassType() ) ) {
+			continue;
+		}
+		idAI *ai = static_cast<idAI *>( ent );
+		if ( ai->health <= 0 || ai->aifl.dead || ai->IsHidden() || ai->team == player->team ) {
+			continue;
+		}
+		if ( !all && ai->GetEnemy() == NULL ) {
+			continue;
+		}
+		if ( !ai->fl.takedamage || ai->aifl.undying ) {
+			gameLocal.Printf( "KILL_HOSTILE name=%s class=%s result=protected\n", ai->GetName(), ai->spawnArgs.GetString( "classname" ) );
+			protectedCount++;
+			continue;
+		}
+		idEntityPtr<idEntity> &target = targets.Alloc();
+		target = ai;
+	}
+
+	int killed = 0;
+	int survived = 0;
+	for ( int i = 0; i < targets.Num(); i++ ) {
+		idEntity *ent = targets[ i ].GetEntity();
+		if ( ent == NULL ) {
+			continue;
+		}
+		idAI *ai = static_cast<idAI *>( ent );
+		idVec3 dir = ai->GetPhysics()->GetOrigin() - player->GetPhysics()->GetOrigin();
+		if ( dir.Normalize() == 0.0f ) {
+			dir.Set( 0.0f, 0.0f, 1.0f );
+		}
+		ai->Damage( player, player, dir, damageDefName, 1.0f, INVALID_JOINT );
+		const bool dead = targets[ i ].GetEntity() == NULL || ai->health <= 0 || ai->aifl.dead;
+		gameLocal.Printf( "KILL_HOSTILE name=%s class=%s result=%s\n", ai->GetName(), ai->spawnArgs.GetString( "classname" ),
+			dead ? "killed" : "survived" );
+		if ( dead ) {
+			killed++;
+		} else {
+			survived++;
+		}
+	}
+	gameLocal.Printf( "KILL_HOSTILES killed=%d survived=%d protected=%d\n", killed, survived, protectedCount );
+}
+
+/*
+==================
 Cmd_Damage_f
 
 Damages the specified entity, with damage_moverCrush (1 point) unless a
@@ -4699,6 +4774,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "spawn",					Cmd_Spawn_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"spawns a game entity", idCmdSystem::ArgCompletion_Decl<DECL_ENTITYDEF> );
 	cmdSystem->AddCommand( "damage",				Cmd_Damage_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"apply damage to an entity", idGameLocal::ArgCompletion_EntityName );
 	cmdSystem->AddCommand( "openq4_launchTestProjectile", Cmd_OpenQ4LaunchTestProjectile_f, CMD_FL_GAME|CMD_FL_CHEAT, "launch a projectile from the player's eye at an entity, for headless tests" );
+	cmdSystem->AddCommand( "openq4_killHostiles",	Cmd_OpenQ4KillHostiles_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"kills the AI fighting the player through ordinary damage, for headless progression tests" );
 	cmdSystem->AddCommand( "openq4_testInput",	Cmd_OpenQ4TestInput_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"holds buttons and movement on the local player for headless tests" );
 	cmdSystem->AddCommand( "openq4_viewReport",	Cmd_OpenQ4ViewReport_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"prints the local player's view, field of view and god mode for headless tests" );
 	cmdSystem->AddCommand( "remove",				Cmd_Remove_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"removes an entity", idGameLocal::ArgCompletion_EntityName );

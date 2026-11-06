@@ -415,6 +415,12 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- A level can no longer end with "cannot load collision model" during heavy
+  effects. When a burst of effects filled the game's table of client-side
+  effects and debris, a piece of debris that did not fit stopped the level
+  with a fatal error; the second trench battle in Air Defense Trenches could
+  trigger it. The piece is now skipped. This affects single-player and
+  multiplayer game modules; replace both.
 - On Linux, a long single-player session no longer grows the game's memory use
   with every level change. Memory the game had already freed stayed reserved,
   about 60 MB per level, so a session that visited many levels could use

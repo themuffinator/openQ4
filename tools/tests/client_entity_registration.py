@@ -78,9 +78,33 @@ def source(mode):
     text=(ROOT/'src'/mode/'Game_local.cpp').read_text()
     return SUPPORT+'\n'.join(function_body(text,'void idGameLocal::'+name+'(') for name in ('RegisterClientEntity','UnregisterClientEntity'))+'\n'+MAIN
 
+def refusal_contract(mode):
+    """A refused registration (full table) must not end the level.
+
+    The refusal skips the spawn-arg transfer, so a refused moveable has no model;
+    its Spawn used to raise "cannot load collision model" and drop the map. It
+    now returns before reading spawn args, and SpawnClientEntityDef reports the
+    refusal before handing the half-spawned object to its caller.
+    """
+    moveable=function_body((ROOT/'src'/mode/'client'/'ClientMoveable.cpp').read_text(encoding='latin-1'),
+                           'void rvClientMoveable::Spawn ( void ) {')
+    guard=moveable.find('if ( entityNumber == -1 ) {')
+    if guard<0 or not guard<moveable.find('ParseSpawnArgsToRenderEntity')<moveable.find('gameLocal.Error'):
+        raise AssertionError(f'{mode}: rvClientMoveable::Spawn must return for a refused registration before using spawn args')
+    spawn=function_body((ROOT/'src'/mode/'Game_local.cpp').read_text(encoding='latin-1'),
+                        'bool idGameLocal::SpawnClientEntityDef(')
+    called=spawn.find('obj->CallSpawn();')
+    refused=spawn.find('->entityNumber == -1', called)
+    handed=spawn.find('*cent = static_cast<rvClientEntity*>(obj);', called)
+    if not 0<=called<refused<handed or 'return false;' not in spawn[refused:handed]:
+        raise AssertionError(f'{mode}: SpawnClientEntityDef must report a refused client entity instead of returning it')
+
 def main():
     if len(sys.argv)==4 and sys.argv[1]=='--generate-native':
         Path(sys.argv[3]).write_text(source(sys.argv[2]),encoding='utf-8'); return 0
+    for mode in ('game','mpgame'):
+        refusal_contract(mode)
+    print('client registration: refused spawns are dropped, not fatal (game, mpgame)')
     compiler=next((path for name in ('clang++','g++','c++') if (path:=shutil.which(name))),None)
     if not compiler: raise RuntimeError('C++17 compiler required')
     failures=0
