@@ -176,3 +176,35 @@ ASan run caught signed overflow in the new hash keys, now unsigned). Thirty
 seeded mutations of `core2.aas32`'s tactical sections, loaded by the dedicated
 server, were each accepted, dropped with a warning or rejected, and every run
 exited normally; see [AAS compiler](aas-compiler.md#loading-and-malformed-data).
+
+## AddressSanitizer gameplay, 6 November 2026
+
+A plain `-Db_sanitize=address` MSVC build links the engine but not the game
+modules: the linker cannot infer the sanitizer runtime for DLLs made of static
+libraries (LNK1394, with `/MT` and with `/MD`). This configuration links all of
+them:
+
+```
+tools/build/meson_setup.ps1 setup <dir> <source> --buildtype=debugoptimized
+  --wrap-mode=forcefallback -Db_sanitize=address -Db_vscrt=md
+  "-Dcpp_link_args=['/INFERASANLIBS:NO','clang_rt.asan_dynamic-x86_64.lib','clang_rt.asan_dynamic_runtime_thunk-x86_64.lib']"
+  "-Dc_link_args=[...same...]"
+```
+
+Run it with the MSVC `bin\Hostx64\x64` directory, which holds
+`clang_rt.asan_dynamic-x86_64.dll`, on `PATH`. `ASAN_OPTIONS=log_path=` must be
+relative: the colon in a drive letter is an option separator.
+
+Every run below finished with no AddressSanitizer report, against the installed
+retail packages:
+
+| Run | Result |
+|---|---|
+| Dedicated server, `mp/q4dm1`-`q4dm8` twice | 16/16 loads, exit 0, `jobsShutdown PASS` |
+| SP client, rebuilt #209 `airdefense1`, eight tactical AI fighting a god-mode player for 12 s | Loaded, AI took cover and fired, normal shutdown |
+| `dmap game/hub2`, and the supplied #209 `airdefense1` (22 minutes under ASan) | Exit 0, all outputs written |
+| `runAASTactical` on `core2` and `convoy2b` (retail collision decoding) | Exit 0 |
+| The four malformed `core2.aas32` fixtures and 30 seeded tactical-section mutations | Each accepted, dropped or rejected; exit 0 |
+
+This is Windows ASan only; a Linux ASan+UBSan gameplay build was not run,
+because it needs more free space on the system drive than the machine had.

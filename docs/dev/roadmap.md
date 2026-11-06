@@ -62,7 +62,7 @@ exact; the estimate column is deliberately approximate.
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
-| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **45%** | 0 / 6 | Final-package lifecycle, measured loading/background work, parser and compiler coverage. |
+| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **95%** | 5 / 6 | Final-package and Linux/macOS map-tour lifecycle (CORE-01). |
 | [Developer map tools](#tool-completion-checkpoints) — TOOL | **20%** | 0 / 4 | Paused: production geometry authoring, build/play integration and reliability. |
 | [Release qualification](#release-qualification-and-completion-rules) — REL | **35%** | 0 / 4 | Exact package matrix, human/device evidence, lifecycle and promotion records. |
 | [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
@@ -4284,17 +4284,17 @@ visual editor have their own active items.
 
 ### CORE completion checkpoints
 
-**Estimate: 90%; 4/6 tasks closed.** CORE-02 (not promoted), CORE-03, CORE-05 and
-CORE-06 are closed. The remaining work is qualification that needs clean final packages,
-other platforms or sanitizer gameplay; the map-editor pause does not pause these
-engine fixes.
+**Estimate: 95%; 5/6 tasks closed.** CORE-02 (not promoted), CORE-03, CORE-04,
+CORE-05 and CORE-06 are closed. CORE-01 needs its tours repeated on clean final
+packages and on Linux/macOS; the map-editor pause does not pause these engine
+fixes.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | CORE-01 — Partial | GUI precache, expression-storage, coordinates and hit-map fixes; 6 November Windows development-build map tours: dedicated 24-load tours with jobs on and off and SP client tours plateau, and every run shuts down cleanly. | Repeat on clean final packages and on Linux/macOS. |
 | CORE-02 — Closed: not promoted | Current-build cold/warm tours, corrupt-cache fallback, bounded staging and map-change generations measured; the opt-in cache is slower cold (40%) and warm (7-14%), so it stays off. | — |
 | CORE-03 — Closed | SP load profiled: remaining main-thread image decode is under 5% of the load, not worth moving; dedicated servers no longer read and discard every level image prefetch (media finish 8.5 s to 1.5 s over 24 loads). | — |
-| CORE-04 — Partial | Strict strings; SDL and content-pack configure warnings fixed and RmlUi's not reproduced; pre-cache/missing-image diagnostics reviewed (genuine retail data); dedicated program-path log fix; collision contents decoding fixed; T-junction ASan/UBSan equivalence fixture; tactical-parser fuzzing. | Sanitizer gameplay: MSVC ASan cannot link the game modules (LNK1394), and a Linux ASan build needs disk the machine lacks. |
+| CORE-04 — Closed | Strict strings; configure warnings fixed (RmlUi's not reproduced); diagnostics reviewed; collision contents decoding fixed; MSVC ASan gameplay (dedicated tour, SP combat, compilers, malformed and fuzzed AAS data) with no report; T-junction ASan/UBSan fixture. | — |
 | CORE-05 — Closed | `hub2` sliver and silhouette repairs; #209's maps profiled and compiling in minutes with byte-identical output; collision contents decoded as retail; rebuilt maps load, render and navigate (AI take cover) in SP with compile memory recorded. | — |
 | CORE-06 — Closed | Tactical features generated as Quake 4 does (98.8% of 7,422 retail features reproduced exactly); `runAASTactical`; rebuilt `airdefense1` AI takes cover as on retail data; malformed data dropped or rejected, fuzzed. | — |
 
@@ -4347,7 +4347,7 @@ engine fixes.
   servers reading and discarding every prefetched level image; only a running
   renderer now prefetches, which cut media finish from 8.5 s to 1.5 s over 24
   dedicated loads.
-- [ ] **CORE-04 — P2, implementation and qualification: compiler and safety debt.**
+- [x] **CORE-04 — P2, implementation and qualification: compiler and safety debt.**
   Strict-string compliance is done (31 October): the sources are const-correct
   and `/Zc:strictStrings-` is removed, so MSVC enforces it. Broaden sanitizer
   gameplay and focused fuzzing for remaining parsers, event normalization and
@@ -4372,10 +4372,13 @@ engine fixes.
   [collision contents names](dmap-compilation.md#collision-contents-names-6-november-2026).
   New coverage: the T-junction fixture checks the indexed hash against the
   original bin scans under Clang ASan+UBSan and MSVC, and 30 seeded mutations of
-  AAS tactical sections load safely. Remaining: sanitizer gameplay. An MSVC
-  `b_sanitize=address` build links the engine but not the game modules
-  (LNK1394 with `/MT` and `/MD`), and a Linux ASan build needs more free disk
-  than the machine had.
+  AAS tactical sections load safely. Closed with
+  [AddressSanitizer gameplay](core-runtime-refinements.md#addresssanitizer-gameplay-6-november-2026):
+  with `/INFERASANLIBS:NO` and explicit `/MD` runtime libraries an MSVC ASan
+  build links every module. A dedicated 16-load tour, SP combat on the rebuilt
+  #209 map, `dmap` of `hub2` and the #209 map, tactical generation, and all
+  malformed and fuzzed AAS inputs ran with no report. Linux ASan gameplay was
+  not run (system-drive space).
 - [x] **CORE-05 — P1, implementation and qualification: safe compiled geometry.**
   The historical `hub2` 36,635,340-index failure is repaired, not an outstanding
   request to raise the 16,777,216-index safety bound or redesign the surface format.

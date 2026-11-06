@@ -31,7 +31,9 @@ See [player release status](../user/release-status.md).
   prefetch (media finish 8.5 s to 1.5 s over 24 stock MP loads). The opt-in
   level-load cache was re-measured and stays off.
 - CORE-01/04: Windows map-cycle tours with jobs on and off plateau and shut down
-  cleanly; fresh configures print no Meson warning.
+  cleanly; fresh configures print no Meson warning; an MSVC AddressSanitizer
+  build ran dedicated and SP gameplay, both compilers and the AAS fuzz cases
+  with no report.
 
 ## Smaller downloads and updates, 6 November 2026
 
