@@ -1847,6 +1847,9 @@ if build_engine or build_games
   # tools/build/content_packs.json lists the runtime packs; each gets a source
   # manifest target and a pack target, and the generated header embeds every
   # pack's digest into the engine.
+  # Reading the table through fs makes Meson reconfigure when it changes, so an
+  # overlay added or removed there gains or loses its target.
+  fs_mod.read('tools/build/content_packs.json')
   openq4_content_pack_table = run_command(
     py,
     meson.project_source_root() / 'tools' / 'build' / 'content_packs.py',
