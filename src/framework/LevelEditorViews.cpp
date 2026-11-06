@@ -36,10 +36,26 @@ OrthoFrame Frame( int mode, const ViewState &view, float width, float height ) {
 
 namespace {
 
+struct RecordedBatch {
+	idVec4 color;
+	std::vector<idDrawVert> verts;
+	std::vector<glIndex_t> indexes;
+};
+
+void Replay( const std::vector<RecordedBatch> &batches ) {
+	const idMaterial *material = declManager->FindMaterial( "gfx/guis/white" );
+	for ( const auto &batch : batches ) {
+		renderSystem->SetColor( batch.color );
+		renderSystem->DrawStretchPic( batch.verts.data(), batch.indexes.data(), static_cast<int>( batch.verts.size() ),
+			static_cast<int>( batch.indexes.size() ), material, false );
+	}
+}
+
 // Thin lines batched as quads in device-context space, one batch per colour.
+// With a recording, batches are kept for replay instead of drawn.
 class LineBatch {
 public:
-	LineBatch( idDeviceContext *context, const idRectangle &clip ) : dc( context ), rect( clip ) {
+	LineBatch( idDeviceContext *context, const idRectangle &clip, std::vector<RecordedBatch> *record = nullptr ) : dc( context ), rect( clip ), recording( record ) {
 		float x = 0, y = 0, w = 1, h = 1;
 		dc->AdjustCoords( &x, &y, &w, &h );
 		offsetX = x; offsetY = y; scaleX = w; scaleY = h;
@@ -87,6 +103,11 @@ public:
 	}
 	void Flush() {
 		if ( verts.empty() ) { return; }
+		if ( recording ) {
+			recording->push_back( { color, std::move( verts ), std::move( indexes ) } );
+			verts.clear(); indexes.clear();
+			return;
+		}
 		renderSystem->SetColor( color );
 		renderSystem->DrawStretchPic( verts.data(), indexes.data(), static_cast<int>( verts.size() ), static_cast<int>( indexes.size() ), material, false );
 		verts.clear(); indexes.clear();
@@ -96,6 +117,7 @@ public:
 private:
 	idDeviceContext *dc;
 	idRectangle rect;
+	std::vector<RecordedBatch> *recording;
 	const idMaterial *material = nullptr;
 	float offsetX = 0, offsetY = 0, scaleX = 1, scaleY = 1, halfWidth = 0.5f;
 	idVec4 color = colorWhite;
@@ -104,6 +126,30 @@ private:
 };
 
 const char *Text( const char *key ) { return common->GetLanguageDict()->GetString( key ); }
+
+// A view's grid and wireframe are rebuilt only when something they show
+// changes: the document, selection, layers, camera, grid or view size.
+struct OrthoCache {
+	std::uint64_t key = 0;
+	bool valid = false;
+	std::vector<RecordedBatch> batches;
+	DrawStats stats;
+};
+OrthoCache orthoCaches[4];
+
+class KeyHash {
+public:
+	template<typename T> KeyHash &Add( const T &value ) {
+		const unsigned char *bytes = reinterpret_cast<const unsigned char *>( &value );
+		for ( std::size_t i = 0; i < sizeof( T ); ++i ) { hash = ( hash ^ bytes[i] ) * 1099511628211ULL; }
+		return *this;
+	}
+	KeyHash &Add( const std::string &text ) {
+		for ( const unsigned char c : text ) { hash = ( hash ^ c ) * 1099511628211ULL; }
+		return Add( text.size() );
+	}
+	std::uint64_t hash = 1469598103934665603ULL;
+};
 
 }
 
@@ -118,9 +164,29 @@ DrawStats DrawOrtho( idDeviceContext *dc, const idRectangle &rect, int mode, idL
 	dc->DrawFilledRect( rect.x, rect.y, rect.w, rect.h, idVec4( 0.035f, 0.045f, 0.03f, 1.0f ) );
 	const OrthoFrame frame = Frame( mode, session.view, rect.w, rect.h );
 	const auto screen = [&]( const Vec3 &p, float &x, float &y ) { frame.ToScreen( p, x, y ); x += rect.x; y += rect.y; };
+	const MapGeometryCache &geometry = session.Geometry();
+	const MapDocument &document = session.Document();
+	float ax = 0, ay = 0, aw = 1, ah = 1;
+	dc->AdjustCoords( &ax, &ay, &aw, &ah );
+	KeyHash key;
+	key.Add( mode ).Add( rect.x ).Add( rect.y ).Add( rect.w ).Add( rect.h ).Add( ax ).Add( ay ).Add( aw ).Add( ah )
+		.Add( engineWindowState.vidWidth ).Add( engineWindowState.vidHeight ).Add( frame.center.x ).Add( frame.center.y ).Add( frame.center.z )
+		.Add( frame.scale ).Add( session.view.grid ).Add( document.Revision() ).Add( session.Workspace().Path() ).Add( geometry.Primitives() );
+	for ( const auto &item : session.selection ) { key.Add( item.entity ).Add( item.primitive ); }
+	for ( const auto &layer : session.view.hiddenLayers ) { key.Add( layer ); }
+	OrthoCache &cache = orthoCaches[mode & 3];
+	if ( cache.valid && cache.key == key.hash ) {
+		Replay( cache.batches );
+		stats = cache.stats;
+	} else {
+		cache.batches.clear();
+		cache.valid = false;
+	}
+	std::vector<RecordedBatch> *record = cache.valid ? nullptr : &cache.batches;
+	if ( record ) {
 	{
 		// Grid: at least 6 px apart; every eighth line brighter; world axes.
-		LineBatch grid( dc, rect );
+		LineBatch grid( dc, rect, record );
 		double spacing = session.view.grid > 0 ? session.view.grid : 8;
 		while ( spacing / frame.scale < 6 && spacing < 1e6 ) { spacing *= 8; }
 		const Vec3 lo = frame.ToWorld( 0, 1 ), hi = frame.ToWorld( 1, 0 );
@@ -146,14 +212,12 @@ DrawStats DrawOrtho( idDeviceContext *dc, const idRectangle &rect, int mode, idL
 		screen( frame.up * -1e7, x0, y0 ); screen( frame.up * 1e7, x1, y1 ); grid.Line( x0, y0, x1, y1 );
 		stats.lines += grid.lines;
 	}
-	const MapGeometryCache &geometry = session.Geometry();
-	const MapDocument &document = session.Document();
 	const EntityId world = document.Entities().empty() ? 0 : document.Entities().front().id;
 	const idVec4 colours[] = { idVec4( 0.62f, 0.66f, 0.55f, 1 ), idVec4( 0.35f, 0.62f, 0.9f, 1 ), idVec4( 0.85f, 0.78f, 0.35f, 1 ), idVec4( 1.0f, 0.55f, 0.05f, 1 ) };
 	const std::size_t lineBudget = 300000;
 	for ( int pass = 0; pass < 4; ++pass ) {
 		// 0 world, 1 entities, 2 patches, 3 selection (drawn last, on top)
-		LineBatch batch( dc, rect );
+		LineBatch batch( dc, rect, record );
 		batch.Begin( colours[pass] );
 		for ( const Entity &entityRef : document.Entities() ) {
 			const Entity *entity = &entityRef;
@@ -205,6 +269,11 @@ DrawStats DrawOrtho( idDeviceContext *dc, const idRectangle &rect, int mode, idL
 			}
 		}
 		stats.lines += batch.lines;
+	}
+		cache.key = key.hash;
+		cache.valid = true;
+		cache.stats = stats;
+		Replay( cache.batches );
 	}
 	if ( overlay.rubber ) {
 		LineBatch rubber( dc, rect );
