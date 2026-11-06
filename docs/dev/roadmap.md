@@ -869,7 +869,7 @@ diagnostics establish whole-frame ownership or production performance.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | REN-01 — Partial | Shared classic GUI/world/interaction/fog/deform/subview/post domains have scoped implementations and contracts. | Qualify each on fresh GL/Vulkan packages: executed ownership, matching appearance, zero-commit rollback, human review and platform breadth. |
-| REN-02 — Partial | Shared material/light contracts and corridors provide foundations. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
+| REN-02 — Partial | Shared material/light contracts and corridors provide foundations; the remaining decline reasons are inventoried. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
 | REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). | Physical platforms. |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. | lavapipe residual, mods authored outside the laboratory, physical Linux/Apple fallback. |
@@ -893,6 +893,17 @@ diagnostics establish whole-frame ownership or production performance.
   composition before changing parity masks, auto-promotion or core-profile defaults.
   Require meaningful visible lighting, complete stock fallback and measured CPU/GPU
   benefit. Diagnostic readiness is not proof that the new executor owns gameplay.
+  Progress, 6 November: the inventory is written
+  ([modern lit-frame inventory](modern-lit-frame-inventory.md)). No lighting
+  domain is proven by default, so every lit stock frame declines to ARB2,
+  usually as `lighting-parity-unproven`. The only per-material proof covers
+  PBR and two narrow classic classes, and every modern-path corridor runs only
+  in a laboratory mode (`r_pbrLinearScene`). The aggregate executor and the
+  REN-01 shared domains are still mutually exclusive.
+  Remaining, in order: prove interaction parity for the dominant stock
+  material shapes, qualify ambient lights, run the corridors in shipped modes,
+  represent stencil-fallback and multiple point shadows, reconcile the two
+  ownership models, then measure benefit before any promotion.
 - [ ] **REN-03 — P1, qualification and implementation: shadow production scope.**
   Qualify point/projected/CSM, stencil/map hybrids, moments, movers, near emitters,
   dynamic/cutout/custom receivers and constrained budgets through full scenes and
