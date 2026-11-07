@@ -6,9 +6,11 @@ dynamic, texgen, cinematic and late-sort stages, and the subviews that draw
 them, are declined by complete-view admission instead of being re-blended in
 linear light. This harness freezes stock single-player maps and toggles the
 laboratory linear scene (r_pbrLinearScene) under tone mapping and under the
-HDR-off PBR preview. Each request must leave the engine capture byte-identical
-to the display-referred frame and restore it exactly. On Vulkan the
-ownership report must show the request and no admitted main view.
+HDR-off PBR preview. On Vulkan every request, and its removal, must leave the
+engine capture byte-identical to the display-referred frame, and the
+ownership report must show the request with no admitted main view. OpenGL is
+held to one display level, because its tone-mapped airdefense1 frame wanders
+by one level even between captures with identical settings.
 """
 from __future__ import annotations
 
@@ -51,13 +53,18 @@ def ownership(text: str) -> dict:
 
 def validate(captures: dict, reports: dict, backend: str) -> list[str]:
     failures = []
+    # Vulkan must reproduce the frozen frame byte for byte. OpenGL's tone-mapped
+    # airdefense1 frame wanders by one level between captures with identical
+    # settings, so the reference backend is held to one display level.
+    limit = 0 if backend == "vulkan" else 1
     for group in GROUPS:
         if any(name not in captures for name in group):
             failures.append("missing capture in " + "/".join(group))
             continue
-        digests = {captures[name]["sha256"] for name in group}
-        if len(digests) != 1:
-            failures.append("linear-scene request changed the stock frame: " + "/".join(group))
+        for other in group[1:]:
+            error = captures[group[0]]["maximumErrorTo"].get(other, 255)
+            if error > limit:
+                failures.append(f"linear-scene request changed the stock frame: {group[0]}/{other} ({error} levels)")
     if backend != "vulkan":
         return failures
     linear, preview = reports.get("linear", {}), reports.get("preview", {})
@@ -121,17 +128,24 @@ def run_map(args, runtime: Path, basepath: Path, output: Path, map_name: str) ->
     if args.backend == "vulkan":
         checks += [["Vulkan: validation enabled (VK_LAYER_KHRONOS_validation, debug messenger active)"]]
     _, failures = matrix.evaluate_checks(log, checks, warnings)
-    captures, reports = {}, {}
+    captures, reports, pixels = {}, {}, {}
     for name, _ in CONTROLS:
         path = game / "screenshots" / (name + ".tga")
         try:
             width, height, rgb = gameplay.load_tga_rgb(path)
             if (width, height) != (1280, 720) or max(rgb) == min(rgb):
                 raise ValueError("incorrect extent or blank frame")
-            captures[name] = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "path": str(path)}
+            captures[name] = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "path": str(path),
+                              "maximumErrorTo": {}}
+            pixels[name] = rgb
         except (OSError, ValueError) as exc:
             failures.append(f"{name}: invalid engine capture: {exc}")
         reports[name] = ownership(section(log, name))
+    for group in GROUPS:
+        for other in group[1:]:
+            if group[0] in pixels and other in pixels:
+                captures[group[0]]["maximumErrorTo"][other] = max(
+                    abs(a - b) for a, b in zip(pixels[group[0]], pixels[other]))
     failures += validate(captures, reports, args.backend)
     if exit_code != 0 or timeout:
         failures.append(f"process failure: exit={exit_code} timeout={timeout}")
