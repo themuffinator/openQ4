@@ -337,6 +337,16 @@
 	"#str_41573"	"Oto Takip: Kapalı"
 	"#str_41574"	"Oto Takip: Katil"
 	"#str_41575"	"Oto Takip: Aksiyon"
+	"#str_41576"	"Kampanya demosu"
+	"#str_41577"	"Başka kampanya"
+	"#str_41578"	"%s içinde kaydedildi. Oynatmak için kampanyayı değiştirin."
+	"#str_41579"	"Kesintiye uğrayan kayıt"
+	"#str_41580"	"Son tam kareye kadar oynatılır"
+	"#str_41581"	"Kayıt sürüyor"
+	"#str_41582"	"Bölümler: %d"
+	"#str_41583"	"Bölüm"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Arena campaign
 	"#str_42000"	"TEK OYUNCULU"

@@ -21,7 +21,7 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 6 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **31 / 115 (27.0%)** | **84 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-08, not partial substeps. |
+| Formally closed roadmap tasks | **31 / 116 (26.7%)** | **85 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, not partial substeps. |
 | Estimated category progress | **18 categories: 3 at 100%, 13 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -55,7 +55,7 @@ exact; the estimate column is deliberately approximate.
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **55%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, editable layouts and Quest. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
-| [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 8 | Full playthroughs, effect parity, broader restore graphs and platform/save evidence. |
+| [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **0%** | 0 / 6 | Measured baseline, enhanced solvers, behavior preservation and integration. |
 | [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 9 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
@@ -2340,7 +2340,7 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
 
 ### Q4 completion checkpoints
 
-**Estimate: 75%; 1/8 tasks closed.** Campaign entry/transition and targeted-state
+**Estimate: 75%; 1/9 tasks closed.** Campaign entry/transition and targeted-state
 probes are useful but do not establish full playthroughs. Portable v5 saves now
 exist; their optional scope and platform gates remain separate from restoring
 historical saves and recovering safely from damage.
@@ -2355,6 +2355,7 @@ historical saves and recovering safely from damage.
 | Q4-06 — Partial; optional P3 | Raw inventory and field codecs restored; v5 portable stamp/encoding implemented; Windows/Linux bidirectional stock/Awakening cross-loads pass. | Confirm outstanding CI/Apple codec runs; macOS and another ARM64 runtime cross-load/resave directions; publish player migration guidance with accepted scope. |
 | Q4-07 — Partial | Original-writer Windows corpus substantially qualified; v2 stamp reporting repaired; exact HiDef fixture investigated. | Resolve #123 against the reporter's actual GUI/content; other ABIs; recover/reproduce absent stage-two artifacts before claiming independently reviewable acceptance. |
 | Q4-08 — Partial | Durable commit/recovery implemented; 56 process-interruption points, locked-file failure and NTFS/ext4/WSL 9p checks recorded. | APFS result, removable/network filesystems and actual power-cut behavior; retain measured CRC/sync costs and last-valid-save preservation. |
+| Q4-09 — Partial | Render demo v11: one recording spans levels, save loads, death reloads and restarts as self-contained segments; gameplay-only frames; level loads, continuous timeline and level markers in playback; campaign-aware library and gate; whole retained HUD and in-world screens recorded. Windows checks pass with stock and Awakening content: GL recording, GL and Vulkan playback. | Vulkan recording, Linux and macOS, a long multi-level session with seek timing and file size, joint-data compression, the masked retained HUD groups that replay unmasked, and local sounds already playing at a segment start. |
 
 Completion substeps must keep three forms of evidence distinct:
 
@@ -2946,6 +2947,41 @@ Completion substeps must keep three forms of evidence distinct:
   adds about 1 ms on NTFS and 7 ms on ext4. Remaining: macOS APFS (the new
   native test runs there in CI), removable and network filesystems, and any
   power-cut test.
+- [ ] **Q4-09 — P2, implementation and qualification: campaign demo recording and
+  playback.** A render demo recorded in single-player must survive everything a
+  campaign does between its levels and replay as the player saw it. Acceptance:
+  one recording across level transitions, save loads, death reloads, difficulty
+  restarts and quit-to-menu; recording armed at the title so a campaign records
+  from its first frame; no menu, pause or loading-screen frames; playback that
+  loads each level (with its loading screen), purges the previous level's media,
+  keeps one timeline and offers each level start as a marker; a library entry that
+  names the campaign, first level, level count and duration, refuses a demo from
+  the other campaign before anything is torn down, and marks an interrupted
+  recording as playable to its last complete frame; the HUD and in-world screens
+  as the player saw them. Qualify on OpenGL and Vulkan, Windows and Linux, with
+  stock and Awakening content and a session long enough to measure seek time and
+  file size.
+  Progress, 7 November 2026: render demo v11 implements the format and both ends
+  ([architecture](multiview-demos.md#campaign-render-demos-v11-7-november-2026)).
+  On the staged Windows GL client with stock content, a recording armed at the
+  title spanned airdefense1, a change to airdefense2 and a save load back (3
+  segments, 745 frames) and replayed all 745 frames; a death through the restart
+  menu suspended the recording until the reload; `disconnect` finalized it; a killed
+  recording played to its last complete frame; level markers, cross-level seeks,
+  the library entry and the cross-campaign refusal behaved as specified; and
+  playback frames matched live captures for the HUD values, icons, crosshair and an
+  in-world terminal. Vulkan played the same recordings identically (all 745 frames
+  of the three-level demo; the HUD capture matched). `campaign_demo_contract.py`
+  pins the format and both ends.
+  An Awakening recording across a trench1-to-trench2 transition (406 frames) found
+  that render demos could not replay a local sound (music, narration, interface)
+  at all; the sound reader now resolves that emitter, and the demo played in full
+  and was refused in base Quake 4.
+  Remaining: Vulkan recording, Linux and macOS, a long session with measured seek
+  times (rewinds replay from the start), size work on animated-entity joints
+  (about 0.7–1.4 MB per second on stock levels), the retained HUD's masked
+  groups, which replay without their masks, and local sounds already playing when
+  a segment starts.
 
 ## Rigid-body and ragdoll physics
 

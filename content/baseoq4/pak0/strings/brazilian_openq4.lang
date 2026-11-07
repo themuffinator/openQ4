@@ -337,6 +337,16 @@
 	"#str_41573"	"Seguir Auto: Não"
 	"#str_41574"	"Seguir Auto: Matador"
 	"#str_41575"	"Seguir Auto: Ação"
+	"#str_41576"	"Demo de campanha"
+	"#str_41577"	"Outra campanha"
+	"#str_41578"	"Gravada em %s. Troque de campanha para reproduzi-la."
+	"#str_41579"	"Gravação interrompida"
+	"#str_41580"	"Reproduz até o último quadro completo"
+	"#str_41581"	"Gravação em andamento"
+	"#str_41582"	"Níveis: %d"
+	"#str_41583"	"Nível"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Arena campaign
 	"#str_42000"	"UM JOGADOR"

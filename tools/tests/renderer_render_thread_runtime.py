@@ -161,6 +161,7 @@ struct idRenderWorldLocal {
     void FreeLightDef(int i){Free(lightDefs,i);}
     void FreeEffectDef(int i){Free(effectsDef,i);}
     void FreeDeferredLightDefs(){assert(!R_RenderThread_InFlight());}
+    void FreeDemoGuiSurfaces(int){assert(!R_RenderThread_InFlight());}
 };
 '''
 

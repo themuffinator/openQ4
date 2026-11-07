@@ -537,8 +537,8 @@ def test_render_entity_render_demo_and_module_abi_are_versioned():
     session = read(ROOT / "src" / "framework" / "Session.h")
     require(
         session,
-        "OPENQ4_RENDERDEMO_CURRENT_VERSION = 10",
-        "new render demos must advertise the flat-diffuse payload",
+        "OPENQ4_RENDERDEMO_CURRENT_VERSION = 11",
+        "new render demos must advertise the flat-diffuse payload (v10) and later",
     )
     require(
         session,

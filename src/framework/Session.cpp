@@ -2051,6 +2051,32 @@ static bool Session_GetMapDeclDict( const char *mapPath, const char *entityFilte
 	return false;
 }
 
+/*
+===============
+Session_LevelDisplayName
+===============
+*/
+idStr Session_LevelDisplayName( const char *map, const char *entityFilter ) {
+	idStr mapPath = map != NULL ? map : "";
+	if ( idStr::Icmpn( mapPath.c_str(), "maps/", 5 ) == 0 ) {
+		mapPath = mapPath.c_str() + 5;
+	}
+	mapPath.StripFileExtension();
+	if ( mapPath.IsEmpty() ) {
+		return "";
+	}
+	idDict mapDecl;
+	if ( Session_GetMapDeclDict( mapPath.c_str(), entityFilter != NULL ? entityFilter : "", mapDecl ) ) {
+		const char *name = mapDecl.GetString( "name", "" );
+		if ( name[0] != '\0' ) {
+			return common->GetLanguageDict()->GetString( name );
+		}
+	}
+	idStr shortName = mapPath;
+	shortName.StripPath();
+	return shortName;
+}
+
 #ifndef ID_DEDICATED
 static bool Session_SaveGameMapExists( const idStr &normalizedPath, const idStr &normalizedEntityFilter ) {
 	if ( !Session_IsSafeNormalizedMapPath( normalizedPath ) ) {
@@ -4032,6 +4058,20 @@ void idSessionLocal::Clear() {
 	renderDemoKnownDurationMS = -1;
 	renderDemoSeekTargetMS = 0;
 	renderDemoSeekDeadlineMS = 0;
+	renderDemoRecordState = RENDER_DEMO_RECORD_IDLE;
+	renderDemoRecordFile = NULL;
+	renderDemoRecordPath.Clear();
+	renderDemoRecordFrames = 0;
+	renderDemoRecordStartMsec = 0;
+	renderDemoRecordSegments.Clear();
+	renderDemoNextSegmentReason.Clear();
+	renderDemoFrameClock = false;
+	renderDemoUserCmdHz = 0;
+	renderDemoPlayHeader.Clear();
+	renderDemoPlaySegments.Clear();
+	renderDemoPlaySegment = -1;
+	renderDemoPlayMap.Clear();
+	renderDemoLevelLoadOpen = false;
 
 	syncNextGameFrame = false;
 	syncNextGameFrameAwaitingAsyncTicLog = false;
@@ -4288,6 +4328,12 @@ void idSessionLocal::StopInternal( bool preserveWipe ) {
 		// clear mapSpawned and demo playing flags
 		UnloadMap();
 
+		// Leaving the game ends a campaign recording. One still waiting for its
+		// first level survives, as the title's new game may reload the game module.
+		if ( renderDemoRecordState == RENDER_DEMO_RECORD_SUSPENDED ) {
+			StopRecordingRenderDemo();
+		}
+
 		// disconnect async client
 		idAsyncNetwork::client.DisconnectFromServer();
 
@@ -4330,6 +4376,9 @@ void idSessionLocal::Shutdown() {
 	}
 
 	Stop();
+	if ( IsRenderDemoRecording() ) {
+		StopRecordingRenderDemo();
+	}
 
 	// Sound worlds must be released through soundSystem so the internal
 	// soundWorlds registry is updated before soundSystem shutdown walks it.
@@ -5243,7 +5292,7 @@ idSessionLocal::StartRecordingRenderDemo
 ================
 */
 void idSessionLocal::StartRecordingRenderDemo( const char *demoName ) {
-	if ( writeDemo ) {
+	if ( IsRenderDemoRecording() ) {
 		// allow it to act like a toggle
 		StopRecordingRenderDemo();
 		return;
@@ -5253,44 +5302,144 @@ void idSessionLocal::StartRecordingRenderDemo( const char *demoName ) {
 		common->Printf( "idSessionLocal::StartRecordingRenderDemo: no name specified\n" );
 		return;
 	}
-
-	console->Close();
-
-	writeDemo = new idDemoFile;
-	if ( !writeDemo->OpenForWriting( demoName ) ) {
-		common->Printf( "error opening %s\n", demoName );
-		delete writeDemo;
-		writeDemo = NULL;
+	if ( IsDedicatedServer() ) {
+		common->Printf( "Dedicated servers cannot record render demos.\n" );
+		return;
+	}
+	if ( readDemo != NULL || cmdDemoFile != NULL ) {
+		common->Printf( "Stop demo playback before recording a demo.\n" );
 		return;
 	}
 
-	common->Printf( "recording to %s\n", writeDemo->GetName() );
+	console->Close();
 
-	writeDemo->WriteInt( DS_VERSION );
-	writeDemo->WriteInt( OPENQ4_RENDERDEMO_CURRENT_VERSION );
+	renderDemoRecordPath = demoName;
+	renderDemoRecordFrames = 0;
+	renderDemoRecordStartMsec = Sys_Milliseconds();
+	renderDemoRecordSegments.Clear();
+	renderDemoNextSegmentReason.Clear();
 
-	// if we are in a map already, dump the current state
-	sw->StartWritingDemo( writeDemo );
-	rw->StartWritingDemo( writeDemo );
+	if ( mapSpawned && !insideExecuteMapChange ) {
+		// if we are in a map already, dump the current state
+		BeginRenderDemoSegment( "start" );
+	} else {
+		// From the title or between levels: the next single-player level starts
+		// the recording, so a campaign can be recorded from its first frame. The
+		// file opens with that level, so nothing is left behind if none comes.
+		renderDemoRecordState = RENDER_DEMO_RECORD_ARMED;
+		renderDemoNextSegmentReason = "start";
+		common->Printf( "will record to %s once the next level loads\n", renderDemoRecordPath.c_str() );
+	}
+}
+
+/*
+================
+idSessionLocal::OpenRenderDemoRecordFile
+
+Opens the recording's file with its first level: the stream version and the
+header that tells playback which content to load and how long a frame is.
+================
+*/
+bool idSessionLocal::OpenRenderDemoRecordFile() {
+	renderDemoRecordFile = new idDemoFile;
+	if ( !renderDemoRecordFile->OpenForWriting( renderDemoRecordPath.c_str() ) ) {
+		common->Printf( "error opening %s\n", renderDemoRecordPath.c_str() );
+		delete renderDemoRecordFile;
+		renderDemoRecordFile = NULL;
+		return false;
+	}
+
+	renderDemoRecordFile->WriteInt( DS_VERSION );
+	renderDemoRecordFile->WriteInt( OPENQ4_RENDERDEMO_CURRENT_VERSION );
+
+	// What playback needs to find the right content and keep time across levels.
+	idDict header;
+	header.Set( "game", fileSystem->GetActiveGameDir() );
+	header.Set( "campaign", !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ? "awakening" : "quake4" );
+	header.Set( "mode", idAsyncNetwork::IsActive() ? "multiplayer" : "singleplayer" );
+	header.SetInt( "userCmdHz", common->GetUserCmdHz() );
+	header.SetInt( "skill", cvarSystem->GetCVarInteger( "g_skill" ) );
+	header.Set( "build", ENGINE_VERSION );
+	renderDemoRecordFile->WriteInt( DS_SESSION );
+	renderDemoRecordFile->WriteInt( DSC_HEADER );
+	renderDemoRecordFile->WriteDict( header );
+
+	common->Printf( "recording to %s\n", renderDemoRecordFile->GetName() );
+	return true;
 }
 
 /*
 ================
 idSessionLocal::StopRecordingRenderDemo
+
+Ends a recording cleanly: the stream's DSC_END record, then the raw summary
+the demo library reads. A recording that never reached a level holds no
+frames, so its file is removed instead of left unplayable.
 ================
 */
 void idSessionLocal::StopRecordingRenderDemo() {
-	if ( !writeDemo ) {
+	if ( !IsRenderDemoRecording() ) {
 		common->Printf( "idSessionLocal::StopRecordingRenderDemo: not recording\n" );
 		return;
 	}
-	sw->StopWritingDemo();
-	rw->StopWritingDemo();
-
-	writeDemo->Close();
-	common->Printf( "stopped recording %s.\n", writeDemo->GetName() );
-	delete writeDemo;
+	if ( renderDemoRecordFile == NULL ) {
+		// still armed: no level began, so no file was ever opened
+		common->Printf( "cancelled recording %s before any level loaded.\n", renderDemoRecordPath.c_str() );
+		renderDemoRecordState = RENDER_DEMO_RECORD_IDLE;
+		renderDemoRecordPath.Clear();
+		renderDemoNextSegmentReason.Clear();
+		renderDemoRecordSegments.Clear();
+		renderDemoRecordFrames = 0;
+		return;
+	}
+	if ( renderDemoRecordState == RENDER_DEMO_RECORD_RECORDING ) {
+		sw->StopWritingDemo();
+		rw->StopWritingDemo();
+	}
 	writeDemo = NULL;
+	renderDemoRecordState = RENDER_DEMO_RECORD_IDLE;
+
+	idDemoFile *file = renderDemoRecordFile;
+	renderDemoRecordFile = NULL;
+	const idStr path = renderDemoRecordPath;
+	renderDemoRecordPath.Clear();
+	renderDemoNextSegmentReason.Clear();
+
+	if ( renderDemoRecordSegments.Num() == 0 || renderDemoRecordFrames <= 0 ) {
+		file->Close();
+		delete file;
+		fileSystem->RemoveFile( path.c_str() );
+		renderDemoRecordSegments.Clear();
+		common->Printf( "stopped recording %s: no level was recorded, so the file was removed.\n", path.c_str() );
+		return;
+	}
+
+	idDict end;
+	end.SetInt( "frames", renderDemoRecordFrames );
+	end.SetInt( "segments", renderDemoRecordSegments.Num() );
+	file->WriteInt( DS_SESSION );
+	file->WriteInt( DSC_END );
+	file->WriteDict( end );
+
+	idDict summary;
+	summary.SetInt( "version", OPENQ4_RENDERDEMO_CURRENT_VERSION );
+	summary.SetInt( "frames", renderDemoRecordFrames );
+	summary.SetInt( "userCmdHz", common->GetUserCmdHz() );
+	summary.SetInt( "segments", renderDemoRecordSegments.Num() );
+	summary.Set( "game", fileSystem->GetActiveGameDir() );
+	for ( int i = 0; i < renderDemoRecordSegments.Num(); i++ ) {
+		const renderDemoSegment_t &segment = renderDemoRecordSegments[i];
+		summary.Set( va( "segment%d", i ), va( "%d %s %s %s", segment.startFrame, segment.reason.c_str(),
+			segment.map.c_str(), segment.entityFilter.IsEmpty() ? "-" : segment.entityFilter.c_str() ) );
+	}
+	const bool summarized = file->CloseWithTrailer( summary );
+	delete file;
+	common->Printf( "stopped recording %s: %d frames, %d s over %d segment%s%s.\n", path.c_str(),
+		renderDemoRecordFrames, Session_RenderDemoFramesToMS( renderDemoRecordFrames, common->GetUserCmdHz() ) / 1000,
+		renderDemoRecordSegments.Num(), renderDemoRecordSegments.Num() == 1 ? "" : "s",
+		summarized ? "" : "; its summary could not be written" );
+	renderDemoRecordSegments.Clear();
+	renderDemoRecordFrames = 0;
 }
 
 /*
@@ -5317,9 +5466,14 @@ void idSessionLocal::StopPlayingRenderDemo() {
 	sw->StopAllSounds();
 	SetPlayingSoundWorld( menuSoundWorld );
 
-	common->Printf( "stopped playing %s.\n", readDemo->GetName() );
+	// the file is already closed, so name it from the session
+	common->Printf( "stopped playing %s.\n", activeRenderDemoName.c_str() );
 	delete readDemo;
 	readDemo = NULL;
+	CloseRenderDemoLevelLoad();
+	renderDemoFrameClock = false;
+	renderDemoPlaySegments.Clear();
+	renderDemoPlaySegment = -1;
 	activeRenderDemoName.Clear();
 	renderDemoPaused = false;
 	renderDemoSeeking = false;
@@ -5384,7 +5538,20 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 		return;
 	}
 	demoName.DefaultFileExtension( ".demo" );
-	const int cachedDuration =
+
+	// A campaign demo needs the content of the campaign it was recorded in;
+	// refuse before tearing down whatever is running.
+	idStr refusal;
+	if ( !Session_RenderDemoContentMatches( demoName.c_str(), refusal ) ) {
+		common->Warning( "Render demo '%s' cannot play here: %s", demoName.c_str(), refusal.c_str() );
+		return;
+	}
+	if ( IsRenderDemoRecording() ) {
+		// One file cannot be recorded while another plays into the same worlds.
+		StopRecordingRenderDemo();
+	}
+
+	int cachedDuration =
 		!renderDemoDurationName.IsEmpty() && !renderDemoDurationName.Icmp( demoName )
 			? renderDemoKnownDurationMS : -1;
 	const bool restoreDemoMenu = guiDemoMenu != NULL && guiActive == guiDemoMenu;
@@ -5419,6 +5586,12 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 		return;
 	}
 	activeRenderDemoName = demoName;
+	// A campaign demo's summary gives its duration and level starts up front.
+	ResetRenderDemoPlaybackSession();
+	if ( renderDemoUserCmdHz > 0 && renderDemoPlayHeader.GetInt( "frames" ) > 0 ) {
+		cachedDuration = RenderDemoFramesToMS( renderDemoPlayHeader.GetInt( "frames" ) - 1 );
+		renderDemoDurationName = demoName;
+	}
 	renderDemoPaused = false;
 	renderDemoSeekRestartPending = false;
 	renderDemoSeekRestartPresentationPending = false;
@@ -5663,7 +5836,14 @@ void idSessionLocal::CompressDemoFile( const char *scheme, const char *demoName 
 	}
 
 	demoread.Close();
-	demowrite.Close();
+	// A campaign demo's summary sits outside its compressed stream; carry it
+	// over so the library still describes the recompressed copy.
+	idDict summary;
+	if ( idDemoFile::ReadTrailer( fullDemoName.c_str(), summary ) ) {
+		demowrite.CloseWithTrailer( summary );
+	} else {
+		demowrite.Close();
+	}
 
 	cvarSystem->SetCVarBool( "com_preloadDemos", savedPreload );
 	cvarSystem->SetCVarInteger("com_compressDemos", savedCompression);
@@ -5850,6 +6030,9 @@ bool idSessionLocal::RestartLevelAtSkill( int skill ) {
 	// before now holds the old difficulty. Dying should reload the fresh start
 	// autosave instead.
 	lastCheckPoint = -1;
+	if ( renderDemoRecordState == RENDER_DEMO_RECORD_RECORDING ) {
+		renderDemoNextSegmentReason = "restart";
+	}
 	MoveToNewMap( mapName.c_str() );
 	return true;
 #endif
@@ -6237,6 +6420,19 @@ void idSessionLocal::UnloadMap() {
 	}
 	StopPlayingRenderDemo();
 
+	// Before teardown, so the outgoing level's deletions are not recorded.
+	if ( renderDemoRecordState == RENDER_DEMO_RECORD_RECORDING ) {
+		if ( idAsyncNetwork::IsActive() ) {
+			// A multiplayer recording keeps its historical one-map scope.
+			StopRecordingRenderDemo();
+		} else {
+			// A single-player recording runs on through level transitions,
+			// save loads, death reloads and restarts; the next level starts a
+			// new segment, and Stop() ends it at the menu.
+			SuspendRenderDemoRecording();
+		}
+	}
+
 	if ( com_showFramePacing.GetInteger() >= 2 && framePacingStats.valid ) {
 		Session_PrintFramePacingSummary( framePacingStats, " final" );
 	}
@@ -6259,10 +6455,6 @@ void idSessionLocal::UnloadMap() {
 	if ( cmdDemoFile ) {
 		fileSystem->CloseFile( cmdDemoFile );
 		cmdDemoFile = NULL;
-	}
-
-	if ( writeDemo ) {
-		StopRecordingRenderDemo();
 	}
 
 	// drop every render entity/light the outgoing session registered, matching
@@ -7387,6 +7579,18 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	int		i;
 	bool	reloadingSameMap;
 
+	// Why the next segment of a campaign recording begins: the first level of
+	// an armed recording, a save load, a restart (RestartLevelAtSkill) or a level.
+	if ( IsRenderDemoRecording() ) {
+		if ( renderDemoRecordState == RENDER_DEMO_RECORD_ARMED ) {
+			renderDemoNextSegmentReason = "start";
+		} else if ( loadingSaveGame && savegameFile != NULL ) {
+			renderDemoNextSegmentReason = "load";
+		} else if ( renderDemoNextSegmentReason.IsEmpty() ) {
+			renderDemoNextSegmentReason = "level";
+		}
+	}
+
 	loadingAssetQueueActive = false;
 	loadingAssetQueueTotal = 0;
 	loadingAssetQueueLoaded = 0;
@@ -7859,6 +8063,9 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	}
 	ResetFramePacingStats();
 	Sys_ClearEvents();
+
+	// A campaign recording resumes with this level as its next segment.
+	ContinueRenderDemoAfterMapChange();
 }
 
 /*
@@ -9325,8 +9532,9 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 				StartMenu( false );
 				break;
 			}
-			renderDemoKnownDurationMS = Max( 0,
-				currentDemoRenderView.time - renderDemoStartViewTime );
+			renderDemoKnownDurationMS = renderDemoFrameClock
+				? RenderDemoFramesToMS( numDemoFrames - 1 )
+				: Max( 0, currentDemoRenderView.time - renderDemoStartViewTime );
 			renderDemoDurationName = activeRenderDemoName;
 			if ( numDemoFrames != 1 ) {
 				// if the demo has a single frame (a demoShot), continuously replay
@@ -9353,6 +9561,46 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 					activeRenderDemoName.c_str() );
 				Stop();
 				StartMenu( false );
+				break;
+			}
+			continue;
+		}
+		if ( ds == DS_SESSION && renderdemoVersion >= OPENQ4_RENDERDEMO_SESSION_VERSION ) {
+			// A campaign recording's header, a level's segment or its clean end.
+			bool finished = false;
+			if ( !ProcessRenderDemoSessionRecord( finished ) ) {
+				common->Warning( "Render demo '%s' contains a malformed session record; playback stopped safely",
+					activeRenderDemoName.c_str() );
+				Stop();
+				StartMenu( false );
+				break;
+			}
+			if ( readDemo == NULL ) {
+				break;
+			}
+			if ( finished ) {
+				// DSC_END: the summary trailer follows, so stop reading here
+				// exactly as the stream's end would. Commands the last game tic
+				// wrote after the last drawn frame are complete; they just have
+				// no frame left to show.
+				renderDemoFramePayloadPending = false;
+				if ( numDemoFrames <= 0 ) {
+					common->Warning( "Render demo '%s' ended without a complete frame; playback stopped safely",
+						activeRenderDemoName.c_str() );
+					Stop();
+					StartMenu( false );
+					break;
+				}
+				renderDemoKnownDurationMS = RenderDemoFramesToMS( numDemoFrames - 1 );
+				renderDemoDurationName = activeRenderDemoName;
+				if ( numDemoFrames != 1 ) {
+					Stop();
+					StartMenu();
+				} else {
+					// A one-frame recording (demoShot) keeps showing its frame,
+					// and never reads past its end again.
+					readDemo->Close();
+				}
 				break;
 			}
 			continue;
@@ -9730,9 +9978,13 @@ void idSessionLocal::Draw() {
 			renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
 		}
 
-		// save off the 2D drawing from the game
+		// save off the 2D drawing from the game, and end the recorded frame:
+		// only gameplay draws make frames, so a recording skips menus,
+		// pauses and loading screens
 		if ( writeDemo ) {
 			renderSystem->WriteDemoPics();
+			renderSystem->WriteDemoEndFrame();
+			renderDemoRecordFrames++;
 		}
 		// A pause screen that just closed releases the softened view.
 		if ( guiRetainedReleasing != NULL ) {
@@ -10087,7 +10339,12 @@ void idSessionLocal::Frame() {
 		numCmdsToRun = 0;
 	}
 
-	// don't let a long onDemand sound load unsync everything
+	// don't let a long onDemand sound load unsync everything; a recording
+	// runs exactly USERCMD_PER_DEMO_FRAME tics a frame, and skipping tics
+	// under it would fail the fixed-tic check below
+	if ( timeHitch && writeDemo ) {
+		timeHitch = 0;
+	}
 	if ( timeHitch ) {
 		int	skip = common->GetUserCmdTicsForMsecFloor( timeHitch );
 		lastGameTic += skip;

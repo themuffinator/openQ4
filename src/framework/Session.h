@@ -46,7 +46,7 @@ typedef struct {
 } logStats_t;
 
 static const int	MAX_LOGGED_STATS = 60 * 120;		// log every half second 
-static const int	OPENQ4_RENDERDEMO_CURRENT_VERSION = 10;
+static const int	OPENQ4_RENDERDEMO_CURRENT_VERSION = 11;
 static const int	OPENQ4_RENDERDEMO_ENTITY_EXTRAS_VERSION = 3;
 static const int	OPENQ4_RENDERDEMO_LIGHT_EXTRAS_VERSION = 4;
 static const int	OPENQ4_RENDERDEMO_RENDER_VIEW_DECLS_VERSION = 5;
@@ -56,6 +56,9 @@ static const int	OPENQ4_RENDERDEMO_EFFECTS_VERSION = 7;
 static const int	OPENQ4_RENDERDEMO_VISIBILITY_EFFECTS_VERSION = 8;
 static const int	OPENQ4_RENDERDEMO_BRIGHTSKIN_VERSION = 9;
 static const int	OPENQ4_RENDERDEMO_FLAT_DIFFUSE_VERSION = 10;
+// Session records (DS_SESSION): a header, one self-contained segment per level
+// a recording spans, gameplay-only frames, a clean end and a raw summary trailer.
+static const int	OPENQ4_RENDERDEMO_SESSION_VERSION = 11;
 
 typedef enum {
 	MSG_OK,

@@ -337,6 +337,16 @@
 	"#str_41573"	"Suivi auto : Non"
 	"#str_41574"	"Suivi auto : Tueur"
 	"#str_41575"	"Suivi auto : Action"
+	"#str_41576"	"Démo de campagne"
+	"#str_41577"	"Autre campagne"
+	"#str_41578"	"Enregistrée dans %s. Changez de campagne pour la lire."
+	"#str_41579"	"Enregistrement interrompu"
+	"#str_41580"	"Lecture jusqu'à la dernière image complète"
+	"#str_41581"	"Enregistrement en cours"
+	"#str_41582"	"Niveaux : %d"
+	"#str_41583"	"Niveau"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Campagne d'arène
 	"#str_42000"	"UN JOUEUR"

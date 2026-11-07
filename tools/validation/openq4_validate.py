@@ -510,6 +510,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "decl_checksum_stability_contract.py",
         root / "tools" / "tests" / "match_control_localization_bridge.py",
         root / "tools" / "tests" / "match_control_ui_contract.py",
+        root / "tools" / "tests" / "campaign_demo_contract.py",
         root / "tools" / "tests" / "demo_playback.py",
         root / "tools" / "tests" / "docs_link_integrity.py",
         root / "tools" / "tests" / "dmap_render_geometry_lifecycle.py",

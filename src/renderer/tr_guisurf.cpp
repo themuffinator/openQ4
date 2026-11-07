@@ -261,7 +261,7 @@ Create a texture space on the given surface and
 call the GUI generator to create quads for it.
 =================
 */
-void R_RenderGuiSurf( idUserInterface *gui, drawSurf_t *drawSurf ) {
+void R_RenderGuiSurf( idUserInterface *gui, drawSurf_t *drawSurf, int entityGui ) {
 	idVec3	origin, axis[3];
 
 	// for testing the performance hit
@@ -305,15 +305,30 @@ void R_RenderGuiSurf( idUserInterface *gui, drawSurf_t *drawSurf ) {
 	myGlMultMatrix( guiModelMatrix, drawSurf->space->modelMatrix, 
 			modelMatrix );
 
+	// A render demo (v11) carries an entity's in-world GUI as the geometry it
+	// drew; playback has no live GUI behind the entity, so it draws that.
+	const idRenderEntityLocal *entityDef = drawSurf->space != NULL ? drawSurf->space->entityDef : NULL;
+	idRenderWorldLocal *world = tr.viewDef->renderWorld;
+	const bool demoWorld = entityGui >= 0 && entityDef != NULL && world != NULL && world == session->rw;
+	idGuiModel *recorded = demoWorld && session->readDemo != NULL
+		? world->DemoGuiSurface( entityDef->index, entityGui ) : NULL;
+
 	tr.guiRecursionLevel++;
 
 	// call the gui, which will call the 2D drawing functions
 	tr.guiModel->Clear();
-	gui->Redraw( tr.viewDef->renderView.time, false );
+	idGuiModel *emitted = recorded;
+	if ( emitted == NULL ) {
+		gui->Redraw( tr.viewDef->renderView.time, false );
+		if ( demoWorld && session->writeDemo != NULL && tr.guiRecursionLevel == 1 && !tr.viewDef->isSubview ) {
+			world->WriteGuiSurface( entityDef->index, entityGui, *tr.guiModel );
+		}
+		emitted = tr.guiModel;
+	}
 	// The generated quads become ordinary 3D drawSurfs. Preserve that origin
 	// explicitly so shared in-world ownership cannot claim root UI by sort.
 	tr.inWorldGuiEmissionDepth++;
-	tr.guiModel->EmitToCurrentView( modelMatrix, drawSurf->space->weaponDepthHack );
+	emitted->EmitToCurrentView( modelMatrix, drawSurf->space->weaponDepthHack );
 	tr.inWorldGuiEmissionDepth--;
 	tr.guiModel->Clear();
 	R_UpdateGuiScreenRectState( gui, drawSurf );

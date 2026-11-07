@@ -6,6 +6,31 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Campaign demos (Q4-09), 7 November 2026
+
+- [x] Record a whole single-player session as one demo. `recordDemo` now keeps
+  recording through level transitions, save loads, deaths and reloads,
+  difficulty restarts and chapter starts. Enter it at the title screen to record
+  from the first frame of the next level. Menus, pauses and loading screens are
+  left out, and quitting to the menu or the game finishes the file.
+- [x] Campaign demos play back level by level: each level shows its loading
+  screen, the timeline runs across levels, **Prev/Next Marker** jump between
+  level starts, and seeking, speed, pause and stepping cross levels.
+- [x] Demos now show the HUD as you saw it, values, icons, crosshair and panels
+  included, and in-world computer screens, which earlier render demos left
+  blank. Grouped HUD panels play back without their shaped edges.
+- [x] Render demos no longer stop playing where the recording started music,
+  narration or an interface sound.
+- [x] The demo library lists a campaign recording with its first level, length
+  and number of levels. It refuses one recorded in the other campaign, saying
+  which, and still plays an interrupted recording up to its last frame.
+- Compatibility: campaign demos use render demo version 11. Earlier openQ4
+  builds cannot play them; this build still plays earlier openQ4 render demos.
+  Expect more than 1 MB per second on busy levels.
+- Evidence and remaining qualification:
+  [campaign render demos](multiview-demos.md#campaign-render-demos-v11-7-november-2026),
+  roadmap Q4-09.
+
 ## Level editor completion (TOOL-01 to TOOL-04), 6 November 2026
 
 - [x] The experimental level editor (`editorExperimental`) now edits brushes

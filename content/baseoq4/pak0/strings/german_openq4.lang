@@ -337,6 +337,16 @@
 	"#str_41573"	"Auto-Folgen: Aus"
 	"#str_41574"	"Auto-Folgen: Killer"
 	"#str_41575"	"Auto-Folgen: Action"
+	"#str_41576"	"Kampagnen-Demo"
+	"#str_41577"	"Andere Kampagne"
+	"#str_41578"	"Aufgenommen in %s. Wechsle die Kampagne, um sie abzuspielen."
+	"#str_41579"	"Unterbrochene Aufnahme"
+	"#str_41580"	"Spielt bis zum letzten vollständigen Bild"
+	"#str_41581"	"Aufnahme läuft"
+	"#str_41582"	"Level: %d"
+	"#str_41583"	"Level"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Arena campaign
 	"#str_42000"	"EINZELSPIELER"

@@ -337,6 +337,16 @@
 	"#str_41573"	"Segui auto: No"
 	"#str_41574"	"Segui auto: Killer"
 	"#str_41575"	"Segui auto: Azione"
+	"#str_41576"	"Demo della campagna"
+	"#str_41577"	"Altra campagna"
+	"#str_41578"	"Registrata in %s. Cambia campagna per riprodurla."
+	"#str_41579"	"Registrazione interrotta"
+	"#str_41580"	"Riproduce fino all'ultimo fotogramma completo"
+	"#str_41581"	"Registrazione in corso"
+	"#str_41582"	"Livelli: %d"
+	"#str_41583"	"Livello"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Campagna arena
 	"#str_42000"	"GIOCATORE SINGOLO"

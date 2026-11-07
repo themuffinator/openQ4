@@ -6345,6 +6345,9 @@ void idRenderSystemLocal::Clear( void ) {
 	guiRecursionLevel = 0;
 	guiModel = NULL;
 	demoGuiModel = NULL;
+	demoFrameGuiModel = NULL;
+	demoLastGuiModel = NULL;
+	demoLastGuiModelValid = false;
 	pendingRenderTextureDeletes.Clear();
 	useUIViewportFor2D = true;
 	activeRenderTexture = NULL;
@@ -6406,6 +6409,12 @@ void idRenderSystemLocal::Init( void ) {
 
 	demoGuiModel = new idGuiModel;
 	demoGuiModel->Clear();
+
+	demoFrameGuiModel = new idGuiModel;
+	demoFrameGuiModel->Clear();
+	demoLastGuiModel = new idGuiModel;
+	demoLastGuiModel->Clear();
+	demoLastGuiModelValid = false;
 
 	R_InitTriSurfData();
 
@@ -6486,6 +6495,11 @@ void idRenderSystemLocal::Shutdown( void ) {
 
 	delete guiModel;
 	delete demoGuiModel;
+	delete demoFrameGuiModel;
+	demoFrameGuiModel = NULL;
+	delete demoLastGuiModel;
+	demoLastGuiModel = NULL;
+	demoLayerGuiModels.DeleteContents( true );
 
 	ShutdownSpecialEffects();
 	Clear();

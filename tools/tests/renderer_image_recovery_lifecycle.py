@@ -35,6 +35,8 @@ struct GuiModel{};
 class idRenderSystemLocal{
 public:
  FILE* logFile=nullptr;GuiModel* guiModel=nullptr;GuiModel* demoGuiModel=nullptr;
+ GuiModel* demoFrameGuiModel=nullptr;GuiModel* demoLastGuiModel=nullptr;bool demoLastGuiModelValid=false;
+ struct{void DeleteContents(bool){}} demoLayerGuiModels;
  void Shutdown();void Init();
  void ShutdownSpecialEffects(){ShutdownBoundary("effects");}
  void Clear(){ShutdownBoundary("clear");guiModel=demoGuiModel=nullptr;}

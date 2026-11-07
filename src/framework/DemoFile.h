@@ -41,8 +41,26 @@ typedef enum {
 	DS_FINISHED,
 	DS_RENDER,
 	DS_SOUND,
-	DS_VERSION
+	DS_VERSION,
+	// openQ4 render demo v11+: session records owned by the engine session,
+	// which frame the campaign segments of a recording (Session_demo.cpp).
+	DS_SESSION
 } demoSystem_t;
+
+// The records a DS_SESSION token introduces. Every record is a dictionary.
+typedef enum {
+	DSC_HEADER = 1,		// once, after DS_VERSION: game directory, campaign, mode, tic rate
+	DSC_SEGMENT,		// a level (map) begins; both sides then reset the hash-string table
+	DSC_SEGMENT_READY,	// the segment's world and sound state are complete
+	DSC_END				// a clean stop; nothing after it is part of the stream
+} demoSessionRecord_t;
+
+// A raw summary appended after the compressed stream of a cleanly stopped
+// recording, so the demo library can describe a long campaign demo without
+// decoding it: payload | int payloadLength | uint crc32( payload ) | magic.
+#define DEMO_TRAILER_MAGIC			"OQ4DSUM1"
+const int DEMO_TRAILER_MAGIC_LENGTH	= 8;
+const int DEMO_TRAILER_MAX_PAYLOAD	= 256 * 1024;
 
 class idDemoFile : public idFile {
 public:
@@ -69,6 +87,18 @@ public:
 	void			ReadDict( idDict &dict );
 	void			WriteDict( const idDict &dict );
 
+	// Starts a new hash-string table. A campaign segment does this on both
+	// sides, so each level's table is bounded and depends on nothing before it.
+	void			ResetHashStrings();
+
+	// Ends the compressed stream, appends the raw trailer (see
+	// DEMO_TRAILER_MAGIC) and closes the file. False if the stream was not
+	// being written or the trailer could not be written.
+	bool			CloseWithTrailer( const idDict &summary );
+	// Reads a closed recording's trailer without decoding its stream. False
+	// when the file has no intact trailer, as an interrupted recording has not.
+	static bool		ReadTrailer( const char *fileName, idDict &summary );
+
 	int				Read( void *buffer, int len );
 	int				Write( const void *buffer, int len );
 
@@ -81,6 +111,7 @@ private:
 	idCompressor *	compressor;
 
 	idList<idStr*>	demoStrings;
+	idHashIndex		demoStringHash;		// writer lookup into demoStrings
 	idFile *		fLog;
 	bool			log;
 	idStr			logStr;

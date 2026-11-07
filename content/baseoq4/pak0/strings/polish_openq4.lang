@@ -349,6 +349,16 @@
 	"#str_41573"	"Śledzenie: Wył."
 	"#str_41574"	"Śledzenie: Zabójca"
 	"#str_41575"	"Śledzenie: Akcja"
+	"#str_41576"	"Demo kampanii"
+	"#str_41577"	"Inna kampania"
+	"#str_41578"	"Nagrano w %s. Zmień kampanię, aby odtworzyć."
+	"#str_41579"	"Przerwane nagranie"
+	"#str_41580"	"Odtwarza do ostatniej pełnej klatki"
+	"#str_41581"	"Trwa nagrywanie"
+	"#str_41582"	"Poziomy: %d"
+	"#str_41583"	"Poziom"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Arena campaign
 	"#str_42000"	"GRA JEDNOOSOBOWA"

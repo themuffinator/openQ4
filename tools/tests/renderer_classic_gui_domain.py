@@ -252,7 +252,8 @@ def validate_gl_consumer() -> None:
         gui_surface,
         (
             "tr.inWorldGuiEmissionDepth++;",
-            "tr.guiModel->EmitToCurrentView(",
+            # the live GUI's geometry, or a render demo's recorded copy of it
+            "emitted->EmitToCurrentView(",
             "tr.inWorldGuiEmissionDepth--;",
         ),
         "in-world GUI front-end provenance scope",

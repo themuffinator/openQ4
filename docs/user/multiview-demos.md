@@ -19,6 +19,44 @@ Only controls supported by the selected format are enabled. A loose file in
 your save-path `demos/` directory can be deleted after confirmation;
 package-backed demos are read-only.
 
+## Record your campaign
+
+A single-player recording now follows you through the whole session. Open the
+console and enter:
+
+```text
+recordDemo my_campaign
+```
+
+Enter it at the title screen and the recording starts with the first frame of
+the next level you start, continue or load. Enter it during a level and it starts
+there.
+
+One file keeps recording through level transitions, save loads, deaths and
+reloads, difficulty restarts and chapter starts. Time spent in menus, on the
+pause screen or on loading screens is left out. Recording stops when you enter
+`stopRecording`, quit to the main menu or quit the game. It also stops when you
+join a multiplayer game. `demoRecordStatus` shows whether a recording is
+waiting, running or between levels, with its file, length and level count.
+
+Recordings go to `demos/` in your save path, under the active campaign's game
+directory. In **Demos** a campaign recording is listed as **Campaign demo**,
+with its first level, length and number of levels. A demo recorded in the other
+campaign (Quake 4 or The Awakening) says so and cannot be played until you switch
+campaigns. A recording cut short by a crash or power loss is marked
+**Interrupted recording** and still plays up to its last complete frame.
+
+During playback each new level shows its loading screen, and the overlay names
+the level you are watching. **Prev Marker** and **Next Marker**, or
+`demoMarker prev` and `demoMarker next`, jump between level starts; Prev goes to
+the start of the current level first. Seeking, speed, pause and stepping work
+across levels.
+
+A campaign demo stores what you saw and heard, including the HUD and in-world
+screens, not the game itself, so the camera cannot leave your view. Grouped HUD
+panels play back without their shaped edges. Busy levels can use more than 1 MB
+per second, so a long campaign recording needs several gigabytes of space.
+
 ## Record a match
 
 Host a multiplayer server map, then use:
@@ -174,7 +212,7 @@ recording or playback.
 |---|---|---|---|
 | openQ4 MVD `.mvd` 1.3 | Supported | Pause, speed, step, and seeking from the nearest keyframe | Full-world free roam, player follow, markers and auto-tracking |
 | openQ4 MVD `.mvd` 1.0-1.2 | Supported, including compatible API-39, API-42, and API-44 1.0/1.1 recordings | Pause, speed, step, and replay-based seek | Full-world free roam, player follow and auto-tracking |
-| openQ4 render `.demo` | Supported | Pause, speed, step, and replay-based seek | Fixed recorded camera |
+| openQ4 render `.demo`, including campaign demos | Supported | Pause, speed, step, replay-based seek and level markers | Fixed recorded camera |
 | Retail Quake 4 render `.demo` | Not supported yet | None | Not available |
 | Retail Quake 4 `.netdemo` | Not supported yet | None | Not available |
 | Command `.cdemo` | Developer best effort | Play/stop only | Determined by the recorded simulation |

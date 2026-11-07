@@ -337,6 +337,16 @@
 	"#str_41573"	"Sledování: Vyp."
 	"#str_41574"	"Sledování: Vrah"
 	"#str_41575"	"Sledování: Akce"
+	"#str_41576"	"Demo kampaně"
+	"#str_41577"	"Jiná kampaň"
+	"#str_41578"	"Nahráno v %s. Pro přehrání přepněte kampaň."
+	"#str_41579"	"Přerušený záznam"
+	"#str_41580"	"Přehraje se do posledního úplného snímku"
+	"#str_41581"	"Probíhá nahrávání"
+	"#str_41582"	"Úrovně: %d"
+	"#str_41583"	"Úroveň"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Arena campaign
 	"#str_42000"	"JEDEN HRÁČ"

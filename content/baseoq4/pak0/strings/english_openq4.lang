@@ -337,6 +337,16 @@
 	"#str_41573"	"Auto-Track: Off"
 	"#str_41574"	"Auto-Track: Killer"
 	"#str_41575"	"Auto-Track: Action"
+	"#str_41576"	"Campaign demo"
+	"#str_41577"	"Other campaign"
+	"#str_41578"	"Recorded in %s. Switch campaigns to play it."
+	"#str_41579"	"Interrupted recording"
+	"#str_41580"	"Plays up to the last complete frame"
+	"#str_41581"	"Recording in progress"
+	"#str_41582"	"Levels: %d"
+	"#str_41583"	"Level"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Arena campaign
 	"#str_42000"	"SINGLE PLAYER"

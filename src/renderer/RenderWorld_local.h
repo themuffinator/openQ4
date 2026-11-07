@@ -412,7 +412,18 @@ public:
 	bool					ReadRenderEntity();
 	bool					ReadRenderLight();
 	bool					ReadRenderEffect();
-	
+
+	// An entity's in-world GUI in a render demo (v11), by entity handle and
+	// renderEntity_t::gui slot. Recording writes a GUI's geometry when it
+	// changes; playback draws the last geometry read in place of a live GUI.
+	void					WriteGuiSurface( qhandle_t handle, int entityGui, const class idGuiModel &model );
+	bool					ReadGuiSurface();
+	class idGuiModel *		DemoGuiSurface( qhandle_t handle, int entityGui ) const;
+	void					FreeDemoGuiSurfaces( qhandle_t handle );	// -1: all
+	idList<class idGuiModel *>	demoGuiSurfaces;		// playback, handle * MAX_RENDERENTITY_GUI + slot
+	idList<unsigned int>	demoGuiSurfaceChecksums;	// recording, same index; 0 = not written
+	class idGuiModel *		demoGuiScratch = NULL;		// recording: the filtered copy written
+
 
 	//--------------------------
 	// RenderWorld.cpp

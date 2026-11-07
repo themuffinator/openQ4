@@ -313,10 +313,134 @@ void		idRenderWorldLocal::StartWritingDemo( idDemoFile *demo ) {
 			effectsDef[i]->archived = false;
 		}
 	}
+
+	// every in-world GUI is written again as it next draws, and the next
+	// frame's 2D in full: a segment depends on nothing before it
+	demoGuiSurfaceChecksums.Clear();
+	if ( this == session->rw ) {
+		tr.demoLastGuiModelValid = false;
+	}
 }
 
 void idRenderWorldLocal::StopWritingDemo() {
 //	writeDemo = NULL;
+}
+
+// Entity handles a render demo may carry an in-world GUI for.
+static const int DEMO_MAX_GUI_SURFACE_HANDLE = 1 << 16;
+
+/*
+==============
+WriteGuiSurface
+==============
+*/
+void idRenderWorldLocal::WriteGuiSurface( qhandle_t handle, int entityGui, const idGuiModel &model ) {
+	if ( this != session->rw || session->writeDemo == NULL || handle < 0 || handle >= DEMO_MAX_GUI_SURFACE_HANDLE ||
+		 entityGui < 0 || entityGui >= MAX_RENDERENTITY_GUI ) {
+		return;
+	}
+	// The screen-only pictures a GUI may sample at runtime never reach the demo.
+	if ( demoGuiScratch == NULL ) {
+		demoGuiScratch = new idGuiModel;
+	}
+	idGuiModel &recorded = *demoGuiScratch;
+	recorded.Clear();
+	recorded.AppendForDemo( model );
+	const unsigned int checksum = recorded.ContentChecksum() | 1u;
+	const int slot = handle * MAX_RENDERENTITY_GUI + entityGui;
+	if ( demoGuiSurfaceChecksums.Num() <= slot ) {
+		const int previous = demoGuiSurfaceChecksums.Num();
+		demoGuiSurfaceChecksums.SetNum( slot + 1 );
+		for ( int i = previous; i < demoGuiSurfaceChecksums.Num(); i++ ) {
+			demoGuiSurfaceChecksums[i] = 0;
+		}
+	}
+	if ( demoGuiSurfaceChecksums[slot] == checksum ) {
+		return;		// unchanged since it was last written
+	}
+	demoGuiSurfaceChecksums[slot] = checksum;
+	session->writeDemo->WriteInt( DS_RENDER );
+	session->writeDemo->WriteInt( DC_GUI_SURFACE );
+	session->writeDemo->WriteInt( handle );
+	session->writeDemo->WriteInt( entityGui );
+	recorded.WriteToDemo( session->writeDemo );
+	if ( r_showDemo.GetBool() ) {
+		common->Printf( "write DC_GUI_SURFACE: %i:%i\n", handle, entityGui );
+	}
+}
+
+/*
+==============
+ReadGuiSurface
+==============
+*/
+bool idRenderWorldLocal::ReadGuiSurface() {
+	int handle = 0;
+	int entityGui = 0;
+	if ( !R_DemoReadInt( session->readDemo, handle ) || !R_DemoReadInt( session->readDemo, entityGui ) ) {
+		return false;
+	}
+	if ( handle < 0 || handle >= DEMO_MAX_GUI_SURFACE_HANDLE || entityGui < 0 || entityGui >= MAX_RENDERENTITY_GUI ) {
+		return R_RejectRenderDemo( session->readDemo, va( "in-world GUI %d:%d is out of range", handle, entityGui ) );
+	}
+	const int slot = handle * MAX_RENDERENTITY_GUI + entityGui;
+	if ( demoGuiSurfaces.Num() <= slot ) {
+		const int previous = demoGuiSurfaces.Num();
+		demoGuiSurfaces.SetNum( slot + 1 );
+		for ( int i = previous; i < demoGuiSurfaces.Num(); i++ ) {
+			demoGuiSurfaces[i] = NULL;
+		}
+	}
+	if ( demoGuiSurfaces[slot] == NULL ) {
+		demoGuiSurfaces[slot] = new idGuiModel;
+	}
+	if ( !demoGuiSurfaces[slot]->ReadFromDemo( session->readDemo ) ) {
+		delete demoGuiSurfaces[slot];
+		demoGuiSurfaces[slot] = NULL;
+		return false;
+	}
+	if ( r_showDemo.GetBool() ) {
+		common->Printf( "DC_GUI_SURFACE: %i:%i\n", handle, entityGui );
+	}
+	return true;
+}
+
+/*
+==============
+DemoGuiSurface
+==============
+*/
+idGuiModel *idRenderWorldLocal::DemoGuiSurface( qhandle_t handle, int entityGui ) const {
+	if ( handle < 0 || entityGui < 0 || entityGui >= MAX_RENDERENTITY_GUI ) {
+		return NULL;
+	}
+	const int slot = handle * MAX_RENDERENTITY_GUI + entityGui;
+	return slot < demoGuiSurfaces.Num() ? demoGuiSurfaces[slot] : NULL;
+}
+
+/*
+==============
+FreeDemoGuiSurfaces
+==============
+*/
+void idRenderWorldLocal::FreeDemoGuiSurfaces( qhandle_t handle ) {
+	if ( handle < 0 ) {
+		demoGuiSurfaces.DeleteContents( true );
+		demoGuiSurfaceChecksums.Clear();
+		delete demoGuiScratch;
+		demoGuiScratch = NULL;
+		return;
+	}
+	for ( int entityGui = 0; entityGui < MAX_RENDERENTITY_GUI; entityGui++ ) {
+		const int slot = handle * MAX_RENDERENTITY_GUI + entityGui;
+		if ( slot < demoGuiSurfaces.Num() && demoGuiSurfaces[slot] != NULL ) {
+			delete demoGuiSurfaces[slot];
+			demoGuiSurfaces[slot] = NULL;
+		}
+		if ( slot < demoGuiSurfaceChecksums.Num() ) {
+			demoGuiSurfaceChecksums[slot] = 0;
+		}
+	}
 }
 
 /*
@@ -517,6 +641,15 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile *readDemo, renderView_t
 		break;
 	case DC_END_FRAME:
 		return true;
+
+	case DC_GUI_SURFACE:
+		if ( session->renderdemoVersion < OPENQ4_RENDERDEMO_SESSION_VERSION ) {
+			return R_RejectRenderDemo( readDemo, "in-world GUI record before render demo v11" );
+		}
+		if ( !ReadGuiSurface() ) {
+			return false;
+		}
+		break;
 
 	default:
 		return R_RejectRenderDemo( readDemo, va( "invalid render command %d", static_cast<int>( dc ) ) );

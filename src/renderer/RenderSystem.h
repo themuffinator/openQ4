@@ -614,6 +614,10 @@ public:
 	// dump all 2D drawing so far this frame to the demo file
 	virtual void			WriteDemoPics() = 0;
 
+	// ends the recorded frame; the session calls it only after a gameplay
+	// draw, so menus, pauses and loading screens leave no frames behind
+	virtual void			WriteDemoEndFrame() = 0;
+
 	// draw the 2D pics that were saved out with the current demo frame
 	virtual void			DrawDemoPics() = 0;
 

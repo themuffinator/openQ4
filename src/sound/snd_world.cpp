@@ -970,6 +970,24 @@ void idSoundWorldLocal::OnReloadSound( const idDecl* shader )
 
 /*
 ========================
+idSoundWorldLocal::DemoEmitterForIndex
+
+A render demo records the emitter's live index, and slot zero is this world's
+localSound emitter (music, narration, interface sounds), which SCMD_STATE
+recreates first. Savegames never name it; demos do.
+========================
+*/
+idSoundEmitter* idSoundWorldLocal::DemoEmitterForIndex( int index )
+{
+	if( index == 0 )
+	{
+		return emitters.Num() > 0 ? emitters[0] : NULL;
+	}
+	return EmitterForIndex( index );
+}
+
+/*
+========================
 idSoundWorldLocal::EmitterForIndex
 ========================
 */
@@ -1429,7 +1447,7 @@ bool idSoundWorldLocal::ProcessDemoCommand( idDemoFile* readDemo )
 			{
 				return false;
 			}
-			idSoundEmitter* emitter = EmitterForIndex( index );
+			idSoundEmitter* emitter = DemoEmitterForIndex( index );
 			if( emitter == NULL )
 			{
 				return reader.Fail( va( "references unavailable emitter %d", index ) );
@@ -1457,7 +1475,7 @@ bool idSoundWorldLocal::ProcessDemoCommand( idDemoFile* readDemo )
 			{
 				return reader.Fail( va( "contains invalid diversity %g", diversity ) );
 			}
-			idSoundEmitter* emitter = EmitterForIndex( index );
+			idSoundEmitter* emitter = DemoEmitterForIndex( index );
 			if( emitter == NULL )
 			{
 				return reader.Fail( va( "references unavailable emitter %d", index ) );
@@ -1478,7 +1496,7 @@ bool idSoundWorldLocal::ProcessDemoCommand( idDemoFile* readDemo )
 			{
 				return false;
 			}
-			idSoundEmitter* emitter = EmitterForIndex( index );
+			idSoundEmitter* emitter = DemoEmitterForIndex( index );
 			if( emitter == NULL )
 			{
 				return reader.Fail( va( "references unavailable emitter %d", index ) );
@@ -1495,7 +1513,7 @@ bool idSoundWorldLocal::ProcessDemoCommand( idDemoFile* readDemo )
 			{
 				return false;
 			}
-			idSoundEmitter* emitter = EmitterForIndex( index );
+			idSoundEmitter* emitter = DemoEmitterForIndex( index );
 			if( emitter == NULL )
 			{
 				return reader.Fail( va( "references unavailable emitter %d", index ) );
@@ -1516,7 +1534,7 @@ bool idSoundWorldLocal::ProcessDemoCommand( idDemoFile* readDemo )
 			{
 				return false;
 			}
-			idSoundEmitter* emitter = EmitterForIndex( index );
+			idSoundEmitter* emitter = DemoEmitterForIndex( index );
 			if( emitter == NULL )
 			{
 				return reader.Fail( va( "references unavailable emitter %d", index ) );

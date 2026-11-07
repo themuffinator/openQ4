@@ -337,6 +337,16 @@
 	"#str_41573"	"Követés: Ki"
 	"#str_41574"	"Követés: Gyilkos"
 	"#str_41575"	"Követés: Akció"
+	"#str_41576"	"Kampánydemó"
+	"#str_41577"	"Másik kampány"
+	"#str_41578"	"Felvéve: %s. Válts kampányt a lejátszáshoz."
+	"#str_41579"	"Megszakadt felvétel"
+	"#str_41580"	"Az utolsó teljes képkockáig játssza le"
+	"#str_41581"	"Felvétel folyamatban"
+	"#str_41582"	"Pályák: %d"
+	"#str_41583"	"Pálya"
+	"#str_41584"	"Quake 4"
+	"#str_41585"	"Quake 4: The Awakening"
 
 // Arena campaign
 	"#str_42000"	"EGYJÁTÉKOS"

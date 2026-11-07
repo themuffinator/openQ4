@@ -158,6 +158,7 @@ Declarations* declManager=&declarations;
 // This fixture qualifies indexed mesh submission with atlas caching disabled.
 // Rasterization itself is covered by the retained runtime and capture suites.
 struct {bool GetBool()const{return false;}} ui_retainedAtlas;
+static bool RetainedAtlasActive(){return ui_retainedAtlas.GetBool();}
 struct Host {
     int viewportWidth=1280,viewportHeight=720;
     bool rasterNewMeshes=true;

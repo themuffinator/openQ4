@@ -680,6 +680,8 @@ void idRenderWorldLocal::FreeEntityDef( qhandle_t entityHandle ) {
 	if ( session->writeDemo && def->archived ) {
 		WriteFreeEntity( entityHandle );
 	}
+	// a later entity in this slot draws its own in-world GUI, if any
+	FreeDemoGuiSurfaces( entityHandle );
 
 	// if we are playing a demo, these will have been freed
 	// in R_FreeEntityDefDerivedData(), otherwise the gui
