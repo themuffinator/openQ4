@@ -819,10 +819,42 @@ in `hdr-gameplay/` exposed a fixture assumption: the first-run enhanced preset
 enabled bloom, so disabling tone mapping still ran the bloom/sky-preservation
 pass. The runner now explicitly pins bloom off for its disabled-HDR control.
 
+## Stock content stays display-referred (6 November 2026, VK-05)
+
+**Decision (project owner, 6 November 2026).** Classic stock material stages
+are not re-blended in linear light. That covers blends other than replace
+or add, dynamic, texgen and cinematic stages, materials sorted at or after
+`SS_MEDIUM`, and the subviews that draw them. They keep Quake 4's
+display-referred path, which matches OpenGL and the retail game. Complete-view
+admission therefore declines any view that contains them, and the whole view
+falls back to that path. This closes VK-05's classic-stage admission scope as
+declined by design. Linear-light compositing of classic blends inside an HDR
+scene, either directly or as a display-referred pass after tone mapping, is
+not planned.
+
+**Fallback qualification.** `renderer_hdr_stock_fallback.py` freezes the
+stock single-player maps `airdefense1` and `process1` with PBR materials on and
+toggles the laboratory linear scene (`r_pbrLinearScene`). It does this twice:
+with tone mapping on, and with the HDR-off PBR preview. The view weapon and
+HUD are hidden, because they animate on real time. Each request must leave the
+engine capture byte-identical to the display-referred frame and restore it
+exactly. On Vulkan, `rendererVulkanHDRInfo` must report the request, no linear
+view and no admitted outcome.
+
+On `8844bad24` (RTX 4060 Laptop, NVIDIA 591.74, validation enabled and no
+validation messages), Vulkan passes on both maps. Every main view declines:
+`ambient-stage` on `airdefense1`, whose subviews also decline as
+`subview`, and `ambient-blend` on `process1`. All six captures of each group
+are byte-identical. On OpenGL the HDR-off group is byte-identical on both maps and `process1` passes completely. On `airdefense1` the first tone-mapped OpenGL capture differed from the later capture with the same settings, so that frame had not settled yet; the harness now waits 300 frames before its first capture. The settled OpenGL rerun is still to be done.
+
+Reports and engine images: `.tmp/vk-roadmap/nov6/hdr-fallback/`.
+
 ## Remaining acceptance
 
-- Extend the bounded HDR scene path to the explicitly declined material,
-  baked-lighting, portal/capture and post-effect combinations listed above.
+- Classic stages stay declined by design (see
+  [stock content stays display-referred](#stock-content-stays-display-referred-6-november-2026-vk-05)).
+  For admitted PBR views, tiled and out-of-frame captures and authored
+  post-effect combinations still need HDR-scene coverage.
 - Extend the single-root scene-extent contract to separately owned multi-view,
   portal and authored capture graphs. The v30d result above closes the three
   retained scaled HDR comparisons for eligible single-root scenes; it does not

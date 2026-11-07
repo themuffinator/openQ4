@@ -626,7 +626,7 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-02 — Partial | Six controlled foreground samples pass the declared 28 ms presentation p99 budget on NVIDIA/Intel; failed diagnostic repeats remain retained. | Physical direct/hybrid routing, other power conditions and the broader exact-package pacing matrix. |
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
 | VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel; OpenGL clip-space depth through `VK_EXT_depth_clip_control` removes the three stencil pixels. | The strict lighting image gate (one point-map and one projected-map shadow-filter pixel on NVIDIA, more on Intel) and broader authored-lighting/mod content. |
-| VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
+| VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls; classic stock stages stay display-referred by decision, with a byte-identical, qualified fallback. | Tiled/out-of-frame captures and authored-post combinations of admitted (PBR) views. |
 | VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
 | VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. Tiled (larger-than-window) captures, direct and through the game-owned post target, pass on OpenGL and on Vulkan with NVIDIA and Intel. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix. |
 
@@ -761,6 +761,14 @@ and untested drivers remain open, with no tolerance or support-tier change.
   paired post/cubemap controls pass within one level, with exact main-view
   recovery. Complete-view material admission remains required. Tiled/out-of-frame
   captures and arbitrary portal/nested/material combinations remain open.
+  Decision, 6 November: classic stock stages (non-replace/add blends, dynamic,
+  texgen and cinematic stages, late sorts and the subviews that draw them) [stay
+  display-referred](vulkan-hdr.md#stock-content-stays-display-referred-6-november-2026-vk-05),
+  matching OpenGL and retail, instead of being re-blended in linear light.
+  Their admission scope is closed as declined by design. On Vulkan, requesting
+  the linear scene on stock `airdefense1` and `process1` leaves every capture
+  byte-identical, declines every main view and admits nothing. Tiled and
+  out-of-frame captures and authored post effects of admitted PBR views remain.
 - [ ] **VK-06 — P2, measured optimization: submission and resource lifetime.**
   Profile descriptor/pipeline churn, barriers, command recording, uploads and
   attachment reuse before changing them. Preserve GUI/transparency/post order,
