@@ -424,6 +424,24 @@ public:
 	idList<unsigned int>	demoGuiSurfaceChecksums;	// recording, same index; 0 = not written
 	class idGuiModel *		demoGuiScratch = NULL;		// recording: the filtered copy written
 
+	// An entity's joints in a render demo (v12). Recording predicts them from the
+	// joints it last wrote for the handle and playback from the joints it last
+	// read; both sides drop that history at every DC_LOADMAP, so a segment still
+	// depends on nothing before it.
+	struct demoJointHistory_t {
+		int						numJoints = 0;
+		bool					hasPrevious = false;	// previous: the record before current, same joint count
+		idList<unsigned int>	current;				// the joints as raw IEEE words
+		idList<unsigned int>	previous;
+	};
+	void					WriteDemoJoints( qhandle_t handle, const idJointMat *joints, int numJoints );
+	bool					ReadDemoJoints( qhandle_t handle, idJointMat *joints, int numJoints );
+	void					ResetDemoJointHistory( qhandle_t handle );	// -1: all
+	demoJointHistory_t *	DemoJointHistory( qhandle_t handle, bool create );
+	idList<demoJointHistory_t *>	demoJointHistory;	// by entity handle
+	idList<byte>			demoJointBuffer;			// one record's encoded joints
+	idList<unsigned int>	demoJointWords;				// one record's decoded joints
+
 
 	//--------------------------
 	// RenderWorld.cpp

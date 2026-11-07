@@ -24,9 +24,13 @@ See [player release status](../user/release-status.md).
 - [x] The demo library lists a campaign recording with its first level, length
   and number of levels. It refuses one recorded in the other campaign, saying
   which, and still plays an interrupted recording up to its last frame.
-- Compatibility: campaign demos use render demo version 11. Earlier openQ4
-  builds cannot play them; this build still plays earlier openQ4 render demos.
-  Expect more than 1 MB per second on busy levels.
+- [x] Demos are about a quarter smaller on levels full of animated characters,
+  with no change to what plays back: moving characters' skeletons are stored as
+  exact changes from the previous frame instead of in full.
+- Compatibility: new demos use render demo version 12. Earlier openQ4 builds
+  cannot play them; this build still plays earlier openQ4 render demos,
+  including version 11 campaign demos. Expect about 1 MB per second on busy
+  levels.
 - Evidence and remaining qualification:
   [campaign render demos](multiview-demos.md#campaign-render-demos-v11-7-november-2026),
   roadmap Q4-09.

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Structural contracts for campaign render demos (render demo v11).
+"""Structural contracts for campaign render demos (render demo v11 and v12).
 
 A campaign recording spans every single-player level it reaches as
 self-contained segments, records only gameplay frames, and ends with a raw
 summary trailer. Playback loads each segment's level, keeps one timeline and
-offers the level starts as markers. These checks pin the ordering and gating
-that keep a long recording decodable and its library entry honest.
+offers the level starts as markers. v12 predicts animated entities' joints
+from the joints last recorded for the same handle. These checks pin the
+ordering and gating that keep a long recording decodable and its library
+entry honest.
 """
 
 from __future__ import annotations
@@ -57,8 +59,9 @@ def require_order(text: str, needles: tuple[str, ...], context: str) -> None:
 
 def validate_format() -> None:
     session_h = read("src/framework/Session.h")
-    require(session_h, "OPENQ4_RENDERDEMO_CURRENT_VERSION = 11;", "current render-demo version")
+    require(session_h, "OPENQ4_RENDERDEMO_CURRENT_VERSION = 12;", "current render-demo version")
     require(session_h, "OPENQ4_RENDERDEMO_SESSION_VERSION = 11;", "session-record version")
+    require(session_h, "OPENQ4_RENDERDEMO_JOINT_PREDICTION_VERSION = 12;", "joint-prediction version")
 
     demo_h = read("src/framework/DemoFile.h")
     require_order(demo_h, ("DS_FINISHED,", "DS_RENDER,", "DS_SOUND,", "DS_VERSION,", "DS_SESSION"),
@@ -269,6 +272,73 @@ def validate_renderer() -> None:
         raise AssertionError("every coverage-atlas use must go through RetainedAtlasActive()")
 
 
+def validate_joints() -> None:
+    """v12 joint records: exact integer prediction, one shared history, checksummed."""
+    world_demo = read("src/renderer/RenderWorld_demo.cpp")
+    local_h = read("src/renderer/RenderWorld_local.h")
+    for needle in ("struct demoJointHistory_t {", "bool\t\t\t\t\thasPrevious = false;",
+                   "void\t\t\t\t\tWriteDemoJoints( qhandle_t handle, const idJointMat *joints, int numJoints );",
+                   "bool\t\t\t\t\tReadDemoJoints( qhandle_t handle, idJointMat *joints, int numJoints );",
+                   "void\t\t\t\t\tResetDemoJointHistory( qhandle_t handle );\t// -1: all"):
+        require(local_h, needle, "render world joint history")
+    for needle in ("const byte DEMO_JOINTS_RAW = 0;", "const byte DEMO_JOINTS_PREDICTED = 1;",
+                   "static_assert( sizeof( idJointMat ) == DEMO_JOINT_WORDS * sizeof( unsigned int )"):
+        require(world_demo, needle, "joint record layout")
+
+    # prediction runs on the words as integers, so every platform decodes the same bits
+    prediction = between(world_demo, "ID_INLINE unsigned int R_DemoJointPrediction", "// Keeps what was just written", "prediction")
+    require(prediction, "return last + ( last - history.previous[word] );", "linear integer prediction")
+    reject(prediction, "float", "floating-point prediction")
+    store = between(world_demo, "void R_DemoStoreJointHistory", "ID_INLINE void R_DemoPutWord", "history update")
+    require_order(store, ("history.numJoints == numJoints && history.current.Num() == numWords",
+                          "history.previous.Swap( history.current );", "history.hasPrevious = true;",
+                          "history.hasPrevious = false;", "memcpy( history.current.Ptr(), words"),
+                  "a history keeps the last record and the one before it at the same joint count")
+
+    entity_writer = between(world_demo, "void\tidRenderWorldLocal::WriteRenderEntity", "bool\tidRenderWorldLocal::ReadRenderEntity", "entity writer")
+    require(entity_writer, "WriteDemoJoints( handle, ent->joints, ent->numJoints );", "entity joints go through the joint coder")
+    reject(entity_writer, "WriteFloat( data[j] )", "raw joint floats in the entity writer")
+    entity_reader = between(world_demo, "bool\tidRenderWorldLocal::ReadRenderEntity", "UpdateEntityDef( index, &ent );", "entity reader")
+    require_order(entity_reader, ("Mem_Alloc16( ent.numJoints * sizeof( ent.joints[0] ) )",
+                                  "ReadDemoJoints( index, ent.joints, ent.numJoints )",
+                                  "R_FreeRenderDemoEntityPayload( ent, demoDecals, demoOverlay );"),
+                  "a failed joint record frees the entity payload")
+
+    writer = between(world_demo, "void idRenderWorldLocal::WriteDemoJoints", "bool idRenderWorldLocal::ReadDemoJoints", "joint writer")
+    require_order(writer, ("history == NULL || history->numJoints != numJoints", "out[0] = DEMO_JOINTS_RAW;",
+                           "memcmp( words + first, history->current.Ptr() + first",
+                           "( residual << 1 ) ^ ( 0u - ( residual >> 31 ) )", "out[0] = DEMO_JOINTS_PREDICTED;",
+                           "R_DemoJointChecksum( words, numWords )", "R_DemoStoreJointHistory( *history, words, numJoints );"),
+                  "raw without a matching history, else moved joints' zigzagged residuals and a checksum")
+    reader = between(world_demo, "bool idRenderWorldLocal::ReadDemoJoints", "/*\n==============\nProcessDemoCommand", "joint reader")
+    require_order(reader, ("session->renderdemoVersion < OPENQ4_RENDERDEMO_JOINT_PREDICTION_VERSION",
+                           "R_DemoReadFloat( demo, data[j] )", "return true;"),
+                  "older demos keep their raw joint floats")
+    for needle in ("predicts joints it never recorded", "joint payload of %d bytes is out of range",
+                   "( shift == 28 && *cursor > 0x0Fu )", "malformed joint residual", "joint payload has trailing bytes",
+                   "joints do not match their checksum", "unknown joint record %d"):
+        require(reader, needle, "bounded, verified joint reader")
+    require_order(reader, ("R_DemoJointChecksum( words, numWords )", "memcpy( joints, words",
+                           "R_DemoStoreJointHistory( *history, words, numJoints );"),
+                  "playback keeps the verified joints as its history")
+
+    # both sides drop the history at the same stream point, DC_LOADMAP
+    load_writer = between(world_demo, "void\tidRenderWorldLocal::WriteLoadMap", "void\tidRenderWorldLocal::WriteVisibleDefs", "WriteLoadMap")
+    require_order(load_writer, ("this != session->rw", "WriteInt( DC_LOADMAP );", "ResetDemoJointHistory( -1 );"),
+                  "a recorded map load or segment start drops the joint history")
+    load_reader = between(world_demo, "case DC_LOADMAP: {", "case DC_RENDERVIEW:", "DC_LOADMAP reader")
+    require_order(load_reader, ("ResetDemoJointHistory( -1 );", "InitFromMap( header.mapname )"),
+                  "playback drops the joint history at the same point")
+    delete_reader = between(world_demo, "case DC_DELETE_ENTITYDEF:", "case DC_UPDATE_LIGHTDEF:", "DC_DELETE_ENTITYDEF reader")
+    reject(delete_reader, "ResetDemoJointHistory", "playback must keep history across the delete before each rewrite")
+    free_defs = between(read("src/renderer/RenderWorld_load.cpp"), "void idRenderWorldLocal::FreeDefs() {", "generateAllInteractionsCalled = false;", "FreeDefs")
+    require(free_defs, "ResetDemoJointHistory( -1 );", "the history goes with the world's entities")
+    free_entity = between(read("src/renderer/RenderWorld.cpp"), "void idRenderWorldLocal::FreeEntityDef", "GetRenderEntity", "FreeEntityDef")
+    require_order(free_entity, ("FreeDemoGuiSurfaces( entityHandle );", "session->writeDemo != NULL && this == session->rw",
+                                "ResetDemoJointHistory( entityHandle );"),
+                  "only a recording drops a freed handle's history")
+
+
 def validate_localization() -> None:
     for language in LANGUAGES:
         table = read(f"content/baseoq4/pak0/strings/{language}_openq4.lang")
@@ -291,6 +361,7 @@ def main() -> int:
     validate_player()
     validate_library()
     validate_renderer()
+    validate_joints()
     validate_localization()
     print("campaign demo contracts: ok")
     return 0

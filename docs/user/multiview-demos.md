@@ -54,8 +54,8 @@ across levels.
 
 A campaign demo stores what you saw and heard, including the HUD and in-world
 screens, not the game itself, so the camera cannot leave your view. Grouped HUD
-panels play back without their shaped edges. Busy levels can use more than 1 MB
-per second, so a long campaign recording needs several gigabytes of space.
+panels play back without their shaped edges. Busy levels use about 1 MB per
+second, so a long campaign recording needs several gigabytes of space.
 
 ## Record a match
 

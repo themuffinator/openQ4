@@ -682,6 +682,11 @@ void idRenderWorldLocal::FreeEntityDef( qhandle_t entityHandle ) {
 	}
 	// a later entity in this slot draws its own in-world GUI, if any
 	FreeDemoGuiSurfaces( entityHandle );
+	// and a recording writes its first joints in full; playback keeps the
+	// handle's history, since a demo's DC_DELETE_ENTITYDEF is not always a free
+	if ( session->writeDemo != NULL && this == session->rw ) {
+		ResetDemoJointHistory( entityHandle );
+	}
 
 	// if we are playing a demo, these will have been freed
 	// in R_FreeEntityDefDerivedData(), otherwise the gui

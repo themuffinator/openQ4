@@ -749,7 +749,7 @@ v11 adds session records (`DS_SESSION`, `DemoFile.h`). Each is a dictionary;
 readers skip unknown record kinds.
 
 ```text
-DS_VERSION 11
+DS_VERSION 12 (11 before joint prediction; both play)
 DS_SESSION DSC_HEADER   game, campaign, mode, userCmdHz, skill, build
 per segment (one level):
   DS_SESSION DSC_SEGMENT        index, frame, map, entityFilter, reason, skill
@@ -764,8 +764,9 @@ raw trailer (outside the compressed stream): payload | int length | uint crc32 |
 
 A segment depends on nothing before it: a fresh string table, the full sound
 state, a level load that frees every definition, archive flags reset so every
-visible entity, light and effect is written again, in-world GUIs rewritten and
-the first frame's 2D written in full. The writer finds hash strings through an
+visible entity, light and effect is written again, in-world GUIs rewritten, the
+first frame's 2D written in full and, from v12, no joints predicted from an
+earlier record ([joint prediction](#joint-prediction-v12-7-november-2026)). The writer finds hash strings through an
 index instead of a linear search, and the per-segment reset keeps each table
 far below the 65,536-string bound over a long campaign.
 
@@ -860,6 +861,68 @@ plays back as its unmasked content.
   sound already playing when a segment begins is still not restored: the sound
   state, shared with savegames, never stores that slot.
 
+### Joint prediction (v12), 7 November 2026
+
+Measured first, on a scripted recording of 16.7 seconds (airdefense1 for 8
+seconds, then a change to airdefense2), uncompressed bytes by record: animated
+entities' joints 28.9%, the 2D model 28.5%, sound commands 21.3%, effects 13.0%,
+the other entity fields 5.9%, in-world GUIs 1.9%, the rest under 1%. The demo
+file's LZW (a 12-bit dictionary) cannot compress raw joint floats at all: the
+10.3 MB of joints in that recording still took 10.5 MB, half of the 20.4 MB
+file. Each frame about fifteen animated entities rewrite every joint, and 78% of
+those joints move from one frame to the next.
+
+v12 writes an entity's joints (`WriteDemoJoints` / `ReadDemoJoints` in
+`RenderWorld_demo.cpp`) as:
+
+```text
+byte mode
+  0 raw         numJoints * 12 little-endian IEEE words (v11's layout)
+  1 predicted   int payloadBytes
+                a bit per joint, set when it moved since the handle's last record
+                for each moved joint, 12 LEB128 varints of the zigzagged residual
+                uint FNV-1a checksum of the decoded words
+```
+
+The prediction is the word last recorded for that handle, extended linearly by
+the step from the record before it when both had this joint count. It works on
+the words as 32-bit integers, never as floats, so every platform decodes the
+recorded bits exactly, scale, signed zeros and NaNs included. Recording and
+playback keep the same history per entity handle and both drop it at every
+`DC_LOADMAP`, a segment start or map load. A recording also drops a handle's
+history when the entity is freed and writes its next joints raw. Playback keeps
+it across `DC_DELETE_ENTITYDEF`, which a recording writes before every rewrite
+of an archived entity. A predicted record without a matching history, a
+malformed residual, trailing bytes or a checksum mismatch stops playback with a
+warning instead of showing a wrong pose.
+
+The encoding was chosen offline from that recording's joints, compressed by an
+exact model of the demo LZW: XOR against the previous record took 6.6 MB, XOR
+with the bytes regrouped by significance 6.3 MB, first-order integer residuals
+5.9 MB, linear residuals as varints with the moved-joint mask 5.4 MB. Rice coding
+packs the same residuals into 4.6 MB, but the LZW expands near-random bytes by a
+quarter, to 5.9 MB; varints keep a structure it can use. Quaternions were not
+used: they are not exact, and Quake 4 joint matrices can carry scale.
+
+Result on the same scripted clip recorded again (two segments, 500 frames, the
+second level starting at frame 260 in both): 20.4 MB in v11, 15.4 MB in v12
+(-24.5%), about 1.22 MB/s down to 0.92 MB/s. The 2D model, sound commands and
+effects are now the larger share.
+
+Validation, staged Windows client, hidden window, no input:
+
+- `timeDemoQuit` played all 500 frames of the v12 clip on GL and on Vulkan, with
+  every predicted record matching its checksum. The v11 recording of the same
+  clip and the earlier three-level v11 demo (745 frames) still play in full.
+- Paused at 6 s (level one) and 12 s (level two), the v11 and v12 recordings
+  played in the same savepath show the same view and the same pistol and hand
+  pose; what differs is smoke, fire and light flicker between two live
+  recordings. Compare in one savepath: a savepath whose first run detected the
+  balanced preset drew airdefense1's sky black for both demos.
+- In an uncompressed v12 demo, one flipped residual bit stopped playback at that
+  frame with "joints do not match their checksum", and a bad mode byte with
+  "unknown joint record"; the client exited normally both times.
+
 ### Library
 
 A v11 single-player entry shows **Campaign demo**, its first level, the date,
@@ -904,12 +967,14 @@ captures under `.tmp/campaign-demos/` (local only):
   **Other campaign** with Play disabled.
 - Size: about 0.7 MB/s in a quiet corridor and 1.4 MB/s on airdefense1, where
   about fifteen animated entities rewrite their joints every frame. A changed
-  2D surface is typically 1 of 10 per frame.
+  2D surface is typically 1 of 10 per frame. v12's joint prediction takes a
+  quarter off ([joint prediction](#joint-prediction-v12-7-november-2026)).
 
-`campaign_demo_contract.py` pins the format, both ends, the library and the
-strings. Remaining (Q4-09): Vulkan recording, Linux and macOS, a long session
-with measured seek times, joint-data size, masked HUD groups and local sounds
-already playing at a segment start.
+`campaign_demo_contract.py` pins the format, both ends, the joint coding, the
+library and the strings. Remaining (Q4-09): Vulkan recording, Linux and macOS, a
+long session with measured seek times and size, the 2D model, sound and effect
+records that now dominate the size, masked HUD groups and local sounds already
+playing at a segment start.
 
 ## Update policy
 

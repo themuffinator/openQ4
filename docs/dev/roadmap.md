@@ -2363,7 +2363,7 @@ historical saves and recovering safely from damage.
 | Q4-06 — Partial; optional P3 | Raw inventory and field codecs restored; v5 portable stamp/encoding implemented; Windows/Linux bidirectional stock/Awakening cross-loads pass. | Confirm outstanding CI/Apple codec runs; macOS and another ARM64 runtime cross-load/resave directions; publish player migration guidance with accepted scope. |
 | Q4-07 — Partial | Original-writer Windows corpus substantially qualified; v2 stamp reporting repaired; exact HiDef fixture investigated. | Resolve #123 against the reporter's actual GUI/content; other ABIs; recover/reproduce absent stage-two artifacts before claiming independently reviewable acceptance. |
 | Q4-08 — Partial | Durable commit/recovery implemented; 56 process-interruption points, locked-file failure and NTFS/ext4/WSL 9p checks recorded. | APFS result, removable/network filesystems and actual power-cut behavior; retain measured CRC/sync costs and last-valid-save preservation. |
-| Q4-09 — Partial | Render demo v11: one recording spans levels, save loads, death reloads and restarts as self-contained segments; gameplay-only frames; level loads, continuous timeline and level markers in playback; campaign-aware library and gate; whole retained HUD and in-world screens recorded. Windows checks pass with stock and Awakening content: GL recording, GL and Vulkan playback. | Vulkan recording, Linux and macOS, a long multi-level session with seek timing and file size, joint-data compression, the masked retained HUD groups that replay unmasked, and local sounds already playing at a segment start. |
+| Q4-09 — Partial | Render demo v11: one recording spans levels, save loads, death reloads and restarts as self-contained segments; gameplay-only frames; level loads, continuous timeline and level markers in playback; campaign-aware library and gate; whole retained HUD and in-world screens recorded. Render demo v12 predicts animated-entity joints exactly, a quarter smaller. Windows checks pass with stock and Awakening content: GL recording, GL and Vulkan playback. | Vulkan recording, Linux and macOS, a long multi-level session with seek timing and file size, the 2D, sound and effect records that now dominate the size, the masked retained HUD groups that replay unmasked, and local sounds already playing at a segment start. |
 
 Completion substeps must keep three forms of evidence distinct:
 
@@ -2985,9 +2985,18 @@ Completion substeps must keep three forms of evidence distinct:
   that render demos could not replay a local sound (music, narration, interface)
   at all; the sound reader now resolves that emitter, and the demo played in full
   and was refused in base Quake 4.
+  Render demo v12 (7 November 2026) predicts animated entities' joints from the
+  joints last recorded for the same handle and stores only the moved joints'
+  residuals, exact on every platform and checksummed
+  ([joint prediction](multiview-demos.md#joint-prediction-v12-7-november-2026)).
+  Joints had been half of the compressed file. The same scripted airdefense1 to
+  airdefense2 clip (500 frames) shrank from 20.4 MB to 15.4 MB (-24.5%, about
+  0.92 MB per second); it replayed all 500 frames on GL and Vulkan with every
+  record verified, the three-level v11 demo still played in full, and paused
+  frames of the two recordings matched in view and pose.
   Remaining: Vulkan recording, Linux and macOS, a long session with measured seek
-  times (rewinds replay from the start), size work on animated-entity joints
-  (about 0.7–1.4 MB per second on stock levels), the retained HUD's masked
+  times (rewinds replay from the start) and size, the 2D model, sound and effect
+  records that now make up most of a recording, the retained HUD's masked
   groups, which replay without their masks, and local sounds already playing when
   a segment starts.
 
