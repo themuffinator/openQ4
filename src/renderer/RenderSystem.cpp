@@ -1515,6 +1515,14 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 	}
 
 	guiModel->Clear();
+	if ( demoFrameGuiModel != NULL ) {
+		// a frame's recorded 2D starts empty, whatever the last frame drew
+		demoFrameGuiModel->Clear();
+	}
+	if ( session->writeDemo == NULL && demoLayerGuiModels.Num() > 0 ) {
+		// retained layer content is only tracked while a demo records
+		demoLayerGuiModels.DeleteContents( true );
+	}
 	useUIViewportFor2D = true;
 	activeRenderTexture = NULL;
 
@@ -1651,9 +1659,33 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 }
 
 void idRenderSystemLocal::WriteDemoPics() {
+	// The frame's earlier screen batches, then the one still pending.
+	idGuiModel *frame = demoFrameGuiModel != NULL ? demoFrameGuiModel : guiModel;
+	if ( demoFrameGuiModel != NULL && R_DemoGuiTarget() == demoFrameGuiModel ) {
+		demoFrameGuiModel->AppendForDemo( *guiModel );
+	}
 	session->writeDemo->WriteInt( DS_RENDER );
 	session->writeDemo->WriteInt( DC_GUI_MODEL );
-	guiModel->WriteToDemo( session->writeDemo );
+	if ( demoFrameGuiModel == NULL || demoLastGuiModel == NULL ) {
+		frame->WriteToDemo( session->writeDemo );
+		return;
+	}
+	frame->WriteToDemo( session->writeDemo, demoLastGuiModelValid ? demoLastGuiModel : NULL );
+	// keep what was written for the next frame's comparison, without a copy
+	demoLastGuiModel->Swap( *demoFrameGuiModel );
+	demoLastGuiModelValid = true;
+	demoFrameGuiModel->Clear();
+}
+
+void idRenderSystemLocal::WriteDemoEndFrame() {
+	if ( session->writeDemo == NULL ) {
+		return;
+	}
+	session->writeDemo->WriteInt( DS_RENDER );
+	session->writeDemo->WriteInt( DC_END_FRAME );
+	if ( r_showDemo.GetBool() ) {
+		common->Printf( "write DC_END_FRAME\n" );
+	}
 }
 
 void idRenderSystemLocal::DrawDemoPics() {
@@ -1746,14 +1778,9 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 		}
 	}
 
-	if ( session->writeDemo ) {
-		session->writeDemo->WriteInt( DS_RENDER );
-		session->writeDemo->WriteInt( DC_END_FRAME );
-		if ( r_showDemo.GetBool() ) {
-			common->Printf( "write DC_END_FRAME\n" );
-		}
-	}
-
+	// The session ends recorded frames itself (WriteDemoEndFrame), after a
+	// gameplay draw only; ending every presented frame here filled campaign
+	// recordings with the frozen frames of menus, pauses and loading screens.
 }
 
 // Keep the receipt on the frame until the main thread retires it. In the
@@ -2519,6 +2546,15 @@ void idRenderSystemLocal::ClearRenderTarget(bool clearColor, bool clearDepth, fl
 
 	cmd = (renderClearBufferCommand_t*)R_GetCommandBuffer(sizeof(*cmd));
 	cmd->commandId = RC_CLEAR_RENDERTARGET;
+
+	// A recorded retained layer starts over with its target, exactly as its
+	// pixels do; batches still pending reach it after the clear, as they do here.
+	if ( clearColor && session->writeDemo != NULL && activeRenderTexture != NULL ) {
+		idGuiModel *layerContent = R_DemoGuiTarget();
+		if ( layerContent != NULL && layerContent != demoFrameGuiModel ) {
+			layerContent->Clear();
+		}
+	}
 
 	cmd->clearColor = clearColor;
 	cmd->clearDepth = clearDepth;

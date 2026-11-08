@@ -36,15 +36,37 @@ typedef struct {
 	int					numIndexes;
 } guiModelSurface_t;
 
+class idGuiModel;
+
+// The model a 2D batch flushed now belongs to in a recording render demo:
+// the frame's screen 2D, a retained layer's content, or NULL (GuiModel.cpp).
+idGuiModel *R_DemoGuiTarget();
+
 class idGuiModel {
 public:
 	idGuiModel();
 
 	void	Clear();
 
-	void	WriteToDemo( idDemoFile *demo );
+	// previous: the model the stream's last DC_GUI_MODEL wrote, whose
+	// unchanged surfaces a v11 frame repeats in one byte, or NULL.
+	void	WriteToDemo( idDemoFile *demo, const idGuiModel *previous = NULL );
 	bool	ReadFromDemo( idDemoFile *demo );
-	
+	void	Swap( idGuiModel &other );
+	const idList<idDrawVert> &	Verts() const { return verts; }
+	const idList<glIndex_t> &	Indexes() const { return indexes; }
+
+	// Appends another model's surfaces to a render demo's frame model. Scene
+	// composition (post-process sorts) and surfaces that sample a runtime-only
+	// retained UI image (atlas, layer, generated or blur target) are left
+	// out: playback renders the scene itself, and those pixels never reach
+	// the demo.
+	void	AppendForDemo( const idGuiModel &other );
+	void	AppendForDemoScaled( const idGuiModel &other, float opacity );
+	bool	IsEmpty() const;
+	// CRC of the geometry, colors and materials, for change detection.
+	unsigned int	ContentChecksum() const;
+
 	void	EmitToCurrentView( float modelMatrix[16], bool depthHack );
 	void	EmitFullScreen();
 	bool	HasSceneFeedback() const;
@@ -59,6 +81,7 @@ public:
 
 	//---------------------------
 private:
+	bool	ReadSurfacesFromDemo( idDemoFile *demo );
 	void	AdvanceSurf();
 	void	EmitSurface( guiModelSurface_t *surf, float modelMatrix[16], float modelViewMatrix[16], bool depthHack,
 				const struct viewEntity_s *sharedSpace = NULL );

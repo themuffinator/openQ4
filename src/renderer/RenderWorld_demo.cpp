@@ -119,6 +119,79 @@ bool R_DemoReadMat3( idDemoFile *demo, idMat3 &value ) {
 	return R_RejectRenderDemo( demo, "truncated matrix payload" );
 }
 
+/*
+Render demo v12 joint records. After an entity's other fields:
+
+	byte mode
+	DEMO_JOINTS_RAW:       numJoints * 12 little-endian IEEE words (v11's layout)
+	DEMO_JOINTS_PREDICTED: int payloadBytes
+	                       payload: a bit per joint, set when it moved since the
+	                                handle's last record, then for each moved joint
+	                                12 LEB128 varints of the zigzagged residual
+	                       uint checksum of the decoded words
+
+Prediction works on the words as unsigned integers, never as floats, so every
+platform decodes the recorded bits exactly: the last record's word, extended
+linearly by the step from the record before it when both have this joint count.
+Recording and playback keep the same history, so the reader rebuilds the words
+the writer saw; the checksum stops playback cleanly if they ever disagree.
+*/
+const int DEMO_JOINT_WORDS = 12;
+const byte DEMO_JOINTS_RAW = 0;
+const byte DEMO_JOINTS_PREDICTED = 1;
+const int DEMO_JOINT_VARINT_MAX_BYTES = 5;
+
+static_assert( sizeof( idJointMat ) == DEMO_JOINT_WORDS * sizeof( unsigned int ), "render demo joints are 12 IEEE words" );
+static_assert( sizeof( float ) == sizeof( unsigned int ), "render demo joints store floats as 32-bit words" );
+
+unsigned int R_DemoJointChecksum( const unsigned int *words, int numWords ) {
+	// FNV-1a over the little-endian bytes
+	unsigned int hash = 2166136261u;
+	for ( int i = 0; i < numWords; i++ ) {
+		const unsigned int word = words[i];
+		for ( int shift = 0; shift < 32; shift += 8 ) {
+			hash ^= ( word >> shift ) & 0xFFu;
+			hash *= 16777619u;
+		}
+	}
+	return hash;
+}
+
+ID_INLINE unsigned int R_DemoJointPrediction( const idRenderWorldLocal::demoJointHistory_t &history, int word ) {
+	const unsigned int last = history.current[word];
+	if ( !history.hasPrevious ) {
+		return last;
+	}
+	return last + ( last - history.previous[word] );
+}
+
+// Keeps what was just written or read as the handle's history.
+void R_DemoStoreJointHistory( idRenderWorldLocal::demoJointHistory_t &history, const unsigned int *words, int numJoints ) {
+	const int numWords = numJoints * DEMO_JOINT_WORDS;
+	if ( history.numJoints == numJoints && history.current.Num() == numWords ) {
+		history.previous.Swap( history.current );
+		history.hasPrevious = true;
+	} else {
+		history.previous.Clear();
+		history.hasPrevious = false;
+	}
+	history.current.SetNum( numWords );
+	memcpy( history.current.Ptr(), words, numWords * sizeof( unsigned int ) );
+	history.numJoints = numJoints;
+}
+
+ID_INLINE void R_DemoPutWord( byte *out, unsigned int word ) {
+	out[0] = static_cast<byte>( word );
+	out[1] = static_cast<byte>( word >> 8 );
+	out[2] = static_cast<byte>( word >> 16 );
+	out[3] = static_cast<byte>( word >> 24 );
+}
+
+ID_INLINE unsigned int R_DemoGetWord( const byte *in ) {
+	return static_cast<unsigned int>( in[0] ) | ( static_cast<unsigned int>( in[1] ) << 8 ) |
+		( static_cast<unsigned int>( in[2] ) << 16 ) | ( static_cast<unsigned int>( in[3] ) << 24 );
+}
+
 void R_WriteDemoRenderViewData( idDemoFile *demo, const renderView_t *renderView ) {
 	demo->WriteInt( renderView->viewID );
 	demo->WriteInt( renderView->x );
@@ -313,10 +386,334 @@ void		idRenderWorldLocal::StartWritingDemo( idDemoFile *demo ) {
 			effectsDef[i]->archived = false;
 		}
 	}
+
+	// every in-world GUI is written again as it next draws, and the next
+	// frame's 2D in full: a segment depends on nothing before it
+	demoGuiSurfaceChecksums.Clear();
+	if ( this == session->rw ) {
+		tr.demoLastGuiModelValid = false;
+	}
 }
 
 void idRenderWorldLocal::StopWritingDemo() {
 //	writeDemo = NULL;
+}
+
+// Entity handles a render demo may carry an in-world GUI for.
+static const int DEMO_MAX_GUI_SURFACE_HANDLE = 1 << 16;
+
+/*
+==============
+WriteGuiSurface
+==============
+*/
+void idRenderWorldLocal::WriteGuiSurface( qhandle_t handle, int entityGui, const idGuiModel &model ) {
+	if ( this != session->rw || session->writeDemo == NULL || handle < 0 || handle >= DEMO_MAX_GUI_SURFACE_HANDLE ||
+		 entityGui < 0 || entityGui >= MAX_RENDERENTITY_GUI ) {
+		return;
+	}
+	// The screen-only pictures a GUI may sample at runtime never reach the demo.
+	if ( demoGuiScratch == NULL ) {
+		demoGuiScratch = new idGuiModel;
+	}
+	idGuiModel &recorded = *demoGuiScratch;
+	recorded.Clear();
+	recorded.AppendForDemo( model );
+	const unsigned int checksum = recorded.ContentChecksum() | 1u;
+	const int slot = handle * MAX_RENDERENTITY_GUI + entityGui;
+	if ( demoGuiSurfaceChecksums.Num() <= slot ) {
+		const int previous = demoGuiSurfaceChecksums.Num();
+		demoGuiSurfaceChecksums.SetNum( slot + 1 );
+		for ( int i = previous; i < demoGuiSurfaceChecksums.Num(); i++ ) {
+			demoGuiSurfaceChecksums[i] = 0;
+		}
+	}
+	if ( demoGuiSurfaceChecksums[slot] == checksum ) {
+		return;		// unchanged since it was last written
+	}
+	demoGuiSurfaceChecksums[slot] = checksum;
+	session->writeDemo->WriteInt( DS_RENDER );
+	session->writeDemo->WriteInt( DC_GUI_SURFACE );
+	session->writeDemo->WriteInt( handle );
+	session->writeDemo->WriteInt( entityGui );
+	recorded.WriteToDemo( session->writeDemo );
+	if ( r_showDemo.GetBool() ) {
+		common->Printf( "write DC_GUI_SURFACE: %i:%i\n", handle, entityGui );
+	}
+}
+
+/*
+==============
+ReadGuiSurface
+==============
+*/
+bool idRenderWorldLocal::ReadGuiSurface() {
+	int handle = 0;
+	int entityGui = 0;
+	if ( !R_DemoReadInt( session->readDemo, handle ) || !R_DemoReadInt( session->readDemo, entityGui ) ) {
+		return false;
+	}
+	if ( handle < 0 || handle >= DEMO_MAX_GUI_SURFACE_HANDLE || entityGui < 0 || entityGui >= MAX_RENDERENTITY_GUI ) {
+		return R_RejectRenderDemo( session->readDemo, va( "in-world GUI %d:%d is out of range", handle, entityGui ) );
+	}
+	const int slot = handle * MAX_RENDERENTITY_GUI + entityGui;
+	if ( demoGuiSurfaces.Num() <= slot ) {
+		const int previous = demoGuiSurfaces.Num();
+		demoGuiSurfaces.SetNum( slot + 1 );
+		for ( int i = previous; i < demoGuiSurfaces.Num(); i++ ) {
+			demoGuiSurfaces[i] = NULL;
+		}
+	}
+	if ( demoGuiSurfaces[slot] == NULL ) {
+		demoGuiSurfaces[slot] = new idGuiModel;
+	}
+	if ( !demoGuiSurfaces[slot]->ReadFromDemo( session->readDemo ) ) {
+		delete demoGuiSurfaces[slot];
+		demoGuiSurfaces[slot] = NULL;
+		return false;
+	}
+	if ( r_showDemo.GetBool() ) {
+		common->Printf( "DC_GUI_SURFACE: %i:%i\n", handle, entityGui );
+	}
+	return true;
+}
+
+/*
+==============
+DemoGuiSurface
+==============
+*/
+idGuiModel *idRenderWorldLocal::DemoGuiSurface( qhandle_t handle, int entityGui ) const {
+	if ( handle < 0 || entityGui < 0 || entityGui >= MAX_RENDERENTITY_GUI ) {
+		return NULL;
+	}
+	const int slot = handle * MAX_RENDERENTITY_GUI + entityGui;
+	return slot < demoGuiSurfaces.Num() ? demoGuiSurfaces[slot] : NULL;
+}
+
+/*
+==============
+FreeDemoGuiSurfaces
+==============
+*/
+void idRenderWorldLocal::FreeDemoGuiSurfaces( qhandle_t handle ) {
+	if ( handle < 0 ) {
+		demoGuiSurfaces.DeleteContents( true );
+		demoGuiSurfaceChecksums.Clear();
+		delete demoGuiScratch;
+		demoGuiScratch = NULL;
+		return;
+	}
+	for ( int entityGui = 0; entityGui < MAX_RENDERENTITY_GUI; entityGui++ ) {
+		const int slot = handle * MAX_RENDERENTITY_GUI + entityGui;
+		if ( slot < demoGuiSurfaces.Num() && demoGuiSurfaces[slot] != NULL ) {
+			delete demoGuiSurfaces[slot];
+			demoGuiSurfaces[slot] = NULL;
+		}
+		if ( slot < demoGuiSurfaceChecksums.Num() ) {
+			demoGuiSurfaceChecksums[slot] = 0;
+		}
+	}
+}
+
+/*
+==============
+DemoJointHistory
+==============
+*/
+idRenderWorldLocal::demoJointHistory_t *idRenderWorldLocal::DemoJointHistory( qhandle_t handle, bool create ) {
+	if ( handle < 0 || handle > LUDICROUS_INDEX ) {
+		return NULL;
+	}
+	if ( handle >= demoJointHistory.Num() ) {
+		if ( !create ) {
+			return NULL;
+		}
+		const int previous = demoJointHistory.Num();
+		demoJointHistory.SetNum( handle + 1 );
+		for ( int i = previous; i < demoJointHistory.Num(); i++ ) {
+			demoJointHistory[i] = NULL;
+		}
+	}
+	if ( demoJointHistory[handle] == NULL && create ) {
+		demoJointHistory[handle] = new demoJointHistory_t;
+	}
+	return demoJointHistory[handle];
+}
+
+/*
+==============
+ResetDemoJointHistory
+
+Playback never drops one handle's history: the DC_DELETE_ENTITYDEF that
+precedes every rewrite of an archived entity is not a free. Recording may, and
+then writes that handle's next joints raw.
+==============
+*/
+void idRenderWorldLocal::ResetDemoJointHistory( qhandle_t handle ) {
+	if ( handle < 0 ) {
+		demoJointHistory.DeleteContents( true );
+		demoJointBuffer.Clear();
+		demoJointWords.Clear();
+		return;
+	}
+	if ( handle < demoJointHistory.Num() && demoJointHistory[handle] != NULL ) {
+		delete demoJointHistory[handle];
+		demoJointHistory[handle] = NULL;
+	}
+}
+
+/*
+==============
+WriteDemoJoints
+==============
+*/
+void idRenderWorldLocal::WriteDemoJoints( qhandle_t handle, const idJointMat *joints, int numJoints ) {
+	idDemoFile *demo = session->writeDemo;
+	const int numWords = numJoints * DEMO_JOINT_WORDS;
+	demoJointWords.SetNum( numWords );
+	memcpy( demoJointWords.Ptr(), joints, numWords * sizeof( unsigned int ) );
+	const unsigned int *words = demoJointWords.Ptr();
+
+	demoJointHistory_t *history = DemoJointHistory( handle, true );
+	if ( history == NULL || history->numJoints != numJoints ) {
+		demoJointBuffer.SetNum( 1 + numWords * 4 );
+		byte *out = demoJointBuffer.Ptr();
+		out[0] = DEMO_JOINTS_RAW;
+		for ( int i = 0; i < numWords; i++ ) {
+			R_DemoPutWord( out + 1 + i * 4, words[i] );
+		}
+		demo->Write( out, demoJointBuffer.Num() );
+	} else {
+		const int maskBytes = ( numJoints + 7 ) >> 3;
+		const int headerBytes = 1 + 4;
+		demoJointBuffer.SetNum( headerBytes + maskBytes + numWords * DEMO_JOINT_VARINT_MAX_BYTES + 4 );
+		byte *out = demoJointBuffer.Ptr();
+		byte *mask = out + headerBytes;
+		memset( mask, 0, maskBytes );
+		byte *cursor = mask + maskBytes;
+		for ( int joint = 0; joint < numJoints; joint++ ) {
+			const int first = joint * DEMO_JOINT_WORDS;
+			if ( memcmp( words + first, history->current.Ptr() + first, DEMO_JOINT_WORDS * sizeof( unsigned int ) ) == 0 ) {
+				continue;
+			}
+			mask[joint >> 3] |= static_cast<byte>( 1 << ( joint & 7 ) );
+			for ( int word = first; word < first + DEMO_JOINT_WORDS; word++ ) {
+				const unsigned int residual = words[word] - R_DemoJointPrediction( *history, word );
+				unsigned int value = ( residual << 1 ) ^ ( 0u - ( residual >> 31 ) );
+				while ( value >= 0x80u ) {
+					*cursor++ = static_cast<byte>( ( value & 0x7Fu ) | 0x80u );
+					value >>= 7;
+				}
+				*cursor++ = static_cast<byte>( value );
+			}
+		}
+		const int payloadBytes = static_cast<int>( cursor - mask );
+		out[0] = DEMO_JOINTS_PREDICTED;
+		R_DemoPutWord( out + 1, static_cast<unsigned int>( payloadBytes ) );
+		R_DemoPutWord( cursor, R_DemoJointChecksum( words, numWords ) );
+		cursor += 4;
+		demo->Write( out, static_cast<int>( cursor - out ) );
+	}
+	if ( history != NULL ) {
+		R_DemoStoreJointHistory( *history, words, numJoints );
+	}
+}
+
+/*
+==============
+ReadDemoJoints
+==============
+*/
+bool idRenderWorldLocal::ReadDemoJoints( qhandle_t handle, idJointMat *joints, int numJoints ) {
+	idDemoFile *demo = session->readDemo;
+	const int numWords = numJoints * DEMO_JOINT_WORDS;
+
+	if ( session->renderdemoVersion < OPENQ4_RENDERDEMO_JOINT_PREDICTION_VERSION ) {
+		for ( int i = 0; i < numJoints; i++ ) {
+			float *data = joints[i].ToFloatPtr();
+			for ( int j = 0; j < DEMO_JOINT_WORDS; j++ ) {
+				if ( !R_DemoReadFloat( demo, data[j] ) ) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	char mode = 0;
+	if ( !R_DemoReadChar( demo, mode ) ) {
+		return false;
+	}
+	demoJointWords.SetNum( numWords );
+	unsigned int *words = demoJointWords.Ptr();
+	demoJointHistory_t *history = DemoJointHistory( handle, true );
+
+	if ( static_cast<byte>( mode ) == DEMO_JOINTS_RAW ) {
+		demoJointBuffer.SetNum( numWords * 4 );
+		if ( demo->Read( demoJointBuffer.Ptr(), demoJointBuffer.Num() ) != demoJointBuffer.Num() ) {
+			return R_RejectRenderDemo( demo, "truncated joint payload" );
+		}
+		for ( int i = 0; i < numWords; i++ ) {
+			words[i] = R_DemoGetWord( demoJointBuffer.Ptr() + i * 4 );
+		}
+	} else if ( static_cast<byte>( mode ) == DEMO_JOINTS_PREDICTED ) {
+		if ( history == NULL || history->numJoints != numJoints ) {
+			return R_RejectRenderDemo( demo, va( "entity %d predicts joints it never recorded", handle ) );
+		}
+		const int maskBytes = ( numJoints + 7 ) >> 3;
+		int payloadBytes = 0;
+		if ( !R_DemoReadInt( demo, payloadBytes ) ) {
+			return false;
+		}
+		if ( payloadBytes < maskBytes || payloadBytes > maskBytes + numWords * DEMO_JOINT_VARINT_MAX_BYTES ) {
+			return R_RejectRenderDemo( demo, va( "joint payload of %d bytes is out of range", payloadBytes ) );
+		}
+		demoJointBuffer.SetNum( payloadBytes + 4 );
+		if ( demo->Read( demoJointBuffer.Ptr(), demoJointBuffer.Num() ) != demoJointBuffer.Num() ) {
+			return R_RejectRenderDemo( demo, "truncated joint payload" );
+		}
+		const byte *mask = demoJointBuffer.Ptr();
+		const byte *cursor = mask + maskBytes;
+		const byte *end = mask + payloadBytes;
+		for ( int joint = 0; joint < numJoints; joint++ ) {
+			const int first = joint * DEMO_JOINT_WORDS;
+			if ( ( mask[joint >> 3] & ( 1 << ( joint & 7 ) ) ) == 0 ) {
+				memcpy( words + first, history->current.Ptr() + first, DEMO_JOINT_WORDS * sizeof( unsigned int ) );
+				continue;
+			}
+			for ( int word = first; word < first + DEMO_JOINT_WORDS; word++ ) {
+				unsigned int value = 0;
+				for ( int shift = 0; ; shift += 7 ) {
+					if ( cursor >= end || shift >= 7 * DEMO_JOINT_VARINT_MAX_BYTES ||
+						 ( shift == 28 && *cursor > 0x0Fu ) ) {
+						return R_RejectRenderDemo( demo, "malformed joint residual" );
+					}
+					const byte next = *cursor++;
+					value |= static_cast<unsigned int>( next & 0x7Fu ) << shift;
+					if ( ( next & 0x80u ) == 0 ) {
+						break;
+					}
+				}
+				const unsigned int residual = ( value >> 1 ) ^ ( 0u - ( value & 1u ) );
+				words[word] = R_DemoJointPrediction( *history, word ) + residual;
+			}
+		}
+		if ( cursor != end ) {
+			return R_RejectRenderDemo( demo, "joint payload has trailing bytes" );
+		}
+		if ( R_DemoGetWord( end ) != R_DemoJointChecksum( words, numWords ) ) {
+			return R_RejectRenderDemo( demo, va( "entity %d joints do not match their checksum", handle ) );
+		}
+	} else {
+		return R_RejectRenderDemo( demo, va( "unknown joint record %d", static_cast<int>( static_cast<byte>( mode ) ) ) );
+	}
+
+	memcpy( joints, words, numWords * sizeof( unsigned int ) );
+	if ( history != NULL ) {
+		R_DemoStoreJointHistory( *history, words, numJoints );
+	}
+	return true;
 }
 
 /*
@@ -362,6 +759,8 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile *readDemo, renderView_t
 		if ( r_showDemo.GetBool() ) {
 			common->Printf( "DC_LOADMAP: %s\n", header.mapname );
 		}
+		// the writer dropped its joint history as it wrote this command
+		ResetDemoJointHistory( -1 );
 		if ( !InitFromMap( header.mapname ) ) {
 			return R_RejectRenderDemo( readDemo, va( "map '%s' could not be loaded", header.mapname ) );
 		}
@@ -518,6 +917,15 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile *readDemo, renderView_t
 	case DC_END_FRAME:
 		return true;
 
+	case DC_GUI_SURFACE:
+		if ( session->renderdemoVersion < OPENQ4_RENDERDEMO_SESSION_VERSION ) {
+			return R_RejectRenderDemo( readDemo, "in-world GUI record before render demo v11" );
+		}
+		if ( !ReadGuiSurface() ) {
+			return false;
+		}
+		break;
+
 	default:
 		return R_RejectRenderDemo( readDemo, va( "invalid render command %d", static_cast<int>( dc ) ) );
 	}
@@ -540,6 +948,8 @@ void	idRenderWorldLocal::WriteLoadMap() {
 
 	session->writeDemo->WriteInt( DS_RENDER );
 	session->writeDemo->WriteInt( DC_LOADMAP );
+	// no entity's joints are predicted across a map load or segment start
+	ResetDemoJointHistory( -1 );
 
 	demoHeader_t	header;
 	memset( &header, 0, sizeof( header ) );
@@ -1018,11 +1428,7 @@ void	idRenderWorldLocal::WriteRenderEntity( qhandle_t handle, const renderEntity
 		session->writeDemo->WriteHashString( ent->referenceShader->GetName() );
 	}
 	if ( ent->numJoints ) {
-		for ( int i = 0; i < ent->numJoints; i++) {
-			float *data = ent->joints[i].ToFloatPtr();
-			for ( int j = 0; j < 12; ++j)
-				session->writeDemo->WriteFloat( data[j] );
-		}
+		WriteDemoJoints( handle, ent->joints, ent->numJoints );
 	}
 
 	session->writeDemo->WriteInt( ent->weaponDepthHackInViewID );
@@ -1252,15 +1658,10 @@ bool	idRenderWorldLocal::ReadRenderEntity() {
 		}
 	}
 	if ( ent.numJoints ) {
-		ent.joints = (idJointMat *)Mem_Alloc16( ent.numJoints * sizeof( ent.joints[0] ) ); 
-		for ( int i = 0; i < ent.numJoints; i++) {
-			float *data = ent.joints[i].ToFloatPtr();
-			for ( int j = 0; j < 12; ++j) {
-				if ( !R_DemoReadFloat( session->readDemo, data[j] ) ) {
-					R_FreeRenderDemoEntityPayload( ent, demoDecals, demoOverlay );
-					return false;
-				}
-			}
+		ent.joints = (idJointMat *)Mem_Alloc16( ent.numJoints * sizeof( ent.joints[0] ) );
+		if ( !ReadDemoJoints( index, ent.joints, ent.numJoints ) ) {
+			R_FreeRenderDemoEntityPayload( ent, demoDecals, demoOverlay );
+			return false;
 		}
 	}
 

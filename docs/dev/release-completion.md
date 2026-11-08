@@ -6,6 +6,75 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Frame-time profiling command and performance report, 8 November 2026
+
+- [x] `profileFrameWork <frames> [file.csv]` takes an optional CSV path below the
+  save path, and `profileFrameWork 0` stops a running capture early and writes the
+  frames recorded so far, so a frame-time log of a chosen duration can be taken from
+  a config script without waiting for the frame count.
+- Developer tooling, no shipped default changes: `tools/tests/performance_suite.py`
+  measures scripted stock-map scenarios on both renderers with per-frame traces, the
+  per-launch GPU load and feature toggle ladders, and
+  [`docs/dev/performance-report.md`](performance-report.md) records the frame-rate
+  drop since 0.13.2 on the RTX 4060 Laptop: the current Ultra preset's 16-sample scene
+  target, shadow-mapped point lights and post chain on OpenGL, the Vulkan backend's
+  clamp of that preset to 8 samples, and its equal-settings regression led by the
+  soft-particle depth capture. The optimization plan is the roadmap's FPS category.
+- Evidence: [performance report](performance-report.md), roadmap FPS-01 to FPS-09.
+
+## Campaign demos (Q4-09), 7 November 2026
+
+- [x] Record a whole single-player session as one demo. `recordDemo` now keeps
+  recording through level transitions, save loads, deaths and reloads,
+  difficulty restarts and chapter starts. Enter it at the title screen to record
+  from the first frame of the next level. Menus, pauses and loading screens are
+  left out, and quitting to the menu or the game finishes the file.
+- [x] Campaign demos play back level by level: each level shows its loading
+  screen, the timeline runs across levels, **Prev/Next Marker** jump between
+  level starts, and seeking, speed, pause and stepping cross levels.
+- [x] Demos now show the HUD as you saw it, values, icons, crosshair and panels
+  included, and in-world computer screens, which earlier render demos left
+  blank. Grouped HUD panels play back without their shaped edges.
+- [x] Render demos no longer stop playing where the recording started music,
+  narration or an interface sound.
+- [x] The demo library lists a campaign recording with its first level, length
+  and number of levels. It refuses one recorded in the other campaign, saying
+  which, and still plays an interrupted recording up to its last frame.
+- [x] Demos are about a quarter smaller on levels full of animated characters,
+  with no change to what plays back: moving characters' skeletons are stored as
+  exact changes from the previous frame instead of in full.
+- Compatibility: new demos use render demo version 12. Earlier openQ4 builds
+  cannot play them; this build still plays earlier openQ4 render demos,
+  including version 11 campaign demos. Expect about 1 MB per second on busy
+  levels.
+- Evidence and remaining qualification:
+  [campaign render demos](multiview-demos.md#campaign-render-demos-v11-7-november-2026),
+  roadmap Q4-09.
+
+## Level editor completion (TOOL-01 to TOOL-04), 6 November 2026
+
+- [x] The experimental level editor (`editorExperimental`) now edits brushes
+  and patches as well as entities, with lossless `brushDef3`/patch adapters,
+  transforms with texture lock, one undo step per gesture, groups, layers,
+  prefabs, reference-repairing rename and a bounded background asset index; a
+  docked workspace with 3D and top/front/side views, per-map view state, entity
+  models, a typed inspector and source-linked validation; and sandboxed
+  builds whose outputs replace the playable files only after a whole
+  successful compile, with an isolated play client. Two engine defects found on
+  the way are fixed: a leak in a map whose folder did not exist beside the
+  engine aborted `dmap` (its `.lin` trail used `fopen` there), and the
+  dedicated server then hung in shutdown, which builds now detect.
+  On Windows, OpenGL and Vulkan, `level_editor_authoring.py` qualifies the
+  workspace, every label in 12 languages at three sizes, an editor-authored map
+  built and played with AI on its rebuilt navigation, a leaking and a cancelled
+  build that leave the previous outputs untouched, and a stock `airdefense1`
+  round trip with tactical AI; the native suites pass all 543,372 retail
+  primitives, also under Linux GCC and Clang sanitizers. Declared latency
+  budgets are met. The build-and-play phase also passes on Linux; macOS is
+  covered by its preview evidence gate.
+  See [the editor reference](level-editor-modernization.md) and the
+  [user guide](../user/level-editor.md).
+
 ## Vulkan depth precision and antialiased GUI models, 6 November 2026
 
 - With MSAA on, Vulkan now antialiases 3D models shown inside menus and other
@@ -117,6 +186,11 @@ See [player release status](../user/release-status.md).
 - On Vulkan, a `screenshot` or `envshot` larger than the game window now
   captures the whole picture. Before, it repeated the same window-sized corner
   in every part of the image. Ordinary screenshots are unchanged.
+- A `screenshot` larger than the game window is now correct on OpenGL and
+  Vulkan with anti-aliasing (SMAA) on, too. Before, most of the picture came
+  out black or as repeated copies of one part, and on OpenGL one corner could
+  repeat another even with anti-aliasing off. See
+  [tiled-capture evidence](vulkan-captures.md#tiled-captures-6-november-2026).
 - A new developer drill, `r_vkMaterialDescriptorPoolTest`, makes the graphics
   driver itself refuse shader resources. On NVIDIA and Intel, the affected
   authored shader stages skip without changing the image, and rendering
@@ -2404,6 +2478,22 @@ completed release material here and publish curated notes in `releases/`.
   settings coverage, GUI value/clipping/navigation contracts, the focus reveal
   and adapter harnesses, and in-game Settings and Load Game captures. Candidate
   player wording is in [baseline refinements](releases/baseline-refinements.md).
+
+## Audio progression audit with fights, 6 November 2026
+
+- [x] AUD-06/07: `openq4_killHostiles` and `audio_scene_audit.py --fight` let the
+  progression audit win the fights scripts wait on; all 42 campaign maps ran
+  (1,967 steps, 1,052 kills) with no mute leak or untranscribed cue, reaching 88
+  dialogue lines no earlier report had.
+- [x] A full client entity table no longer ends the level with "cannot load
+  collision model" (both game libraries); found on `airdefense2`.
+- [x] The audit now reports a dead player and a map that ends inside its own
+  scene, matches its markers after unterminated script output, and removes
+  failed-objective entities in its disposable session. The `teleport` cheat
+  moves a driver's vehicle with it.
+- Evidence and remaining gates (the probe player's death at `walker`'s step 11,
+  ordered human play, physical devices):
+  [fights in the progression audit](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
 
 ## Audio progression-audit recovery, 26 October 2026
 
@@ -6378,7 +6468,7 @@ Process:
 2. When cutting a release with curated notes, save them in `docs/dev/releases/vX.Y.Z.md`; the manual release workflow will use that tracked file instead of the auto-generated history summary.
 3. If no tracked release file exists, the workflow falls back to the generated release notes from commit history.
 4. Move shipped items into a historical release section here (optional), and keep remaining work under stable IDs in `docs/dev/roadmap.md`.
-5. For macOS support claims, complete the "macOS Evidence Gate" below and keep `docs/dev/macos-signoff-evidence.md` current before promoting anything beyond experimental wording.
+5. For macOS support claims, complete the "macOS Evidence Gate" below and keep `docs/dev/macos-signoff-evidence.md` current before promoting anything beyond preview wording.
 
 ## macOS Support Claim Guard
 

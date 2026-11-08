@@ -515,7 +515,7 @@ runtime before and after and records exit 0. Repeat with
 |---|---:|---:|---:|---|---|
 | Native openQ4 `.mvd` 1.3 | Yes | Yes | Yes, through keyframes, then replay | Full-world free roam, player follow, markers and auto-tracking | Markers, keyframes and user-info updates are optional records. |
 | Native openQ4 `.mvd` 1.0-1.2 | Yes | Yes | Yes, replay based | Full-world free roam, player follow and auto-tracking | 1.0/1.1 retain legacy instance-0 capture semantics; protocol/content checks still apply. |
-| Native or historical openQ4 render `.demo` | Yes | Yes | Yes, replay based | Fixed recorded camera | Presentation stream; it has no off-camera game state. |
+| Native or historical openQ4 render `.demo` | Yes | Yes | Yes, replay based | Fixed recorded camera | Presentation stream; it has no off-camera game state. A v11 campaign demo spans single-player levels as segments whose starts are markers ([campaign render demos](#campaign-render-demos-v11-7-november-2026)). |
 | Retail Quake 4 render `.demo` | No | No | No | Recorded camera only in the original engine | Detected as legacy; the byte-oriented retail stream needs a separate decoder. |
 | Retail Quake 4 `.netdemo` | No | No | No | Depends on original client/server recording | `NDMO` metadata is shown, but retail packet protocols are not decoded. |
 | openQ4 `.cdemo` | Best effort | No | No | Simulation-defined | Unversioned developer artifact; safe only with the matching engine/game build. |
@@ -735,6 +735,246 @@ directory parsing, baseline validation, marker stepping, the marker diff and
 auto-tracking with 15 single-reversal controls; `mvd_recovery_contract.py`
 now also requires recovery to rebuild both directories from the surviving
 records (2,365 cut points, six controls).
+
+## Campaign render demos (v11), 7 November 2026
+
+Roadmap Q4-09 owns this work. Before v11 a render demo ended at the first map
+unload, so it could never span a level transition, a save load or a death
+reload. Its frames also included every menu and loading screen, and it kept
+only the 2D batch still pending at the end of a frame.
+
+### Stream
+
+v11 adds session records (`DS_SESSION`, `DemoFile.h`). Each is a dictionary;
+readers skip unknown record kinds.
+
+```text
+DS_VERSION 12 (11 before joint prediction; both play)
+DS_SESSION DSC_HEADER   game, campaign, mode, userCmdHz, skill, build
+per segment (one level):
+  DS_SESSION DSC_SEGMENT        index, frame, map, entityFilter, reason, skill
+  -- both sides reset the hash-string table here --
+  DS_SOUND  SCMD_STATE          the complete sound world
+  DS_RENDER DC_LOADMAP          the level, then its portal states
+  DS_SESSION DSC_SEGMENT_READY
+  frames ... DS_RENDER DC_END_FRAME
+DS_SESSION DSC_END              frames, segments
+raw trailer (outside the compressed stream): payload | int length | uint crc32 | "OQ4DSUM1"
+```
+
+A segment depends on nothing before it: a fresh string table, the full sound
+state, a level load that frees every definition, archive flags reset so every
+visible entity, light and effect is written again, in-world GUIs rewritten, the
+first frame's 2D written in full and, from v12, no joints predicted from an
+earlier record ([joint prediction](#joint-prediction-v12-7-november-2026)). The writer finds hash strings through an
+index instead of a linear search, and the per-segment reset keeps each table
+far below the 65,536-string bound over a long campaign.
+
+The trailer gives the library and the player the duration (frame count and
+tic rate) and every segment's start frame, reason and map without decoding the
+stream. Its payload is a dictionary under a CRC; a recording that was killed has
+no trailer and is described as interrupted. `DSC_END` stops the reader before
+the trailer's bytes.
+
+`DC_GUI_SURFACE` (entity handle, GUI slot, 2D model) carries an entity's
+in-world GUI as it drew, written only when its checksum changes.
+`DC_GUI_MODEL` is now written surface by surface: a surface identical to the
+same surface of the previous frame costs one byte. A changed one stores plain
+vertices in 25 bytes rather than 68, and indices in two bytes. Readers before
+v11 keep the old decoders.
+
+### Recording
+
+`recordDemo [name]` in a level opens the file (version, then header) and
+records that level as the first segment. At the title or between levels it
+**arms** the recording: the file opens, header first, with the next
+single-player level. The states are armed, recording and suspended. `writeDemo` is
+set only while recording, so the renderer and sound system write nothing while
+a level loads or before the first level.
+
+- `UnloadMap` suspends a single-player recording before teardown, so a level
+  change, save load, death (`died`), restart or chapter start never ends it.
+  A multiplayer recording keeps its one-map scope and stops there.
+- `ExecuteMapChange` names the next segment's reason (start, level, load or
+  restart) and, once the level is spawned, `ContinueRenderDemoAfterMapChange`
+  begins the segment. A multiplayer join, MVD playback or demo playback ends
+  the recording instead.
+- `Stop()` (quit to menu, disconnect) ends a suspended recording; an armed one
+  survives it, since a new game from the title may reload the game module first.
+  Shutdown ends any recording. An armed recording opens its file with its first
+  level, so one cancelled or quit before any level leaves no file.
+- Only the gameplay branch of `idSessionLocal::Draw` ends a recorded frame
+  (`WriteDemoEndFrame`); `EndFrame` no longer does. Menus, pauses and loading
+  screens leave no frames, and the frame count equals the recorded game time:
+  a recording runs exactly `USERCMD_PER_DEMO_FRAME` tics per frame. A long
+  sound load (`timeHitch`) no longer skips tics under that fixed-tic check,
+  which would have stopped the engine.
+- `demoRecordStatus` prints
+  `RENDER_DEMO_RECORDING state= path= frames= seconds= segments= map= elapsed=`.
+
+### What the 2D record holds
+
+The renderer flushes its 2D batch whenever a retained root begins, a render
+target changes or a scene is captured. While a demo records,
+`idGuiModel::EmitFullScreen` appends each batch flushed to the screen to a
+frame model that `WriteDemoPics` writes. Batches drawn into a retained
+composition layer (`_retainedLayerImageN`) are kept as that layer's content,
+which resets with the layer's clear. A composite of the layer records as its
+content, each vertex colour scaled by the composite's opacity, so grouped HUD
+panels survive. Left out of the recording:
+
+- post-process sorts, which compose the scene itself: the game presents its
+  off-screen scene target with `postprocess/nopostprocess`, and playback renders
+  the recorded scene directly;
+- retained materials whose images exist only in the recording process: the
+  coverage atlas, masks, generated pixels, blurred backdrops, model previews,
+  the pause scene and layer-sampling linear masks.
+
+While a demo records, the retained host stops using the coverage atlas, cached
+layers, cached masked sources and frame replay, so the HUD reaches the
+recording as vector geometry. The visible frame is the same.
+Masks are not replayed: a masked HUD group (the marine HUD's slanted plates)
+plays back as its unmasked content.
+
+### Playback
+
+- A segment resets the reader's string table and checks that its frame number
+  matches the frames played. A new level shows the loading screen with the level's
+  name (not while seeking, timing or capturing), stops the outgoing sounds and
+  opens a media load (`declManager`, `renderSystem`, `soundSystem`, BSE) that
+  `DSC_SEGMENT_READY` closes, purging what the previous level used and this one
+  does not, in `ExecuteMapChange`'s order.
+- The timeline counts frames at the recording's tic rate, so it continues across
+  levels whose game clocks restart. Seeking is the existing restart-and-replay
+  path, crossing segments as it goes.
+- Level starts are markers: `demoMarker next|prev` and the playback deck's
+  marker buttons. Previous returns to the current level's start unless it is
+  within two seconds of it. The overlay names the level (`Level 2/3: <name>`).
+- `StartPlayingRenderDemo` reads the header first and refuses a demo recorded
+  in another game directory before stopping anything.
+- In-world GUIs draw the recorded geometry in place of the empty GUI playback
+  gives the entity.
+- Sound commands may name emitter 0, the sound world's local emitter (music,
+  narration, interface sounds). The reader resolved demo emitters through the
+  savegame lookup, which rejects 0, so any recording that started a local sound
+  stopped playing at that command; `DemoEmitterForIndex` now resolves it. A local
+  sound already playing when a segment begins is still not restored: the sound
+  state, shared with savegames, never stores that slot.
+
+### Joint prediction (v12), 7 November 2026
+
+Measured first, on a scripted recording of 16.7 seconds (airdefense1 for 8
+seconds, then a change to airdefense2), uncompressed bytes by record: animated
+entities' joints 28.9%, the 2D model 28.5%, sound commands 21.3%, effects 13.0%,
+the other entity fields 5.9%, in-world GUIs 1.9%, the rest under 1%. The demo
+file's LZW (a 12-bit dictionary) cannot compress raw joint floats at all: the
+10.3 MB of joints in that recording still took 10.5 MB, half of the 20.4 MB
+file. Each frame about fifteen animated entities rewrite every joint, and 78% of
+those joints move from one frame to the next.
+
+v12 writes an entity's joints (`WriteDemoJoints` / `ReadDemoJoints` in
+`RenderWorld_demo.cpp`) as:
+
+```text
+byte mode
+  0 raw         numJoints * 12 little-endian IEEE words (v11's layout)
+  1 predicted   int payloadBytes
+                a bit per joint, set when it moved since the handle's last record
+                for each moved joint, 12 LEB128 varints of the zigzagged residual
+                uint FNV-1a checksum of the decoded words
+```
+
+The prediction is the word last recorded for that handle, extended linearly by
+the step from the record before it when both had this joint count. It works on
+the words as 32-bit integers, never as floats, so every platform decodes the
+recorded bits exactly, scale, signed zeros and NaNs included. Recording and
+playback keep the same history per entity handle and both drop it at every
+`DC_LOADMAP`, a segment start or map load. A recording also drops a handle's
+history when the entity is freed and writes its next joints raw. Playback keeps
+it across `DC_DELETE_ENTITYDEF`, which a recording writes before every rewrite
+of an archived entity. A predicted record without a matching history, a
+malformed residual, trailing bytes or a checksum mismatch stops playback with a
+warning instead of showing a wrong pose.
+
+The encoding was chosen offline from that recording's joints, compressed by an
+exact model of the demo LZW: XOR against the previous record took 6.6 MB, XOR
+with the bytes regrouped by significance 6.3 MB, first-order integer residuals
+5.9 MB, linear residuals as varints with the moved-joint mask 5.4 MB. Rice coding
+packs the same residuals into 4.6 MB, but the LZW expands near-random bytes by a
+quarter, to 5.9 MB; varints keep a structure it can use. Quaternions were not
+used: they are not exact, and Quake 4 joint matrices can carry scale.
+
+Result on the same scripted clip recorded again (two segments, 500 frames, the
+second level starting at frame 260 in both): 20.4 MB in v11, 15.4 MB in v12
+(-24.5%), about 1.22 MB/s down to 0.92 MB/s. The 2D model, sound commands and
+effects are now the larger share.
+
+Validation, staged Windows client, hidden window, no input:
+
+- `timeDemoQuit` played all 500 frames of the v12 clip on GL and on Vulkan, with
+  every predicted record matching its checksum. The v11 recording of the same
+  clip and the earlier three-level v11 demo (745 frames) still play in full.
+- Paused at 6 s (level one) and 12 s (level two), the v11 and v12 recordings
+  played in the same savepath show the same view and the same pistol and hand
+  pose; what differs is smoke, fire and light flicker between two live
+  recordings. Compare in one savepath: a savepath whose first run detected the
+  balanced preset drew airdefense1's sky black for both demos.
+- In an uncompressed v12 demo, one flipped residual bit stopped playback at that
+  frame with "joints do not match their checksum", and a bad mode byte with
+  "unknown joint record"; the client exited normally both times.
+
+### Library
+
+A v11 single-player entry shows **Campaign demo**, its first level, the date,
+the duration from the trailer and `<campaign> / Levels: N`. The file being
+recorded is listed as **Recording in progress** and cannot be played. A demo
+from the other campaign is **Other campaign**, with Play disabled and the
+reason. A demo without a trailer is **Interrupted recording**, still playable to
+its last complete frame. `compressDemo` carries the trailer over.
+
+### Validation, 7 November 2026
+
+Staged Windows GL client, stock content, hidden window, no input; cases and
+captures under `.tmp/campaign-demos/` (local only):
+
+- Armed at the title: airdefense1 (start), `map game/airdefense2` (level) and
+  `loadGame` back to airdefense1 (load): 3 segments, 745 frames, 33.5 MB.
+  `timeDemoQuit` played all 745 frames through the three segments with the media
+  purge reporting 41 and 9 models at the later segments.
+- Real-time playback: `demoMarker next` twice reached each segment start; two
+  `prev` presses during a seek stepped back two levels; `demoSeek 12` crossed
+  back into the second level; the library showed the entry as playable with
+  capabilities 159.
+- Death through the restart menu (`kill`, then the attack usercmd from
+  `openq4_testInput`): the recording suspended with no frames while the menu
+  stood, resumed on `loadGame` as a load segment, and `disconnect` finalized it;
+  all 319 frames played.
+- Killed mid-recording: no trailer, listed as interrupted and playable; 181
+  frames played before the reader stopped safely at the cut.
+- A demo whose header names `q4xbase`: **Incompatible / Other campaign**, Play
+  disabled, and `playDemo` refused without leaving the menu.
+- HUD and screens: playback frames matched live captures for health, the weapon
+  icon, crosshair ring, small icons, the in-world "transfer successful" terminal
+  and the (unmasked) plates.
+- Vulkan (`r_renderApi vulkan`) played the GL recordings identically: all 745
+  frames of the three-level demo, and the same HUD capture.
+- The Awakening (`fs_game q4xbase`, its content hard-linked from the user profile
+  into the case's): armed at the title, `m01_stranarus_trench1` then a change to
+  `m01_stranarus_trench2`, 2 segments and 406 frames. It first stopped playing at
+  a local-sound command (the emitter-0 defect above); after the fix the library
+  showed **Campaign demo**, Stranarus Trench, 00:13 and "Quake 4: The Awakening /
+  Levels: 2", and all 406 frames played. Copied into base Quake 4 it was listed as
+  **Other campaign** with Play disabled.
+- Size: about 0.7 MB/s in a quiet corridor and 1.4 MB/s on airdefense1, where
+  about fifteen animated entities rewrite their joints every frame. A changed
+  2D surface is typically 1 of 10 per frame. v12's joint prediction takes a
+  quarter off ([joint prediction](#joint-prediction-v12-7-november-2026)).
+
+`campaign_demo_contract.py` pins the format, both ends, the joint coding, the
+library and the strings. Remaining (Q4-09): Vulkan recording, Linux and macOS, a
+long session with measured seek times and size, the 2D model, sound and effect
+records that now dominate the size, masked HUD groups and local sounds already
+playing at a segment start.
 
 ## Update policy
 

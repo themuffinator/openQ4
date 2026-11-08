@@ -111,7 +111,10 @@ typedef enum {
 	DC_GUI_MODEL,
 	DC_UPDATE_EFFECTDEF,
 	DC_STOP_EFFECTDEF,
-	DC_DELETE_EFFECTDEF
+	DC_DELETE_EFFECTDEF,
+	// render demo v11: an entity's in-world GUI as it drew, whenever it
+	// changes, so playback shows the screens the player saw
+	DC_GUI_SURFACE
 } demoCommand_t;
 
 /*
@@ -963,6 +966,7 @@ public:
 	virtual void			DrawBigChar( int x, int y, int ch, const idMaterial *material );
 	virtual void			DrawBigStringExt( int x, int y, const char *string, const idVec4 &setColor, bool forceColor, const idMaterial *material );
 	virtual void			WriteDemoPics();
+	virtual void			WriteDemoEndFrame();
 	virtual void			DrawDemoPics();
 	virtual void			SetFrameShaderTime( int timeMsec );
 	virtual void			BeginFrame( int windowWidth, int windowHeight );
@@ -1140,6 +1144,18 @@ public:
 	int						inWorldGuiEmissionDepth;	// provenance scope for R_RenderGuiSurf output
 	class idGuiModel *		guiModel;
 	class idGuiModel *		demoGuiModel;
+	// While a render demo records: every full-screen 2D batch the frame
+	// flushed to the main target, so WriteDemoPics records the whole HUD and
+	// not only the batch still pending at the end of the frame.
+	class idGuiModel *		demoFrameGuiModel;
+	// The frame model written last, whose unchanged surfaces the next frame
+	// repeats; invalid at a segment start, which must stand alone.
+	class idGuiModel *		demoLastGuiModel;
+	bool					demoLastGuiModelValid;
+	// While recording: what each retained UI composition layer
+	// (_retainedLayerImageN, index N) holds, so a composite of it records as
+	// that content at the composite's opacity instead of unreplayable pixels.
+	idList<class idGuiModel *>	demoLayerGuiModels;
 	idList<idRenderTexture*> pendingRenderTextureDeletes;
 	bool					useUIViewportFor2D;
 
@@ -1203,6 +1219,19 @@ extern backEndState_t		backEnd;
 bool RB_ClassicFogBlend_PreflightLinearView( const viewDef_t *viewDef );
 bool RB_ClassicFogBlend_DrawLinearView( const viewDef_t *viewDef, GLuint vertexProgram, GLint mvpLocation, GLint fogLocation );
 extern idRenderSystemLocal	tr;
+
+/*
+RB_TileOffsetX / RB_TileOffsetY
+
+A larger-than-window capture (R_ReadTiledPixels) draws the frame once per
+window-sized tile with tr.viewportOffset moved to that tile. Only drawing to
+the window moves: a view drawn into a render texture (an engine scene target
+or a game-owned post target, both sized to the whole capture) is drawn at the
+texture's own origin, and whatever later composites that texture to the
+window takes the offset. Ordinary frames have a zero offset.
+*/
+ID_INLINE int RB_TileOffsetX( void ) { return backEnd.renderTexture == NULL ? tr.viewportOffset[0] : 0; }
+ID_INLINE int RB_TileOffsetY( void ) { return backEnd.renderTexture == NULL ? tr.viewportOffset[1] : 0; }
 #ifdef OPENQ4_RENDERER_VK_MODULE
 extern thread_local glconfig_t glConfig;
 #else
@@ -2583,7 +2612,9 @@ TR_GUISURF
 */
 
 void R_SurfaceToTextureAxis( const srfTriangles_t *tri, idVec3 &origin, idVec3 axis[3] );
-void R_RenderGuiSurf( idUserInterface *gui, drawSurf_t *drawSurf );
+// entityGui is the renderEntity_t::gui slot the GUI came from, or -1 for a
+// material's global GUI; render demos record and replay entity slots only.
+void R_RenderGuiSurf( idUserInterface *gui, drawSurf_t *drawSurf, int entityGui = -1 );
 void R_GuiTraceProbe_f( const idCmdArgs &args );
 
 /*

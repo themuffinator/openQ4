@@ -96,10 +96,9 @@ fixture without MSAA, in three cases:
 - `direct` draws straight into the window. Each backend must place every
   tile's own part of the frame, and the 2x capture box-filtered to window size
   must correlate with the window capture at 0.98 or better.
-- `post` draws through the game-owned SMAA target. Both backends offset views
-  drawn into that target too, so neither produces a correct 2x image there;
-  the case is recorded, not gated.
-- `restored` repeats `post` and must match it exactly.
+- `post` draws through the game-owned SMAA target, which the capture sizes
+  to the whole capture. It is gated the same way.
+- `restored` repeats `post`, is gated the same way, and must match it exactly.
 
 `--compare` checks GL against Vulkan per tile, within the existing
 two-display-level limit.
@@ -113,9 +112,31 @@ build failed this: its four tiles were identical. OpenGL fails its own
 level. The one failure is that defective GL tile. In `post`, both backends
 produce the same incorrect image (three tiles identical, correlation 0.140) and
 match each other within one level. These two OpenGL/shared tiled-capture
-defects are recorded as open; they are outside the Vulkan parity fix and do
-not loosen any image gate. Reports and engine images: `.tmp/vk-roadmap/nov6/tiled-{gl,nvidia}/`
-and `tiled-comparison/`.
+defects were recorded as open, outside the Vulkan parity fix. Reports and
+engine images: `.tmp/vk-roadmap/nov6/tiled-{gl,nvidia}/` and `tiled-comparison/`.
+
+**Window draws only.** Both backends added the tile offset to every view,
+including views drawn into a render texture. A target sized to the whole
+capture then held the scene shifted by the tile, and the view that composites
+it to the window shifted it again. Now only drawing to the window takes the
+offset. OpenGL applies it through `RB_TileOffsetX`/`RB_TileOffsetY`, which are
+zero while `backEnd.renderTexture` is bound. Vulkan's
+`VK_Backend_ApplyTileOffset` follows `RC_SET_RENDERTEXTURE` through the frame
+and moves only the views drawn to the window. The scene is drawn at its
+target's origin, and the composite moves to the tile.
+
+Re-run with every case gated on the RTX 4060 Laptop (OpenGL and Vulkan
+`--device 0`) and the Iris Xe (Vulkan `--device 2`). All three pass `direct`,
+`post` and `restored`. The box-filtered correlation is 0.999 in `direct` and
+0.9998 in `post`/`restored`, and every pair of full tiles differs in at
+least 4,868 pixels. `restored` repeats `post` exactly. All 27 GL/Vulkan
+tile comparisons are within one display level on each device. The OpenGL
+`direct` tile repeat is gone too. Its runtime no longer exists, so that run's
+route could not be re-examined. The game draws through its own render target
+whenever its scene size differs from the screen's, so a tile probably took
+that route and was offset twice. Reports and engine images:
+`.tmp/vk-roadmap/nov6/tiled-fix/{gl,nvidia,intel}/` and
+`comparison-{nvidia,intel}/`.
 
 ## Nested, cropped and offset views (6 November 2026)
 

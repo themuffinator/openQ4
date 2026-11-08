@@ -218,8 +218,8 @@ def test_clustered_decal_executor_is_atomic_and_exact() -> None:
         "R_ModernGLExecutor_RestoreDrawVertColorStream",
         "MODERN_GL_DECAL_COLOR_BINDING_INDEX",
         "clusteredDecalSurface != NULL",
-        "tr.viewportOffset[0]",
-        "tr.viewportOffset[1]",
+        "useLegacyViewportOffset ? RB_TileOffsetX() : 0",
+        "useLegacyViewportOffset ? RB_TileOffsetY() : 0",
         "|| command.negativeScale",
         "R_ModernGLExecutor_TextureForCommand( command ) != binding->textureHandle",
         "binding->image->GetOpts().textureType != TT_2D",
@@ -245,8 +245,9 @@ def test_clustered_decal_executor_is_atomic_and_exact() -> None:
         "static void R_ModernGLExecutor_RestoreAfterForwardPlusDecalOverlay",
     )
     for token in (
-        "tr.viewportOffset[0] + viewDef->viewport.x1",
-        "tr.viewportOffset[1] + viewDef->viewport.y1",
+        # A tiled capture moves only window draws (RB_TileOffsetX).
+        "RB_TileOffsetX() + viewDef->viewport.x1",
+        "RB_TileOffsetY() + viewDef->viewport.y1",
         "R_GLStateCache().SetViewport",
         "R_GLStateCache().SetScissor",
         "backEnd.currentScissor = viewDef->scissor",

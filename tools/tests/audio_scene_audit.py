@@ -19,8 +19,11 @@ whose speaker has not spawned yet stays silent; the report counts what plays.
 With --progress the player is moved instead: teleported into each trigger volume the
 player can touch, nearest first from the player start, so the map's own trigger chains
 run as the player reaches them (doors, spawns, scripted scenes and the conversations
-that wait on them). Volumes that hurt or reach the level's end are left out. This is
-still not a playthrough: no enemy is fought and no route is walked.
+that wait on them). Volumes that hurt or reach the level's end are left out. With
+--fight, the hostiles fighting the player halfway through each step are killed through
+ordinary damage from the player (openq4_killHostiles), so the deaths, death targets and
+the conversations scripts hold until a fight is won run too. This is still not a
+playthrough: no route is walked and nothing is aimed or dodged.
 
 Checks: declared or flagged speech always follows Dialogue Volume; muting it
 silences every dialogue voice while other sounds continue; every cue shown has
@@ -60,16 +63,24 @@ SOURCE_ROW = re.compile(r'^\s*\d+\s+(\d+)\s+[\d.]+\s+[\d.]+\s+(\S+)', re.M)
 CHANNEL = re.compile(r'^SOUND_DIALOGUE emitter=(\d+) channel=(-?\d+) shader=(\S+) sample=(\S+) '
                      r'dialogue=(\d) transcript=(\w+)\r?\nSOUND_DISTANCE_BACKEND ([^\n]+)', re.M)
 CHANNEL_END = re.compile(r'^SOUND_DIALOGUE_END channels=(\d+)\s*$', re.M)
-SCENE_MARK = re.compile(r'^SCENE_(?:PROBE|STEP|MEMORY|END|BEGIN)\b', re.M)
+# The harness's own markers are matched anywhere on a line: a map script that prints
+# without a newline (process2's "colour swap left") leaves the next echo mid-line.
+SCENE_MARK = re.compile(r'SCENE_(?:PROBE|STEP|MEMORY|END|BEGIN)\b', re.M)
 CUE = re.compile(r'^Subtitle shader=(\S+) emitter=\d+ speaker=\d+ time=\d+ duration=\d+ radio=\d textBytes=\d+', re.M)
-PROBE = re.compile(r'^SCENE_PROBE (\S+) (\d+) (full|mute)\s*$', re.M)
+PROBE = re.compile(r'SCENE_PROBE (\S+) (\d+) (full|mute)\s*$', re.M)
 ADMISSION = re.compile(r'^Audio admission: reserved=(\d+) KiB peak=(\d+) KiB budget=(\d+) MiB refused=(\d+)', re.M)
 MEMORY = re.compile(r'^Audio memory: CPU=(\d+) KiB OpenAL=(\d+) KiB pending-input<=(\d+) KiB aggregate<=(\d+) KiB', re.M)
 STREAMING = re.compile(r'^Vorbis streaming: reserved=(\d+) KiB', re.M)
 VOICE = re.compile(r'^SOUND_VOICE source=\d+ state=(\w+) routed=\d queued=(\d) serial=\d+ offsetMs=[\d.-]+ sample=(\S+)', re.M)
 PROCESS = re.compile(r'^Process memory: private=(\d+) KiB resident=(\d+) KiB', re.M)
-STEP = re.compile(r'^SCENE_STEP (\S+) (\d+) (\S+)\s*$', re.M)
+STEP = re.compile(r'SCENE_STEP (\S+) (\d+) (\S+)\s*$', re.M)
+KILLS = re.compile(r'KILL_HOSTILES killed=(\d+) survived=(\d+) protected=(\d+)\s*$', re.M)
+SURVIVOR = re.compile(r'KILL_HOSTILE name=(\S+) class=(\S+) result=(survived|protected)\s*$', re.M)
+# teleport/trigger refuse a dead player; god mode does not cover every hazard
+# (a teleported vehicle driver, noGod damage), and the rest of the chain is lost.
+DEAD = re.compile(r'You must be alive to use this command\.')
 MAP_LOAD = re.compile(r'^Map: (\S+)', re.M)
+SHUTDOWN = re.compile(r'^-+ Game Map Shutdown -+\s*$', re.M)
 LOAD_TIME = re.compile(r'^\s*(\d+) msec to load (\S+)\s*$', re.M)
 LOAD_PHASES = re.compile(r'^Map load phases: ([^\n]+) msec\s*$', re.M)
 MEDIA_PHASES = re.compile(r'^Map media phases: ([^\n]+) msec\s*$', re.M)
@@ -219,8 +230,11 @@ def scene_steps(roots, maps, progress=False, blocked_exits=None):
             # Moving near an unrelated trigger can touch an overlapping exit,
             # and scripts can reach an exit indirectly. Remove the end targets
             # in this disposable session as well as excluding their chains.
+            # A timed objective the route cannot keep pace with (Awakening's race
+            # lockdown gates) fails the mission, which ends the level too.
+            failures = {n for n, e in by_name.items() if e.get('classname') == 'item_objectivefailed'}
             if blocked_exits is not None:
-                blocked_exits[name] = sorted(by_name[n]['name'] for n in endings)
+                blocked_exits[name] = sorted(by_name[n]['name'] for n in endings | failures)
             starts = [origin_of(e) for e in entities if e.get('classname') == 'info_player_start' and origin_of(e)]
             volumes = [e for e in entities if player_touchable(e) and e.get('name') and origin_of(e)
                        and not ends_level('$' + e['name'].lower(), set())]
@@ -253,8 +267,11 @@ def scene_entries(maps, repeat):
     return [(f'pass{run}/{name}' if repeat > 1 else name, name) for run in range(1, repeat + 1) for name in maps]
 
 
-def scene_cfgs(entries, seconds, interval, walk=None, step_msec=4000, tail=0, move='trigger', blocked_exits=None):
-    """One cfg per opening; with a walk, each map's scene triggers follow its opening probes."""
+def scene_cfgs(entries, seconds, interval, walk=None, step_msec=4000, tail=0, move='trigger', blocked_exits=None,
+               fight=False):
+    """One cfg per opening; with a walk, each map's scene triggers follow its opening probes.
+    With fight, the hostiles engaged halfway through each step are killed before its probe,
+    and once more before the tail."""
     probes = max(1, (seconds * 1000) // (interval + 150))
     files = []
     for index, (name, level) in enumerate(entries):
@@ -277,7 +294,14 @@ def scene_cfgs(entries, seconds, interval, walk=None, step_msec=4000, tail=0, mo
             for number, (_, entity) in enumerate(walk.get(level, [])):
                 # Quoted names survive idLexer tokenization even when they
                 # start with a digit (e.g. recomp's 2wavfinal_berserker_trig).
-                steps += [f'echo SCENE_STEP {name} {number} "{entity}"', f'{move} "{entity}"'] + probe(step_msec)
+                steps += [f'echo SCENE_STEP {name} {number} "{entity}"', f'{move} "{entity}"']
+                if fight:
+                    steps += [f'waitMsec {step_msec // 2}', 'openq4_killHostiles']
+                    steps += probe(step_msec - step_msec // 2)
+                else:
+                    steps += probe(step_msec)
+            if fight:
+                steps.append('openq4_killHostiles')
             # Let the conversations the last steps started finish.
             for _ in range((tail * 1000) // (interval + 150)):
                 steps += probe(interval)
@@ -299,7 +323,8 @@ def launch(args, root, entries, walk=None, blocked_exits=None):
     game = root / 'save' / game_dir
     game.mkdir(parents=True, exist_ok=True)
     move = 'teleport' if args.progress else 'trigger'
-    for index, text in enumerate(scene_cfgs(entries, args.seconds, args.interval, walk, args.step_msec, args.tail, move, blocked_exits)):
+    for index, text in enumerate(scene_cfgs(entries, args.seconds, args.interval, walk, args.step_msec, args.tail, move,
+                                            blocked_exits, getattr(args, 'fight', False))):
         (game / f'scene-{index}.cfg').write_text(text, encoding='utf-8')
     config = root / 'alsoft.conf'
     config.write_text('[general]\ndrivers=wave\nchannels=stereo\nhrtf=false\n[wave]\nfile=' + str(root / 'mix.wav') + '\n',
@@ -413,15 +438,17 @@ def audit(log, labels):
     scenes = {}
     begin = 0
     for name in labels:
-        marker = re.search(rf'^SCENE_END {re.escape(name)}\s*$', log[begin:], re.M)
+        marker = re.search(rf'SCENE_END {re.escape(name)}\s*$', log[begin:], re.M)
         segment = log[begin:begin + marker.end()] if marker else log[begin:]
         if marker:
             begin += marker.end()
         speech = [dict(zip(FIELDS, m)) for m in SPEECH.findall(segment)]
         speech = [s for s in speech if s['game'] == '1']
         # Scripted scenes: what each step's trigger found, and the speech after the opening.
-        begin_at = re.search(rf'^SCENE_BEGIN {re.escape(name)}\s*$', segment, re.M)
+        begin_at = re.search(rf'SCENE_BEGIN {re.escape(name)}\s*$', segment, re.M)
         step_marks = list(STEP.finditer(segment))
+        first_dead = DEAD.search(segment)
+        dead_at = sum(m.start() < first_dead.start() for m in step_marks) - 1 if first_dead else None
         missing_steps = sum('entity not found' in segment[m.end():(step_marks[i + 1].start() if i + 1 < len(step_marks) else len(segment))]
                                                    .split('SCENE_PROBE', 1)[0] for i, m in enumerate(step_marks))
         split = step_marks[0].start() if step_marks else len(segment)
@@ -429,6 +456,11 @@ def audit(log, labels):
         walked = [s for s in walked if s['game'] == '1' and s['dialogue'] == '1']
         opening = [s for s in opening if s['game'] == '1' and s['dialogue'] == '1']
         level_changes = MAP_LOAD.findall(segment[begin_at.end():]) if begin_at else []
+        # The map ending inside its own scene (an error drop, a failed mission, a
+        # dead player's game over) loses the rest of the chain as surely as a change.
+        shutdown = SHUTDOWN.search(segment, begin_at.end()) if begin_at else None
+        if shutdown:
+            level_changes.append(f'shutdown after step {sum(m.start() < shutdown.start() for m in step_marks) - 1}')
         text_shaders = {s['shader'].lower() for s in speech if s['transcript'] == 'text'}
         probes = {}
         marks = list(PROBE.finditer(segment))
@@ -453,8 +485,10 @@ def audit(log, labels):
                 elif len(probe['cues']) < 2:  # the overlay shows the two newest utterances
                     missed.append(sample)
         statuses = Counter(s['transcript'] for s in speech if s['dialogue'] == '1')
+        kills = [tuple(int(v) for v in k) for k in KILLS.findall(segment)]
+        survivors = Counter(f'{c} {r}' for _, c, r in SURVIVOR.findall(segment))
         memory = {}
-        at = re.search(rf'^SCENE_MEMORY {re.escape(name)}\s*$', segment, re.M)
+        at = re.search(rf'SCENE_MEMORY {re.escape(name)}\s*$', segment, re.M)
         if at:
             tail = segment[at.end():]
             # The totals cover every sample; the filter only empties the per-sample listing.
@@ -496,6 +530,13 @@ def audit(log, labels):
             'mapped_lines_missed': sorted(set(missed)),
             'scene_steps': len(step_marks),
             'scene_steps_not_spawned': missing_steps,
+            'player_dead_at_step': dead_at,
+            'player_dead_commands': len(DEAD.findall(segment)),
+            'fight_passes': len(kills),
+            'hostiles_killed': sum(k[0] for k in kills),
+            'hostiles_survived': sum(k[1] for k in kills),
+            'hostiles_protected': sum(k[2] for k in kills),
+            'hostile_survivor_classes': dict(sorted(survivors.items())),
             'scene_dialogue_starts': len(walked),
             'streams_observed_playing': sorted({sample_key(v[2]) for v in VOICE.findall(segment)
                                                 if v[1] == '1' and v[0] == 'playing'}),
@@ -520,6 +561,8 @@ def main():
     parser.add_argument('--walk', action='store_true', help="Trigger each map's speech scenes after its opening")
     parser.add_argument('--progress', action='store_true',
                         help='With --walk: teleport the player through every trigger volume it can touch instead')
+    parser.add_argument('--fight', action='store_true',
+                        help='With --progress: kill the hostiles fighting the player halfway through each step')
     parser.add_argument('--step-msec', type=int, default=4000, help='Milliseconds between scene triggers')
     parser.add_argument('--tail', type=int, default=15, help='Seconds of probes after the last scene of a map')
     parser.add_argument('--silent-baseline', action='store_true',
@@ -540,6 +583,8 @@ def main():
         parser.error('the silent baseline compares openings; run it without --walk')
     if args.progress and not args.walk:
         parser.error('--progress requires --walk')
+    if args.fight and not args.progress:
+        parser.error('--fight requires --progress')
     if args.seconds < 1 or args.interval < 1 or args.step_msec < 1 or args.tail < 0:
         parser.error('seconds, interval and step-msec must be positive; tail must be nonnegative')
     if not 16 <= args.decode_memory_mb <= 1024 or not 32 <= args.audio_memory_mb <= 2048:
@@ -565,7 +610,9 @@ def main():
                       'radio_starts': scene['radio_starts'], 'probes': scene['probes'],
                       'mapped_lines_shown': scene['mapped_lines_shown'], 'scene_steps': scene['scene_steps'],
                       'scene_steps_not_spawned': scene['scene_steps_not_spawned'],
-                      'scene_dialogue_starts': scene['scene_dialogue_starts']})
+                      'scene_dialogue_starts': scene['scene_dialogue_starts'],
+                      'hostiles_killed': scene['hostiles_killed'], 'hostiles_survived': scene['hostiles_survived'],
+                      'hostiles_protected': scene['hostiles_protected']})
         total.update({'transcript_' + key: value for key, value in scene['transcripts'].items()})
     # The corpus the run reached: distinct dialogue shaders, and how many had a transcript.
     heard = set().union(*(s['dialogue_shaders'] for s in scenes.values())) if scenes else set()
@@ -598,6 +645,11 @@ def main():
         checks['scenes_walked'] = total['scene_steps'] == sum(len(walk.get(level, [])) for _, level in entries)
         checks['scenes_stay_on_their_map'] = all(not s['unexpected_level_changes'] for s in scenes.values())
         checks['scenes_add_speech'] = total['distinct_scene_only_shaders'] > 0
+        checks['player_survives'] = all(s['player_dead_at_step'] is None for s in scenes.values())
+    if args.fight:
+        # Every step and the tail ran their kill pass, and the passes found fights to win.
+        checks['fights_resolved'] = all(s['fight_passes'] == s['scene_steps'] + 1 for s in scenes.values() if s['loaded']) \
+            and total['hostiles_killed'] > 0
     if args.silent_baseline:
         # The same openings with sound off: what audio adds to the whole process,
         # and how much of that the managed payloads above do not account for.
@@ -659,7 +711,7 @@ def main():
         'decode_mode': args.decode_mode, 'stream_decode': args.stream_decode, 'decode_memory_mb': args.decode_memory_mb, 'audio_memory_mb': args.audio_memory_mb,
         'walk': {level: [entity for _, entity in steps] for level, steps in walk.items()} if walk else None,
         'step_msec': args.step_msec if walk else None,
-        'progress': args.progress, 'suppressed_level_exits': blocked_exits,
+        'progress': args.progress, 'fight': args.fight, 'suppressed_level_exits': blocked_exits,
         'game': 'q4xbase' if args.awakening else 'baseoq4', 'returncode': code, 'command': command,
         'microphone': False, 'host_input': False, 'output': 'OpenAL wave writer', 'transcripts_recorded': False,
         'executable_sha256': hashlib.sha256(exe.read_bytes()).hexdigest(),

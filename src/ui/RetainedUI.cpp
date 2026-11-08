@@ -77,6 +77,13 @@ idCVar ui_retainedTrace("ui_retainedTrace", "0", CVAR_GUI | CVAR_BOOL | CVAR_NOC
 	"trace retained event commits and typed application dispatch for semantic validation");
 idCVar ui_retainedAtlas("ui_retainedAtlas", "1", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
 	"cache unchanged solid vector coverage in bounded runtime texture pages");
+
+// A render demo records 2D drawing as geometry and material names; the
+// coverage atlas, cached composition layers and replayed frames hold pixels
+// only this process has. While one records, the HUD draws its vectors directly
+// so playback shows the whole HUD.
+static bool RetainedRecordingRenderDemo() { return session != NULL && session->writeDemo != NULL; }
+static bool RetainedAtlasActive() { return ui_retainedAtlas.GetBool() && !RetainedRecordingRenderDemo(); }
 idCVar ui_retainedSourceCache("ui_retainedSourceCache", "1", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
 	"reuse unchanged vector artwork beneath moving analytic masks");
 idCVar ui_retainedLinearMasks("ui_retainedLinearMasks", "1", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
@@ -399,19 +406,19 @@ public:
 			++cached.stableFrames;
 		}
 		cached.lastFrame=frame;
-		if (ui_retainedAtlas.GetBool() && rasterNewMeshes && (!handle || idStr::Icmp(material->GetName(),"_retainedMultiply")==0) &&
+		if (RetainedAtlasActive() && rasterNewMeshes && (!handle || idStr::Icmp(material->GetName(),"_retainedMultiply")==0) &&
 			!cached.rasterTried && cached.stableFrames>=2 && vertices.size()>=64) {
 			cached.rasterTried=true;
 			CacheRaster(cached,vertices,indices);
 		}
-		if (ui_retainedAtlas.GetBool() && !cached.rasterTiles.empty() &&
+		if (RetainedAtlasActive() && !cached.rasterTiles.empty() &&
 			std::none_of(cached.rasterTiles.begin(),cached.rasterTiles.end(),[&](const auto& tile){return atlasPages[tile.page].dirty;})) {
 			DrawRaster(cached,1);
 		} else Submit(cached,material);
 	}
 	bool CanDrawMeshOpacity(std::uint64_t mesh,std::uint64_t revision) const override {
 		const auto found=meshes.find(mesh);
-		if (!ui_retainedAtlas.GetBool() || found==meshes.end()) return false;
+		if (!RetainedAtlasActive() || found==meshes.end()) return false;
 		const auto& cached=found->second;
 		if (cached.revision!=revision || cached.width!=viewportWidth || cached.height!=viewportHeight ||
 			cached.handle || cached.rasterTiles.empty() ||
@@ -469,8 +476,8 @@ public:
 		renderSystem->ClearRenderTarget(true,false,1,0,0,0,0);
 		return true;
 	}
-	bool CanCacheLayers() const override { return true; }
-	bool CanReplayFrames() const override { return ui_retainedReplay.GetBool(); }
+	bool CanCacheLayers() const override { return !RetainedRecordingRenderDemo(); }
+	bool CanReplayFrames() const override { return ui_retainedReplay.GetBool() && !RetainedRecordingRenderDemo(); }
 	bool TrimLayer(std::uint32_t id) override {
 		if (!id || id>layers.size()) return false;
 		auto& layer=layers[id-1];
@@ -489,7 +496,7 @@ public:
 	void CompositeLayer(std::uint32_t source, std::uint32_t destination, float opacity, const openq4::ui::Bounds& clip) override {
 		DrawLayer(layers[source-1].material,destination,opacity,clip);
 	}
-	bool CanCompositeMaskedLayer() const override { return ui_retainedSourceCache.GetBool(); }
+	bool CanCompositeMaskedLayer() const override { return ui_retainedSourceCache.GetBool() && !RetainedRecordingRenderDemo(); }
 	void CompositeMaskedLayer(std::uint32_t source, const std::vector<openq4::ui::Vertex>& mask,
 		const std::vector<int>& indices, float opacity) override {
 		std::vector<openq4::ui::Vertex> vertices; vertices.reserve(mask.size());

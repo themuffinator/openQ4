@@ -2119,6 +2119,10 @@ void idRenderWorldLocal::FreeDefs() {
 	R_RenderThread_Sync( "world defs" );
 	int		i;
 
+	// render-demo in-world GUIs and joint history belong to the entities going away
+	FreeDemoGuiSurfaces( -1 );
+	ResetDemoJointHistory( -1 );
+
 	generateAllInteractionsCalled = false;
 
 	// Every def is about to be freed one by one; clearing the draw-surf area memo

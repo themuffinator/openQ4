@@ -141,6 +141,18 @@ struct demoLibraryEntry_t {
 	idStr					details;
 };
 
+// A v11 render demo's time at a frame index: each recorded frame is
+// USERCMD_PER_DEMO_FRAME tics at the recording's tic rate (Session_demo.cpp).
+int Session_RenderDemoFramesToMS( int frames, int userCmdHz );
+
+// A level's localized name from its map declaration, or the map path when it
+// has none (Session.cpp).
+idStr Session_LevelDisplayName( const char *map, const char *entityFilter );
+
+// False, with the player-facing reason, when a campaign render demo was
+// recorded in another game directory than the active one (Session_demo.cpp).
+bool Session_RenderDemoContentMatches( const char *path, idStr &reason );
+
 // Whether the legacy browser's filter (all, mvd, render, legacy or
 // incomplete) shows an entry, and an entry's text for the retained page.
 bool Session_DemoEntryMatchesFilter( const demoLibraryEntry_t &entry, const char *filter );
@@ -1014,6 +1026,56 @@ public:
 	int					renderDemoKnownDurationMS;
 	int					renderDemoSeekTargetMS;
 	int					renderDemoSeekDeadlineMS;
+
+	// Campaign render demos (render demo v11, Session_demo.cpp). A recording
+	// is one file of self-contained segments, one per level it spans: a
+	// single-player map change, save load, death reload or restart suspends
+	// it and the next level starts a new segment. writeDemo is set only while
+	// recording, so nothing is written while a level loads, before the first
+	// level or between levels.
+	enum renderDemoRecordState_t {
+		RENDER_DEMO_RECORD_IDLE,
+		RENDER_DEMO_RECORD_ARMED,		// waiting for the next single-player level
+		RENDER_DEMO_RECORD_RECORDING,
+		RENDER_DEMO_RECORD_SUSPENDED	// between levels
+	};
+	struct renderDemoSegment_t {
+		int				startFrame;		// frames recorded before the segment
+		idStr			map;
+		idStr			entityFilter;
+		idStr			reason;			// start, level, load or restart
+	};
+	renderDemoRecordState_t	renderDemoRecordState;
+	idDemoFile *		renderDemoRecordFile;
+	idStr				renderDemoRecordPath;
+	int					renderDemoRecordFrames;
+	int					renderDemoRecordStartMsec;
+	idList<renderDemoSegment_t> renderDemoRecordSegments;
+	idStr				renderDemoNextSegmentReason;	// set by the map change that ends one
+
+	// Playback of a v11 recording. Its timeline counts recorded frames, each
+	// USERCMD_PER_DEMO_FRAME tics at the recording's tic rate, so it runs on
+	// across levels whose game clocks restart.
+	bool				renderDemoFrameClock;
+	int					renderDemoUserCmdHz;
+	idDict				renderDemoPlayHeader;
+	idList<renderDemoSegment_t> renderDemoPlaySegments;	// from the trailer, then as met
+	int					renderDemoPlaySegment;		// the segment playing, or -1
+	idStr				renderDemoPlayMap;			// the playing segment's map
+	bool				renderDemoLevelLoadOpen;	// a segment's media load is open
+
+	bool				IsRenderDemoRecording() const { return renderDemoRecordState != RENDER_DEMO_RECORD_IDLE; }
+	bool				OpenRenderDemoRecordFile();
+	void				BeginRenderDemoSegment( const char *reason );
+	void				SuspendRenderDemoRecording();
+	void				ContinueRenderDemoAfterMapChange();
+	void				PrintRenderDemoRecordStatus();
+	void				ResetRenderDemoPlaybackSession();
+	bool				ProcessRenderDemoSessionRecord( bool &finished );
+	void				CloseRenderDemoLevelLoad();
+	int					RenderDemoFramesToMS( int frames ) const;
+	bool				SeekRenderDemoSegment( int direction );
+	idStr				RenderDemoSegmentLabel() const;
 
 	idUserInterface *	GetActiveMenu();
 

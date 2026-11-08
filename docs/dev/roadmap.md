@@ -2,7 +2,8 @@
 
 > **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.13.2 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
-Updated 4 November 2026. The progress review below uses the integrated source and
+Updated 8 November 2026 with the frame-rate recovery category (FPS). The progress
+review below otherwise dates from 4 November and uses the integrated source and
 recorded evidence through `c09500893cea22bd7becd7a1b6ece5439c408cde`. The MP-02
 closeout and task counts additionally include its later integrated safety
 qualification and the accepted timing-contention caveat of 4 November.
@@ -19,13 +20,14 @@ multiplayer and audio are furthest along among the unfinished workstreams. Full
 campaign progression, physical-device qualification, rendering performance and the
 UI toolkit/editor/corpus remain major completion gates.
 
-| Progress measure, 4 November 2026 | Current result | Meaning |
+| Progress measure, 6 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **16 / 115 (13.9%)** | **99 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-08, not partial substeps. |
-| Estimated category progress | **18 categories: 1 at 100%, 15 partial, 2 at 0%** | Includes one paused category (map tools); the detailed estimates follow. |
+| Formally closed roadmap tasks | **31 / 125 (24.8%)** | **94 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Estimated category progress | **19 categories: 3 at 100%, 14 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
+| Ultra frame rate at 2560x1440 | **19-58 fps on the RTX 4060 Laptop; no budget declared yet** | 0.13.2 Ultra runs 113-336 fps on the same scenes and the current build matches it at equal settings within 12%: the preset carries the drop. See the FPS category and the [performance report](performance-report.md). |
 | Release acceptance | **0 / 4 REL tasks closed** | Current-source progress is unreleased; 0.13.2 remains the available release under the recorded release-status policy. |
 
 ### Category completion estimates
@@ -51,11 +53,12 @@ exact; the estimate column is deliberately approximate.
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
+| [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **10%** | 0 / 9 | Declared budgets, preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; Quest waits on AND-05. |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **55%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, editable layouts and Quest. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
-| [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 8 | Full playthroughs, effect parity, broader restore graphs and platform/save evidence. |
+| [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **0%** | 0 / 6 | Measured baseline, enhanced solvers, behavior preservation and integration. |
 | [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 9 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
@@ -63,7 +66,7 @@ exact; the estimate column is deliberately approximate.
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
 | [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **100%** | 6 / 6 | None; macOS evidence stays with the platform gate. |
-| [Developer map tools](#tool-completion-checkpoints) — TOOL | **20%** | 0 / 4 | Paused: production geometry authoring, build/play integration and reliability. |
+| [Developer map tools](#tool-completion-checkpoints) — TOOL | **100%** | 4 / 4 | None; macOS evidence stays with the platform gate. |
 | [Release qualification](#release-qualification-and-completion-rules) — REL | **35%** | 0 / 4 | Exact package matrix, human/device evidence, lifecycle and promotion records. |
 | [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
 
@@ -85,8 +88,8 @@ The detailed task retains its full conditions and evidence links.
   scope. It cannot substitute for physical interaction, sustained performance or
   an ordered playthrough. A code fix still needs its applicable acceptance tests.
 - Preserve deliberate scope boundaries: MP-05's selected demo scope, VR-06's active
-  GL lifecycle scope, optional Q4-06/VR-05/PKG-06/IOS-06 work, the map-editor pause
-  and the deferred real-WAN/cross-architecture MP peer gates.
+  GL lifecycle scope, optional Q4-06/VR-05/PKG-06/IOS-06 work, the level editor's
+  experimental label and the deferred real-WAN/cross-architecture MP peer gates.
 
 ### Status reconciliation in this review
 
@@ -215,8 +218,8 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | --- | --- | --- |
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
-| 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope and REN-01 through REN-08 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items; TOOL-01 through TOOL-04 only when the paused map-editor work resumes | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope, REN-01 through REN-08 and FPS-01 through FPS-09 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items (TOOL-01 through TOOL-04 closed 6 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
 | 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
@@ -235,6 +238,7 @@ to a final project-wide phase. Important dependencies are:
 | Quest VR integration | VR-01's PC Vulkan/EGL integration and VR-06 lifecycle are in place; the standalone flavor needs AND-01 packaging/verifier work and the AND-05 distribution decision. PC headset qualification (VR-02) can proceed independently. |
 | Android sustained operation | AND-02 includes AUD-03/CORE-03 aggregate memory and cancellation behavior, not only renderer FPS. |
 | Modern-renderer promotion | Each REN-01 shared-domain gate is separate from REN-02 aggregate visible-lighting ownership. Keep their defaults and rollback decisions independent. |
+| Preset re-tiering (FPS-02) | FPS-01's recorded budgets first; the FPS-03, FPS-04 and FPS-05 cost reductions decide what each tier can afford. HF-07's Quality floor and FPS-02's Ultra budget are measured by the same suite on the same reference machine; neither is qualified from a hidden or windowed capture. |
 | Content pack split, trim and overlays (PKG-02 through PKG-04) | PKG-01's verifier first proves identical bulk-pack bytes across platforms and consecutive candidates. Client-only packs need their pure-server exemption before the dedicated server drops them. |
 | Enhanced physics default (PHYS-06) | PHYS-01's recorded baseline and budgets first; PHYS-04's behavior envelope and PHYS-05's save/multiplayer/demo integration must pass before `g_enhancedPhysics` defaults on. `0` always runs the unchanged legacy path. |
 | Steam integration (STEAM-02 through STEAM-06) | STEAM-01's app-identity, licence and distribution decision first. Joining and invites use MP-08's interoperability contract and the existing MP join flow. Steam absent or disabled always runs the unchanged path. |
@@ -626,9 +630,9 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-02 — Partial | Six controlled foreground samples pass the declared 28 ms presentation p99 budget on NVIDIA/Intel; failed diagnostic repeats remain retained. | Physical direct/hybrid routing, other power conditions and the broader exact-package pacing matrix. |
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
 | VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel; OpenGL clip-space depth through `VK_EXT_depth_clip_control` removes the three stencil pixels. | The strict lighting image gate (one point-map and one projected-map shadow-filter pixel on NVIDIA, more on Intel) and broader authored-lighting/mod content. |
-| VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls. | Complete scene/material admission; tiled/out-of-frame captures, portals, nested views and authored-post combinations. |
+| VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls; classic stock stages stay display-referred by decision, with a byte-identical, qualified fallback. | Tiled/out-of-frame captures and authored-post combinations of admitted (PBR) views. |
 | VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, tiled (larger-than-window) captures, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. Tiled (larger-than-window) captures, direct and through the game-owned post target, pass on OpenGL and on Vulkan with NVIDIA and Intel. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix. |
 
 ### VK task evidence and acceptance
 
@@ -761,6 +765,14 @@ and untested drivers remain open, with no tolerance or support-tier change.
   paired post/cubemap controls pass within one level, with exact main-view
   recovery. Complete-view material admission remains required. Tiled/out-of-frame
   captures and arbitrary portal/nested/material combinations remain open.
+  Decision, 6 November: classic stock stages (non-replace/add blends, dynamic,
+  texgen and cinematic stages, late sorts and the subviews that draw them) [stay
+  display-referred](vulkan-hdr.md#stock-content-stays-display-referred-6-november-2026-vk-05),
+  matching OpenGL and retail, instead of being re-blended in linear light.
+  Their admission scope is closed as declined by design. On Vulkan, requesting
+  the linear scene on stock `airdefense1` and `process1` leaves every capture
+  byte-identical, declines every main view and admits nothing. Tiled and
+  out-of-frame captures and authored post effects of admitted PBR views remain.
 - [ ] **VK-06 — P2, measured optimization: submission and resource lifetime.**
   Profile descriptor/pipeline churn, barriers, command recording, uploads and
   attachment reuse before changing them. Preserve GUI/transparency/post order,
@@ -841,8 +853,14 @@ and untested drivers remain open, with no tolerance or support-tier change.
   tile correctly (box-filtered correlation 0.999). 26 of 27 GL/Vulkan tile
   comparisons are within one display level; the remaining one is an OpenGL
   tile that repeats another. Tiling through the game-owned post-process target
-  is wrong on both backends, identically. Those OpenGL/shared tiled-capture
-  defects remain open outside this Vulkan fix.
+  is wrong on both backends, identically.
+  Progress, 6 November (tiled, closed): both backends offset views drawn
+  *into* a render texture as well as views drawn to the window. Now only window
+  draws take the tile offset; a view drawn into a target sized to the capture
+  stays at the target's origin, and its composite moves instead. OpenGL and
+  Vulkan (NVIDIA and Intel) now pass the gated `direct`, `post` and `restored`
+  cases (box-filtered correlation 0.999 direct, 0.9998 post), and all 27
+  GL/Vulkan tile comparisons on each device are within one display level.
   Progress, 6 November (views): the [nested/cropped/offset fixture](vulkan-captures.md#nested-cropped-and-offset-views-6-november-2026)
   found that remote-camera captures into ordinary file textures (the stock
   `textures/common/camera1` idiom) failed on both backends. Those textures
@@ -1446,6 +1464,174 @@ diagnostics establish whole-frame ownership or production performance.
   [motion blur qualification](temporal-presentation.md#motion-blur-qualification-6-november-2026).
   Physical Linux/macOS/Android runs and appearance review remain with platform
   qualification (PLAT).
+
+## Frame-rate recovery and performance budgets
+
+Sources: [performance report](performance-report.md) (methodology, build matrices, feature
+ladders, hitch catalog, bisection, headroom), `tools/tests/performance_suite.py`,
+`src/framework/PerformancePreset.cpp` and the startup detection in `src/framework/Common.cpp`,
+the shadow-map scheduling in `src/renderer/draw_arb2.cpp` and
+`src/renderer/Vulkan/vk_ShadowMap.cpp`, the MSAA and SSAO policy in
+`src/renderer/RenderSystem_init.cpp`, and the HF-07 attribution in
+[runtime performance](ui/runtime-performance.md).
+
+The 7-8 November 2026 measurement on the RTX 4060 Laptop (2560x1440, frame cap and vsync
+off, nine scripted stock-map scenarios, three interleaved launches per build) found no
+general code regression since 0.13.2. At the 0.13.2 Ultra settings the current build is
+within noise of 0.13.2 on convoy1, hub2, the combat wave and the walker and 7-12% slower on
+storage2, airdefense1 and the effects wave. The frame-rate drop players report is the
+current **Ultra preset**, which costs 12-49 ms per frame on that GPU (19-58 fps where
+0.13.2 Ultra runs 113-336 fps): 16x MSAA into the RGBA16F scene target (this GPU honours
+the 16 samples; MSAA 4 alone doubles the airdefense1 frame rate), shadow-mapped point
+lights with 13-tap PCSS, cascades and a 16384 atlas (30 of hub2's 54 ms), full-resolution
+32-sample SSAO, 16-sample motion blur, bloom and the HDR tone map. A fresh install
+auto-detects Enhanced with a 120 fps cap. This category restores a measured, budgeted
+preset ladder, removes the structural costs behind it, closes the equal-settings
+differences and installs a release gate, so that "Ultra" again means the best image the
+reference hardware can hold at its declared frame rate rather than every maximum at once.
+
+### FPS completion checkpoints
+
+**Estimate: 10%; 0/9 tasks closed.** The suite, the two baselines and the per-feature
+cost attribution exist on one development machine; no budget has been declared, no
+preset re-tiered and no optimization landed.
+
+| Task / state | Completed points and evidence | Remaining subpoints / closure boundary |
+| --- | --- | --- |
+| FPS-01 — Partial | Suite (nine scripted stock-map scenarios, per-frame traces, cold/warm passes, toggle ladders, attribution, hitch events, transitions, idle-launch retry), 0.13.2 and current baselines on both backends on the RTX 4060 Laptop, report with the settings/code split. | Reference-desktop run; declared per-scenario budgets recorded beside the release notes. |
+| FPS-02 — Not started | Every current Ultra feature priced per scene; preset catalog and startup detection read. | Declared targets per tier and resolution; Ultra/Quality/Enhanced re-tiered to them; explicit "everything on" choice without a frame-rate claim; startup banner and fresh-install cap decided. |
+| FPS-03 — Not started | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. | Dynamic-caster composition for point lights, per-face culling, tier budgets and sizes, Vulkan light scan. |
+| FPS-04 — Not started | SSAO, motion blur, HDR tone map, bloom and SMAA priced per scene on both backends (the chain is 10-14 ms per frame at 16 samples on OpenGL, 4-6 ms at 8 samples on Vulkan). | Half-resolution SSAO on OpenGL, pass merging, MSAA-aware resolves, tone-map cost. |
+| FPS-05 — Not started | 16x MSAA measured as the largest single Ultra cost on OpenGL; the Vulkan backend found to clamp the preset's 16 samples to the device's 8, so the two backends render different Ultra images. | Sample-count policy per tier, resolve cost, one sample count on both backends, MSAA 4 + SMAA as the Ultra candidate. |
+| FPS-06 — Not started | Equal-settings deltas attributed: in storage2 the retained HUD's layer composition (17 two-dimensional views and 34 render-target commands per frame against the classic HUD's 7 and 17; about 0.4 ms of main-thread time); on Vulkan the soft-particle depth capture (1.3 ms in airdefense1). The 2 October build equals 0.13.2 and the 15 October build carries the storage2 step, bracketing the 8 October retained-HUD commit (bisection); interpolation, light grid, reverb, portal cull and the five new Vulkan backend features cost nothing measurable. | Bisection pass 2 for the remainder, the retained HUD composed in one pass, the Vulkan soft-particle capture made cheap, closure within 3% average and 10% p99 of 0.13.2 on every suite scene on both backends. |
+| FPS-07 — Not started | Hitch classes recorded: 2-3 s cold draw stalls at Ultra, periodic 100 ms hub2 frames, a 393 ms storage2 frame, first-use events. | Attribution per class, fixes or declared budgets, clean first-use catalog on both backends. |
+| FPS-08 — Not started | HF-07 attribution: the Quality frame is CPU-bound on one thread; Vulkan render-thread stage 1 landed and gains nothing at the GPU-bound Ultra (within 0.4 ms, longer tails). | Front-end and submission cost, stage 2 overlap, game-tic cost; shared with HF-07 and REN-07. |
+| FPS-09 — Not started | Prevention plan written (report section 9). | Suite in the release checklist, budgets as gates, cvar-default diff and attribution checks in CI. |
+
+### FPS task evidence and acceptance
+
+- [ ] **FPS-01 — P0, qualification: performance suite, baselines and budgets.** Keep
+  `tools/tests/performance_suite.py` the single way frame rates are measured for this
+  project: scripted stock-map scenarios driven by `g_autoExecAfterMapLoad` and
+  `benchmarkViewSweep`, never synthesized input; per-frame traces from
+  `profileFrameWork`; cold and warm passes; interleaved builds; the per-launch CPU/GPU
+  load record. Run the OpenGL and Vulkan matrices on the project's reference desktop,
+  then declare a per-scenario budget (warm mean frame time and p99) for each supported
+  tier at 2560x1440 and record it in the [performance report](performance-report.md)
+  beside the release notes. Close when the budgets exist for both backends on the
+  reference machine and the suite's `report` output is the artifact the release
+  workflow cites. Completed so far: the suite, the OpenGL and Vulkan matrices of 0.13.2,
+  the current build and the current build at the 0.13.2 settings on the RTX 4060 Laptop,
+  the settings/code split, and the feature ladders and restart variants on both backends.
+- [ ] **FPS-02 — P0, decision and implementation: re-tier the presets to declared
+  budgets.** Ultra currently requests every maximum at once and no tier is tied to a
+  frame rate. Declare, per tier, the resolution and reference hardware it must hold and
+  the frame-time budget it must meet (the user's Ultra target is 220 fps average and
+  180 fps 1% low at 2560x1440 on the reference desktop). Rebuild the Ultra, Quality and
+  Enhanced recipes in `src/framework/PerformancePreset.cpp` from the measured feature
+  costs: MSAA sample count (FPS-05), shadow-map tier (FPS-03), SSAO resolution and
+  samples, motion-blur samples, bloom mips and SMAA quality (FPS-04). Keep an explicit
+  "everything on" choice for players who want it, labelled without a frame-rate claim.
+  Decide the fresh-install behaviour from the `own-default` measurements: the
+  auto-detected tier, its frame cap against the display refresh rate, and the startup
+  banner that today prints the bootstrap `minimum` profile with 64 MB of video memory
+  before the device exists (`Quality profile:` in `src/framework/Common.cpp`; the
+  detected tier is applied later and `com_videoRam` is never corrected). Update the
+  preset self-test, the SYSTEM catalog and the player documentation together. Close when
+  every re-tiered preset meets its declared budget on the reference machine on both
+  backends, the self-test passes, and the release notes describe the change and what a
+  player must re-select.
+- [ ] **FPS-03 — P1, implementation: shadow-map cost.** In hub2 the shadow maps are 33 of
+  the current Ultra's 54 ms per frame and 30 ms of that is point lights: a point light
+  with any moving caster in range re-renders all six cube faces every frame, because
+  only projected lights compose dynamic casters over cached static depth
+  (`RB_ShadowMapStaticCacheable`, `src/renderer/draw_arb2.cpp`). Implement the
+  dynamic-caster composition for point lights, cull cube faces that cannot reach the
+  view, make the importance-ordered update budget (`r_shadowMapMaxUpdatesPerView`) part
+  of every tier instead of unlimited at Ultra, size the atlas and the per-light maps by
+  tier and available video memory (the 16384 atlas is 1 GiB of the 8 GB card), lower
+  the PCSS tap count with distance, and remove the per-surface quadratic light scan
+  on Vulkan (`R_ShadowMapLightWillUseShadowMaps`). Close when hub2 and storage2 at the
+  re-tiered Ultra spend less than a declared share of the frame on shadow maps on both
+  backends, with image comparisons showing no shadow regression at the stock maps'
+  reference poses.
+- [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
+  screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
+  half-resolution path exists only on Vulkan and only below 32 samples), motion blur
+  (16 samples), the HDR tone map (3 ms in airdefense1 at 16x MSAA), bloom (5 mips) and
+  SMAA ultra: 10-14 ms per frame at 16 samples on OpenGL, 4-6 ms at 8 samples on Vulkan.
+  Bring the half-resolution SSAO to OpenGL, merge passes that read the same
+  scene target, make the resolves MSAA-aware so the tone map does not pay a second
+  resolve, and set the sample counts per tier. Close when the post chain at the
+  re-tiered Ultra costs less than a declared budget per scene on both backends and the
+  feature ladders show each pass within its share.
+- [ ] **FPS-05 — P1, decision and implementation: MSAA and the HDR scene target.** The
+  Ultra recipe requests 16 samples; OpenGL renders them on this GPU (`GL_MAX_SAMPLES` 32)
+  into an RGBA16F target at 2560x1440, where MSAA 4 alone doubles the airdefense1 frame
+  rate, while the Vulkan backend clamps the request to the device's 8 colour samples
+  (`Forward render target MSAA: requested 16, effective 8`), so the two backends render
+  different Ultra images and the Vulkan Ultra is 1.7-2.7x faster for that reason alone.
+  Measure 16/8/4/2/0 with and without the HDR target and with SMAA/TAA alternatives on
+  both backends (16/4/0 and 8/4/0 are in the report), declare the sample-count policy
+  per tier and resolution so that a preset means the same sample count on both backends,
+  and make the resolve and the sample count visible in `gfxInfo` and the settings menu.
+  Close when the chosen Ultra sample count is justified by the measurements in the
+  report, both backends honour it or report the clamp, and the settings menu names the
+  trade-off.
+- [ ] **FPS-06 — P1, investigation and implementation: equal-settings regressions.** At
+  the 0.13.2 settings the current build is slower than 0.13.2 on OpenGL by a constant
+  1.0-1.2 ms per frame in storage2 (0.9-1.0 ms of it in the draw phase, in every window
+  of the drift launches; airdefense1 is within 0.05 ms) and spends more spike frames in
+  the effects wave (183 against 17 over three warm launches); the 2 October build
+  (834564945) is within 3% of 0.13.2, so the storage2 regression entered after it. On
+  Vulkan the current build is slower in every scene, +0.8 to +2.3 ms per frame (+24-50%),
+  85-90% of it in the draw phase, where 0.13.2's Vulkan backend was 4-25% faster than its
+  OpenGL one; 1.3 ms of the airdefense1 share is the soft-particle depth capture, a
+  feature the 0.13.2 backend did not draw, which leaves the forward pass and resolves the
+  8-sample depth per view (four times OpenGL's cost for the same effect), and the current
+  build issues 7-15% more draws in the airdefense1 scenes. In storage2 the difference is
+  the retained HUD: its layer composition binds an offscreen target per layer and mask,
+  every bind flushes the pending 2D batch as a full-screen view, and the frame carries 17
+  two-dimensional views and 34 render-target commands against the classic HUD's 7 and 17
+  (`r_rendererMetrics 2`), about 0.4 ms of main-thread time on OpenGL and render-pass
+  boundaries with attachment store and load on Vulkan, where that scene is GPU-bound.
+  Presentation interpolation, the light grid, reverb, the portal cull and the five Vulkan
+  backend features that stay on at the 0.13.2 settings (snapshot retention, window-view
+  multisampling, the portal-sky mask, ARB program translation, the precise frame wait)
+  cost nothing measurable. Compose the retained HUD's layers in one offscreen pass, or
+  with scissor and stencil instead of per-layer targets, so the HUD adds one 2D view like
+  the classic one; make the Vulkan soft-particle capture read the prepass depth without a
+  render-pass break; the bisection (one build per week at the 0.13.2 settings against the
+  0.13.2 rebuild) places the storage2 step between the 2 October and 15 October builds,
+  around the 8 October commit that made the retained HUD the gameplay HUD, so the HUD
+  composition is the fix to verify; then fix or document each remaining component. Close when the current build at the 0.13.2
+  settings is within 3% average and 10% p99 of 0.13.2 on every suite scene on both
+  backends.
+- [ ] **FPS-07 — P1, implementation: hitch catalog.** Attribute and remove the stalls the
+  matrices recorded: 2.0 s and 3.0 s draw stalls in a cold convoy1 pass at the current
+  Ultra, periodic 100-124 ms draw frames in hub2 at the same sweep direction every turn,
+  a 393 ms storage2 frame (134 ms of events, 252 ms of draw), and the first-use events of
+  the `hitch_firstuse` scenario (weapons, first spawns, first explosion, scope, flashlight)
+  and the level transition. Close when each class is attributed in the report, fixed or
+  given a declared budget, and the hitch scenario shows no frame above a declared ceiling
+  outside level loads on both backends.
+- [ ] **FPS-08 — P2, implementation: CPU-side renderer and game cost.** The HF-07
+  attribution found the Quality frame CPU-bound on one thread (tic, scene front end and
+  Vulkan recording in turn); the render-thread prototype's first stage gained 0.5 ms
+  there and nothing at the GPU-bound Ultra (within 0.4 ms in the Vulkan ladders, with
+  4 ms of the frame moved into the session phase and longer tails).
+  Measure the front end, backend submission (OpenGL draw submission with shadow maps) and
+  game tic per scene from the attribution runs, land the stage-2 overlap under REN-07,
+  and reduce the front-end and tic work the attribution names. Close when the CPU-bound
+  scenes meet their declared budgets with the GPU as the limit; shared with HF-07.
+- [ ] **FPS-09 — P1, qualification: regression gate.** Put the suite in the release
+  checklist (`docs/dev/release-completion.md`, the manual release workflow): the core
+  scenarios on the reference machine before every release and on every renderer,
+  game-loop or asset-loading change, with the per-scenario budgets from FPS-01 as the
+  gate (5% average, 10% p99), a cvar-default diff that fails when a default with a
+  performance cost changes without a release note, the preset self-test, and the toggle
+  ladder as the required before/after evidence in commits that touch post effects,
+  shadows or presentation. Close when a release candidate has been gated by it once.
 
 ## Virtual reality
 
@@ -2373,7 +2559,7 @@ Sources: [retail decl audit](retail-q4-decl-parity-audit.md),
 
 ### Q4 completion checkpoints
 
-**Estimate: 75%; 1/8 tasks closed.** Campaign entry/transition and targeted-state
+**Estimate: 75%; 1/9 tasks closed.** Campaign entry/transition and targeted-state
 probes are useful but do not establish full playthroughs. Portable v5 saves now
 exist; their optional scope and platform gates remain separate from restoring
 historical saves and recovering safely from damage.
@@ -2388,6 +2574,7 @@ historical saves and recovering safely from damage.
 | Q4-06 — Partial; optional P3 | Raw inventory and field codecs restored; v5 portable stamp/encoding implemented; Windows/Linux bidirectional stock/Awakening cross-loads pass. | Confirm outstanding CI/Apple codec runs; macOS and another ARM64 runtime cross-load/resave directions; publish player migration guidance with accepted scope. |
 | Q4-07 — Partial | Original-writer Windows corpus substantially qualified; v2 stamp reporting repaired; exact HiDef fixture investigated. | Resolve #123 against the reporter's actual GUI/content; other ABIs; recover/reproduce absent stage-two artifacts before claiming independently reviewable acceptance. |
 | Q4-08 — Partial | Durable commit/recovery implemented; 56 process-interruption points, locked-file failure and NTFS/ext4/WSL 9p checks recorded. | APFS result, removable/network filesystems and actual power-cut behavior; retain measured CRC/sync costs and last-valid-save preservation. |
+| Q4-09 — Partial | Render demo v11: one recording spans levels, save loads, death reloads and restarts as self-contained segments; gameplay-only frames; level loads, continuous timeline and level markers in playback; campaign-aware library and gate; whole retained HUD and in-world screens recorded. Render demo v12 predicts animated-entity joints exactly, a quarter smaller. Windows checks pass with stock and Awakening content: GL recording, GL and Vulkan playback. | Vulkan recording, Linux and macOS, a long multi-level session with seek timing and file size, the 2D, sound and effect records that now dominate the size, the masked retained HUD groups that replay unmasked, and local sounds already playing at a segment start. |
 
 Completion substeps must keep three forms of evidence distinct:
 
@@ -2979,6 +3166,50 @@ Completion substeps must keep three forms of evidence distinct:
   adds about 1 ms on NTFS and 7 ms on ext4. Remaining: macOS APFS (the new
   native test runs there in CI), removable and network filesystems, and any
   power-cut test.
+- [ ] **Q4-09 — P2, implementation and qualification: campaign demo recording and
+  playback.** A render demo recorded in single-player must survive everything a
+  campaign does between its levels and replay as the player saw it. Acceptance:
+  one recording across level transitions, save loads, death reloads, difficulty
+  restarts and quit-to-menu; recording armed at the title so a campaign records
+  from its first frame; no menu, pause or loading-screen frames; playback that
+  loads each level (with its loading screen), purges the previous level's media,
+  keeps one timeline and offers each level start as a marker; a library entry that
+  names the campaign, first level, level count and duration, refuses a demo from
+  the other campaign before anything is torn down, and marks an interrupted
+  recording as playable to its last complete frame; the HUD and in-world screens
+  as the player saw them. Qualify on OpenGL and Vulkan, Windows and Linux, with
+  stock and Awakening content and a session long enough to measure seek time and
+  file size.
+  Progress, 7 November 2026: render demo v11 implements the format and both ends
+  ([architecture](multiview-demos.md#campaign-render-demos-v11-7-november-2026)).
+  On the staged Windows GL client with stock content, a recording armed at the
+  title spanned airdefense1, a change to airdefense2 and a save load back (3
+  segments, 745 frames) and replayed all 745 frames; a death through the restart
+  menu suspended the recording until the reload; `disconnect` finalized it; a killed
+  recording played to its last complete frame; level markers, cross-level seeks,
+  the library entry and the cross-campaign refusal behaved as specified; and
+  playback frames matched live captures for the HUD values, icons, crosshair and an
+  in-world terminal. Vulkan played the same recordings identically (all 745 frames
+  of the three-level demo; the HUD capture matched). `campaign_demo_contract.py`
+  pins the format and both ends.
+  An Awakening recording across a trench1-to-trench2 transition (406 frames) found
+  that render demos could not replay a local sound (music, narration, interface)
+  at all; the sound reader now resolves that emitter, and the demo played in full
+  and was refused in base Quake 4.
+  Render demo v12 (7 November 2026) predicts animated entities' joints from the
+  joints last recorded for the same handle and stores only the moved joints'
+  residuals, exact on every platform and checksummed
+  ([joint prediction](multiview-demos.md#joint-prediction-v12-7-november-2026)).
+  Joints had been half of the compressed file. The same scripted airdefense1 to
+  airdefense2 clip (500 frames) shrank from 20.4 MB to 15.4 MB (-24.5%, about
+  0.92 MB per second); it replayed all 500 frames on GL and Vulkan with every
+  record verified, the three-level v11 demo still played in full, and paused
+  frames of the two recordings matched in view and pose.
+  Remaining: Vulkan recording, Linux and macOS, a long session with measured seek
+  times (rewinds replay from the start) and size, the 2D model, sound and effect
+  records that now make up most of a recording, the retained HUD's masked
+  groups, which replay without their masks, and local sounds already playing when
+  a segment starts.
 
 ## Rigid-body and ragdoll physics
 
@@ -3899,8 +4130,8 @@ automatically satisfied by a listening pass.
 | AUD-03 — Partial | Aggregate payload budgets/backpressure, bounded compressed streaming, recycled-source fix and exactly-once low-memory trim implemented; Windows/Linux measurements recorded. | Real mobile OS low-memory callbacks, device/provider process-memory budgets, thermal/loading/cancellation behavior and device breadth. |
 | AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio. | Physical surround outputs and real endpoint/layout transitions; preserve positional mix and stock zero-rolloff behavior. |
 | AUD-05 — Partial | Consent/PTT/capture pipeline, codec/transport/moderation and bounded playback pass multi-process Windows/Linux and clock/loss tests. | Physical microphone/capture hotplug, independent-machine clocks and OS/device breadth. Existing 1:59:29 run is not a two-hour pass; cancelled rerun is not silently reinstated. |
-| AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit and extensive scripted-scene mute/save checks exist. | Ordered movement/combat-dependent scenes and physical listening/device checks; retain effects/music separation. |
-| AUD-07 — Partial | Playback-driven captions, fallback/mapping policy, portrait overlap and real save/load checks implemented. | Missing transcripts remain explicit; full gameplay-order/locale corpus and physical stereo-HUD readability. Available mappings do not mean every line is captioned. |
+| AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit, extensive scripted-scene mute/save checks and a 42-map progression sweep with fights (1,052 kills, no mute leak) exist. | Ordered human play, including `walker` past the step where the probe player dies, and physical listening/device checks; retain effects/music separation. |
+| AUD-07 — Partial | Playback-driven captions, fallback/mapping policy, portrait overlap, real save/load checks and the fight-gated scene corpus (1,546 distinct lines across retained reports, no untranscribed cue) implemented. | Missing transcripts remain explicit; ordered human play and physical stereo-HUD readability. Installed transcripts are English only. Available mappings do not mean every line is captioned. |
 
 ### AUD task evidence and acceptance
 
@@ -4192,6 +4423,19 @@ automatically satisfied by a listening pass.
   as failures. Attempts and missing entities remain explicit; these probes do not
   replace an ordered playthrough or physical listening.
   [Progression-audit evidence](audio-voice-evidence.md#progression-audit-recovery-26-october-2026).
+  November 6: the progression audit now fights. `openq4_killHostiles` kills the AI
+  fighting the player through ordinary damage halfway through each step, so the
+  conversations scripts hold until a fight is won run too. All 42 maps ran
+  (1,967 steps, 1,052 kills): 1,418 dialogue starts, no mute leak in 2,681 muted
+  probes, effects continuing, and 88 lines no earlier report reached. The sweep
+  found a level-ending defect inherited from the SDK, now fixed: a full client
+  entity table turned a refused debris piece into a fatal "cannot load collision
+  model" error (`airdefense2`'s second trench). The `teleport` cheat now moves a
+  driver's vehicle with it, which completes `m07_race`; the probe player still
+  dies at `walker`'s step 11 (on foot, cause not identified), so its later steps
+  remain uncovered.
+  This is still not an ordered playthrough; physical devices remain open.
+  [Fight evidence](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
 - [ ] **AUD-07 — P1, decision, implementation and qualification: dialogue subtitles.**
   Address [#186](https://github.com/themuffinator/openQ4/issues/186) with UI-02/UI-04.
   Inventory dialogue-to-text/localization data available from installed assets and
@@ -4252,6 +4496,15 @@ automatically satisfied by a listening pass.
   Interrupted map chains are not accepted as full scene coverage. Complete
   gameplay-order coverage and physical stereo-HUD placement remain open.
   [Progression-audit evidence](audio-voice-evidence.md#progression-audit-recovery-26-october-2026).
+  November 6: with fights, the 42-map progression sweep starts 993 distinct
+  dialogue lines (679 transcribed); every cue shown had a transcript. Two
+  transcribed lines were heard without a cue, both at their very end: one voice
+  already stopped, one 4.06 s into a 4.32 s line whose cue had ended with its
+  logical playback. Across every retained
+  report the corpus is now 1,546 distinct lines (954 stock, 592 Awakening). The
+  installed game has English transcripts only, which the player guide states;
+  ordered human play and physical stereo-HUD placement remain open.
+  [Fight evidence](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
 
 ## Desktop platforms and packaging
 
@@ -4524,17 +4777,15 @@ Sources: [job service](parallel-job-system.md), [loading caches](loading-cache-m
 [runtime refinements](core-runtime-refinements.md), [map workspace](level-editor-modernization.md),
 [AAS compiler](aas-compiler.md), [dmap](dmap-compilation.md).
 
-The broader map-editor implementation remains **paused** as recorded in its
-reference. TOOL-01 through TOOL-04 preserve the outstanding scope; this planning
-consolidation does not resume it. Compiler/runtime compatibility fixes and the UI
-visual editor have their own active items.
+The map-editor work resumed on 6 November 2026 and TOOL-01 through TOOL-04 are
+closed; the editor stays labelled experimental. Compiler/runtime compatibility
+fixes and the UI visual editor have their own items.
 
 ### CORE completion checkpoints
 
 **Estimate: 100%; 6/6 tasks closed.** CORE-01, CORE-02 (not promoted), CORE-03,
 CORE-04, CORE-05 and CORE-06 are closed. macOS, a preview platform, is qualified
-through its own evidence gate rather than CORE-01. The map-editor pause does not
-pause these engine fixes.
+through its own evidence gate rather than CORE-01.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
@@ -4701,42 +4952,99 @@ pause these engine fixes.
 
 ### TOOL completion checkpoints
 
-**Estimate: 20%; 0/4 tasks closed; broader implementation paused.** Existing
-transactional document/persistence and experimental source-view work is retained.
-These substeps describe the remaining scope and do not authorize resuming it.
-The UI visual editor is a separate active UI-06 obligation.
+**Estimate: 100%; 4/4 tasks closed.** Work resumed on 6 November 2026 and the
+[level editor](level-editor-modernization.md) now authors, builds and plays
+Quake 4 maps. It stays labelled experimental; the legacy Radiant source remains
+unbuilt and separate, and the UI visual editor is a separate UI-06 obligation.
+macOS, a preview platform, is qualified through its own evidence gate.
 
-| Task / state | Completed points and evidence | Remaining completion subpoints when resumed |
+| Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| TOOL-01 — Partial; paused | Document service, source preview, entity/property browser and basic graphical workspace exist. | Docking, orthographic/persistent views, richer previews, typed properties/diagnostics and localized high-DPI/input/backend qualification. |
-| TOOL-02 — Partial foundations; paused | Lossless source retention, point-entity edits, undo and atomic/conflict-aware persistence exist. | Brush/patch geometry adapters, transforms/snapping/texture lock, per-gesture undo, layers/groups/prefabs/reference repair and bounded asynchronous indexing. |
-| TOOL-03 — Not integrated; paused | Native dmap/AAS commands exist separately from the workspace. | Build progress/cancel/linked diagnostics, preserved old output, isolated play sandbox and editor restoration; stock/custom round trips and rebuilt AI. |
-| TOOL-04 — Partial foundations; paused | Document save/conflict/recovery rules have scoped evidence. | Full authoring I/O failure, external edits, repeated undo, restart/render-switch/platform tests and latency budgets; reproduce disappearing workspace labels. |
+| TOOL-01 — Closed | Docked, tabbed and resizable panels with persisted layout; 3D plus top/front/side wireframe views and quad; per-map camera and view state; static entity models; typed inspector from entityDef `editor_*` declarations; source-linked diagnostics; all labels fit in 12 languages at 720p, 1080p and 2160p; GL and Vulkan. | — |
+| TOOL-02 — Closed | Lossless brushDef3/patch adapters; grid, snap, move, turn, scale and texture lock; one undo step per gesture or tool; groups, layers, prefabs, duplicate, reference-repairing rename; bounded background asset index; all 543,372 retail primitives round-trip. | — |
+| TOOL-03 — Closed | Sandboxed child-process builds with progress, cancel and linked diagnostics; outputs published only after a whole successful build; isolated play client; editor state kept; authored and stock maps built and played with AI on the rebuilt navigation. | — |
+| TOOL-04 — Closed | Fault-injected storage and builds, external-edit detection, atomic saves, recovery, randomized undo/redo, renderer switch and resized restart, Windows and Linux runs, declared latency budgets met; the old restart label defect no longer reproduces. | — |
 
 ### TOOL task evidence and acceptance
 
-- [ ] **TOOL-01 — P2, implementation: complete the map workspace.** Build on the
+- [x] **TOOL-01 — P2, implementation: complete the map workspace.** Build on the
   existing transactional document service and source preview. Add docking,
   orthographic views/camera persistence, richer entity/model previews, typed
   properties and linked diagnostics. Qualify localized responsive layouts, native
   input/high DPI and desktop backends. This is not restored MFC Radiant.
-- [ ] **TOOL-02 — P2, implementation: geometry and asset authoring.** Add lossless
+  Closed 6 November ([workspace](level-editor-modernization.md#milestone-4-the-docked-workspace-tool-01),
+  [evidence](level-editor-modernization.md#qualification-evidence-6-november-2026)):
+  Panels dock left, right or (Problems) under the views, two to a
+  dock as tabs, resize and persist in `editorExperimental_layout`. Top, front
+  and side wireframes drawn through the GUI device context join the 3D view,
+  alone or as a quad; each map's cameras, view mode, grid, texture lock, layers
+  and selection persist. Point entities show their static models, loaded
+  within a per-frame budget; the inspector types properties from entityDef
+  `editor_*` declarations and refuses ill-typed values, and validation links
+  each problem to its entity or primitive. Every label fits in all 12
+  languages at 1280x720, 1920x1080 and 2538x1312 in two layouts (the first
+  runs found wrapping in nine languages). OpenGL and Vulkan pass the workspace
+  phase, including a renderer switch and a resized restart; input is driven
+  through engine events into the workspace GUI, and a physical pointer and
+  keyboard pass remains the owner's hands-on check.
+- [x] **TOOL-02 — P2, implementation: geometry and asset authoring.** Add lossless
   brush/patch adapters, grid/snapping/transforms, texture locking, one undo action
   per gesture, layers/groups/prefabs and safe rename/reference repair. Make asset
   indexing asynchronous and bounded. Test cancellation, mixed selections, large
   maps and preservation of untouched source.
-- [ ] **TOOL-03 — P2, implementation: build and play workflow.** Integrate dmap/AAS
+  Closed 6 November ([geometry](level-editor-modernization.md#milestone-3-geometry-and-asset-authoring-tool-02)):
+  Lossless `brushDef3`/patch adapters rewrite only changed numbers;
+  all 543,372 primitives of the 79 retail maps serialize byte for byte and every
+  valid one survives locked transforms (five degenerate retail brushes are
+  reported). Move, turn, scale and snap act on mixed selections with per-face
+  texture lock; grouped transactions make each gesture or tool one undo step,
+  and a cancelled gesture restores the exact revision. `func_group` groups,
+  `editor_layer` layers, prefabs that rename collisions and keep their links,
+  duplicates whose links follow the copies, and renames that repair `target`,
+  `bind` and entityDef-declared references. Asset names are indexed a bounded
+  slice per frame, with cancellation and size limits. On a 20,000-brush map,
+  turning 5,000 brushes and 1,000 entities is one 146-227 ms step.
+- [x] **TOOL-03 — P2, implementation: build and play workflow.** Integrate dmap/AAS
   progress, cancellation and source-linked diagnostics with an isolated play
   sandbox and editor-state restoration. Preserve previous playable output on
   failure. Consume CORE-05/CORE-06 compiler capabilities and qualify stock/custom map
   round trips and AI use of rebuilt data.
-- [ ] **TOOL-04 — P2, qualification: authoring reliability.** Cover forced I/O
+  Closed 6 November ([build and play](level-editor-modernization.md#milestone-5-build-and-play-tool-03)):
+  Builds run the dedicated server as a child process (SDL3, or
+  `posix_spawn` where the Linux dedicated server has no SDL3) against a sandbox
+  save path; `com_compilerOutput` keeps `.proc`/`.aas` there. Progress, cancel
+  and diagnostics are mapped through `idMapFile::Resolve`'s renumbering to the
+  source brush. Outputs replace the previous set only after a whole successful
+  build, with rollback; leaks, errors, timeouts, cancels and hung compilers
+  leave it untouched. Play starts an isolated client with the sandbox as its
+  profile while the editor keeps its state. A room authored only with editor
+  commands built (navigation with 5 areas and 8 reachabilities) and its
+  marines walked about 200 and 150 units around a pillar; stock `airdefense1`
+  was edited, rebuilt (1,170 areas, 242 tactical features) and played with
+  tactical AI taking cover. Two engine defects found on the way are fixed: a
+  leak in a map whose folder was not beside the engine aborted `dmap`, and the
+  dedicated server then hung in shutdown.
+- [x] **TOOL-04 — P2, qualification: authoring reliability.** Cover forced I/O
   failure, external edits, atomic saves, recovery, repeated undo/redo, renderer
   switches and Windows/Linux/macOS workflows. Declare startup/edit/selection/view
   latency budgets. Keep the known unbuilt legacy Radiant defects distinct from
   the supported experimental workspace and the separate UI visual editor.
   Reproduce and fix workspace labels disappearing after full video restart on
   GL/Vulkan; Vulkan reactivation helping one run does not close both backends.
+  Closed 6 November ([qualification](level-editor-modernization.md#milestone-6-qualification-tool-04)):
+  Fault-injected storage covers short writes, sync, backup and
+  promotion failures and conflicts (2,938 document checks), and build staging
+  and promotion failures roll back; external edits are detected while a map
+  is open; 2,000 randomized edits and gestures undo to the original bytes.
+  The workspace phase covers a renderer switch, a resized restart, view state
+  across a client restart and the declared budgets on `airdefense1`: startup
+  6 s, edit 100 ms, selection 16 ms, view drawing 16 ms at the 95th percentile
+  and validation 250 ms, all met on both backends. Windows is qualified end to
+  end; Linux passes the native suites under GCC and Clang sanitizers and the
+  build-and-play phase on a GCC build under Xvfb; macOS is qualified through the platform evidence gate.
+  The restart label defect no longer reproduces with the old or the new
+  editor on either backend. Legacy Radiant defects stay recorded as unbuilt
+  source, apart from this editor and the UI visual editor.
 
 ## Deferred design decisions
 

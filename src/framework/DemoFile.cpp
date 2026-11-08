@@ -261,7 +261,112 @@ void idDemoFile::Close() {
 		compressor = NULL;
 	}
 
+	ResetHashStrings();
+}
+
+/*
+================
+idDemoFile::ResetHashStrings
+================
+*/
+void idDemoFile::ResetHashStrings() {
 	demoStrings.DeleteContents( true );
+	demoStringHash.Clear();
+}
+
+/*
+================
+idDemoFile::CloseWithTrailer
+
+The trailer lies outside the compressed stream, so it is written raw after
+the compressor has flushed. Readers stop at the stream's DSC_END record and
+never decode these bytes.
+================
+*/
+bool idDemoFile::CloseWithTrailer( const idDict &summary ) {
+	if ( !writing || compressor == NULL || f == NULL ) {
+		Close();
+		return false;
+	}
+	compressor->FinishCompress();
+	delete compressor;
+	compressor = NULL;
+
+	idFile_Memory payload( "demoTrailer" );
+	const int count = Min( summary.GetNumKeyVals(), MAX_DEMO_DICT_ENTRIES );
+	payload.WriteInt( count );
+	for ( int i = 0; i < count; i++ ) {
+		const idKeyValue *kv = summary.GetKeyVal( i );
+		payload.WriteString( kv->GetKey() );
+		payload.WriteString( kv->GetValue() );
+	}
+	const int length = payload.Length();
+	bool written = length > 0 && length <= DEMO_TRAILER_MAX_PAYLOAD;
+	if ( written ) {
+		const unsigned int crc = CRC32_BlockChecksum( payload.GetDataPtr(), length );
+		written =
+			f->Write( payload.GetDataPtr(), length ) == length &&
+			f->WriteInt( length ) == static_cast<int>( sizeof( length ) ) &&
+			f->WriteUnsignedInt( crc ) == static_cast<int>( sizeof( crc ) ) &&
+			f->Write( DEMO_TRAILER_MAGIC, DEMO_TRAILER_MAGIC_LENGTH ) == DEMO_TRAILER_MAGIC_LENGTH;
+	}
+	writing = false;
+	Close();
+	return written;
+}
+
+/*
+================
+idDemoFile::ReadTrailer
+================
+*/
+bool idDemoFile::ReadTrailer( const char *fileName, idDict &summary ) {
+	summary.Clear();
+	idFile *file = fileSystem->OpenFileRead( fileName, false );
+	if ( file == NULL ) {
+		return false;
+	}
+	const int footerBytes = static_cast<int>( sizeof( int ) + sizeof( unsigned int ) ) + DEMO_TRAILER_MAGIC_LENGTH;
+	const int fileLength = file->Length();
+	bool valid = fileLength > footerBytes &&
+		file->Seek( fileLength - footerBytes, FS_SEEK_SET ) == 0;
+	int length = 0;
+	unsigned int crc = 0;
+	char magic[DEMO_TRAILER_MAGIC_LENGTH];
+	valid = valid &&
+		file->ReadInt( length ) == static_cast<int>( sizeof( length ) ) &&
+		file->ReadUnsignedInt( crc ) == static_cast<int>( sizeof( crc ) ) &&
+		file->Read( magic, DEMO_TRAILER_MAGIC_LENGTH ) == DEMO_TRAILER_MAGIC_LENGTH &&
+		memcmp( magic, DEMO_TRAILER_MAGIC, DEMO_TRAILER_MAGIC_LENGTH ) == 0 &&
+		length > 0 && length <= DEMO_TRAILER_MAX_PAYLOAD &&
+		length <= fileLength - footerBytes &&
+		file->Seek( fileLength - footerBytes - length, FS_SEEK_SET ) == 0;
+	idList<byte> payload;
+	if ( valid ) {
+		payload.SetNum( length );
+		valid = file->Read( payload.Ptr(), length ) == length &&
+			CRC32_BlockChecksum( payload.Ptr(), length ) == crc;
+	}
+	fileSystem->CloseFile( file );
+	if ( !valid ) {
+		return false;
+	}
+
+	idFile_Memory reader( "demoTrailer", reinterpret_cast<const char *>( payload.Ptr() ), length );
+	int count = 0;
+	if ( reader.ReadInt( count ) != static_cast<int>( sizeof( count ) ) ||
+		 count < 0 || count > MAX_DEMO_DICT_ENTRIES ) {
+		return false;
+	}
+	for ( int i = 0; i < count; i++ ) {
+		idStr key, value;
+		if ( reader.ReadString( key ) <= 0 || reader.ReadString( value ) < 0 ) {
+			summary.Clear();
+			return false;
+		}
+		summary.Set( key, value );
+	}
+	return true;
 }
 
 /*
@@ -339,8 +444,10 @@ void idDemoFile::WriteHashString( const char *str ) {
 		const char *text = va( "%s > Writing hash string\n", logStr.c_str() );
 		fLog->Write( text, idLib::SizeToInt( strlen( text ), "idDemoFile::WriteHashString" ) );
 	}
-	// see if it is already in the has table
-	for ( int i = 0 ; i < demoStrings.Num() ; i++ ) {
+	// see if it is already in the table; a campaign recording sees tens of
+	// thousands of names, so this must not be a linear search
+	const int key = demoStringHash.GenerateKey( str, true );
+	for ( int i = demoStringHash.First( key ); i != -1; i = demoStringHash.Next( i ) ) {
 		if ( !strcmp( demoStrings[i]->c_str(), str ) ) {
 			WriteInt( i );
 			return;
@@ -350,6 +457,7 @@ void idDemoFile::WriteHashString( const char *str ) {
 	// add it to our table and the demo table
 	idStr	*copy = new idStr( str );
 //common->Printf( "hash:%i = %s\n", demoStrings.Num(), str );
+	demoStringHash.Add( key, demoStrings.Num() );
 	demoStrings.Append( copy );
 	int cmd = -1;	
 	WriteInt( cmd );

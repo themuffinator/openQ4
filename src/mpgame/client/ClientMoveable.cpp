@@ -86,6 +86,15 @@ rvClientMoveable::Spawn
 ================
 */
 void rvClientMoveable::Spawn ( void ) {
+	// openQ4: a full client entity table refuses the registration, leaving
+	// this entity without its spawn args and already queued for removal.
+	// Spawning debris with no model used to raise a fatal "cannot load
+	// collision model" error and end the level; drop the piece instead.
+	// SpawnClientEntityDef reports the refusal to the caller.
+	if ( entityNumber == -1 ) {
+		return;
+	}
+
 	// parse static models the same way the editor display does
 	gameEdit->ParseSpawnArgsToRenderEntity( &spawnArgs, &renderEntity );
 

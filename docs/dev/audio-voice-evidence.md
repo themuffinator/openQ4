@@ -1473,6 +1473,131 @@ before launching any game. Physical capture/hotplug, independent-machine clocks
 and OS/device breadth remain open under AUD-05. The other AUD gates retain their
 existing limits; neither issue changes the subtitle or dialogue-coverage claims.
 
+## Fights in the progression audit, 6 November 2026
+
+The 26 October progression audit moved the player through every trigger volume
+but never fought, so a conversation that a script holds until enemies die never
+started. Only eight maps had been rerun after its recovery. This round adds
+combat and runs the corrected planner over all 42 campaign maps.
+
+`openq4_killHostiles [all]` (cheat, game library) kills every living, visible
+AI on another team than the player that has an enemy. The damage comes from the
+player through the ordinary damage path (`damage_suicide`), so death animations,
+death targets and the scripts waiting on those deaths run as they do in play.
+AI that cannot take damage or are scripted not to die are left alone and counted
+as protected; an AI still alive after the hit is counted as a survivor. Friendly
+marines share the player's team (0) and are never touched. `audio_scene_audit.py
+--walk --progress --fight` runs it halfway through each teleport step and once
+before the tail, and reports each map's kills, survivors and protected classes.
+
+### A level could end when the client entity table filled
+
+The first `airdefense2` run ended its level at the 24th step with `ERROR:
+rvClientMoveable '-1': cannot load collision model`. Activating the second
+trench there starts about 4,000 short-lived tracer effects at once; a census
+after each later kill pass found 4,079 `rvClientEffect` entries in the 4,096-slot
+client entity table, falling back to about 100 two steps later. A client entity
+the full table refuses is queued for removal, but the refusal also skips handing
+it its spawn arguments. A refused debris piece therefore spawned with no model,
+and `rvClientMoveable::Spawn` raised a fatal error that ended the map. The
+Quake 4 1.4.2 SDK has the same code, so retail is exposed to it too.
+
+A refused moveable now returns before reading its spawn arguments, and
+`SpawnClientEntityDef` reports the refusal to its caller instead of handing back
+the half-spawned object; every caller already handles a failed spawn by dropping
+the piece. Both game libraries carry the change. `client_entity_registration.py`
+checks the guard in both trees and fails when it is removed. On the fixed build,
+`airdefense2` fills the table again (100 and 89 refusals in two runs) and
+completes all 40 steps with no error.
+
+### Harness corrections found by the sweep
+
+- `process2` prints `colour swap left` without a newline, so the next probe
+  marker began mid-line and two probes merged; its routing check failed although
+  every source was attributed. The harness's own markers are now matched
+  anywhere on a line.
+- The player died in `walker` (step 11) and `m07_race` (step 10), and the game
+  then ended the level. A dead player's refused commands are now reported per
+  map (`player_dead_at_step`, check `player_survives`), and a map that shuts down
+  inside its own scene counts as an unexpected level change. In `m07_race` the
+  player was riding a speeder: the `teleport` cheat moved only the driver, who
+  died apart from the vehicle. It now moves the vehicle with its driver, and
+  `m07_race` then completes all 55 steps. That change does not help everywhere:
+  in `m07_race1`, which had completed, the speeder teleported into a pipe was
+  destroyed at step 6 and the player died. In `walker` the player was on foot
+  (no vehicle teleport ran) and still dies at step 11; the cause is not
+  identified. `walker`'s later steps remain uncovered.
+- Awakening's race maps fail an objective when a lockdown gate closes before the
+  player reaches it. A teleport route cannot keep that pace, and the failed
+  mission ended `m07_race1` and `m07_race2` partway. Like level exits,
+  `item_objectivefailed` entities are now removed in the disposable session;
+  both maps then complete all of their steps.
+
+### Results
+
+Every group's report keeps its own failed checks. Four of the nine groups passed
+as run (`stock-02`, `stock-03`, `stock-05`, `awakening-00`); every rerun report
+still fails on the one map in it that lost the player. The totals below take
+each map from its latest run that completed every step (no dead player, no
+early map end, a kill pass per step), and otherwise from its latest run, in the
+order sweep groups, then `stock-rerun` and `awakening-race`, then the
+vehicle-teleport reruns `vehicle-stock` and `vehicle-awakening`. That takes
+`process2`, `m07_race1` and `m07_race2` from the first reruns, `airdefense2`,
+`walker` and `m07_race` from the vehicle-teleport reruns, and every other map
+from its group.
+
+| Measure | Stock (29 maps) | Awakening (13 maps) |
+| --- | ---: | ---: |
+| Planned teleport steps | 1,362 | 605 |
+| Targets absent when visited | 110 | 35 |
+| Hostiles killed / survived / protected | 680 / 24 / 75 | 372 / 11 / 16 |
+| Dialogue starts | 973 | 445 |
+| Distinct dialogue shaders / with transcripts | 637 / 359 | 356 / 320 |
+| Not reached by any earlier retained walk or progression report | 55 (35 transcribed) | 33 (30 transcribed) |
+| Distinct dialogue shaders, all retained reports | 954 | 592 |
+| Full/muted probe pairs | 1,855 | 826 |
+| Mute leaks / cues without a transcript | 0 / 0 | 0 / 0 |
+| Maps that lost the player | 1 (`walker`, step 11) | 0 |
+
+The newly reached lines cluster where fights gate the script: `mcc_2` (20),
+`tram1` (12), `storage2` (10), `core2` (7), and Awakening's `m04_prison` and
+`m08_cryofac` (13 each) and `m05_bio` (6).
+The earlier corpus comes from `--walk` runs and eight progression maps, so these
+counts combine the effect of the fights with that of running progression on
+every map; this round did not run a fightless control. Protected AI are the
+scripted-invulnerable harvesters, the gladiator, iron maidens and Makron
+phases; survivors are convoy ground vehicles (23 in Convoy, 4 in the Awakening
+races), Awakening's pain lord (7 passes) and one Makron phase.
+
+Declared or flagged speech always followed Dialogue Volume, muting it silenced
+every dialogue voice while effects continued, and every cue shown had a
+transcript. No mute leak, misrouted line or untranscribed cue appeared anywhere.
+The overlay showed 330 transcribed lines while they played. Two transcribed lines
+were heard with a subtitle slot free and no cue, both in their last moments:
+`hub1`'s `vo_1_2_14_52_1` voice had already stopped and was being retired, and
+`m04_prison`'s `vo_tak_dekletmstrg` was 4.06 s into its 4.32 s sample. Cues
+follow the channel's logical clock, not OpenAL's offset, so a cue ends with the
+logical sample while the voice's last fraction of a second still plays; the
+probe did not record the logical clock, so that reading of the second case is
+inferred from the code, not measured. The audible list counts a voice until the
+mixer retires it, so the check reports both; neither is a line left uncaptioned
+for its duration.
+
+Reports, console output, engine logs, the census, `final-compare.json` (the
+per-map selection and comparison) and `evidence-manifest.json` (executable,
+game-library and harness hashes per run) are under `.tmp/aud-fight/` in the
+AUD worktree. The stock groups and `awakening-00` ran build `53adceae3f9511de…`,
+the later groups and the first reruns the client-entity fix `1eed5d0d49e2ba59…`,
+and the vehicle-teleport reruns `5203ee4494a142eb…` (Windows x64,
+debugoptimized, OpenAL Soft wave output, hidden windowed SP). A report's
+harness hash is read when it is written, so `awakening-00`'s names a harness
+edited while it ran. `stock-rerun` predates the shutdown check, which is why
+its own report does not list `walker`'s early end; the selected `walker` run has it.
+
+These are still routing probes, not a playthrough: nothing is aimed, dodged or
+driven, teleports can telefrag actors and script null-entity warnings remain.
+Ordered human play, physical listening and devices stay open.
+
 ## Other verification and limitations
 
 ### PR #212 merge qualification, 4 November 2026

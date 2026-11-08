@@ -312,6 +312,8 @@ public:
 
 	// for load games
 	virtual idSoundEmitter* EmitterForIndex( int index );
+	// a render demo's emitter index, where 0 is localSound
+	idSoundEmitter*		DemoEmitterForIndex( int index );
 
 	// query data from all emitters in the world
 	virtual float			CurrentShakeAmplitude();

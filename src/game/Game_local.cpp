@@ -6357,6 +6357,12 @@ bool idGameLocal::SpawnClientEntityDef( const idDict &args, rvClientEntity **cen
 
 		obj->CallSpawn();
 
+		// openQ4: a client entity the full table refused is already queued
+		// for removal and never finished spawning; callers must not use it.
+		if ( obj->IsType( rvClientEntity::GetClassType() ) && static_cast<rvClientEntity*>(obj)->entityNumber == -1 ) {
+			return false;
+		}
+
 		if ( cent && obj->IsType( rvClientEntity::GetClassType() ) ) {
 			*cent = static_cast<rvClientEntity*>(obj);
 		}

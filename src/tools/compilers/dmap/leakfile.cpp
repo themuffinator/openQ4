@@ -53,9 +53,8 @@ occupied leaf
 void LeakFile (tree_t *tree)
 {
 	idVec3	mid;
-	FILE	*linefile;
+	idFile	*linefile;
 	idStr	filename;
-	idStr	ospath;
 	node_t	*node;
 	int		count;
 
@@ -68,10 +67,14 @@ void LeakFile (tree_t *tree)
 	// write the points to the file
 	//
 	sprintf( filename, "%s.lin", dmapGlobals.mapFileBase );
-	ospath = fileSystem->RelativePathToOSPath( filename );
-	linefile = fopen( ospath, "w" );
+	// The leak trail goes where the .proc goes. OpenFileWrite creates the
+	// map's folder, which a raw fopen beside the engine did not, and a leak
+	// is already being reported, so failing to draw it must not be fatal.
+	extern const char *Compiler_OutputBasePath( void );
+	linefile = fileSystem->OpenFileWrite( filename, Compiler_OutputBasePath() );
 	if ( !linefile ) {
-		common->Error( "Couldn't open %s\n", filename.c_str() );
+		common->Warning( "Couldn't write the leak trail %s", filename.c_str() );
+		return;
 	}
 
 	count = 0;
@@ -98,15 +101,15 @@ void LeakFile (tree_t *tree)
 		}
 		node = nextnode;
 		mid = nextportal->winding->GetCenter();
-		fprintf (linefile, "%f %f %f\n", mid[0], mid[1], mid[2]);
+		linefile->Printf( "%f %f %f\n", mid[0], mid[1], mid[2] );
 		count++;
 	}
 	// add the occupant center
 	node->occupant->mapEntity->epairs.GetVector( "origin", "", mid );
 
-	fprintf (linefile, "%f %f %f\n", mid[0], mid[1], mid[2]);
+	linefile->Printf( "%f %f %f\n", mid[0], mid[1], mid[2] );
 	common->Printf ("%5i point linefile\n", count+1);
 
-	fclose (linefile);
+	fileSystem->CloseFile( linefile );
 }
 

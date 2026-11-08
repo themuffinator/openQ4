@@ -44,6 +44,8 @@ struct Renderer {
     support += function_body(raster, 'inline bool RasterizeCoverage(') + '\n}\n'
     support += r'''
 struct {bool enabled=true;bool GetBool()const{return enabled;}} ui_retainedAtlas;
+// A recording render demo turns the atlas off; these cases do not record.
+static bool RetainedAtlasActive(){return ui_retainedAtlas.GetBool();}
 struct Host {
     int viewportWidth=2*(TEST_ATLAS_SIZE-2)+260,viewportHeight=720;
     bool rasterNewMeshes=true;

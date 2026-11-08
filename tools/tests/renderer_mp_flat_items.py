@@ -535,10 +535,10 @@ def test_render_entity_render_demo_and_module_abi_are_versioned():
         assert_true(match is not None, f"{owner} renderEntity_t must append colour then flags")
 
     session = read(ROOT / "src" / "framework" / "Session.h")
-    require(
-        session,
-        "OPENQ4_RENDERDEMO_CURRENT_VERSION = 10",
-        "new render demos must advertise the flat-diffuse payload",
+    current = re.search(r"OPENQ4_RENDERDEMO_CURRENT_VERSION = (\d+);", session)
+    assert_true(
+        current is not None and int(current.group(1)) >= 10,
+        "new render demos must advertise the flat-diffuse payload (v10) and later",
     )
     require(
         session,

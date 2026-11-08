@@ -289,6 +289,22 @@ if get_option('build_native_tests')
     install: false,
   )
   test('openq4-editor-document', openq4_editor_document_test, timeout: 30)
+  openq4_editor_authoring_test = executable(
+    'openq4-editor-authoring-test',
+    files(
+      'tools/tests/native/EditorAuthoringTest.cpp',
+      'src/tools/leveleditor/MapDocument.cpp',
+      'src/tools/leveleditor/MapWorkspace.cpp',
+      'src/tools/leveleditor/MapGeometry.cpp',
+      'src/tools/leveleditor/MapEditing.cpp',
+      'src/tools/leveleditor/MapValidator.cpp',
+      'src/tools/leveleditor/MapBuild.cpp',
+      'src/tools/leveleditor/EditorState.cpp',
+    ),
+    include_directories: root_include_dir,
+    install: false,
+  )
+  test('openq4-editor-authoring', openq4_editor_authoring_test, timeout: 120)
 
   openq4_file_memory_under_test = custom_target(
     'openq4-file-memory-under-test',

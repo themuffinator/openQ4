@@ -10,6 +10,18 @@ See [release status](../../user/release-status.md) and the
 
 ## Highlights
 
+- **Build levels in the experimental editor.** `editorExperimental` now edits
+  brushes and patches as well as entities: move, turn and scale them in new
+  top, front and side views or in 3D, on a grid and with texture lock, draw new
+  brushes, group, layer and duplicate them, save and insert prefabs, and rename
+  entities without breaking their links. Panels dock where you want them, each
+  map remembers its cameras, and the inspector knows each property's type.
+  **Build** compiles the saved map in the background, links every compiler
+  warning to the brush or entity it names, and replaces your playable files
+  only when the whole compile succeeds; **Play** opens the result in its own
+  window with a private profile. See the
+  [level editor guide](../../user/level-editor.md).
+
 - **Vehicle, fly, shot and item clips work as Quake 4 intended.** openQ4 read
   the names in Quake 4's collision files literally, but Quake 4 wrote several of
   them one slot off. The Convoy and Walker levels' vehicle clips, and the shot
@@ -415,6 +427,12 @@ See [release status](../../user/release-status.md) and the
 
 ## Change Log
 
+- A level can no longer end with "cannot load collision model" during heavy
+  effects. When a burst of effects filled the game's table of client-side
+  effects and debris, a piece of debris that did not fit stopped the level
+  with a fatal error; the second trench battle in Air Defense Trenches could
+  trigger it. The piece is now skipped. This affects single-player and
+  multiplayer game modules; replace both.
 - On Linux, a long single-player session no longer grows the game's memory use
   with every level change. Memory the game had already freed stayed reserved,
   about 60 MB per level, so a session that visited many levels could use
@@ -794,15 +812,16 @@ See [release status](../../user/release-status.md) and the
   flashlight, no longer show speckled shadow "acne" with shadow maps on (the
   **Quality** and **Ultra** presets), on OpenGL and Vulkan. Shadows still meet
   the objects that cast them.
-- Added a separate experimental level-editor workspace. Run `editorExperimental` to
-  browse maps and entities, inspect a source-geometry preview, edit entity
-  properties and use undo/redo, protected saves, backups and recovery. Pane
-  widths are adjustable and preserved. Brushes and patches remain read-only;
-  point entities appear as colored markers and preview lighting is provisional.
-  The legacy Radiant editor and its command are retained for legacy tool builds.
-  Update the bundled data along with the engine to receive the editor interface.
-  The experiment has a known label-display issue after a full video restart;
-  save work before restarting the client.
+- Added an experimental level editor. Run `editorExperimental` to edit Quake 4
+  maps: brushes, patches and entities in 3D and top, front and side views,
+  with docked panels, typed properties, validation, layers, groups, prefabs,
+  sandboxed builds and play tests. Brushes and patches keep their exact source
+  text until you change them. The legacy Radiant editor and its command are
+  retained for legacy tool builds. Update the bundled data along with the
+  engine to receive the editor interface and its translations.
+- Compiling a map that leaks no longer aborts with "Couldn't open ... .lin"
+  when the map's folder does not exist beside the engine; the leak trail is
+  written beside the compiled map.
 - Fixed vertically flipped Vulkan scenes when presenting a reduced-resolution
   render texture through an ordinary material, including PBR with bloom and HDR.
 - Fixed upside-down Vulkan gameplay with SMAA enabled, including PBR scenes.

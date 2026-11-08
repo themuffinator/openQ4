@@ -119,12 +119,14 @@ class SceneAuditTest(unittest.TestCase):
                 entity(1, classname='trigger_once', name='safe', origin='1 0 0') +
                 entity(2, classname='trigger_once', name='exit_trigger', origin='2 0 0', target='relay') +
                 entity(3, classname='trigger_relay', name='relay', target='end') +
-                entity(4, classname='target_endlevel', name='end'))
+                entity(4, classname='target_endlevel', name='end') +
+                entity(5, classname='item_objectivefailed', name='late_gate'))
         exits = {}
         with patch.object(audit, 'content_files', side_effect=[{}, {'maps/game/test.map': text}]):
             steps = audit.scene_steps([], ['game/test'], progress=True, blocked_exits=exits)
         self.assertEqual(steps, {'game/test': [('trigger_once', 'safe')]})
-        self.assertEqual(exits, {'game/test': ['end']})
+        # A failed timed objective ends the level as well; it is removed, not routed around.
+        self.assertEqual(exits, {'game/test': ['end', 'late_gate']})
         cfg = audit.scene_cfgs([('game/test', 'game/test')], 3, 1000, steps,
                                move='teleport', blocked_exits=exits)[0]
         self.assertLess(cfg.index('remove "end"'), cfg.index('teleport "safe"'))
@@ -137,6 +139,60 @@ class SceneAuditTest(unittest.TestCase):
                                move='teleport', blocked_exits={'game/test': ['3end']})[0]
         self.assertIn('echo SCENE_STEP game/test 0 "2door"\nteleport "2door"\n', cfg)
         self.assertIn('remove "3end"\n', cfg)
+
+    def test_fight_kills_halfway_through_each_step_and_before_the_tail(self):
+        steps = {'game/test': [('trigger_once', 'a'), ('trigger_once', 'b')]}
+        cfg = audit.scene_cfgs([('game/test', 'game/test')], 3, 1000, steps, step_msec=4001, tail=2,
+                               move='teleport', fight=True)[0]
+        self.assertEqual(cfg.count('openq4_killHostiles\n'), 3)
+        self.assertIn('teleport "a"\nwaitMsec 2000\nopenq4_killHostiles\nwaitMsec 2001\n', cfg)
+        last_step = cfg.index('teleport "b"')
+        self.assertLess(cfg.index('openq4_killHostiles\n', cfg.index('openq4_killHostiles\n', last_step) + 1),
+                        cfg.index('SCENE_MEMORY'))
+        quiet = audit.scene_cfgs([('game/test', 'game/test')], 3, 1000, steps, move='teleport')[0]
+        self.assertNotIn('openq4_killHostiles', quiet)
+
+    def test_markers_after_unterminated_script_output_still_split_probes(self):
+        # process2 prints "colour swap left" without a newline before a probe marker.
+        log = ('SCENE_BEGIN game/test\nSCENE_PROBE game/test 0 full\n' + audible() + channel() +
+               'SOUND_DIALOGUE_END channels=1\ncolour swap leftSCENE_PROBE game/test 0 mute\n' +
+               'SOUND_DIALOGUE_END channels=0\nSCENE_END game/test\n')
+        scene = audit.audit(log, ['game/test'])['game/test']
+        self.assertEqual(scene['probes'], 1)
+        self.assertTrue(scene['voice_routing_recorded'])
+        self.assertEqual(scene['mute_leaks'], [])
+
+    def test_map_ending_inside_its_scene_is_a_failure(self):
+        shutdown = '------------ Game Map Shutdown --------------\n'
+        log = ('SCENE_BEGIN game/test\nSCENE_STEP game/test 0 "a"\nSCENE_STEP game/test 1 "b"\n' + shutdown +
+               'SCENE_STEP game/test 2 "c"\nSCENE_END game/test\n' + shutdown + 'SCENE_BEGIN game/next\nSCENE_END game/next\n')
+        result = audit.audit(log, ['game/test', 'game/next'])
+        self.assertEqual(result['game/test']['unexpected_level_changes'], ['shutdown after step 1'])
+        # The shutdown between maps belongs to the planned level change.
+        self.assertEqual(result['game/next']['unexpected_level_changes'], [])
+
+    def test_player_death_is_reported_at_its_step(self):
+        log = ('SCENE_BEGIN game/test\nSCENE_STEP game/test 0 "a"\nSCENE_STEP game/test 1 "b"\n'
+               'You must be alive to use this command.\nSCENE_STEP game/test 2 "c"\n'
+               'You must be alive to use this command.\nSCENE_END game/test\n')
+        scene = audit.audit(log, ['game/test'])['game/test']
+        self.assertEqual((scene['player_dead_at_step'], scene['player_dead_commands']), (1, 2))
+        alive = audit.audit(log.replace('You must be alive to use this command.\n', ''), ['game/test'])
+        self.assertIsNone(alive['game/test']['player_dead_at_step'])
+
+    def test_fight_results_are_counted_per_scene(self):
+        log = ('SCENE_BEGIN game/test\nSCENE_STEP game/test 0 "a"\n'
+               'KILL_HOSTILE name=grunt_1 class=monster_grunt result=killed\n'
+               'KILL_HOSTILE name=boss class=monster_makron result=survived\n'
+               'KILL_HOSTILE name=intro class=monster_gladiator result=protected\n'
+               'KILL_HOSTILES killed=1 survived=1 protected=1\n'
+               'KILL_HOSTILES killed=2 survived=0 protected=0\n'
+               'SCENE_END game/test\n')
+        scene = audit.audit(log, ['game/test'])['game/test']
+        self.assertEqual((scene['fight_passes'], scene['hostiles_killed'], scene['hostiles_survived'],
+                          scene['hostiles_protected']), (2, 3, 1, 1))
+        self.assertEqual(scene['hostile_survivor_classes'],
+                         {'monster_gladiator protected': 1, 'monster_makron survived': 1})
 
 
 if __name__ == '__main__':

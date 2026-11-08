@@ -164,9 +164,12 @@ back. OpenGL adds that offset to every view's glViewport/glScissor. Vulkan's
 executor builds its viewports and scissors from viewDef->viewport in many
 places, so the frame's views are moved by the offset once, here, before any
 of them is planned or drawn; every tile then shows its own part of the
-capture instead of repeating the first. Scissors cut at the attachment edge
-(vkCmdSetScissorClamped). Ordinary frames have a zero offset and are
-untouched.
+capture instead of repeating the first. Only views drawn to the window move:
+a view drawn into a render texture (a game-owned post target sized to the
+whole capture) stays at the texture's origin, and the view that composites
+the texture to the window moves instead, as RB_TileOffsetX does on OpenGL.
+Scissors cut at the attachment edge (vkCmdSetScissorClamped). Ordinary frames
+have a zero offset and are untouched.
 ====================
 */
 static void VK_Backend_ApplyTileOffset( const emptyCommand_t *cmds ) {
@@ -179,8 +182,14 @@ static void VK_Backend_ApplyTileOffset( const emptyCommand_t *cmds ) {
 	static const int maxViews = 256;
 	const viewDef_t *moved[ maxViews ];
 	int numMoved = 0;
+	// The frame starts on the window (the backend clears backEnd.renderTexture).
+	const idRenderTexture *target = NULL;
 	for ( ; cmds != NULL; cmds = (const emptyCommand_t *)cmds->next ) {
-		if ( cmds->commandId != RC_DRAW_VIEW ) {
+		if ( cmds->commandId == RC_SET_RENDERTEXTURE ) {
+			target = ( (const setRenderTargetCommand_t *)cmds )->renderTexture;
+			continue;
+		}
+		if ( cmds->commandId != RC_DRAW_VIEW || target != NULL ) {
 			continue;
 		}
 		viewDef_t *viewDef = ( (const drawSurfsCommand_t *)cmds )->viewDef;

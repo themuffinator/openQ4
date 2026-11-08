@@ -9,7 +9,7 @@
 
 [![Licensing: GPL engine and SDK game code](https://img.shields.io/badge/Licensing-GPL%20engine%20%7C%20SDK%20game%20code-blue.svg)](LICENSING.md)
 [![Status](https://img.shields.io/badge/status-Beta%20Development-d97a1f.svg)](https://github.com/themuffinator/openQ4/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20experimental-lightgrey.svg)](https://github.com/themuffinator/openQ4)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20preview-lightgrey.svg)](https://github.com/themuffinator/openQ4)
 [![Architecture](https://img.shields.io/badge/arch-x64%20%7C%20ARM64-orange.svg)](https://github.com/themuffinator/openQ4)
 [![Proudly vibecoded](assets/docs/img/badge-proudly-vibecoded.svg)](AGENTS.md)
 
@@ -55,12 +55,12 @@ It is for players who want the original Quake 4 experience on today's hardware.
 - **Built for modern displays.** Widescreen, ultrawide, multi-monitor, borderless and fullscreen setups all work. On 144 Hz and 240 Hz screens the camera, weapons and moving objects are drawn smoothly between the game's 60 Hz ticks, while gameplay, networking, demos and saves keep their original timing.
 - **Optional visual upgrades.** Bloom, HDR, anti-aliasing, soft particles, baked light grids, cel shading, a CRT filter and cleaner [shadow maps](https://github.com/themuffinator/openQ4/blob/v0.13.2/docs/user/shadow-mapping.md), each one switchable.
 - **Real liquids.** Wade, swim and drown in water, take damage in slime and lava, with underwater visuals and audio. Retail Quake 4 has no liquids, so they appear in maps built for them; see the [Liquids guide](https://github.com/themuffinator/openQ4/blob/v0.13.2/docs/user/liquids.md).
-- **OpenAL audio**, including bundled OpenAL Soft in experimental macOS packages.
+- **OpenAL audio**, including bundled OpenAL Soft in preview macOS packages.
 - **Controller support and quality-of-life fixes**, including a better console and modern settings behaviour.
 - **More single-player.** Alongside the original campaign there is an experimental [Arena Campaign](https://github.com/themuffinator/openQ4/blob/v0.13.2/docs/user/arena-campaign.md): bot matches across five tiers of the stock maps, with boss matches and saved progress.
 - **Better multiplayer** (experimental): a server browser with sorting, filters and favourites, [readable chat with history](https://github.com/themuffinator/openQ4/blob/v0.13.2/docs/user/multiplayer-chat.md), Duel queues and spectator match controls.
 - **A demo library and player** with pause, speed, stepping, rewind and fast-forward, plus free-fly playback of full-match recordings.
-- **Single-player and multiplayer in one install** on Windows, Linux and Steam Deck, with experimental Apple Silicon macOS packages.
+- **Single-player and multiplayer in one install** on Windows, Linux and Steam Deck, with preview Apple Silicon macOS packages.
 - **An experimental Vulkan renderer**, chosen with `r_renderApi vulkan`. OpenGL is the recommended default in this release.
 - **Renderer previews**, all off by default: [temporal anti-aliasing and dynamic resolution](https://github.com/themuffinator/openQ4/blob/v0.13.2/docs/user/temporal-presentation.md) and [volumetrics, reflections and indirect light](https://github.com/themuffinator/openQ4/blob/v0.13.2/docs/user/advanced-screen-space-lighting.md).
 
@@ -99,7 +99,7 @@ You need a legitimate Quake 4 install plus the openQ4 package that matches your 
 | **Minimum** | 64-bit CPU, 4 GB RAM, a working OpenGL compatibility driver with ARB2-era vertex/fragment program support, and about 12 GB free for the openQ4 package plus retail Quake 4 assets. Use the `minimum` or `lowpower` performance preset on constrained systems. |
 | **Recommended** | Modern quad-core CPU, 8 GB RAM, OpenGL 4.1+ compatibility-class GPU with 2 GB+ VRAM, current graphics drivers, and 15 GB+ free. For high resolutions, `quality`, or `ultra`, 16 GB RAM and 6 GB+ VRAM gives much better headroom. |
 
-Packages are available for Windows x64, Linux x64 and Steam Deck/SteamOS, with preview Linux ARM64, experimental Apple Silicon/arm64 macOS and experimental Windows ARM64 builds:
+Packages are available for Windows x64, Linux x64 and Steam Deck/SteamOS, with preview Linux ARM64, preview Apple Silicon/arm64 macOS and experimental Windows ARM64 builds:
 
 - **Linux** ships as directly executable AppImages and archives for `x86_64` and `aarch64`. Linux ARM64 needs a desktop OpenGL compatibility driver.
 - **macOS** players can get [signed and notarized builds for Apple Silicon and Intel Macs](https://www.macsourceports.com/game/quake4) from Schnapple at Mac Source Ports. Our GitHub OpenGL/Metal bridge packages remain unsigned Apple Silicon previews; players have run them only on current macOS.

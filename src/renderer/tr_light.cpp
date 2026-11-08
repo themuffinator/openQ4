@@ -2289,6 +2289,7 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 
 	// check for gui surfaces
 	idUserInterface	*gui = NULL;
+	int				entityGui = -1;		// the renderEntity_t::gui slot, for render demos
 
 	if ( !space->entityDef ) {
 		gui = shader->GlobalGui();
@@ -2296,6 +2297,9 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 		int guiNum = shader->GetEntityGui() - 1;
 		if ( guiNum >= 0 && guiNum < MAX_RENDERENTITY_GUI ) {
 			gui = renderEntity->gui[ guiNum ];
+			if ( gui != NULL ) {
+				entityGui = guiNum;
+			}
 		}
 		if ( gui == NULL ) {
 			gui = shader->GlobalGui();
@@ -2319,7 +2323,7 @@ void R_AddDrawSurf( const srfTriangles_t *tri, const viewEntity_t *space, const 
 		if ( !R_PreciseCullSurface( drawSurf, ndcBounds ) ) {
 			// did we ever use this to forward an entity color to a gui that didn't set color?
 //			memcpy( tr.guiShaderParms, shaderParms, sizeof( tr.guiShaderParms ) );
-			R_RenderGuiSurf( gui, drawSurf );
+			R_RenderGuiSurf( gui, drawSurf, entityGui );
 		}
 
 		tr.viewDef->floatTime = oldFloatTime;

@@ -116,52 +116,98 @@ void idGuiModel::Clear() {
 	AdvanceSurf();
 }
 
+// A GUI vertex whose normal and tangents hold the constant 2D frame; only
+// payload-carrying vertices (shader-evaluated linear masks) differ.
+static bool R_GuiDemoVertIsPlain( const idDrawVert &vert ) {
+	return vert.normal[0] == 0.0f && vert.normal[1] == 0.0f && vert.normal[2] == 1.0f &&
+		vert.tangents[0][0] == 1.0f && vert.tangents[0][1] == 0.0f && vert.tangents[0][2] == 0.0f &&
+		vert.tangents[1][0] == 0.0f && vert.tangents[1][1] == 1.0f && vert.tangents[1][2] == 0.0f;
+}
+
+// Whether surface index of model a equals the same surface of model b, in
+// everything a recorded frame stores.
+static bool R_GuiDemoSurfacesMatch( const idGuiModel &a, const guiModelSurface_t &sa,
+		const idGuiModel &b, const guiModelSurface_t &sb ) {
+	if ( sa.material != sb.material || sa.numVerts != sb.numVerts || sa.numIndexes != sb.numIndexes ||
+		 memcmp( sa.color, sb.color, sizeof( sa.color ) ) != 0 ) {
+		return false;
+	}
+	for ( int i = 0; i < sa.numVerts; i++ ) {
+		const idDrawVert &va = a.Verts()[sa.firstVert + i];
+		const idDrawVert &vb = b.Verts()[sb.firstVert + i];
+		if ( va.xyz != vb.xyz || va.st != vb.st || memcmp( va.color, vb.color, sizeof( va.color ) ) != 0 ||
+			 va.normal != vb.normal || va.tangents[0] != vb.tangents[0] || va.tangents[1] != vb.tangents[1] ) {
+			return false;
+		}
+	}
+	return sa.numIndexes == 0 ||
+		memcmp( &a.Indexes()[sa.firstIndex], &b.Indexes()[sb.firstIndex], sa.numIndexes * sizeof( glIndex_t ) ) == 0;
+}
+
 /*
 ================
 idGuiModel::WriteToDemo
+
+Render demo v11 writes a model surface by surface. A surface identical to the
+same surface of previous (the frame written before it) is one byte; a HUD
+mostly repeats from frame to frame. A changed surface stores plain vertices
+in 25 bytes rather than 68, and indices in two bytes.
 ================
 */
-void idGuiModel::WriteToDemo( idDemoFile *demo ) {
-	int		i, j;
-
-	i = verts.Num();
-	demo->WriteInt( i );
-	for ( j = 0; j < i; j++ )
-	{
-		demo->WriteVec3( verts[j].xyz );
-		demo->WriteVec2( verts[j].st );
-		demo->WriteVec3( verts[j].normal );
-		demo->WriteVec3( verts[j].tangents[0] );
-		demo->WriteVec3( verts[j].tangents[1] );
-		demo->WriteUnsignedChar( verts[j].color[0] );
-		demo->WriteUnsignedChar( verts[j].color[1] );
-		demo->WriteUnsignedChar( verts[j].color[2] );
-		demo->WriteUnsignedChar( verts[j].color[3] );
-	}
-	
-	i = indexes.Num();
-	demo->WriteInt( i );
-	for ( j = 0; j < i; j++ ) {
-		demo->WriteInt(indexes[j] );
-	}
-	
-	i = surfaces.Num();
-	demo->WriteInt( i );
-	for ( j = 0 ; j < i ; j++ ) {
-		guiModelSurface_t	*surf = &surfaces[j];
-		
-		demo->WriteBool( surf->material != NULL );
-		demo->WriteFloat( surf->color[0] );
-		demo->WriteFloat( surf->color[1] );
-		demo->WriteFloat( surf->color[2] );
-		demo->WriteFloat( surf->color[3] );
-		demo->WriteInt( surf->firstVert );
-		demo->WriteInt( surf->numVerts );
-		demo->WriteInt( surf->firstIndex );
-		demo->WriteInt( surf->numIndexes );
-		if ( surf->material != NULL ) {
-			demo->WriteHashString( surf->material->GetName() );
+void idGuiModel::WriteToDemo( idDemoFile *demo, const idGuiModel *previous ) {
+	int written = 0;
+	demo->WriteInt( surfaces.Num() );
+	for ( int j = 0; j < surfaces.Num(); j++ ) {
+		const guiModelSurface_t &surface = surfaces[j];
+		if ( previous != NULL && j < previous->surfaces.Num() &&
+			 R_GuiDemoSurfacesMatch( *this, surface, *previous, previous->surfaces[j] ) ) {
+			demo->WriteUnsignedChar( 0 );		// as the previous frame drew it
+			continue;
 		}
+		written++;
+		demo->WriteUnsignedChar( 1 );
+		demo->WriteBool( surface.material != NULL );
+		if ( surface.material != NULL ) {
+			demo->WriteHashString( surface.material->GetName() );
+		}
+		demo->WriteFloat( surface.color[0] );
+		demo->WriteFloat( surface.color[1] );
+		demo->WriteFloat( surface.color[2] );
+		demo->WriteFloat( surface.color[3] );
+		demo->WriteInt( surface.numVerts );
+		for ( int i = 0; i < surface.numVerts; i++ ) {
+			const idDrawVert &vert = verts[surface.firstVert + i];
+			const bool plain = R_GuiDemoVertIsPlain( vert );
+			demo->WriteUnsignedChar( plain ? 0 : 1 );
+			demo->WriteVec3( vert.xyz );
+			demo->WriteVec2( vert.st );
+			if ( !plain ) {
+				demo->WriteVec3( vert.normal );
+				demo->WriteVec3( vert.tangents[0] );
+				demo->WriteVec3( vert.tangents[1] );
+			}
+			demo->WriteUnsignedChar( vert.color[0] );
+			demo->WriteUnsignedChar( vert.color[1] );
+			demo->WriteUnsignedChar( vert.color[2] );
+			demo->WriteUnsignedChar( vert.color[3] );
+		}
+		demo->WriteInt( surface.numIndexes );
+		const bool shortIndexes = surface.numVerts <= 0xffff;
+		for ( int i = 0; i < surface.numIndexes; i++ ) {
+			if ( shortIndexes ) {
+				demo->WriteUnsignedShort( static_cast<unsigned short>( indexes[surface.firstIndex + i] ) );
+			} else {
+				demo->WriteInt( indexes[surface.firstIndex + i] );
+			}
+		}
+		if ( r_showDemo.GetBool() && surface.numVerts > 0 ) {
+			common->Printf( "  gui surface %d: %s color=%.2f %.2f %.2f %.2f verts=%d\n", j,
+				surface.material != NULL ? surface.material->GetName() : "<none>",
+				surface.color[0], surface.color[1], surface.color[2], surface.color[3], surface.numVerts );
+		}
+	}
+	if ( r_showDemo.GetBool() ) {
+		common->Printf( "  gui model: %d of %d surfaces written\n", written, surfaces.Num() );
 	}
 }
 
@@ -171,6 +217,10 @@ idGuiModel::ReadFromDemo
 ================
 */
 bool idGuiModel::ReadFromDemo( idDemoFile *demo ) {
+	if ( session->renderdemoVersion >= OPENQ4_RENDERDEMO_SESSION_VERSION ) {
+		return ReadSurfacesFromDemo( demo );
+	}
+
 	int		i, j;
 
 	i = 0;
@@ -286,6 +336,385 @@ bool idGuiModel::ReadFromDemo( idDemoFile *demo ) {
 
 /*
 ================
+idGuiModel::ReadSurfacesFromDemo
+
+The v11 surface-by-surface record: a repeated surface copies the same surface
+of the model as it stood before this read.
+================
+*/
+bool idGuiModel::ReadSurfacesFromDemo( idDemoFile *demo ) {
+	idGuiModel previous;
+	Swap( previous );
+	surfaces.SetNum( 0, false );
+	verts.SetNum( 0, false );
+	indexes.SetNum( 0, false );
+	surf = NULL;
+
+	int count = 0;
+	if ( demo == NULL || demo->ReadInt( count ) != sizeof( count ) ) {
+		Clear();
+		return R_RejectGuiModelDemo( demo, "truncated surface count" );
+	}
+	if ( count < 0 || count > 1 << 16 ) {
+		Clear();
+		return R_RejectGuiModelDemo( demo, va( "surface count %d is out of range", count ) );
+	}
+	for ( int j = 0; j < count; j++ ) {
+		unsigned char kind = 0;
+		if ( demo->ReadUnsignedChar( kind ) != sizeof( kind ) || kind > 1 ) {
+			Clear();
+			return R_RejectGuiModelDemo( demo, "invalid surface record" );
+		}
+		guiModelSurface_t surface;
+		if ( kind == 0 ) {
+			if ( j >= previous.surfaces.Num() ) {
+				Clear();
+				return R_RejectGuiModelDemo( demo, "repeats a surface the previous frame did not have" );
+			}
+			const guiModelSurface_t &source = previous.surfaces[j];
+			surface = source;
+			surface.firstVert = verts.Num();
+			surface.firstIndex = indexes.Num();
+			for ( int i = 0; i < source.numVerts; i++ ) {
+				verts.Append( previous.verts[source.firstVert + i] );
+			}
+			for ( int i = 0; i < source.numIndexes; i++ ) {
+				indexes.Append( previous.indexes[source.firstIndex + i] );
+			}
+			surfaces.Append( surface );
+			continue;
+		}
+
+		bool hasMaterial = false;
+		if ( demo->ReadBool( hasMaterial ) != sizeof( byte ) ) {
+			Clear();
+			return R_RejectGuiModelDemo( demo, "truncated material flag" );
+		}
+		surface.material = hasMaterial ? declManager->FindMaterial( demo->ReadHashString() ) : NULL;
+		if ( !demo->IsOpen() ) {
+			Clear();
+			return false;
+		}
+		int numVerts = 0;
+		if ( demo->ReadFloat( surface.color[0] ) != sizeof( surface.color[0] ) ||
+			 demo->ReadFloat( surface.color[1] ) != sizeof( surface.color[1] ) ||
+			 demo->ReadFloat( surface.color[2] ) != sizeof( surface.color[2] ) ||
+			 demo->ReadFloat( surface.color[3] ) != sizeof( surface.color[3] ) ||
+			 demo->ReadInt( numVerts ) != sizeof( numVerts ) ) {
+			Clear();
+			return R_RejectGuiModelDemo( demo, "truncated surface payload" );
+		}
+		if ( !R_IsFiniteGuiDemoColor( surface.color ) ) {
+			Clear();
+			return R_RejectGuiModelDemo( demo, "non-finite surface color" );
+		}
+		if ( numVerts < 0 || numVerts > ( 1 << 20 ) - verts.Num() ) {
+			Clear();
+			return R_RejectGuiModelDemo( demo, va( "vertex count %d is out of range", numVerts ) );
+		}
+		surface.firstVert = verts.Num();
+		surface.numVerts = numVerts;
+		for ( int i = 0; i < numVerts; i++ ) {
+			idDrawVert vert;
+			unsigned char layout = 0;
+			if ( demo->ReadUnsignedChar( layout ) != sizeof( layout ) || layout > 1 ) {
+				Clear();
+				return R_RejectGuiModelDemo( demo, "invalid vertex layout" );
+			}
+			vert.normal.Set( 0, 0, 1 );
+			vert.tangents[0].Set( 1, 0, 0 );
+			vert.tangents[1].Set( 0, 1, 0 );
+			if ( demo->ReadVec3( vert.xyz ) != sizeof( vert.xyz ) ||
+				 demo->ReadVec2( vert.st ) != sizeof( vert.st ) ||
+				 ( layout != 0 && demo->ReadVec3( vert.normal ) != sizeof( vert.normal ) ) ||
+				 ( layout != 0 && demo->ReadVec3( vert.tangents[0] ) != sizeof( vert.tangents[0] ) ) ||
+				 ( layout != 0 && demo->ReadVec3( vert.tangents[1] ) != sizeof( vert.tangents[1] ) ) ||
+				 demo->ReadUnsignedChar( vert.color[0] ) != sizeof( vert.color[0] ) ||
+				 demo->ReadUnsignedChar( vert.color[1] ) != sizeof( vert.color[1] ) ||
+				 demo->ReadUnsignedChar( vert.color[2] ) != sizeof( vert.color[2] ) ||
+				 demo->ReadUnsignedChar( vert.color[3] ) != sizeof( vert.color[3] ) ) {
+				Clear();
+				return R_RejectGuiModelDemo( demo, "truncated vertex payload" );
+			}
+			vert.color2[0] = vert.color2[1] = vert.color2[2] = vert.color2[3] = 255;
+			if ( !R_IsFiniteGuiDemoDrawVert( vert ) ) {
+				Clear();
+				return R_RejectGuiModelDemo( demo, "non-finite vertex payload" );
+			}
+			verts.Append( vert );
+		}
+		int numIndexes = 0;
+		if ( demo->ReadInt( numIndexes ) != sizeof( numIndexes ) ) {
+			Clear();
+			return R_RejectGuiModelDemo( demo, "truncated index count" );
+		}
+		if ( numIndexes < 0 || numIndexes > ( 1 << 21 ) - indexes.Num() ) {
+			Clear();
+			return R_RejectGuiModelDemo( demo, va( "index count %d is out of range", numIndexes ) );
+		}
+		surface.firstIndex = indexes.Num();
+		surface.numIndexes = numIndexes;
+		const bool shortIndexes = numVerts <= 0xffff;
+		for ( int i = 0; i < numIndexes; i++ ) {
+			int index = 0;
+			if ( shortIndexes ) {
+				unsigned short shortIndex = 0;
+				if ( demo->ReadUnsignedShort( shortIndex ) != sizeof( shortIndex ) ) {
+					Clear();
+					return R_RejectGuiModelDemo( demo, "truncated index payload" );
+				}
+				index = shortIndex;
+			} else if ( demo->ReadInt( index ) != sizeof( index ) ) {
+				Clear();
+				return R_RejectGuiModelDemo( demo, "truncated index payload" );
+			}
+			if ( index < 0 || index >= numVerts ) {
+				Clear();
+				return R_RejectGuiModelDemo( demo, va( "surface vertex index %d is out of range", index ) );
+			}
+			indexes.Append( index );
+		}
+		surfaces.Append( surface );
+	}
+	if ( surfaces.Num() == 0 ) {
+		Clear();
+	} else {
+		surf = &surfaces[surfaces.Num() - 1];
+	}
+	return true;
+}
+
+/*
+================
+idGuiModel::Swap
+================
+*/
+void idGuiModel::Swap( idGuiModel &other ) {
+	surfaces.Swap( other.surfaces );
+	verts.Swap( other.verts );
+	indexes.Swap( other.indexes );
+	surf = surfaces.Num() > 0 ? &surfaces[surfaces.Num() - 1] : NULL;
+	other.surf = other.surfaces.Num() > 0 ? &other.surfaces[other.surfaces.Num() - 1] : NULL;
+}
+
+/*
+================
+R_GuiDemoSurfaceIsExcluded
+
+2D a render demo leaves out of a frame. Post-process sorts compose the scene
+itself: the game presents its off-screen scene target with one (for example
+postprocess/nopostprocess sampling _postProcessAlbedo0), and playback renders
+the recorded scene directly, so replaying it would cover the scene with a
+stale target. Retained UI materials whose images exist only in the recording
+process: the coverage atlas, composition layers and masks, generated pixels,
+blurred backdrops, model previews and the pause scene; also a layer-sampling
+linear mask (slot 0 samples _white and replays).
+================
+*/
+static bool R_GuiDemoSurfaceIsExcluded( const idMaterial *material ) {
+	if ( material == NULL ) {
+		return false;
+	}
+	if ( material->GetSort() >= SS_POST_PROCESS ) {
+		return true;
+	}
+	const char *name = material->GetName();
+	if ( idStr::Icmpn( name, "_retained", 9 ) != 0 ) {
+		return false;
+	}
+	static const char *const runtimeOnly[] = {
+		"_retainedAtlas/", "_retainedMultiplyAtlas/", "_retainedLayer/", "_retainedMask/",
+		"_retainedGenerated/", "_retainedBlur/", "_retainedModel", "_retainedPauseScene"
+	};
+	for ( int i = 0; i < static_cast<int>( sizeof( runtimeOnly ) / sizeof( runtimeOnly[0] ) ); i++ ) {
+		if ( idStr::Icmpn( name, runtimeOnly[i], idStr::Length( runtimeOnly[i] ) ) == 0 ) {
+			return true;
+		}
+	}
+	static const char linearMask[] = "_retainedLinearMask/";
+	if ( idStr::Icmpn( name, linearMask, sizeof( linearMask ) - 1 ) == 0 ) {
+		return idStr::Cmp( name + sizeof( linearMask ) - 1, "0" ) != 0;
+	}
+	return false;
+}
+
+/*
+================
+R_DemoRetainedLayerSlot
+
+N for a retained UI composition layer's image or material
+(_retainedLayerImageN, _retainedLayer/N), else 0.
+================
+*/
+static int R_DemoRetainedLayerSlot( const char *name, const char *prefix ) {
+	const int length = idStr::Length( prefix );
+	if ( name == NULL || idStr::Icmpn( name, prefix, length ) != 0 || !idStr::IsNumeric( name + length ) ) {
+		return 0;
+	}
+	const int slot = atoi( name + length );
+	return slot > 0 && slot < 4096 ? slot : 0;
+}
+
+/*
+================
+R_DemoGuiTarget
+
+The model a flushed 2D batch belongs to while a render demo records: the
+frame's screen model, a retained layer's content, or NULL for any other
+target (scene captures, crops, render textures of the game).
+================
+*/
+idGuiModel *R_DemoGuiTarget() {
+	if ( session->writeDemo == NULL || tr.currentRenderCrop != 0 || tr.guiRecursionLevel != 0 ) {
+		return NULL;
+	}
+	if ( tr.activeRenderTexture == NULL ) {
+		return tr.demoFrameGuiModel;
+	}
+	if ( tr.activeRenderTexture->GetNumColorImages() <= 0 || tr.activeRenderTexture->GetColorImage( 0 ) == NULL ) {
+		return NULL;
+	}
+	const int slot = R_DemoRetainedLayerSlot( tr.activeRenderTexture->GetColorImage( 0 )->GetName(), "_retainedLayerImage" );
+	if ( slot <= 0 ) {
+		return NULL;
+	}
+	if ( tr.demoLayerGuiModels.Num() <= slot ) {
+		const int previous = tr.demoLayerGuiModels.Num();
+		tr.demoLayerGuiModels.SetNum( slot + 1 );
+		for ( int i = previous; i < tr.demoLayerGuiModels.Num(); i++ ) {
+			tr.demoLayerGuiModels[i] = NULL;
+		}
+	}
+	if ( tr.demoLayerGuiModels[slot] == NULL ) {
+		tr.demoLayerGuiModels[slot] = new idGuiModel;
+		tr.demoLayerGuiModels[slot]->Clear();
+	}
+	return tr.demoLayerGuiModels[slot];
+}
+
+/*
+================
+idGuiModel::AppendForDemo
+================
+*/
+void idGuiModel::AppendForDemo( const idGuiModel &other ) {
+	AppendForDemoScaled( other, 1.0f );
+}
+
+/*
+================
+idGuiModel::AppendForDemoScaled
+
+opacity scales every appended vertex colour: GUI colours are premultiplied,
+so this is the composite of a retained layer at that opacity.
+================
+*/
+void idGuiModel::AppendForDemoScaled( const idGuiModel &other, float opacity ) {
+	if ( &other == this ) {
+		return;
+	}
+	for ( int i = 0; i < other.surfaces.Num(); i++ ) {
+		const guiModelSurface_t &source = other.surfaces[i];
+		if ( source.numVerts <= 0 || source.numIndexes <= 0 ) {
+			continue;
+		}
+		// A retained layer's composite records as the layer's content.
+		const int layerSlot = source.material != NULL
+			? R_DemoRetainedLayerSlot( source.material->GetName(), "_retainedLayer/" ) : 0;
+		if ( layerSlot > 0 ) {
+			const idGuiModel *content = layerSlot < tr.demoLayerGuiModels.Num() ? tr.demoLayerGuiModels[layerSlot] : NULL;
+			if ( content != NULL && content != this ) {
+				const float layerOpacity = opacity * source.color[3] *
+					( other.verts[source.firstVert].color[3] / 255.0f );
+				AppendForDemoScaled( *content, layerOpacity );
+			}
+			continue;
+		}
+		if ( R_GuiDemoSurfaceIsExcluded( source.material ) ) {
+			if ( r_showDemo.GetBool() ) {
+				common->Printf( "  gui surface left out of the demo: %s verts=%d\n",
+					source.material->GetName(), source.numVerts );
+			}
+			continue;
+		}
+		// Fill the open surface when it is still empty, so the first surface
+		// carries geometry: EmitFullScreen tests that one alone.
+		if ( surf == NULL || surf->numVerts > 0 || surf->numIndexes > 0 ) {
+			AdvanceSurf();
+		}
+		surf->material = source.material;
+		surf->color[0] = source.color[0];
+		surf->color[1] = source.color[1];
+		surf->color[2] = source.color[2];
+		surf->color[3] = source.color[3];
+		surf->firstVert = verts.Num();
+		surf->numVerts = source.numVerts;
+		surf->firstIndex = indexes.Num();
+		surf->numIndexes = source.numIndexes;
+		// Indices are relative to their surface's first vertex. A linear mask's
+		// colour carries shader data, not light, so it is never scaled.
+		const bool scale = opacity < 1.0f && !( source.material != NULL &&
+			idStr::Icmpn( source.material->GetName(), "_retainedLinearMask/", 20 ) == 0 );
+		for ( int vert = 0; vert < source.numVerts; vert++ ) {
+			idDrawVert copy = other.verts[source.firstVert + vert];
+			if ( scale ) {
+				for ( int channel = 0; channel < 4; channel++ ) {
+					copy.color[channel] = static_cast<byte>( idMath::ClampFloat( 0.0f, 255.0f,
+						copy.color[channel] * opacity + 0.5f ) );
+				}
+			}
+			verts.Append( copy );
+		}
+		for ( int index = 0; index < source.numIndexes; index++ ) {
+			indexes.Append( other.indexes[source.firstIndex + index] );
+		}
+	}
+}
+
+/*
+================
+idGuiModel::IsEmpty
+================
+*/
+bool idGuiModel::IsEmpty() const {
+	for ( int i = 0; i < surfaces.Num(); i++ ) {
+		if ( surfaces[i].numVerts > 0 && surfaces[i].numIndexes > 0 ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+================
+idGuiModel::ContentChecksum
+================
+*/
+unsigned int idGuiModel::ContentChecksum() const {
+	uint32_t crc;
+	CRC32_InitChecksum( crc );
+	if ( verts.Num() > 0 ) {
+		CRC32_UpdateChecksum( crc, verts.Ptr(), verts.Num() * static_cast<int>( sizeof( verts[0] ) ) );
+	}
+	if ( indexes.Num() > 0 ) {
+		CRC32_UpdateChecksum( crc, indexes.Ptr(), indexes.Num() * static_cast<int>( sizeof( indexes[0] ) ) );
+	}
+	for ( int i = 0; i < surfaces.Num(); i++ ) {
+		const guiModelSurface_t &surface = surfaces[i];
+		CRC32_UpdateChecksum( crc, surface.color, sizeof( surface.color ) );
+		CRC32_UpdateChecksum( crc, &surface.firstVert, sizeof( surface.firstVert ) );
+		CRC32_UpdateChecksum( crc, &surface.numVerts, sizeof( surface.numVerts ) );
+		CRC32_UpdateChecksum( crc, &surface.firstIndex, sizeof( surface.firstIndex ) );
+		CRC32_UpdateChecksum( crc, &surface.numIndexes, sizeof( surface.numIndexes ) );
+		const char *name = surface.material != NULL ? surface.material->GetName() : "";
+		CRC32_UpdateChecksum( crc, name, idStr::Length( name ) );
+	}
+	CRC32_FinishChecksum( crc );
+	return crc;
+}
+
+/*
+================
 EmitSurface
 ================
 */
@@ -381,6 +810,17 @@ void idGuiModel::EmitFullScreen( void ) {
 
 	if ( surfaces[0].numVerts == 0 ) {
 		return;
+	}
+
+	// A recorded frame keeps every 2D batch flushed to the screen, not only
+	// the one still pending when WriteDemoPics runs: the retained HUD flushes
+	// as its root begins, and a cropped or render-texture batch never reached
+	// the screen.
+	if ( this == tr.guiModel && session->writeDemo != NULL ) {
+		idGuiModel *demoTarget = R_DemoGuiTarget();
+		if ( demoTarget != NULL ) {
+			demoTarget->AppendForDemo( *this );
+		}
 	}
 
 	viewDef = (viewDef_t *)R_ClearedFrameAlloc( sizeof( *viewDef ) );

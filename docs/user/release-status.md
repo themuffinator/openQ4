@@ -14,8 +14,9 @@ GitHub's latest-release link currently resolves to 0.13.2. Status checked on
 Download the complete package from the [0.13.2 release](https://github.com/themuffinator/openQ4/releases/tag/v0.13.2).
 The available downloads are Windows x64 and experimental Windows ARM64
 installers/ZIPs, Linux x64 archives/AppImages, preview Linux ARM64
-archives/AppImages, and experimental Apple Silicon macOS OpenGL/Metal bridge
-unsigned archives. This release has no Android APK.
+archives/AppImages, and preview Apple Silicon macOS OpenGL/Metal bridge
+unsigned archives. This release has no Android APK. The 0.13.2 notes call the
+macOS packages experimental because they predate macOS becoming a preview.
 
 Keep your legitimate Quake 4 installation. Install or extract openQ4 into its
 own folder and launch `openQ4-client_x64.exe` on Windows, the Linux AppImage,

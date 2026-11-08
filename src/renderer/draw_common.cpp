@@ -4320,13 +4320,13 @@ static void RB_RestorePostProcessTarget( idRenderTexture *renderTexture, int vie
 	}
 
 	glViewport(
-		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1,
-		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1,
+		RB_TileOffsetX() + backEnd.viewDef->viewport.x1,
+		RB_TileOffsetY() + backEnd.viewDef->viewport.y1,
 		viewportWidth,
 		viewportHeight );
 	glScissor(
-		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
-		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+		RB_TileOffsetX() + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+		RB_TileOffsetY() + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
 		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
 		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
 	backEnd.currentScissor = backEnd.viewDef->scissor;
@@ -8031,13 +8031,13 @@ static void RB_RVSpecialRestoreDrawingView( void ) {
 	backEnd.currentSpace = NULL;
 
 	glViewport(
-		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1,
-		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1,
+		RB_TileOffsetX() + backEnd.viewDef->viewport.x1,
+		RB_TileOffsetY() + backEnd.viewDef->viewport.y1,
 		viewportWidth,
 		viewportHeight );
 	glScissor(
-		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
-		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+		RB_TileOffsetX() + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+		RB_TileOffsetY() + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
 		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
 		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
 	backEnd.currentScissor = backEnd.viewDef->scissor;
@@ -8578,13 +8578,13 @@ static bool RB_SetRVSpecialOrthoForView( void ) {
 	}
 
 	glViewport(
-		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1,
-		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1,
+		RB_TileOffsetX() + backEnd.viewDef->viewport.x1,
+		RB_TileOffsetY() + backEnd.viewDef->viewport.y1,
 		viewportWidth,
 		viewportHeight );
 	glScissor(
-		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
-		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+		RB_TileOffsetX() + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+		RB_TileOffsetY() + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
 		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
 		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
 	backEnd.currentScissor = backEnd.viewDef->scissor;
@@ -14754,8 +14754,8 @@ static bool RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid
 		useDepthTextureCompare ? 1.0f : 0.0f
 	};
 	const float depthViewport[4] = {
-		backEnd.viewDef != NULL ? static_cast<float>( tr.viewportOffset[0] + backEnd.viewDef->viewport.x1 ) : 0.0f,
-		backEnd.viewDef != NULL ? static_cast<float>( tr.viewportOffset[1] + backEnd.viewDef->viewport.y1 ) : 0.0f,
+		backEnd.viewDef != NULL ? static_cast<float>( RB_TileOffsetX() + backEnd.viewDef->viewport.x1 ) : 0.0f,
+		backEnd.viewDef != NULL ? static_cast<float>( RB_TileOffsetY() + backEnd.viewDef->viewport.y1 ) : 0.0f,
 		0.0f,
 		0.0f
 	};
@@ -15137,8 +15137,8 @@ static bool RB_STD_DrawLightGridInlineSurface( const drawSurf_t *surf ) {
 	if ( r_useScissor.GetBool() && !backEnd.currentScissor.Equals( surf->scissorRect ) ) {
 		backEnd.currentScissor = surf->scissorRect;
 		glScissor(
-			tr.viewportOffset[0] + backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
-			tr.viewportOffset[1] + backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
+			RB_TileOffsetX() + backEnd.viewDef->viewport.x1 + backEnd.currentScissor.x1,
+			RB_TileOffsetY() + backEnd.viewDef->viewport.y1 + backEnd.currentScissor.y1,
 			backEnd.currentScissor.x2 + 1 - backEnd.currentScissor.x1,
 			backEnd.currentScissor.y2 + 1 - backEnd.currentScissor.y1 );
 	}
@@ -15189,14 +15189,14 @@ static void RB_STD_LightGridIndirect( void ) {
 	// Restore whole-view scissor after per-light/decal passes so the overlay
 	// is clipped only by the current view, not by the last submitted light.
 	glViewport(
-		tr.viewportOffset[0] + backEnd.viewDef->viewport.x1,
-		tr.viewportOffset[1] + backEnd.viewDef->viewport.y1,
+		RB_TileOffsetX() + backEnd.viewDef->viewport.x1,
+		RB_TileOffsetY() + backEnd.viewDef->viewport.y1,
 		backEnd.viewDef->viewport.x2 + 1 - backEnd.viewDef->viewport.x1,
 		backEnd.viewDef->viewport.y2 + 1 - backEnd.viewDef->viewport.y1 );
 	if ( r_useScissor.GetBool() ) {
 		glScissor(
-			tr.viewportOffset[0] + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
-			tr.viewportOffset[1] + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+			RB_TileOffsetX() + backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+			RB_TileOffsetY() + backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
 			backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
 			backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
 		backEnd.currentScissor = backEnd.viewDef->scissor;
