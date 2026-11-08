@@ -160,7 +160,12 @@ booted, rooted AOSP/userdebug emulator. It verifies the diagnostic APK, copies
 and hashes the caller's retail archives, then runs silent Hangar 1 movement,
 look/fire/release and save/load checks. `--mode mp` instead runs a Q4DM1
 listen server with explicit auto-join and the same movement/release checks;
-it does not create a save. Captures come from the engine's
+it does not create a save. `--mode rotate` applies the Interface setup's
+Landscape and portrait choice, turns the AVD to portrait mid-match through its
+`user_rotation` setting when the engine asks, drives the portrait thumb deck,
+turns back and saves/loads. It checks the window and engine captures follow
+each turn, the deck arrangement and that neither turn moves the player, and it
+restores the AVD's rotation settings and the app's setup preferences. Captures come from the engine's
 `screenshot` command. The probe starts the internal game Activity from the
 rooted AVD, so it does not qualify setup navigation or physical input. It refuses
 physical-device serials and an already running diagnostic app, preserves existing

@@ -476,6 +476,15 @@ See [release status](../../user/release-status.md) and the
 - The experimental Android build now uses OpenAL Soft 1.25.2, the same audio
   library release as the desktop packages, built with the current Android
   NDK (r30).
+- Experimental Android: you can now play holding the phone upright. Choose
+  **Landscape and portrait** under **Screen orientation** on the Interface
+  setup page; the game then turns with the device (unless Android's rotation
+  lock is on) and keeps your match running. Upright, the touch controls gather
+  in the band below the view, with movement on the left and fire, weapon,
+  jump, crouch, zoom and reload on the right, and the Remastered HUD's
+  readouts sit just above them. Landscape stays the default and is now held
+  reliably: the engine's window could previously ask Android for every
+  orientation.
 - Multiplayer bots on Linux and macOS no longer risk a crash when a player
   slot is empty. The bot code checked for a missing player in a way those
   systems' compilers are allowed to skip.

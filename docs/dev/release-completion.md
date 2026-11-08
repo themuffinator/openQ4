@@ -6,6 +6,20 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Android portrait play and orientation ownership (AND-01, AND-04), 8 November 2026
+
+- Built-in touch controls gain section 13.6's portrait thumb deck, and the
+  Remastered HUD's bottom readouts rise above it while the overlay is active.
+- The Interface setup page adds **Screen orientation** (Landscape, or
+  Landscape and portrait). `OpenQ4Activity` applies it and overrides SDL's
+  `setOrientationBis`, which requested `FULL_USER` for the resizable engine
+  window regardless of the manifest's landscape lock.
+- Validation: native/JVM host tests with negative controls, and
+  `android_emulator_smoke.py --mode rotate` on the API 35 x86_64 AVD (a
+  landscape-portrait-landscape turn mid-match with movement, fire and
+  save/load). Physical phones remain unqualified. See the
+  [recovery review](platform-recovery-review.md#android-portrait-thumb-deck-and-orientation-ownership-8-november-2026).
+
 ## Frame-time profiling command and performance report, 8 November 2026
 
 - [x] `profileFrameWork <frames> [file.csv]` takes an optional CSV path below the

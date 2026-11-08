@@ -15,7 +15,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /**
- * Viewing profile, UI size and text size (ui-visual-design.md section 13.2).
+ * Viewing profile, UI size and text size (ui-visual-design.md section 13.2),
+ * and whether play may turn to portrait (section 13.6).
  * Setup edits an isolated draft; the engine applies each applied transaction
  * once at foreground entry, so later in-game size changes survive a return.
  */
@@ -59,6 +60,14 @@ final class InterfacePage {
             int value = position == 0 ? 0 : 100 + (position - 1) * 5;
             if (value != draft.textPercent) change(draft.select(draft.profile, draft.uiPercent, value));
         }));
+        column.addView(theme.text(R.string.setup_orientation, false));
+        Spinner orientation = spinner(context.getResources().getStringArray(R.array.setup_orientations), draft.orientation,
+                R.string.setup_orientation);
+        column.addView(orientation);
+        orientation.setOnItemSelectedListener(select(position -> {
+            if (position != draft.orientation) change(draft.withOrientation(position));
+        }));
+        column.addView(theme.text(R.string.setup_orientation_help, false));
         column.addView(effective);
         column.addView(sampleTitle);
         column.addView(sampleBody);

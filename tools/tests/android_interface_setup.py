@@ -43,27 +43,38 @@ public class InterfaceSetupTest {
         Resources getResources(){return resources;}
         @GETTER@
     }
+    static class ActivityInfo {static final int SCREEN_ORIENTATION_SENSOR_LANDSCAPE=6,SCREEN_ORIENTATION_FULL_USER=13;}
+    @ORIENTATION@
     @SAVE@
     static String expected(int profile,int ui,int text){return profile+":"+ui+":"+text;}
     static String tail(String record){String[] f=record.split(":");return f[2]+":"+f[3]+":"+f[4];}
     public static void main(String[] args) throws IOException {
         int trips=0;
-        for(int p=0;p<=5;p++)for(int u=0;u<=200;u+=5)for(int t=0;t<=200;t+=5){
+        for(int p=0;p<=5;p++)for(int u=0;u<=200;u+=5)for(int t=0;t<=200;t+=5)for(int o=0;o<=1;o++){
             if((u!=0 && u<75) || (t!=0 && t<100))continue;
-            InterfaceSettings a=new InterfaceSettings("0123456789abcdef0123456789abcdef",p,u,t),b=InterfaceSettings.decode(a.encode());
-            check(b.revision.equals(a.revision) && b.profile==p && b.uiPercent==u && b.textPercent==t,"preference round trip");
+            InterfaceSettings a=new InterfaceSettings("0123456789abcdef0123456789abcdef",p,u,t,o),b=InterfaceSettings.decode(a.encode());
+            check(b.revision.equals(a.revision) && b.profile==p && b.uiPercent==u && b.textPercent==t && b.orientation==o,"preference round trip");
             check(a.encode().length()<=48 && a.engineValues(false,1).length()<=48 && a.engineValues(true,2).length()<=48,"record exceeds JNI bound");
+            // The engine reads sizes only; orientation never changes its record.
+            check(a.engineValues(false,1).equals(a.withOrientation(1-o).engineValues(false,1)),"orientation reached the engine record");
+            // Records saved before the orientation choice keep their sizes and stay landscape.
+            InterfaceSettings legacy=InterfaceSettings.decodeOrNull("1:"+a.revision+":"+p+":"+u+":"+t);
+            check(legacy!=null && legacy.profile==p && legacy.uiPercent==u && legacy.textPercent==t
+                && legacy.orientation==InterfaceSettings.ORIENTATION_LANDSCAPE,"version 1 record lost or rotated");
             ++trips;
         }
         for(String value:new String[]{null,"","2:0123456789abcdef0123456789abcdef:0:0:0","1:0123456789ABCDEF0123456789abcdef:0:0:0",
                 "1:0123456789abcdef0123456789abcde:0:0:0","1:0123456789abcdef0123456789abcdef:6:0:0","1:0123456789abcdef0123456789abcdef:0:70:0",
                 "1:0123456789abcdef0123456789abcdef:0:205:0","1:0123456789abcdef0123456789abcdef:0:0:95","1:0123456789abcdef0123456789abcdef:0:101:0",
-                "1:0123456789abcdef0123456789abcdef:0:0:0:0","1:0123456789abcdef0123456789abcdef:0:0:0\n","1:0123456789abcdef0123456789abcdef:-1:0:0"}){
+                "1:0123456789abcdef0123456789abcdef:0:0:0:0","1:0123456789abcdef0123456789abcdef:0:0:0\n","1:0123456789abcdef0123456789abcdef:-1:0:0",
+                "2:0123456789abcdef0123456789abcdef:0:0:0:2","2:0123456789abcdef0123456789abcdef:0:0:0:-1","2:0123456789abcdef0123456789abcdef:0:0:0:",
+                "2:0123456789abcdef0123456789abcdef:0:0:0:0:0","1:0123456789abcdef0123456789abcdef:0:0:0:1","3:0123456789abcdef0123456789abcdef:0:0:0:1",
+                "2:0123456789abcdef0123456789abcdef:0:0:0:1\n"}){
             check(InterfaceSettings.decodeOrNull(value)==null && InterfaceSettings.decode(value)==InterfaceSettings.DEFAULT,"malformed record accepted: "+value);
         }
-        for(int[] bad:new int[][]{{-1,0,0},{6,0,0},{0,74,0},{0,205,0},{0,77,0},{0,0,99},{0,0,205},{0,0,103}}){
+        for(int[] bad:new int[][]{{-1,0,0,0},{6,0,0,0},{0,74,0,0},{0,205,0,0},{0,77,0,0},{0,0,99,0},{0,0,205,0},{0,0,103,0},{0,0,0,2},{0,0,0,-1}}){
             boolean rejected=false;
-            try{new InterfaceSettings("0123456789abcdef0123456789abcdef",bad[0],bad[1],bad[2]);}catch(IllegalArgumentException e){rejected=true;}
+            try{new InterfaceSettings("0123456789abcdef0123456789abcdef",bad[0],bad[1],bad[2],bad[3]);}catch(IllegalArgumentException e){rejected=true;}
             check(rejected,"invalid settings constructed: "+Arrays.toString(bad));
         }
         // ui-visual-design.md 13.2: Desk 100/100, Couch 150/125, Handheld 125/100,
@@ -86,6 +97,14 @@ public class InterfaceSetupTest {
         InterfaceSettings draft=auto.select(2,0,0),first=draft.applied(),second=draft.applied();
         check(draft.revision.equals(auto.revision) && !first.revision.equals(auto.revision) && !first.revision.equals(second.revision),"apply reused a transaction identity");
         check(first.revision.matches("[0-9a-f]{32}"),"applied identity format");
+
+        // Orientation: landscape unless the player applied Landscape and portrait.
+        check(screenOrientation(null)==ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,"unconfigured host left landscape");
+        check(screenOrientation(auto)==ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,"default record left landscape");
+        check(screenOrientation(auto.withOrientation(1))==ActivityInfo.SCREEN_ORIENTATION_FULL_USER,"portrait choice not honoured");
+        InterfaceSettings rotating=auto.select(2,0,0).withOrientation(1);
+        check(rotating.revision.equals(auto.revision) && rotating.profile==2,"orientation edit changed the draft identity or sizes");
+        check(rotating.applied().orientation==1 && rotating.select(3,0,0).orientation==1,"apply or size edit dropped the orientation");
 
         Host host=new Host();SharedPreferences prefs=host.prefs;
         check(host.getInterfaceSetup()==null,"unconfigured launcher overwrote engine interface settings");
@@ -110,6 +129,10 @@ public class InterfaceSetupTest {
         check(tail(host.getInterfaceSetup()).equals(expected(5,100,130)),"tablet width not read from the live configuration");
         prefs.edit().putString(InterfaceSettings.SAVED,"1:corrupt").commit();
         check(host.getInterfaceSetup()==null,"corrupt applied record reached engine");
+        prefs.edit().remove(InterfaceSettings.SAVED).commit();
+        check(saveApplied(prefs,auto.withOrientation(1)),"orientation apply rejected");
+        check(screenOrientation(InterfaceSettings.decodeOrNull(prefs.disk.get(InterfaceSettings.SAVED)))==ActivityInfo.SCREEN_ORIENTATION_FULL_USER,
+            "applied orientation did not survive process restart");
 
         // Every engine record the Activity can produce, for the native reader.
         try(Writer out=new OutputStreamWriter(new FileOutputStream(args[0]),StandardCharsets.US_ASCII)){
@@ -120,7 +143,7 @@ public class InterfaceSetupTest {
                     out.write(value.engineValues(tablet==1,font)+"\n");++records;
                 }
             System.out.println("PASS: "+trips+" preference round trips, malformed recovery, 13.2 profile defaults, system font scale, transaction identity, "
-                +"draft isolation, initial/update commit failure, process persistence and actual Activity getter; "+records+" engine records exported");
+                +"draft isolation, initial/update commit failure, process persistence, version 1 records, orientation policy and actual Activity getter; "+records+" engine records exported");
         }
     }
 }
@@ -217,6 +240,19 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     production = ROOT/'mobile/android/app/src/main/java/com/darkmatter/openq4'
     java_source = JAVA.replace('@GETTER@', function_body((production/'OpenQ4Activity.java').read_text(encoding='utf-8'), 'public String getInterfaceSetup('))
+    activity = (production/'OpenQ4Activity.java').read_text(encoding='utf-8')
+    java_source = java_source.replace('@ORIENTATION@', function_body(activity, 'static int screenOrientation('))
+    # SDL's window-derived request (FULL_USER for openQ4's resizable window)
+    # must never replace the player's orientation, which the Activity applies
+    # before SDL creates the window and again on each return from setup.
+    bis = function_body(activity, 'public void setOrientationBis(')
+    assert 'applyScreenOrientation' in bis and 'super.setOrientationBis' not in bis, 'SDL can override the orientation'
+    assert 'applyScreenOrientation();' in function_body(activity, 'protected void onCreate('), 'orientation not applied at creation'
+    assert 'applyScreenOrientation();' in function_body(activity, 'protected void onResume('), 'orientation not applied on return'
+    manifest = (ROOT/'mobile/android/app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
+    assert 'android:screenOrientation="sensorLandscape"' in manifest, 'manifest default orientation changed'
+    page = (production/'InterfacePage.java').read_text(encoding='utf-8')
+    assert 'R.array.setup_orientations' in page and 'draft.withOrientation(position)' in page, 'interface page lacks orientation'
     java_source = java_source.replace('@SAVE@', function_body((production/'InterfacePage.java').read_text(encoding='utf-8'), 'static boolean saveApplied('))
     launcher = (production/'LauncherActivity.java').read_text(encoding='utf-8')
     assert 'new InterfacePage(this, theme, session.prefs).build(' in launcher, 'setup does not open the interface page'

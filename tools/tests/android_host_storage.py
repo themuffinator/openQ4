@@ -199,7 +199,20 @@ public class SDLActivity {
     }
     public static final android.content.res.Resources resources = new android.content.res.Resources();
     public android.content.res.Resources getResources() { return resources; }
+    // SDL's window-derived orientation request and the Activity's own.
+    public int requestedOrientation = -1, orientationRequests;
+    public void setOrientationBis(int w, int h, boolean resizable, String hint) { requestedOrientation = 13; }
+    public int getRequestedOrientation() { return requestedOrientation; }
+    public void setRequestedOrientation(int value) { requestedOrientation = value; ++orientationRequests; }
+    public void runOnUiThread(Runnable action) { action.run(); }
+    public static void setOrientationOverride(SDLActivity activity, int w, int h) { activity.setOrientationBis(w, h, true, ""); }
 }''',
+            "android/content/pm/ActivityInfo.java": r'''
+package android.content.pm;
+public final class ActivityInfo {
+    public static final int SCREEN_ORIENTATION_SENSOR_LANDSCAPE = 6, SCREEN_ORIENTATION_FULL_USER = 13;
+}
+''',
             "android/content/Intent.java": r'''
 package android.content;
 public class Intent {
@@ -420,6 +433,30 @@ public final class StorageTest {
             "applied interface setup not resolved for this tablet");
         SDLActivity.preferences.values.put(InterfaceSettings.SAVED, "1:damaged");
         require(activity.getInterfaceSetup() == null, "damaged interface record reached the engine");
+        // The player's orientation choice, never SDL's: openQ4's resizable
+        // window would make SDL request FULL_USER (13) at window creation.
+        SDLActivity.preferences.values.clear();
+        activity.onCreate(null);
+        require(activity.getRequestedOrientation() == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
+            "unconfigured game did not request landscape");
+        org.libsdl.app.SDLActivity.setOrientationOverride(activity, 1920, 1080);
+        require(activity.getRequestedOrientation() == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
+            "SDL window creation unlocked portrait");
+        int requests = activity.orientationRequests;
+        activity.onResume();
+        require(activity.orientationRequests == requests, "unchanged orientation requested again");
+        SDLActivity.preferences.values.put(InterfaceSettings.SAVED, "2:0123456789abcdef0123456789abcdef:0:0:0:1");
+        activity.onResume();
+        require(activity.getRequestedOrientation() == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER,
+            "applied Landscape and portrait did not reach the returning game");
+        SDLActivity.preferences.values.put(InterfaceSettings.SAVED, "1:0123456789abcdef0123456789abcdef:0:0:0");
+        org.libsdl.app.SDLActivity.setOrientationOverride(activity, 1080, 1920);
+        require(activity.getRequestedOrientation() == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
+            "version 1 setup record or a portrait window left portrait unlocked");
+        SDLActivity.preferences.values.put(InterfaceSettings.SAVED, "2:damaged");
+        activity.onResume();
+        require(activity.getRequestedOrientation() == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
+            "damaged setup record unlocked portrait");
         SDLActivity.preferences.values.clear();
         File old = extract(activity);
         List<String> launch = Arrays.asList(activity.getArguments());

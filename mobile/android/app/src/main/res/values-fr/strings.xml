@@ -117,6 +117,12 @@
     <string name="setup_interface_applied">Interface enregistrée. Elle sera appliquée au retour au jeu ou à son lancement.</string>
     <string name="setup_interface_save_failed">Impossible d’enregistrer les réglages de l’interface. Les réglages précédents sont conservés ; vérifiez l’espace libre de l’application et réessayez.</string>
     <string name="setup_interface_percent">%1$d %%</string>
+    <string name="setup_orientation">Orientation de l\'écran</string>
+    <string name="setup_orientation_help">Paysage et portrait fait pivoter le jeu avec l\'appareil, sauf si le verrouillage de la rotation d\'Android est activé. En portrait, les commandes tactiles se regroupent dans la bande sous la vue.</string>
+    <string-array name="setup_orientations">
+        <item>Paysage</item>
+        <item>Paysage et portrait</item>
+    </string-array>
     <string-array name="setup_viewing_profiles">
         <item>Automatique (cet appareil)</item>
         <item>Bureau (écran)</item>

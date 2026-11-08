@@ -55,7 +55,7 @@ exact; the estimate column is deliberately approximate.
 | [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **10%** | 0 / 9 | Declared budgets, preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; Quest waits on AND-05. |
-| [Android and mobile rendering](#android-and-mobile-rendering) — AND | **55%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, editable layouts and Quest. |
+| [Android and mobile rendering](#android-and-mobile-rendering) — AND | **57%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, editable layouts, physical portrait play and Quest. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
@@ -1754,16 +1754,16 @@ Sources: [Android build and packaging](android-build.md),
 
 ### AND completion checkpoints
 
-**Estimate: 55%; 0/5 tasks closed.** Onboarding, touch and several lifecycle
+**Estimate: 57%; 0/5 tasks closed.** Onboarding, touch and several lifecycle
 repairs are already integrated; they are not all still archived. S25 and emulator
 checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| AND-01 — Partial | Phone/emulator scope, startup ownership, UI-thread binding, background handling, Back/cutouts and touch controls repaired; S25 save/touch/audio checks exist. | Remaining host/input recovery, editable/portrait layouts, suspend/process death/network resume and Quest-specific flavor verification. |
+| AND-01 — Partial | Phone/emulator scope, startup ownership, UI-thread binding, background handling, Back/cutouts and touch controls repaired; S25 save/touch/audio checks exist; host-owned orientation and the portrait thumb deck pass a mid-match emulator rotation. | Remaining host/input recovery, the editable layout, physical portrait play, suspend/process death/network resume and Quest-specific flavor verification. |
 | AND-02 — Partial | GLES3 build/package infrastructure and narrow S25/emulator gameplay evidence exist. | Physical Adreno/Mali and API breadth; SP/MP transitions, device input/audio, thermal/storage/aggregate memory and sustained performance. |
 | AND-03 — Partial | Verified package repair/import, localized setup, settings return, control/interface setup and save/log export implemented; scoped device round trips pass. | Release-signing continuity; cloud/removable providers; interrupted-process recovery; physical setup/accessibility and upgrade matrix. |
-| AND-04 — Partial | Touch presets, UI/text sizing, retained safe areas and HUD safe-area positioning exist. | Device-based presets and GLES limits; keyboard/touch targets, full overlay editing, cutouts/gesture bars/folds/multi-window qualification. |
+| AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas and HUD safe-area and thumb-deck positioning exist. | Device-based presets and GLES limits; keyboard/touch targets, full overlay editing, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
 | AND-05 — Not integrated | Quest recovery sources are identified under VR-01/AND-01; the archived Quest change (`65aa9bd88`) moved here from VR-01 on 6 November, on top of the integrated PC Vulkan/EGL XR path. | Dedicated verified flavor, installation/assets, stereo/controller UI, comfort/session recovery and sustained thermal/refresh budgets; distribution decision. |
 
 ### AND task evidence and acceptance
@@ -1831,6 +1831,12 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
   gameplay/save round trips and physical move/look/fire, tap/hold weapon
   selection and background/resume audio pass on the recorded S25 builds.
   The full editable layout/portrait contract and setup integration remain open.
+  [Portrait and orientation ownership](platform-recovery-review.md#android-portrait-thumb-deck-and-orientation-ownership-8-november-2026)
+  add section 13.6's thumb deck and stop SDL's window creation from replacing
+  the landscape lock with `FULL_USER`; portrait is an Interface setup choice.
+  Native/JVM checks and a silent emulator probe (`--mode rotate`) pass a
+  landscape-portrait-landscape turn mid-match with movement, fire and save/load.
+  Physical portrait play and the per-orientation layout editor remain.
   Broader device startup and the remaining host/input/lifecycle recovery are
   still open.
 - [ ] **AND-02 — P1, qualification: real Adreno/Mali gameplay.** Cover the API floor
@@ -1922,7 +1928,11 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
   the Remastered HUD's edge readouts follow the same
   [safe area](ui/remastered-hud.md#the-windows-safe-area-2-november-2026);
   cutout, gesture-bar, fold and multi-window qualification on devices
-  remains.
+  remains. In portrait the Remastered HUD's bottom readouts now rise above the
+  touch thumb deck while the overlay is active, and **Landscape and portrait**
+  on the Interface page opts into turning the device; stock GUIs in portrait,
+  the Touch HUD preset as a whole and readouts behind a raised weapon control
+  on 9:16 phones remain.
 - [ ] **AND-05 — P2, integration and qualification: standalone Quest.** After
   VR-01/AND-01, qualify real installation, assets, stereo gameplay, controller/UI
   interaction, comfort, session recovery and sustained refresh/thermal budgets.
