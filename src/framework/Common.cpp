@@ -5970,7 +5970,7 @@ idCommonLocal::InitCommands
 */
 void idCommonLocal::InitCommands( void ) {
 	LevelEditor_InitCommands();
-	cmdSystem->AddCommand( "profileFrameWork", Com_ProfileFrameWork_f, CMD_FL_SYSTEM, "capture 1..60000 complete engine frames without per-frame logging; writes diagnostics/frame-work.csv (0 stops)" );
+	cmdSystem->AddCommand( "profileFrameWork", Com_ProfileFrameWork_f, CMD_FL_SYSTEM, "capture 1..60000 complete engine frames without per-frame logging into diagnostics/frame-work.csv or a named .csv; 0 stops early and writes the frames captured so far" );
 	cmdSystem->AddCommand( "error", Com_Error_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "causes an error" );
 	cmdSystem->AddCommand( "crash", Com_Crash_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "causes a crash" );
 	cmdSystem->AddCommand( "freeze", Com_Freeze_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "freezes the game for a number of seconds" );
@@ -6384,28 +6384,29 @@ static void Common_PresentationStallProbe( void ) {
 }
 
 static openq4::FrameWorkProfile commonFrameWorkProfile;
+static idStr commonFrameWorkTracePath( "diagnostics/frame-work.csv" );
 
 static double Common_FrameWorkNow() {
 	return Common_GetPresentationClockNow() * 1000.0 / Common_GetPresentationClockUnitsPerSecond();
 }
 
-static void Com_ProfileFrameWork_f( const idCmdArgs &args ) {
-	const int frames = args.Argc()==2 ? atoi(args.Argv(1)) : -1;
-	if (!commonFrameWorkProfile.Reset(frames)) {
-		common->Printf("usage: profileFrameWork <0..60000>\n"); return;
+// A trace path given on the console must stay below the save path: relative,
+// no parent references, no drive, .csv extension.
+static bool Common_FrameWorkTracePathOk( const char *path ) {
+	idStr candidate( path );
+	if ( candidate.Length() < 5 || candidate[0] == '/' || candidate[0] == '\\' ) {
+		return false;
 	}
-	common->Printf("Frame work profile: requested %d complete frames\n",frames);
+	if ( candidate.Find( ".." ) != -1 || candidate.Find( ':' ) != -1 ) {
+		return false;
+	}
+	return idStr::Icmp( candidate.Right( 4 ), ".csv" ) == 0;
 }
 
-static void Common_MarkFrameWork(openq4::FrameWorkPhase phase) {
-	if (commonFrameWorkProfile.Active()) commonFrameWorkProfile.Mark(phase,Common_FrameWorkNow());
-}
-
-static void Common_EndFrameWork(int frame) {
-	if (!commonFrameWorkProfile.Active() || !commonFrameWorkProfile.End(frame,Common_FrameWorkNow())) return;
+static void Common_WriteFrameWorkTrace() {
 	const auto& samples=commonFrameWorkProfile.Samples();
 	static const char* names[]{"gap","wait","events","configuration","commands","session","draw","tail"};
-	idFile* file=fileSystem->OpenFileWrite("diagnostics/frame-work.csv");
+	idFile* file=fileSystem->OpenFileWrite(commonFrameWorkTracePath.c_str());
 	if (file) {
 		// startMs: Wait-phase start on the presentation clock (QueryPerformanceCounter
 		// ticks in milliseconds on Windows), for tools/debug/cpu_sampler.py frames.
@@ -6424,12 +6425,48 @@ static void Common_EndFrameWork(int frame) {
 			const double value=phase<0 ? sample.Total() : sample.milliseconds[phase];
 			values.push_back(value); total+=value;
 		}
+		if (values.empty()) break;
 		std::sort(values.begin(),values.end());
 		common->Printf("Frame work phase=%s samples=%u mean_ms=%.6f p95_ms=%.6f p99_ms=%.6f max_ms=%.6f\n",
 			phase<0 ? "total" : names[phase],static_cast<unsigned>(values.size()),total/values.size(),
 			values[static_cast<size_t>(ceil(values.size()*.95))-1],values[static_cast<size_t>(ceil(values.size()*.99))-1],values.back());
 	}
-	common->Printf("Frame work trace: %s\n",file ? "diagnostics/frame-work.csv" : "file write unavailable");
+	common->Printf("Frame work trace: %s\n",file ? commonFrameWorkTracePath.c_str() : "file write unavailable");
+}
+
+static void Com_ProfileFrameWork_f( const idCmdArgs &args ) {
+	if ( args.Argc() < 2 || args.Argc() > 3 ) {
+		common->Printf( "usage: profileFrameWork <1..60000> [relative csv path below the save path]\n       profileFrameWork 0   (stop early and write the frames captured so far)\n" );
+		return;
+	}
+	const int frames = atoi( args.Argv( 1 ) );
+	if ( frames == 0 ) {
+		if ( commonFrameWorkProfile.Stop() ) {
+			Common_WriteFrameWorkTrace();
+		} else {
+			common->Printf( "Frame work profile: nothing captured\n" );
+		}
+		return;
+	}
+	if ( args.Argc() == 3 && !Common_FrameWorkTracePathOk( args.Argv( 2 ) ) ) {
+		common->Printf( "profileFrameWork: the trace path must be a relative .csv path below the save path\n" );
+		return;
+	}
+	if ( !commonFrameWorkProfile.Reset( frames ) ) {
+		common->Printf( "usage: profileFrameWork <1..60000> [relative csv path below the save path]\n" );
+		return;
+	}
+	commonFrameWorkTracePath = args.Argc() == 3 ? args.Argv( 2 ) : "diagnostics/frame-work.csv";
+	common->Printf( "Frame work profile: requested %d complete frames -> %s\n", frames, commonFrameWorkTracePath.c_str() );
+}
+
+static void Common_MarkFrameWork(openq4::FrameWorkPhase phase) {
+	if (commonFrameWorkProfile.Active()) commonFrameWorkProfile.Mark(phase,Common_FrameWorkNow());
+}
+
+static void Common_EndFrameWork(int frame) {
+	if (!commonFrameWorkProfile.Active() || !commonFrameWorkProfile.End(frame,Common_FrameWorkNow())) return;
+	Common_WriteFrameWorkTrace();
 }
 
 void idCommonLocal::Frame( void ) {

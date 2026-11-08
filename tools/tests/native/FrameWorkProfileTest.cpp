@@ -33,6 +33,11 @@ int main() {
 	CHECK(!profile.End(0,7));
 	profile.Begin(0); profile.Mark(FrameWorkPhase::Wait,std::numeric_limits<double>::quiet_NaN());
 	CHECK(!profile.End(0,7) && Frame(profile,1,10));
+	// Stop ends an incomplete capture early and keeps the frames recorded so far.
+	CHECK(profile.Reset(3) && !Frame(profile,30,300) && !Frame(profile,31,310) && profile.Active());
+	CHECK(profile.Stop() && !profile.Active() && profile.Samples().size()==2 && profile.Samples()[1].frame==31);
+	CHECK(!Frame(profile,32,320) && profile.Samples().size()==2);
+	CHECK(profile.Reset(2) && !profile.Stop() && !profile.Active() && profile.Samples().empty());
 	CHECK(profile.Reset(0) && !profile.Active() && profile.Samples().empty());
 	std::puts("frame work profile: exact phases, gaps, frame start times, bounded capture, reset, stop and invalid-clock controls passed");
 }

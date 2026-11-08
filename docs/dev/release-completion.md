@@ -6,6 +6,22 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Frame-time profiling command and performance report, 8 November 2026
+
+- [x] `profileFrameWork <frames> [file.csv]` takes an optional CSV path below the
+  save path, and `profileFrameWork 0` stops a running capture early and writes the
+  frames recorded so far, so a frame-time log of a chosen duration can be taken from
+  a config script without waiting for the frame count.
+- Developer tooling, no shipped default changes: `tools/tests/performance_suite.py`
+  measures scripted stock-map scenarios on both renderers with per-frame traces, the
+  per-launch GPU load and feature toggle ladders, and
+  [`docs/dev/performance-report.md`](performance-report.md) records the frame-rate
+  drop since 0.13.2 on the RTX 4060 Laptop: the current Ultra preset's 16-sample scene
+  target, shadow-mapped point lights and post chain on OpenGL, the Vulkan backend's
+  clamp of that preset to 8 samples, and its equal-settings regression led by the
+  soft-particle depth capture. The optimization plan is the roadmap's FPS category.
+- Evidence: [performance report](performance-report.md), roadmap FPS-01 to FPS-09.
+
 ## Campaign demos (Q4-09), 7 November 2026
 
 - [x] Record a whole single-player session as one demo. `recordDemo` now keeps

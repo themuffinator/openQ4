@@ -45,6 +45,8 @@ public:
 		return --remaining==0;
 	}
 	void Abort() { recording=false; previousEnd=-1; }
+	// Ends an incomplete capture early, keeping the frames recorded so far.
+	bool Stop() { remaining=0; recording=false; previousEnd=-1; return !samples.empty(); }
 	const std::vector<FrameWorkSample>& Samples() const { return samples; }
 private:
 	std::vector<FrameWorkSample> samples;
