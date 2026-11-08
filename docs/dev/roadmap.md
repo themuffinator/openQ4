@@ -20,14 +20,14 @@ multiplayer and audio are furthest along among the unfinished workstreams. Full
 campaign progression, physical-device qualification, rendering performance and the
 UI toolkit/editor/corpus remain major completion gates.
 
-| Progress measure, 6 November 2026 | Current result | Meaning |
+| Progress measure, 8 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **31 / 125 (24.8%)** | **94 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Formally closed roadmap tasks | **35 / 125 (28.0%)** | **90 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
 | Estimated category progress | **19 categories: 3 at 100%, 14 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
-| Ultra frame rate at 2560x1440 | **19-58 fps on the RTX 4060 Laptop; no budget declared yet** | 0.13.2 Ultra runs 113-336 fps on the same scenes and the current build matches it at equal settings within 12%: the preset carries the drop. See the FPS category and the [performance report](performance-report.md). |
+| Ultra frame rate at 2560x1440 | **19-58 fps on GL, 48-122 fps on Vulkan, on the reference laptop; budgets declared** | 0.13.2 Ultra runs 113-336 fps on the same scenes and the current build matches it at equal settings within 12%: the preset carries the drop. Warm mean and p99 budgets for Ultra, Quality and Enhanced on both backends are in [`performance-budgets.json`](performance-budgets.json) (FPS-01). See the FPS category and the [performance report](performance-report.md). |
 | Release acceptance | **0 / 4 REL tasks closed** | Current-source progress is unreleased; 0.13.2 remains the available release under the recorded release-status policy. |
 
 ### Category completion estimates
@@ -53,7 +53,7 @@ exact; the estimate column is deliberately approximate.
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
-| [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **10%** | 0 / 9 | Declared budgets, preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
+| [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **18%** | 1 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; Quest waits on AND-05. |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **57%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, editable layouts, physical portrait play and Quest. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
@@ -1492,13 +1492,13 @@ reference hardware can hold at its declared frame rate rather than every maximum
 
 ### FPS completion checkpoints
 
-**Estimate: 10%; 0/9 tasks closed.** The suite, the two baselines and the per-feature
-cost attribution exist on one development machine; no budget has been declared, no
-preset re-tiered and no optimization landed.
+**Estimate: 18%; 1/9 tasks closed.** The suite, the two baselines, the per-feature
+cost attribution and the declared per-scenario budgets exist on the reference machine
+(the RTX 4060 Laptop); no preset has been re-tiered and no optimization has landed.
 
 | Task / state | Completed points and evidence | Remaining subpoints / closure boundary |
 | --- | --- | --- |
-| FPS-01 — Partial | Suite (nine scripted stock-map scenarios, per-frame traces, cold/warm passes, toggle ladders, attribution, hitch events, transitions, idle-launch retry), 0.13.2 and current baselines on both backends on the RTX 4060 Laptop, report with the settings/code split. | Reference-desktop run; declared per-scenario budgets recorded beside the release notes. |
+| FPS-01 — Closed | Suite (nine scripted stock-map scenarios, per-frame traces, cold/warm passes, toggle ladders, attribution, hitch events, transitions, idle-launch retry), 0.13.2 and current baselines on both backends, report with the settings/code split; the RTX 4060 Laptop named the reference machine; 42 budgets (7 scenarios x Ultra/Quality/Enhanced x OpenGL/Vulkan, warm mean and p99) declared from 126 launches of 94e0b14ec in `docs/dev/performance-budgets.json` and report section 10; `budgets` and `check` subcommands. | Budgets are redeclared when FPS-02 re-tiers the presets; the gate itself is FPS-09. |
 | FPS-02 — Not started | Every current Ultra feature priced per scene; preset catalog and startup detection read. | Declared targets per tier and resolution; Ultra/Quality/Enhanced re-tiered to them; explicit "everything on" choice without a frame-rate claim; startup banner and fresh-install cap decided. |
 | FPS-03 — Not started | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. | Dynamic-caster composition for point lights, per-face culling, tier budgets and sizes, Vulkan light scan. |
 | FPS-04 — Not started | SSAO, motion blur, HDR tone map, bloom and SMAA priced per scene on both backends (the chain is 10-14 ms per frame at 16 samples on OpenGL, 4-6 ms at 8 samples on Vulkan). | Half-resolution SSAO on OpenGL, pass merging, MSAA-aware resolves, tone-map cost. |
@@ -1510,12 +1510,12 @@ preset re-tiered and no optimization landed.
 
 ### FPS task evidence and acceptance
 
-- [ ] **FPS-01 — P0, qualification: performance suite, baselines and budgets.** Keep
+- [x] **FPS-01 — P0, qualification: performance suite, baselines and budgets.** Keep
   `tools/tests/performance_suite.py` the single way frame rates are measured for this
   project: scripted stock-map scenarios driven by `g_autoExecAfterMapLoad` and
   `benchmarkViewSweep`, never synthesized input; per-frame traces from
   `profileFrameWork`; cold and warm passes; interleaved builds; the per-launch CPU/GPU
-  load record. Run the OpenGL and Vulkan matrices on the project's reference desktop,
+  load record. Run the OpenGL and Vulkan matrices on the project's reference machine,
   then declare a per-scenario budget (warm mean frame time and p99) for each supported
   tier at 2560x1440 and record it in the [performance report](performance-report.md)
   beside the release notes. Close when the budgets exist for both backends on the
@@ -1523,11 +1523,26 @@ preset re-tiered and no optimization landed.
   workflow cites. Completed so far: the suite, the OpenGL and Vulkan matrices of 0.13.2,
   the current build and the current build at the 0.13.2 settings on the RTX 4060 Laptop,
   the settings/code split, and the feature ladders and restart variants on both backends.
+  Closed 8 November 2026. The reference machine is the RTX 4060 Laptop (MSI Vector GP77
+  13VF, i7-13700H, 2560x1440 fullscreen) that measured the report. The reference run
+  (`.tmp/perf-suite/ref-gl`, `ref-vk`, runtime `.tmp/stock-runtime/perf-ref`, `main`
+  94e0b14ec, client SHA-256 `44064cda...`) measured the seven timed scenarios at
+  `own-ultra`, `own-quality` and `own-enhanced` on OpenGL and Vulkan, three rounds of
+  two passes each, 126 launches (one idle launch repeated). `performance_suite.py
+  budgets` wrote the 42 warm-mean and p99 budgets with their gate limits (+5% mean,
+  +10% p99) to [`performance-budgets.json`](performance-budgets.json), and section 10 of
+  the report tabulates them. `performance_suite.py check --budgets
+  docs/dev/performance-budgets.json --runs <candidate runs>` gates a candidate run
+  (exit 1 on a regression). The release checklist in
+  [release-completion.md](release-completion.md) cites the `check` table and the
+  `report` output (`summary.md`, `aggregate.json`) as the release artifact. The Vulkan
+  convoy1 p99 budgets at Quality and Enhanced contain an intermittent warm-window
+  stall (FPS-07).
 - [ ] **FPS-02 — P0, decision and implementation: re-tier the presets to declared
   budgets.** Ultra currently requests every maximum at once and no tier is tied to a
   frame rate. Declare, per tier, the resolution and reference hardware it must hold and
   the frame-time budget it must meet (the user's Ultra target is 220 fps average and
-  180 fps 1% low at 2560x1440 on the reference desktop). Rebuild the Ultra, Quality and
+  180 fps 1% low at 2560x1440 on the reference machine). Rebuild the Ultra, Quality and
   Enhanced recipes in `src/framework/PerformancePreset.cpp` from the measured feature
   costs: MSAA sample count (FPS-05), shadow-map tier (FPS-03), SSAO resolution and
   samples, motion-blur samples, bloom mips and SMAA quality (FPS-04). Keep an explicit
@@ -1539,7 +1554,8 @@ preset re-tiered and no optimization landed.
   detected tier is applied later and `com_videoRam` is never corrected). Update the
   preset self-test, the SYSTEM catalog and the player documentation together. Close when
   every re-tiered preset meets its declared budget on the reference machine on both
-  backends, the self-test passes, and the release notes describe the change and what a
+  backends (rerun `performance_suite.py budgets` for the new recipes and commit the
+  updated `performance-budgets.json`), the self-test passes, and the release notes describe the change and what a
   player must re-select.
 - [ ] **FPS-03 — P1, implementation: shadow-map cost.** In hub2 the shadow maps are 33 of
   the current Ultra's 54 ms per frame and 30 ms of that is point lights: a point light
@@ -1628,7 +1644,8 @@ preset re-tiered and no optimization landed.
   checklist (`docs/dev/release-completion.md`, the manual release workflow): the core
   scenarios on the reference machine before every release and on every renderer,
   game-loop or asset-loading change, with the per-scenario budgets from FPS-01 as the
-  gate (5% average, 10% p99), a cvar-default diff that fails when a default with a
+  gate (5% average, 10% p99; `performance_suite.py check` against
+  `performance-budgets.json`), a cvar-default diff that fails when a default with a
   performance cost changes without a release note, the preset self-test, and the toggle
   ladder as the required before/after evidence in commits that touch post effects,
   shadows or presentation. Close when a release candidate has been gated by it once.
