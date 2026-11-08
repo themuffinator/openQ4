@@ -124,6 +124,12 @@
     <string name="setup_interface_applied">Interface saved. It applies when you return to or launch the game.</string>
     <string name="setup_interface_save_failed">Could not save interface settings. Your previous applied settings are retained; check free app storage and retry.</string>
     <string name="setup_interface_percent">%1$d%%</string>
+    <string name="setup_orientation">Screen orientation</string>
+    <string name="setup_orientation_help">Landscape and portrait turns the game with the device unless Android\'s rotation lock is on. In portrait the touch controls gather in the band below the view.</string>
+    <string-array name="setup_orientations">
+        <item>Landscape</item>
+        <item>Landscape and portrait</item>
+    </string-array>
     <string-array name="setup_viewing_profiles">
         <item>Automatic (this device)</item>
         <item>Desk (monitor)</item>

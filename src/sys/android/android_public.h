@@ -50,5 +50,8 @@ void AndroidTouchControls_Draw();
 // Lower edge of the visible top controls in SDL window coordinates; zero
 // when inactive. HUD placement converts this into its own viewport.
 float AndroidTouchControls_HudTop();
+// Portrait: the thumb deck's top edge in SDL window coordinates, which the
+// bottom readouts stay above; zero when inactive or in landscape.
+float AndroidTouchControls_HudBottomEdge();
 
 #endif

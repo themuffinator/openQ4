@@ -22,6 +22,14 @@ and per launch the level-load time, the effective settings and the renderer iden
         --scenarios core --rounds 3 --passes 2
     python tools/tests/performance_suite.py report --runs .tmp/perf-suite/<name> --out .tmp/perf-suite/<name>/report
 
+Budgets (FPS-01): the reference runs measure each tier on both backends (`own-ultra`, `own-quality`,
+`own-enhanced`), `budgets` declares the warm mean and p99 per scenario, backend and tier with the gate
+limits, and `check` gates a candidate run against that file (exit 1 on a regression):
+
+    python tools/tests/performance_suite.py budgets --runs <gl run> <vk run> --machine "<name>" \
+        --out docs/dev/performance-budgets.json --markdown <dir>/budgets.md
+    python tools/tests/performance_suite.py check --budgets docs/dev/performance-budgets.json --runs <candidate runs>
+
 Beyond the plain matrix: `--toggle LABEL=cmd;cmd` turns a launch into a feature ladder
 (base0, toggle, base1, toggle ...; the report prices every toggle against its neighbouring
 base windows), `--attribution` adds renderer metrics, GPU timers and the benchmark capture
@@ -274,6 +282,8 @@ EQ_0132_ULTRA = (
 
 SETTINGS: dict[str, Settings] = {
     "own-ultra": Settings("own-ultra", "ultra", (), "the build's own Ultra preset, frame cap and vsync off"),
+    "own-quality": Settings("own-quality", "quality", (), "the build's own Quality preset, frame cap and vsync off"),
+    "own-enhanced": Settings("own-enhanced", "enhanced", (), "the build's own Enhanced preset, frame cap and vsync off"),
     "own-default": Settings("own-default", None, (), "whatever the build applies on a first launch (auto-detected preset), frame cap and vsync off"),
     "eq-0132-ultra": Settings("eq-0132-ultra", "ultra", EQ_0132_ULTRA, "Ultra preset, then every cvar whose effective value differs from the 0.13.2 Ultra configuration (listCvars diff, 24 values) forced to the 0.13.2 value"),
     "own-ultra-msaa4": Settings("own-ultra-msaa4", "ultra", (("r_multiSamples", "4"),), "Ultra preset with 4x MSAA (MSAA needs a restart, so it cannot be an in-launch toggle)"),
@@ -1489,6 +1499,199 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+# ----------------------------------------------------------------------------
+# Budgets
+# ----------------------------------------------------------------------------
+
+BUDGET_SCHEMA = 1
+BUDGET_TOLERANCE_MEAN = 0.05   # a candidate fails when its warm mean frame time exceeds the budget by more than this
+BUDGET_TOLERANCE_P99 = 0.10    # ... or its p99 frame time by more than this
+TIER_ORDER = ("ultra", "quality", "enhanced", "balanced", "lowpower", "minimum")
+
+
+def settings_tier(settings_name: str) -> str:
+    """The preset tier a settings profile measures: own-ultra -> ultra; profiles with overrides keep their own name."""
+    profile = SETTINGS.get(settings_name)
+    if profile and profile.preset and not profile.overrides:
+        return profile.preset
+    return settings_name
+
+
+def budget_measurements(rows: list[dict[str, Any]]) -> dict[tuple[str, str, str], dict[str, Any]]:
+    """Per (scenario, api, tier): the warm group of the aggregate (median over passes of the per-pass mean and p99), or
+    the cold group for scenarios that measure one pass per launch (the walker)."""
+    candidates: dict[tuple[str, str, str], list[tuple[str, str, dict[str, Any]]]] = {}
+    for (scenario, label, api, kind), g in sorted(aggregate(rows).items()):
+        if kind in ("warm", "cold"):
+            candidates.setdefault((scenario, api, settings_tier(g["settings"])), []).append((label, kind, g))
+    result: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for key, found in candidates.items():
+        scenario, api = key[0], key[1]
+        kind = "warm" if any(k == "warm" for _, k, _ in found) else "cold"
+        chosen = [(label, g) for label, k, g in found if k == kind]
+        if len(chosen) > 1:
+            raise SystemExit(f"{scenario} / {api} / {key[2]} is measured by several builds ({', '.join(l for l, _ in chosen)}); "
+                             "give budgets and checks one build per backend and tier")
+        label, g = chosen[0]
+        result[key] = {"scenario": scenario, "api": api, "tier": key[2], "settings": g["settings"], "label": label,
+                       "pass_kind": kind, "passes": g["passes"], "mean_ms": g["mean_ms"], "p99_ms": g["p99_ms"],
+                       "fps_avg": g["fps_avg"], "fps_1pct_low": g["fps_1pct_low"], "spread_fps_avg": g["spread_fps_avg"],
+                       "max_ms": g["max_ms"], "gpu_mean": g["gpu_mean"], "exe": g["exe"]}
+    return result
+
+
+def select_labels(records: list[dict[str, Any]], labels: list[str]) -> list[dict[str, Any]]:
+    if not labels:
+        return records
+    unknown = set(labels) - {rec["label"] for rec in records}
+    if unknown:
+        raise SystemExit(f"no launches for labels {sorted(unknown)}")
+    return [rec for rec in records if rec["label"] in labels]
+
+
+def _repo_relative(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _tier_rank(tier: str) -> tuple[int, str]:
+    return (TIER_ORDER.index(tier) if tier in TIER_ORDER else len(TIER_ORDER), tier)
+
+
+def budget_markdown(doc: dict[str, Any]) -> list[str]:
+    """One table per tier: every scenario's OpenGL and Vulkan budget (warm mean and p99) and the gate limits."""
+    entries = doc["budgets"]
+    apis = sorted({e["api"] for e in entries})
+    lines = []
+    for tier in sorted({e["tier"] for e in entries}, key=_tier_rank):
+        header = "| Scenario | " + " | ".join(f"{api} mean ms (fps) | {api} p99 ms (1% low) | {api} gate mean / p99 ms" for api in apis) + " |"
+        lines += [f"#### {tier}", "", header, "|---|" + "---:|---:|---:|" * len(apis)]
+        for scenario in [s for s in ALL_TIMED if any(e["scenario"] == s and e["tier"] == tier for e in entries)] + \
+                sorted({e["scenario"] for e in entries if e["tier"] == tier and e["scenario"] not in ALL_TIMED}):
+            cells = []
+            for api in apis:
+                e = next((e for e in entries if e["scenario"] == scenario and e["api"] == api and e["tier"] == tier), None)
+                if e is None:
+                    cells += ["-", "-", "-"]
+                    continue
+                mark = "" if e["pass_kind"] == "warm" else " (single pass)"
+                cells += [f"{e['mean_ms']:.2f} ({e['fps_avg']:.0f}){mark}", f"{e['p99_ms']:.2f} ({e['fps_1pct_low']:.0f})",
+                          f"{e['limit_mean_ms']:.2f} / {e['limit_p99_ms']:.2f}"]
+            lines.append(f"| {scenario} | " + " | ".join(cells) + " |")
+        lines.append("")
+    return lines
+
+
+def cmd_budgets(args: argparse.Namespace) -> int:
+    """Declare per-scenario budgets from accepted reference runs: the warm mean and p99 frame time of every scenario,
+    backend and tier, with the gate limits `check` applies to a candidate."""
+    run_dirs = [Path(r) if Path(r).is_absolute() else REPO_ROOT / r for r in args.runs]
+    records = select_labels(load_records(run_dirs), args.labels)
+    suspects = [rec for rec in records if launch_suspect(rec)]
+    if suspects and not args.drop_suspect:
+        for rec in suspects:
+            print(f"suspect launch: {rec['label']} {rec['api']} {rec['scenario']} round {rec['round']}: {launch_suspect(rec)}")
+        raise SystemExit("refusing to declare budgets from launches that did not render; re-run them or pass --drop-suspect")
+    records = [rec for rec in records if not launch_suspect(rec)]
+    measured = budget_measurements(analyse(records))
+    if not measured:
+        raise SystemExit("no frame traces in the given runs")
+    plans = [json.loads((d / "plan.json").read_text(encoding="utf-8")) for d in run_dirs if (d / "plan.json").exists()]
+    hosts = {json.dumps(p.get("host", {}), sort_keys=True) for p in plans}
+    displays = {json.dumps(p.get("display", {}), sort_keys=True) for p in plans}
+    if len(hosts) > 1 or len(displays) > 1:
+        raise SystemExit("the runs come from different machines or display modes; budgets are declared for one reference machine")
+    exes = sorted({e["exe"] for e in measured.values()})
+    versions = sorted({rec.get("version", "") for rec in records if rec.get("version")})
+    entries = []
+    for e in sorted(measured.values(), key=lambda e: (_tier_rank(e["tier"]), e["scenario"], e["api"])):
+        entries.append({**e, "limit_mean_ms": round(e["mean_ms"] * (1.0 + args.tolerance_mean), 3),
+                        "limit_p99_ms": round(e["p99_ms"] * (1.0 + args.tolerance_p99), 3)})
+    doc = {
+        "schema": BUDGET_SCHEMA,
+        "declared": dt.date.today().isoformat(),
+        "machine": {"name": args.machine, **(plans[0].get("host", {}) if plans else {})},
+        "display": plans[0].get("display", {}) if plans else {},
+        "build": {"exe_sha256": exes, "version": versions},
+        "runs": [_repo_relative(d) for d in run_dirs],
+        "tolerance": {"mean": args.tolerance_mean, "p99": args.tolerance_p99},
+        "method": "warm passes (pass 2 onward; the walker scene measures one pass per launch), median over launches of each pass's "
+                  "mean and p99 frame interval from profileFrameWork; a candidate fails when its mean exceeds limit_mean_ms or its "
+                  "p99 exceeds limit_p99_ms",
+        "budgets": entries,
+    }
+    out = Path(args.out) if Path(args.out).is_absolute() else REPO_ROOT / args.out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
+    md = budget_markdown(doc)
+    if args.markdown:
+        md_path = Path(args.markdown) if Path(args.markdown).is_absolute() else REPO_ROOT / args.markdown
+        md_path.write_text("\n".join(md) + "\n", encoding="utf-8")
+    print("\n".join(md))
+    print(f"budgets: {out} ({len(entries)} entries from {len(records)} launches)")
+    return 0
+
+
+def check_budgets(doc: dict[str, Any], measured: dict[tuple[str, str, str], dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every budget entry against the candidate's measurement of the same scenario, backend and tier."""
+    results = []
+    for b in doc["budgets"]:
+        m = measured.get((b["scenario"], b["api"], b["tier"]))
+        if m is None:
+            results.append({**b, "status": "not measured"})
+            continue
+        over_mean = m["mean_ms"] > b["limit_mean_ms"]
+        over_p99 = m["p99_ms"] > b["limit_p99_ms"]
+        status = "fail" if over_mean or over_p99 else "pass"
+        results.append({**b, "status": status, "candidate_mean_ms": m["mean_ms"], "candidate_p99_ms": m["p99_ms"],
+                        "delta_mean_pct": round(100.0 * (m["mean_ms"] / b["mean_ms"] - 1.0), 1),
+                        "delta_p99_pct": round(100.0 * (m["p99_ms"] / b["p99_ms"] - 1.0), 1),
+                        "over": [name for name, flag in (("mean", over_mean), ("p99", over_p99)) if flag]})
+    return results
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    """Gate a candidate run against declared budgets; exit 1 when any measured entry exceeds its limits."""
+    budget_path = Path(args.budgets) if Path(args.budgets).is_absolute() else REPO_ROOT / args.budgets
+    doc = json.loads(budget_path.read_text(encoding="utf-8"))
+    if doc.get("schema") != BUDGET_SCHEMA:
+        raise SystemExit(f"{budget_path}: budget schema {doc.get('schema')!r}, expected {BUDGET_SCHEMA}")
+    run_dirs = [Path(r) if Path(r).is_absolute() else REPO_ROOT / r for r in args.runs]
+    records = [rec for rec in select_labels(load_records(run_dirs), args.labels) if not launch_suspect(rec)]
+    results = check_budgets(doc, budget_measurements(analyse(records)))
+    plans = [json.loads((d / "plan.json").read_text(encoding="utf-8")) for d in run_dirs if (d / "plan.json").exists()]
+    reference = {k: v for k, v in doc.get("machine", {}).items() if k in ("gpu", "cpu")}
+    notes = []
+    for plan in plans:
+        host = {k: v for k, v in plan.get("host", {}).items() if k in ("gpu", "cpu")}
+        if reference and host and host != reference:
+            notes.append(f"candidate ran on {host}, the budgets were declared on {reference}: the gate only applies on the reference machine")
+        if doc.get("display") and plan.get("display") and plan["display"] != doc["display"]:
+            notes.append(f"candidate display {plan['display']} differs from the budgets' {doc['display']}")
+    lines = ["| tier | scenario | api | budget mean / p99 ms | candidate mean / p99 ms | delta mean / p99 | status |", "|---|---|---|---|---|---|---|"]
+    for r in results:
+        if r["status"] == "not measured":
+            lines.append(f"| {r['tier']} | {r['scenario']} | {r['api']} | {r['mean_ms']:.2f} / {r['p99_ms']:.2f} | - | - | not measured |")
+        else:
+            lines.append(f"| {r['tier']} | {r['scenario']} | {r['api']} | {r['mean_ms']:.2f} / {r['p99_ms']:.2f} | {r['candidate_mean_ms']:.2f} / {r['candidate_p99_ms']:.2f} | "
+                         f"{r['delta_mean_pct']:+.1f}% / {r['delta_p99_pct']:+.1f}% | {r['status']}{' (' + ', '.join(r['over']) + ')' if r['over'] else ''} |")
+    failed = [r for r in results if r["status"] == "fail"]
+    missing = [r for r in results if r["status"] == "not measured"]
+    summary = f"{len(results) - len(failed) - len(missing)} pass, {len(failed)} fail, {len(missing)} not measured"
+    text = "\n".join(["# Performance budget check", "", f"Budgets: `{_repo_relative(budget_path)}` (declared {doc.get('declared')}). {summary}.", ""]
+                     + [f"- {n}" for n in notes] + ([""] if notes else []) + lines) + "\n"
+    if args.out:
+        out = Path(args.out) if Path(args.out).is_absolute() else REPO_ROOT / args.out
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+    print(text)
+    if args.require_all and missing:
+        return 1
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1523,6 +1726,23 @@ def main(argv: list[str] | None = None) -> int:
     report.add_argument("--drop-suspect", action="store_true",
                         help="leave launches whose GPU stayed idle out of the tables (they are listed under Warnings)")
     report.set_defaults(func=cmd_report)
+    budgets = sub.add_parser("budgets", help="declare per-scenario budgets (warm mean and p99 per backend and tier) from reference runs")
+    budgets.add_argument("--runs", nargs="+", required=True, help="accepted reference run directories (one machine, one display mode)")
+    budgets.add_argument("--out", required=True, help="budget file to write (JSON)")
+    budgets.add_argument("--markdown", default="", help="also write the budget tables as Markdown")
+    budgets.add_argument("--machine", required=True, help="name of the reference machine the budgets apply to")
+    budgets.add_argument("--tolerance-mean", type=float, default=BUDGET_TOLERANCE_MEAN, help="allowed growth of the warm mean frame time (fraction)")
+    budgets.add_argument("--tolerance-p99", type=float, default=BUDGET_TOLERANCE_P99, help="allowed growth of the p99 frame time (fraction)")
+    budgets.add_argument("--drop-suspect", action="store_true", help="leave launches whose GPU stayed idle out instead of refusing")
+    budgets.add_argument("--labels", nargs="+", default=[], help="only the launches of these build labels")
+    budgets.set_defaults(func=cmd_budgets)
+    check = sub.add_parser("check", help="gate a candidate run against declared budgets (exit 1 on a regression)")
+    check.add_argument("--budgets", required=True, help="budget file written by `budgets`")
+    check.add_argument("--runs", nargs="+", required=True, help="candidate run directories")
+    check.add_argument("--out", default="", help="also write the verdict as Markdown")
+    check.add_argument("--require-all", action="store_true", help="also fail when a budget entry was not measured")
+    check.add_argument("--labels", nargs="+", default=[], help="only the launches of these build labels")
+    check.set_defaults(func=cmd_check)
     args = parser.parse_args(argv)
     return args.func(args)
 

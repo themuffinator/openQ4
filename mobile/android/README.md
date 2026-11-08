@@ -133,8 +133,12 @@ qualification as part of the experimental Android package.
 On Android 11 and later, the SDL surface stays inside the display cutout, with
 a black strip beside the camera hole. Rendering and input therefore share the
 same content coordinates. Density changes keep the existing native Activity
-session. The app currently selects either landscape orientation; portrait and
-physical cutout/rotation/input qualification remain in progress.
+session. The game plays in either landscape orientation unless the player
+chooses Landscape and portrait on the Interface setup page; the Activity
+applies that choice itself, because SDL would otherwise request every
+orientation when it creates the engine's resizable window. In portrait the
+touch controls form the thumb deck below the view. Physical portrait,
+cutout, rotation and input qualification remain in progress.
 
 Saves/configuration/logs live in private `files/saves/baseoq4/`, and generated
 texture caches live in the Android cache directory. With a debug APK, retrieve

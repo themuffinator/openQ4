@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run silent SP/save or MP/touch diagnostics on an isolated Android emulator.
+"""Run silent SP/save, MP/touch or SP rotation diagnostics on an isolated Android emulator.
 
 Requires a booted AOSP/userdebug AVD and the separately verified emulator APK.
 No OS pointer/keyboard input or OS screen capture is used. Retail files are
@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/build"))
@@ -26,6 +27,56 @@ PACKAGE = "com.darkmatter.openq4.emulator"
 SAVE_ROOT = "files/saves/baseoq4"
 SLOT = "AndroidEmulatorSmoke"
 CAPTURES = ("emulator-spawn.tga", "emulator-moved.tga", "emulator-restored.tga")
+ROTATE_CAPTURES = ("emulator-spawn.tga", "emulator-portrait.tga", "emulator-moved.tga", "emulator-restored.tga")
+# Rotation mode applies Interface setup's "Landscape and portrait" (version 2
+# record) and turns the AVD through its rotation setting, never through input.
+SETUP_PREFS = "shared_prefs/setup.xml"
+ROTATE_INTERFACE = "2:0a4d0e2f5c6b7a8998a7b6c5d4e3f201:0:0:0:1"
+# Portrait thumb deck (section 13.6): the stick in the deck's leading half,
+# a look drag in the view above it, Fire by name.
+ROTATE_GAMEPLAY = f"""god
+notarget
+give all
+waitMsec 2000
+echo EMULATOR_GAMEPLAY_READY
+viewpos
+touchControlsTest layout
+screenshot "screenshots/emulator-spawn.tga"
+echo EMULATOR_ROTATE_PORTRAIT
+waitMsec 12000
+echo EMULATOR_PORTRAIT_READY
+viewpos
+touchControlsTest layout
+touchControlsTest state
+screenshot "screenshots/emulator-portrait.tga"
+touchControlsTest down 1 0.15 0.88
+touchControlsTest move 1 0.15 0.80
+touchControlsTest down 2 fire
+touchControlsTest down 3 0.45 0.25
+touchControlsTest move 3 0.55 0.27
+waitMsec 1500
+touchControlsTest cancel 1 0.15 0.80
+touchControlsTest cancel 2 fire
+touchControlsTest up 3 0.55 0.27
+waitMsec 2000
+wait 60
+echo EMULATOR_TOUCH_RELEASED
+viewpos
+touchControlsTest state
+screenshot "screenshots/emulator-moved.tga"
+waitMsec 1000
+echo EMULATOR_TOUCH_NEUTRAL
+viewpos
+echo EMULATOR_ROTATE_LANDSCAPE
+waitMsec 12000
+echo EMULATOR_LANDSCAPE_RESTORED
+viewpos
+touchControlsTest layout
+saveGame {SLOT}
+waitMsec 700
+set g_autoExecAfterMapLoad emulator_restored.cfg
+loadGame {SLOT}
+"""
 SCRIPTS = {
     "autoexec.cfg": """set r_fullscreen 0
 set r_borderless 0
@@ -128,10 +179,26 @@ quit
             "\nwaitMsec 2000\necho EMULATOR_GAMEPLAY_READY",
             "\nsetviewpos -3336 3760 260.25 90\nwaitMsec 2000\necho EMULATOR_GAMEPLAY_READY",
         )
+    elif mode == "rotate":
+        scripts["emulator_smoke.cfg"] = ROTATE_GAMEPLAY
     elif mode != "sp":
         raise ValueError("Unknown emulator game mode")
     scripts["emulator_smoke.cfg"] = "com_activeGameModule\n" + scripts["emulator_smoke.cfg"]
     return scripts
+
+
+def layout_after_marker(log: str, marker: str) -> dict:
+    """The touchControlsTest layout printed after an engine marker."""
+    block = log.split("EMULATOR_" + marker, 1)
+    if len(block) != 2:
+        raise ValueError(f"Missing layout marker: {marker}")
+    block = block[1].split("EMULATOR_", 1)[0]
+    size = re.search(r"touch controls: (\w+), (\d+)x(\d+) px", block)
+    if not size:
+        raise ValueError(f"No touch layout after {marker}")
+    controls = {name: (float(x), float(y)) for name, x, y in
+                re.findall(r"(?m)^\s+(\w+)\s+at ([-0-9.]+) ([-0-9.]+), radius", block)}
+    return {"state": size.group(1), "width": int(size.group(2)), "height": int(size.group(3)), "controls": controls}
 
 
 def pose_after_marker(log: str, marker: str, mode: str = "sp") -> list[float]:
@@ -141,13 +208,13 @@ def pose_after_marker(log: str, marker: str, mode: str = "sp") -> list[float]:
     # Map/renderer messages can arrive between the marker and viewpos after
     # restoring. Never borrow a pose from the following measurement, though.
     block = section[1].split("EMULATOR_", 1)[0]
-    pattern = (r"(?m)^origin: \(([^)]+)\) angles: \(([^)]+)\)" if mode == "sp"
+    pattern = (r"(?m)^origin: \(([^)]+)\) angles: \(([^)]+)\)" if mode != "mp"
                else r"(?m)^\(([^)]+)\) ([-+0-9.eE]+)\s*$")
     matches = re.findall(pattern, block)
     if len(matches) != 1:
         raise ValueError(f"Expected one view sample at {marker}, found {len(matches)}")
     pose = [float(value) for group in matches[0] for value in group.split()]
-    if len(pose) != (6 if mode == "sp" else 4) or not all(math.isfinite(v) for v in pose):
+    if len(pose) != (4 if mode == "mp" else 6) or not all(math.isfinite(v) for v in pose):
         raise ValueError(f"Invalid view sample at {marker}")
     return pose
 
@@ -163,8 +230,8 @@ class Probe:
         self.pid = None
         self.mode = args.mode
         self.scripts = scripts_for_mode(self.mode)
-        self.captures = CAPTURES if self.mode == "sp" else (*CAPTURES[:2], "emulator-neutral.tga")
-        self.save_names = tuple(f"savegames/{SLOT}.{ext}" for ext in ("save", "txt", "tga")) if self.mode == "sp" else ()
+        self.captures = {"sp": CAPTURES, "rotate": ROTATE_CAPTURES}.get(self.mode, (*CAPTURES[:2], "emulator-neutral.tga"))
+        self.save_names = tuple(f"savegames/{SLOT}.{ext}" for ext in ("save", "txt", "tga")) if self.mode != "mp" else ()
         self.report = {"status": "running", "serial": args.serial, "package": PACKAGE, "mode": self.mode,
                        "capture_method": "engine screenshot", "audio": "disabled",
                        "input": "engine diagnostic commands; no OS input",
@@ -173,6 +240,10 @@ class Probe:
         self.created = {}
         self.before_config = None
         self.prepared = False
+        self.before_prefs = None
+        self.prefs_written = None
+        self.rotation = None
+        self.rotated = []
 
     def write_report(self):
         (self.out / "report.json").write_text(json.dumps(self.report, indent=2) + "\n", encoding="utf-8")
@@ -234,6 +305,67 @@ class Probe:
                 (self.out / ("failed-write-" + name.replace("/", "-"))).write_bytes(actual)
             raise ValueError(f"Device write mismatch: {name}; expected {len(data)} bytes, "
                              f"actual {None if actual is None else len(actual)}")
+
+    def prefs_path(self) -> str:
+        for candidate in ("shared_prefs", SETUP_PREFS):
+            if self.private_test("-L", candidate):
+                raise ValueError(f"Linked preferences path: {candidate}")
+        return SETUP_PREFS
+
+    def read_prefs(self) -> bytes | None:
+        path = self.prefs_path()
+        return self.adb("exec-out", "run-as", PACKAGE, "cat", path).stdout if self.private_test("-f", path) else None
+
+    def apply_rotation_setup(self):
+        """Record the AVD's rotation and the app's setup preferences, then select portrait-capable play."""
+        values = {}
+        for key in ("accelerometer_rotation", "user_rotation"):
+            values[key] = self.adb("shell", "settings", "get", "system", key).stdout.decode().strip()
+            if not re.fullmatch(r"\d+|null", values[key]):
+                raise ValueError(f"Unexpected rotation setting {key}: {values[key]}")
+        self.rotation = values
+        self.report["original_rotation"] = values
+        self.set_rotation(0)
+        self.adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
+        self.before_prefs = self.read_prefs()
+        if self.before_prefs is not None:
+            (self.out / "before-setup.xml").write_bytes(self.before_prefs)
+            root = ET.fromstring(self.before_prefs)
+        else:
+            root = ET.Element("map")
+        for entry in [e for e in root if e.get("name") == "interface_settings"]:
+            root.remove(entry)
+        ET.SubElement(root, "string", name="interface_settings").text = ROTATE_INTERFACE
+        data = b"<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n" + ET.tostring(root, encoding="unicode").encode()
+        self.prefs_written = data
+        self.adb("shell", "run-as", PACKAGE, "mkdir", "-p", "shared_prefs")
+        self.adb("exec-in", "run-as", PACKAGE, "sh", "-c", f"cat > {self.prefs_path()}", input_data=data)
+        if self.read_prefs() != data:
+            raise ValueError("Setup preferences write mismatch")
+        self.report["interface_record"] = ROTATE_INTERFACE
+
+    def set_rotation(self, rotation: int):
+        self.adb("shell", "settings", "put", "system", "user_rotation", str(rotation))
+        self.rotated.append({"user_rotation": rotation, "at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat()})
+
+    def restore_rotation_setup(self):
+        if self.prefs_written is not None:
+            current = self.read_prefs()
+            if current != self.prefs_written:
+                (self.out / "after-setup.xml").write_bytes(current or b"")
+                raise ValueError("Setup preferences changed during the run; refusing to restore")
+            if self.before_prefs is not None:
+                self.adb("exec-in", "run-as", PACKAGE, "sh", "-c", f"cat > {self.prefs_path()}", input_data=self.before_prefs)
+            else:
+                self.adb("shell", "run-as", PACKAGE, "rm", self.prefs_path())
+            self.report["original_setup_restored"] = True
+        if self.rotation is not None:
+            for key, value in self.rotation.items():
+                if value == "null":
+                    self.adb("shell", "settings", "delete", "system", key)
+                else:
+                    self.adb("shell", "settings", "put", "system", key, value)
+            self.report["original_rotation_restored"] = True
 
     def remote_sha(self, remote: str) -> str | None:
         exists = self.adb("shell", "test", "-f", remote, check=False)
@@ -375,6 +507,8 @@ class Probe:
         if old_log is not None:
             (self.out / "before-openq4.log").write_bytes(old_log)
         self.prepared = True
+        if self.mode == "rotate":
+            self.apply_rotation_setup()
         if old_log is not None:
             if self.read("logs/openq4.log") != old_log:
                 raise ValueError("Log changed during preparation")
@@ -391,6 +525,7 @@ class Probe:
         result = self.adb("shell", "am", "start", "-W", "-n",
                           PACKAGE + "/com.darkmatter.openq4.OpenQ4Activity",
                           "--ez", "multiplayer", "true" if self.mode == "mp" else "false", timeout=60)
+        requests = {"EMULATOR_ROTATE_PORTRAIT": 1, "EMULATOR_ROTATE_LANDSCAPE": 0}
         (self.out / "launch.log").write_bytes(result.stdout + result.stderr)
         deadline = time.monotonic() + self.args.timeout
         last_marker = ""
@@ -405,10 +540,14 @@ class Probe:
             if re.search(rb"(?:^|\n)(?:ERROR:|FATAL:|Fatal)", data):
                 self.collect()
                 raise ValueError("Engine reported a fatal error; inspect openq4.log")
-            markers = re.findall(rb"EMULATOR_(?:GAMEPLAY_READY|TOUCH_RELEASED|SAVE_RESTORED|SMOKE_COMPLETE)", data)
+            markers = re.findall(rb"EMULATOR_(?:GAMEPLAY_READY|ROTATE_PORTRAIT|ROTATE_LANDSCAPE|TOUCH_RELEASED"
+                                 rb"|SAVE_RESTORED|SMOKE_COMPLETE)", data)
             if markers and markers[-1].decode() != last_marker:
                 last_marker = markers[-1].decode()
                 print(last_marker, flush=True)
+                # The engine waits after each request; turn the AVD at once.
+                if self.mode == "rotate" and last_marker in requests:
+                    self.set_rotation(requests.pop(last_marker))
             if self.pid and not pid:
                 break
             time.sleep(2)
@@ -420,28 +559,34 @@ class Probe:
     def assess(self):
         log = (self.out / "openq4.log").read_text(errors="replace")
         for marker in ("EMULATOR_GAMEPLAY_READY", "EMULATOR_TOUCH_RELEASED", "EMULATOR_SMOKE_COMPLETE",
-                       *(("EMULATOR_SAVE_RESTORED",) if self.mode == "sp" else ())):
+                       *(("EMULATOR_SAVE_RESTORED",) if self.mode != "mp" else ()),
+                       *(("EMULATOR_PORTRAIT_READY", "EMULATOR_LANDSCAPE_RESTORED") if self.mode == "rotate" else ())):
             if marker not in log:
                 raise ValueError(f"Missing engine completion marker: {marker}")
         if re.search(r"(?:^|\n)(?:ERROR:|FATAL|Fatal)", log):
             raise ValueError("Engine reports a fatal error")
-        if f'"com_activeGameModule" is:"game_{self.mode}"' not in log:
+        if f'"com_activeGameModule" is:"game_{"mp" if self.mode == "mp" else "sp"}"' not in log:
             raise ValueError("Requested game module was not active")
         poses = {}
         for marker in ("GAMEPLAY_READY", "TOUCH_RELEASED", "TOUCH_NEUTRAL",
-                       *(("SAVE_RESTORED",) if self.mode == "sp" else ())):
+                       *(("SAVE_RESTORED",) if self.mode != "mp" else ()),
+                       *(("PORTRAIT_READY", "LANDSCAPE_RESTORED") if self.mode == "rotate" else ())):
             poses[marker] = pose_after_marker(log, marker, self.mode)
-        movement = math.dist(poses["GAMEPLAY_READY"][:3], poses["TOUCH_RELEASED"][:3])
-        yaw = 4 if self.mode == "sp" else 3
-        yaw_change = abs((poses["TOUCH_RELEASED"][yaw] - poses["GAMEPLAY_READY"][yaw] + 180) % 360 - 180)
+        # Rotation measures the portrait drive from the pose rotation left.
+        start = "PORTRAIT_READY" if self.mode == "rotate" else "GAMEPLAY_READY"
+        movement = math.dist(poses[start][:3], poses["TOUCH_RELEASED"][:3])
+        yaw = 3 if self.mode == "mp" else 4
+        yaw_change = abs((poses["TOUCH_RELEASED"][yaw] - poses[start][yaw] + 180) % 360 - 180)
         # Retain measured values even when the behavioral assertion fails.
         self.report.update(poses=poses, movement_distance=movement, yaw_change=yaw_change)
         if movement < 20 or yaw_change < 1:
             raise ValueError("Touch probe did not move and turn the player")
         if poses["TOUCH_RELEASED"] != poses["TOUCH_NEUTRAL"]:
             raise ValueError("Player did not settle after touch release")
-        if self.mode == "sp" and any(abs(a - b) > 0.2 for a, b in zip(poses["TOUCH_NEUTRAL"], poses["SAVE_RESTORED"])):
+        if self.mode != "mp" and any(abs(a - b) > 0.2 for a, b in zip(poses["TOUCH_NEUTRAL"], poses["SAVE_RESTORED"])):
             raise ValueError("Save restore changed the settled player pose")
+        if self.mode == "rotate":
+            self.assess_rotation(log, poses)
         released = log.split("EMULATOR_TOUCH_RELEASED", 1)[1].split("EMULATOR_TOUCH_NEUTRAL", 1)[0]
         if "pressed: none, stick free" not in released:
             raise ValueError("Touch release left an action held")
@@ -459,12 +604,40 @@ class Probe:
                               "height": int.from_bytes(header[14:16], "little")}
             if min(captures[name]["width"], captures[name]["height"]) < 300:
                 raise ValueError("Unexpected engine capture size")
+        if self.mode == "rotate" and not (captures["emulator-portrait.tga"]["height"] > captures["emulator-portrait.tga"]["width"]
+                                          and captures["emulator-spawn.tga"]["width"] > captures["emulator-spawn.tga"]["height"]):
+            raise ValueError("Engine captures did not follow the rotation")
         self.report.update(status="pass", engine_pid=self.pid, captures=captures, poses=poses,
                            movement_distance=movement, yaw_change=yaw_change,
                            pose_format="XYZ, pitch/yaw/roll" if self.mode == "sp" else "XYZ, yaw",
-                           scope="Native " + self.mode.upper() + ", engine touch commands"
-                           + (" and same-build save/load" if self.mode == "sp" else "; local listen server, no remote peers")
+                           scope="Native " + ("SP rotation" if self.mode == "rotate" else self.mode.upper())
+                           + ", engine touch commands"
+                           + (" and same-build save/load" if self.mode != "mp" else "; local listen server, no remote peers")
+                           + ("; AVD rotation setting, landscape-portrait-landscape mid-match" if self.mode == "rotate" else "")
                            + "; visual review separate")
+
+    def assess_rotation(self, log: str, poses: dict):
+        layouts = {marker: layout_after_marker(log, marker)
+                   for marker in ("GAMEPLAY_READY", "PORTRAIT_READY", "LANDSCAPE_RESTORED")}
+        self.report["touch_layouts"] = layouts
+        for marker in ("GAMEPLAY_READY", "LANDSCAPE_RESTORED"):
+            if not layouts[marker]["width"] > layouts[marker]["height"]:
+                raise ValueError(f"Window not landscape at {marker}")
+        portrait = layouts["PORTRAIT_READY"]
+        if not portrait["height"] > portrait["width"] or portrait["state"] != "active":
+            raise ValueError("Window did not turn to portrait with the touch controls active")
+        c = portrait["controls"]
+        deck = 0.5 + 0.375 * portrait["width"] / portrait["height"]
+        if not (abs(c["fire"][0] - 0.75) < 0.01 and c["weapon"][1] < c["fire"][1]
+                and c["jump"][0] > c["fire"][0] and c["crouch"][0] > c["fire"][0]
+                and c["zoom"][0] < c["fire"][0] and c["reload"][0] < c["fire"][0]
+                and all(c[n][0] > 0.5 and c[n][1] > deck for n in ("fire", "jump", "crouch", "reload", "zoom"))):
+            raise ValueError("Portrait touch controls are not the section 13.6 thumb deck")
+        # Turning the device is a resize: the player neither moves nor turns.
+        for before, after in (("GAMEPLAY_READY", "PORTRAIT_READY"), ("TOUCH_NEUTRAL", "LANDSCAPE_RESTORED")):
+            if any(abs(a - b) > 0.2 for a, b in zip(poses[before], poses[after])):
+                raise ValueError(f"Rotation changed the player pose ({before} -> {after})")
+        self.report["rotation_requests"] = self.rotated
 
     def cleanup(self):
         if not self.prepared:
@@ -499,6 +672,7 @@ class Probe:
             self.adb("shell", "run-as", PACKAGE, "rm", self.path("openQ4Config.cfg"))
         self.report["retired_test_files"] = retired
         self.report["original_config_restored"] = True
+        self.restore_rotation_setup()
 
 
 def main():
@@ -507,7 +681,7 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--mode", choices=("sp", "mp"), default="sp")
+    parser.add_argument("--mode", choices=("sp", "mp", "rotate"), default="sp")
     parser.add_argument("--timeout", type=int, default=420)
     args = parser.parse_args()
     if not re.fullmatch(r"emulator-\d{4,5}", args.serial):
@@ -530,7 +704,7 @@ def main():
             raise
         finally:
             probe.write_report()
-    scope = "SP gameplay/save" if args.mode == "sp" else "MP gameplay"
+    scope = {"sp": "SP gameplay/save", "mp": "MP gameplay", "rotate": "SP rotation/portrait deck/save"}[args.mode]
     print(f"PASS: silent emulator {scope} probe; inspect the retained engine captures.", flush=True)
 
 

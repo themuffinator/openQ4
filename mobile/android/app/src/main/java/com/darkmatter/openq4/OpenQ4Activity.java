@@ -5,6 +5,7 @@ package com.darkmatter.openq4;
 import android.annotation.TargetApi;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Insets;
@@ -42,6 +43,28 @@ public final class OpenQ4Activity extends SDLActivity {
         return saved == null ? null : saved.engineValues(config.smallestScreenWidthDp >= 600, config.fontScale);
     }
 
+    /** Landscape either way up, or with the player's Interface choice also portrait (rotation lock respected). */
+    static int screenOrientation(InterfaceSettings saved) {
+        return saved != null && saved.orientation == InterfaceSettings.ORIENTATION_AUTOMATIC
+                ? ActivityInfo.SCREEN_ORIENTATION_FULL_USER : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+    }
+
+    private void applyScreenOrientation() {
+        int requested = screenOrientation(InterfaceSettings.decodeOrNull(
+                getSharedPreferences("setup", MODE_PRIVATE).getString(InterfaceSettings.SAVED, null)));
+        if (getRequestedOrientation() != requested) setRequestedOrientation(requested);
+    }
+
+    /**
+     * SDL calls this from its thread whenever it creates the window. For a
+     * resizable window without SDL_HINT_ORIENTATIONS it would request FULL_USER,
+     * unlocking portrait regardless of the manifest; the player's choice decides.
+     */
+    @Override
+    public void setOrientationBis(int w, int h, boolean resizable, String hint) {
+        runOnUiThread(this::applyScreenOrientation);
+    }
+
     @Override
     protected boolean onUnhandledMessage(int command, Object param) {
         if (command != COMMAND_USER) return super.onUnhandledMessage(command, param);
@@ -64,12 +87,15 @@ public final class OpenQ4Activity extends SDLActivity {
     protected void onResume() {
         super.onResume();
         setupOpening = false;
+        // A new Apply in setup reaches the running game on its return.
+        applyScreenOrientation();
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         StorageSession.INSTANCE.activityCreated(this);
         super.onCreate(savedInstanceState);
+        applyScreenOrientation();
         if (!mBrokenLibraries && mLayout != null && Build.VERSION.SDK_INT >= 30) {
             keepOutOfDisplayCutout(mLayout);
         }

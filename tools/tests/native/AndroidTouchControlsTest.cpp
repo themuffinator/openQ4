@@ -58,7 +58,85 @@ static void CheckLayout( float width, float height, float density, float scale, 
 	}
 }
 
+// Section 13.6 portrait: the cluster gathers in the deck's trailing half, Fire
+// in its middle with the weapon control above it, jump and crouch outside it
+// and zoom and reload inside it; every other drag looks and the stick floats
+// in the deck's leading half.
+static void CheckPortraitDeck( float width, float height, float density, int preset, bool wholeDeck ) {
+	const Layout layout = ComputeLayout( width * density, height * density, density, 1, preset );
+	Check( layout.available, "portrait deck fits" );
+	const float w = layout.width, h = layout.height;
+	const float deckTop = DeckTop( w, h );
+	Check( Near( layout.stickTop, deckTop ) && deckTop > h * 0.5f && deckTop < h, "stick limited to the deck below the center screen" );
+	const auto &b = layout.buttons;
+	const auto mirror = [&]( float x ) { return preset == PRESET_LEFT_HANDED ? w - x : x; };
+	const auto outward = [&]( float a, float c ) { return preset == PRESET_LEFT_HANDED ? a < c : a > c; };
+	const int cluster[] = { BUTTON_FIRE, BUTTON_JUMP, BUTTON_CROUCH, BUTTON_WEAPON, BUTTON_RELOAD, BUTTON_ZOOM };
+	for ( int button : cluster ) {
+		const float reach = HitRadius( layout, button );
+		const float trailing = mirror( b[button].x );
+		Check( trailing - reach >= w * 0.5f - 0.01f, "portrait cluster stays in the deck's trailing half" );
+		if ( wholeDeck ) Check( b[button].y - reach >= deckTop - 0.01f, "portrait cluster fits the deck at the reference" );
+	}
+	// The authored geometry holds without PlaceButton's fallback moving it.
+	Check( Near( mirror( b[BUTTON_FIRE].x ), w * 0.75f ), "Fire in the middle of the trailing half" );
+	Check( Near( b[BUTTON_WEAPON].x, b[BUTTON_FIRE].x ) && b[BUTTON_WEAPON].y < b[BUTTON_FIRE].y, "weapon control above Fire" );
+	Check( outward( b[BUTTON_JUMP].x, b[BUTTON_FIRE].x ) && outward( b[BUTTON_CROUCH].x, b[BUTTON_FIRE].x )
+		&& b[BUTTON_JUMP].y < b[BUTTON_CROUCH].y, "jump and crouch outside Fire, jump uppermost" );
+	Check( outward( b[BUTTON_FIRE].x, b[BUTTON_ZOOM].x ) && outward( b[BUTTON_FIRE].x, b[BUTTON_RELOAD].x )
+		&& b[BUTTON_ZOOM].y < b[BUTTON_RELOAD].y, "zoom and reload inside Fire, zoom uppermost" );
+	Check( Near( layout.stickHome.x, mirror( w * 0.25f ) ) && layout.stickHome.y > deckTop, "resting stick in the deck's leading half" );
+	// The top actions keep their landscape corners, clear of a camera cutout.
+	Check( mirror( b[BUTTON_PAUSE].x ) < w * 0.25f && mirror( b[BUTTON_SCORES].x ) > w * 0.75f
+		&& mirror( b[BUTTON_CHAT].x ) > w * 0.5f + 24 * density, "pause top leading; scoreboard and chat top trailing" );
+
+	Controls controls;
+	controls.SetLayout( layout );
+	controls.SetVisibleButtons( kAllButtons );
+	const float deckY = ( deckTop + h ) * 0.5f;
+	const float leading = mirror( 24 * density ), trailing = mirror( w * 0.5f + 4 * density );
+	Check( HitButton( layout, leading, deckY, kAllButtons ) == BUTTON_NONE, "deck's leading edge is free for the stick" );
+	controls.FingerDown( { 1, 1 }, leading, deckY, 0 );
+	controls.FingerMove( { 1, 1 }, mirror( 24 * density ) + ( preset == PRESET_LEFT_HANDED ? -40 : 40 ) * density, deckY, 10 );
+	auto output = controls.TakeOutput();
+	Check( std::fabs( output.moveSide ) > 0.5f && Near( output.lookX, 0 ), "deck's leading half moves" );
+	controls.Reset();
+	controls.TakeOutput();
+	if ( HitButton( layout, trailing, deckTop + 2 * density, kAllButtons ) == BUTTON_NONE ) {
+		controls.FingerDown( { 1, 2 }, trailing, deckTop + 2 * density, 0 );
+		controls.FingerMove( { 1, 2 }, trailing + 10, deckTop + 2 * density, 10 );
+		output = controls.TakeOutput();
+		Check( Near( output.moveSide, 0 ) && Near( output.lookX, 10 ), "deck's trailing half looks" );
+	}
+	controls.Reset();
+	controls.TakeOutput();
+	controls.FingerDown( { 1, 3 }, leading, deckTop - 4 * density, 0 );
+	controls.FingerMove( { 1, 3 }, leading, deckTop - 4 * density + 6, 10 );
+	output = controls.TakeOutput();
+	Check( Near( output.moveForward, 0 ) && Near( output.lookY, 6 ), "the view above the deck looks" );
+}
+
 int main() {
+	// Portrait at the 720x1280 dp reference and on 9:16 to 20:9 phones (S25 is
+	// about 384x832 dp). The reference holds the whole cluster in the deck.
+	for ( const float density : { 1.0f, 2.8125f } ) {
+		for ( int preset : { PRESET_DEFAULT, PRESET_COMPACT, PRESET_LEFT_HANDED } ) {
+			CheckPortraitDeck( 720, 1280, density, preset, true );
+			for ( const auto &size : { std::pair<float,float>( 360.0f, 640.0f ), { 360.0f, 745.667f }, { 384.0f, 832.0f }, { 412.0f, 915.0f } } ) {
+				CheckPortraitDeck( size.first, size.second, density, preset, false );
+			}
+		}
+	}
+	{
+		// 20:9 phones and wider fit everything but the weapon control in the deck.
+		const Layout s25 = ComputeLayout( 384, 832, 1, 1 );
+		for ( int button : { BUTTON_FIRE, BUTTON_JUMP, BUTTON_CROUCH, BUTTON_RELOAD, BUTTON_ZOOM } ) {
+			Check( s25.buttons[button].y - HitRadius( s25, button ) >= DeckTop( 384, 832 ), "S25-sized deck holds the cluster" );
+		}
+		const Layout landscape = ComputeLayout( 720, 360, 1, 1 );
+		Check( Near( landscape.buttons[BUTTON_FIRE].x, 592 ) && Near( landscape.buttons[BUTTON_FIRE].y, 240 )
+			&& Near( landscape.buttons[BUTTON_ZOOM].x, 488 ) && Near( landscape.stickTop, 0 ), "landscape layout unchanged by the portrait deck" );
+	}
 	Contacts contacts;
 	Check( contacts.Begin( {1, 1}, true ) == CONTACT_GAME, "gameplay claims initial contact" );
 	Check( contacts.Begin( {2, 1}, false ) == CONTACT_MENU, "separate device may own menu pointer" );

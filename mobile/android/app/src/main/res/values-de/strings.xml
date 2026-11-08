@@ -117,6 +117,12 @@
     <string name="setup_interface_applied">Oberfläche gespeichert. Sie gilt bei der Rückkehr ins Spiel oder beim nächsten Spielstart.</string>
     <string name="setup_interface_save_failed">Die Oberflächeneinstellungen konnten nicht gespeichert werden. Die bisherigen Einstellungen bleiben erhalten; prüfe den freien App-Speicher und versuche es erneut.</string>
     <string name="setup_interface_percent">%1$d %%</string>
+    <string name="setup_orientation">Bildschirmausrichtung</string>
+    <string name="setup_orientation_help">Mit Quer- und Hochformat dreht sich das Spiel mit dem Gerät, sofern die Android-Drehsperre aus ist. Im Hochformat liegen die Touch-Steuerelemente im Streifen unter dem Bild.</string>
+    <string-array name="setup_orientations">
+        <item>Querformat</item>
+        <item>Quer- und Hochformat</item>
+    </string-array>
     <string-array name="setup_viewing_profiles">
         <item>Automatisch (dieses Gerät)</item>
         <item>Schreibtisch (Monitor)</item>

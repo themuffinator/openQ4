@@ -1357,3 +1357,70 @@ interaction is pending; AND-03 remains open.
 
 Evidence: `.tmp/stage-two/android-interface-setup-evidence.json`, SHA-256
 `4ab95f6993ed201853bb886bc5ae6b30f80523eebd69a1cf627e1e341d2962fc`.
+
+## Android portrait thumb deck and orientation ownership, 8 November 2026
+
+The built-in touch controls now have the section 13.6 portrait arrangement.
+When the window is taller than wide, the band below the 640 u center screen
+is the thumb deck. The stick floats in its leading half. Fire sits in the
+middle of its trailing half with the weapon control above it, jump and crouch
+outside it and zoom and reload inside it. At the 720x1280 dp reference the
+columns keep the landscape cluster's spacing and the whole cluster fits the
+deck. A 360-412 dp phone has only 180-206 dp of trailing half, so the outer
+and inner columns move in and the rows rise; sizes and the 8 dp gaps stay as
+in landscape. On a 9:16 phone (360x640 dp) the weapon, jump and zoom controls
+rise above the deck; on a 19.5:9 phone (S25 class, about 384x832 dp) only the
+weapon control crosses the deck's top, by about 28 dp. At 150% control size the cluster climbs into the view. Each
+orientation is computed on its own, so turning the device swaps arrangements
+and the player's preset and size apply to both. While the overlay is active in
+portrait, the Remastered HUD's bottom readouts rise to the deck's top edge
+(`AndroidTouchControls_HudBottomEdge`), as the Touch HUD preset specifies.
+Landscape placement is unchanged.
+
+The host also owns the orientation now. The manifest selects
+`sensorLandscape`, but SDL's `setOrientationBis` runs when the engine creates
+its window and, for openQ4's resizable window without an orientation hint,
+requests `FULL_USER`. On the diagnostic AVD the 2 November APK
+(`d3c28b451d18442830071498a41d4af80f7ba21323808993bddaa1b1d5ff64be`) reported
+`requestedOrientation=SCREEN_ORIENTATION_FULL_USER` after window creation;
+the display did not turn during that 45-second check, so the effect on devices
+was not observed. `OpenQ4Activity` overrides `setOrientationBis` and applies the
+player's choice at creation, on SDL's request and on each return from setup:
+`SENSOR_LANDSCAPE` by default, or `FULL_USER` (Android's rotation lock
+respected) after **Landscape and portrait** is applied on the Interface setup
+page. The Interface record becomes version 2 with the orientation; version 1
+records decode as landscape, and the engine's record keeps the sizes only, so
+the native reader is unchanged. Strings exist in all four setup languages.
+
+Checks: `openq4-android-touch-controls` adds the deck arrangement at the
+reference and four phone shapes, two densities and all three presets (trailing
+half, Fire centred, weapon above, outer/inner columns, stick and look regions,
+landscape unchanged); removing the portrait placement fails it.
+`android_touch_controls.py` covers the bottom reservation's landscape, portrait,
+menu and controller cases. `android_interface_setup.py` passes 7,128 round
+trips with orientation, version 1 migration, malformed version 2 records and
+the Activity's mapping; its JNI half accepts all 960 Java records.
+`android_host_storage.py` drives the real Activity through creation, SDL's
+request and setup returns; delegating to SDL's request fails it. The Android
+setup, touch setup, build, lifecycle, window, save/base path and console host
+tests pass.
+
+`android_emulator_smoke.py --mode rotate` is the new silent rotation probe. It
+applies the version 2 record, turns the AVD with its `user_rotation` setting
+(no input) when the engine asks, drives the portrait deck through
+`touchControlsTest`, turns back and saves/loads, then restores the AVD's
+rotation settings, the app's setup preferences and configuration. Its report
+(SHA-256 `00fc29d331b5fd1164bd73ce1fdb2e925d447f19f59bcae3d6b4496eeb4b5c8f`)
+records APK `bf189b254eb1db6b917e4244e1946feb0e0b4caa62312c6701ebcf33676c2195`
+on the AOSP API 35 x86_64 AVD (Android 15, 4 KiB pages, SwiftShader). Hangar 1
+turned from 1920x1080 to 1080x1920 and back mid-match in one process, with the
+player's pose unchanged by either turn. In portrait the stick, a look drag
+above the deck and Fire moved the player 208.6 u and turned it 15.4 degrees;
+the release settled and the save restored that pose. The portrait capture shows
+the view across the width, the status bar just above the deck and the cluster
+in the trailing half. With the default record and the AVD set to portrait,
+the new APK held `SENSOR_LANDSCAPE` and rotation 0 after window creation.
+Evidence is under `.tmp/android-evidence/2026-11-08-portrait/` in the main
+checkout. Physical phones, the stock GUIs (Classic HUD, stock menus) in
+portrait, the layout editor with per-orientation layouts and readouts behind a
+raised weapon control on narrow phones remain open; AND-01 and AND-04 stay open.

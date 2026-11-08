@@ -14,7 +14,11 @@
 	docs/dev/ui-visual-design.md section 13.6 is the specification: a floating
 	move stick on the leading half, drag-to-look on the trailing half, Fire at
 	88 dp in the trailing thumb zone with jump, crouch, weapon, reload and zoom
-	around it, and Pause at 48 dp in the top leading corner. Stick bases are
+	around it, and Pause at 48 dp in the top leading corner. In portrait the
+	band below the center screen is the thumb deck: the stick floats in its
+	leading half and the cluster gathers in its trailing half (PlacePortraitDeck);
+	each orientation is laid out on its own, so turning the device swaps between
+	the two arrangements and the player's preset and size apply to both. Stick bases are
 	thin-railed rings and buttons cut plates around centered vector symbols,
 	35% opaque at rest and 80% with the orange marker while pressed, without
 	labels. Quake 4 has no use key: Fire clicks the terminal under the
@@ -192,6 +196,73 @@ inline bool PlaceButton( Layout &layout, int button, unsigned placed ) {
 	return best >= 0.0f;
 }
 
+/*
+====================
+DeckTop
+
+Portrait (section 13.6): the 640 u center screen spans the width, 480 u tall,
+and the band below it is the thumb deck. Its top edge, in window pixels, or 0
+in landscape, where the whole height is available to the stick.
+====================
+*/
+inline float DeckTop( float width, float height ) {
+	return height > width ? height * 0.5f + width * 0.375f : 0.0f;
+}
+
+// How far b must rise above a, in whole pixels, for two circles `separation`
+// apart whose centers are `across` apart horizontally.
+inline float DeckRise( float separation, float across ) {
+	return across >= separation ? 0.0f : std::ceil( std::sqrt( separation * separation - across * across ) );
+}
+
+inline float HitRadius( const Layout &layout, int button );
+
+/*
+====================
+PlacePortraitDeck
+
+Section 13.6's portrait arrangement in the deck's trailing half: Fire in its
+middle with the weapon control above it, jump and crouch outside it and zoom
+and reload inside it. At the 720 dp reference the columns keep the landscape
+cluster's spacing. A narrower half (a 360-412 dp phone has 180-206 dp) brings
+the outer and inner columns in to keep every target inside the half, 24 dp
+clear of the trailing edge, and raises the rows instead, so sizes and the 8 dp
+gaps stay as in landscape. Only the desired centers are set here; PlaceButton
+still resolves anything that does not fit.
+====================
+*/
+inline void PlacePortraitDeck( Layout &layout, float dp ) {
+	// Pixels throughout, from the actual hit regions: the compact preset's
+	// smaller artwork keeps 48 physical dp targets, as PlaceButton measures.
+	// A pixel of slack keeps float error from failing PlaceButton's 8 dp test.
+	const float gap = 8.0f * layout.nativeDp + 1.0f, edge = 24.0f * layout.nativeDp;
+	const float fireR = HitRadius( layout, BUTTON_FIRE ), weaponR = HitRadius( layout, BUTTON_WEAPON );
+	const float sideR = std::max( HitRadius( layout, BUTTON_JUMP ), HitRadius( layout, BUTTON_CROUCH ) );
+	const float innerR = std::max( HitRadius( layout, BUTTON_ZOOM ), HitRadius( layout, BUTTON_RELOAD ) );
+	const float center = layout.width * 0.25f;	// Fire, from the trailing edge
+	const float outside = std::max( 0.0f, std::min( 76.0f * dp, center - edge - sideR ) );
+	const float inside = std::max( 0.0f, std::min( 96.0f * dp, center - innerR ) );
+	const float low = std::max( 60.0f * dp, edge + std::max( sideR, innerR ) );	// crouch and reload
+	const float fireToSide = fireR + sideR + gap, fireToInner = fireR + innerR + gap;
+	const float fire = std::max( { 128.0f * dp, low + DeckRise( fireToSide, outside ), low + DeckRise( fireToInner, inside ) } );
+	const float jump = std::max( fire + DeckRise( fireToSide, outside ), low + 2.0f * sideR + gap );
+	const float zoom = std::max( fire + DeckRise( fireToInner, inside ), low + 2.0f * innerR + gap );
+	const float weapon = std::max( { fire + fireR + weaponR + gap, jump + DeckRise( sideR + weaponR + gap, outside ),
+		zoom + DeckRise( innerR + weaponR + gap, inside ) } );
+	const struct { int button; float fromSide; float fromBottom; } deck[] = {
+		{ BUTTON_FIRE, center, fire },
+		{ BUTTON_JUMP, center - outside, jump },
+		{ BUTTON_CROUCH, center - outside, low },
+		{ BUTTON_WEAPON, center, weapon },
+		{ BUTTON_RELOAD, center + inside, low },
+		{ BUTTON_ZOOM, center + inside, zoom },
+	};
+	for ( const auto &place : deck ) {
+		layout.buttons[place.button].x = layout.width - place.fromSide;
+		layout.buttons[place.button].y = layout.height - place.fromBottom;
+	}
+}
+
 inline Layout ComputeLayout( float width, float height, float dpScale, float playerScale, int preset = PRESET_DEFAULT ) {
 	Layout layout;
 	if ( !std::isfinite( width ) || !std::isfinite( height )
@@ -209,6 +280,8 @@ inline Layout ComputeLayout( float width, float height, float dpScale, float pla
 		button.x = place.anchor == ANCHOR_LEADING_TOP ? place.fromSide * dp : layout.width - place.fromSide * dp;
 		button.y = place.anchor == ANCHOR_TRAILING_BOTTOM ? layout.height - place.fromEnd * dp : place.fromEnd * dp;
 	}
+	const bool portrait = height > width;
+	if ( portrait ) PlacePortraitDeck( layout, dp );
 	// Reserve the gameplay cluster first. Enlarged controls on a short phone
 	// can require the two multiplayer actions to move along the top edge.
 	unsigned placed = 0;
@@ -219,11 +292,12 @@ inline Layout ComputeLayout( float width, float height, float dpScale, float pla
 	layout.available = true;
 	layout.stickBaseRadius = kStickBaseRadiusDp * dp;
 	layout.stickKnobRadius = kStickKnobRadiusDp * dp;
-	layout.stickHome.x = std::min( ( kStickBaseRadiusDp + 56.0f ) * dp, layout.width * 0.25f );
+	// In portrait the resting ring sits in the middle of the deck's leading half.
+	layout.stickHome.x = portrait ? layout.width * 0.25f : std::min( ( kStickBaseRadiusDp + 56.0f ) * dp, layout.width * 0.25f );
 	layout.stickHome.y = layout.height - ( kStickBaseRadiusDp + 48.0f ) * dp;
 	layout.stickHome.radius = layout.stickBaseRadius;
 	layout.leadingEdge = layout.width * 0.5f;
-	layout.stickTop = height > width ? height * 0.5f + width * 0.375f : 0.0f;
+	layout.stickTop = DeckTop( width, height );
 	layout.stickHome.y = std::max( layout.stickHome.y, ( layout.stickTop + height ) * 0.5f );
 	layout.tapSlop = kHitSlopDp * layout.nativeDp;
 	if ( preset == PRESET_LEFT_HANDED ) {
@@ -274,6 +348,13 @@ inline float HudTop( const Layout &layout, unsigned visible ) {
 		bottom = std::max( bottom, layout.buttons[i].y + HitRadius( layout, i ) + 8.0f * layout.nativeDp );
 	}
 	return bottom;
+}
+
+// Portrait: the window-coordinate edge the bottom readouts stay above, the
+// deck's top (section 13.6 raises them to the center screen's bottom edge);
+// 0 in landscape, where the readouts keep their place beside the cluster.
+inline float HudBottomEdge( const Layout &layout ) {
+	return layout.available ? layout.stickTop : 0.0f;
 }
 
 /*

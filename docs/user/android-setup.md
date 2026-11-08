@@ -38,8 +38,18 @@ into the app’s game-data directory, use **Check installed files**.
 
 Using a controller, keyboard or mouse hides the gameplay controls; touching
 the game view brings them back. Multiplayer adds scoreboard and chat buttons
-at the top. Layout editing and full portrait presentation are still in
-development.
+at the top.
+
+The game plays in landscape unless you choose **Landscape and portrait** on
+the Interface page (below). Held upright, the band below the game view becomes
+the thumb deck: drag in its left half to move, and the fire button sits in its
+right half with the weapon button above it, jump and crouch toward the edge,
+and zoom and reload toward the middle. Dragging anywhere else looks. The
+Remastered HUD moves its health, armor and ammunition readouts up above the
+deck. Turning the
+device keeps your game; buttons held at that moment are released. On shorter
+phones the upper buttons can sit above the deck, and at larger button sizes
+the controls climb into the view. Layout editing is still in development.
 
 Select **Controls** in Android setup to choose Default, Compact or Left-handed.
 Left-handed moves the movement area to the right and mirrors the buttons.
@@ -72,8 +82,14 @@ shows the sizes the game will use. The game still fits its menus to the screen,
 so on a phone a larger interface size may not enlarge them; text size
 always applies.
 
-Select **Apply interface** to save. The game uses these sizes at its next launch
-or return from setup. Each Apply takes effect once: if you later change the
+**Screen orientation** chooses **Landscape** (either way up; the default) or
+**Landscape and portrait**, which turns the game with the device unless
+Android's rotation lock is on. Portrait shows the game view across the width
+with the touch controls below it. Portrait play is new and still being tested
+on phones.
+
+Select **Apply interface** to save. The game uses these sizes and the
+orientation at its next launch or return from setup. Each Apply takes effect once: if you later change the
 UI scale or text size inside the game, returning from setup keeps
 those changes until you apply the Interface page again. **Discard changes**
 keeps the previously applied settings.

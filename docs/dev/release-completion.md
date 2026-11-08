@@ -6,6 +6,43 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Frame-rate budgets on the reference machine (FPS-01), 8 November 2026
+
+- Developer tooling and evidence, no shipped default changes. The RTX 4060 Laptop
+  that measured the performance report is the reference machine. The reference run
+  measured the seven timed stock-map scenarios at Ultra, Quality and Enhanced on
+  OpenGL and Vulkan (126 launches of `main` 94e0b14ec at 2560x1440).
+  `docs/dev/performance-budgets.json` and
+  [section 10 of the performance report](performance-report.md#10-declared-budgets-fps-01)
+  record 42 warm-mean and p99 budgets.
+- `tools/tests/performance_suite.py budgets` declares budgets from reference runs;
+  `check --budgets docs/dev/performance-budgets.json --runs <runs>` gates a
+  candidate (+5% mean, +10% p99; exit 1 on a regression). It also adds `own-quality`
+  and `own-enhanced` settings profiles.
+- **Release checklist:** before cutting a release, run the timed scenarios at the
+  three tiers on both backends on the reference machine, then `report` and `check`.
+  Keep the report's `summary.md`/`aggregate.json` and the `check` table with the
+  release notes, and cite them in `docs/dev/releases/vX.Y.Z.md`. A p99-only failure is
+  rerun before it counts (report section 10.4). If the release changes a preset on
+  purpose, redeclare with `budgets` and commit the new file. The enforced gate
+  remains FPS-09.
+- Known caveat: the Vulkan convoy1 p99 budgets at Quality and Enhanced include an
+  intermittent warm-window stall (FPS-07).
+
+## Android portrait play and orientation ownership (AND-01, AND-04), 8 November 2026
+
+- Built-in touch controls gain section 13.6's portrait thumb deck, and the
+  Remastered HUD's bottom readouts rise above it while the overlay is active.
+- The Interface setup page adds **Screen orientation** (Landscape, or
+  Landscape and portrait). `OpenQ4Activity` applies it and overrides SDL's
+  `setOrientationBis`, which requested `FULL_USER` for the resizable engine
+  window regardless of the manifest's landscape lock.
+- Validation: native/JVM host tests with negative controls, and
+  `android_emulator_smoke.py --mode rotate` on the API 35 x86_64 AVD (a
+  landscape-portrait-landscape turn mid-match with movement, fire and
+  save/load). Physical phones remain unqualified. See the
+  [recovery review](platform-recovery-review.md#android-portrait-thumb-deck-and-orientation-ownership-8-november-2026).
+
 ## Frame-time profiling command and performance report, 8 November 2026
 
 - [x] `profileFrameWork <frames> [file.csv]` takes an optional CSV path below the

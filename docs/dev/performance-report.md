@@ -2,7 +2,8 @@
 
 Measured 7-8 November 2026 on the RTX 4060 Laptop (section 2); the 0.13.2 baseline is
 the tag rebuilt with the same per-frame logging as the current source and validated
-against the release binary. The run chain's output lives under `.tmp/perf-suite/`
+against the release binary. Section 10 declares the FPS-01 budgets from the reference
+run of the evening of 8 November. The run chain's output lives under `.tmp/perf-suite/`
 (appendix); the plan it feeds is the FPS category of the
 [development roadmap](roadmap.md#frame-rate-recovery-and-performance-budgets).
 
@@ -55,7 +56,11 @@ against the release binary. The run chain's output lives under `.tmp/perf-suite/
   traces, toggle ladders, attribution, hitch events, idle-launch retry, the report), the
   `profileFrameWork` CSV path and early stop, this report, and the roadmap's FPS-01 to
   FPS-09 (section 8) with the regression gate of section 9.
-- **Caveats.** One shared development laptop, not the reference desktop; three launches
+- **Budgets.** FPS-01 named this laptop the reference machine and declared a warm-mean
+  and p99 budget per scenario for Ultra, Quality and Enhanced on both backends
+  (section 10, `docs/dev/performance-budgets.json`); `performance_suite.py check` gates a
+  candidate run against them.
+- **Caveats.** One shared development laptop; three launches
   that missed the foreground were repeated; the 25 September bisection build did not
   build in pass 2 and is bracketed by the equal 2 October build.
 
@@ -72,7 +77,8 @@ against the release binary. The run chain's output lives under `.tmp/perf-suite/
 | OS | Windows 11 Home 10.0.26200 |
 | Toolchain | MSVC 19.50 (VS 18), Meson 1.10.2, ninja 1.13; `--buildtype=debugoptimized -Db_ndebug=true` (the release configuration), x64 |
 
-The machine is a shared development box, not the project's reference desktop. Each
+The machine is a shared development box and, since FPS-01, the project's reference
+machine for frame-rate budgets (section 10). Each
 launch records the system CPU load and the GPU utilisation, clock, temperature,
 power and memory once a second (`load` in every `result.json`); the report quotes
 those numbers where a run may have been disturbed.
@@ -1009,12 +1015,12 @@ A factor at or below 1.00 means the target is met.
   frames in scripted spawns, first-use loads and the point-light cube re-renders, so the
   1% low target needs the hitch work of section 8 as much as the frame-rate work, and a
   definition that says whether level-script spawn frames count.
-- **Transfer to the reference desktop.** Every figure here is from the RTX 4060 Laptop;
-  the ratios between configurations transfer (the sample count, shadow maps and post chain
-  cost the same share of a frame on a faster card of the same architecture), the absolute
-  frame rates do not. The reference run of FPS-01 (`docs/dev/roadmap.md`) fixes the
-  absolute budgets; the roadmap's targets are to be declared per tier and hardware, and
-  220 / 180 should name the tier and the machine it applies to.
+- **Transfer to other machines.** Every figure here is from the RTX 4060 Laptop, which
+  FPS-01 made the reference machine; the ratios between configurations transfer (the
+  sample count, shadow maps and post chain cost the same share of a frame on a faster card
+  of the same architecture), the absolute frame rates do not. Section 10 holds the
+  absolute budgets for this machine; the roadmap's targets are to be declared per tier and
+  hardware, and 220 / 180 should name the tier and the machine it applies to.
 
 ## 8. Optimization roadmap
 
@@ -1023,7 +1029,7 @@ as the FPS category; this is its summary, in the order the measurements rank the
 
 | Task | What it does | Why, from this report |
 |---|---|---|
-| FPS-01 performance suite, baselines and budgets | Keep `performance_suite.py` the single frame-rate measurement; run both backends on the reference desktop; declare a warm-mean and p99 budget per core scenario and tier; keep the report's `aggregate.json` beside the release notes. | Every number here comes from one development laptop; the targets are set for the reference desktop (section 7). |
+| FPS-01 performance suite, baselines and budgets (closed) | Keep `performance_suite.py` the single frame-rate measurement; both backends measured on the reference machine; a warm-mean and p99 budget declared per scenario, tier and backend (section 10); the `check` table and the report's `aggregate.json` go beside the release notes. | A fixed line to measure the work below, and every release, against (section 10). |
 | FPS-02 re-tier the presets to declared budgets | Rebuild Ultra, Quality and Enhanced from the measured feature costs; declare the resolution and frame-time budget each tier must hold; keep an explicit "everything on" choice with no frame-rate claim; decide the fresh-install cap, anisotropy and tier; fix the startup banner. | The preset, not the code, carries the 4-12x drop (section 3.1); fresh installs lost half their frame rate to a 120 cap and 4x anisotropy (section 3.2). |
 | FPS-03 shadow-map cost | Compose dynamic casters over cached point-light cube maps, cull cube faces, apply the update budget at every tier, size the atlas by tier and video memory, cheaper PCSS with distance, remove the quadratic light scan on Vulkan. | 30 of hub2's 54 ms are point-light cube maps re-rendered every frame; they also produce the periodic 100 ms frames (sections 4.1, 5). |
 | FPS-04 post-processing chain | Half-resolution SSAO on OpenGL, pass merging, MSAA-aware resolves, tone-map and motion-blur sample policy per tier. | 10-14 ms at 16 samples, 2-3 ms per pass at 4 (sections 4.1, 4.2). |
@@ -1038,15 +1044,19 @@ as the FPS category; this is its summary, in the order the measurements rank the
 
 1. **Run the suite before every release and on every renderer, game-loop or
    asset-loading change that reaches `main`.** `tools/tests/performance_suite.py run
-   --scenarios core --rounds 3` on the reference machine with the staged `.install`,
-   then `report`. The report's `aggregate.json` is the artifact to keep next to the
-   release notes (`docs/dev/releases/vX.Y.Z.md`).
-2. **Budgets per scenario, not one global number.** For each core scenario record
-   the median warm average frame time and the p99 frame time of the last accepted
-   release; a release candidate fails the gate when either regresses by more than
-   5 % (average) or 10 % (p99) on the reference machine, or when a new hitch class (a
-   frame above 2x the median that was not in the previous catalog) appears in
-   `hitch_firstuse`.
+   --scenarios timed --rounds 3 --passes 2` with `--config` entries for `own-ultra`,
+   `own-quality` and `own-enhanced` on the reference machine with the staged `.install`,
+   then `report` and `check --budgets docs/dev/performance-budgets.json`. The report's
+   `summary.md` and `aggregate.json` and the `check` table are the artifacts to keep next
+   to the release notes (`docs/dev/releases/vX.Y.Z.md`).
+2. **Budgets per scenario, not one global number.** Section 10 records, for each timed
+   scenario, tier and backend, the median warm mean frame time and p99 frame time on the
+   reference machine; `check` fails a candidate when either exceeds its budget by more
+   than 5 % (mean) or 10 % (p99). Rerun a failing scenario before treating it as a
+   regression (section 10.4), and also fail the release when a new hitch class (a frame
+   above 2x the median that was not in the previous catalog) appears in
+   `hitch_firstuse`. When a release intentionally changes a preset, redeclare with
+   `budgets` and commit the new file with the release notes.
 3. **Per-system budgets** from the attribution runs: game tic, renderer front end,
    backend submit, GPU, sound update and HUD each get a millisecond budget at Ultra
    2560x1440 on the reference machine; the `profileFrameWork` phase means and
@@ -1065,6 +1075,97 @@ as the FPS category; this is its summary, in the order the measurements rank the
    launch so a disturbed run can be recognised, repeats on its own a launch whose GPU
    stayed idle (the client missed the foreground and rendered nothing), and flags any
    that still did under **Warnings** in the report.
+
+## 10. Declared budgets (FPS-01)
+
+These are the frame-time budgets of the current presets on the reference machine, the
+RTX 4060 Laptop of section 2, fullscreen 2560x1440, frame cap and vsync off. They are
+regression ceilings for the build as it stands, not targets: no tier holds 220 / 180 in
+every scene, and FPS-02 redeclares them when it re-tiers the presets. The machine-readable
+copy is [`performance-budgets.json`](performance-budgets.json).
+
+- **Build.** `main` 94e0b14ec, debugoptimized with `b_ndebug=true` (the release
+  configuration), staged into the fixed runtime `.tmp/stock-runtime/perf-ref`, client
+  SHA-256 `44064cda370395a79c14a2e899647027ad113283d7c03e155e24f476ed2efd4b`.
+- **Run.** `ref-gl` and `ref-vk` (appendix): the seven timed scenarios at the build's own
+  `own-ultra`, `own-quality` and `own-enhanced` profiles, the three tiers interleaved,
+  three rounds of two passes each, 63 launches per backend. One Vulkan Quality launch
+  missed the foreground and was repeated.
+- **Budget.** For each scenario, tier and backend: the median over the three launches of
+  the warm pass's (p2) mean frame interval and p99 frame interval from
+  `profileFrameWork`. The gate limit is the budget plus 5 % (mean) or 10 % (p99).
+  The walker scene measures one pass per launch, so its budget is that cold pass. In
+  storage2 every launch measures the same window position relative to the map script's
+  frame-time doubling (section 4.2), so the p2 windows compare like with like.
+
+Commands:
+
+```
+python tools/tests/performance_suite.py budgets --runs .tmp/perf-suite/ref-gl .tmp/perf-suite/ref-vk \
+    --machine "RTX 4060 Laptop reference (MSI Vector GP77 13VF)" --out docs/dev/performance-budgets.json
+python tools/tests/performance_suite.py check --budgets docs/dev/performance-budgets.json --runs <candidate runs>
+```
+
+`check` prints one row per budget (budget, measured, delta, verdict), notes a host or
+display that differs from the reference, exits 1 on any failure, and with
+`--require-all` also fails a budget the candidate did not measure. The reference runs
+checked against their own file pass all 42 budgets.
+
+### 10.1 Ultra
+
+| Scenario | GL mean ms (fps) | GL p99 ms (1% low) | GL gate mean / p99 ms | VK mean ms (fps) | VK p99 ms (1% low) | VK gate mean / p99 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| outdoor_airdefense1 | 25.18 (40) | 42.77 (23) | 26.44 / 47.05 | 14.34 (70) | 21.39 (47) | 15.06 / 23.53 |
+| outdoor_convoy1 | 34.98 (29) | 55.26 (18) | 36.73 / 60.79 | 16.07 (62) | 20.73 (48) | 16.87 / 22.80 |
+| combat_airdefense1 | 39.19 (26) | 50.74 (20) | 41.15 / 55.81 | 18.97 (53) | 23.21 (43) | 19.92 / 25.53 |
+| effects_airdefense1 | 39.98 (25) | 52.98 (19) | 41.98 / 58.28 | 19.49 (51) | 25.14 (40) | 20.46 / 27.65 |
+| indoor_storage2 | 26.68 (38) | 40.92 (24) | 28.01 / 45.01 | 14.54 (69) | 27.14 (37) | 15.27 / 29.85 |
+| indoor_hub2 | 51.54 (19) | 87.12 (12) | 54.12 / 95.83 | 20.87 (48) | 31.34 (32) | 21.91 / 34.47 |
+| vehicle_walker | 17.25 (58) (single pass) | 29.56 (34) | 18.11 / 32.52 | 8.22 (122) (single pass) | 10.62 (94) | 8.63 / 11.68 |
+
+### 10.2 Quality
+
+| Scenario | GL mean ms (fps) | GL p99 ms (1% low) | GL gate mean / p99 ms | VK mean ms (fps) | VK p99 ms (1% low) | VK gate mean / p99 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| outdoor_airdefense1 | 6.82 (147) | 10.92 (92) | 7.16 / 12.01 | 6.71 (149) | 9.63 (104) | 7.05 / 10.59 |
+| outdoor_convoy1 | 10.24 (98) | 13.94 (72) | 10.75 / 15.33 | 9.84 (102) | 28.61 (35) | 10.33 / 31.47 |
+| combat_airdefense1 | 9.73 (103) | 17.36 (58) | 10.22 / 19.10 | 8.89 (112) | 13.26 (75) | 9.34 / 14.59 |
+| effects_airdefense1 | 9.50 (105) | 11.77 (85) | 9.97 / 12.95 | 8.64 (116) | 13.72 (73) | 9.07 / 15.09 |
+| indoor_storage2 | 7.07 (141) | 11.13 (90) | 7.42 / 12.24 | 6.67 (150) | 11.47 (87) | 7.00 / 12.62 |
+| indoor_hub2 | 11.20 (89) | 19.90 (50) | 11.76 / 21.89 | 8.57 (117) | 12.52 (80) | 9.00 / 13.77 |
+| vehicle_walker | 5.83 (172) (single pass) | 8.31 (120) | 6.12 / 9.14 | 5.21 (192) (single pass) | 8.03 (124) | 5.47 / 8.83 |
+
+### 10.3 Enhanced
+
+| Scenario | GL mean ms (fps) | GL p99 ms (1% low) | GL gate mean / p99 ms | VK mean ms (fps) | VK p99 ms (1% low) | VK gate mean / p99 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| outdoor_airdefense1 | 5.65 (177) | 10.03 (100) | 5.93 / 11.03 | 5.16 (194) | 6.84 (146) | 5.42 / 7.52 |
+| outdoor_convoy1 | 6.48 (154) | 8.63 (116) | 6.80 / 9.49 | 6.12 (163) | 18.24 (55) | 6.43 / 20.06 |
+| combat_airdefense1 | 8.11 (123) | 15.07 (66) | 8.52 / 16.58 | 6.92 (144) | 13.12 (76) | 7.27 / 14.43 |
+| effects_airdefense1 | 7.67 (130) | 15.21 (66) | 8.05 / 16.73 | 6.59 (152) | 16.70 (60) | 6.92 / 18.37 |
+| indoor_storage2 | 6.25 (160) | 11.68 (86) | 6.56 / 12.85 | 4.52 (221) | 7.91 (126) | 4.75 / 8.70 |
+| indoor_hub2 | 6.90 (145) | 10.24 (98) | 7.25 / 11.26 | 5.97 (168) | 8.52 (117) | 6.27 / 9.37 |
+| vehicle_walker | 4.67 (214) (single pass) | 7.96 (126) | 4.90 / 8.76 | 4.29 (233) (single pass) | 7.65 (131) | 4.50 / 8.41 |
+
+### 10.4 Notes on the budgets
+
+- **The Ultra budgets differ by backend for a reason.** Vulkan clamps the preset's 16
+  samples to 8 (section 3.3), so the two backends' Ultra budgets measure different
+  images. FPS-05 makes the sample count the same; the budgets follow.
+- **Vulkan convoy1 at Quality and Enhanced carries an intermittent stall.** The warm
+  window of two of the three Quality launches and one of the three Enhanced launches
+  holds a run of slow frames (87 and 151 frames above 25 ms, worst 121 ms, at Quality;
+  41 frames, worst 99 ms, at Enhanced). The other launches, OpenGL and the Vulkan Ultra
+  launches show none. The median keeps the stall in those two p99 budgets (28.61 and
+  18.24 ms against means of 9.84 and 6.12 ms). It is a hitch class for FPS-07; once it
+  is fixed, redeclare those budgets lower.
+- **p99 noise between days.** Checking the 7 November Ultra runs of d856fe6bb
+  (`matrix-gl`/`matrix-vk`, label `head`) against these budgets: every mean is within
+  4 % except Vulkan convoy1 (14 % faster, inside that scene's launch spread of 58-71
+  fps). The OpenGL p99 is 11-20 % higher in four scenes, and the Vulkan walker p99 12 %
+  higher. That run interleaved three builds and is a different build, so it does not
+  separate a tail improvement from noise. Until FPS-09 settles the round count, treat a
+  p99-only failure as provisional: rerun that scenario before calling it a regression.
 
 ## Appendix: artifacts
 
@@ -1085,6 +1186,7 @@ and paks; SHA-256 of `openQ4-client_x64.exe`):
 | `v0132-release` | the published 0.13.2 Windows x64 package, unmodified | `a15d3a1a956843914d4dff1cee081e777f14d571f172a5050749c85dff543ac1` |
 | `perf-bisect-834564945` | `main` at 834564945 (2 October), pass 1 | `93b50504578f6b2172897b0164b3355799b819c725e2460406b0c5e9b26e14af` |
 | `perf-bisect-156ced3fd` | `main` at 156ced3fd (15 October), pass 2, client-only staging | `32dc13aafe9d1776034e5afdf244cff31cd35040037dce49fafa6426805235fd` |
+| `perf-ref` | `main` 94e0b14ec, debugoptimized, b_ndebug, staged from `.install` (the FPS-01 reference runtime, section 10) | `44064cda370395a79c14a2e899647027ad113283d7c03e155e24f476ed2efd4b` |
 
 `perf-bisect-56a74bd48` (22 October) was built but not measured before the chain was paused.
 The renderer and game modules of `perf-head` carry PDB paths into `.tmp/perf-build-head`,
@@ -1123,6 +1225,8 @@ launches follow it in the order of its `summary.jsonl`):
 | `.tmp/perf-suite/attrib-storage2-vk` | v0132/headeq | vk | indoor_storage2 | 4 | 2026-11-08 05:26 | section 6, stack samples |
 | `.tmp/perf-suite/toggles-eq-vk2` | headeq | vk | indoor_storage2, outdoor_airdefense1 | 2 | 2026-11-08 05:32 | section 3.3 |
 | `.tmp/perf-suite/toggles-vk-outdoor` | head | vk | outdoor_airdefense1 | 1 | 2026-11-08 05:48 | section 3.3 |
+| `.tmp/perf-suite/ref-gl` | ultra/quality/enhanced (`perf-ref`) | gl | the seven timed scenarios | 63 | 2026-11-08 18:32 | section 10, FPS-01 reference run |
+| `.tmp/perf-suite/ref-vk` | ultra/quality/enhanced (`perf-ref`) | vk | the seven timed scenarios | 63 | 2026-11-08 19:59 | section 10; Quality outdoor round 3 idle, repeated |
 | `.tmp/perf-suite/default-vk-redo` | v0132def | vk | outdoor_airdefense1 | 1 | 2026-11-08 05:58 | section 3.3 |
 | `.tmp/perf-suite/drift-vk-redo` | v0132 | vk | indoor_storage2 | 1 | 2026-11-08 06:00 | section 3.3 |
 | `.tmp/perf-suite/viewdiag`, `viewdiag2` | v0132/headeq | gl | indoor_storage2, hidden window, `r_rendererMetrics 2` | 3 | 2026-11-08 06:10 | section 6, the view breakdown |

@@ -331,6 +331,11 @@ float AndroidTouchControls_HudTop( void ) {
 	return openq4::touch::HudTop( touchControls.GetLayout(), touchControls.VisibleButtons() );
 }
 
+float AndroidTouchControls_HudBottomEdge( void ) {
+	if ( touchOverlayHidden || !TouchControls_Active() ) return 0.0f;
+	return openq4::touch::HudBottomEdge( touchControls.GetLayout() );
+}
+
 /*
 ====================
 AndroidTouchControls_Draw
@@ -513,6 +518,10 @@ void AndroidTouchControls_Draw( void ) {
 }
 
 float AndroidTouchControls_HudTop( void ) {
+	return 0.0f;
+}
+
+float AndroidTouchControls_HudBottomEdge( void ) {
 	return 0.0f;
 }
 

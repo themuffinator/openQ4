@@ -119,6 +119,13 @@ int main(){try{
     button(ANDROID_TOUCH_DOWN,1,1,BUTTON_FIRE);
     check(AndroidTouchControls_HudTop()==hudTop,"touch did not restore HUD reservation");
     AndroidTouchControls_Release();check(AndroidTouchControls_HudTop()==0,"background retained touch HUD reservation");
+    // Portrait raises the bottom readouts above the thumb deck; landscape keeps them.
+    reset();check(AndroidTouchControls_HudBottomEdge()==0,"landscape reserved a thumb deck");
+    AndroidTouchControls_Frame(360,745,1,true);
+    check(std::fabs(AndroidTouchControls_HudBottomEdge()-(745*.5f+360*.375f))<.01f,"portrait readouts not raised to the deck");
+    sessLocal.guiActive=&sessLocal;check(AndroidTouchControls_HudBottomEdge()==0,"menu kept the deck reservation");
+    sessLocal.guiActive=nullptr;AndroidTouchControls_OtherInput();
+    check(AndroidTouchControls_HudBottomEdge()==0,"controller kept the deck reservation");
     reset();values["in_joystick"]=0;values["sensitivity"]=0;values["m_yaw"]=0;
     button(ANDROID_TOUCH_DOWN,1,1,BUTTON_FIRE);button(ANDROID_TOUCH_UP,1,1,BUTTON_FIRE);frame();frame();
     check(motion.Take().buttons==(1u<<QUAKE4_BTN_ATTACK) && !motion.Take().buttons,"quick tap lost between event pumps and usercmd");
@@ -175,7 +182,7 @@ int main(){try{
     check(AndroidTouchControls_HandleFinger(ANDROID_TOUCH_UP,1,2,.2f,.2f),"orphan release became menu pointer");
     reset();button(ANDROID_TOUCH_DOWN,1,1,BUTTON_FIRE);values["in_touchscreen"]=0;frame();
     check(!motion.Take().buttons && !touchControls.HasFingers(),"disabling touch retained actions");
-    std::puts("PASS: production touch routing, motion, button edges, menu/focus/rotation handoffs, capabilities and radial input");
+    std::puts("PASS: production touch routing, motion, button edges, menu/focus/rotation handoffs, portrait deck HUD reservation, capabilities and radial input");
     return 0;
 }catch(const std::exception& error){std::fprintf(stderr,"%s\n",error.what());return 1;}}
 '''
@@ -189,7 +196,7 @@ def source() -> str:
         "static void TouchControls_LetGo(", "static void TouchControls_Apply(",
         "void AndroidTouchControls_Frame(", "bool AndroidTouchControls_HandleFinger(",
         "void AndroidTouchControls_OtherInput(", "void AndroidTouchControls_Release(",
-        "float AndroidTouchControls_HudTop(",
+        "float AndroidTouchControls_HudTop(", "float AndroidTouchControls_HudBottomEdge(",
     )
     functions = "\n".join(function_body(glue, signature) for signature in signatures)
     return SUPPORT.replace("@CVARS@", cvars).replace("@FUNCTIONS@", functions)
