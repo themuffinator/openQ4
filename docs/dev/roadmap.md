@@ -1652,7 +1652,7 @@ and AND-05.
 | VR-01 — Closed (PC scope) | Vulkan (runtime-created device), desktop-independent submission, Wayland EGL and SP world-GUI pointing integrated at render API 32 with VR-06's guarantees; GL/Vulkan SP/MP/menu smokes, the Vulkan fault matrix and Linux Wayland/X11 bindings pass on the simulated runtime. | Quest standalone moved to AND-05 by decision; physical headsets are VR-02. |
 | VR-02 — Partial | GL and Vulkan stereo, tracking/input, room scale, play spaces, aiming, haptics, world GUIs, per-eye TAA and comfort controls provide the testable implementation; the [headset checklist](vr-headset-qualification.md) is ready to run. | Run the checklist on each available PC runtime/headset: combat, refresh/latency, controls, collision, vehicles, HUD/world-GUI readability and recovery. |
 | VR-03 — Closed | STAGE/LOCAL_FLOOR/LOCAL selection with warned fallback, floor-referenced standing height, recentering, calibration and live seated/standing changes pass natively and on the simulated runtime (GL/Vulkan). | Physical body alignment is checklist section 4 (VR-02). |
-| VR-04 — Partial | `openxr_vr_stereo_cost.py` records flat/stereo/warm-stereo CPU, build, submit and GPU tails; the simulated baseline on this GPU is recorded below. Uploads and dynamic geometry are already shared; culling, lights and draws are per eye as required. | Headset tails against the refresh budgets (checklist 2.2), and sharing work where those tails show a view-independent cost. |
+| VR-04 — Partial | `openxr_vr_stereo_cost.py` records flat/stereo/warm-stereo CPU, build, submit and GPU tails, now at a chosen preset (`--preset quality`); the simulated baselines on this GPU are recorded below. Uploads, dynamic geometry, remote cameras, cached static shadow maps and (8 November) world-GUI quads are shared between the eyes; culling, lights, draws, mirror/reflection/refraction/x-ray maps and dynamic shadow composition stay per eye. `openxr_vr_stereo_share_smoke.py` proves both by work count on OpenGL and Vulkan. | Headset tails against the refresh budgets (checklist 2.2), and sharing work where those tails show a view-independent cost. |
 | VR-05 — Closed (approved scope) | Decision: per-eye TAA only. Each eye has its own view identity, history images, motion vectors and resets in the SP game chain and both backends' own temporal scenes; dynamic resolution stays off in VR. SP/MP GL/Vulkan pass the simulated-runtime smoke. | Headset comfort is checklist section 7; hand presence and physical-object interaction need their own designs. |
 | VR-06 — Closed | Active GL teardown/ownership repair passes native failure cases and simulated-runtime SP/MP gameplay. | Carry guarantees into VR-01 backends; physical controller/headset validation remains VR-02. |
 
@@ -1712,6 +1712,19 @@ and AND-05.
   budgets are the headset's frame interval: 11.1 ms at 90 Hz, 12.5 ms at 80 Hz,
   13.9 ms at 72 Hz, for both the CPU and the GPU p95. This shared desktop is too
   noisy to attribute a sharing change; headset tails (checklist 2.2) decide it.
+  8 November, by deterministic work count instead of time
+  ([stereo sharing](platform-recovery-review.md#stereo-work-sharing-8-november-2026)):
+  the second eye emits the world-GUI quads the first eye drew instead of
+  running each GUI again (`r_vrStereoGuiShare`, default on; half the GUI
+  redraws). Mirror, reflection, refraction and x-ray maps now render for each
+  eye: they follow the viewer, and the second eye had been showing the first
+  eye's capture. Remote cameras still render once per frame. At the Quality
+  preset static shadow maps are already reused by both eyes (no fresh
+  renders); each eye composes its own dynamic casters, one composition per eye
+  in airdefense1, too small to justify sharing it across both backends yet.
+  Found on the way, OpenGL only and older than this work: in the eye views a
+  world GUI loses to the geometry behind it, and a mirror render map shows
+  streaks in flat views too. Vulkan draws both.
 - [x] **VR-05 — P3, decision and implementation: per-eye temporal features and
   further interaction.** TAA/dynamic resolution require independent eye histories,
   motion vectors, resets and scale control before enablement. Hand presence and

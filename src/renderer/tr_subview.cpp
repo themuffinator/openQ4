@@ -349,7 +349,8 @@ R_RemoteRender
 static void R_RemoteRender( drawSurf_t *surf, textureStage_t *stage ) {
 	viewDef_t		*parms;
 
-	// remote views can be reused in a single frame
+	// remote views can be reused in a single frame, by both eyes of a stereo
+	// one: the camera does not depend on the viewer
 	if ( stage->dynamicFrameCount == tr.frameCount ) {
 		return;
 	}
@@ -396,6 +397,7 @@ static void R_RemoteRender( drawSurf_t *surf, textureStage_t *stage ) {
 
 	// copy this rendering to the image
 	stage->dynamicFrameCount = tr.frameCount;
+	tr.pc.c_remoteSubviews++;
 	if (!stage->image) {
 		stage->image = globalImages->scratchImage;
 	}
@@ -412,8 +414,9 @@ R_MirrorRender
 void R_MirrorRender( drawSurf_t *surf, textureStage_t *stage, idScreenRect scissor ) {
 	viewDef_t		*parms;
 
-	// remote views can be reused in a single frame
-	if ( stage->dynamicFrameCount == tr.frameCount ) {
+	// reused within a frame, but rendered again for the other eye: the camera
+	// follows the viewer
+	if ( stage->dynamicFrameCount == R_VR_EyeSubviewFrameKey() ) {
 		return;
 	}
 
@@ -447,7 +450,8 @@ void R_MirrorRender( drawSurf_t *surf, textureStage_t *stage, idScreenRect sciss
 	R_RenderView( parms );
 
 	// copy this rendering to the image
-	stage->dynamicFrameCount = tr.frameCount;
+	stage->dynamicFrameCount = R_VR_EyeSubviewFrameKey();
+	tr.pc.c_eyeSubviews++;
 	stage->image = globalImages->scratchImage;
 
 	tr.CaptureRenderToImage( stage->image->GetName() );
@@ -462,7 +466,7 @@ R_ReflectionRender
 void R_ReflectionRender( drawSurf_t *surf, textureStage_t *stage, idScreenRect scissor ) {
 	viewDef_t		*parms;
 
-	if ( stage->dynamicFrameCount == tr.frameCount ) {
+	if ( stage->dynamicFrameCount == R_VR_EyeSubviewFrameKey() ) {
 		return;
 	}
 
@@ -491,7 +495,8 @@ void R_ReflectionRender( drawSurf_t *surf, textureStage_t *stage, idScreenRect s
 
 	R_RenderView( parms );
 
-	stage->dynamicFrameCount = tr.frameCount;
+	stage->dynamicFrameCount = R_VR_EyeSubviewFrameKey();
+	tr.pc.c_eyeSubviews++;
 	stage->image = globalImages->ImageFromFile( "_reflectionRender", TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
 
 	tr.CaptureRenderToImage( stage->image->GetName() );
@@ -506,7 +511,7 @@ R_RefractionRender
 static void R_RefractionRender( drawSurf_t *surf, textureStage_t *stage, idScreenRect scissor ) {
 	viewDef_t		*parms;
 
-	if ( stage->dynamicFrameCount == tr.frameCount ) {
+	if ( stage->dynamicFrameCount == R_VR_EyeSubviewFrameKey() ) {
 		return;
 	}
 
@@ -542,7 +547,8 @@ static void R_RefractionRender( drawSurf_t *surf, textureStage_t *stage, idScree
 
 	R_RenderView( parms );
 
-	stage->dynamicFrameCount = tr.frameCount;
+	stage->dynamicFrameCount = R_VR_EyeSubviewFrameKey();
+	tr.pc.c_eyeSubviews++;
 	stage->image = globalImages->ImageFromFile( "_refractionRender", TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
 
 	tr.CaptureRenderToImage( stage->image->GetName() );
@@ -557,8 +563,9 @@ R_XrayRender
 void R_XrayRender( drawSurf_t *surf, textureStage_t *stage, idScreenRect scissor ) {
 	viewDef_t		*parms;
 
-	// remote views can be reused in a single frame
-	if ( stage->dynamicFrameCount == tr.frameCount ) {
+	// reused within a frame, but rendered again for the other eye: the camera
+	// follows the viewer
+	if ( stage->dynamicFrameCount == R_VR_EyeSubviewFrameKey() ) {
 		return;
 	}
 
@@ -592,7 +599,8 @@ void R_XrayRender( drawSurf_t *surf, textureStage_t *stage, idScreenRect scissor
 	R_RenderView( parms );
 
 	// copy this rendering to the image
-	stage->dynamicFrameCount = tr.frameCount;
+	stage->dynamicFrameCount = R_VR_EyeSubviewFrameKey();
+	tr.pc.c_eyeSubviews++;
 	stage->image = globalImages->scratchImage2;
 
 	tr.CaptureRenderToImage( stage->image->GetName());

@@ -183,8 +183,7 @@ static bool R_TemporalPresentation_VRFrame( void ) {
 
 // The eye the front end renders this VR frame's view for, -1 otherwise.
 static int R_TemporalPresentation_VREye( void ) {
-	return tr.vrFrame.active && tr.vrFrame.stereo && ( tr.vrFrontEndTarget == 0 || tr.vrFrontEndTarget == 1 )
-		? tr.vrFrontEndTarget : -1;
+	return R_VR_FrontEndEye();
 }
 
 int R_TemporalPresentation_HistorySlot( void ) {

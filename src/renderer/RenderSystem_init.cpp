@@ -6494,6 +6494,7 @@ void idRenderSystemLocal::Shutdown( void ) {
 	ProcessPendingRenderTextureDeletes();
 
 	delete guiModel;
+	R_ShutdownStereoGuiShare();
 	delete demoGuiModel;
 	delete demoFrameGuiModel;
 	demoFrameGuiModel = NULL;

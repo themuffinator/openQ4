@@ -207,6 +207,60 @@ GPU. Headset tails, from the same script with `--system-runtime`, decide
 whether a sharing change is needed (checklist 2.2). Reports:
 `.tmp/stage-vr/2026-11-06/final/cost-{gl,vk}/*/report.json`.
 
+### Stereo work sharing (8 November 2026)
+
+Timing on this desktop cannot attribute a sharing change, so this round counts
+work instead. `r_showDynamic` now also prints `guisShared`, `eyeSubviews`
+(mirror, reflection, refraction and x-ray maps rendered) and `remoteSubviews`
+(remote-camera views rendered). `openxr_vr_stereo_share_smoke.py` spawns three
+test screens in front of the player on airdefense1 (a world GUI, a remote
+camera and a mirror, as fixtures in its own profile), stops game time and
+takes the medians per frame:
+
+| Phase | GUI surfaces | Shared | Eye subviews | Remote subviews |
+| --- | ---: | ---: | ---: | ---: |
+| flat | 2 | 0 | 1 | 1 |
+| stereo, `r_vrStereoGuiShare 0` | 4 | 0 | 2 | 1 |
+| stereo, sharing on | 4 | 2 | 2 | 1 |
+
+OpenGL and Vulkan count the same. With sharing on, the second eye emits the
+quads the first eye's GUI drew. They are in the GUI's own 640x480 space and
+each eye places them through its own matrices, so only the redraw is saved.
+Both eyes captured with sharing on match those with it off exactly. A GUI
+that renders a nested view while drawing (a renderDef window) is not shared,
+nor are GUIs inside subviews or nested GUIs. Eye-dependent subviews key their
+once-per-frame reuse by frame and eye, because their camera follows the
+viewer: before, the second eye drew the first eye's mirror image. Remote
+cameras keep one render per frame.
+
+Shadow maps at the Quality preset (`openxr_vr_stereo_cost.py --preset quality
+--extra r_shadowMapReport=1`): in steady state every view, flat or eye,
+re-renders no static map (OpenGL `updates=0`; Vulkan two exact cache hits and
+`fresh=0`) and composes one dynamic map (`composed=1`). Static maps are
+therefore already shared between the eyes, and stereo adds one composition per
+frame here. That does not yet justify same-frame composition sharing in both
+backends.
+
+| API | Phase | CPU p50 / p95 | GPU p50 / p95 | Draws | Lights |
+| --- | --- | --- | --- | ---: | ---: |
+| OpenGL | flat | 19.35 / 29.56 | 8.65 / 12.28 | 1,053 | 30 |
+| OpenGL | stereo | 30.58 / 47.88 | 11.57 / 15.91 | 1,445 | 62 |
+| OpenGL | warm | 28.52 / 45.14 | 10.61 / 14.48 | 1,445 | 62 |
+| Vulkan | flat | 5.99 / 8.39 | 6.48 / 6.52 | 1,052 | 30 |
+| Vulkan | stereo | 9.51 / 13.62 | 7.48 / 7.50 | 1,426 | 62 |
+| Vulkan | warm | 7.32 / 11.33 | 7.51 / 7.53 | 1,426 | 62 |
+
+Vulkan's stereo GPU cost at Quality is 1.16 times flat and inside a 90 Hz
+budget on this GPU; its CPU p95 is not. OpenGL's CPU tails are high in every
+phase of this run, flat included, so they say nothing about stereo.
+
+Found during this round, OpenGL only and present in the build before it: in
+the eye views a world GUI loses to the geometry behind it, while the remote
+screen beside it at the same depth draws (flat views draw the GUI whole), and
+a mirror render map shows horizontal streaks in flat views too. Vulkan draws
+both correctly in each eye. Evidence: `.tmp/stage-vr/2026-11-08/`
+(share-smoke reports and captures per API, Quality cost reports).
+
 ## Android selection and package matrix
 
 | Variant | Selected ABI/API/render scope | Distribution and prerequisite |

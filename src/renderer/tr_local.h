@@ -785,6 +785,9 @@ typedef struct {
 	int		c_entitySnapshotsReused;	// transform-only entity updates that kept the dynamic snapshot
 	int		c_entityUpdatesElided;		// bytewise-identical entity updates that also kept refs and interactions
 	int		c_guiSurfs;
+	int		c_guiSurfsShared;	// world GUIs the second eye drew from the first eye's quads (VR-04)
+	int		c_eyeSubviews;		// eye-dependent texture subviews rendered (mirror/reflection/refraction/x-ray maps)
+	int		c_remoteSubviews;	// remote-camera views rendered (once per frame, shared by both eyes)
 	int		frontEndMsec;		// sum of time in all RE_RenderScene's in a frame
 } performanceCounters_t;
 
@@ -1210,6 +1213,13 @@ bool	RB_VR_PresentFrame( void );
 void	R_VR_ShutdownTargets( void );
 // front end (RenderSystem_vr.cpp): destroys the VR targets before an image purge
 void	R_VR_DestroyTargets( void );
+// The eye the front end is rendering a stereo VR frame for, -1 otherwise.
+int	R_VR_FrontEndEye( void );
+// A frame key for a subview that depends on the eye it is seen from (mirror,
+// reflection, refraction and x-ray render maps): unique per frame and eye.
+int	R_VR_EyeSubviewFrameKey( void );
+// Frees the world-GUI quads the eyes of one stereo frame share (tr_guisurf.cpp).
+void	R_ShutdownStereoGuiShare( void );
 // RenderSystem_init.cpp: VR frames present the window without waiting for vsync
 void	R_SetVRSwapIntervalBypass( bool active );
 

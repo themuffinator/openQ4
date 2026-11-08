@@ -248,6 +248,32 @@ void idRenderSystemLocal::ApplyVRTargetExtent( int width, int height ) {
 	R_TemporalPresentation_SetVRExtent( width, height );
 }
 
+/*
+====================
+R_VR_FrontEndEye
+====================
+*/
+int R_VR_FrontEndEye( void ) {
+	return tr.vrFrame.active && tr.vrFrame.stereo && ( tr.vrFrontEndTarget == 0 || tr.vrFrontEndTarget == 1 )
+		? tr.vrFrontEndTarget : -1;
+}
+
+/*
+====================
+R_VR_EyeSubviewFrameKey
+
+A texture subview whose camera is derived from the viewer (a mirror,
+reflection, refraction or x-ray render map) is rendered once per frame and
+eye: the second eye reusing the first eye's capture showed it the first
+eye's reflection. Unsigned arithmetic keeps the key defined when the frame
+count wraps; equality is all callers test.
+====================
+*/
+int R_VR_EyeSubviewFrameKey( void ) {
+	const unsigned int eye = (unsigned int)( R_VR_FrontEndEye() + 1 );	// 0 flat or screen, 1/2 the eyes
+	return (int)( (unsigned int)tr.frameCount * 4u + eye );
+}
+
 static void R_VR_AddTargetCommand( int target, int width, int height ) {
 	vrTargetCommand_t *cmd = (vrTargetCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
 	cmd->commandId = RC_VR_TARGET;

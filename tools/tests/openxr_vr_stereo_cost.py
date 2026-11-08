@@ -20,7 +20,9 @@ headset budgets come from the refresh rate (11.1 ms at 90 Hz, 13.9 ms at 72 Hz).
 --system-runtime measures on the installed OpenXR runtime and a real headset
 instead (VR-02's qualification checklist): its eyes are the headset's own and
 its frames are paced by the headset's compositor, so the CPU and GPU work, not
-the frame interval, is the comparable figure.
+the frame interval, is the comparable figure. --preset applies a performance
+preset first (quality and ultra render shadow maps), keeping the harness's
+unpaced frame settings, and the report goes to its own profile directory.
 """
 from __future__ import annotations
 
@@ -92,6 +94,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--eye-size", default="1440x1600", help="the per-eye size the runtime recommends")
     parser.add_argument("--window", default="1920x1080", help="the flat window size")
     parser.add_argument("--extra", action="append", default=[], help="another cvar=value for both phases (A/B tests)")
+    parser.add_argument("--preset", help="applyPerformancePreset first (for example quality), keeping unpaced frames")
     parser.add_argument("--system-runtime", action="store_true",
                         help="use the installed OpenXR runtime and headset, not the test runtime")
     options = parser.parse_args(argv)
@@ -107,7 +110,7 @@ def main(argv: list[str] | None = None) -> None:
     output = (options.output_dir or ROOT / ".tmp/openxr-vr-stereo-cost").resolve()
     if output == staged or staged in output.parents or output in staged.parents:
         parser.error("output and staged runtime directories must not overlap")
-    profile = output / f"{options.render_api}"
+    profile = output / (f"{options.render_api}-{options.preset}" if options.preset else options.render_api)
     game = profile / "baseoq4"
     game.mkdir(parents=True, exist_ok=True)
     for phase in PHASES:
@@ -118,8 +121,13 @@ def main(argv: list[str] | None = None) -> None:
     # 256 frames fill the trace; 400 more than that keeps the last phase's frames only
     settle = "wait 400"
     vulkan_restart = 6000 if options.render_api == "vulkan" else 2500
+    # a preset sets the frame cap and vsync its own way; measure unpaced again
+    unpaced = []
+    if options.preset:
+        unpaced = ["com_maxfps 0", "r_swapInterval 0"]
+        unpaced += [" ".join(item.partition("=")[::2]) for item in options.extra]
     commands = [
-        "waitMsec 2500", "god", "notarget", f"setviewpos {POSE}", "g_stopTime 1", "waitMsec 1500",
+        *unpaced, "waitMsec 2500", "god", "notarget", f"setviewpos {POSE}", "g_stopTime 1", "waitMsec 1500",
         "r_rendererMetrics 1", settle, "echo VR_COST_FLAT", "rendererBenchmarkCapture stereo_cost_flat.csv",
         "vr_enable 1", "vr_restart", f"waitMsec {vulkan_restart}", "vr_status", settle,
         "echo VR_COST_STEREO", "rendererBenchmarkCapture stereo_cost_stereo.csv",
@@ -155,6 +163,8 @@ def main(argv: list[str] | None = None) -> None:
         settings[key] = value
     for key, value in settings.items():
         args += ["+set", key, value]
+    if options.preset:
+        args += ["+applyPerformancePreset", options.preset]
     args += ["+map", "game/airdefense1"]
     command = [str(staged / executable), *args]
     (profile / "command.json").write_text(json.dumps(command, indent=2), encoding="utf-8")
@@ -172,7 +182,7 @@ def main(argv: list[str] | None = None) -> None:
     eye_size = re.search(r"OpenXR: session created, eyes (\d+)x(\d+)", text)
     report = {"render_api": options.render_api, "runtime": "system" if options.system_runtime else "test",
               "eye_size": f"{eye_size.group(1)}x{eye_size.group(2)}" if options.system_runtime and eye_size else options.eye_size,
-              "window": options.window, "extra": options.extra, "phases": {}}
+              "window": options.window, "extra": options.extra, "preset": options.preset, "phases": {}}
     for phase in PHASES:
         report["phases"][phase] = summarise(game / f"stereo_cost_{phase}.csv")
         report["phases"][phase]["work"] = work(text, f"VR_COST_{phase.upper()}")

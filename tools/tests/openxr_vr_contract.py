@@ -17,6 +17,10 @@ Pins what keeps VR safe to ship without a headset in CI:
   input, and every action name the runtime shows is localised;
 - both game modules draw the aim marker into each eye between its 3D pass and
   its fade;
+- a stereo frame shares view-independent work between the eyes and keeps
+  eye-dependent work per eye (VR-04): the second eye emits the first eye's
+  world-GUI quads, a remote camera renders once per frame, and mirror,
+  reflection, refraction and x-ray render maps render once per eye;
 - the user guide, developer plan, licence notice and runtime smoke exist.
 """
 from __future__ import annotations
@@ -237,6 +241,37 @@ def check_temporal() -> None:
             "the simulated-runtime smoke qualifies per-eye history")
 
 
+def check_stereo_sharing() -> None:
+    # VR-04: share what does not depend on the eye, keep what does
+    gui = read("src/renderer/tr_guisurf.cpp")
+    require(gui, "if ( R_VR_FrontEndEye() != 1 || !R_StereoGuiShareEligible() ) {",
+            "only the second eye emits shared GUI quads")
+    require(gui, "if ( R_VR_FrontEndEye() != 0 || !R_StereoGuiShareEligible() ) {",
+            "only the first eye keeps GUI quads for sharing")
+    require(gui, "tr.guiRecursionLevel == 1 && tr.viewDef != NULL && !tr.viewDef->isSubview",
+            "subviews and nested GUIs never share")
+    require(gui, "slot.frameCount == tr.frameCount && slot.time == tr.viewDef->renderView.time",
+            "shared quads belong to this frame and GUI time only")
+    require(gui, "if ( tr.viewCount == viewCountBeforeRedraw ) {",
+            "a GUI that rendered a view of its own draws again for the second eye")
+    require(read("src/renderer/RenderSystem_init.cpp"), "R_ShutdownStereoGuiShare();",
+            "the shared GUI models are freed with the renderer")
+    subview = read("src/renderer/tr_subview.cpp")
+    if subview.count("stage->dynamicFrameCount == R_VR_EyeSubviewFrameKey()") != 4             or subview.count("stage->dynamicFrameCount = R_VR_EyeSubviewFrameKey();") != 4:
+        raise AssertionError("mirror, reflection, refraction and x-ray render maps must render per eye")
+    remote = subview.partition("static void R_RemoteRender(")[2].partition("void R_MirrorRender(")[0]
+    require(remote, "if ( stage->dynamicFrameCount == tr.frameCount ) {",
+            "a remote camera renders once per frame for both eyes")
+    vr = read("src/renderer/RenderSystem_vr.cpp")
+    require(vr, "return (int)( (unsigned int)tr.frameCount * 4u + eye );",
+            "the eye subview key separates the frame's targets")
+    require(read("src/renderer/TemporalPresentation.cpp"), "return R_VR_FrontEndEye();",
+            "temporal presentation and stereo sharing agree on the eye")
+    share = read("tools/tests/openxr_vr_stereo_share_smoke.py")
+    require(share, 'assert 2 * stereo["shared"] == stereo["guis"]', "the share smoke requires every second eye's GUI shared")
+    require(share, 'assert stereo["eye_subviews"] == 2 * flat["eye_subviews"]', "the share smoke requires a mirror per eye")
+
+
 def check_engine() -> None:
     system = read("src/framework/VRSystem.cpp")
     require(system, "#if defined( OPENQ4_OPENXR )\nidVRSystem *vrSystem = VR_GetOpenXRSystem();",
@@ -343,6 +378,7 @@ def main() -> int:
     check_egl()
     check_play_space()
     check_temporal()
+    check_stereo_sharing()
     check_engine()
     check_strings()
     check_documents()

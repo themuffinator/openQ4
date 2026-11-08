@@ -2904,6 +2904,15 @@ completed release material here and publish curated notes in `releases/`.
   headset qualification is the [VR-02 checklist](vr-headset-qualification.md),
   and Quest waits on AND-05.
 
+- [x] Mirrors and other reflective surfaces now show each eye its own
+  reflection in VR; before, the right eye saw the left eye's (VR-04). Screens
+  in the world are now drawn once per frame for both eyes instead of once per
+  eye, saving CPU time in stereo without changing the picture
+  (`r_vrStereoGuiShare 0` turns this off). Known, OpenGL only and not new: in the headset, screens in the world
+  can disappear behind the scenery beyond them, and mirrors show streaks.
+  Vulkan is unaffected.
+  [Evidence](platform-recovery-review.md#stereo-work-sharing-8-november-2026).
+
 - [x] Recover safely when a damaged save fails partway through physics or
   vehicle data. Partial physics state no longer points cleanup at another
   entity or indexes unset contacts, and failed vehicle-part reads release their

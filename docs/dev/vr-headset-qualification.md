@@ -51,7 +51,7 @@ here: it waits on the AND-05 distribution decision.
 | # | Do this | Pass when |
 | --- | --- | --- |
 | 2.1 | In the runtime's performance overlay, watch frame timing in the airdefense1 battle and in a dark indoor map (`game/hangar1`). | Frames hold the headset's refresh rate (90, 80 or 72 Hz) with no repeating reprojection in ordinary play. Note any sustained drops and where. |
-| 2.2 | Run `python tools/tests/openxr_vr_stereo_cost.py --basepath <Quake 4> --system-runtime --render-api gl`, then `--render-api vulkan`, with the headset on. | Report the printed stereo CPU and GPU p95/p99 against the budget for the headset's rate: 11.1 ms at 90 Hz, 12.5 ms at 80 Hz, 13.9 ms at 72 Hz. Attach both `report.json` files. |
+| 2.2 | Run `python tools/tests/openxr_vr_stereo_cost.py --basepath <Quake 4> --system-runtime --render-api gl`, then `--render-api vulkan`, with the headset on. Repeat both with `--preset quality` (shadow maps on). | Report the printed stereo CPU and GPU p95/p99 against the budget for the headset's rate: 11.1 ms at 90 Hz, 12.5 ms at 80 Hz, 13.9 ms at 72 Hz. Attach all four `report.json` files. |
 | 2.3 | Turn your head quickly left and right while looking at a doorway edge. | The world stays fixed in space; no lag, swim or judder. |
 
 ## 3. Aim, hands and weapons (VR-02)

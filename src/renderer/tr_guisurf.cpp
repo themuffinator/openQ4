@@ -255,6 +255,102 @@ static void R_UpdateGuiScreenRectState( idUserInterface *gui, const drawSurf_t *
 
 /*
 =================
+Stereo GUI sharing (VR-04)
+
+Both eyes of a stereo frame draw a world GUI at the same game time, and the
+quads a GUI emits are in its own 640x480 space, so they do not depend on the
+eye. The first eye keeps them; the second eye emits those instead of running
+the GUI again. A GUI that rendered a view of its own while drawing (a
+renderDef window) is drawn again, because its quads alone would drop that
+view from the second eye. Flat frames, subviews and nested GUIs never share.
+=================
+*/
+static const int STEREO_GUI_SHARE_SLOTS = 32;
+
+typedef struct {
+	const idUserInterface *	gui;
+	int						frameCount;
+	int						time;
+	idGuiModel *			model;
+} stereoGuiShare_t;
+
+static stereoGuiShare_t	stereoGuiShare[STEREO_GUI_SHARE_SLOTS];
+
+idCVar r_vrStereoGuiShare( "r_vrStereoGuiShare", "1", CVAR_RENDERER | CVAR_BOOL,
+	"the second eye of a stereo VR frame emits the world-GUI quads the first eye drew instead of running each GUI again" );
+
+static bool R_StereoGuiShareEligible( void ) {
+	return r_vrStereoGuiShare.GetBool() && R_VR_FrontEndEye() >= 0 && tr.guiRecursionLevel == 1 && tr.viewDef != NULL && !tr.viewDef->isSubview;
+}
+
+static stereoGuiShare_t *R_StereoGuiShareFind( const idUserInterface *gui ) {
+	for ( int i = 0; i < STEREO_GUI_SHARE_SLOTS; i++ ) {
+		stereoGuiShare_t &slot = stereoGuiShare[i];
+		if ( slot.gui == gui && slot.frameCount == tr.frameCount && slot.time == tr.viewDef->renderView.time
+				&& slot.model != NULL ) {
+			return &slot;
+		}
+	}
+	return NULL;
+}
+
+// The first eye's quads for this GUI, when the second eye can emit them.
+static idGuiModel *R_StereoGuiShareLookup( const idUserInterface *gui ) {
+	if ( R_VR_FrontEndEye() != 1 || !R_StereoGuiShareEligible() ) {
+		return NULL;
+	}
+	stereoGuiShare_t *slot = R_StereoGuiShareFind( gui );
+	return slot != NULL ? slot->model : NULL;
+}
+
+// Moves the GUI's freshly drawn quads (tr.guiModel) into a slot the second eye
+// can find, and returns the model holding them now.
+static idGuiModel *R_StereoGuiShareKeep( const idUserInterface *gui ) {
+	if ( R_VR_FrontEndEye() != 0 || !R_StereoGuiShareEligible() ) {
+		return tr.guiModel;
+	}
+	stereoGuiShare_t *slot = R_StereoGuiShareFind( gui );
+	if ( slot == NULL ) {
+		for ( int i = 0; i < STEREO_GUI_SHARE_SLOTS && slot == NULL; i++ ) {
+			if ( stereoGuiShare[i].frameCount != tr.frameCount || stereoGuiShare[i].gui == NULL ) {
+				slot = &stereoGuiShare[i];
+			}
+		}
+	}
+	if ( slot == NULL ) {
+		return tr.guiModel;	// more GUIs in view than slots: the rest draw per eye
+	}
+	if ( slot->model == NULL ) {
+		slot->model = new idGuiModel;
+	}
+	slot->gui = gui;
+	slot->frameCount = tr.frameCount;
+	slot->time = tr.viewDef->renderView.time;
+	slot->model->Swap( *tr.guiModel );
+	return slot->model;
+}
+
+// A GUI that rendered a view while drawing cannot be shared this frame.
+static void R_StereoGuiShareForget( const idUserInterface *gui ) {
+	for ( int i = 0; i < STEREO_GUI_SHARE_SLOTS; i++ ) {
+		if ( stereoGuiShare[i].gui == gui ) {
+			stereoGuiShare[i].gui = NULL;
+			stereoGuiShare[i].frameCount = -1;
+		}
+	}
+}
+
+void R_ShutdownStereoGuiShare( void ) {
+	for ( int i = 0; i < STEREO_GUI_SHARE_SLOTS; i++ ) {
+		delete stereoGuiShare[i].model;
+		stereoGuiShare[i].model = NULL;
+		stereoGuiShare[i].gui = NULL;
+		stereoGuiShare[i].frameCount = -1;
+	}
+}
+
+/*
+=================
 R_RenderGuiSurf
 
 Create a texture space on the given surface and
@@ -319,11 +415,24 @@ void R_RenderGuiSurf( idUserInterface *gui, drawSurf_t *drawSurf, int entityGui 
 	tr.guiModel->Clear();
 	idGuiModel *emitted = recorded;
 	if ( emitted == NULL ) {
+		// the second eye of a stereo frame emits the first eye's quads
+		emitted = R_StereoGuiShareLookup( gui );
+		if ( emitted != NULL ) {
+			tr.pc.c_guiSurfsShared++;
+		}
+	}
+	if ( emitted == NULL ) {
+		const int viewCountBeforeRedraw = tr.viewCount;
 		gui->Redraw( tr.viewDef->renderView.time, false );
 		if ( demoWorld && session->writeDemo != NULL && tr.guiRecursionLevel == 1 && !tr.viewDef->isSubview ) {
 			world->WriteGuiSurface( entityDef->index, entityGui, *tr.guiModel );
 		}
-		emitted = tr.guiModel;
+		if ( tr.viewCount == viewCountBeforeRedraw ) {
+			emitted = R_StereoGuiShareKeep( gui );
+		} else {
+			R_StereoGuiShareForget( gui );
+			emitted = tr.guiModel;
+		}
 	}
 	// The generated quads become ordinary 3D drawSurfs. Preserve that origin
 	// explicitly so shared in-world ownership cannot claim root UI by sort.
