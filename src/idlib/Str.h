@@ -898,10 +898,13 @@ ID_INLINE void idStr::Append( const char *text, int l ) {
 		);
 		EnsureAlloced( idStrAllocationDetail::SaturatingAdd( newLength, 1 ) );
 		newLen = idLib::SizeToInt( newLength, "idStr::Append" );
-		for ( i = 0; text[ i ] && i < l; i++ ) {
+		// Test the bound before reading: callers pass exact-length buffers that
+		// are not NUL-terminated. An embedded NUL ends the copy, and the length
+		// then counts only the bytes copied, not the uninitialised tail.
+		for ( i = 0; i < l && text[ i ]; i++ ) {
 			data[ len + i ] = text[ i ];
 		}
-		len = newLen;
+		len = ( i == l ) ? newLen : len + i;
 		data[ len ] = '\0';
 	}
 }

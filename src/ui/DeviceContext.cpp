@@ -1134,6 +1134,13 @@ int idDeviceContext::FindFont( const char *name ) {
 		return index;
 	} else {
 		common->Printf( "Could not register font %s [%s]\n", name, fileName.c_str() );
+		// The unnamed placeholder can never match a later lookup, so keeping it
+		// grew the list on every retry and made ReloadFonts report a failure
+		// after every vid_restart. It is the last entry, so removing it moves
+		// nothing; entry 0 stays as the SetFont fallback slot.
+		if ( index > 0 ) {
+			fonts.RemoveIndex( index );
+		}
 		return -1;
 	}
 }

@@ -8636,6 +8636,8 @@ void idMultiplayerGame::RemoveAnnouncerSoundRange( int startType, int endType ) 
 			if ( snd->soundShader == i ) {
 				snd->announcerSoundNode.Remove( );
 				delete snd;
+				// openQ4: the rest of the range would read the freed node
+				break;
 			}
 		}
 	}

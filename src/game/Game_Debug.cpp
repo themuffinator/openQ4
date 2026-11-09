@@ -335,11 +335,11 @@ rvGameDebug::JumpTo
 ================
 */
 void rvGameDebug::JumpTo ( int jumpIndex ) {
-	if ( jumpIndex >= jumpPoints.Num() ) { 
+	if ( jumpIndex < 0 || jumpIndex >= jumpPoints.Num() ) { 
 		return;
 	}
 
-	jumpIndex = jumpIndex;
+	this->jumpIndex = jumpIndex;
 
 	idPlayer* player = gameLocal.GetLocalPlayer();
 	if( player ) {

@@ -595,6 +595,13 @@ Sys_InstallCrashHandler
 ====================
 */
 void Sys_InstallCrashHandler(void) {
+	// A stack overflow runs the exception filter in the few KB past the guard
+	// page. The 8 KB log buffer, the path buffers, LoadLibrary and
+	// MiniDumpWriteDump need more, so the report faulted again and the process
+	// died with no log or dump. Reserve headroom on this (the main) thread;
+	// its 16 MB stack makes 128 KB a small price.
+	ULONG stackGuarantee = 128 * 1024;
+	SetThreadStackGuarantee(&stackGuarantee);
 	_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 	_set_invalid_parameter_handler(Sys_InvalidParameterHandler);
 	_set_purecall_handler(Sys_PurecallHandler);

@@ -2781,7 +2781,8 @@ void R_AddEffectSurfaces(void) {
 	int dropFrustumCull = 0;
 	int dropScissor = 0;
 
-	effectSubmit_t *pending = (effectSubmit_t *)R_FrameAlloc( Max( 1, world->effectsDef.Num() ) * sizeof( effectSubmit_t ) );
+	int pendingCapacity = Max( 1, world->effectsDef.Num() );
+	effectSubmit_t *pending = (effectSubmit_t *)R_FrameAlloc( pendingCapacity * sizeof( effectSubmit_t ) );
 	int numPending = 0;
 
 	for (int i = 0; i < world->effectsDef.Num(); i++) {
@@ -2960,6 +2961,15 @@ void R_AddEffectSurfaces(void) {
 			continue;
 		}
 
+		// Servicing and rendering an effect can start others through the game
+		// (impact, timeout and child effects reach AddEffectDef), and this loop
+		// visits the defs they append, so the list can outgrow its first size.
+		if ( numPending == pendingCapacity ) {
+			effectSubmit_t *grown = (effectSubmit_t *)R_FrameAlloc( pendingCapacity * 2 * sizeof( effectSubmit_t ) );
+			memcpy( grown, pending, numPending * sizeof( pending[0] ) );
+			pending = grown;
+			pendingCapacity *= 2;
+		}
 		effectSubmit_t &submit = pending[numPending++];
 		submit.def = def;
 		submit.space = vEffect;

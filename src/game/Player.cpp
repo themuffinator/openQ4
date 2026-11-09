@@ -5545,6 +5545,10 @@ idPlayer::ClearPowerup
 ==============
 */
 void idPlayer::ClearPowerup( int i ) {
+	// openQ4: EVENT_POWERUP passes a short straight off the wire here.
+	if ( i < 0 || i >= POWERUP_MAX ) {
+		return;
+	}
 	if ( gameLocal.isServer ) {
 		idBitMsg	msg;
 		byte		msgBuf[MAX_EVENT_PARAM_SIZE];

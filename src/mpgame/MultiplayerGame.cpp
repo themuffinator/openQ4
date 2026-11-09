@@ -22609,7 +22609,33 @@ void idMultiplayerGame::ReceiveCenterPrint( const idBitMsg &msg ) {
 }
 // openQ4 END
 
+// openQ4: a client receives these parameters as signed bytes from the server
+// (GAME_RELIABLE_MESSAGE_DB), and the player-name events index userInfo and
+// entities with them; the asserts below are gone in release builds.
+static bool MP_MessageEventParmsValid( msg_evt_t evt, int parm1, int parm2 ) {
+	const bool client1 = parm1 >= 0 && parm1 < MAX_CLIENTS;
+	const bool client2 = parm2 >= 0 && parm2 < MAX_CLIENTS;
+	switch ( evt ) {
+		case MSG_KILLED:
+		case MSG_KILLEDTEAM:
+		case MSG_TELEFRAGGED:
+			return client1 && client2;
+		case MSG_SUICIDE:
+		case MSG_DIED:
+		case MSG_FORCEREADY:
+		case MSG_JOINEDSPEC:
+		case MSG_FRAGLIMIT:	// a team number (0/1) in team games, a client otherwise
+			return client1;
+		default:
+			return true;
+	}
+}
+
 void idMultiplayerGame::PrintMessageEvent( int to, msg_evt_t evt, int parm1, int parm2 ) {
+	if ( !MP_MessageEventParmsValid( evt, parm1, parm2 ) ) {
+		gameLocal.Warning( "Ignoring message event %d with invalid parameters %d %d", (int)evt, parm1, parm2 );
+		return;
+	}
 	idPlayer *p = gameLocal.GetLocalPlayer();
 	if ( to == -1 || ( p && to == p->entityNumber ) ) {
 		switch ( evt ) {
@@ -25872,6 +25898,8 @@ void idMultiplayerGame::RemoveAnnouncerSoundRange( int startType, int endType ) 
 			if ( snd->soundShader == i ) {
 				snd->announcerSoundNode.Remove( );
 				delete snd;
+				// openQ4: the rest of the range would read the freed node
+				break;
 			}
 		}
 	}

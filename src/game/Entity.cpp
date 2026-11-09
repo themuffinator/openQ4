@@ -3926,9 +3926,19 @@ bool idEntity::RunPhysics( void ) {
 
 		// if the master pusher has a "blocked" function, call it
 		Signal( SIG_BLOCKED );
+// openQ4 BEGIN
+		// The mover team-blocked handlers delete some blockers on the spot
+		// (ProcessEvent( &EV_Remove )), so look the blocker up again before
+		// the part handler damages or names it.
+		idEntityPtr<idEntity> blocker;
+		blocker = blockingEntity;
 		ProcessEvent( &EV_TeamBlocked, blockedPart, blockingEntity );
-		// call the blocked function on the blocked part
-		blockedPart->ProcessEvent( &EV_PartBlocked, blockingEntity );
+		blockingEntity = blocker.GetEntity();
+		if ( blockingEntity != NULL ) {
+			// call the blocked function on the blocked part
+			blockedPart->ProcessEvent( &EV_PartBlocked, blockingEntity );
+		}
+// openQ4 END
 		return false;
 	}
 

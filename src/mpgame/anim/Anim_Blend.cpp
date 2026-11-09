@@ -354,8 +354,10 @@ const char *idAnim::AddFrameCommand( const idDeclModelDef *modelDef, const idLis
 		token.Split( *fc.parmList, ' ' );
 		fc.event = idEventDef::FindEvent( (*fc.parmList)[0] );
 		if( !fc.event ) {
+			// openQ4: format before the delete, which nulls the list
+			const char *errorText = va( "Event '%s' not found", (*fc.parmList)[0].c_str() );
 			SAFE_DELETE_PTR( fc.parmList );
-			return va( "Event '%s' not found", (*fc.parmList)[0].c_str() );
+			return errorText;
 		}
 		
 		fc.parmList->RemoveIndex( 0 );

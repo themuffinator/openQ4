@@ -2562,8 +2562,11 @@ static idImage *VK_Post_BuildHDRPyramid( const viewDef_t *viewDef, idImage *scen
 	for ( int level = 0; level < VK_HDR_MAX_LEVELS; ++level ) {
 		const int nextWidth = Max( 1, ( width + 1 ) / 2 ), nextHeight = Max( 1, ( height + 1 ) / 2 );
 		const float block[4] = { 1.0f / width, 1.0f / height, level == 0 ? 1.0f : 0.0f, 0.0f };
+		// Not va(): its shared ring is not thread safe and this can run on the render thread.
+		char targetName[32];
+		idStr::snPrintf( targetName, sizeof( targetName ), "_vkHDRLuminance%d", level );
 		if ( !VK_Post_EnsureColorTarget( vkHDR.images[level], vkHDR.targets[level],
-				va( "_vkHDRLuminance%d", level ), nextWidth, nextHeight, TF_LINEAR, "Vulkan HDR luminance" )
+				targetName, nextWidth, nextHeight, TF_LINEAR, "Vulkan HDR luminance" )
 				|| !VK_Post_DrawBloomStep( vkHDR.targets[level], VK_POST_HDR_LUMINANCE,
 					VK_POST_MODULE_HDR_LUMINANCE, source, block, sizeof( block ), plan ) ) { return NULL; }
 		source = vkHDR.images[level];
@@ -2771,9 +2774,12 @@ static bool VK_Post_BuildBloomPyramid( const viewDef_t *viewDef, idImage *scene,
 		int width, height;
 		VK_Post_BloomLevelSize( level, viewWidth, viewHeight, width, height );
 		for ( int pingPong = 0; pingPong < 2; pingPong++ ) {
+			// Not va(): its shared ring is not thread safe and this can run on the render thread.
+			char targetName[32];
+			idStr::snPrintf( targetName, sizeof( targetName ), "_vkBloomL%dP%d", level, pingPong );
 			if ( !VK_Post_EnsureColorTarget( vkPostScene.bloomImages[ level ][ pingPong ],
 					vkPostScene.bloomTargets[ level ][ pingPong ],
-					va( "_vkBloomL%dP%d", level, pingPong ), width, height, TF_LINEAR, "Vulkan bloom level" ) ) {
+					targetName, width, height, TF_LINEAR, "Vulkan bloom level" ) ) {
 				return false;
 			}
 		}

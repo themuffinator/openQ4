@@ -4418,6 +4418,10 @@ void idPhantomObjects::Event_Activate( idEntity *activator ) {
 	} else {
 		target = static_cast<idActor *>( activator );
 	}
+	// openQ4: no local player to aim at on a dedicated server
+	if ( !target.GetEntity() ) {
+		return;
+	}
 	
 	end_time = gameLocal.time + SEC2MS( spawnArgs.GetFloat( "end_time", "0" ) );
 
@@ -4474,6 +4478,10 @@ void idPhantomObjects::Think( void ) {
 	targetEnt = target.GetEntity();
 	if ( !targetEnt || ( targetEnt->health <= 0 ) || ( end_time && ( gameLocal.time > end_time ) ) || gameLocal.inCinematic ) {
 		BecomeInactive( TH_THINK );
+		// openQ4: the throw below needs the target
+		if ( !targetEnt ) {
+			return;
+		}
 	}
 
 	const idVec3 &toPos = targetEnt->GetEyePosition();
