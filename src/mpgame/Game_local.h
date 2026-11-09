@@ -398,6 +398,8 @@ typedef enum {
 	// not a send throttle - this one paces the "your events are being dropped"
 	// log line so a flooding client cannot drive the server's disk writes
 	RELIABLE_FLOOD_EVENT,
+	// emotes are forwarded to every client in the sender's instance
+	RELIABLE_FLOOD_EMOTE,
 
 	RELIABLE_FLOOD_NUM
 } reliableFloodClass_t;
@@ -408,6 +410,7 @@ const int RELIABLE_FLOOD_CHAT_DELAY		= 500;
 const int RELIABLE_FLOOD_VCHAT_DELAY	= 500;
 const int RELIABLE_FLOOD_VOTEMAPS_DELAY	= 2000;
 const int RELIABLE_FLOOD_EVENT_DELAY	= 5000;
+const int RELIABLE_FLOOD_EMOTE_DELAY	= 500;
 
 // "has never sent one of these".  It cannot be 0: gameLocal.time starts at 0 on
 // every map load, so a zero stamp reads as "sent just now" and swallows each
@@ -1362,7 +1365,10 @@ private:
 	void					NetworkEventWarning( const entityNetEvent_t *event, const char *fmt, ... ) id_attribute((format(printf,3,4)));
 // openQ4: client->server reliable message abuse guards
 	int						CountQueuedClientEvents( int clientNum );
+public:
+	// also asked by idPlayer for the client events it forwards
 	bool					CheckClientReliableFlood( int clientNum, int floodClass, int delayMS );
+private:
 	void					ResetClientReliableFlood( int clientNum );
 	void					ServerProcessEntityNetworkEventQueue( void );
 	void					ClientProcessEntityNetworkEventQueue( void );

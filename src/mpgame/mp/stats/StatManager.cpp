@@ -589,6 +589,13 @@ void rvStatManager::ReceiveInGameAward( const idBitMsg& msg ) {
 	inGameAward_t award = (inGameAward_t)msg.ReadByte();
 	int client = msg.ReadByte();
 
+	// openQ4: both bytes index fixed tables below - the award counts and names,
+	// and the per-client icon rows
+	if ( award < 0 || award >= IGA_NUM_AWARDS || client < 0 || client >= MAX_CLIENTS ) {
+		common->Warning( "Ignoring in-game award %d for client %d", (int)award, client );
+		return;
+	}
+
 	// display award on hud		
 	idPlayer* player = gameLocal.GetLocalPlayer();
 	idPlayer* remote = gameLocal.GetClientByNum(client);

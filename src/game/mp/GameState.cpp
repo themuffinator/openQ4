@@ -2009,6 +2009,15 @@ void rvTourneyGameState::UnpackState( const idBitMsg& inMsg ) {
 				
 				assert( rnd >= 1 ); // something is uninitialized
 
+				// openQ4: these index tourneyHistory's rounds and divide below
+				if ( startRound < 1 || startRound > MAX_ROUNDS ||
+					 rnd < 1 || rnd > MAX_ROUNDS ||
+					 maxr < 1 || maxr > MAX_ROUNDS ) {
+					common->Warning( "Ignoring invalid tourney history range %d/%d/%d",
+						startRound, rnd, maxr );
+					break;
+				}
+
 				for( int i = startRound - 1; i <= Min( (rnd - 1), (maxr - 1) ); i++ ) {
 					for( int j = 0; j < MAX_ARENAS / (i + 1); j++ ) {
 						inMsg.ReadString( tourneyHistory[ i ][ j ].playerOne, MAX_TOURNEY_HISTORY_NAME_LEN );

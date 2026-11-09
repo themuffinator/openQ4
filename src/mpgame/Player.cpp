@@ -15753,11 +15753,32 @@ bool idPlayer::ServerReceiveEvent( int event, int time, const idBitMsg &msg ) {
 			return true;
 		}
 		case EVENT_EMOTE: {
+			// openQ4: an emote is one byte. The sender's parameters used to be
+			// forwarded as they came, up to MAX_EVENT_PARAM_SIZE bytes of them and
+			// as many times a frame as the event queue allows, each as a reliable
+			// message to every client in the instance - enough to overflow the
+			// other players' reliable queues and have the server drop them.
+			// Validate, throttle and forward a message built here instead.
+			const int newEmote = msg.ReadByte();
+			if ( msg.IsReadOverflowed() || newEmote < PE_NONE || newEmote > PE_TAUNT ) {
+				return true;
+			}
+			if ( !gameLocal.CheckClientReliableFlood( entityNumber, RELIABLE_FLOOD_EMOTE, RELIABLE_FLOOD_EMOTE_DELAY ) ) {
+				return true;
+			}
+
+			idBitMsg	forwardMsg;
+			byte		forwardBuf[8];
+
+			forwardMsg.Init( forwardBuf, sizeof( forwardBuf ) );
+			forwardMsg.BeginWriting();
+			forwardMsg.WriteByte( newEmote );
+
 			// forward the emote on to all clients except the one that sent it to us
-			ServerSendInstanceEvent( EVENT_EMOTE, &msg, false, entityNumber );
+			ServerSendInstanceEvent( EVENT_EMOTE, &forwardMsg, false, entityNumber );
 
 			// Set the emote locally
-			SetEmote( (playerEmote_t)msg.ReadByte() );
+			SetEmote( (playerEmote_t)newEmote );
 			
 			return true;
 		}

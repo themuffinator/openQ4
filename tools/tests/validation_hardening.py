@@ -819,6 +819,7 @@ def validate_validation_wiring() -> None:
         # Generated production excerpts are compiled by the Meson native tests.
         "generate_aas_tactical_test.py",
         "generate_bitmsg_test.py",
+        "generate_compressor_test.py",
         "mp_view_decoder.py",
         "linux_dedicated_server_smoke.py",
         "linux_dedicated_stock_map_smoke.py",

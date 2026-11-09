@@ -166,7 +166,7 @@ private:
 	idMsgQueue		reliableReceive;
 
 private:
-	void			WriteMessageData( idBitMsg &out, const idBitMsg &msg );
+	bool			WriteMessageData( idBitMsg &out, const idBitMsg &msg );
 	bool			ReadMessageData( idBitMsg &out, const idBitMsg &msg );
 
 	void			UpdateOutgoingRate( const int time, const int size );
