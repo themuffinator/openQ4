@@ -178,6 +178,8 @@ windowDef Desktop
 	}
 
 	onNamedEvent warmupTransitionIn {
+		// openQ4: the Remastered warm-up banner (oq4_warmbanner) slides with the stock bar.
+		transition "oq4_warmbanner_slab::rect" "$oq4_warmbanner_slab::rect" "$oq4_warmbanner_down::rect" "500" ;
 		set "tourn_topbar::visible" "0" ;
 		set "p_round1::visible" "0" ;
 		set "p_round2::visible" "0" ;
@@ -188,6 +190,8 @@ windowDef Desktop
 	}
 
 	onNamedEvent warmupTransitionOut {
+		// openQ4: the Remastered warm-up banner (oq4_warmbanner) slides with the stock bar.
+		transition "oq4_warmbanner_slab::rect" "$oq4_warmbanner_down::rect" "$oq4_warmbanner_up::rect" "500" ;
 		if ( "gui::round" == 1 ) {
 			set "p_round1::visible" "1" ;
 			set "p_round2::visible" "0" ;
@@ -1527,1373 +1531,3167 @@ windowDef Desktop
 			screenalignx	left
 			screenaligny	top
 			visible	1
-			windowDef tourn_topbar
-			{
-				rect	-99,-29,840,62
-				visible	0
-				background	"gfx/guis/common/128_sqsolid"
-				matcolor	0,0,0,0.6
-			}
+			// openQ4: outside Classic the bar sits in the centre screen and shows only
+			// with a round name (oq4_tbar_text).
 			windowDef tourn_topmsg
 			{
-				rect	0,34,640,32
-				visible	1
+				rect	"gui::oq4_hudEdgeLeft",34,640,32
+				visible	("gui::oq4_hudRemastered" == 0) + "gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * ("oq4_tbar_text::textwidth" > 0)
 				background	"gfx/guis/hud/tourntop_msg"
 				matcolor	0,0,0,0.6
 			}
-			windowDef tourn_stopwatch
+			// openQ4: the stock strip, clock and lines; oq4_tourney_rem and oq4_rem_tl
+			// draw the Remastered ones outside Classic.
+			windowDef oq4_stock_tourn
 			{
-				rect	4,57,20,20
-				visible	1
-				background	"gfx/guis/hud/icons/icon_stopwatch"
-				matcolor	1,1,0.552,1
-			}
-			windowDef tourn_time
-			{
-				rect	23,59,200,20
-				visible	("gui::infinity" == 0)
-				forecolor	1,1,1,1
-				text	"gui::timeleft"
-				textscale	.25
-				textstyle	1
-				font	"fonts/lowpixel"
-			}
-			windowDef tourn_infinity
-			{
-				rect	25,59,20,19
-				visible	("gui::infinity" == 1)
-				background	"gfx/guis/hud/icons/icon_infinity"
-				matcolor	1,1,1,1
-			}		
-			windowDef tourn_arenaInfo_1
-			{
-				rect	4,36,632,16
-				visible	1
-				forecolor	1,1,1,1
-				text	"gui::spectatetext0"
-				textscale	.22
-				textstyle	1
-				font	"fonts/lowpixel"
-			}
-			windowDef tourn_arenaInfo_2
-			{
-				rect	4,77,632,16
-				visible	1
-				forecolor	1,1,0.552,1
-				text	"gui::spectatetext1"
-				textscale	0.2
-				textstyle	1
-				font	"fonts/lowpixel"
-			}
-			windowDef tourn_arenaInfo_3
-			{
-				rect	4,91,632,16
-				visible	1
-				forecolor	1,1,0.552,1
-				text	"gui::spectatetext2"
-				textscale	0.2
-				textstyle	1
-				font	"fonts/lowpixel"
-			}
-			windowDef p_round1
-			{
-				rect	0,0,640,32
-				visible	0
-				windowDef round1_sep1
+				rect	0,0,( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),480
+				noclip	1
+				visible	("gui::oq4_hudRemastered" == 0)
+				windowDef tourn_topbar
 				{
-					rect	77,0,8,32
-					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
+					rect	-99,-29,840,62
+					visible	0
+					background	"gfx/guis/common/128_sqsolid"
+					matcolor	0,0,0,0.6
 				}
-				windowDef round1_sep2
+				windowDef tourn_stopwatch
 				{
-					rect	157,0,8,32
+					rect	4,57,20,20
 					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
+					background	"gfx/guis/hud/icons/icon_stopwatch"
+					matcolor	1,1,0.552,1
 				}
-				windowDef round1_sep3
+				windowDef tourn_time
 				{
-					rect	237,0,8,32
-					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
+					rect	23,59,200,20
+					visible	("gui::infinity" == 0)
+					forecolor	1,1,1,1
+					text	"gui::timeleft"
+					textscale	.25
+					textstyle	1
+					font	"fonts/lowpixel"
 				}
-				windowDef round1_sep4
+				windowDef tourn_infinity
 				{
-					rect	317,0,8,32
-					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
-				}
-				windowDef round1_sep5
+					rect	25,59,20,19
+					visible	("gui::infinity" == 1)
+					background	"gfx/guis/hud/icons/icon_infinity"
+					matcolor	1,1,1,1
+				}		
+				windowDef tourn_arenaInfo_1
 				{
-					rect	397,0,8,32
+					rect	4,36,632,16
 					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
+					forecolor	1,1,1,1
+					text	"gui::spectatetext0"
+					textscale	.22
+					textstyle	1
+					font	"fonts/lowpixel"
 				}
-				windowDef round1_sep6
+				windowDef tourn_arenaInfo_2
 				{
-					rect	477,0,8,32
+					rect	4,77,632,16
 					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
+					forecolor	1,1,0.552,1
+					text	"gui::spectatetext1"
+					textscale	0.2
+					textstyle	1
+					font	"fonts/lowpixel"
 				}
-				windowDef round1_sep7
+				windowDef tourn_arenaInfo_3
 				{
-					rect	557,0,8,32
+					rect	4,91,632,16
 					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
+					forecolor	1,1,0.552,1
+					text	"gui::spectatetext2"
+					textscale	0.2
+					textstyle	1
+					font	"fonts/lowpixel"
 				}
-				windowDef p_round1_bracket1
-				{
-					rect	0,0,80,32
-					visible	1
-					windowDef hover_round1_bracket1
-					{
-						rect	1,0,128,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round1_bracket1
-					{
-						rect	1,1,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round1_bracket1
-					{
-						rect	1,15,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round1_bracket1
-					{
-						rect	2,0,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round1_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round1_bracket1
-					{
-						rect	66,0,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round1_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round1_bracket1
-					{
-						rect	2,13,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round1_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round1_bracket1
-					{
-						rect	66,13,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round1_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round1_bracket1
-					{
-						rect	0,6,80,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round1_bracket2
-				{
-					rect	80,0,80,32
-					visible	1
-					windowDef hover_round1_bracket2
-					{
-						rect	1,0,128,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round1_bracket2
-					{
-						rect	1,1,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round1_bracket2
-					{
-						rect	1,15,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round1_bracket2
-					{
-						rect	2,0,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round1_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round1_bracket2
-					{
-						rect	66,0,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round1_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round1_bracket2
-					{
-						rect	2,13,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round1_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round1_bracket2
-					{
-						rect	66,13,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round1_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round1_bracket2
-					{
-						rect	0,6,80,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round1_bracket3
-				{
-					rect	160,0,80,32
-					visible	1
-					windowDef hover_round1_bracket3
-					{
-						rect	1,0,128,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round1_bracket3
-					{
-						rect	1,1,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round1_bracket3
-					{
-						rect	1,15,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round1_bracket3
-					{
-						rect	2,0,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round1_bracket3"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round1_bracket3
-					{
-						rect	66,0,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round1_bracket3"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round1_bracket3
-					{
-						rect	2,13,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round1_bracket3"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round1_bracket3
-					{
-						rect	66,13,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round1_bracket3"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round1_bracket3
-					{
-						rect	0,6,80,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round1_bracket4
-				{
-					rect	240,0,80,32
-					visible	1
-					windowDef hover_round1_bracket4
-					{
-						rect	1,0,128,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round1_bracket4
-					{
-						rect	1,1,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round1_bracket4
-					{
-						rect	1,15,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round1_bracket4
-					{
-						rect	2,0,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round1_bracket4"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round1_bracket4
-					{
-						rect	66,0,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round1_bracket4"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round1_bracket4
-					{
-						rect	2,13,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round1_bracket4"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round1_bracket4
-					{
-						rect	66,13,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round1_bracket4"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round1_bracket4
-					{
-						rect	0,6,80,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round1_bracket5
-				{
-					rect	320,0,80,32
-					visible	1
-					windowDef hover_round1_bracket5
-					{
-						rect	1,0,128,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round1_bracket5
-					{
-						rect	1,1,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round1_bracket5
-					{
-						rect	1,15,128,15
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round1_bracket5
-					{
-						rect	2,0,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round1_bracket5"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round1_bracket5
-					{
-						rect	66,0,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round1_bracket5"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round1_bracket5
-					{
-						rect	2,13,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round1_bracket5"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round1_bracket5
-					{
-						rect	66,13,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round1_bracket5"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round1_bracket5
-					{
-						rect	0,6,80,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round1_bracket6
-				{
-					rect	400,0,80,32
-					visible	1
-					windowDef hover_round1_bracket6
-					{
-						rect	1,0,128,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round1_bracket6
-					{
-						rect	1,1,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round1_bracket6
-					{
-						rect	1,15,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round1_bracket6
-					{
-						rect	2,0,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round1_bracket6"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round1_bracket6
-					{
-						rect	66,0,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round1_bracket6"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round1_bracket6
-					{
-						rect	2,13,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round1_bracket6"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round1_bracket6
-					{
-						rect	66,13,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round1_bracket6"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round1_bracket6
-					{
-						rect	0,6,80,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round1_bracket7
-				{
-					rect	480,0,80,32
-					visible	1
-					windowDef hover_round1_bracket7
-					{
-						rect	1,0,128,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round1_bracket7
-					{
-						rect	1,1,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round1_bracket7
-					{
-						rect	1,15,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round1_bracket7
-					{
-						rect	2,0,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round1_bracket7"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round1_bracket7
-					{
-						rect	66,0,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round1_bracket7"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round1_bracket7
-					{
-						rect	2,13,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round1_bracket7"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round1_bracket7
-					{
-						rect	66,13,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round1_bracket7"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round1_bracket7
-					{
-						rect	0,6,80,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round1_bracket8
-				{
-					rect	560,0,80,32
-					visible	1
-					windowDef hover_round1_bracket8
-					{
-						rect	1,0,128,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round1_bracket8
-					{
-						rect	1,1,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round1_bracket8
-					{
-						rect	1,15,128,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round1_bracket8
-					{
-						rect	2,0,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round1_bracket8"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round1_bracket8
-					{
-						rect	66,0,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round1_bracket8"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round1_bracket8
-					{
-						rect	2,13,66,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round1_bracket8"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round1_bracket8
-					{
-						rect	66,13,11,15
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round1_bracket8"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round1_bracket8
-					{
-						rect	0,6,80,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-			}
-			windowDef p_round2
-			{
-				rect	0,0,640,32
-				visible	0
-				windowDef round2_sep
-				{
-					rect	157,0,8,32
-					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
-				}
-				windowDef round2_sep2
-				{
-					rect	317,0,8,32
-					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
-				}
-				windowDef round2_sep3
-				{
-					rect	477,0,8,32
-					visible	1
-					background	"gfx/guis/hud/tourn_sep"
-					matcolor	1,1,1,0.5
-				}
-				windowDef p_round2_bracket1
-				{
-					rect	0,0,160,32
-					visible	1
-					windowDef hover_round2_bracket1
-					{
-						rect	1,0,256,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over2"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round2_bracket1
-					{
-						rect	1,1,256,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round2_bracket1
-					{
-						rect	1,15,256,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round2_bracket1
-					{
-						rect	2,0,140,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round2_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round2_bracket1
-					{
-						rect	146,0,11,16
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round2_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round2_bracket1
-					{
-						rect	2,13,140,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round2_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round2_bracket1
-					{
-						rect	146,13,11,16
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round2_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round2_bracket1
-					{
-						rect	0,6,160,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round2_bracket2
-				{
-					rect	160,0,160,32
-					visible	1
-					windowDef hover_round2_bracket2
-					{
-						rect	1,0,256,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over2"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round2_bracket2
-					{
-						rect	1,1,256,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round2_bracket2
-					{
-						rect	1,15,256,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round2_bracket2
-					{
-						rect	3,0,140,16
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round2_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round2_bracket2
-					{
-						rect	146,0,11,16
-						visible	1
-						forecolor	1,0.5,0,1
-						text	"gui::score1_round2_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round2_bracket2
-					{
-						rect	2,13,140,16
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round2_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round2_bracket2
-					{
-						rect	146,13,11,16
-						visible	1
-						forecolor	1,0.5,0,1
-						text	"gui::score2_round2_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round2_bracket2
-					{
-						rect	0,6,160,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round2_bracket3
-				{
-					rect	320,0,160,32
-					visible	1
-					windowDef hover_round2_bracket3
-					{
-						rect	1,0,256,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over2"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round2_bracket3
-					{
-						rect	1,1,256,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round2_bracket3
-					{
-						rect	1,15,256,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round2_bracket3
-					{
-						rect	2,0,140,16
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round2_bracket3"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round2_bracket3
-					{
-						rect	146,0,11,16
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round2_bracket3"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round2_bracket3
-					{
-						rect	2,13,140,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round2_bracket3"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round2_bracket3
-					{
-						rect	146,13,11,16
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round2_bracket3"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round2_bracket3
-					{
-						rect	0,6,160,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-				windowDef p_round2_bracket4
-				{
-					rect	480,0,160,32
-					visible	1
-					windowDef hover_round2_bracket4
-					{
-						rect	0,0,256,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over2"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round2_bracket4
-					{
-						rect	1,1,256,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round2_bracket4
-					{
-						rect	1,15,256,16
-						visible	1
-						background	"gfx/guis/hud/tourntop_sel2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round2_bracket4
-					{
-						rect	2,0,140,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round2_bracket4"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round2_bracket4
-					{
-						rect	146,0,11,16
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round2_bracket4"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round2_bracket4
-					{
-						rect	2,13,140,15
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round2_bracket4"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round2_bracket4
-					{
-						rect	146,13,11,16
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round2_bracket4"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round2_bracket4
-					{
-						rect	0,6,160,15
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-				}
-			}
-			windowDef p_round3
-			{
-				rect	0,0,640,32
-				visible	0
-				windowDef round3_sep
-				{
-					rect	312,0,16,32
-					visible	1
-					background	"gfx/guis/hud/tourn_sep2"
-					matcolor	1,1,1,0.5
-				}
-				windowDef p_round3_bracket1
-				{
-					rect	0,0,320,32
-					visible	1
-					windowDef hover_round3_bracket1
-					{
-						rect	1,0,315,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over3"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round3_bracket1
-					{
-						rect	1,0,220,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round3_bracket1
-					{
-						rect	179,0,220,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round3_bracket1
-					{
-						rect	3,6,102,14
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round3_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round3_bracket1
-					{
-						rect	108,3,17,22
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round3_bracket1"
-						textscale	0.33
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round3_bracket1
-					{
-						rect	182,6,102,14
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round3_bracket1"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round3_bracket1
-					{
-						rect	285,3,17,22
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round3_bracket1"
-						textscale	0.33
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round3_bracket1
-					{
-						rect	0,4,320,20
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.33
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-					windowDef vs_round3_bracket1
-					{
-						rect	144,6,29,17
-						visible	1
-						forecolor	1,1,1,0.6
-						text	"#str_200290"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-				}
-				windowDef p_round3_bracket2
-				{
-					rect	320,0,320,32
-					visible	1
-					windowDef hover_round3_bracket2
-					{
-						rect	4,0,315,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over3"
-						matcolor	0.243,0.341,0.717,0
-					}
-					windowDef sel1_round3_bracket2
-					{
-						rect	4,0,220,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef sel2_round3_bracket2
-					{
-						rect	182,0,220,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over2"
-						matcolor	0.368,0.725,0.529,0
-					}
-					windowDef name1_round3_bracket2
-					{
-						rect	7,6,112,13
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round3_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score1_round3_bracket2
-					{
-						rect	111,3,17,21
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round3_bracket2"
-						textscale	0.33
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef name2_round3_bracket2
-					{
-						rect	186,6,112,13
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round3_bracket2"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-					windowDef score2_round3_bracket2
-					{
-						rect	288,3,17,22
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round3_bracket2"
-						textscale	0.33
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
-					}
-					windowDef empty_round3_bracket2
-					{
-						rect	0,4,320,20
-						visible	0
-						forecolor	1,1,1,0.4
-						text	"#str_200952"
-						textscale	0.33
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	1
-					}
-					windowDef vs_round3_bracket2
-					{
-						rect	147,6,29,16
-						visible	1
-						forecolor	1,1,1,0.6
-						text	"#str_200290"
-						textscale	0.22
-						font	"fonts/lowpixel"
-						textstyle	1
-					}
-				}
-			}
-			windowDef p_round4
-			{
-				rect	0,0,640,32
-				visible	0
-				windowDef p_round4_bracket1
+				windowDef p_round1
 				{
 					rect	0,0,640,32
-					visible	1
-					windowDef hover_round4_bracket1
+					visible	0
+					windowDef round1_sep1
+					{
+						rect	77,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef round1_sep2
+					{
+						rect	157,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef round1_sep3
+					{
+						rect	237,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef round1_sep4
+					{
+						rect	317,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef round1_sep5
+					{
+						rect	397,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef round1_sep6
+					{
+						rect	477,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef round1_sep7
+					{
+						rect	557,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef p_round1_bracket1
+					{
+						rect	0,0,80,32
+						visible	1
+						windowDef hover_round1_bracket1
+						{
+							rect	1,0,128,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round1_bracket1
+						{
+							rect	1,1,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round1_bracket1
+						{
+							rect	1,15,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round1_bracket1
+						{
+							rect	2,0,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round1_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round1_bracket1
+						{
+							rect	66,0,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round1_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round1_bracket1
+						{
+							rect	2,13,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round1_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round1_bracket1
+						{
+							rect	66,13,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round1_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round1_bracket1
+						{
+							rect	0,6,80,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round1_bracket2
+					{
+						rect	80,0,80,32
+						visible	1
+						windowDef hover_round1_bracket2
+						{
+							rect	1,0,128,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round1_bracket2
+						{
+							rect	1,1,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round1_bracket2
+						{
+							rect	1,15,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round1_bracket2
+						{
+							rect	2,0,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round1_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round1_bracket2
+						{
+							rect	66,0,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round1_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round1_bracket2
+						{
+							rect	2,13,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round1_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round1_bracket2
+						{
+							rect	66,13,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round1_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round1_bracket2
+						{
+							rect	0,6,80,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round1_bracket3
+					{
+						rect	160,0,80,32
+						visible	1
+						windowDef hover_round1_bracket3
+						{
+							rect	1,0,128,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round1_bracket3
+						{
+							rect	1,1,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round1_bracket3
+						{
+							rect	1,15,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round1_bracket3
+						{
+							rect	2,0,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round1_bracket3"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round1_bracket3
+						{
+							rect	66,0,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round1_bracket3"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round1_bracket3
+						{
+							rect	2,13,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round1_bracket3"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round1_bracket3
+						{
+							rect	66,13,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round1_bracket3"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round1_bracket3
+						{
+							rect	0,6,80,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round1_bracket4
+					{
+						rect	240,0,80,32
+						visible	1
+						windowDef hover_round1_bracket4
+						{
+							rect	1,0,128,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round1_bracket4
+						{
+							rect	1,1,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round1_bracket4
+						{
+							rect	1,15,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round1_bracket4
+						{
+							rect	2,0,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round1_bracket4"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round1_bracket4
+						{
+							rect	66,0,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round1_bracket4"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round1_bracket4
+						{
+							rect	2,13,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round1_bracket4"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round1_bracket4
+						{
+							rect	66,13,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round1_bracket4"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round1_bracket4
+						{
+							rect	0,6,80,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round1_bracket5
+					{
+						rect	320,0,80,32
+						visible	1
+						windowDef hover_round1_bracket5
+						{
+							rect	1,0,128,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round1_bracket5
+						{
+							rect	1,1,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round1_bracket5
+						{
+							rect	1,15,128,15
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round1_bracket5
+						{
+							rect	2,0,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round1_bracket5"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round1_bracket5
+						{
+							rect	66,0,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round1_bracket5"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round1_bracket5
+						{
+							rect	2,13,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round1_bracket5"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round1_bracket5
+						{
+							rect	66,13,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round1_bracket5"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round1_bracket5
+						{
+							rect	0,6,80,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round1_bracket6
+					{
+						rect	400,0,80,32
+						visible	1
+						windowDef hover_round1_bracket6
+						{
+							rect	1,0,128,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round1_bracket6
+						{
+							rect	1,1,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round1_bracket6
+						{
+							rect	1,15,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round1_bracket6
+						{
+							rect	2,0,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round1_bracket6"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round1_bracket6
+						{
+							rect	66,0,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round1_bracket6"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round1_bracket6
+						{
+							rect	2,13,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round1_bracket6"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round1_bracket6
+						{
+							rect	66,13,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round1_bracket6"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round1_bracket6
+						{
+							rect	0,6,80,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round1_bracket7
+					{
+						rect	480,0,80,32
+						visible	1
+						windowDef hover_round1_bracket7
+						{
+							rect	1,0,128,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round1_bracket7
+						{
+							rect	1,1,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round1_bracket7
+						{
+							rect	1,15,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round1_bracket7
+						{
+							rect	2,0,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round1_bracket7"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round1_bracket7
+						{
+							rect	66,0,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round1_bracket7"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round1_bracket7
+						{
+							rect	2,13,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round1_bracket7"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round1_bracket7
+						{
+							rect	66,13,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round1_bracket7"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round1_bracket7
+						{
+							rect	0,6,80,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round1_bracket8
+					{
+						rect	560,0,80,32
+						visible	1
+						windowDef hover_round1_bracket8
+						{
+							rect	1,0,128,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round1_bracket8
+						{
+							rect	1,1,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round1_bracket8
+						{
+							rect	1,15,128,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round1_bracket8
+						{
+							rect	2,0,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round1_bracket8"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round1_bracket8
+						{
+							rect	66,0,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round1_bracket8"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round1_bracket8
+						{
+							rect	2,13,66,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round1_bracket8"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round1_bracket8
+						{
+							rect	66,13,11,15
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round1_bracket8"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round1_bracket8
+						{
+							rect	0,6,80,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+				}
+				windowDef p_round2
+				{
+					rect	0,0,640,32
+					visible	0
+					windowDef round2_sep
+					{
+						rect	157,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef round2_sep2
+					{
+						rect	317,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef round2_sep3
+					{
+						rect	477,0,8,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep"
+						matcolor	1,1,1,0.5
+					}
+					windowDef p_round2_bracket1
+					{
+						rect	0,0,160,32
+						visible	1
+						windowDef hover_round2_bracket1
+						{
+							rect	1,0,256,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over2"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round2_bracket1
+						{
+							rect	1,1,256,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round2_bracket1
+						{
+							rect	1,15,256,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round2_bracket1
+						{
+							rect	2,0,140,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round2_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round2_bracket1
+						{
+							rect	146,0,11,16
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round2_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round2_bracket1
+						{
+							rect	2,13,140,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round2_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round2_bracket1
+						{
+							rect	146,13,11,16
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round2_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round2_bracket1
+						{
+							rect	0,6,160,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round2_bracket2
+					{
+						rect	160,0,160,32
+						visible	1
+						windowDef hover_round2_bracket2
+						{
+							rect	1,0,256,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over2"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round2_bracket2
+						{
+							rect	1,1,256,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round2_bracket2
+						{
+							rect	1,15,256,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round2_bracket2
+						{
+							rect	3,0,140,16
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round2_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round2_bracket2
+						{
+							rect	146,0,11,16
+							visible	1
+							forecolor	1,0.5,0,1
+							text	"gui::score1_round2_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round2_bracket2
+						{
+							rect	2,13,140,16
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round2_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round2_bracket2
+						{
+							rect	146,13,11,16
+							visible	1
+							forecolor	1,0.5,0,1
+							text	"gui::score2_round2_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round2_bracket2
+						{
+							rect	0,6,160,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round2_bracket3
+					{
+						rect	320,0,160,32
+						visible	1
+						windowDef hover_round2_bracket3
+						{
+							rect	1,0,256,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over2"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round2_bracket3
+						{
+							rect	1,1,256,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round2_bracket3
+						{
+							rect	1,15,256,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round2_bracket3
+						{
+							rect	2,0,140,16
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round2_bracket3"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round2_bracket3
+						{
+							rect	146,0,11,16
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round2_bracket3"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round2_bracket3
+						{
+							rect	2,13,140,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round2_bracket3"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round2_bracket3
+						{
+							rect	146,13,11,16
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round2_bracket3"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round2_bracket3
+						{
+							rect	0,6,160,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+					windowDef p_round2_bracket4
+					{
+						rect	480,0,160,32
+						visible	1
+						windowDef hover_round2_bracket4
+						{
+							rect	0,0,256,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over2"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round2_bracket4
+						{
+							rect	1,1,256,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round2_bracket4
+						{
+							rect	1,15,256,16
+							visible	1
+							background	"gfx/guis/hud/tourntop_sel2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round2_bracket4
+						{
+							rect	2,0,140,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round2_bracket4"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round2_bracket4
+						{
+							rect	146,0,11,16
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round2_bracket4"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round2_bracket4
+						{
+							rect	2,13,140,15
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round2_bracket4"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round2_bracket4
+						{
+							rect	146,13,11,16
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round2_bracket4"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round2_bracket4
+						{
+							rect	0,6,160,15
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+					}
+				}
+				windowDef p_round3
+				{
+					rect	0,0,640,32
+					visible	0
+					windowDef round3_sep
+					{
+						rect	312,0,16,32
+						visible	1
+						background	"gfx/guis/hud/tourn_sep2"
+						matcolor	1,1,1,0.5
+					}
+					windowDef p_round3_bracket1
+					{
+						rect	0,0,320,32
+						visible	1
+						windowDef hover_round3_bracket1
+						{
+							rect	1,0,315,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over3"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round3_bracket1
+						{
+							rect	1,0,220,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round3_bracket1
+						{
+							rect	179,0,220,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round3_bracket1
+						{
+							rect	3,6,102,14
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round3_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round3_bracket1
+						{
+							rect	108,3,17,22
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round3_bracket1"
+							textscale	0.33
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round3_bracket1
+						{
+							rect	182,6,102,14
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round3_bracket1"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round3_bracket1
+						{
+							rect	285,3,17,22
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round3_bracket1"
+							textscale	0.33
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round3_bracket1
+						{
+							rect	0,4,320,20
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.33
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+						windowDef vs_round3_bracket1
+						{
+							rect	144,6,29,17
+							visible	1
+							forecolor	1,1,1,0.6
+							text	"#str_200290"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+					}
+					windowDef p_round3_bracket2
+					{
+						rect	320,0,320,32
+						visible	1
+						windowDef hover_round3_bracket2
+						{
+							rect	4,0,315,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over3"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round3_bracket2
+						{
+							rect	4,0,220,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round3_bracket2
+						{
+							rect	182,0,220,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over2"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round3_bracket2
+						{
+							rect	7,6,112,13
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round3_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round3_bracket2
+						{
+							rect	111,3,17,21
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round3_bracket2"
+							textscale	0.33
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round3_bracket2
+						{
+							rect	186,6,112,13
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round3_bracket2"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round3_bracket2
+						{
+							rect	288,3,17,22
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round3_bracket2"
+							textscale	0.33
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef empty_round3_bracket2
+						{
+							rect	0,4,320,20
+							visible	0
+							forecolor	1,1,1,0.4
+							text	"#str_200952"
+							textscale	0.33
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	1
+						}
+						windowDef vs_round3_bracket2
+						{
+							rect	147,6,29,16
+							visible	1
+							forecolor	1,1,1,0.6
+							text	"#str_200290"
+							textscale	0.22
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+					}
+				}
+				windowDef p_round4
+				{
+					rect	0,0,640,32
+					visible	0
+					windowDef p_round4_bracket1
 					{
 						rect	0,0,640,32
 						visible	1
-						background	"gfx/guis/hud/tourntop_over3"
-						matcolor	0.243,0.341,0.717,0
+						windowDef hover_round4_bracket1
+						{
+							rect	0,0,640,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over3"
+							matcolor	0.243,0.341,0.717,0
+						}
+						windowDef sel1_round4_bracket1
+						{
+							rect	1,0,284,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over3"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef sel2_round4_bracket1
+						{
+							rect	354,0,284,32
+							visible	1
+							background	"gfx/guis/hud/tourntop_over3"
+							matcolor	0.368,0.725,0.529,0
+						}
+						windowDef name1_round4_bracket1
+						{
+							rect	6,4,224,22
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name1_round4_bracket1"
+							textscale	0.31
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score1_round4_bracket1
+						{
+							rect	248,2,17,25
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score1_round4_bracket1"
+							textscale	0.4
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef name2_round4_bracket1
+						{
+							rect	378,4,224,22
+							visible	1
+							forecolor	1,1,1,1
+							text	"gui::name2_round4_bracket1"
+							textscale	0.31
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
+						windowDef score2_round4_bracket1
+						{
+							rect	610,2,17,25
+							visible	1
+							forecolor	1,0.501,0,1
+							text	"gui::score2_round4_bracket1"
+							textscale	0.4
+							font	"fonts/lowpixel"
+							textstyle	1
+							textalign	2
+						}
+						windowDef vs_round4_bracket1
+						{
+							rect	298,2,44,25
+							visible	1
+							forecolor	1,1,1,0.6
+							text	"#str_200290"
+							textscale	0.4
+							font	"fonts/lowpixel"
+							textstyle	1
+						}
 					}
-					windowDef sel1_round4_bracket1
+				}
+			}
+			// openQ4: Remastered Tourney (ui-visual-design.md 14.9) in the centre screen: the
+			// bracket strip on plates at 0.55 read from the stock cells' state (names, the
+			// blue settle, your row aqua at 0.40, the winner checked and the loser at
+			// 0.50), the message bar's round name and the instructions under it.
+			windowDef oq4_tourney_rem
+			{
+				rect	"gui::oq4_hudEdgeLeft",0,640,480
+				noclip	1
+				visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras"
+				windowDef oq4_tround1
+				{
+					rect	0,0,640,34
+					noclip	1
+					visible	("gui::round" == 1)
+					windowDef oq4_t1b1
 					{
-						rect	1,0,284,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over3"
-						matcolor	0.368,0.725,0.529,0
+						rect	2,2,78,30
+						noclip	1
+						windowDef oq4_t1b1_plate
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t1b1_blue
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round1_bracket1::matcolor_w" * "desktop::round1_bracket1_done"
+							shear	0,-.22
+							visible	"desktop::round1_bracket1_done"
+						}
+						windowDef oq4_t1b1_sel1
+						{
+							rect	1.5,2,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round1_bracket1::matcolor_w" > 0.2) + ("hover_round1_bracket1::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket1_done"))
+							shear	0,-.22
+							visible	"name1_round1_bracket1::visible"
+						}
+						windowDef oq4_t1b1_n1
+						{
+							rect	4,3.6,56,12
+							text	"gui::name1_round1_bracket1"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round1_bracket1::forecolor_x","name1_round1_bracket1::forecolor_y","name1_round1_bracket1::forecolor_z","name1_round1_bracket1::forecolor_w"
+							visible	"name1_round1_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b1_s1
+						{
+							rect	45,2.68,30,12
+							text	"gui::score1_round1_bracket1"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round1_bracket1::forecolor_x","score1_round1_bracket1::forecolor_y","score1_round1_bracket1::forecolor_z","score1_round1_bracket1::forecolor_w"
+							visible	"score1_round1_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b1_check1a
+						{
+							rect	57.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket1_done" * ("name2_round1_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b1_check1b
+						{
+							rect	59.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket1_done" * ("name2_round1_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b1_sel2
+						{
+							rect	1.5,16,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round1_bracket1::matcolor_w" > 0.2) + ("hover_round1_bracket1::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket1_done"))
+							shear	0,-.22
+							visible	"name2_round1_bracket1::visible"
+						}
+						windowDef oq4_t1b1_n2
+						{
+							rect	4,17.6,56,12
+							text	"gui::name2_round1_bracket1"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round1_bracket1::forecolor_x","name2_round1_bracket1::forecolor_y","name2_round1_bracket1::forecolor_z","name2_round1_bracket1::forecolor_w"
+							visible	"name2_round1_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b1_s2
+						{
+							rect	45,16.68,30,12
+							text	"gui::score2_round1_bracket1"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round1_bracket1::forecolor_x","score2_round1_bracket1::forecolor_y","score2_round1_bracket1::forecolor_z","score2_round1_bracket1::forecolor_w"
+							visible	"score2_round1_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b1_check2a
+						{
+							rect	57.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket1_done" * ("name1_round1_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b1_check2b
+						{
+							rect	59.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket1_done" * ("name1_round1_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b1_empty
+						{
+							rect	0,9.6,78,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round1_bracket1::visible" + ("oq4_t1b1_n1::textwidth" == 0) * ("oq4_t1b1_n2::textwidth" == 0)
+							nowrap	1
+						}
 					}
-					windowDef sel2_round4_bracket1
+					windowDef oq4_t1b2
 					{
-						rect	354,0,284,32
-						visible	1
-						background	"gfx/guis/hud/tourntop_over3"
-						matcolor	0.368,0.725,0.529,0
+						rect	82,2,78,30
+						noclip	1
+						windowDef oq4_t1b2_plate
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t1b2_blue
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round1_bracket2::matcolor_w" * "desktop::round1_bracket2_done"
+							shear	0,-.22
+							visible	"desktop::round1_bracket2_done"
+						}
+						windowDef oq4_t1b2_sel1
+						{
+							rect	1.5,2,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round1_bracket2::matcolor_w" > 0.2) + ("hover_round1_bracket2::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket2_done"))
+							shear	0,-.22
+							visible	"name1_round1_bracket2::visible"
+						}
+						windowDef oq4_t1b2_n1
+						{
+							rect	4,3.6,56,12
+							text	"gui::name1_round1_bracket2"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round1_bracket2::forecolor_x","name1_round1_bracket2::forecolor_y","name1_round1_bracket2::forecolor_z","name1_round1_bracket2::forecolor_w"
+							visible	"name1_round1_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b2_s1
+						{
+							rect	45,2.68,30,12
+							text	"gui::score1_round1_bracket2"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round1_bracket2::forecolor_x","score1_round1_bracket2::forecolor_y","score1_round1_bracket2::forecolor_z","score1_round1_bracket2::forecolor_w"
+							visible	"score1_round1_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b2_check1a
+						{
+							rect	57.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket2_done" * ("name2_round1_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b2_check1b
+						{
+							rect	59.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket2_done" * ("name2_round1_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b2_sel2
+						{
+							rect	1.5,16,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round1_bracket2::matcolor_w" > 0.2) + ("hover_round1_bracket2::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket2_done"))
+							shear	0,-.22
+							visible	"name2_round1_bracket2::visible"
+						}
+						windowDef oq4_t1b2_n2
+						{
+							rect	4,17.6,56,12
+							text	"gui::name2_round1_bracket2"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round1_bracket2::forecolor_x","name2_round1_bracket2::forecolor_y","name2_round1_bracket2::forecolor_z","name2_round1_bracket2::forecolor_w"
+							visible	"name2_round1_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b2_s2
+						{
+							rect	45,16.68,30,12
+							text	"gui::score2_round1_bracket2"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round1_bracket2::forecolor_x","score2_round1_bracket2::forecolor_y","score2_round1_bracket2::forecolor_z","score2_round1_bracket2::forecolor_w"
+							visible	"score2_round1_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b2_check2a
+						{
+							rect	57.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket2_done" * ("name1_round1_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b2_check2b
+						{
+							rect	59.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket2_done" * ("name1_round1_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b2_empty
+						{
+							rect	0,9.6,78,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round1_bracket2::visible" + ("oq4_t1b2_n1::textwidth" == 0) * ("oq4_t1b2_n2::textwidth" == 0)
+							nowrap	1
+						}
 					}
-					windowDef name1_round4_bracket1
+					windowDef oq4_t1b3
 					{
-						rect	6,4,224,22
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name1_round4_bracket1"
-						textscale	0.31
-						font	"fonts/lowpixel"
-						textstyle	1
+						rect	162,2,78,30
+						noclip	1
+						windowDef oq4_t1b3_plate
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t1b3_blue
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round1_bracket3::matcolor_w" * "desktop::round1_bracket3_done"
+							shear	0,-.22
+							visible	"desktop::round1_bracket3_done"
+						}
+						windowDef oq4_t1b3_sel1
+						{
+							rect	1.5,2,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round1_bracket3::matcolor_w" > 0.2) + ("hover_round1_bracket3::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket3_done"))
+							shear	0,-.22
+							visible	"name1_round1_bracket3::visible"
+						}
+						windowDef oq4_t1b3_n1
+						{
+							rect	4,3.6,56,12
+							text	"gui::name1_round1_bracket3"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round1_bracket3::forecolor_x","name1_round1_bracket3::forecolor_y","name1_round1_bracket3::forecolor_z","name1_round1_bracket3::forecolor_w"
+							visible	"name1_round1_bracket3::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b3_s1
+						{
+							rect	45,2.68,30,12
+							text	"gui::score1_round1_bracket3"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round1_bracket3::forecolor_x","score1_round1_bracket3::forecolor_y","score1_round1_bracket3::forecolor_z","score1_round1_bracket3::forecolor_w"
+							visible	"score1_round1_bracket3::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b3_check1a
+						{
+							rect	57.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket3_done" * ("name2_round1_bracket3::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b3_check1b
+						{
+							rect	59.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket3_done" * ("name2_round1_bracket3::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b3_sel2
+						{
+							rect	1.5,16,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round1_bracket3::matcolor_w" > 0.2) + ("hover_round1_bracket3::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket3_done"))
+							shear	0,-.22
+							visible	"name2_round1_bracket3::visible"
+						}
+						windowDef oq4_t1b3_n2
+						{
+							rect	4,17.6,56,12
+							text	"gui::name2_round1_bracket3"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round1_bracket3::forecolor_x","name2_round1_bracket3::forecolor_y","name2_round1_bracket3::forecolor_z","name2_round1_bracket3::forecolor_w"
+							visible	"name2_round1_bracket3::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b3_s2
+						{
+							rect	45,16.68,30,12
+							text	"gui::score2_round1_bracket3"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round1_bracket3::forecolor_x","score2_round1_bracket3::forecolor_y","score2_round1_bracket3::forecolor_z","score2_round1_bracket3::forecolor_w"
+							visible	"score2_round1_bracket3::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b3_check2a
+						{
+							rect	57.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket3_done" * ("name1_round1_bracket3::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b3_check2b
+						{
+							rect	59.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket3_done" * ("name1_round1_bracket3::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b3_empty
+						{
+							rect	0,9.6,78,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round1_bracket3::visible" + ("oq4_t1b3_n1::textwidth" == 0) * ("oq4_t1b3_n2::textwidth" == 0)
+							nowrap	1
+						}
 					}
-					windowDef score1_round4_bracket1
+					windowDef oq4_t1b4
 					{
-						rect	248,2,17,25
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score1_round4_bracket1"
-						textscale	0.4
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
+						rect	242,2,78,30
+						noclip	1
+						windowDef oq4_t1b4_plate
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t1b4_blue
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round1_bracket4::matcolor_w" * "desktop::round1_bracket4_done"
+							shear	0,-.22
+							visible	"desktop::round1_bracket4_done"
+						}
+						windowDef oq4_t1b4_sel1
+						{
+							rect	1.5,2,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round1_bracket4::matcolor_w" > 0.2) + ("hover_round1_bracket4::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket4_done"))
+							shear	0,-.22
+							visible	"name1_round1_bracket4::visible"
+						}
+						windowDef oq4_t1b4_n1
+						{
+							rect	4,3.6,56,12
+							text	"gui::name1_round1_bracket4"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round1_bracket4::forecolor_x","name1_round1_bracket4::forecolor_y","name1_round1_bracket4::forecolor_z","name1_round1_bracket4::forecolor_w"
+							visible	"name1_round1_bracket4::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b4_s1
+						{
+							rect	45,2.68,30,12
+							text	"gui::score1_round1_bracket4"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round1_bracket4::forecolor_x","score1_round1_bracket4::forecolor_y","score1_round1_bracket4::forecolor_z","score1_round1_bracket4::forecolor_w"
+							visible	"score1_round1_bracket4::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b4_check1a
+						{
+							rect	57.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket4_done" * ("name2_round1_bracket4::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b4_check1b
+						{
+							rect	59.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket4_done" * ("name2_round1_bracket4::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b4_sel2
+						{
+							rect	1.5,16,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round1_bracket4::matcolor_w" > 0.2) + ("hover_round1_bracket4::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket4_done"))
+							shear	0,-.22
+							visible	"name2_round1_bracket4::visible"
+						}
+						windowDef oq4_t1b4_n2
+						{
+							rect	4,17.6,56,12
+							text	"gui::name2_round1_bracket4"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round1_bracket4::forecolor_x","name2_round1_bracket4::forecolor_y","name2_round1_bracket4::forecolor_z","name2_round1_bracket4::forecolor_w"
+							visible	"name2_round1_bracket4::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b4_s2
+						{
+							rect	45,16.68,30,12
+							text	"gui::score2_round1_bracket4"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round1_bracket4::forecolor_x","score2_round1_bracket4::forecolor_y","score2_round1_bracket4::forecolor_z","score2_round1_bracket4::forecolor_w"
+							visible	"score2_round1_bracket4::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b4_check2a
+						{
+							rect	57.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket4_done" * ("name1_round1_bracket4::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b4_check2b
+						{
+							rect	59.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket4_done" * ("name1_round1_bracket4::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b4_empty
+						{
+							rect	0,9.6,78,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round1_bracket4::visible" + ("oq4_t1b4_n1::textwidth" == 0) * ("oq4_t1b4_n2::textwidth" == 0)
+							nowrap	1
+						}
 					}
-					windowDef name2_round4_bracket1
+					windowDef oq4_t1b5
 					{
-						rect	378,4,224,22
-						visible	1
-						forecolor	1,1,1,1
-						text	"gui::name2_round4_bracket1"
-						textscale	0.31
-						font	"fonts/lowpixel"
-						textstyle	1
+						rect	322,2,78,30
+						noclip	1
+						windowDef oq4_t1b5_plate
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t1b5_blue
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round1_bracket5::matcolor_w" * "desktop::round1_bracket5_done"
+							shear	0,-.22
+							visible	"desktop::round1_bracket5_done"
+						}
+						windowDef oq4_t1b5_sel1
+						{
+							rect	1.5,2,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round1_bracket5::matcolor_w" > 0.2) + ("hover_round1_bracket5::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket5_done"))
+							shear	0,-.22
+							visible	"name1_round1_bracket5::visible"
+						}
+						windowDef oq4_t1b5_n1
+						{
+							rect	4,3.6,56,12
+							text	"gui::name1_round1_bracket5"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round1_bracket5::forecolor_x","name1_round1_bracket5::forecolor_y","name1_round1_bracket5::forecolor_z","name1_round1_bracket5::forecolor_w"
+							visible	"name1_round1_bracket5::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b5_s1
+						{
+							rect	45,2.68,30,12
+							text	"gui::score1_round1_bracket5"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round1_bracket5::forecolor_x","score1_round1_bracket5::forecolor_y","score1_round1_bracket5::forecolor_z","score1_round1_bracket5::forecolor_w"
+							visible	"score1_round1_bracket5::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b5_check1a
+						{
+							rect	57.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket5_done" * ("name2_round1_bracket5::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b5_check1b
+						{
+							rect	59.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket5_done" * ("name2_round1_bracket5::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b5_sel2
+						{
+							rect	1.5,16,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round1_bracket5::matcolor_w" > 0.2) + ("hover_round1_bracket5::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket5_done"))
+							shear	0,-.22
+							visible	"name2_round1_bracket5::visible"
+						}
+						windowDef oq4_t1b5_n2
+						{
+							rect	4,17.6,56,12
+							text	"gui::name2_round1_bracket5"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round1_bracket5::forecolor_x","name2_round1_bracket5::forecolor_y","name2_round1_bracket5::forecolor_z","name2_round1_bracket5::forecolor_w"
+							visible	"name2_round1_bracket5::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b5_s2
+						{
+							rect	45,16.68,30,12
+							text	"gui::score2_round1_bracket5"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round1_bracket5::forecolor_x","score2_round1_bracket5::forecolor_y","score2_round1_bracket5::forecolor_z","score2_round1_bracket5::forecolor_w"
+							visible	"score2_round1_bracket5::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b5_check2a
+						{
+							rect	57.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket5_done" * ("name1_round1_bracket5::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b5_check2b
+						{
+							rect	59.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket5_done" * ("name1_round1_bracket5::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b5_empty
+						{
+							rect	0,9.6,78,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round1_bracket5::visible" + ("oq4_t1b5_n1::textwidth" == 0) * ("oq4_t1b5_n2::textwidth" == 0)
+							nowrap	1
+						}
 					}
-					windowDef score2_round4_bracket1
+					windowDef oq4_t1b6
 					{
-						rect	610,2,17,25
-						visible	1
-						forecolor	1,0.501,0,1
-						text	"gui::score2_round4_bracket1"
-						textscale	0.4
-						font	"fonts/lowpixel"
-						textstyle	1
-						textalign	2
+						rect	402,2,78,30
+						noclip	1
+						windowDef oq4_t1b6_plate
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t1b6_blue
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round1_bracket6::matcolor_w" * "desktop::round1_bracket6_done"
+							shear	0,-.22
+							visible	"desktop::round1_bracket6_done"
+						}
+						windowDef oq4_t1b6_sel1
+						{
+							rect	1.5,2,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round1_bracket6::matcolor_w" > 0.2) + ("hover_round1_bracket6::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket6_done"))
+							shear	0,-.22
+							visible	"name1_round1_bracket6::visible"
+						}
+						windowDef oq4_t1b6_n1
+						{
+							rect	4,3.6,56,12
+							text	"gui::name1_round1_bracket6"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round1_bracket6::forecolor_x","name1_round1_bracket6::forecolor_y","name1_round1_bracket6::forecolor_z","name1_round1_bracket6::forecolor_w"
+							visible	"name1_round1_bracket6::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b6_s1
+						{
+							rect	45,2.68,30,12
+							text	"gui::score1_round1_bracket6"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round1_bracket6::forecolor_x","score1_round1_bracket6::forecolor_y","score1_round1_bracket6::forecolor_z","score1_round1_bracket6::forecolor_w"
+							visible	"score1_round1_bracket6::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b6_check1a
+						{
+							rect	57.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket6_done" * ("name2_round1_bracket6::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b6_check1b
+						{
+							rect	59.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket6_done" * ("name2_round1_bracket6::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b6_sel2
+						{
+							rect	1.5,16,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round1_bracket6::matcolor_w" > 0.2) + ("hover_round1_bracket6::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket6_done"))
+							shear	0,-.22
+							visible	"name2_round1_bracket6::visible"
+						}
+						windowDef oq4_t1b6_n2
+						{
+							rect	4,17.6,56,12
+							text	"gui::name2_round1_bracket6"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round1_bracket6::forecolor_x","name2_round1_bracket6::forecolor_y","name2_round1_bracket6::forecolor_z","name2_round1_bracket6::forecolor_w"
+							visible	"name2_round1_bracket6::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b6_s2
+						{
+							rect	45,16.68,30,12
+							text	"gui::score2_round1_bracket6"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round1_bracket6::forecolor_x","score2_round1_bracket6::forecolor_y","score2_round1_bracket6::forecolor_z","score2_round1_bracket6::forecolor_w"
+							visible	"score2_round1_bracket6::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b6_check2a
+						{
+							rect	57.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket6_done" * ("name1_round1_bracket6::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b6_check2b
+						{
+							rect	59.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket6_done" * ("name1_round1_bracket6::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b6_empty
+						{
+							rect	0,9.6,78,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round1_bracket6::visible" + ("oq4_t1b6_n1::textwidth" == 0) * ("oq4_t1b6_n2::textwidth" == 0)
+							nowrap	1
+						}
 					}
-					windowDef vs_round4_bracket1
+					windowDef oq4_t1b7
 					{
-						rect	298,2,44,25
-						visible	1
-						forecolor	1,1,1,0.6
-						text	"#str_200290"
-						textscale	0.4
-						font	"fonts/lowpixel"
-						textstyle	1
+						rect	482,2,78,30
+						noclip	1
+						windowDef oq4_t1b7_plate
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t1b7_blue
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round1_bracket7::matcolor_w" * "desktop::round1_bracket7_done"
+							shear	0,-.22
+							visible	"desktop::round1_bracket7_done"
+						}
+						windowDef oq4_t1b7_sel1
+						{
+							rect	1.5,2,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round1_bracket7::matcolor_w" > 0.2) + ("hover_round1_bracket7::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket7_done"))
+							shear	0,-.22
+							visible	"name1_round1_bracket7::visible"
+						}
+						windowDef oq4_t1b7_n1
+						{
+							rect	4,3.6,56,12
+							text	"gui::name1_round1_bracket7"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round1_bracket7::forecolor_x","name1_round1_bracket7::forecolor_y","name1_round1_bracket7::forecolor_z","name1_round1_bracket7::forecolor_w"
+							visible	"name1_round1_bracket7::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b7_s1
+						{
+							rect	45,2.68,30,12
+							text	"gui::score1_round1_bracket7"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round1_bracket7::forecolor_x","score1_round1_bracket7::forecolor_y","score1_round1_bracket7::forecolor_z","score1_round1_bracket7::forecolor_w"
+							visible	"score1_round1_bracket7::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b7_check1a
+						{
+							rect	57.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket7_done" * ("name2_round1_bracket7::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b7_check1b
+						{
+							rect	59.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket7_done" * ("name2_round1_bracket7::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b7_sel2
+						{
+							rect	1.5,16,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round1_bracket7::matcolor_w" > 0.2) + ("hover_round1_bracket7::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket7_done"))
+							shear	0,-.22
+							visible	"name2_round1_bracket7::visible"
+						}
+						windowDef oq4_t1b7_n2
+						{
+							rect	4,17.6,56,12
+							text	"gui::name2_round1_bracket7"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round1_bracket7::forecolor_x","name2_round1_bracket7::forecolor_y","name2_round1_bracket7::forecolor_z","name2_round1_bracket7::forecolor_w"
+							visible	"name2_round1_bracket7::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b7_s2
+						{
+							rect	45,16.68,30,12
+							text	"gui::score2_round1_bracket7"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round1_bracket7::forecolor_x","score2_round1_bracket7::forecolor_y","score2_round1_bracket7::forecolor_z","score2_round1_bracket7::forecolor_w"
+							visible	"score2_round1_bracket7::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b7_check2a
+						{
+							rect	57.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket7_done" * ("name1_round1_bracket7::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b7_check2b
+						{
+							rect	59.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket7_done" * ("name1_round1_bracket7::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b7_empty
+						{
+							rect	0,9.6,78,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round1_bracket7::visible" + ("oq4_t1b7_n1::textwidth" == 0) * ("oq4_t1b7_n2::textwidth" == 0)
+							nowrap	1
+						}
 					}
+					windowDef oq4_t1b8
+					{
+						rect	562,2,78,30
+						noclip	1
+						windowDef oq4_t1b8_plate
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t1b8_blue
+						{
+							rect	0,0,78,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round1_bracket8::matcolor_w" * "desktop::round1_bracket8_done"
+							shear	0,-.22
+							visible	"desktop::round1_bracket8_done"
+						}
+						windowDef oq4_t1b8_sel1
+						{
+							rect	1.5,2,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round1_bracket8::matcolor_w" > 0.2) + ("hover_round1_bracket8::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket8_done"))
+							shear	0,-.22
+							visible	"name1_round1_bracket8::visible"
+						}
+						windowDef oq4_t1b8_n1
+						{
+							rect	4,3.6,56,12
+							text	"gui::name1_round1_bracket8"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round1_bracket8::forecolor_x","name1_round1_bracket8::forecolor_y","name1_round1_bracket8::forecolor_z","name1_round1_bracket8::forecolor_w"
+							visible	"name1_round1_bracket8::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b8_s1
+						{
+							rect	45,2.68,30,12
+							text	"gui::score1_round1_bracket8"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round1_bracket8::forecolor_x","score1_round1_bracket8::forecolor_y","score1_round1_bracket8::forecolor_z","score1_round1_bracket8::forecolor_w"
+							visible	"score1_round1_bracket8::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b8_check1a
+						{
+							rect	57.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket8_done" * ("name2_round1_bracket8::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b8_check1b
+						{
+							rect	59.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket8_done" * ("name2_round1_bracket8::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b8_sel2
+						{
+							rect	1.5,16,75,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round1_bracket8::matcolor_w" > 0.2) + ("hover_round1_bracket8::matcolor_w" > 0.2) * (1 - "desktop::round1_bracket8_done"))
+							shear	0,-.22
+							visible	"name2_round1_bracket8::visible"
+						}
+						windowDef oq4_t1b8_n2
+						{
+							rect	4,17.6,56,12
+							text	"gui::name2_round1_bracket8"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round1_bracket8::forecolor_x","name2_round1_bracket8::forecolor_y","name2_round1_bracket8::forecolor_z","name2_round1_bracket8::forecolor_w"
+							visible	"name2_round1_bracket8::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b8_s2
+						{
+							rect	45,16.68,30,12
+							text	"gui::score2_round1_bracket8"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round1_bracket8::forecolor_x","score2_round1_bracket8::forecolor_y","score2_round1_bracket8::forecolor_z","score2_round1_bracket8::forecolor_w"
+							visible	"score2_round1_bracket8::visible"
+							nowrap	1
+						}
+						windowDef oq4_t1b8_check2a
+						{
+							rect	57.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round1_bracket8_done" * ("name1_round1_bracket8::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b8_check2b
+						{
+							rect	59.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round1_bracket8_done" * ("name1_round1_bracket8::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t1b8_empty
+						{
+							rect	0,9.6,78,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round1_bracket8::visible" + ("oq4_t1b8_n1::textwidth" == 0) * ("oq4_t1b8_n2::textwidth" == 0)
+							nowrap	1
+						}
+					}
+				}
+				windowDef oq4_tround2
+				{
+					rect	0,0,640,34
+					noclip	1
+					visible	("gui::round" == 2)
+					windowDef oq4_t2b1
+					{
+						rect	2,2,158,30
+						noclip	1
+						windowDef oq4_t2b1_plate
+						{
+							rect	0,0,158,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t2b1_blue
+						{
+							rect	0,0,158,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round2_bracket1::matcolor_w" * "desktop::round2_bracket1_done"
+							shear	0,-.22
+							visible	"desktop::round2_bracket1_done"
+						}
+						windowDef oq4_t2b1_sel1
+						{
+							rect	1.5,2,155,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round2_bracket1::matcolor_w" > 0.2) + ("hover_round2_bracket1::matcolor_w" > 0.2) * (1 - "desktop::round2_bracket1_done"))
+							shear	0,-.22
+							visible	"name1_round2_bracket1::visible"
+						}
+						windowDef oq4_t2b1_n1
+						{
+							rect	4,3.6,136,12
+							text	"gui::name1_round2_bracket1"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round2_bracket1::forecolor_x","name1_round2_bracket1::forecolor_y","name1_round2_bracket1::forecolor_z","name1_round2_bracket1::forecolor_w"
+							visible	"name1_round2_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b1_s1
+						{
+							rect	125,2.68,30,12
+							text	"gui::score1_round2_bracket1"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round2_bracket1::forecolor_x","score1_round2_bracket1::forecolor_y","score1_round2_bracket1::forecolor_z","score1_round2_bracket1::forecolor_w"
+							visible	"score1_round2_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b1_check1a
+						{
+							rect	137.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round2_bracket1_done" * ("name2_round2_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b1_check1b
+						{
+							rect	139.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round2_bracket1_done" * ("name2_round2_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b1_sel2
+						{
+							rect	1.5,16,155,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round2_bracket1::matcolor_w" > 0.2) + ("hover_round2_bracket1::matcolor_w" > 0.2) * (1 - "desktop::round2_bracket1_done"))
+							shear	0,-.22
+							visible	"name2_round2_bracket1::visible"
+						}
+						windowDef oq4_t2b1_n2
+						{
+							rect	4,17.6,136,12
+							text	"gui::name2_round2_bracket1"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round2_bracket1::forecolor_x","name2_round2_bracket1::forecolor_y","name2_round2_bracket1::forecolor_z","name2_round2_bracket1::forecolor_w"
+							visible	"name2_round2_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b1_s2
+						{
+							rect	125,16.68,30,12
+							text	"gui::score2_round2_bracket1"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round2_bracket1::forecolor_x","score2_round2_bracket1::forecolor_y","score2_round2_bracket1::forecolor_z","score2_round2_bracket1::forecolor_w"
+							visible	"score2_round2_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b1_check2a
+						{
+							rect	137.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round2_bracket1_done" * ("name1_round2_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b1_check2b
+						{
+							rect	139.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round2_bracket1_done" * ("name1_round2_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b1_empty
+						{
+							rect	0,9.6,158,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round2_bracket1::visible" + ("oq4_t2b1_n1::textwidth" == 0) * ("oq4_t2b1_n2::textwidth" == 0)
+							nowrap	1
+						}
+					}
+					windowDef oq4_t2b2
+					{
+						rect	162,2,158,30
+						noclip	1
+						windowDef oq4_t2b2_plate
+						{
+							rect	0,0,158,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t2b2_blue
+						{
+							rect	0,0,158,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round2_bracket2::matcolor_w" * "desktop::round2_bracket2_done"
+							shear	0,-.22
+							visible	"desktop::round2_bracket2_done"
+						}
+						windowDef oq4_t2b2_sel1
+						{
+							rect	1.5,2,155,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round2_bracket2::matcolor_w" > 0.2) + ("hover_round2_bracket2::matcolor_w" > 0.2) * (1 - "desktop::round2_bracket2_done"))
+							shear	0,-.22
+							visible	"name1_round2_bracket2::visible"
+						}
+						windowDef oq4_t2b2_n1
+						{
+							rect	4,3.6,136,12
+							text	"gui::name1_round2_bracket2"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round2_bracket2::forecolor_x","name1_round2_bracket2::forecolor_y","name1_round2_bracket2::forecolor_z","name1_round2_bracket2::forecolor_w"
+							visible	"name1_round2_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b2_s1
+						{
+							rect	125,2.68,30,12
+							text	"gui::score1_round2_bracket2"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round2_bracket2::forecolor_x","score1_round2_bracket2::forecolor_y","score1_round2_bracket2::forecolor_z","score1_round2_bracket2::forecolor_w"
+							visible	"score1_round2_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b2_check1a
+						{
+							rect	137.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round2_bracket2_done" * ("name2_round2_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b2_check1b
+						{
+							rect	139.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round2_bracket2_done" * ("name2_round2_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b2_sel2
+						{
+							rect	1.5,16,155,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round2_bracket2::matcolor_w" > 0.2) + ("hover_round2_bracket2::matcolor_w" > 0.2) * (1 - "desktop::round2_bracket2_done"))
+							shear	0,-.22
+							visible	"name2_round2_bracket2::visible"
+						}
+						windowDef oq4_t2b2_n2
+						{
+							rect	4,17.6,136,12
+							text	"gui::name2_round2_bracket2"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round2_bracket2::forecolor_x","name2_round2_bracket2::forecolor_y","name2_round2_bracket2::forecolor_z","name2_round2_bracket2::forecolor_w"
+							visible	"name2_round2_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b2_s2
+						{
+							rect	125,16.68,30,12
+							text	"gui::score2_round2_bracket2"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round2_bracket2::forecolor_x","score2_round2_bracket2::forecolor_y","score2_round2_bracket2::forecolor_z","score2_round2_bracket2::forecolor_w"
+							visible	"score2_round2_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b2_check2a
+						{
+							rect	137.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round2_bracket2_done" * ("name1_round2_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b2_check2b
+						{
+							rect	139.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round2_bracket2_done" * ("name1_round2_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b2_empty
+						{
+							rect	0,9.6,158,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round2_bracket2::visible" + ("oq4_t2b2_n1::textwidth" == 0) * ("oq4_t2b2_n2::textwidth" == 0)
+							nowrap	1
+						}
+					}
+					windowDef oq4_t2b3
+					{
+						rect	322,2,158,30
+						noclip	1
+						windowDef oq4_t2b3_plate
+						{
+							rect	0,0,158,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t2b3_blue
+						{
+							rect	0,0,158,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round2_bracket3::matcolor_w" * "desktop::round2_bracket3_done"
+							shear	0,-.22
+							visible	"desktop::round2_bracket3_done"
+						}
+						windowDef oq4_t2b3_sel1
+						{
+							rect	1.5,2,155,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round2_bracket3::matcolor_w" > 0.2) + ("hover_round2_bracket3::matcolor_w" > 0.2) * (1 - "desktop::round2_bracket3_done"))
+							shear	0,-.22
+							visible	"name1_round2_bracket3::visible"
+						}
+						windowDef oq4_t2b3_n1
+						{
+							rect	4,3.6,136,12
+							text	"gui::name1_round2_bracket3"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round2_bracket3::forecolor_x","name1_round2_bracket3::forecolor_y","name1_round2_bracket3::forecolor_z","name1_round2_bracket3::forecolor_w"
+							visible	"name1_round2_bracket3::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b3_s1
+						{
+							rect	125,2.68,30,12
+							text	"gui::score1_round2_bracket3"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round2_bracket3::forecolor_x","score1_round2_bracket3::forecolor_y","score1_round2_bracket3::forecolor_z","score1_round2_bracket3::forecolor_w"
+							visible	"score1_round2_bracket3::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b3_check1a
+						{
+							rect	137.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round2_bracket3_done" * ("name2_round2_bracket3::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b3_check1b
+						{
+							rect	139.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round2_bracket3_done" * ("name2_round2_bracket3::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b3_sel2
+						{
+							rect	1.5,16,155,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round2_bracket3::matcolor_w" > 0.2) + ("hover_round2_bracket3::matcolor_w" > 0.2) * (1 - "desktop::round2_bracket3_done"))
+							shear	0,-.22
+							visible	"name2_round2_bracket3::visible"
+						}
+						windowDef oq4_t2b3_n2
+						{
+							rect	4,17.6,136,12
+							text	"gui::name2_round2_bracket3"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round2_bracket3::forecolor_x","name2_round2_bracket3::forecolor_y","name2_round2_bracket3::forecolor_z","name2_round2_bracket3::forecolor_w"
+							visible	"name2_round2_bracket3::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b3_s2
+						{
+							rect	125,16.68,30,12
+							text	"gui::score2_round2_bracket3"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round2_bracket3::forecolor_x","score2_round2_bracket3::forecolor_y","score2_round2_bracket3::forecolor_z","score2_round2_bracket3::forecolor_w"
+							visible	"score2_round2_bracket3::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b3_check2a
+						{
+							rect	137.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round2_bracket3_done" * ("name1_round2_bracket3::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b3_check2b
+						{
+							rect	139.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round2_bracket3_done" * ("name1_round2_bracket3::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b3_empty
+						{
+							rect	0,9.6,158,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round2_bracket3::visible" + ("oq4_t2b3_n1::textwidth" == 0) * ("oq4_t2b3_n2::textwidth" == 0)
+							nowrap	1
+						}
+					}
+					windowDef oq4_t2b4
+					{
+						rect	482,2,158,30
+						noclip	1
+						windowDef oq4_t2b4_plate
+						{
+							rect	0,0,158,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t2b4_blue
+						{
+							rect	0,0,158,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round2_bracket4::matcolor_w" * "desktop::round2_bracket4_done"
+							shear	0,-.22
+							visible	"desktop::round2_bracket4_done"
+						}
+						windowDef oq4_t2b4_sel1
+						{
+							rect	1.5,2,155,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round2_bracket4::matcolor_w" > 0.2) + ("hover_round2_bracket4::matcolor_w" > 0.2) * (1 - "desktop::round2_bracket4_done"))
+							shear	0,-.22
+							visible	"name1_round2_bracket4::visible"
+						}
+						windowDef oq4_t2b4_n1
+						{
+							rect	4,3.6,136,12
+							text	"gui::name1_round2_bracket4"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round2_bracket4::forecolor_x","name1_round2_bracket4::forecolor_y","name1_round2_bracket4::forecolor_z","name1_round2_bracket4::forecolor_w"
+							visible	"name1_round2_bracket4::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b4_s1
+						{
+							rect	125,2.68,30,12
+							text	"gui::score1_round2_bracket4"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round2_bracket4::forecolor_x","score1_round2_bracket4::forecolor_y","score1_round2_bracket4::forecolor_z","score1_round2_bracket4::forecolor_w"
+							visible	"score1_round2_bracket4::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b4_check1a
+						{
+							rect	137.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round2_bracket4_done" * ("name2_round2_bracket4::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b4_check1b
+						{
+							rect	139.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round2_bracket4_done" * ("name2_round2_bracket4::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b4_sel2
+						{
+							rect	1.5,16,155,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round2_bracket4::matcolor_w" > 0.2) + ("hover_round2_bracket4::matcolor_w" > 0.2) * (1 - "desktop::round2_bracket4_done"))
+							shear	0,-.22
+							visible	"name2_round2_bracket4::visible"
+						}
+						windowDef oq4_t2b4_n2
+						{
+							rect	4,17.6,136,12
+							text	"gui::name2_round2_bracket4"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round2_bracket4::forecolor_x","name2_round2_bracket4::forecolor_y","name2_round2_bracket4::forecolor_z","name2_round2_bracket4::forecolor_w"
+							visible	"name2_round2_bracket4::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b4_s2
+						{
+							rect	125,16.68,30,12
+							text	"gui::score2_round2_bracket4"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round2_bracket4::forecolor_x","score2_round2_bracket4::forecolor_y","score2_round2_bracket4::forecolor_z","score2_round2_bracket4::forecolor_w"
+							visible	"score2_round2_bracket4::visible"
+							nowrap	1
+						}
+						windowDef oq4_t2b4_check2a
+						{
+							rect	137.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round2_bracket4_done" * ("name1_round2_bracket4::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b4_check2b
+						{
+							rect	139.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round2_bracket4_done" * ("name1_round2_bracket4::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t2b4_empty
+						{
+							rect	0,9.6,158,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round2_bracket4::visible" + ("oq4_t2b4_n1::textwidth" == 0) * ("oq4_t2b4_n2::textwidth" == 0)
+							nowrap	1
+						}
+					}
+				}
+				windowDef oq4_tround3
+				{
+					rect	0,0,640,34
+					noclip	1
+					visible	("gui::round" == 3)
+					windowDef oq4_t3b1
+					{
+						rect	2,2,318,30
+						noclip	1
+						windowDef oq4_t3b1_plate
+						{
+							rect	0,0,318,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t3b1_blue
+						{
+							rect	0,0,318,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round3_bracket1::matcolor_w" * "desktop::round3_bracket1_done"
+							shear	0,-.22
+							visible	"desktop::round3_bracket1_done"
+						}
+						windowDef oq4_t3b1_sel1
+						{
+							rect	1.5,2,315,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round3_bracket1::matcolor_w" > 0.2) + ("hover_round3_bracket1::matcolor_w" > 0.2) * (1 - "desktop::round3_bracket1_done"))
+							shear	0,-.22
+							visible	"name1_round3_bracket1::visible"
+						}
+						windowDef oq4_t3b1_n1
+						{
+							rect	4,3.6,296,12
+							text	"gui::name1_round3_bracket1"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round3_bracket1::forecolor_x","name1_round3_bracket1::forecolor_y","name1_round3_bracket1::forecolor_z","name1_round3_bracket1::forecolor_w"
+							visible	"name1_round3_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t3b1_s1
+						{
+							rect	285,2.68,30,12
+							text	"gui::score1_round3_bracket1"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round3_bracket1::forecolor_x","score1_round3_bracket1::forecolor_y","score1_round3_bracket1::forecolor_z","score1_round3_bracket1::forecolor_w"
+							visible	"score1_round3_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t3b1_check1a
+						{
+							rect	297.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round3_bracket1_done" * ("name2_round3_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t3b1_check1b
+						{
+							rect	299.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round3_bracket1_done" * ("name2_round3_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t3b1_sel2
+						{
+							rect	1.5,16,315,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round3_bracket1::matcolor_w" > 0.2) + ("hover_round3_bracket1::matcolor_w" > 0.2) * (1 - "desktop::round3_bracket1_done"))
+							shear	0,-.22
+							visible	"name2_round3_bracket1::visible"
+						}
+						windowDef oq4_t3b1_n2
+						{
+							rect	4,17.6,296,12
+							text	"gui::name2_round3_bracket1"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round3_bracket1::forecolor_x","name2_round3_bracket1::forecolor_y","name2_round3_bracket1::forecolor_z","name2_round3_bracket1::forecolor_w"
+							visible	"name2_round3_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t3b1_s2
+						{
+							rect	285,16.68,30,12
+							text	"gui::score2_round3_bracket1"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round3_bracket1::forecolor_x","score2_round3_bracket1::forecolor_y","score2_round3_bracket1::forecolor_z","score2_round3_bracket1::forecolor_w"
+							visible	"score2_round3_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t3b1_check2a
+						{
+							rect	297.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round3_bracket1_done" * ("name1_round3_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t3b1_check2b
+						{
+							rect	299.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round3_bracket1_done" * ("name1_round3_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t3b1_empty
+						{
+							rect	0,9.6,318,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round3_bracket1::visible" + ("oq4_t3b1_n1::textwidth" == 0) * ("oq4_t3b1_n2::textwidth" == 0)
+							nowrap	1
+						}
+					}
+					windowDef oq4_t3b2
+					{
+						rect	322,2,318,30
+						noclip	1
+						windowDef oq4_t3b2_plate
+						{
+							rect	0,0,318,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t3b2_blue
+						{
+							rect	0,0,318,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round3_bracket2::matcolor_w" * "desktop::round3_bracket2_done"
+							shear	0,-.22
+							visible	"desktop::round3_bracket2_done"
+						}
+						windowDef oq4_t3b2_sel1
+						{
+							rect	1.5,2,315,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round3_bracket2::matcolor_w" > 0.2) + ("hover_round3_bracket2::matcolor_w" > 0.2) * (1 - "desktop::round3_bracket2_done"))
+							shear	0,-.22
+							visible	"name1_round3_bracket2::visible"
+						}
+						windowDef oq4_t3b2_n1
+						{
+							rect	4,3.6,296,12
+							text	"gui::name1_round3_bracket2"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round3_bracket2::forecolor_x","name1_round3_bracket2::forecolor_y","name1_round3_bracket2::forecolor_z","name1_round3_bracket2::forecolor_w"
+							visible	"name1_round3_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t3b2_s1
+						{
+							rect	285,2.68,30,12
+							text	"gui::score1_round3_bracket2"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round3_bracket2::forecolor_x","score1_round3_bracket2::forecolor_y","score1_round3_bracket2::forecolor_z","score1_round3_bracket2::forecolor_w"
+							visible	"score1_round3_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t3b2_check1a
+						{
+							rect	297.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round3_bracket2_done" * ("name2_round3_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t3b2_check1b
+						{
+							rect	299.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round3_bracket2_done" * ("name2_round3_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t3b2_sel2
+						{
+							rect	1.5,16,315,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round3_bracket2::matcolor_w" > 0.2) + ("hover_round3_bracket2::matcolor_w" > 0.2) * (1 - "desktop::round3_bracket2_done"))
+							shear	0,-.22
+							visible	"name2_round3_bracket2::visible"
+						}
+						windowDef oq4_t3b2_n2
+						{
+							rect	4,17.6,296,12
+							text	"gui::name2_round3_bracket2"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round3_bracket2::forecolor_x","name2_round3_bracket2::forecolor_y","name2_round3_bracket2::forecolor_z","name2_round3_bracket2::forecolor_w"
+							visible	"name2_round3_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t3b2_s2
+						{
+							rect	285,16.68,30,12
+							text	"gui::score2_round3_bracket2"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round3_bracket2::forecolor_x","score2_round3_bracket2::forecolor_y","score2_round3_bracket2::forecolor_z","score2_round3_bracket2::forecolor_w"
+							visible	"score2_round3_bracket2::visible"
+							nowrap	1
+						}
+						windowDef oq4_t3b2_check2a
+						{
+							rect	297.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round3_bracket2_done" * ("name1_round3_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t3b2_check2b
+						{
+							rect	299.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round3_bracket2_done" * ("name1_round3_bracket2::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t3b2_empty
+						{
+							rect	0,9.6,318,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round3_bracket2::visible" + ("oq4_t3b2_n1::textwidth" == 0) * ("oq4_t3b2_n2::textwidth" == 0)
+							nowrap	1
+						}
+					}
+				}
+				windowDef oq4_tround4
+				{
+					rect	0,0,640,34
+					noclip	1
+					visible	("gui::round" == 4)
+					windowDef oq4_t4b1
+					{
+						rect	2,2,638,30
+						noclip	1
+						windowDef oq4_t4b1_plate
+						{
+							rect	0,0,638,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0,0,0,0.55
+							shear	0,-.22
+						}
+						windowDef oq4_t4b1_blue
+						{
+							rect	0,0,638,30
+							background	"gfx/guis/hud/pickupbar"
+							matcolor	0.243,0.341,0.717,"hover_round4_bracket1::matcolor_w" * "desktop::round4_bracket1_done"
+							shear	0,-.22
+							visible	"desktop::round4_bracket1_done"
+						}
+						windowDef oq4_t4b1_sel1
+						{
+							rect	1.5,2,635,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel1_round4_bracket1::matcolor_w" > 0.2) + ("hover_round4_bracket1::matcolor_w" > 0.2) * (1 - "desktop::round4_bracket1_done"))
+							shear	0,-.22
+							visible	"name1_round4_bracket1::visible"
+						}
+						windowDef oq4_t4b1_n1
+						{
+							rect	4,3.6,616,12
+							text	"gui::name1_round4_bracket1"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name1_round4_bracket1::forecolor_x","name1_round4_bracket1::forecolor_y","name1_round4_bracket1::forecolor_z","name1_round4_bracket1::forecolor_w"
+							visible	"name1_round4_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t4b1_s1
+						{
+							rect	605,2.68,30,12
+							text	"gui::score1_round4_bracket1"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score1_round4_bracket1::forecolor_x","score1_round4_bracket1::forecolor_y","score1_round4_bracket1::forecolor_z","score1_round4_bracket1::forecolor_w"
+							visible	"score1_round4_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t4b1_check1a
+						{
+							rect	617.13,8.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round4_bracket1_done" * ("name2_round4_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t4b1_check1b
+						{
+							rect	619.115,7.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round4_bracket1_done" * ("name2_round4_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t4b1_sel2
+						{
+							rect	1.5,16,635,13
+							backcolor	0.368,0.725,0.529,0.4 * (("sel2_round4_bracket1::matcolor_w" > 0.2) + ("hover_round4_bracket1::matcolor_w" > 0.2) * (1 - "desktop::round4_bracket1_done"))
+							shear	0,-.22
+							visible	"name2_round4_bracket1::visible"
+						}
+						windowDef oq4_t4b1_n2
+						{
+							rect	4,17.6,616,12
+							text	"gui::name2_round4_bracket1"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							forecolor	"name2_round4_bracket1::forecolor_x","name2_round4_bracket1::forecolor_y","name2_round4_bracket1::forecolor_z","name2_round4_bracket1::forecolor_w"
+							visible	"name2_round4_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t4b1_s2
+						{
+							rect	605,16.68,30,12
+							text	"gui::score2_round4_bracket1"
+							font	"fonts/chain"
+							textscale	0.208
+							textalign	2
+							forecolor	"score2_round4_bracket1::forecolor_x","score2_round4_bracket1::forecolor_y","score2_round4_bracket1::forecolor_z","score2_round4_bracket1::forecolor_w"
+							visible	"score2_round4_bracket1::visible"
+							nowrap	1
+						}
+						windowDef oq4_t4b1_check2a
+						{
+							rect	617.13,22.55,4.24,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	-45
+							visible	"desktop::round4_bracket1_done" * ("name1_round4_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t4b1_check2b
+						{
+							rect	619.115,21.3,7.77,1.4
+							backcolor	0.71,0.78,0.518,1
+							rotate	45
+							visible	"desktop::round4_bracket1_done" * ("name1_round4_bracket1::forecolor_w" < 0.95)
+						}
+						windowDef oq4_t4b1_empty
+						{
+							rect	0,9.6,638,12
+							text	"#str_200952"
+							font	"fonts/lowpixel"
+							textscale	0.174
+							textalign	1
+							forecolor	1,1,1,0.4
+							visible	"empty_round4_bracket1::visible" + ("oq4_t4b1_n1::textwidth" == 0) * ("oq4_t4b1_n2::textwidth" == 0)
+							nowrap	1
+						}
+					}
+				}
+				windowDef oq4_tbar_text
+				{
+					rect	8,37.2,400,16
+					text	"gui::oq4_tourney_label"
+					font	"fonts/lowpixel"
+					textscale	0.2
+					forecolor	1,1,1,1
+					nowrap	1
+				}
+				windowDef oq4_thelp1
+				{
+					rect	8,77.28,624,26
+					text	"gui::spectatetext1"
+					font	"fonts/lowpixel"
+					textscale	0.18
+					forecolor	1,1,1,0.7
+				}
+				windowDef oq4_thelp2
+				{
+					rect	8,90.28,624,26
+					text	"gui::spectatetext2"
+					font	"fonts/lowpixel"
+					textscale	0.18
+					forecolor	1,1,1,0.7
 				}
 			}
 			windowDef tourn_overbar
@@ -2901,12 +4699,22 @@ windowDef Desktop
 				rect	-100,-62,840,62
 				visible	1
 				background	"gfx/guis/common/128_sqsolid"
-				matcolor	0,0,0,1
+				matcolor	0,0,0,1 - "gui::oq4_hudRemastered"
+				noclip	1
 				notime	1
+				// openQ4: outside Classic the banner is a 640 u slab at 0.60 over the centre
+				// screen (the bar no longer clips: its rect need not cover the slab), and
+				// Minimal hides it.
+				windowDef oq4_overbar_slab
+				{
+					rect	100 + "gui::oq4_hudEdgeLeft",0,640,62
+					backcolor	0,0,0,0.6
+					visible	"gui::oq4_hudRemastered"
+				}
 				windowDef tourn_title1
 				{
-					rect	100,32,318,25
-					visible	1
+					rect	100 + "gui::oq4_hudEdgeLeft",32,318,25
+					visible	"gui::oq4_hudShowExtras"
 					forecolor	1,1,1,1
 					text	"#str_200943"
 					textscale	0.4
@@ -2916,8 +4724,8 @@ windowDef Desktop
 				}
 				windowDef tourn_title2
 				{
-					rect	422,32,318,25
-					visible	1
+					rect	422 + "gui::oq4_hudEdgeLeft",32,318,25
+					visible	"gui::oq4_hudShowExtras"
 					forecolor	1,0.5,0,1
 					text	"#str_200286"
 					textscale	0.4
@@ -2937,12 +4745,12 @@ windowDef Desktop
 				rect	0,-62,( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),62
 				visible	1
 				background	"gfx/guis/common/128_sqsolid"
-				matcolor	0,0,0,1
+				matcolor	0,0,0,1 - "gui::oq4_hudRemastered"
 				notime	1
 				windowDef tourn_warmup_title
 				{
 					rect	"gui::virtual_screen_x_expand",32,640,25
-					visible	1
+					visible	("gui::oq4_hudRemastered" == 0)
 					forecolor	1,1,1,1
 					text	"#str_200953"
 					textscale	0.4
@@ -2958,6 +4766,40 @@ windowDef Desktop
 				background	"gfx/guis/common/128_sqsolid"
 				matcolor	0,0,0,1
 				notime	1
+			}
+			// openQ4: outside Classic the warm-up banner is a 640 u slab at 0.60 over the
+			// centre screen, sliding 34 u down and back with the stock bar's events, and
+			// Minimal hides it.
+			windowDef oq4_warmbanner
+			{
+				rect	"gui::oq4_hudEdgeLeft",0,640,480
+				noclip	1
+				visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras"
+				windowDef oq4_warmbanner_slab
+				{
+					rect	0,-62,640,62
+					backcolor	0,0,0,0.6
+					windowDef oq4_warmbanner_title
+					{
+						rect	0,32,640,25
+						text	"#str_200953"
+						font	"fonts/lowpixel"
+						textscale	0.4
+						textalign	1
+						textstyle	1
+						forecolor	1,1,1,1
+					}
+				}
+				windowDef oq4_warmbanner_up
+				{
+					rect	0,-62,640,62
+					visible	0
+				}
+				windowDef oq4_warmbanner_down
+				{
+					rect	0,-28,640,62
+					visible	0
+				}
 			}
 		}
 	
@@ -3077,259 +4919,267 @@ windowDef Desktop
 			}
 
 		}
-		windowDef p_ctf
+		// openQ4: the stock team panels, flags and clock; oq4_rem_tl draws the
+		// Remastered ones outside Classic.
+		windowDef oq4_stock_ctf
 		{
 			rect	0,0,640,480
-			screenalignx	left
-			screenaligny	top
-			backcolor 0,0,0,0
-			visible	0
-			windowDef ctf_clan1_bg
-			{
-				rect	1,-3,102,58
-				background	"gfx/guis/hud/ctf_bgbar"
-				visible	1
-				matcolor	0,0,0,1
-			}
-			windowDef ctf_clan1_bgcolor
-			{
-				rect	1,-3,101,58
-				background	"gfx/guis/hud/ctf_bgbar2"
-				visible	1
-				matcolor	0.415,0.643,0.168,0.8
-			}
-			windowDef ctf_clan1_logo
-			{
-				rect	6,14,24,24
-				visible	1
-				background	"gfx/guis/mainmenu/marinelogo"
-				matcolor	1,1,1,1
-			}
-			windowDef ctf_clan1_score_marine
-			{
-				rect	36,13,43,24
-				visible	0
-				forecolor	(1-"gui::marine_pulse_amount"),1,(1-"gui::marine_pulse_amount"),1
-				text	"gui::marine_score"
-				textscale	0.36
-				font	"fonts/lowpixel"
-			}
-			windowDef ctf_clan1_score_strogg
-			{
-				rect	36,13,43,24
-				visible	0
-				forecolor	1,(1-(0.5*"gui::strogg_pulse_amount")),(1-"gui::strogg_pulse_amount"),1
-				text	"gui::strogg_score"
-				textscale	0.36
-				font	"fonts/lowpixel"
-			}
-			windowDef ctf_clan2_bg
-			{
-				rect	1,41,102,58
-				background	"gfx/guis/hud/ctf_bgbar"
-				visible	1
-				matcolor	0,0,0,1
-			}
-			windowDef ctf_clan2_bgcolor
-			{
-				rect	1,41,101,58
-				background	"gfx/guis/hud/ctf_bgbar2"
-				visible	1
-				matcolor	1,0.482,0.0156,0.8
-			}
-			windowDef ctf_clan2_logo
-			{
-				rect	6,57,24,24
-				visible	1
-				background	"gfx/guis/mainmenu/strogglogo"
-				matcolor	1,1,1,1
-			}
-			windowDef ctf_clan2_score_marine
-			{
-				rect	36,57,43,24
-				visible	0
-				forecolor	(1-"gui::marine_pulse_amount"),1,(1-"gui::marine_pulse_amount"),1
-				text	"gui::marine_score"
-				textscale	0.36
-				font	"fonts/lowpixel"
-			}
-			windowDef ctf_clan2_score_strogg
-			{
-				rect	36,57,43,24
-				visible	0
-				forecolor	1,(1-(0.5*"gui::strogg_pulse_amount")),(1-"gui::strogg_pulse_amount"),1
-				text	"gui::strogg_score"
-				textscale	0.36
-				font	"fonts/lowpixel"
-			}
-			windowDef p_ctf_2
+			noclip	1
+			visible	("gui::oq4_hudRemastered" == 0)
+			windowDef p_ctf
 			{
 				rect	0,0,640,480
 				screenalignx	left
 				screenaligny	top
-				visible	0
 				backcolor 0,0,0,0
-				windowDef ctf_clan1_flag
-				{
-					rect	86,11,28,28
-					visible	1
-					background	"gfx/guis/hud/ctf_flag"
-					matcolor	0.415,0.643,0.168,0.8
-					shear	0,-.22
-				}
-				windowDef d_ctf_clan1_flag
-				{
-					rect	83,8,34,34
-					visible	0
-					background	"gfx/guis/hud/ctf_flag"
-					matcolor	0.415,0.643,0.168,0.8
-					shear	0,-.22
-
-					onTime 0 {
-						transition "ctf_clan1_flag::rect" "$ctf_clan1_flag::rect" "$d_ctf_clan1_flag::rect" "250" ;
-					}
-
-					onTime 250 {
-						transition "ctf_clan1_flag::rect" "$d_ctf_clan1_flag::rect" "$ctf_clan1_flag::rect" "750" ;
-					}
-
-					onTime 1000 {
-						resettime "0" ;
-					}
-
-				}
-				windowDef ctf_clan1_flag_status
-				{
-					rect	87,10,20,30
-					visible	1
-					forecolor	1,1,1,1
-					text	""
-					textscale	0.5
-					font	"fonts/lowpixel"
-					textalign	1
-					textstyle	1
-				}
-				windowDef ctf_clan2_flag
-				{
-					rect	86,55,28,28
-					visible	1
-					background	"gfx/guis/hud/ctf_flag"
-					matcolor	1,0.482,0.0156,0.8
-					shear	0,-.22
-				}
-				windowDef d_ctf_clan2_flag
-				{
-					rect	83,52,34,34
-					visible	0
-					background	"gfx/guis/hud/ctf_flag"
-					matcolor	1,0.482,0.0156,0.8
-					shear	0,-.22
-
-					onTime 0 {
-						transition "ctf_clan2_flag::rect" "$ctf_clan2_flag::rect" "$d_ctf_clan2_flag::rect" "250" ;
-					}
-
-					onTime 250 {
-						transition "ctf_clan2_flag::rect" "$d_ctf_clan2_flag::rect" "$ctf_clan2_flag::rect" "750" ;
-					}
-
-					onTime 1000 {
-						resettime "0" ;
-					}
-
-				}
-				windowDef ctf_clan2_flag_status
-				{
-					rect	87,54,20,30
-					visible	1
-					forecolor	1,1,1,1
-					text	""
-					textscale	0.5
-					font	"fonts/lowpixel"
-					textalign	1
-					textstyle	1
-				}
-			}
-			windowDef p_onectf
-			{
-				rect	0,0,640,480
-				screenalignx	left
-				screenaligny	top
 				visible	0
-				windowDef ctfone_arc
+				windowDef ctf_clan1_bg
 				{
-					rect	83,13,37,70
+					rect	1,-3,102,58
+					background	"gfx/guis/hud/ctf_bgbar"
 					visible	1
-					background	"gfx/guis/hud/onectf_arc"
-					matcolor	0.584,0.584,0.584,0.8
-					shear	0,-.06
+					matcolor	0,0,0,1
 				}
-				windowDef ctfone_flag
+				windowDef ctf_clan1_bgcolor
 				{
-					rect	97,33,28,28
+					rect	1,-3,101,58
+					background	"gfx/guis/hud/ctf_bgbar2"
 					visible	1
-					background	"gfx/guis/hud/ctf_flag"
-					matcolor	1,1,.552,0.8
-					shear	0,-.22
+					matcolor	0.415,0.643,0.168,0.8
 				}
-				windowDef d_ctfone_flag
+				windowDef ctf_clan1_logo
 				{
-					rect	94,30,34,34
+					rect	6,14,24,24
+					visible	1
+					background	"gfx/guis/mainmenu/marinelogo"
+					matcolor	1,1,1,1
+				}
+				windowDef ctf_clan1_score_marine
+				{
+					rect	36,13,43,24
 					visible	0
-					background	"gfx/guis/hud/ctf_flag"
-					matcolor	1,1,.552,0.8
-					shear	0,-.22
-
-					onTime 0 {
-						transition "ctfone_flag::rect" "$ctfone_flag::rect" "$d_ctfone_flag::rect" "250" ;
-						transition "ctfone_flag::matcolor" "$desktop::neutral" "$desktop::ctfoneflag_color" "250" ;
-					}
-
-					onTime 250 {
-						transition "ctfone_flag::rect" "$d_ctfone_flag::rect" "$ctfone_flag::rect" "750" ;
-						transition "ctfone_flag::matcolor" "$desktop::ctfoneflag_color" "$desktop::neutral" "750" ;
-					}
-
-					onTime 1000 {
-						resettime "0" ;
-					}
-
-				}
-				windowDef ctfone_flag_status
-				{
-					rect	98,31,20,30
-					visible	1
-					forecolor	1,1,1,1
-					text	""
-					textscale	0.5
+					forecolor	(1-"gui::marine_pulse_amount"),1,(1-"gui::marine_pulse_amount"),1
+					text	"gui::marine_score"
+					textscale	0.36
 					font	"fonts/lowpixel"
-					textalign	1
-					textstyle	1
 				}
-			}
-			windowDef ctf_stopwatch
-			{
-				rect	4,94,20,20
-				visible	1
-				background	"gfx/guis/hud/icons/icon_stopwatch"
-				matcolor	1,1,0.552,1
-			}
-			windowDef ctf_time
-			{
-				rect	23,96,200,20
-				visible	("gui::infinity" == 0)
-				forecolor	1,1,1,1
-				text	"gui::timeleft"
-				textscale	.25
-				textstyle	1
-				font	"fonts/lowpixel"
-			}
-			windowDef ctf_infinity
-			{
-				rect	25,96,20,20
-				visible	("gui::infinity" == 1)
-				background	"gfx/guis/hud/icons/icon_infinity"
-				matcolor	1,1,1,1
+				windowDef ctf_clan1_score_strogg
+				{
+					rect	36,13,43,24
+					visible	0
+					forecolor	1,(1-(0.5*"gui::strogg_pulse_amount")),(1-"gui::strogg_pulse_amount"),1
+					text	"gui::strogg_score"
+					textscale	0.36
+					font	"fonts/lowpixel"
+				}
+				windowDef ctf_clan2_bg
+				{
+					rect	1,41,102,58
+					background	"gfx/guis/hud/ctf_bgbar"
+					visible	1
+					matcolor	0,0,0,1
+				}
+				windowDef ctf_clan2_bgcolor
+				{
+					rect	1,41,101,58
+					background	"gfx/guis/hud/ctf_bgbar2"
+					visible	1
+					matcolor	1,0.482,0.0156,0.8
+				}
+				windowDef ctf_clan2_logo
+				{
+					rect	6,57,24,24
+					visible	1
+					background	"gfx/guis/mainmenu/strogglogo"
+					matcolor	1,1,1,1
+				}
+				windowDef ctf_clan2_score_marine
+				{
+					rect	36,57,43,24
+					visible	0
+					forecolor	(1-"gui::marine_pulse_amount"),1,(1-"gui::marine_pulse_amount"),1
+					text	"gui::marine_score"
+					textscale	0.36
+					font	"fonts/lowpixel"
+				}
+				windowDef ctf_clan2_score_strogg
+				{
+					rect	36,57,43,24
+					visible	0
+					forecolor	1,(1-(0.5*"gui::strogg_pulse_amount")),(1-"gui::strogg_pulse_amount"),1
+					text	"gui::strogg_score"
+					textscale	0.36
+					font	"fonts/lowpixel"
+				}
+				windowDef p_ctf_2
+				{
+					rect	0,0,640,480
+					screenalignx	left
+					screenaligny	top
+					visible	0
+					backcolor 0,0,0,0
+					windowDef ctf_clan1_flag
+					{
+						rect	86,11,28,28
+						visible	1
+						background	"gfx/guis/hud/ctf_flag"
+						matcolor	0.415,0.643,0.168,0.8
+						shear	0,-.22
+					}
+					windowDef d_ctf_clan1_flag
+					{
+						rect	83,8,34,34
+						visible	0
+						background	"gfx/guis/hud/ctf_flag"
+						matcolor	0.415,0.643,0.168,0.8
+						shear	0,-.22
+
+						onTime 0 {
+							transition "ctf_clan1_flag::rect" "$ctf_clan1_flag::rect" "$d_ctf_clan1_flag::rect" "250" ;
+						}
+
+						onTime 250 {
+							transition "ctf_clan1_flag::rect" "$d_ctf_clan1_flag::rect" "$ctf_clan1_flag::rect" "750" ;
+						}
+
+						onTime 1000 {
+							resettime "0" ;
+						}
+
+					}
+					windowDef ctf_clan1_flag_status
+					{
+						rect	87,10,20,30
+						visible	1
+						forecolor	1,1,1,1
+						text	""
+						textscale	0.5
+						font	"fonts/lowpixel"
+						textalign	1
+						textstyle	1
+					}
+					windowDef ctf_clan2_flag
+					{
+						rect	86,55,28,28
+						visible	1
+						background	"gfx/guis/hud/ctf_flag"
+						matcolor	1,0.482,0.0156,0.8
+						shear	0,-.22
+					}
+					windowDef d_ctf_clan2_flag
+					{
+						rect	83,52,34,34
+						visible	0
+						background	"gfx/guis/hud/ctf_flag"
+						matcolor	1,0.482,0.0156,0.8
+						shear	0,-.22
+
+						onTime 0 {
+							transition "ctf_clan2_flag::rect" "$ctf_clan2_flag::rect" "$d_ctf_clan2_flag::rect" "250" ;
+						}
+
+						onTime 250 {
+							transition "ctf_clan2_flag::rect" "$d_ctf_clan2_flag::rect" "$ctf_clan2_flag::rect" "750" ;
+						}
+
+						onTime 1000 {
+							resettime "0" ;
+						}
+
+					}
+					windowDef ctf_clan2_flag_status
+					{
+						rect	87,54,20,30
+						visible	1
+						forecolor	1,1,1,1
+						text	""
+						textscale	0.5
+						font	"fonts/lowpixel"
+						textalign	1
+						textstyle	1
+					}
+				}
+				windowDef p_onectf
+				{
+					rect	0,0,640,480
+					screenalignx	left
+					screenaligny	top
+					visible	0
+					windowDef ctfone_arc
+					{
+						rect	83,13,37,70
+						visible	1
+						background	"gfx/guis/hud/onectf_arc"
+						matcolor	0.584,0.584,0.584,0.8
+						shear	0,-.06
+					}
+					windowDef ctfone_flag
+					{
+						rect	97,33,28,28
+						visible	1
+						background	"gfx/guis/hud/ctf_flag"
+						matcolor	1,1,.552,0.8
+						shear	0,-.22
+					}
+					windowDef d_ctfone_flag
+					{
+						rect	94,30,34,34
+						visible	0
+						background	"gfx/guis/hud/ctf_flag"
+						matcolor	1,1,.552,0.8
+						shear	0,-.22
+
+						onTime 0 {
+							transition "ctfone_flag::rect" "$ctfone_flag::rect" "$d_ctfone_flag::rect" "250" ;
+							transition "ctfone_flag::matcolor" "$desktop::neutral" "$desktop::ctfoneflag_color" "250" ;
+						}
+
+						onTime 250 {
+							transition "ctfone_flag::rect" "$d_ctfone_flag::rect" "$ctfone_flag::rect" "750" ;
+							transition "ctfone_flag::matcolor" "$desktop::ctfoneflag_color" "$desktop::neutral" "750" ;
+						}
+
+						onTime 1000 {
+							resettime "0" ;
+						}
+
+					}
+					windowDef ctfone_flag_status
+					{
+						rect	98,31,20,30
+						visible	1
+						forecolor	1,1,1,1
+						text	""
+						textscale	0.5
+						font	"fonts/lowpixel"
+						textalign	1
+						textstyle	1
+					}
+				}
+				windowDef ctf_stopwatch
+				{
+					rect	4,94,20,20
+					visible	1
+					background	"gfx/guis/hud/icons/icon_stopwatch"
+					matcolor	1,1,0.552,1
+				}
+				windowDef ctf_time
+				{
+					rect	23,96,200,20
+					visible	("gui::infinity" == 0)
+					forecolor	1,1,1,1
+					text	"gui::timeleft"
+					textscale	.25
+					textstyle	1
+					font	"fonts/lowpixel"
+				}
+				windowDef ctf_infinity
+				{
+					rect	25,96,20,20
+					visible	("gui::infinity" == 1)
+					background	"gfx/guis/hud/icons/icon_infinity"
+					matcolor	1,1,1,1
+				}
 			}
 		}
 		windowDef p_ffa
@@ -3523,12 +5373,12 @@ windowDef Desktop
 			// Deathmatch and Duel: two 150x18 u plates from y 36, the ordinal (the
 			// leader's in #FFBE23), the name and the score in Chain; the leader's
 			// row carries the limit and a tie for the lead the TIED tag; your row the
-			// band and rims at 0.40 with your signed gap after it. Under them the
-			// timer plate: the stopwatch and one readout per match state.
+			// band and rims at 0.40 with your signed gap after it. Under them sits
+			// the timer (oq4_rem_tl). Minimal hides the standing.
 			windowDef oq4_standing
 			{
 				rect	6,36,200,40
-				visible	"gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))
+				visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * (("gui::gametype" == 1) + ("gui::gametype" == 9))
 				windowDef oq4_row1
 				{
 					rect	0,0,190,18
@@ -3744,10 +5594,580 @@ windowDef Desktop
 					}
 				}
 			}
+		}
+		// openQ4: the Remastered top-leading group (ui-visual-design.md 14.9) outside
+		// Classic: the team panels with their flags, alive pips and the Dead Zone
+		// plate; the timer, under the standing or panels, or under Tourney's message
+		// bar; and the plates in its column. Minimal hides it.
+		windowDef oq4_rem_tl
+		{
+			rect	0,0,640,480
+			screenalignx	left
+			screenaligny	top
+			noclip	1
+			visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras"
+			// openQ4: the Remastered flags' beat (ui-visual-design.md 14.9): matcolor_w runs
+			// 0 to 1 over 250 ms and back over 750 ms, once a second. A taken flag grows
+			// with it by the stock pulse's 34/28, and the one flag swings to its carrier's
+			// team color.
+			windowDef oq4_flag_beat
+			{
+				rect	0,0,1,1
+				visible	0
+				matcolor	1,1,1,0
+
+				onTime 0 {
+					transition "oq4_flag_beat::matcolor" "1,1,1,0" "1,1,1,1" "250" ;
+				}
+
+				onTime 250 {
+					transition "oq4_flag_beat::matcolor" "1,1,1,1" "1,1,1,0" "750" ;
+				}
+
+				onTime 1000 {
+					resetTime "0" ;
+				}
+
+			}
+			// Team modes: two 150x22 u plates, your team (the followed player's) first: the
+			// team block at 0.80 with the mark, the name in its text color and the score
+			// in Chain against the limit.
+			windowDef oq4_teams
+			{
+				rect	0,0,640,480
+				noclip	1
+				visible	"gui::oq4_team_game" * ("gui::gametype" != 2)
+				windowDef oq4_team0
+				{
+					rect	6,36 + 25 * ("gui::oq4_my_team" != 0),240,22
+					noclip	1
+					windowDef oq4_team0_plate
+					{
+						rect	0,0,150,22
+						background	"gfx/guis/hud/pickupbar"
+						matcolor	0,0,0,0.5
+						shear	0,-.22
+					}
+					windowDef oq4_team0_block
+					{
+						rect	0,0,26,22
+						backcolor	0.416,0.643,0.169,0.8
+						shear	0,-.22
+					}
+					windowDef oq4_team0_logo
+					{
+						rect	5,3,16,16
+						background	"gfx/guis/mainmenu/marinelogo"
+						matcolor	1,1,1,1
+					}
+					windowDef oq4_team0_name
+					{
+						rect	32,2.38,64,12
+						text	"#str_200197"
+						font	"fonts/lowpixel"
+						textscale	0.13
+						forecolor	0.667,0.89,0.333,1
+						nowrap	1
+					}
+					windowDef oq4_team0_score
+					{
+						rect	52,-0.56,60,22
+						text	"gui::marine_score"
+						font	"fonts/chain"
+						textscale	0.35
+						textalign	2
+						forecolor	1 - 0.333 * "gui::marine_pulse_amount",1 - 0.11 * "gui::marine_pulse_amount",1 - 0.667 * "gui::marine_pulse_amount",1
+						nowrap	1
+					}
+					windowDef oq4_team0_slash
+					{
+						rect	112.5,7,6,10
+						text	"#str_231222"
+						font	"fonts/chain"
+						textscale	0.167
+						forecolor	1,1,1,0.45
+						visible	("gui::oq4_limit" > 0)
+						nowrap	1
+					}
+					windowDef oq4_team0_limit
+					{
+						rect	116,7,30,10
+						text	"gui::oq4_limit"
+						font	"fonts/chain"
+						textscale	0.167
+						forecolor	1,1,1,0.45
+						visible	("gui::oq4_limit" > 0)
+						nowrap	1
+					}
+					windowDef oq4_team0_flag
+					{
+						rect	134,2.5,110,18
+						noclip	1
+						visible	(("gui::gametype" == 4) + ("gui::gametype" == 6))
+						windowDef oq4_team0_flag_base
+						{
+							rect	-1,-1,20,20
+							background	"gfx/guis/hud/ctf_flag"
+							matcolor	0.416,0.643,0.169,0.45
+							shear	0,-.22
+							visible	("gui::oq4_flag0_state" == 0)
+						}
+						windowDef oq4_team0_flag_taken
+						{
+							rect	9 - 10 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),9 - 10 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),20 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),20 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w")
+							background	"gfx/guis/hud/ctf_flag"
+							matcolor	0.416,0.643,0.169,0.9
+							shear	0,-.22
+							visible	("gui::oq4_flag0_state" == 1)
+						}
+						windowDef oq4_team0_flag_dropped
+						{
+							rect	-1,-1,20,20
+							background	"gfx/guis/hud/ctf_flag"
+							matcolor	0.416,0.643,0.169,0.9
+							shear	0,-.22
+							visible	("gui::oq4_flag0_state" == 2)
+						}
+						windowDef oq4_team0_flag_bang
+						{
+							rect	3.5,0.86,12,12
+							text	"#str_231225"
+							font	"fonts/lowpixel"
+							textscale	0.16
+							textalign	1
+							forecolor	1,1,1,1
+							visible	("gui::oq4_flag0_state" == 1)
+							nowrap	1
+						}
+						windowDef oq4_team0_flag_query
+						{
+							rect	3.5,0.86,12,12
+							text	"#str_231226"
+							font	"fonts/lowpixel"
+							textscale	0.16
+							textalign	1
+							forecolor	1,1,1,1
+							visible	("gui::oq4_flag0_state" == 2)
+							nowrap	1
+						}
+						windowDef oq4_team0_carrier
+						{
+							rect	22,2.32,80,14
+							text	"gui::oq4_flag0_carrier"
+							font	"fonts/lowpixel"
+							textscale	0.17
+							forecolor	0.667 + 0.333 * ("gui::oq4_flag0_carrier_team" == 1),0.89 - 0.333 * ("gui::oq4_flag0_carrier_team" == 1),0.333 - 0.333 * ("gui::oq4_flag0_carrier_team" == 1),1
+							visible	("gui::oq4_flag0_state" == 1)
+							nowrap	1
+						}
+					}
+					windowDef oq4_team0_nflag
+					{
+						rect	134,2.5,110,18
+						noclip	1
+						visible	(("gui::gametype" == 5) + ("gui::gametype" == 7)) * ("gui::oq4_flag2_state" == 1) * ("gui::oq4_flag2_carrier_team" == 0)
+						windowDef oq4_team0_nflag_icon
+						{
+							rect	9 - 10 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),9 - 10 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),20 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),20 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w")
+							background	"gfx/guis/hud/ctf_flag"
+							matcolor	1 - 0.584 * "oq4_flag_beat::matcolor_w",1 - 0.357 * "oq4_flag_beat::matcolor_w",0.553 - 0.384 * "oq4_flag_beat::matcolor_w",0.9
+							shear	0,-.22
+						}
+						windowDef oq4_team0_nflag_bang
+						{
+							rect	3.5,0.86,12,12
+							text	"#str_231225"
+							font	"fonts/lowpixel"
+							textscale	0.16
+							textalign	1
+							forecolor	1,1,1,1
+							nowrap	1
+						}
+						windowDef oq4_team0_ncarrier
+						{
+							rect	22,2.32,80,14
+							text	"gui::oq4_flag2_carrier"
+							font	"fonts/lowpixel"
+							textscale	0.17
+							forecolor	0.667,0.89,0.333,1
+							nowrap	1
+						}
+					}
+					windowDef oq4_team0_pip0
+					{
+						rect	156,8,4,7
+						backcolor	0.667,0.89,0.333,0.2 + 0.7 * ("gui::oq4_alive0" > 0)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total0" > 0)
+					}
+					windowDef oq4_team0_pip1
+					{
+						rect	162,8,4,7
+						backcolor	0.667,0.89,0.333,0.2 + 0.7 * ("gui::oq4_alive0" > 1)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total0" > 1)
+					}
+					windowDef oq4_team0_pip2
+					{
+						rect	168,8,4,7
+						backcolor	0.667,0.89,0.333,0.2 + 0.7 * ("gui::oq4_alive0" > 2)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total0" > 2)
+					}
+					windowDef oq4_team0_pip3
+					{
+						rect	174,8,4,7
+						backcolor	0.667,0.89,0.333,0.2 + 0.7 * ("gui::oq4_alive0" > 3)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total0" > 3)
+					}
+					windowDef oq4_team0_pip4
+					{
+						rect	180,8,4,7
+						backcolor	0.667,0.89,0.333,0.2 + 0.7 * ("gui::oq4_alive0" > 4)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total0" > 4)
+					}
+					windowDef oq4_team0_pip5
+					{
+						rect	186,8,4,7
+						backcolor	0.667,0.89,0.333,0.2 + 0.7 * ("gui::oq4_alive0" > 5)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total0" > 5)
+					}
+					windowDef oq4_team0_pip6
+					{
+						rect	192,8,4,7
+						backcolor	0.667,0.89,0.333,0.2 + 0.7 * ("gui::oq4_alive0" > 6)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total0" > 6)
+					}
+					windowDef oq4_team0_pip7
+					{
+						rect	198,8,4,7
+						backcolor	0.667,0.89,0.333,0.2 + 0.7 * ("gui::oq4_alive0" > 7)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total0" > 7)
+					}
+				}
+				windowDef oq4_team1
+				{
+					rect	6,36 + 25 * ("gui::oq4_my_team" != 1),240,22
+					noclip	1
+					windowDef oq4_team1_plate
+					{
+						rect	0,0,150,22
+						background	"gfx/guis/hud/pickupbar"
+						matcolor	0,0,0,0.5
+						shear	0,-.22
+					}
+					windowDef oq4_team1_block
+					{
+						rect	0,0,26,22
+						backcolor	1,0.482,0.016,0.8
+						shear	0,-.22
+					}
+					windowDef oq4_team1_logo
+					{
+						rect	5,3,16,16
+						background	"gfx/guis/mainmenu/strogglogo"
+						matcolor	1,1,1,1
+					}
+					windowDef oq4_team1_name
+					{
+						rect	32,2.38,64,12
+						text	"#str_200199"
+						font	"fonts/lowpixel"
+						textscale	0.13
+						forecolor	1,0.557,0,1
+						nowrap	1
+					}
+					windowDef oq4_team1_score
+					{
+						rect	52,-0.56,60,22
+						text	"gui::strogg_score"
+						font	"fonts/chain"
+						textscale	0.35
+						textalign	2
+						forecolor	1,1 - 0.443 * "gui::strogg_pulse_amount",1 - 1 * "gui::strogg_pulse_amount",1
+						nowrap	1
+					}
+					windowDef oq4_team1_slash
+					{
+						rect	112.5,7,6,10
+						text	"#str_231222"
+						font	"fonts/chain"
+						textscale	0.167
+						forecolor	1,1,1,0.45
+						visible	("gui::oq4_limit" > 0)
+						nowrap	1
+					}
+					windowDef oq4_team1_limit
+					{
+						rect	116,7,30,10
+						text	"gui::oq4_limit"
+						font	"fonts/chain"
+						textscale	0.167
+						forecolor	1,1,1,0.45
+						visible	("gui::oq4_limit" > 0)
+						nowrap	1
+					}
+					windowDef oq4_team1_flag
+					{
+						rect	134,2.5,110,18
+						noclip	1
+						visible	(("gui::gametype" == 4) + ("gui::gametype" == 6))
+						windowDef oq4_team1_flag_base
+						{
+							rect	-1,-1,20,20
+							background	"gfx/guis/hud/ctf_flag"
+							matcolor	1,0.482,0.016,0.45
+							shear	0,-.22
+							visible	("gui::oq4_flag1_state" == 0)
+						}
+						windowDef oq4_team1_flag_taken
+						{
+							rect	9 - 10 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),9 - 10 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),20 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),20 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w")
+							background	"gfx/guis/hud/ctf_flag"
+							matcolor	1,0.482,0.016,0.9
+							shear	0,-.22
+							visible	("gui::oq4_flag1_state" == 1)
+						}
+						windowDef oq4_team1_flag_dropped
+						{
+							rect	-1,-1,20,20
+							background	"gfx/guis/hud/ctf_flag"
+							matcolor	1,0.482,0.016,0.9
+							shear	0,-.22
+							visible	("gui::oq4_flag1_state" == 2)
+						}
+						windowDef oq4_team1_flag_bang
+						{
+							rect	3.5,0.86,12,12
+							text	"#str_231225"
+							font	"fonts/lowpixel"
+							textscale	0.16
+							textalign	1
+							forecolor	1,1,1,1
+							visible	("gui::oq4_flag1_state" == 1)
+							nowrap	1
+						}
+						windowDef oq4_team1_flag_query
+						{
+							rect	3.5,0.86,12,12
+							text	"#str_231226"
+							font	"fonts/lowpixel"
+							textscale	0.16
+							textalign	1
+							forecolor	1,1,1,1
+							visible	("gui::oq4_flag1_state" == 2)
+							nowrap	1
+						}
+						windowDef oq4_team1_carrier
+						{
+							rect	22,2.32,80,14
+							text	"gui::oq4_flag1_carrier"
+							font	"fonts/lowpixel"
+							textscale	0.17
+							forecolor	0.667 + 0.333 * ("gui::oq4_flag1_carrier_team" == 1),0.89 - 0.333 * ("gui::oq4_flag1_carrier_team" == 1),0.333 - 0.333 * ("gui::oq4_flag1_carrier_team" == 1),1
+							visible	("gui::oq4_flag1_state" == 1)
+							nowrap	1
+						}
+					}
+					windowDef oq4_team1_nflag
+					{
+						rect	134,2.5,110,18
+						noclip	1
+						visible	(("gui::gametype" == 5) + ("gui::gametype" == 7)) * ("gui::oq4_flag2_state" == 1) * ("gui::oq4_flag2_carrier_team" == 1)
+						windowDef oq4_team1_nflag_icon
+						{
+							rect	9 - 10 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),9 - 10 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),20 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w"),20 * (1 + 0.2143 * "oq4_flag_beat::matcolor_w")
+							background	"gfx/guis/hud/ctf_flag"
+							matcolor	1,1 - 0.518 * "oq4_flag_beat::matcolor_w",0.553 - 0.537 * "oq4_flag_beat::matcolor_w",0.9
+							shear	0,-.22
+						}
+						windowDef oq4_team1_nflag_bang
+						{
+							rect	3.5,0.86,12,12
+							text	"#str_231225"
+							font	"fonts/lowpixel"
+							textscale	0.16
+							textalign	1
+							forecolor	1,1,1,1
+							nowrap	1
+						}
+						windowDef oq4_team1_ncarrier
+						{
+							rect	22,2.32,80,14
+							text	"gui::oq4_flag2_carrier"
+							font	"fonts/lowpixel"
+							textscale	0.17
+							forecolor	1,0.557,0,1
+							nowrap	1
+						}
+					}
+					windowDef oq4_team1_pip0
+					{
+						rect	156,8,4,7
+						backcolor	1,0.557,0,0.2 + 0.7 * ("gui::oq4_alive1" > 0)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total1" > 0)
+					}
+					windowDef oq4_team1_pip1
+					{
+						rect	162,8,4,7
+						backcolor	1,0.557,0,0.2 + 0.7 * ("gui::oq4_alive1" > 1)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total1" > 1)
+					}
+					windowDef oq4_team1_pip2
+					{
+						rect	168,8,4,7
+						backcolor	1,0.557,0,0.2 + 0.7 * ("gui::oq4_alive1" > 2)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total1" > 2)
+					}
+					windowDef oq4_team1_pip3
+					{
+						rect	174,8,4,7
+						backcolor	1,0.557,0,0.2 + 0.7 * ("gui::oq4_alive1" > 3)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total1" > 3)
+					}
+					windowDef oq4_team1_pip4
+					{
+						rect	180,8,4,7
+						backcolor	1,0.557,0,0.2 + 0.7 * ("gui::oq4_alive1" > 4)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total1" > 4)
+					}
+					windowDef oq4_team1_pip5
+					{
+						rect	186,8,4,7
+						backcolor	1,0.557,0,0.2 + 0.7 * ("gui::oq4_alive1" > 5)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total1" > 5)
+					}
+					windowDef oq4_team1_pip6
+					{
+						rect	192,8,4,7
+						backcolor	1,0.557,0,0.2 + 0.7 * ("gui::oq4_alive1" > 6)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total1" > 6)
+					}
+					windowDef oq4_team1_pip7
+					{
+						rect	198,8,4,7
+						backcolor	1,0.557,0,0.2 + 0.7 * ("gui::oq4_alive1" > 7)
+						shear	0,-.22
+						visible	"gui::oq4_pips" * ("gui::oq4_total1" > 7)
+					}
+				}
+				windowDef oq4_nflag_free
+				{
+					rect	140,47,18,18
+					noclip	1
+					visible	(("gui::gametype" == 5) + ("gui::gametype" == 7)) * ("gui::oq4_flag2_state" != 1)
+					windowDef oq4_nflag_free_base
+					{
+						rect	-1,-1,20,20
+						background	"gfx/guis/hud/ctf_flag"
+						matcolor	1,1,0.553,0.45
+						shear	0,-.22
+						visible	("gui::oq4_flag2_state" == 0)
+					}
+					windowDef oq4_nflag_free_dropped
+					{
+						rect	-1,-1,20,20
+						background	"gfx/guis/hud/ctf_flag"
+						matcolor	1,1,0.553,0.9
+						shear	0,-.22
+						visible	("gui::oq4_flag2_state" == 2)
+					}
+					windowDef oq4_nflag_free_query
+					{
+						rect	3.5,0.86,12,12
+						text	"#str_231226"
+						font	"fonts/lowpixel"
+						textscale	0.16
+						textalign	1
+						forecolor	1,1,1,1
+						visible	("gui::oq4_flag2_state" == 2)
+						nowrap	1
+					}
+				}
+			}
+			windowDef oq4_zone
+			{
+				rect	6,86,240,14
+				noclip	1
+				visible	("gui::gametype" == 8)
+				definefloat	"value"	"oq4_zone_v1::textwidth" * ("gui::oq4_zone" == 1) + "oq4_zone_v2::textwidth" * ("gui::oq4_zone" == 2) + "oq4_zone_v3::textwidth" * ("gui::oq4_zone" == 3) + "oq4_zone_v0::textwidth" * ("gui::oq4_zone" == 0)
+				windowDef oq4_zone_plate
+				{
+					rect	0,0,"oq4_zone_label::textwidth" + "oq4_zone::value" + 31,14
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.5
+					shear	0,-.22
+				}
+				windowDef oq4_zone_label
+				{
+					rect	6,1.91,80,12
+					text	"#str_231218"
+					font	"fonts/lowpixel"
+					textscale	0.135
+					forecolor	1,1,1,0.7
+					nowrap	1
+				}
+				windowDef oq4_zone_swatch
+				{
+					rect	"oq4_zone_label::textwidth" + 12,3,7,8
+					backcolor	0.416 * ("gui::oq4_zone" == 1) + 1 * ("gui::oq4_zone" == 2) + 1 * ("gui::oq4_zone" == 3),0.643 * ("gui::oq4_zone" == 1) + 0.482 * ("gui::oq4_zone" == 2) + 0.745 * ("gui::oq4_zone" == 3),0.169 * ("gui::oq4_zone" == 1) + 0.016 * ("gui::oq4_zone" == 2) + 0.137 * ("gui::oq4_zone" == 3),("gui::oq4_zone" != 0)
+				}
+				windowDef oq4_zone_v1
+				{
+					rect	"oq4_zone_label::textwidth" + 23,1.91,100,12
+					text	"#str_200197"
+					font	"fonts/lowpixel"
+					textscale	0.135
+					forecolor	0.667,0.89,0.333,1
+					visible	("gui::oq4_zone" == 1)
+					nowrap	1
+				}
+				windowDef oq4_zone_v2
+				{
+					rect	"oq4_zone_label::textwidth" + 23,1.91,100,12
+					text	"#str_200199"
+					font	"fonts/lowpixel"
+					textscale	0.135
+					forecolor	1,0.557,0,1
+					visible	("gui::oq4_zone" == 2)
+					nowrap	1
+				}
+				windowDef oq4_zone_v3
+				{
+					rect	"oq4_zone_label::textwidth" + 23,1.91,100,12
+					text	"#str_231219"
+					font	"fonts/lowpixel"
+					textscale	0.135
+					forecolor	1,0.745,0.137,1
+					visible	("gui::oq4_zone" == 3)
+					nowrap	1
+				}
+				windowDef oq4_zone_v0
+				{
+					rect	"oq4_zone_label::textwidth" + 23,1.91,100,12
+					text	"#str_231220"
+					font	"fonts/lowpixel"
+					textscale	0.135
+					forecolor	1,1,1,0.55
+					visible	("gui::oq4_zone" == 0)
+					nowrap	1
+				}
+			}
 			windowDef oq4_timer
 			{
-				rect	6,82,140,16
-				visible	"gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))
+				rect	6 + ("gui::gametype" == 2) * "gui::oq4_hudEdgeLeft",82 + 8 * "gui::oq4_team_game" + 17 * ("gui::gametype" == 8) - 24 * ("gui::gametype" == 2),140,16
 				definefloat	"warm"	("gui::oq4_state" == 1) * ("gui::oq4_countdown" == 0)
 				definefloat	"count"	("gui::oq4_countdown" != 0)
 				definefloat	"sudden"	("gui::oq4_state" == 4) * ("gui::oq4_countdown" == 0)
@@ -3822,7 +6242,7 @@ windowDef Desktop
 					text	"gui::oq4_clock"
 					font	"fonts/chain"
 					textscale	0.26
-					forecolor	1,1 - 0.255 * ("gui::oq4_clock_warn" >= 1) * "oq4_timer::timed" - 0.573 * ("gui::oq4_clock_warn" == 2) * "oq4_timer::timed",1 - 0.863 * ("gui::oq4_clock_warn" >= 1) * "oq4_timer::timed" - 0.137 * ("gui::oq4_clock_warn" == 2) * "oq4_timer::timed",1 - 0.3 * "oq4_timer::untimed"
+					forecolor	1 - 0.106 * ("gui::oq4_clock_warn" == 2) * "oq4_timer::timed",1 - (0.255 * ("gui::oq4_clock_warn" == 1) + 0.573 * ("gui::oq4_clock_warn" == 2)) * "oq4_timer::timed",1 - (0.863 * ("gui::oq4_clock_warn" == 1) + 0.663 * ("gui::oq4_clock_warn" == 2)) * "oq4_timer::timed",1 - 0.3 * "oq4_timer::untimed"
 					visible	"oq4_timer::timed" + "oq4_timer::untimed"
 					nowrap	1
 				}
@@ -3846,6 +6266,771 @@ windowDef Desktop
 					textalign	2
 					forecolor	1,1,1,1
 					visible	"oq4_timer::warm" * ("gui::showready" != 0)
+					nowrap	1
+				}
+			}
+			// Tourney: ROUND n and ARENA n on a plate beside the timer, under the message bar.
+			windowDef oq4_tplace
+			{
+				rect	6 + ("gui::gametype" == 2) * "gui::oq4_hudEdgeLeft" + "oq4_timer::width" + 4,58,200,16
+				noclip	1
+				visible	("gui::gametype" == 2)
+				windowDef oq4_tplace_plate
+				{
+					rect	0,0,"oq4_tplace_round::textwidth" + 8 * ("oq4_tplace_arena::textwidth" > 0) + "oq4_tplace_arena::textwidth" + 14,16
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.5
+					shear	0,-.22
+					visible	(("oq4_tplace_round::textwidth" + "oq4_tplace_arena::textwidth") > 0)
+				}
+				windowDef oq4_tplace_round
+				{
+					rect	6,2.91,100,12
+					text	"gui::oq4_tourney_round"
+					font	"fonts/lowpixel"
+					textscale	0.135
+					forecolor	1,1,1,0.7
+					nowrap	1
+				}
+				windowDef oq4_tplace_arena
+				{
+					rect	"oq4_tplace_round::textwidth" + 14,2.91,100,12
+					text	"gui::oq4_mb_sub"
+					font	"fonts/lowpixel"
+					textscale	0.135
+					forecolor	1,1,1,0.7
+					nowrap	1
+				}
+			}
+			// Round modes: ROUND n with the round clock for the whole timed round.
+			windowDef oq4_round
+			{
+				rect	6,(82 + 8 * "gui::oq4_team_game" + 17 * ("gui::gametype" == 8) - 24 * ("gui::gametype" == 2)) + 18,200,14
+				noclip	1
+				visible	"gui::showround" * ("gui::gametype" != 2)
+				windowDef oq4_round_plate
+				{
+					rect	0,0,"oq4_round_text::textwidth" + 8 * ("oq4_round_clock::textwidth" > 0) + "oq4_round_clock::textwidth" + 14,14
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.5
+					shear	0,-.22
+				}
+				windowDef oq4_round_text
+				{
+					rect	6,1.91,100,12
+					text	"gui::roundtext"
+					font	"fonts/lowpixel"
+					textscale	0.135
+					forecolor	1,1,1,0.7
+					nowrap	1
+				}
+				windowDef oq4_round_clock
+				{
+					rect	"oq4_round_text::textwidth" + 14,-0.32,40,12
+					text	"gui::roundtime"
+					font	"fonts/chain"
+					textscale	0.208
+					forecolor	1,0.745,0.137,1
+					nowrap	1
+				}
+			}
+			windowDef oq4_credits
+			{
+				rect	6,(82 + 8 * "gui::oq4_team_game" + 17 * ("gui::gametype" == 8) - 24 * ("gui::gametype" == 2)) + 18 + 16 * "gui::showround" * ("gui::gametype" != 2),200,14
+				noclip	1
+				windowDef oq4_credits_plate
+				{
+					rect	0,0,"oq4_credits_text::textwidth" + 14,14
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.5
+					shear	0,-.22
+					visible	("oq4_credits_text::textwidth" > 0)
+				}
+				windowDef oq4_credits_text
+				{
+					rect	6,0.52,160,13
+					text	"gui::credits"
+					font	"fonts/lowpixel"
+					textscale	0.17
+					forecolor	1,1,1,1
+					nowrap	1
+				}
+			}
+			windowDef oq4_status
+			{
+				rect	6,(82 + 8 * "gui::oq4_team_game" + 17 * ("gui::gametype" == 8) - 24 * ("gui::gametype" == 2)) + 18 + 16 * "gui::showround" * ("gui::gametype" != 2) + 16 * ("oq4_credits_text::textwidth" > 0),200,14
+				noclip	1
+				windowDef oq4_status_plate
+				{
+					rect	0,0,"oq4_status_text::textwidth" + 14,14
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.5
+					shear	0,-.22
+					visible	("oq4_status_text::textwidth" > 0)
+				}
+				windowDef oq4_status_text
+				{
+					rect	6,0.52,160,13
+					text	"gui::gameStatus"
+					font	"fonts/lowpixel"
+					textscale	0.17
+					forecolor	1,1,1,1
+					nowrap	1
+				}
+			}
+		}
+		// openQ4: the Remastered kill feed (ui-visual-design.md 14.9) from the game's
+		// oq4_feed fields: top trailing, four lines (two under Tourney's strip), each on
+		// its own plate at 0.35, or the header-band plate at 0.30 when it involves you.
+		// Attacker, the Quad mark, the weapon in its color code (a skull for suicides
+		// and the world, the telefrag mark), a TEAM tag on a team kill, then the
+		// victim; names cut at 84 u, white for you and in the team's text color in
+		// team modes. The game times the lines; the player HUD's stock feed stays
+		// empty outside Classic.
+		windowDef oq4_feed
+		{
+			rect	0,0,640,480
+			screenalignx	right
+			screenaligny	top
+			noclip	1
+			visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras"
+			windowDef oq4_feed0
+			{
+				rect	0,12.5 + 46 * ("gui::gametype" == 2),640,15
+				noclip	1
+				visible	"gui::oq4_feed0_live"
+				definefloat	"vw"	"oq4_feed0_v::textwidth"
+				definefloat	"tw"	"gui::oq4_feed0_teamkill" * ("oq4_feed0_tag_text::textwidth" + 12)
+				definefloat	"mx"	617 - ("oq4_feed0::vw" + "oq4_feed0::tw")
+				definefloat	"qw"	"gui::oq4_feed0_quad" * 14
+				definefloat	"aw"	"gui::oq4_feed0_hasAttacker" * ("oq4_feed0_a::textwidth" + 5)
+				definefloat	"left"	"oq4_feed0::mx" - ("oq4_feed0::qw" + "oq4_feed0::aw" + 6)
+				windowDef oq4_feed0_plate
+				{
+					rect	"oq4_feed0::left",0,637 - "oq4_feed0::left",15
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.35 * "gui::oq4_feed0_alpha"
+					shear	0,-.22
+					visible	("gui::oq4_feed0_you" == 0)
+				}
+				windowDef oq4_feed0_band
+				{
+					rect	"oq4_feed0::left",0,637 - "oq4_feed0::left",15
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0.545,0.588,0.294,0.3 * "gui::oq4_feed0_alpha"
+					shear	0,-.22
+					visible	"gui::oq4_feed0_you"
+				}
+				windowDef oq4_feed0_a
+				{
+					rect	"oq4_feed0::mx" - ("oq4_feed0::qw" + "oq4_feed0::aw"),-1.05,84,17
+					text	"gui::oq4_feed0_attacker"
+					font	"fonts/lowpixel"
+					textscale	0.225
+					forecolor	"gui::oq4_feed0_youAttacker" + (1 - "gui::oq4_feed0_youAttacker") * ("gui::oq4_feed0_team" * (0.667 + 0.333 * ("gui::oq4_feed0_attackerTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 1),"gui::oq4_feed0_youAttacker" + (1 - "gui::oq4_feed0_youAttacker") * ("gui::oq4_feed0_team" * (0.89 - 0.333 * ("gui::oq4_feed0_attackerTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 1),"gui::oq4_feed0_youAttacker" + (1 - "gui::oq4_feed0_youAttacker") * ("gui::oq4_feed0_team" * (0.333 - 0.333 * ("gui::oq4_feed0_attackerTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 0.553),"gui::oq4_feed0_alpha"
+					visible	"gui::oq4_feed0_hasAttacker"
+					nowrap	1
+				}
+				windowDef oq4_feed0_q
+				{
+					rect	"oq4_feed0::mx" - 14,2,11,11
+					background	"gfx/guis/hud/icons/item_quadkill_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	"gui::oq4_feed0_quad"
+				}
+				windowDef oq4_feed0_w0
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_gauntlet_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 0)
+				}
+				windowDef oq4_feed0_w1
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_machinegun_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 1)
+				}
+				windowDef oq4_feed0_w2
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_shotgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 2)
+				}
+				windowDef oq4_feed0_w3
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_hyperblaster_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 3)
+				}
+				windowDef oq4_feed0_w4
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_grenade_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 4)
+				}
+				windowDef oq4_feed0_w5
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_nailgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 5)
+				}
+				windowDef oq4_feed0_w6
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_rocket_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 6)
+				}
+				windowDef oq4_feed0_w7
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_railgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 7)
+				}
+				windowDef oq4_feed0_w8
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_lightning_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 8)
+				}
+				windowDef oq4_feed0_w9
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_darkmatter_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 9)
+				}
+				windowDef oq4_feed0_w10
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_fire_colored"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 0) * ("gui::oq4_feed0_weapon" == 10)
+				}
+				windowDef oq4_feed0_skull
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/kill_self"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 1)
+				}
+				windowDef oq4_feed0_tele
+				{
+					rect	"oq4_feed0::mx",2,11,11
+					background	"gfx/guis/hud/icons/kill_telefrag"
+					matcolor	1,1,1,"gui::oq4_feed0_alpha"
+					visible	("gui::oq4_feed0_kind" == 2)
+				}
+				windowDef oq4_feed0_tag
+				{
+					rect	633 - ("oq4_feed0::vw" + "oq4_feed0::tw"),2.5,"oq4_feed0::tw" - 4,10
+					backcolor	0.667 + 0.333 * ("gui::oq4_feed0_victimTeam" == 1),0.89 - 0.333 * ("gui::oq4_feed0_victimTeam" == 1),0.333 - 0.333 * ("gui::oq4_feed0_victimTeam" == 1),0.85 * "gui::oq4_feed0_alpha"
+					visible	"gui::oq4_feed0_teamkill"
+					windowDef oq4_feed0_tag_text
+					{
+						rect	4,0.72,60,10
+						text	"#str_231001"
+						font	"fonts/lowpixel"
+						textscale	0.12
+						forecolor	0.063,0.078,0.039,"gui::oq4_feed0_alpha"
+						nowrap	1
+					}
+				}
+				windowDef oq4_feed0_v
+				{
+					rect	633 - "oq4_feed0::vw",-1.05,84,17
+					text	"gui::oq4_feed0_victim"
+					font	"fonts/lowpixel"
+					textscale	0.225
+					forecolor	"gui::oq4_feed0_youVictim" + (1 - "gui::oq4_feed0_youVictim") * ("gui::oq4_feed0_team" * (0.667 + 0.333 * ("gui::oq4_feed0_victimTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 1),"gui::oq4_feed0_youVictim" + (1 - "gui::oq4_feed0_youVictim") * ("gui::oq4_feed0_team" * (0.89 - 0.333 * ("gui::oq4_feed0_victimTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 1),"gui::oq4_feed0_youVictim" + (1 - "gui::oq4_feed0_youVictim") * ("gui::oq4_feed0_team" * (0.333 - 0.333 * ("gui::oq4_feed0_victimTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 0.553),"gui::oq4_feed0_alpha"
+					nowrap	1
+				}
+			}
+			windowDef oq4_feed1
+			{
+				rect	0,27.5 + 46 * ("gui::gametype" == 2),640,15
+				noclip	1
+				visible	"gui::oq4_feed1_live"
+				definefloat	"vw"	"oq4_feed1_v::textwidth"
+				definefloat	"tw"	"gui::oq4_feed1_teamkill" * ("oq4_feed1_tag_text::textwidth" + 12)
+				definefloat	"mx"	617 - ("oq4_feed1::vw" + "oq4_feed1::tw")
+				definefloat	"qw"	"gui::oq4_feed1_quad" * 14
+				definefloat	"aw"	"gui::oq4_feed1_hasAttacker" * ("oq4_feed1_a::textwidth" + 5)
+				definefloat	"left"	"oq4_feed1::mx" - ("oq4_feed1::qw" + "oq4_feed1::aw" + 6)
+				windowDef oq4_feed1_plate
+				{
+					rect	"oq4_feed1::left",0,637 - "oq4_feed1::left",15
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.35 * "gui::oq4_feed1_alpha"
+					shear	0,-.22
+					visible	("gui::oq4_feed1_you" == 0)
+				}
+				windowDef oq4_feed1_band
+				{
+					rect	"oq4_feed1::left",0,637 - "oq4_feed1::left",15
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0.545,0.588,0.294,0.3 * "gui::oq4_feed1_alpha"
+					shear	0,-.22
+					visible	"gui::oq4_feed1_you"
+				}
+				windowDef oq4_feed1_a
+				{
+					rect	"oq4_feed1::mx" - ("oq4_feed1::qw" + "oq4_feed1::aw"),-1.05,84,17
+					text	"gui::oq4_feed1_attacker"
+					font	"fonts/lowpixel"
+					textscale	0.225
+					forecolor	"gui::oq4_feed1_youAttacker" + (1 - "gui::oq4_feed1_youAttacker") * ("gui::oq4_feed1_team" * (0.667 + 0.333 * ("gui::oq4_feed1_attackerTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 1),"gui::oq4_feed1_youAttacker" + (1 - "gui::oq4_feed1_youAttacker") * ("gui::oq4_feed1_team" * (0.89 - 0.333 * ("gui::oq4_feed1_attackerTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 1),"gui::oq4_feed1_youAttacker" + (1 - "gui::oq4_feed1_youAttacker") * ("gui::oq4_feed1_team" * (0.333 - 0.333 * ("gui::oq4_feed1_attackerTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 0.553),"gui::oq4_feed1_alpha"
+					visible	"gui::oq4_feed1_hasAttacker"
+					nowrap	1
+				}
+				windowDef oq4_feed1_q
+				{
+					rect	"oq4_feed1::mx" - 14,2,11,11
+					background	"gfx/guis/hud/icons/item_quadkill_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	"gui::oq4_feed1_quad"
+				}
+				windowDef oq4_feed1_w0
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_gauntlet_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 0)
+				}
+				windowDef oq4_feed1_w1
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_machinegun_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 1)
+				}
+				windowDef oq4_feed1_w2
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_shotgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 2)
+				}
+				windowDef oq4_feed1_w3
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_hyperblaster_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 3)
+				}
+				windowDef oq4_feed1_w4
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_grenade_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 4)
+				}
+				windowDef oq4_feed1_w5
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_nailgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 5)
+				}
+				windowDef oq4_feed1_w6
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_rocket_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 6)
+				}
+				windowDef oq4_feed1_w7
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_railgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 7)
+				}
+				windowDef oq4_feed1_w8
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_lightning_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 8)
+				}
+				windowDef oq4_feed1_w9
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_darkmatter_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 9)
+				}
+				windowDef oq4_feed1_w10
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_fire_colored"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 0) * ("gui::oq4_feed1_weapon" == 10)
+				}
+				windowDef oq4_feed1_skull
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/kill_self"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 1)
+				}
+				windowDef oq4_feed1_tele
+				{
+					rect	"oq4_feed1::mx",2,11,11
+					background	"gfx/guis/hud/icons/kill_telefrag"
+					matcolor	1,1,1,"gui::oq4_feed1_alpha"
+					visible	("gui::oq4_feed1_kind" == 2)
+				}
+				windowDef oq4_feed1_tag
+				{
+					rect	633 - ("oq4_feed1::vw" + "oq4_feed1::tw"),2.5,"oq4_feed1::tw" - 4,10
+					backcolor	0.667 + 0.333 * ("gui::oq4_feed1_victimTeam" == 1),0.89 - 0.333 * ("gui::oq4_feed1_victimTeam" == 1),0.333 - 0.333 * ("gui::oq4_feed1_victimTeam" == 1),0.85 * "gui::oq4_feed1_alpha"
+					visible	"gui::oq4_feed1_teamkill"
+					windowDef oq4_feed1_tag_text
+					{
+						rect	4,0.72,60,10
+						text	"#str_231001"
+						font	"fonts/lowpixel"
+						textscale	0.12
+						forecolor	0.063,0.078,0.039,"gui::oq4_feed1_alpha"
+						nowrap	1
+					}
+				}
+				windowDef oq4_feed1_v
+				{
+					rect	633 - "oq4_feed1::vw",-1.05,84,17
+					text	"gui::oq4_feed1_victim"
+					font	"fonts/lowpixel"
+					textscale	0.225
+					forecolor	"gui::oq4_feed1_youVictim" + (1 - "gui::oq4_feed1_youVictim") * ("gui::oq4_feed1_team" * (0.667 + 0.333 * ("gui::oq4_feed1_victimTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 1),"gui::oq4_feed1_youVictim" + (1 - "gui::oq4_feed1_youVictim") * ("gui::oq4_feed1_team" * (0.89 - 0.333 * ("gui::oq4_feed1_victimTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 1),"gui::oq4_feed1_youVictim" + (1 - "gui::oq4_feed1_youVictim") * ("gui::oq4_feed1_team" * (0.333 - 0.333 * ("gui::oq4_feed1_victimTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 0.553),"gui::oq4_feed1_alpha"
+					nowrap	1
+				}
+			}
+			windowDef oq4_feed2
+			{
+				rect	0,42.5 + 46 * ("gui::gametype" == 2),640,15
+				noclip	1
+				visible	"gui::oq4_feed2_live"
+				definefloat	"vw"	"oq4_feed2_v::textwidth"
+				definefloat	"tw"	"gui::oq4_feed2_teamkill" * ("oq4_feed2_tag_text::textwidth" + 12)
+				definefloat	"mx"	617 - ("oq4_feed2::vw" + "oq4_feed2::tw")
+				definefloat	"qw"	"gui::oq4_feed2_quad" * 14
+				definefloat	"aw"	"gui::oq4_feed2_hasAttacker" * ("oq4_feed2_a::textwidth" + 5)
+				definefloat	"left"	"oq4_feed2::mx" - ("oq4_feed2::qw" + "oq4_feed2::aw" + 6)
+				windowDef oq4_feed2_plate
+				{
+					rect	"oq4_feed2::left",0,637 - "oq4_feed2::left",15
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.35 * "gui::oq4_feed2_alpha"
+					shear	0,-.22
+					visible	("gui::oq4_feed2_you" == 0)
+				}
+				windowDef oq4_feed2_band
+				{
+					rect	"oq4_feed2::left",0,637 - "oq4_feed2::left",15
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0.545,0.588,0.294,0.3 * "gui::oq4_feed2_alpha"
+					shear	0,-.22
+					visible	"gui::oq4_feed2_you"
+				}
+				windowDef oq4_feed2_a
+				{
+					rect	"oq4_feed2::mx" - ("oq4_feed2::qw" + "oq4_feed2::aw"),-1.05,84,17
+					text	"gui::oq4_feed2_attacker"
+					font	"fonts/lowpixel"
+					textscale	0.225
+					forecolor	"gui::oq4_feed2_youAttacker" + (1 - "gui::oq4_feed2_youAttacker") * ("gui::oq4_feed2_team" * (0.667 + 0.333 * ("gui::oq4_feed2_attackerTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 1),"gui::oq4_feed2_youAttacker" + (1 - "gui::oq4_feed2_youAttacker") * ("gui::oq4_feed2_team" * (0.89 - 0.333 * ("gui::oq4_feed2_attackerTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 1),"gui::oq4_feed2_youAttacker" + (1 - "gui::oq4_feed2_youAttacker") * ("gui::oq4_feed2_team" * (0.333 - 0.333 * ("gui::oq4_feed2_attackerTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 0.553),"gui::oq4_feed2_alpha"
+					visible	"gui::oq4_feed2_hasAttacker"
+					nowrap	1
+				}
+				windowDef oq4_feed2_q
+				{
+					rect	"oq4_feed2::mx" - 14,2,11,11
+					background	"gfx/guis/hud/icons/item_quadkill_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	"gui::oq4_feed2_quad"
+				}
+				windowDef oq4_feed2_w0
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_gauntlet_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 0)
+				}
+				windowDef oq4_feed2_w1
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_machinegun_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 1)
+				}
+				windowDef oq4_feed2_w2
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_shotgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 2)
+				}
+				windowDef oq4_feed2_w3
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_hyperblaster_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 3)
+				}
+				windowDef oq4_feed2_w4
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_grenade_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 4)
+				}
+				windowDef oq4_feed2_w5
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_nailgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 5)
+				}
+				windowDef oq4_feed2_w6
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_rocket_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 6)
+				}
+				windowDef oq4_feed2_w7
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_railgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 7)
+				}
+				windowDef oq4_feed2_w8
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_lightning_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 8)
+				}
+				windowDef oq4_feed2_w9
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_darkmatter_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 9)
+				}
+				windowDef oq4_feed2_w10
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_fire_colored"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 0) * ("gui::oq4_feed2_weapon" == 10)
+				}
+				windowDef oq4_feed2_skull
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/kill_self"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 1)
+				}
+				windowDef oq4_feed2_tele
+				{
+					rect	"oq4_feed2::mx",2,11,11
+					background	"gfx/guis/hud/icons/kill_telefrag"
+					matcolor	1,1,1,"gui::oq4_feed2_alpha"
+					visible	("gui::oq4_feed2_kind" == 2)
+				}
+				windowDef oq4_feed2_tag
+				{
+					rect	633 - ("oq4_feed2::vw" + "oq4_feed2::tw"),2.5,"oq4_feed2::tw" - 4,10
+					backcolor	0.667 + 0.333 * ("gui::oq4_feed2_victimTeam" == 1),0.89 - 0.333 * ("gui::oq4_feed2_victimTeam" == 1),0.333 - 0.333 * ("gui::oq4_feed2_victimTeam" == 1),0.85 * "gui::oq4_feed2_alpha"
+					visible	"gui::oq4_feed2_teamkill"
+					windowDef oq4_feed2_tag_text
+					{
+						rect	4,0.72,60,10
+						text	"#str_231001"
+						font	"fonts/lowpixel"
+						textscale	0.12
+						forecolor	0.063,0.078,0.039,"gui::oq4_feed2_alpha"
+						nowrap	1
+					}
+				}
+				windowDef oq4_feed2_v
+				{
+					rect	633 - "oq4_feed2::vw",-1.05,84,17
+					text	"gui::oq4_feed2_victim"
+					font	"fonts/lowpixel"
+					textscale	0.225
+					forecolor	"gui::oq4_feed2_youVictim" + (1 - "gui::oq4_feed2_youVictim") * ("gui::oq4_feed2_team" * (0.667 + 0.333 * ("gui::oq4_feed2_victimTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 1),"gui::oq4_feed2_youVictim" + (1 - "gui::oq4_feed2_youVictim") * ("gui::oq4_feed2_team" * (0.89 - 0.333 * ("gui::oq4_feed2_victimTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 1),"gui::oq4_feed2_youVictim" + (1 - "gui::oq4_feed2_youVictim") * ("gui::oq4_feed2_team" * (0.333 - 0.333 * ("gui::oq4_feed2_victimTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 0.553),"gui::oq4_feed2_alpha"
+					nowrap	1
+				}
+			}
+			windowDef oq4_feed3
+			{
+				rect	0,57.5 + 46 * ("gui::gametype" == 2),640,15
+				noclip	1
+				visible	"gui::oq4_feed3_live"
+				definefloat	"vw"	"oq4_feed3_v::textwidth"
+				definefloat	"tw"	"gui::oq4_feed3_teamkill" * ("oq4_feed3_tag_text::textwidth" + 12)
+				definefloat	"mx"	617 - ("oq4_feed3::vw" + "oq4_feed3::tw")
+				definefloat	"qw"	"gui::oq4_feed3_quad" * 14
+				definefloat	"aw"	"gui::oq4_feed3_hasAttacker" * ("oq4_feed3_a::textwidth" + 5)
+				definefloat	"left"	"oq4_feed3::mx" - ("oq4_feed3::qw" + "oq4_feed3::aw" + 6)
+				windowDef oq4_feed3_plate
+				{
+					rect	"oq4_feed3::left",0,637 - "oq4_feed3::left",15
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.35 * "gui::oq4_feed3_alpha"
+					shear	0,-.22
+					visible	("gui::oq4_feed3_you" == 0)
+				}
+				windowDef oq4_feed3_band
+				{
+					rect	"oq4_feed3::left",0,637 - "oq4_feed3::left",15
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0.545,0.588,0.294,0.3 * "gui::oq4_feed3_alpha"
+					shear	0,-.22
+					visible	"gui::oq4_feed3_you"
+				}
+				windowDef oq4_feed3_a
+				{
+					rect	"oq4_feed3::mx" - ("oq4_feed3::qw" + "oq4_feed3::aw"),-1.05,84,17
+					text	"gui::oq4_feed3_attacker"
+					font	"fonts/lowpixel"
+					textscale	0.225
+					forecolor	"gui::oq4_feed3_youAttacker" + (1 - "gui::oq4_feed3_youAttacker") * ("gui::oq4_feed3_team" * (0.667 + 0.333 * ("gui::oq4_feed3_attackerTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 1),"gui::oq4_feed3_youAttacker" + (1 - "gui::oq4_feed3_youAttacker") * ("gui::oq4_feed3_team" * (0.89 - 0.333 * ("gui::oq4_feed3_attackerTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 1),"gui::oq4_feed3_youAttacker" + (1 - "gui::oq4_feed3_youAttacker") * ("gui::oq4_feed3_team" * (0.333 - 0.333 * ("gui::oq4_feed3_attackerTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 0.553),"gui::oq4_feed3_alpha"
+					visible	"gui::oq4_feed3_hasAttacker"
+					nowrap	1
+				}
+				windowDef oq4_feed3_q
+				{
+					rect	"oq4_feed3::mx" - 14,2,11,11
+					background	"gfx/guis/hud/icons/item_quadkill_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	"gui::oq4_feed3_quad"
+				}
+				windowDef oq4_feed3_w0
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_gauntlet_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 0)
+				}
+				windowDef oq4_feed3_w1
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_machinegun_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 1)
+				}
+				windowDef oq4_feed3_w2
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_shotgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 2)
+				}
+				windowDef oq4_feed3_w3
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_hyperblaster_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 3)
+				}
+				windowDef oq4_feed3_w4
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_grenade_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 4)
+				}
+				windowDef oq4_feed3_w5
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_nailgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 5)
+				}
+				windowDef oq4_feed3_w6
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_rocket_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 6)
+				}
+				windowDef oq4_feed3_w7
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_railgun_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 7)
+				}
+				windowDef oq4_feed3_w8
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_lightning_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 8)
+				}
+				windowDef oq4_feed3_w9
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_darkmatter_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 9)
+				}
+				windowDef oq4_feed3_w10
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/item_fire_colored"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 0) * ("gui::oq4_feed3_weapon" == 10)
+				}
+				windowDef oq4_feed3_skull
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/kill_self"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 1)
+				}
+				windowDef oq4_feed3_tele
+				{
+					rect	"oq4_feed3::mx",2,11,11
+					background	"gfx/guis/hud/icons/kill_telefrag"
+					matcolor	1,1,1,"gui::oq4_feed3_alpha"
+					visible	("gui::oq4_feed3_kind" == 2)
+				}
+				windowDef oq4_feed3_tag
+				{
+					rect	633 - ("oq4_feed3::vw" + "oq4_feed3::tw"),2.5,"oq4_feed3::tw" - 4,10
+					backcolor	0.667 + 0.333 * ("gui::oq4_feed3_victimTeam" == 1),0.89 - 0.333 * ("gui::oq4_feed3_victimTeam" == 1),0.333 - 0.333 * ("gui::oq4_feed3_victimTeam" == 1),0.85 * "gui::oq4_feed3_alpha"
+					visible	"gui::oq4_feed3_teamkill"
+					windowDef oq4_feed3_tag_text
+					{
+						rect	4,0.72,60,10
+						text	"#str_231001"
+						font	"fonts/lowpixel"
+						textscale	0.12
+						forecolor	0.063,0.078,0.039,"gui::oq4_feed3_alpha"
+						nowrap	1
+					}
+				}
+				windowDef oq4_feed3_v
+				{
+					rect	633 - "oq4_feed3::vw",-1.05,84,17
+					text	"gui::oq4_feed3_victim"
+					font	"fonts/lowpixel"
+					textscale	0.225
+					forecolor	"gui::oq4_feed3_youVictim" + (1 - "gui::oq4_feed3_youVictim") * ("gui::oq4_feed3_team" * (0.667 + 0.333 * ("gui::oq4_feed3_victimTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 1),"gui::oq4_feed3_youVictim" + (1 - "gui::oq4_feed3_youVictim") * ("gui::oq4_feed3_team" * (0.89 - 0.333 * ("gui::oq4_feed3_victimTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 1),"gui::oq4_feed3_youVictim" + (1 - "gui::oq4_feed3_youVictim") * ("gui::oq4_feed3_team" * (0.333 - 0.333 * ("gui::oq4_feed3_victimTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 0.553),"gui::oq4_feed3_alpha"
 					nowrap	1
 				}
 			}
@@ -4699,7 +7884,7 @@ windowDef Desktop
 	  		rect	3,110,167,17
 	 		screenalignx	left
 	 		screenaligny	top
-	  		visible	1
+	  		visible	("gui::oq4_hudRemastered" == 0)
 	   		forecolor	1,1,1,1
 	  		text	"gui::credits"
 	  		font "fonts/lowpixel"
@@ -4711,7 +7896,7 @@ windowDef Desktop
 	  		rect	3,127,167,17
 	 		screenalignx	left
 	 		screenaligny	top
-	  		visible	1
+	  		visible	("gui::oq4_hudRemastered" == 0)
 	   		forecolor	1,1,1,1
 	  		text	"gui::gameStatus"
 	  		font "fonts/lowpixel"
@@ -4726,7 +7911,7 @@ windowDef Desktop
 			rect	170,40,300,20
 			screenalignx	left
 			screenaligny	top
-			visible	"gui::showround"
+			visible	"gui::showround" * ("gui::oq4_hudRemastered" == 0)
 			forecolor	1,1,1,1
 			text	"gui::roundtext"
 			font	"fonts/lowpixel"
@@ -4739,7 +7924,7 @@ windowDef Desktop
 			rect	170,58,300,20
 			screenalignx	left
 			screenaligny	top
-			visible	"gui::showroundtime"
+			visible	"gui::showroundtime" * ("gui::oq4_hudRemastered" == 0)
 			forecolor	1,0.25,0.25,1
 			text	"gui::roundtime"
 			font	"fonts/lowpixel"
@@ -4755,7 +7940,7 @@ windowDef Desktop
 			rect	170,80,300,20
 			screenalignx	left
 			screenaligny	top
-			visible	"gui::overtime"
+			visible	"gui::overtime" * ("gui::oq4_hudRemastered" == 0)
 			forecolor	1,0.85,0.3,1
 			text	"gui::overtimetext"
 			font	"fonts/lowpixel"

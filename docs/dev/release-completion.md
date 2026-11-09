@@ -26,6 +26,28 @@ See [player release status](../user/release-status.md).
   an engine reload. Details are in the
   [pure-server cache decision](mp-network-qualification.md#level-load-caches-on-pure-servers-9-november-2026).
 
+## Every multiplayer mode gets the Remastered HUD in the classic interface, 9 November 2026
+
+- **Team modes, Tourney and the kill feed join the new layout.** With
+  `ui_retained 0`, the layout that Deathmatch and Duel received earlier today now
+  covers the rest of multiplayer, keeping the original artwork:
+  - Team DM, CTF, One Flag, Arena CTF, Dead Zone, Clan Arena, Freeze Tag and Red
+    Rover show compact team panels with your team first and the score against
+    the limit. The flags show who carries them, the round modes show who is
+    still standing, and Dead Zone names the team holding the zone.
+  - The match timer sits under the panels, with the round number and round
+    clock in the round modes.
+  - Tourney shows its bracket strip on plates, with your match highlighted and
+    each finished match's winner ticked. The message bar names the round, and
+    the round and arena sit beside the timer.
+  - The kill feed sits in the top-right corner, each line on its own plate with
+    the weapon icon, team colors and a TEAM tag on team kills. Lines that
+    involve you stand out, and a long name no longer pushes the victim off the
+    screen.
+- **Minimal now hides the multiplayer extras too,** as it does in the modern HUD.
+- Choose the Classic layout (`ui_hudLayout 0`) to keep the original positions.
+- Evidence: [stock interface HUD layout](ui/legacy-hud-layout.md#multiplayer-groups).
+
 ## Joining a pure server no longer restarts the game, 9 November 2026
 
 - **Much faster first join to a pure server.** Joining a server with pure

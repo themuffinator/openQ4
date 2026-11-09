@@ -470,9 +470,12 @@ artwork. The status bar is centered on the bottom edge, and the weapon strip
 shows the weapon's name above it. Up to two pickup lines sit over the gauges,
 and a repeated item counts up on its line ("Armor Shard ×2"). Vehicles get the
 centered status bar and an Exit prompt with your jump key in the bottom-right
-corner. In Deathmatch and Duel, multiplayer shows the standing with your gap
-and the timer on plates. Chat sits at the bottom left, clear of the status bar,
-with each message on its own plate. Layout, HUD width, safe area, pickup
+corner. Multiplayer shows the standing with your gap, or the team panels with
+your team first, the flags and their carriers, on compact plates with the timer
+under them. Tourney shows its bracket strip with your match highlighted, and the
+kill feed puts each line on its own plate in the top-right corner. Chat sits at
+the bottom left, clear of the status bar, with each message on its own plate.
+Layout, HUD width, safe area, pickup
 messages, weapon strip and damage direction all work there. Minimal hides the
 same extras, and Competitive uses the Remastered positions. HUD size and opacity
 apply only to the modern UI. `ui_hudLayout 0` keeps the original Quake 4

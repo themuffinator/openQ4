@@ -2468,7 +2468,9 @@ Completion must advance through the existing dependencies:
   pickup merge, chat and standing, and save-compat revisions
   ([stock interface HUD layout](ui/legacy-hud-layout.md)). This does not migrate
   or accept a GUI. The next inventory refresh (UI-10) picks up the edited
-  GUIs and their revisions.
+  GUIs and their revisions. The same day the stock multiplayer HUD gained the
+  team modes' panels and flags, Tourney's strip and message bar, and the kill
+  feed ([multiplayer groups](ui/legacy-hud-layout.md#multiplayer-groups)).
 - [ ] **UI-05 — P1, decision and qualification: resolve visual policy conflicts.**
   Reconcile SP/MP hit-marker defaults with visual specification section 14.7 and
   other recorded deviations before acceptance. Preserve editable vector framing,
