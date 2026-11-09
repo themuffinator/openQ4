@@ -490,7 +490,17 @@ class AndroidBuildTests(unittest.TestCase):
                                        check=True,capture_output=True,text=True)
             inventory_path.write_text(generated.stdout,encoding='utf-8')
             self.assertEqual([call[0] for call in invoke()], ["compile"])
+            # An edit refreshes the provenance snapshot in place without a reconfigure.
+            before = json.loads(inventory_path.read_text(encoding="utf-8"))
             (game / "src/game/Game_local.cpp").write_text("// changed game\n", encoding="utf-8")
+            self.assertEqual([call[0] for call in invoke()], ["compile"])
+            after = json.loads(inventory_path.read_text(encoding="utf-8"))
+            self.assertNotEqual(before["sourceDigest"], after["sourceDigest"])
+            self.assertEqual(after["sourceDigest"], json.loads(subprocess.run(
+                [sys.executable, str(scripts / 'game_source_inventory.py'), str(project)],
+                check=True, capture_output=True, text=True).stdout)["sourceDigest"])
+            # A new source file changes what Meson compiles, so it reconfigures.
+            (game / "src/mpgame/Added.cpp").write_text("// new game file\n", encoding="utf-8")
             self.assertEqual([call[0] for call in invoke()], ["setup", "compile"])
 
     def test_ndk_target_and_missing_tools(self) -> None:

@@ -380,7 +380,8 @@ function Test-GameSourcesRefreshNeeded {
     $python = Get-Command python -ErrorAction SilentlyContinue
     if ($null -eq $python) { $python = Get-Command python3 -ErrorAction SilentlyContinue }
     if ($null -eq $python) { throw "Python is required to check canonical game sources." }
-    & $python.Source (Join-Path $RepoRoot "tools\build\game_source_inventory.py") $RepoRoot --check (Join-Path $BuildDir "openq4_game_sources.json") | Out-Null
+    # Content and git-state drift only refresh the snapshot; a membership change reconfigures.
+    & $python.Source (Join-Path $RepoRoot "tools\build\game_source_inventory.py") $RepoRoot --refresh (Join-Path $BuildDir "openq4_game_sources.json") | Out-Null
     return ($LASTEXITCODE -ne 0)
 }
 

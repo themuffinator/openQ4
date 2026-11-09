@@ -71,8 +71,10 @@ Their source histories are preserved in the import commit. See the
 [import record](docs/dev/game-source-provenance.md) and [licensing scope](LICENSING.md).
 
 Meson compiles game sources directly. The wrappers compare
-`builddir/openq4_game_sources.json` with the canonical source tree so additions,
-removals and content changes refresh configuration and source stamps. Game DLLs
+`builddir/openq4_game_sources.json` with the canonical source tree before each
+build. Adding or removing a game source file reconfigures Meson; editing one, or
+committing, only refreshes the snapshot's hashes and Git identity in place, since
+ninja already rebuilds edited files. Game DLLs
 remain available in `builddir/baseoq4/` and are staged into `.install/baseoq4/`.
 The compatibility `build_gamelibs.ps1` entry point builds this engine checkout;
 `OPENQ4_BUILD_GAMELIBS` no longer starts a companion build.

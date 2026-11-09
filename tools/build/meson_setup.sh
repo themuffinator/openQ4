@@ -190,8 +190,9 @@ test_game_sources_refresh_needed() {
     local games
     games="$(get_meson_build_option_value "${build_dir}" build_games || true)"
     [[ "${games}" != "false" ]] || return 1
+    # Content and git-state drift only refresh the snapshot; a membership change reconfigures.
     if "${PYTHON_CMD}" "${script_dir}/game_source_inventory.py" "${repo_root}" \
-        --check "${build_dir}/openq4_game_sources.json" >/dev/null; then
+        --refresh "${build_dir}/openq4_game_sources.json" >/dev/null; then
         return 1
     fi
     return 0
