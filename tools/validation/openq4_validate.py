@@ -517,6 +517,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "dmap_vertex_sharing.py",
         root / "tools" / "tests" / "dmap_tjunction_slivers.py",
         root / "tools" / "tests" / "dmap_optimizer_zero_area.py",
+        root / "tools" / "tests" / "dmap_patch_texture_groups.py",
         root / "tools" / "tests" / "idstr_last_color_code.py",
         root / "tools" / "tests" / "renderer_silhouette_edges.py",
         root / "tools" / "tests" / "fatal_error_startup_safety.py",
