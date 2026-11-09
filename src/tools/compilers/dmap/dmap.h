@@ -201,6 +201,7 @@ typedef struct optimizeGroup_s {
 										// groups will not be combined into model surfaces
 										// after optimization
 	textureVectors_t	texVec;
+	int					texVecSource;	// texVecSource_t: how texVec relates to the triangles' own coordinates
 
 	bool				surfaceEmited;
 

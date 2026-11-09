@@ -325,3 +325,57 @@ The pairing was read from the name and flag tables in the retail `Quake4.exe`;
 the brush counts come from every `.cm` in the installed Quake 4 1.4.2 packages.
 Matching it is what lets the AAS tactical pass reproduce retail features on the
 convoy maps (see [AAS compiler](aas-compiler.md#verified-against-retail-output)).
+
+## Texture seams between consecutive patches (9 November 2026)
+
+The #209 reporter's rebuilt `walker` showed `textures/tram/road1_1` smeared into
+streaks on a ramp in `_area13`. The [supplied `walker.map`](https://github.com/user-attachments/files/34512935/walker.zip)
+differs from the stock source only in patch subdivision, and its `road1_1`
+brushes and patches are identical to stock. Compiling the stock map reproduces
+it: eight triangles of `_area13`'s `road1_1` surface (109,907 square units) have
+their texture collapsed along one direction, where the retail `walker.proc` has
+none.
+
+The ramp is three flat 3×3 patches laid end to end, each running t from 0 to 1,
+so where two meet the same position carries t = 1 on one and t = 0 on the next.
+dmap puts coplanar triangles with the same material and texture mapping in one
+optimize group, and the optimizer welds a group's coincident vertices to the
+first coordinates it meets. id's `TexVecForTri` fitted a curve triangle's mapping
+as two normalized directions and an offset that took t along the s direction, so
+it could not tell where a repeat starts. Triangles from both patches matched,
+and the seam vertices were welded to one value, stretching the texture across
+the triangles between them. `noOpt` removes the streaks.
+
+Curve and model triangles are now fitted with their in-plane gradient and
+intercept, the form brush sides use, and such a triangle joins a group only when
+the group's mapping reproduces each of its texture coordinates to within 0.005.
+Brush sides keep id's comparison, and curves still never share a group with
+brush sides.
+
+One build compared both rules, the old one behind a temporary switch whose
+output was byte-identical to the previous build. The runs in each row ran side
+by side on a desktop shared with game clients, so times compare only within a
+row. A collapsed triangle has its texture squeezed below 1/50 along one
+direction over more than 64 square units, the signature of a welded seam:
+
+| Map | Old grouping | New grouping |
+|---|---|---|
+| Stock `walker` | 97,769 triangles; 55 collapsed (159,328 sq units), including the 8 streaked `road1_1` triangles; `tr_rail`, `console5b` and `pipecap1_1` texel density 17%, 7% and 1% below retail; 67 s geometry | 96,286 triangles; 12 collapsed (3,987 sq units); every material whose world area matches retail matches its texel density; 40 s |
+| Supplied `airdefense1` | 983,934 triangles; 197 collapsed (192,160 sq units); 490 s geometry, 193 s of it shadows | 628,994 triangles; none collapsed; 398 s, 144 s shadows |
+| Supplied `core1` | 1,632,526 triangles; 301 collapsed (42,348 sq units); 558 s, 246 s shadows | 1,024,404 triangles; 276 collapsed (30,200 sq units), exactly as in retail's `core1.proc`; 450 s, 176 s shadows |
+
+Fewer triangles come out because a flat patch's triangles now reliably share
+one group. Near-zero-area triangles (below 0.0001 square units) rise from 36 to
+287 in `airdefense1` and from 121 to 281 in `core1`, almost all on thin railing
+strips that now merge; retail's `core1.proc` has 210. Stock `airdefense1`, `putra`, `hub2`, `process2` and `medlabs` compiled
+with the new rule show no material whose texel density differs from retail
+where the world area matches, apart from one `airdefense1` brush face whose
+coordinates in the stock map are near ±9.5 million. Recompiling is what
+repairs a map; existing `.proc` files keep their streaks.
+
+`tools/tests/dmap_patch_texture_groups.py` runs the production fit and
+comparison on the road seam, brush sides, zero-area and constant mappings, and
+4,000 random planes and mappings, including small fragments far from the origin
+like a 10×10 subdivided patch. A control built with id's fit must accept the
+road seam. Clang, Clang ASan+UBSan and MSVC pass; both GitHub validation
+workflows and the local validation runner include it.

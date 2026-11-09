@@ -6,6 +6,19 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Rebuilt maps keep their textures where patches meet (CORE-05, #209), 9 November 2026
+
+- **No more smeared strips on rebuilt maps.** Where flat patches meet end to end
+  and the texture starts again at the seam, such as the ramp road on `walker`,
+  openQ4's `dmap` welded the seam and stretched the texture across a strip of
+  triangles. Retail-compiled maps never had this. Recompile your maps to repair
+  them; existing `.proc` files keep the streaks.
+- **Dense maps compile faster and smaller.** The #209 reporter's 10×10-patch
+  `airdefense1` and `core1` come out with 36-37% fewer triangles, and geometry
+  takes about a fifth less time than with the previous build on the same machine.
+- Evidence: [dmap compilation](dmap-compilation.md#texture-seams-between-consecutive-patches-9-november-2026);
+  `tools/tests/dmap_patch_texture_groups.py`.
+
 ## Graphics presets rebuilt around frame rates (FPS-02), 9 November 2026
 
 - **Ultra, Quality and Enhanced now hold a frame rate.** On the reference laptop

@@ -34,6 +34,25 @@ If you have questions concerning this license or the applicable additional terms
 
 #define	 TEXTURE_OFFSET_EQUAL_EPSILON	0.005
 #define	 TEXTURE_VECTOR_EQUAL_EPSILON	0.001
+#define	 TEXTURE_ST_EQUAL_EPSILON		0.005
+
+/*
+===============
+Texture vector sources
+
+A brush side's triangles take their coordinates from the side's projection, so
+two sides with matching projections can share a group. Curve and model
+triangles keep their own coordinates, and the optimizer welds a group's
+coincident vertices to whichever coordinates it meets first; such a triangle
+may only join a group of fitted triangles whose mapping reproduces its
+coordinates.
+===============
+*/
+typedef enum {
+	TEXVEC_SIDE,		// a brush side's projection
+	TEXVEC_FITTED,		// fitted to a triangle that keeps its own coordinates
+	TEXVEC_NONE			// no fit (zero-area triangle); never shares a group
+} texVecSource_t;
 
 /*
 ===============
@@ -103,6 +122,49 @@ static bool TexVecsMatch( const textureVectors_t *a, const textureVectors_t *b )
 
 /*
 ===============
+GroupAcceptsTris
+
+Brush sides keep the id rule. Curves and models never share a group with brush
+sides, as before, when their normalized vectors could not match a projection.
+Between fitted triangles, the projections must point the same way and the
+group's mapping must reproduce every incoming vertex, so welding cannot move
+it. The id rule let coplanar patches whose coordinates differ by a whole repeat
+(a road laid as consecutive patches, each running 0 to 1) share a group, and
+their seam vertices were welded to one value, stretching the texture across the
+triangles between them (issue #209).
+===============
+*/
+static bool GroupAcceptsTris( const optimizeGroup_t *group, const mapTri_t *triList, const textureVectors_t *texVec, int source ) {
+	if ( source != group->texVecSource || source == TEXVEC_NONE ) {
+		return false;
+	}
+	if ( source == TEXVEC_SIDE ) {
+		return TexVecsMatch( texVec, &group->texVec );
+	}
+	for ( int i = 0 ; i < 2 ; i++ ) {
+		for ( int j = 0 ; j < 3 ; j++ ) {
+			if ( idMath::Fabs( texVec->v[i][j] - group->texVec.v[i][j] ) > TEXTURE_VECTOR_EQUAL_EPSILON ) {
+				return false;
+			}
+		}
+	}
+	for ( const mapTri_t *tri = triList ; tri ; tri = tri->next ) {
+		for ( int k = 0 ; k < 3 ; k++ ) {
+			const idVec3 &xyz = tri->v[k].xyz;
+			for ( int i = 0 ; i < 2 ; i++ ) {
+				const idVec4 &v = group->texVec.v[i];
+				const double st = double( xyz[0] ) * v[0] + double( xyz[1] ) * v[1] + double( xyz[2] ) * v[2] + v[3];
+				if ( fabs( st - tri->v[k].st[i] ) > TEXTURE_ST_EQUAL_EPSILON ) {
+					return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+/*
+===============
 AddTriListToArea
 
 The triList is appended to the apropriate optimzeGroup_t,
@@ -110,7 +172,7 @@ creating a new one if needed.
 The entire list is assumed to come from the same planar primitive
 ===============
 */
-static void AddTriListToArea( uEntity_t *e, mapTri_t *triList, int planeNum, int areaNum, textureVectors_t *texVec ) {
+static void AddTriListToArea( uEntity_t *e, mapTri_t *triList, int planeNum, int areaNum, textureVectors_t *texVec, int texVecSource ) {
 	uArea_t		*area;
 	optimizeGroup_t	*group;
 
@@ -129,7 +191,7 @@ static void AddTriListToArea( uEntity_t *e, mapTri_t *triList, int planeNum, int
 			group = ref.group;
 			if ( group->material == triList->material && group->planeNum == planeNum
 				&& group->mergeGroup == triList->mergeGroup && ref.areaNum == areaNum
-				&& TexVecsMatch( texVec, &group->texVec ) ) {
+				&& GroupAcceptsTris( group, triList, texVec, texVecSource ) ) {
 				ref.tail->next = triList;
 				ref.tail = LastTri( triList );
 				return;
@@ -140,7 +202,7 @@ static void AddTriListToArea( uEntity_t *e, mapTri_t *triList, int planeNum, int
 			if ( group->material == triList->material
 				&& group->planeNum == planeNum
 				&& group->mergeGroup == triList->mergeGroup
-				&& TexVecsMatch( texVec, &group->texVec ) ) {
+				&& GroupAcceptsTris( group, triList, texVec, texVecSource ) ) {
 				group->triList = MergeTriLists( group->triList, triList );
 				return;
 			}
@@ -154,6 +216,7 @@ static void AddTriListToArea( uEntity_t *e, mapTri_t *triList, int planeNum, int
 	group->material = triList->material;
 	group->nextGroup = area->groups;
 	group->texVec = *texVec;
+	group->texVecSource = texVecSource;
 	group->triList = triList;
 	area->groups = group;
 
@@ -170,46 +233,50 @@ static void AddTriListToArea( uEntity_t *e, mapTri_t *triList, int planeNum, int
 /*
 ===================
 TexVecForTri
+
+Fits the triangle's texture mapping in the form brush sides use,
+st = xyz * v + v[3], with each v lying in the triangle's plane. The id version
+normalized the directions and took the t offset along the s direction, so it
+said nothing about where a repeat starts. Any texture coordinates fit,
+including ones that do not vary; only a zero-area triangle has no fit.
 ===================
 */
-static void TexVecForTri( textureVectors_t *texVec, mapTri_t *tri ) {
-	float	area, inva;
-	idVec3	temp;
-	idVec5	d0, d1;
-	idDrawVert	*a, *b, *c;
+static int TexVecForTri( textureVectors_t *texVec, const mapTri_t *tri ) {
+	const idDrawVert &a = tri->v[0];
+	const idDrawVert &b = tri->v[1];
+	const idDrawVert &c = tri->v[2];
+	double e1[3], e2[3], n[3], p[3], q[3];
 
-	a = &tri->v[0];
-	b = &tri->v[1];
-	c = &tri->v[2];
-
-	d0[0] = b->xyz[0] - a->xyz[0];
-	d0[1] = b->xyz[1] - a->xyz[1];
-	d0[2] = b->xyz[2] - a->xyz[2];
-	d0[3] = b->st[0] - a->st[0];
-	d0[4] = b->st[1] - a->st[1];
-
-	d1[0] = c->xyz[0] - a->xyz[0];
-	d1[1] = c->xyz[1] - a->xyz[1];
-	d1[2] = c->xyz[2] - a->xyz[2];
-	d1[3] = c->st[0] - a->st[0];
-	d1[4] = c->st[1] - a->st[1];
-
-	area = d0[3] * d1[4] - d0[4] * d1[3];
-	inva = 1.0 / area;
-
-    temp[0] = (d0[0] * d1[4] - d0[4] * d1[0]) * inva;
-    temp[1] = (d0[1] * d1[4] - d0[4] * d1[1]) * inva;
-    temp[2] = (d0[2] * d1[4] - d0[4] * d1[2]) * inva;
-	temp.Normalize();
-	texVec->v[0].ToVec3() = temp;
-	texVec->v[0][3] = tri->v[0].xyz * texVec->v[0].ToVec3() - tri->v[0].st[0];
-
-    temp[0] = (d0[3] * d1[0] - d0[0] * d1[3]) * inva;
-    temp[1] = (d0[3] * d1[1] - d0[1] * d1[3]) * inva;
-    temp[2] = (d0[3] * d1[2] - d0[2] * d1[3]) * inva;
-	temp.Normalize();
-	texVec->v[1].ToVec3() = temp;
-	texVec->v[1][3] = tri->v[0].xyz * texVec->v[0].ToVec3() - tri->v[0].st[1];
+	memset( texVec, 0, sizeof( *texVec ) );
+	for ( int i = 0 ; i < 3 ; i++ ) {
+		e1[i] = double( b.xyz[i] ) - a.xyz[i];
+		e2[i] = double( c.xyz[i] ) - a.xyz[i];
+	}
+	n[0] = e1[1] * e2[2] - e1[2] * e2[1];
+	n[1] = e1[2] * e2[0] - e1[0] * e2[2];
+	n[2] = e1[0] * e2[1] - e1[1] * e2[0];
+	const double nn = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
+	if ( nn <= 1e-12 ) {
+		return TEXVEC_NONE;
+	}
+	// in the plane, p * e1 = q * e2 = nn and p * e2 = q * e1 = 0
+	p[0] = e2[1] * n[2] - e2[2] * n[1];
+	p[1] = e2[2] * n[0] - e2[0] * n[2];
+	p[2] = e2[0] * n[1] - e2[1] * n[0];
+	q[0] = n[1] * e1[2] - n[2] * e1[1];
+	q[1] = n[2] * e1[0] - n[0] * e1[2];
+	q[2] = n[0] * e1[1] - n[1] * e1[0];
+	for ( int i = 0 ; i < 2 ; i++ ) {
+		const double d1 = double( b.st[i] ) - a.st[i];
+		const double d2 = double( c.st[i] ) - a.st[i];
+		double g[3];
+		for ( int j = 0 ; j < 3 ; j++ ) {
+			g[j] = ( d1 * p[j] + d2 * q[j] ) / nn;
+			texVec->v[i][j] = float( g[j] );
+		}
+		texVec->v[i][3] = float( a.st[i] - ( g[0] * a.xyz[0] + g[1] * a.xyz[1] + g[2] * a.xyz[2] ) );
+	}
+	return TEXVEC_FITTED;
 }
 
 
@@ -467,9 +534,9 @@ void ClipTriIntoTree_r( idWinding *w, mapTri_t *originalTri, uEntity_t *e, node_
 		PlaneForTri( originalTri, plane );
 		planeNum = FindFloatPlane( plane );
 
-		TexVecForTri( &texVec, originalTri );
+		const int texVecSource = TexVecForTri( &texVec, originalTri );
 
-		AddTriListToArea( e, list, planeNum, node->area, &texVec );
+		AddTriListToArea( e, list, planeNum, node->area, &texVec, texVecSource );
 	}
 
 	delete w;
@@ -571,7 +638,7 @@ static void PutWindingIntoAreas_r( uEntity_t *e, const idWinding *w, side_t *sid
 
 				// put in single area
 				tri = TriListForSide( side, w );
-				AddTriListToArea( e, tri, side->planenum, area, &side->texVec );
+				AddTriListToArea( e, tri, side->planenum, area, &side->texVec, TEXVEC_SIDE );
 				return;
 			}
 		}
@@ -596,7 +663,7 @@ static void PutWindingIntoAreas_r( uEntity_t *e, const idWinding *w, side_t *sid
 		mapTri_t	*tri;
 
 		tri = TriListForSide( side, w );
-		AddTriListToArea( e, tri, side->planenum, node->area, &side->texVec );
+		AddTriListToArea( e, tri, side->planenum, node->area, &side->texVec, TEXVEC_SIDE );
 	}
 }
 
@@ -642,9 +709,9 @@ void AddMapTriToAreas( mapTri_t *tri, uEntity_t *e ) {
 		PlaneForTri( tri, plane );
 		planeNum = FindFloatPlane( plane );
 
-		TexVecForTri( &texVec, newTri );
+		const int texVecSource = TexVecForTri( &texVec, newTri );
 
-		AddTriListToArea( e, newTri, planeNum, area, &texVec );
+		AddTriListToArea( e, newTri, planeNum, area, &texVec, texVecSource );
 	} else {
 		// fragment into areas
 		w = WindingForTri( tri );
