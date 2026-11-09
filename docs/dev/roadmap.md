@@ -55,7 +55,7 @@ exact; the estimate column is deliberately approximate.
 | [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **30%** | 2 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; Quest waits on AND-05. |
-| [Android and mobile rendering](#android-and-mobile-rendering) — AND | **62%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, physical portrait/lifecycle play and Quest. |
+| [Android and mobile rendering](#android-and-mobile-rendering) — AND | **66%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
@@ -1865,21 +1865,21 @@ Sources: [Android build and packaging](android-build.md),
 
 ### AND completion checkpoints
 
-**Estimate: 62%; 0/5 tasks closed.** Onboarding, touch and several lifecycle
+**Estimate: 66%; 1/5 tasks closed.** Onboarding, touch and several lifecycle
 repairs are already integrated; they are not all still archived. S25 and emulator
 checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| AND-01 — Partial (implementation complete) | Phone/emulator scope, startup ownership, UI-thread binding, background handling, Back/cutouts and touch controls repaired; S25 save/touch/audio checks exist; host-owned orientation and the portrait thumb deck pass a mid-match emulator rotation; the per-orientation layout editor, suspension save, multiplayer resume/reconnect and Quest flavor package checks pass native/JVM and emulator probes. | Physical-device qualification only: portrait play, editor touch interaction, and suspend/process death/network resume on a real phone. |
+| AND-01 — Closed | Phone/emulator scope, startup ownership, UI-thread binding, background handling, Back/cutouts and touch controls repaired; S25 save/touch/audio checks exist; host-owned orientation and the portrait thumb deck pass a mid-match emulator rotation; the per-orientation layout editor, suspension save, multiplayer resume/reconnect and Quest flavor package checks pass native/JVM and emulator probes. | None; S25 hardware checks pass (layout, portrait, suspension save, background kill/restore, multiplayer reconnect, editor by hand). Residuals moved to AND-02/AND-04. |
 | AND-02 — Partial | GLES3 build/package infrastructure and narrow S25/emulator gameplay evidence exist. | Physical Adreno/Mali and API breadth; SP/MP transitions, device input/audio, thermal/storage/aggregate memory and sustained performance. |
 | AND-03 — Partial | Verified package repair/import, localized setup, settings return, control/interface setup and save/log export implemented; scoped device round trips pass. | Release-signing continuity; cloud/removable providers; interrupted-process recovery; physical setup/accessibility and upgrade matrix. |
-| AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas and HUD safe-area and thumb-deck positioning exist. | Device-based presets and GLES limits; keyboard/touch targets, full overlay editing, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
+| AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas, HUD safe-area and thumb-deck positioning and the per-orientation layout editor exist. | Device-based presets and GLES limits; keyboard/touch targets, human-finger portrait play, the weapon control over the portrait readouts, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
 | AND-05 — Not integrated | Quest recovery sources are identified under VR-01/AND-01; the archived Quest change (`65aa9bd88`) moved here from VR-01 on 6 November, on top of the integrated PC Vulkan/EGL XR path. | Dedicated verified flavor, installation/assets, stereo/controller UI, comfort/session recovery and sustained thermal/refresh budgets; distribution decision. |
 
 ### AND task evidence and acceptance
 
-- [ ] **AND-01 — P1, integration: recover onboarding, controls and lifecycle work.**
+- [x] **AND-01 — P1, integration: recover onboarding, controls and lifecycle work.**
   Review archived Android changes for touch controls (`486ecf735`), diagnostics/
   lifecycle (`3ce244cda`), background tic sleep (`819846f5d`), cutouts (`20766e8d1`),
   launcher/localized data preflight (`ba6d3af2e`, `c5845ca2d`, `2f1d2d681`) and
@@ -1959,10 +1959,16 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
   AND-05 its flavor-aware package checks. Native, JVM, C++/Java placement and
   retained-UI checks pass, and the emulator probes (`--mode lifecycle`,
   `--mode resume`) pass the layout record, background save, `am kill` and
-  restore, and reconnect/keep-alive against a dedicated server. What remains
-  is physical: portrait play, the editor's touch interaction, and
-  suspend/process death/network resume on a real phone (S25), plus Quest
-  device work under AND-05.
+  restore, and reconnect/keep-alive against a dedicated server.
+  [On the S25](platform-recovery-review.md#s25-physical-checks-9-november-2026)
+  the same checks pass on hardware: the edited landscape layout, portrait play
+  with the thumb deck, the `Suspended` save, Android's background kill and an
+  exact restore, a 57-second multiplayer stay that reconnects past the dropped
+  channel's disconnects, and the editor driven by hand (which found and fixed
+  taps pinning controls). Closed 9 November 2026. Human-finger portrait play
+  and the raised weapon control over the armour readout move to AND-04;
+  audible resume and Adreno/Mali breadth stay with AND-02; Quest device work
+  is AND-05.
 - [ ] **AND-02 — P1, qualification: real Adreno/Mali gameplay.** Cover the API floor
   and current Android, ES3 capability differences, stock SP/MP, saves, map/campaign
   transitions, materials/shadows/ETC2/EAC, cold/warm caches, audio and touch/gamepad/
@@ -2056,7 +2062,8 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
   touch thumb deck while the overlay is active, and **Landscape and portrait**
   on the Interface page opts into turning the device; stock GUIs in portrait,
   the Touch HUD preset as a whole and readouts behind a raised weapon control
-  on 9:16 phones remain.
+  remain; the S25 (19.5:9) shows the weapon control over the armour readout
+  too, and human-finger portrait play moved here from AND-01.
 - [ ] **AND-05 — P2, integration and qualification: standalone Quest.** After
   VR-01/AND-01, qualify real installation, assets, stereo gameplay, controller/UI
   interaction, comfort, session recovery and sustained refresh/thermal budgets.

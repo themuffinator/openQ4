@@ -125,8 +125,8 @@ Save/log exports to local Downloads and an exported-save restore round trip
 pass on the recorded S25 debug package. Physical folder-import providers,
 accessibility and visual qualification are still required; host fixtures do
 not establish those results. Leaving single player writes the `Suspended`
-save, which the emulator lifecycle probe restores after `am kill`; physical
-process-death qualification is still required.
+save, which the emulator lifecycle probe and a Galaxy S25 check restore after
+`am kill`.
 
 The Android Back button or gesture follows the game's menu/pause navigation.
 Fatal-error screens accept touch release on density-scaled Copy, Clear and Quit

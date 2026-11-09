@@ -1647,4 +1647,56 @@ local loop. Evidence is under `.tmp/android-evidence/2026-11-09-and01/` in
 the main checkout (`lifecycle`, `resume-15`, `resume-50`, the editor capture). Not qualified: physical phones (portrait
 play, the editor's touch interaction, suspend/process death/network resume
 on a real device and network), Adreno/Mali drivers, and the Quest flavor's
-Gradle side and headsets (AND-05). AND-01 stays open for its physical gates.
+Gradle side and headsets (AND-05). The S25 checks below follow.
+
+### S25 physical checks, 9 November 2026
+
+The test Galaxy S25 (SM-S931B, Android 16/API 36, `sun` platform) received a
+debug ARM64 build 2297 of this source over USB. The installed copy had been
+signed with an earlier round's debug key (`.tmp/a2/android-user/` in the main
+checkout), so the APK was re-signed with that key
+(`fad563ec2d9702b6ef43bfffbc57d93591e7ad8034946291f631f570cfc28530`) and
+updated in place; existing saves and settings were kept. A non-rooted phone
+will not let the shell start the internal game Activity, so the player tapped
+setup's play and Return to game buttons; everything else came from engine
+diagnostic commands, activity-manager intents and the rotation setting. The
+probe preserved and restored the setup preferences, configuration, log and
+rotation settings and removed its scripts and the test save.
+
+- **Layout, portrait, suspension save and process death** (report
+  `0137347aa771a65ef130628975a9ad200633a8401d1cbbebbc14c481759bd2a8`). In
+  landscape (2237x1080 after the cutout, 3 px/dp) the applied record placed
+  Fire at the recorded 0.785, 0.667 at 125%, hid Jump and faded Zoom to 20%;
+  touch commands moved the player 221 u. Turned upright through
+  `user_rotation`, the game continued in portrait (1080x2237) with the thumb
+  deck and an unedited portrait layout, as the record leaves it; touch moved
+  the player 162 u and released cleanly. Home wrote the 6,835,708-byte
+  `Suspended` save, `am kill` ended the backgrounded process
+  (`USER REQUESTED / KILL BACKGROUND`), and the relaunched game loaded the save
+  with the pose unchanged (0.0 u). The phone's captures show the edited
+  landscape overlay and the portrait deck; in portrait the raised weapon
+  control overlaps the armour readout, which is AND-04's open "readouts behind
+  a raised weapon control" item and occurs at 19.5:9 as well as 9:16. The
+  relaunch came back upright rather than in landscape, probably because
+  unlocking the phone reapplied its rotation.
+- **Multiplayer resume** (report
+  `69cb1fcfdd6b80e82b74938461bb492b8e9e1c65a40d3be49fa2fa5d08a91397`). Over
+  home Wi-Fi to this build's Windows dedicated server, the S25 joined Q4DM1,
+  went home for 57 s and returned: it reconnected at once ("away 57 s, beyond
+  the time-out"), ignored three disconnects from the dropped channel, received
+  a fresh challenge and reloaded the map with no message box.
+- **Layout editor by hand.** The first attempt lost a drag and a hide: tapping
+  a control to select it was treated as a drop that pinned it in place. With
+  taps limited to selection (a drag must exceed 8 dp) and editor logging, the
+  player dragged Fire, stepped its size to 125%, selected and hid Jump and
+  applied; the log and the saved preference agree
+  (`1|-68,168,125,35,0;*,*,100,35,1;...`), the engine's parser accepts that
+  record, and at 125% both implementations hold Fire inside the 24 dp edge
+  margin. The player's previous setup was restored afterwards.
+
+Evidence is under `.tmp/android-evidence/2026-11-09-and01/s25/` in the main
+checkout. Not covered: human-finger gameplay in portrait (movement used the
+engine's touch commands; earlier S25 rounds covered finger move/look/fire in
+landscape), audible resume (audio was disabled), a short multiplayer stay on
+the phone (covered on the emulator) and Adreno/Mali breadth, which AND-02 and
+AND-04 own.

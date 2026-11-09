@@ -300,7 +300,9 @@ See [player release status](../user/release-status.md).
   before, it stayed silent until you left the match.
 - Developer: `verify_android_apk.py --variant quest` and Meson's
   `android_headset` option give the Meta Quest flavor its own package checks
-  ahead of AND-05. Validation and remaining physical-device scope are in the
+  ahead of AND-05. Checked on the Android emulator and on a Galaxy S25
+  (layout, portrait, background save and restore, multiplayer reconnect, the
+  editor by hand); details are in the
   [recovery review](platform-recovery-review.md#android-touch-layout-editor-suspension-save-network-resume-and-quest-flavor-checks-9-november-2026).
 
 Candidate player wording: You can now rearrange the Android touch controls:

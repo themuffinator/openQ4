@@ -116,6 +116,7 @@ final class TouchLayoutPage {
                                 .faded(TouchLayout.OPACITY_DEFAULT).hiding(false)))));
         column.addView(theme.button(R.string.setup_layout_reset, () -> change(TouchLayout.Edits.DEFAULT)));
         column.addView(theme.button(R.string.setup_layout_apply, () -> {
+            android.util.Log.i("openQ4", "layout editor: apply " + record.encode());
             if (saveApplied(prefs, record, settings)) {
                 Toast.makeText(context, R.string.setup_layout_applied, Toast.LENGTH_SHORT).show(); back.run();
             } else {
@@ -162,6 +163,7 @@ final class TouchLayoutPage {
     private void change(TouchLayout.Edits next) {
         if (syncing) return;
         if (TouchLayout.compute(width(), height(), 1, settings.scale(), settings.preset, next).editsRejected) {
+            android.util.Log.i("openQ4", "layout editor: change refused (does not fit)");
             refuse(); update(); return;
         }
         record = record.with(portrait, next);
@@ -235,7 +237,8 @@ final class TouchLayoutPage {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final String[] names;
         private int dragging = -1, pointer = -1;
-        private float dragX, dragY, scale = 1, left, top;
+        private float dragX, dragY, startX, startY, scale = 1, left, top;
+        private boolean moved;
 
         Preview(Context context) {
             super(context);
@@ -267,6 +270,7 @@ final class TouchLayoutPage {
                 pointer = event.getPointerId(0);
                 if (hit >= 0) {
                     selected = hit; dragging = hit; dragX = layout.x[hit]; dragY = layout.y[hit];
+                    startX = x; startY = y; moved = false;
                     getParent().requestDisallowInterceptTouchEvent(true);
                     performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
                     update();
@@ -275,17 +279,27 @@ final class TouchLayoutPage {
             }
             int index = event.findPointerIndex(pointer);
             if (dragging >= 0 && index >= 0 && action == MotionEvent.ACTION_MOVE) {
-                dragX = Math.max(0, Math.min(width(), (event.getX(index) - left) / scale));
-                dragY = Math.max(0, Math.min(height(), (event.getY(index) - top) / scale));
+                float x = (event.getX(index) - left) / scale, y = (event.getY(index) - top) / scale;
+                // A finger that stays within 8 dp selects; only a drag places.
+                moved = moved || Math.hypot((x - startX) * scale, (y - startY) * scale) > theme.dp(8);
+                dragX = Math.max(0, Math.min(width(), x));
+                dragY = Math.max(0, Math.min(height(), y));
                 invalidate();
             } else if (dragging >= 0 && index >= 0 && action == MotionEvent.ACTION_UP) {
                 int button = dragging; dragging = -1; pointer = -1;
                 getParent().requestDisallowInterceptTouchEvent(false);
-                TouchLayout.Edits next = TouchLayout.drop(width(), height(), 1, settings.scale(), settings.preset,
-                                                          edits(), button, dragX, dragY);
-                if (next == null) { refuse(); update(); } else change(next);
+                if (moved) {
+                    TouchLayout.Edits next = TouchLayout.drop(width(), height(), 1, settings.scale(), settings.preset,
+                                                              edits(), button, dragX, dragY);
+                    if (next == null) android.util.Log.i("openQ4", "layout editor: drop of control " + button + " refused");
+                    if (next == null) { refuse(); update(); } else change(next);
+                } else {
+                    invalidate();	// a tap selects; it never pins the control where it is
+                }
                 performClick();
             } else if (action == MotionEvent.ACTION_CANCEL || (index < 0 && dragging >= 0)) {
+                android.util.Log.i("openQ4", "layout editor: gesture " + (action == MotionEvent.ACTION_CANCEL ? "cancelled" : "lost its pointer")
+                                   + " while dragging " + dragging);
                 dragging = -1; pointer = -1; getParent().requestDisallowInterceptTouchEvent(false); invalidate();
             }
             return true;
