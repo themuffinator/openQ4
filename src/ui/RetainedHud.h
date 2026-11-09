@@ -26,6 +26,34 @@ private:
 class idUserInterface;
 class idUserInterfaceLocal;
 
+// The stock interface's HUD (ui_retained 0) in the Remastered layout (visual
+// specification 14.4-14.9). No retained peer draws there, so the stock HUD
+// GUIs lay themselves out: the engine publishes the HUD settings as state
+// their scripts read (oq4_hud*), moves their edge anchors by the HUD width
+// cap and the safe inset, and keeps the two pickup lines' slots, which a GUI
+// script cannot compare or measure. Classic (ui_hudLayout 0) keeps the stock
+// rectangles and anchors, as does the retained interface's own Classic.
+class idLegacyHudLayout {
+public:
+	// Whether a GUI is one of the HUDs this layout covers (the Remastered routes).
+	static bool Covers(const char* source);
+	// The layout the stock windows show: 0 Classic, 1 Remastered, 2 Minimal,
+	// 3 Competitive (Remastered outside its retained match bar). An external
+	// mod keeps its own stock-named HUD layouts: Classic.
+	static int Layout();
+	// Publish oq4_hudLayout, oq4_hudRemastered, oq4_hudMinimal and whether
+	// the optional groups show (oq4_hudShowPickups, _Strip, _Damage, _Extras);
+	// the GUI also publishes the edges (oq4_hudEdgeLeft, _Top, _Right, _Bottom).
+	static void Publish(idUserInterfaceLocal& gui, int layout);
+	// Where the edge anchors sit outside the 4:3 canvas, in the GUI's virtual
+	// units (left, top, right, bottom): the side screens capped by the HUD
+	// width setting and every edge moved in by the safe inset. xExpand and
+	// yExpand are the view's full expansion beyond the canvas on each side.
+	static void Edges(float xExpand, float yExpand, float edges[4]);
+	// The pickup lines (14.8): their life, matching the scripts' hold and fade.
+	static constexpr int PickupLife = 3250;
+};
+
 // The Remastered layout of a stock HUD GUI (visual specification 14.4-14.9).
 // The stock GUI keeps its scripts, saves, named events and Classic drawing.
 // This peer receives the same state and events, and draws the generated

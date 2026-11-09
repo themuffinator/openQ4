@@ -49,6 +49,12 @@ you type, counts the characters you have left near the limit and shows the
 Send, Channel and Cancel keys. The history shows only whole messages and never
 covers the team list of the Competitive layout.
 
+The stock interface (`ui_retained 0`) shows the resting messages the same way
+in the Remastered and Minimal layouts: the latest four at the left edge above
+the status bar, each on its own plate, with names in white and team messages
+behind a TEAM tag in your team's colour. Opening chat there keeps the stock
+entry field and its history.
+
 With the Classic layout, chat grows upward above the lower HUD in Quake 4's
 olive frame: new messages appear for three seconds and fade out over another
 0.75 seconds, and opening chat reveals the retained conversation again.

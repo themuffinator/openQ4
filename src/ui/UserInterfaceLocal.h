@@ -147,7 +147,21 @@ private:
 public:
 	// The Remastered layout draws this stock HUD in place of its own windows.
 	bool                        RemasteredActive() const;
+	// The stock interface's Remastered layout of this HUD (idLegacyHudLayout):
+	// its edge anchors this frame (left, top, right, bottom), when it moves them.
+	bool                        LegacyEdges( float edges[4] ) const;
 private:
+	// The stock interface's Remastered layout (idLegacyHudLayout); transient
+	// presentation, never saved. legacyHudSource: -1 unknown, 0 no, 1 a HUD.
+	int                         legacyHudSource = -1;
+	bool                        legacyEdges = false;
+	float                       legacyEdge[4] = {};
+	struct LegacyPickupLine { idStr text; int count = 0, start = 0; bool used = false; };
+	LegacyPickupLine            legacyPickups[2];
+	int                         legacyPickupNewest = 0;
+	void                        PublishLegacyHud( float xExpand, float yExpand );
+	void                        PublishLegacyPickup();
+	float                       MeasureWindowText( const char *windowName, const char *text ) const;
 	idWindow *					bindHandler;
 
 	idStr						source;

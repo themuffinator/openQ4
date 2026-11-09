@@ -647,7 +647,9 @@ def validate_bind_menu_and_spectator_consumers() -> None:
     mphud = read(ROOT / "content" / "baseoq4" / "pak0" / "guis" / "mphud.gui")
     require(mphud, '"gui::spectatetext1"', "multiplayer spectator HUD binding prompt")
     ready_prompt_window = body_of(mphud, "windowDef Spectate1", "mphud.gui Spectate1")
-    if re.search(r"\brect\s+0\s*,\s*141\s*,\s*640\s*,\s*40\b", ready_prompt_window) is None:
+    # Classic keeps the stock place; the stock interface's Remastered layout
+    # (oq4_hudRemastered) adds its own offset to the same 640x40 window.
+    if re.search(r"\brect\s+0\s*,\s*141\b[^,\n]*,\s*640\s*,\s*40\b", ready_prompt_window) is None:
         raise AssertionError("The stock non-tourney readiness prompt must retain its 640x40 HUD window")
     require(ready_prompt_window, "textscale\t0.31", "stock readiness prompt text scale")
 

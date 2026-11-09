@@ -464,3 +464,16 @@ For example, `ui_hudScale 1.25` enlarges the HUD by 25%. On narrow screens the
 status bar's size is limited to keep every gauge visible. `ui_retained 0`
 restores the stock interface; the stock HUD also appears automatically if a new
 one cannot load.
+
+The stock interface (`ui_retained 0`) uses the same layout with its original
+artwork. The status bar is centered on the bottom edge, and the weapon strip
+shows the weapon's name above it. Up to two pickup lines sit over the gauges,
+and a repeated item counts up on its line ("Armor Shard ×2"). Vehicles get the
+centered status bar and an Exit prompt with your jump key in the bottom-right
+corner. In Deathmatch and Duel, multiplayer shows the standing with your gap
+and the timer on plates. Chat sits at the bottom left, clear of the status bar,
+with each message on its own plate. Layout, HUD width, safe area, pickup
+messages, weapon strip and damage direction all work there. Minimal hides the
+same extras, and Competitive uses the Remastered positions. HUD size and opacity
+apply only to the modern UI. `ui_hudLayout 0` keeps the original Quake 4
+positions.

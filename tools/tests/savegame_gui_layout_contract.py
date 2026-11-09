@@ -43,10 +43,10 @@ REVISION_ROOT = "guis/savecompat"
 # objective and cinematic GUIs, weapon and vehicle zoom GUIs and vehicle HUDs.
 SERIALIZED_GUIS: dict[str, str] = {
     "guis/cinematic.gui": "63d5f187afe545a3533f14780605a7e614463f5c",
-    "guis/hud.gui": "51c029611142acc27f7e0e03c2f09791d108994e",
-    "guis/hud_strogg.gui": "98430b36f89e9b2887eff70d49980178cca8a0f8",
+    "guis/hud.gui": "9d918517cc81194d1f9798ccd92ab566d8b4799d",
+    "guis/hud_strogg.gui": "de8ce88cbf1444b424ae27dd093f0d33f30a1144",
     "guis/vehicles/airdef_cannon.gui": "e92ae101f581b82a2885ac970b8755a92e1cbcae",
-    "guis/vehicles/hud.gui": "fa96e0421d400e4e880236fe27b623bdfd2e7e2e",
+    "guis/vehicles/hud.gui": "95493b94ce52d5ff87683c94e2b09a318bc5f3e9",
     "guis/vehicles/strogg_noise.gui": "d0777427b93ec45c90c6dfdf3ba6352aec981dc6",
     "guis/weapons/machinegun_scope.gui": "d2690deda0fc05b110508071a34051631df8c1c9",
     "guis/weapons/nailgun_scope.gui": "ae6876c4199d6d252ea11d80ce284bc6d145d34a",
@@ -68,24 +68,52 @@ LAYOUT_NEUTRAL_EDITS: dict[str, dict[str, tuple[str, str]]] = {
     },
 }
 
-# OPENQ4_SAVEGAME_GUI_REVISIONS as it must read, with the blob each saved
-# definition keeps and the commit whose parent shipped it.
-GUI_REVISIONS: dict[str, dict[str, object]] = {
-    "guis/hud.gui": {
+# OPENQ4_SAVEGAME_GUI_REVISIONS as it must read, in table order (a GUI edited
+# more than once lists its revisions oldest first), with the blob each saved
+# definition keeps and a commit that shipped it: `shippedBefore` names the
+# commit that changed it (its parent shipped it), `shippedIn` one that shipped it.
+GUI_REVISIONS: list[dict[str, object]] = [
+    {
+        "gui": "guis/hud.gui",
         "firstBuild": 1562,
         "savedDefinition": "guis/savecompat/hud_r1.gui",
         "marker": "hit_indicator_reduced",
         "savedBlob": "d403389d3b651fb9dd536bae1cbfe41e950c6f3c",
         "shippedBefore": "38bdc687",
     },
-    "guis/hud_strogg.gui": {
+    {
+        "gui": "guis/hud_strogg.gui",
         "firstBuild": 1562,
         "savedDefinition": "guis/savecompat/hud_strogg_r1.gui",
         "marker": "hit_indicator_reduced",
         "savedBlob": "cfea8778e2824f7b04348c3bc1f63e6d2fa530bc",
         "shippedBefore": "38bdc687",
     },
-}
+    {
+        "gui": "guis/hud.gui",
+        "firstBuild": 2280,
+        "savedDefinition": "guis/savecompat/hud_r2.gui",
+        "marker": "p_pickup0",
+        "savedBlob": "51c029611142acc27f7e0e03c2f09791d108994e",
+        "shippedIn": "8fdd8f077",
+    },
+    {
+        "gui": "guis/hud_strogg.gui",
+        "firstBuild": 2280,
+        "savedDefinition": "guis/savecompat/hud_strogg_r2.gui",
+        "marker": "p_pickup0",
+        "savedBlob": "98430b36f89e9b2887eff70d49980178cca8a0f8",
+        "shippedIn": "8fdd8f077",
+    },
+    {
+        "gui": "guis/vehicles/hud.gui",
+        "firstBuild": 2280,
+        "savedDefinition": "guis/savecompat/vehicle_hud_r1.gui",
+        "marker": "oq4_prompt",
+        "savedBlob": "fa96e0421d400e4e880236fe27b623bdfd2e7e2e",
+        "shippedIn": "8fdd8f077",
+    },
+]
 
 # openQ4 GUIs that single-player saves never contain: menus, loading screens and
 # multiplayer-only GUIs (idPlayer deliberately skips mphud).
@@ -198,18 +226,24 @@ def validate_revisions(guis: dict[str, Path]) -> None:
     match = re.search(r"OPENQ4_SAVEGAME_GUI_REVISIONS\[\]\s*=\s*\{(?P<body>.*?)\n\};", releases, re.DOTALL)
     if match is None:
         raise AssertionError("SaveGameReleases.h has no OPENQ4_SAVEGAME_GUI_REVISIONS table")
-    table = {
-        gui: {"firstBuild": int(build), "savedDefinition": saved, "marker": marker}
+    table = [
+        {"gui": gui, "firstBuild": int(build), "savedDefinition": saved, "marker": marker}
         for gui, build, saved, marker in REVISION_ENTRY.findall(match.group("body"))
-    }
-    expected = {
-        gui: {key: entry[key] for key in ("firstBuild", "savedDefinition", "marker")}
-        for gui, entry in GUI_REVISIONS.items()
-    }
+    ]
+    expected = [
+        {key: entry[key] for key in ("gui", "firstBuild", "savedDefinition", "marker")}
+        for entry in GUI_REVISIONS
+    ]
     if table != expected:
         raise AssertionError(f"OPENQ4_SAVEGAME_GUI_REVISIONS {table} does not match the contract {expected}")
+    # The reader takes a GUI's first revision its payload predates.
+    for gui in {str(entry["gui"]) for entry in GUI_REVISIONS}:
+        builds = [int(entry["firstBuild"]) for entry in GUI_REVISIONS if entry["gui"] == gui]
+        if builds != sorted(set(builds)):
+            raise AssertionError(f"{gui}'s revisions are not listed oldest first with distinct builds: {builds}")
 
-    for gui, entry in sorted(GUI_REVISIONS.items()):
+    for entry in GUI_REVISIONS:
+        gui = str(entry["gui"])
         if gui not in SERIALIZED_GUIS:
             raise AssertionError(f"{gui} has a saved revision but is not classified as serialized")
         saved_path = PAK0 / str(entry["savedDefinition"])
@@ -228,17 +262,19 @@ def validate_revisions(guis: dict[str, Path]) -> None:
             raise AssertionError(f"{entry['savedDefinition']} also has marker window '{entry['marker']}'")
 
     shipped = {path.relative_to(PAK0).as_posix() for path in (PAK0 / REVISION_ROOT).glob("**/*.gui")}
-    orphaned = shipped - {str(entry["savedDefinition"]) for entry in GUI_REVISIONS.values()}
+    orphaned = shipped - {str(entry["savedDefinition"]) for entry in GUI_REVISIONS}
     if orphaned:
         raise AssertionError(f"Saved GUI revisions no reader uses: {sorted(orphaned)}")
 
 
 def validate_release_provenance() -> None:
-    """Optional: each saved revision is what the commit before its change shipped."""
-    for gui, entry in sorted(GUI_REVISIONS.items()):
+    """Optional: each saved revision is what a commit before its change shipped."""
+    for entry in GUI_REVISIONS:
+        gui = entry["gui"]
+        shipped = entry["shippedIn"] if "shippedIn" in entry else f"{entry['shippedBefore']}^"
         result = subprocess.run(
             ["git", "-C", str(ROOT), "rev-parse", "--verify", "--quiet",
-             f"{entry['shippedBefore']}^:content/baseoq4/pak0/{gui}"],
+             f"{shipped}:content/baseoq4/pak0/{gui}"],
             capture_output=True,
             text=True,
         )
@@ -247,7 +283,7 @@ def validate_release_provenance() -> None:
             return
         if result.stdout.strip() != entry["savedBlob"]:
             raise AssertionError(f"{gui} revision pin {entry['savedBlob']} is not what "
-                                 f"{entry['shippedBefore']}^ shipped ({result.stdout.strip()})")
+                                 f"{shipped} shipped ({result.stdout.strip()})")
 
 
 def validate_engine_migration() -> None:

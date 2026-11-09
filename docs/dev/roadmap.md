@@ -2461,6 +2461,12 @@ Completion must advance through the existing dependencies:
   Progress, 24 October: the Medical Labs implant overlay has
   [engine captures](ui/remastered-hud.md#medical-labs-implant-captures-24-october-2026)
   through the level's own script at 4:3, 16:9, 21:9, 32:9 and 9:16 (`FLOW-062`).
+  Progress, 9 November: the stock interface's player, multiplayer and vehicle HUD
+  GUIs follow the Remastered layout outside Classic, with matching settings, the
+  pickup merge, chat and standing, and save-compat revisions
+  ([stock interface HUD layout](ui/legacy-hud-layout.md)). This does not migrate
+  or accept a GUI. The next inventory refresh (UI-10) picks up the edited
+  GUIs and their revisions.
 - [ ] **UI-05 — P1, decision and qualification: resolve visual policy conflicts.**
   Reconcile SP/MP hit-marker defaults with visual specification section 14.7 and
   other recorded deviations before acceptance. Preserve editable vector framing,

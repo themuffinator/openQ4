@@ -258,6 +258,14 @@ only the current revision has:
 | --- | ---: | --- | --- |
 | `guis/hud.gui` | 1562 | `guis/savecompat/hud_r1.gui` | `hit_indicator_reduced` |
 | `guis/hud_strogg.gui` | 1562 | `guis/savecompat/hud_strogg_r1.gui` | `hit_indicator_reduced` |
+| `guis/hud.gui` | 2280 | `guis/savecompat/hud_r2.gui` | `p_pickup0` |
+| `guis/hud_strogg.gui` | 2280 | `guis/savecompat/hud_strogg_r2.gui` | `p_pickup0` |
+| `guis/vehicles/hud.gui` | 2280 | `guis/savecompat/vehicle_hud_r1.gui` | `oq4_prompt` |
+
+A GUI edited more than once lists its revisions oldest first, and a record is
+read through the first one whose build its payload predates. The 2280
+revisions are the stock interface's Remastered HUD layout (the pickup lines,
+the Minimal and HUD-setting wrappers and the vehicle prompt).
 
 A record from a payload whose layout build predates the revision, and whose blob
 does not name that window, is read through `idUserInterface::ReadFromSaveGameWithLayout`.

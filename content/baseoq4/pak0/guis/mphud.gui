@@ -3035,6 +3035,19 @@ windowDef Desktop
 			}
 
 		}
+		// openQ4: the Remastered centre column (14.9): the frag notice, the main
+		// notice and the warm-up reason stack from y 81 and move down for each
+		// other, each on its own plate at 0.35 fitted to its line.
+		windowDef oq4_frag_plate
+		{
+			rect	320 - ("fragNotice::textwidth" + 16) / 2,81,"fragNotice::textwidth" + 16,23.4
+			screenalignx	middle
+			screenaligny	top
+			background	"gfx/guis/hud/pickupbar"
+			matcolor	0,0,0,0.35 * "fragNotice::forecolor_w"
+			shear	0,-.22
+			visible	"gui::oq4_hudRemastered" * ("fragNotice::textwidth" > 0) * "fragNotice::visible"
+		}
 		windowDef fragNotice
 		{
 			rect	100,81,440,30
@@ -3386,7 +3399,7 @@ windowDef Desktop
 			{
 				rect	0,35,242,28
 				background	"gfx/guis/hud/ffa_bgbar"
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				matcolor	0,0,0,1
 			}
 			windowDef ffa_player1_bgcolor
@@ -3394,7 +3407,7 @@ windowDef Desktop
 	//			rect	0,35,242,28
 				rect	0, (35-(4*"gui::player1_pulse_amount")),242+(4*"gui::player1_pulse_amount"),28+(8*"gui::player1_pulse_amount")
 				background	"gfx/guis/hud/ffa_bgbar2"
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				matcolor	1,1,0.552,0.4
 	//			matcolor	"gui::player1_color_r", "gui::player1_color_g", "gui::player1_color_b", "gui::player1_color_a"
 			}
@@ -3402,7 +3415,7 @@ windowDef Desktop
 			{
 				rect	0,64,242,28
 				background	"gfx/guis/hud/ffa_bgbar"
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				matcolor	0,0,0,1
 			}
 			windowDef ffa_player2_bgcolor1
@@ -3410,14 +3423,14 @@ windowDef Desktop
 	//			rect	0,64,242,28
 				rect	0, (64-(4*"gui::player2_pulse_amount")),242+(4*"gui::player2_pulse_amount"),28+(8*"gui::player2_pulse_amount")
 				background	"gfx/guis/hud/ffa_bgbar2"
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				matcolor	1,1,0.552,0.4
 	//			matcolor	"gui::player2_color_r", "gui::player2_color_g", "gui::player2_color_b", "gui::player2_color_a"
 			}
 			windowDef ffa_player1_rank
 			{
 				rect	3,39,20,16
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				forecolor	1,1,1,1
 				text	"gui::player1_rank"
 				textscale	0.22
@@ -3428,7 +3441,7 @@ windowDef Desktop
 			windowDef ffa_player1_name
 			{
 				rect	23,39,112,16
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				forecolor	1,1,1,1
 				text	"gui::player1_name"
 				textscale	.22
@@ -3438,7 +3451,7 @@ windowDef Desktop
 			windowDef ffa_player1_score
 			{
 				rect	136,39,27,16
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				forecolor	1,1,0.552,1
 	//			forecolor	"gui::player1_color_r", "gui::player1_color_g", "gui::player1_color_b", 1
 	//			forecolor	1,1,0.552 + ((1-0.552)*"gui::player1_pulse_amount"),1
@@ -3451,14 +3464,14 @@ windowDef Desktop
 			windowDef ffa_stopwatch
 			{
 				rect	4,92,20,20
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				background	"gfx/guis/hud/icons/icon_stopwatch"
 				matcolor	1,1,0.552,1
 			}
 			windowDef ffa_time
 			{
 				rect	23,94,200,20
-				visible	("gui::infinity" == 0)
+				visible	("gui::infinity" == 0) * (("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0)
 				forecolor	1,1,1,1
 				text	"gui::timeleft"
 				textscale	.25
@@ -3468,14 +3481,14 @@ windowDef Desktop
 			windowDef ffa_infinity
 			{
 				rect	25,94,20,19
-				visible ("gui::infinity" == 1)
+				visible	("gui::infinity" == 1) * (("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0)
 				background	"gfx/guis/hud/icons/icon_infinity"
 				matcolor	1,1,1,1
 			}
 			windowDef ffa_player2_rank
 			{
 				rect	3,68,20,16
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				forecolor	1,1,1,1
 				text	"gui::player2_rank"
 				textscale	0.22
@@ -3486,7 +3499,7 @@ windowDef Desktop
 			windowDef ffa_player2_name
 			{
 				rect	23,68,112,16
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				forecolor	1,1,1,1
 				text	"gui::player2_name"
 				textscale	.22
@@ -3496,7 +3509,7 @@ windowDef Desktop
 			windowDef ffa_player2_score
 			{
 				rect	136,69,27,16
-				visible	1
+				visible	("gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))) == 0
 				forecolor	1,1,0.552,1
 	//			forecolor	"gui::player2_color_r", "gui::player2_color_g", "gui::player2_color_b", 1
 	//			forecolor	1,1,0.552 + ((1-0.552)*"gui::player2_pulse_amount"),1
@@ -3505,6 +3518,336 @@ windowDef Desktop
 				textstyle	1
 				font	"fonts/lowpixel"
 				textalign	2
+			}
+			// openQ4: the Remastered standing (ui-visual-design.md 14.9) for
+			// Deathmatch and Duel: two 150x18 u plates from y 36, the ordinal (the
+			// leader's in #FFBE23), the name and the score in Chain; the leader's
+			// row carries the limit and a tie for the lead the TIED tag; your row the
+			// band and rims at 0.40 with your signed gap after it. Under them the
+			// timer plate: the stopwatch and one readout per match state.
+			windowDef oq4_standing
+			{
+				rect	6,36,200,40
+				visible	"gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))
+				windowDef oq4_row1
+				{
+					rect	0,0,190,18
+					windowDef oq4_row1_plate
+					{
+						rect	0,0,150,18
+						background	"gfx/guis/hud/pickupbar"
+						matcolor	0,0,0,0.5
+						shear	0,-.22
+					}
+					windowDef oq4_row1_band
+					{
+						rect	2.5,2,145,14
+						backcolor	1,1,0.553,0.16
+						shear	0,-.22
+						visible	"gui::oq4_row1_you"
+					}
+					windowDef oq4_row1_rim0
+					{
+						rect	2.5,2,145,1
+						backcolor	1,1,0.553,0.32
+						shear	0,-.22
+						visible	"gui::oq4_row1_you"
+					}
+					windowDef oq4_row1_rim1
+					{
+						rect	2.5,15,145,1
+						backcolor	1,1,0.553,0.32
+						shear	0,-.22
+						visible	"gui::oq4_row1_you"
+					}
+					windowDef oq4_row1_rank
+					{
+						rect	0,4,28,14
+						text	"gui::oq4_rank1"
+						font	"fonts/lowpixel"
+						textscale	0.16
+						textalign	2
+						forecolor	1,0.745,0.137,1
+						nowrap	1
+					}
+					windowDef oq4_row1_name
+					{
+						rect	32,2,76,16
+						text	"gui::player1_name"
+						font	"fonts/lowpixel"
+						textscale	0.2
+						forecolor	0.894 + 0.106 * "gui::oq4_row1_you",0.922 + 0.078 * "gui::oq4_row1_you",0.824 + 0.176 * "gui::oq4_row1_you",1
+						nowrap	1
+					}
+					windowDef oq4_row1_score
+					{
+						rect	100 - 13 * ("gui::oq4_limit" > 0),0,44,18
+						text	"gui::player1_score"
+						font	"fonts/chain"
+						textscale	0.27
+						textalign	2
+						forecolor	1,1,0.553 + 0.447 * "gui::oq4_row1_you",1
+						nowrap	1
+					}
+					windowDef oq4_row1_slash
+					{
+						rect	133,6,6,10
+						text	"#str_231222"
+						font	"fonts/chain"
+						textscale	0.167
+						forecolor	1,1,1,0.45
+						visible	("gui::oq4_limit" > 0)
+					}
+					windowDef oq4_row1_limit
+					{
+						rect	138,6,30,10
+						text	"gui::oq4_limit"
+						font	"fonts/chain"
+						textscale	0.167
+						forecolor	1,1,1,0.45
+						visible	("gui::oq4_limit" > 0)
+						nowrap	1
+					}
+					windowDef oq4_row1_tied
+					{
+						rect	156,4,24,10
+						backcolor	1,0.745,0.137,0.85
+						visible	"gui::oq4_tied"
+						windowDef oq4_row1_tied_text
+						{
+							rect	0,0,24,10
+							text	"#str_231200"
+							font	"fonts/lowpixel"
+							textscale	0.11
+							textalign	1
+							forecolor	0.063,0.078,0.039,1
+						}
+					}
+					windowDef oq4_row1_plus
+					{
+						rect	156,4,8,12
+						text	"#str_231223"
+						font	"fonts/chain"
+						textscale	0.208
+						forecolor	0.71,0.78,0.518,1
+						visible	"gui::oq4_row1_you" * "gui::oq4_gap_show" * (1 - "gui::oq4_tied" * ("gui::oq4_gap" == 0)) * ("gui::oq4_gap" >= 0)
+					}
+					windowDef oq4_row1_gain
+					{
+						rect	162,4,30,12
+						text	"gui::oq4_gap"
+						font	"fonts/chain"
+						textscale	0.208
+						forecolor	0.71,0.78,0.518,1
+						visible	"gui::oq4_row1_you" * "gui::oq4_gap_show" * (1 - "gui::oq4_tied" * ("gui::oq4_gap" == 0)) * ("gui::oq4_gap" >= 0)
+						nowrap	1
+					}
+					windowDef oq4_row1_loss
+					{
+						rect	156,4,36,12
+						text	"gui::oq4_gap"
+						font	"fonts/chain"
+						textscale	0.208
+						forecolor	0.894,0.427,0.337,1
+						visible	"gui::oq4_row1_you" * "gui::oq4_gap_show" * (1 - "gui::oq4_tied" * ("gui::oq4_gap" == 0)) * ("gui::oq4_gap" < 0)
+						nowrap	1
+					}
+				}
+				windowDef oq4_row2
+				{
+					rect	0,21,190,18
+					windowDef oq4_row2_plate
+					{
+						rect	0,0,150,18
+						background	"gfx/guis/hud/pickupbar"
+						matcolor	0,0,0,0.5
+						shear	0,-.22
+					}
+					windowDef oq4_row2_band
+					{
+						rect	2.5,2,145,14
+						backcolor	1,1,0.553,0.16
+						shear	0,-.22
+						visible	"gui::oq4_row2_you"
+					}
+					windowDef oq4_row2_rim0
+					{
+						rect	2.5,2,145,1
+						backcolor	1,1,0.553,0.32
+						shear	0,-.22
+						visible	"gui::oq4_row2_you"
+					}
+					windowDef oq4_row2_rim1
+					{
+						rect	2.5,15,145,1
+						backcolor	1,1,0.553,0.32
+						shear	0,-.22
+						visible	"gui::oq4_row2_you"
+					}
+					windowDef oq4_row2_rank
+					{
+						rect	0,4,28,14
+						text	"gui::oq4_rank2"
+						font	"fonts/lowpixel"
+						textscale	0.16
+						textalign	2
+						forecolor	1,1 - 0.255 * "gui::oq4_tied",1 - 0.863 * "gui::oq4_tied",1
+						nowrap	1
+					}
+					windowDef oq4_row2_name
+					{
+						rect	32,2,76,16
+						text	"gui::player2_name"
+						font	"fonts/lowpixel"
+						textscale	0.2
+						forecolor	0.894 + 0.106 * "gui::oq4_row2_you",0.922 + 0.078 * "gui::oq4_row2_you",0.824 + 0.176 * "gui::oq4_row2_you",1
+						nowrap	1
+					}
+					windowDef oq4_row2_score
+					{
+						rect	100 - 13 * 0,0,44,18
+						text	"gui::player2_score"
+						font	"fonts/chain"
+						textscale	0.27
+						textalign	2
+						forecolor	1,1,0.553 + 0.447 * "gui::oq4_row2_you",1
+						nowrap	1
+					}
+					windowDef oq4_row2_plus
+					{
+						rect	156,4,8,12
+						text	"#str_231223"
+						font	"fonts/chain"
+						textscale	0.208
+						forecolor	0.71,0.78,0.518,1
+						visible	"gui::oq4_row2_you" * "gui::oq4_gap_show" * (1 - "gui::oq4_tied" * ("gui::oq4_gap" == 0)) * ("gui::oq4_gap" >= 0)
+					}
+					windowDef oq4_row2_gain
+					{
+						rect	162,4,30,12
+						text	"gui::oq4_gap"
+						font	"fonts/chain"
+						textscale	0.208
+						forecolor	0.71,0.78,0.518,1
+						visible	"gui::oq4_row2_you" * "gui::oq4_gap_show" * (1 - "gui::oq4_tied" * ("gui::oq4_gap" == 0)) * ("gui::oq4_gap" >= 0)
+						nowrap	1
+					}
+					windowDef oq4_row2_loss
+					{
+						rect	156,4,36,12
+						text	"gui::oq4_gap"
+						font	"fonts/chain"
+						textscale	0.208
+						forecolor	0.894,0.427,0.337,1
+						visible	"gui::oq4_row2_you" * "gui::oq4_gap_show" * (1 - "gui::oq4_tied" * ("gui::oq4_gap" == 0)) * ("gui::oq4_gap" < 0)
+						nowrap	1
+					}
+				}
+			}
+			windowDef oq4_timer
+			{
+				rect	6,82,140,16
+				visible	"gui::oq4_hudRemastered" * (("gui::gametype" == 1) + ("gui::gametype" == 9))
+				definefloat	"warm"	("gui::oq4_state" == 1) * ("gui::oq4_countdown" == 0)
+				definefloat	"count"	("gui::oq4_countdown" != 0)
+				definefloat	"sudden"	("gui::oq4_state" == 4) * ("gui::oq4_countdown" == 0)
+				definefloat	"review"	("gui::oq4_state" >= 5)
+				definefloat	"timed"	("gui::oq4_countdown" == 0) * ("gui::oq4_state" != 1) * ("gui::oq4_state" != 4) * ("gui::oq4_state" < 5) * ("gui::oq4_timed" != 0) * ("gui::overtime" == 0)
+				definefloat	"over"	("gui::oq4_countdown" == 0) * ("gui::oq4_state" != 1) * ("gui::oq4_state" != 4) * ("gui::oq4_state" < 5) * ("gui::overtime" != 0)
+				definefloat	"untimed"	("gui::oq4_countdown" == 0) * ("gui::oq4_state" != 1) * ("gui::oq4_state" != 4) * ("gui::oq4_state" < 5) * ("gui::oq4_timed" == 0)
+				definefloat	"width"	"oq4_timer::warm" * 112 + "oq4_timer::count" * 104 + "oq4_timer::sudden" * 112 + "oq4_timer::review" * 40 + "oq4_timer::timed" * 60 + "oq4_timer::over" * 120 + "oq4_timer::untimed" * 76
+				windowDef oq4_timer_plate
+				{
+					rect	0,0,"oq4_timer::width",16
+					background	"gfx/guis/hud/pickupbar"
+					matcolor	0,0,0,0.5
+					shear	0,-.22
+				}
+				windowDef oq4_timer_watch
+				{
+					rect	4,1.5,13,13
+					background	"gfx/guis/hud/icons/icon_stopwatch"
+					matcolor	1,1,0.553,1
+				}
+				windowDef oq4_timer_infinity
+				{
+					rect	21,2,12,12
+					background	"gfx/guis/hud/icons/icon_infinity"
+					matcolor	1,1,1,1
+					visible	"oq4_timer::untimed" + "oq4_timer::sudden" + "oq4_timer::review"
+				}
+				windowDef oq4_timer_warm
+				{
+					rect	21,3,64,12
+					text	"#str_231206"
+					font	"fonts/lowpixel"
+					textscale	0.13
+					forecolor	1,1,1,0.7
+					visible	"oq4_timer::warm"
+					nowrap	1
+				}
+				windowDef oq4_timer_starts
+				{
+					rect	21,3,64,12
+					text	"#str_231207"
+					font	"fonts/lowpixel"
+					textscale	0.13
+					forecolor	1,1,1,0.7
+					visible	"oq4_timer::count"
+					nowrap	1
+				}
+				windowDef oq4_timer_sudden
+				{
+					rect	37,3,80,12
+					text	"#str_231208"
+					font	"fonts/lowpixel"
+					textscale	0.13
+					forecolor	1,1,1,0.7
+					visible	"oq4_timer::sudden"
+					nowrap	1
+				}
+				windowDef oq4_timer_overtime
+				{
+					rect	21,3,64,12
+					text	"gui::overtimetext"
+					font	"fonts/lowpixel"
+					textscale	0.13
+					forecolor	1,1,1,0.7
+					visible	"oq4_timer::over"
+					nowrap	1
+				}
+				windowDef oq4_timer_clock
+				{
+					rect	21 + 16 * "oq4_timer::untimed",0,48,16
+					text	"gui::oq4_clock"
+					font	"fonts/chain"
+					textscale	0.26
+					forecolor	1,1 - 0.255 * ("gui::oq4_clock_warn" >= 1) * "oq4_timer::timed" - 0.573 * ("gui::oq4_clock_warn" == 2) * "oq4_timer::timed",1 - 0.863 * ("gui::oq4_clock_warn" >= 1) * "oq4_timer::timed" - 0.137 * ("gui::oq4_clock_warn" == 2) * "oq4_timer::timed",1 - 0.3 * "oq4_timer::untimed"
+					visible	"oq4_timer::timed" + "oq4_timer::untimed"
+					nowrap	1
+				}
+				windowDef oq4_timer_countdown
+				{
+					rect	"oq4_timer::width" - 52,0,48,16
+					text	"gui::oq4_clock"
+					font	"fonts/chain"
+					textscale	0.26
+					textalign	2
+					forecolor	1,0.745,0.137,1
+					visible	"oq4_timer::count" + "oq4_timer::over"
+					nowrap	1
+				}
+				windowDef oq4_timer_ready
+				{
+					rect	"oq4_timer::width" - 64,2,58,12
+					text	"gui::oq4_mb_ready"
+					font	"fonts/chain"
+					textscale	0.165
+					textalign	2
+					forecolor	1,1,1,1
+					visible	"oq4_timer::warm" * ("gui::showready" != 0)
+					nowrap	1
+				}
 			}
 		}
 		windowDef p_mframes
@@ -4217,15 +4560,25 @@ windowDef Desktop
 			}
 
 		}
+		windowDef oq4_warm_plate
+		{
+			rect	320 - ("Spectate1::textwidth" + 16) / 2,81 + 26.4 * ("fragNotice::textwidth" > 0) * "fragNotice::visible" + 23.8 * ("mainNotice::textwidth" > 0) * "mainNotice::visible","Spectate1::textwidth" + 16,16.9 * "Spectate1::textlines"
+			screenalignx	middle
+			screenaligny	top
+			background	"gfx/guis/hud/pickupbar"
+			matcolor	0,0,0,0.35 * "Spectate1::forecolor_w"
+			shear	0,-.22
+			visible	"gui::oq4_hudRemastered" * ("Spectate1::textwidth" > 0) * "Spectate1::visible" * ("gui::oq4_state" == 1) * ("gui::oq4_spectating" == 0)
+		}
 		windowDef Spectate1
 		{
 			text	"gui::spectatetext1"
 			font	"fonts/lowpixel"
-			rect	0,141,640,40
+			rect	0,141 + "gui::oq4_hudRemastered" * (26.4 * ("fragNotice::textwidth" > 0) * "fragNotice::visible" + 23.8 * ("mainNotice::textwidth" > 0) * "mainNotice::visible" - 60),640,40
 			screenalignx	middle
 			screenaligny	top
 			forecolor	1,1,0.549,1
-			textscale	0.31
+			textscale	0.31 - 0.05 * "gui::oq4_hudRemastered"
 			visible	("gui::gametype" != 2)
 			textalign	1
 			textstyle	1
@@ -4517,9 +4870,19 @@ windowDef Desktop
 		}
 	}
 
+	windowDef oq4_main_plate
+	{
+		rect	320 - ("mainNotice::textwidth" + 16) / 2,81 + 26.4 * ("fragNotice::textwidth" > 0) * "fragNotice::visible","mainNotice::textwidth" + 16,20.8
+		screenalignx	middle
+		screenaligny	top
+		background	"gfx/guis/hud/pickupbar"
+		matcolor	0,0,0,0.35 * "mainNotice::forecolor_w"
+		shear	0,-.22
+		visible	"gui::oq4_hudRemastered" * ("mainNotice::textwidth" > 0) * "mainNotice::visible"
+	}
 	windowDef mainNotice
 	{
-		rect	120,102,400,30
+		rect	120,102 + "gui::oq4_hudRemastered" * (26.4 * ("fragNotice::textwidth" > 0) * "fragNotice::visible" - 21),400,30
 		screenalignx	middle
 		screenaligny	top
 		visible	1

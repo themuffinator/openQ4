@@ -756,6 +756,21 @@ idWindow::Draw
 ================
 */
 void idWindow::Draw( int time, float x, float y ) {
+	if ( measureTextWidth ) {
+		// The widest of its explicit lines, up to the text rectangle.
+		float widest = 0.0f;
+		int lines = 0;
+		const char *line = text.c_str();
+		while ( line != NULL && *line != '\0' ) {
+			const char *end = strchr( line, '\n' );
+			const idStr part = end != NULL ? idStr( line, 0, static_cast<int>( end - line ) ) : idStr( line );
+			widest = Max( widest, static_cast<float>( dc->TextWidth( part, textScale, 0, static_cast<int>( textspacing ) ) ) );
+			++lines;
+			line = end != NULL ? end + 1 : NULL;
+		}
+		textWidth = Min( textRect.w, widest );
+		textLines = static_cast<float>( lines );
+	}
 	if ( text.Length() == 0 ) {
 		return;
 	}
@@ -2090,20 +2105,25 @@ void idWindow::CalcClientRect(float xofs, float yofs) {
 		float xExpand = 0.0f;
 		float yExpand = 0.0f;
 		dc->GetVirtualScreenExpansion( forceAspectWidth, forceAspectHeight, xExpand, yExpand );
+		// A HUD in the stock interface's Remastered layout caps its side screens
+		// and insets its edges (idLegacyHudLayout); the inset also moves edge
+		// groups on a 4:3 view, where nothing expands.
+		float edges[4] = { xExpand, yExpand, xExpand, yExpand };
+		const bool legacyEdges = gui != NULL && gui->LegacyEdges( edges );
 
-		if ( xExpand > 0.0f && applyScreenAlignX ) {
+		if ( ( legacyEdges || xExpand > 0.0f ) && applyScreenAlignX ) {
 			if ( screenAlignX == SCREEN_ALIGN_X_LEFT ) {
-				drawRect.x -= xExpand;
+				drawRect.x -= edges[0];
 			} else if ( screenAlignX == SCREEN_ALIGN_X_RIGHT ) {
-				drawRect.x += xExpand;
+				drawRect.x += edges[2];
 			}
 		}
 
-		if ( yExpand > 0.0f && applyScreenAlignY ) {
+		if ( ( legacyEdges || yExpand > 0.0f ) && applyScreenAlignY ) {
 			if ( screenAlignY == SCREEN_ALIGN_Y_TOP ) {
-				drawRect.y -= yExpand;
+				drawRect.y -= edges[1];
 			} else if ( screenAlignY == SCREEN_ALIGN_Y_BOTTOM ) {
-				drawRect.y += yExpand;
+				drawRect.y += edges[3];
 			}
 		}
 
@@ -2740,6 +2760,14 @@ idWinVar *idWindow::GetWinVarByName(const char *_name, bool fixup, drawWin_t** o
 		*owner = NULL;
 	}
 
+	if (idStr::Icmp(_name, "textwidth") == 0) {
+		measureTextWidth = true;
+		retVar = &textWidth;
+	}
+	if (idStr::Icmp(_name, "textlines") == 0) {
+		measureTextWidth = true;
+		retVar = &textLines;
+	}
 	if (idStr::Icmp(_name, "notime") == 0) {
 		retVar = &noTime;
 	}

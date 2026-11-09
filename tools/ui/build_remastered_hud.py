@@ -18,7 +18,7 @@ from pathlib import Path
 
 import build_retained_screens as ui
 from remastered_hud_base import (AND, NOT, S, HudDocument, anchor, beyond_minimal, gameplay_root, join_events, layout_state,
-                                 op, status_scale)
+                                 op, sel, status_scale, u)
 from remastered_hud_groups import (boss_bar, dev_readouts, hit_indicator, interactive_brackets, missile_chevron, notices,
                                    pickup_lines, powerups, transmission, weapon_strip)
 from remastered_hud_lint import lint
@@ -66,6 +66,11 @@ def classic_air_document(*, strogg: bool) -> dict:
         "left": ui.length(50, "%"), "top": ui.length(100, "%"),
         "margin-left": ui.length(-480), "margin-top": ui.length(-720),
         "width": ui.length(960), "height": ui.length(720)}, [gauge])
+    # The stock interface's Remastered layout centres the stock status bar
+    # (oq4_hudRemastered, idLegacyHudLayout): the gauge follows its health gauge.
+    doc.boolean("oq4_hudRemastered")
+    doc.bind("air-classic-canvas.status", "air-classic-canvas", "margin-left",
+             op("+", -480, sel(S("oq4_hudRemastered"), u(85.5 if strogg else 88), 0)))
     return doc.build(full("air-classic-root", [canvas]), {"canvas": {"height": 720, "minWidth": 960},
         "extensions": {"openq4": {"joinEvents": joins, "reference": "ui-visual-design.md 14.3"}}})
 

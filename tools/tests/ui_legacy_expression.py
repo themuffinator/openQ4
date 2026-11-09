@@ -94,6 +94,7 @@ struct RegisterEntry{const char* name;int type;};
 struct RegisterList {void AddReg(const char*,int,idParser*,idWindow*,idWinVar*){throw std::runtime_error("unexpected predefined property in custom probe");}};
 struct idWindow {
  // FIELDS
+ bool measureTextWidth=false;
  idList<idWinVar*> definedVars;idList<idWindow*> children;idList<TimeEvent*> timeLineEvents;idList<NamedEvent*> namedEvents;Script* scripts[SCRIPT_COUNT]{};
  idWindow* parent=nullptr;idStr name="synthetic";int flags=0;int disabled=0;RegisterList regList;static constexpr int NumRegisterVars=0;static RegisterEntry RegisterVars[1];
  Gui owner;Gui* gui=&owner;std::map<std::string,drawWin_t> namedWindows;int numOps=0;std::deque<wexpOp_t> ops;idList<float> expressionRegisters;bool registerIsTemporary[MAX_EXPRESSION_REGISTERS]{};

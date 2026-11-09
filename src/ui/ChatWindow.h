@@ -25,6 +25,7 @@ private:
     void PublishCaret();
     void ScrollMessages(int delta);
     void Reflow(float width, float scale);
+    void DrawRemasteredLines(const float edges[4]);
     void SetInput(const char *value);
     bool input;
     std::uint64_t cachedRevision;

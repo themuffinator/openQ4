@@ -5,6 +5,7 @@
 #include <chrono>
 #include "DeviceContext.h"
 #include "Window.h"
+#include "SimpleWindow.h"
 #include "UserInterfaceLocal.h"
 #include "RetainedUI.h"
 extern idUserInterfaceManagerLocal uiManagerLocal;
@@ -648,6 +649,108 @@ bool idRemasteredHud::Failed() const { return true; }
 const char* idRemasteredHud::Document() const { return ""; }
 #endif
 
+// The stock interface's Remastered layout (idLegacyHudLayout). The cvars are
+// read by name: the dedicated server compiles none of the HUD's own.
+bool idLegacyHudLayout::Covers(const char* source) {
+	return idRemasteredHud::DocumentFor(source)!=nullptr;
+}
+
+int idLegacyHudLayout::Layout() {
+	for (const char* cvar:{"fs_game","fs_game_base"}) {
+		const char* mod=cvarSystem->GetCVarString(cvar);
+		if (mod[0] && idStr::Icmp(mod,"baseoq4") && idStr::Icmp(mod,"q4base") && idStr::Icmp(mod,"q4xbase")) return 0;
+	}
+	return idMath::ClampInt(0,3,cvarSystem->GetCVarInteger("ui_hudLayout"));
+}
+
+void idLegacyHudLayout::Publish(idUserInterfaceLocal& gui,int layout) {
+	const bool remastered=layout!=0,minimal=layout==2;
+	gui.SetStateInt("oq4_hudLayout",layout);
+	gui.SetStateBool("oq4_hudRemastered",remastered);
+	gui.SetStateBool("oq4_hudMinimal",minimal);
+	// Classic keeps every stock group; the HUD settings (13.9) and Minimal
+	// trim Remastered's.
+	gui.SetStateBool("oq4_hudShowExtras",!minimal);
+	gui.SetStateBool("oq4_hudShowPickups",!remastered || (!minimal && cvarSystem->GetCVarBool("ui_hudPickups")));
+	gui.SetStateBool("oq4_hudShowStrip",!remastered || (!minimal && cvarSystem->GetCVarBool("ui_hudWeaponStrip")));
+	gui.SetStateBool("oq4_hudShowDamage",!remastered || (!minimal && cvarSystem->GetCVarBool("ui_hudDamageDirection")));
+}
+
+void idLegacyHudLayout::Edges(float xExpand,float yExpand,float edges[4]) {
+	// The view as the Remastered documents' dp (1.5 dp a unit on the 720 dp
+	// high, at least 960 dp wide canvas), so both interfaces share one rule.
+	const auto layout=openq4::ui::HudLayoutFor((640+2*xExpand)*1.5f,(480+2*yExpand)*1.5f,1.f,{0,0,0,0},
+		cvarSystem->GetCVarInteger("ui_hudWidth"),cvarSystem->GetCVarFloat("ui_hudSafeInset"),1.f);
+	edges[0]=xExpand-layout.left/1.5f;
+	edges[1]=yExpand-layout.top/1.5f;
+	edges[2]=xExpand-layout.right/1.5f;
+	edges[3]=yExpand-layout.bottom/1.5f;
+}
+
+void idUserInterfaceLocal::PublishLegacyHud(float xExpand,float yExpand) {
+	if (legacyHudSource<0) legacyHudSource=idLegacyHudLayout::Covers(source.c_str()) ? 1 : 0;
+	legacyEdges=false;
+	if (!legacyHudSource) return;
+	const int layout=idLegacyHudLayout::Layout();
+	idLegacyHudLayout::Publish(*this,layout);
+	// Classic keeps the stock anchors (the retained Classic its 4:3 canvas).
+	if (layout>0) { idLegacyHudLayout::Edges(xExpand,yExpand,legacyEdge); legacyEdges=true; }
+	// The same edges for windows the stock anchors at the centre, which
+	// Remastered moves to an edge (a vehicle's prompt and status bar).
+	static const char* const EdgeKeys[4]={"oq4_hudEdgeLeft","oq4_hudEdgeTop","oq4_hudEdgeRight","oq4_hudEdgeBottom"};
+	for (int i=0;i<4;++i) SetStateFloat(EdgeKeys[i],legacyEdges ? legacyEdge[i] : 0.f);
+}
+
+bool idUserInterfaceLocal::LegacyEdges(float edges[4]) const {
+	if (!legacyEdges) return false;
+	for (int i=0;i<4;++i) edges[i]=legacyEdge[i];
+	return true;
+}
+
+float idUserInterfaceLocal::MeasureWindowText(const char* windowName,const char* text) const {
+	if (!desktop || !text || !text[0]) return 0;
+	drawWin_t* found=desktop->FindChildByName(windowName);
+	if (!found) return 0;
+	int font=0; float scale=0;
+	if (found->win) { font=found->win->fontNum; scale=found->win->textScale; }
+	else if (found->simp) { font=found->simp->fontNum; scale=found->simp->textScale; }
+	else return 0;
+	uiManagerLocal.dc.SetFont(font);
+	return static_cast<float>(uiManagerLocal.dc.TextWidth(text,scale,0));
+}
+
+// itemPickup in the Remastered layout (14.8): up to two lines, the newest
+// nearest the gauges, and a repeat of the newest line's item while it shows
+// merged into it with a count. The scripts show and time the lines; the
+// engine compares the names and measures each line for its fitted plate.
+void idUserInterfaceLocal::PublishLegacyPickup() {
+	if (legacyHudSource<0) legacyHudSource=idLegacyHudLayout::Covers(source.c_str()) ? 1 : 0;
+	if (!legacyHudSource) return;
+	const idStr text=state.GetString("itemtext");
+	const idStr icon=state.GetString("itemicon");
+	const auto live=[&](const LegacyPickupLine& line) {
+		return line.used && time>=line.start && time-line.start<idLegacyHudLayout::PickupLife;
+	};
+	int slot=legacyPickupNewest;
+	if (live(legacyPickups[slot]) && legacyPickups[slot].text==text) {
+		++legacyPickups[slot].count;
+	} else {
+		slot=1-slot;
+		legacyPickupNewest=slot;
+		legacyPickups[slot].text=text;
+		legacyPickups[slot].count=1;
+		legacyPickups[slot].used=true;
+	}
+	LegacyPickupLine& line=legacyPickups[slot];
+	line.start=time;
+	idStr shown=line.text;
+	if (line.count>1) shown+=va(" %s%d",common->GetLanguageDict()->GetString("#str_231060"),line.count);
+	SetStateString(va("oq4_pick%d_text",slot),shown.c_str());
+	SetStateString(va("oq4_pick%d_icon",slot),icon.c_str());
+	SetStateFloat(va("oq4_pick%d_width",slot),MeasureWindowText(va("pickup%d_text",slot),shown.c_str()));
+	SetStateInt("oq4_pick_newest",slot);
+}
+
 bool idUserInterfaceLocal::DrawRemasteredHud(int drawTime) {
 	const char* document=idRemasteredHud::DocumentFor(source.c_str());
 	if (!document || !idRemasteredHud::Enabled()) { delete remastered; remastered=nullptr; return false; }
@@ -755,7 +858,10 @@ void idUserInterfaceManagerLocal::HudTest(const idCmdArgs& args) {
 		else if (args.Argc()==5 && !idStr::Icmp(args.Argv(2),"presentation")) {
 			if (!gui->SetPresentationValue(args.Argv(3),args.Argv(4))) common->Warning("HUD probe: unknown presentation alias %s",args.Argv(3));
 		} else continue;
-		gui->StateChanged(common->GetPresentationTime()); ++count;
+		// The GUI's own clock: a stock HUD runs on game time, and the
+		// presentation clock would start its timelines far from it.
+		const auto* local=dynamic_cast<idUserInterfaceLocal*>(gui);
+		gui->StateChanged(local ? local->GetTime() : common->GetPresentationTime()); ++count;
 	}
 	if (!count) common->Warning("HUD probe: no matching GUI or operation: %s",args.Argv(1));
 }

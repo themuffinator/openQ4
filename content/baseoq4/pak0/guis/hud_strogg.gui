@@ -105,7 +105,8 @@ windowDef Desktop
 //-----------------------	
 
 		set "p_weapswitch::visible" "0";
-		if ( "gui::player_lastweapon" >= 0 && "desktop::hidden" == 0)
+		// openQ4: the weapon strip setting and Minimal (13.9) keep it hidden.
+		if ( "gui::player_lastweapon" >= 0 && "desktop::hidden" == 0 && "gui::oq4_hudShowStrip" != 0 )
 		{
 			namedEvent "p_weapswitch::UpdateWeapons";
 			set "p_weapswitch::visible" "1";
@@ -134,11 +135,30 @@ windowDef Desktop
 		}
 	}	
 	
+	// openQ4: Remastered (14.8) shows up to two lines over the status bar, the
+	// newest nearest the gauges, a repeat merged into its line with a count;
+	// the engine fills the slots (oq4_pick*), Classic keeps the stock line.
 	onNamedEvent itemPickup {
-		//if ( "desktop::weapswitch" == 0 ) {
+		if ( "gui::oq4_hudRemastered" == 0 ) {
 			set "p_itempickup::visible" "1" ;
 			resettime "p_itempickup" "0" ;
-		//}
+		} else if ( "gui::oq4_hudShowPickups" != 0 ) {
+			if ( "gui::oq4_pick_newest" == 0 ) {
+				stopTransitions "p_pickup0" ;
+				set "pickup0_plate::matcolor" "0,0,0,0.5" ;
+				set "pickup0_icon::matcolor" "1,0.8,0,0.6" ;
+				set "pickup0_text::forecolor" "0.988,1,0.784,1" ;
+				set "p_pickup0::visible" "1" ;
+				resettime "p_pickup0" "0" ;
+			} else {
+				stopTransitions "p_pickup1" ;
+				set "pickup1_plate::matcolor" "0,0,0,0.5" ;
+				set "pickup1_icon::matcolor" "1,0.8,0,0.6" ;
+				set "pickup1_text::forecolor" "0.988,1,0.784,1" ;
+				set "p_pickup1::visible" "1" ;
+				resettime "p_pickup1" "0" ;
+			}
+		}
 	}		
 	
 	onNamedEvent radioChatterUp {
@@ -338,7 +358,7 @@ windowDef Desktop
 	
 	windowDef p_ammo
 	{
-		rect	0,0,640,480
+		rect	85.5 * "gui::oq4_hudRemastered",0,640,480
 		screenalignx	middle
 		screenaligny	bottom
 		visible	1
@@ -437,7 +457,7 @@ windowDef Desktop
 	
 	windowDef p_tram
 	{
-		rect	0,0,640,480
+		rect	245.5 * "gui::oq4_hudRemastered",0,640,480
 		screenalignx	middle
 		screenaligny	bottom
 		visible	0
@@ -553,7 +573,7 @@ windowDef Desktop
 	
 	windowDef p_health
 	{
-		rect	0,0,640,480
+		rect	85.5 * "gui::oq4_hudRemastered",0,640,480
 		screenalignx	middle
 		screenaligny	bottom
 		visible	1
@@ -651,7 +671,7 @@ windowDef Desktop
 	
 	windowDef p_armor
 	{
-		rect	0,0,640,480
+		rect	85.5 * "gui::oq4_hudRemastered",0,640,480
 		screenalignx	middle
 		screenaligny	bottom
 		visible	"gui::player_armor"
@@ -731,9 +751,11 @@ windowDef Desktop
 // weapon switching
 //-----------------------	
 
+	// openQ4: the Remastered layout (ui-visual-design.md 14.4, 14.5) sets the
+	// strip above the pickup lines, its slots at 350 u and the name above them.
 	windowDef p_weapswitch
 	{
-		rect	0,350,640,80
+		rect	0,350 - 26 * "gui::oq4_hudRemastered",640,80
 		screenalignx	middle
 		screenaligny	bottom
 		visible	0
@@ -969,7 +991,7 @@ windowDef Desktop
 
 		windowDef ws_name
 		{
-			rect	0,46,640,40
+			rect	0,46 - 39 * "gui::oq4_hudRemastered",640,40
 			forecolor	0.988,1,0.784,1
 			textalign	1
 			font	"fonts/r_strogg"
@@ -980,7 +1002,7 @@ windowDef Desktop
 		
 		windowDef ws_weapon0
 		{
-			rect	("desktop::switchLeft" + "gui::weapon0_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon0_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon0_bg
 			{
 				rect	0,0,26,26
@@ -1010,7 +1032,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon1
 		{
-			rect	("desktop::switchLeft" + "gui::weapon1_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon1_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon1_bg
 			{
 				rect	0,0,26,26
@@ -1041,7 +1063,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon2
 		{
-			rect	("desktop::switchLeft" + "gui::weapon2_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon2_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon2_bg
 			{
 				rect	0,0,26,26
@@ -1072,7 +1094,7 @@ windowDef Desktop
 
 		windowDef ws_weapon3
 		{
-			rect	("desktop::switchLeft" + "gui::weapon3_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon3_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon3_bg
 			{
 				rect	0,0,26,26
@@ -1102,7 +1124,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon4
 		{
-			rect	("desktop::switchLeft" + "gui::weapon4_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon4_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon4_bg
 			{
 				rect	0,0,26,26
@@ -1132,7 +1154,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon5
 		{
-			rect	("desktop::switchLeft" + "gui::weapon5_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon5_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon5_bg
 			{
 				rect	0,0,26,26
@@ -1162,7 +1184,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon6
 		{
-			rect	("desktop::switchLeft" + "gui::weapon6_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon6_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon6_bg
 			{
 				rect	0,0,26,26
@@ -1192,7 +1214,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon7
 		{
-			rect	("desktop::switchLeft" + "gui::weapon7_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon7_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon7_bg
 			{
 				rect	0,0,26,26
@@ -1222,7 +1244,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon8
 		{
-			rect	("desktop::switchLeft" + "gui::weapon8_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon8_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon8_bg
 			{
 				rect	0,0,26,26
@@ -1252,7 +1274,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon9
 		{
-			rect	("desktop::switchLeft" + "gui::weapon9_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon9_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon9_bg
 			{
 				rect	0,0,26,26
@@ -1282,7 +1304,7 @@ windowDef Desktop
 		}
 		windowDef ws_weapon10
 		{
-			rect	("desktop::switchLeft" + "gui::weapon10_index" * 30),20,26,26
+			rect	("desktop::switchLeft" + "gui::weapon10_index" * 30),20 + 6 * "gui::oq4_hudRemastered",26,26
 			windowDef ws_weapon10_bg
 			{
 				rect	0,0,26,26
@@ -1316,79 +1338,86 @@ windowDef Desktop
 // radio messages
 //-----------------------				
 	
-	windowDef p_radio
+	// openQ4: Minimal (ui_hudLayout 2) leaves out the transmission display.
+	windowDef p_radio_layout
 	{
 		rect	0,0,640,480
-		screenalignx	right
-		screenaligny	top
-		visible	0
-		windowDef radio_backbar
+		noclip	1
+		visible	"gui::oq4_hudShowExtras"
+		windowDef p_radio
 		{
-			rect	519,6,113,28
-			visible	1
-			background	"gfx/guis/hud_rev3/radiobar"
-			matcolor	0,0,0,0.498
-			shear	0,.22
-		}
-		windowDef t_radio1
-		{
-			rect	546,9,81,12
-			visible	1
-			forecolor	1,1,1,1
-			text	"#str_200272"
-			textscale	0.16
-			font	"fonts/r_strogg"
-			textspacing	0
-		}
-		windowDef t_radio2
-		{
-			rect	547,17,81,12
-			visible	1
-			forecolor	1,1,1,1
-			text	"#str_200273"
-			textscale	0.16
-			font	"fonts/r_strogg"
-			textspacing	0
-		}
-		windowDef waveform
-		{
-			rect	515,8,41,25
-			visible	1
-			background	"gfx/guis/hud/s_waveform"
-			matcolor	1,0.8,0,1
-		}
-		windowDef rhino_backbar
-		{
-			rect	474,6,46,47
-			background	"gfx/guis/hud/wsbar"
-			matcolor	0,0,0,0.4
-			shear	0,.22
-			visible	"gui::rhinochatter"
-		}
-		windowDef rhino
-		{
-			rect	477,10,42,39
-			background	"gfx/guis/hud/radio_rhino"
-			visible	"gui::rhinochatter"
-			matcolor	1,1,0,1
-			notime	1
-			shear	0,.22
-		}
-		windowDef d_rhino_backbar
-		{
-			rect	492,7,26,26
-			background	"gfx/guis/hud/wsbar"
-			matcolor	0,0,0,0.4
-			shear	0,.22
+			rect	0,0,640,480
+			screenalignx	right
+			screenaligny	top
 			visible	0
-		}
-		windowDef d_rhino
-		{
-			rect	494,9,22,22
-			background	"gfx/guis/hud/radio_rhino"
-			visible	0
-			matcolor	1,1,1,1
-			shear	0,.22
+			windowDef radio_backbar
+			{
+				rect	519,6,113,28
+				visible	1
+				background	"gfx/guis/hud_rev3/radiobar"
+				matcolor	0,0,0,0.498
+				shear	0,.22
+			}
+			windowDef t_radio1
+			{
+				rect	546,9,81,12
+				visible	1
+				forecolor	1,1,1,1
+				text	"#str_200272"
+				textscale	0.16
+				font	"fonts/r_strogg"
+				textspacing	0
+			}
+			windowDef t_radio2
+			{
+				rect	547,17,81,12
+				visible	1
+				forecolor	1,1,1,1
+				text	"#str_200273"
+				textscale	0.16
+				font	"fonts/r_strogg"
+				textspacing	0
+			}
+			windowDef waveform
+			{
+				rect	515,8,41,25
+				visible	1
+				background	"gfx/guis/hud/s_waveform"
+				matcolor	1,0.8,0,1
+			}
+			windowDef rhino_backbar
+			{
+				rect	474,6,46,47
+				background	"gfx/guis/hud/wsbar"
+				matcolor	0,0,0,0.4
+				shear	0,.22
+				visible	"gui::rhinochatter"
+			}
+			windowDef rhino
+			{
+				rect	477,10,42,39
+				background	"gfx/guis/hud/radio_rhino"
+				visible	"gui::rhinochatter"
+				matcolor	1,1,0,1
+				notime	1
+				shear	0,.22
+			}
+			windowDef d_rhino_backbar
+			{
+				rect	492,7,26,26
+				background	"gfx/guis/hud/wsbar"
+				matcolor	0,0,0,0.4
+				shear	0,.22
+				visible	0
+			}
+			windowDef d_rhino
+			{
+				rect	494,9,22,22
+				background	"gfx/guis/hud/radio_rhino"
+				visible	0
+				matcolor	1,1,1,1
+				shear	0,.22
+			}
 		}
 	}
 
@@ -1435,207 +1464,306 @@ windowDef Desktop
 		}
 	}	
 
+	// openQ4: the Remastered pickup lines (14.8), each centred at 401 u while
+	// it is the newest and 377 u above it once a newer one arrives, on the
+	// stock rounded plate fitted to its line (at least 96 u): the icon 6 u in,
+	// the name 25 u in and 7 u clear of the plate's end. Each holds 3000 ms
+	// and fades over 250 ms.
+	windowDef p_pickup0
+	{
+		rect	0,377 + 24 * ("gui::oq4_pick_newest" == 0),640,24
+		screenalignx	middle
+		screenaligny	bottom
+		visible	0
+		notime	1
+		definefloat	"plate"	("gui::oq4_pick0_width" > 64) ? ("gui::oq4_pick0_width" + 32) : 96
+
+		onTime 3000 {
+			transition "pickup0_plate::matcolor" "0,0,0,0.5" "0,0,0,0" "250" ;
+			transition "pickup0_icon::matcolor" "1,0.8,0,0.6" "1,0.8,0,0" "250" ;
+			transition "pickup0_text::forecolor" "0.988,1,0.784,1" "0.988,1,0.784,0" "250" ;
+		}
+
+		onTime 3250 {
+			set "visible" "0" ;
+		}
+
+		windowDef pickup0_plate
+		{
+			rect	320 - "p_pickup0::plate" / 2,1.5,"p_pickup0::plate",21
+			background	"gfx/guis/hud/pickupbar"
+			matcolor	0,0,0,0.5
+			shear	0,.22
+		}
+		windowDef pickup0_icon
+		{
+			rect	326 - "p_pickup0::plate" / 2,4,16,16
+			background	"gui::oq4_pick0_icon"
+			matcolor	1,0.8,0,0.6
+		}
+		windowDef pickup0_text
+		{
+			rect	345 - "p_pickup0::plate" / 2,5,"p_pickup0::plate",11
+			forecolor	0.988,1,0.784,1
+			text	"gui::oq4_pick0_text"
+			textscale	0.16
+			font	"fonts/r_strogg"
+			textspacing	0
+			nowrap	1
+		}
+	}
+	windowDef p_pickup1
+	{
+		rect	0,377 + 24 * ("gui::oq4_pick_newest" == 1),640,24
+		screenalignx	middle
+		screenaligny	bottom
+		visible	0
+		notime	1
+		definefloat	"plate"	("gui::oq4_pick1_width" > 64) ? ("gui::oq4_pick1_width" + 32) : 96
+
+		onTime 3000 {
+			transition "pickup1_plate::matcolor" "0,0,0,0.5" "0,0,0,0" "250" ;
+			transition "pickup1_icon::matcolor" "1,0.8,0,0.6" "1,0.8,0,0" "250" ;
+			transition "pickup1_text::forecolor" "0.988,1,0.784,1" "0.988,1,0.784,0" "250" ;
+		}
+
+		onTime 3250 {
+			set "visible" "0" ;
+		}
+
+		windowDef pickup1_plate
+		{
+			rect	320 - "p_pickup1::plate" / 2,1.5,"p_pickup1::plate",21
+			background	"gfx/guis/hud/pickupbar"
+			matcolor	0,0,0,0.5
+			shear	0,.22
+		}
+		windowDef pickup1_icon
+		{
+			rect	326 - "p_pickup1::plate" / 2,4,16,16
+			background	"gui::oq4_pick1_icon"
+			matcolor	1,0.8,0,0.6
+		}
+		windowDef pickup1_text
+		{
+			rect	345 - "p_pickup1::plate" / 2,5,"p_pickup1::plate",11
+			forecolor	0.988,1,0.784,1
+			text	"gui::oq4_pick1_text"
+			textscale	0.16
+			font	"fonts/r_strogg"
+			textspacing	0
+			nowrap	1
+		}
+	}
+
 //-----------------------		
 // powerups
 //-----------------------		
 		
-	windowDef powerups
+	// openQ4: Minimal leaves out the powerups.
+	windowDef p_powerups_layout
 	{
-		rect	520,0,120,480
-		screenalignx	right
-		screenaligny	bottom
-		visible	1
-		windowDef powerup_flag
+		rect	0,0,640,480
+		noclip	1
+		visible	"gui::oq4_hudShowExtras"
+		windowDef powerups
 		{
-			rect	38,435,84,39
-			visible	"gui::powerup_flag_visible"
-			windowDef powerup_flag_bg
+			rect	520,-61 * "gui::oq4_hudRemastered",120,480
+			screenalignx	right
+			screenaligny	bottom
+			visible	1
+			windowDef powerup_flag
 			{
-				rect	2,-1,81,42
-				background	"gfx/guis/hud/powerup_bgbar"
-				visible	1
-				matcolor	0,0,0,1
-				matscalex	-1
-				matscaley	-1
-			}
-			windowDef powerup_flag_icon
-			{
-				rect	23,8,22,22
-				visible	1
-				background	"gfx/guis/hud/ctf_flag"
-				matcolor	1,0.482,0.0156,0.8
-				shear	0,-.22
-
-				onTime 0 {
-					transition "powerup_flag_icon::rect" "$powerup_flag_icon::rect" "$d_powerup_flag_icon::rect" "150" ;
+				rect	38,435,84,39
+				visible	"gui::powerup_flag_visible"
+				windowDef powerup_flag_bg
+				{
+					rect	2,-1,81,42
+					background	"gfx/guis/hud/powerup_bgbar"
+					visible	1
+					matcolor	0,0,0,1
+					matscalex	-1
+					matscaley	-1
 				}
+				windowDef powerup_flag_icon
+				{
+					rect	23,8,22,22
+					visible	1
+					background	"gfx/guis/hud/ctf_flag"
+					matcolor	1,0.482,0.0156,0.8
+					shear	0,-.22
 
-				onTime +150 {
-					transition "powerup_flag_icon::rect" "$d_powerup_flag_icon::rect" "$powerup_flag_icon::rect" "500" ;
+					onTime 0 {
+						transition "powerup_flag_icon::rect" "$powerup_flag_icon::rect" "$d_powerup_flag_icon::rect" "150" ;
+					}
+
+					onTime +150 {
+						transition "powerup_flag_icon::rect" "$d_powerup_flag_icon::rect" "$powerup_flag_icon::rect" "500" ;
+					}
+
+					onTime +500 {
+						resettime "0" ;
+					}
+
 				}
-
-				onTime +500 {
-					resettime "0" ;
+				windowDef d_powerup_flag_icon
+				{
+					rect	20,5,28,28
+					visible	0
+					background	"gfx/guis/hud/ctf_flag"
+					matcolor	1,0.482,0.0156,0.8
+					shear	0,-.22
 				}
-
 			}
-			windowDef d_powerup_flag_icon
+			windowDef powerup4
 			{
-				rect	20,5,28,28
-				visible	0
-				background	"gfx/guis/hud/ctf_flag"
-				matcolor	1,0.482,0.0156,0.8
-				shear	0,-.22
+				rect	37,400,84,38
+				visible	"gui::powerup4_visible"
+				windowDef powerup4_bg
+				{
+					rect	2,0,81,42
+					background	"gfx/guis/hud/powerup_bgbar"
+					visible	1
+					matcolor	0,0,0,1
+					matscalex	-1
+					matscaley	-1
+				}
+				windowDef powerup4_icon
+				{
+					rect	21,7,28,28
+					visible	1
+					background	"gui::powerup4_icon"
+					matcolor	1,1,1,1
+				}
+				windowDef powerup4_time
+				{
+					rect	48,7,31,25
+					visible	1
+					text	"gui::powerup4_time"
+					forecolor	0.988,1,0.784,1
+					textscale	0.4
+					font	"fonts/r_strogg"
+				}			
 			}
-		}
-		windowDef powerup4
-		{
-			rect	37,400,84,38
-			visible	"gui::powerup4_visible"
-			windowDef powerup4_bg
+			windowDef powerup0
 			{
-				rect	2,0,81,42
-				background	"gfx/guis/hud/powerup_bgbar"
-				visible	1
-				matcolor	0,0,0,1
-				matscalex	-1
-				matscaley	-1
+				rect	37,365,84,38
+				visible	"gui::powerup0_visible"
+				windowDef powerup0_bg
+				{
+					rect	2,0,81,42
+					background	"gfx/guis/hud/powerup_bgbar"
+					visible	1
+					matcolor	0,0,0,1
+					matscalex	-1
+					matscaley	-1
+				}
+				windowDef powerup0_icon
+				{
+					rect	21,7,28,28
+					visible	1
+					background	"gui::powerup0_icon"
+					matcolor	1,1,1,1
+				}
+				windowDef powerup0_time
+				{
+					rect	48,7,31,25
+					visible	1
+					text	"gui::powerup0_time"
+					forecolor	0.988,1,0.784,1
+					textscale	0.4
+					font	"fonts/r_strogg"
+				}
 			}
-			windowDef powerup4_icon
+			windowDef powerup1
 			{
-				rect	21,7,28,28
-				visible	1
-				background	"gui::powerup4_icon"
-				matcolor	1,1,1,1
+				rect	37,330,84,38
+				visible	"gui::powerup1_visible"
+				windowDef powerup1_bg
+				{
+					rect	2,0,81,42
+					background	"gfx/guis/hud/powerup_bgbar"
+					visible	1
+					matcolor	0,0,0,1
+					matscalex	-1
+					matscaley	-1
+				}
+				windowDef powerup1_icon
+				{
+					rect	21,7,28,28
+					visible	1
+					background	"gui::powerup1_icon"
+					matcolor	1,1,1,1
+				}
+				windowDef powerup1_time
+				{
+					rect	48,7,31,25
+					visible	1
+					text	"gui::powerup1_time"
+					forecolor	0.988,1,0.784,1
+					textscale	0.4
+					font	"fonts/r_strogg"
+				}
 			}
-			windowDef powerup4_time
+			windowDef powerup2
 			{
-				rect	48,7,31,25
-				visible	1
-				text	"gui::powerup4_time"
-				forecolor	0.988,1,0.784,1
-				textscale	0.4
-				font	"fonts/r_strogg"
-			}			
-		}
-		windowDef powerup0
-		{
-			rect	37,365,84,38
-			visible	"gui::powerup0_visible"
-			windowDef powerup0_bg
-			{
-				rect	2,0,81,42
-				background	"gfx/guis/hud/powerup_bgbar"
-				visible	1
-				matcolor	0,0,0,1
-				matscalex	-1
-				matscaley	-1
+				rect	37,295,84,38
+				visible	"gui::powerup2_visible"
+				windowDef powerup2_bg
+				{
+					rect	2,0,81,42
+					background	"gfx/guis/hud/powerup_bgbar"
+					visible	1
+					matcolor	0,0,0,1
+					matscalex	-1
+					matscaley	-1
+				}
+				windowDef powerup2_icon
+				{
+					rect	21,7,28,28
+					visible	1
+					background	"gui::powerup2_icon"
+					matcolor	1,1,1,1
+				}
+				windowDef powerup2_time
+				{
+					rect	48,7,31,25
+					visible	1
+					text	"gui::powerup2_time"
+					forecolor	0.988,1,0.784,1
+					textscale	0.4
+					font	"fonts/r_strogg"
+				}
 			}
-			windowDef powerup0_icon
+			windowDef powerup3
 			{
-				rect	21,7,28,28
-				visible	1
-				background	"gui::powerup0_icon"
-				matcolor	1,1,1,1
-			}
-			windowDef powerup0_time
-			{
-				rect	48,7,31,25
-				visible	1
-				text	"gui::powerup0_time"
-				forecolor	0.988,1,0.784,1
-				textscale	0.4
-				font	"fonts/r_strogg"
-			}
-		}
-		windowDef powerup1
-		{
-			rect	37,330,84,38
-			visible	"gui::powerup1_visible"
-			windowDef powerup1_bg
-			{
-				rect	2,0,81,42
-				background	"gfx/guis/hud/powerup_bgbar"
-				visible	1
-				matcolor	0,0,0,1
-				matscalex	-1
-				matscaley	-1
-			}
-			windowDef powerup1_icon
-			{
-				rect	21,7,28,28
-				visible	1
-				background	"gui::powerup1_icon"
-				matcolor	1,1,1,1
-			}
-			windowDef powerup1_time
-			{
-				rect	48,7,31,25
-				visible	1
-				text	"gui::powerup1_time"
-				forecolor	0.988,1,0.784,1
-				textscale	0.4
-				font	"fonts/r_strogg"
-			}
-		}
-		windowDef powerup2
-		{
-			rect	37,295,84,38
-			visible	"gui::powerup2_visible"
-			windowDef powerup2_bg
-			{
-				rect	2,0,81,42
-				background	"gfx/guis/hud/powerup_bgbar"
-				visible	1
-				matcolor	0,0,0,1
-				matscalex	-1
-				matscaley	-1
-			}
-			windowDef powerup2_icon
-			{
-				rect	21,7,28,28
-				visible	1
-				background	"gui::powerup2_icon"
-				matcolor	1,1,1,1
-			}
-			windowDef powerup2_time
-			{
-				rect	48,7,31,25
-				visible	1
-				text	"gui::powerup2_time"
-				forecolor	0.988,1,0.784,1
-				textscale	0.4
-				font	"fonts/r_strogg"
-			}
-		}
-		windowDef powerup3
-		{
-			rect	37,260,84,38
-			visible	"gui::powerup3_visible"
-			windowDef powerup3_bg
-			{
-				rect	2,0,81,42
-				background	"gfx/guis/hud/powerup_bgbar"
-				visible	1
-				matcolor	0,0,0,1
-				matscalex	-1
-				matscaley	-1
-			}
-			windowDef powerup3_icon
-			{
-				rect	21,7,28,28
-				visible	1
-				background	"gui::powerup3_icon"
-				matcolor	1,1,1,1
-			}
-			windowDef powerup3_time
-			{
-				rect	48,7,31,25
-				visible	1
-				text	"gui::powerup3_time"
-				forecolor	0.988,1,0.784,1
-				textscale	0.4
-				font	"fonts/r_strogg"
+				rect	37,260,84,38
+				visible	"gui::powerup3_visible"
+				windowDef powerup3_bg
+				{
+					rect	2,0,81,42
+					background	"gfx/guis/hud/powerup_bgbar"
+					visible	1
+					matcolor	0,0,0,1
+					matscalex	-1
+					matscaley	-1
+				}
+				windowDef powerup3_icon
+				{
+					rect	21,7,28,28
+					visible	1
+					background	"gui::powerup3_icon"
+					matcolor	1,1,1,1
+				}
+				windowDef powerup3_time
+				{
+					rect	48,7,31,25
+					visible	1
+					text	"gui::powerup3_time"
+					forecolor	0.988,1,0.784,1
+					textscale	0.4
+					font	"fonts/r_strogg"
+				}
 			}
 		}
 	}
@@ -1708,157 +1836,164 @@ windowDef Desktop
 // boss bar
 //-----------------------
 	
-	windowDef Bossbar
+	// openQ4: Minimal leaves out the boss bar and the exit notice.
+	windowDef p_alerts_layout
 	{
-		rect	-20,0,640,480
-		screenalignx	middle
-		screenaligny	top
-		visible	0
-		windowDef boss_backbar
+		rect	0,0,640,480
+		noclip	1
+		visible	"gui::oq4_hudShowExtras"
+		windowDef Bossbar
 		{
-			rect	240,40,200,50
-			visible	1
-			background	"gfx/guis/hud/s_bossbar"
-			matcolor	0,0,0,0.5
-		}
-		windowDef boss_healthicon
-		{
-			rect	334,75,12,12
-			visible	1
-			background	"gfx/guis/hud/icons/item_health"
-			matcolor	1,1,1,0.2
-		}
-		windowDef boss_health_bar2
-		{
-			rect	239,40,200,50
-			visible	1
-			background	"gfx/guis/hud/s_boss_healthbar"
-			matcolor	0.917,0.560,0.0823,0.2
-		}
-		windowDef boss_shield_bar_left2
-		{
-			rect	240,40,100,50
-			visible	1
-			background	"gfx/guis/hud/s_boss_shieldbar"
-			matcolor	0.415,0.549,0.541,0.2
-		}
-		windowDef boss_shield_bar_right2
-		{
-			rect	340,40,100,50
-			visible	1
-			background	"gfx/guis/hud/s_boss_shieldbar"
-			matcolor	0.415,0.549,0.541,0.2
-			matscalex	-1
-		}
-		windowDef p_boss_health_bar
-		{
-			rect	266,40,149 * "gui::boss_health" / ("gui::boss_maxhealth" + 1),50
-			visible	1
-			windowDef boss_health_bar
+			rect	-20,0,640,480
+			screenalignx	middle
+			screenaligny	top
+			visible	0
+			windowDef boss_backbar
 			{
-				rect	-26,0,200,50
+				rect	240,40,200,50
+				visible	1
+				background	"gfx/guis/hud/s_bossbar"
+				matcolor	0,0,0,0.5
+			}
+			windowDef boss_healthicon
+			{
+				rect	334,75,12,12
+				visible	1
+				background	"gfx/guis/hud/icons/item_health"
+				matcolor	1,1,1,0.2
+			}
+			windowDef boss_health_bar2
+			{
+				rect	239,40,200,50
 				visible	1
 				background	"gfx/guis/hud/s_boss_healthbar"
-				matcolor	0.917,0.560,0.0823,0.35
+				matcolor	0.917,0.560,0.0823,0.2
 			}
-		}
-		windowDef p_boss_shield_bar_left
-		{
-			rect	250,40,89 * "gui::boss_shield_percent",50
-			visible	0
-			windowDef boss_shield_bar_left
+			windowDef boss_shield_bar_left2
 			{
-				rect	-10,0,100,50
+				rect	240,40,100,50
 				visible	1
 				background	"gfx/guis/hud/s_boss_shieldbar"
-				matcolor	0.415,0.549,0.541,0.35
+				matcolor	0.415,0.549,0.541,0.2
 			}
-		}
-		windowDef p_boss_shield_bar_right
-		{
-			rect	341 + 89 * ( 1 - "gui::boss_shield_percent" ),40,89,50
-			visible	0
-			windowDef boss_shield_bar_right
+			windowDef boss_shield_bar_right2
 			{
-				rect	-90 * ( 1 - "gui::boss_shield_percent" ),0,100,50
+				rect	340,40,100,50
 				visible	1
 				background	"gfx/guis/hud/s_boss_shieldbar"
-				matcolor	0.415,0.549,0.541,0.35
+				matcolor	0.415,0.549,0.541,0.2
 				matscalex	-1
 			}
-		}
-		windowDef p_boss_shield_bar_leftwarn
-		{
-			rect	250,40,89 * "gui::boss_shield_percent",50
-			visible	0
-			windowDef boss_shield_bar_leftwarn
+			windowDef p_boss_health_bar
 			{
-				rect	-9,0,100,50
+				rect	266,40,149 * "gui::boss_health" / ("gui::boss_maxhealth" + 1),50
 				visible	1
-				background	"gfx/guis/hud/s_boss_shieldbar"
-				matcolor	1,0.25,0,1*guitable_10_5[time*0.002]
+				windowDef boss_health_bar
+				{
+					rect	-26,0,200,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_healthbar"
+					matcolor	0.917,0.560,0.0823,0.35
+				}
 			}
-		}
-		windowDef p_boss_shield_bar_rightwarn
-		{
-			rect	341 + 89 * ( 1 - "gui::boss_shield_percent" ),40,89,50
-			visible	0
-			windowDef boss_shield_bar_rightwarn
+			windowDef p_boss_shield_bar_left
 			{
-				rect	-90 * ( 1 - "gui::boss_shield_percent" ),0,100,50
-				visible	1
-				background	"gfx/guis/hud/s_boss_shieldbar"
-				matcolor	1,0.25,0,1*guitable_10_5[time*0.002]
-				matscalex	-1
+				rect	250,40,89 * "gui::boss_shield_percent",50
+				visible	0
+				windowDef boss_shield_bar_left
+				{
+					rect	-10,0,100,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_shieldbar"
+					matcolor	0.415,0.549,0.541,0.35
+				}
+			}
+			windowDef p_boss_shield_bar_right
+			{
+				rect	341 + 89 * ( 1 - "gui::boss_shield_percent" ),40,89,50
+				visible	0
+				windowDef boss_shield_bar_right
+				{
+					rect	-90 * ( 1 - "gui::boss_shield_percent" ),0,100,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_shieldbar"
+					matcolor	0.415,0.549,0.541,0.35
+					matscalex	-1
+				}
+			}
+			windowDef p_boss_shield_bar_leftwarn
+			{
+				rect	250,40,89 * "gui::boss_shield_percent",50
+				visible	0
+				windowDef boss_shield_bar_leftwarn
+				{
+					rect	-9,0,100,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_shieldbar"
+					matcolor	1,0.25,0,1*guitable_10_5[time*0.002]
+				}
+			}
+			windowDef p_boss_shield_bar_rightwarn
+			{
+				rect	341 + 89 * ( 1 - "gui::boss_shield_percent" ),40,89,50
+				visible	0
+				windowDef boss_shield_bar_rightwarn
+				{
+					rect	-90 * ( 1 - "gui::boss_shield_percent" ),0,100,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_shieldbar"
+					matcolor	1,0.25,0,1*guitable_10_5[time*0.002]
+					matscalex	-1
+				}
 			}
 		}
-	}
 
-//-----------------------		
-// exit level status
-//-----------------------
+	//-----------------------		
+	// exit level status
+	//-----------------------
 
-	windowDef p_exit_level
-	{
-		rect	0,0,640,75
-		screenalignx	middle
-		screenaligny	top
-		visible	0
-		windowDef p_exit_text
+		windowDef p_exit_level
 		{
-			rect	225,36,199,26
-			visible	1
-			forecolor	1,0.4,0,1
-			text	"#str_200013"
-			textscale	0.4
-			font	"fonts/marine"
-			textalign	1
-		}
-		windowDef p_exit_arr1
-		{
-			rect	261,11,130,33
-			visible	1
-			background	"gfx/guis/common/arrow5"
-			matcolor	1,0.4,0,0.5
-			matscaley	-1
-
-			onTime 0 {
-				transition "matcolor_w" ".5" "0" "1000" ;
-				transition "rect" "$p_exit_arr1::rect" "$p_exit_arr2::rect" "1000" "300" "300"  ;
-			}
-
-			onTime 1000 {
-				resettime "0" ;
-			}
-
-		}
-		windowDef p_exit_arr2
-		{
-			rect	261,0,130,33
+			rect	0,92 * "gui::oq4_hudRemastered" * "Bossbar::visible",640,75
+			screenalignx	middle
+			screenaligny	top
 			visible	0
-			background	"gfx/guis/common/arrow5"
-			matcolor	1,1,1,1
-			matscaley	-1
+			windowDef p_exit_text
+			{
+				rect	225,36,199,26
+				visible	1
+				forecolor	1,0.4,0,1
+				text	"#str_200013"
+				textscale	0.4
+				font	"fonts/marine"
+				textalign	1
+			}
+			windowDef p_exit_arr1
+			{
+				rect	261,11,130,33
+				visible	1
+				background	"gfx/guis/common/arrow5"
+				matcolor	1,0.4,0,0.5
+				matscaley	-1
+
+				onTime 0 {
+					transition "matcolor_w" ".5" "0" "1000" ;
+					transition "rect" "$p_exit_arr1::rect" "$p_exit_arr2::rect" "1000" "300" "300"  ;
+				}
+
+				onTime 1000 {
+					resettime "0" ;
+				}
+
+			}
+			windowDef p_exit_arr2
+			{
+				rect	261,0,130,33
+				visible	0
+				background	"gfx/guis/common/arrow5"
+				matcolor	1,1,1,1
+				matscaley	-1
+			}
 		}
 	}
 	
@@ -1868,7 +2003,7 @@ windowDef Desktop
 
 	windowDef quicksave_msg
 	{
-		rect	0,64,640,20
+		rect	0,64 + "gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * (32 * "Bossbar::visible" + 64 * "p_exit_level::visible"),640,20
 		screenalignx	middle
 		screenaligny	top
 		visible	0
@@ -1894,47 +2029,54 @@ windowDef Desktop
 // hit indicator
 //-----------------------	
 
-	windowDef hit_indicator
+	// openQ4: the damage direction setting and Minimal hide the hit indicator.
+	windowDef p_hit_layout
 	{
-		rect		0,0,640,480
-		background	"gfx/guis/hud/directional_hit"
-		matcolor	1,.1,.1,.7
-		rotate		"gui::hitdir"
-		visible		0
-		notime		1
+		rect	0,0,640,480
+		noclip	1
+		visible	"gui::oq4_hudShowDamage"
+		windowDef hit_indicator
+		{
+			rect		0,0,640,480
+			background	"gfx/guis/hud/directional_hit"
+			matcolor	1,.1,.1,.7
+			rotate		"gui::hitdir"
+			visible		0
+			notime		1
 		
-		onTime 0 
-		{
-			set "visible" "1";
-			set "matcolor" "1,.1,.1,.7";
-			transition "matcolor" "1,.1,.1,.7" "1,.1,.1,0" "500" ;
-		}
+			onTime 0 
+			{
+				set "visible" "1";
+				set "matcolor" "1,.1,.1,.7";
+				transition "matcolor" "1,.1,.1,.7" "1,.1,.1,0" "500" ;
+			}
 		
-		onTime +600
-		{
-			set "visible" "0";
-		}
-	}
-
-	windowDef hit_indicator_reduced
-	{
-		rect		0,0,640,480
-		background	"gfx/guis/hud/directional_hit"
-		matcolor	1,.1,.1,.4
-		rotate		"gui::hitdir"
-		visible		0
-		notime		1
-
-		onTime 0
-		{
-			set "visible" "1";
-			set "matcolor" "1,.1,.1,.4";
-			transition "matcolor" "1,.1,.1,.4" "1,.1,.1,0" "500" ;
+			onTime +600
+			{
+				set "visible" "0";
+			}
 		}
 
-		onTime +600
+		windowDef hit_indicator_reduced
 		{
-			set "visible" "0";
+			rect		0,0,640,480
+			background	"gfx/guis/hud/directional_hit"
+			matcolor	1,.1,.1,.4
+			rotate		"gui::hitdir"
+			visible		0
+			notime		1
+
+			onTime 0
+			{
+				set "visible" "1";
+				set "matcolor" "1,.1,.1,.4";
+				transition "matcolor" "1,.1,.1,.4" "1,.1,.1,0" "500" ;
+			}
+
+			onTime +600
+			{
+				set "visible" "0";
+			}
 		}
 	}
 

@@ -210,27 +210,34 @@ windowDef Desktop
 		textscale	0.45
 		font	"fonts/marine"
 	}
-	windowDef damage
+	// openQ4: Minimal (ui_hudLayout 2) leaves out the hit flash and the electrical warnings.
+	windowDef p_effects_layout
 	{
 		rect	0,0,640,480
-		visible	1
-		background	"gfx/guis/common/add_box2"
-		matcolor	0,0,0,1
-	}
-	windowDef left_elecwarn
-	{
-		rect	0,167,128,128
-		visible	0
-		background	"gfx/guis/vehicles/veh_elecwarn"
-		matcolor	0.6,0,0,1
-	}
-	windowDef right_elecwarn
-	{
-		rect	512,167,128,128
-		visible	0
-		background	"gfx/guis/vehicles/veh_elecwarn"
-		matcolor	0.6,0,0,1
-		matscalex	-1
+		noclip	1
+		visible	"gui::oq4_hudShowExtras"
+		windowDef damage
+		{
+			rect	0,0,640,480
+			visible	1
+			background	"gfx/guis/common/add_box2"
+			matcolor	0,0,0,1
+		}
+		windowDef left_elecwarn
+		{
+			rect	0 - "gui::oq4_hudEdgeLeft",167,128,128
+			visible	0
+			background	"gfx/guis/vehicles/veh_elecwarn"
+			matcolor	0.6,0,0,1
+		}
+		windowDef right_elecwarn
+		{
+			rect	512 + "gui::oq4_hudEdgeRight",167,128,128
+			visible	0
+			background	"gfx/guis/vehicles/veh_elecwarn"
+			matcolor	0.6,0,0,1
+			matscalex	-1
+		}
 	}
 	windowDef BgSOUND
 	{
@@ -246,9 +253,11 @@ windowDef Desktop
 		matcolor	1 ,1 ,1 ,1
 		visible	0
 	}
+	// openQ4: the Remastered layout (ui-visual-design.md 14.4, 14.12) centres
+	// the vehicle's status bar on the bottom edge (its stock span is 11-288 u).
 	windowDef p_armor
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	1
 		windowDef health_backbar
 		{
@@ -307,7 +316,7 @@ windowDef Desktop
 	}
 	windowDef p_shields
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	1
 		windowDef armor_backbar
 		{
@@ -366,7 +375,7 @@ windowDef Desktop
 	}
 	windowDef p_ammo
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	1
 		windowDef ammo_backbar
 		{
@@ -379,7 +388,7 @@ windowDef Desktop
 	}
 	windowDef p_rockets
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	"gui::vehicle_weapon" == 3
 		windowDef rocket
 		{
@@ -409,7 +418,7 @@ windowDef Desktop
 	}
 	windowDef p_mgun
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	"gui::vehicle_weapon" == 1
 		windowDef mgun_tank
 		{
@@ -428,7 +437,7 @@ windowDef Desktop
 	}
 	windowDef p_mgun_walker
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	"gui::vehicle_weapon" == 2
 		windowDef mgun_walker
 		{
@@ -447,7 +456,7 @@ windowDef Desktop
 	}
 	windowDef p_cannon
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	"gui::vehicle_weapon" == 0
 		windowDef cannon
 		{
@@ -466,7 +475,7 @@ windowDef Desktop
 	}
 	windowDef p_weapcharge
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	("gui::vehicle_weapon" == 0 || "gui::vehicle_weapon" == 3)
 		windowDef weapon_charge_bg
 		{
@@ -490,68 +499,75 @@ windowDef Desktop
 			}
 		}
 	}
-	windowDef p_radio
+	// openQ4: Minimal leaves out the transmission display.
+	windowDef p_radio_layout
 	{
-		rect	485,10,144,28
-		screenalignx	right
-		screenaligny	top
-		visible	1
-		windowDef radio_backbar
+		rect	0,0,640,480
+		noclip	1
+		visible	"gui::oq4_hudShowExtras"
+		windowDef p_radio
 		{
-			rect	31,0,113,28
+			rect	485,10,144,28
+			screenalignx	right
+			screenaligny	top
 			visible	1
-			background	"gfx/guis/hud_rev3/radiobar"
-			matcolor	0,0,0,0.498
-			shear	0,-.22
-		}
-		windowDef t_radio1
-		{
-			rect	56,1,81,12
-			visible	1
-			forecolor	1,1,1,1
-			text	"#str_200272"
-			textscale	0.2
-			font	"fonts/marine"
-			textspacing	0
-		}
-		windowDef t_radio2
-		{
-			rect	56,8,81,12
-			visible	1
-			forecolor	1,1,1,1
-			text	"#str_200273"
-			textscale	0.2
-			font	"fonts/marine"
-			textspacing	0
-		}
-		windowDef waveform
-		{
-			rect	24,2,41,25
-			visible	1
-			background	"gfx/guis/hud/waveform"
-			matcolor	1,0.5,0,1
-		}
-		windowDef rhino_backbar
-		{
-			rect	4,1,26,26
-			background	"gfx/guis/hud/wsbar"
-			matcolor	0,0,0,0.4
-			shear	0,-.22
-			visible	"gui::rhinochatter"
-		}
-		windowDef rhino
-		{
-			rect	6,3,22,22
-			background	"gfx/guis/hud/radio_rhino"
-			visible	"gui::rhinochatter"
-			matcolor	1,0.6,0,1
-			notime	1
-			shear	0,-.22
+			windowDef radio_backbar
+			{
+				rect	31,0,113,28
+				visible	1
+				background	"gfx/guis/hud_rev3/radiobar"
+				matcolor	0,0,0,0.498
+				shear	0,-.22
+			}
+			windowDef t_radio1
+			{
+				rect	56,1,81,12
+				visible	1
+				forecolor	1,1,1,1
+				text	"#str_200272"
+				textscale	0.2
+				font	"fonts/marine"
+				textspacing	0
+			}
+			windowDef t_radio2
+			{
+				rect	56,8,81,12
+				visible	1
+				forecolor	1,1,1,1
+				text	"#str_200273"
+				textscale	0.2
+				font	"fonts/marine"
+				textspacing	0
+			}
+			windowDef waveform
+			{
+				rect	24,2,41,25
+				visible	1
+				background	"gfx/guis/hud/waveform"
+				matcolor	1,0.5,0,1
+			}
+			windowDef rhino_backbar
+			{
+				rect	4,1,26,26
+				background	"gfx/guis/hud/wsbar"
+				matcolor	0,0,0,0.4
+				shear	0,-.22
+				visible	"gui::rhinochatter"
+			}
+			windowDef rhino
+			{
+				rect	6,3,22,22
+				background	"gfx/guis/hud/radio_rhino"
+				visible	"gui::rhinochatter"
+				matcolor	1,0.6 + 0.4 * "gui::oq4_hudRemastered",0,1
+				notime	1
+				shear	0,-.22
+			}
 		}
 	}
 	windowDef p_weapnotification
 	{
-		rect	0,0,640,480
+		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	1
 		windowDef d_weap_msg
 		{
@@ -644,58 +660,66 @@ windowDef Desktop
 		matcolor	0.698,0.811,0.427,0.5
 		rotate	"gui::vehicle_rotate"
 	}
-	windowDef missile_indicator
+	// openQ4: Minimal leaves out the missile warning.
+	windowDef p_missile_layout
 	{
 		rect	0,0,640,480
-		background	"gfx/guis/hud/directional_hit2"
-		matcolor	1,.1,.1,.7
-		rotate	"gui::missiledir"
-		visible	0
-		notime	1
+		noclip	1
+		visible	"gui::oq4_hudShowExtras"
+		windowDef missile_indicator
+		{
+			rect	0,0,640,480
+			background	"gfx/guis/hud/directional_hit2"
+			matcolor	1,.1,.1,.7
+			rotate	"gui::missiledir"
+			visible	0
+			notime	1
 
-		onTime 0 {
-			transition "matcolor_w" "0.7" "0.3" "200" ;
+			onTime 0 {
+				transition "matcolor_w" "0.7" "0.3" "200" ;
+			}
+
+			onTime +200 {
+				transition "matcolor_w" "0.3" "0.7" "200" ;
+			}
+
+			onTime +400 {
+				resettime "0" ;
+			}
+
 		}
+		windowDef missile_text
+		{
+			rect	0,61,640,33
+			visible	0
+			notime	1
+			forecolor	1,.1,.1,.7
+			text	"#str_200891"
+			textscale	0.4
+			font	"fonts/marine"
+			textalign	1
+			textspacing	-2
 
-		onTime +200 {
-			transition "matcolor_w" "0.3" "0.7" "200" ;
+			onTime 0 {
+				transition "forecolor_w" "0.7" "0.3" "200" ;
+			}
+
+			onTime +200 {
+				transition "forecolor_w" "0.3" "0.7" "200" ;
+			}
+
+			onTime +400 {
+				resettime "0" ;
+			}
+
 		}
-
-		onTime +400 {
-			resettime "0" ;
-		}
-
 	}
-	windowDef missile_text
-	{
-		rect	0,61,640,33
-		visible	0
-		notime	1
-		forecolor	1,.1,.1,.7
-		text	"#str_200891"
-		textscale	0.4
-		font	"fonts/marine"
-		textalign	1
-		textspacing	-2
-
-		onTime 0 {
-			transition "forecolor_w" "0.7" "0.3" "200" ;
-		}
-
-		onTime +200 {
-			transition "forecolor_w" "0.3" "0.7" "200" ;
-		}
-
-		onTime +400 {
-			resettime "0" ;
-		}
-
-	}
+	// openQ4: Remastered sets the prompt at the bottom-trailing corner (14.8).
 	windowDef exit_msg
 	{
-		rect	310,457,319,19
+		rect	310 + "gui::oq4_hudEdgeRight",457 + "gui::oq4_hudEdgeBottom",319,19
 		visible	0
-		forecolor	1,1,1,1
+		forecolor	1,1,1,1 - "gui::oq4_hudRemastered"
 		text	"#str_200909"
 		textscale	0.25
 		font	"fonts/lowpixel"
@@ -704,14 +728,65 @@ windowDef Desktop
 	}
 	windowDef lock_msg
 	{
-		rect	310,457,319,19
+		rect	310 + "gui::oq4_hudEdgeRight",457 + "gui::oq4_hudEdgeBottom",319,19
 		visible	0
-		forecolor	1,0.5,0,1
+		forecolor	1,0.5,0,1 - "gui::oq4_hudRemastered"
 		text	"#str_200913"
 		textscale	0.25
 		font	"fonts/lowpixel"
 		textalign	2
 		textstyle	1
+	}
+	// openQ4: the Remastered HUD prompt (14.8): one sheared plate at black 0.50
+	// at the bottom-trailing corner, never wider than its content: the jump
+	// key's cap (the engine's inline keycap) and Exit, or Vehicle locked in
+	// #FF8000 while a script locks the vehicle.
+	windowDef oq4_prompt
+	{
+		rect	0,0,640,480
+		noclip	1
+		visible	"gui::oq4_hudRemastered" * ("exit_msg::visible" + "lock_msg::visible")
+		definefloat	"chip"	"oq4_prompt_key::textwidth"
+		definefloat	"width"	"exit_msg::visible" * (15 + "oq4_prompt::chip" + "oq4_prompt_exit::textwidth") + "lock_msg::visible" * (11 + "oq4_prompt_locked::textwidth")
+		definefloat	"left"	629 + "gui::oq4_hudEdgeRight" - "oq4_prompt::width"
+		definefloat	"top"	460 + "gui::oq4_hudEdgeBottom"
+		windowDef oq4_prompt_plate
+		{
+			rect	"oq4_prompt::left","oq4_prompt::top","oq4_prompt::width",16
+			background	"gfx/guis/hud/pickupbar"
+			matcolor	0,0,0,0.5
+			shear	0,-.22
+		}
+		windowDef oq4_prompt_key
+		{
+			rect	"oq4_prompt::left" + 5.5,"oq4_prompt::top" + 1,96,14
+			text	"gui::oq4_key_jump"
+			font	"fonts/lowpixel"
+			textscale	0.2
+			forecolor	1,1,1,0.92
+			visible	"exit_msg::visible"
+			nowrap	1
+		}
+		windowDef oq4_prompt_exit
+		{
+			rect	"oq4_prompt::left" + 9.5 + "oq4_prompt::chip","oq4_prompt::top" + 1,96,14
+			text	"#str_231229"
+			font	"fonts/lowpixel"
+			textscale	0.2
+			forecolor	1,1,1,0.92
+			visible	"exit_msg::visible"
+			nowrap	1
+		}
+		windowDef oq4_prompt_locked
+		{
+			rect	"oq4_prompt::left" + 5.5,"oq4_prompt::top" + 1,160,14
+			text	"#str_231230"
+			font	"fonts/lowpixel"
+			textscale	0.2
+			forecolor	1,0.5,0,1
+			visible	"lock_msg::visible"
+			nowrap	1
+		}
 	}
 	windowDef p_exit_level
 	{
@@ -775,106 +850,113 @@ windowDef Desktop
 		}
 
 	}
-	windowDef Bossbar
+	// openQ4: Minimal leaves out the boss bar.
+	windowDef p_boss_layout
 	{
 		rect	0,0,640,480
-		visible	0
-		windowDef boss_backbar
+		noclip	1
+		visible	"gui::oq4_hudShowExtras"
+		windowDef Bossbar
 		{
-			rect	240,40,200,50
-			visible	1
-			background	"gfx/guis/hud/s_bossbar"
-			matcolor	0,0,0,0.5
-		}
-		windowDef boss_healthicon
-		{
-			rect	334,75,12,12
-			visible	1
-			background	"gfx/guis/hud/icons/item_health"
-			matcolor	1,1,1,0.2
-		}
-		windowDef boss_health_bar2
-		{
-			rect	239,40,200,50
-			visible	1
-			background	"gfx/guis/hud/s_boss_healthbar"
-			matcolor	0.917,0.560,0.0823,0.2
-		}
-		windowDef boss_shield_bar_left2
-		{
-			rect	240,40,100,50
-			visible	1
-			background	"gfx/guis/hud/s_boss_shieldbar"
-			matcolor	0.415,0.549,0.541,0.2
-		}
-		windowDef boss_shield_bar_right2
-		{
-			rect	340,40,100,50
-			visible	1
-			background	"gfx/guis/hud/s_boss_shieldbar"
-			matcolor	0.415,0.549,0.541,0.2
-			matscalex	-1
-		}
-		windowDef p_boss_health_bar
-		{
-			rect	266,40,149 * "gui::boss_health" / ("gui::boss_maxhealth" + 1),50
-			visible	1
-			windowDef boss_health_bar
+			rect	0,0,640,480
+			visible	0
+			windowDef boss_backbar
 			{
-				rect	-26,0,200,50
+				rect	240,40,200,50
+				visible	1
+				background	"gfx/guis/hud/s_bossbar"
+				matcolor	0,0,0,0.5
+			}
+			windowDef boss_healthicon
+			{
+				rect	334,75,12,12
+				visible	1
+				background	"gfx/guis/hud/icons/item_health"
+				matcolor	1,1,1,0.2
+			}
+			windowDef boss_health_bar2
+			{
+				rect	239,40,200,50
 				visible	1
 				background	"gfx/guis/hud/s_boss_healthbar"
-				matcolor	0.917,0.560,0.0823,0.35
+				matcolor	0.917,0.560,0.0823,0.2
 			}
-		}
-		windowDef p_boss_shield_bar_left
-		{
-			rect	250,40,89 * "gui::boss_shield_percent",50
-			visible	0
-			windowDef boss_shield_bar_left
+			windowDef boss_shield_bar_left2
 			{
-				rect	-10,0,100,50
+				rect	240,40,100,50
 				visible	1
 				background	"gfx/guis/hud/s_boss_shieldbar"
-				matcolor	0.415,0.549,0.541,0.35
+				matcolor	0.415,0.549,0.541,0.2
 			}
-		}
-		windowDef p_boss_shield_bar_right
-		{
-			rect	341 + 89 * ( 1 - "gui::boss_shield_percent" ),40,89,50
-			visible	0
-			windowDef boss_shield_bar_right
+			windowDef boss_shield_bar_right2
 			{
-				rect	-90 * ( 1 - "gui::boss_shield_percent" ),0,100,50
+				rect	340,40,100,50
 				visible	1
 				background	"gfx/guis/hud/s_boss_shieldbar"
-				matcolor	0.415,0.549,0.541,0.35
+				matcolor	0.415,0.549,0.541,0.2
 				matscalex	-1
 			}
-		}
-		windowDef p_boss_shield_bar_leftwarn
-		{
-			rect	250,40,89 * "gui::boss_shield_percent",50
-			visible	0
-			windowDef boss_shield_bar_leftwarn
+			windowDef p_boss_health_bar
 			{
-				rect	-9,0,100,50
+				rect	266,40,149 * "gui::boss_health" / ("gui::boss_maxhealth" + 1),50
 				visible	1
-				background	"gfx/guis/hud/s_boss_shieldbar"
-				matcolor	1,0.25,0,1*guitable_10_5[time*0.002]
+				windowDef boss_health_bar
+				{
+					rect	-26,0,200,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_healthbar"
+					matcolor	0.917,0.560,0.0823,0.35
+				}
 			}
-		}
-		windowDef p_boss_shield_bar_rightwarn
-		{
-			rect	341 + 89 * ( 1 - "gui::boss_shield_percent" ),40,89,50
-			visible	0
-			windowDef boss_shield_bar_rightwarn
+			windowDef p_boss_shield_bar_left
 			{
-				rect	-90 * ( 1 - "gui::boss_shield_percent" ),0,100,50
-				visible	1
-				background	"gfx/guis/hud/s_boss_shieldbar"
-				matcolor	1,0.25,0,1*guitable_10_5[time*0.002]
-				matscalex	-1
+				rect	250,40,89 * "gui::boss_shield_percent",50
+				visible	0
+				windowDef boss_shield_bar_left
+				{
+					rect	-10,0,100,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_shieldbar"
+					matcolor	0.415,0.549,0.541,0.35
+				}
+			}
+			windowDef p_boss_shield_bar_right
+			{
+				rect	341 + 89 * ( 1 - "gui::boss_shield_percent" ),40,89,50
+				visible	0
+				windowDef boss_shield_bar_right
+				{
+					rect	-90 * ( 1 - "gui::boss_shield_percent" ),0,100,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_shieldbar"
+					matcolor	0.415,0.549,0.541,0.35
+					matscalex	-1
+				}
+			}
+			windowDef p_boss_shield_bar_leftwarn
+			{
+				rect	250,40,89 * "gui::boss_shield_percent",50
+				visible	0
+				windowDef boss_shield_bar_leftwarn
+				{
+					rect	-9,0,100,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_shieldbar"
+					matcolor	1,0.25,0,1*guitable_10_5[time*0.002]
+				}
+			}
+			windowDef p_boss_shield_bar_rightwarn
+			{
+				rect	341 + 89 * ( 1 - "gui::boss_shield_percent" ),40,89,50
+				visible	0
+				windowDef boss_shield_bar_rightwarn
+				{
+					rect	-90 * ( 1 - "gui::boss_shield_percent" ),0,100,50
+					visible	1
+					background	"gfx/guis/hud/s_boss_shieldbar"
+					matcolor	1,0.25,0,1*guitable_10_5[time*0.002]
+					matscalex	-1
+				}
 			}
 		}
 	}

@@ -6,6 +6,29 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## The classic interface's HUD gets the Remastered layout, 9 November 2026
+
+- **The modern HUD's layout without the modern UI.** With `ui_retained 0`, the
+  HUD now follows the same layout as the modern interface, keeping its original
+  artwork:
+  - The status bar is centered on the bottom edge.
+  - The weapon strip names the weapon above it.
+  - Up to two pickup lines sit over the gauges and count repeats ("Armor Shard ×2").
+  - Notices no longer overlap the boss bar.
+  - Vehicles get a centered status bar and an Exit prompt naming your key in the
+    bottom-right corner.
+  - Deathmatch and Duel show the new standing rows and timer plate.
+  - Chat sits at the bottom left above the status bar, each message on its own plate.
+  - On ultrawide screens the edge items stop at 21:9, as in the modern HUD.
+- **Your HUD settings now work there too.** HUD Layout, HUD width, safe area,
+  pickup messages, the weapon strip and the damage direction indicator all apply.
+  Minimal hides the same extras. HUD size and opacity stay modern-UI settings.
+  Choose the Classic layout (`ui_hudLayout 0`) to keep the original positions.
+- **Older saves still load.** Saves from earlier builds restore with the new
+  layout, keeping what was on screen, such as a boss bar.
+- Evidence: [stock interface HUD layout](ui/legacy-hud-layout.md);
+  `tools/tests/savegame_gui_layout_contract.py`.
+
 ## Fixes and smoother first spawns from an audit round, 9 November 2026
 
 - **No hitch on your first multiplayer spawn.** A multiplayer player spawns after

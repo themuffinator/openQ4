@@ -280,6 +280,84 @@ void idChatWindow::Reflow(float width, float scale) {
     cachedScreenHeight = screenHeight;
 }
 
+/*
+The Remastered chat box (ui-visual-design.md 14.9) for the stock interface's
+HUD in the Remastered layout, from the lines the game publishes for it
+(oq4_chat<slot>_*, oldest first): each message on its own plate at 0.35 as
+wide as its text, newest at the bottom, Lowpixel on a 13.3 u pitch. All-chat
+is #FFFF8D with white names, a team line opens with the TEAM tag in the
+team's text colour, a server line is white at 0.70, and your own lines take
+the header band at 0.30. The box sits 8 u in from the leading edge with its
+bottom 59 u above the bottom edge, clear of the status bar, wherever at least
+180 u lie between the edge and the 438 u status bar (up to 300 u wide);
+otherwise it is 200 u wide and rises to 150 u, clear of the weapon strip.
+*/
+void idChatWindow::DrawRemasteredLines(const float edges[4]) {
+    const int slots = 8;
+    // Lowpixel 10.7 u and the tag's 7.2 u, matched to the Remastered type.
+    const float scale = 0.2f, tagScale = 0.13f;
+    const float pitch = 13.3f, padding = 4.0f, gap = 2.0f;
+    const float leading = -edges[0];
+    const float room = 101.0f - 16.0f - leading;
+    const bool wide = room >= 180.0f;
+    const float boxWidth = wide ? Min(room, 300.0f) : 200.0f;
+    const float left = leading + 8.0f;
+    float bottom = 480.0f + edges[3] - (wide ? 59.0f : 150.0f);
+    SetFont();
+    const char *tag = common->GetLocalizedString("#str_231001");
+    const float tagWidth = static_cast<float>(dc->TextWidth(tag, tagScale, -1)) + 8.0f;
+    int count = 0;
+    for (int slot = 0; slot < slots; ++slot) {
+        if (gui->GetStateBool(va("oq4_chat%d_live", slot))) { count = slot + 1; }
+    }
+    for (int slot = count - 1; slot >= 0; --slot) {
+        if (!gui->GetStateBool(va("oq4_chat%d_live", slot))) { continue; }
+        const float alpha = idMath::ClampFloat(0.0f, 1.0f, gui->GetStateFloat(va("oq4_chat%d_alpha", slot)));
+        const int kind = gui->GetStateInt(va("oq4_chat%d_kind", slot));
+        const bool strogg = gui->GetStateInt(va("oq4_chat%d_team", slot), "-1") == 1;
+        const bool you = gui->GetStateBool(va("oq4_chat%d_you", slot));
+        const bool teamLine = kind == 1, server = kind == 2;
+        // #FFFF8D, white, and the team text colours #AAE355 and #FF8E00.
+        const char *teamInk = strogg ? "^c950" : "^c683";
+        idStr words;
+        if (!server) {
+            words = va("%s%s: ", you || !teamLine ? "^c999" : teamInk, gui->GetStateString(va("oq4_chat%d_name", slot)));
+        }
+        words += server ? "^c999" : teamLine ? teamInk : "^c995";
+        words += gui->GetStateString(va("oq4_chat%d_text", slot));
+        const float indent = teamLine ? tagWidth + 4.0f : 0.0f;
+        const float wordsWidth = Max(32.0f, boxWidth - padding * 2.0f - indent);
+        idList<int> breaks;
+        dc->DrawText(words, scale, 0, colorWhite, idRectangle(0, 0, wordsWidth, 480), true, -1, true, &breaks, 0, 0, 0, true);
+        const int lines = Max(1, breaks.Num());
+        const float plateWidth = lines > 1 ? boxWidth :
+            Min(boxWidth, static_cast<float>(dc->TextWidth(words, scale, -1)) + padding * 2.0f + indent);
+        const float height = lines * pitch;
+        const float top = bottom - height;
+        if (top < 0.0f - edges[1]) { break; }
+        dc->DrawFilledRect(left, top, plateWidth, height, you ? idVec4(0.545f, 0.588f, 0.294f, 0.30f * alpha) :
+            idVec4(0.0f, 0.0f, 0.0f, 0.35f * alpha));
+        if (teamLine) {
+            // The header-band tag: the team's text colour at 0.85 under dark Lowpixel.
+            const idVec4 plate = strogg ? idVec4(1.0f, 0.557f, 0.0f, 0.85f * alpha) : idVec4(0.667f, 0.890f, 0.333f, 0.85f * alpha);
+            dc->DrawFilledRect(left + padding, top + 2.0f, tagWidth, 10.0f, plate);
+            dc->DrawText(tag, tagScale, 1, idVec4(0.063f, 0.078f, 0.039f, alpha),
+                idRectangle(left + padding, top + 2.0f, tagWidth, 10.0f), false);
+        }
+        const idVec4 ink(1.0f, 1.0f, 1.0f, server ? 0.7f * alpha : alpha);
+        idStr colour;
+        for (int i = 0; i < lines; ++i) {
+            const int start = i < breaks.Num() ? breaks[i] : 0;
+            const int end = i + 1 < breaks.Num() ? breaks[i + 1] : words.Length();
+            idStr line = colour + words.Mid(start, Max(0, end - start));
+            line.StripTrailingWhitespace();
+            dc->DrawText(line, scale, 0, ink, idRectangle(left + padding + indent, top + i * pitch, wordsWidth, pitch), false);
+            colour = line.GetLastColorCode();
+        }
+        bottom = top - gap;
+    }
+}
+
 void idChatWindow::Draw(int time, float x, float y) {
     const bool editing = input && activeChat == this;
     if (input && !editing) { return; }
@@ -289,6 +367,13 @@ void idChatWindow::Draw(int time, float x, float y) {
     // The Remastered layout draws chat in the multiplayer HUD document; this
     // control keeps the input, its history recall and channel switching.
     if (idRemasteredHud::Enabled()) { return; }
+    // The stock interface's HUD in the Remastered layout (idLegacyHudLayout)
+    // draws the resting lines in the Remastered construction.
+    float edges[4];
+    if (!input && gui->LegacyEdges(edges)) {
+        DrawRemasteredLines(edges);
+        return;
+    }
     float alpha = 1.0f;
     if (!editing) {
         if (chatHistory.messages.empty() || ui_chatTime.GetFloat() <= 0.0f) { return; }

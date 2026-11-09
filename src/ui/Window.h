@@ -503,6 +503,13 @@ protected:
 	idWinFloat	textScale;
 	idWinFloat	rotate;
 	idWinStr	text;
+	// openQ4: "textwidth", the drawn text's widest line in virtual units, and
+	// "textlines", its explicit line count, which other windows' expressions
+	// read (a plate fitted to its text). Measured only once something
+	// references either, as the window draws; never saved.
+	idWinFloat	textWidth;
+	idWinFloat	textLines;
+	bool		measureTextWidth = false;
 	idWinBackground	backGroundName;			// 
 	idWinFloat textspacing;
 	idWinFloat textstyle;

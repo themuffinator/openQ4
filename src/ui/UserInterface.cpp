@@ -1383,6 +1383,10 @@ const char *idUserInterfaceLocal::HandleEvent( const sysEvent_t *event, int _tim
 
 void idUserInterfaceLocal::HandleNamedEvent ( const char* eventName ) {
 	evaluatedHudValid = false;
+	// The stock interface's Remastered pickup lines read their slots in the event.
+	if ( !idStr::Icmp( eventName, "itemPickup" ) ) {
+		PublishLegacyPickup();
+	}
 	desktop->RunNamedEvent( eventName );
 	// The Remastered layout answers the same events as the stock windows,
 	// including those sent before its first frame, which it replays.
@@ -1420,6 +1424,8 @@ void idUserInterfaceLocal::Redraw( int _time, bool useAspectCorrection ) {
 		uiManagerLocal.dc.GetVirtualScreenExpansion( desktop->forceAspectWidth, desktop->forceAspectHeight, xExpand, yExpand );
 		SetStateFloat( "virtual_screen_x_expand", xExpand );
 		SetStateFloat( "virtual_screen_y_expand", yExpand );
+		// A HUD's layout setting, which its stock windows follow (idLegacyHudLayout).
+		PublishLegacyHud( xExpand, yExpand );
 		// Physical aspect of the region the authored canvas covers.  The expanded
 		// logical area always maps onto the whole 2D viewport, so this is the only
 		// value a gui needs to size cinematic framing that has to look the same on
