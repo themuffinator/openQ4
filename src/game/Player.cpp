@@ -9386,6 +9386,15 @@ bool idPlayer::EnterVehicle( idEntity* vehicle ) {
 		seat->GetEyePosition( eyeOrigin, eyeAxis );
 		const float headYaw = vrFrame.head.valid ? vrFrame.head.axis[ 0 ].ToYaw() : 0.0f;
 		vrVehicleDeltaYaw = idMath::AngleNormalize180( eyeAxis[ 0 ].ToYaw() - vrFrame.bodyYaw - headYaw );
+		// the seat follows the vehicle's turns from here, not from the first
+		// frame it is driven: m07's race seats the player on the speeder and
+		// only then turns it 165 degrees, which a later start left behind, so
+		// the head-steered turret ran to its stop chasing the old facing
+		const idVec3 &nose = entered->GetAxis()[ 0 ];
+		if ( nose.ToVec2().LengthSqr() >= 0.01f ) {
+			vrVehicleYaw = nose.ToYaw();
+			vrVehicleYawValid = true;
+		}
 		if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
 			gameLocal.Printf( "VR vehicle %s: %s\n", entered->GetClassname(),
 				seat->TurretAlignsVehicle() ? "steers after its turret, the view stays put" : "its turns carry the view" );
