@@ -2461,6 +2461,17 @@ static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPat
 		return false;
 	}
 
+	// openQ4's own derived data is not read under a pure lock or fs_restrict,
+	// and the directory gate would refuse this file once published, so do not
+	// compose or write one: the stock levelshot is shown. One read before a
+	// pure lock is evicted at the lock instead of restarting the engine (see
+	// FS_IsGeneratedLoadscreenPath).
+	if ( FS_GeneratedDataReadsRefused() ) {
+		common->DPrintf( "Expanded loading background for '%s' skipped while pure; using the source levelshot\n",
+			backgroundPath.c_str() );
+		return false;
+	}
+
 	// Never use a shared, predictable staging name. If the platform cannot
 	// provide a secure nonce, keep the stock source levelshot instead of risking
 	// another client truncating this client's in-progress publication.

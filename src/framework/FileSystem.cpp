@@ -1601,6 +1601,7 @@ public:
 
 private:
 	friend dword 			BackgroundDownloadThread( void *parms );
+	friend bool				FS_GeneratedDataReadsRefused( void );
 
 	searchpath_t *			searchPaths;
 	int						readCount;			// total bytes read
@@ -1640,7 +1641,7 @@ private:
 
 	idList<pack_t *>		serverPaks;
 	bool					loadedFileFromDir;		// set to true once a file was loaded from a directory - can't switch to pure anymore
-	bool					loadedImageCacheFromDir;	// a generated image cache entry was read: a pure lock must reload those images
+	bool					loadedImageCacheFromDir;	// a generated image cache entry or expanded loading background was read: a pure lock must evict those images
 	bool					pureImageCacheEvictionPending;	// the pure lock was taken over such reads; TakePureImageCacheEviction hands it on
 	idList<int>				restartChecksums;		// used during a restart to set things in right order
 	idList<int>				addonChecksums;			// list of checksums that should go to the search list directly ( for restarts )
@@ -2086,6 +2087,20 @@ identity before a byte of it is used.
 */
 bool idFileSystemLocal::GeneratedCacheReadsRefused( void ) const {
 	return fs_restrict.GetBool() || serverPaks.Num() > 0;
+}
+
+/*
+================
+FS_GeneratedDataReadsRefused
+
+The same gate for engine code that publishes derived data under fs_savepath
+and reads it back through the search paths: the session's expanded loading
+backgrounds (see FS_IsGeneratedLoadscreenPath). The directory gate refuses
+those reads while this holds, so the session does not compose one.
+================
+*/
+bool FS_GeneratedDataReadsRefused( void ) {
+	return fileSystemLocal.GeneratedCacheReadsRefused();
 }
 
 bool idFileSystemLocal::GeneratedCacheReadsEnabled( const generatedCacheKind_t kind ) const {
@@ -7059,13 +7074,14 @@ fsPureReply_t idFileSystemLocal::SetPureServerChecksums( const int pureChecksums
 			common->Printf( "SetPureServerChecksums: there are files loaded from dir\n" );
 		}
 	}
-	// Generated image cache entries alone do not need a restart: the lock now
-	// refuses the cache, and the caller reloads the images it supplied (see
-	// FS_IsGeneratedImageCachePath and TakePureImageCacheEviction).
+	// Generated image cache entries and expanded loading backgrounds alone do
+	// not need a restart: the lock now refuses both, and the caller evicts the
+	// images they supplied (see FS_IsGeneratedImageCachePath,
+	// FS_IsGeneratedLoadscreenPath and TakePureImageCacheEviction).
 	if ( success && loadedImageCacheFromDir && serverPaks.Num() ) {
 		pureImageCacheEvictionPending = true;
 		if ( fs_debug.GetBool() ) {
-			common->Printf( "SetPureServerChecksums: generated image cache entries were loaded; their images must be reloaded\n" );
+			common->Printf( "SetPureServerChecksums: generated images were loaded from a directory; they must be evicted\n" );
 		}
 	}
 	return ( success ? PURE_OK : PURE_RESTART );
@@ -7081,7 +7097,8 @@ bool idFileSystemLocal::TakePureImageCacheEviction( void ) {
 		return false;
 	}
 	pureImageCacheEvictionPending = false;
-	// No cache entry can be read again until the lock is cleared.
+	// No cache entry or loading background can be read again until the lock
+	// is cleared.
 	loadedImageCacheFromDir = false;
 	return true;
 }
@@ -7463,6 +7480,63 @@ static bool FS_IsGeneratedImageCachePath( const char *path ) {
 
 /*
 ===========
+FS_IsGeneratedLoadscreenPath
+
+An expanded loading background. In a window that is not 4:3 the session
+composes the map's levelshot, and any _left/_right/_top/_bottom art, into one
+image of the window's shape, publishes it under fs_savepath as
+guis/assets/generated/loadscreens/<map>_<w>x<h>.tga and loads it back through
+the search paths (Session_PrepareExpandedLoadingBackground). Like a generated
+image cache entry it is openQ4's own derived data, so it is never read while
+pure: the directory gate refuses it, and the session does not compose one
+while FS_GeneratedDataReadsRefused holds. A read before the pure lock leaves
+the same pending eviction as a cache entry instead of a restart, and the client
+then purges every resident loading background
+(idImageManager::ReloadGeneratedCacheImages). Only the names the session
+writes qualify: a single segment ending in _<width>x<height>.tga.
+===========
+*/
+static bool FS_IsGeneratedLoadscreenPath( const char *path ) {
+	static const char prefix[] = "guis/assets/generated/loadscreens/";
+	static const char extension[] = ".tga";
+	const size_t prefixLength = sizeof( prefix ) - 1;
+	const size_t extensionLength = sizeof( extension ) - 1;
+	if ( path == NULL ) {
+		return false;
+	}
+	const size_t length = strlen( path );
+	if ( length <= prefixLength + extensionLength ||
+		idStr::Icmpn( path, prefix, static_cast<int>( prefixLength ) ) != 0 ||
+		idStr::Icmp( path + length - extensionLength, extension ) != 0 ) {
+		return false;
+	}
+	const char *name = path + prefixLength;
+	const char *cursor = path + length - extensionLength;
+	for ( const char *c = name; c < cursor; c++ ) {
+		if ( *c == '/' || *c == '\\' ) {
+			return false;
+		}
+	}
+	// walk back over <height>, 'x', <width> and '_'; a map name must remain
+	const char *digits = cursor;
+	while ( cursor > name && cursor[ -1 ] >= '0' && cursor[ -1 ] <= '9' ) {
+		cursor--;
+	}
+	if ( cursor == digits || cursor == name || ( cursor[ -1 ] != 'x' && cursor[ -1 ] != 'X' ) ) {
+		return false;
+	}
+	digits = --cursor;
+	while ( cursor > name && cursor[ -1 ] >= '0' && cursor[ -1 ] <= '9' ) {
+		cursor--;
+	}
+	if ( cursor == digits || cursor == name || cursor[ -1 ] != '_' ) {
+		return false;
+	}
+	return cursor - 1 > name;
+}
+
+/*
+===========
 idFileSystemLocal::GetPackStatus
 ===========
 */
@@ -7704,14 +7778,15 @@ idFile *idFileSystemLocal::OpenFileReadSearch( const char *relativePath, int sea
 				common->Printf( "idFileSystem::OpenFileRead: %s (found in '%s/%s')\n", relativePath, dir->path.c_str(), dir->gamedir.c_str() );
 			}
 
-			if ( FS_IsGeneratedImageCachePath( relativePath ) ) {
-				// Regenerable image cache: a pure lock reloads these images
-				// instead of the engine. See FS_IsGeneratedImageCachePath.
+			if ( FS_IsGeneratedImageCachePath( relativePath ) || FS_IsGeneratedLoadscreenPath( relativePath ) ) {
+				// openQ4's own derived images: a pure lock evicts them instead
+				// of restarting the engine. See FS_IsGeneratedImageCachePath
+				// and FS_IsGeneratedLoadscreenPath.
 				if ( !loadedImageCacheFromDir ) {
 					if ( restartChecksums.Num() ) {
 						common->FatalError( "'%s' loaded from directory: Failed to restart with pure mode restrictions for server connect", relativePath );
 					}
-					common->DPrintf( "filesystem: switching to pure mode will reload cached images. '%s' loaded from the generated image cache.\n", relativePath );
+					common->DPrintf( "filesystem: switching to pure mode will evict generated images. '%s' is a generated image.\n", relativePath );
 					loadedImageCacheFromDir = true;
 				}
 			} else if ( !loadedFileFromDir && !FileAllowedFromDir( relativePath ) ) {

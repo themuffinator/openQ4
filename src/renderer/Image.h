@@ -462,8 +462,10 @@ public:
 	// Reloads, from their sources, every image whose resident pixels came from
 	// the generated image cache. The client calls it once a pure lock is in
 	// place, when the filesystem's directory gate already refuses the cache,
-	// so the reload derives each image from the pure paks. False when any such
-	// image still holds cache pixels; the caller must then restart the engine.
+	// so the reload derives each image from the pure paks. Resident expanded
+	// loading backgrounds, which have no pure source, are purged. False when
+	// any such image still holds its pixels; the caller must then restart the
+	// engine.
 	bool				ReloadGeneratedCacheImages();
 	void ClearCheckedImagePolicyChanges(); // Only after an exact checked restart.
 

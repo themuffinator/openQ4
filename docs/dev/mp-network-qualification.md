@@ -592,12 +592,92 @@ with `fs_debug 1` listing every explicit file open.
 
 ### Outside this decision
 
-- A client that loaded a map in a non-4:3 window before connecting restarts on
-  its pure connect. The session publishes an expanded loading background
+- A client that loaded a map in a non-4:3 window before connecting restarted
+  on its pure connect. The session publishes an expanded loading background
   (`guis/assets/generated/loadscreens/<map>_<w>x<h>.tga`) under the save path
-  and loads it back through the search paths, which counts as a directory
+  and loads it back through the search paths, which counted as a directory
   read. That is independent of the level-load caches and of
-  `com_levelLoadModernization`; it is why the 640x360 run restarted.
+  `com_levelLoadModernization`; it is why the 640x360 run restarted. The
+  [next decision](#expanded-loading-backgrounds-on-pure-servers-9-november-2026)
+  resolves it.
+
+## Expanded loading backgrounds on pure servers, 9 November 2026
+
+**Decision: the session's expanded loading backgrounds follow the image cache's
+rule. None is composed or read while pure, and one read before the lock is
+purged at the lock instead of restarting the engine.** In a window that is not
+4:3, the session composes the map's levelshot and any `_left`, `_right`, `_top`
+and `_bottom` tiles into one image of the window's shape. It writes that image
+under the save path as `guis/assets/generated/loadscreens/<map>_<w>x<h>.tga`
+and loads it back through the search paths
+(`Session_PrepareExpandedLoadingBackground`). The image is openQ4's own derived
+data, read from a directory, so it cannot be used while pure. Until now, a
+client that had loaded any map in such a window counted that read as a file
+loaded from a directory, and its first pure connect ran a full `ReloadEngine`.
+
+What changed:
+
+- `FS_IsGeneratedLoadscreenPath` recognises exactly what the session writes: a
+  single file in that folder whose name ends in `_<width>x<height>.tga`. A
+  directory read of such a file sets `loadedImageCacheFromDir`, as an image
+  cache read does, so `SetPureServerChecksums` leaves the eviction pending
+  instead of answering `PURE_RESTART`. Any other loose file, including any other
+  name in that folder, still restarts.
+- `idImageManager::ReloadGeneratedCacheImages`, which the client already runs
+  after such a lock, now also purges every resident image under
+  `guis/assets/generated/loadscreens/`. Nothing is reloaded, because the image
+  has no source in any pak. If one cannot be purged, the client restarts as
+  before. No interface slot changed; render API 33 covers both kinds.
+- While a pure lock or `fs_restrict` holds, the session composes and writes
+  nothing (`FS_GeneratedDataReadsRefused`, the same gate as the level-load
+  caches) and the loading screen shows the stock levelshot, as it did after the
+  old restart. The directory gate would refuse the file anyway, and the
+  session's existing check that the active VFS exposes what it published stays.
+- `pure_expanded_loadscreen_contract.py` compiles the classifier and the
+  renderer's name test against names built from the session's own format
+  string and against near misses, and pins every link from the read to the
+  purge. Its `--mutations` mode breaks each of 14 links and requires the check
+  that owns it to fail. Both CI workflows and `openq4_validate.py` run it.
+
+A pure client therefore sees the 4:3 levelshot, framed, instead of the wide
+background. Its inputs would be acceptable while pure, since the levelshot and
+tiles come from the client-only loadscreen pack, but the save-path round trip
+is not. Showing the wide background on pure servers would need it built in
+memory instead; that is not part of this change.
+
+### Evidence
+
+The [level-load probe](#level-load-caches-on-pure-servers-9-november-2026)
+setup, unchanged except for its window and counters: a `builddir` dedicated server (`si_pure 1`, `net_LANServer 1`,
+`mp/q4dm1`), a `builddir` client with `com_levelLoadModernization 1` in a
+hidden 640x360 window, each with its own save path under
+`.tmp/pure-loadscreen/`, and a base path of hard links to the retail PK4s only.
+The client's first session hosted `mp/q4dm1` locally. Its second hosted it
+again, published and read the 1820x1024 background, then disconnected and
+joined the pure server with `fs_debug 1` listing every open.
+
+| Client, 640x360 | At the lock | Engine reloads | Pure map load | Pure session | Result |
+| --- | --- | --- | --- | --- | --- |
+| OpenGL, before (77c519cdc) | Restart required by `q4dm1_1820x1024.tga` | 1 | 22.6 s, after the reload | 88.0 s | Active player |
+| OpenGL, after | 100 cached images reloaded, 2 loading backgrounds purged | 0 | 16.1 s | 45.8 s | Active player, no warnings |
+| Vulkan, after | Same | 0 | 49.0 s* | 83.4 s* | Active player, no warnings |
+| OpenGL, after, repeat | Same | 0 | 44.7 s* | 94.3 s* | Active player, no warnings |
+
+- Every run read the background from the save path five times before the
+  connect. After the connect, no file under
+  `guis/assets/generated/loadscreens/` was opened or written; the pure map's
+  loading screen used the stock levelshot, logged as
+  `Expanded loading background ... skipped while pure`.
+- Without the restart, the 16:9 pure map load (16.1 s) is in line with the
+  4:3 run's 18.1 s in the level-load evidence above.
+- \* The Vulkan run and the repeat overlapped another session's build and a
+  benchmark on the same machine; every load phase took two to three times
+  longer, image probing included (9.2 s against 3.5 s). They show the
+  behaviour, not timing.
+- Engine screenshots in pure gameplay on OpenGL and Vulkan show the world, the
+  weapon view model and the HUD intact.
+- "Pure session" runs from the client's start to active play and includes the
+  local load before the connect.
 
 ## Still open
 

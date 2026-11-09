@@ -155,6 +155,12 @@ animations under `generated/`. A pure server's clients never read those either.
 Anything a client loaded from them before connecting is loaded again from the
 original game files when the server's map loads.
 
+In a window that is not 4:3, openQ4 widens each map's loading screen to fit and
+saves the result in the save folder (`guis/assets/generated/loadscreens/`). A
+pure server's clients never use that file: their loading screen shows the
+map's standard picture. A client that showed one before connecting drops it on
+connect. Before 9 November that restarted the whole engine instead.
+
 ## Malformed network traffic
 
 The shared bit-message reader records attempts to read beyond the received

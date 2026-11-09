@@ -4187,6 +4187,11 @@ Completion substeps:
   and animations decoded from them before the lock are derived again at the
   next level load
   ([evidence](mp-network-qualification.md#level-load-caches-on-pure-servers-9-november-2026)).
+  So do the session's expanded loading backgrounds for windows that are not
+  4:3: none is composed or read while pure, and one read before the lock is
+  purged at it, so a widescreen client that loaded a map first no longer
+  restarts on its pure connect
+  ([evidence](mp-network-qualification.md#expanded-loading-backgrounds-on-pure-servers-9-november-2026)).
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,

@@ -151,7 +151,8 @@ def check_filesystem(filesystem: str) -> None:
                   "netpath = BuildOSPath( dir->path, dir->gamedir, relativePath );",
                   "the pure gate runs before any directory open")
     # a cache read is classified first; everything else keeps the restart
-    require_order(search, "if ( FS_IsGeneratedImageCachePath( relativePath ) ) {",
+    # (pure_expanded_loadscreen_contract.py owns the loading background half)
+    require_order(search, "if ( FS_IsGeneratedImageCachePath( relativePath ) || FS_IsGeneratedLoadscreenPath( relativePath ) ) {",
                   "} else if ( !loadedFileFromDir && !FileAllowedFromDir( relativePath ) ) {",
                   "generated image cache reads are classified before the restart trigger")
     require(search, "loadedImageCacheFromDir = true;", "a cache read records a pending image reload")
