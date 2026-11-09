@@ -983,7 +983,8 @@ diagnostics establish whole-frame ownership or production performance.
   fallback (no stock material reaches the case).
   The point static/live composition audit found no defect: point lights never
   compose (dynamic casters defeat the cube cache on both backends), projected
-  lights compose static depth with live casters.
+  lights compose static depth with live casters. (Point lights compose on both
+  backends since 9 November 2026, under FPS-03.)
   Image-level receiver check after motion (`--cases receivers`): at every
   tour pose the frame from the motion-warmed cache matches a fresh render on
   both backends (worst 0.002% of bytes), with a shadows-off control proving the
@@ -1650,19 +1651,22 @@ optimization has landed.
   `r_shadowMapPointCacheMegs` that never evicts a cube in use, the nine-tap point filter
   as one pass over its sixteen texels, no shadow filtering for unlit fragments, and a
   quarter-second live-caster window so per-tic entities stop flipping into the static
-  set at high refresh. Done on OpenGL: live casters composed over a copy of the cached
-  static cube (`r_shadowMapPointCompose`), one static entry for both ownerships, and
+  set at high refresh. Also on both: live casters composed over a copy of the cached
+  static cube (`r_shadowMapPointCompose`), which on Vulkan brought the point phase to
+  half to two thirds of its GPU time where lights have live casters (0.06 to 0.15 ms
+  a frame in hub2 and the airdefense1 arena, no measurable CPU change). Done on
+  OpenGL: one static entry for both ownerships, and
   timer queries only while the report is on, which were about half of that scene's
   CPU frame. Hub2 at Quality on OpenGL: 12.0 to 6.6 ms of GPU and 11.8 to 5.2 ms of
   CPU, the premium over stencil point shadows down from 5.7/4.1 ms to 1.1/0.8 ms;
   on Vulkan the mapped frame is within 0.1 ms of GPU of the stencil one in hub2 and
   storage2. These are hidden-window probe figures, not fullscreen budgets. Remaining,
-  in order: point composition on Vulkan (a light with a live or cutout caster still
-  re-renders its cube there), elision for prelit lights together with suppression of
+  in order: elision for prelit lights together with suppression of
   dynamic volumes (`suppressDynamicShadowVolume` tests the instantiated model, which
   is always static, so it never fires), a tile size per projected light (Quality and
   Ultra have four atlas cells), depth-only cubes on OpenGL, faces the view cannot see,
-  and the fullscreen budgets, including whether Enhanced can map point lights.
+  the fullscreen budgets, including whether Enhanced can map point lights, and one
+  static cube for both ownerships of a composed Vulkan light.
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur

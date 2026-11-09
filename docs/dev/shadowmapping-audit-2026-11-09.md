@@ -41,7 +41,7 @@ cache (sixteen at most) against forty cubes in view.
 | Finding | State |
 |---|---|
 | **Point cache far smaller than a view.** In the hub2 sweep 26 of 39 cacheable cube passes missed every frame: 29 cubes (174 faces) re-rendered per frame, 4.9 ms of CPU. OpenGL also evicted the first slot in a chain, one miss evicting an entry a later light of the same view would have hit. | **Fixed, both backends.** 64 slots (96 records), bounded by `r_shadowMapPointCacheMegs` (512 MiB, never fewer than the old twelve). A cube used this frame or the last is not evicted; the light renders to scratch until one leaves the view. OpenGL recycles a light's own stale cube. Archived profiles holding the old 12 move to 64 once. |
-| **Point lights with any moving or alpha-tested caster re-rendered six faces every view** and dropped their cached cube. Alpha-tested casters are always classed live, so a static light touching one grate never cached. | **Fixed on OpenGL.** The cached cube keeps static depth; each view blits it to the scratch cube and draws the live chains over it (`r_shadowMapPointCompose`). LOCAL and GLOBAL ownerships share one static entry when the light has no static local caster. 0.15 ms of GPU per composed pass in hub2. **Open on Vulkan**, which still re-renders such cubes. |
+| **Point lights with any moving or alpha-tested caster re-rendered six faces every view** and dropped their cached cube. Alpha-tested casters are always classed live, so a static light touching one grate never cached. | **Fixed, both backends.** The cached cube keeps static depth; each view copies it to a scratch cube and draws the live chains over the copy (`r_shadowMapPointCompose`). OpenGL blits face by face and shares one static entry between the LOCAL and GLOBAL ownerships when the light has no static local caster; 0.15 ms of GPU per composed pass in hub2. Vulkan copies the six faces in one transfer and keeps a static cube per ownership, because a resident entry is reserved by one pass per view. It does not compose under the opt-in shared interaction stream, which draws every pass's whole caster plan. See "Vulkan point composition" below. |
 | **GL timer queries ran in every shadow phase of every light**, whether or not anything read them. A view with more phases than the 64 query slots polled all 64 unfinished queries for each further phase. | **Fixed.** Queries are issued only while `r_shadowMapReport` or `r_shadowMapDebugOverlay` is on. This alone was about half of the OpenGL CPU frame in hub2. |
 | **The point receiver's per-texel path was the common path.** Each of the nine taps compared four texels against their own point on the receiver plane, with a cube-face selection each: 36 comparisons that read a four-by-four block of texels. | **Fixed, both backends.** The default kernel (nine fixed taps, one texel radius, hardware comparison) is one pass over the sixteen texels with the same weights, or nine plain bilinear lookups where the bias covers the block. Other tap counts, radii and the rotated mode keep the tap-by-tap path. 1.6 to 2.6 ms of GPU in hub2 against the old path, in two launches. |
 | **Receivers filtered shadows for fragments the light does not reach** (outside the falloff, turned away). | **Fixed, both backends**, in the stock-material path. The PBR variants still sample first. |
@@ -96,11 +96,35 @@ work went from 29 updates (174 faces) to none, with five composed passes.
 | Point lights on stencil, storage2 | 5.78 | 3.6 |
 
 On Vulkan the dense pose went from 18 fresh cubes a frame (108 faces) to 3, the
-lights with a live caster.
+lights with a live caster, and with point composition to none.
+
+### Vulkan point composition
+
+Added after the table above was measured. GPU time of the shadow-map phases
+from `r_vkGpuPhaseProfile` over 240 frames a window, composition on against
+`r_shadowMapPointCompose 0` in the same launch, two windows each:
+
+| Scene, preset | Point cubes, ms | All shadow maps, ms | Fresh cubes a frame |
+|---|---|---|---|
+| airdefense1 arena, Quality | 0.13 from 0.28 | 0.40 from 0.55 | 0 from 2 to 5 |
+| airdefense1 arena, Ultra | 0.11 from 0.20 | 1.22 from 1.31 | not counted |
+| hub2, Quality | 0.15 from 0.24 | 0.69 from 0.75 | 0 to 2 from 0 to 7 |
+
+The fresh cubes left in hub2 are lights the sweep brings into view for the
+first time. The point phase costs half to two thirds of what it did where lights
+have live casters, which is 0.06 to 0.15 ms of a 6 to 8 ms GPU frame in these
+scenes. Whole-frame GPU
+means moved by less than their window-to-window spread at Quality (about 0.2 ms)
+and by 0.09 ms at Ultra, and CPU frame time did not change measurably: a
+composed pass trades its static draws for a copy, five layout transitions and
+six more render scopes. The validation layers reported nothing in hub2 or the
+arena with composition on, or with the shared interaction stream on.
 
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
-`caster-cycle-point` and `caster-cycle-cutout` on both backends (caster counts,
-cache reuse, cached against fresh images byte-identical), the in-engine
+`caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
+(caster counts, cache reuse, cached against fresh images byte-identical; run
+again after the Vulkan port, where the point lights now report
+`reuse+compose`), the in-engine
 `rendererShadowProjectedDiagnosticSelfTest` (now with the cache and live-window
 policies) and `performancePresetSelfTest`, and
 `renderer_vulkan_shadow_compatibility.py`, which pins every contract above.
@@ -116,11 +140,10 @@ whether Enhanced can now map point lights on Vulkan.
 
 ## Still open, in order of value
 
-1. Vulkan point composition (the OpenGL change mirrored: a cube copy, a LOAD
-   scope for the live chains, a pass that names both its static source and its
-   composed target).
-2. Front-end elision for prelit lights and suppression of dynamic volumes for
+1. Front-end elision for prelit lights and suppression of dynamic volumes for
    mapped lights, with a rebuild when a light returns to stencil.
-3. A tile size per projected light, so the atlas holds a view at every tier.
-4. Depth-only point cubes on OpenGL while nothing samples the colour cube.
-5. Cube faces the view cannot see; fullscreen budgets for the three tiers.
+2. A tile size per projected light, so the atlas holds a view at every tier.
+3. Depth-only point cubes on OpenGL while nothing samples the colour cube.
+4. Cube faces the view cannot see; fullscreen budgets for the three tiers.
+5. One static cube for both ownerships of a composed Vulkan light, as on
+   OpenGL. It needs a resident entry two passes of a view can share.

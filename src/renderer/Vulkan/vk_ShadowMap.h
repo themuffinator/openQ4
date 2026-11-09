@@ -19,8 +19,9 @@ typedef struct classicInteractionDomainView_s classicInteractionDomainView_t;
 	ownerships of every admitted point light. Exact-signature opaque
 	static-only passes may reuse resident depth: projected entries copy
 	between transfer-only cache images and the current atlas tile, while point
-	entries retain identity-owned cubes. Projected maps compose live moving and
-	cutout casters over static depth; point maps with live casters regenerate.
+	entries retain identity-owned cubes. Both compose live moving and cutout
+	casters over static depth: projected maps over the restored tile, point
+	maps over a scratch copy of the resident cube (r_shadowMapPointCompose).
 	Each prepared light carries
 	the retail LOCAL/GLOBAL receiver ownership split: LOCAL maps contain global
 	casters, while GLOBAL maps contain global + local casters. Include after
@@ -63,15 +64,19 @@ typedef struct vkShadowPassState_s {
 	bool				unionLocalDepth; // fresh PCSS GLOBAL stores only local casters
 	bool				cacheHit;		// exact resident entry supplies this pass
 	bool				cacheUpdate;	// fresh render will publish this entry
-	bool				composeDynamic;	// projected only: the cached tile holds STATIC
-									// depth, and this view's dynamic casters are drawn
-									// over it after publication/restore (the GL
-									// SHADOWMAP_RENDER_COMPOSE_DYNAMIC contract)
+	bool				composeDynamic;	// the cached entry holds STATIC depth, and this
+									// view's dynamic casters are drawn over it after
+									// publication/restore (the GL
+									// SHADOWMAP_RENDER_COMPOSE_DYNAMIC contract): over
+									// the atlas tile for a projected light, over a
+									// scratch copy of the resident cube for a point one
 	int					cacheEntry;	// class-specific resident slot, -1 when uncached
 	int					cacheSignature;
 	int					tileX;			// atlas block origin, image (top-left) coordinates
 	int					tileY;
-	int					cubeIndex;		// point cube pool slot (pointLight only)
+	int					cubeIndex;		// point cube pool slot (pointLight only): an
+									// uncached map, or the composed copy receivers
+									// sample while cacheEntry stays its static source
 	VkDescriptorSet		pointSet;		// cube set-7 descriptor set for the active frame slot (pointLight only)
 	float				atlasRects[ SHADOWMAP_PROJECTED_MAX_CASCADES ][ 4 ];
 										// composed per-cascade UV rects; v spans inverted

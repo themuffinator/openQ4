@@ -15,10 +15,10 @@ See [player release status](../user/release-status.md).
   campaign (Nexus Hub 2, Quality preset, OpenGL) the frame's graphics-card
   time fell from 12.0 to 6.6 ms and its processor time from 11.8 to 5.2 ms.
 - **A character walking under a light no longer makes that light redraw its
-  whole shadow map** on OpenGL: only the character is drawn over the stored
-  map. Grates and fences no longer keep a light from storing its map either.
-  Vulkan gains the larger store and the cheaper filter; the redraw for moving
-  casters remains there.
+  whole shadow map**, on OpenGL and Vulkan: only the character is drawn over
+  the stored map. Grates and fences no longer keep a light from storing its
+  map either. On Vulkan this is a small gain, about a tenth of a millisecond
+  of graphics-card time in a busy fight.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.
