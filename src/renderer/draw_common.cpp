@@ -3486,7 +3486,10 @@ static int RB_CompareMovingEntityHistory( const void *a, const void *b ) {
 // view weapon included), one entry per entity, sorted for the lookups above.
 static void RB_CollectMovingEntityHistory( drawSurf_t **drawSurfs, int numDrawSurfs,
 		idList<rbMotionBlurEntityHistory_t> &history ) {
-	history.Clear();
+	// openQ4: empty the list but keep its storage. Clear() freed it, so each
+	// frame regrew the list 16 entries at a time from nothing, and the Clear()
+	// after each Swap below then freed the previous frame's buffer as well.
+	history.SetNum( 0, false );
 	for ( int i = 0; i < numDrawSurfs; i++ ) {
 		const drawSurf_t *surf = drawSurfs[i];
 		if ( surf == NULL || surf->space == NULL || surf->space->entityDef == NULL
@@ -3515,7 +3518,7 @@ static void RB_CollectMovingEntityHistory( drawSurf_t **drawSurfs, int numDrawSu
 static void RB_UpdateMotionBlurEntityHistory( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	RB_CollectMovingEntityHistory( drawSurfs, numDrawSurfs, rbMotionBlurNextEntityHistory );
 	rbMotionBlurEntityHistory.Swap( rbMotionBlurNextEntityHistory );
-	rbMotionBlurNextEntityHistory.Clear();
+	rbMotionBlurNextEntityHistory.SetNum( 0, false );
 }
 
 static bool RB_EnsureMotionVectorRenderTexture( int viewportWidth, int viewportHeight ) {
@@ -5995,10 +5998,10 @@ static void RB_UpdateTemporalEntityHistory( const viewDef_t *viewDef,
 		RB_CollectMovingEntityHistory( viewDef->drawSurfs, viewDef->numDrawSurfs,
 			rbTemporalNextEntityHistory );
 	} else {
-		rbTemporalNextEntityHistory.Clear();
+		rbTemporalNextEntityHistory.SetNum( 0, false );
 	}
 	rbTemporalEntityHistory.Swap( rbTemporalNextEntityHistory );
-	rbTemporalNextEntityHistory.Clear();
+	rbTemporalNextEntityHistory.SetNum( 0, false );
 	rbTemporalEntityHistoryGeneration = generation;
 	rbTemporalEntityHistoryViewIdentity = viewDef != NULL
 		? viewDef->temporalViewIdentity : 0;

@@ -864,13 +864,16 @@ struct idUserInterfaceRetained::Impl {
 		if (!settingsFields) return SyncNumberDrafts();
 		StateValues current;
 		if (!UI_SettingsRead(settingsOwner,current)) return false;
-		StateValues updates, published; const auto live = RuntimeView()->GetState(false);
+		// One lookup per key. This runs on every Prepare - each redraw, event and
+		// value query - and copying the document's whole state to compare these
+		// few keys cost a map of every variable it declares each time.
+		StateValues updates, published;
 		for (const auto& [key,declaration] : document.Model().state) if (key.starts_with("settings.")) {
 			const auto source = current.find(key);
 			const auto& value = source == current.end() ? declaration.initial : source->second;
 			published.emplace(key,value);
-			const auto before = live.find(key);
-			if (before == live.end() || before->second != value) updates.emplace(key,value);
+			StateValue before;
+			if (declaration.HostSourced() || !RuntimeView()->GetStateValue(key,before) || before != value) updates.emplace(key,value);
 		}
 		std::string error;
 		if (!updates.empty() && !RuntimeView()->SetState(updates,error,RetainedUI_PresentationTime())) { Error(error); return false; }
@@ -896,8 +899,11 @@ struct idUserInterfaceRetained::Impl {
 		if (declarations.contains(NumberDraftPending)) values.emplace(NumberDraftPending,!summary.blocking.empty());
 		if (declarations.contains(NumberDraftMessage)) values.emplace(NumberDraftMessage,
 			std::string(summary.blocking.empty() ? "" : "#str_230006"));
-		const auto live = RuntimeView()->GetState(false); StateValues changes;
-		for (const auto& [key,value] : values) if (!live.contains(key) || live.at(key) != value) changes.emplace(key,value);
+		StateValues changes;
+		for (const auto& [key,value] : values) {
+			StateValue live;
+			if (declarations.at(key).HostSourced() || !RuntimeView()->GetStateValue(key,live) || live != value) changes.emplace(key,value);
+		}
 		std::string error;
 		if (!changes.empty() && !RuntimeView()->SetState(changes,error,RetainedUI_PresentationTime())) { Error(error); return false; }
 		for (const auto& [key,value] : values) {

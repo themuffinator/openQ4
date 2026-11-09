@@ -653,7 +653,8 @@ void idProjectile::Think( void ) {
 		// Smoke does not survive underwater. Swap the fly trail for a bubble trail while the
 		// projectile is inside a liquid, and put the original back when it comes out.
 		{
-			const int trailLiquid = gameLocal.LiquidContentsAtPoint( GetPhysics()->GetOrigin(), this );
+			// the crossing test above already asked about this origin
+			const int trailLiquid = currentLiquid;
 			const bool wantLiquidTrail = ( trailLiquid != 0 );
 
 			if ( wantLiquidTrail != flyEffectIsLiquid ) {

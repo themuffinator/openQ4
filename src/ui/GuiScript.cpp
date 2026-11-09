@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
+#include <unordered_set>
+
 #include "Window.h"
 #include "Winvar.h"
 #include "GuiScript.h"
@@ -37,16 +39,24 @@ If you have questions concerning this license or the applicable additional terms
 idCVar gui_debugScript( "gui_debugScript", "0", CVAR_GUI | CVAR_INTEGER, "log gui script execution details (0=off, 1=key events, 2=verbose, 3=sets/transitions/cmds, 4=state changes, 5=redraw trace)" );
 
 namespace {
-	idList<const idGuiScriptList*> g_guiScriptLists;
+	// openQ4: every live script list, for IsValid. This was an idList searched
+	// from the front: Execute asks before every statement it runs, so each
+	// statement cost a walk over every script list of every loaded GUI, and
+	// each list's destruction another to remove itself. Never destroyed, so
+	// lists torn down at exit still find it.
+	std::unordered_set<const idGuiScriptList*> &GuiScriptLists( void ) {
+		static std::unordered_set<const idGuiScriptList*> *lists = new std::unordered_set<const idGuiScriptList*>;
+		return *lists;
+	}
 }
 
 idGuiScriptList::idGuiScriptList() {
 	list.SetGranularity( 4 );
-	g_guiScriptLists.Append( this );
+	GuiScriptLists().insert( this );
 }
 
 idGuiScriptList::~idGuiScriptList() {
-	g_guiScriptLists.Remove( this );
+	GuiScriptLists().erase( this );
 	list.DeleteContents( true );
 }
 
@@ -54,7 +64,7 @@ bool idGuiScriptList::IsValid( const idGuiScriptList *list ) {
 	if ( list == NULL ) {
 		return false;
 	}
-	return g_guiScriptLists.FindIndex( list ) != -1;
+	return GuiScriptLists().count( list ) != 0;
 }
 
 

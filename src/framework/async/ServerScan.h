@@ -256,8 +256,8 @@ private:
 	void				LocalClear( );		// we need to clear some internal data as well
 
 	void				EmitGetInfo( netadr_t &serv );
-	void				GUIAdd( int id, const networkServer_t server );
-	bool				IsFiltered( const networkServer_t server );
+	void				GUIAdd( int id, const networkServer_t &server );
+	bool				IsFiltered( const networkServer_t &server );
 	void				UpdateBrowserStatus();
 	void				UpdateLoadProgress();
 	void				SetLoadProgress( const char *notice, float pct );

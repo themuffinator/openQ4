@@ -44,6 +44,10 @@ void SCR_DrawTextRightAlign( float &y, const char *text, ... ) id_attribute((for
 #define CON_LINE_STRIDE			256
 #define	CON_MAX_TOTAL_LINES		(CON_TEXTSIZE / CON_LINE_STRIDE)
 #define CON_HISTORY_MAX_CHARS	(CON_TEXTSIZE * 8)
+// openQ4: the history is trimmed back to CON_HISTORY_MAX_CHARS once it has run
+// this far past it, and its buffer is reserved to hold that plus one long line
+#define CON_HISTORY_TRIM_SLACK	(CON_HISTORY_MAX_CHARS / 8)
+#define CON_HISTORY_RESERVE		(CON_HISTORY_MAX_CHARS + CON_HISTORY_TRIM_SLACK + 4096)
 #define CONSOLE_FIRSTREPEAT		200
 #define CONSOLE_REPEAT			100
 #define CON_SCROLLBAR_BASE_WIDTH		2.0f
@@ -4608,9 +4612,19 @@ void idConsoleLocal::Print( const char *txt ) {
 	}
 
 	UpdateLayoutMetrics();
+	// openQ4: idStr grows 32 bytes at a time and copies itself whenever it does,
+	// so nearly every line printed used to copy the whole history - 1.5 MB once
+	// it was full, and three times that for the trim below, which also ran on
+	// every line. Reserve the buffer once and trim in place a slack's worth at a
+	// time; the replay only ever needs the tail, so what it rebuilds is the same.
+	if ( printHistory.Allocated() < CON_HISTORY_RESERVE ) {
+		printHistory.ReAllocate( CON_HISTORY_RESERVE, true );
+	}
 	printHistory.Append( txt );
-	if ( printHistory.Length() > CON_HISTORY_MAX_CHARS ) {
-		printHistory = printHistory.Right( CON_HISTORY_MAX_CHARS );
+	if ( printHistory.Length() > CON_HISTORY_MAX_CHARS + CON_HISTORY_TRIM_SLACK ) {
+		const int drop = printHistory.Length() - CON_HISTORY_MAX_CHARS;
+		memmove( &printHistory[0], &printHistory[drop], CON_HISTORY_MAX_CHARS + 1 );
+		printHistory.CapLength( CON_HISTORY_MAX_CHARS );
 	}
 
 	PrintToBuffer( txt, true );

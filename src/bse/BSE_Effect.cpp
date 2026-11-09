@@ -19,20 +19,6 @@
 #include "../sound/sound.h"
 //#include "../renderer/RenderCommon.h"
 
-static ID_INLINE void BSE_BoundTriSurf(srfTriangles_t* tri) {
-	if (!tri) {
-		return;
-	}
-	if (tri->numVerts <= 0 || !tri->verts) {
-		tri->bounds.Clear();
-		return;
-	}
-	tri->bounds.Clear();
-	for (int i = 0; i < tri->numVerts; ++i) {
-		tri->bounds.AddPoint(tri->verts[i].xyz);
-	}
-}
-
 void rvBSE::Init(const rvDeclEffect* declEffect, renderEffect_s* parms, float time)
 {
 	int v6; // esi
@@ -535,7 +521,10 @@ idRenderModel* rvBSE::Render(idRenderModel* model, const struct renderEffect_s* 
 			continue;
 		}
 
-		BSE_BoundTriSurf(tri);
+		// rvSegment::Render and RenderMotion bound a surface as the last thing
+		// they do to it, and ClearSurface left every other one empty (skipped
+		// above), so tri->bounds is current; walking the vertices again here
+		// bounded every particle surface twice per view.
 		if (!hasBounds) {
 			modelBounds = tri->bounds;
 			hasBounds = true;
