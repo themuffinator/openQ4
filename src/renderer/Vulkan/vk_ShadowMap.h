@@ -49,7 +49,10 @@ typedef enum vkShadowReceiverPass_e {
 static const int VK_SHADOW_MAX_LIGHTS = 256;
 static const int VK_SHADOW_MAX_POINT_CUBES =
 	VK_SHADOW_MAX_LIGHTS * VK_SHADOW_RECEIVER_PASS_COUNT;
-static const int VK_SHADOW_MAX_CACHE_SLOTS = 16;
+// Resident cache records of either class. Point cubes set the bound (a dense
+// stock view lights forty point lights, and one without a slot re-renders six
+// faces every view); the projected cvar still stops at sixteen.
+static const int VK_SHADOW_MAX_CACHE_SLOTS = SHADOWMAP_POINT_CACHE_MAX_SLOTS;
 
 // Per-receiver-pass resource state. resourcePass identifies the pass that
 // owns/rendered the contents; when no local casters exist the LOCAL and

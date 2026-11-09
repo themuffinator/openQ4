@@ -254,6 +254,121 @@ shadowMapPointReceiverSettings_t R_ShadowMapPointStorageAdjustedReceiverSettings
 		r_shadowMapPointMaxWorldBias.GetFloat() );
 }
 
+int R_ShadowMapDynamicCasterFramesFor( float frameMsec ) {
+	if ( !std::isfinite( static_cast<double>( frameMsec ) ) || frameMsec <= 0.0f ) {
+		return SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES;
+	}
+	const double frames = std::ceil(
+		static_cast<double>( SHADOWMAP_DYNAMIC_CASTER_WINDOW_MSEC ) / frameMsec );
+	if ( frames >= static_cast<double>( SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES ) ) {
+		return SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES;
+	}
+	return Max( SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES, static_cast<int>( frames ) );
+}
+
+// Written once per frame before the front end runs; front-end jobs only read.
+static int shadowMapDynamicCasterFrames = SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES;
+static int shadowMapLastFrameMsec = 0;
+static float shadowMapSmoothedFrameMsec = 0.0f;
+
+void R_ShadowMapBeginFrame( int nowMsec ) {
+	const int elapsed = nowMsec - shadowMapLastFrameMsec;
+	shadowMapLastFrameMsec = nowMsec;
+	if ( elapsed <= 0 || elapsed > 1000 ) {
+		// first frame, a clock that did not advance, or a load: keep the estimate
+		if ( shadowMapSmoothedFrameMsec <= 0.0f ) {
+			shadowMapDynamicCasterFrames = SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES;
+		}
+		return;
+	}
+	// A fast frame shortens the interval at once and a slow one lengthens it
+	// gradually, so a hitch cannot close the window on a moving caster.
+	const float sample = static_cast<float>( elapsed );
+	if ( shadowMapSmoothedFrameMsec <= 0.0f || sample < shadowMapSmoothedFrameMsec ) {
+		shadowMapSmoothedFrameMsec = sample;
+	} else {
+		shadowMapSmoothedFrameMsec += ( sample - shadowMapSmoothedFrameMsec ) * 0.05f;
+	}
+	shadowMapDynamicCasterFrames =
+		R_ShadowMapDynamicCasterFramesFor( shadowMapSmoothedFrameMsec );
+}
+
+int R_ShadowMapDynamicCasterFrames( void ) {
+	return shadowMapDynamicCasterFrames;
+}
+
+int R_ShadowMapPointCacheSlotLimitFor( int requestedSlots, int budgetMegs,
+		int faceSize, int bytesPerTexel, int maxSlots ) {
+	const int slotCeiling = idMath::ClampInt( 0,
+		SHADOWMAP_POINT_CACHE_MAX_SLOTS, maxSlots );
+	const int requested = idMath::ClampInt( 0, slotCeiling, requestedSlots );
+	if ( requested <= SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS ) {
+		return requested;
+	}
+	// 64-bit: six 2048 faces of eight bytes are 201 MiB each.
+	const double entryBytes = 6.0
+		* static_cast<double>( Max( 1, faceSize ) )
+		* static_cast<double>( Max( 1, faceSize ) )
+		* static_cast<double>( Max( 1, bytesPerTexel ) );
+	const double budgetBytes = static_cast<double>( Max( 0, budgetMegs ) )
+		* 1048576.0;
+	const double affordable = std::floor( budgetBytes / entryBytes );
+	const int budgetSlots = affordable >= static_cast<double>( slotCeiling )
+		? slotCeiling : static_cast<int>( affordable );
+	return Min( requested,
+		Max( SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS, budgetSlots ) );
+}
+
+int R_ShadowMapPointCacheSlotLimit( int faceSize, int bytesPerTexel,
+		int maxSlots ) {
+	return R_ShadowMapPointCacheSlotLimitFor(
+		r_shadowMapPointCacheSize.GetInteger(),
+		r_shadowMapPointCacheMegs.GetInteger(),
+		faceSize, bytesPerTexel, maxSlots );
+}
+
+// Pins the two pure policies above: the point cache holds a dense view's
+// lights at the shipped cube size inside its memory bound, never fewer than
+// the twelve slots it always had, and the live-caster window spans a game tic
+// at every display rate.
+bool R_ShadowMapCachePolicySelfTest( void ) {
+	const int maxSlots = SHADOWMAP_POINT_CACHE_MAX_SLOTS;
+	// 512 cubes of colour and depth are 12 MiB each: 42 fit in 512 MiB
+	if ( R_ShadowMapPointCacheSlotLimitFor( 64, 512, 512, 8, maxSlots ) != 42 ) {
+		return false;
+	}
+	// depth-only 512 cubes are 6 MiB: the requested 64 fit
+	if ( R_ShadowMapPointCacheSlotLimitFor( 64, 512, 512, 4, maxSlots ) != 64 ) {
+		return false;
+	}
+	// 2048 cubes are 192 MiB each, yet the first twelve slots stay available
+	if ( R_ShadowMapPointCacheSlotLimitFor( 64, 512, 2048, 8, maxSlots ) != 12 ) {
+		return false;
+	}
+	// an explicit small count is honoured, the record bound is never exceeded
+	if ( R_ShadowMapPointCacheSlotLimitFor( 4, 512, 512, 8, maxSlots ) != 4
+			|| R_ShadowMapPointCacheSlotLimitFor( 0, 512, 512, 8, maxSlots ) != 0
+			|| R_ShadowMapPointCacheSlotLimitFor( 4096, 1 << 20, 128, 4, maxSlots ) != maxSlots
+			|| R_ShadowMapPointCacheSlotLimitFor( 64, 512, 512, 8, 16 ) != 16 ) {
+		return false;
+	}
+	// 60 Hz tics are 16.7 ms apart: the window must exceed one tic's worth of
+	// frames at 60, 144, 240 and 1000 frames a second, with room to spare
+	const float frameMsec[] = { 16.667f, 6.944f, 4.167f, 1.0f };
+	for ( int i = 0; i < 4; ++i ) {
+		const int frames = R_ShadowMapDynamicCasterFramesFor( frameMsec[i] );
+		const float ticFrames = 16.667f / frameMsec[i];
+		if ( frames < SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES
+				|| frames > SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES
+				|| static_cast<float>( frames ) < ticFrames * 4.0f ) {
+			return false;
+		}
+	}
+	// a stalled or broken clock holds casters live rather than freezing them
+	return R_ShadowMapDynamicCasterFramesFor( 0.0f ) == SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES
+		&& R_ShadowMapDynamicCasterFramesFor( 1000.0f ) == SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES;
+}
+
 bool R_ShadowMapCasterTransformNeedsTwoSided( const float modelMatrix[ 16 ] ) {
 	if ( modelMatrix == NULL ) {
 		return true;

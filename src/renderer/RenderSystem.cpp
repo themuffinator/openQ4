@@ -37,6 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "RendererResourceSettings.h"
 #include "RendererUpload.h"
 #include "ScenePackets.h"
+#include "ShadowMapClassification.h"
 #include "TemporalPresentation.h"
 #include "SavePreviewCapture.h"
 #include "DisplayPresentation.h"
@@ -1638,6 +1639,9 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 
 	// set the time for shader effects in 2D rendering
 	SetFrameShaderTime( eventLoop->Milliseconds() );
+	// the wall clock, not the event clock: the shadow-map static/live caster
+	// split follows rendered frames even while the game is paused or scaled
+	R_ShadowMapBeginFrame( Sys_Milliseconds() );
 
 	//
 	// draw buffer stuff

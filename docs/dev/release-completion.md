@@ -6,6 +6,39 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Shadow maps cost far less, and match the original shadows in more places, 9 November 2026
+
+- **Busy rooms run faster with shadow maps on.** In Quake 4 nineteen in twenty
+  shadow-casting lights are point lights, and a busy room shows forty at once;
+  the game kept the shadow maps of only twelve and redrew the rest every
+  frame. It now keeps a whole view's worth. In the densest room of the
+  campaign (Nexus Hub 2, Quality preset, OpenGL) the frame's graphics-card
+  time fell from 12.0 to 6.6 ms and its processor time from 11.8 to 5.2 ms.
+- **A character walking under a light no longer makes that light redraw its
+  whole shadow map** on OpenGL: only the character is drawn over the stored
+  map. Grates and fences no longer keep a light from storing its map either.
+  Vulkan gains the larger store and the cheaper filter; the redraw for moving
+  casters remains there.
+- **Lights that only cast the map's built-in shadows cast them again.** With
+  shadow maps on, these lights (common in the multiplayer maps) had no shadow
+  at all and shone through walls.
+- **Pillars and containers shadow characters again.** Some static scenery
+  stopped shadowing characters and other scenery of its kind under most lights
+  when shadow maps were on.
+- **Enhanced preset: gibs and burning corpses no longer cast hard shadows**
+  from the point lights that preset leaves on the original shadows, as in the
+  original game. On Quality and above they still cast.
+- **Enhanced preset: shadow edges are no longer nudged to one side** by the
+  five-sample filter.
+- **Upgrade note.** A profile that still holds the old 12-slot setting
+  (`r_shadowMapPointCacheSize`) moves to 64 once; any other value is kept. The
+  store is limited to 512 MiB of video memory (`r_shadowMapPointCacheMegs`).
+  No preset changed.
+- Evidence and what remains open: the
+  [9 November shadow audit](shadowmapping-audit-2026-11-09.md). The figures
+  are hidden-window probe timings on the reference laptop, not the fullscreen
+  preset budgets, which were not re-measured.
+
 ## Accented chat no longer freezes the HUD, plus server hardening and less wasted work from a second audit round, 9 November 2026
 
 - **Accented letters no longer freeze the Remastered HUD.** Typing a letter

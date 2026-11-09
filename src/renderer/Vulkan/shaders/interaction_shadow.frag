@@ -209,6 +209,10 @@ vec4 AtlasRectByIndex(int cascadeIndex) {
     return shadow.atlasRects[3];
 }
 
+// Two of the four ring taps of the five-tap kernel; the others mirror them.
+const vec2 kShadowFiveTapRingA = vec2(0.670820, 0.223607);
+const vec2 kShadowFiveTapRingB = vec2(-0.223607, 0.670820);
+
 float StableShadowHash(vec3 value) {
     return fract(sin(dot(value, vec3(12.9898, 78.233, 37.719)))
         * 43758.5453);
@@ -457,10 +461,19 @@ float SampleShadowCascade(vec4 shadowCoord, vec4 atlasRect,
     if (shadow.filterParams.y <= 1.0) {
         return result;
     }
+    // The first four taps of the nine- and thirteen-tap sets all lie to one
+    // side of the centre. Alone they pull the shadow 0.4 radius sideways and
+    // soften one side of its edge only, so the five-tap kernel uses a ring.
     vec2 o1 = rotation * vec2(-0.326212, -0.405805);
     vec2 o2 = rotation * vec2(-0.840144, -0.073580);
     vec2 o3 = rotation * vec2(-0.695914, 0.457137);
     vec2 o4 = rotation * vec2(-0.203345, 0.620716);
+    if (shadow.filterParams.y <= 5.0) {
+        o1 = rotation * kShadowFiveTapRingA;
+        o2 = rotation * kShadowFiveTapRingB;
+        o3 = -o1;
+        o4 = -o2;
+    }
     result += SampleShadowCompare(clamp(uv + o1 * tap,
         clampMin, clampMax), depth, cascadeIndex,
         length(o1) * tapBias);
@@ -937,12 +950,20 @@ void main() {
     vec3 light = vec3(ndotl);
     light *= textureProj(lightFalloffMap, vLightFalloffTexCoord).rgb;
     light *= textureProj(lightProjectionMap, vLightProjectionTexCoord).rgb;
-    light *= SampleShadowFactor();
+    // A fragment the light does not reach (outside the projected image, past
+    // the falloff, turned away) has no shadow to resolve, and the filter is
+    // most of this shader's cost. The debug views still show every fragment.
+    bool lit = max(light.r, max(light.g, light.b)) > 0.0 || ShadowVisualDebugMode();
+    if (lit) {
+        light *= SampleShadowFactor();
+    }
     if (ShadowVisualDebugMode()) {
         outColor = ShadowDebugOutput();
         return;
     }
-    light *= SampleTranslucentShadow();
+    if (lit) {
+        light *= SampleTranslucentShadow();
+    }
 
     vec3 diffuse = texture(diffuseMap, diffuseTexCoord).rgb * inter.diffuseColor.rgb;
     diffuse = ApplyFlatDiffuseSweep(diffuse, vLightFalloffTexCoord.z);

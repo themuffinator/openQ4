@@ -1660,13 +1660,20 @@ static bool VK_ShadowMap_StaticCacheable(
 }
 
 static int VK_ShadowMap_ProjectedCacheSlotLimit( void ) {
-	return idMath::ClampInt( 0, VK_SHADOW_MAX_CACHE_SLOTS,
+	// the record array is sized for point cubes; projected tiles keep their
+	// own sixteen-slot ceiling
+	return idMath::ClampInt( 0, Min( 16, VK_SHADOW_MAX_CACHE_SLOTS ),
 			r_shadowMapProjectedCacheSize.GetInteger() );
 }
 
+static double VK_ShadowMap_DepthBytesPerPixel( void );
+
+// r_shadowMapPointCacheSize within r_shadowMapPointCacheMegs, by the shared
+// policy the OpenGL backend sizes its cube cache with.
 static int VK_ShadowMap_PointCacheSlotLimit( void ) {
-	return idMath::ClampInt( 0, VK_SHADOW_MAX_CACHE_SLOTS,
-			r_shadowMapPointCacheSize.GetInteger() );
+	return R_ShadowMapPointCacheSlotLimit( VK_ShadowMap_PointSizeValue(),
+			static_cast<int>( VK_ShadowMap_DepthBytesPerPixel() ),
+			VK_SHADOW_MAX_CACHE_SLOTS );
 }
 
 static void VK_ShadowMap_BeginCacheView( const viewDef_t *viewDef ) {
@@ -1893,6 +1900,13 @@ static int VK_ShadowMap_AllocPointCacheEntry( void ) {
 		if ( !entry.valid ) {
 			selected = i;
 			break;
+		}
+		// A cube sampled this frame or the last belongs to a light that is
+		// still on screen. Lookups and allocations interleave per light, so
+		// evicting it makes that light miss later in this same view and evict
+		// the next one in turn. Leave it; the caller takes a scratch cube.
+		if ( entry.lastUsedFrame >= backEnd.frameCount - 1 ) {
+			continue;
 		}
 		if ( selected < 0 || entry.lastUsedFrame
 				< vkShadow.pointCache[ selected ].lastUsedFrame ) {

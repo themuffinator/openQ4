@@ -523,9 +523,13 @@ bool G_DynamicLightShadowsEnabled( void ) {
 // Gibs, dissolving/sinking corpses, and fading client moveables forced
 // noShadow in the stencil era: per-chunk volumes were expensive and could
 // not follow alpha-tested dissolves. The shadow-map caster path handles
-// both, so they keep casting while it is active.
+// both, so they keep casting while it is active for every light class. With
+// point lights left on stencil (r_shadowMapPointLights 0, the Enhanced
+// preset) nineteen lights in twenty would draw exactly the volumes retail
+// suppressed, so those entities stay shadowless there as in retail.
 bool G_ShadowMapCorpseShadowsEnabled( void ) {
-	return cvarSystem->GetCVarBool( "r_useShadowMap" );
+	return cvarSystem->GetCVarBool( "r_useShadowMap" )
+		&& cvarSystem->GetCVarBool( "r_shadowMapPointLights" );
 }
 
 idCVar g_skipPlayerShadowsMP(		"g_skipPlayerShadowsMP",	"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "disables all player shadows in multiplayer" );

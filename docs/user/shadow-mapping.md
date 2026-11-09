@@ -177,17 +177,21 @@ vid_restart
 
 ## Residency and Update Budgeting
 
-openQ4 can keep opaque static depth resident and reuse it across backend views. Regular projected lights can compose moving and cutout casters over that depth each frame. Point lights still require an entirely static, opaque caster set for reuse. Translucent caster passes continue to update normally, and view-fitted CSM/global cache reuse requires an explicit opt-in.
+openQ4 keeps opaque static depth resident and reuses it across backend views. Moving and cutout casters are composed over that depth each frame: projected lights on both renderers, and point lights on OpenGL, where a walking character or an alpha-tested grate costs one copy of the cached cube plus its own draws. On Vulkan a point light with a moving or cutout caster still re-renders its cube. Translucent caster passes continue to update normally, and view-fitted CSM/global cache reuse requires an explicit opt-in.
+
+Point lights are nineteen in twenty of Quake 4's shadow-casting lights, and a dense view shows forty at once, so the point cube cache is sized for a whole view within a memory bound. A light with no slot is still shadowed: it renders into a scratch cube every view.
 
 OpenGL preserves the world's cache while drawing 2D HUD, console, and post-processing views. Changing the actual render world or map still invalidates its resident maps.
 
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
-| `r_shadowMapStaticCache` | `1` | `0..1` | Reuses opaque static depth for projected lights, and complete static-only maps for point lights. |
-| `r_shadowMapStaticHysteresisFrames` | `2` | `0..120` | Frames to wait after dynamic casters disappear before a point light becomes cacheable again. Projected lights stay cached while dynamic casters move: their static tiles persist in the atlas and the moving casters are composed on top each frame. |
+| `r_shadowMapStaticCache` | `1` | `0..1` | Reuses opaque static depth for projected and point lights. |
+| `r_shadowMapStaticHysteresisFrames` | `2` | `0..120` | Frames to wait after dynamic casters disappear before a point light that cannot compose (Vulkan, or `r_shadowMapPointCompose 0`) becomes cacheable again. Composed lights stay cached while dynamic casters move: their static depth persists and the moving casters are drawn on top each frame. |
 | `r_shadowMapResidentFrames` | `120` | `1..3600` | Frames an unused static shadow map can stay resident before its slot may be expired. |
 | `r_shadowMapProjectedCacheSize` | `8` | `0..16` | Static projected-light cache slots inside the shared atlas. |
-| `r_shadowMapPointCacheSize` | `12` | `0..16` | Static point-light cubemap cache slots. |
+| `r_shadowMapPointCacheSize` | `64` | `0..96` | Static point-light cubemap cache slots. Profiles still holding the old `12` move to `64` once on upgrade; any other count is kept. |
+| `r_shadowMapPointCacheMegs` | `512` | `64..8192` | Video memory the point cube cache may fill, in MiB. Slots beyond it stay unused, except that the first twelve are always available. At the default 512 cube size this allows 42 cubes on OpenGL and all 64 on Vulkan; the `SM cache:` report line shows the count in use. |
+| `r_shadowMapPointCompose` | `1` | `0..1` | OpenGL: draws a point light's moving and cutout casters over a copy of its cached static cube instead of re-rendering all six faces. `0` restores the full re-render for comparison. Not archived. |
 | `r_shadowMapCacheCSM` | `0` | `0..1` | Allows static-cache reuse for CSM/global shadow-map passes when their fitted projection is unchanged. Both backends refresh the map when camera movement or coverage settings change the fit. Most useful for fixed-view or otherwise stable scenes. |
 | `r_shadowMapSubviewPolicy` | `1` | `0..2` | Shadow maps in mirror/remote-camera subviews: `0` renders them like main views, `1` reuses cached maps or falls back to stencil, `2` prefers stencil in subviews. When the target has no usable stencil attachment or an ownership contains map-only casters, Vulkan still renders the required fresh map rather than dropping its shadow. |
 | `r_shadowMapTranslucentReceivers` | `1` | `0..1` | Lets translucent surfaces sample the shadow map like opaque receivers, matching the stencil path's `r_stencilTranslucentShadows` behavior. |
@@ -206,7 +210,7 @@ Normal cache hits preserve the exact floating-point projection and caster transf
 
 ### Doors and other movers
 
-A resting door may enter static depth. When it moves, its old static membership must invalidate that depth before its current pose is composed into a projected map. Adding the moving leaf over an old closed-door map would leave a ghost blocker. Point maps with moving casters regenerate. Changed portal connectivity also changes the participating caster and receiver sets; returning after a door moved elsewhere must validate them again.
+A resting door may enter static depth. When it moves, its old static membership must invalidate that depth before its current pose is composed into a projected map. Adding the moving leaf over an old closed-door map would leave a ghost blocker. Point lights follow the same rule where they compose; elsewhere a point map with moving casters regenerates. Changed portal connectivity also changes the participating caster and receiver sets; returning after a door moved elsewhere must validate them again.
 
 Freezing single-player simulation with `g_stopTime 1` also holds the door's rendered pose and material clock. This allows consistent comparisons of cached and freshly rendered shadows at the same point in its travel.
 
@@ -339,7 +343,7 @@ Practical advice:
 | `r_shadowMapReport` | `0` | Shadow-map diagnostics: `0` off, `1` summary, `2` per-light decisions, `3` verbose receiver-submit decisions. |
 | `r_shadowMapReportInterval` | `30` | Frames between report prints when `r_shadowMapReport` is enabled. |
 | `r_shadowMapMaxUpdatesPerView` | `0` | Optional per-view update budget; `0` means unlimited. Both renderers require exact cache hits. Budget misses use stencil only when it is complete, and may exceed the limit for map-only casters. Two-pass lights can fill their cache over successive views. |
-| `r_shadowMapGpuTimerQueries` | `1` | Uses non-blocking GL timer queries for shadow-map GPU timing when the driver supports them. |
+| `r_shadowMapGpuTimerQueries` | `1` | Uses non-blocking GL timer queries for shadow-map GPU timing when the driver supports them. The queries are issued only while `r_shadowMapReport` or `r_shadowMapDebugOverlay` is on, so they cost nothing in normal play. |
 | `r_shadowMapGpuSyncTimings` | `0` | Diagnostic-only GPU-synchronized pass timing using `glFinish`; leave off during normal play. |
 | `reportShaderPrograms` | n/a | Prints current ARB/GLSL shader validity, including shadow programs. |
 
