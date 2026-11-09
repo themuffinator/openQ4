@@ -343,7 +343,7 @@ def mcc_document() -> dict:
 # Barrel heat (idVehicleTurretGun): #FF9E1A, the vehicle charge bar's orange,
 # and #FF3300, the HUD's warning red, from vehicle_heatwarn and while it vents.
 HEAT, HEAT_HOT = "#FF9E1A", "#FF3300"
-HEAT_KEY, OVERHEATED_KEY = "#str_231708", "#str_231709"
+OVERHEATED_KEY = "#str_231709"
 
 
 def heat_gauge(doc: HudDocument) -> dict:
@@ -352,8 +352,8 @@ def heat_gauge(doc: HudDocument) -> dict:
     at 0.35 in #FF9E1A, both #FF3300 (0.35 and 0.60) and pulsing at 2 Hz
     once the heat reaches vehicle_heatwarn or the gun vents; the heat as a
     percentage of the gun's limit in Chain 0.5 where the clip shows, the
-    gun's traced glyph (veh_mgun) where the weapon render sits and HEAT in
-    the label's place."""
+    gun's traced glyph (veh_mgun) where the weapon render sits and a heat
+    symbol in the notch, where the other gauges carry their icons."""
     from remastered_hud_status import BACK, MARINE, backing_nodes, fill_window, gauge_surface, legacy_readout
     from remastered_hud_status import full as full_group
     w, h, k = 125, 59, -0.22
@@ -384,10 +384,17 @@ def heat_gauge(doc: HudDocument) -> dict:
     numerals = full_group("heat-numerals", [number], color=ui.colour(ink))
     doc.bind("heat-numerals.color", "heat-numerals", "color", [sel(hot, c, d) for c, d in zip(rgb(HEAT_HOT), ink)])
     gun = full_group("heat-gun", hud_svg.icon_nodes("veh_mgun", "heat-gun-g", u(9), u(17), u(22), tint=MARINE["gun"]))
-    label = text_box("heat-label", HEAT_KEY, face="lowpixel", size=10.08, colour=MARINE["icon"], baseline=u(47), x=u(9),
-                     width=u(70))
-    doc.bind("heat-label.color", "heat-label", "color", [sel(hot, c, d) for c, d in zip(rgb(HEAT_HOT, 0.8), MARINE["icon"])])
-    return box("heat-gauge", u(101), u(420), u(w), u(h), [pulse, gun, numerals, label])
+    # The notch carries the gauge's symbol, as on the health and armor gauges
+    # (16 u at 98, 38): three rising heat waves, #FF3300 at 0.80 when hot.
+    icons = []
+    for name, tint, shown in (("cool", MARINE["icon"], NOT(hot)), ("hot", rgb(HEAT_HOT, 0.8), hot)):
+        waves = [pts_path(f"wave{i}", [(u(x0 + 1.4 * math.sin(math.pi * 3 * s / 12)), u(53 - 14 * s / 12)) for s in range(13)],
+                          closed=False, stroke=stroke(tint, u(1.9), join="round", cap="round"))
+                 for i, x0 in enumerate((101.5, 106, 110.5))]
+        icon = vec(f"heat-icon-{name}", waves)
+        doc.show(icon["id"], shown)
+        icons.append(icon)
+    return box("heat-gauge", u(101), u(420), u(w), u(h), [pulse, gun, numerals, *icons])
 
 
 def heat_reticle(doc: HudDocument) -> dict:

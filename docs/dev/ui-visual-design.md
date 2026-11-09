@@ -2868,18 +2868,22 @@ whatever its first frame happened to show.
   and armor in their places and, on the gauge where ammunition shows, the heat
   in the same construction, track 0.20 and fill 0.35 in #FF9E1A, the heat as a
   percentage of the gun's limit in Chain 0.5 where the clip shows, the gun's
-  glyph where the weapon render sits and HEAT in Low Pixel at the label's
-  place. From the warning level (75%) and while the gun vents, the track and
+  glyph where the weapon render sits and, in the notch where the other gauges
+  carry their icons, a 16 u symbol of three rising heat waves in the icon
+  tint (#FF3300 at 0.80 when hot). From the warning level (75%) and while the gun vents, the track and
   fill turn #FF3300 at 0.35 and 0.60 and pulse at 2 Hz and the figures turn
   #FF3300. Once the barrel is warm, a 40x3 u bar at black 0.45 sits 22 u under
   the crosshair, filling from its leading edge in #FF9E1A at 0.85, #FF3300 at
   the warning level; while the gun vents, OVERHEATED in Marine #FF3300 with
-  the stock drop shadow pulses between 100% and 55% at 2 Hz beneath it. Minimal keeps the gauges and the crosshair's heat; the
-  transmission display, damage direction, notices and Exit in the HUD prompt
-  complete it. Classic builds it on the stock vehicle HUD: the hull and shield
-  gauges become HEALTH and ARMOR with their values in Chain 0.45, and the
-  weapon panel carries the gun's glyph with HEAT over the charge bar, which
-  shows the heat, and OVERHEATED over it while the gun vents.
+  the stock drop shadow pulses between 100% and 55% at 2 Hz beneath it.
+  Minimal keeps the gauges and the crosshair's heat; the transmission display,
+  damage direction, notices and Exit in the HUD prompt complete it. Classic
+  builds it on the stock vehicle HUD: the hull and shield gauges become HEALTH
+  and ARMOR, their values in Chain 0.5 where the on-foot gauges put theirs
+  (the gauge's 66, 9 u, 52x26 u, right-aligned); the weapon panel carries the
+  gun's glyph where the vehicle HUD draws the current machinegun, HEAT on the
+  panel's top row where it names the other weapon, OVERHEATED in its place
+  while the gun vents, and the heat in the charge bar.
 - **Speeder bike.** The m07 race keeps the stock vehicle HUD and centers a
   progress bar at the top: a 45% black plate whose raised tab carries the race
   timer, gold Marine 0.65 seconds and Marine 0.55 hundredths, and ten

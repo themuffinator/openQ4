@@ -310,11 +310,11 @@ windowDef Desktop
 		}
 		windowDef t_health_val
 		{
-			rect	104,423,62,28
+			rect	137,429,52,26
 			visible	1
-			forecolor	0.850,0.905,0.749,1
+			forecolor	0.866,0.921,0.764,1
 			text	"gui::player_health"
-			textscale	0.45
+			textscale	0.5
 			shear	0,-.22
 			font	"fonts/chain"
 			textalign	2
@@ -380,11 +380,11 @@ windowDef Desktop
 		}
 		windowDef t_armor_val
 		{
-			rect	197,423,62,28
+			rect	230,429,52,26
 			visible	1
-			forecolor	0.850,0.905,0.749,1
+			forecolor	0.866,0.921,0.764,1
 			text	"gui::player_armor"
-			textscale	0.45
+			textscale	0.5
 			shear	0,-.22
 			font	"fonts/chain"
 			textalign	2
@@ -405,23 +405,23 @@ windowDef Desktop
 	}
 	// The gun's glyph and its barrel heat where the vehicle HUD shows its
 	// weapons and charge: the bar fills #FF9E1A, turns #FF3300 and pulses at
-	// 2 Hz from the warning level, and stays full and flashing while the gun
-	// vents, with OVERHEATED over it.
+	// 2 Hz from the warning level and while the gun vents, when OVERHEATED
+	// takes the HEAT label's place.
 	windowDef p_mgun
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
 		visible	1
 		windowDef mgun_turret
 		{
-			rect	14,420,72,31
+			rect	16,432,74,32
 			background	"gfx/guis/vehicles/veh_mgun"
 			visible	1
 			matcolor	0.658,0.639,0.376,0.8 - 0.5 * "gui::vehicle_overheat"
 		}
 		windowDef t_heat
 		{
-			rect	15,452,60,13
-			visible	1
+			rect	23,413,90,13
+			visible	"gui::vehicle_overheat" == 0
 			forecolor	0.658,0.639,0.376,0.6
 			text	"#str_231708"
 			textscale	0.14
@@ -468,13 +468,12 @@ windowDef Desktop
 		}
 		windowDef t_overheat
 		{
-			rect	9,440,90,20
+			rect	21,407,130,19
 			visible	"gui::vehicle_overheat"
 			forecolor	1,0.2,0,1*guitable_10_5[time*0.002]
 			text	"#str_231709"
 			textscale	0.22
 			font	"fonts/marine"
-			textalign	1
 			textstyle	1
 		}
 	}
