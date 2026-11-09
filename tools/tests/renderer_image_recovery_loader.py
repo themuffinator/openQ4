@@ -37,7 +37,7 @@ bool R_ImagePolicyUsesPreparedContent(){return uses;}void R_ImagePolicyObserveEr
 struct Renderer{bool IsOpenGLRunning(){return context;}}tr;
 struct idImageUploadErrorScope{};
 class idImage {
-public:bimageFile_t opts{9,9,9,9,9,9};bool defaulted=true,scratchImage=false;std::string loadedSourceName="original";void(*generatorFunction)(idImage*)=nullptr;
+public:bimageFile_t opts{9,9,9,9,9,9};bool defaulted=true,scratchImage=false,generatedCacheContent=true;std::string loadedSourceName="original";void(*generatorFunction)(idImage*)=nullptr;
  void DeriveOpts(){throw std::runtime_error("unexpected scratch-image path");}
  const char* GetName()const{return "textures/input";}void ActuallyLoadImage(bool);
  void AllocImage(){++allocations;if(!allowed)return;TEST(opts.width==8&&opts.height==8&&opts.numLevels==4&&opts.format==7&&opts.textureType==1&&opts.colorFormat==0);}
@@ -61,14 +61,16 @@ static void Reset(){ordinary=borrowed=allocations=uploads=errors=observed=loaded
  for(int i=0;i<4;++i){binary.parts[i]={i,0,8>>i,8>>i};binary.data[i].fill(static_cast<unsigned char>(21+i));}}
 int main(){try{
  Reset();const auto pristine=binary.data;idImage image;image.ActuallyLoadImage(false);
- TEST(borrowed==1&&allocations==1&&uploads==4&&!ordinary&&!errors&&loaded==1&&!image.defaulted&&image.loadedSourceName=="textures/owned.dds");TEST(binary.data==pristine&&!destructors);
+ TEST(borrowed==1&&allocations==1&&uploads==4&&!ordinary&&!errors&&loaded==1&&!image.defaulted&&image.loadedSourceName=="textures/owned.dds");
+ // a direct source is not content the generated cache supplied
+ TEST(!image.generatedCacheContent);TEST(binary.data==pristine&&!destructors);
  for(int mode=0;mode<6;++mode){Reset();idImage i;
   if(mode==0)allowed=false;if(mode==1)mutationAllowed=false;if(mode==2)context=false;if(mode==3)failBorrow=true;if(mode==4)throwBorrow=true;if(mode==5)acceptObservation=false;
-  i.ActuallyLoadImage(false);TEST(!allocations&&!uploads&&!ordinary&&i.opts.width==9&&i.defaulted&&i.loadedSourceName=="original"&&binary.data==pristine&&!destructors);
+  i.ActuallyLoadImage(false);TEST(!allocations&&!uploads&&!ordinary&&i.opts.width==9&&i.defaulted&&i.generatedCacheContent&&i.loadedSourceName=="original"&&binary.data==pristine&&!destructors);
  }
  for(int n=0;n<4;++n){Reset();failUpload=n;idImage i;i.ActuallyLoadImage(false);TEST(uploads==n&&errors==1&&!ordinary&&binary.data==pristine&&!destructors);}
  Reset();uses=false;idImage other;other.ActuallyLoadImage(false);TEST(ordinary==1&&!borrowed&&!allocations);
- Reset();other.generatorFunction=[](idImage*){++generators;};other.ActuallyLoadImage(false);TEST(generators==1&&!borrowed&&!ordinary&&!allocations);
+ Reset();other.generatorFunction=[](idImage*){++generators;};other.ActuallyLoadImage(false);TEST(generators==1&&!borrowed&&!ordinary&&!allocations&&!other.generatedCacheContent);
  std::printf("PASS %d actual loader-entry checks\n",checks);return 0;
 }catch(const std::exception& e){std::fprintf(stderr,"FAIL %d %s\n",checks,e.what());return 1;}}
 '''
