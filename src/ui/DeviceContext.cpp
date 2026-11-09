@@ -3020,12 +3020,19 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 				escapePayloadType, escapeSourceLength, escapeRepeats );
 		}
 		const bool isIconEscape = escapeLength > 0 && escapePayloadType == S_ESCAPE_ICON;
+		// openQ4: an escape that does not fit the line buffer is skipped, and len
+		// must then stay where it is. It used to advance regardless, so a line of
+		// zero-width escapes (which never word-break) walked len past the buffer
+		// and the line's terminator was written out there, on the stack.
+		const bool escapeFits = escapeLength > 0 && len + escapeSourceLength < static_cast<int>( sizeof( buff ) );
 		if ( escapeLength > 0 ) {
-			if ( len + escapeSourceLength < static_cast<int>( sizeof( buff ) ) ) {
+			if ( escapeFits ) {
 				idStr::Copynz( &buff[len], p, escapeSourceLength + 1 );
 			}
 			if ( !isIconEscape ) {
-				len += escapeSourceLength;
+				if ( escapeFits ) {
+					len += escapeSourceLength;
+				}
 				p += escapeSourceLength;
 				continue;
 			}
@@ -3132,7 +3139,9 @@ int idDeviceContext::DrawText( const char *text, float textScale, int textAlign,
 		}
 
 		if ( escapeLength > 0 ) {
-			len += escapeSourceLength;
+			if ( escapeFits ) {
+				len += escapeSourceLength;
+			}
 			p += escapeSourceLength;
 		} else {
 			if ( len + charBytes < static_cast<int>( sizeof( buff ) ) ) {

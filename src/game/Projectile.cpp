@@ -1332,7 +1332,18 @@ void idProjectile::SpawnImpactEntities(const trace_t& collision, const idVec3 ve
 	for(int i = 0;i < numImpactEntities; i++)
 	{
 		idProjectile* spawnProjectile = NULL;
-		gameLocal.SpawnEntityDef(*impactEntityDict,(idEntity**)&spawnProjectile);
+		idEntity* spawnedEntity = NULL;
+		gameLocal.SpawnEntityDef(*impactEntityDict,&spawnedEntity);
+		// openQ4: the def decides what spawns. Anything that is not a projectile
+		// used to be treated as one, with methodOfDeath written into it.
+		if ( spawnedEntity != NULL ) {
+			if ( spawnedEntity->IsType( idProjectile::GetClassType() ) ) {
+				spawnProjectile = static_cast<idProjectile*>( spawnedEntity );
+			} else {
+				gameLocal.Warning( "impact entity '%s' of '%s' is not a projectile", spawnedEntity->GetEntityDefName(), GetEntityDefName() );
+				spawnedEntity->PostEventMS( &EV_Remove, 0 );
+			}
+		}
 		if(spawnProjectile != NULL)
 		{
 			int pitch = rvRandom::irand(ieMinPitch, ieMaxPitch);

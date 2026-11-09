@@ -1489,9 +1489,11 @@ void Sys_DLL_Unload(INT_PTR dllHandle) {
 	}
 	if (FreeLibrary((HMODULE)dllHandle) == 0) {
 		int lastError = GetLastError();
-		LPVOID lpMsgBuf;
+		// openQ4: without FROM_SYSTEM the call fails and writes nothing, and the
+		// error below then formatted an uninitialised pointer with %s
+		LPVOID lpMsgBuf = NULL;
 		FormatMessage(
-			FORMAT_MESSAGE_ALLOCATE_BUFFER,
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 			NULL,
 			lastError,
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
@@ -1499,7 +1501,7 @@ void Sys_DLL_Unload(INT_PTR dllHandle) {
 			0,
 			NULL
 		);
-		Sys_Error("Sys_DLL_Unload: FreeLibrary failed - %s (%d)", lpMsgBuf, lastError);
+		Sys_Error("Sys_DLL_Unload: FreeLibrary failed - %s (%d)", lpMsgBuf != NULL ? (const char *)lpMsgBuf : "unknown error", lastError);
 	}
 }
 

@@ -254,9 +254,24 @@ const char *idEditWindow::HandleEvent(const sysEvent_t *event, bool *updateVisua
 		return ret;
 	}
 
+	// openQ4: take the length first - for a gui:: bound string that is what
+	// re-reads the binding, and c_str() then returns the fresh text - and hold
+	// the cursor to it. Only Draw clamped the cursor, so a key that arrived after
+	// the text was shortened or cleared but before the next draw (Enter clears
+	// the chat line, and several events can share a frame) moved a negative
+	// number of bytes or wrote before the buffer.
+	int len = text.Length();
 	idStr::Copynz( buffer, text.c_str(), sizeof( buffer ) );
 	int key = event->evValue;
-	int len = text.Length();
+	if ( len > MAX_EDITFIELD - 1 ) {
+		len = MAX_EDITFIELD - 1;
+	}
+	if ( cursorPos > len ) {
+		cursorPos = len;
+	}
+	if ( cursorPos < 0 ) {
+		cursorPos = 0;
+	}
 
 	if ( event->evType == SE_CHAR ) {
 		if ( event->evValue == Sys_GetConsoleKey( false ) || event->evValue == Sys_GetConsoleKey( true ) ) {

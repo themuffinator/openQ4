@@ -64,6 +64,41 @@ enum { SE_KEY=1,SE_MOUSE,SE_CHAR,K_TAB=10,K_SHIFT,K_UPARROW,K_DOWNARROW,K_LEFTAR
        K_ENTER,K_KP_ENTER,K_SPACE,K_ESCAPE,K_MOUSE1,K_MOUSE2,K_MOUSE3,K_MOUSE4,K_MOUSE5,K_MOUSE6,K_MOUSE7,K_MOUSE8,
        K_JOY1,K_JOY2,K_JOY3,K_JOY4,K_JOY5,K_JOY6,K_JOY7,K_JOY8,K_JOY9,K_JOY10,K_JOY11,K_JOY12,K_JOY13,K_JOY14,K_JOY15,K_JOY16,
        K_HOME,K_END,K_PGUP,K_PGDN,K_MWHEELUP,K_MWHEELDOWN,K_CTRL,K_ALT,K_RIGHT_ALT,K_BACKSPACE,K_DEL,K_INS,K_LAST_KEY=512 };
+// The text layer's decoding (src/idlib/LangDict.cpp), reduced to what the
+// adapter asks of it: strict UTF-8, and a byte that starts no sequence read as
+// Latin-1.
+const int UTF8_MAX_BYTES=4; const unsigned int UNICODE_REPLACEMENT=0xFFFD;
+static int LangDict_DecodeUtf8(const char* p,int available,unsigned int& codePoint) {
+    const auto byte=[&](int i) { return static_cast<unsigned char>(p[i]); };
+    if (available<=0) return 0;
+    if (byte(0)<0x80) { codePoint=byte(0); return 1; }
+    const int length=byte(0)>=0xf0 && byte(0)<=0xf4 ? 4 : byte(0)>=0xe0 ? 3 : byte(0)>=0xc2 && byte(0)<=0xdf ? 2 : 0;
+    if (!length || byte(0)>0xf4 || length>available) return 0;
+    unsigned int value=byte(0) & (0xff >> (length+1));
+    for (int i=1;i<length;++i) { if ((byte(i) & 0xc0)!=0x80) return 0; value=(value<<6) | (byte(i) & 0x3f); }
+    const unsigned int minimum=length==2 ? 0x80 : length==3 ? 0x800 : 0x10000;
+    if (value<minimum || value>0x10ffff || (value>=0xd800 && value<=0xdfff)) return 0;
+    codePoint=value; return length;
+}
+static int LangDict_NextCodePoint(const char* p,int available,unsigned int& codePoint) {
+    if (!p || available<=0) { codePoint=0; return 0; }
+    const int used=LangDict_DecodeUtf8(p,available,codePoint);
+    if (used>0) return used;
+    codePoint=static_cast<unsigned char>(p[0]); return 1;
+}
+static bool LangDict_IsUtf8(const char* buffer,int length) {
+    for (int i=0;i<length;) { unsigned int codePoint=0; const int used=LangDict_DecodeUtf8(buffer+i,length-i,codePoint); if (!used) return false; i+=used; }
+    return true;
+}
+static int LangDict_EncodeUtf8(unsigned int codePoint,char out[UTF8_MAX_BYTES]) {
+    if (codePoint<0x80) { out[0]=static_cast<char>(codePoint); return 1; }
+    if (codePoint<0x800) { out[0]=static_cast<char>(0xc0 | (codePoint>>6)); out[1]=static_cast<char>(0x80 | (codePoint & 0x3f)); return 2; }
+    if (codePoint>=0xd800 && codePoint<=0xdfff) return 0;
+    if (codePoint<0x10000) { out[0]=static_cast<char>(0xe0 | (codePoint>>12)); out[1]=static_cast<char>(0x80 | ((codePoint>>6) & 0x3f)); out[2]=static_cast<char>(0x80 | (codePoint & 0x3f)); return 3; }
+    if (codePoint>0x10ffff) return 0;
+    out[0]=static_cast<char>(0xf0 | (codePoint>>18)); out[1]=static_cast<char>(0x80 | ((codePoint>>12) & 0x3f));
+    out[2]=static_cast<char>(0x80 | ((codePoint>>6) & 0x3f)); out[3]=static_cast<char>(0x80 | (codePoint & 0x3f)); return 4;
+}
 struct idKeyInput {
     static inline std::map<int,std::string> bindings;
     static bool KeyIsBoundTo(int key,const char* binding) { return bindings.contains(key) && bindings.at(key)==binding; }
@@ -876,6 +911,14 @@ static void CheckPublicTextQueries() {
         assert(std::string(gui.GetStateString("text"))=="untouched");
         gui.SetStateString("binding.forward","capture"); gui.StateChanged(0);
         assert(std::get<std::string>(Live().state.at("binding.forward"))=="capture");
+        // Text typed into a stock field is one byte a character. A lone high
+        // byte reaches the document as UTF-8 and does not fail the batch it
+        // arrives in; text that already is UTF-8 passes through untouched.
+        gui.SetStateString("binding.forward","caf\xe9 ol\xe9"); gui.SetStateString("binding.save","with it"); gui.StateChanged(0);
+        assert(std::get<std::string>(Live().state.at("binding.forward"))=="caf\xc3\xa9 ol\xc3\xa9");
+        assert(std::get<std::string>(Live().state.at("binding.save"))=="with it");
+        gui.SetStateString("binding.forward","na\xc3\xafve"); gui.StateChanged(0);
+        assert(std::get<std::string>(Live().state.at("binding.forward"))=="na\xc3\xafve");
         idKeyInput::bindings={{103,"savegame quick"}};
         gui.SetKeyBindingNames(); gui.StateChanged(0);
         assert(std::get<std::string>(Live().state.at("binding.forward"))=="None");

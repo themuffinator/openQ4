@@ -964,8 +964,12 @@ bool idInventory::DetermineAmmoAvailability( idPlayer* owner, const char *ammoNa
 	}
 
 	// Make sure the clip info is updated.
-	if ( owner->weapon ) {
-		clip[ owner->GetCurrentWeapon( ) ] = owner->weapon->AmmoInClip( );
+	// openQ4: there is no current weapon while a pickup is forcing a switch -
+	// GiveWeaponMod sets it to -1 for the weapon in hand - and this then wrote
+	// clip[-1], the last slot of the ammo table before it.
+	const int clipWeapon = owner->GetCurrentWeapon( );
+	if ( owner->weapon && clipWeapon >= 0 && clipWeapon < MAX_WEAPONS ) {
+		clip[ clipWeapon ] = owner->weapon->AmmoInClip( );
 	}
 
 	 if ( !idStr::Icmpn( ammoName, "start_ammo_", 11 ) ) {

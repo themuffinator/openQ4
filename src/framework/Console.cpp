@@ -2403,7 +2403,6 @@ idConsoleLocal::InsertInputChar
 */
 void idConsoleLocal::InsertInputChar( int ch ) {
 	char *buffer = consoleField.GetBuffer();
-	const int len = consoleField.GetLength();
 	int cursor = consoleField.GetCursor();
 
 	if ( ch < ' ' ) {
@@ -2412,6 +2411,11 @@ void idConsoleLocal::InsertInputChar( int ch ) {
 
 	DeleteInputSelection();
 	cursor = consoleField.GetCursor();
+	// openQ4: measure after the selection is gone. With the length from before,
+	// overstriking a selection that reached the end of the line left the new
+	// character unterminated and the deleted tail came back, and inserting over
+	// a full selected line was refused as if the line were still full.
+	const int len = consoleField.GetLength();
 
 	if ( idKeyInput::GetOverstrikeMode() ) {
 		if ( cursor >= MAX_EDIT_LINE - 2 ) {
@@ -2502,8 +2506,11 @@ void idConsoleLocal::PasteClipboardToInput( void ) {
 	DeleteInputSelection();
 	focus = CON_FOCUS_INPUT;
 	for ( int i = 0; text[i] != '\0'; ++i ) {
-		if ( text[i] >= ' ' ) {
-			InsertInputChar( text[i] );
+		// openQ4: plain char is signed off Windows, where every byte of
+		// non-ASCII text compared below ' ' and the paste dropped it
+		const int ch = static_cast<unsigned char>( text[i] );
+		if ( ch >= ' ' ) {
+			InsertInputChar( ch );
 		}
 	}
 

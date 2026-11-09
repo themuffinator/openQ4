@@ -73,6 +73,28 @@ std::string KeyEscapeNames(const char* text) {
 	return result;
 }
 
+// A string the stock interface built can carry bytes that are not UTF-8: text
+// typed into one of its fields is one byte a character, so an accented letter
+// in a chat line or a player's name arrives as a lone high byte. A document
+// refuses a whole batch of state over one such value, which froze the
+// Remastered HUD for everyone who was sent the line. Read such text the way
+// the text layer draws it and hand the document UTF-8.
+std::string StateText(std::string text) {
+	if (LangDict_IsUtf8(text.c_str(),static_cast<int>(text.size()))) return text;
+	std::string repaired;
+	for (size_t i = 0; i < text.size();) {
+		unsigned int codePoint = 0;
+		const int used = LangDict_NextCodePoint(text.c_str() + i,static_cast<int>(text.size() - i),codePoint);
+		if (used <= 0) break;
+		char encoded[UTF8_MAX_BYTES];
+		int count = LangDict_EncodeUtf8(codePoint,encoded);
+		if (count <= 0) count = LangDict_EncodeUtf8(UNICODE_REPLACEMENT,encoded);
+		repaired.append(encoded,static_cast<size_t>(count));
+		i += static_cast<size_t>(used);
+	}
+	return repaired;
+}
+
 // The glyph a prompt's chip draws for a bound key (ui-visual-design.md 13.4,
 // 13.5, 14.8), in the family of the controller in use, and its label. A
 // document that declares "<key>.glyph" beside a key state receives the kind;
@@ -161,7 +183,7 @@ int FirstKeyEscape(const char* text) {
 
 bool ConvertState(const char* text, size_t type, StateValue& value) {
 	if (!text) return false;
-	if (type == 2) value = KeyEscapeNames(text);
+	if (type == 2) value = StateText(KeyEscapeNames(text));
 	else if (type == 1) {
 		if (!idStr::Cmp(text,"1") || !idStr::Cmp(text,"true")) value = true;
 		else if (!idStr::Cmp(text,"0") || !idStr::Cmp(text,"false")) value = false;
