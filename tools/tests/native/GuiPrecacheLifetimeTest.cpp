@@ -42,6 +42,7 @@ static Game gameLocal;
 struct Decls { void FindSound(const char*,bool) {} void MediaPrint(const char*,...) {} };
 static Decls decls;
 static auto* declManager = &decls;
+struct idPlayer { static void PrecacheMultiplayerSpawn() {} };
 struct idMultiplayerGame {
     static constexpr int AS_NUM_SOUNDS=2;
     static constexpr const char* announcerSoundDefs[2] = {"one","two"};

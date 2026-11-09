@@ -24895,6 +24895,8 @@ void idMultiplayerGame::Precache( void ) {
 		return;
 	}
 	gameLocal.FindEntityDef( "player_marine", false );
+	// openQ4: players spawn after the load, so cache what their spawn needs now.
+	idPlayer::PrecacheMultiplayerSpawn();
 	
 	// MP game sounds
 	for ( i = 0; i < AS_NUM_SOUNDS; i++ ) {

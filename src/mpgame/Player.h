@@ -542,6 +542,8 @@ public:
 	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
 
 	static const char*		GetSpawnClassname ( void );
+	static void				PrecacheSpawnDecls( void );
+	static void				PrecacheMultiplayerSpawn( void );
 
 	virtual void			Hide( void );
 	virtual void			Show( void );

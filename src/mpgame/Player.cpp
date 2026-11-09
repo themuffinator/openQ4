@@ -2507,20 +2507,7 @@ void idPlayer::Spawn( void ) {
 	noFallDelta = spawnArgs.GetFloat("no_fall_delta", "7");
 
 	// precache decls
-	declManager->FindType( DECL_ENTITYDEF, "damage_fatalfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_hardfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_softfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_noair", false, false );
-// openQ4 BEGIN
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_drown", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_lava", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_slime", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "liquid_openq4", false, false );
-// openQ4 END
-	declManager->FindType( DECL_ENTITYDEF, "damage_suicide", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_telefrag", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "dmg_shellshock", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "dmg_shellshock_nohl", false, false );
+	PrecacheSpawnDecls();
 
 	gibSkin = declManager->FindSkin( spawnArgs.GetString( "skin_gibskin" ) );
 
@@ -3237,20 +3224,7 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
  	showWeaponViewModel = GetUserInfo()->GetBool( "ui_showGun" );
 
 	// precache decls
-	declManager->FindType( DECL_ENTITYDEF, "damage_fatalfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_hardfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_softfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_noair", false, false );
-// openQ4 BEGIN
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_drown", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_lava", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_slime", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "liquid_openq4", false, false );
-// openQ4 END
-	declManager->FindType( DECL_ENTITYDEF, "damage_suicide", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_telefrag", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "dmg_shellshock", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "dmg_shellshock_nohl", false, false );
+	PrecacheSpawnDecls();
 // RAVEN END
 	ResetWeaponWheel( true );
 	ResetQuickChat();
@@ -16876,6 +16850,121 @@ const char* idPlayer::GetSpawnClassname ( void ) {
 	
 	return world->spawnArgs.GetString( "player", "player_marine" );
 }
+
+// openQ4 BEGIN
+/*
+=====================
+idPlayer::PrecacheSpawnDecls
+
+The damage and liquid defs a spawned player can need at any moment.
+=====================
+*/
+void idPlayer::PrecacheSpawnDecls( void ) {
+	static const char * const spawnDefs[] = {
+		"damage_fatalfall",
+		"damage_hardfall",
+		"damage_softfall",
+		"damage_noair",
+		"damage_openq4_drown",
+		"damage_openq4_lava",
+		"damage_openq4_slime",
+		"liquid_openq4",
+		"damage_suicide",
+		"damage_telefrag",
+		"dmg_shellshock",
+		"dmg_shellshock_nohl",
+	};
+
+	for ( int i = 0; i < (int)( sizeof( spawnDefs ) / sizeof( spawnDefs[ 0 ] ) ); i++ ) {
+		declManager->FindType( DECL_ENTITYDEF, spawnDefs[ i ], false, false );
+	}
+}
+
+/*
+=====================
+idPlayer::PrecacheMultiplayerSpawn
+
+A multiplayer player spawns when its client enters the game, after the level
+load has ended, so everything the first spawn touched for the first time was
+parsed and loaded mid-frame: about ninety decls and their images on mp/q4dm1,
+from the player model and crosshairs to the damage defs. Touch that set from
+inside the load instead.
+=====================
+*/
+void idPlayer::PrecacheMultiplayerSpawn( void ) {
+	const idDeclEntityDef *playerDef = gameLocal.FindEntityDef( GetSpawnClassname(), false );
+	if ( playerDef == NULL ) {
+		return;
+	}
+
+	// The retained multiplayer menus parse this def with media caching off,
+	// in which case finding it again caches nothing.
+	gameLocal.CacheDictionaryMedia( &playerDef->dict );
+
+	// The def_default_model keys name playerModel decls, which the def_ media
+	// rule looks up as entityDefs and so misses. Cache the models this game
+	// type can fall back to or force, plus the local player's own choice, the
+	// same set UpdateModelSetup picks from. Cache each model's media directly,
+	// because a model the player setup menu already parsed would not cache it
+	// again. Other players' choices arrive with their userinfo.
+	const bool teamGame = gameLocal.IsTeamGame();
+	const char *modelNames[] = {
+		teamGame ? playerDef->dict.GetString( "def_default_model_marine" ) : playerDef->dict.GetString( "def_default_model" ),
+		teamGame ? playerDef->dict.GetString( "def_default_model_strogg" ) : "",
+		teamGame ? Player_ForcedModelCVarString( g_forceMarineModel ) : Player_ForcedModelCVarString( g_forceModel ),
+		teamGame ? Player_ForcedModelCVarString( g_forceStroggModel ) : "",
+		teamGame ? cvarSystem->GetCVarString( "ui_model_marine" ) : cvarSystem->GetCVarString( "ui_model" ),
+		teamGame ? cvarSystem->GetCVarString( "ui_model_strogg" ) : "",
+	};
+	for ( int i = 0; i < (int)( sizeof( modelNames ) / sizeof( modelNames[ 0 ] ) ); i++ ) {
+		if ( modelNames[ i ] == NULL || modelNames[ i ][ 0 ] == '\0' ) {
+			continue;
+		}
+		const rvDeclPlayerModel *model = static_cast<const rvDeclPlayerModel *>( declManager->FindType( DECL_PLAYER_MODEL, modelNames[ i ], false ) );
+		if ( model == NULL ) {
+			continue;
+		}
+		idDict media;
+		media.Set( "model", model->model.c_str() );
+		media.Set( "def_head", model->head.c_str() );
+		media.Set( "def_head_ui", model->uiHead.c_str() );
+		media.Set( "skin", model->skin.c_str() );
+		media.SetDefaults( &model->sounds );
+		gameLocal.CacheDictionaryMedia( &media );
+	}
+
+	// The weapons SetupWeaponEntity caches on spawn, the warmup arsenal's included.
+	for ( int w = 0; w < MAX_WEAPONS; w++ ) {
+		const char *weaponName = playerDef->dict.GetString( va( "def_weapon%d", w ) );
+		if ( weaponName[ 0 ] != '\0' ) {
+			rvWeapon::CacheWeapon( weaponName );
+		}
+	}
+
+	// In multiplayer the cursor and cinematic HUD are shared templates, like
+	// the hud and mphud in MPGuis, so loading them now leaves the spawn a lookup.
+	static const char * const guiKeys[] = { "cursor", "cinematicHud" };
+	for ( int i = 0; i < (int)( sizeof( guiKeys ) / sizeof( guiKeys[ 0 ] ) ); i++ ) {
+		const char *guiName = playerDef->dict.GetString( guiKeys[ i ] );
+		if ( guiName[ 0 ] != '\0' ) {
+			uiManager->FindGui( guiName, true, false, true );
+		}
+	}
+
+	// Not a media key, so CacheDictionaryMedia skips it.
+	const char *afName = playerDef->dict.GetString( "articulatedFigure" );
+	if ( afName[ 0 ] != '\0' ) {
+		declManager->FindType( DECL_AF, afName, false );
+	}
+
+	declManager->FindType( DECL_ENTITYDEF, "player_viewweapon", false, false );
+	declManager->FindType( DECL_ENTITYDEF, "player_animatedentity", false, false );
+	declManager->FindType( DECL_ENTITYDEF, "ammo_types", false, false );
+	declManager->FindType( DECL_ENTITYDEF, "ItemCostConstants", false );
+	declManager->FindSound( "player_sounds_hitArmor" );
+	PrecacheSpawnDecls();
+}
+// openQ4 END
 
 /*
 ===============
