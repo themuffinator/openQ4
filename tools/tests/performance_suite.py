@@ -927,14 +927,36 @@ def parse_config_arg(text: str) -> RunConfig:
     runtime, api, settings = parts
     if api not in ("gl", "vk"):
         raise SystemExit(f"api must be gl or vk in {text!r}")
-    if settings not in SETTINGS:
-        raise SystemExit(f"unknown settings profile {settings!r}; choose from {', '.join(SETTINGS)}")
+    profile = settings_from_spec(settings)
     path = Path(runtime)
     if not path.is_absolute():
         path = (REPO_ROOT / path).resolve()
     if not (path / CLIENT_EXE).is_file():
         raise SystemExit(f"runtime {path} has no {CLIENT_EXE}")
-    return RunConfig(label=label, runtime=path, api=api, settings=SETTINGS[settings])
+    return RunConfig(label=label, runtime=path, api=api, settings=profile)
+
+
+SETTINGS_SPEC_PRESET_RE = re.compile(r"[a-z][a-z0-9]*")
+SETTINGS_SPEC_CVAR_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+SETTINGS_SPEC_VALUE_RE = re.compile(r"[-A-Za-z0-9_.]+")
+
+
+def settings_from_spec(spec: str) -> Settings:
+    """A named profile, or an ad-hoc `<preset>[+cvar=value...]` recipe (e.g. `quality+r_multiSamples=2`)
+    for screening preset candidates without a rebuild; the preset is applied, then the overrides."""
+    if spec in SETTINGS:
+        return SETTINGS[spec]
+    preset, *pairs = spec.split("+")
+    if not SETTINGS_SPEC_PRESET_RE.fullmatch(preset):
+        raise SystemExit(f"unknown settings profile {spec!r}; choose from {', '.join(SETTINGS)} or <preset>[+cvar=value...]")
+    overrides: list[tuple[str, str]] = []
+    for pair in pairs:
+        name, sep, value = pair.partition("=")
+        if not sep or not SETTINGS_SPEC_CVAR_RE.fullmatch(name) or not SETTINGS_SPEC_VALUE_RE.fullmatch(value):
+            raise SystemExit(f"settings spec {spec!r}: {pair!r} is not cvar=value")
+        overrides.append((name, value))
+    described = f"the build's {preset} preset" + (f" with {len(overrides)} overrides" if overrides else "")
+    return Settings(spec, preset, tuple(overrides), described + ", frame cap and vsync off")
 
 
 def select_scenarios(spec: str) -> list[Scenario]:
@@ -1511,8 +1533,11 @@ TIER_ORDER = ("ultra", "quality", "enhanced", "balanced", "lowpower", "minimum")
 
 def settings_tier(settings_name: str) -> str:
     """The preset tier a settings profile measures: own-ultra -> ultra; profiles with overrides keep their own name."""
-    profile = SETTINGS.get(settings_name)
-    if profile and profile.preset and not profile.overrides:
+    try:
+        profile = settings_from_spec(settings_name)
+    except SystemExit:
+        return settings_name
+    if profile.preset and not profile.overrides:
         return profile.preset
     return settings_name
 

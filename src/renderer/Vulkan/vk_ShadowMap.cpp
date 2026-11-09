@@ -3087,6 +3087,14 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 		}
 
 		const shadowMapLightClassification_t classification = R_ClassifyShadowMapLight( vLight );
+		// Point maps disabled by policy (r_shadowMapPointLights 0, the Enhanced
+		// preset): the front end built this light's stencil volumes and no map
+		// caster lists (tr_light.cpp), so it is not a candidate. Leave before
+		// the caster and capacity checks below, which would otherwise report a
+		// policy exclusion as a hard shadow-map failure and mark it sticky.
+		if ( classification.pointLight && !r_shadowMapPointLights.GetBool() ) {
+			continue;
+		}
 		const bool passNeeded[ VK_SHADOW_RECEIVER_PASS_COUNT ] = {
 			vLight->localInteractions != NULL,
 			vLight->globalInteractions != NULL || hasTranslucentReceivers
@@ -3151,11 +3159,8 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 			// governed by ownership resources; the lazy pool covers both
 			// receiver ownerships of every admitted light, while exact resident
 			// hits claim no scratch cube.
-			if ( !r_shadowMapPointLights.GetBool() ) {
-				// policy gate the front-end mirror checks identically
-				// (tr_light.cpp) — never elided, no sticky needed
-				continue;
-			}
+			// The r_shadowMapPointLights policy gate ran at classification,
+			// before the caster and capacity checks.
 			vkShadowLightState_t &entry = vkShadow.lights[ vkShadow.numLights ];
 			memset( &entry, 0, sizeof( entry ) );
 			entry.vLight = vLight;

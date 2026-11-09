@@ -32,8 +32,9 @@ SAMPLE_MS = 27000  # Includes the complete 24-second game-time sweep and its wal
 # 150 FPS: the engine reports percentiles as the upper edge of 50 us bins, so a
 # pass is never rounded in.
 P99_FRAME_MS = 6.6667
-ULTRA_QUALITY = {
-    "com_performancePreset": "ultra", "r_multiSamples": 16, "r_postAA": 3,
+# Maximum requests every quality maximum and carries no frame-rate target.
+MAXIMUM_QUALITY = {
+    "com_performancePreset": "maximum", "r_multiSamples": 16, "r_postAA": 3,
     "image_anisotropy": 16, "image_picmip": 0, "image_downSize": 0,
     "image_downSizeBump": 0, "image_downSizeSpecular": 0, "image_ignoreHighQuality": 0,
     "image_usePrecompressedTextures": 1, "r_shadows": 1, "r_useShadowMap": 1,
@@ -45,7 +46,7 @@ ULTRA_QUALITY = {
     "r_shadowMapCascadeStabilize": 1, "r_motionBlurObjectVectors": 1,
     "r_shadowMapHashedAlpha": 1, "r_shadowMapTranslucentReceivers": 1,
     "r_shadowMapPointLights": 1, "r_ssao": 1, "r_ssaoSamples": 32,
-    # Automatic: full resolution at Ultra's 32 samples, half at Quality's 20.
+    # Automatic: full resolution at 32 samples, half at Quality's 20.
     # The CVar is archived, so a stale value would otherwise pick either.
     "r_ssaoResolution": 0,
     "r_bloom": 1, "r_bloomMipCount": 5, "r_motionBlur": 1, "r_motionBlurSamples": 16,
@@ -55,16 +56,22 @@ ULTRA_QUALITY = {
     "g_showHud": 1, "ui_showGun": 1, "ui_retained": 1, "ui_hudLayout": 1,
     "r_skipParticles": 0, "r_skipInteractions": 0, "bse_render": 1, "r_skipSubviews": 0,
 }
+# FPS-02 Ultra: the 75 Hz class's best image.
+ULTRA_QUALITY = {
+    **MAXIMUM_QUALITY,
+    "com_performancePreset": "ultra", "r_multiSamples": 4,
+    "r_shadowMapPointSize": 512, "r_shadowMapPointFilterTaps": 9,
+    "r_shadowMapPointFilterMode": 0, "r_shadowMapAtlasSize": 8192,
+    "r_shadowMapCSM": 0, "r_motionBlur": 0, "r_motionBlurSamples": 8,
+}
 QUALITY = {
     **ULTRA_QUALITY,
-    "com_performancePreset": "quality", "r_multiSamples": 4, "r_postAA": 2,
-    "image_anisotropy": 8, "r_shadowMapSize": 2048, "r_shadowMapPointSize": 1024,
-    "r_shadowMapFilterTaps": 9, "r_shadowMapPointFilterTaps": 9,
-    "r_shadowMapPointFilterMode": 0, "r_shadowMapAtlasSize": 4096,
-    "r_shadowMapCSM": 0, "r_ssaoSamples": 20, "r_motionBlur": 0, "r_motionBlurSamples": 8,
+    "com_performancePreset": "quality", "r_multiSamples": 2, "r_postAA": 2,
+    "r_shadowMapSize": 2048, "r_shadowMapFilterTaps": 9, "r_shadowMapAtlasSize": 4096,
+    "r_ssaoSamples": 20,
 }
-QUALITY_PROFILES = {"quality": QUALITY, "ultra": ULTRA_QUALITY}
-POST_AA = {"quality": "SMAA1xHigh", "ultra": "SMAA1xUltra"}
+QUALITY_PROFILES = {"quality": QUALITY, "ultra": ULTRA_QUALITY, "maximum": MAXIMUM_QUALITY}
+POST_AA = {"quality": "SMAA1xHigh", "ultra": "SMAA1xUltra", "maximum": "SMAA1xUltra"}
 
 
 def check_rotation(text: str, api: str, preset: str = "quality") -> list[str]:

@@ -22,12 +22,12 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 8 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **35 / 125 (28.0%)** | **90 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Formally closed roadmap tasks | **36 / 125 (28.8%)** | **89 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
 | Estimated category progress | **19 categories: 3 at 100%, 14 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
-| Ultra frame rate at 2560x1440 | **19-58 fps on GL, 48-122 fps on Vulkan, on the reference laptop; budgets declared** | 0.13.2 Ultra runs 113-336 fps on the same scenes and the current build matches it at equal settings within 12%: the preset carries the drop. Warm mean and p99 budgets for Ultra, Quality and Enhanced on both backends are in [`performance-budgets.json`](performance-budgets.json) (FPS-01). See the FPS category and the [performance report](performance-report.md). |
+| Ultra frame rate at 2560x1440 | **91-188 fps on GL, 96-188 fps on Vulkan, on the reference laptop; every tier meets its refresh class** | FPS-02 re-tiered the presets to refresh classes (Enhanced 144/90, Quality 100/60, Ultra 75/45 average/1% low) and all three meet them in every scene on both backends; the previous everything-on Ultra (19-58 fps on GL) is now the Maximum preset with no frame-rate target. Budgets are in [`performance-budgets.json`](performance-budgets.json). See the FPS category and the [performance report](performance-report.md). |
 | Release acceptance | **0 / 4 REL tasks closed** | Current-source progress is unreleased; 0.13.2 remains the available release under the recorded release-status policy. |
 
 ### Category completion estimates
@@ -53,7 +53,7 @@ exact; the estimate column is deliberately approximate.
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
-| [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **18%** | 1 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
+| [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **30%** | 2 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; Quest waits on AND-05. |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **57%** | 0 / 5 | Device/lifecycle breadth, setup upgrades, editable layouts, physical portrait play and Quest. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
@@ -1492,17 +1492,19 @@ reference hardware can hold at its declared frame rate rather than every maximum
 
 ### FPS completion checkpoints
 
-**Estimate: 18%; 1/9 tasks closed.** The suite, the two baselines, the per-feature
+**Estimate: 30%; 2/9 tasks closed.** The suite, the two baselines, the per-feature
 cost attribution and the declared per-scenario budgets exist on the reference machine
-(the RTX 4060 Laptop); no preset has been re-tiered and no optimization has landed.
+(the RTX 4060 Laptop). Enhanced, Quality and Ultra are re-tiered to refresh classes and
+meet them on both backends; the previous Ultra is the Maximum preset. No structural
+optimization has landed.
 
 | Task / state | Completed points and evidence | Remaining subpoints / closure boundary |
 | --- | --- | --- |
-| FPS-01 — Closed | Suite (nine scripted stock-map scenarios, per-frame traces, cold/warm passes, toggle ladders, attribution, hitch events, transitions, idle-launch retry), 0.13.2 and current baselines on both backends, report with the settings/code split; the RTX 4060 Laptop named the reference machine; 42 budgets (7 scenarios x Ultra/Quality/Enhanced x OpenGL/Vulkan, warm mean and p99) declared from 126 launches of 94e0b14ec in `docs/dev/performance-budgets.json` and report section 10; `budgets` and `check` subcommands. | Budgets are redeclared when FPS-02 re-tiers the presets; the gate itself is FPS-09. |
-| FPS-02 — Not started | Every current Ultra feature priced per scene; preset catalog and startup detection read. | Declared targets per tier and resolution; Ultra/Quality/Enhanced re-tiered to them; explicit "everything on" choice without a frame-rate claim; startup banner and fresh-install cap decided. |
-| FPS-03 — Not started | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. | Dynamic-caster composition for point lights, per-face culling, tier budgets and sizes, Vulkan light scan. |
+| FPS-01 — Closed | Suite (nine scripted stock-map scenarios, per-frame traces, cold/warm passes, toggle ladders, attribution, hitch events, transitions, idle-launch retry), 0.13.2 and current baselines on both backends, report with the settings/code split; the RTX 4060 Laptop named the reference machine; 42 budgets (7 scenarios x Ultra/Quality/Enhanced x OpenGL/Vulkan, warm mean and p99) declared from 126 launches of 94e0b14ec in `docs/dev/performance-budgets.json` and report section 10; `budgets` and `check` subcommands. | Budgets redeclared by FPS-02 (report section 11); the gate itself is FPS-09. |
+| FPS-02 — Closed | Refresh classes declared at 2560x1440 on the reference machine (Enhanced 144/90, Quality 100/60, Ultra 75/45 fps average/1% low); candidates screened on both backends; the three recipes rebuilt (point cubes 512 or stencil, MSAA 0/2/4, no cascades or motion blur below Maximum); `maximum` added as the everything-on preset without a frame-rate claim; detected starts capped at the display refresh; the startup banner reports the bootstrap and the detected profile with corrected video memory; Vulkan point-policy admission fixed; 42 budgets redeclared from 126 launches, every tier inside its class in every scene. | Closed. |
+| FPS-03 — Not started | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. FPS-02 sized the tiers around them: 512 cubes at Quality and Ultra, stencil point shadows at Enhanced, 2048 only at Maximum. | Dynamic-caster composition for point lights, per-face culling, tier budgets and sizes, Vulkan light scan. |
 | FPS-04 — Not started | SSAO, motion blur, HDR tone map, bloom and SMAA priced per scene on both backends (the chain is 10-14 ms per frame at 16 samples on OpenGL, 4-6 ms at 8 samples on Vulkan). | Half-resolution SSAO on OpenGL, pass merging, MSAA-aware resolves, tone-map cost. |
-| FPS-05 — Not started | 16x MSAA measured as the largest single Ultra cost on OpenGL; the Vulkan backend found to clamp the preset's 16 samples to the device's 8, so the two backends render different Ultra images. | Sample-count policy per tier, resolve cost, one sample count on both backends, MSAA 4 + SMAA as the Ultra candidate. |
+| FPS-05 — Not started | 16x MSAA measured as the largest single Ultra cost on OpenGL; the Vulkan backend found to clamp the preset's 16 samples to the device's 8, so the two backends render different Ultra images. FPS-02's Ultra uses 4x MSAA with SMAA ultra, which both backends honour; only Maximum still requests 16. | Sample-count policy per tier, resolve cost, one sample count on both backends, MSAA 4 + SMAA as the Ultra candidate. |
 | FPS-06 — Not started | Equal-settings deltas attributed: in storage2 the retained HUD's layer composition (17 two-dimensional views and 34 render-target commands per frame against the classic HUD's 7 and 17; about 0.4 ms of main-thread time); on Vulkan the soft-particle depth capture (1.3 ms in airdefense1). The 2 October build equals 0.13.2 and the 15 October build carries the storage2 step, bracketing the 8 October retained-HUD commit (bisection); interpolation, light grid, reverb, portal cull and the five new Vulkan backend features cost nothing measurable. | Bisection pass 2 for the remainder, the retained HUD composed in one pass, the Vulkan soft-particle capture made cheap, closure within 3% average and 10% p99 of 0.13.2 on every suite scene on both backends. |
 | FPS-07 — Not started | Hitch classes recorded: 2-3 s cold draw stalls at Ultra, periodic 100 ms hub2 frames, a 393 ms storage2 frame, first-use events. | Attribution per class, fixes or declared budgets, clean first-use catalog on both backends. |
 | FPS-08 — Not started | HF-07 attribution: the Quality frame is CPU-bound on one thread; Vulkan render-thread stage 1 landed and gains nothing at the GPU-bound Ultra (within 0.4 ms, longer tails). | Front-end and submission cost, stage 2 overlap, game-tic cost; shared with HF-07 and REN-07. |
@@ -1536,9 +1538,10 @@ cost attribution and the declared per-scenario budgets exist on the reference ma
   (exit 1 on a regression). The release checklist in
   [release-completion.md](release-completion.md) cites the `check` table and the
   `report` output (`summary.md`, `aggregate.json`) as the release artifact. The Vulkan
-  convoy1 p99 budgets at Quality and Enhanced contain an intermittent warm-window
-  stall (FPS-07).
-- [ ] **FPS-02 — P0, decision and implementation: re-tier the presets to declared
+  convoy1 p99 budgets at Quality and Enhanced contain a Vulkan presentation stall
+  (slow presents with short frame work, sometimes a swapchain recreation; FPS-07), not
+  a game-side hitch.
+- [x] **FPS-02 — P0, decision and implementation: re-tier the presets to declared
   budgets.** Ultra currently requests every maximum at once and no tier is tied to a
   frame rate. Declare, per tier, the resolution and reference hardware it must hold and
   the frame-time budget it must meet (the user's Ultra target is 220 fps average and
@@ -1557,6 +1560,30 @@ cost attribution and the declared per-scenario budgets exist on the reference ma
   backends (rerun `performance_suite.py budgets` for the new recipes and commit the
   updated `performance-budgets.json`), the self-test passes, and the release notes describe the change and what a
   player must re-select.
+  Closed 9 November 2026. The targets are refresh classes at 2560x1440 on the reference
+  machine, on both backends and in every timed scenario: Enhanced 144 fps average and
+  90 fps 1% low, Quality 100/60, Ultra 75/45; 220/180 stays a goal for the lighter
+  scenes, not a tier gate. Screening on both backends (report section 11.2) priced the
+  levers: point-light cube size dominates (2048 cubes double the hub2 p99), cascades
+  cost about 4 ms on OpenGL, MSAA about 1 ms per halving once cubes are small. The new
+  recipes (section 11.3): Enhanced drops MSAA for SMAA high, leaves point lights on
+  stencil shadows (`r_shadowMapPointLights` is now a per-preset value) and caps at
+  144; Quality uses 2x MSAA and 512 cubes; Ultra uses 4x MSAA, 512 cubes, an 8192
+  atlas and no cascades or motion blur; all use 16x anisotropy. The previous Ultra
+  recipe is the new `maximum` preset (**Maximum**, localized in the 12 language
+  tables), which carries no frame-rate claim and which Auto-Detect never selects. An
+  automatic recommendation caps `com_maxfps` at the display's whole-hertz refresh
+  rate; the `Quality profile:` banner names the first-launch bootstrap and reprints the
+  detected profile with `com_videoRam` corrected. The Vulkan shadow-map admission now
+  applies the point-light policy before the caster and capacity checks, which had
+  logged sticky `shadow map pass failed` errors with point maps off. The FPS-02 run
+  (`.tmp/perf-suite/fps02-gl`, `fps02-vk`, 126 launches) meets every class: Ultra
+  91-188 fps, Quality 120-238, Enhanced 166-298, worst p99 15.40, 11.70 and 10.39 ms;
+  `performance_suite.py budgets` redeclared the 42 budgets, and the runs pass `check
+  --require-all`. The preset self-test (`presets=8`), `ui_performance_presets.py`, the
+  SYSTEM catalog tests and the in-game preset smoke pass on both backends. Player
+  guidance and re-selection notes are in [display settings](../user/display-settings.md)
+  and [release-completion.md](release-completion.md).
 - [ ] **FPS-03 — P1, implementation: shadow-map cost.** In hub2 the shadow maps are 33 of
   the current Ultra's 54 ms per frame and 30 ms of that is point lights: a point light
   with any moving caster in range re-renders all six cube faces every frame, because

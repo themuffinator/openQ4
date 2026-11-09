@@ -17,7 +17,7 @@ import renderer_gameplay_benchmark as benchmark
 from mp_round_remote_smoke import verify_runtime_is_current, write_script
 
 ROOT = Path(__file__).resolve().parents[2]
-PROFILES = ('minimum', 'lowpower', 'performance', 'balanced', 'enhanced', 'quality', 'ultra')
+PROFILES = ('minimum', 'lowpower', 'performance', 'balanced', 'enhanced', 'quality', 'ultra', 'maximum')
 
 
 def main():
@@ -71,9 +71,9 @@ def main():
         benchmark.append_set(launch, key, value)
     benchmark.append_command(launch, 'map', 'game/airdefense1')
     assert sum(s.startswith('+') for s in launch) <= 64
-    # Ultra first, then down through the ladder: catches inherited expensive
+    # Maximum first, then down through the ladder: catches inherited expensive
     # settings/resources. Each profile recreates the device in actual gameplay.
-    sequence = tuple(args.profiles.split(',')) if args.profiles else (() if args.auto_only else ('ultra',) + PROFILES[:-1])
+    sequence = tuple(args.profiles.split(',')) if args.profiles else (() if args.auto_only else ('maximum',) + PROFILES[:-1])
     if any(name not in PROFILES for name in sequence):
         raise ValueError('Unknown preset in --profiles')
     lines = ['echo PRESET_AUDIT_STARTUP', 'com_performancePreset', 'r_multiSamples',
@@ -110,7 +110,7 @@ def main():
     identities = json.loads((output/'runtime.json').read_text(encoding='utf-8'))
     if any(hashlib.sha256((runtime/name).read_bytes()).hexdigest() != digest for name, digest in identities.items()):
         failures.append('staged runtime changed during test')
-    for marker in ['PerformancePreset self-test passed (presets=7', 'PRESET_AUDIT_COMPLETE']:
+    for marker in ['PerformancePreset self-test passed (presets=8', 'PRESET_AUDIT_COMPLETE']:
         if marker not in text:
             failures.append('missing ' + marker)
     if args.expected_startup:
@@ -142,7 +142,7 @@ def main():
             failures.append('incomplete profile ' + name)
             continue
         section = match[1]
-        modern = name in ('enhanced', 'quality', 'ultra')
+        modern = name in ('enhanced', 'quality', 'ultra', 'maximum')
         expected = {'com_performancePreset': name, 'r_fullscreen': '0',
             'r_useShadowMap': str(int(modern)), 'r_ssao': str(int(modern)), 'r_hdrSceneTarget': str(int(modern))}
         for key, value in expected.items():

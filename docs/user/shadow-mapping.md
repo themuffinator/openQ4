@@ -143,7 +143,7 @@ vid_restart
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
 | `r_shadows` | `1` | `0..1` | Master shadow toggle. |
-| `r_useShadowMap` | `0` | `0..1` | Enables the shadow-map pipeline for supported lights. The `enhanced`, `quality` and `ultra` performance presets set it to `1`. |
+| `r_useShadowMap` | `0` | `0..1` | Enables the shadow-map pipeline for supported lights. The `enhanced`, `quality`, `ultra` and `maximum` performance presets set it to `1`; Enhanced leaves `r_shadowMapPointLights` at `0`, so point lights keep stencil shadows there. |
 | `r_shadowMapCSM` | `0` | `0..1` | Enables cascaded shadow maps for projected lights. |
 | `r_shadowMapProjectedCSM` | `1` | `0..1` | Allows ordinary projected lights to use CSM when `r_shadowMapCSM` is enabled; parallel/global lights keep their dedicated large-coverage policy. |
 | `r_shadowMapConservativeCasters` | `1` | `0..1` | Keeps shadow-map caster submission separate from visible receiver scissors, so off-screen blockers can still shadow visible receivers. |

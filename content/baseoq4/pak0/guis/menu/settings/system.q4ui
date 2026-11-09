@@ -4870,6 +4870,58 @@
    }
   },
   {
+   "id": "tall.settings_preset-option-7.height",
+   "node": "settings_preset-option-7",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_preset-option-7-label.padding-left",
+   "node": "settings_preset-option-7-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_preset-option-7-label.font-size",
+   "node": "settings_preset-option-7-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_preset-option-7-label.line-height",
+   "node": "settings_preset-option-7-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
    "id": "tall.settings_preset-scroll-track.width",
    "node": "settings_preset-scroll-track",
    "property": "width",
@@ -35408,7 +35460,7 @@
                      "left": {"type": "length", "value": 173.011, "unit": "dp"},
                      "top": {"type": "length", "value": 36.0, "unit": "dp"},
                      "width": {"type": "length", "value": 245.489, "unit": "dp"},
-                     "height": {"type": "length", "value": 158.0, "unit": "dp"},
+                     "height": {"type": "length", "value": 180.0, "unit": "dp"},
                      "display": {"type": "keyword", "value": "none"}
                     },
                     "children": [
@@ -35467,7 +35519,7 @@
                        "position": {"type": "keyword", "value": "relative"},
                        "display": {"type": "keyword", "value": "block"},
                        "width": {"type": "length", "value": 227.489, "unit": "dp"},
-                       "height": {"type": "length", "value": 154.0, "unit": "dp"},
+                       "height": {"type": "length", "value": 176.0, "unit": "dp"},
                        "margin-left": {"type": "length", "value": 2, "unit": "dp"},
                        "margin-top": {"type": "length", "value": 2, "unit": "dp"}
                       },
@@ -36027,6 +36079,84 @@
                             }
                            }
                           ]
+                         },
+                         {
+                          "id": "settings_preset-option-7",
+                          "type": "group",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                          },
+                          "children": [
+                           {
+                            "id": "settings_preset-option-7-selected",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_preset-option-7-highlight",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_preset-option-7-label",
+                            "type": "text",
+                            "properties": {
+                             "text": {"type": "text", "value": "#str_229977"},
+                             "position": {"type": "keyword", "value": "relative"},
+                             "display": {"type": "keyword", "value": "block"},
+                             "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                             "font-family": {"type": "font", "value": "lowpixel"},
+                             "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                             "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                             "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                             "white-space": {"type": "keyword", "value": "nowrap"},
+                             "overflow": {"type": "keyword", "value": "hidden"}
+                            }
+                           }
+                          ]
                          }
                         ]
                        }
@@ -36040,7 +36170,7 @@
                        "left": {"type": "length", "value": 233.489, "unit": "dp"},
                        "top": {"type": "length", "value": 2, "unit": "dp"},
                        "width": {"type": "length", "value": 8, "unit": "dp"},
-                       "height": {"type": "length", "value": 154.0, "unit": "dp"}
+                       "height": {"type": "length", "value": 176.0, "unit": "dp"}
                       },
                       "children": [
                        {
@@ -36127,7 +36257,7 @@
                     "content": "settings_preset-content",
                     "value": "settings_preset-value"
                    },
-                   "visibleRows": 7,
+                   "visibleRows": 8,
                    "options": [
                     {
                      "id": "settings_preset-option-0",
@@ -36212,6 +36342,18 @@
                       "highlight": "settings_preset-option-6-highlight"
                      },
                      "labelIndex": 6
+                    },
+                    {
+                     "id": "settings_preset-option-7",
+                     "node": "settings_preset-option-7",
+                     "label": "#str_229977",
+                     "value": "maximum",
+                     "parts": {
+                      "label": "settings_preset-option-7-label",
+                      "selected": "settings_preset-option-7-selected",
+                      "highlight": "settings_preset-option-7-highlight"
+                     },
+                     "labelIndex": 7
                     }
                    ],
                    "placementBounds": "settings-body",

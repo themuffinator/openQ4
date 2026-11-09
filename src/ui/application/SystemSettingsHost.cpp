@@ -280,7 +280,7 @@ bool ValidateCandidate(const StateValues* original, const StateValues& current,
 
 const std::vector<SystemSettingDescriptor>& SystemSettingsHost::Catalog() {
 	static const std::vector<SystemSettingDescriptor> catalog = {
-		String("com_performancePreset", {"minimum","lowpower","performance","balanced","enhanced","quality","ultra"}, "#str_229976", SystemSettingPresetExpansion),
+		String("com_performancePreset", {"minimum","lowpower","performance","balanced","enhanced","quality","ultra","maximum"}, "#str_229976", SystemSettingPresetExpansion),
 		Boolean("r_bloom", "#str_41082"), Boolean("r_borderless", "#str_229909", SystemSettingDisplayRestart),
 		Number("r_brightness", .5, 2, "#str_200148", SystemSettingImmediate, {}, false), Boolean("r_crt", "#str_41090"),
 		Number("r_customHeight", 240, 16384, "#str_229949", SystemSettingDisplayRestart),

@@ -84,7 +84,7 @@ EDITS = ("com_performancePreset", "r_bloom", "r_borderless", "r_brightness", "r_
          "r_rendererUploadMegs", "r_shadowMapMaxUpdatesPerView", "r_shadowMapSize", "r_useShadowMap", "s_maxEmitterChannels",
          "s_maxSoundsPerShader", "s_numberOfSpeakers", "s_useEAXReverb", "ui_retainedScale", "ui_retainedTextScale")
 RENDER_SLOTS = 32                         # the renderer device list (RenderingSettings)
-PROFILES = ("minimum", "lowpower", "performance", "balanced", "enhanced", "quality", "ultra")   # PerformancePreset.cpp
+PROFILES = ("minimum", "lowpower", "performance", "balanced", "enhanced", "quality", "ultra", "maximum")   # PerformancePreset.cpp
 # The service's values as presentation variables: each its name and state.
 PRESENTED = (("open", "settings.open"), ("dirty", "settings.dirty"), ("busy", "settings.busy"), ("canApply", "settings.canApply"),
              ("phase", "settings.phase"), ("message", "settings.message"), ("request", "settings.request"),

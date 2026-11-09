@@ -61,12 +61,15 @@ If you have questions concerning this license or the applicable additional terms
 #include "../sys/NetworkEndpoint.h"
 
 #include "PresentationPacing.h"
+#include "../sys/DisplayModeRule.h"
 #include "FrameWorkProfile.h"
 
 #if defined( USE_SDL3 )
 #include <SDL3/SDL_locale.h>
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_cpuinfo.h>
+// The refresh of the display the game window is on, 0 when unknown (sdl3_backend.cpp).
+float Sys_SDL_GetWindowRefreshHz( void );
 #endif
 
 #define	MAX_PRINT_MSG_SIZE	4096
@@ -119,9 +122,9 @@ idCVar com_version( "si_version", version.string, CVAR_SYSTEM|CVAR_ROM|CVAR_SERV
 idCVar com_buildInfo( "com_buildInfo", buildInfo.string, CVAR_SYSTEM|CVAR_ROM, "detailed engine build information" );
 idCVar com_skipRenderer( "com_skipRenderer", "0", CVAR_BOOL|CVAR_SYSTEM, "skip the renderer completely" );
 idCVar com_machineSpec( "com_machineSpec", "-1", CVAR_INTEGER | CVAR_ARCHIVE | CVAR_SYSTEM, "hardware classification, -1 = not detected, 0 = low quality, 1 = medium quality, 2 = high quality, 3 = ultra quality" );
-const char *com_performancePresetArgs[] = { "minimum", "lowpower", "performance", "balanced", "enhanced", "quality", "ultra", NULL };
-static const char *com_performancePresetValueStrings[] = { "balanced", "minimum", "lowpower", "performance", "enhanced", "quality", "ultra", NULL };
-idCVar com_performancePreset( "com_performancePreset", "balanced", CVAR_ARCHIVE | CVAR_SYSTEM, "coherent system performance preset: minimum, lowpower, performance, balanced, enhanced, quality, ultra", com_performancePresetValueStrings, idCmdSystem::ArgCompletion_String<com_performancePresetArgs> );
+const char *com_performancePresetArgs[] = { "minimum", "lowpower", "performance", "balanced", "enhanced", "quality", "ultra", "maximum", NULL };
+static const char *com_performancePresetValueStrings[] = { "balanced", "minimum", "lowpower", "performance", "enhanced", "quality", "ultra", "maximum", NULL };
+idCVar com_performancePreset( "com_performancePreset", "balanced", CVAR_ARCHIVE | CVAR_SYSTEM, "coherent system performance preset: minimum, lowpower, performance, balanced, enhanced, quality, ultra, maximum (everything on, no frame-rate target)", com_performancePresetValueStrings, idCmdSystem::ArgCompletion_String<com_performancePresetArgs> );
 idCVar com_purgeAll( "com_purgeAll", "0", CVAR_BOOL | CVAR_ARCHIVE | CVAR_SYSTEM, "purge everything between level loads" );
 idCVar com_WriteSingleDeclFile( "com_WriteSingleDeclFile", "0", CVAR_SYSTEM | CVAR_BOOL, "write a packed decl file after startup or map loads; use com_singleDeclFileWriteMode for openQ4 or exact-retail game-type coverage" );
 idCVar com_memoryMarker( "com_memoryMarker", "-1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_INIT, "used as a marker for memory stats" );
@@ -3369,13 +3372,16 @@ bool Common_CapturePerformancePresetSignals(openq4::PerformancePresetSignals& ou
  signals.legacyRenderer=!vulkan && (!classicPrograms || config.maxTextureSize<2048);
 #if defined( USE_SDL3 )
  signals.logicalCpus=SDL_GetNumLogicalCPUCores();
+ // The display the window is on, so a detected start can match its rate.
+ signals.displayRefreshHz=openq4::DisplayRefreshHertz(Sys_SDL_GetWindowRefreshHz());
 #endif
  output=signals;error.clear();return true;
 }
-static bool Common_DetectPerformancePreset( openQ4PerformancePreset_t &preset, idStr &reason ) {
+static bool Common_DetectPerformancePreset( openQ4PerformancePreset_t &preset, idStr &reason, int *videoRamMB = NULL ) {
  openq4::PerformancePresetSignals signals;std::string error;
  if (!Common_CapturePerformancePresetSignals(signals,error)) {reason=error.c_str();return false;}
  const auto detected=openq4::DetectPerformancePreset(signals);
+ if (videoRamMB!=NULL) *videoRamMB=detected.videoRamMB;
  if (!openq4::ResolveDetectedPerformancePreset(detected,preset)) {reason="detected profile is unavailable";return false;}
  using Reason=openq4::PerformancePresetReason;
  const char* policy="unknown hardware; conservative starting point";
@@ -3395,9 +3401,10 @@ static bool Common_DetectPerformancePreset( openQ4PerformancePreset_t &preset, i
   case Reason::Cpu:policy="limited or unknown CPU concurrency";break;
   default:break;
  }
- reason=va("%s; GPU=%s, RAM=%d MiB, dedicated VRAM=%d MiB (0=unknown/shared), drawable=%dx%d, CPUs=%d, scene scale=%d%%, post AA=%d",
+ reason=va("%s; GPU=%s, RAM=%d MiB, dedicated VRAM=%d MiB (0=unknown/shared), drawable=%dx%d, CPUs=%d, scene scale=%d%%, post AA=%d, display=%d Hz (0=unknown), frame cap=%d",
   policy,RendererGpuClassName(signals.gpuClass),detected.systemRamMB,detected.videoRamMB,
-  signals.drawableWidth,signals.drawableHeight,signals.logicalCpus,preset.screenFraction,preset.postAA);
+  signals.drawableWidth,signals.drawableHeight,signals.logicalCpus,preset.screenFraction,preset.postAA,
+  signals.displayRefreshHz,preset.maxFps);
  return true;
 }
 
@@ -3468,6 +3475,23 @@ static void Com_AutoDetectPerformancePreset_f( const idCmdArgs &args ) {
 	Common_AutoDetectPerformancePresetCommand( args );
 }
 
+// The reporter-facing summary of the tier, video memory, preset and ambient
+// floor behind the image (issue #73). Printed at every startup, and again after
+// a first launch's detection replaces the bootstrap profile.
+static void Common_PrintQualityProfile( bool firstLaunchBootstrap = false ) {
+	if ( firstLaunchBootstrap ) {
+		common->Printf( "Quality profile: first launch; bootstrap preset '%s' until the device is detected\n",
+			com_performancePreset.GetString() );
+		return;
+	}
+	common->Printf(
+		"Quality profile: com_machineSpec=%d com_videoRam=%d com_performancePreset='%s' r_forceAmbient=%.3f\n",
+		com_machineSpec.GetInteger(),
+		com_videoRam.GetInteger(),
+		com_performancePreset.GetString(),
+		cvarSystem->GetCVarFloat( "r_forceAmbient" ) );
+}
+
 static bool Common_BootstrapStartupPerformancePreset(
 	openQ4PerformancePresetCVarBackup_t bootstrap[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT] ) {
 	const auto *preset = Common_FindPerformancePreset( "minimum" );
@@ -3489,9 +3513,10 @@ static bool Common_ApplyStartupPerformancePreset(
 		if ( assigned[i] && idStr::Icmp( bootstrap[i].name, "com_performancePreset" ) == 0 ) explicitPreset = true;
 	}
 	openQ4PerformancePreset_t detectedPreset;
+	int detectedVideoRamMB = 0;
 	const char *name = explicitPreset ? com_performancePreset.GetString() : "auto";
 	const auto *preset = explicitPreset ? Common_FindPerformancePreset( name ) :
-		( Common_DetectPerformancePreset( detectedPreset, reason ) ? &detectedPreset : NULL );
+		( Common_DetectPerformancePreset( detectedPreset, reason, &detectedVideoRamMB ) ? &detectedPreset : NULL );
 	if ( preset == NULL ) {
 		common->Printf( "First-launch performance detection unavailable (requested '%s'): %s\n",
 			name != NULL ? name : "", reason.c_str() );
@@ -3514,8 +3539,11 @@ static bool Common_ApplyStartupPerformancePreset(
 		Common_RestorePerformancePresetModifiedFlags( modifiedFlags );
 		return false;
 	}
+	// The bootstrap ran before a device existed; record what the device reported.
+	if ( detectedVideoRamMB > 0 ) com_videoRam.SetInteger( detectedVideoRamMB );
 	common->Printf( "First-launch performance preset '%s'%s%s; preserving configured overrides.\n",
 		preset->name, reason.c_str()[0] == '\0' ? "" : ": ", reason.c_str() );
+	Common_PrintQualityProfile();
 	return true;
 }
 
@@ -3707,12 +3735,15 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 	bool passed = true;
 
 	// Enhanced is the affordable modern-effects tier; lower tiers retain stencil.
-	const bool shadowMapTier = Common_PerformancePresetIsNamed( preset, "enhanced" ) || Common_PerformancePresetIsNamed( preset, "quality" ) || Common_PerformancePresetIsNamed( preset, "ultra" );
+	const bool shadowMapTier = Common_PerformancePresetIsNamed( preset, "enhanced" ) || Common_PerformancePresetIsNamed( preset, "quality" ) || Common_PerformancePresetIsNamed( preset, "ultra" ) || Common_PerformancePresetIsNamed( preset, "maximum" );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_useShadowMap", preset.useShadowMap, shadowMapTier ? 1 : 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_bloom", preset.bloom, shadowMapTier ? 1 : 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_ssao", preset.ssao, shadowMapTier ? 1 : 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_hdrToneMap", preset.hdrToneMap, shadowMapTier ? 1 : 0 );
-	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_motionBlur", preset.motionBlur, Common_PerformancePresetIsNamed( preset, "ultra" ) ? 1 : 0 );
+	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_motionBlur", preset.motionBlur, Common_PerformancePresetIsNamed( preset, "maximum" ) ? 1 : 0 );
+	// Only Enhanced leaves point lights on stencil shadows; every other shadow-map
+	// tier maps them, and the stencil tiers keep the inert default.
+	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointLights", preset.shadowMapPointLights, Common_PerformancePresetIsNamed( preset, "enhanced" ) ? 0 : 1 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_crt", preset.crt, 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_useLightGrid", preset.useLightGrid, 1 );
 
@@ -3755,7 +3786,11 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_machineSpec", preset.machineSpec, 2 );
 		passed &= Common_PerformancePresetCheckBenchmarkPreset( preset, "modern" );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_screenFraction", preset.screenFraction, 100 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 2 );
+		// FPS-02 Enhanced holds 144 Hz: SMAA high instead of MSAA.
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 0 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_postAA", preset.postAA, 2 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_maxfps", preset.maxFps, 144 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 1024 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 512 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterMode", preset.shadowMapFilterMode, 0 );
@@ -3766,12 +3801,35 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_machineSpec", preset.machineSpec, 3 );
 		passed &= Common_PerformancePresetCheckBenchmarkPreset( preset, "modern" );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_screenFraction", preset.screenFraction, 100 );
-		passed &= Common_PerformancePresetCheckIntAtLeast( preset, "r_multiSamples", preset.multiSamples, 4 );
-		passed &= Common_PerformancePresetCheckIntAtLeast( preset, "image_anisotropy", preset.anisotropy, 8 );
+		// FPS-02 Quality holds 100 Hz with every light class shadow-mapped.
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 2 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 2048 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 512 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterMode", preset.shadowMapFilterMode, 2 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapCSM", preset.shadowMapCSM, 0 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_usePrecompressedTextures", preset.usePrecompressedTextures, 1 );
 		passed &= Common_PerformancePresetCheckIntAtLeast( preset, "r_rendererUploadMegs", preset.uploadMegs, 32 );
 		passed &= Common_PerformancePresetCheckRestoredAudio( preset );
 	} else if ( Common_PerformancePresetIsNamed( preset, "ultra" ) ) {
+		// FPS-02 Ultra: the best image that holds 75 Hz on the reference machine.
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_machineSpec", preset.machineSpec, 3 );
+		passed &= Common_PerformancePresetCheckBenchmarkPreset( preset, "high-end" );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_screenFraction", preset.screenFraction, 100 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 4 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_postAA", preset.postAA, 3 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 4096 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 512 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterTaps", preset.shadowMapFilterTaps, 13 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterMode", preset.shadowMapFilterMode, 2 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapAtlasSize", preset.shadowMapAtlasSize, 8192 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapCSM", preset.shadowMapCSM, 0 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_ssaoSamples", preset.ssaoSamples, 32 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_usePrecompressedTextures", preset.usePrecompressedTextures, 1 );
+		passed &= Common_PerformancePresetCheckIntAtLeast( preset, "r_rendererUploadMegs", preset.uploadMegs, 32 );
+		passed &= Common_PerformancePresetCheckRestoredAudio( preset );
+	} else if ( Common_PerformancePresetIsNamed( preset, "maximum" ) ) {
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_machineSpec", preset.machineSpec, 3 );
 		passed &= Common_PerformancePresetCheckBenchmarkPreset( preset, "high-end" );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_screenFraction", preset.screenFraction, 100 );
@@ -3833,7 +3891,12 @@ static bool Common_ValidatePerformancePresetProgression( void ) {
 
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "com_machineSpec", previousPreset.machineSpec, preset.machineSpec );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_screenFraction", previousPreset.screenFraction, preset.screenFraction );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_multiSamples", previousPreset.multiSamples, preset.multiSamples );
+		// Entering the shadow-mapped tiers may trade MSAA for the modern effects
+		// (FPS-02: Enhanced spends its 144 Hz budget on them and keeps SMAA high);
+		// within a renderer class sample counts only rise.
+		if ( previousPreset.useShadowMap == preset.useShadowMap ) {
+			passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_multiSamples", previousPreset.multiSamples, preset.multiSamples );
+		}
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_postAA", previousPreset.postAA, preset.postAA );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "com_maxfps", previousPreset.maxFps, preset.maxFps );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "image_anisotropy", previousPreset.anisotropy, preset.anisotropy );
@@ -4027,7 +4090,7 @@ static bool Common_ValidatePerformancePresetApplied( const openQ4PerformancePres
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_ssaoSamples", preset.ssaoSamples );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_bloomMipCount", preset.bloomMipCount );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_motionBlurSamples", preset.motionBlurSamples );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointLights", 1 );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointLights", preset.shadowMapPointLights );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_hdrSceneTarget", preset.hdrToneMap );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadows", 1 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_skipBump", 0 );
@@ -4077,7 +4140,7 @@ static void Com_PerformancePresetSelfTest_f( const idCmdArgs &args ) {
 		common->Printf( "PerformancePreset self-test failed: auto-detect returned unknown preset '%s'\n", detectedPresetName != NULL ? detectedPresetName : "" );
 		passed = false;
 	}
-	if ( idStr::Icmp( detectedPresetName, "ultra" ) == 0 || idStr::Icmp( detectedPresetName, "quality" ) == 0 ) {
+	if ( idStr::Icmp( detectedPresetName, "maximum" ) == 0 || idStr::Icmp( detectedPresetName, "ultra" ) == 0 || idStr::Icmp( detectedPresetName, "quality" ) == 0 ) {
 		common->Printf( "PerformancePreset self-test failed: auto-detect selected an unmeasured top tier\n" );
 		passed = false;
 	}
@@ -7662,13 +7725,9 @@ void idCommonLocal::InitGame( void ) {
 	// only prints on the run that detects the tier. Every later run -- which is
 	// every run a reporter actually sends -- said nothing about which quality
 	// tier, VRAM figure, preset or ambient floor produced the image they are
-	// asking about (issue #73).
-	Printf(
-		"Quality profile: com_machineSpec=%d com_videoRam=%d com_performancePreset='%s' r_forceAmbient=%.3f\n",
-		com_machineSpec.GetInteger(),
-		com_videoRam.GetInteger(),
-		com_performancePreset.GetString(),
-		cvarSystem->GetCVarFloat( "r_forceAmbient" ) );
+	// asking about (issue #73). A first launch has only the bootstrap profile
+	// here; the detected one is printed once the device exists.
+	Common_PrintQualityProfile( detectStartupPreset );
 
 	// if any archived cvars are modified after this, we will trigger a writing of the config file
 	cvarSystem->ClearModifiedFlags( CVAR_ARCHIVE );

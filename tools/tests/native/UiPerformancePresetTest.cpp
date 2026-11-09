@@ -53,11 +53,12 @@ static void Profiles(){
  {0,75,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {1,85,0,1,60,2,1,0,0,0,0,64,0,0,1,0,0,1024,2,0,0,0,0,0,1,16,4,0,1,40,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {2,100,2,1,120,4,1,0,0,0,0,64,0,0,1,0,0,1024,0,0,0,0,0,0,1,16,4,0,1,48,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
- {2,100,2,2,120,4,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
- {3,100,4,2,144,8,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,1024,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
+ {2,100,0,2,144,16,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,0,1,1,0,0,0,0,0,4,1,1,1,1,1},
+ {3,100,2,2,144,16,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,512,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
+ {3,100,4,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,0,0,1,32,4,0,1,48,512,13,9,2,0,8192,32,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
  {3,100,16,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,2048,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1}};
- const char* names[]={"minimum","lowpower","performance","balanced","enhanced","quality","ultra"};
- const char* renderer[]={"low","low","baseline","baseline","modern","modern","high-end"};
+ const char* names[]={"minimum","lowpower","performance","balanced","enhanced","quality","ultra","maximum"};
+ const char* renderer[]={"low","low","baseline","baseline","modern","modern","high-end","high-end"};
  std::set<std::string> targets;for(const auto* key:PerformancePresetTargets())targets.insert(key);
  Check(targets.size()==55,"exact unique target count");
  for(int n=0;n<PerformancePresetCount;++n){
@@ -189,6 +190,20 @@ static void DetectionResolution(){
  auto invalid=DetectPerformancePreset(s);invalid.screenFraction=201;
  Check(!ResolveDetectedPerformancePreset(invalid,output)&&output.screenFraction==100,"invalid recommendation cannot change output");
  Check(FindPerformancePreset("performance")->screenFraction==85&&FindPerformancePreset("balanced")->postAA==1,"automatic adaptations leave manual recipes immutable");
+ // A detected start presents at the display's whole-hertz rate (FPS-02); an
+ // unknown or implausible rate keeps the tier's manual-choice cap.
+ {
+  PerformancePresetSignals d;d.systemRamMB=32768;d.videoRamMB=8192;d.gpuClass=RendererGpuClass::Discrete;
+  d.modernEffects=true;d.logicalCpus=8;d.drawableWidth=2560;d.drawableHeight=1440;
+  const int tierCap=FindPerformancePreset("enhanced")->maxFps;
+  for(const auto& [hz,cap]:std::vector<std::pair<int,int>>{{240,240},{144,144},{60,60},{30,30},{0,tierCap},{29,tierCap},{-1,tierCap},{1000,1000},{1001,tierCap}}){
+   d.displayRefreshHz=hz;const auto detected=DetectPerformancePreset(d);PerformancePreset resolved;
+   Check(detected.maxFps==cap&&ResolveDetectedPerformancePreset(detected,resolved)&&resolved.maxFps==cap,"detected frame cap follows the display");
+  }
+  d.displayRefreshHz=240;auto bad=DetectPerformancePreset(d);bad.maxFps=1001;PerformancePreset untouched=*FindPerformancePreset("ultra");
+  Check(!ResolveDetectedPerformancePreset(bad,untouched)&&untouched.maxFps==FindPerformancePreset("ultra")->maxFps,"out-of-range detected cap refused");
+  Check(FindPerformancePreset("enhanced")->maxFps==tierCap,"detection leaves the manual cap immutable");
+ }
  for(int spec=0;spec<4;++spec){
   const char* names[]={"lowpower","performance","balanced","ultra"};
   Check(PerformancePresetForMachineSpec(spec)==FindPerformancePreset(names[spec]),"stock quality maps to canonical recipe");

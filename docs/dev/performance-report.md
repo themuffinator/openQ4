@@ -3,7 +3,8 @@
 Measured 7-8 November 2026 on the RTX 4060 Laptop (section 2); the 0.13.2 baseline is
 the tag rebuilt with the same per-frame logging as the current source and validated
 against the release binary. Section 10 declares the FPS-01 budgets from the reference
-run of the evening of 8 November. The run chain's output lives under `.tmp/perf-suite/`
+run of the evening of 8 November; section 11 re-tiers the presets to refresh classes
+(FPS-02) and redeclares the budgets from the run of 9 November. The run chain's output lives under `.tmp/perf-suite/`
 (appendix); the plan it feeds is the FPS category of the
 [development roadmap](roadmap.md#frame-rate-recovery-and-performance-budgets).
 
@@ -60,6 +61,13 @@ run of the evening of 8 November. The run chain's output lives under `.tmp/perf-
   and p99 budget per scenario for Ultra, Quality and Enhanced on both backends
   (section 10, `docs/dev/performance-budgets.json`); `performance_suite.py check` gates a
   candidate run against them.
+- **Re-tiered presets.** FPS-02 rebuilt the three tiers from the measured feature costs
+  to hold refresh classes on the reference machine on both backends: Enhanced 144 fps
+  average and 90 fps 1% low, Quality 100/60, Ultra 75/45. All three meet them in every
+  scene (Ultra 91-188 fps, Quality 120-238, Enhanced 166-298). The previous Ultra is
+  now **Maximum**, an everything-on choice with no frame-rate target. Point-light cube
+  maps were the lever: Ultra and Quality use 512 cubes, and Enhanced leaves point lights
+  on stencil shadows. A fresh install caps at the display's refresh rate (section 11).
 - **Caveats.** One shared development laptop; three launches
   that missed the foreground were repeated; the 25 September bisection build did not
   build in pass 2 and is bracketed by the equal 2 October build.
@@ -1081,8 +1089,10 @@ as the FPS category; this is its summary, in the order the measurements rank the
 These are the frame-time budgets of the current presets on the reference machine, the
 RTX 4060 Laptop of section 2, fullscreen 2560x1440, frame cap and vsync off. They are
 regression ceilings for the build as it stands, not targets: no tier holds 220 / 180 in
-every scene, and FPS-02 redeclares them when it re-tiers the presets. The machine-readable
-copy is [`performance-budgets.json`](performance-budgets.json).
+every scene. FPS-02 has since re-tiered the presets and redeclared the budgets (section
+11); [`performance-budgets.json`](performance-budgets.json) holds section 11's budgets,
+and the tables below remain the record of the presets before the re-tier. The FPS-01
+Ultra recipe lives on as the Maximum preset, so section 10.1 is what Maximum costs.
 
 - **Build.** `main` 94e0b14ec, debugoptimized with `b_ndebug=true` (the release
   configuration), staged into the fixed runtime `.tmp/stock-runtime/perf-ref`, client
@@ -1152,13 +1162,17 @@ checked against their own file pass all 42 budgets.
 - **The Ultra budgets differ by backend for a reason.** Vulkan clamps the preset's 16
   samples to 8 (section 3.3), so the two backends' Ultra budgets measure different
   images. FPS-05 makes the sample count the same; the budgets follow.
-- **Vulkan convoy1 at Quality and Enhanced carries an intermittent stall.** The warm
+- **Vulkan convoy1 at Quality and Enhanced carries a presentation stall.** The warm
   window of two of the three Quality launches and one of the three Enhanced launches
   holds a run of slow frames (87 and 151 frames above 25 ms, worst 121 ms, at Quality;
   41 frames, worst 99 ms, at Enhanced). The other launches, OpenGL and the Vulkan Ultra
   launches show none. The median keeps the stall in those two p99 budgets (28.61 and
-  18.24 ms against means of 9.84 and 6.12 ms). It is a hitch class for FPS-07; once it
-  is fixed, redeclare those budgets lower.
+  18.24 ms against means of 9.84 and 6.12 ms). Corrected on 9 November (FPS-02): this
+  is not a game-side hitch. The slow frames arrive steadily, about 45 a second, 20 to
+  31 seconds into the warm pass, while the per-frame work stays short; the time is
+  spent waiting on presentation. Some of those launches log `GPU frame timing reset:
+  reason=Vulkan swapchain recreation` at that moment. It belongs to the Vulkan
+  presentation work under FPS-07; once it is fixed, redeclare those budgets lower.
 - **p99 noise between days.** Checking the 7 November Ultra runs of d856fe6bb
   (`matrix-gl`/`matrix-vk`, label `head`) against these budgets: every mean is within
   4 % except Vulkan convoy1 (14 % faster, inside that scene's launch spread of 58-71
@@ -1166,6 +1180,188 @@ checked against their own file pass all 42 budgets.
   higher. That run interleaved three builds and is a different build, so it does not
   separate a tail improvement from noise. Until FPS-09 settles the round count, treat a
   p99-only failure as provisional: rerun that scenario before calling it a regression.
+
+## 11. Re-tiered presets (FPS-02)
+
+FPS-02 rebuilt Enhanced, Quality and Ultra so that each holds a declared frame-rate
+class on the reference machine, kept the previous Ultra recipe as an explicit
+everything-on preset named **Maximum** that carries no frame-rate target, and
+redeclared the budgets of section 10 from the re-tiered build. The machine-readable
+budgets in [`performance-budgets.json`](performance-budgets.json) are now this
+section's.
+
+### 11.1 Refresh classes
+
+Each class applies to every timed scenario, on OpenGL and on Vulkan, as the warm-pass
+mean and p99 frame interval on the reference machine (RTX 4060 Laptop, fullscreen
+2560x1440, frame cap and vsync off):
+
+| Preset | Average fps | 1% low fps | Mean ms | p99 ms |
+|---|---:|---:|---:|---:|
+| Enhanced | 144 | 90 | 6.94 | 11.1 |
+| Quality | 100 | 60 | 10.0 | 16.7 |
+| Ultra | 75 | 45 | 13.3 | 22.2 |
+| Maximum | none | none | none | none |
+
+The classes follow common display refresh rates, so a tier names the display it can
+keep fed. The 220 fps average and 180 fps 1% low of section 7 stay a goal for the
+lighter scenes, not a tier gate: no recipe with shadow-mapped lights and the modern
+post chain reaches it in hub2, combat or convoy1 on this GPU.
+
+### 11.2 What the levers cost
+
+The candidates were screened on the FPS-01 reference runtime (`perf-ref`, 94e0b14ec):
+each was a shipped preset with cvar overrides (`<preset>+cvar=value`), measured in five
+scenes (combat, effects, hub2, convoy1, storage2), one launch of two passes per scene
+and backend (`screen-*`, `screen2-*`, `screen3-*` in the appendix). The table gives
+the worst scene's warm mean and p99 in milliseconds.
+
+| Candidate | OpenGL worst mean / p99 | Vulkan worst mean / p99 |
+|---|---:|---:|
+| Enhanced (FPS-01): 2x MSAA, all lights shadow-mapped | 8.11 / 15.07 | 6.92 / 16.70 |
+| Enhanced, point lights on stencil | 6.26 / 10.9 | 6.15 / 9.1 |
+| Enhanced, MSAA off | 6.74 / 12.8 | 5.51 / 9.4 |
+| Enhanced, MSAA off, point lights on stencil, 16x AF (chosen) | 6.12 / 10.4 | 4.82 / 8.5 |
+| Enhanced, every light on stencil | 6.41 / 10.7 | 6.28 / 9.7 |
+| Quality (FPS-01): 4x MSAA, 1024 point cubes | 11.20 / 19.90 | 9.84 / 28.61 |
+| Quality, 512 point cubes | 9.54 / 14.0 | 10.16 / 12.2 |
+| Quality, 2x MSAA | 10.24 / 18.4 | 8.82 / 11.2 |
+| Quality, 2x MSAA, 512 point cubes (chosen) | 8.67 / 11.8 | 9.07 / 12.3 |
+| Ultra base: Quality with 4096 projected maps, 13 taps, 8192 atlas, 32 SSAO, SMAA ultra | 13.13 / 21.6 | 11.81 / 15.1 |
+| base + four cascades | 17.00 / 23.5 | 11.91 / 15.3 |
+| base + 8-sample motion blur | 13.75 / 22.6 | 12.00 / 15.6 |
+| base + 2048 point cubes | 22.07 / 49.9 | 15.77 / 26.6 |
+| base with 2x MSAA | 12.12 / 21.1 | 10.36 / 13.8 |
+| base with 512 point cubes (chosen) | 11.11 / 14.7 | 10.64 / 14.4 |
+
+The FPS-01 rows are the section 10 budgets of the same runtime.
+
+- **Point-light cube maps are the lever.** In hub2 on OpenGL, 2048 cubes double the
+  Ultra base's p99 (21.6 to 49.9 ms) and 512 cubes cut it to 14.7; no other single
+  change moves a tier as far. At Enhanced, leaving point lights on the stencil shadows
+  retail used frees 2-4 ms of p99 in every scene.
+- **Projected shadow maps at 1024 cost nothing over stencil.** Enhanced with every
+  light on stencil is no faster than Enhanced with only point lights on stencil, so
+  Enhanced keeps shadow maps for projected and parallel lights.
+- **Cascades cost about 4 ms per frame on OpenGL** in the airdefense1 scenes and hub2,
+  and next to nothing on Vulkan. Ultra leaves them to Maximum. At an 8192 atlas the
+  Vulkan backend also logged shadow-pass failures with cascades on; Maximum's 16384
+  atlas does not.
+- **MSAA is worth about 1 ms per halving** once point cubes are small (Ultra base 4x to
+  2x: 13.1 to 12.1 ms on OpenGL, 11.8 to 10.4 on Vulkan). Ultra keeps 4x, which both
+  backends honour, so the two backends now render the same Ultra image (FPS-05).
+- **Motion blur at 8 samples costs about 0.6 ms**; Ultra leaves it to Maximum.
+- **Anisotropic filtering is free** at this resolution; every modern tier uses 16x.
+
+### 11.3 The recipes
+
+| Preset | Changes from the FPS-01 recipe |
+|---|---|
+| Enhanced | MSAA 2x to off (SMAA high stays), point lights back on stencil shadows (`r_shadowMapPointLights 0`; projected and parallel lights keep 1024 maps), anisotropy 4x to 16x, frame cap 120 to 144. |
+| Quality | MSAA 4x to 2x, point cubes 1024 to 512, anisotropy 8x to 16x. |
+| Ultra | MSAA 16x request to 4x, point cubes 2048 to 512 with 9-tap fixed filtering, atlas 16384 to 8192, cascades and motion blur off. Projected maps stay 4096 with 13-tap PCSS; SSAO 32 samples, SMAA ultra and the 240 cap stay. |
+| Maximum | New: the FPS-01 Ultra recipe unchanged. Its cost is section 10.1. |
+
+`r_shadowMapPointLights` was already a preset target fixed at 1; it now follows the
+preset table, so the SYSTEM catalog keeps its target list. Auto-Detect still never
+recommends Quality or higher.
+
+### 11.4 Fresh installs and the startup banner
+
+- **Frame cap.** An automatic recommendation (Auto-Detect, or the first launch of a
+  fresh installation) caps `com_maxfps` at the whole-hertz refresh rate of the display
+  the window is on, and keeps the tier's own cap when that rate is unknown or outside
+  30-1000 Hz. A preset chosen by name keeps its table cap. On the reference machine's
+  240 Hz panel the detected Enhanced therefore presents up to 240 fps instead of the
+  120 that section 3.2 measured.
+- **Banner.** The `Quality profile:` line now says when it is printing the first-launch
+  bootstrap preset, and prints the detected profile again once detection has applied
+  it, with `com_videoRam` corrected to the measured video memory (8188 MB on OpenGL,
+  7956 MB on Vulkan on this laptop) instead of the bootstrap 64 MB.
+
+### 11.5 The Vulkan point-light policy fix
+
+With point-light shadow maps disabled by policy, the Vulkan shadow-map admission loop
+tested the light's casters and the atlas capacity before the policy, found no map
+casters for a point light (none are collected when its maps are off), and reported a
+hard `shadow map pass failed for lightDef` that stuck to the light. The light still
+drew stencil shadows, but the failure was logged and counted in every Vulkan launch
+with point maps off. The policy check now runs before the caster and capacity checks
+(`src/renderer/Vulkan/vk_ShadowMap.cpp`). The Vulkan smoke at Enhanced logs no failure
+and draws the same 41 stencil volumes, and `renderer_vulkan_shadow_compatibility.py`
+passes.
+
+### 11.6 Results and budgets
+
+- **Build.** `main` a4f7f2002 with the FPS-02 change (committed as the FPS-02 commit),
+  debugoptimized with `b_ndebug=true`, staged into `.tmp/stock-runtime/perf-head`,
+  client SHA-256 `6d1e35432d096b389502ffb1551b074d0b711b9d688a7bf36df91c04f9d69f1b`.
+- **Run.** `fps02-gl` and `fps02-vk`: the seven timed scenarios at `own-ultra`,
+  `own-quality` and `own-enhanced`, interleaved, three rounds of two passes, 63
+  launches per backend. Every launch held the foreground; none was repeated. No launch
+  logged a shadow-pass failure or a Vulkan swapchain recreation.
+- **Budgets.** Redeclared with the section 10 command and method (`--runs
+  .tmp/perf-suite/fps02-gl .tmp/perf-suite/fps02-vk`); 42 entries from 126 launches.
+  The runs checked against the new file pass all 42 with `--require-all`.
+
+Every tier meets its class in every scene on both backends:
+
+| Preset | Class mean / p99 ms | OpenGL worst mean / p99 ms (fps) | Vulkan worst mean / p99 ms (fps) |
+|---|---:|---:|---:|
+| Enhanced | 6.94 / 11.1 | 6.03 combat / 10.39 combat (166 / 96) | 5.04 combat / 8.98 combat (198 / 111) |
+| Quality | 10.0 / 16.7 | 8.30 hub2 / 11.70 combat (120 / 86) | 7.61 hub2 / 10.69 combat (131 / 94) |
+| Ultra | 13.3 / 22.2 | 10.97 hub2 / 15.40 storage2 (91 / 65) | 10.40 storage2 / 15.01 storage2 (96 / 67) |
+
+Across the seven scenes Enhanced runs 166-298 fps, Quality 120-238 and Ultra 91-188.
+Against FPS-01, hub2 at Ultra on OpenGL went from 19 to 91 fps.
+
+#### 11.6.1 Ultra
+
+| Scenario | GL mean ms (fps) | GL p99 ms (1% low) | GL gate mean / p99 ms | VK mean ms (fps) | VK p99 ms (1% low) | VK gate mean / p99 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| outdoor_airdefense1 | 6.70 (149) | 9.34 (107) | 7.04 / 10.27 | 7.65 (131) | 9.88 (101) | 8.03 / 10.87 |
+| outdoor_convoy1 | 8.90 (112) | 12.71 (79) | 9.35 / 13.98 | 8.64 (116) | 12.76 (78) | 9.07 / 14.04 |
+| combat_airdefense1 | 9.32 (107) | 12.95 (77) | 9.79 / 14.24 | 9.67 (103) | 11.58 (86) | 10.15 / 12.74 |
+| effects_airdefense1 | 9.03 (111) | 11.65 (86) | 9.48 / 12.81 | 10.22 (98) | 12.42 (80) | 10.73 / 13.66 |
+| indoor_storage2 | 9.36 (107) | 15.40 (65) | 9.83 / 16.94 | 10.40 (96) | 15.01 (67) | 10.92 / 16.51 |
+| indoor_hub2 | 10.97 (91) | 14.45 (69) | 11.52 / 15.89 | 9.38 (107) | 12.46 (80) | 9.85 / 13.71 |
+| vehicle_walker | 5.81 (172) (single pass) | 8.46 (118) | 6.10 / 9.31 | 5.32 (188) (single pass) | 6.08 (164) | 5.59 / 6.69 |
+
+#### 11.6.2 Quality
+
+| Scenario | GL mean ms (fps) | GL p99 ms (1% low) | GL gate mean / p99 ms | VK mean ms (fps) | VK p99 ms (1% low) | VK gate mean / p99 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| outdoor_airdefense1 | 5.46 (183) | 9.60 (104) | 5.73 / 10.56 | 5.42 (185) | 7.63 (131) | 5.69 / 8.39 |
+| outdoor_convoy1 | 7.31 (137) | 10.48 (95) | 7.67 / 11.53 | 6.36 (157) | 9.46 (106) | 6.68 / 10.41 |
+| combat_airdefense1 | 7.92 (126) | 11.70 (86) | 8.32 / 12.87 | 7.27 (138) | 10.69 (94) | 7.63 / 11.76 |
+| effects_airdefense1 | 7.53 (133) | 10.19 (98) | 7.91 / 11.21 | 7.35 (136) | 9.01 (111) | 7.72 / 9.91 |
+| indoor_storage2 | 5.70 (176) | 7.33 (136) | 5.99 / 8.06 | 5.14 (194) | 6.44 (155) | 5.40 / 7.08 |
+| indoor_hub2 | 8.30 (120) | 11.33 (88) | 8.71 / 12.46 | 7.61 (131) | 10.07 (99) | 7.99 / 11.08 |
+| vehicle_walker | 4.55 (220) (single pass) | 6.04 (166) | 4.78 / 6.64 | 4.19 (238) (single pass) | 4.85 (206) | 4.40 / 5.33 |
+
+#### 11.6.3 Enhanced
+
+| Scenario | GL mean ms (fps) | GL p99 ms (1% low) | GL gate mean / p99 ms | VK mean ms (fps) | VK p99 ms (1% low) | VK gate mean / p99 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| outdoor_airdefense1 | 4.42 (226) | 6.95 (144) | 4.64 / 7.64 | 3.92 (255) | 5.23 (191) | 4.12 / 5.75 |
+| outdoor_convoy1 | 4.83 (207) | 6.87 (146) | 5.07 / 7.56 | 4.09 (244) | 6.28 (159) | 4.29 / 6.91 |
+| combat_airdefense1 | 6.03 (166) | 10.39 (96) | 6.33 / 11.43 | 5.04 (198) | 8.98 (111) | 5.29 / 9.88 |
+| effects_airdefense1 | 5.36 (187) | 8.38 (119) | 5.63 / 9.22 | 4.58 (218) | 7.29 (137) | 4.81 / 8.02 |
+| indoor_storage2 | 4.15 (241) | 5.69 (176) | 4.36 / 6.26 | 3.36 (298) | 4.46 (224) | 3.53 / 4.91 |
+| indoor_hub2 | 3.87 (258) | 5.65 (177) | 4.06 / 6.21 | 3.43 (292) | 4.14 (242) | 3.60 / 4.55 |
+| vehicle_walker | 3.93 (254) (single pass) | 4.56 (219) | 4.13 / 5.02 | 3.50 (286) (single pass) | 4.06 (246) | 3.67 / 4.47 |
+
+### 11.7 Notes
+
+- **Enhanced has the least margin.** The OpenGL combat wave uses 87 % of the mean class
+  and 94 % of the p99 class. There the regression gate (+10 % p99, 11.43 ms) sits above
+  the class (11.1 ms), so a candidate can pass `check` and still miss the class. A
+  release that claims the class compares against both.
+- **The Vulkan convoy1 stall did not recur.** Section 10.4's presentation stall left no
+  trace in these 63 Vulkan launches (convoy1 p99 9.46 ms at Quality against 28.61 at
+  FPS-01). It stays open under FPS-07 until its cause is found.
+- **Maximum is not budgeted.** It carries no frame-rate claim; section 10.1 records what
+  it cost at 94e0b14ec, and the FPS-03 to FPS-05 work lowers that cost.
 
 ## Appendix: artifacts
 
@@ -1181,7 +1377,7 @@ and paks; SHA-256 of `openQ4-client_x64.exe`):
 
 | Runtime | Build | Client SHA-256 |
 |---|---|---|
-| `perf-head` | `main` d856fe6bb + the frame-logger extension, debugoptimized, b_ndebug (worktree `.tmp/wt-perf-head`, build `.tmp/perf-build-head`) | `aa07229e9204932206709afaa7575c677baf70a5ca86457ccb818e64976c40b1` |
+| `perf-head` | `main` d856fe6bb + the frame-logger extension, debugoptimized, b_ndebug (worktree `.tmp/wt-perf-head`, build `.tmp/perf-build-head`) for sections 3-9; restaged on 9 November from `.install` with the FPS-02 build for section 11 | `aa07229e9204932206709afaa7575c677baf70a5ca86457ccb818e64976c40b1` (sections 3-9), `6d1e35432d096b389502ffb1551b074d0b711b9d688a7bf36df91c04f9d69f1b` (section 11) |
 | `perf-0132` | tag `v0.13.2` (fcdd56967) + the same extension, release paks (worktree `.tmp/wt-perf-0132`, build `.tmp/perf-build-0132`) | `0313af56a5ba763180304ceb7f72af8a6a330367fd5cce6e0b367b2d6bf59385` |
 | `v0132-release` | the published 0.13.2 Windows x64 package, unmodified | `a15d3a1a956843914d4dff1cee081e777f14d571f172a5050749c85dff543ac1` |
 | `perf-bisect-834564945` | `main` at 834564945 (2 October), pass 1 | `93b50504578f6b2172897b0164b3355799b819c725e2460406b0c5e9b26e14af` |
@@ -1231,6 +1427,11 @@ launches follow it in the order of its `summary.jsonl`):
 | `.tmp/perf-suite/drift-vk-redo` | v0132 | vk | indoor_storage2 | 1 | 2026-11-08 06:00 | section 3.3 |
 | `.tmp/perf-suite/viewdiag`, `viewdiag2` | v0132/headeq | gl | indoor_storage2, hidden window, `r_rendererMetrics 2` | 3 | 2026-11-08 06:10 | section 6, the view breakdown |
 | `.tmp/perf-suite/bisect-gl/156ced3fd` | v0132/b156ced3fd | gl | indoor_storage2, outdoor_airdefense1 | 8 | 2026-11-08 06:16 | section 6 |
+| `.tmp/perf-suite/screen-gl`, `screen-vk` | ten preset+override candidates (`perf-ref`) | gl, vk | combat, effects, hub2, convoy1, storage2 | 50 each | 2026-11-08 22:01, 23:13 | section 11.2 |
+| `.tmp/perf-suite/screen2-gl`, `screen2-vk` | four candidates (`perf-ref`) | gl, vk | the same five | 20 each | 2026-11-09 00:30, 00:59 | section 11.2 |
+| `.tmp/perf-suite/screen3-gl`, `screen3-vk` | three candidates (`perf-ref`) | gl, vk | the same five | 15 each | 2026-11-09 01:29, 01:51 | section 11.2 |
+| `.tmp/perf-suite/fps02-gl` | ultra/quality/enhanced (`perf-head`, FPS-02 build) | gl | the seven timed scenarios | 63 | 2026-11-09 02:38 | section 11.6, FPS-02 reference run |
+| `.tmp/perf-suite/fps02-vk` | ultra/quality/enhanced (`perf-head`, FPS-02 build) | vk | the seven timed scenarios | 63 | 2026-11-09 04:02 | section 11.6 |
 
 **Chain scripts and kits** (`.tmp/perf/`): `phase2.sh` and `phase3.sh` with their step
 scripts (`run_matrix.sh`, `run_toggles.sh`, `run_msaa.sh`, `run_default.sh`,

@@ -141,7 +141,7 @@
 					forecolor	1,0.745,0.137,0.8
 					choiceType	1
 					choices	"#str_229977"
-					values	"minimum;lowpower;performance;balanced;enhanced;quality;ultra"
+					values	"minimum;lowpower;performance;balanced;enhanced;quality;ultra;maximum"
 					cvar	"com_performancePreset"
 					textscale	0.21
 					font	"fonts/lowpixel"
