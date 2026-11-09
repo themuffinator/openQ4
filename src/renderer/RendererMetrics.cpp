@@ -1955,15 +1955,22 @@ void R_RendererMetrics_RecordClusteredLighting( const rendererClusteredLightingS
 	rg_rendererMetrics.clusteredLighting = stats;
 }
 
+// These run for every vertex-cache upload. Only R_RendererMetrics_EndFrame
+// reads the counters, and it returns early with metrics off, so skip the
+// lock while they are off.
 void R_RendererMetrics_AddUploadBytes( int bytes ) {
+	if ( bytes <= 0 || r_rendererMetrics.GetInteger() <= 0 ) {
+		return;
+	}
 	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
-	if ( bytes > 0 ) {
-		rg_rendererMetrics.uploadBytes += bytes;
-	}
+	rg_rendererMetrics.uploadBytes += bytes;
 }
 
 void R_RendererMetrics_AddBufferStall( void ) {
+	if ( r_rendererMetrics.GetInteger() <= 0 ) {
+		return;
+	}
 	std::lock_guard<std::recursive_mutex> metricsLock( rendererMetricsMutex );
 	rendererMetricsFrame_t &rg_rendererMetrics = R_RendererMetrics_CurrentFrame();
 	rg_rendererMetrics.bufferStalls++;

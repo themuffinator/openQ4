@@ -1105,8 +1105,12 @@ static void RB_ClearSceneScaleState( rbSceneScaleState_t &state ) {
 	// Capacity-preserving reset: SetNum(0,false) keeps the list storage and the
 	// no-arg Clear() memsets the hash in place, so a per-view state that is now
 	// retained (see RB_STD_DrawView) no longer frees and reallocates every view.
+	// SetGranularity resizes an allocated list to its rounded-up count, which is
+	// zero here, so it may only run while the granularity still needs setting.
+	if ( state.rectRestores.GetGranularity() != 256 ) {
+		state.rectRestores.SetGranularity( 256 );
+	}
 	state.rectRestores.SetNum( 0, false );
-	state.rectRestores.SetGranularity( 256 );
 	state.rectRestoreHash.Clear();
 }
 

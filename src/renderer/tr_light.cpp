@@ -1269,6 +1269,12 @@ typedef struct drawSurfAreaMemo_s {
 } drawSurfAreaMemo_t;
 
 static const int DRAWSURF_AREA_MEMO_MAX = 65536;
+// idList grows by its granularity, 16 entries by default, so warming the memo
+// up recopied every entry each 16 inserts, megabytes per resize near the cap;
+// 1024 hash heads also left long chains there. Neither size changes which
+// entry a lookup finds.
+static const int DRAWSURF_AREA_MEMO_GRANULARITY = 4096;
+static const int DRAWSURF_AREA_MEMO_HASH_SIZE = 16384;
 static idList<drawSurfAreaMemo_t>	s_drawSurfAreaMemo;
 static idHashIndex					s_drawSurfAreaMemoHash;
 static idHashIndex					s_drawSurfAreaMemoEntityHash;
@@ -1285,6 +1291,14 @@ void R_ClearDrawSurfAreaMemo( void ) {
 	s_drawSurfAreaMemo.Clear();
 	s_drawSurfAreaMemoHash.Free();
 	s_drawSurfAreaMemoEntityHash.Free();
+}
+
+// The size cap only needs the contents dropped, so keep the storage rather
+// than regrowing it from nothing.
+static void R_ResetDrawSurfAreaMemo( void ) {
+	s_drawSurfAreaMemo.SetNum( 0, false );
+	s_drawSurfAreaMemoHash.Clear();
+	s_drawSurfAreaMemoEntityHash.Clear();
 }
 
 void R_InvalidateDrawSurfAreaMemoForEntity( const idRenderEntityLocal *entityDef ) {
@@ -1336,7 +1350,18 @@ static const portalArea_t *R_ResolveDrawSurfArea( const srfTriangles_t *tri, con
 
 	if ( entryIndex == -1 ) {
 		if ( s_drawSurfAreaMemo.Num() >= DRAWSURF_AREA_MEMO_MAX ) {
-			R_ClearDrawSurfAreaMemo();
+			R_ResetDrawSurfAreaMemo();
+		}
+		if ( s_drawSurfAreaMemo.GetGranularity() != DRAWSURF_AREA_MEMO_GRANULARITY ) {
+			// First insertion: size the list and both hashes once. SetGranularity
+			// would shrink a live list to its count, so it runs only here.
+			s_drawSurfAreaMemo.SetGranularity( DRAWSURF_AREA_MEMO_GRANULARITY );
+			if ( s_drawSurfAreaMemo.Num() == 0 ) {
+				s_drawSurfAreaMemoHash.Clear( DRAWSURF_AREA_MEMO_HASH_SIZE, DRAWSURF_AREA_MEMO_GRANULARITY );
+				s_drawSurfAreaMemoEntityHash.Clear( DRAWSURF_AREA_MEMO_HASH_SIZE, DRAWSURF_AREA_MEMO_GRANULARITY );
+			}
+			s_drawSurfAreaMemoHash.SetGranularity( DRAWSURF_AREA_MEMO_GRANULARITY );
+			s_drawSurfAreaMemoEntityHash.SetGranularity( DRAWSURF_AREA_MEMO_GRANULARITY );
 		}
 		entryIndex = s_drawSurfAreaMemo.Num();
 		drawSurfAreaMemo_t &newEntry = s_drawSurfAreaMemo.Alloc();
