@@ -6,6 +6,50 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Fixes and smoother first spawns from an audit round, 9 November 2026
+
+- **No hitch on your first multiplayer spawn.** A multiplayer player spawns after
+  the level has finished loading, so the first spawn on each map used to parse and
+  load the player model, skins, crosshairs, weapons, HUD pieces and damage
+  definitions mid-game: 86 late loads on `mp/q4dm1`, many with images. They now
+  load with the level, on listen servers, dedicated servers and connecting
+  clients alike, and only one small definition is left. Loading a map takes a
+  little longer in exchange. Nothing needs to be changed.
+- **Crash and corruption fixes.**
+  - A mover that crushed a corpse, a loose moveable or a ragdoll could damage it
+    after it had already been deleted.
+  - Bursts of particle impacts or child effects could overrun a per-frame list
+    and corrupt rendering memory.
+  - A crafted server or demo stream could make a client write or read outside
+    its powerup and player tables.
+  - The Tourney announcer read a sound entry after freeing it.
+  - Appending a fixed-length buffer to a string read one byte past it, for example
+    on 4-byte UTF-8 text from a JSON file.
+  - A model or camera definition naming an unknown frame event crashed instead of
+    reporting the bad name.
+  - On Vulkan with the render thread enabled, bloom and HDR setup used the shared
+    text buffer that the game thread uses at the same time.
+- **Better crash reports.** A stack overflow on Windows now still writes its crash
+  log and dump; before, the report needed more stack than was left and the game
+  vanished without one.
+- **Smaller fixes.** `func_waitforbutton` now fires (an operator mix-up meant it
+  never could), the `jumpnext`/`jumpprev` debug commands step through the points,
+  `func_phantom_objects` no longer crashes without a target, and a GUI naming a
+  missing font no longer grows the font list on every lookup or reports a font
+  failure after every `vid_restart`.
+- **Less per-frame overhead.** OpenGL no longer frees and reallocates its
+  scaled-rendering bookkeeping every view, upload counters no longer take a lock
+  while renderer metrics are off, and the light-grid area memo grows in large
+  steps instead of recopying itself every 16 entries.
+- **Faster local builds.** Editing game code or committing no longer forces a full
+  Meson reconfigure on the next `meson_setup` compile; only adding or removing
+  game source files does. The build's source snapshot is refreshed in place
+  instead.
+- Validation: SP `game/airdefense1` and MP `mp/q4dm1` probes on OpenGL and Vulkan
+  with clean logs, a dedicated-server connect, 334 of 337 native tests (the other
+  three fail on unrelated in-progress or older work), and the affected Python
+  contract tests.
+
 ## Rebuilt maps keep their textures where patches meet (CORE-05, #209), 9 November 2026
 
 - **No more smeared strips on rebuilt maps.** Where flat patches meet end to end
