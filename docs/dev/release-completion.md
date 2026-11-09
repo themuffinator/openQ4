@@ -60,6 +60,15 @@ See [player release status](../user/release-status.md).
   `func_phantom_objects` no longer crashes without a target, and a GUI naming a
   missing font no longer grows the font list on every lookup or reports a font
   failure after every `vid_restart`.
+- **Tab walks the settings tabs in reading order again.** On Display, Game
+  Options and Controls, Tab from a tab's last setting went back up to the first
+  tab of the strip once the tabs began answering the mouse. It now moves on to
+  Apply Changes or Back, then to the strip, and never reaches a hidden tab's
+  settings.
+- **GUI expressions read colour components correctly.** An expression reading
+  one component of a window colour, such as `forecolor[3]`, read unrelated
+  memory instead, a fault inherited from the original GUI code. No stock GUI
+  does this, so only custom GUIs see a difference.
 - **Less per-frame overhead.** OpenGL no longer frees and reallocates its
   scaled-rendering bookkeeping every view, upload counters no longer take a lock
   while renderer metrics are off, and the light-grid area memo grows in large

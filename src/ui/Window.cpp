@@ -4511,9 +4511,10 @@ void idWindow::EvaluateRegisters(float *registers) {
 				break;
 			}
 			if ( op->b >= 0 && registers[op->b] >= 0 && registers[op->b] < 4 ) {
-				// grabs vector components
+				// grabs vector components. The inherited ((idVec4&)var) cast
+				// read the local pointer's own bytes and the stack beyond them.
 				idWinVec4 *var = (idWinVec4 *)( op->a );
-				registers[op->c] = ((idVec4&)var)[registers[op->b]];
+				registers[op->c] = static_cast<const idVec4 &>( *var )[ static_cast<int>( registers[op->b] ) ];
 			} else {
 				registers[op->c] = ((idWinVar*)(op->a))->x();
 			}

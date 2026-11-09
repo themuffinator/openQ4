@@ -398,7 +398,10 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
         # The strip follows the pages in the tree: each page is a full-size
         # group, and a later group's box takes the pointer's hits over earlier
         # controls, so a strip under the pages left its tabs dead to the mouse
-        # and the VR pointer. They never overlap on screen.
+        # and the VR pointer. They never overlap on screen. It also follows
+        # the footer and Back, the last controls in reading order: Next and
+        # Previous walk the tree as a ring, so a tab's last row leads on to
+        # Back and Back to the strip, the order the page reads in.
         above.append(group(f"{prefix}-strip", absolute(left=U * CONTENT_LEFT, top=U * STRIP_TOP, width=width, height=2 * TAB_RISE),
                            strip))
         # The tabs keep their size in the strip's slots at any text size.
@@ -516,7 +519,7 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
         back = page_prompts(doc, back_id or f"{prefix}_back", event=back_event)
     if body is not None:
         pages = [group(body, FULL, pages)]
-    return subpage_document(doc, prefix, CRUMB, title_key, firsts[0], [*chrome, *pages, *above, *footer, back], list(overlays),
+    return subpage_document(doc, prefix, CRUMB, title_key, firsts[0], [*chrome, *pages, *footer, back, *above], list(overlays),
                             stretch=tuple(scrollers), activate=activate(steps) if activate else steps,
                             backing_node=settings_backing(f"{prefix}-backing"))
 

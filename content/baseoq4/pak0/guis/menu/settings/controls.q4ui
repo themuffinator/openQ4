@@ -31591,6 +31591,1386 @@
         ]
        },
        {
+        "id": "prompts",
+        "type": "group",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 570.0, "unit": "dp"},
+         "width": {"type": "length", "value": 390.0, "unit": "dp"},
+         "height": {"type": "length", "value": 45.0, "unit": "dp"},
+         "opacity": {"type": "number", "value": 1},
+         "bottom": {"type": "length", "value": 13.5, "unit": "dp"}
+        },
+        "children": [
+         {
+          "id": "prompts-lead",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "top": {"type": "length", "value": 11.5, "unit": "dp"},
+           "height": {"type": "length", "value": 22, "unit": "dp"},
+           "right": {"type": "length", "value": 176.0, "unit": "dp"},
+           "display": {"type": "keyword", "value": "flex"},
+           "flex-direction": {"type": "keyword", "value": "row"},
+           "align-items": {"type": "keyword", "value": "center"},
+           "pointer-events": {"type": "keyword", "value": "none"}
+          },
+          "children": [
+           {
+            "id": "prompt-231042-glyph",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "flex"},
+             "flex-direction": {"type": "keyword", "value": "row"},
+             "align-items": {"type": "keyword", "value": "center"},
+             "height": {"type": "length", "value": 22, "unit": "dp"},
+             "margin-right": {"type": "length", "value": 6, "unit": "dp"}
+            },
+            "children": [
+             {
+              "id": "prompt-231042-cap",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "block"},
+               "height": {"type": "length", "value": 22, "unit": "dp"},
+               "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+               "padding-right": {"type": "length", "value": 8, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "cap",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[6, {"fraction": 1}]]},
+                 {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -6}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               }
+              ],
+              "children": [
+               {
+                "id": "prompt-231042-key",
+                "type": "text",
+                "properties": {
+                 "text": {"type": "text", "value": "#str_107019"},
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "font-family": {"type": "font", "value": "lowpixel"},
+                 "font-size": {"type": "length", "value": 13, "unit": "dp"},
+                 "line-height": {"type": "length", "value": 22, "unit": "dp"},
+                 "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                 "white-space": {"type": "keyword", "value": "nowrap"}
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-xbox",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               },
+               {
+                "id": "mark-a1",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
+                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
+                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-a2",
+                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-xbox-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               },
+               {
+                "id": "mark-b1",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
+                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
+                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
+                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
+                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-b2",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
+                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
+                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
+                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-playstation",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               },
+               {
+                "id": "mark-x1",
+                "commands": [{"id": "p0", "op": "move", "points": [[7.3, 7.3]]}, {"id": "p1", "op": "line", "points": [[14.7, 14.7]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-x2",
+                "commands": [{"id": "p0", "op": "move", "points": [[14.7, 7.3]]}, {"id": "p1", "op": "line", "points": [[7.3, 14.7]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-playstation-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               },
+               {
+                "id": "mark-o",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[15.5, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[15.5, 13.485], [13.485, 15.5], [11.0, 15.5]]},
+                 {"id": "b", "op": "cubic", "points": [[8.515, 15.5], [6.5, 13.485], [6.5, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[6.5, 8.515], [8.515, 6.5], [11.0, 6.5]]},
+                 {"id": "d", "op": "cubic", "points": [[13.485, 6.5], [15.5, 8.515], [15.5, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-nintendo",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               },
+               {
+                "id": "mark-b1",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
+                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
+                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
+                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
+                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-b2",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
+                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
+                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
+                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-nintendo-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               },
+               {
+                "id": "mark-a1",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
+                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
+                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-a2",
+                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-steamdeck",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "ring",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[20.9, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[20.9, 16.468], [16.468, 20.9], [11.0, 20.9]]},
+                 {"id": "b", "op": "cubic", "points": [[5.532, 20.9], [1.1, 16.468], [1.1, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[1.1, 5.532], [5.532, 1.1], [11.0, 1.1]]},
+                 {"id": "d", "op": "cubic", "points": [[16.468, 1.1], [20.9, 5.532], [20.9, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-a1",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
+                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
+                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-a2",
+                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-steamdeck-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "ring",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[20.9, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[20.9, 16.468], [16.468, 20.9], [11.0, 20.9]]},
+                 {"id": "b", "op": "cubic", "points": [[5.532, 20.9], [1.1, 16.468], [1.1, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[1.1, 5.532], [5.532, 1.1], [11.0, 1.1]]},
+                 {"id": "d", "op": "cubic", "points": [[16.468, 1.1], [20.9, 5.532], [20.9, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-b1",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
+                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
+                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
+                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
+                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-b2",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
+                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
+                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
+                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-generic",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "dot-north",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[13.7, 4.3]]},
+                 {"id": "a", "op": "cubic", "points": [[13.7, 5.791], [12.491, 7.0], [11.0, 7.0]]},
+                 {"id": "b", "op": "cubic", "points": [[9.509, 7.0], [8.3, 5.791], [8.3, 4.3]]},
+                 {"id": "c", "op": "cubic", "points": [[8.3, 2.809], [9.509, 1.6], [11.0, 1.6]]},
+                 {"id": "d", "op": "cubic", "points": [[12.491, 1.6], [13.7, 2.809], [13.7, 4.3]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-west",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[7.0, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[7.0, 12.491], [5.791, 13.7], [4.3, 13.7]]},
+                 {"id": "b", "op": "cubic", "points": [[2.809, 13.7], [1.6, 12.491], [1.6, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[1.6, 9.509], [2.809, 8.3], [4.3, 8.3]]},
+                 {"id": "d", "op": "cubic", "points": [[5.791, 8.3], [7.0, 9.509], [7.0, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-east",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[20.4, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[20.4, 12.491], [19.191, 13.7], [17.7, 13.7]]},
+                 {"id": "b", "op": "cubic", "points": [[16.209, 13.7], [15.0, 12.491], [15.0, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[15.0, 9.509], [16.209, 8.3], [17.7, 8.3]]},
+                 {"id": "d", "op": "cubic", "points": [[19.191, 8.3], [20.4, 9.509], [20.4, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-south",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[14.6, 17.7]]},
+                 {"id": "a", "op": "cubic", "points": [[14.6, 19.688], [12.988, 21.3], [11.0, 21.3]]},
+                 {"id": "b", "op": "cubic", "points": [[9.012, 21.3], [7.4, 19.688], [7.4, 17.7]]},
+                 {"id": "c", "op": "cubic", "points": [[7.4, 15.712], [9.012, 14.1], [11.0, 14.1]]},
+                 {"id": "d", "op": "cubic", "points": [[12.988, 14.1], [14.6, 15.712], [14.6, 17.7]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               }
+              ]
+             },
+             {
+              "id": "prompt-231042-generic-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "dot-north",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[13.7, 4.3]]},
+                 {"id": "a", "op": "cubic", "points": [[13.7, 5.791], [12.491, 7.0], [11.0, 7.0]]},
+                 {"id": "b", "op": "cubic", "points": [[9.509, 7.0], [8.3, 5.791], [8.3, 4.3]]},
+                 {"id": "c", "op": "cubic", "points": [[8.3, 2.809], [9.509, 1.6], [11.0, 1.6]]},
+                 {"id": "d", "op": "cubic", "points": [[12.491, 1.6], [13.7, 2.809], [13.7, 4.3]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-west",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[7.0, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[7.0, 12.491], [5.791, 13.7], [4.3, 13.7]]},
+                 {"id": "b", "op": "cubic", "points": [[2.809, 13.7], [1.6, 12.491], [1.6, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[1.6, 9.509], [2.809, 8.3], [4.3, 8.3]]},
+                 {"id": "d", "op": "cubic", "points": [[5.791, 8.3], [7.0, 9.509], [7.0, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-east",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.3, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.3, 12.988], [19.688, 14.6], [17.7, 14.6]]},
+                 {"id": "b", "op": "cubic", "points": [[15.712, 14.6], [14.1, 12.988], [14.1, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[14.1, 9.012], [15.712, 7.4], [17.7, 7.4]]},
+                 {"id": "d", "op": "cubic", "points": [[19.688, 7.4], [21.3, 9.012], [21.3, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+               },
+               {
+                "id": "dot-south",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[13.7, 17.7]]},
+                 {"id": "a", "op": "cubic", "points": [[13.7, 19.191], [12.491, 20.4], [11.0, 20.4]]},
+                 {"id": "b", "op": "cubic", "points": [[9.509, 20.4], [8.3, 19.191], [8.3, 17.7]]},
+                 {"id": "c", "op": "cubic", "points": [[8.3, 16.209], [9.509, 15.0], [11.0, 15.0]]},
+                 {"id": "d", "op": "cubic", "points": [[12.491, 15.0], [13.7, 16.209], [13.7, 17.7]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "id": "prompt-231042-verb",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_231042"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "font-size": {"type": "length", "value": 14, "unit": "dp"},
+             "line-height": {"type": "length", "value": 22, "unit": "dp"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.8]},
+             "white-space": {"type": "keyword", "value": "nowrap"}
+            }
+           }
+          ]
+         },
+         {
+          "id": "controls_back",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 228.0, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "height": {"type": "length", "value": 45.0, "unit": "dp"},
+           "display": {"type": "keyword", "value": "flex"},
+           "flex-direction": {"type": "keyword", "value": "row"},
+           "align-items": {"type": "keyword", "value": "center"},
+           "padding-left": {"type": "length", "value": 8.0, "unit": "dp"},
+           "padding-right": {"type": "length", "value": 8.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "controls_back-glyph",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "flex"},
+             "flex-direction": {"type": "keyword", "value": "row"},
+             "align-items": {"type": "keyword", "value": "center"},
+             "height": {"type": "length", "value": 22, "unit": "dp"},
+             "margin-right": {"type": "length", "value": 6, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0.85},
+             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+            },
+            "children": [
+             {
+              "id": "controls_back-cap",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "block"},
+               "height": {"type": "length", "value": 22, "unit": "dp"},
+               "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+               "padding-right": {"type": "length", "value": 8, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "cap",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[6, {"fraction": 1}]]},
+                 {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -6}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               }
+              ],
+              "children": [
+               {
+                "id": "controls_back-key",
+                "type": "text",
+                "properties": {
+                 "text": {"type": "text", "value": "#str_107020"},
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "font-family": {"type": "font", "value": "lowpixel"},
+                 "font-size": {"type": "length", "value": 13, "unit": "dp"},
+                 "line-height": {"type": "length", "value": 22, "unit": "dp"},
+                 "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                 "white-space": {"type": "keyword", "value": "nowrap"}
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-xbox",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               },
+               {
+                "id": "mark-b1",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
+                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
+                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
+                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
+                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-b2",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
+                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
+                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
+                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-xbox-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               },
+               {
+                "id": "mark-a1",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
+                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
+                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-a2",
+                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-playstation",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               },
+               {
+                "id": "mark-o",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[15.5, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[15.5, 13.485], [13.485, 15.5], [11.0, 15.5]]},
+                 {"id": "b", "op": "cubic", "points": [[8.515, 15.5], [6.5, 13.485], [6.5, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[6.5, 8.515], [8.515, 6.5], [11.0, 6.5]]},
+                 {"id": "d", "op": "cubic", "points": [[13.485, 6.5], [15.5, 8.515], [15.5, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-playstation-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               },
+               {
+                "id": "mark-x1",
+                "commands": [{"id": "p0", "op": "move", "points": [[7.3, 7.3]]}, {"id": "p1", "op": "line", "points": [[14.7, 14.7]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-x2",
+                "commands": [{"id": "p0", "op": "move", "points": [[14.7, 7.3]]}, {"id": "p1", "op": "line", "points": [[7.3, 14.7]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-nintendo",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               },
+               {
+                "id": "mark-a1",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
+                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
+                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-a2",
+                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-nintendo-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "disc",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
+                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
+                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               },
+               {
+                "id": "mark-b1",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
+                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
+                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
+                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
+                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-b2",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
+                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
+                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
+                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-steamdeck",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "ring",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[20.9, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[20.9, 16.468], [16.468, 20.9], [11.0, 20.9]]},
+                 {"id": "b", "op": "cubic", "points": [[5.532, 20.9], [1.1, 16.468], [1.1, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[1.1, 5.532], [5.532, 1.1], [11.0, 1.1]]},
+                 {"id": "d", "op": "cubic", "points": [[16.468, 1.1], [20.9, 5.532], [20.9, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-b1",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
+                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
+                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
+                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
+                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-b2",
+                "commands": [
+                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
+                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
+                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
+                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-steamdeck-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "ring",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[20.9, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[20.9, 16.468], [16.468, 20.9], [11.0, 20.9]]},
+                 {"id": "b", "op": "cubic", "points": [[5.532, 20.9], [1.1, 16.468], [1.1, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[1.1, 5.532], [5.532, 1.1], [11.0, 1.1]]},
+                 {"id": "d", "op": "cubic", "points": [[16.468, 1.1], [20.9, 5.532], [20.9, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-a1",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
+                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
+                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "mark-a2",
+                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.9,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-generic",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "dot-north",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[13.7, 4.3]]},
+                 {"id": "a", "op": "cubic", "points": [[13.7, 5.791], [12.491, 7.0], [11.0, 7.0]]},
+                 {"id": "b", "op": "cubic", "points": [[9.509, 7.0], [8.3, 5.791], [8.3, 4.3]]},
+                 {"id": "c", "op": "cubic", "points": [[8.3, 2.809], [9.509, 1.6], [11.0, 1.6]]},
+                 {"id": "d", "op": "cubic", "points": [[12.491, 1.6], [13.7, 2.809], [13.7, 4.3]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-west",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[7.0, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[7.0, 12.491], [5.791, 13.7], [4.3, 13.7]]},
+                 {"id": "b", "op": "cubic", "points": [[2.809, 13.7], [1.6, 12.491], [1.6, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[1.6, 9.509], [2.809, 8.3], [4.3, 8.3]]},
+                 {"id": "d", "op": "cubic", "points": [[5.791, 8.3], [7.0, 9.509], [7.0, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-east",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[21.3, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[21.3, 12.988], [19.688, 14.6], [17.7, 14.6]]},
+                 {"id": "b", "op": "cubic", "points": [[15.712, 14.6], [14.1, 12.988], [14.1, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[14.1, 9.012], [15.712, 7.4], [17.7, 7.4]]},
+                 {"id": "d", "op": "cubic", "points": [[19.688, 7.4], [21.3, 9.012], [21.3, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               },
+               {
+                "id": "dot-south",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[13.7, 17.7]]},
+                 {"id": "a", "op": "cubic", "points": [[13.7, 19.191], [12.491, 20.4], [11.0, 20.4]]},
+                 {"id": "b", "op": "cubic", "points": [[9.509, 20.4], [8.3, 19.191], [8.3, 17.7]]},
+                 {"id": "c", "op": "cubic", "points": [[8.3, 16.209], [9.509, 15.0], [11.0, 15.0]]},
+                 {"id": "d", "op": "cubic", "points": [[12.491, 15.0], [13.7, 16.209], [13.7, 17.7]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "controls_back-generic-swapped",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 22, "unit": "dp"},
+               "height": {"type": "length", "value": 22, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "dot-north",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[13.7, 4.3]]},
+                 {"id": "a", "op": "cubic", "points": [[13.7, 5.791], [12.491, 7.0], [11.0, 7.0]]},
+                 {"id": "b", "op": "cubic", "points": [[9.509, 7.0], [8.3, 5.791], [8.3, 4.3]]},
+                 {"id": "c", "op": "cubic", "points": [[8.3, 2.809], [9.509, 1.6], [11.0, 1.6]]},
+                 {"id": "d", "op": "cubic", "points": [[12.491, 1.6], [13.7, 2.809], [13.7, 4.3]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-west",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[7.0, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[7.0, 12.491], [5.791, 13.7], [4.3, 13.7]]},
+                 {"id": "b", "op": "cubic", "points": [[2.809, 13.7], [1.6, 12.491], [1.6, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[1.6, 9.509], [2.809, 8.3], [4.3, 8.3]]},
+                 {"id": "d", "op": "cubic", "points": [[5.791, 8.3], [7.0, 9.509], [7.0, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-east",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[20.4, 11.0]]},
+                 {"id": "a", "op": "cubic", "points": [[20.4, 12.491], [19.191, 13.7], [17.7, 13.7]]},
+                 {"id": "b", "op": "cubic", "points": [[16.209, 13.7], [15.0, 12.491], [15.0, 11.0]]},
+                 {"id": "c", "op": "cubic", "points": [[15.0, 9.509], [16.209, 8.3], [17.7, 8.3]]},
+                 {"id": "d", "op": "cubic", "points": [[19.191, 8.3], [20.4, 9.509], [20.4, 11.0]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
+                 "widthDp": 1.3,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "dot-south",
+                "commands": [
+                 {"id": "m", "op": "move", "points": [[14.6, 17.7]]},
+                 {"id": "a", "op": "cubic", "points": [[14.6, 19.688], [12.988, 21.3], [11.0, 21.3]]},
+                 {"id": "b", "op": "cubic", "points": [[9.012, 21.3], [7.4, 19.688], [7.4, 17.7]]},
+                 {"id": "c", "op": "cubic", "points": [[7.4, 15.712], [9.012, 14.1], [11.0, 14.1]]},
+                 {"id": "d", "op": "cubic", "points": [[12.988, 14.1], [14.6, 15.712], [14.6, 17.7]]},
+                 {"id": "z", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "id": "controls_back-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_230045"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "font-size": {"type": "length", "value": 14, "unit": "dp"},
+             "line-height": {"type": "length", "value": 22, "unit": "dp"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.8]},
+             "white-space": {"type": "keyword", "value": "nowrap"},
+             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+            }
+           },
+           {
+            "id": "controls_back-focus",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 8.0, "unit": "dp"},
+             "top": {"type": "length", "value": 35.5, "unit": "dp"},
+             "height": {"type": "length", "value": 2, "unit": "dp"},
+             "right": {"type": "length", "value": 8.0, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "inset",
+              "commands": [{"id": "p0", "op": "move", "points": [[0, 1]]}, {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]}],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+               "widthDp": 1.2,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_230045",
+           "states": {
+            "default": "controls_back.default",
+            "hover": "controls_back.hover",
+            "focus": "controls_back.focus",
+            "pressed": "controls_back.pressed",
+            "disabled": "controls_back.disabled"
+           },
+           "action": "back"
+          }
+         }
+        ]
+       },
+       {
         "id": "controls-strip",
         "type": "group",
         "properties": {
@@ -32981,1386 +34361,6 @@
             "pressed": "tab-next.pressed",
             "disabled": "tab-next.disabled"
            }
-          }
-         }
-        ]
-       },
-       {
-        "id": "prompts",
-        "type": "group",
-        "properties": {
-         "position": {"type": "keyword", "value": "absolute"},
-         "left": {"type": "length", "value": 570.0, "unit": "dp"},
-         "width": {"type": "length", "value": 390.0, "unit": "dp"},
-         "height": {"type": "length", "value": 45.0, "unit": "dp"},
-         "opacity": {"type": "number", "value": 1},
-         "bottom": {"type": "length", "value": 13.5, "unit": "dp"}
-        },
-        "children": [
-         {
-          "id": "prompts-lead",
-          "type": "group",
-          "properties": {
-           "position": {"type": "keyword", "value": "absolute"},
-           "top": {"type": "length", "value": 11.5, "unit": "dp"},
-           "height": {"type": "length", "value": 22, "unit": "dp"},
-           "right": {"type": "length", "value": 176.0, "unit": "dp"},
-           "display": {"type": "keyword", "value": "flex"},
-           "flex-direction": {"type": "keyword", "value": "row"},
-           "align-items": {"type": "keyword", "value": "center"},
-           "pointer-events": {"type": "keyword", "value": "none"}
-          },
-          "children": [
-           {
-            "id": "prompt-231042-glyph",
-            "type": "group",
-            "properties": {
-             "position": {"type": "keyword", "value": "relative"},
-             "display": {"type": "keyword", "value": "flex"},
-             "flex-direction": {"type": "keyword", "value": "row"},
-             "align-items": {"type": "keyword", "value": "center"},
-             "height": {"type": "length", "value": 22, "unit": "dp"},
-             "margin-right": {"type": "length", "value": 6, "unit": "dp"}
-            },
-            "children": [
-             {
-              "id": "prompt-231042-cap",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "block"},
-               "height": {"type": "length", "value": 22, "unit": "dp"},
-               "padding-left": {"type": "length", "value": 8, "unit": "dp"},
-               "padding-right": {"type": "length", "value": 8, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "cap",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 0]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-                 {"id": "p3", "op": "line", "points": [[6, {"fraction": 1}]]},
-                 {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -6}]]},
-                 {"id": "close", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               }
-              ],
-              "children": [
-               {
-                "id": "prompt-231042-key",
-                "type": "text",
-                "properties": {
-                 "text": {"type": "text", "value": "#str_107019"},
-                 "position": {"type": "keyword", "value": "relative"},
-                 "display": {"type": "keyword", "value": "block"},
-                 "font-family": {"type": "font", "value": "lowpixel"},
-                 "font-size": {"type": "length", "value": 13, "unit": "dp"},
-                 "line-height": {"type": "length", "value": 22, "unit": "dp"},
-                 "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
-                 "white-space": {"type": "keyword", "value": "nowrap"}
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-xbox",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               },
-               {
-                "id": "mark-a1",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
-                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
-                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-a2",
-                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-xbox-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               },
-               {
-                "id": "mark-b1",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
-                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
-                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
-                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
-                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-b2",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
-                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
-                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
-                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-playstation",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               },
-               {
-                "id": "mark-x1",
-                "commands": [{"id": "p0", "op": "move", "points": [[7.3, 7.3]]}, {"id": "p1", "op": "line", "points": [[14.7, 14.7]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-x2",
-                "commands": [{"id": "p0", "op": "move", "points": [[14.7, 7.3]]}, {"id": "p1", "op": "line", "points": [[7.3, 14.7]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-playstation-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               },
-               {
-                "id": "mark-o",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[15.5, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[15.5, 13.485], [13.485, 15.5], [11.0, 15.5]]},
-                 {"id": "b", "op": "cubic", "points": [[8.515, 15.5], [6.5, 13.485], [6.5, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[6.5, 8.515], [8.515, 6.5], [11.0, 6.5]]},
-                 {"id": "d", "op": "cubic", "points": [[13.485, 6.5], [15.5, 8.515], [15.5, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-nintendo",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               },
-               {
-                "id": "mark-b1",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
-                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
-                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
-                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
-                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-b2",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
-                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
-                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
-                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-nintendo-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               },
-               {
-                "id": "mark-a1",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
-                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
-                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-a2",
-                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-steamdeck",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "ring",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[20.9, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[20.9, 16.468], [16.468, 20.9], [11.0, 20.9]]},
-                 {"id": "b", "op": "cubic", "points": [[5.532, 20.9], [1.1, 16.468], [1.1, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[1.1, 5.532], [5.532, 1.1], [11.0, 1.1]]},
-                 {"id": "d", "op": "cubic", "points": [[16.468, 1.1], [20.9, 5.532], [20.9, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-a1",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
-                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
-                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-a2",
-                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-steamdeck-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "ring",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[20.9, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[20.9, 16.468], [16.468, 20.9], [11.0, 20.9]]},
-                 {"id": "b", "op": "cubic", "points": [[5.532, 20.9], [1.1, 16.468], [1.1, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[1.1, 5.532], [5.532, 1.1], [11.0, 1.1]]},
-                 {"id": "d", "op": "cubic", "points": [[16.468, 1.1], [20.9, 5.532], [20.9, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-b1",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
-                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
-                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
-                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
-                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-b2",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
-                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
-                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
-                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-generic",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "dot-north",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[13.7, 4.3]]},
-                 {"id": "a", "op": "cubic", "points": [[13.7, 5.791], [12.491, 7.0], [11.0, 7.0]]},
-                 {"id": "b", "op": "cubic", "points": [[9.509, 7.0], [8.3, 5.791], [8.3, 4.3]]},
-                 {"id": "c", "op": "cubic", "points": [[8.3, 2.809], [9.509, 1.6], [11.0, 1.6]]},
-                 {"id": "d", "op": "cubic", "points": [[12.491, 1.6], [13.7, 2.809], [13.7, 4.3]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-west",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[7.0, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[7.0, 12.491], [5.791, 13.7], [4.3, 13.7]]},
-                 {"id": "b", "op": "cubic", "points": [[2.809, 13.7], [1.6, 12.491], [1.6, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[1.6, 9.509], [2.809, 8.3], [4.3, 8.3]]},
-                 {"id": "d", "op": "cubic", "points": [[5.791, 8.3], [7.0, 9.509], [7.0, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-east",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[20.4, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[20.4, 12.491], [19.191, 13.7], [17.7, 13.7]]},
-                 {"id": "b", "op": "cubic", "points": [[16.209, 13.7], [15.0, 12.491], [15.0, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[15.0, 9.509], [16.209, 8.3], [17.7, 8.3]]},
-                 {"id": "d", "op": "cubic", "points": [[19.191, 8.3], [20.4, 9.509], [20.4, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-south",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[14.6, 17.7]]},
-                 {"id": "a", "op": "cubic", "points": [[14.6, 19.688], [12.988, 21.3], [11.0, 21.3]]},
-                 {"id": "b", "op": "cubic", "points": [[9.012, 21.3], [7.4, 19.688], [7.4, 17.7]]},
-                 {"id": "c", "op": "cubic", "points": [[7.4, 15.712], [9.012, 14.1], [11.0, 14.1]]},
-                 {"id": "d", "op": "cubic", "points": [[12.988, 14.1], [14.6, 15.712], [14.6, 17.7]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               }
-              ]
-             },
-             {
-              "id": "prompt-231042-generic-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "dot-north",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[13.7, 4.3]]},
-                 {"id": "a", "op": "cubic", "points": [[13.7, 5.791], [12.491, 7.0], [11.0, 7.0]]},
-                 {"id": "b", "op": "cubic", "points": [[9.509, 7.0], [8.3, 5.791], [8.3, 4.3]]},
-                 {"id": "c", "op": "cubic", "points": [[8.3, 2.809], [9.509, 1.6], [11.0, 1.6]]},
-                 {"id": "d", "op": "cubic", "points": [[12.491, 1.6], [13.7, 2.809], [13.7, 4.3]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-west",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[7.0, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[7.0, 12.491], [5.791, 13.7], [4.3, 13.7]]},
-                 {"id": "b", "op": "cubic", "points": [[2.809, 13.7], [1.6, 12.491], [1.6, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[1.6, 9.509], [2.809, 8.3], [4.3, 8.3]]},
-                 {"id": "d", "op": "cubic", "points": [[5.791, 8.3], [7.0, 9.509], [7.0, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-east",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.3, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.3, 12.988], [19.688, 14.6], [17.7, 14.6]]},
-                 {"id": "b", "op": "cubic", "points": [[15.712, 14.6], [14.1, 12.988], [14.1, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[14.1, 9.012], [15.712, 7.4], [17.7, 7.4]]},
-                 {"id": "d", "op": "cubic", "points": [[19.688, 7.4], [21.3, 9.012], [21.3, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
-               },
-               {
-                "id": "dot-south",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[13.7, 17.7]]},
-                 {"id": "a", "op": "cubic", "points": [[13.7, 19.191], [12.491, 20.4], [11.0, 20.4]]},
-                 {"id": "b", "op": "cubic", "points": [[9.509, 20.4], [8.3, 19.191], [8.3, 17.7]]},
-                 {"id": "c", "op": "cubic", "points": [[8.3, 16.209], [9.509, 15.0], [11.0, 15.0]]},
-                 {"id": "d", "op": "cubic", "points": [[12.491, 15.0], [13.7, 16.209], [13.7, 17.7]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             }
-            ]
-           },
-           {
-            "id": "prompt-231042-verb",
-            "type": "text",
-            "properties": {
-             "text": {"type": "text", "value": "#str_231042"},
-             "position": {"type": "keyword", "value": "relative"},
-             "display": {"type": "keyword", "value": "block"},
-             "font-family": {"type": "font", "value": "marine"},
-             "font-size": {"type": "length", "value": 14, "unit": "dp"},
-             "line-height": {"type": "length", "value": 22, "unit": "dp"},
-             "color": {"type": "color", "value": [1, 1, 1, 0.8]},
-             "white-space": {"type": "keyword", "value": "nowrap"}
-            }
-           }
-          ]
-         },
-         {
-          "id": "controls_back",
-          "type": "group",
-          "properties": {
-           "position": {"type": "keyword", "value": "absolute"},
-           "left": {"type": "length", "value": 228.0, "unit": "dp"},
-           "top": {"type": "length", "value": 0, "unit": "dp"},
-           "height": {"type": "length", "value": 45.0, "unit": "dp"},
-           "display": {"type": "keyword", "value": "flex"},
-           "flex-direction": {"type": "keyword", "value": "row"},
-           "align-items": {"type": "keyword", "value": "center"},
-           "padding-left": {"type": "length", "value": 8.0, "unit": "dp"},
-           "padding-right": {"type": "length", "value": 8.0, "unit": "dp"}
-          },
-          "children": [
-           {
-            "id": "controls_back-glyph",
-            "type": "group",
-            "properties": {
-             "position": {"type": "keyword", "value": "relative"},
-             "display": {"type": "keyword", "value": "flex"},
-             "flex-direction": {"type": "keyword", "value": "row"},
-             "align-items": {"type": "keyword", "value": "center"},
-             "height": {"type": "length", "value": 22, "unit": "dp"},
-             "margin-right": {"type": "length", "value": 6, "unit": "dp"},
-             "opacity": {"type": "number", "value": 0.85},
-             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
-            },
-            "children": [
-             {
-              "id": "controls_back-cap",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "block"},
-               "height": {"type": "length", "value": 22, "unit": "dp"},
-               "padding-left": {"type": "length", "value": 8, "unit": "dp"},
-               "padding-right": {"type": "length", "value": 8, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "cap",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 0]]},
-                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-                 {"id": "p3", "op": "line", "points": [[6, {"fraction": 1}]]},
-                 {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -6}]]},
-                 {"id": "close", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               }
-              ],
-              "children": [
-               {
-                "id": "controls_back-key",
-                "type": "text",
-                "properties": {
-                 "text": {"type": "text", "value": "#str_107020"},
-                 "position": {"type": "keyword", "value": "relative"},
-                 "display": {"type": "keyword", "value": "block"},
-                 "font-family": {"type": "font", "value": "lowpixel"},
-                 "font-size": {"type": "length", "value": 13, "unit": "dp"},
-                 "line-height": {"type": "length", "value": 22, "unit": "dp"},
-                 "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
-                 "white-space": {"type": "keyword", "value": "nowrap"}
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-xbox",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               },
-               {
-                "id": "mark-b1",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
-                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
-                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
-                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
-                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-b2",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
-                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
-                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
-                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-xbox-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               },
-               {
-                "id": "mark-a1",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
-                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
-                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-a2",
-                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-playstation",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               },
-               {
-                "id": "mark-o",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[15.5, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[15.5, 13.485], [13.485, 15.5], [11.0, 15.5]]},
-                 {"id": "b", "op": "cubic", "points": [[8.515, 15.5], [6.5, 13.485], [6.5, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[6.5, 8.515], [8.515, 6.5], [11.0, 6.5]]},
-                 {"id": "d", "op": "cubic", "points": [[13.485, 6.5], [15.5, 8.515], [15.5, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-playstation-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               },
-               {
-                "id": "mark-x1",
-                "commands": [{"id": "p0", "op": "move", "points": [[7.3, 7.3]]}, {"id": "p1", "op": "line", "points": [[14.7, 14.7]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-x2",
-                "commands": [{"id": "p0", "op": "move", "points": [[14.7, 7.3]]}, {"id": "p1", "op": "line", "points": [[7.3, 14.7]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-nintendo",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               },
-               {
-                "id": "mark-a1",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
-                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
-                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-a2",
-                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-nintendo-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "disc",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.6, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.6, 16.854], [16.854, 21.6], [11.0, 21.6]]},
-                 {"id": "b", "op": "cubic", "points": [[5.146, 21.6], [0.4, 16.854], [0.4, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[0.4, 5.146], [5.146, 0.4], [11.0, 0.4]]},
-                 {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               },
-               {
-                "id": "mark-b1",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
-                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
-                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
-                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
-                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-b2",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
-                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
-                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
-                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-steamdeck",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "ring",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[20.9, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[20.9, 16.468], [16.468, 20.9], [11.0, 20.9]]},
-                 {"id": "b", "op": "cubic", "points": [[5.532, 20.9], [1.1, 16.468], [1.1, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[1.1, 5.532], [5.532, 1.1], [11.0, 1.1]]},
-                 {"id": "d", "op": "cubic", "points": [[16.468, 1.1], [20.9, 5.532], [20.9, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-b1",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 15.5]]},
-                 {"id": "c1", "op": "line", "points": [[8.2, 6.5]]},
-                 {"id": "c2", "op": "line", "points": [[11.3, 6.5]]},
-                 {"id": "c3", "op": "cubic", "points": [[13.7, 6.5], [13.7, 10.9], [11.3, 10.9]]},
-                 {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-b2",
-                "commands": [
-                 {"id": "c0", "op": "move", "points": [[8.2, 10.9]]},
-                 {"id": "c1", "op": "line", "points": [[11.8, 10.9]]},
-                 {"id": "c2", "op": "cubic", "points": [[14.5, 10.9], [14.5, 15.5], [11.8, 15.5]]},
-                 {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-steamdeck-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "ring",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[20.9, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[20.9, 16.468], [16.468, 20.9], [11.0, 20.9]]},
-                 {"id": "b", "op": "cubic", "points": [[5.532, 20.9], [1.1, 16.468], [1.1, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[1.1, 5.532], [5.532, 1.1], [11.0, 1.1]]},
-                 {"id": "d", "op": "cubic", "points": [[16.468, 1.1], [20.9, 5.532], [20.9, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.5,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-a1",
-                "commands": [
-                 {"id": "p0", "op": "move", "points": [[7.4, 15.5]]},
-                 {"id": "p1", "op": "line", "points": [[11.0, 6.5]]},
-                 {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "mark-a2",
-                "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.9,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-generic",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "dot-north",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[13.7, 4.3]]},
-                 {"id": "a", "op": "cubic", "points": [[13.7, 5.791], [12.491, 7.0], [11.0, 7.0]]},
-                 {"id": "b", "op": "cubic", "points": [[9.509, 7.0], [8.3, 5.791], [8.3, 4.3]]},
-                 {"id": "c", "op": "cubic", "points": [[8.3, 2.809], [9.509, 1.6], [11.0, 1.6]]},
-                 {"id": "d", "op": "cubic", "points": [[12.491, 1.6], [13.7, 2.809], [13.7, 4.3]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-west",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[7.0, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[7.0, 12.491], [5.791, 13.7], [4.3, 13.7]]},
-                 {"id": "b", "op": "cubic", "points": [[2.809, 13.7], [1.6, 12.491], [1.6, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[1.6, 9.509], [2.809, 8.3], [4.3, 8.3]]},
-                 {"id": "d", "op": "cubic", "points": [[5.791, 8.3], [7.0, 9.509], [7.0, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-east",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[21.3, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[21.3, 12.988], [19.688, 14.6], [17.7, 14.6]]},
-                 {"id": "b", "op": "cubic", "points": [[15.712, 14.6], [14.1, 12.988], [14.1, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[14.1, 9.012], [15.712, 7.4], [17.7, 7.4]]},
-                 {"id": "d", "op": "cubic", "points": [[19.688, 7.4], [21.3, 9.012], [21.3, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               },
-               {
-                "id": "dot-south",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[13.7, 17.7]]},
-                 {"id": "a", "op": "cubic", "points": [[13.7, 19.191], [12.491, 20.4], [11.0, 20.4]]},
-                 {"id": "b", "op": "cubic", "points": [[9.509, 20.4], [8.3, 19.191], [8.3, 17.7]]},
-                 {"id": "c", "op": "cubic", "points": [[8.3, 16.209], [9.509, 15.0], [11.0, 15.0]]},
-                 {"id": "d", "op": "cubic", "points": [[12.491, 15.0], [13.7, 16.209], [13.7, 17.7]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               }
-              ]
-             },
-             {
-              "id": "controls_back-generic-swapped",
-              "type": "vector",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "none"},
-               "width": {"type": "length", "value": 22, "unit": "dp"},
-               "height": {"type": "length", "value": 22, "unit": "dp"}
-              },
-              "paths": [
-               {
-                "id": "dot-north",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[13.7, 4.3]]},
-                 {"id": "a", "op": "cubic", "points": [[13.7, 5.791], [12.491, 7.0], [11.0, 7.0]]},
-                 {"id": "b", "op": "cubic", "points": [[9.509, 7.0], [8.3, 5.791], [8.3, 4.3]]},
-                 {"id": "c", "op": "cubic", "points": [[8.3, 2.809], [9.509, 1.6], [11.0, 1.6]]},
-                 {"id": "d", "op": "cubic", "points": [[12.491, 1.6], [13.7, 2.809], [13.7, 4.3]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-west",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[7.0, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[7.0, 12.491], [5.791, 13.7], [4.3, 13.7]]},
-                 {"id": "b", "op": "cubic", "points": [[2.809, 13.7], [1.6, 12.491], [1.6, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[1.6, 9.509], [2.809, 8.3], [4.3, 8.3]]},
-                 {"id": "d", "op": "cubic", "points": [[5.791, 8.3], [7.0, 9.509], [7.0, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-east",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[20.4, 11.0]]},
-                 {"id": "a", "op": "cubic", "points": [[20.4, 12.491], [19.191, 13.7], [17.7, 13.7]]},
-                 {"id": "b", "op": "cubic", "points": [[16.209, 13.7], [15.0, 12.491], [15.0, 11.0]]},
-                 {"id": "c", "op": "cubic", "points": [[15.0, 9.509], [16.209, 8.3], [17.7, 8.3]]},
-                 {"id": "d", "op": "cubic", "points": [[19.191, 8.3], [20.4, 9.509], [20.4, 11.0]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
-                 "widthDp": 1.3,
-                 "minimumPixels": 1,
-                 "join": "miter",
-                 "cap": "butt"
-                }
-               },
-               {
-                "id": "dot-south",
-                "commands": [
-                 {"id": "m", "op": "move", "points": [[14.6, 17.7]]},
-                 {"id": "a", "op": "cubic", "points": [[14.6, 19.688], [12.988, 21.3], [11.0, 21.3]]},
-                 {"id": "b", "op": "cubic", "points": [[9.012, 21.3], [7.4, 19.688], [7.4, 17.7]]},
-                 {"id": "c", "op": "cubic", "points": [[7.4, 15.712], [9.012, 14.1], [11.0, 14.1]]},
-                 {"id": "d", "op": "cubic", "points": [[12.988, 14.1], [14.6, 15.712], [14.6, 17.7]]},
-                 {"id": "z", "op": "close"}
-                ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
-               }
-              ]
-             }
-            ]
-           },
-           {
-            "id": "controls_back-label",
-            "type": "text",
-            "properties": {
-             "text": {"type": "text", "value": "#str_230045"},
-             "position": {"type": "keyword", "value": "relative"},
-             "display": {"type": "keyword", "value": "block"},
-             "font-family": {"type": "font", "value": "marine"},
-             "font-size": {"type": "length", "value": 14, "unit": "dp"},
-             "line-height": {"type": "length", "value": 22, "unit": "dp"},
-             "color": {"type": "color", "value": [1, 1, 1, 0.8]},
-             "white-space": {"type": "keyword", "value": "nowrap"},
-             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
-            }
-           },
-           {
-            "id": "controls_back-focus",
-            "type": "vector",
-            "properties": {
-             "position": {"type": "keyword", "value": "absolute"},
-             "left": {"type": "length", "value": 8.0, "unit": "dp"},
-             "top": {"type": "length", "value": 35.5, "unit": "dp"},
-             "height": {"type": "length", "value": 2, "unit": "dp"},
-             "right": {"type": "length", "value": 8.0, "unit": "dp"},
-             "opacity": {"type": "number", "value": 0},
-             "pointer-events": {"type": "keyword", "value": "none"}
-            },
-            "paths": [
-             {
-              "id": "inset",
-              "commands": [{"id": "p0", "op": "move", "points": [[0, 1]]}, {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]}],
-              "stroke": {
-               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
-               "widthDp": 1.2,
-               "minimumPixels": 1,
-               "join": "miter",
-               "cap": "butt"
-              }
-             }
-            ]
-           }
-          ],
-          "control": {
-           "role": "button",
-           "label": "#str_230045",
-           "states": {
-            "default": "controls_back.default",
-            "hover": "controls_back.hover",
-            "focus": "controls_back.focus",
-            "pressed": "controls_back.pressed",
-            "disabled": "controls_back.disabled"
-           },
-           "action": "back"
           }
          }
         ]

@@ -1064,7 +1064,9 @@ def check_retained_tab_strips_take_the_pointer() -> None:
     """A retained group placed after a control takes the pointer's hits over it
     (RmlUi returns the topmost box), and each settings tab page is a full-size
     group. The tab strip must therefore follow every page of its sub-page, or
-    its tabs are dead to the mouse and the VR pointer."""
+    its tabs are dead to the mouse and the VR pointer. Next and Previous walk
+    the tree as a ring, so the strip also follows Back: a tab's last row leads
+    on to Back, and Back to the strip, the order the page reads in."""
     for page, name in (("game", "game"), ("controls", "controls"), ("system", "settings")):
         text = read(ROOT / f"content/baseoq4/pak0/guis/menu/settings/{page}.q4ui")
         document = json.loads("\n".join(line for line in text.split("\n") if not line.startswith("//")))
@@ -1073,20 +1075,23 @@ def check_retained_tab_strips_take_the_pointer() -> None:
         def walk(node, path=()):
             if isinstance(node, dict):
                 ident = node.get("id", "")
-                if ident == f"{name}-strip" or ident.startswith(f"{name}-page-"):
+                if ident in (f"{name}-strip", f"{name}_back") or ident.startswith(f"{name}-page-"):
                     found[ident] = path
                 for position, child in enumerate(node.get("children", [])):
                     walk(child, path + (position,))
 
         walk(document["root"])
         strip = found.get(f"{name}-strip")
-        pages = [path for ident, path in found.items() if ident != f"{name}-strip"]
-        if strip is None or not pages:
-            raise AssertionError(f"{page}.q4ui: no tab strip or tab pages found")
+        back = found.get(f"{name}_back")
+        pages = [path for ident, path in found.items() if ident.startswith(f"{name}-page-")]
+        if strip is None or back is None or not pages:
+            raise AssertionError(f"{page}.q4ui: no tab strip, Back or tab pages found")
         # later in tree order, and not inside a page: drawn above every page
         for path in pages:
             if strip[:len(path)] == path or strip < path:
                 raise AssertionError(f"{page}.q4ui: the tab strip must follow every tab page in the tree")
+        if strip < back:
+            raise AssertionError(f"{page}.q4ui: the tab strip must follow Back, or Next leaves a tab's last row for the strip")
 
 
 def main() -> None:
