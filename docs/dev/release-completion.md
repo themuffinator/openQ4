@@ -6,6 +6,20 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Vulkan drops unused shadow volumes like OpenGL (FPS-03), 9 November 2026
+
+- **Vulkan now treats lights without baked shadows as OpenGL does.** This covers
+  the weapon flashlight, moving lights and lights the game spawns. When such a light
+  renders a shadow map, Vulkan no longer keeps its old-style stencil shadow volumes
+  as well. Shadows look the same; nothing needs to be changed.
+- **No measurable frame-rate change on the stock maps.** Most map lights have baked
+  shadows and are unaffected, so this is a correctness step for FPS-03 rather than a
+  speed-up.
+- **What to expect if a shadow map fails.** As on OpenGL, such a light can draw
+  unshadowed for one frame before it falls back to stencil shadows.
+- Evidence: FPS-03 in the [roadmap](roadmap.md);
+  `tools/tests/renderer_vulkan_shadow_compatibility.py`.
+
 ## Widescreen players join pure servers without a restart, 9 November 2026
 
 - **No more restart on the first pure join in a widescreen window.** If you

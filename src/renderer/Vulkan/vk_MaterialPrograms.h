@@ -8,6 +8,9 @@
 vkGLSLProgramFamily_t VK_MaterialPrograms_NativeFamily( const char *program );
 bool VK_MaterialPrograms_Validate( const newShaderStage_t *stage );
 bool VK_MaterialPrograms_NeedsStencil( const idMaterial *material, const float *registers );
+// Advances when a reload or shutdown discards the authored/native source
+// selection, so a cached NeedsStencil verdict must be recomputed.
+int VK_MaterialPrograms_NeedsStencilGeneration();
 bool VK_Exec_BuildAuthoredMaterialUniforms( const viewDef_t *viewDef, const drawSurf_t *surf,
     const shaderStage_t *stage, const drawInteraction_t *interaction, oq4material::UniformBlock &block );
 bool VK_MaterialPrograms_Bind( const newShaderStage_t *stage,

@@ -1340,6 +1340,24 @@ idInteraction::idInteraction( void ) {
 	dynamicModelFrameCount	= 0;
 	frustumState			= FRUSTUM_UNINITIALIZED;
 	frustumAreas			= NULL;
+	stencilReceiverGeneration	= -1;
+	stencilReceiverNeeded		= false;
+	buildModel				= NULL;
+}
+
+/*
+===============
+R_InvalidateShadowMapReceiverScan
+
+R_ShadowMapLightWillUseShadowMaps memoizes the Vulkan receiver scan of a light
+on its view light for the current view. Any change to the set or state of the
+light's interactions can change that verdict.
+===============
+*/
+static void R_InvalidateShadowMapReceiverScan( const idRenderLightLocal *lightDef ) {
+	if ( lightDef != NULL && lightDef->viewCount == tr.viewCount && lightDef->viewLight != NULL ) {
+		lightDef->viewLight->shadowMapReceiverScanValid = false;
+	}
 }
 
 /*
@@ -1367,6 +1385,10 @@ idInteraction *idInteraction::AllocAndLink( idRenderEntityLocal *edef, idRenderL
 
 	interaction->frustumState = idInteraction::FRUSTUM_UNINITIALIZED;
 	interaction->frustumAreas = NULL;
+
+	interaction->stencilReceiverGeneration = -1;
+	interaction->stencilReceiverNeeded = false;
+	interaction->buildModel = NULL;
 
 	// link at the start of the entity's list
 	interaction->lightNext = ldef->firstInteraction;
@@ -1396,6 +1418,9 @@ idInteraction *idInteraction::AllocAndLink( idRenderEntityLocal *edef, idRenderL
 		}
 		renderWorld->interactionTable[ index ] = interaction;
 	}
+
+	// an unbuilt interaction leaves the light's receivers unknown
+	R_InvalidateShadowMapReceiverScan( ldef );
 
 	return interaction;
 }
@@ -1438,6 +1463,9 @@ void idInteraction::FreeSurfaces( void ) {
 		this->surfaces = NULL;
 	}
 	this->numSurfaces = -1;
+	this->stencilReceiverGeneration = -1;
+	this->buildModel = NULL;
+	R_InvalidateShadowMapReceiverScan( this->lightDef );
 }
 
 /*
@@ -1446,6 +1474,8 @@ idInteraction::Unlink
 ===============
 */
 void idInteraction::Unlink( void ) {
+
+	R_InvalidateShadowMapReceiverScan( this->lightDef );
 
 	// unlink from the entity's list
 	if ( this->entityPrev ) {
@@ -1519,6 +1549,8 @@ void idInteraction::MakeEmpty( void ) {
 
 	// an empty interaction has no surfaces
 	numSurfaces = 0;
+	stencilReceiverGeneration = -1;
+	buildModel = NULL;
 
 	Unlink();
 
@@ -1751,6 +1783,13 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 	numSurfaces = model->NumSurfaces();
 	surfaces = (surfaceInteraction_t *)R_ClearedStaticAlloc( sizeof( *surfaces ) * numSurfaces );
 
+	// Slots after the current one are still NULL while the loop below runs.
+	// Until it finishes, the Vulkan receiver verdict for this interaction
+	// covers every surface of the model (R_ShadowMapLightWillUseShadowMaps).
+	buildModel = model;
+	stencilReceiverGeneration = -1;
+	R_InvalidateShadowMapReceiverScan( lightDef );
+
 	interactionGenerated = false;
 	const bool interactionHasShadows = HasShadows();
 	const bool shadowMapsEnabledForInteraction = interactionHasShadows && r_shadows.GetBool() && r_useShadowMap.GetBool();
@@ -1914,6 +1953,11 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 			R_FreeInteractionCullInfo( sint->cullInfo );
 		}
 	}
+
+	// the slots are final: only the filled ones are receivers from now on
+	buildModel = NULL;
+	stencilReceiverGeneration = -1;
+	R_InvalidateShadowMapReceiverScan( lightDef );
 
 	// if none of the surfaces generated anything, don't even bother checking?
 	if ( !interactionGenerated ) {
