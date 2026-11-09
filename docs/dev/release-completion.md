@@ -174,6 +174,32 @@ See [player release status](../user/release-status.md).
   Vulkan presentation stall: slow presents while the frame work stays short, sometimes
   with a swapchain recreation (FPS-07). It is not a game-side hitch.
 
+## Android touch layout editor, background saves and multiplayer resume (AND-01), 9 November 2026
+
+- [x] A touch layout editor in Android setup moves, resizes (75-150%), fades
+  and hides each touch control on an 8 dp grid, with separate landscape and
+  portrait layouts, the three presets and resets. It opens from setup's
+  Controls page or, during play, from **Settings > Controls > Touch layout**.
+  Edits are drafts until **Apply layout**, and survive the app being closed.
+- [x] Leaving single player saves it as **Suspended**, so if Android closes
+  openQ4 in the background, **Continue** picks up where you left off
+  (`com_suspendSave`).
+- [x] Returning to a multiplayer match after 40 seconds or more away
+  reconnects to the server at once instead of freezing until a time-out;
+  after a shorter break the connection is checked and re-established if the
+  server no longer answers (`net_resumeReconnect`, `net_resumeProbe`).
+- [x] Sound comes back when you return to a multiplayer match on Android;
+  before, it stayed silent until you left the match.
+- Developer: `verify_android_apk.py --variant quest` and Meson's
+  `android_headset` option give the Meta Quest flavor its own package checks
+  ahead of AND-05. Validation and remaining physical-device scope are in the
+  [recovery review](platform-recovery-review.md#android-touch-layout-editor-suspension-save-network-resume-and-quest-flavor-checks-9-november-2026).
+
+Candidate player wording: You can now rearrange the Android touch controls:
+move, resize, fade or hide each button, separately for landscape and portrait.
+Switching away from the game saves your single-player progress first, and a
+multiplayer match reconnects by itself when you come back.
+
 ## Android portrait play and orientation ownership (AND-01, AND-04), 8 November 2026
 
 - Built-in touch controls gain section 13.6's portrait thumb deck, and the

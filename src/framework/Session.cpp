@@ -8513,6 +8513,62 @@ private:
 
 /*
 ===============
+idSessionLocal::SaveForSuspension
+
+Android may end a backgrounded app at any time without another call, so
+single player is saved as it leaves the foreground (ui-visual-design.md
+13.6: saves survive process death). The save is the "Suspended" autosave:
+it needs no screenshot, which a backgrounded window cannot draw, it rolls
+over each time and CONTINUE, which resumes the newest save, finds it after a
+restart. Nothing is saved, and no message is shown, where a save would be
+refused or would not resume cleanly: multiplayer, menus over a level that is
+not running, loading, demos, cinematics, death or a failed objective.
+===============
+*/
+static idCVar com_suspendSave( "com_suspendSave", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
+	"Android: save single player as 'Suspended' whenever the app goes to the background, so the system ending it there loses no progress" );
+
+bool idSessionLocal::SaveForSuspension( void ) {
+#if defined( __ANDROID__ ) && !defined( ID_DEDICATED )
+	if ( !com_suspendSave.GetBool() || !mapSpawned || insideExecuteMapChange || IsMultiplayer() || readDemo
+			|| IsDemoPlaybackActive() || com_editorActive || game == NULL || idAsyncNetwork::IsActive() ) {
+		return false;
+	}
+	if ( game->InCinematic() || objectiveFailed || game->GetPersistentPlayerInfo( 0 ).GetInt( "health" ) <= 0
+			|| Sys_GetDriveFreeSpace( cvarSystem->GetCVarString( "fs_savepath" ) ) < 25 ) {
+		common->Printf( "Not saving for the background: the game cannot be saved now\n" );
+		return false;
+	}
+	common->Printf( "Saving 'Suspended' as the app goes to the background\n" );
+	return SaveGame( "Suspended", ST_AUTO );
+#else
+	return false;
+#endif
+}
+
+void Session_SuspendSave( void ) {
+	sessLocal.SaveForSuspension();
+}
+
+/*
+===============
+Session_AppForeground
+
+The SDL pump's return from the Android background. A multiplayer client
+reconnects when the server has dropped it while the app was away, instead of
+waiting out the time-out (ui-visual-design.md 13.6). This runs before the
+frame's network processing: a disconnect the server queued meanwhile must not
+reach the client first, which would end the match behind a message box.
+===============
+*/
+void Session_AppForeground( int suspendedMs ) {
+	if ( idAsyncNetwork::client.IsActive() ) {
+		idAsyncNetwork::client.ApplicationResumed( suspendedMs );
+	}
+}
+
+/*
+===============
 idSessionLocal::SaveGame
 ===============
 */

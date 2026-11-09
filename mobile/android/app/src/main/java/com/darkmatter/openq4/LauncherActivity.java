@@ -32,6 +32,7 @@ import java.util.Locale;
 /** Setup runs before SDL loads. Every game launch remains an explicit player action. */
 public final class LauncherActivity extends Activity implements SetupTask.Observer<RetailData.Report> {
     private static final int PICK_FOLDER = 1, EXPORT_SAVES = 2, EXPORT_LOGS = 3;
+    static final String EXTRA_PAGE = "setup_page", PAGE_TOUCH_LAYOUT = "touch_layout";
     private static Session retained;
 
     private static final class Session {
@@ -61,6 +62,7 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
     private boolean started;
     private boolean controlsPage;
     private boolean interfacePage;
+    private boolean layoutPage;
     private final Handler refresh = new Handler(Looper.getMainLooper());
     private final Runnable refreshState = () -> { if (started) changed(session.task.state()); };
     private final SetupTask.Observer<DocumentExport.Result> exportObserver = ignored -> changed(session.task.state());
@@ -99,10 +101,23 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
             session.picking = state.getInt("picking", session.picking);
             controlsPage = state.getBoolean("controls_page", false);
             interfacePage = state.getBoolean("interface_page", false);
+            layoutPage = state.getBoolean("layout_page", false);
+        } else {
+            layoutPage = PAGE_TOUCH_LAYOUT.equals(getIntent().getStringExtra(EXTRA_PAGE));
         }
         theme = new SetupTheme(this);
         build();
         if (state != null) scroll.post(() -> scroll.scrollTo(0, state.getInt("scroll", 0)));
+    }
+
+    /** singleTask: the game's request for the layout editor reaches a running setup here. */
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (PAGE_TOUCH_LAYOUT.equals(intent.getStringExtra(EXTRA_PAGE)) && !layoutPage) {
+            controlsPage = interfacePage = false; layoutPage = true;
+            build(); changed(session.task.state());
+        }
     }
 
     @Override protected void onStart() {
@@ -117,6 +132,7 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
         state.putInt("scroll", scroll.getScrollY());
         state.putBoolean("controls_page", controlsPage);
         state.putBoolean("interface_page", interfacePage);
+        state.putBoolean("layout_page", layoutPage);
         super.onSaveInstanceState(state);
     }
 
@@ -166,9 +182,15 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
         addButton(column, returnGame);
         if (!session.prefs.getBoolean("language_chosen", false)) {
             languagePage(column);
+        } else if (layoutPage) {
+            new TouchLayoutPage(this, theme, session.prefs).build(column, () -> {
+                layoutPage = false; build(); changed(session.task.state());
+            });
         } else if (controlsPage) {
             new ControlsPage(this, theme, session.prefs).build(column, () -> {
                 controlsPage = false; build(); changed(session.task.state());
+            }, () -> {
+                controlsPage = false; layoutPage = true; build(); changed(session.task.state());
             });
         } else if (interfacePage) {
             new InterfacePage(this, theme, session.prefs).build(column, () -> {

@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
-"""Run silent SP/save, MP/touch or SP rotation diagnostics on an isolated Android emulator.
+"""Run silent SP/save, MP/touch, SP rotation, lifecycle or MP resume diagnostics on an isolated Android emulator.
 
 Requires a booted AOSP/userdebug AVD and the separately verified emulator APK.
 No OS pointer/keyboard input or OS screen capture is used. Retail files are
 copied from the caller's installation; the APK contains no retail assets.
+
+--mode lifecycle applies a touch layout editor record through the setup
+preferences, plays, sends the app to the background through the activity
+manager (the Home intent, not input), requires the "Suspended" save, ends the
+backgrounded process with `am kill` as Android's memory management would,
+relaunches it and loads that save. --mode resume joins the dedicated server
+at --server, stays in the background for --away seconds and returns, then
+requires the connection to survive (a stay shorter than the time-out) or the
+client to reconnect (a longer one).
 """
 from __future__ import annotations
 
@@ -32,6 +41,35 @@ ROTATE_CAPTURES = ("emulator-spawn.tga", "emulator-portrait.tga", "emulator-move
 # record) and turns the AVD through its rotation setting, never through input.
 SETUP_PREFS = "shared_prefs/setup.xml"
 ROTATE_INTERFACE = "2:0a4d0e2f5c6b7a8998a7b6c5d4e3f201:0:0:0:1"
+# Lifecycle mode: the layout editor's applied record, as Apply writes it -
+# Fire moved 160 dp from the right and 120 dp from the bottom at 125%, Jump
+# hidden, Zoom faded to 20%; portrait untouched. The engine reads it with the
+# touch settings at foreground entry.
+SUSPEND_SLOT = "Suspended"
+UNTOUCHED = "*,*,100,35,0"
+LIFECYCLE_TOUCH = "1:0:10:5"
+LIFECYCLE_LAYOUT = ("1|" + ";".join(["-160,-120,125,35,0", "*,*,100,35,1", UNTOUCHED, UNTOUCHED, UNTOUCHED,
+                                     "*,*,100,20,0", UNTOUCHED, UNTOUCHED, UNTOUCHED])
+                    + "|" + ";".join([UNTOUCHED] * 9))
+LIFECYCLE_CAPTURES = ("emulator-spawn.tga", "emulator-moved.tga", "emulator-restored.tga")
+LIFECYCLE_TAIL = """echo EMULATOR_BACKGROUND_REQUEST
+waitMsec 600000
+"""
+RESUMED = """echo EMULATOR_SUSPEND_RESTORED
+waitMsec 1000
+viewpos
+touchControlsTest layout
+screenshot "screenshots/emulator-restored.tga"
+echo EMULATOR_SMOKE_COMPLETE
+quit
+"""
+# Runs after each map load: the join, and again after a reconnect, which the
+# harness counts. Re-arming g_autoExecAfterMapLoad from here would fire at once.
+RESUME_GAMEPLAY = """waitMsec 2000
+echo EMULATOR_GAMEPLAY_READY
+getviewpos
+echo EMULATOR_BACKGROUND_REQUEST
+"""
 # Portrait thumb deck (section 13.6): the stick in the deck's leading half,
 # a look drag in the view above it, Fire by name.
 ROTATE_GAMEPLAY = f"""god
@@ -155,9 +193,20 @@ def sha(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def scripts_for_mode(mode: str) -> dict[str, str]:
+def scripts_for_mode(mode: str, server: str | None = None) -> dict[str, str]:
     scripts = dict(SCRIPTS)
-    if mode == "mp":
+    if mode == "lifecycle":
+        scripts.pop("emulator_restored.cfg")
+        scripts["emulator_smoke.cfg"] = scripts["emulator_smoke.cfg"].split(f"saveGame {SLOT}", 1)[0] + LIFECYCLE_TAIL
+    elif mode == "resume":
+        if not server or not re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}:\d{2,5}", server):
+            raise ValueError("Resume mode needs --server <IPv4>:<port>")
+        scripts.pop("emulator_restored.cfg")
+        scripts["autoexec.cfg"] = scripts["autoexec.cfg"].replace(
+            "devmap game/hangar1", f"""set net_enableIPv6 0
+connect {server}""")
+        scripts["emulator_smoke.cfg"] = RESUME_GAMEPLAY
+    elif mode == "mp":
         scripts.pop("emulator_restored.cfg")
         scripts["autoexec.cfg"] = scripts["autoexec.cfg"].replace(
             "devmap game/hangar1", """set ui_autoJoin 1
@@ -187,6 +236,13 @@ quit
     return scripts
 
 
+def lifecycle_relaunch_autoexec() -> str:
+    """The second launch's autoexec: the same settings, then CONTINUE's load of the suspension save."""
+    return SCRIPTS["autoexec.cfg"].replace("set g_autoExecAfterMapLoad emulator_smoke.cfg",
+                                           "set g_autoExecAfterMapLoad emulator_resumed.cfg").replace(
+        "devmap game/hangar1", f"loadGame {SUSPEND_SLOT}")
+
+
 def layout_after_marker(log: str, marker: str) -> dict:
     """The touchControlsTest layout printed after an engine marker."""
     block = log.split("EMULATOR_" + marker, 1)
@@ -198,7 +254,13 @@ def layout_after_marker(log: str, marker: str) -> dict:
         raise ValueError(f"No touch layout after {marker}")
     controls = {name: (float(x), float(y)) for name, x, y in
                 re.findall(r"(?m)^\s+(\w+)\s+at ([-0-9.]+) ([-0-9.]+), radius", block)}
-    return {"state": size.group(1), "width": int(size.group(2)), "height": int(size.group(3)), "controls": controls}
+    radii = {name: float(r) for name, r in re.findall(r"(?m)^\s+(\w+)\s+at [-0-9.]+ [-0-9.]+, radius ([-0-9.]+)", block)}
+    opacity = {name: float(o) for name, o in re.findall(r"(?m)^\s+(\w+)\s+at .*, opacity ([-0-9.]+)", block)}
+    hidden = sorted(re.findall(r"(?m)^\s+(\w+)\s+at .*, hidden$", block))
+    dp = re.search(r"px, ([0-9.]+) px per dp(, edited|, edits rejected)?", block)
+    return {"state": size.group(1), "width": int(size.group(2)), "height": int(size.group(3)), "controls": controls,
+            "radii": radii, "opacity": opacity, "hidden": hidden, "dp": float(dp.group(1)) if dp else None,
+            "edited": bool(dp and dp.group(2) == ", edited")}
 
 
 def pose_after_marker(log: str, marker: str, mode: str = "sp") -> list[float]:
@@ -229,9 +291,14 @@ class Probe:
         (self.out / "runner.py").write_bytes(Path(__file__).read_bytes())
         self.pid = None
         self.mode = args.mode
-        self.scripts = scripts_for_mode(self.mode)
-        self.captures = {"sp": CAPTURES, "rotate": ROTATE_CAPTURES}.get(self.mode, (*CAPTURES[:2], "emulator-neutral.tga"))
-        self.save_names = tuple(f"savegames/{SLOT}.{ext}" for ext in ("save", "txt", "tga")) if self.mode != "mp" else ()
+        self.scripts = scripts_for_mode(self.mode, getattr(args, "server", None))
+        self.captures = {"sp": CAPTURES, "rotate": ROTATE_CAPTURES, "lifecycle": LIFECYCLE_CAPTURES,
+                         "resume": ()}.get(self.mode, (*CAPTURES[:2], "emulator-neutral.tga"))
+        slot = SUSPEND_SLOT if self.mode == "lifecycle" else SLOT
+        self.save_names = (tuple(f"savegames/{slot}.{ext}" for ext in ("save", "txt", "tga"))
+                           if self.mode in ("sp", "rotate", "lifecycle") else ())
+        self.pids = []
+        self.lifecycle = {}
         self.report = {"status": "running", "serial": args.serial, "package": PACKAGE, "mode": self.mode,
                        "capture_method": "engine screenshot", "audio": "disabled",
                        "input": "engine diagnostic commands; no OS input",
@@ -327,22 +394,90 @@ class Probe:
         self.report["original_rotation"] = values
         self.set_rotation(0)
         self.adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
+        self.write_setup({"interface_settings": ROTATE_INTERFACE})
+        self.report["interface_record"] = ROTATE_INTERFACE
+
+    def write_setup(self, entries: dict[str, str]):
+        """Replace these setup preference strings, keeping the original for restoration."""
         self.before_prefs = self.read_prefs()
         if self.before_prefs is not None:
             (self.out / "before-setup.xml").write_bytes(self.before_prefs)
             root = ET.fromstring(self.before_prefs)
         else:
             root = ET.Element("map")
-        for entry in [e for e in root if e.get("name") == "interface_settings"]:
+        for entry in [e for e in root if e.get("name") in entries]:
             root.remove(entry)
-        ET.SubElement(root, "string", name="interface_settings").text = ROTATE_INTERFACE
+        for name, value in entries.items():
+            ET.SubElement(root, "string", name=name).text = value
         data = b"<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n" + ET.tostring(root, encoding="unicode").encode()
         self.prefs_written = data
         self.adb("shell", "run-as", PACKAGE, "mkdir", "-p", "shared_prefs")
         self.adb("exec-in", "run-as", PACKAGE, "sh", "-c", f"cat > {self.prefs_path()}", input_data=data)
         if self.read_prefs() != data:
             raise ValueError("Setup preferences write mismatch")
-        self.report["interface_record"] = ROTATE_INTERFACE
+
+    def go_home(self):
+        """Background the app with the activity manager's Home intent; no input reaches the device."""
+        result = self.adb("shell", "am", "start", "-W", "-a", "android.intent.action.MAIN",
+                          "-c", "android.intent.category.HOME", timeout=60)
+        return datetime.datetime.now(datetime.timezone.utc).isoformat(), result
+
+    def wait_for_pid(self, present: bool, seconds: int) -> str:
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            pid = self.adb("shell", "pidof", PACKAGE, check=False).stdout.decode().strip()
+            if bool(pid) == present:
+                return pid
+            time.sleep(1)
+        raise TimeoutError(f"Application process {'did not start' if present else 'did not end'}")
+
+    def suspend_and_kill(self):
+        """Lifecycle: background, require the suspension save, end the process as the system would, relaunch."""
+        at, _ = self.go_home()
+        self.lifecycle["backgrounded_utc"] = at
+        deadline = time.monotonic() + 60
+        save = None
+        while time.monotonic() < deadline:
+            log = self.read("logs/openq4.log") or b""
+            save = self.read(f"savegames/{SUSPEND_SLOT}.save")
+            if b"Saving 'Suspended' as the app goes to the background" in log and save:
+                break
+            time.sleep(1)
+        else:
+            raise ValueError("No suspension save after the app went to the background")
+        (self.out / "suspended-before-kill.log").write_bytes(log)
+        self.lifecycle["suspension_save_sha256"] = hashlib.sha256(save).hexdigest()
+        self.lifecycle["suspension_save_bytes"] = len(save)
+        pid = self.adb("shell", "pidof", PACKAGE, check=False).stdout.decode().strip()
+        if pid != self.pid:
+            raise ValueError("The backgrounded process changed before it was ended")
+        state = self.adb("shell", "dumpsys", "activity", "processes", PACKAGE, check=False).stdout.decode(errors="replace")
+        (self.out / "background-process-state.txt").write_text(state, encoding="utf-8")
+        # As Android's low-memory killer would: the app is told nothing more.
+        self.adb("shell", "am", "kill", PACKAGE)
+        self.wait_for_pid(False, 30)
+        self.lifecycle["killed_pid"] = self.pid
+        self.lifecycle["killed_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        relaunch = lifecycle_relaunch_autoexec()
+        self.created["autoexec.cfg"] = relaunch.encode()
+        self.put("autoexec.cfg", relaunch.encode())
+        self.created["emulator_resumed.cfg"] = RESUMED.encode()
+        self.put("emulator_resumed.cfg", RESUMED.encode())
+        self.report["created_script_sha256"] = {n: hashlib.sha256(d).hexdigest() for n, d in self.created.items()}
+        result = self.adb("shell", "am", "start", "-W", "-n", PACKAGE + "/com.darkmatter.openq4.OpenQ4Activity",
+                          "--ez", "multiplayer", "false", timeout=60)
+        (self.out / "relaunch.log").write_bytes(result.stdout + result.stderr)
+        self.pid = None
+
+    def away_and_return(self):
+        """Resume: stay in the background for --away seconds, then bring the same process back."""
+        at, _ = self.go_home()
+        self.lifecycle["backgrounded_utc"] = at
+        time.sleep(self.args.away)
+        result = self.adb("shell", "am", "start", "-W", "-n", PACKAGE + "/com.darkmatter.openq4.OpenQ4Activity", timeout=60)
+        (self.out / "return.log").write_bytes(result.stdout + result.stderr)
+        self.lifecycle["returned_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        self.lifecycle["away_seconds"] = self.args.away
 
     def set_rotation(self, rotation: int):
         self.adb("shell", "settings", "put", "system", "user_rotation", str(rotation))
@@ -496,7 +631,7 @@ class Probe:
             self.report["page_size"] = int(page.group(1)) * 1024
             self.report["page_size_source"] = "/proc/self/smaps KernelPageSize"
         self.adb("shell", "run-as", PACKAGE, "mkdir", "-p", SAVE_ROOT)
-        for name in (*self.scripts, *self.save_names,
+        for name in (*self.scripts, *self.save_names, *(("emulator_resumed.cfg",) if self.mode == "lifecycle" else ()),
                      *("screenshots/" + name for name in self.captures)):
             if self.read(name) is not None:
                 raise ValueError(f"Existing test file must be reviewed before reuse: {name}")
@@ -509,6 +644,9 @@ class Probe:
         self.prepared = True
         if self.mode == "rotate":
             self.apply_rotation_setup()
+        elif self.mode == "lifecycle":
+            self.write_setup({"touch_settings": LIFECYCLE_TOUCH, "touch_layout": LIFECYCLE_LAYOUT})
+            self.report["touch_layout_record"] = LIFECYCLE_LAYOUT
         if old_log is not None:
             if self.read("logs/openq4.log") != old_log:
                 raise ValueError("Log changed during preparation")
@@ -524,7 +662,7 @@ class Probe:
         print(f"Retail files verified; launching silent {self.mode.upper()} diagnostics.", flush=True)
         result = self.adb("shell", "am", "start", "-W", "-n",
                           PACKAGE + "/com.darkmatter.openq4.OpenQ4Activity",
-                          "--ez", "multiplayer", "true" if self.mode == "mp" else "false", timeout=60)
+                          "--ez", "multiplayer", "true" if self.mode in ("mp", "resume") else "false", timeout=60)
         requests = {"EMULATOR_ROTATE_PORTRAIT": 1, "EMULATOR_ROTATE_LANDSCAPE": 0}
         (self.out / "launch.log").write_bytes(result.stdout + result.stderr)
         deadline = time.monotonic() + self.args.timeout
@@ -534,6 +672,7 @@ class Probe:
             if pid:
                 if self.pid is None:
                     self.pid = pid
+                    self.pids.append(pid)
                 elif pid != self.pid:
                     raise ValueError("Native game process was replaced")
             data = self.read("logs/openq4.log") or b""
@@ -541,13 +680,39 @@ class Probe:
                 self.collect()
                 raise ValueError("Engine reported a fatal error; inspect openq4.log")
             markers = re.findall(rb"EMULATOR_(?:GAMEPLAY_READY|ROTATE_PORTRAIT|ROTATE_LANDSCAPE|TOUCH_RELEASED"
-                                 rb"|SAVE_RESTORED|SMOKE_COMPLETE)", data)
+                                 rb"|SAVE_RESTORED|SUSPEND_RESTORED|BACKGROUND_REQUEST|RECONNECTED|SMOKE_COMPLETE)", data)
             if markers and markers[-1].decode() != last_marker:
                 last_marker = markers[-1].decode()
                 print(last_marker, flush=True)
                 # The engine waits after each request; turn the AVD at once.
                 if self.mode == "rotate" and last_marker in requests:
                     self.set_rotation(requests.pop(last_marker))
+                if (last_marker == "EMULATOR_BACKGROUND_REQUEST" and self.mode == "resume"
+                        and "backgrounded_utc" not in self.lifecycle and b"#str_04320" in data):
+                    # A slow join (a loaded host) can outlast the server's time-out
+                    # before the probe starts; that run measures nothing.
+                    raise ValueError("The server dropped the client during the join, before the background stay; rerun")
+                if last_marker == "EMULATOR_BACKGROUND_REQUEST" and "backgrounded_utc" not in self.lifecycle:
+                    if self.mode == "lifecycle":
+                        self.suspend_and_kill()
+                        (self.out / "first-run-openq4.log").write_bytes(data)
+                        last_marker = ""
+                        continue
+                    if self.mode == "resume":
+                        self.away_and_return()
+            after = data.split(b"EMULATOR_BACKGROUND_REQUEST", 1)[1] if b"EMULATOR_BACKGROUND_REQUEST" in data else b""
+            done = (b"Network: the connection survived the background" in after if self.args.away < 40 else
+                    b"Network: reconnecting after the background" in after and re.search(rb"msec to load mp/", after.split(
+                        b"Network: reconnecting after the background", 1)[1])) if self.mode == "resume" and "returned_utc" in self.lifecycle else False
+            if done:
+                # The pass condition is in the log (g_autoExecAfterMapLoad fires once a
+                # session, so a reconnect's map load is the marker). Give a lost
+                # connection time to show before ending the client, which would play on.
+                time.sleep(15)
+                (self.out / "resumed-openq4.log").write_bytes(self.read("logs/openq4.log") or data)
+                self.adb("shell", "am", "force-stop", PACKAGE)
+                self.wait_for_pid(False, 30)
+                break
             if self.pid and not pid:
                 break
             time.sleep(2)
@@ -557,6 +722,10 @@ class Probe:
         self.assess()
 
     def assess(self):
+        if self.mode == "lifecycle":
+            return self.assess_lifecycle()
+        if self.mode == "resume":
+            return self.assess_resume()
         log = (self.out / "openq4.log").read_text(errors="replace")
         for marker in ("EMULATOR_GAMEPLAY_READY", "EMULATOR_TOUCH_RELEASED", "EMULATOR_SMOKE_COMPLETE",
                        *(("EMULATOR_SAVE_RESTORED",) if self.mode != "mp" else ()),
@@ -616,6 +785,97 @@ class Probe:
                            + ("; AVD rotation setting, landscape-portrait-landscape mid-match" if self.mode == "rotate" else "")
                            + "; visual review separate")
 
+    def assess_lifecycle(self):
+        first = (self.out / "first-run-openq4.log").read_text(errors="replace")
+        log = (self.out / "openq4.log").read_text(errors="replace")
+        for text, marker in ((first, "EMULATOR_GAMEPLAY_READY"), (first, "EMULATOR_TOUCH_NEUTRAL"),
+                             (first, "EMULATOR_BACKGROUND_REQUEST"), (log, "EMULATOR_SUSPEND_RESTORED"),
+                             (log, "EMULATOR_SMOKE_COMPLETE")):
+            if marker not in text:
+                raise ValueError(f"Missing engine marker: {marker}")
+        for text in (first, log):
+            if re.search(r"(?:^|\n)(?:ERROR:|FATAL|Fatal)", text):
+                raise ValueError("Engine reports a fatal error")
+        # The applied editor record reached the engine: Fire placed and enlarged,
+        # Jump hidden, Zoom faded, and the same again after the relaunch.
+        layouts = {"first": layout_after_marker(first, "GAMEPLAY_READY"), "relaunched": layout_after_marker(log, "SUSPEND_RESTORED")}
+        self.report["touch_layouts"] = layouts
+        for name, layout in layouts.items():
+            dp, w, h = layout["dp"], layout["width"], layout["height"]
+            fire = layout["controls"].get("fire")
+            if not layout["edited"] or not dp or fire is None:
+                raise ValueError(f"The layout editor record was not applied ({name})")
+            if abs(fire[0] - (w - 160 * dp) / w) > 0.002 or abs(fire[1] - (h - 120 * dp) / h) > 0.002:
+                raise ValueError(f"Fire is not where the record placed it ({name}): {fire}")
+            if layout["hidden"] != ["jump"] or abs(layout["opacity"].get("zoom", 0) - 0.20) > 0.001:
+                raise ValueError(f"Hidden or faded controls differ from the record ({name})")
+            if abs(layout["radii"]["fire"] - 1.25 * 44 * dp / w) > 0.002:
+                raise ValueError(f"Fire is not at 125% ({name})")
+        poses = {marker: pose_after_marker(first, marker) for marker in ("GAMEPLAY_READY", "TOUCH_RELEASED", "TOUCH_NEUTRAL")}
+        poses["SUSPEND_RESTORED"] = pose_after_marker(log, "SUSPEND_RESTORED")
+        movement = math.dist(poses["GAMEPLAY_READY"][:3], poses["TOUCH_RELEASED"][:3])
+        self.report.update(poses=poses, movement_distance=movement)
+        if movement < 20:
+            raise ValueError("The edited layout's controls did not move the player")
+        if any(abs(a - b) > 0.2 for a, b in zip(poses["TOUCH_NEUTRAL"], poses["SUSPEND_RESTORED"])):
+            raise ValueError("The suspension save did not restore the player where the app was left")
+        if len(self.pids) != 2 or self.pids[0] == self.pids[1]:
+            raise ValueError("Expected the original process and one relaunched process")
+        exit_info = (self.out / "exit-info.txt").read_text(errors="replace")
+        killed = re.search(r"pid=" + re.escape(self.pids[0]) + r"\b[^\n]*\n[^\n]*reason=(\d+) \(([A-Z_ ]+)\) subreason=(\d+) \(([A-Z_ ]+)\)", exit_info)
+        self.lifecycle["killed_exit_reason"] = f"{killed.group(2)} / {killed.group(4)}" if killed else None
+        if int(self.report["ro.build.version.sdk"]) >= 30:
+            # `am kill` records USER REQUESTED / KILL BACKGROUND: the process
+            # ended in the background with no further call into the app.
+            if not killed or killed.group(4) != "KILL BACKGROUND":
+                raise ValueError("The first process did not end by the background kill")
+            if not re.search(r"pid=" + re.escape(self.pids[1]) + r"\b[^\n]*\n[^\n]*reason=1 \(EXIT_SELF\)[^\n]*status=0\b", exit_info):
+                raise ValueError("No successful native self-exit record for the relaunched process")
+        captures = self.check_captures()
+        self.report.update(status="pass", engine_pids=self.pids, captures=captures, lifecycle=self.lifecycle,
+                           scope="Native SP: layout editor record through setup preferences and JNI, touch play, "
+                                 "background through the Home intent, the Suspended save, `am kill` of the backgrounded "
+                                 "process, relaunch and load of that save; visual review separate")
+
+    def assess_resume(self):
+        log = (self.out / "resumed-openq4.log").read_text(errors="replace")
+        for marker in ("EMULATOR_GAMEPLAY_READY", "EMULATOR_BACKGROUND_REQUEST"):
+            if marker not in log:
+                raise ValueError(f"Missing engine marker: {marker}")
+        if '"com_activeGameModule" is:"game_mp"' not in log:
+            raise ValueError("The multiplayer module was not active")
+        back = log.split("EMULATOR_BACKGROUND_REQUEST", 1)[1]
+        away = re.search(r"Network: back from (\d+) ms in the background", back)
+        reconnect = re.search(r"Network: reconnecting after the background \(([^)]*)\)", back)
+        survived = "Network: the connection survived the background" in back
+        self.lifecycle.update(reported_ms=int(away.group(1)) if away else None,
+                              reconnect_reason=reconnect.group(1) if reconnect else None, connection_survived=survived)
+        if self.args.away >= 40:
+            if not reconnect or "beyond the time-out" not in reconnect.group(1):
+                raise ValueError("A stay beyond the time-out did not reconnect at once")
+            if not re.search(r"msec to load mp/", back.split("Network: reconnecting after the background", 1)[1]):
+                raise ValueError("The client did not return to the game after reconnecting")
+            if any(box in back for box in ("#str_04320", "#str_04328", "#str_04329")):
+                raise ValueError("The client showed a lost connection instead of reconnecting")
+        else:
+            if not away or not survived or reconnect or "#str_04320" in back:
+                raise ValueError("A short stay did not keep its connection")
+        self.report.update(status="pass", engine_pids=self.pids, lifecycle=self.lifecycle,
+                           scope=f"Native MP client of the dedicated server at {self.args.server}: background through the "
+                                 f"Home intent for {self.args.away} s and return; "
+                                 + ("immediate reconnect" if self.args.away >= 40 else "connection kept"))
+
+    def check_captures(self) -> dict:
+        captures = {}
+        for name in self.captures:
+            path = self.out / name
+            if not path.is_file() or path.stat().st_size < 18:
+                raise ValueError(f"Missing engine capture: {name}")
+            header = path.read_bytes()[:18]
+            captures[name] = {"sha256": sha(path), "width": int.from_bytes(header[12:14], "little"),
+                              "height": int.from_bytes(header[14:16], "little")}
+        return captures
+
     def assess_rotation(self, log: str, poses: dict):
         layouts = {marker: layout_after_marker(log, marker)
                    for marker in ("GAMEPLAY_READY", "PORTRAIT_READY", "LANDSCAPE_RESTORED")}
@@ -652,6 +912,8 @@ class Probe:
         retired = {}
         for name, expected in self.created.items():
             actual = self.read(name)
+            if actual is not None and name == "autoexec.cfg" and self.mode == "lifecycle" and actual == SCRIPTS["autoexec.cfg"].encode():
+                expected = actual	# a failure before the relaunch left the first script
             if actual is None:
                 # An attempted write may have failed before creating a file.
                 continue
@@ -673,6 +935,7 @@ class Probe:
         self.report["retired_test_files"] = retired
         self.report["original_config_restored"] = True
         self.restore_rotation_setup()
+        self.report["lifecycle"] = self.lifecycle
 
 
 def main():
@@ -681,13 +944,17 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--mode", choices=("sp", "mp", "rotate"), default="sp")
+    parser.add_argument("--mode", choices=("sp", "mp", "rotate", "lifecycle", "resume"), default="sp")
     parser.add_argument("--timeout", type=int, default=420)
+    parser.add_argument("--server", help="resume mode: the dedicated server, <IPv4>:<port>, as the emulator reaches it")
+    parser.add_argument("--away", type=int, default=50, help="resume mode: seconds in the background (40 or more is beyond the time-out)")
     args = parser.parse_args()
     if not re.fullmatch(r"emulator-\d{4,5}", args.serial):
         parser.error("Only an explicitly selected emulator serial is accepted")
-    if not 30 <= args.timeout <= 900:
-        parser.error("Timeout must be between 30 and 900 seconds")
+    if not 30 <= args.timeout <= 1500:
+        parser.error("Timeout must be between 30 and 1500 seconds")
+    if args.mode == "resume" and (not args.server or not 5 <= args.away <= 300):
+        parser.error("Resume mode needs --server and --away between 5 and 300 seconds")
     for name in ("adb", "apk", "stage", "build_tools", "certificate", "assets"):
         setattr(args, name, getattr(args, name).resolve())
     probe = Probe(args)
@@ -704,7 +971,8 @@ def main():
             raise
         finally:
             probe.write_report()
-    scope = {"sp": "SP gameplay/save", "mp": "MP gameplay", "rotate": "SP rotation/portrait deck/save"}[args.mode]
+    scope = {"sp": "SP gameplay/save", "mp": "MP gameplay", "rotate": "SP rotation/portrait deck/save",
+             "lifecycle": "SP touch layout/suspension save/process death/restore", "resume": "MP background/resume"}[args.mode]
     print(f"PASS: silent emulator {scope} probe; inspect the retained engine captures.", flush=True)
 
 

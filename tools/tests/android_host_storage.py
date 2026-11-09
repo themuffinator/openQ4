@@ -222,6 +222,8 @@ public class Intent {
     public Intent(Object context, Class<?> target) { this.context = context; this.target = target; }
     public boolean getBooleanExtra(String key, boolean value) { return value; }
     public String getStringExtra(String key) { return org.libsdl.app.SDLActivity.language; }
+    public final java.util.Map<String, String> extras = new java.util.HashMap<>();
+    public Intent putExtra(String key, String value) { extras.put(key, value); return this; }
 }''',
             "android/content/ActivityNotFoundException.java": r'''
 package android.content;
@@ -271,6 +273,7 @@ final class R { static final class string { static final int setup_open_failed =
             "com/darkmatter/openq4/LauncherActivity.java": r'''
 package com.darkmatter.openq4;
 public final class LauncherActivity {
+    static final String EXTRA_PAGE = "setup_page", PAGE_TOUCH_LAYOUT = "touch_layout";
     static String applied;
     static void languageApplied(String tag) { applied = tag; }
 }
@@ -708,7 +711,7 @@ public final class StoragePackageProbe {
         # and retail-import Android APIs have separate executable fixtures.
         source_paths.extend(str(root / "mobile/android/app/src/main/java/com/darkmatter/openq4" / name)
                             for name in ("OpenQ4Activity.java", "PackageStorage.java", "StorageSession.java", "SetupLanguage.java",
-                                         "TouchSettings.java", "InterfaceSettings.java"))
+                                         "TouchSettings.java", "InterfaceSettings.java", "TouchLayout.java"))
         classes = scratch / "classes"
         classes.mkdir()
         javac = Path(args.javac).resolve()

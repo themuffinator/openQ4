@@ -35,6 +35,16 @@ public final class OpenQ4Activity extends SDLActivity {
         return saved == null ? null : TouchSettings.decode(saved).engineValues();
     }
 
+    /** The layout editor's applied record (TouchLayout), read with getTouchSetup; null before the first Apply. */
+    public String getTouchLayout() {
+        TouchLayout.Record saved = TouchLayout.Record.decode(
+                getSharedPreferences("setup", MODE_PRIVATE).getString(TouchLayout.SAVED, null));
+        return saved == null ? null : saved.encode();
+    }
+
+    /** SDL user message arguments: which setup page the game asked for. */
+    static final int SETUP_PAGE_HOME = 0, SETUP_PAGE_TOUCH_LAYOUT = 1;
+
     /** An unchanged applied revision never overwrites later in-game scale choices. */
     public String getInterfaceSetup() {
         InterfaceSettings saved = InterfaceSettings.decodeOrNull(
@@ -73,7 +83,11 @@ public final class OpenQ4Activity extends SDLActivity {
         if (setupOpening || isFinishing() || mBrokenLibraries || !mActivityCreated) return true;
         setupOpening = true;
         try {
-            startActivity(new Intent(this, LauncherActivity.class));
+            Intent setup = new Intent(this, LauncherActivity.class);
+            // The game's Settings > Controls > Touch layout opens the editor itself.
+            if (param instanceof Integer && (Integer) param == SETUP_PAGE_TOUCH_LAYOUT)
+                setup.putExtra(LauncherActivity.EXTRA_PAGE, LauncherActivity.PAGE_TOUCH_LAYOUT);
+            startActivity(setup);
             Log.i("openQ4", "Opened Android setup from the game");
         } catch (ActivityNotFoundException unavailable) {
             setupOpening = false;

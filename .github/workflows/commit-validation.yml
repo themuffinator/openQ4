@@ -156,6 +156,7 @@ jobs:
             tools/tests/in_game_difficulty_restart.py \
             tools/tests/async_drop_client_contract.py \
             tools/tests/async_client_frame_contract.py \
+            tools/tests/async_client_resume.py \
             tools/tests/async_rcon_verify_contract.py \
             tools/tests/async_session_command_contract.py \
             tools/tests/async_usercmd_window_contract.py \
@@ -207,6 +208,7 @@ jobs:
             tools/tests/android_setup_task.py \
             tools/tests/android_setup_flow.py \
             tools/tests/android_touch_setup.py \
+            tools/tests/android_touch_layout.py \
             tools/tests/android_interface_setup.py \
             tools/tests/android_private_export.py \
             tools/tests/android_document_export.py \
@@ -714,6 +716,7 @@ jobs:
           python tools/tests/in_game_difficulty_restart.py
           python tools/tests/async_drop_client_contract.py
           python tools/tests/async_client_frame_contract.py
+          python tools/tests/async_client_resume.py
           python tools/tests/async_rcon_verify_contract.py --mutations
           python tools/tests/async_session_command_contract.py
           python tools/tests/async_usercmd_window_contract.py
@@ -756,6 +759,7 @@ jobs:
           python tools/tests/android_setup_task.py
           python tools/tests/android_setup_flow.py
           python tools/tests/android_touch_setup.py
+          python tools/tests/android_touch_layout.py
           python tools/tests/android_interface_setup.py
           python tools/tests/android_private_export.py
           python tools/tests/android_document_export.py

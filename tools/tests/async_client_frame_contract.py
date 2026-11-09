@@ -49,6 +49,7 @@ struct idAsyncClient {
     void Reconnect(){}
     void SetupConnection(){}
     bool CheckTimeout(){return timeout;}
+    bool CheckResume(){return false;}
     void Idle(){}
     void SendUserInfoToServer(){events+='S';}
     void SendUsercmdsToServer(){}

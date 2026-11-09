@@ -110,6 +110,40 @@
         <item>Compact</item>
         <item>Left-handed</item>
     </string-array>
+    <string name="setup_layout_edit">Edit layout</string>
+    <string name="setup_layout">Touch layout editor</string>
+    <string name="setup_layout_help">Drag a control to move it. It snaps to an 8 dp grid and keeps clear of the other controls, the screen edges and the crosshair. Choose a control to resize, fade or hide it. Landscape and portrait keep their own layouts. Apply saves the layout for the next game launch or return to the game.</string>
+    <string name="setup_layout_orientation">Orientation</string>
+    <string name="setup_layout_control">Control</string>
+    <string name="setup_layout_size">Size: %1$d%%</string>
+    <string name="setup_layout_size_label">Control size</string>
+    <string name="setup_layout_opacity">Opacity: %1$d%%</string>
+    <string name="setup_layout_opacity_label">Control opacity</string>
+    <string name="setup_layout_hide">Hide this control</string>
+    <string name="setup_layout_pause_note">Pause always stays visible: it also skips cinematics.</string>
+    <string name="setup_layout_multiplayer_note">This control appears in multiplayer only.</string>
+    <string name="setup_layout_reset_control">Reset this control</string>
+    <string name="setup_layout_reset">Reset this orientation</string>
+    <string name="setup_layout_no_fit">That does not fit. Try a smaller size or another place.</string>
+    <string name="setup_layout_apply">Apply layout</string>
+    <string name="setup_layout_applied">Layout saved. It applies when you return to or launch the game.</string>
+    <string name="setup_layout_save_failed">Could not save the layout. Your previous applied layout is retained; check free app storage and retry.</string>
+    <string name="setup_layout_preview">Layout preview. Drag a control to move it, or choose it below.</string>
+    <string-array name="setup_layout_orientations">
+        <item>Landscape</item>
+        <item>Portrait</item>
+    </string-array>
+    <string-array name="setup_layout_controls">
+        <item>Fire</item>
+        <item>Jump</item>
+        <item>Crouch</item>
+        <item>Weapon</item>
+        <item>Reload</item>
+        <item>Zoom</item>
+        <item>Pause</item>
+        <item>Scoreboard</item>
+        <item>Chat</item>
+    </string-array>
     <string name="setup_interface">Interface</string>
     <string name="setup_interface_help">Choose the size of menus and text in the game. Automatic picks Phone or Tablet for this device. Phone and Tablet text starts from your Android font size. Apply sets these sizes once, at the next game launch or return to the game; later changes in the game Settings are kept.</string>
     <string name="setup_viewing_profile">Viewing profile</string>

@@ -58,6 +58,114 @@ static void CheckLayout( float width, float height, float density, float scale, 
 	}
 }
 
+// An edited layout keeps the rules among the controls it shows: 48 dp targets
+// wholly on screen, 8 dp gaps and the crosshair clearance.
+static void CheckEditedRules( const Layout &layout, float density ) {
+	Check( layout.available, "edited layout available" );
+	for ( int button = 0; button < BUTTON_COUNT; ++button ) {
+		if ( layout.hidden & ( 1u << button ) ) continue;
+		const Circle &circle = layout.buttons[button];
+		const float reach = HitRadius( layout, button );
+		Check( reach >= 24.0f * density - .001f, "edited target keeps 48 dp" );
+		Check( circle.x - reach >= 0 && circle.y - reach >= 0 && circle.x + reach <= layout.width
+			&& circle.y + reach <= layout.height, "edited target on screen" );
+		const float crosshairGap = reach + 24 * density;
+		Check( DistanceSquared( circle.x, circle.y, layout.width / 2, layout.height / 2 ) >= crosshairGap * crosshairGap - 0.01f,
+			"edited controls leave the crosshair clear" );
+		for ( int other = 0; other < button; ++other ) {
+			if ( layout.hidden & ( 1u << other ) ) continue;
+			const float gap = std::sqrt( DistanceSquared( circle.x, circle.y, layout.buttons[other].x, layout.buttons[other].y ) )
+				- reach - HitRadius( layout, other );
+			Check( gap >= 8.0f * density - 0.01f, "edited controls keep 8 dp gaps" );
+		}
+	}
+}
+
+static OrientationEdits ParseOrFail( const char *record ) {
+	OrientationEdits edits;
+	Check( ParseLayoutEdits( record, edits ), "valid layout record refused" );
+	return edits;
+}
+
+// Section 13.6's layout editor: move, resize, fade and hide each control, a
+// layout per orientation, and a preset fallback for edits that do not fit.
+static void CheckLayoutEdits() {
+	const char *untouched = "*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0";
+	char record[512];
+	std::snprintf( record, sizeof record, "1|%s|%s", untouched, untouched );
+	OrientationEdits edits = ParseOrFail( record );
+	Check( edits.landscape.IsDefault() && edits.portrait.IsDefault(), "untouched record is the preset" );
+	const Layout preset = ComputeLayout( 720, 360, 1, 1 );
+	const Layout same = ComputeLayout( 720, 360, 1, 1, PRESET_DEFAULT, &edits.landscape );
+	Check( !same.edited && Near( same.buttons[BUTTON_FIRE].x, preset.buttons[BUTTON_FIRE].x ), "default edits change nothing" );
+
+	// Fire moved and enlarged, jump hidden, zoom faded; portrait edits differ.
+	std::snprintf( record, sizeof record,
+		"1|-160,-120,150,35,0;*,*,100,35,1;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,10,0;48,-80,100,80,0;*,*,100,35,0;*,*,100,35,0|%s",
+		untouched );
+	edits = ParseOrFail( record );
+	const Layout edited = ComputeLayout( 720, 360, 1, 1, PRESET_DEFAULT, &edits.For( 720, 360 ) );
+	Check( edited.edited && !edited.editsRejected, "edits applied" );
+	Check( Near( edited.buttons[BUTTON_FIRE].x, 560 ) && Near( edited.buttons[BUTTON_FIRE].y, 240 )
+		&& Near( edited.buttons[BUTTON_FIRE].radius, 66 ), "moved, enlarged Fire sits where the player put it" );
+	Check( Near( edited.buttons[BUTTON_PAUSE].x, 48 ) && Near( edited.buttons[BUTTON_PAUSE].y, 280 ),
+		"a top action can be placed anywhere" );
+	Check( edited.hidden == ( 1u << BUTTON_JUMP ), "hidden mask" );
+	Check( Near( RestOpacity( edited, BUTTON_ZOOM ), 0.10f ) && Near( RestOpacity( edited, BUTTON_FIRE ), 0.35f )
+		&& Near( RestOpacity( preset, BUTTON_FIRE ), kRestOpacity ), "faded control opacity" );
+	Check( Near( PlateAlpha( true, 0.10f ), kPressedOpacity ) && Near( PlateAlpha( false, 0.80f ), 0.80f ),
+		"a faded control still shows pressed at full press opacity" );
+	CheckEditedRules( edited, 1 );
+	Check( HitButton( edited, edited.buttons[BUTTON_JUMP].x, edited.buttons[BUTTON_JUMP].y, kAllButtons & ~edited.hidden )
+		!= BUTTON_JUMP, "a hidden control cannot be pressed" );
+	Check( HudTop( edited, kAllButtons & ~edited.hidden ) <= edited.buttons[BUTTON_SCORES].y + HitRadius( edited, BUTTON_SCORES )
+		+ 8.0f + .01f, "Pause moved to the bottom no longer reserves the top" );
+	Mesh faded;
+	AddPlate( faded, edited.buttons[BUTTON_ZOOM], 1, false, RestOpacity( edited, BUTTON_ZOOM ) );
+	Check( !faded.vertices.empty() && faded.vertices[0].rgba[3] == ToByte( 0.10f * kPlateColor.a ), "faded plate draws fainter" );
+	const Layout portrait = ComputeLayout( 360, 720, 1, 1, PRESET_DEFAULT, &edits.For( 360, 720 ) );
+	Check( !portrait.edited && portrait.hidden == 0, "each orientation keeps its own edits" );
+
+	// The editor's placements resolve collisions: a control dropped on another
+	// moves to the nearest free spot, never overlapping.
+	std::snprintf( record, sizeof record,
+		"1|*,*,100,35,0;-128,-120,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0|%s",
+		untouched );
+	edits = ParseOrFail( record );
+	for ( const float density : { 1.0f, 2.75f } ) {
+		for ( int preset : { PRESET_DEFAULT, PRESET_COMPACT, PRESET_LEFT_HANDED } ) {
+			const Layout overlap = ComputeLayout( 720 * density, 360 * density, density, 1, preset, &edits.landscape );
+			CheckEditedRules( overlap, density );
+			Check( Near( overlap.buttons[BUTTON_JUMP].x, 592 * density ) && Near( overlap.buttons[BUTTON_JUMP].y, 240 * density ),
+				"the placed control keeps its spot; the preset control moves aside" );
+		}
+	}
+
+	// Everything at 150% on a small phone at the largest size cannot fit: the
+	// preset is shown instead, and editsRejected says so.
+	const char *huge = "*,*,150,35,0;*,*,150,35,0;*,*,150,35,0;*,*,150,35,0;*,*,150,35,0;*,*,150,35,0;*,*,150,35,0;*,*,150,35,0;*,*,150,35,0";
+	std::snprintf( record, sizeof record, "1|%s|%s", huge, huge );
+	edits = ParseOrFail( record );
+	const Layout small = ComputeLayout( 640, 360, 1, 1.5f, PRESET_DEFAULT, &edits.landscape );
+	const Layout smallPreset = ComputeLayout( 640, 360, 1, 1.5f );
+	Check( small.available && small.editsRejected && !small.edited, "edits that cannot fit fall back to the preset" );
+	for ( int i = 0; i < BUTTON_COUNT; ++i ) {
+		Check( Near( small.buttons[i].x, smallPreset.buttons[i].x ) && Near( small.buttons[i].radius, smallPreset.buttons[i].radius ),
+			"the fallback is exactly the preset" );
+	}
+
+	// Refused records leave the previous edits untouched.
+	OrientationEdits kept = ParseOrFail( record );
+	for ( const char *bad : { "", "1", "1|", "2|x|y", "1|*,*,100,35,0|*,*,100,35,0" } ) {
+		Check( !ParseLayoutEdits( bad, kept ) && kept.landscape.controls[0].size == 150, "malformed record refused" );
+	}
+	std::snprintf( record, sizeof record,
+		"1|*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,1;*,*,100,35,0;*,*,100,35,0|%s",
+		untouched );
+	Check( !ParseLayoutEdits( record, kept ), "Pause cannot be hidden" );
+	Check( !ParseLayoutEdits( nullptr, kept ), "null record refused" );
+}
+
 // Section 13.6 portrait: the cluster gathers in the deck's trailing half, Fire
 // in its middle with the weapon control above it, jump and crouch outside it
 // and zoom and reload inside it; every other drag looks and the stick floats
@@ -323,5 +431,6 @@ int main() {
 	controls.SetLayout( ComputeLayout( 16, 16, 1, 1 ) );
 	BuildOverlay( controls, mesh );
 	Check( mesh.vertices.empty(), "unsupported viewport never draws invalid geometry" );
-	std::puts( "PASS: physical-dp layouts, independent fingers, taps, wheel cancellation, rotation, portrait, cinematics and mesh" );
+	CheckLayoutEdits();
+	std::puts( "PASS: physical-dp layouts, independent fingers, taps, wheel cancellation, rotation, portrait, cinematics, mesh and layout edits" );
 }

@@ -143,6 +143,26 @@ continues to require a nondebuggable ARM64 phone release and rejects this APK.
 An ABI label alone does not qualify a binary: ELF machine/API and every
 packaged library's bytes are checked.
 
+## Meta Quest flavor verification
+
+The standalone headset build is the phone build declared as an immersive
+OpenXR app. Its integration, distribution and device qualification are AND-05;
+AND-01 provides the checks it must pass. `-Dandroid_headset=true` on an
+arm64-v8a configuration stages package variant `quest` and installs the
+`openq4-headset` marker that starts the game in VR. The phone Gradle host
+refuses that stage until the flavor's Gradle side lands.
+
+`verify_android_apk.py --variant quest` then requires its own application ID,
+`com.darkmatter.openq4.quest` (never the phone's, so neither APK replaces the
+other), a nondebuggable release signature, the same seven ARM64 libraries (the
+OpenXR loader links into the client), the marker asset, and a manifest that
+requires head tracking, requests the OpenXR runtime permission, opens the game
+with the immersive OpenXR and Quest categories and names its supported
+headsets. Phone and emulator APKs must carry none of these and no marker, and
+no stage or APK of any variant may carry the headset-free OpenXR test runtime
+(`libopenq4-xr-test-runtime.so`). The application ID and API floor are the
+flavor's until AND-05's distribution decision.
+
 Create AVDs using the [Android emulator tools](https://developer.android.com/studio/run/emulator-commandline).
 Set `ANDROID_USER_HOME` and the AVD data path inside the checkout's `.tmp/`
 before invoking SDK/AVD tools; keep SDK downloads and VM disks off the system
@@ -165,7 +185,17 @@ Landscape and portrait choice, turns the AVD to portrait mid-match through its
 `user_rotation` setting when the engine asks, drives the portrait thumb deck,
 turns back and saves/loads. It checks the window and engine captures follow
 each turn, the deck arrangement and that neither turn moves the player, and it
-restores the AVD's rotation settings and the app's setup preferences. Captures come from the engine's
+restores the AVD's rotation settings and the app's setup preferences.
+`--mode lifecycle` writes a touch layout editor record into the setup
+preferences (as **Apply layout** does), checks that the engine places, sizes,
+fades and hides the controls it names, then sends the app to the background
+with the activity manager's Home intent, requires the `Suspended` save, ends
+the backgrounded process with `am kill` as Android's memory management would,
+relaunches it and loads that save, which must restore the player where the app
+was left. `--mode resume --server <IPv4>:<port> --away <seconds>` joins a
+dedicated server the emulator can reach, stays in the background for the given
+time and returns the same process: a stay shorter than the 40-second time-out
+must keep its connection, a longer one must reconnect at once. Captures come from the engine's
 `screenshot` command. The probe starts the internal game Activity from the
 rooted AVD, so it does not qualify setup navigation or physical input. It refuses
 physical-device serials and an already running diagnostic app, preserves existing

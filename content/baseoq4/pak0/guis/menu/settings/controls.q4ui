@@ -57,6 +57,7 @@
   "controls.46.keys": {"type": "string", "initial": "", "keyBinding": "emote taunt"},
   "controls.47.keys": {"type": "string", "initial": "", "keyBinding": "emote grab_a"},
   "controls.48.keys": {"type": "string", "initial": "", "keyBinding": "_voicechat"},
+  "controls.touchLayout": {"type": "boolean", "initial": false},
   "page.tab": {"type": "number", "initial": 0},
   "page.leaving": {"type": "number", "initial": -1},
   "prompt.glyphs": {"type": "number", "initial": 0},
@@ -73,6 +74,7 @@
  "actions": {
   "controlsBind": {"operation": "session.menu", "arguments": {"command": "controlsBind"}},
   "controlsClear": {"operation": "session.menu", "arguments": {"command": "controlsClear"}},
+  "controlsTouchLayout": {"operation": "session.menu", "arguments": {"command": "controlsTouchLayout"}},
   "back": {"operation": "session.menu", "arguments": {"command": "controlsBack"}}
  },
  "events": {
@@ -752,6 +754,12 @@
    "node": "controls_bind_48-value",
    "property": "text",
    "value": {"state": "controls.48.keys"}
+  },
+  {
+   "id": "controls_touch_layout.display",
+   "node": "controls_touch_layout",
+   "property": "display",
+   "value": {"op": "select", "args": [{"state": "controls.touchLayout"}, "block", "none"]}
   },
   {
    "id": "tab-move-active.display",
@@ -10573,6 +10581,123 @@
    }
   },
   {
+   "id": "tall.controls_touch_layout.width",
+   "node": "controls_touch_layout",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_touch_layout.height",
+   "node": "controls_touch_layout",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_touch_layout-focus.width",
+   "node": "controls_touch_layout-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_touch_layout-focus.height",
+   "node": "controls_touch_layout-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_touch_layout-head.left",
+   "node": "controls_touch_layout-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_touch_layout-head.width",
+   "node": "controls_touch_layout-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     247.4808,
+     {"op": "*", "args": [121.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_touch_layout-head.height",
+   "node": "controls_touch_layout-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_touch_layout-label.font-size",
+   "node": "controls_touch_layout-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_touch_layout-label.line-height",
+   "node": "controls_touch_layout-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
    "id": "tall.controls-other-note.margin-bottom",
    "node": "controls-other-note",
    "property": "margin-bottom",
@@ -10686,6 +10811,12 @@
   {
    "id": "controls_bind_48.enabled",
    "node": "controls_bind_48",
+   "property": "enabled",
+   "value": {"op": "==", "args": [{"state": "page.tab"}, 3]}
+  },
+  {
+   "id": "controls_touch_layout.enabled",
+   "node": "controls_touch_layout",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 3]}
   },
@@ -18265,6 +18396,150 @@
     },
     {
      "node": "controls_bind_48-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_touch_layout.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "controls_touch_layout-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "controls_touch_layout-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "controls_touch_layout-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_touch_layout.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "controls_touch_layout-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "controls_touch_layout-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "controls_touch_layout-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_touch_layout.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "controls_touch_layout-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls_touch_layout-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls_touch_layout-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_touch_layout.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "controls_touch_layout-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls_touch_layout-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls_touch_layout-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_touch_layout.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "controls_touch_layout-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "controls_touch_layout-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "controls_touch_layout-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -30552,7 +30827,7 @@
                   "pressed": "controls_bind_42.pressed",
                   "disabled": "controls_bind_42.disabled"
                  },
-                 "navigation": {"down": "controls_bind_43", "up": "controls_bind_41", "right": "controls_bind_48"}
+                 "navigation": {"down": "controls_bind_43", "up": "controls_bind_41", "right": "controls_touch_layout"}
                 }
                }
               ]
@@ -31579,7 +31854,158 @@
                   "pressed": "controls_bind_48.pressed",
                   "disabled": "controls_bind_48.disabled"
                  },
-                 "navigation": {"down": "controls_bind_36", "up": "controls_bind_47", "left": "controls_bind_41"}
+                 "navigation": {"down": "controls_touch_layout", "up": "controls_bind_47", "left": "controls_bind_41"}
+                }
+               },
+               {
+                "id": "controls_touch_layout",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "controls_touch_layout-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "controls_touch_layout-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "controls_touch_layout-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "controls_touch_layout-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 121.0, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "controls_touch_layout-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_231762"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "button",
+                 "label": "#str_231762",
+                 "action": "controlsTouchLayout",
+                 "states": {
+                  "default": "controls_touch_layout.default",
+                  "hover": "controls_touch_layout.hover",
+                  "focus": "controls_touch_layout.focus",
+                  "pressed": "controls_touch_layout.pressed",
+                  "disabled": "controls_touch_layout.disabled"
+                 },
+                 "navigation": {"down": "controls_bind_36", "up": "controls_bind_48", "left": "controls_bind_42"}
                 }
                }
               ]

@@ -61,6 +61,8 @@ def staged_package(stage: Path, variant: str) -> tuple[dict[str, bytes], dict[st
         'licenses/sdl3/LICENSE.txt': b'SDL', 'licenses/openal-soft/COPYING': b'OpenAL',
         'licenses/android-ndk/NOTICE.toolchain': b'NDK',
     })
+    if verify_android_apk.variant_info(variant).headset:
+        files[verify_android_apk.HEADSET_MARKER] = b'# openQ4 Meta Quest build marker\n'
     entries = {}
     for name, data in sorted(files.items()):
         path = stage / name
@@ -335,6 +337,96 @@ class AndroidBuildTests(unittest.TestCase):
                         verify_android_apk.verify_tools(Path('emulator.apk'), Path('tools'), certificate, '0.14.000', variant)
                 else:
                     verify_android_apk.verify_tools(Path('emulator.apk'), Path('tools'), certificate, '0.14.000', variant)
+
+    def test_quest_flavor_payload_is_its_own_package(self) -> None:
+        with tempfile.TemporaryDirectory(prefix='android-quest-', dir=ROOT / '.tmp') as temporary:
+            stage = Path(temporary) / 'stage'
+            files, entries = staged_package(stage, 'quest')
+            apk = Path(temporary) / 'quest.apk'
+            write_apk(apk, entries)
+            verify_android_apk.verify_payload(apk, stage, '0.14.000', 'quest')
+            with self.assertRaisesRegex(ValueError, 'Expected phone'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000')
+            # The headset-free test runtime never ships, staged or packaged.
+            write_apk(apk, dict(entries, **{'lib/arm64-v8a/' + verify_android_apk.XR_TEST_RUNTIME: android_library()}))
+            with self.assertRaisesRegex(ValueError, 'never carry the OpenXR test runtime'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'quest')
+            runtime = stage / 'lib' / verify_android_apk.XR_TEST_RUNTIME
+            runtime.write_bytes(android_library())
+            write_apk(apk, entries)
+            with self.assertRaisesRegex(ValueError, 'never be staged'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'quest')
+            runtime.unlink()
+            # The marker is what starts the game in VR: required here, packaged exactly.
+            marker = stage / verify_android_apk.HEADSET_MARKER
+            marker.unlink()
+            with self.assertRaisesRegex(ValueError, 'must carry the openq4-headset marker'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'quest')
+            marker.write_bytes(files[verify_android_apk.HEADSET_MARKER])
+            changed = dict(entries)
+            changed.pop('assets/' + verify_android_apk.HEADSET_MARKER)
+            write_apk(apk, changed)
+            with self.assertRaisesRegex(ValueError, 'asset set differs'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'quest')
+            write_apk(apk, dict(entries, **{'assets/' + verify_android_apk.HEADSET_MARKER: b'other marker'}))
+            with self.assertRaisesRegex(ValueError, 'differs from validated stage'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'quest')
+        with tempfile.TemporaryDirectory(prefix='android-quest-phone-', dir=ROOT / '.tmp') as temporary:
+            # A phone stage that carries the marker would start phones in VR.
+            stage = Path(temporary) / 'stage'
+            files, entries = staged_package(stage, 'phone')
+            (stage / verify_android_apk.HEADSET_MARKER).write_bytes(b'marker')
+            apk = Path(temporary) / 'phone.apk'
+            write_apk(apk, dict(entries, **{'assets/' + verify_android_apk.HEADSET_MARKER: b'marker'}))
+            with self.assertRaisesRegex(ValueError, 'belongs to Quest stages only'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000')
+
+    def test_quest_manifest_declares_an_immersive_headset_app(self) -> None:
+        certificate = ROOT / 'mobile/android/release-signing-cert.pem'
+        cert_digest = hashlib.sha256(ssl.PEM_cert_to_DER_cert(certificate.read_text())).hexdigest()
+        android = 'http://schemas.android.com/apk/res/android'
+        feature = ('    E: uses-feature (line=5)\n'
+                   '      A: android:name(0x01010003)="android.hardware.vr.headtracking" (Raw: "android.hardware.vr.headtracking")\n'
+                   '      A: android:required(0x0101028e)=(type 0x12)0xffffffff\n'
+                   '      A: android:version(0x01010519)=(type 0x10)0x1\n')
+        permission = ('    E: uses-permission (line=6)\n'
+                      '      A: android:name(0x01010003)="org.khronos.openxr.permission.OPENXR" (Raw: "org.khronos.openxr.permission.OPENXR")\n')
+        devices = ('        E: meta-data (line=20)\n'
+                   '          A: android:name(0x01010003)="com.oculus.supportedDevices" (Raw: "com.oculus.supportedDevices")\n'
+                   '          A: android:value(0x01010024)="quest2|questpro|quest3|quest3s" (Raw: "quest2|questpro|quest3|quest3s")\n')
+        immersive = ''.join(f'            E: category (line=30)\n              A: {android}:name(0x01010003)="{name}" (Raw: "{name}")\n'
+                            for name in verify_android_apk.HEADSET_CATEGORIES)
+        application = ('    E: application (line=10)\n      A: android:extractNativeLibs(0x010104ea)=(type 0x12)0xffffffff\n'
+                       '      E: activity (line=15)\n')
+        tree = lambda *parts: f'N: android={android}\n  E: manifest (line=2)\n' + ''.join(parts)
+        quest_tree = tree(feature, permission, application, devices, '          E: intent-filter (line=28)\n', immersive)
+        badging = ("package: name='com.darkmatter.openq4.quest' versionCode='14000' versionName='0.14.000'\nsdkVersion:'24'\n"
+                   "targetSdkVersion:'35'\nnative-code: 'arm64-v8a'\nlaunchable-activity: name='com.darkmatter.openq4.LauncherActivity'\n")
+        signer = f'Verified using v2 scheme (APK Signature Scheme v2): true\nSigner #1 certificate SHA-256 digest: {cert_digest}\n'
+        phone_badging = badging.replace('.openq4.quest', '.openq4')
+        for variant, outputs, message in (
+            ('quest', [signer, '', badging, quest_tree], ''),
+            ('phone', [signer, '', badging, quest_tree], 'manifest mismatch'),
+            ('quest', [signer, '', badging + 'application-debuggable\n', quest_tree], 'Quest APK must not be debuggable'),
+            ('quest', [signer, '', badging, quest_tree.replace('(type 0x12)0xffffffff\n      A: android:version', '(type 0x12)0x0\n      A: android:version')],
+             'require head tracking'),
+            ('quest', [signer, '', badging, quest_tree.replace(feature, '')], 'require head tracking'),
+            ('quest', [signer, '', badging, quest_tree.replace(permission, '')], 'OpenXR runtime permission'),
+            ('quest', [signer, '', badging, quest_tree.replace('category.IMMERSIVE_HMD', 'category.HOME')], 'immersive OpenXR activity'),
+            ('quest', [signer, '', badging, quest_tree.replace(devices, '')], 'supported headsets'),
+            ('phone', [signer, '', phone_badging, tree(application)], ''),
+            ('phone', [signer, '', phone_badging, tree(feature, application)], 'must not declare the OpenXR headset'),
+            ('phone', [signer, '', phone_badging, tree(permission, application)], 'must not declare the OpenXR headset'),
+            ('phone', [signer, '', phone_badging, tree(application, immersive)], 'must not declare the OpenXR headset'),
+        ):
+            with self.subTest(variant=variant, message=message), mock.patch.object(
+                    verify_android_apk.subprocess, 'run', side_effect=[
+                        subprocess.CompletedProcess([], 0, stdout=text) for text in outputs]):
+                if message:
+                    with self.assertRaisesRegex(ValueError, message):
+                        verify_android_apk.verify_tools(Path('quest.apk'), Path('tools'), certificate, '0.14.000', variant)
+                else:
+                    verify_android_apk.verify_tools(Path('quest.apk'), Path('tools'), certificate, '0.14.000', variant)
 
     def test_library_validation_checks_loadability(self) -> None:
         (ROOT / ".tmp").mkdir(exist_ok=True)

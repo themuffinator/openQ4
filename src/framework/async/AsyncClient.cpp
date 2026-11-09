@@ -207,11 +207,82 @@ idAsyncClient::idAsyncClient
 idAsyncClient::idAsyncClient( void ) {
 	guiNetMenu = NULL;
 	updateState = UPDATE_NONE;
+	resumeReconnectTime = 0;
 	Clear();
 }
 
 bool idAsyncClient::IsActive( void ) const {
 	return active || idAsyncNetwork::multiViewDemo.IsPlaying();
+}
+
+static idCVar net_resumeReconnect( "net_resumeReconnect", "1", CVAR_SYSTEM | CVAR_BOOL | CVAR_ARCHIVE | CVAR_NOCHEAT,
+	"reconnect to the server after the app returns from the background if the connection did not survive" );
+static idCVar net_resumeProbe( "net_resumeProbe", "5000", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT,
+	"after a return from the background, milliseconds without a packet before reconnecting", 1000, 30000 );
+
+/*
+==================
+idAsyncClient::ApplicationResumed
+
+ui-visual-design.md 13.6: after a stay in the background multiplayer
+reconnects or shows a connection-lost state. The server drops a silent client
+after its time-out; waiting out ours meant a frozen game for 40 seconds. A
+stay longer than the time-out reconnects at once. After a shorter one the
+backlog queued while away is dropped, so only a packet the server sends now
+proves the connection; without one in net_resumeProbe ms, reconnect. A failed
+reconnect reports the lost connection as any failed connect does.
+==================
+*/
+void idAsyncClient::ApplicationResumed( int suspendedMs ) {
+	resumeProbeTime = -1;
+	if ( !active || clientState < CS_CONNECTED || !net_resumeReconnect.GetBool() || idAsyncNetwork::server.IsActive()
+			|| idAsyncNetwork::multiViewDemo.IsPlaying() ) {
+		return;
+	}
+	// Whatever queued while away is stale, including a disconnect the server
+	// sent when it dropped the client.
+	ClearPendingPackets();
+	if ( suspendedMs >= idAsyncNetwork::clientServerTimeout.GetInteger() * 1000 ) {
+		ResumeReconnect( va( "away %d s, beyond the time-out", suspendedMs / 1000 ) );
+		return;
+	}
+	resumeProbeTime = clientTime;
+	common->Printf( "Network: back from %d ms in the background; awaiting the server\n", suspendedMs );
+}
+
+void idAsyncClient::ResumeReconnect( const char *reason ) {
+	resumeProbeTime = -1;
+	resumeReconnectTime = Sys_Milliseconds();
+	common->Printf( "Network: reconnecting after the background (%s)\n", reason );
+	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reconnect\n" );
+}
+
+// The server that dropped the client can still answer the old channel with a
+// disconnect while the new connection is being set up; that must not end the
+// reconnect behind a message box. Only before the new connection exists, and
+// only briefly after the reconnect began.
+bool idAsyncClient::StaleDisconnectAfterResume( void ) const {
+	return resumeReconnectTime != 0 && clientState < CS_CONNECTED
+		&& Sys_Milliseconds() - resumeReconnectTime < 10000;
+}
+
+// True once a reconnect is on its way: the frame stops there.
+bool idAsyncClient::CheckResume( void ) {
+	if ( resumeProbeTime < 0 ) {
+		return false;
+	}
+	// Strictly later: the first frame back reads the backlog before the session
+	// reports the return, at the same client time.
+	if ( lastPacketTime > resumeProbeTime ) {
+		common->Printf( "Network: the connection survived the background\n" );
+		resumeProbeTime = -1;
+		return false;
+	}
+	if ( clientTime - resumeProbeTime < net_resumeProbe.GetInteger() ) {
+		return false;
+	}
+	ResumeReconnect( "no packet since the return" );
+	return true;
 }
 
 int idAsyncClient::GetLocalClientNum( void ) const {
@@ -246,6 +317,7 @@ void idAsyncClient::Clear( void ) {
 	lastConnectTime = -9999;
 	lastEmptyTime = -9999;
 	lastPacketTime = -9999;
+	resumeProbeTime = -1;
 	lastSnapshotTime = -9999;
 	snapshotGameFrame = 0;
 	snapshotGameTime = 0;
@@ -1927,6 +1999,10 @@ void idAsyncClient::ProcessDisconnectMessage( const netadr_t from, const idBitMs
 		common->Printf( "Disconnect packet from unknown server.\n" );
 		return;
 	}
+	if ( StaleDisconnectAfterResume() ) {
+		common->Printf( "Network: ignoring the dropped connection's disconnect while reconnecting\n" );
+		return;
+	}
 	arenaCampaign.AbortMatch();
 	session->Stop();
 	session->MessageBox( MSG_OK, common->GetLanguageDict()->GetString ( "#str_04320" ), NULL, true );
@@ -2762,7 +2838,7 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 		return;
 	}
 
-	if ( CheckTimeout() ) {
+	if ( CheckResume() || CheckTimeout() ) {
 		return;
 	}
 

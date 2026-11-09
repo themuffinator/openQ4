@@ -30,15 +30,26 @@ enum androidTouchPhase_t {ANDROID_TOUCH_DOWN,ANDROID_TOUCH_MOVE,ANDROID_TOUCH_UP
 struct idCVar;
 static std::map<std::string,idCVar*> registered;
 static std::map<std::string,float> values;
+struct idStr {
+    std::string text;
+    idStr()=default;
+    idStr(const char* value):text(value){}
+    int Cmp(const char* other)const{return text.compare(other);}
+    int Length()const{return static_cast<int>(text.size());}
+    const char* c_str()const{return text.c_str();}
+};
 struct idCVar {
-    float value;
-    idCVar(const char* name,const char* initial,int,const char*,float=0,float=0):value(std::strtof(initial,nullptr)){registered[name]=this;}
+    float value;std::string text;
+    idCVar(const char* name,const char* initial,int,const char*,float=0,float=0):value(std::strtof(initial,nullptr)),text(initial){registered[name]=this;}
     float GetFloat()const{return value;}
     int GetInteger()const{return static_cast<int>(value);}
     bool GetBool()const{return value!=0;}
+    const char* GetString()const{return text.c_str();}
     void SetFloat(float v){value=v;}
     void SetBool(bool v){value=v?1.0f:0.0f;}
+    void SetString(const char* v){text=v;}
 };
+struct Common {int warnings=0,prints=0;void Warning(const char*,...){++warnings;}void Printf(const char*,...){++prints;}} commonValue,*common=&commonValue;
 struct Cvars {
     float GetCVarFloat(const char* name){auto it=registered.find(name);return it==registered.end()?values[name]:it->second->GetFloat();}
     bool GetCVarBool(const char* name){return GetCVarFloat(name)!=0;}
@@ -74,6 +85,9 @@ static openq4::touch::Controls touchControls;
 static openq4::touch::Contacts touchContacts;
 static float touchDisplayScale=1,touchWheelX=0,touchWheelY=0,touchPlayerScale=-1;
 static int touchPlayerPreset=-1;
+static idStr touchLayoutRecord;
+static openq4::touch::OrientationEdits touchLayoutEdits;
+static bool touchLayoutValid=false;
 static int setupLoads=0;
 static void TouchControls_LoadSetup(){++setupLoads;}
 // The interface record has its own transaction test (android_interface_setup.py).
@@ -90,7 +104,7 @@ static void reset(){
     AndroidTouchControls_Release();sessLocal=Session{};consoleValue.active=retainedOpen=loading=false;
     gameValue.cinematic=false;values.clear();values["in_touchscreen"]=1;
     in_touchControls.SetBool(true);in_touchControlsScale.SetFloat(1);in_touchLookSensitivity.SetFloat(1);
-    in_touchLayoutPreset.SetFloat(0);
+    in_touchLayoutPreset.SetFloat(0);in_touchLayout.SetString("");commonValue=Common{};
     ui_touchCanReload.SetBool(true);ui_touchCanZoom.SetBool(true);
     usercmd.impulses.clear();commands.text.clear();escape.clear();now=1000;frame();motion.Take();
 }
@@ -182,7 +196,25 @@ int main(){try{
     check(AndroidTouchControls_HandleFinger(ANDROID_TOUCH_UP,1,2,.2f,.2f),"orphan release became menu pointer");
     reset();button(ANDROID_TOUCH_DOWN,1,1,BUTTON_FIRE);values["in_touchscreen"]=0;frame();
     check(!motion.Take().buttons && !touchControls.HasFingers(),"disabling touch retained actions");
-    std::puts("PASS: production touch routing, motion, button edges, menu/focus/rotation handoffs, portrait deck HUD reservation, capabilities and radial input");
+    // The layout editor's record: hidden controls leave the visible set and
+    // cannot be pressed, each orientation reads its own edits, and a malformed
+    // record falls back to the preset with a warning.
+    reset();const std::string untouched="*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0";
+    const std::string hideJump="-160,-120,100,35,0;*,*,100,35,1;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0;*,*,100,35,0";
+    in_touchLayout.SetString(("1|"+hideJump+"|"+untouched).c_str());button(ANDROID_TOUCH_DOWN,1,1,BUTTON_FIRE);frame();
+    check(!(touchControls.VisibleButtons()&(1u<<BUTTON_JUMP)) && touchControls.GetLayout().edited,"hidden control still visible");
+    check(std::fabs(touchControls.GetLayout().buttons[BUTTON_FIRE].x-560)<.01f,"moved control not applied");
+    check(!(motion.Take().buttons&(1u<<QUAKE4_BTN_ATTACK)),"a layout change kept the old press");
+    AndroidTouchControls_HandleFinger(ANDROID_TOUCH_UP,1,1,0,0);
+    const auto jumpAt=touchControls.GetLayout().buttons[BUTTON_JUMP];
+    AndroidTouchControls_HandleFinger(ANDROID_TOUCH_DOWN,1,2,jumpAt.x/720,jumpAt.y/360);frame();
+    check(!(motion.Take().buttons&(1u<<QUAKE4_BTN_MOVE_UP)),"a hidden control was pressed");
+    AndroidTouchControls_HandleFinger(ANDROID_TOUCH_UP,1,2,0,0);
+    AndroidTouchControls_Frame(360,720,1,true);
+    check(!touchControls.GetLayout().edited && (touchControls.VisibleButtons()&(1u<<BUTTON_JUMP)),"portrait used the landscape edits");
+    in_touchLayout.SetString("1|broken");AndroidTouchControls_Frame(720,360,1,true);
+    check(!touchControls.GetLayout().edited && commonValue.warnings==1,"malformed layout record applied or silent");
+    std::puts("PASS: production touch routing, motion, button edges, menu/focus/rotation handoffs, portrait deck HUD reservation, capabilities, radial input and layout edits");
     return 0;
 }catch(const std::exception& error){std::fprintf(stderr,"%s\n",error.what());return 1;}}
 '''

@@ -368,7 +368,18 @@ void S_TrimMemory(const char *reason);
 // Main-thread state consumed outside SDL's pump, before gameplay/audio resume.
 static bool s_sdlAppSuspendedSinceQuery = false;
 static SDL_AtomicInt s_sdlAppBackgrounded = { 0 };
+static int s_sdlAppSuspendedAt = 0, s_sdlAppSuspendedMs = 0;
 void S_SetDevicePaused(bool paused);
+// Session.cpp: single player's "Suspended" save, written while the app goes to
+// the background, so the system ending the app in the background loses nothing.
+void Session_SuspendSave(void);
+// Session.cpp: tells a multiplayer client how long the app was away, from this
+// pump, before the frame's network processing can read what queued meanwhile.
+void Session_AppForeground(int suspendedMs);
+// How long the last completed background stay lasted, in milliseconds.
+int Sys_SDL_LastSuspensionMs(void) {
+	return s_sdlAppSuspendedMs;
+}
 bool Sys_SDL_IsAppBackgrounded(void) {
 	return SDL_GetAtomicInt(&s_sdlAppBackgrounded) != 0;
 }
@@ -2731,6 +2742,7 @@ static void SDL3_HandleAppBackgroundTransition(int eventTime, const char *reason
 	s_sdlAppInBackground = true;
 #if defined(__ANDROID__)
 	s_sdlAppSuspendedSinceQuery = true;
+	s_sdlAppSuspendedAt = Sys_Milliseconds();
 #endif
 	openq4::NativeInputBeforeWindowChange();
 	win32.activeApp = false;
@@ -2754,6 +2766,11 @@ static void SDL3_HandleAppBackgroundTransition(int eventTime, const char *reason
 	}
 	if (common != NULL && common->IsInitialized() && fileSystem != NULL && fileSystem->IsInitialized()) {
 		common->WriteConfigToFile(CONFIG_FILE);
+#if defined(__ANDROID__)
+		// SDL blocks this thread once the event pump returns, and Android may
+		// then end the process without another call: save now (section 13.6).
+		Session_SuspendSave();
+#endif
 	}
 }
 
@@ -2766,6 +2783,8 @@ static void SDL3_HandleAppForegroundTransition(int eventTime, const char *reason
 	s_sdlAppInBackground = false;
 #if defined(__ANDROID__)
 	SDL_SetAtomicInt(&s_sdlAppBackgrounded, 0);
+	s_sdlAppSuspendedMs = Sys_Milliseconds() - s_sdlAppSuspendedAt;
+	Session_AppForeground(s_sdlAppSuspendedMs);
 #endif
 	openq4::NativeInputBeforeWindowChange();
 	win32.activeApp = Sys_SDL_IsGameWindowFocused();

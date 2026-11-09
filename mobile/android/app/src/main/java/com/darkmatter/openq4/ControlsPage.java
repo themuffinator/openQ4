@@ -37,7 +37,7 @@ final class ControlsPage {
                 prefs.getString(TouchSettings.SAVED, TouchSettings.DEFAULT.encode())));
     }
 
-    void build(LinearLayout column, Runnable back) {
+    void build(LinearLayout column, Runnable back, Runnable editLayout) {
         column.addView(theme.text(R.string.setup_controls, true));
         column.addView(theme.text(R.string.setup_controls_help, false));
         TextView devices = theme.text(R.string.setup_controller_none, false);
@@ -70,6 +70,8 @@ final class ControlsPage {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         presets.setAdapter(adapter); presets.setSelection(draft.preset); column.addView(presets);
         description = theme.text(R.string.setup_touch_default_help, false); column.addView(description);
+        // Section 13.6's editor: move, resize, fade and hide each control per orientation.
+        column.addView(theme.button(R.string.setup_layout_edit, editLayout));
         sensitivity = theme.text(R.string.setup_touch_sensitivity, true); column.addView(sensitivity);
         speed = slider(draft.sensitivityStep - 1, 39, R.string.setup_touch_sensitivity_label);
         speed.setOnSeekBarChangeListener(listener(value -> changed(new TouchSettings(draft.preset, value + 1, draft.sizeStep))));

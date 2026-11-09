@@ -103,6 +103,40 @@
         <item>Compacte</item>
         <item>Gaucher</item>
     </string-array>
+    <string name="setup_layout_edit">Modifier la disposition</string>
+    <string name="setup_layout">Éditeur des commandes tactiles</string>
+    <string name="setup_layout_help">Faites glisser une commande pour la déplacer. Elle s’aligne sur une grille de 8 dp et reste à l’écart des autres commandes, des bords de l’écran et du réticule. Choisissez une commande pour la redimensionner, l’estomper ou la masquer. Paysage et portrait ont chacun leur disposition. Appliquer enregistre la disposition pour le prochain lancement du jeu ou le retour au jeu.</string>
+    <string name="setup_layout_orientation">Orientation</string>
+    <string name="setup_layout_control">Commande</string>
+    <string name="setup_layout_size">Taille : %1$d %%</string>
+    <string name="setup_layout_size_label">Taille de la commande</string>
+    <string name="setup_layout_opacity">Opacité : %1$d %%</string>
+    <string name="setup_layout_opacity_label">Opacité de la commande</string>
+    <string name="setup_layout_hide">Masquer cette commande</string>
+    <string name="setup_layout_pause_note">Pause reste toujours visible : elle permet aussi de passer les cinématiques.</string>
+    <string name="setup_layout_multiplayer_note">Cette commande n’apparaît qu’en multijoueur.</string>
+    <string name="setup_layout_reset_control">Réinitialiser cette commande</string>
+    <string name="setup_layout_reset">Réinitialiser cette orientation</string>
+    <string name="setup_layout_no_fit">Cela ne tient pas. Essayez une taille plus petite ou un autre emplacement.</string>
+    <string name="setup_layout_apply">Appliquer la disposition</string>
+    <string name="setup_layout_applied">Disposition enregistrée. Elle s’applique au retour au jeu ou à son lancement.</string>
+    <string name="setup_layout_save_failed">Impossible d’enregistrer la disposition. La disposition appliquée précédente est conservée ; vérifiez l’espace libre de l’application et réessayez.</string>
+    <string name="setup_layout_preview">Aperçu de la disposition. Faites glisser une commande pour la déplacer, ou choisissez-la ci-dessous.</string>
+    <string-array name="setup_layout_orientations">
+        <item>Paysage</item>
+        <item>Portrait</item>
+    </string-array>
+    <string-array name="setup_layout_controls">
+        <item>Tirer</item>
+        <item>Sauter</item>
+        <item>S’accroupir</item>
+        <item>Arme</item>
+        <item>Recharger</item>
+        <item>Zoom</item>
+        <item>Pause</item>
+        <item>Scores</item>
+        <item>Discussion</item>
+    </string-array>
     <string name="setup_interface">Interface</string>
     <string name="setup_interface_help">Choisissez la taille des menus et du texte du jeu. Automatique choisit Téléphone ou Tablette selon cet appareil. Sur Téléphone et Tablette, le texte part de la taille de police Android. Appliquer définit ces tailles une seule fois, au prochain lancement ou retour au jeu ; les modifications faites ensuite dans les paramètres du jeu sont conservées.</string>
     <string name="setup_viewing_profile">Profil d’affichage</string>

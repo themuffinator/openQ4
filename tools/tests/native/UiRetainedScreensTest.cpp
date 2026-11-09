@@ -267,7 +267,7 @@ static const std::set<std::string> SessionCommands = {"continue","singlePlayer",
 	"createMapsOlder","createBanList","createBanPick","createBanRemove",
 	"joinBack","joinPick","joinServer","joinSpectate","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet","joinSourceLan",
 	"joinClearSort","joinSortFavorite","joinSortLocked","joinSortName","joinSortPing","joinSortPlayers","joinSortGameType","joinSortMap",
-	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults","joinConnect","joinSearch","joinSearchClear","joinSortNext",
+	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","controlsTouchLayout","settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults","joinConnect","joinSearch","joinSearchClear","joinSortNext",
 	"mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction","mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction",
 	"mpVoteYes","mpVoteNo","mpCallVote","mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpMatch","mpMatchSelect",
 	"mpSummaryChat","mpAdminPass","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch","mpAdminBans","mpAdminBanPick","mpAdminUnban",
@@ -4704,6 +4704,28 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(std::get<double>(runtime.GetState().at("page.tab")) == 3 && runtime.FocusedControl() == "controls_bind_36",
 		"the tabs wrap to the last");
 	Check(text("controls_bind_48-value","text") == "V","the last tab shows its keys");
+	// TOUCH LAYOUT closes the Other tab only where the session reports the
+	// built-in touch controls (Android); it asks for the layout editor.
+	{
+		const auto* touch = document.Model().FindNode("controls_touch_layout");
+		Check(touch && touch->control && touch->control->role == ControlRole::Button && touch->control->action == "controlsTouchLayout",
+			"TOUCH LAYOUT asks the session for the layout editor");
+		Check(text("controls_touch_layout","display") == "none","no TOUCH LAYOUT without the built-in touch controls");
+		Check(!runtime.FocusControl("controls_touch_layout",0.81),"a hidden TOUCH LAYOUT takes no focus");
+		Check(runtime.SetState({{"controls.touchLayout",true}},error,0.82),"the session reports the touch controls");
+		runtime.Frame(viewport,0.83);
+		Check(text("controls_touch_layout","display") == "block","TOUCH LAYOUT shows with the touch controls");
+		const auto last = bounds("controls_bind_48"), touchRow = bounds("controls_touch_layout");
+		Check(std::abs(touchRow.x-last.x) < .5f && touchRow.y > last.y,"TOUCH LAYOUT follows the last binding in its column");
+		Check(runtime.FocusControl("controls_touch_layout",0.84),"TOUCH LAYOUT takes focus");
+		runtime.TakeActions();
+		press(MenuInput::Accept,0.85);
+		const auto actions = runtime.TakeActions();
+		Check(actions.size() == 1 && actions[0].action == "controlsTouchLayout","Accept on TOUCH LAYOUT asks for the editor");
+		Check(runtime.SetState({{"controls.touchLayout",false}},error,0.86),"the touch controls go");
+		runtime.Frame(viewport,0.87);
+		Check(runtime.FocusControl("controls_bind_36",0.88),"focus returns to the tab");
+	}
 	Check(runtime.RunEvent("onBack",0.9,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "controlsBack","Back asks the session to return");
 	const auto portrait = SettingsViewport(document,540,960);

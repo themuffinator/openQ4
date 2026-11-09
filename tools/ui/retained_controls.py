@@ -12,7 +12,12 @@ Delete clear, any other key binds (idSessionLocal::RetainedControlsKey).
 Delete, Backspace or the west face button on a row clears it
 (controlsClear). The session reads the row from the focused control. How to
 change a binding stands on the heading line. BACK, or the back input,
-returns to the settings screen that opened the page."""
+returns to the settings screen that opened the page.
+
+On Android with the built-in touch controls the Other tab ends with TOUCH
+LAYOUT (controlsTouchLayout), which opens the Android setup's layout editor
+(docs/dev/ui-visual-design.md section 13.6) over the paused game; the session
+shows it through controls.touchLayout, and elsewhere the row is not shown."""
 from __future__ import annotations
 
 from build_retained_screens import Document
@@ -48,6 +53,7 @@ SECTIONS = (
     )),
 )
 BINDINGS = tuple(binding for _section, _heading, rows in SECTIONS for _label, binding in rows)
+TOUCH_LAYOUT_ROW, TOUCH_LAYOUT_LABEL = "controls_touch_layout", "#str_231762"
 
 
 def controls_document() -> dict:
@@ -57,6 +63,8 @@ def controls_document() -> dict:
         doc.state[f"controls.{row}.keys"] = {"type": "string", "initial": "", "keyBinding": binding}
     doc.session("controlsBind", "controlsBind")
     doc.session("controlsClear", "controlsClear")
+    doc.state["controls.touchLayout"] = {"type": "boolean", "initial": False}
+    doc.session("controlsTouchLayout", "controlsTouchLayout")
     tabs, row = [], 0
     for section, heading_key, rows in SECTIONS:
         # A tab's keys start where its own labels allow: the keys bound to an
@@ -67,6 +75,12 @@ def controls_document() -> dict:
             built.append(button_row(doc, f"controls_bind_{row}", label_key, value_x, {"state": f"controls.{row}.keys"},
                                     {"action": "controlsBind"}))
             row += 1
+        if section == "other":
+            # Shown only where the session reports the built-in touch controls;
+            # the rows above keep their columns either way.
+            built.append(button_row(doc, TOUCH_LAYOUT_ROW, TOUCH_LAYOUT_LABEL, value_x, None, {"action": "controlsTouchLayout"}))
+            doc.bind(f"{TOUCH_LAYOUT_ROW}.display", TOUCH_LAYOUT_ROW, "display",
+                     {"op": "select", "args": [{"state": "controls.touchLayout"}, "block", "none"]})
         half = (len(built) + 1) // 2
         tabs.append((section, heading_key, [built[:half], built[half:]]))
     # The west face button clears the focused row, as Delete does.

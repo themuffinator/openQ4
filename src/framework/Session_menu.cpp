@@ -58,14 +58,19 @@ static bool Session_AndroidSetupAvailable() {
 #endif
 }
 
-static void Session_OpenAndroidSetup() {
+// OpenQ4Activity's SETUP_PAGE_* arguments: setup's home, or the touch layout editor.
+enum { ANDROID_SETUP_HOME = 0, ANDROID_SETUP_TOUCH_LAYOUT = 1 };
+
+static void Session_OpenAndroidSetup( int page = 0 ) {
 #if defined( __ANDROID__ ) && !defined( OPENQ4_SIGMATOUCH )
 	// SDL posts to OpenQ4Activity's main-thread handler. The existing Android
 	// lifecycle owns input release, audio suspension and the paused SP return.
 	// Keep the engine and its storage lease alive while setup is in front.
-	if ( !SDL_SendAndroidMessage( 0x8000, 0 ) ) {
+	if ( !SDL_SendAndroidMessage( 0x8000, page ) ) {
 		common->Warning( "Could not open Android setup: %s", SDL_GetError() );
 	}
+#else
+	(void)page;
 #endif
 }
 
@@ -3082,6 +3087,8 @@ void idSessionLocal::PublishRetainedControls( idUserInterface *gui ) {
 			common->GetLanguageDict()->GetString( "#str_07000" ) );
 	}
 	gui->SetStateInt( "controls.capture", retainedControlsCapture );
+	// TOUCH LAYOUT: the built-in touch controls' editor lives in the Android setup.
+	gui->SetStateBool( "controls.touchLayout", Session_AndroidSetupAvailable() );
 	gui->StateChanged( common->GetPresentationTime() );
 #endif
 }
@@ -3092,13 +3099,22 @@ idSessionLocal::HandleRetainedControlsRequest
 
 The CONTROLS page's verbs on the focused row: controlsBind waits for its new
 key (RetainedControlsKey), controlsClear clears it as the stock field's
-Delete does. BACK returns to the settings screen.
+Delete does. BACK returns to the settings screen. controlsTouchLayout opens
+the Android setup's touch layout editor; the game waits behind it as for any
+return from setup.
 ===============
 */
 void idSessionLocal::HandleRetainedControlsRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
 	if ( !idStr::Icmp( request, "controlsBack" ) ) {
 		ReturnRetainedControls();
+		return;
+	}
+	if ( !idStr::Icmp( request, "controlsTouchLayout" ) ) {
+		if ( Session_AndroidSetupAvailable() ) {
+			HandleMainMenuCommands( "play main_menu_selection" );
+			Session_OpenAndroidSetup( ANDROID_SETUP_TOUCH_LAYOUT );
+		}
 		return;
 	}
 	const bool bind = !idStr::Icmp( request, "controlsBind" );
@@ -5932,6 +5948,10 @@ idSessionLocal::GuiFrameEvents
 =================
 */
 void idSessionLocal::GuiFrameEvents() {
+	// Multiplayer frames never run idSessionLocal::Frame, so a return from the
+	// Android background is handled here too and its audio resumes. The
+	// suspension is consumed once.
+	HandleAppResume( false );
 	// Programmatic events and deactivation actions are independent of input
 	// focus, the console, and which GUI currently receives physical events.
 	PumpApplicationActions();

@@ -5555,7 +5555,8 @@ def main() -> int:
     controls_publish = function_body(menu, 'void idSessionLocal::PublishRetainedControls(')
     assert controls_publish.index('gui->SetKeyBindingNames();') < controls_publish.index('retainedControlsCapture >= 0') < controls_publish.index('gui->StateChanged(')
     assert {name: action['arguments']['command'] for name, action in controls_document['actions'].items()} == \
-        {'controlsBind': 'controlsBind', 'controlsClear': 'controlsClear', 'back': 'controlsBack'}
+        {'controlsBind': 'controlsBind', 'controlsClear': 'controlsClear', 'controlsTouchLayout': 'controlsTouchLayout',
+         'back': 'controlsBack'}
     controls_key = function_body(menu, 'bool idSessionLocal::RetainedControlsKey(')
     assert 'idKeyInput::NumBinds( binding ) >= 2 && !idKeyInput::KeyIsBoundTo( key, binding )' in controls_key
     assert 'key != K_ESCAPE && key != K_JOY7 && key != K_JOY8' in controls_key and 'idKeyInput::UnbindBinding( binding );' in controls_key

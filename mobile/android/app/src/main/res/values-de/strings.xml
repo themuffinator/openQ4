@@ -103,6 +103,40 @@
         <item>Kompakt</item>
         <item>Linkshändig</item>
     </string-array>
+    <string name="setup_layout_edit">Layout bearbeiten</string>
+    <string name="setup_layout">Touch-Layout-Editor</string>
+    <string name="setup_layout_help">Ziehe ein Bedienelement, um es zu verschieben. Es rastet in einem 8-dp-Raster ein und hält Abstand zu den anderen Bedienelementen, den Bildschirmrändern und dem Fadenkreuz. Wähle ein Bedienelement, um seine Größe, Deckkraft oder Sichtbarkeit zu ändern. Quer- und Hochformat haben eigene Layouts. Anwenden speichert das Layout für den nächsten Spielstart oder die Rückkehr ins Spiel.</string>
+    <string name="setup_layout_orientation">Ausrichtung</string>
+    <string name="setup_layout_control">Bedienelement</string>
+    <string name="setup_layout_size">Größe: %1$d %%</string>
+    <string name="setup_layout_size_label">Größe des Bedienelements</string>
+    <string name="setup_layout_opacity">Deckkraft: %1$d %%</string>
+    <string name="setup_layout_opacity_label">Deckkraft des Bedienelements</string>
+    <string name="setup_layout_hide">Dieses Bedienelement ausblenden</string>
+    <string name="setup_layout_pause_note">Pause bleibt immer sichtbar: Damit werden auch Zwischensequenzen übersprungen.</string>
+    <string name="setup_layout_multiplayer_note">Dieses Bedienelement erscheint nur im Mehrspielermodus.</string>
+    <string name="setup_layout_reset_control">Dieses Bedienelement zurücksetzen</string>
+    <string name="setup_layout_reset">Diese Ausrichtung zurücksetzen</string>
+    <string name="setup_layout_no_fit">Das passt nicht. Versuche eine kleinere Größe oder eine andere Stelle.</string>
+    <string name="setup_layout_apply">Layout anwenden</string>
+    <string name="setup_layout_applied">Layout gespeichert. Es gilt bei der Rückkehr ins Spiel oder beim nächsten Spielstart.</string>
+    <string name="setup_layout_save_failed">Das Layout konnte nicht gespeichert werden. Das bisherige Layout bleibt erhalten; prüfe den freien App-Speicher und versuche es erneut.</string>
+    <string name="setup_layout_preview">Layout-Vorschau. Ziehe ein Bedienelement, um es zu verschieben, oder wähle es unten aus.</string>
+    <string-array name="setup_layout_orientations">
+        <item>Querformat</item>
+        <item>Hochformat</item>
+    </string-array>
+    <string-array name="setup_layout_controls">
+        <item>Feuern</item>
+        <item>Springen</item>
+        <item>Ducken</item>
+        <item>Waffe</item>
+        <item>Nachladen</item>
+        <item>Zoom</item>
+        <item>Pause</item>
+        <item>Punktestand</item>
+        <item>Chat</item>
+    </string-array>
     <string name="setup_interface">Oberfläche</string>
     <string name="setup_interface_help">Wähle die Größe von Menüs und Text im Spiel. Automatisch wählt Telefon oder Tablet passend zu diesem Gerät. Text für Telefon und Tablet beginnt bei deiner Android-Schriftgröße. Anwenden setzt diese Größen einmal beim nächsten Spielstart oder bei der Rückkehr ins Spiel; spätere Änderungen in den Spieleinstellungen bleiben erhalten.</string>
     <string name="setup_viewing_profile">Anzeigeprofil</string>

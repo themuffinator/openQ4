@@ -44,6 +44,8 @@ static idCVar in_touchLayoutPreset( "in_touchLayoutPreset", "0", CVAR_SYSTEM | C
 	"touch layout: 0 default, 1 compact, 2 left-handed", 0, 2 );
 static idCVar in_touchLookSensitivity( "in_touchLookSensitivity", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"touch drag-to-look speed: 1 turns a quarter of a degree for each dp dragged", 0.1f, 4.0f );
+static idCVar in_touchLayout( "in_touchLayout", "", CVAR_SYSTEM | CVAR_ARCHIVE,
+	"the touch layout editor's landscape and portrait edits (android_touch_controls.h); empty uses the preset" );
 static idCVar ui_radialTouchActive( "ui_radialTouchActive", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_ROM | CVAR_NOCHEAT,
 	"the radial selector is steered by a touch gesture" );
 static idCVar ui_radialTouchX( "ui_radialTouchX", "0", CVAR_SYSTEM | CVAR_FLOAT | CVAR_ROM | CVAR_NOCHEAT,
@@ -68,6 +70,9 @@ static float					touchWheelX = 0.0f, touchWheelY = 0.0f;
 static bool						touchWheelOwned = false;
 static float					touchPlayerScale = -1.0f;
 static int						touchPlayerPreset = -1;
+static idStr					touchLayoutRecord;		// in_touchLayout as last parsed
+static openq4::touch::OrientationEdits	touchLayoutEdits;
+static bool						touchLayoutValid = false;
 static bool						touchAppActive = false;
 static bool						touchPosted = false;	// some input reached the bridge since the last let-go
 static bool						touchOverlayHidden = false;
@@ -112,6 +117,38 @@ static void Interface_LoadSetup(void) {
 		settings.profile, settings.scale, settings.textScale);
 }
 
+// The layout editor's applied record, read with the touch settings it was
+// applied with. A malformed record never replaces the engine's last good one.
+static void TouchControls_LoadLayout( void ) {
+	JNIEnv *env = static_cast<JNIEnv *>( SDL_GetAndroidJNIEnv() );
+	if ( env == NULL ) return;
+	jobject activity = static_cast<jobject>( SDL_GetAndroidActivity() );
+	if ( activity == NULL ) return;
+	jclass type = env->GetObjectClass( activity );
+	jmethodID getter = type != NULL ? env->GetMethodID( type, "getTouchLayout", "()Ljava/lang/String;" ) : NULL;
+	jstring record = getter != NULL ? static_cast<jstring>( env->CallObjectMethod( activity, getter ) ) : NULL;
+	idStr value;
+	bool valid = false;
+	if ( !env->ExceptionCheck() && record != NULL && env->GetStringUTFLength( record ) < openq4::touch::kEditRecordLimit ) {
+		const char *bytes = env->GetStringUTFChars( record, NULL );
+		if ( bytes != NULL ) {
+			openq4::touch::OrientationEdits edits;
+			valid = openq4::touch::ParseLayoutEdits( bytes, edits );
+			value = bytes;
+			env->ReleaseStringUTFChars( record, bytes );
+		}
+	}
+	if ( env->ExceptionCheck() ) {
+		env->ExceptionClear();
+		valid = false;
+		common->Warning( "Could not read Android touch layout" );
+	}
+	if ( record != NULL ) env->DeleteLocalRef( record );
+	if ( type != NULL ) env->DeleteLocalRef( type );
+	env->DeleteLocalRef( activity );
+	if ( valid ) in_touchLayout.SetString( value.c_str() );
+}
+
 // Java owns the standalone setup preference. Read its one atomic applied
 // record on startup/foreground only, after SDL has restored the Activity.
 // Drafts never reach this boundary; CVar and input changes stay on this thread.
@@ -143,6 +180,7 @@ static void TouchControls_LoadSetup( void ) {
 	in_touchLayoutPreset.SetInteger( static_cast<int>( settings[0] ) );
 	in_touchLookSensitivity.SetFloat( settings[1] );
 	in_touchControlsScale.SetFloat( settings[2] );
+	TouchControls_LoadLayout();
 }
 
 /*
@@ -257,19 +295,35 @@ void AndroidTouchControls_Frame( int windowWidth, int windowHeight, float displa
 	const float scale = std::isfinite( requestedScale ) ? idMath::ClampFloat( 0.75f, 1.5f, requestedScale ) : 1.0f;
 	const int preset = in_touchLayoutPreset.GetInteger();
 	const float density = std::isfinite( displayScale ) && displayScale >= 0.25f && displayScale <= 16.0f ? displayScale : 1.0f;
-	if ( previous.width != windowWidth || previous.height != windowHeight || density != touchDisplayScale
+	const bool layoutChanged = touchLayoutRecord.Cmp( in_touchLayout.GetString() ) != 0;
+	if ( layoutChanged ) {
+		touchLayoutRecord = in_touchLayout.GetString();
+		touchLayoutEdits = openq4::touch::OrientationEdits();
+		touchLayoutValid = touchLayoutRecord.Length() > 0
+			&& openq4::touch::ParseLayoutEdits( touchLayoutRecord.c_str(), touchLayoutEdits );
+		if ( touchLayoutRecord.Length() > 0 && !touchLayoutValid ) {
+			common->Warning( "in_touchLayout is not a valid touch layout; using the preset" );
+		}
+	}
+	if ( layoutChanged || previous.width != windowWidth || previous.height != windowHeight || density != touchDisplayScale
 			|| scale != touchPlayerScale || preset != touchPlayerPreset ) {
 		TouchControls_LetGo();
 		touchDisplayScale = density;
 		touchPlayerScale = scale;
 		touchPlayerPreset = preset;
-		touchControls.SetLayout( openq4::touch::ComputeLayout( static_cast<float>( windowWidth ),
-			static_cast<float>( windowHeight ), density, scale, preset ) );
+		const float width = static_cast<float>( windowWidth ), height = static_cast<float>( windowHeight );
+		const openq4::touch::Layout layout = openq4::touch::ComputeLayout( width, height, density, scale, preset,
+			touchLayoutValid ? &touchLayoutEdits.For( width, height ) : NULL );
+		if ( layout.editsRejected ) {
+			common->Printf( "Touch layout edits do not fit a %dx%d window; using the preset\n", windowWidth, windowHeight );
+		}
+		touchControls.SetLayout( layout );
 	}
 	const bool cinematic = TouchControls_InCinematic();
 	unsigned visible = session != NULL && session->IsMultiplayer() ? openq4::touch::kAllButtons : openq4::touch::kSinglePlayerButtons;
 	if ( !ui_touchCanReload.GetBool() ) visible &= ~( 1u << openq4::touch::BUTTON_RELOAD );
 	if ( !ui_touchCanZoom.GetBool() ) visible &= ~( 1u << openq4::touch::BUTTON_ZOOM );
+	visible &= ~touchControls.GetLayout().hidden;
 	touchControls.SetVisibleButtons( cinematic ? ( 1u << openq4::touch::BUTTON_PAUSE ) : visible );
 	touchControls.SetGesturesAllowed( !cinematic );
 	if ( !TouchControls_Active() || !touchControls.GetLayout().available ) {
@@ -411,12 +465,14 @@ static void TouchControls_Test_f( const idCmdArgs &args ) {
 	const char *verb = args.Argv( 1 );
 	const openq4::touch::Layout &layout = touchControls.GetLayout();
 	if ( idStr::Icmp( verb, "layout" ) == 0 ) {
-		common->Printf( "touch controls: %s, %.0fx%.0f px, %.3f px per dp\n",
-			TouchControls_Active() ? "active" : "inactive", layout.width, layout.height, layout.dp );
+		common->Printf( "touch controls: %s, %.0fx%.0f px, %.3f px per dp%s\n",
+			TouchControls_Active() ? "active" : "inactive", layout.width, layout.height, layout.dp,
+			layout.edited ? ", edited" : layout.editsRejected ? ", edits rejected" : "" );
 		for ( int i = 0; i < openq4::touch::BUTTON_COUNT; i++ ) {
 			const openq4::touch::Circle &button = layout.buttons[i];
-			common->Printf( "  %-6s at %.3f %.3f, radius %.3f\n", touchControlNames[i],
-				button.x / layout.width, button.y / layout.height, button.radius / layout.width );
+			common->Printf( "  %-6s at %.3f %.3f, radius %.3f, opacity %.2f%s\n", touchControlNames[i],
+				button.x / layout.width, button.y / layout.height, button.radius / layout.width,
+				openq4::touch::RestOpacity( layout, i ), ( layout.hidden & ( 1u << i ) ) ? ", hidden" : "" );
 		}
 		return;
 	}

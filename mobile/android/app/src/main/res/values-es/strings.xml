@@ -103,6 +103,40 @@
         <item>Compacta</item>
         <item>Para zurdos</item>
     </string-array>
+    <string name="setup_layout_edit">Editar disposición</string>
+    <string name="setup_layout">Editor de controles táctiles</string>
+    <string name="setup_layout_help">Arrastra un control para moverlo. Se ajusta a una cuadrícula de 8 dp y se mantiene alejado de los demás controles, de los bordes de la pantalla y de la mira. Elige un control para cambiar su tamaño, atenuarlo u ocultarlo. Horizontal y vertical tienen su propia disposición. Aplicar guarda la disposición para el próximo inicio del juego o al volver a él.</string>
+    <string name="setup_layout_orientation">Orientación</string>
+    <string name="setup_layout_control">Control</string>
+    <string name="setup_layout_size">Tamaño: %1$d %%</string>
+    <string name="setup_layout_size_label">Tamaño del control</string>
+    <string name="setup_layout_opacity">Opacidad: %1$d %%</string>
+    <string name="setup_layout_opacity_label">Opacidad del control</string>
+    <string name="setup_layout_hide">Ocultar este control</string>
+    <string name="setup_layout_pause_note">Pausa siempre está visible: también omite las cinemáticas.</string>
+    <string name="setup_layout_multiplayer_note">Este control solo aparece en multijugador.</string>
+    <string name="setup_layout_reset_control">Restablecer este control</string>
+    <string name="setup_layout_reset">Restablecer esta orientación</string>
+    <string name="setup_layout_no_fit">No cabe. Prueba con un tamaño menor u otro lugar.</string>
+    <string name="setup_layout_apply">Aplicar disposición</string>
+    <string name="setup_layout_applied">Disposición guardada. Se aplica al volver al juego o al iniciarlo.</string>
+    <string name="setup_layout_save_failed">No se pudo guardar la disposición. Se conserva la disposición aplicada anterior; comprueba el almacenamiento libre de la aplicación y vuelve a intentarlo.</string>
+    <string name="setup_layout_preview">Vista previa de la disposición. Arrastra un control para moverlo o elígelo abajo.</string>
+    <string-array name="setup_layout_orientations">
+        <item>Horizontal</item>
+        <item>Vertical</item>
+    </string-array>
+    <string-array name="setup_layout_controls">
+        <item>Disparar</item>
+        <item>Saltar</item>
+        <item>Agacharse</item>
+        <item>Arma</item>
+        <item>Recargar</item>
+        <item>Zoom</item>
+        <item>Pausa</item>
+        <item>Marcador</item>
+        <item>Chat</item>
+    </string-array>
     <string name="setup_interface">Interfaz</string>
     <string name="setup_interface_help">Elige el tamaño de los menús y del texto del juego. Automático elige Teléfono o Tableta según este dispositivo. En Teléfono y Tableta, el texto parte del tamaño de fuente de Android. Aplicar fija estos tamaños una vez, en el próximo inicio o regreso al juego; los cambios posteriores en los ajustes del juego se conservan.</string>
     <string name="setup_viewing_profile">Perfil de visualización</string>

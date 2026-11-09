@@ -90,7 +90,12 @@ struct Layout {
 	float dp = 1.0f;					// pixels per dp, times the player's scale
 	bool available = false;			// all targets fit, with their minimum spacing
 	bool leftHanded = false;			// movement on the right; look/fire on the left
+	bool edited = false;				// the player's layout edits are in effect
+	bool editsRejected = false;		// edits were given but did not fit; the preset is shown
+	unsigned hidden = 0;				// controls the player hid (1 << ButtonId)
+	unsigned moved = 0;					// controls the player placed (1 << ButtonId)
 	Circle buttons[BUTTON_COUNT] = {};
+	float restOpacity[BUTTON_COUNT] = {};	// 0 means the default, kRestOpacity
 	Circle stickHome = {};				// the faint ring a resting stick shows
 	float stickBaseRadius = 0.0f;		// full deflection
 	float stickKnobRadius = 0.0f;
@@ -127,6 +132,9 @@ static const ButtonPlacement kButtonPlacements[BUTTON_COUNT] = {
 	{ ANCHOR_TRAILING_TOP, 120.0f, 40.0f, 48.0f },		// BUTTON_CHAT
 };
 
+// Section 13.6: 35% opaque at rest, 80% while pressed.
+static const float kRestOpacity = 0.35f;
+static const float kPressedOpacity = 0.80f;
 static const float kStickBaseRadiusDp = 64.0f;
 static const float kStickKnobRadiusDp = 28.0f;
 static const float kStickDeadZone = 0.08f;
@@ -144,16 +152,20 @@ inline float HitRadius( const Layout &layout, int button ) {
 	return std::max( layout.buttons[button].radius, 24.0f * layout.nativeDp );
 }
 
-inline bool PlaceButton( Layout &layout, int button, unsigned placed ) {
+// free: a control the player placed, which may sit anywhere on the screen. It
+// keeps 24 dp from the side and bottom edges' system gestures and 8 dp from
+// the top, as the top actions do.
+inline bool PlaceButton( Layout &layout, int button, unsigned placed, bool free = false ) {
 	const float radius = HitRadius( layout, button );
 	const float gap = 8.0f * layout.nativeDp;
-	const bool top = kButtonPlacements[button].anchor != ANCHOR_TRAILING_BOTTOM;
+	const bool top = !free && kButtonPlacements[button].anchor != ANCHOR_TRAILING_BOTTOM;
 	// The gameplay controls support swipes; keep them clear of system gestures.
 	const float edge = ( top ? 8.0f : 24.0f ) * layout.nativeDp;
+	const float topEdge = ( top || free ? 8.0f : 24.0f ) * layout.nativeDp;
 	const float left = edge + radius;
 	const float right = layout.width - left;
 	const float bottom = layout.height - edge - radius;
-	const float yMin = edge + radius;
+	const float yMin = topEdge + radius;
 	const float yMax = top ? yMin : bottom;
 	if ( right < left || yMax < yMin ) return false;
 	const Circle desired = layout.buttons[button];
@@ -263,7 +275,8 @@ inline void PlacePortraitDeck( Layout &layout, float dp ) {
 	}
 }
 
-inline Layout ComputeLayout( float width, float height, float dpScale, float playerScale, int preset = PRESET_DEFAULT ) {
+// The preset's arrangement, before any player edits.
+inline Layout ComputePresetLayout( float width, float height, float dpScale, float playerScale, int preset = PRESET_DEFAULT ) {
 	Layout layout;
 	if ( !std::isfinite( width ) || !std::isfinite( height )
 			|| width <= 1.0f || height <= 1.0f || width > 65536.0f || height > 65536.0f ) return layout;
@@ -312,6 +325,172 @@ inline Layout ComputeLayout( float width, float height, float dpScale, float pla
 
 /*
 ====================
+Layout edits
+
+Section 13.6's layout editor moves, resizes (75-150%), fades and hides each
+control, and each orientation keeps its own edits. The Android setup's editor
+(mobile/android/.../TouchLayout.java) writes them as one record and previews
+them with a port of this file's placement; the engine keeps the applied
+record in in_touchLayout.
+
+Positions are whole physical dp from the window's nearest edges, so a layout
+survives a resize, a cutout or another phone of the same shape: x from the
+left edge, or when negative from the right; y from the top, or when negative
+from the bottom. Pause cannot be hidden: it is also a cinematic's skip.
+
+Record: "1|<landscape>|<portrait>", each orientation nine entries in ButtonId
+order separated by ';', each entry "x,y,size,opacity,hidden" with x and y
+both '*' for a control left where the preset puts it.
+====================
+*/
+static const int kEditSizeDefault = 100, kEditSizeMin = 75, kEditSizeMax = 150;
+static const int kEditOpacityDefault = 35, kEditOpacityMin = 10, kEditOpacityMax = 80;
+static const int kEditStep = 5;				// size and opacity percentages
+static const int kEditGridDp = 8;				// the editor's snapping grid
+static const int kEditPositionLimit = 8192;	// dp
+static const int kEditRecordLimit = 512;		// characters
+
+struct ControlEdit {
+	bool moved = false;
+	int x = 0;
+	int y = 0;
+	int size = kEditSizeDefault;
+	int opacity = kEditOpacityDefault;
+	bool hidden = false;
+	bool IsDefault() const {
+		return !moved && size == kEditSizeDefault && opacity == kEditOpacityDefault && !hidden;
+	}
+};
+
+struct LayoutEdits {
+	ControlEdit controls[BUTTON_COUNT];
+	bool IsDefault() const {
+		for ( const ControlEdit &edit : controls ) if ( !edit.IsDefault() ) return false;
+		return true;
+	}
+};
+
+struct OrientationEdits {
+	LayoutEdits landscape;
+	LayoutEdits portrait;
+	const LayoutEdits &For( float width, float height ) const { return height > width ? portrait : landscape; }
+};
+
+namespace detail {
+inline bool ParseEditInt( const char *&cursor, int &value, bool allowSign ) {
+	const bool negative = allowSign && *cursor == '-';
+	if ( negative ) ++cursor;
+	int digits = 0, result = 0;
+	while ( *cursor >= '0' && *cursor <= '9' ) {
+		if ( ++digits > 4 ) return false;
+		result = result * 10 + ( *cursor++ - '0' );
+	}
+	if ( digits == 0 ) return false;
+	value = negative ? -result : result;
+	return true;
+}
+
+inline bool ParseEditPosition( const char *&cursor, bool &moved, int &value ) {
+	if ( *cursor == '*' ) {
+		++cursor;
+		moved = false;
+		value = 0;
+		return true;
+	}
+	moved = true;
+	return ParseEditInt( cursor, value, true ) && value != 0 && value >= -kEditPositionLimit && value <= kEditPositionLimit;
+}
+
+inline bool ParseEditPercent( const char *&cursor, int &value, int low, int high ) {
+	return ParseEditInt( cursor, value, false ) && value >= low && value <= high && value % kEditStep == 0;
+}
+
+inline bool ParseOrientation( const char *&cursor, LayoutEdits &out ) {
+	for ( int i = 0; i < BUTTON_COUNT; ++i ) {
+		ControlEdit edit;
+		bool movedY = false;
+		int hidden = 0;
+		if ( !ParseEditPosition( cursor, edit.moved, edit.x ) || *cursor++ != ','
+				|| !ParseEditPosition( cursor, movedY, edit.y ) || movedY != edit.moved || *cursor++ != ','
+				|| !ParseEditPercent( cursor, edit.size, kEditSizeMin, kEditSizeMax ) || *cursor++ != ','
+				|| !ParseEditPercent( cursor, edit.opacity, kEditOpacityMin, kEditOpacityMax ) || *cursor++ != ','
+				|| !ParseEditInt( cursor, hidden, false ) || hidden > 1 || ( hidden && i == BUTTON_PAUSE ) ) {
+			return false;
+		}
+		edit.hidden = hidden != 0;
+		out.controls[i] = edit;
+		if ( i + 1 < BUTTON_COUNT && *cursor++ != ';' ) return false;
+	}
+	return true;
+}
+}	// namespace detail
+
+// False, leaving out untouched, for a missing, malformed or oversized record.
+inline bool ParseLayoutEdits( const char *record, OrientationEdits &out ) {
+	if ( record == nullptr ) return false;
+	for ( int length = 0; record[length] != '\0'; ++length ) {
+		if ( length + 1 >= kEditRecordLimit ) return false;	// records are shorter than the limit
+	}
+	const char *cursor = record;
+	if ( *cursor++ != '1' || *cursor++ != '|' ) return false;
+	OrientationEdits candidate;
+	if ( !detail::ParseOrientation( cursor, candidate.landscape ) || *cursor++ != '|'
+			|| !detail::ParseOrientation( cursor, candidate.portrait ) || *cursor != '\0' ) return false;
+	out = candidate;
+	return true;
+}
+
+/*
+====================
+ComputeLayout
+
+The preset's arrangement with the player's edits for this orientation.
+Placed controls are reserved first, where the player put them, then the rest
+take their preset places or the nearest free ones; the 48 dp targets, 8 dp
+gaps, edge margins and crosshair clearance hold for every control. Edits that
+cannot all fit (a smaller window, larger controls) fall back to the preset,
+and editsRejected says so.
+====================
+*/
+inline Layout ComputeLayout( float width, float height, float dpScale, float playerScale, int preset = PRESET_DEFAULT,
+		const LayoutEdits *edits = nullptr ) {
+	Layout layout = ComputePresetLayout( width, height, dpScale, playerScale, preset );
+	if ( edits == nullptr || edits->IsDefault() || !layout.available ) return layout;
+	Layout edited = layout;
+	edited.edited = true;
+	for ( int i = 0; i < BUTTON_COUNT; ++i ) {
+		const ControlEdit &edit = edits->controls[i];
+		edited.restOpacity[i] = static_cast<float>( edit.opacity ) / 100.0f;
+		if ( edit.hidden && i != BUTTON_PAUSE ) edited.hidden |= 1u << i;
+		edited.buttons[i].radius = layout.buttons[i].radius * static_cast<float>( edit.size ) / 100.0f;
+		if ( edit.moved ) {
+			edited.moved |= 1u << i;
+			edited.buttons[i].x = edit.x > 0 ? edit.x * layout.nativeDp : width + edit.x * layout.nativeDp;
+			edited.buttons[i].y = edit.y > 0 ? edit.y * layout.nativeDp : height + edit.y * layout.nativeDp;
+		}
+	}
+	unsigned placed = 0;
+	for ( int pass = 0; pass < 2; ++pass ) {
+		for ( int i = 0; i < BUTTON_COUNT; ++i ) {
+			const bool moved = ( edited.moved & ( 1u << i ) ) != 0;
+			if ( ( edited.hidden & ( 1u << i ) ) || moved != ( pass == 0 ) ) continue;
+			if ( !PlaceButton( edited, i, placed, moved ) ) {
+				layout.editsRejected = true;
+				return layout;
+			}
+			placed |= 1u << i;
+		}
+	}
+	return edited;
+}
+
+inline float RestOpacity( const Layout &layout, int button ) {
+	const float value = layout.restOpacity[button];
+	return value > 0.0f ? value : kRestOpacity;
+}
+
+/*
+====================
 HitButton
 
 The plate a press at (x, y) lands on, or BUTTON_NONE. The nearest plate wins
@@ -338,13 +517,20 @@ inline int HitButton( const Layout &layout, float x, float y, unsigned visible =
 	return best;
 }
 
+// Whether a control sits along the top edge: a top action where its preset
+// puts it, or any control the player placed in the window's top quarter.
+inline bool TopControl( const Layout &layout, int button ) {
+	if ( layout.moved & ( 1u << button ) ) return layout.buttons[button].y < layout.height * 0.25f;
+	return kButtonPlacements[button].anchor != ANCHOR_TRAILING_BOTTOM;
+}
+
 // Window-coordinate lower edge of the top controls, including their touch
 // clearance. HUDs in an inset viewport may already start below this edge.
 inline float HudTop( const Layout &layout, unsigned visible ) {
 	if ( !layout.available ) return 0.0f;
 	float bottom = 0.0f;
 	for ( int i = 0; i < BUTTON_COUNT; ++i ) {
-		if ( !( visible & ( 1u << i ) ) || kButtonPlacements[i].anchor == ANCHOR_TRAILING_BOTTOM ) continue;
+		if ( !( visible & ( 1u << i ) ) || !TopControl( layout, i ) ) continue;
 		bottom = std::max( bottom, layout.buttons[i].y + HitRadius( layout, i ) + 8.0f * layout.nativeDp );
 	}
 	return bottom;
@@ -831,8 +1017,6 @@ static const Color kRailColor = { 0.702f, 0.816f, 0.431f, 1.0f };		// #B3D06E
 static const Color kSymbolColor = { 0.867f, 0.922f, 0.765f, 1.0f };		// #DDEBC3
 static const Color kPlateColor = { 0.090f, 0.110f, 0.070f, 1.0f };		// #171C12
 static const Color kMarkerColor = { 0.890f, 0.537f, 0.0f, 1.0f };		// #E38900
-static const float kRestOpacity = 0.35f;
-static const float kPressedOpacity = 0.80f;
 
 inline uint8_t ToByte( float value ) {
 	if ( !( value > 0.0f ) ) {
@@ -927,8 +1111,14 @@ fill, a thin rail around the outline, and while pressed the orange marker,
 the solid right triangle the Marine family puts in the corner the cut leaves.
 ====================
 */
-inline void AddPlate( Mesh &mesh, const Circle &plate, float dp, bool pressed ) {
-	const float alpha = pressed ? kPressedOpacity : kRestOpacity;
+// restAlpha: the control's opacity at rest, which the layout editor fades;
+// pressed controls never show fainter than kPressedOpacity.
+inline float PlateAlpha( bool pressed, float restAlpha ) {
+	return pressed ? std::max( kPressedOpacity, restAlpha ) : restAlpha;
+}
+
+inline void AddPlate( Mesh &mesh, const Circle &plate, float dp, bool pressed, float restAlpha = kRestOpacity ) {
+	const float alpha = PlateAlpha( pressed, restAlpha );
 	// Inscribe the entire plate, including its rail, in the circular hit
 	// region. Otherwise a visible corner can start a look/stick gesture.
 	const float half = plate.radius * 0.70710678f - dp;
@@ -964,8 +1154,9 @@ inline void AddPlate( Mesh &mesh, const Circle &plate, float dp, bool pressed ) 
 }
 
 // The symbol each control carries, in a box of `size` pixels around (x, y).
-inline void AddSymbol( Mesh &mesh, int button, float x, float y, float size, float dp, bool pressed ) {
-	const float alpha = pressed ? kPressedOpacity : kRestOpacity;
+inline void AddSymbol( Mesh &mesh, int button, float x, float y, float size, float dp, bool pressed,
+		float restAlpha = kRestOpacity ) {
+	const float alpha = PlateAlpha( pressed, restAlpha );
 	const float stroke = 3.0f * dp;
 	const float h = size * 0.5f;
 	switch ( button ) {
@@ -1079,8 +1270,9 @@ inline void BuildOverlay( const Controls &controls, Mesh &mesh, bool pauseOnly =
 		}
 		const bool pressed = controls.ButtonPressed( i );
 		const Circle &plate = layout.buttons[i];
-		AddPlate( mesh, plate, dp, pressed );
-		AddSymbol( mesh, i, plate.x, plate.y, plate.radius * 1.1f, dp, pressed );
+		const float rest = RestOpacity( layout, i );
+		AddPlate( mesh, plate, dp, pressed, rest );
+		AddSymbol( mesh, i, plate.x, plate.y, plate.radius * 1.1f, dp, pressed, rest );
 	}
 	if ( pauseOnly ) {
 		return;

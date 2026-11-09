@@ -493,6 +493,7 @@ public:
 	void				ReturnRetainedControls();
 	void				PublishRetainedControls( idUserInterface *gui );
 	void				HandleRetainedControlsRequest( idUserInterface *gui, const char *request );
+	bool				SaveForSuspension( void );
 	bool				RetainedControlsKey( const sysEvent_t *event );
 	void				PushRetainedNotice( const char *text, int kind, const char *action, const char *subject, int undo,
 							bool persistent );

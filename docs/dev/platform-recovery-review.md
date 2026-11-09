@@ -1496,3 +1496,132 @@ Evidence is under `.tmp/android-evidence/2026-11-08-portrait/` in the main
 checkout. Physical phones, the stock GUIs (Classic HUD, stock menus) in
 portrait, the layout editor with per-orientation layouts and readouts behind a
 raised weapon control on narrow phones remain open; AND-01 and AND-04 stay open.
+
+## Android touch layout editor, suspension save, network resume and Quest flavor checks, 9 November 2026
+
+**Touch layout editor.** Section 13.6's editor now exists. **Edit layout** on
+the Controls setup page, or the game's **Settings > Controls > Touch layout**
+(an Android-only row closing the Other tab, session verb
+`controlsTouchLayout`, which opens setup straight at the editor through SDL
+user message argument 1), shows this device's screen in either orientation
+with every control and its name. Dragging moves a control on an 8 dp grid;
+**Size** (75-150%), **Opacity** (10-80%) and **Hide this control** apply to the
+chosen one; Pause cannot be hidden, since it is also a cinematic's skip. Each
+orientation keeps its own edits, and the preset, a per-control reset and an
+orientation reset are offered. Every change is a draft in the setup
+preferences, so it survives process death; **Apply layout** commits the layout
+with the touch settings in one transaction, or neither.
+
+The engine keeps the applied record in archived `in_touchLayout`
+(`1|<landscape>|<portrait>`, nine `x,y,size,opacity,hidden` entries; positions
+are whole dp from the window's nearest edges). `ComputeLayout` reserves the
+placed controls first where the player put them, then gives the others their
+preset places or the nearest free ones, so the 48 dp targets, 8 dp gaps, edge
+margins and crosshair clearance hold for every control. A record that cannot
+fit the window (split-screen, a larger size) shows the preset instead.
+Hidden controls leave the visible set; faded ones draw at their opacity and at
+80% while pressed. `TouchLayout.java` ports the placement in the same float
+arithmetic for the preview, and a drop is stored as the snapped grid point
+when it fits there or as the spot placement chose, so the record always says
+what the editor showed.
+
+**Suspension save.** Android may end a backgrounded app without another call,
+and SDL blocks the engine thread as soon as the background event is handled.
+The background transition therefore writes single player as the `Suspended`
+autosave (`com_suspendSave`, default 1): no screenshot, which a backgrounded
+window cannot draw; it rolls over each time; and CONTINUE, which resumes the
+newest save, finds it after a restart. It is skipped silently where a save
+would be refused or would not resume cleanly: multiplayer, loading, demos,
+cinematics, death, a failed objective or nearly full storage.
+
+**Network resume.** A multiplayer client now learns how long the app was away.
+A stay of at least the 40-second time-out reconnects at once, since the server
+has dropped the client; before, the client waited out its own time-out behind
+a frozen view. After a shorter stay the backlog queued while away is dropped
+and only a packet received after the return proves the connection; without
+one within `net_resumeProbe` (5 s) the client reconnects. A failed reconnect
+shows the ordinary connection message. `net_resumeReconnect 0` turns this off.
+A listen server or a multi-view demo never reconnects.
+
+The first emulator run found why the client never heard of the return:
+multiplayer frames run `idSessionLocal::GuiFrameEvents`, never
+`idSessionLocal::Frame`, so `HandleAppResume` did not run while connected.
+The server's reply to the client's first packet then disconnected it with the
+ordinary message box. The same gap left Android's paused OpenAL device paused
+for the rest of a match: audio returned only after leaving multiplayer.
+`GuiFrameEvents` now handles the return too (the suspension is consumed once),
+which resumes the audio. A later run showed a second race: a disconnect the
+server queued when it dropped the client was read by the first network frame
+after the return. The SDL pump's foreground transition, which runs before any
+network processing, now tells the client (`Session_AppForeground`), and the
+client drops the queued backlog before reconnecting or probing. A third run
+showed the dropped channel's disconnect arriving after the reconnect had
+started, ending it during the challenge; for 10 seconds after a resume
+reconnect, a disconnect that arrives before the new connection exists is
+ignored and logged.
+
+**Quest flavor verification.** `verify_android_apk.py --variant quest` checks
+the headset build AND-05 will integrate: its own application ID, a
+nondebuggable signature, the phone's seven libraries, the `openq4-headset`
+marker, and a manifest requiring head tracking, requesting the OpenXR
+permission, opening the game with the immersive OpenXR and Quest categories
+and naming supported headsets. Phone and emulator APKs must carry none of
+these. No stage or APK may carry the OpenXR test runtime.
+`-Dandroid_headset=true` stages the variant; the phone Gradle host refuses
+that stage until the flavor's Gradle side lands.
+
+Checks: `android_touch_layout.py` runs the production header and
+`TouchLayout.java` over 3,402 window/density/size/preset/record cases and
+requires the same placements (0.02 px), flags and exact opacities, the same
+verdict on 33 record grammar cases (moved/unmoved pairs, percentages off the
+5% step, a hidden Pause, oversize records) and 22,680 editor drops whose stored
+records reproduce the shown positions; mutating either side's clearance or
+opacity fails it. `openq4-android-touch-controls` adds the edit rules (placed
+controls keep their spot, the rest move aside, every rule holds, the preset
+fallback is exact, malformed records leave the last good one).
+`android_touch_controls.py` drives the production glue: hidden controls leave
+the visible set and cannot be pressed, each orientation reads its own edits,
+a layout change releases held input, a malformed `in_touchLayout` warns and
+uses the preset. `android_touch_setup.py` covers the draft/Apply transaction
+(failed commits keep the drafts and the applied records), the Activity
+getter and the JNI layout read (grammar, size bound, exceptions, references).
+`android_setup_task.py` and `android_host_storage.py` cover the setup page
+argument. The retained CONTROLS test checks TOUCH LAYOUT is hidden without
+touch controls, shown and focusable with them, below the last binding, and
+asks for `controlsTouchLayout`; `ui_retained_gate.py` passes.
+`android_lifecycle.py` requires the save before SDL blocks, once per stay, no
+save on desktop, the client report from the pump and the multiplayer frame's
+resume. `async_client_resume.py` covers the reconnect, probe, stale packets,
+exclusions and the stale-disconnect window. `android_build.py` adds the Quest
+payload and manifest cases. Windows builds every target.
+
+The emulator probes ran on APK
+`f557c695e3e170bd9372059e4f0f76af5f5790656615e17555cc4d71bfcef124` (build
+2284) on the AOSP API 35 x86_64 AVD (Android 15, 4 KiB pages, SwiftShader).
+`--mode lifecycle` (report SHA-256
+`4b780eef8653ac685f507c9b214788152c70aecf2efa46830f71dba645231375`): the
+applied record placed Fire at the recorded 0.854, 0.806 of the 1920x1080
+window at 125%, hid Jump and faded Zoom to 20%; the edited controls moved the
+player 229 u; the Home intent backgrounded the app, which wrote the
+6,836,350-byte `Suspended` save; `am kill` ended the backgrounded process
+(`USER REQUESTED / KILL BACKGROUND`); the relaunched process loaded the save
+with the pose unchanged to 0.1 u and the same edited layout, then exited
+normally. `--mode resume` against this build's Windows dedicated server
+(reached from the AVD at the WSL host address): after 15 s away the client
+reported 14,775 ms, the connection survived and no reconnect or message box
+followed (report `de23e59908f1ca90003140f3fa117cf227db2efac670efab89a97fb0776b9745`);
+after 50 s it reconnected at once ("away 49 s, beyond the time-out"),
+ignored three disconnects from the dropped channel during the challenge and
+reloaded Q4DM1 without a message box (report
+`03fd4d1757c66c64edf7623c49225299d8a044c6fe79171ec452c0b0d73ce378`). The
+editor page opens straight from the game's request intent with its
+localized text and the labelled preview of the device's landscape screen.
+
+The WSL emulator build had stamped build 0, because its copied tree had no
+`.git`, and every save it wrote failed validation; giving that tree the
+worktree's git metadata fixed the build number. This affected only that
+local loop. Evidence is under `.tmp/android-evidence/2026-11-09-and01/` in
+the main checkout (`lifecycle`, `resume-15`, `resume-50`, the editor capture). Not qualified: physical phones (portrait
+play, the editor's touch interaction, suspend/process death/network resume
+on a real device and network), Adreno/Mali drivers, and the Quest flavor's
+Gradle side and headsets (AND-05). AND-01 stays open for its physical gates.

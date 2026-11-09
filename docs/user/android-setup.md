@@ -49,7 +49,7 @@ Remastered HUD moves its health, armor and ammunition readouts up above the
 deck. Turning the
 device keeps your game; buttons held at that moment are released. On shorter
 phones the upper buttons can sit above the deck, and at larger button sizes
-the controls climb into the view. Layout editing is still in development.
+the controls climb into the view; the layout editor (below) can move them.
 
 Select **Controls** in Android setup to choose Default, Compact or Left-handed.
 Left-handed moves the movement area to the right and mirrors the buttons.
@@ -61,6 +61,27 @@ Select **Apply controls** to save. These choices take effect at the next game
 launch or return from setup. **Discard changes** keeps the previously applied
 settings. Unapplied choices are retained as a draft if setup is interrupted;
 the test grid never sends movement or fire commands to the running game.
+
+### Edit the touch layout
+
+Select **Edit layout** on the Controls page, or in the game open **Settings**,
+then **Controls**, and select **Touch layout** at the end of the Other tab.
+The editor shows your screen with every control and its name:
+
+- Drag a control to move it. It snaps to an 8 dp grid and keeps clear of the
+  other controls, the screen edges and the crosshair; if the spot is taken it
+  moves to the nearest free place.
+- Choose a control by tapping it or from the **Control** list, then set its
+  **Size** (75–150%) and **Opacity** (10–80%), or **Hide this control**. Pause
+  always stays visible, because it also skips cinematics.
+- **Orientation** switches between the landscape and portrait layouts; each
+  keeps its own. **Touch layout** changes the preset the layout starts from.
+- **Reset this control** and **Reset this orientation** go back to the preset.
+
+Select **Apply layout** to save it; it takes effect when you return to or
+launch the game. Edits are kept as a draft if setup is interrupted, and
+**Discard changes** keeps the applied layout. If a layout does not fit the
+game window, for example in split-screen, the game shows the preset instead.
 
 ## Adjust menu and text size
 
@@ -93,6 +114,19 @@ orientation at its next launch or return from setup. Each Apply takes effect onc
 UI scale or text size inside the game, returning from setup keeps
 those changes until you apply the Interface page again. **Discard changes**
 keeps the previously applied settings.
+
+## Leaving the game
+
+Switching to another app pauses single player and saves it as **Suspended**
+first. If Android closes openQ4 while it is in the background, **Continue** on
+the title screen picks up from that save. The save is skipped during
+cinematics, after death or a failed objective, and when storage is nearly full.
+Turn it off with `com_suspendSave 0` in the console.
+
+In multiplayer the server drops a player who is away for 40 seconds or more.
+Returning after that reconnects to the same server straight away; after a
+shorter break the game checks the connection and reconnects if the server no
+longer answers. If the server has gone, you see the usual connection message.
 
 ## Return to setup during play
 

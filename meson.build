@@ -34,8 +34,13 @@ module_filename_prefix = host_system == 'android' ? 'lib' : ''
 if host_system == 'android'
   if host_cpu_family == 'aarch64'
     android_abi = 'arm64-v8a'
-    android_variant = 'phone'
+    # The Quest flavor is the phone build declared as a headset app; its stage
+    # carries the marker that verify_android_apk.py --variant quest requires.
+    android_variant = get_option('android_headset') ? 'quest' : 'phone'
   elif host_cpu_family == 'x86_64'
+    if get_option('android_headset')
+      error('The Meta Quest headset flavor is arm64-v8a only.')
+    endif
     android_abi = 'x86_64'
     android_variant = 'emulator'
   else
@@ -2382,6 +2387,9 @@ if build_engine
       install: true,
       install_dir: install_root_dir,
     )
+    if android_variant == 'quest'
+      install_data('mobile/android/app/src/quest/assets/openq4-headset', install_dir: install_root_dir)
+    endif
     openal_dep = declare_dependency(
       compile_args: android_include_args,
       dependencies: cc.find_library('openal', dirs: [android_deps_root / 'lib'], required: true),

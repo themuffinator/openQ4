@@ -23,8 +23,12 @@ import java.util.function.*;
 public final class SetupTaskTest {
     static void require(boolean value,String reason){if(!value)throw new AssertionError(reason);}
     static class ActivityNotFoundException extends RuntimeException {}
-    static class Intent {final Class<?> target;Intent(Object owner,Class<?> target){this.target=target;}}
-    static class LauncherActivity {}
+    static class Intent {
+        final Class<?> target;final Map<String,String> extras=new HashMap<>();
+        Intent(Object owner,Class<?> target){this.target=target;}
+        Intent putExtra(String key,String value){extras.put(key,value);return this;}
+    }
+    static class LauncherActivity {static final String EXTRA_PAGE="setup_page",PAGE_TOUCH_LAYOUT="touch_layout";}
     static class R {static class string {static final int setup_open_failed=1;}}
     static class Log {static void i(String tag,String text){}static void e(String tag,String text,Throwable error){}}
     static class Toast {
@@ -35,14 +39,15 @@ public final class SetupTaskTest {
     static class SDLActivity {
         static final int COMMAND_USER=0x8000;
         boolean mBrokenLibraries,mActivityCreated=true,finishing,fail;
-        int starts,unknown,resumes,finishes;
+        int starts,unknown,resumes,finishes;Intent last;
         protected boolean onUnhandledMessage(int command,Object value){++unknown;return false;}
         protected void onResume(){++resumes;}
         boolean isFinishing(){return finishing;}
-        void startActivity(Intent intent){require(intent.target==LauncherActivity.class,"wrong target");if(fail)throw new ActivityNotFoundException();++starts;}
+        void startActivity(Intent intent){require(intent.target==LauncherActivity.class,"wrong target");if(fail)throw new ActivityNotFoundException();++starts;last=intent;}
         void finish(){++finishes;}
     }
     static class GameActivity extends SDLActivity {
+        static final int SETUP_PAGE_HOME=0,SETUP_PAGE_TOUCH_LAYOUT=1;
         private boolean setupOpening;
         int orientations;
         // Production onResume() reapplies the saved orientation (AND-04); the
@@ -61,6 +66,12 @@ public final class SetupTaskTest {
         require(game.resumes==1 && game.orientations==1 && game.starts==2,"SDL resume, orientation reapply or second handoff lost");
         game.onResume();game.fail=true;game.onUnhandledMessage(0x8000,0);game.fail=false;game.onUnhandledMessage(0x8000,0);
         require(Toast.shown==1 && game.starts==3,"failed handoff was not reported/retryable");
+        require(game.last.extras.isEmpty(),"the setup home page asked for a sub-page");
+        // Settings > Controls > Touch layout opens the layout editor itself.
+        game.onResume();game.onUnhandledMessage(0x8000,1);
+        require(game.starts==4 && "touch_layout".equals(game.last.extras.get(LauncherActivity.EXTRA_PAGE)),"layout editor request lost its page");
+        game.onResume();game.onUnhandledMessage(0x8000,7);
+        require(game.starts==5 && game.last.extras.isEmpty(),"unknown page argument opened a sub-page");
         for(int state=0;state<3;++state){
             GameActivity inactive=new GameActivity();inactive.finishing=state==0;inactive.mBrokenLibraries=state==1;inactive.mActivityCreated=state!=2;
             require(inactive.onUnhandledMessage(0x8000,0) && inactive.starts==0,"inactive game launched setup");

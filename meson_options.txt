@@ -63,6 +63,13 @@ option(
 )
 
 option(
+  'android_headset',
+  type: 'boolean',
+  value: false,
+  description: 'Android arm64-v8a only: stage the experimental Meta Quest headset flavor (package variant "quest", with the openq4-headset marker that starts the game in VR). The Gradle flavor and its distribution are AND-05; see docs/dev/android-build.md.',
+)
+
+option(
   'sigmatouch_root',
   type: 'string',
   value: '',

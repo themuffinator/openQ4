@@ -115,13 +115,18 @@ document. Cancellation and failures preserve the originals; a partial destinatio
 may need removal in Files. See the [player guide](../../docs/user/android-setup.md)
 for backup contents, limits, cloud-provider completion and upgrade guidance.
 
-Setup also provides touch controls presets and an Interface page for the viewing
-profile, menu size and text size, and the game's Settings can reopen it during
-play. See the [player guide](../../docs/user/android-setup.md) for both pages.
+Setup also provides touch controls presets, a touch layout editor that moves,
+resizes, fades and hides each control per orientation (`TouchLayoutPage`, with
+`TouchLayout` porting the engine's placement), and an Interface page for the
+viewing profile, menu size and text size. The game's Settings can reopen setup
+during play, and its Controls page opens the layout editor directly. See the
+[player guide](../../docs/user/android-setup.md) for these pages.
 Save/log exports to local Downloads and an exported-save restore round trip
 pass on the recorded S25 debug package. Physical folder-import providers,
-accessibility, visual and process-death qualification are still required; host
-fixtures do not establish those results.
+accessibility and visual qualification are still required; host fixtures do
+not establish those results. Leaving single player writes the `Suspended`
+save, which the emulator lifecycle probe restores after `am kill`; physical
+process-death qualification is still required.
 
 The Android Back button or gesture follows the game's menu/pause navigation.
 Fatal-error screens accept touch release on density-scaled Copy, Clear and Quit
