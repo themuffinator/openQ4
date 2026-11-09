@@ -333,6 +333,29 @@ under 0.5% of either eye).
 With the fix, every row above reads 0.00% on both renderers, and the eyes show
 the near ground and the wreck the flat view shows.
 
+With the eyes culling correctly, the dropship hull, the wreck and a dune hid
+the stereo-share smoke's remote-camera screen and half its GUI (about 13,500
+backdrop pixels per eye instead of 25,000). The smoke now looks 40 degrees
+further left (yaw 190.7) with its screens raised clear of the ground: all
+three are in view and the GUI covers about 23,900 pixels per eye.
+
+### VR seat turn restored (9 November 2026)
+
+The same archived branch held a second fix main never got (`383eebfc5`,
+4 October). `idPlayer::UpdateVRVehicleFrame` carries a vehicle's turns into
+the seat's facing, but it began counting at the first frame the vehicle was
+driven. The Awakening's m07 race seats the player on its speeder bike and
+turns it 165 degrees in the same script frame, so that turn was lost and the
+head-steered turret ran to its stop chasing the old facing, leaving the
+player looking back over the bike. `EnterVehicle` now records the vehicle's
+heading at boarding (`00c2addb7`).
+
+The VR smoke seats the player in a walker and turns the walker 45 degrees in
+the same script line. Against a build without the fix the seat looked along
+the boarding heading, 150.7; with it, along the new heading, 105.7, on both
+renderers. The m07 race itself was not re-run: its October harness and
+Awakening mirror no longer exist, and the smoke exercises the same path.
+
 ## Android selection and package matrix
 
 | Variant | Selected ABI/API/render scope | Distribution and prerequisite |

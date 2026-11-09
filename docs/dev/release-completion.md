@@ -3083,6 +3083,11 @@ completed release material here and publish curated notes in `releases/`.
   should be. Both renderers were affected; flat play was not.
   [Details](platform-recovery-review.md#vr-eye-culling-restored-9-november-2026).
 
+- [x] VR: The Awakening's speeder-bike race no longer leaves you looking
+  backwards over the bike when it seats you. Any vehicle a level turns as it
+  seats you now faces where the level points it.
+  [Details](platform-recovery-review.md#vr-seat-turn-restored-9-november-2026).
+
 - [x] Recover safely when a damaged save fails partway through physics or
   vehicle data. Partial physics state no longer points cleanup at another
   entity or indexes unset contacts, and failed vehicle-part reads release their

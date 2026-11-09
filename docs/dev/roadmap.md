@@ -1731,8 +1731,10 @@ and AND-05.
   planes fix (`ea85bdd7b`) is restored in `3a40f705c`; without it the eyes lost
   near terrain and wreckage on both renderers
   ([evidence](platform-recovery-review.md#vr-eye-culling-restored-9-november-2026)).
-  `383eebfc5` (a VR seat follows the turn a script makes as it seats the
-  player) is still unreviewed.
+  The seat-turn fix (`383eebfc5`: when a script turns a vehicle in the same
+  frame it seats the player, the seat missed that turn, leaving The
+  Awakening's m07 speeder bike facing backwards) is restored in `00c2addb7`
+  ([evidence](platform-recovery-review.md#vr-seat-turn-restored-9-november-2026)).
 - [ ] **VR-02 — P1, qualification: real headset gameplay and comfort.** Qualify
   available PC runtimes/headsets for refresh pacing, tracking latency, aim/grip,
   handedness, two-hand weapons, haptics, room-scale collision/MP prediction, crouch,
