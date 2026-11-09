@@ -837,6 +837,19 @@ if get_option('build_native_tests')
   )
   test('openq4-bitmsg', openq4_bitmsg_test, timeout: 30)
 
+  openq4_compressor_under_test = custom_target(
+    'openq4-compressor-under-test',
+    input: files('src/framework/Compressor.cpp'),
+    output: 'CompressorUnderTest.inc',
+    command: [py, files('tools/tests/generate_compressor_test.py'), '@INPUT@', '@OUTPUT@'],
+  )
+  openq4_compressor_test = executable(
+    'openq4-compressor-test',
+    [files('tools/tests/native/CompressorTest.cpp'), openq4_compressor_under_test],
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-compressor', openq4_compressor_test, timeout: 30)
+
   foreach game_source : ['game', 'mpgame']
     tactical_include = 'AasTactical-' + game_source + 'UnderTest.inc'
     tactical_under_test = custom_target(

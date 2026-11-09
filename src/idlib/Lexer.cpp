@@ -1083,7 +1083,10 @@ int idLexer::ReadNumber( idToken *token ) {
 					token->subtype |= TT_NAN;
 					c2++;
 				}
-				for ( i = 0; i < c2; i++ ) {
+				// openQ4: stop at the terminator. Text ending in "1.#" was read up
+				// to three bytes past its end, and lexing went on from there
+				// under the no-error flags decls and command lines use.
+				for ( i = 0; i < c2 && c != '\0'; i++ ) {
 					token->AppendDirty( c );
 					c = *(++idLexer::script_p);
 				}

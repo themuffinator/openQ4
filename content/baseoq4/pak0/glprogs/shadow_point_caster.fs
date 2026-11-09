@@ -16,7 +16,10 @@ varying vec2 vAlphaTexCoord;
 varying vec3 vAlphaHashCoord;
 
 vec2 PackDepth16( float depth ) {
-	vec2 enc = fract( vec2( 1.0, 255.0 ) * clamp( depth, 0.0, 1.0 ) );
+	// Stop one code below 1.0: fract( 1.0 ) is zero, so a caster at or beyond
+	// the far envelope wrapped to the nearest depth there is and shadowed
+	// every receiver behind its texel.
+	vec2 enc = fract( vec2( 1.0, 255.0 ) * clamp( depth, 0.0, 65024.0 / 65025.0 ) );
 	enc.x -= enc.y * ( 1.0 / 255.0 );
 	return enc;
 }

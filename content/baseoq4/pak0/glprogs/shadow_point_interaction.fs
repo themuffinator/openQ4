@@ -207,6 +207,10 @@ float NormalCdf( float x ) {
 	return 0.5 * ( 1.0 + ApproxErf( x * 0.70710678 ) );
 }
 
+// Two of the four ring taps of the five-tap kernel; the others mirror them.
+const vec2 kShadowFiveTapRingA = vec2( 0.670820, 0.223607 );
+const vec2 kShadowFiveTapRingB = vec2( -0.223607, 0.670820 );
+
 float StableShadowHash( vec3 value ) {
 	return fract( sin( dot( value, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 );
 }
@@ -364,6 +368,14 @@ float PointShadowFilteredCompare(vec3 direction, float depth, float bias, float 
     if (!hardwareCompare) {
         return PointShadowPlaneCompare(direction, depth, bias, texelScale);
     }
+    // One bilinear lookup against this tap's own point on the receiver plane
+    // still holds while the bias covers the depth the plane spans across the
+    // four texels it reads, a texel diagonal at most. That is most lit
+    // surface; only steep or distant receivers need each texel compared
+    // against its own ray, at four lookups and four face selections a tap.
+    if (planeDepth * texelScale * (planeSlope + texelScale) * 1.4142136 < bias) {
+        return PointShadowCompareDepth(direction, planeDepth - bias);
+    }
     vec3 face, axisS, axisT;
     PointShadowCubeAxes(direction, face, axisS, axisT);
     vec2 st = vec2(dot(direction, axisS), dot(direction, axisT)) / dot(direction, face);
@@ -399,6 +411,72 @@ float RawPointShadowDepth( vec3 direction ) {
 #endif
 }
 
+#ifdef OPENQ4_POINT_SHADOW_COMPARE
+// The default kernel: nine bilinear comparisons on a grid one texel apart.
+// Together they read a four-by-four block of texels, weighted
+// ( 1-f, 1, 1, f ) along each axis. Where the bias covers the depth the
+// receiver plane spans across that block, the nine hardware lookups are the
+// kernel. Elsewhere each of the sixteen texels is compared once, against its
+// own ray's point on the receiver plane, and given the same weight; taken tap
+// by tap that cost four face selections and four lookups for each of the
+// nine taps, most of them repeats of a texel already read.
+float SamplePointShadowGrid( vec3 direction, float depth ) {
+	float bias = ShadowReceiverBias();
+	float texelScale = uPointShadowTexelScale;
+	vec3 face, axisS, axisT;
+	PointShadowCubeAxes( direction, face, axisS, axisT );
+	vec2 st = vec2( dot( direction, axisS ), dot( direction, axisT ) ) / dot( direction, face );
+
+	bool perTexel = dot( gPointReceiverPlane.xyz, gPointReceiverPlane.xyz ) >= 0.5
+		&& !ShadowDebugModeIs( kShadowDebugBiasOff )
+		&& !ShadowDebugModeIs( kShadowDebugReceiverPlaneBiasOff );
+	if ( perTexel ) {
+		float planeCos = abs( dot( gPointReceiverPlane.xyz, direction ) );
+		float planeSlope = sqrt( max( 1.0 - planeCos * planeCos, 0.0 ) ) / max( planeCos, 1.0e-5 );
+		// the block reaches two texels from the receiver in each direction
+		perTexel = 4.0 * depth * texelScale * ( planeSlope + texelScale ) >= bias * 0.5;
+	}
+	if ( !perTexel ) {
+		float lit = 0.0;
+		for ( int j = -1; j <= 1; j++ ) {
+			for ( int i = -1; i <= 1; i++ ) {
+				vec2 tapSt = st + vec2( float( i ), float( j ) ) * texelScale;
+				lit += PointShadowCompareDepth( face + axisS * tapSt.x + axisT * tapSt.y, depth - bias );
+			}
+		}
+		return lit * ( 1.0 / 9.0 );
+	}
+
+	vec2 grid = ( st + 1.0 ) / texelScale - 0.5;
+	vec2 weight = fract( grid );
+	vec2 lower = ( floor( grid ) + 0.5 ) * texelScale - 1.0;
+	float lit = 0.0;
+	for ( int j = 0; j < 4; j++ ) {
+		float t = lower.y + ( float( j ) - 1.0 ) * texelScale;
+		float weightT = ( j == 0 ) ? 1.0 - weight.y : ( ( j == 3 ) ? weight.y : 1.0 );
+		for ( int i = 0; i < 4; i++ ) {
+			float s = lower.x + ( float( i ) - 1.0 ) * texelScale;
+			float weightS = ( i == 0 ) ? 1.0 - weight.x : ( ( i == 3 ) ? weight.x : 1.0 );
+			vec3 texel = face + axisS * s + axisT * t;
+			float texelLit;
+			if ( max( abs( s ), abs( t ) ) > 1.0 ) {
+				// past the edge of this face the neighbouring face has its own grid
+				texelLit = PointShadowPlaneCompare( texel, depth, bias, texelScale );
+			} else {
+				float denominator = dot( gPointReceiverPlane.xyz, texel );
+				float planeDepth = gPointReceiverPlane.w * length( texel )
+					/ ( abs( denominator ) > 1.0e-5 ? denominator : 1.0 );
+				float texelDepth = ( abs( denominator ) > 1.0e-5 && planeDepth > 0.0 && planeDepth < 1.0 )
+					? planeDepth : depth;
+				texelLit = PointShadowCompareDepth( texel, texelDepth - bias );
+			}
+			lit += texelLit * weightS * weightT;
+		}
+	}
+	return lit * ( 1.0 / 9.0 );
+}
+#endif
+
 float SamplePointShadow() {
 	if ( uPointShadowFar <= 0.0 ) {
 		return 1.0;
@@ -414,6 +492,13 @@ float SamplePointShadow() {
 	if ( filterRadius <= 0.0 || uPointShadowTexelScale <= 0.0 ) {
 		return SamplePointShadowCompare( direction, depth );
 	}
+#ifdef OPENQ4_POINT_SHADOW_COMPARE
+	// nine fixed taps at a one-texel radius: the shipped default
+	if ( uShadowFilterMode < 0.5 && uShadowFilterTaps > 5.0 && uShadowFilterTaps <= 9.0
+			&& abs( filterRadius - 1.0 ) < 0.01 ) {
+		return SamplePointShadowGrid( direction, depth );
+	}
+#endif
 
 	vec3 up = ( abs( direction.z ) < 0.99 ) ? vec3( 0.0, 0.0, 1.0 ) : vec3( 0.0, 1.0, 0.0 );
 	vec3 tangent = SafeNormalize( cross( up, direction ) );
@@ -426,10 +511,19 @@ float SamplePointShadow() {
 		return shadow;
 	}
 	mat2 rotation = ShadowOffsetRotation( direction );
+	// The first four taps of the nine- and thirteen-tap sets all lie to one
+	// side of the centre. Alone they pull the shadow 0.4 radius sideways and
+	// soften one side of its edge only, so the five-tap kernel uses a ring.
 	vec2 o1 = rotation * vec2( -0.326212, -0.405805 );
 	vec2 o2 = rotation * vec2( -0.840144, -0.073580 );
 	vec2 o3 = rotation * vec2( -0.695914, 0.457137 );
 	vec2 o4 = rotation * vec2( -0.203345, 0.620716 );
+	if ( uShadowFilterTaps <= 5.0 ) {
+		o1 = rotation * kShadowFiveTapRingA;
+		o2 = rotation * kShadowFiveTapRingB;
+		o3 = -o1;
+		o4 = -o2;
+	}
 	shadow += SamplePointShadowCompare( SafeNormalize( direction + ( tangent * o1.x + bitangent * o1.y ) * tap ), depth );
 	shadow += SamplePointShadowCompare( SafeNormalize( direction + ( tangent * o2.x + bitangent * o2.y ) * tap ), depth );
 	shadow += SamplePointShadowCompare( SafeNormalize( direction + ( tangent * o3.x + bitangent * o3.y ) * tap ), depth );
@@ -568,8 +662,13 @@ void main() {
 	vec3 light = vec3( ndotl );
 	light *= texture2DProj( uLightFalloffMap, vLightFalloffTexCoord ).rgb;
 	light *= texture2DProj( uLightProjectionMap, vLightProjectionTexCoord ).rgb;
-	light *= SamplePointShadow();
-	light *= SamplePointTranslucentShadow();
+	// A light's box reaches well past its falloff, and a bumped surface turns
+	// away from it: a fragment the light does not reach has no shadow to
+	// resolve, and the filter is most of this shader's cost.
+	if ( max( light.r, max( light.g, light.b ) ) > 0.0 ) {
+		light *= SamplePointShadow();
+		light *= SamplePointTranslucentShadow();
+	}
 
 	vec3 diffuse = texture2D( uDiffuseMap, vDiffuseTexCoord ).rgb * uDiffuseColor.rgb;
 	diffuse = ApplyFlatDiffuseSweep( diffuse, vLightFalloffTexCoord.z );

@@ -1897,7 +1897,8 @@ static int VK_Post_CompareMotionEntityHistory( const void *a, const void *b ) {
 // exactly (rigid or posed, the view weapon included), sorted for lookups.
 static void VK_Post_UpdateTemporalMotionEntityHistory( const viewDef_t *viewDef,
 		idList<vkPostMotionEntityHistory_t> &history, idList<vkPostMotionEntityHistory_t> &nextHistory ) {
-	nextHistory.Clear();
+	// openQ4: keep the storage; Clear() made every frame regrow both lists
+	nextHistory.SetNum( 0, false );
 	for ( int i = 0; i < viewDef->numDrawSurfs; i++ ) {
 		const drawSurf_t *surf = viewDef->drawSurfs[ i ];
 		if ( surf == NULL || surf->space == NULL || surf->space->entityDef == NULL
@@ -1923,7 +1924,7 @@ static void VK_Post_UpdateTemporalMotionEntityHistory( const viewDef_t *viewDef,
 		nextHistory.SetNum( unique, false );
 	}
 	history.Swap( nextHistory );
-	nextHistory.Clear();
+	nextHistory.SetNum( 0, false );
 }
 
 static bool VK_Post_FindTemporalMotionEntityHistory( const idList<vkPostMotionEntityHistory_t> &history,

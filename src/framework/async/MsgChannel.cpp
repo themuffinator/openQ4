@@ -83,6 +83,7 @@ idMsgChannel::idMsgChannel
 */
 idMsgChannel::idMsgChannel() {
 	id = -1;
+	compressor = NULL;
 }
 
 /*
@@ -96,7 +97,14 @@ void idMsgChannel::Init( const netadr_t adr, const int id ) {
 	this->remoteAddress = adr;
 	this->id = id;
 	this->maxRate = 50000;
-	this->compressor = idCompressor::AllocRunLength_ZeroBased();
+	// openQ4: a channel is opened again without a Shutdown when a client
+	// reconnects onto its old slot, when a listen server changes map and when a
+	// pure restart reconnects, and each used to leak the previous compressor
+	// and its 64 KiB buffer. The compressor is re-initialised per message, so
+	// the one already here serves.
+	if ( this->compressor == NULL ) {
+		this->compressor = idCompressor::AllocRunLength_ZeroBased();
+	}
 
 	lastSendTime = 0;
 	lastDataBytes = 0;
@@ -168,9 +176,17 @@ bool idMsgChannel::ReadyToSend( const int time ) const {
 idMsgChannel::WriteMessageData
 ================
 */
-void idMsgChannel::WriteMessageData( idBitMsg &out, const idBitMsg &msg ) {
+bool idMsgChannel::WriteMessageData( idBitMsg &out, const idBitMsg &msg ) {
 	idBitMsg tmp;
 	byte tmpBuf[MAX_MESSAGE_SIZE];
+	idBitMsg packed;
+	// openQ4: the zero-run coder spends six bits on a lone three-bit zero word,
+	// so data chosen for it grows - 0x88 bytes by a quarter, and never by more
+	// than double. Packing straight into the caller's MAX_MESSAGE_SIZE buffer
+	// made a 13 KiB backlog of such bytes a fatal idBitMsg overflow, which a
+	// client could arrange in a server's queues. Pack here first and refuse
+	// what does not fit.
+	byte packedBuf[MAX_MESSAGE_SIZE * 2 + 64];
 
 	tmp.Init( tmpBuf, sizeof( tmpBuf ) );
 
@@ -185,15 +201,23 @@ void idMsgChannel::WriteMessageData( idBitMsg &out, const idBitMsg &msg ) {
 	// write data
 	tmp.WriteData( msg.GetData(), msg.GetSize() );
 
-	// write message size
-	out.WriteShort( tmp.GetSize() );
-
 	// compress message
-	idFile_BitMsg file( out );
+	packed.Init( packedBuf, sizeof( packedBuf ) );
+	idFile_BitMsg file( packed );
 	compressor->Init( &file, true, 3 );
 	compressor->Write( tmp.GetData(), tmp.GetSize() );
 	compressor->FinishCompress();
 	outgoingCompression = compressor->GetCompressionRatio();
+
+	// the receiver reassembles into MAX_MESSAGE_SIZE as well
+	if ( (int)sizeof( short ) + packed.GetSize() > out.GetMaxSize() - out.GetSize() ) {
+		return false;
+	}
+
+	// write message size
+	out.WriteShort( tmp.GetSize() );
+	out.WriteData( packed.GetData(), packed.GetSize() );
+	return true;
 }
 
 /*
@@ -367,11 +391,14 @@ int idMsgChannel::SendMessage( idPort &port, const int time, const idBitMsg &msg
 
 	// fragment large messages
 	if ( totalLength >= Net_FragmentSize( remoteAddress ) ) {
+		// write out the message data
+		if ( !WriteMessageData( unsentMsg, msg ) ) {
+			common->Printf( "idMsgChannel::SendMessage: message too large once packed, length = %i\n", totalLength );
+			return -1;
+		}
+
 		unsentFragments = true;
 		unsentFragmentStart = 0;
-
-		// write out the message data
-		WriteMessageData( unsentMsg, msg );
 
 		// send the first fragment now
 		SendNextFragment( port, time );

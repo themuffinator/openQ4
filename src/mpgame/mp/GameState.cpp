@@ -2444,9 +2444,12 @@ void rvTourneyGameState::UnpackState( const idBitMsg& inMsg ) {
 				int rnd = inMsg.ReadChar();
 				int maxr = inMsg.ReadByte();
 				
-				if ( startRound < 1 || startRound > MAX_ARENAS ||
-					 rnd < 1 || rnd > MAX_ARENAS ||
-					 maxr < 1 || maxr > MAX_ARENAS ) {
+				// openQ4: these index tourneyHistory's rounds, of which there are
+				// MAX_ROUNDS. The check used MAX_ARENAS, twice as many, so a server
+				// or demo could write four rows of names past the array.
+				if ( startRound < 1 || startRound > MAX_ROUNDS ||
+					 rnd < 1 || rnd > MAX_ROUNDS ||
+					 maxr < 1 || maxr > MAX_ROUNDS ) {
 					common->Warning( "Ignoring invalid tourney history range %d/%d/%d",
 						startRound, rnd, maxr );
 					break;

@@ -16,10 +16,15 @@ namespace {
 	uint32 rg_gpuSkinningGeneration = 1;
 	bool rg_gpuSkinningInitialized = false;
 
-	static ID_INLINE void R_GpuSkinning_SaturatingAdd( uint64 &value, uint64 amount ) {
-		std::lock_guard<std::recursive_mutex> lock( rg_gpuSkinningStatsMutex );
+	// the caller holds rg_gpuSkinningStatsMutex
+	static ID_INLINE void R_GpuSkinning_AddLocked( uint64 &value, uint64 amount ) {
 		const uint64 maxValue = ~static_cast<uint64>( 0 );
 		value = amount > maxValue - value ? maxValue : value + amount;
+	}
+
+	static ID_INLINE void R_GpuSkinning_SaturatingAdd( uint64 &value, uint64 amount ) {
+		std::lock_guard<std::recursive_mutex> lock( rg_gpuSkinningStatsMutex );
+		R_GpuSkinning_AddLocked( value, amount );
 	}
 
 	static ID_INLINE idVec3 R_GpuSkinning_TransformVector( const float *matrix,
@@ -348,11 +353,14 @@ void R_GpuSkinning_RecordCpuSkinning( uint64 elapsedMicroseconds,
 	if ( numVerts <= 0 ) {
 		return;
 	}
-	R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.cpuSkinVertices, numVerts );
-	R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.cpuSkinMicroseconds, elapsedMicroseconds );
+	// openQ4: one lock for the call. This runs for every skinned surface every
+	// frame, and each counter used to take the mutex for itself.
+	std::lock_guard<std::recursive_mutex> lock( rg_gpuSkinningStatsMutex );
+	R_GpuSkinning_AddLocked( rg_gpuSkinningStats.cpuSkinVertices, numVerts );
+	R_GpuSkinning_AddLocked( rg_gpuSkinningStats.cpuSkinMicroseconds, elapsedMicroseconds );
 	if ( positionsOnly ) {
-		R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.cpuPositionOnlyVertices, numVerts );
-		R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.cpuPositionOnlyMicroseconds, elapsedMicroseconds );
+		R_GpuSkinning_AddLocked( rg_gpuSkinningStats.cpuPositionOnlyVertices, numVerts );
+		R_GpuSkinning_AddLocked( rg_gpuSkinningStats.cpuPositionOnlyMicroseconds, elapsedMicroseconds );
 	}
 }
 
@@ -368,15 +376,16 @@ void R_GpuSkinning_RecordBackendPrepared( int numVerts ) {
 
 void R_GpuSkinning_RecordBackendPrepared( int numVerts, int numJoints,
 	uint64 paletteBytes ) {
-	R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.backendPrepared, 1 );
-	R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.surfacesAdmitted, 1 );
+	std::lock_guard<std::recursive_mutex> lock( rg_gpuSkinningStatsMutex );
+	R_GpuSkinning_AddLocked( rg_gpuSkinningStats.backendPrepared, 1 );
+	R_GpuSkinning_AddLocked( rg_gpuSkinningStats.surfacesAdmitted, 1 );
 	if ( numVerts > 0 ) {
-		R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.preparedVertices, numVerts );
+		R_GpuSkinning_AddLocked( rg_gpuSkinningStats.preparedVertices, numVerts );
 	}
 	if ( numJoints > 0 ) {
-		R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.paletteUploads, 1 );
-		R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.paletteJoints, numJoints );
-		R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.paletteBytes, paletteBytes );
+		R_GpuSkinning_AddLocked( rg_gpuSkinningStats.paletteUploads, 1 );
+		R_GpuSkinning_AddLocked( rg_gpuSkinningStats.paletteJoints, numJoints );
+		R_GpuSkinning_AddLocked( rg_gpuSkinningStats.paletteBytes, paletteBytes );
 	}
 }
 
@@ -410,11 +419,15 @@ bool R_GpuSkinning_PrepareAmbientCache( srfTriangles_s *tri, bool needsLighting 
 	if ( !R_GpuSkinning_IsCandidate( tri ) ) {
 		return false;
 	}
-	R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.surfaceAttempts, 1 );
 	if ( !r_gpuSkinning.GetBool() ) {
-		R_GpuSkinning_RecordFallback( GPU_SKINNING_FALLBACK_DISABLED );
+		// the default path, taken for every skinned surface: count the attempt
+		// and its fallback under one lock
+		std::lock_guard<std::recursive_mutex> lock( rg_gpuSkinningStatsMutex );
+		R_GpuSkinning_AddLocked( rg_gpuSkinningStats.surfaceAttempts, 1 );
+		R_GpuSkinning_AddLocked( rg_gpuSkinningStats.fallbacks[ GPU_SKINNING_FALLBACK_DISABLED ], 1 );
 		return false;
 	}
+	R_GpuSkinning_SaturatingAdd( rg_gpuSkinningStats.surfaceAttempts, 1 );
 	gpuSkinningSurface_t surface;
 	if ( !R_GpuSkinning_GetSurface( tri, surface ) ) {
 		R_GpuSkinning_RecordFallback( surface.fallbackReason );

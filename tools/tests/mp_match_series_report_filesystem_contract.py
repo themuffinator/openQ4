@@ -30,6 +30,11 @@ def _resolve_engine_root() -> Path:
     override = os.environ.get("OPENQ4_ENGINE_REPO", "").strip()
     if override:
         return Path(override)
+    # The game sources live in the engine repository now, so this checkout is
+    # the engine. Looking for a sibling named openQ4 first tested a different
+    # checkout from a worktree, or none at all.
+    if (ROOT / "src/framework").is_dir():
+        return ROOT
     for name in ("openQ4", "OpenQ4"):
         candidate = ROOT.parent / name
         if candidate.is_dir():

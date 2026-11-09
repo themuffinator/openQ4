@@ -1133,7 +1133,12 @@ void Net_SendUDPPacket( SOCKET netSocket, int length, const void *data, const ne
 	int				ret;
 	struct sockaddr_storage addr;
 	int				addrLen = 0;
-	const bool verbosePacket = cvarSystem != NULL && cvarSystem->GetCVarInteger( "net_verbose" ) >= 2;
+	// openQ4: look the cvar up once, not by name for every packet sent
+	static idCVar *	netVerbose = NULL;
+	if ( netVerbose == NULL && cvarSystem != NULL ) {
+		netVerbose = cvarSystem->Find( "net_verbose" );
+	}
+	const bool verbosePacket = netVerbose != NULL && netVerbose->GetInteger() >= 2;
 
 	if( netSocket == INVALID_SOCKET ) {
 		return;

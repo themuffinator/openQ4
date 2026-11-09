@@ -990,7 +990,7 @@ bool idServerScan::ValidMapPath( const char *path ) {
 idServerScan::GUIAdd
 ================
 */
-void idServerScan::GUIAdd( int id, const networkServer_t server ) {
+void idServerScan::GUIAdd( int id, const networkServer_t &server ) {
 	const idStr name = ServerBrowserText( server.serverInfo.GetString( "si_name" ) );
 	const idStr map = ServerBrowserText( server.serverInfo.GetString( "si_mapName" ), 64 );
 	const idStr type = ServerBrowserText( ServerBrowserGameType( server.serverInfo.GetString( "si_gameType" ) ), 64 );
@@ -1048,7 +1048,7 @@ void idServerScan::ApplyFilter( ) {
 idServerScan::IsFiltered
 ================
 */
-bool idServerScan::IsFiltered( const networkServer_t server ) {
+bool idServerScan::IsFiltered( const networkServer_t &server ) {
 	int i;
 	const idKeyValue *keyval;
 

@@ -1897,6 +1897,21 @@ def validate_exact_filter_tiers(sample_body: str, sample_call: str, context: str
         raise AssertionError(
             f"{context} must transform exactly the twelve off-center Poisson taps"
         )
+    # The first four Poisson taps all lie to one side of the centre, so the
+    # five-tap tier replaces them with a balanced ring before it samples.
+    require_order(
+        sample_body,
+        (
+            "if (shadow.filterParams.y <= 5.0) {",
+            "o1 = rotation * kShadowFiveTapRingA;",
+            "o2 = rotation * kShadowFiveTapRingB;",
+            "o3 = -o1;",
+            "o4 = -o2;",
+            "if (shadow.filterParams.y <= 5.0)",
+            "return result * (1.0 / 5.0);",
+        ),
+        f"{context} balanced five-tap ring",
+    )
     require_order(
         sample_body,
         (
@@ -2663,7 +2678,7 @@ def validate_point_receiver_world_bias_contract() -> None:
         (
             "g_activePointShadowMapCache",
             "entry == &g_pointShadowMapCache[i]",
-            "r_shadowMapPointCacheSize.GetInteger()",
+            "RB_ShadowMapPointCacheSlotLimit()",
             "entry->passKind != static_cast<int>( SHADOWMAP_PASS_GLOBAL )",
             "entry->lastUpdatedFrame > tr.frameCount",
             "entry->size != RB_ShadowMapPointSizeValue()",
@@ -4310,8 +4325,8 @@ def validate_exact_static_cache_and_admission_contract() -> None:
     )
     require_compact(
         header,
-        "static const int VK_SHADOW_MAX_CACHE_SLOTS = 16;",
-        "bounded class-specific static caches",
+        "static const int VK_SHADOW_MAX_CACHE_SLOTS = SHADOWMAP_POINT_CACHE_MAX_SLOTS;",
+        "static cache records sized for a whole view of point lights",
     )
     for obsolete_gate in (
         "VK_SHADOW_MAX_POINT_LIGHTS",
@@ -4539,10 +4554,29 @@ def validate_exact_static_cache_and_admission_contract() -> None:
         "r_shadowMapProjectedCacheSize.GetInteger()",
         "projected cache-size cvar",
     )
-    require(
+    # The point limit is the shared policy both backends size their cube cache
+    # with: the slot cvar, bounded by the memory cvar and the record count.
+    require_order(
         point_limit,
-        "r_shadowMapPointCacheSize.GetInteger()",
-        "point cache-size cvar",
+        (
+            "R_ShadowMapPointCacheSlotLimit( VK_ShadowMap_PointSizeValue(),",
+            "VK_ShadowMap_DepthBytesPerPixel()",
+            "VK_SHADOW_MAX_CACHE_SLOTS",
+        ),
+        "point cache-size policy",
+    )
+    shared_point_limit = braced_body(
+        read("src/renderer/ShadowMapClassification.cpp"),
+        "int R_ShadowMapPointCacheSlotLimit(",
+        "shared point cache-size policy",
+    )
+    require_order(
+        shared_point_limit,
+        (
+            "r_shadowMapPointCacheSize.GetInteger()",
+            "r_shadowMapPointCacheMegs.GetInteger()",
+        ),
+        "shared point cache-size cvars",
     )
 
     begin_cache_view = braced_body(
@@ -4956,7 +4990,7 @@ def validate_exact_static_cache_and_admission_contract() -> None:
     require_compact(
         render,
         """if ( projectedCount == 0 && pointFreshCount == 0
-            && pointHitCount > 0 ) {
+            && pointComposeCount == 0 && pointHitCount > 0 ) {
             VK_ShadowMap_FinalizeCachePasses( viewDef );
             return true;
         }""",
@@ -5432,6 +5466,10 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
         (
             "!r_shadows.GetBool()",
             "!r_useShadowMap.GetBool()",
+            # a prelight-only light keeps its combined volume: it has no
+            # per-surface volumes and no map casters to replace it with
+            "lightDef->parms.noShadows || lightDef->parms.noDynamicShadows",
+            "return false;",
             "lightDef->parms.pointLight",
             "!r_shadowMapPointLights.GetBool()",
             "return false;",
@@ -5448,7 +5486,7 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
     )
     require_compact(
         gl_backend,
-        """if ( !allowEviction ) {
+        """if ( !allowEviction || oldest == NULL ) {
         return NULL;
     }
     oldest->valid = false;""",
@@ -5697,11 +5735,12 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
 def validate_dynamic_caster_composition_contract() -> None:
     """GL SHADOWMAP_RENDER_STATIC_ONLY / _COMPOSE_DYNAMIC parity.
 
-    A projected light with a moving caster must keep its resident entry,
-    which holds STATIC depth only, and draw the dynamic chains over the
-    published or restored tile. Re-rendering the whole static scene every
-    frame is the behaviour this replaces, so the pieces that make the split
-    safe are pinned here rather than left to reading.
+    A light with a moving caster must keep its resident entry, which holds
+    STATIC depth only, and draw the dynamic chains over the published or
+    restored tile (projected) or over a scratch copy of the resident cube
+    (point). Re-rendering the whole static scene every frame is the
+    behaviour this replaces, so the pieces that make the split safe are
+    pinned here rather than left to reading.
     """
     shadow_map = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
     header = read("src/renderer/Vulkan/vk_ShadowMap.h")
@@ -5717,16 +5756,17 @@ def validate_dynamic_caster_composition_contract() -> None:
         "static bool VK_ShadowMap_StaticCacheable(",
         "static cache admission",
     )
-    # Only the point path bakes dynamics into cached content. Projected
-    # dynamics compose, so they must not defeat or invalidate the cache --
+    # Dynamics compose, so they must not defeat or invalidate the cache --
     # except while the opt-in shared stream can own the view, whose sealed
-    # allowCacheReuse forbids a composed hit on both backends.
+    # allowCacheReuse forbids a composed hit on both backends, and for a
+    # point cube that cannot compose, which regenerates instead.
     require_compact(
         cacheable,
         """const bool dynamicsDefeatCache = haveDynamicCasters
-            && ( pointLight
-                || r_rendererSharedWorldInteraction.GetBool() );""",
-        "projected dynamics keep the cache, point dynamics defeat it",
+            && ( r_rendererSharedWorldInteraction.GetBool()
+                || ( pointLight
+                    && !VK_ShadowMap_PointComposeAvailable() ) );""",
+        "dynamics keep the cache unless the light cannot compose",
     )
     require_compact(
         cacheable,
@@ -5741,11 +5781,28 @@ def validate_dynamic_caster_composition_contract() -> None:
         )
     require_compact(
         cacheable,
-        """if ( pointLight
+        """if ( pointLight && !VK_ShadowMap_PointComposeAvailable()
                 && backEnd.frameCount - history->lastDynamicFrame
                     < Max( 0,
                             r_shadowMapStaticHysteresisFrames.GetInteger() ) ) {""",
-        "static hysteresis applies only to the baked point path",
+        "static hysteresis applies only to a point cube that regenerates",
+    )
+    read_only = braced_body(
+        shadow_map,
+        "static bool VK_ShadowMap_StaticCacheableReadOnly(",
+        "side-effect-free static cache admission",
+    )
+    require_order(
+        read_only,
+        (
+            """const bool pointRegenerates = pointLight
+                && !VK_ShadowMap_PointComposeAvailable();""",
+            """if ( haveDynamicCasters
+                && ( pointRegenerates
+                    || r_rendererSharedWorldInteraction.GetBool() ) ) {""",
+            "if ( history != NULL && pointRegenerates",
+        ),
+        "the admission estimate predicts the same cacheability the walk decides",
     )
 
     allocate = braced_body(
@@ -5813,6 +5870,151 @@ def validate_dynamic_caster_composition_contract() -> None:
         raise AssertionError(
             "The compose scope must preserve the cached tile instead of clearing it"
         )
+
+    # Point lights compose too (GL RB_RenderPointShadowMap render modes): the
+    # resident cube keeps static depth, and each view copies it to a scratch
+    # cube and draws the live chains over the copy.
+    available = braced_body(
+        shadow_map,
+        "static bool VK_ShadowMap_PointComposeAvailable( void ) {",
+        "point compose availability",
+    )
+    require_compact(
+        available,
+        """return r_shadowMapPointCompose.GetBool()
+            && !r_rendererSharedWorldInteraction.GetBool();""",
+        "the sealed shared stream never composes a point cube",
+    )
+    create_cube = braced_body(
+        shadow_map,
+        "static bool VK_ShadowMap_CreatePointCube(",
+        "point cube creation",
+    )
+    require_compact(
+        create_cube,
+        """ici.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+            | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;""",
+        "resident and scratch cubes can be the two ends of the composed copy",
+    )
+    claim = braced_body(
+        shadow_map,
+        "static bool VK_ShadowMap_ClaimPointComposeTarget(",
+        "composed point target claim",
+    )
+    require_order(
+        claim,
+        (
+            "vkShadow.pointCubesUsed >= VK_SHADOW_MAX_POINT_CUBES",
+            "!VK_ShadowMap_EnsurePointCube( vkShadow.pointCubesUsed )",
+            "pass.composeDynamic = true;",
+            "pass.cubeIndex = cubeIndex;",
+            "pass.pointSet = pointSet;",
+            "vkShadow.pointCubesUsed++;",
+        ),
+        "a composed pass samples a scratch cube and keeps its entry as the static source",
+    )
+    allocate_point = braced_body(
+        shadow_map,
+        "static bool VK_ShadowMap_AllocatePointPass(",
+        "point ownership allocation",
+    )
+    require_order(
+        allocate_point,
+        (
+            """const bool composeDynamic = VK_ShadowMap_PointComposeAvailable()
+                && VK_ShadowMap_PassHasDynamicCasters( light.vLight,
+                        receiverPass );""",
+            "pass.cacheHit = true;",
+            """if ( composeDynamic
+                && ( cache.size != vkShadow.pointCubeFaceSize
+                    || !VK_ShadowMap_ClaimPointComposeTarget( pass,
+                            frameSlot ) ) ) {""",
+            "VK_ShadowMap_CancelScheduledPass( schedule, true );",
+            "pass.cacheUpdate = true;",
+            """if ( !composeDynamic
+                || VK_ShadowMap_ClaimPointComposeTarget( pass,
+                        frameSlot ) ) {""",
+            "VK_ShadowMap_CancelScheduledPass( schedule, true );",
+        ),
+        "cached point passes with live casters claim a composed target or fail whole",
+    )
+    copy_cube = braced_body(
+        shadow_map,
+        "static void VK_ShadowMap_CopyDepthCube(",
+        "resident cube copy",
+    )
+    for token in (
+        "region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;",
+        "region.srcSubresource.layerCount = 6;",
+        "region.dstSubresource.layerCount = 6;",
+        "copy.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;",
+        "copy.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;",
+    ):
+        require_compact(copy_cube, token, "all six faces of depth in one copy")
+    # A composed hit is GPU work: it must not take the pure-hit early return,
+    # it needs the solid alpha descriptor, and it revalidates its live casters.
+    require_compact(
+        render,
+        """if ( pointCasterPipeline == VK_NULL_HANDLE
+                || VK_ShadowMap_PointComposeTarget( pass )
+                    == NULL
+                || !VK_ShadowMap_PassCastersRepresentable(
+                        light, receiverPass ) ) {""",
+        "composed point hits revalidate their live casters and their target",
+    )
+    require_compact(
+        render,
+        """const int casterPassCount = projectedFreshCount + pointFreshCount
+            + projectedComposeCount + pointComposeCount;""",
+        "composed point passes bind the solid alpha descriptor",
+    )
+    require_order(
+        render,
+        (
+            "if ( pointFreshCount > 0 || pointComposeCount > 0 ) {",
+            "const bool composePass = !classicCommit && pass.composeDynamic;",
+            """if ( pass.cacheHit && !composePass ) {
+                continue;
+            }""",
+            "const bool renderCube = !pass.cacheHit;",
+            # the static chains alone are published ...
+            """drawCubeFaces( *cube, VK_ATTACHMENT_LOAD_OP_CLEAR,
+                composePass ? VK_SHADOW_CHAINS_STATIC_ONLY
+                    : VK_SHADOW_CHAINS_ALL );""",
+            "if ( composePass && pass.valid ) {",
+            # ... copied whole to the scratch cube ...
+            "VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,",
+            "VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,",
+            """VK_ShadowMap_CopyDepthCube( cmd, cube->image,
+                composeTarget->image, faceSize );""",
+            # ... the resident cube returns to its sampled layout ...
+            """VK_ShadowMap_ImageBarrier( cmd, cube->image, 6,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,""",
+            "cube->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;",
+            # ... and only the live chains are drawn over the copy.
+            """drawCubeFaces( *composeTarget, VK_ATTACHMENT_LOAD_OP_LOAD,
+                VK_SHADOW_CHAINS_DYNAMIC_ONLY );""",
+            "vkShadow.composePasses++;",
+            "cube = composeTarget;",
+            "cube->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;",
+        ),
+        "point compose: static publish, whole-cube copy, live chains over the copy",
+    )
+    overlay_cube = braced_body(
+        shadow_map,
+        "static const vkPointShadowCube_t *VK_ShadowMap_OverlayPassCube(",
+        "overlay point cube resolution",
+    )
+    require_order(
+        overlay_cube,
+        (
+            "VK_ShadowMap_PointComposeTarget( pass );",
+            "return composed;",
+            "return &vkShadow.pointCache[ pass.cacheEntry ].cube;",
+        ),
+        "the overlay shows the composed cube the receivers sampled",
+    )
 
 
 def validate_csm_static_cache_contract() -> None:
@@ -7273,6 +7475,270 @@ def validate_translucent_moment_contract() -> None:
     require(point, "packed *= SamplePointTranslucentShadow();", "point PBR receiver")
 
 
+def validate_point_cache_parity_and_receiver_cost_contract() -> None:
+    """Point lights are the dominant shadowing class in Quake 4. Their cube
+    cache must hold a whole dense view, compose live casters over static
+    depth instead of re-rendering six faces, and never thrash; diagnostics
+    must cost nothing while they are off; the receiver must not pay for
+    fragments the light does not reach; and the stencil rules mapped lights
+    replace (prelight-only lights, the prelight's global ownership) must hold.
+    """
+    classification_h = read("src/renderer/ShadowMapClassification.h")
+    classification = read("src/renderer/ShadowMapClassification.cpp")
+    gl = read("src/renderer/draw_arb2.cpp")
+    vk = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+    init = read("src/renderer/RenderSystem_init.cpp")
+    interaction = read("src/renderer/Interaction.cpp")
+
+    require(classification_h, "static const int SHADOWMAP_POINT_CACHE_MAX_SLOTS = 96;",
+        "point cube cache record bound")
+    require(classification_h, "static const int SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS = 12;",
+        "point cube cache budget floor")
+    slot_limit = braced_body(classification, "int R_ShadowMapPointCacheSlotLimitFor(",
+        "point cache slot policy")
+    require_order(
+        slot_limit,
+        (
+            "requested <= SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS",
+            "return requested;",
+            "budgetBytes / entryBytes",
+            "Max( SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS, budgetSlots )",
+        ),
+        "point cache slot policy",
+    )
+    require(init, 'idCVar r_shadowMapPointCacheSize( "r_shadowMapPointCacheSize", "64"',
+        "point cache default holds a dense view")
+    require(init, 'idCVar r_shadowMapPointCacheMegs( "r_shadowMapPointCacheMegs", "512"',
+        "point cache memory bound")
+    migration = braced_body(init, "static void R_MigrateLegacyShadowMapPointCacheSize(",
+        "legacy twelve-slot migration")
+    require_order(
+        migration,
+        (
+            "r_shadowMapPointCacheDefaultsMigrated.GetBool()",
+            "r_shadowMapPointCacheSize.GetInteger() == 12",
+            "r_shadowMapPointCacheSize.SetInteger( 64 );",
+            "r_shadowMapPointCacheDefaultsMigrated.SetBool( true );",
+        ),
+        "legacy twelve-slot migration",
+    )
+    require(init, "R_MigrateLegacyShadowMapPointCacheSize();", "migration runs at startup")
+
+    require_compact(gl, "g_pointShadowMapCache[SHADOWMAP_POINT_CACHE_MAX_SLOTS];",
+        "GL point cache records")
+    gl_limit = braced_body(gl, "static int RB_ShadowMapPointCacheSlotLimit( void ) {",
+        "GL point cache slot limit")
+    require(gl_limit, "R_ShadowMapPointCacheSlotLimit( RB_ShadowMapPointSizeValue(),",
+        "GL point cache slot limit")
+    # Neither backend may evict a cube a light still on screen is using: the
+    # victim misses later in the same view and evicts the next one in turn.
+    gl_alloc = braced_body(gl, "static pointShadowMapCacheEntry_t *RB_ShadowMapAllocPointCacheEntry(",
+        "GL point cache allocation")
+    require_order(
+        gl_alloc,
+        (
+            "if ( !entry->valid ) {",
+            "entry->lastUsedFrame >= tr.frameCount - 1",
+            "continue;",
+            "if ( !allowEviction || oldest == NULL ) {",
+        ),
+        "GL point cache allocation",
+    )
+    vk_alloc = braced_body(vk, "static int VK_ShadowMap_AllocPointCacheEntry(",
+        "Vulkan point cache allocation")
+    require_order(
+        vk_alloc,
+        (
+            "if ( entry.reserved ) {",
+            "if ( !entry.valid ) {",
+            "entry.lastUsedFrame >= backEnd.frameCount - 1",
+            "continue;",
+        ),
+        "Vulkan point cache allocation",
+    )
+    gl_recycle = braced_body(gl, "static pointShadowMapCacheEntry_t *RB_ShadowMapRecyclePointCacheEntry(",
+        "GL point cache same-light recycle")
+    require_order(
+        gl_recycle,
+        (
+            "entry->lightIndex == lightIndex",
+            "entry->passKind == static_cast<int>( passKind )",
+            "entry->lastUsedFrame != tr.frameCount",
+            "newest->valid = false;",
+        ),
+        "GL point cache same-light recycle",
+    )
+
+    # GL composes live casters over a copy of the cached static cube.
+    gl_cacheable = braced_body(gl, "static bool RB_ShadowMapStaticCacheable(",
+        "GL static cacheability")
+    require_compact(
+        gl_cacheable,
+        """const bool dynamicsDefeatCache = pointLight && vLight->shadowMapDynamicCasterCount > 0
+        && !RB_ShadowMapPointComposeAvailable();""",
+        "GL point lights compose instead of defeating the cache",
+    )
+    gl_point_render = braced_body(gl, "static bool RB_RenderPointShadowMap(",
+        "GL point cube render modes")
+    require_order(
+        gl_point_render,
+        (
+            "const bool composeMode = renderMode == SHADOWMAP_RENDER_COMPOSE_DYNAMIC;",
+            "!RB_ShadowMapPointCacheEntryStorageValid( composeFrom )",
+            "g_shadowMapStats.composePasses++;",
+            "g_shadowMapStats.shadowMapUpdates++;",
+            "composeFrom->renderTexture->MakeCurrent( cubeFace )",
+            "glBlitFramebuffer( 0, 0, shadowMapWidth, shadowMapHeight,",
+            "glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );",
+            "if ( drawStaticChains ) {",
+            "if ( drawDynamicChains ) {",
+        ),
+        "GL point cube compose",
+    )
+    gl_run_pass = braced_body(gl, "static void RB_ShadowMapRunPass(", "GL shadow pass driver")
+    require_order(
+        gl_run_pass,
+        (
+            "schedule.pointEntry != NULL && RB_ShadowMapPointComposeAvailable()",
+            "SHADOWMAP_RENDER_COMPOSE_DYNAMIC, schedule.pointEntry );",
+            "composePlanned ? SHADOWMAP_RENDER_STATIC_ONLY : SHADOWMAP_RENDER_FULL;",
+            "SHADOWMAP_RENDER_COMPOSE_DYNAMIC, schedule.pointEntry );",
+        ),
+        "GL point compose scheduling",
+    )
+    gl_pass_kind = braced_body(gl, "static shadowMapPassKind_t RB_ShadowMapCachePassKind(",
+        "GL cache ownership identity")
+    require_order(
+        gl_pass_kind,
+        (
+            "vLight->localShadowMapCasters != NULL",
+            "return passKind;",
+            "vLight->localShadowMapDynamicCasters == NULL",
+            "return SHADOWMAP_PASS_GLOBAL;",
+            "!RB_ShadowMapPointComposeAvailable()",
+        ),
+        "composed ownerships share one static entry",
+    )
+
+    # Timer queries exist for the report; they must not run without it.
+    gl_timers = braced_body(gl, "static bool RB_ShadowMapGpuTimerQueriesAvailable( void ) {",
+        "GL shadow timer query gate")
+    require_order(
+        gl_timers,
+        (
+            "!r_shadowMapGpuTimerQueries.GetBool()",
+            "r_shadowMapReport.GetInteger() <= 0 && !r_shadowMapDebugOverlay.GetBool()",
+            "return false;",
+        ),
+        "GL shadow timer query gate",
+    )
+    gl_restore = braced_body(gl, "static void RB_ShadowMapRestoreViewViewport( void ) {",
+        "GL view viewport restore")
+    require_order(
+        gl_restore,
+        ("RB_TileOffsetX() + backEnd.viewDef->viewport.x1", "RB_TileOffsetY() + backEnd.viewDef->viewport.y1"),
+        "shadow passes restore the tiled-capture offset",
+    )
+    if gl.count("RB_ShadowMapRestoreViewViewport();") != 4:
+        raise AssertionError("every GL shadow-map pass must restore the view viewport through the shared helper")
+
+    # A caster stays live for a quarter second of frames, not one frame.
+    require(classification_h, "static const int SHADOWMAP_DYNAMIC_CASTER_WINDOW_MSEC = 250;",
+        "live caster window")
+    dynamic = braced_body(interaction, "static bool R_ShadowMapCasterIsDynamic(",
+        "live caster classification")
+    require(dynamic, "const int recentFrame = tr.frameCount - R_ShadowMapDynamicCasterFrames();",
+        "live caster window spans a game tic at any display rate")
+    require(read("src/renderer/RenderSystem.cpp"), "R_ShadowMapBeginFrame( Sys_Milliseconds() );",
+        "live caster window follows rendered frames")
+    require(read("src/renderer/ModernShadowPlanner.cpp"), "R_ShadowMapCachePolicySelfTest()",
+        "cache policy self-test runs with the shadow diagnostics")
+
+    # Stencil rules a mapped light replaces.
+    per_surface = braced_body(interaction, "bool R_ShadowMapsNeedPerSurfaceStencilVolumes(",
+        "prelight-only lights keep their prelight")
+    require(per_surface, "lightDef->parms.noShadows || lightDef->parms.noDynamicShadows",
+        "prelight-only lights keep their prelight")
+    require_order(
+        interaction,
+        (
+            "const bool prelightOwnsShadows =",
+            "r_useOptimizedShadows.GetBool() &&",
+            "entityDef->parms.hModel->IsStaticWorldModel() &&",
+            "R_LightHasRealPrelightModel( lightDef->parms );",
+            "const bool materialNoSelfShadow = !prelightOwnsShadows",
+            "&& shadowShader->TestMaterialFlag( MF_NOSELFSHADOW );",
+        ),
+        "static world under a prelit light keeps the prelight's global ownership",
+    )
+    require_compact(
+        read("src/game/gamesys/SysCvar.cpp"),
+        """return cvarSystem->GetCVarBool( "r_useShadowMap" )
+        && cvarSystem->GetCVarBool( "r_shadowMapPointLights" );""",
+        "corpse shadows need every light class mapped",
+    )
+
+    # Receivers: no shadow work for unlit fragments, a balanced five-tap ring,
+    # and the default nine taps as one pass over a four-by-four texel block.
+    gl_point = read("content/baseoq4/pak0/glprogs/shadow_point_interaction.fs")
+    gl_projected = read("content/baseoq4/pak0/glprogs/shadow_interaction.fs")
+    vk_point = read("src/renderer/Vulkan/shaders/interaction_shadow_point.frag")
+    vk_projected = read("src/renderer/Vulkan/shaders/interaction_shadow.frag")
+    require_order(
+        gl_point,
+        (
+            "float SamplePointShadowGrid( vec3 direction, float depth ) {",
+            "perTexel = 4.0 * depth * texelScale * ( planeSlope + texelScale ) >= bias * 0.5;",
+            "return lit * ( 1.0 / 9.0 );",
+            "PointShadowPlaneCompare( texel, depth, bias, texelScale );",
+            "return lit * ( 1.0 / 9.0 );",
+            "return SamplePointShadowGrid( direction, depth );",
+            "if ( max( light.r, max( light.g, light.b ) ) > 0.0 ) {",
+            "light *= SamplePointShadow();",
+        ),
+        "GL point receiver grid kernel and unlit early-out",
+    )
+    require_order(
+        vk_point,
+        (
+            "float SamplePointShadowGrid(vec3 direction, float depth) {",
+            "perTexel = 4.0 * depth * texelScale * (planeSlope + texelScale) >= bias * 0.5;",
+            "PointShadowPlaneCompare(texel, depth, bias, texelScale);",
+            "return SamplePointShadowGrid(direction, depth);",
+            "bool lit = max(light.r, max(light.g, light.b)) > 0.0 || ShadowVisualDebugMode();",
+            "light *= SampleShadowFactor();",
+        ),
+        "Vulkan point receiver grid kernel and unlit early-out",
+    )
+    require_order(
+        gl_projected,
+        (
+            "if ( max( light.r, max( light.g, light.b ) ) > 0.0 || ShadowVisualDebugMode() ) {",
+            "shadowInfo = SampleShadow();",
+        ),
+        "GL projected receiver unlit early-out",
+    )
+    require_order(
+        vk_projected,
+        (
+            "bool lit = max(light.r, max(light.g, light.b)) > 0.0 || ShadowVisualDebugMode();",
+            "light *= SampleShadowFactor();",
+        ),
+        "Vulkan projected receiver unlit early-out",
+    )
+    for shader, context in ((gl_point, "GL point"), (gl_projected, "GL projected")):
+        require_order(
+            shader,
+            ("o1 = rotation * kShadowFiveTapRingA;", "o2 = rotation * kShadowFiveTapRingB;", "o3 = -o1;", "o4 = -o2;"),
+            f"{context} receiver balanced five-tap ring",
+        )
+    require(
+        read("content/baseoq4/pak0/glprogs/shadow_point_caster.fs"),
+        "clamp( depth, 0.0, 65024.0 / 65025.0 )",
+        "packed point depth cannot wrap to the nearest value at the far envelope",
+    )
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -7321,6 +7787,7 @@ def main() -> None:
     validate_vulkan_receiver_scan_contract()
     validate_live_cutout_and_point_culling_contract()
     validate_translucent_moment_contract()
+    validate_point_cache_parity_and_receiver_cost_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

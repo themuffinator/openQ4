@@ -463,7 +463,9 @@ idCVar r_shadowMapStaticCache( "r_shadowMapStaticCache", "1", CVAR_RENDERER | CV
 idCVar r_shadowMapStaticHysteresisFrames( "r_shadowMapStaticHysteresisFrames", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "frames to wait after dynamic casters disappear before static shadow-map reuse", 0, 120, idCmdSystem::ArgCompletion_Integer<0,120> );
 idCVar r_shadowMapResidentFrames( "r_shadowMapResidentFrames", "120", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "frames a resident static shadow map may remain unused before its cache slot can be expired", 1, 3600, idCmdSystem::ArgCompletion_Integer<1,3600> );
 idCVar r_shadowMapProjectedCacheSize( "r_shadowMapProjectedCacheSize", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "static projected-light shadow-map cache slots", 0, 16, idCmdSystem::ArgCompletion_Integer<0,16> );
-idCVar r_shadowMapPointCacheSize( "r_shadowMapPointCacheSize", "12", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "static point-light cubemap cache slots", 0, 16, idCmdSystem::ArgCompletion_Integer<0,16> );
+idCVar r_shadowMapPointCacheSize( "r_shadowMapPointCacheSize", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "static point-light cubemap cache slots; a dense Quake 4 view lights forty point lights at once, and one without a slot re-renders its cube every frame. r_shadowMapPointCacheMegs bounds the memory the slots may take", 0, 96, idCmdSystem::ArgCompletion_Integer<0,96> );
+idCVar r_shadowMapPointCacheMegs( "r_shadowMapPointCacheMegs", "512", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "video memory the static point-light cubemap cache may fill, in MiB: slots beyond it stay unused, except that the first twelve are always available", 64, 8192 );
+idCVar r_shadowMapPointCompose( "r_shadowMapPointCompose", "1", CVAR_RENDERER | CVAR_BOOL, "draw a point light's moving and cutout casters over a copy of its cached static cube instead of re-rendering all six faces every view; 0 restores the full re-render for comparison" );
 idCVar r_shadowMapCacheCSM( "r_shadowMapCacheCSM", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "allow static-cache reuse for view-fitted CSM/global shadow-map passes" );
 idCVar r_shadowMapTranslucentFilterRadius( "r_shadowMapTranslucentFilterRadius", "-1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "translucent shadow moment filter radius in texels, -1 = inherit opaque shadow radius", -1.0f, 8.0f );
 idCVar r_shadowMapTranslucentMinVariance( "r_shadowMapTranslucentMinVariance", "0.00001", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "minimum variance used when resolving translucent shadow moments", 0.000001f, 0.01f );
@@ -740,6 +742,7 @@ idCVar r_shadowMapPolygonFactor( "r_shadowMapPolygonFactor", "0.25", CVAR_RENDER
 idCVar r_shadowMapPolygonOffset( "r_shadowMapPolygonOffset", "0.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "constant depth bias used when rendering shadow-map casters", 0.0f, 64.0f );
 static idCVar r_shadowMapContactQualityMigrated( "r_shadowMapContactQualityMigrated", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for legacy broad shadow filtering defaults" );
 static idCVar r_shadowMapFilterDefaultsMigrated( "r_shadowMapFilterDefaultsMigrated", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the legacy fixed-PCF projected shadow filter defaults" );
+static idCVar r_shadowMapPointCacheDefaultsMigrated( "r_shadowMapPointCacheDefaultsMigrated", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the legacy twelve-slot point shadow cache" );
 static idCVar r_pbrMaterialsDefaultMigrated( "r_pbrMaterialsDefaultMigrated", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the PBR material default" );
 static idCVar r_temporalAADefaultMigrated( "r_temporalAADefaultMigrated", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the automatic temporal AA default" );
 extern idCVar r_temporalAA;
@@ -6101,6 +6104,27 @@ static void R_MigrateLegacyShadowMapContactQuality( void ) {
 
 /*
 ==================
+R_MigrateLegacyShadowMapPointCacheSize
+
+The point cache held twelve cubes, a third of the point lights one dense stock
+view shows; every light past the twelfth re-rendered six faces each frame. An
+archived profile keeps that twelve, so move exactly the old default once; any
+other count is a player's choice and is kept.
+==================
+*/
+static void R_MigrateLegacyShadowMapPointCacheSize( void ) {
+	if ( r_shadowMapPointCacheDefaultsMigrated.GetBool() ) {
+		return;
+	}
+	if ( r_shadowMapPointCacheSize.GetInteger() == 12 ) {
+		common->Printf( "Migrating the legacy point shadow cache: 64 slots within r_shadowMapPointCacheMegs\n" );
+		r_shadowMapPointCacheSize.SetInteger( 64 );
+	}
+	r_shadowMapPointCacheDefaultsMigrated.SetBool( true );
+}
+
+/*
+==================
 R_MigrateLegacyShadowMapFilterDefaults
 
 Projected shadow maps now default to PCSS-lite with a 2 texel minimum radius.
@@ -6111,6 +6135,8 @@ Runs after the contact-quality migration, which can itself leave the old pair.
 ==================
 */
 static void R_MigrateLegacyShadowMapFilterDefaults( void ) {
+	// the other shadow default that moved; it keeps its own one-time flag
+	R_MigrateLegacyShadowMapPointCacheSize();
 	if ( r_shadowMapFilterDefaultsMigrated.GetBool() ) {
 		return;
 	}

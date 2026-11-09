@@ -1557,6 +1557,8 @@ extern idCVar r_shadowMapStaticHysteresisFrames;	// frames after dynamic casters
 extern idCVar r_shadowMapResidentFrames;	// frames a resident static shadow map may remain unused
 extern idCVar r_shadowMapProjectedCacheSize;	// projected shadow-map static cache slots
 extern idCVar r_shadowMapPointCacheSize;	// point shadow-map static cache slots
+extern idCVar r_shadowMapPointCacheMegs;	// memory bound on those slots, MiB
+extern idCVar r_shadowMapPointCompose;	// 1 = compose live casters over a cached static cube
 extern idCVar r_shadowMapCacheCSM;		// 1 = allow CSM/static cache reuse
 extern idCVar r_shadowMapTranslucentFilterRadius;	// translucent moment filter radius, -1 = inherit opaque radius
 extern idCVar r_shadowMapTranslucentMinVariance;	// minimum variance for translucent moment resolve

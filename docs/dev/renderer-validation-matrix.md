@@ -1143,6 +1143,12 @@ show a stale or doubled caster; the cost is a full cube render per frame for
 point lights with moving casters (`RB_ShadowMapStaticCacheable`,
 `VK_ShadowMap_StaticCacheable`).
 
+Since 9 November 2026 a point light composes as well, on both backends: its
+cached cube holds static depth and each view draws the live casters over a copy
+(`r_shadowMapPointCompose`; see the
+[9 November audit](shadowmapping-audit-2026-11-09.md)). The old rule above
+still holds with that cvar off and, on Vulkan, under the shared stream.
+
 Cutout casters whose coverage cannot be reproduced (an active alpha-test stage
 with no bindable image, or generated texture coordinates): Vulkan already
 failed such a light to the sticky stencil fallback, while OpenGL drew the

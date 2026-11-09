@@ -3158,7 +3158,9 @@ void idDeclManagerLocal::MakeNameCanonical( const char *name, char *result, int 
 	int i, lastDot;
 
 	lastDot = -1;
-	for ( i = 0; i < maxLength && name[i] != '\0'; i++ ) {
+	// openQ4: leave room for the terminator; a name of maxLength or more
+	// characters with no dot wrote it one past the caller's buffer
+	for ( i = 0; i < maxLength - 1 && name[i] != '\0'; i++ ) {
 		int c = name[i];
 		if ( c == '\\' ) {
 			result[i] = '/';
@@ -3989,8 +3991,18 @@ void idDeclLocal::ParseLocal( bool noCaching ) {
 			common->Warning( "You should precache: %s", GetName() );
 
 			idFile *stubSource = fileSystem->OpenFileRead( sourceFile->fileName.c_str() );
-			if ( stubSource != NULL ) {
-				char *sourceText = (char *)_alloca( stubLength + 1 );
+			// openQ4: the offset and length are numbers out of the decl text. They
+			// went straight to _alloca and Read, so a stub naming a huge or negative
+			// length overflowed the stack or read into it. Hold them to the file
+			// and take the buffer from the heap.
+			if ( stubSource != NULL && ( stubOffset < 0 || stubLength <= 0 ||
+					stubLength > stubSource->Length() - stubOffset ) ) {
+				common->Warning( "Packed decl stub for %s is outside %s (%d bytes at %d).",
+					GetName(), sourceFile->fileName.c_str(), stubLength, stubOffset );
+				fileSystem->CloseFile( stubSource );
+			} else if ( stubSource != NULL ) {
+				idTempArray<char> sourceTextBuffer( stubLength + 1 );
+				char *sourceText = sourceTextBuffer.Ptr();
 				stubSource->Seek( stubOffset, FS_SEEK_SET );
 				const int readBytes = stubSource->Read( sourceText, stubLength );
 				fileSystem->CloseFile( stubSource );

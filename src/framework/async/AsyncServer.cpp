@@ -112,6 +112,26 @@ static void AsyncServer_ClearChallenges( challenge_t challenges[ MAX_CHALLENGES 
 	}
 }
 
+// openQ4: ceiling on the user info a client may hold on the server. Deltas add
+// keys without limit otherwise, every change is rebroadcast to everyone, and a
+// dictionary that no longer fits one message is a fatal overflow the next time
+// the server writes it out whole. The game declares 32 user info cvars.
+const int CLIENT_USERINFO_MAX_KEYS		= 128;
+const int CLIENT_USERINFO_MAX_BYTES		= 4096;
+
+static bool AsyncServer_UserInfoWithinLimits( const idDict &info ) {
+	const int numKeyVals = info.GetNumKeyVals();
+	if ( numKeyVals > CLIENT_USERINFO_MAX_KEYS ) {
+		return false;
+	}
+	int bytes = 0;
+	for ( int i = 0; i < numKeyVals; i++ ) {
+		const idKeyValue *keyValue = info.GetKeyVal( i );
+		bytes += keyValue->GetKey().Length() + keyValue->GetValue().Length() + 2;
+	}
+	return bytes <= CLIENT_USERINFO_MAX_BYTES;
+}
+
 // openQ4: below this much room in the message channel there is no point building
 // a snapshot - the channel would refuse it and the game would have already
 // consumed the client's unreliable message queue writing it.
@@ -1766,7 +1786,13 @@ void idAsyncServer::ProcessReliableClientMessages( int clientNum ) {
 
 	msg.Init( msgBuf, sizeof( msgBuf ) );
 
-	while ( client.channel.GetReliableMessage( msg ) ) {
+	// openQ4: stop once the client has been dropped. A disconnect, a failed pure
+	// check or the game kicking the sender left the rest of the packet's
+	// reliable messages running against the dead slot: a trailing pure message
+	// put the zombie back to SCS_CONNECTED, so the same packet's unreliable part began
+	// a client the game had just disconnected, and trailing user info was
+	// broadcast for it.
+	while ( client.clientState > SCS_ZOMBIE && client.channel.GetReliableMessage( msg ) ) {
 		id = msg.ReadByte();
 		if ( msg.IsReadOverflowed() ) {
 			DropClient( clientNum, "#str_07138" );
@@ -1777,6 +1803,11 @@ void idAsyncServer::ProcessReliableClientMessages( int clientNum ) {
 				idDict info;
 				msg.ReadDeltaDict( info, &sessLocal.mapSpawnData.userInfo[clientNum] );
 				if ( msg.IsReadOverflowed() ) {
+					DropClient( clientNum, "#str_07138" );
+					return;
+				}
+				if ( !AsyncServer_UserInfoWithinLimits( info ) ) {
+					common->Printf( "client %d sent oversized user info (%d keys)\n", clientNum, info.GetNumKeyVals() );
 					DropClient( clientNum, "#str_07138" );
 					return;
 				}

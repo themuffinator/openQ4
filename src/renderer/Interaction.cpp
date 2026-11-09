@@ -160,6 +160,14 @@ bool R_ShadowMapsNeedPerSurfaceStencilVolumes(
 		!r_useShadowMap.GetBool() ) {
 		return false;
 	}
+	// A noDynamicShadows light casts its dmap prelight and nothing else: no
+	// interaction of it has shadows (idInteraction::HasShadows), so it has no
+	// per-surface volumes and no map casters, and no backend maps it. Treating
+	// it as mappable dropped the prelight too and left the light shining
+	// through every wall (197 stock lights, most of them in multiplayer maps).
+	if ( lightDef->parms.noShadows || lightDef->parms.noDynamicShadows ) {
+		return false;
+	}
 	if ( lightDef->parms.pointLight && !lightDef->parms.parallel &&
 		!r_shadowMapPointLights.GetBool() ) {
 		return false;
@@ -628,7 +636,12 @@ static bool R_ShadowMapCasterIsDynamic( const idRenderEntityLocal *entityDef, co
 	// frame. A resting entity's pose cannot change without one of the two
 	// frame counters advancing, and either advance also changes the caster
 	// signature hash, so reuse stays correct when it wakes.
-	const int recentFrame = tr.frameCount - 1;
+	//
+	// "Changing" spans the frames of about a quarter second, not one frame: an
+	// entity the game updates once a tic is untouched on the frames between
+	// tics whenever the display outruns the tic rate, and a one-frame window
+	// then moved it into the static set and back every tic.
+	const int recentFrame = tr.frameCount - R_ShadowMapDynamicCasterFrames();
 	if ( entityDef->lastModifiedFrameNum >= recentFrame ) {
 		return true;
 	}
@@ -2190,6 +2203,19 @@ void idInteraction::AddActiveInteraction( void ) {
 		shadowMapCasterPolicyActive &&
 		shadowMapsEnabled &&
 		R_TranslucentShadowMapMomentsSupportedForLight( lightDef );
+	// dmap folds every static-world caster of a prelit light into one volume,
+	// and retail links that volume as a GLOBAL shadow: it darkens noSelfShadow
+	// receivers as well (R_AddOptimizedPrelightShadows). A mapped light draws
+	// those casters surface by surface instead, so they keep that ownership.
+	// Routed by material, a noSelfShadow pillar or cargo container stopped
+	// shadowing the marine behind it, and its light needed a second map.
+	const bool prelightOwnsShadows =
+		interactionHasShadows &&
+		shadowMapCasterPolicyActive &&
+		r_useOptimizedShadows.GetBool() &&
+		entityDef->parms.hModel != NULL &&
+		entityDef->parms.hModel->IsStaticWorldModel() &&
+		R_LightHasRealPrelightModel( lightDef->parms );
 
 	// for each surface of this entity / light interaction
 	for ( int i = 0; i < numSurfaces; i++ ) {
@@ -2366,8 +2392,10 @@ void idInteraction::AddActiveInteraction( void ) {
 
 		// Shadow ownership and shadow-admission policy stay tied to the original
 		// interaction material. Retail does not let global shader overrides change
-		// whether a surface casts or locally routes its shadows.
-		const bool materialNoSelfShadow = shadowShader->TestMaterialFlag( MF_NOSELFSHADOW );
+		// whether a surface casts or locally routes its shadows. The static world
+		// under a prelit light is the exception retail makes: global ownership.
+		const bool materialNoSelfShadow = !prelightOwnsShadows
+			&& shadowShader->TestMaterialFlag( MF_NOSELFSHADOW );
 		const int shadowReceiverMask = materialNoSelfShadow
 			? SHADOWMAP_RECEIVER_MASK_GLOBAL
 			: ( SHADOWMAP_RECEIVER_MASK_LOCAL | SHADOWMAP_RECEIVER_MASK_GLOBAL );

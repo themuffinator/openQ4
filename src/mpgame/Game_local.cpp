@@ -5790,6 +5790,11 @@ void idGameLocal::RegisterEntity( idEntity *ent ) {
 		spawn_entnum = firstFreeIndex++;
 	} else {
 		assert( spawn_entnum < MAX_CLIENTS || spawn_entnum >= minSpawnIndex );
+		// openQ4: the number comes from spawn args, which a map or a script can
+		// set, and it indexes entities[] and spawnIds[] below
+		if ( spawn_entnum < 0 || spawn_entnum >= ENTITYNUM_NONE ) {
+			Error( "idGameLocal::RegisterEntity: spawn_entnum %d out of range", spawn_entnum );
+		}
 	}
 
 	entities[ spawn_entnum ] = ent;
@@ -6769,6 +6774,11 @@ int idGameLocal::EntitiesWithinRadius( const idVec3 org, float radius, idEntity 
 	bo.ExpandSelf( radius );
 	for( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
 		if ( ent->GetPhysics()->GetAbsBounds().IntersectsBounds( bo ) ) {
+			// openQ4: maxCount was never looked at; callers pass arrays on the stack
+			if ( entCount >= maxCount ) {
+				Warning( "idGameLocal::EntitiesWithinRadius: max count" );
+				break;
+			}
 			entityList[entCount++] = ent;
 		}
 	}

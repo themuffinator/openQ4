@@ -89,6 +89,40 @@ bool R_ShadowMapCasterTransformNeedsTwoSided( const float modelMatrix[ 16 ] );
 bool R_ShadowMapLightOriginInsideCasterBounds( const viewLight_t *vLight,
 	const float modelMatrix[ 16 ], const float boundsMin[ 3 ],
 	const float boundsMax[ 3 ] );
+// Point lights are the dominant shadowing class in Quake 4: ten thousand
+// authored against five hundred projectors, forty in one dense stock view.
+// The static cube cache is therefore sized for a whole view and bounded by
+// memory, not by a fixed handful of slots: a light without a slot re-renders
+// six faces every view. Both backends keep this many slot records.
+static const int SHADOWMAP_POINT_CACHE_MAX_SLOTS = 96;
+// Slots that are always available, so a large cube size cannot starve the
+// cache below what earlier builds offered.
+static const int SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS = 12;
+// Usable point cache slots for a cube of faceSize texels whose six faces
+// cost bytesPerTexel each: r_shadowMapPointCacheSize, bounded by
+// r_shadowMapPointCacheMegs and by maxSlots.
+int R_ShadowMapPointCacheSlotLimit( int faceSize, int bytesPerTexel,
+	int maxSlots );
+// The pure form, for the self-test.
+int R_ShadowMapPointCacheSlotLimitFor( int requestedSlots, int budgetMegs,
+	int faceSize, int bytesPerTexel, int maxSlots );
+// A caster is live (drawn every view over the cached static depth) while its
+// entity changed within about a quarter of a second, counted in rendered
+// frames. One frame is not enough: the game updates an entity once a tic, so
+// at twice the tic rate and above a walking character read as static on the
+// frames between tics, joined the static signature and forced the cached map
+// to be re-rendered every tic.
+static const int SHADOWMAP_DYNAMIC_CASTER_WINDOW_MSEC = 250;
+static const int SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES = 2;
+static const int SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES = 500;
+// Called once per rendered frame with a millisecond clock.
+void R_ShadowMapBeginFrame( int nowMsec );
+int R_ShadowMapDynamicCasterFrames( void );
+// The pure form, for the self-test: the window in frames for a smoothed frame
+// interval in milliseconds.
+int R_ShadowMapDynamicCasterFramesFor( float frameMsec );
+// pins the cache-size and live-caster window policies
+bool R_ShadowMapCachePolicySelfTest( void );
 // Conservative cube-face rejection, shared by GL and Vulkan. Invalid bounds
 // or transforms remain visible. Face order is +X,-X,+Y,-Y,+Z,-Z.
 bool R_ShadowMapCasterOutsidePointFace( const viewLight_t *vLight,

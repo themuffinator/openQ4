@@ -497,6 +497,11 @@ bool idItem::GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis ) {
 				idPlayer* spec = (idPlayer*)gameLocal.entities[ gameLocal.GetLocalPlayer()->spectator ];
 				if( spec && spec->GetRenderView() ) {
 					axis = spec->GetRenderView()->viewaxis;
+				} else {
+					// openQ4: the followed player can be gone before the next
+					// snapshot retargets us; axis was left unset here and the
+					// caller used it anyway, for every simple item that frame
+					axis = gameLocal.GetLocalPlayer()->GetRenderView()->viewaxis;
 				}
 			} else {
 				axis = gameLocal.GetLocalPlayer()->GetRenderView()->viewaxis;	

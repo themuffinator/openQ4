@@ -62,7 +62,14 @@ ID_INLINE int GetSegmentParticleCap() {
 }
 
 ID_INLINE bool BSESpawnTraceEnabled() {
-	return cvarSystem && cvarSystem->GetCVarInteger("bse_frameCounters") >= 2;
+	// openQ4: asked for every particle spawned, so find the cvar once. It is
+	// registered by the renderer; the cvar system's own record of it, which is
+	// what Find returns, outlives a renderer reload.
+	static idCVar* frameCounters = NULL;
+	if (frameCounters == NULL && cvarSystem != NULL) {
+		frameCounters = cvarSystem->Find("bse_frameCounters");
+	}
+	return frameCounters != NULL && frameCounters->GetInteger() >= 2;
 }
 
 ID_INLINE void BSE_BoundTriSurf(srfTriangles_t* tri) {

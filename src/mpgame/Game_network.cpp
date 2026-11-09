@@ -3240,8 +3240,19 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 				victimScore = msg.ReadBits( ASYNC_PLAYER_FRAG_BITS );
 			}
 
-			idPlayer* attacker = (attackerEntityNumber != 255 ? static_cast<idPlayer*>(gameLocal.entities[ attackerEntityNumber ]) : NULL);
-			idPlayer* victim = (victimEntityNumber != 255 ? static_cast<idPlayer*>(gameLocal.entities[ victimEntityNumber ]) : NULL);
+			// openQ4: the server names a player or sends 255. Anything else off the
+			// wire used to be cast to idPlayer whatever it was, and its entity
+			// number then indexed the MAX_CLIENTS-long userInfo and playerState.
+			idPlayer* attacker = NULL;
+			idPlayer* victim = NULL;
+			if ( attackerEntityNumber < MAX_CLIENTS && gameLocal.entities[ attackerEntityNumber ] != NULL &&
+				 gameLocal.entities[ attackerEntityNumber ]->IsType( idPlayer::GetClassType() ) ) {
+				attacker = static_cast<idPlayer*>( gameLocal.entities[ attackerEntityNumber ] );
+			}
+			if ( victimEntityNumber < MAX_CLIENTS && gameLocal.entities[ victimEntityNumber ] != NULL &&
+				 gameLocal.entities[ victimEntityNumber ]->IsType( idPlayer::GetClassType() ) ) {
+				victim = static_cast<idPlayer*>( gameLocal.entities[ victimEntityNumber ] );
+			}
 			int methodOfDeath = msg.ReadByte( );
 			bool quadKill = msg.ReadBits( 1 ) != 0;
 			if ( IsServerDemoPlaying() ) {

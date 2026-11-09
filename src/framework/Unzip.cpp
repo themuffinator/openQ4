@@ -1970,7 +1970,15 @@ extern int unzReadCurrentFile  (unzFile file, void *buf, unsigned len)
 		if (pfile_in_zip_read_info->compression_method==0)
 		{
 			uInt uDoCopy,i ;
-			if (pfile_in_zip_read_info->stream.avail_out < 
+
+			// openQ4: a stored entry whose headers claim more uncompressed than
+			// compressed bytes runs out of input with output still wanted, and
+			// this loop then copied nothing forever. Later minizip returns here.
+			if ((pfile_in_zip_read_info->stream.avail_in == 0) &&
+				(pfile_in_zip_read_info->rest_read_compressed == 0))
+				return (iRead==0) ? UNZ_EOF : iRead;
+
+			if (pfile_in_zip_read_info->stream.avail_out <
                             pfile_in_zip_read_info->stream.avail_in)
 				uDoCopy = pfile_in_zip_read_info->stream.avail_out ;
 			else
@@ -2825,12 +2833,19 @@ int inflate_blocks(inflate_blocks_statef *s, z_streamp z, int r)
       s->sub.trees.bb = 7;
       t = inflate_trees_bits(s->sub.trees.blens, &s->sub.trees.bb,
                              &s->sub.trees.tb, s->hufts, z);
+      // openQ4: zlib 1.1.4's fix for the 1.1.3 double free (CVE-2002-0059).
+      // blens was freed here on every error but the mode only left BTREE/DTREE
+      // on a data error, so after a memory error inflate_blocks_reset freed it
+      // again - and a crafted block makes huft_build report one. Free it only
+      // together with the mode change, here and in DTREE below.
       if (t != Z_OK)
       {
-        ZFREE(z, s->sub.trees.blens);
         r = t;
         if (r == Z_DATA_ERROR)
+        {
+          ZFREE(z, s->sub.trees.blens);
           s->mode = BAD;
+        }
         LEAVE
       }
       s->sub.trees.index = 0;
@@ -2891,11 +2906,13 @@ int inflate_blocks(inflate_blocks_statef *s, z_streamp z, int r)
         t = inflate_trees_dynamic(257 + (t & 0x1f), 1 + ((t >> 5) & 0x1f),
                                   s->sub.trees.blens, &bl, &bd, &tl, &td,
                                   s->hufts, z);
-        ZFREE(z, s->sub.trees.blens);
         if (t != Z_OK)
         {
           if (t == (uInt)Z_DATA_ERROR)
+          {
+            ZFREE(z, s->sub.trees.blens);
             s->mode = BAD;
+          }
           r = t;
           LEAVE
         }
@@ -2907,6 +2924,7 @@ int inflate_blocks(inflate_blocks_statef *s, z_streamp z, int r)
         }
         s->sub.decode.codes = c;
       }
+      ZFREE(z, s->sub.trees.blens);
       s->mode = CODES;
     case CODES:
       UPDATE
@@ -3282,7 +3300,7 @@ static int huft_build(uInt *b, uInt n, uInt s, const uInt *d, const uInt *e, inf
 
         /* allocate new table */
         if (*hn + z > MANY)     /* (note: doesn't matter for fixed) */
-          return Z_MEM_ERROR;   /* not enough memory */
+          return Z_DATA_ERROR;  /* overflow of MANY (openQ4: as zlib 1.1.4) */
         u[h] = q = hp + *hn;
         *hn += z;
 

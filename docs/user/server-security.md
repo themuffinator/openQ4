@@ -177,6 +177,13 @@ snapshot tears down the affected session before another game or presentation
 frame. The legacy entity lifecycle is not a whole-snapshot rollback
 transaction.
 
+A server also limits what one client can make it store or relay. A client's
+player info is held to 128 entries and 4 KB in total, and a client that sends
+more is disconnected. Emotes are limited to two a second for each player.
+Messages that follow a client's disconnect in the same packet are ignored. A
+message that would no longer fit a packet once compressed is not sent, where it
+used to stop the server.
+
 This is targeted hardening of the audited legacy paths. It is not a claim that
 every parser is formally verified, and malformed-packet regression tests do not
 replace normal Internet-server isolation, operating-system updates, or careful

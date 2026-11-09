@@ -2313,7 +2313,7 @@ int idParser::Directive_evalfloat( void ) {
 	token.whiteSpaceEnd_p = NULL;
 	token.linesCrossed = 0;
 	token.flags = 0;
-	sprintf(buf, "%1.2f", idMath::Fabs(value));
+	idStr::snPrintf( buf, sizeof( buf ), "%1.2f", idMath::Fabs(value) );
 	token = buf;
 	token.type = TT_NUMBER;
 	token.subtype = TT_FLOAT|TT_LONG|TT_DECIMAL;
@@ -2446,7 +2446,11 @@ idParser::DollarDirective_evalfloat
 int idParser::DollarDirective_evalfloat( void ) {
 	double value;
 	idToken token;
-	char buf[128];
+	// openQ4: the evaluator multiplies in doubles and this one formats the
+	// double, so "%1.2f" can run past 300 digits ($evalfloat of
+	// 1e38*1e38*1e38*1e38 already needs 156) and overran the 128 bytes this
+	// used to be. #evalfloat narrows to float first and stays under 50.
+	char buf[512];
 
 	if ( !idParser::DollarEvaluate( NULL, &value, false ) ) {
 		return false;
@@ -2457,7 +2461,7 @@ int idParser::DollarDirective_evalfloat( void ) {
 	token.whiteSpaceEnd_p = NULL;
 	token.linesCrossed = 0;
 	token.flags = 0;
-	sprintf( buf, "%1.2f", fabs( value ) );
+	idStr::snPrintf( buf, sizeof( buf ), "%1.2f", fabs( value ) );
 	token = buf;
 	token.type = TT_NUMBER;
 	token.subtype = TT_FLOAT | TT_LONG | TT_DECIMAL | TT_VALUESVALID;

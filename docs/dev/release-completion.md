@@ -6,6 +6,124 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Shadow maps cost far less, and match the original shadows in more places, 9 November 2026
+
+- **Busy rooms run faster with shadow maps on.** In Quake 4 nineteen in twenty
+  shadow-casting lights are point lights, and a busy room shows forty at once;
+  the game kept the shadow maps of only twelve and redrew the rest every
+  frame. It now keeps a whole view's worth. In the densest room of the
+  campaign (Nexus Hub 2, Quality preset, OpenGL) the frame's graphics-card
+  time fell from 12.0 to 6.6 ms and its processor time from 11.8 to 5.2 ms.
+- **A character walking under a light no longer makes that light redraw its
+  whole shadow map**, on OpenGL and Vulkan: only the character is drawn over
+  the stored map. Grates and fences no longer keep a light from storing its
+  map either. On Vulkan this is a small gain, about a tenth of a millisecond
+  of graphics-card time in a busy fight.
+- **Lights that only cast the map's built-in shadows cast them again.** With
+  shadow maps on, these lights (common in the multiplayer maps) had no shadow
+  at all and shone through walls.
+- **Pillars and containers shadow characters again.** Some static scenery
+  stopped shadowing characters and other scenery of its kind under most lights
+  when shadow maps were on.
+- **Enhanced preset: gibs and burning corpses no longer cast hard shadows**
+  from the point lights that preset leaves on the original shadows, as in the
+  original game. On Quality and above they still cast.
+- **Enhanced preset: shadow edges are no longer nudged to one side** by the
+  five-sample filter.
+- **Upgrade note.** A profile that still holds the old 12-slot setting
+  (`r_shadowMapPointCacheSize`) moves to 64 once; any other value is kept. The
+  store is limited to 512 MiB of video memory (`r_shadowMapPointCacheMegs`).
+  No preset changed.
+- Evidence and what remains open: the
+  [9 November shadow audit](shadowmapping-audit-2026-11-09.md). The figures
+  are hidden-window probe timings on the reference laptop, not the fullscreen
+  preset budgets, which were not re-measured.
+
+## Accented chat no longer freezes the HUD, plus server hardening and less wasted work from a second audit round, 9 November 2026
+
+- **Accented letters no longer freeze the Remastered HUD.** Typing a letter
+  such as é in multiplayer chat, or playing under a name that has one, handed
+  the HUD a value it refused, and it then stopped taking updates on every
+  client that received the line: chat, the kill feed and the scoreboard names
+  stalled. Text from the game's one-byte fields is now converted before it
+  reaches the HUD or a menu, and the letters draw. Nothing needs to be changed.
+- **Servers stand up better to hostile clients.**
+  - An 8-byte packet that claimed a full-size message and carried none cost the
+    server about 2 GB of memory clearing.
+  - Data chosen to grow under the connection's compression could overflow a
+    packet buffer and stop the server.
+  - A client could add to its player info without limit until the server
+    stopped the next time someone joined. It is now held to 128 entries and
+    4 KB, and a client that sends more is dropped.
+  - Emote spam could overflow other players' message queues and get them
+    disconnected. Emotes are now checked and limited to two a second.
+  - Messages that followed a disconnect in the same packet were still acted on.
+  - Each reconnect, and each map change on a listen server, leaked 64 KB.
+- **Clients stand up better to hostile servers, demos and files.**
+  - Tourney bracket history, death messages and award messages from a server or
+    a demo could index outside their tables.
+  - A damaged demo could run the decoder off the end of its dictionary. This
+    also happened quietly at the end of ordinary recordings, where the decoder
+    read on into the information stored after the demo.
+  - A crafted `.pk4` could free memory twice (the zlib 1.1.3 defect that 1.1.4
+    fixed) or hang the loader with a stored file claiming more data than it has.
+  - In definition files, `$evalfloat` of a very large product overflowed a
+    128-byte buffer, a 1,024-character name wrote one byte past its buffer and a
+    packed stub's length was trusted.
+- **Crash and corruption fixes.**
+  - Single player: picking up a weapon modification for the weapon in your
+    hands while short of ammunition wrote a clip count outside the clip table.
+  - A key pressed in a text field in the same frame its text was cleared, as
+    Enter does to a chat line, could move memory by a negative length.
+  - A long line made only of colour codes overran the line buffer the stock
+    interface draws text from.
+  - Icon-style items were drawn with an unset orientation for a frame when the
+    player you were spectating left.
+  - `g_stopTime 1` made the session read a command out of uninitialised memory.
+  - A map or script naming an out-of-range `spawn_entnum`, an impact entity
+    that is not a projectile, a boss stomp that finds more than 1,024 entities
+    and a sound shader with a huge `shakeData` index no longer write out of
+    bounds.
+  - On Windows, a failure to unload a game module printed garbage instead of
+    the reason.
+- **Console.** Printing a line no longer copies the whole console history, which
+  is 1.5 MB once full and was copied up to three times per line. Pasting non-ASCII
+  text works on Linux and macOS, and typing over a selection in overstrike mode
+  no longer brings the deleted text back.
+- **Less work per frame.**
+  - Stock GUI scripts searched a list of every script block in every loaded GUI
+    before each statement they ran.
+  - Menus with number fields (the multiplayer Escape menu, Save and SYSTEM)
+    copied their whole state on every update to compare two values.
+  - Temporal anti-aliasing and motion blur rebuilt their moving-entity lists
+    from nothing every frame, on OpenGL and Vulkan.
+  - Each animated surface took a statistics lock four times a frame, now twice.
+  - Effects measured every particle surface twice per view, and looked
+    settings up by name for each particle spawned and each segment culled.
+  - Projectiles ask what liquid they are in twice a tick instead of three
+    times, the server browser no longer copies each server's record to filter
+    it, and Windows no longer looks a setting up by name for every packet sent.
+- **Quieter logs.** Single player printed debug lines for any door named
+  `func_door_63` or `func_door_64` and any trigger named `trigger_once_47`,
+  left over from an old investigation. They are gone.
+- **For developers.** A new native test, `openq4-compressor`, runs the
+  connection and demo compressors from the shipped source (round trips, a
+  source that runs dry, growth bounds, corrupt and trailing data), and
+  `network_security.py` pins the new bounds. Four imported multiplayer tests
+  now read the engine from their own checkout; from a worktree they read a
+  different checkout or skipped. `renderer_image_recovery_loader` compiles
+  again.
+- Validation: the native suite passes 338 of 338, with the new compressor test
+  and the three tests that failed before this round. Hidden, input-free probes
+  on OpenGL and Vulkan: single player `game/airdefense1` with a demo recorded
+  and replayed; a multiplayer listen server on `mp/q4dm1` with four bots and a
+  remote client that chats with accented text, takes an accented name and
+  emotes; and the loopback LAN reconnect smoke. The same multiplayer probe on
+  the build from before this round logs `Invalid application state` for
+  `oq4_chat0_text`, the kill feed and the scoreboard name on server and
+  client; this build logs none. The 205 Python contract tests that read the
+  changed files pass.
+
 ## The Awakening's chaingun turret gets heat, its own HUD and a fair machinegun, 9 November 2026
 
 - **The machinegun hits as it does in Quake 4 again.** In The Awakening the

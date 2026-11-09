@@ -489,7 +489,9 @@ bool idSoundShader::ParseShader( idLexer& src )
 			{
 				return false;
 			}
-			if( shakeIndex < 0 )
+			// openQ4: a shader lists at most SOUND_SHADER_MAX_SAMPLES sounds, and
+			// the list below was sized straight from this number in the decl
+			if( shakeIndex < 0 || shakeIndex >= SOUND_SHADER_MAX_SAMPLES )
 			{
 				src.Warning( "shakeData index out of range" );
 			}
@@ -916,7 +918,7 @@ idSoundShader::SetShakeData
 */
 void idSoundShader::SetShakeData( int index, const char* ampData )
 {
-	if( index < 0 )
+	if( index < 0 || index >= SOUND_SHADER_MAX_SAMPLES )
 	{
 		return;
 	}

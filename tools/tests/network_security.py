@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 
@@ -944,6 +945,106 @@ def validate_remote_dictionary_authority() -> None:
     reject(pure, "SendReliableMessage( clientNum, msg )", "client-controlled reliable echo")
 
 
+def validate_channel_and_message_abuse_bounds() -> None:
+    """What one peer can make the other spend, store or index (audit of 9 November 2026)."""
+    server = read("src/framework/async/AsyncServer.cpp")
+    channel = read("src/framework/async/MsgChannel.cpp")
+    compressor = (ROOT / "src/framework/Compressor.cpp").read_text(encoding="latin-1")
+    meson = read("meson.build")
+    native = read("tools/tests/native/CompressorTest.cpp")
+
+    # A dropped client's remaining reliable messages are not processed.
+    reliable_server = function_body(server, "void idAsyncServer::ProcessReliableClientMessages(", "server reliable dispatcher")
+    require(
+        reliable_server,
+        "while ( client.clientState > SCS_ZOMBIE && client.channel.GetReliableMessage( msg ) )",
+        "reliable dispatch stops at a dropped client",
+    )
+
+    # User info is bounded before it is stored and rebroadcast.
+    server_clientinfo = reliable_server[
+        reliable_server.index("case CLIENT_RELIABLE_MESSAGE_CLIENTINFO") :
+        reliable_server.index("case CLIENT_RELIABLE_MESSAGE_PRINT")
+    ]
+    require_before(
+        server_clientinfo,
+        "!AsyncServer_UserInfoWithinLimits( info )",
+        "SendUserInfoBroadcast",
+        "client userinfo size bound before broadcast",
+    )
+    limits = function_body(server, "static bool AsyncServer_UserInfoWithinLimits(", "userinfo limits")
+    require(limits, "numKeyVals > CLIENT_USERINFO_MAX_KEYS", "userinfo key bound")
+    require(limits, "bytes <= CLIENT_USERINFO_MAX_BYTES", "userinfo byte bound")
+    limit_bytes = int(re.search(r"const int CLIENT_USERINFO_MAX_BYTES\s*=\s*(\d+);", server).group(1))
+    assert 1024 <= limit_bytes <= 8192, "a whole userinfo must fit one reliable message with room to spare"
+
+    # The zero-run coder can grow a message, so it packs into its own buffer and
+    # an oversized result fails the send instead of the process.
+    write = function_body(channel, "bool idMsgChannel::WriteMessageData(", "channel message packing")
+    require(write, "byte packedBuf[MAX_MESSAGE_SIZE * 2 + 64];", "packing buffer covers worst-case growth")
+    require(write, "idFile_BitMsg file( packed );", "compressor writes the private buffer")
+    reject(write, "idFile_BitMsg file( out );", "compressor writing the caller's packet")
+    require_before(write, "> out.GetMaxSize() - out.GetSize()", "out.WriteData( packed.GetData(), packed.GetSize() )", "fit check before copy")
+    send = function_body(channel, "int idMsgChannel::SendMessage(", "channel send")
+    require_before(send, "if ( !WriteMessageData( unsentMsg, msg ) )", "unsentFragments = true;", "failed packing leaves no fragments pending")
+
+    # Reopening a channel keeps its compressor.
+    init = function_body(channel, "void idMsgChannel::Init(", "channel init")
+    require(init, "if ( this->compressor == NULL )", "channel init reuses its compressor")
+    require(function_body(channel, "idMsgChannel::idMsgChannel()", "channel constructor"), "compressor = NULL;", "channel constructor")
+
+    # A source that has run dry is not asked for a whole buffer per byte, and the
+    # LZW decoder refuses codes its dictionary cannot hold.
+    read_bits = function_body(compressor, "int idCompressor_BitStream::ReadBits(", "bit-stream refill")
+    require(read_bits, "file->Read( buffer, readDry ? 1 : (int)sizeof( buffer ) )", "dry refill size")
+    require(read_bits, "readDry = ( readLength <= 0 );", "dry refill state")
+    block = function_body(compressor, "void idCompressor_LZW::DecompressBlock(", "LZW block decode")
+    require_before(
+        block,
+        "code > nextCode || ( oldCode == -1 && code >= LZW_FIRST_CODE )",
+        "WriteChain(",
+        "LZW code validation before the chain walk",
+    )
+    require(meson, "test('openq4-compressor', openq4_compressor_test, timeout: 30)", "native compressor test registration")
+    for token in ("TestZeroRunDrySource", "TestLZWCorrupt", "zero-run output stays within twice its input"):
+        require(native, token, "native compressor coverage")
+
+    # Client-side handlers bound what a server or a demo indexes with.
+    for tree in ("src/game", "src/mpgame"):
+        network = (ROOT / tree / "Game_network.cpp").read_text(encoding="latin-1")
+        death = network[network.index("case GAME_RELIABLE_MESSAGE_DEATH") :]
+        death = death[: death.index("mpGame.ReceiveDeathMessage(")]
+        reject(death, "static_cast<idPlayer*>(gameLocal.entities[ attackerEntityNumber ])", f"{tree} unchecked death attacker cast")
+        require(death, "attackerEntityNumber < MAX_CLIENTS", f"{tree} death attacker bound")
+        require(death, "victimEntityNumber < MAX_CLIENTS", f"{tree} death victim bound")
+        assert death.count("->IsType( idPlayer::GetClassType() )") == 2, f"{tree} death message type checks"
+
+        stats = (ROOT / tree / "mp/stats/StatManager.cpp").read_text(encoding="latin-1")
+        award = function_body(stats, "void rvStatManager::ReceiveInGameAward(", f"{tree} in-game award")
+        require_before(
+            award,
+            "award >= IGA_NUM_AWARDS || client < 0 || client >= MAX_CLIENTS",
+            "localInGameAwards[ award ]",
+            f"{tree} award bounds before use",
+        )
+
+        state = (ROOT / tree / "mp/GameState.cpp").read_text(encoding="latin-1")
+        history = state[state.rindex("case MSG_TOURNEY_HISTORY") :]
+        history = history[: history.index("case MSG_TOURNEY_TOURNEYCOUNT")]
+        require_before(history, "maxr > MAX_ROUNDS", "tourneyHistory[ i ][ j ]", f"{tree} tourney history rounds bound")
+        reject(history, "> MAX_ARENAS", f"{tree} tourney history bounded by the arena count")
+
+    # Emotes are validated, throttled and rebuilt before they are forwarded.
+    player = (ROOT / "src/mpgame/Player.cpp").read_text(encoding="latin-1")
+    receive = function_body(player, "bool idPlayer::ServerReceiveEvent(", "player server events")
+    emote = receive[receive.index("case EVENT_EMOTE") :]
+    emote = emote[: emote.index("default:")]
+    require_before(emote, "newEmote > PE_TAUNT", "ServerSendInstanceEvent(", "emote validation before forwarding")
+    require_before(emote, "RELIABLE_FLOOD_EMOTE", "ServerSendInstanceEvent(", "emote throttle before forwarding")
+    require(emote, "ServerSendInstanceEvent( EVENT_EMOTE, &forwardMsg, false, entityNumber )", "emote forwards a rebuilt message")
+    reject(emote, "ServerSendInstanceEvent( EVENT_EMOTE, &msg,", "emote forwarding the sender's bytes")
+
+
 def validate_documentation_and_registration() -> None:
     guide = read("docs/user/server-security.md")
     setup = read("docs/user/server-setup.md")
@@ -1013,6 +1114,7 @@ def main() -> None:
     validate_private_cvar_handling()
     validate_remote_dictionary_authority()
     validate_network_rate_budget()
+    validate_channel_and_message_abuse_bounds()
     validate_documentation_and_registration()
     print("network_security: ok")
 

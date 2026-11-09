@@ -434,7 +434,10 @@ int main() {
     return 0;
 }
 '''
-    engine_root = Path(os.environ.get("OPENQ4_ENGINE_REPO", ROOT.parent / "openQ4"))
+    # This checkout is the engine since the game sources moved into it; a
+    # sibling named openQ4 is only where a companion checkout used to find it.
+    engine_root = Path(os.environ.get("OPENQ4_ENGINE_REPO",
+        ROOT if (ROOT / "src/framework").is_dir() else ROOT.parent / "openQ4"))
     strings_root = engine_root / "content/baseoq4/pak0/strings"
     languages = ("english", "french", "italian", "spanish", "polish", "russian")
     keys = ("#str_42873", "#str_42870", "#str_42871", "#str_201012",
