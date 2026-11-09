@@ -1336,6 +1336,45 @@ void idImageManager::ReloadImages( bool all, bool fileBackedOnly ) {
 
 /*
 ===============
+ReloadGeneratedCacheImages
+
+A generated image cache entry is checked against its source only by a stamp
+anyone can copy, so nothing it put on the GPU before a pure lock may stay there
+afterwards. Called with the lock already in place: the directory gate then
+refuses every generated/images read, and the forced reload derives each image
+from the pure paks (and rewrites its cache entry).
+===============
+*/
+bool idImageManager::ReloadGeneratedCacheImages() {
+	if ( !R_ImagePolicyOperationAllowed() ) {
+		return false;
+	}
+	R_RenderThread_Sync( "image registry" );
+	// the memoized source probes predate the lock
+	R_SetDDSProbeCacheActive( false );
+
+	int reloaded = 0;
+	int failed = 0;
+	for ( int i = 0; i < images.Num(); i++ ) {
+		idImage *image = images[ i ];
+		if ( image == NULL || !image->HoldsGeneratedCacheContent() ) {
+			continue;
+		}
+		image->Reload( true );
+		if ( image->HoldsGeneratedCacheContent() ) {
+			common->Warning( "Could not reload cached image %s from its source", image->GetName() );
+			failed++;
+		} else {
+			reloaded++;
+		}
+	}
+	common->Printf( "Reloaded %d cached image%s from pure content%s\n", reloaded, reloaded == 1 ? "" : "s",
+		failed ? va( "; %d could not be reloaded", failed ) : "" );
+	return failed == 0;
+}
+
+/*
+===============
 R_CombineCubeImages_f
 
 Used to combine animations of six separate tga files into

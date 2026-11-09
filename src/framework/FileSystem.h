@@ -306,6 +306,7 @@ public:
 							// the function tries to configure pure mode from the paks already referenced and this new list
 							// it returns wether the switch was successfull, and sets the missing checksums
 							// the process is verbosive when fs_debug 1
+							// after PURE_OK, the caller must honour TakePureImageCacheEviction
 	virtual fsPureReply_t	SetPureServerChecksums( const int pureChecksums[ MAX_PURE_PAKS ], int gamePakChecksum, int missingChecksums[ MAX_PURE_PAKS ], int *missingGamePakChecksum ) = 0;
 							// fills a 0-terminated list of pak checksums for a client
 							// if OS is -1, give the current game pak checksum. if >= 0, lookup the game pak table (server only)
@@ -450,6 +451,14 @@ public:
 	// costs a cvar check instead of a serialization that is thrown away.
 	virtual bool			GeneratedCacheReadsEnabled( generatedCacheKind_t kind ) const = 0;
 	virtual bool			GeneratedCacheWritesEnabled( generatedCacheKind_t kind ) const = 0;
+	// Appended for RENDER_API_VERSION 33. Reading a generated/images cache
+	// entry from a directory does not make a pure lock restart the engine; a
+	// SetPureServerChecksums that returns PURE_OK with the lock taken over such
+	// reads leaves this pending instead. It returns true once, and the caller
+	// must then call renderSystem->ReloadGeneratedCacheImages() or, if that
+	// fails, restart as for PURE_RESTART. The cache itself stays unreadable
+	// while pure.
+	virtual bool			TakePureImageCacheEviction( void ) = 0;
 };
 
 extern idFileSystem *		fileSystem;

@@ -4171,6 +4171,16 @@ Completion substeps:
   run from an elevated prompt. The default run passes again on the current
   stage. The retail 2.85 server is refused for its protocol and never joined,
   and the openQ4 server answers a 1.4.2 challenge with `server uses protocol 2.41`.
+  Decision, 9 November: openQ4's generated caches are never trusted on a pure
+  server, because a cache entry's source stamp is public pak metadata and its
+  pixels are bound to nothing. Reading the image cache before connecting no
+  longer restarts the engine, though; the client reloads those images once the
+  lock is in place (render API 33). A first pure join on `mp/q4dm1` now reaches
+  gameplay in 7–10 s instead of 50–58 s
+  ([decision and evidence](mp-network-qualification.md#generated-image-cache-on-pure-servers-9-november-2026)).
+  The level-load caches of the experimental `com_levelLoadModernization 1`
+  are still read outside pure mode's gate and must be refused before that mode
+  is promoted.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,

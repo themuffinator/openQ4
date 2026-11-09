@@ -1562,6 +1562,7 @@ public:
 								const char *settingsKey );
 	virtual bool			GeneratedCacheReadsEnabled( generatedCacheKind_t kind ) const;
 	virtual bool			GeneratedCacheWritesEnabled( generatedCacheKind_t kind ) const;
+	virtual bool			TakePureImageCacheEviction( void );
 	virtual idFile *		GetNewFileMemory( void );
 	virtual idFile *		GetNewFilePermanent( void );
 	virtual idFile *		OpenFileReadFlags( const char *relativePath, int searchFlags, pack_t **foundInPak = NULL, bool allowCopyFiles = true, const char* gamedir = NULL );
@@ -1639,6 +1640,8 @@ private:
 
 	idList<pack_t *>		serverPaks;
 	bool					loadedFileFromDir;		// set to true once a file was loaded from a directory - can't switch to pure anymore
+	bool					loadedImageCacheFromDir;	// a generated image cache entry was read: a pure lock must reload those images
+	bool					pureImageCacheEvictionPending;	// the pure lock was taken over such reads; TakePureImageCacheEviction hands it on
 	idList<int>				restartChecksums;		// used during a restart to set things in right order
 	idList<int>				addonChecksums;			// list of checksums that should go to the search list directly ( for restarts )
 	int						restartGamePakChecksum;
@@ -1779,6 +1782,8 @@ idFileSystemLocal::idFileSystemLocal( void ) {
 	dir_cache_count = 0;
 	d3xp = 0;
 	loadedFileFromDir = false;
+	loadedImageCacheFromDir = false;
+	pureImageCacheEvictionPending = false;
 	restartGamePakChecksum = 0;
 	gameDLLChecksum = 0;
 	gamePakChecksum = 0;
@@ -6890,6 +6895,7 @@ idFileSystemLocal::ClearPureChecksums
 void idFileSystemLocal::ClearPureChecksums( void ) {
 	common->DPrintf( "Cleared pure server lock\n" );
 	serverPaks.Clear();
+	pureImageCacheEvictionPending = false;
 	memset( gamePakForOS, 0, sizeof( gamePakForOS ) );
 }
 
@@ -7017,7 +7023,31 @@ fsPureReply_t idFileSystemLocal::SetPureServerChecksums( const int pureChecksums
 			common->Printf( "SetPureServerChecksums: there are files loaded from dir\n" );
 		}
 	}
+	// Generated image cache entries alone do not need a restart: the lock now
+	// refuses the cache, and the caller reloads the images it supplied (see
+	// FS_IsGeneratedImageCachePath and TakePureImageCacheEviction).
+	if ( success && loadedImageCacheFromDir && serverPaks.Num() ) {
+		pureImageCacheEvictionPending = true;
+		if ( fs_debug.GetBool() ) {
+			common->Printf( "SetPureServerChecksums: generated image cache entries were loaded; their images must be reloaded\n" );
+		}
+	}
 	return ( success ? PURE_OK : PURE_RESTART );
+}
+
+/*
+=====================
+idFileSystemLocal::TakePureImageCacheEviction
+=====================
+*/
+bool idFileSystemLocal::TakePureImageCacheEviction( void ) {
+	if ( !pureImageCacheEvictionPending ) {
+		return false;
+	}
+	pureImageCacheEvictionPending = false;
+	// No cache entry can be read again until the lock is cleared.
+	loadedImageCacheFromDir = false;
+	return true;
 }
 
 /*
@@ -7258,6 +7288,8 @@ void idFileSystemLocal::Shutdown( bool reloading ) {
 		addonChecksums.Clear();
 	}
 	loadedFileFromDir = false;
+	loadedImageCacheFromDir = false;
+	pureImageCacheEvictionPending = false;
 	gameDLLChecksum = 0;
 	gamePakChecksum = 0;
 	gameModuleOrigin = GAME_MODULE_ORIGIN_NONE;
@@ -7362,6 +7394,35 @@ bool idFileSystemLocal::FileAllowedFromDir( const char *path ) {
 	}
 
 	return false;
+}
+
+/*
+===========
+FS_IsGeneratedImageCachePath
+
+A binary image cache entry that idBinaryImage writes under generated/images/.
+It is derived data, and its payload is bound to nothing a client could check
+short of deriving it again: the header's source stamp is the pak member's
+CRC-32 and length, which anyone can copy. So such an entry is never read while
+pure (the directory gate in OpenFileReadSearch still refuses it), and one read
+before the pure lock does not force a restart: SetPureServerChecksums leaves a
+pending eviction instead, and the client reloads every image that came from the
+cache once the lock is in place (idRenderSystem::ReloadGeneratedCacheImages),
+or restarts if that fails. Any other directory read still requires a restart.
+===========
+*/
+static bool FS_IsGeneratedImageCachePath( const char *path ) {
+	static const char prefix[] = "generated/images/";
+	static const char extension[] = ".bimage";
+	const size_t prefixLength = sizeof( prefix ) - 1;
+	const size_t extensionLength = sizeof( extension ) - 1;
+	if ( path == NULL ) {
+		return false;
+	}
+	const size_t length = strlen( path );
+	return length > prefixLength + extensionLength &&
+		idStr::Icmpn( path, prefix, static_cast<int>( prefixLength ) ) == 0 &&
+		idStr::Icmp( path + length - extensionLength, extension ) == 0;
 }
 
 /*
@@ -7607,7 +7668,17 @@ idFile *idFileSystemLocal::OpenFileReadSearch( const char *relativePath, int sea
 				common->Printf( "idFileSystem::OpenFileRead: %s (found in '%s/%s')\n", relativePath, dir->path.c_str(), dir->gamedir.c_str() );
 			}
 
-			if ( !loadedFileFromDir && !FileAllowedFromDir( relativePath ) ) {
+			if ( FS_IsGeneratedImageCachePath( relativePath ) ) {
+				// Regenerable image cache: a pure lock reloads these images
+				// instead of the engine. See FS_IsGeneratedImageCachePath.
+				if ( !loadedImageCacheFromDir ) {
+					if ( restartChecksums.Num() ) {
+						common->FatalError( "'%s' loaded from directory: Failed to restart with pure mode restrictions for server connect", relativePath );
+					}
+					common->DPrintf( "filesystem: switching to pure mode will reload cached images. '%s' loaded from the generated image cache.\n", relativePath );
+					loadedImageCacheFromDir = true;
+				}
+			} else if ( !loadedFileFromDir && !FileAllowedFromDir( relativePath ) ) {
 				if ( restartChecksums.Num() ) {
 					common->FatalError( "'%s' loaded from directory: Failed to restart with pure mode restrictions for server connect", relativePath );
 				}

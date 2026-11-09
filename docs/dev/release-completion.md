@@ -6,6 +6,26 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Joining a pure server no longer restarts the game, 9 November 2026
+
+- **Much faster first join to a pure server.** Joining a server with pure
+  checking on (`si_pure 1`) used to restart the whole game the first time in
+  each session, even on a stock install. The client had read images from its
+  own image cache, and pure mode treated that as possibly modified content.
+  Now only those few dozen cached images are rebuilt from the original game
+  files. On the test machine, a client reached the match about 7–10 seconds
+  after connecting instead of 50–58. Nothing needs to be changed.
+- **Pure checking is as strict as before.** On a pure server the client never
+  reads its image cache, because an edited cache entry cannot be told apart
+  from a genuine one without rebuilding it. A loose file read from a game
+  folder before connecting, such as an extracted texture or map, still
+  restarts the game into pure mode.
+- Validation: a pure dedicated `mp/q4dm1` server and a connecting client on
+  OpenGL and Vulkan, with empty and warm caches and with tampered cache files.
+  The engine never reloaded, no cache entry was read after the lock, and the
+  rebuilt images matched the untampered originals byte for byte. Details are in
+  the [pure-server cache decision](mp-network-qualification.md#generated-image-cache-on-pure-servers-9-november-2026).
+
 ## The classic interface's HUD gets the Remastered layout, 9 November 2026
 
 - **The modern HUD's layout without the modern UI.** With `ui_retained 0`, the

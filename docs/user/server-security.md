@@ -138,6 +138,17 @@ openQ4 builds. Retail multiplayer servers expect the checksum of a `q4mp` game
 pak instead. The token is not a cryptographic measurement of the loaded module
 and does not turn pure mode into an anti-cheat system.
 
+On a pure server a client never uses its own generated image cache
+(`generated/images` in the save or cache folder). A cache entry names the game
+file it came from, but an edited copy looks the same, and the only way to tell
+them apart is to rebuild the image. So when a client connects, any image it
+loaded from that cache is rebuilt from the original game files, and images
+needed during the match are rebuilt instead of read. Before 9 November this
+restarted the whole engine on the first pure connect of each session; now only
+those images are rebuilt. A loose file read from a game folder before
+connecting, such as an extracted texture or map, still makes the client restart
+into pure mode.
+
 ## Malformed network traffic
 
 The shared bit-message reader records attempts to read beyond the received

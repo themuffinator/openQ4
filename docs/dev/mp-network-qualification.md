@@ -376,6 +376,11 @@ openQ4 builds, not a cryptographic measurement of the loaded module or an
 anti-cheat system ([server security](../user/server-security.md#pure-multiplayer-and-local-game-modules)).
 Standard builds still download no assets or code.
 
+The slow reload after the pure restart noted above was the engine restart
+that every first pure connect paid because of the generated image cache. Since
+9 November that cache's images are reloaded instead
+([decision](#generated-image-cache-on-pure-servers-9-november-2026)).
+
 ### Retail 2.85 refusal
 
 `tools/tests/mp_retail_protocol_smoke.py` runs the installed retail
@@ -412,6 +417,112 @@ client itself is not run, because it opens a visible game window.
 - `network_security.py` pins both paths. Its mutation controls reject
   dropping the retail answer, the missing protocol print, a missing protocol
   check, following a game directory first, and a challenge without the query.
+
+## Generated image cache on pure servers, 9 November 2026
+
+**Decision: openQ4's generated caches are never trusted on a pure server, but
+reading the image cache before connecting no longer restarts the engine.** The
+client reloads only the images that came from that cache, once the pure lock is
+in place. Any other file read from a directory before the lock still forces the
+full restart, as in the original engine.
+
+### Why the cache cannot be trusted
+
+A `generated/images/**/*.bimage` entry records the source it was derived from
+in its header. For a pak member that record is the member's CRC-32 and length,
+folded into a content stamp (`FS_PakMemberContentStamp`). It keeps a changed
+pak from reusing stale pixels, but it does not prove that the pixels came from
+that source:
+
+- Both values sit in the pak's central directory, readable by anyone. CRC-32 is
+  not a cryptographic hash.
+- Nothing ties the payload to the header. An entry that keeps its real header
+  and has edited pixels passes every load check: transparent walls, bright
+  player skins, or no smoke. The payload run below shows the menu accepting
+  28 such entries as cache hits.
+- A digest or key stored next to the cache adds nothing, because the person
+  editing the file can recompute it. The only check that works is deriving the
+  image again, which is what a cache miss already does.
+
+With `image_usePrecompressedTextures 0` (a player setting), every world texture
+goes through this cache. Trusting it would undo pure mode for the content
+cheats it exists to stop. So the cache stays unreadable while pure: the
+directory gate in `OpenFileReadSearch` refuses it, and `FileAllowedFromDir`
+never admits a `.bimage`. Images needed after the lock are rebuilt from the
+pure paks, about 110 writes on `mp/q4dm1`. That cost is inherent.
+
+### Why the restart went
+
+Pure mode restarts because content read from a directory before the lock could
+still be in use afterwards. On a stock install, the only such reads before a
+connect were image cache entries, in every session. That included the first
+session on a fresh save path, because images written at the title screen are
+read back later in the same session. So practically every client paid a full
+`ReloadEngine` on its first pure connect. The reload alone took 29–35 s here,
+and the cold reload made the map load that followed slower too.
+
+Replacing those images is enough, and it does not weaken the lock (render
+API 33):
+
+- A cache read from a directory sets `loadedImageCacheFromDir`, not
+  `loadedFileFromDir`. When `SetPureServerChecksums` takes the lock over such
+  reads, it leaves an eviction pending
+  (`idFileSystem::TakePureImageCacheEviction`).
+- The client then calls `idRenderSystem::ReloadGeneratedCacheImages`. Each
+  image records whether its resident pixels came from the cache (set in
+  `idImage::ActuallyLoadImage`), and every such image is force-reloaded.
+  Because the lock already refuses the cache, each one is derived from the pure
+  paks, and its cache entry is rewritten.
+- If any image still holds cache pixels afterwards, the client restarts as
+  before.
+- Unchanged: loose source files, other generated trees (sound, animation),
+  referenced paks outside the server's list, and missing paks keep their
+  existing outcome. `pure_image_cache_eviction_contract.py` compiles the path
+  classifier and pins each link, with mutation controls.
+
+### Evidence
+
+A `builddir` dedicated server (`si_pure 1`, `net_LANServer 1`, `mp/q4dm1`) and
+a `builddir` client, each with its own save path under
+`.tmp/pure-cache-restart/`. The client ran in a hidden 640x360 window with
+`ui_autoJoin 1`, on OpenGL unless noted, and did two sessions on one save path:
+the first with an empty cache, the second with a warm one. The base path held hard links to the
+retail PK4s only. Times run from `connect` until the client is an active
+player.
+
+| Build and case | Session | Before the lock | Engine reloads | Connect to gameplay |
+| --- | --- | --- | --- | --- |
+| Before | cold | restart triggered by `bigchars` cache entry | 1 (34.8 s) | 57.7 s |
+| Before | warm | restart triggered by `makeintensity_..._squarelight1a` | 1 (28.9 s) | 51.6 s |
+| After | cold | 10 cached images reloaded | 0 | 7.9 s |
+| After | warm | 36 cached images reloaded | 0 | 7.1 s |
+| After, 111 payloads tampered | warm | 28 forged entries accepted at the menu, 26 images reloaded at the lock | 0 | 9.8 s |
+| After, 111 headers tampered | warm | 26 entries rejected (stamp mismatch), 5 reloaded | 0 | 7.1 s |
+| After, Vulkan client | warm | 26 cached images reloaded | 0 | 9.7 s |
+
+- Engine screenshots in gameplay on OpenGL and Vulkan show the world, HUD,
+  crosshair and lights intact after the reload.
+- In all ten sessions (five runs), no cache entry was read after the eviction. A few cache
+  hits fall between `connect` and the pure reply: the connect screen loads the
+  addon splash images. The eviction replaces them.
+- In both tamper runs, the pure session rewrote 108 of the 111 entries
+  byte-identical to their originals. The other three belong to a size variant
+  that the second session never loaded.
+- Every client became an active player, and every process exited cleanly.
+- Pure-session warnings: none.
+- On this machine the Steam install's `q4base` also holds loose `maps/` files,
+  left by earlier map-compiler work. They force the restart as before; a stock
+  install has none.
+
+### Outside this decision
+
+- With the experimental `com_levelLoadModernization 1` (off by default), the
+  level-load model, world, collision and animation caches are read outside the
+  VFS ([contract](loading-cache-modernization.md#compatibility-boundary)). Pure
+  mode neither refuses them nor restarts over them, which contradicts the rule
+  above. They should be refused while pure before that mode is promoted.
+- The Vulkan pipeline cache is opened by explicit OS path and validated by the
+  driver. It never reaches the VFS, before or after this change.
 
 ## Still open
 

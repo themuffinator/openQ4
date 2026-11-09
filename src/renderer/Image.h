@@ -219,6 +219,10 @@ public:
 	bool		IsDefaulted() const { return defaulted; }
 	bool		IsScratchImage() const { return scratchImage; }
 	bool IsFileBacked() const { return generatorFunction == NULL && !opts.isPersistant && !scratchImage; }
+	// The resident pixels came from a generated/images cache entry rather than
+	// from the image's source. A pure lock reloads such images (see
+	// idImageManager::ReloadGeneratedCacheImages).
+	bool		HoldsGeneratedCacheContent() const { return generatedCacheContent && IsLoaded(); }
 
 	void		SetReferencedOutsideLevelLoad() { referencedOutsideLevelLoad = true; }
 	void		SetReferencedInsideLevelLoad() { levelLoadReferenced = true; }
@@ -343,6 +347,7 @@ private:
 	imageConsumedPolicy_t consumedPolicy{};
 	uint64_t consumedLoadRevision = 0;
 	const uint64_t		imagePolicyIdentity;
+	bool				generatedCacheContent = false;	// set by the last ActuallyLoadImage that uploaded content
 
 
 };
@@ -453,6 +458,13 @@ public:
 
 	// reloads all apropriate images after a vid_restart
 	void				ReloadImages(bool all, bool fileBackedOnly = false);
+
+	// Reloads, from their sources, every image whose resident pixels came from
+	// the generated image cache. The client calls it once a pure lock is in
+	// place, when the filesystem's directory gate already refuses the cache,
+	// so the reload derives each image from the pure paks. False when any such
+	// image still holds cache pixels; the caller must then restart the engine.
+	bool				ReloadGeneratedCacheImages();
 	void ClearCheckedImagePolicyChanges(); // Only after an exact checked restart.
 
 	// reloads every image when a texture reduction cvar changed this frame

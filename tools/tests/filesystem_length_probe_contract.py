@@ -217,6 +217,7 @@ public:
 	ListStub<int> restartChecksums;
 	idStr gameFolder = "baseoq4";
 	bool loadedFileFromDir = false;
+	bool loadedImageCacheFromDir = false;
 	int loadCount = 0, loadStack = 0;
 	std::vector<std::string> looseFiles;		// relative names a directory search path can open
 	std::vector<std::string> assetLog;
@@ -483,7 +484,10 @@ def main() -> None:
     file_source = (ROOT / "src/framework/File.cpp").read_text(encoding="utf-8")
     zip_stamp = function_body(file_source, "ID_TIME_T idFile_InZip::ContentStamp(")
     types = "\n".join(type_definition(source, name) for name in ("fileInPack", "packMemberProbe"))
-    helpers = function_body(source, "static void FS_AppendLooseDirectoryKey(")
+    helpers = "\n".join(function_body(source, signature) for signature in (
+        "static void FS_AppendLooseDirectoryKey(",
+        "static bool FS_IsGeneratedImageCachePath(",
+    ))
     bodies = "\n".join(function_body(source, signature) for signature in (
         "int idFileSystemLocal::ReadFile(",
         "int idFileSystemLocal::ReadFileContentStamp(",

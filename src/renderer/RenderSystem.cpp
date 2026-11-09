@@ -2365,6 +2365,14 @@ void idRenderSystemLocal::CancelSavePreview() {
 	RB_ReleaseSavePreview();
 }
 
+bool idRenderSystemLocal::ReloadGeneratedCacheImages() {
+	// with no device no texture is resident, so nothing holds cache pixels
+	if ( !IsOpenGLRunning() || globalImages == NULL ) {
+		return true;
+	}
+	return globalImages->ReloadGeneratedCacheImages();
+}
+
 void idRenderSystemLocal::CaptureRenderToFile( const char *fileName, bool fixAlpha,
 	int outputWidth, int outputHeight ) {
 	if ( !glConfig.isInitialized ) {
