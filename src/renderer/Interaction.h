@@ -128,6 +128,10 @@ public:
 	mutable int				stencilReceiverGeneration;
 	mutable bool			stencilReceiverNeeded;
 	const idRenderModel *	buildModel;
+	// The view in which AddActiveInteraction returned with this interaction still
+	// unbuilt. It links no receivers in that view, so the receiver scan need not
+	// wait for it; -1 once its surfaces are freed.
+	int						unbuiltVisitView;
 
 public:
 							idInteraction( void );

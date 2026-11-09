@@ -7102,9 +7102,12 @@ def validate_vulkan_receiver_scan_contract() -> None:
     scan = braced_body(light, "static bool R_ShadowMapReceiversAllowMaps(", "Vulkan receiver scan")
     require_order(scan, ("vLight->shadowMapReceiverScanValid", "return vLight->shadowMapReceiverScanAllowsMaps;",
                          "VK_MaterialPrograms_NeedsStencilGeneration()",
-                         "if ( inter->IsDeferred() || R_InteractionReceiverNeedsStencil( inter, generation ) ) {",
-                         "allowsMaps = false;", "vLight->shadowMapReceiverScanValid = true;"),
-                  "memoized Vulkan receiver scan keeps unbuilt interactions unknown")
+                         "if ( inter->IsDeferred() ) {",
+                         "if ( inter->entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {",
+                         "continue;", "allowsMaps = false;",
+                         "if ( R_InteractionReceiverNeedsStencil( inter, generation ) ) {", "allowsMaps = false;",
+                         "vLight->shadowMapReceiverScanValid = true;"),
+                  "memoized Vulkan receiver scan keeps unbuilt interactions that may still gain receivers unknown")
     verdict = braced_body(light, "static bool R_InteractionReceiverNeedsStencil(", "per-interaction receiver verdict")
     require_order(verdict, ("if ( inter->buildModel != NULL ) {", "surf->geometry == NULL",
                             "R_RemapShaderBySkin( surf->shader, parms.customSkin, parms.customShader ), NULL );",
@@ -7117,6 +7120,15 @@ def validate_vulkan_receiver_scan_contract() -> None:
                             ("void idInteraction::Unlink(", "unlinked or emptied interaction")):
         require(braced_body(interaction, marker, context), "R_InvalidateShadowMapReceiverScan(",
                 f"{context} invalidates the memoized receiver scan")
+    # Only an interaction AddActiveInteraction leaves unbuilt in this view may be
+    # skipped; freeing its surfaces makes it unknown again.
+    active = braced_body(interaction, "void idInteraction::AddActiveInteraction(", "interaction submission")
+    require_order(active, ("struct unbuiltVisitMark_t {", "if ( inter->IsDeferred() ) {",
+                           "inter->unbuiltVisitView = tr.viewCount;", "R_InvalidateShadowMapReceiverScan( inter->lightDef );",
+                           "} unbuiltVisitMark = { this };", "CreateInteraction( model );"),
+                  "unbuilt-visit mark is recorded on every return of the only interaction builder")
+    require(braced_body(interaction, "void idInteraction::FreeSurfaces(", "freed surfaces"), "this->unbuiltVisitView = -1;",
+            "freed surfaces forget the unbuilt visit")
     create = braced_body(interaction, "void idInteraction::CreateInteraction(", "interaction creation")
     require_order(create, ("buildModel = model;", "R_InvalidateShadowMapReceiverScan( lightDef );",
                            "const bool suppressDynamicShadowVolume =", "buildModel = NULL;",

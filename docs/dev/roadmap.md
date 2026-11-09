@@ -1502,7 +1502,7 @@ optimization has landed.
 | --- | --- | --- |
 | FPS-01 — Closed | Suite (nine scripted stock-map scenarios, per-frame traces, cold/warm passes, toggle ladders, attribution, hitch events, transitions, idle-launch retry), 0.13.2 and current baselines on both backends, report with the settings/code split; the RTX 4060 Laptop named the reference machine; 42 budgets (7 scenarios x Ultra/Quality/Enhanced x OpenGL/Vulkan, warm mean and p99) declared from 126 launches of 94e0b14ec in `docs/dev/performance-budgets.json` and report section 10; `budgets` and `check` subcommands. | Budgets redeclared by FPS-02 (report section 11); the gate itself is FPS-09. |
 | FPS-02 — Closed | Refresh classes declared at 2560x1440 on the reference machine (Enhanced 144/90, Quality 100/60, Ultra 75/45 fps average/1% low); candidates screened on both backends; the three recipes rebuilt (point cubes 512 or stencil, MSAA 0/2/4, no cascades or motion blur below Maximum); `maximum` added as the everything-on preset without a frame-rate claim; detected starts capped at the display refresh; the startup banner reports the bootstrap and the detected profile with corrected video memory; Vulkan point-policy admission fixed; 42 budgets redeclared from 126 launches, every tier inside its class in every scene. | Closed. |
-| FPS-03 — Partial | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. FPS-02 sized the tiers around them: 512 cubes at Quality and Ultra, stencil point shadows at Enhanced, 2048 only at Maximum. The Vulkan light scan no longer keeps the stencil volumes of every non-prelit mapped light (identical images, CPU-neutral on the stock scenes). | Dynamic-caster composition for point lights, per-face culling, tier budgets and sizes; unbuilt interactions still keep Vulkan volumes. |
+| FPS-03 — Partial | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. FPS-02 sized the tiers around them: 512 cubes at Quality and Ultra, stencil point shadows at Enhanced, 2048 only at Maximum. The Vulkan light scan no longer keeps the stencil volumes of non-prelit mapped lights, including lights with an interaction left unbuilt in the view (identical images, CPU-neutral on the stock scenes). | Dynamic-caster composition for point lights, per-face culling, tier budgets and sizes. |
 | FPS-04 — Not started | SSAO, motion blur, HDR tone map, bloom and SMAA priced per scene on both backends (the chain is 10-14 ms per frame at 16 samples on OpenGL, 4-6 ms at 8 samples on Vulkan). | Half-resolution SSAO on OpenGL, pass merging, MSAA-aware resolves, tone-map cost. |
 | FPS-05 — Not started | 16x MSAA measured as the largest single Ultra cost on OpenGL; the Vulkan backend found to clamp the preset's 16 samples to the device's 8, so the two backends render different Ultra images. FPS-02's Ultra uses 4x MSAA with SMAA ultra, which both backends honour; only Maximum still requests 16. | Sample-count policy per tier, resolve cost, one sample count on both backends, MSAA 4 + SMAA as the Ultra candidate. |
 | FPS-06 — Not started | Equal-settings deltas attributed: in storage2 the retained HUD's layer composition (17 two-dimensional views and 34 render-target commands per frame against the classic HUD's 7 and 17; about 0.4 ms of main-thread time); on Vulkan the soft-particle depth capture (1.3 ms in airdefense1). The 2 October build equals 0.13.2 and the 15 October build carries the storage2 step, bracketing the 8 October retained-HUD commit (bisection); interpolation, light grid, reverb, portal cull and the five new Vulkan backend features cost nothing measurable. | Bisection pass 2 for the remainder, the retained HUD composed in one pass, the Vulkan soft-particle capture made cheap, closure within 3% average and 10% p99 of 0.13.2 on every suite scene on both backends. |
@@ -1625,8 +1625,24 @@ optimization has landed.
   interaction that is never built in the view keeps its volumes. With its volumes
   dropped, a light whose map pass fails draws unshadowed for one frame before the sticky
   fallback restores them, as on OpenGL. This was seen once, for the weapon flashlight,
-  in about twenty launches, and did not recur in four targeted runs. Remaining for the
-  scan: resolve unbuilt interactions conservatively so that those volumes can go too.
+  in about twenty launches, and did not recur in four targeted runs.
+  Unbuilt interactions (9 November 2026, follow-up). An unbuilt interaction no longer
+  holds a light's volumes once it cannot gain receivers in the view: either its entity
+  is not a view entity, or `AddActiveInteraction`, the only builder, which runs once
+  per interaction per view, returned leaving it unbuilt (`unbuiltVisitView`). At the
+  end of each view every non-prelit mapped light can now drop its volumes. Airdefense2
+  with the flashlight has 2,723 elided and 0 kept light-views against 1,811 and 912;
+  hub2 has 8,121 and 0 against 7,901 and 183. Ten frozen poses on hub2, storage2, Air
+  Defense 1 and airdefense2 render byte-identical images with the rule on and off (an
+  eleventh did not freeze). An interaction still waiting for its entity's turn in
+  `R_AddModelSurfaces` stays unknown, so entities processed before it keep their
+  volumes; that costs work but never a shadow. On the stock scenes no dynamic volume is
+  built under a non-prelit mapped light (`createShadowVolumes` did not change), so this
+  ordering costs nothing measurable there. The CPU change could not be measured above
+  the noise of a machine at 76% load. `cpu_sampler.py` puts the shadow-volume linking it
+  removes at 0.03% against 0.11% of airdefense2's main-thread samples. A light whose
+  map is not ready in the frame `r_shadows` or `r_useShadowMap` is switched back on now
+  draws unshadowed for that one frame, as on OpenGL.
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur

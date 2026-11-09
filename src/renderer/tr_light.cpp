@@ -1625,6 +1625,14 @@ too late: earlier entities may already have discarded their volumes. An
 unbuilt interaction is conservatively unknown, never evidence that every
 receiver supports maps. This also covers newly spawned receivers.
 
+Two unbuilt interactions cannot gain receivers in this view and are skipped:
+one whose entity is not a view entity (R_AddModelSurfaces never visits it,
+and entities that become view entities later, such as through-world
+outlines, build no interactions), and one that AddActiveInteraction already
+left unbuilt (it runs once per interaction per view). An interaction still
+waiting for its entity's turn stays unknown; that only costs volumes, never
+a missing shadow.
+
 The verdict is asked once per surface while interactions are built and
 linked, so it is memoized on the view light and recomputed only after one of
 the light's interactions changes state (idInteraction invalidates it).
@@ -1638,7 +1646,14 @@ static bool R_ShadowMapReceiversAllowMaps( const idRenderLightLocal *lightDef ) 
 	const int generation = VK_MaterialPrograms_NeedsStencilGeneration();
 	bool allowsMaps = true;
 	for ( const idInteraction *inter = lightDef->firstInteraction; inter != NULL; inter = inter->lightNext ) {
-		if ( inter->IsDeferred() || R_InteractionReceiverNeedsStencil( inter, generation ) ) {
+		if ( inter->IsDeferred() ) {
+			if ( inter->entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {
+				continue;
+			}
+			allowsMaps = false;
+			break;
+		}
+		if ( R_InteractionReceiverNeedsStencil( inter, generation ) ) {
 			allowsMaps = false;
 			break;
 		}

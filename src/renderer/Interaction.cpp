@@ -1343,6 +1343,7 @@ idInteraction::idInteraction( void ) {
 	stencilReceiverGeneration	= -1;
 	stencilReceiverNeeded		= false;
 	buildModel				= NULL;
+	unbuiltVisitView		= -1;
 }
 
 /*
@@ -1389,6 +1390,7 @@ idInteraction *idInteraction::AllocAndLink( idRenderEntityLocal *edef, idRenderL
 	interaction->stencilReceiverGeneration = -1;
 	interaction->stencilReceiverNeeded = false;
 	interaction->buildModel = NULL;
+	interaction->unbuiltVisitView = -1;
 
 	// link at the start of the entity's list
 	interaction->lightNext = ldef->firstInteraction;
@@ -1465,6 +1467,7 @@ void idInteraction::FreeSurfaces( void ) {
 	this->numSurfaces = -1;
 	this->stencilReceiverGeneration = -1;
 	this->buildModel = NULL;
+	this->unbuiltVisitView = -1;
 	R_InvalidateShadowMapReceiverScan( this->lightDef );
 }
 
@@ -2050,6 +2053,19 @@ instantiate the dynamic model to find out
 ==================
 */
 void idInteraction::AddActiveInteraction( void ) {
+	// This is the only place an interaction is built, and it runs once per
+	// interaction per view. One still unbuilt when it returns links no
+	// receivers in this view; record that for the receiver scan.
+	struct unbuiltVisitMark_t {
+		idInteraction *	inter;
+		~unbuiltVisitMark_t() {
+			if ( inter->IsDeferred() ) {
+				inter->unbuiltVisitView = tr.viewCount;
+				R_InvalidateShadowMapReceiverScan( inter->lightDef );
+			}
+		}
+	} unbuiltVisitMark = { this };
+
 	// Probe lights are environment metadata, including interactions prepared
 	// at level load before R_AddLightSurfaces applies its per-view probe gate.
 	// Never publish those cached interactions into the classic fallback lists.

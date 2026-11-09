@@ -38,7 +38,8 @@ See [player release status](../user/release-status.md).
 - **Vulkan now treats lights without baked shadows as OpenGL does.** This covers
   the weapon flashlight, moving lights and lights the game spawns. When such a light
   renders a shadow map, Vulkan no longer keeps its old-style stencil shadow volumes
-  as well. Shadows look the same; nothing needs to be changed.
+  as well, even when the light also reaches objects that are out of view. Shadows
+  look the same; nothing needs to be changed.
 - **No measurable frame-rate change on the stock maps.** Most map lights have baked
   shadows and are unaffected, so this is a correctness step for FPS-03 rather than a
   speed-up.
