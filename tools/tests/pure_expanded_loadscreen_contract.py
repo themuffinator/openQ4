@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
-"""Pin how a pure lock treats the session's expanded loading backgrounds.
+"""Pin how the session's expanded loading background meets pure servers.
 
 In a window that is not 4:3 the session composes the map's levelshot, with any
-_left/_right/_top/_bottom art, into one image of the window's shape. It
-publishes that image under fs_savepath as
-guis/assets/generated/loadscreens/<map>_<w>x<h>.tga and loads it back through
-the search paths. The image is openQ4's own derived data, and like the
-generated image cache it is never read while pure. Until 9 November 2026 a
-client that had loaded any map in such a window counted that read as a file
-loaded from a directory, so its first pure connect ran a full ReloadEngine.
-The rules decided then, recorded in docs/dev/mp-network-qualification.md:
+_left/_right/_top/_bottom art, into one picture of the window's shape. Until
+9 November 2026 it published that picture under fs_savepath as
+guis/assets/generated/loadscreens/<map>_<w>x<h>.tga and read it back through
+the search paths, so a pure lock had to refuse it and pure clients saw the
+framed 4:3 levelshot. The rules decided then, recorded in
+docs/dev/mp-network-qualification.md:
 
-* While a pure lock or fs_restrict holds, the session composes nothing
-  (FS_GeneratedDataReadsRefused) and shows the stock levelshot. The directory
-  gate in OpenFileReadSearch would refuse the file anyway, and the session
-  still requires the active VFS to expose whatever it published.
-* A read before the lock sets loadedImageCacheFromDir, as a generated image
-  cache read does, not loadedFileFromDir. SetPureServerChecksums leaves an
-  eviction pending, and the client's ReloadGeneratedCacheImages purges every
-  resident loading background; a purge that fails restarts the engine as
-  before. Every other directory read still restarts.
-* Only the names the session writes are exempt from the restart: a single
-  segment ending in _<width>x<height>.tga. The renderer purges every image
-  under the folder, which covers that set.
+* The picture lives only in memory. The session uploads it to a scratch image
+  whose name starts with '_' (the stock GUI's implicit material and the
+  retained screen's _retained/ material find such an image by name whatever
+  their image options) and carries the picture's size, because the retained
+  interface keeps an image's dimensions by name. It writes nothing and asks no
+  pure gate: its sources are VFS reads the lock already admits, so pure
+  clients see the wide background too.
+* The session keeps the pixels and uploads them again when the video restart
+  count moves, before any GUI draws, since a restart reallocates scratch images
+  empty. A failed upload leaves the stock levelshot selected.
+* Files older builds left in that folder are never named again, but a stray
+  reference can still open one. Such a read before the lock still sets
+  loadedImageCacheFromDir rather than loadedFileFromDir, and the client's
+  ReloadGeneratedCacheImages purges every resident image from the folder; a
+  purge that fails restarts the engine. Every other directory read restarts.
 
 This test compiles the real filesystem classifier and the renderer's name test
-against every name shape the session's own format string produces and against
-near misses, then pins each link in the production source. --mutations breaks
-each link and requires the check that owns it to fail.
+against the names those builds wrote and against near misses, then pins each
+link in the production source. --mutations breaks each link and requires the
+check that owns it to fail.
 """
 from __future__ import annotations
 
@@ -47,14 +48,27 @@ SOURCES = {
     "client": "src/framework/async/AsyncClient.cpp",
     "manager": "src/renderer/ImageManager.cpp",
     "render_system": "src/renderer/RenderSystem.cpp",
+    "material": "src/renderer/Material.cpp",
+    "document": "src/ui/retained/Document.cpp",
 }
 
+# What builds before 9 November 2026 wrote (Session_MakeExpandedLoadingBackgroundPath).
+LEGACY_FORMAT = "guis/assets/generated/loadscreens/%s_%dx%d.tga"
+LEGACY_FOLDER = LEGACY_FORMAT[: -len("%s_%dx%d.tga")]
+
 TOKEN = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[{}]', re.S)
+COMMENT = re.compile(r'//[^\n]*|/\*.*?\*/|("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')', re.S)
 PREFIX = re.compile(r'static const char prefix\[\] = "([^"]*)";')
+IMAGE_NAME = re.compile(r'#define SESSION_LOADING_BACKGROUND_IMAGE\s+"([^"]*)"')
 
 
 def read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8").replace("\r\n", "\n")
+
+
+def code_only(source: str) -> str:
+    """Drop comments, keeping string and character literals."""
+    return COMMENT.sub(lambda match: match.group(1) or "", source)
 
 
 def braced(source: str, signature: str) -> str:
@@ -128,7 +142,7 @@ struct idStr {
 static int failures = 0;
 static void Expect( const char *path, bool expected ) {
 	if ( FS_IsGeneratedLoadscreenPath( path ) != expected ) {
-		std::printf( "FAIL: %s should %sbe exempt as an expanded loading background\n", path ? path : "(null)", expected ? "" : "not " );
+		std::printf( "FAIL: %s should %sbe exempt as a legacy expanded loading background\n", path ? path : "(null)", expected ? "" : "not " );
 		++failures;
 	}
 	// every exempt read must be evicted at the lock, with or without the
@@ -145,8 +159,8 @@ static void Expect( const char *path, bool expected ) {
 }
 
 int main() {
-	// what the session writes: Session_MakeExpandedLoadingBackgroundPath
-/*SESSION_PATHS*/
+	// what builds before 9 November 2026 wrote
+/*LEGACY_PATHS*/
 	Expect( "GUIS/Assets/Generated/LoadScreens/Q4DM1_1820X1024.TGA", true );
 	// near misses keep the restart
 	Expect( "guis/assets/generated/loadscreens/q4dm1.tga", false );
@@ -166,13 +180,15 @@ int main() {
 	Expect( "guis/assets/generated/loadscreensx/q4dm1_1820x1024.tga", false );
 	Expect( "xguis/assets/generated/loadscreens/q4dm1_1820x1024.tga", false );
 	Expect( "_oq4/0123456789abcdef0123456789abcdef.tmp", false );
+	Expect( "_expandedLoadingBackground_1820x1024", false );
 	Expect( "gfx/guis/loadscreens/q4dm1.tga", false );
 	Expect( "guis/assets/splash/addon/q4dm1.tga", false );
 	Expect( "generated/images/guis/assets/generated/loadscreens/q4dm1_1820x1024#__0200.bimage", false );
 	Expect( "", false );
 	Expect( nullptr, false );
-	if ( R_IsGeneratedLoadscreenImage( "gfx/guis/loadscreens/q4dm1" ) || R_IsGeneratedLoadscreenImage( nullptr ) ) {
-		std::printf( "FAIL: the renderer would purge a stock levelshot\n" );
+	if ( R_IsGeneratedLoadscreenImage( "gfx/guis/loadscreens/q4dm1" ) || R_IsGeneratedLoadscreenImage( nullptr ) ||
+		R_IsGeneratedLoadscreenImage( "_expandedLoadingBackground_1820x1024" ) ) {
+		std::printf( "FAIL: the renderer would purge a stock levelshot or the session's in-memory background\n" );
 		++failures;
 	}
 	if ( failures ) {
@@ -183,9 +199,9 @@ int main() {
 }
 '''
 
-# Names and window shapes the session can produce: a map's base name, or its
+# Names and window shapes the older builds produced: a map's base name, or its
 # "generated" fallback, and the composite's pixel size.
-SESSION_SAMPLES = (
+LEGACY_SAMPLES = (
     ("q4dm1", 1820, 1024),
     ("airdefense1", 1920, 1080),
     ("q4ctf_1", 2560, 1080),
@@ -221,19 +237,14 @@ def compile_and_run(program: str) -> str:
 def check_classifier(sources: dict[str, str]) -> None:
     classifier = braced(sources["fs"], "static bool FS_IsGeneratedLoadscreenPath(")
     name_test = braced(sources["manager"], "static bool R_IsGeneratedLoadscreenImage(")
-    builder = braced(sources["session"], "static idStr Session_MakeExpandedLoadingBackgroundPath(")
-    form = re.search(r'return va\( "([^"]*)", safeName\.c_str\(\), width, height \);', builder)
-    if form is None or not form.group(1).endswith("%s_%dx%d.tga"):
-        raise AssertionError("the session no longer names its backgrounds <map>_<w>x<h>.tga")
-    folder = form.group(1)[: -len("%s_%dx%d.tga")]
-    if prefix_of(classifier, "the filesystem classifier") != folder:
-        raise AssertionError("the filesystem classifier and the session disagree on the folder")
-    if prefix_of(name_test, "the renderer's name test") != folder:
-        raise AssertionError("the renderer would not purge what the session writes")
-    paths = "\n".join(f'\tExpect( "{form.group(1) % sample}", true );' for sample in SESSION_SAMPLES)
+    if prefix_of(classifier, "the filesystem classifier") != LEGACY_FOLDER:
+        raise AssertionError("the filesystem classifier no longer covers the folder older builds wrote")
+    if prefix_of(name_test, "the renderer's name test") != LEGACY_FOLDER:
+        raise AssertionError("the renderer would not purge what older builds wrote")
+    paths = "\n".join(f'\tExpect( "{LEGACY_FORMAT % sample}", true );' for sample in LEGACY_SAMPLES)
     program = (PROGRAM.replace("/*FS_CLASSIFIER*/", classifier)
                .replace("/*RENDERER_NAME_TEST*/", name_test)
-               .replace("/*SESSION_PATHS*/", paths))
+               .replace("/*LEGACY_PATHS*/", paths))
     failure = compile_and_run(program)
     if failure:
         raise AssertionError(failure)
@@ -243,7 +254,7 @@ def check_filesystem(sources: dict[str, str]) -> None:
     fs = sources["fs"]
     allowed = braced(fs, "bool idFileSystemLocal::FileAllowedFromDir(")
     for token in ("generated", "loadscreens"):
-        forbid(allowed, token, "FileAllowedFromDir must not admit an expanded loading background while pure")
+        forbid(allowed, token, "FileAllowedFromDir must not admit a legacy loading background while pure")
 
     search = braced(fs, "idFile *idFileSystemLocal::OpenFileReadSearch(")
     # nothing under the save path is opened while a lock or fs_restrict holds
@@ -254,59 +265,95 @@ def check_filesystem(sources: dict[str, str]) -> None:
                   "the pure gate runs before any directory open")
     classify = "if ( FS_IsGeneratedImageCachePath( relativePath ) || FS_IsGeneratedLoadscreenPath( relativePath ) ) {"
     restart = "} else if ( !loadedFileFromDir && !FileAllowedFromDir( relativePath ) ) {"
-    require_order(search, classify, restart, "a loading background read is classified before the restart trigger")
+    require_order(search, classify, restart, "a legacy loading background read is classified before the restart trigger")
     branch = search[search.index(classify) : search.index(restart)]
-    require(branch, "loadedImageCacheFromDir = true;", "a loading background read leaves an eviction")
-    forbid(branch, "loadedFileFromDir = true;", "a loading background read must not force the restart")
+    require(branch, "loadedImageCacheFromDir = true;", "a legacy loading background read leaves an eviction")
+    forbid(branch, "loadedFileFromDir = true;", "a legacy loading background read must not force the restart")
 
     pure = braced(fs, "fsPureReply_t idFileSystemLocal::SetPureServerChecksums(")
     require(pure, "if ( loadedFileFromDir ) {\n\t\tsuccess = false;", "any other directory read still restarts")
     require(pure, "if ( success && loadedImageCacheFromDir && serverPaks.Num() ) {\n\t\tpureImageCacheEvictionPending = true;",
             "the eviction is left pending only for a lock actually taken")
 
-    refused = braced(fs, "bool idFileSystemLocal::GeneratedCacheReadsRefused(")
-    require(refused, "return fs_restrict.GetBool() || serverPaks.Num() > 0;", "a pure lock and fs_restrict refuse derived data")
-    gate = braced(fs, "bool FS_GeneratedDataReadsRefused(")
-    require(gate, "return fileSystemLocal.GeneratedCacheReadsRefused();", "the session asks the generated-data gate")
-    require(fs, "friend bool\t\t\t\tFS_GeneratedDataReadsRefused( void );", "the gate may read the lock")
-    require(sources["fs_h"], "bool\t\t\t\t\t\tFS_GeneratedDataReadsRefused( void );", "the gate is declared for engine code")
-
 
 def check_session(sources: dict[str, str]) -> None:
     session = sources["session"]
-    prepare = braced(session, "static bool Session_PrepareExpandedLoadingBackground(")
-    refusal = braced(prepare, "if ( FS_GeneratedDataReadsRefused() ) {")
-    require(refusal, "return false;", "nothing is composed while pure")
-    for later in ("Sys_GetSecureRandomBytes( stagingNonce, sizeof( stagingNonce ) )",
-                  "Session_ResolveImageFilePath( backgroundPath, resolvedCenterPath )",
-                  "R_WriteTGA( stagingPath.c_str()",
-                  "fileSystem->PromoteFile( stagingPath.c_str(), generatedPath.c_str()"):
-        require_order(prepare, "if ( FS_GeneratedDataReadsRefused() ) {", later,
-                      "the pure refusal comes before any read or write")
-    require_order(prepare, "Session_GetLoadingCanvasExpansion(", "if ( FS_GeneratedDataReadsRefused() ) {",
-                  "only an expanding window asks")
-    # whatever is published is still shown only if the active VFS exposes it
-    require_order(prepare, "} else if ( !Session_FileExistsInSearchPaths( generatedPath.c_str() ) ) {",
-                  "declManager->FindMaterial( generatedPath.c_str() )", "the session's VFS visibility gate")
+    code = code_only(session)
+    forbid(code, LEGACY_FOLDER, "the session must not name the folder older builds published to")
+    forbid(code, "FS_GeneratedDataReadsRefused", "the session must not refuse the background while pure")
 
-    builder = braced(session, "static idStr Session_MakeExpandedLoadingBackgroundPath(")
-    require(builder, "safeName.StripPath();", "a background name is a single segment")
-    require(builder, 'safeName = "generated";', "a background name is never empty")
+    name = IMAGE_NAME.search(session)
+    if name is None:
+        raise AssertionError("the session no longer names its loading background image")
+    if not re.fullmatch(r"_[A-Za-z0-9_]+", name.group(1)):
+        raise AssertionError("the loading background image name must start with '_' and stay a plain retained "
+                             "image source, so every material finds the built-in by name")
+
+    prepare = code_only(braced(session, "static bool Session_PrepareExpandedLoadingBackground("))
+    for writer in ("R_WriteTGA(", "PromoteFile(", "WriteFile(", "OpenFileWrite(", "Sys_GetSecureRandomBytes",
+                   '"fs_savepath"', "GeneratedCacheReadsRefused", "serverPaks", "TakePureImageCacheEviction"):
+        forbid(prepare, writer, "the background is composed in memory, not published or gated by the pure lock")
+    # the sources resolve and load through the active VFS
+    require_order(prepare, "Session_ResolveImageFilePath( backgroundPath, resolvedCenterPath )",
+                  "Session_LoadResolvedImageRGBA( resolvedCenterPath, centerPic, centerWidth, centerHeight )",
+                  "the levelshot is read through the search paths")
+    require(prepare, 'va( SESSION_LOADING_BACKGROUND_IMAGE "_%dx%d", outputWidth, outputHeight )',
+            "the image name carries the picture's size")
+    require_order(prepare, 'va( SESSION_LOADING_BACKGROUND_IMAGE "_%dx%d", outputWidth, outputHeight )',
+                  "bool uploaded = Session_UploadLoadingBackground();", "the picture is named before it is uploaded")
+    require_order(prepare, "bool uploaded = Session_UploadLoadingBackground();",
+                  "declManager->FindMaterial( name.c_str() )", "the uploaded image's material is checked")
+    require(prepare, "material->TestMaterialFlag( MF_DEFAULTED )", "a defaulted material is refused")
+    require(prepare, "\tif ( !uploaded ) {\n\t\tSession_ReleaseLoadingBackground( true );\n\t\treturn false;",
+            "a failed upload leaves the stock levelshot selected")
+    require_order(prepare, "\tif ( !uploaded ) {\n\t\tSession_ReleaseLoadingBackground( true );\n\t\treturn false;",
+                  "\n\timageName = name;\n\treturn true;", "the name is handed out only after the upload succeeded")
+
+    upload = code_only(braced(session, "static bool Session_UploadLoadingBackground("))
+    for snippet in ("options.format = FMT_RGBA8;", "options.numLevels = 1;", "options.isPersistant = true;",
+                    "renderSystem->CreateImage( background.imageName.c_str(), &options, TF_LINEAR )",
+                    "renderSystem->GetImageSize( image, width, height );",
+                    "renderSystem->UploadImage( background.imageName.c_str(), background.pixels.Ptr(), background.width, background.height )"):
+        require(upload, snippet, "the picture is a one-level RGBA8 scratch image of exactly its size")
+    require_order(upload, "renderSystem->UploadImage(", "background.restartCount = renderSystem->GetVideoRestartCount();",
+                  "an upload records the video restart it survives")
+
+    restore = code_only(braced(session, "static void Session_RestoreLoadingBackground("))
+    require(restore, "renderSystem->GetVideoRestartCount() == background.restartCount",
+            "a video restart is noticed")
+    require(restore, "if ( !Session_UploadLoadingBackground() ) {", "the kept pixels are uploaded again")
+    draw = braced(session, "void idSessionLocal::Draw() {")
+    require_order(draw, "Session_RestoreLoadingBackground();", "guiLoading->Redraw( presentationTime );",
+                  "the pixels are back before the loading screen draws")
+    require_order(draw, "Session_RestoreLoadingBackground();", "guiLoadingHold->Redraw( presentationTime );",
+                  "the pixels are back before a held loading screen draws")
 
     loading = braced(session, "void idSessionLocal::LoadLoadingGui(")
-    require(loading, "if ( Session_PrepareExpandedLoadingBackground( loadingBackground, stripped.c_str(), "
-            "expandedLoadingBackground ) ) {\n\t\tloadingBackground = expandedLoadingBackground;",
-            "the stock levelshot stays selected unless a background was published")
+    require(loading, "if ( Session_PrepareExpandedLoadingBackground( loadingBackground, expandedLoadingBackground ) ) {\n"
+            "\t\tloadingBackground = expandedLoadingBackground;", "the stock levelshot stays selected unless one was uploaded")
+    require(loading, "} else {\n\t\tSession_ReleaseLoadingBackground( true );", "a load without one keeps no picture")
+
+
+def check_lookup(sources: dict[str, str]) -> None:
+    manager = sources["manager"]
+    for signature in ("idImage\t*idImageManager::ImageFromFile(", "idImage *idImageManager::ImageHandleDeferred("):
+        body = braced(manager, signature)
+        require(body, "if ( name[0] == '_' ) {\n\t\t\t\treturn image;",
+                f"{signature} must return a '_' built-in whatever the material's image options")
+    retained = braced(sources["material"], "if ( retainedAdditive || idStr::Icmpn( GetName(), \"_retained/\", 10 ) == 0 ) {")
+    require(retained, "*p == '_'", "a retained material accepts the background's image name")
+    valid = braced(sources["document"], "bool ValidImageSource(const std::string& source) {")
+    require(valid, "c == '_'", "the retained screen accepts the background's image name as a source")
 
 
 def check_renderer(sources: dict[str, str]) -> None:
     evict = braced(sources["manager"], "bool idImageManager::ReloadGeneratedCacheImages(")
     purge = "if ( image != NULL && image->IsLoaded() && R_IsGeneratedLoadscreenImage( image->GetName() ) ) {"
     require_order(evict, purge, "if ( image == NULL || !image->HoldsGeneratedCacheContent() ) {",
-                  "loading backgrounds are evicted, even when the image cache supplied them")
+                  "legacy loading backgrounds are evicted, even when the image cache supplied them")
     block = braced(evict, purge)
     require_order(block, "image->PurgeImage();", "if ( image->IsLoaded() ) {", "each background is checked after its purge")
-    forbid(block, "Reload(", "a background has no pure source to reload from")
+    forbid(block, "Reload(", "a legacy background has no pure source to reload from")
     require(block, "failed++;\n\t\t\t} else {\n\t\t\t\tpurged++;", "a background left resident fails the eviction")
     require(block, "continue;", "a purged background is not reloaded afterwards")
     require(evict, "return failed == 0;", "a failed eviction makes the client restart")
@@ -325,7 +372,7 @@ def check_client(sources: dict[str, str]) -> None:
     require(validate, "reply = PURE_RESTART;", "a failed eviction falls back to the engine restart")
 
 
-CHECKS = (check_classifier, check_filesystem, check_session, check_renderer, check_client)
+CHECKS = (check_classifier, check_filesystem, check_session, check_lookup, check_renderer, check_client)
 
 
 def run_checks(sources: dict[str, str]) -> None:
@@ -359,22 +406,46 @@ MUTATIONS: dict[str, tuple[str, str, str, str]] = {
     "the renderer folder narrows": (
         "manager", 'static const char prefix[] = "guis/assets/generated/loadscreens/";',
         'static const char prefix[] = "guis/assets/generated/loadscreens/mp/";', "check_classifier"),
-    "a background read forces the restart again": (
+    "a legacy background read forces the restart again": (
         "fs", "if ( FS_IsGeneratedImageCachePath( relativePath ) || FS_IsGeneratedLoadscreenPath( relativePath ) ) {",
         "if ( FS_IsGeneratedImageCachePath( relativePath ) ) {", "check_filesystem"),
     "a classified read still counts as a directory read": (
         "fs", "\t\t\t\t\tloadedImageCacheFromDir = true;", "\t\t\t\t\tloadedFileFromDir = true;", "check_filesystem"),
-    "the gate ignores the pure lock": (
-        "fs", "return fileSystemLocal.GeneratedCacheReadsRefused();", "return false;", "check_filesystem"),
-    "the session composes while pure": (
-        "session", "\tif ( FS_GeneratedDataReadsRefused() ) {", "\tif ( false ) {", "check_session"),
-    "the session drops its VFS gate": (
-        "session", "} else if ( !Session_FileExistsInSearchPaths( generatedPath.c_str() ) ) {", "} else if ( false ) {",
-        "check_session"),
-    "the renderer skips the backgrounds": (
+    "the session publishes to the save path again": (
+        "session", "\tbool uploaded = Session_UploadLoadingBackground();",
+        '\tR_WriteTGA( "_oq4/stage.tmp", background.pixels.Ptr(), outputWidth, outputHeight, false, "fs_savepath" );\n'
+        "\tbool uploaded = Session_UploadLoadingBackground();", "check_session"),
+    "the session refuses the background while pure again": (
+        "session", "renderSystem == NULL || !renderSystem->IsOpenGLRunning() ) {",
+        "renderSystem == NULL || !renderSystem->IsOpenGLRunning() || FS_GeneratedDataReadsRefused() ) {", "check_session"),
+    "the image name loses its underscore": (
+        "session", '#define SESSION_LOADING_BACKGROUND_IMAGE\t"_expandedLoadingBackground"',
+        '#define SESSION_LOADING_BACKGROUND_IMAGE\t"expandedLoadingBackground"', "check_session"),
+    "the image name loses its size": (
+        "session", 'va( SESSION_LOADING_BACKGROUND_IMAGE "_%dx%d", outputWidth, outputHeight )',
+        "idStr( SESSION_LOADING_BACKGROUND_IMAGE )", "check_session"),
+    "the upload forgets the video restart": (
+        "session", "\tbackground.restartCount = renderSystem->GetVideoRestartCount();\n\treturn true;",
+        "\treturn true;", "check_session"),
+    "a video restart is never noticed": (
+        "session", "renderSystem->GetVideoRestartCount() == background.restartCount",
+        "background.restartCount == background.restartCount", "check_session"),
+    "the session draws before restoring the pixels": (
+        "session", "\tSession_RestoreLoadingBackground();\n\tstatic const int fallbackMenuDelayMs = 3000;",
+        "\tstatic const int fallbackMenuDelayMs = 3000;", "check_session"),
+    "a failed upload still selects the background": (
+        "session", "\tif ( !uploaded ) {\n\t\tSession_ReleaseLoadingBackground( true );\n\t\treturn false;",
+        "\tif ( !uploaded ) {\n\t\tSession_ReleaseLoadingBackground( true );", "check_session"),
+    "the material lookup honours options for built-ins": (
+        "manager", "\t\t\tif ( name[0] == '_' ) {\n\t\t\t\treturn image;\n\t\t\t}\n\t\t\tif ( image->cubeFiles != cubeMap ) {\n"
+        "\t\t\t\tcommon->Error( \"Image '%s' has been referenced with conflicting cube map states\", _name );\n\t\t\t}\n\n",
+        "\t\t\tif ( image->cubeFiles != cubeMap ) {\n"
+        "\t\t\t\tcommon->Error( \"Image '%s' has been referenced with conflicting cube map states\", _name );\n\t\t\t}\n\n",
+        "check_lookup"),
+    "the renderer skips the legacy backgrounds": (
         "manager", "if ( image != NULL && image->IsLoaded() && R_IsGeneratedLoadscreenImage( image->GetName() ) ) {",
         "if ( false ) {", "check_renderer"),
-    "the renderer reloads a background instead of purging it": (
+    "the renderer reloads a legacy background instead of purging it": (
         "manager", "\t\t\timage->PurgeImage();\n\t\t\tif ( image->IsLoaded() ) {",
         "\t\t\timage->Reload( true );\n\t\t\tif ( image->IsLoaded() ) {", "check_renderer"),
     "a background left resident passes": (
@@ -402,7 +473,8 @@ def main() -> None:
                 raise AssertionError(f"mutation {name!r} should fail {owner}, but "
                                      + (f"{caught} failed first" if caught else "nothing failed"))
         print(f"pure_expanded_loadscreen_contract: {len(MUTATIONS)} mutations detected")
-    print("pure_expanded_loadscreen_contract: PASS (loading backgrounds refused while pure, evicted instead of a restart)")
+    print("pure_expanded_loadscreen_contract: PASS (wide loading background composed in memory, "
+          "legacy files evicted instead of a restart)")
 
 
 if __name__ == "__main__":

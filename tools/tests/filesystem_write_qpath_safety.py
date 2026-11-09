@@ -156,26 +156,6 @@ def validate_behavior_model() -> None:
             raise AssertionError(f"Expected rejected explicit OS path: {path!r}")
 
 
-def validate_generated_loadscreen_path_budget() -> None:
-    final_qpath = "guis/assets/generated/loadscreens/airdefense1_1820x1024.tga"
-    save_root = "x" * 178
-    final_path = f"{save_root}/{final_qpath}"
-    nonce = "0" * 32
-    sibling_stage = f"{save_root}/{final_qpath.rsplit('/', 1)[0]}/_oq4.{nonce}.00000001.tmp"
-    fixed_stage_qpath = f"_oq4/{nonce}.tmp"
-    fixed_stage = f"{save_root}/{fixed_stage_qpath}"
-    minimum_final_qpath = "guis/assets/generated/loadscreens/a_1x1.tga"
-
-    if len(final_path) != 238 or len(sibling_stage) != 263:
-        raise AssertionError("loadscreen path-budget fixture no longer models the Windows boundary")
-    if len(fixed_stage) != 220 or len(fixed_stage) >= len(final_path):
-        raise AssertionError("root-level loadscreen staging path does not preserve MAX_PATH headroom")
-    if len(fixed_stage_qpath) >= len(minimum_final_qpath):
-        raise AssertionError("loadscreen staging qpath is not shorter than every generated final qpath")
-    if not is_safe_relative_write_path_model(fixed_stage_qpath):
-        raise AssertionError("root-level loadscreen staging path is not a portable mutation qpath")
-
-
 def validate_generated_binary_image_cache_fallback() -> None:
     def compact_digest(logical_name: str) -> str:
         normalized_name = logical_name.replace("\\", "/").lower()
@@ -440,84 +420,40 @@ def validate_source_contract() -> None:
             "checked cleanup missing-file semantics")
 
 
-def validate_generated_loadscreen_publication() -> None:
-    session = read("src/framework/Session.cpp")
+def validate_tga_writer_result_contract() -> None:
     image_files = read("src/imagetools/Image_files.cpp")
     image_header = read("src/renderer/Image.h")
     image_tools_header = read("src/imagetools/ImageTools.h")
-    prepare = function_body(
-        session,
-        "static bool Session_PrepareExpandedLoadingBackground(",
-    )
-    secure_staging_failure = function_body(
-        prepare,
-        "if ( !Sys_GetSecureRandomBytes( stagingNonce, sizeof( stagingNonce ) ) )",
-    )
     writer = function_body(image_files, "bool R_WriteTGA(")
 
     require(writer, "return fileSystem->WriteFile( filename, buffer, bufferSize, basePath ) == bufferSize;",
             "TGA writer reports short writes")
     require(image_header, "bool\tR_WriteTGA(", "renderer TGA writer result contract")
     require(image_tools_header, "bool\tR_WriteTGA(", "imagetools TGA writer result contract")
-    require(prepare, "uint64 stagingNonce[2] = { 0, 0 };",
-            "generated loadscreen 128-bit staging nonce")
-    require(prepare, "Sys_GetSecureRandomBytes( stagingNonce, sizeof( stagingNonce ) )",
-            "generated loadscreen cross-process CSPRNG token")
-    require(secure_staging_failure, "Could not create a secure expanded-loadscreen staging path",
-            "generated loadscreen no-CSPRNG source fallback")
-    require(secure_staging_failure, "return false;",
-            "generated loadscreen no-CSPRNG early return")
-    require(prepare, 'const idStr stagingPath = va( "_oq4/%016llx%016llx.tmp"',
-            "generated loadscreen short root-level staging path")
-    reject(prepare, "static uint32 stagingSequence",
-           "generated loadscreen CSPRNG identity needs no shared sequence")
-    reject(prepare, "stagingPath.StripFilename();",
-           "generated loadscreen staging must not inherit the long final directory")
-    reject(prepare, 'stagingPath += va( "/_oq4.',
-           "generated loadscreen staging must not remain beside the final file")
-    reject(prepare, 'va( "%s.%016llx%016llx.%u.partial"',
-           "generated loadscreen must not inflate the final path past platform limits")
-    require(prepare, "R_WriteTGA( stagingPath.c_str()", "generated loadscreen staged write")
-    require(prepare, "fileSystem->PromoteFile( stagingPath.c_str(), generatedPath.c_str()",
-            "generated loadscreen atomic publication")
-    require(prepare, "else if ( !Session_FileExistsInSearchPaths( generatedPath.c_str() ) )",
-            "generated loadscreen active-VFS visibility gate")
-    require(prepare, "declManager->FindMaterial( generatedPath.c_str() )",
-            "generated loadscreen material preflight")
-    require(prepare, "generatedMaterial->TestMaterialFlag( MF_DEFAULTED )",
-            "generated loadscreen default-material rejection")
-    require(prepare, "using the source levelshot",
-            "generated loadscreen unavailable-path source fallback")
-    require(prepare, "fileSystem->RemoveFileChecked( stagingPath.c_str()",
-            "generated loadscreen failed-stage cleanup")
-    require(prepare, "return published;", "generated loadscreen failure falls back to source")
-    require_order(prepare, "R_WriteTGA( stagingPath.c_str()", "fileSystem->PromoteFile(",
-                  "generated loadscreen write-before-publish order")
-    require_order(prepare, "fileSystem->PromoteFile(",
-                  "Session_FileExistsInSearchPaths( generatedPath.c_str() )",
-                  "generated loadscreen publish-before-VFS-validation order")
-    require_order(prepare, "Session_FileExistsInSearchPaths( generatedPath.c_str() )",
-                  "declManager->FindMaterial( generatedPath.c_str() )",
-                  "generated loadscreen VFS-before-material-validation order")
-    require_order(prepare, "Sys_GetSecureRandomBytes( stagingNonce, sizeof( stagingNonce ) )",
-                  'const idStr stagingPath = va( "_oq4/%016llx%016llx.tmp"',
-                  "generated loadscreen secure-token-before-path order")
-    require_order(prepare, "Sys_GetSecureRandomBytes( stagingNonce, sizeof( stagingNonce ) )",
-                  "R_WriteTGA( stagingPath.c_str()",
-                  "generated loadscreen secure-token-before-write order")
-    reject(prepare, "R_WriteTGA( generatedPath.c_str()",
-           "generated loadscreen must never truncate the live file in place")
-    reject(prepare, "Sys_GetClockTicks()",
-           "generated loadscreen staging token must not use a cross-process clock fallback")
+
+
+def validate_expanded_loadscreen_writes_nothing() -> None:
+    # Since 9 November 2026 the session composes the expanded loading
+    # background in memory and uploads it as a scratch image, so there is no
+    # save-path publication left to stage, budget or clean up.
+    # pure_expanded_loadscreen_contract.py owns the in-memory contract.
+    session = read("src/framework/Session.cpp")
+    prepare = function_body(
+        session,
+        "static bool Session_PrepareExpandedLoadingBackground(",
+    )
+    for writer in ("R_WriteTGA(", "PromoteFile(", "RemoveFileChecked(", "WriteFile(", '"fs_savepath"', '"_oq4/'):
+        reject(prepare, writer, "expanded loadscreen must not write under fs_savepath")
+    require(prepare, "Session_UploadLoadingBackground()", "expanded loadscreen in-memory upload")
 
 
 def main() -> int:
     validate_behavior_model()
-    validate_generated_loadscreen_path_budget()
     validate_generated_binary_image_cache_fallback()
     validate_generated_binary_image_write_integrity()
     validate_source_contract()
-    validate_generated_loadscreen_publication()
+    validate_tga_writer_result_contract()
+    validate_expanded_loadscreen_writes_nothing()
     print("filesystem relative mutation qpath safety checks passed")
     return 0
 

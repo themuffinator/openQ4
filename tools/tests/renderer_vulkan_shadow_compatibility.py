@@ -898,7 +898,7 @@ def validate_runtime_failure_gates() -> None:
 
     signature_lines = {
         "binaryImageCacheWrite": "^3WARNING: ^1idBinaryImage: Could not open generated cache 'generated/images/fixture.bimage' or compact fallback 'generated/images/_compact/v1/fixture.bimage'",
-        "expandedLoadscreenPublish": "^3WARNING: ^1Could not publish expanded loading background 'guis/assets/generated/loadscreens/fixture_1820x1024.tga'; using the source levelshot",
+        "expandedLoadscreenUpload": "^3WARNING: ^1Could not upload expanded loading background '_expandedLoadingBackground_1820x1024'; using the source levelshot",
         "vulkanValidation": "Vulkan validation: descriptor binding mismatch",
         "vulkanVuid": "Validation ID VUID-vkCmdDrawIndexed-commandBuffer-recording",
         "vulkanCallFailed": "Vulkan: vkCreateGraphicsPipelines failed (-3)",
@@ -918,8 +918,12 @@ def validate_runtime_failure_gates() -> None:
         "or compact fallback 'generated/images/_compact/v1/fixture.bimage'"
     )
     expanded_loadscreen_near_miss = (
-        "Could not publish expanded loading background "
-        "'guis/assets/generated/loadscreens/fixture_1820x1024.tga'; using the source levelshot"
+        "Could not upload expanded loading background "
+        "'_expandedLoadingBackground_1820x1024'; using the source levelshot"
+    )
+    expanded_loadscreen_restore = (
+        "^3WARNING: ^1Could not restore expanded loading background "
+        "'_expandedLoadingBackground_1820x1024' after a video restart"
     )
 
     for module, counter_name, context in (
@@ -984,9 +988,13 @@ def validate_runtime_failure_gates() -> None:
             raise AssertionError(
                 f"{context} must require WARNING: for binary-image cache write failures"
             )
-        if counter(expanded_loadscreen_near_miss).get("expandedLoadscreenPublish") != 0:
+        if counter(expanded_loadscreen_near_miss).get("expandedLoadscreenUpload") != 0:
             raise AssertionError(
-                f"{context} must require WARNING: for expanded-loadscreen publication failures"
+                f"{context} must require WARNING: for expanded-loadscreen upload failures"
+            )
+        if counter(expanded_loadscreen_restore).get("expandedLoadscreenUpload") != 1:
+            raise AssertionError(
+                f"{context} must count an expanded-loadscreen restore failure after a video restart"
             )
 
     checks_ok, missing = matrix.evaluate_checks(

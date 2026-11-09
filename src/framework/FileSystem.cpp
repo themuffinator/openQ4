@@ -1601,7 +1601,6 @@ public:
 
 private:
 	friend dword 			BackgroundDownloadThread( void *parms );
-	friend bool				FS_GeneratedDataReadsRefused( void );
 
 	searchpath_t *			searchPaths;
 	int						readCount;			// total bytes read
@@ -2087,20 +2086,6 @@ identity before a byte of it is used.
 */
 bool idFileSystemLocal::GeneratedCacheReadsRefused( void ) const {
 	return fs_restrict.GetBool() || serverPaks.Num() > 0;
-}
-
-/*
-================
-FS_GeneratedDataReadsRefused
-
-The same gate for engine code that publishes derived data under fs_savepath
-and reads it back through the search paths: the session's expanded loading
-backgrounds (see FS_IsGeneratedLoadscreenPath). The directory gate refuses
-those reads while this holds, so the session does not compose one.
-================
-*/
-bool FS_GeneratedDataReadsRefused( void ) {
-	return fileSystemLocal.GeneratedCacheReadsRefused();
 }
 
 bool idFileSystemLocal::GeneratedCacheReadsEnabled( const generatedCacheKind_t kind ) const {
@@ -7482,18 +7467,20 @@ static bool FS_IsGeneratedImageCachePath( const char *path ) {
 ===========
 FS_IsGeneratedLoadscreenPath
 
-An expanded loading background. In a window that is not 4:3 the session
-composes the map's levelshot, and any _left/_right/_top/_bottom art, into one
-image of the window's shape, publishes it under fs_savepath as
-guis/assets/generated/loadscreens/<map>_<w>x<h>.tga and loads it back through
-the search paths (Session_PrepareExpandedLoadingBackground). Like a generated
-image cache entry it is openQ4's own derived data, so it is never read while
-pure: the directory gate refuses it, and the session does not compose one
-while FS_GeneratedDataReadsRefused holds. A read before the pure lock leaves
-the same pending eviction as a cache entry instead of a restart, and the client
-then purges every resident loading background
-(idImageManager::ReloadGeneratedCacheImages). Only the names the session
-writes qualify: a single segment ending in _<width>x<height>.tga.
+An expanded loading background left by an older build. Builds until
+9 November 2026 composed the wide loading screen of a window that is not 4:3,
+published it under fs_savepath as
+guis/assets/generated/loadscreens/<map>_<w>x<h>.tga and loaded it back through
+the search paths. The session now composes it in memory and never names these
+files (Session_PrepareExpandedLoadingBackground), but they stay in players' save
+folders, and a stray reference can still open one: an older build's learned
+level-load manifest, for example. Like a generated image cache entry such a file
+is openQ4's own derived data, so it is never read while pure: the directory gate
+refuses it. A read before the pure lock leaves the same pending eviction as a
+cache entry instead of a restart, and the client then purges every resident
+image from that folder (idImageManager::ReloadGeneratedCacheImages). Only the
+names those builds wrote qualify: a single segment ending in
+_<width>x<height>.tga.
 ===========
 */
 static bool FS_IsGeneratedLoadscreenPath( const char *path ) {

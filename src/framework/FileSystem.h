@@ -460,8 +460,8 @@ public:
 	virtual bool			GeneratedCacheReadsEnabled( generatedCacheKind_t kind ) const = 0;
 	virtual bool			GeneratedCacheWritesEnabled( generatedCacheKind_t kind ) const = 0;
 	// Appended for RENDER_API_VERSION 33. Reading a generated/images cache
-	// entry, or one of the session's expanded loading backgrounds, from a
-	// directory does not make a pure lock restart the engine; a
+	// entry, or an expanded loading background an older build left under the
+	// save path, from a directory does not make a pure lock restart the engine; a
 	// SetPureServerChecksums that returns PURE_OK with the lock taken over such
 	// reads leaves this pending instead. It returns true once, and the caller
 	// must then call renderSystem->ReloadGeneratedCacheImages() or, if that
@@ -476,12 +476,6 @@ extern idFileSystem *		fileSystem;
 // once after the startup language load; later filesystem restarts report such
 // a failure at once.
 void						FS_RaiseDeferredContentPackFailure( void );
-
-// True while a pure lock or fs_restrict holds, when openQ4's own derived data
-// is not read: no generated cache, and no expanded loading background that the
-// session published under fs_savepath. Engine code only; modules ask
-// GeneratedCacheReadsEnabled.
-bool						FS_GeneratedDataReadsRefused( void );
 
 /*
 ================================================

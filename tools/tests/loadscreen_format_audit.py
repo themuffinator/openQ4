@@ -5,8 +5,10 @@ Release loadscreens are either TGA beside DXT1 DDS (as shipped through 0.14) or
 DDS only. For one runtime this harness loads a single-player map on each
 renderer and texture-quality profile, and records what a player sees:
 
-* the loading screen's expanded background, which the session composes from the
-  tiles on the CPU at a wide window (guis/assets/generated/loadscreens/...);
+* the loading screen with its expanded background, which the session composes
+  from the tiles on the CPU at a wide window and holds only in memory, captured
+  by `com_captureLoadingScreen` as the load finishes
+  (screenshots/loading_<n>.tga);
 * the levelshot drawn by the renderer through `testImage`, as a GUI material is,
   captured with `screenshot`;
 * where each tile was read from (fs_debug) and the image list entry.
@@ -49,7 +51,7 @@ def run(args, profile: str, overrides: dict[str, str]) -> dict:
         "fs_basepath": str(args.basepath.resolve()), "fs_savepath": str(home), "fs_devpath": str(home),
         "logFile": "2", "logFileName": "logs/openq4.log", "developer": "1", "fs_debug": "1", "s_noSound": "1",
         "r_fullscreen": "0", "r_mode": "-1", "r_customWidth": "1920", "r_customHeight": "1080",
-        "in_mouse": "0", "ui_retained": "1", "com_skipLoadingContinue": "1",
+        "in_mouse": "0", "ui_retained": "1", "com_skipLoadingContinue": "1", "com_captureLoadingScreen": "1",
         "g_autoExecAfterMapLoad": "audit_loaded.cfg", "g_autoExecAfterMapLoadDelayMs": "1500",
         "win_allowMultipleInstances" if os.name == "nt" else "sys_allowMultipleInstances": "1",
         **overrides,
@@ -62,14 +64,14 @@ def run(args, profile: str, overrides: dict[str, str]) -> dict:
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     log = (game / "logs" / "openq4.log").read_text(encoding="utf-8", errors="replace") if (game / "logs/openq4.log").is_file() else ""
     reads = sorted(set(re.findall(r"OpenFileRead: (gfx/guis/loadscreens/\S+) \(found in '([^']+)'\)", log)))
-    composites = sorted(str(p.relative_to(home)) for p in game.rglob("*.tga") if "generated" in str(p) and "loadscreens" in str(p))
+    loading = sorted(str(p.relative_to(home)) for p in game.glob("screenshots/loading_*.tga"))
     shots = sorted(str(p.relative_to(home)) for p in game.rglob("audit_testimage*"))
     images = [line.strip() for line in log.splitlines() if "loadscreens/" in line and ("x" in line and ("RGBA" in line or "DXT" in line or "MB" in line))][:12]
     return {
         "profile": profile, "cvars": overrides, "exit_code": completed.returncode,
         "seconds": round(time.monotonic() - started, 1), "fatal": "\nFATAL: " in log,
         "reads": [{"file": file, "pack": Path(pack).name} for file, pack in reads],
-        "composites": composites, "testimage_captures": shots, "image_list": images,
+        "loading_captures": loading, "testimage_captures": shots, "image_list": images,
     }
 
 
@@ -96,7 +98,7 @@ def compare(a: Path, b: Path) -> dict:
         if not pa.is_dir() or not pb.is_dir():
             continue
         pairs = {}
-        for kind, pattern in (("testimage", "baseoq4/audit_testimage*"), ("composite", "baseoq4/**/generated/**/loadscreens/*.tga")):
+        for kind, pattern in (("testimage", "baseoq4/audit_testimage*"), ("loading", "baseoq4/screenshots/loading_*.tga")):
             fa, fb = sorted(pa.glob(pattern)), sorted(pb.glob(pattern))
             if fa and fb:
                 pairs[kind] = psnr(fa[0], fb[0])

@@ -438,8 +438,8 @@ WARNING_PATTERNS = {
         r"WARNING:\s*(?:\^[0-9]\s*)*idBinaryImage:\s+Could not open (?:file|generated cache)\b",
         re.IGNORECASE,
     ),
-    "expandedLoadscreenPublish": re.compile(
-        r"WARNING:\s*(?:\^[0-9]\s*)*Could not publish expanded loading background\b",
+    "expandedLoadscreenUpload": re.compile(
+        r"WARNING:\s*(?:\^[0-9]\s*)*Could not (?:upload|restore) expanded loading background\b",
         re.IGNORECASE,
     ),
     "shaderCompileOrLink": re.compile(r"(shader compile|program link).*(failed|error)|failed to compile", re.IGNORECASE),

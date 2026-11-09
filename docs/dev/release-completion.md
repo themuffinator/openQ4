@@ -48,23 +48,28 @@ See [player release status](../user/release-status.md).
 - Evidence: FPS-03 in the [roadmap](roadmap.md);
   `tools/tests/renderer_vulkan_shadow_compatibility.py`.
 
-## Widescreen players join pure servers without a restart, 9 November 2026
+## Widescreen loading screens on pure servers, without a restart, 9 November 2026
 
 - **No more restart on the first pure join in a widescreen window.** If you
   played or hosted a map in a window that is not 4:3 before joining a server
   with pure checking on (`si_pure 1`), the game restarted itself on the
   connect, which cost about 30 seconds. The cause was the widened loading
-  screen openQ4 builds for your window and saves in your settings folder. Now
-  that image is dropped when you connect, and the game goes straight on to the
-  match. Nothing needs to be changed.
-- **Pure checking is as strict as before.** A pure server never uses that
-  saved image, so its loading screen shows the map's standard picture, as it
-  did after the old restart. Any other loose file read from a game folder
-  before connecting still restarts the game into pure mode.
+  screen openQ4 saved in your settings folder and read back. openQ4 now builds
+  that picture in memory and saves nothing, so the game goes straight on to
+  the match. Nothing needs to be changed.
+- **Pure servers show the wide loading screen too.** Their loading screens
+  used to fall back to the map's standard 4:3 picture in a frame. The widened
+  picture is made only from game files the server allows, so it now fills the
+  window there as everywhere else.
+- **Pure checking is as strict as before.** Any loose file read from a game
+  folder before connecting still restarts the game into pure mode. Older
+  versions left saved loading screens in `guis/assets/generated/loadscreens/`
+  in your settings folder; they are no longer used and you can delete them.
 - Validation: a pure dedicated `mp/q4dm1` server and a 640x360 client that
-  first hosted the same map locally, on OpenGL and Vulkan. The client reached
-  the match without an engine reload and read no saved loading screen after
-  connecting. Details are in the
+  first hosted the same map locally, on OpenGL and Vulkan, with the retained
+  and the stock interface. Engine captures of the pure map's loading screen
+  show the wide picture; the client wrote nothing to its settings folder and
+  reached the match without an engine reload. Details are in the
   [pure-server decision](mp-network-qualification.md#expanded-loading-backgrounds-on-pure-servers-9-november-2026).
 
 ## Pure servers also refuse the experimental level-load caches, 9 November 2026

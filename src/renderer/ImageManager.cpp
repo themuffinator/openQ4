@@ -1344,12 +1344,14 @@ afterwards. Called with the lock already in place: the directory gate then
 refuses every generated/images read, and the forced reload derives each image
 from the pure paks (and rewrites its cache entry).
 
-The session's expanded loading backgrounds are derived data with no source in
-any pak: it composes them, publishes them under fs_savepath and loads them back
-(FS_IsGeneratedLoadscreenPath), and the lock refuses that file too. They are
-purged rather than reloaded. Nothing draws one while pure, since the session
-then shows the stock levelshot; should anything bind one, its load is refused
-and the image defaults.
+Expanded loading backgrounds that builds until 9 November 2026 published under
+fs_savepath (guis/assets/generated/loadscreens/, FS_IsGeneratedLoadscreenPath)
+are derived data with no source in any pak, and the lock refuses those files
+too. One a stray reference loaded is purged rather than reloaded; should
+anything bind it again, its load is refused and the image defaults. The
+session's own wide loading screen is an in-memory scratch image
+(_expandedLoadingBackground_<w>x<h>), composed from reads the lock admits, and
+is left alone.
 ===============
 */
 static bool R_IsGeneratedLoadscreenImage( const char *name ) {

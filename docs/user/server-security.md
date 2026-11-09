@@ -155,11 +155,15 @@ animations under `generated/`. A pure server's clients never read those either.
 Anything a client loaded from them before connecting is loaded again from the
 original game files when the server's map loads.
 
-In a window that is not 4:3, openQ4 widens each map's loading screen to fit and
-saves the result in the save folder (`guis/assets/generated/loadscreens/`). A
-pure server's clients never use that file: their loading screen shows the
-map's standard picture. A client that showed one before connecting drops it on
-connect. Before 9 November that restarted the whole engine instead.
+In a window that is not 4:3, openQ4 widens each map's loading screen to fit.
+It builds that picture in memory from the game files the server allows and
+saves nothing, so a pure server's clients see the wide loading screen too.
+Versions before 9 November saved it in the save folder
+(`guis/assets/generated/loadscreens/`), which a pure server cannot trust: their
+clients showed the map's standard picture there, and at first restarted the
+whole engine on connect. Those saved files are no longer used and can be
+deleted; one that is somehow still read before connecting is dropped on
+connect rather than restarting the engine.
 
 ## Malformed network traffic
 

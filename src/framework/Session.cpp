@@ -96,6 +96,7 @@ idCVar	idSessionLocal::com_guid( "com_guid", "", CVAR_SYSTEM | CVAR_ARCHIVE | CV
 idCVar	idSessionLocal::com_lastQuicksave( "com_lastQuicksave", "Quicksave0", CVAR_SYSTEM | CVAR_ARCHIVE, "last quicksave slot" );
 idCVar	com_loadingContinueAutoAdvance( "com_loadingContinueAutoAdvance", "0", CVAR_SYSTEM | CVAR_INTEGER, "auto-accept the single-player loading-screen continue gate after N msec (testing), 0 = off", 0, 60000, idCmdSystem::ArgCompletion_Integer<0,60000> );
 idCVar	com_skipLoadingContinue( "com_skipLoadingContinue", "0", CVAR_SYSTEM | CVAR_BOOL, "skip the single-player loading-screen continue gate (testing)" );
+static idCVar com_captureLoadingScreen( "com_captureLoadingScreen", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_NOCHEAT, "diagnostic: capture each map's finished loading screen with the engine screenshot command, as screenshots/loading_<n>.tga" );
 static idCVar ui_testGuiInGame( "ui_testGuiInGame", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_CHEAT, "draw the loaded game behind testGUI for transparent overlay validation" );
 idCVar	com_minLoadingGuiMsec( "com_minLoadingGuiMsec", "250", CVAR_SYSTEM | CVAR_INTEGER, "minimum time to show the loading GUI before blocking map work starts", 0, 2000, idCmdSystem::ArgCompletion_Integer<0,2000> );
 idCVar	com_showLevelLoadTimes( "com_showLevelLoadTimes", "1", CVAR_SYSTEM | CVAR_BOOL, "print detailed phase timings for level loads" );
@@ -2408,10 +2409,13 @@ static void Session_ReplicateRowIntoRect( byte *dest, int destWidth, int destHei
 	}
 }
 
-static bool Session_GetLoadingCanvasExpansion( float &windowAspect, bool &expandHorizontally, bool &expandVertically ) {
+static bool Session_GetLoadingCanvasExpansion( float &windowAspect, bool &expandHorizontally, bool &expandVertically,
+	int &viewportPixelWidth, int &viewportPixelHeight ) {
 	windowAspect = static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT );
 	expandHorizontally = false;
 	expandVertically = false;
+	viewportPixelWidth = 0;
+	viewportPixelHeight = 0;
 
 	if ( !cvarSystem->GetCVarBool( "ui_aspectCorrection" ) ) {
 		return false;
@@ -2431,6 +2435,8 @@ static bool Session_GetLoadingCanvasExpansion( float &windowAspect, bool &expand
 	const float targetAspect = static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT );
 	const float aspectEpsilon = 0.0001f;
 
+	viewportPixelWidth = idMath::Ftoi( viewportWidth );
+	viewportPixelHeight = idMath::Ftoi( viewportHeight );
 	windowAspect = viewportWidth / viewportHeight;
 	if ( windowAspect > targetAspect + aspectEpsilon ) {
 		expandHorizontally = true;
@@ -2441,44 +2447,114 @@ static bool Session_GetLoadingCanvasExpansion( float &windowAspect, bool &expand
 	return expandHorizontally || expandVertically;
 }
 
-static idStr Session_MakeExpandedLoadingBackgroundPath( const char *mapName, int width, int height ) {
-	idStr safeName = mapName;
-	safeName.BackSlashesToSlashes();
-	safeName.StripPath();
-	safeName.StripFileExtension();
-	if ( safeName.Length() <= 0 ) {
-		safeName = "generated";
-	}
+/*
+================
+Expanded loading background
 
-	return va( "guis/assets/generated/loadscreens/%s_%dx%d.tga", safeName.c_str(), width, height );
+In a window that is not 4:3 the session widens the loading screen: it composes
+the map's levelshot, and any _left/_right/_top/_bottom art beside it, into one
+picture of the window's shape. The picture exists only in memory. The renderer
+holds it as a scratch image whose name starts with '_', so the stock GUI's
+implicit material and the retained screen's _retained/ material both find it by
+name whatever their image options. The session keeps the pixels too, because a
+video restart reallocates scratch images without their contents.
+
+Nothing is written under fs_savepath or read back through the search paths, so
+a pure lock has nothing to refuse and a pure server's clients see the wide
+background as well: its sources are VFS reads that the lock already admits (the
+loadscreen pack is client-only and allowed). Builds until 9 November 2026
+published the picture as guis/assets/generated/loadscreens/<map>_<w>x<h>.tga;
+this build never names those files (see FS_IsGeneratedLoadscreenPath).
+================
+*/
+#define SESSION_LOADING_BACKGROUND_IMAGE	"_expandedLoadingBackground"
+
+struct sessionLoadingBackground_t {
+	// SESSION_LOADING_BACKGROUND_IMAGE_<w>x<h>, empty while none is held. The
+	// size is part of the name because the retained interface keeps an image's
+	// dimensions by its name, and a picture of another shape must not reuse them.
+	idStr			imageName;
+	idList<byte>	pixels;				// RGBA, top row first, exactly as uploaded
+	int				width = 0;
+	int				height = 0;
+	int				restartCount = 0;	// renderSystem->GetVideoRestartCount() at the upload
+};
+static sessionLoadingBackground_t sessionLoadingBackground;
+
+// Allocates the held image at the pixels' size and uploads them.
+static bool Session_UploadLoadingBackground( void ) {
+	sessionLoadingBackground_t &background = sessionLoadingBackground;
+	idImageOpts options;
+	options.width = background.width;
+	options.height = background.height;
+	options.format = FMT_RGBA8;
+	options.numLevels = 1;
+	options.isPersistant = true;
+	idImage *image = renderSystem->CreateImage( background.imageName.c_str(), &options, TF_LINEAR );
+	if ( image == NULL ) {
+		return false;
+	}
+	int width = 0;
+	int height = 0;
+	renderSystem->GetImageSize( image, width, height );
+	if ( width != background.width || height != background.height ||
+		!renderSystem->UploadImage( background.imageName.c_str(), background.pixels.Ptr(), background.width, background.height ) ) {
+		return false;
+	}
+	background.restartCount = renderSystem->GetVideoRestartCount();
+	return true;
 }
 
-static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPath, const char *mapName, idStr &generatedPath ) {
+// A load that shows the stock levelshot keeps no picture. The held image shrinks
+// to one black pixel, so a GUI that still names it draws nothing stale. During
+// shutdown the renderer's own teardown owns the image; only the pixels go.
+static void Session_ReleaseLoadingBackground( bool shrinkImage ) {
+	sessionLoadingBackground_t &background = sessionLoadingBackground;
+	if ( shrinkImage && background.imageName.Length() > 0 && renderSystem != NULL ) {
+		static const byte black[4] = { 0, 0, 0, 255 };
+		idImageOpts options;
+		options.width = 1;
+		options.height = 1;
+		options.format = FMT_RGBA8;
+		options.numLevels = 1;
+		options.isPersistant = true;
+		if ( renderSystem->CreateImage( background.imageName.c_str(), &options, TF_LINEAR ) != NULL ) {
+			renderSystem->UploadImage( background.imageName.c_str(), black, 1, 1 );
+		}
+	}
+	background.imageName.Clear();
+	background.pixels.Clear();
+	background.width = 0;
+	background.height = 0;
+	background.restartCount = 0;
+}
+
+// Each session frame, before any GUI draws: a video restart reallocated the held
+// image empty, so put its pixels back. A loading screen can outlive one, as the
+// retained screen held over a multiplayer join does.
+static void Session_RestoreLoadingBackground( void ) {
+	sessionLoadingBackground_t &background = sessionLoadingBackground;
+	if ( background.pixels.Num() == 0 || renderSystem == NULL ||
+		renderSystem->GetVideoRestartCount() == background.restartCount ) {
+		return;
+	}
+	if ( !Session_UploadLoadingBackground() ) {
+		common->Warning( "Could not restore expanded loading background '%s' after a video restart",
+			background.imageName.c_str() );
+		Session_ReleaseLoadingBackground( true );
+		return;
+	}
+	common->DPrintf( "Expanded loading background '%s' restored after a video restart\n", background.imageName.c_str() );
+}
+
+static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPath, idStr &imageName ) {
 	float windowAspect = 0.0f;
 	bool expandHorizontally = false;
 	bool expandVertically = false;
-	if ( !Session_GetLoadingCanvasExpansion( windowAspect, expandHorizontally, expandVertically ) ) {
-		return false;
-	}
-
-	// openQ4's own derived data is not read under a pure lock or fs_restrict,
-	// and the directory gate would refuse this file once published, so do not
-	// compose or write one: the stock levelshot is shown. One read before a
-	// pure lock is evicted at the lock instead of restarting the engine (see
-	// FS_IsGeneratedLoadscreenPath).
-	if ( FS_GeneratedDataReadsRefused() ) {
-		common->DPrintf( "Expanded loading background for '%s' skipped while pure; using the source levelshot\n",
-			backgroundPath.c_str() );
-		return false;
-	}
-
-	// Never use a shared, predictable staging name. If the platform cannot
-	// provide a secure nonce, keep the stock source levelshot instead of risking
-	// another client truncating this client's in-progress publication.
-	uint64 stagingNonce[2] = { 0, 0 };
-	if ( !Sys_GetSecureRandomBytes( stagingNonce, sizeof( stagingNonce ) ) ) {
-		common->Warning( "Could not create a secure expanded-loadscreen staging path for '%s'; using the source levelshot",
-			backgroundPath.c_str() );
+	int viewportWidth = 0;
+	int viewportHeight = 0;
+	if ( !Session_GetLoadingCanvasExpansion( windowAspect, expandHorizontally, expandVertically, viewportWidth, viewportHeight ) ||
+		renderSystem == NULL || !renderSystem->IsOpenGLRunning() ) {
 		return false;
 	}
 
@@ -2641,49 +2717,6 @@ static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPat
 		}
 	}
 
-	generatedPath = Session_MakeExpandedLoadingBackgroundPath( mapName, outputWidth, outputHeight );
-	// Multiple isolated clients may generate the same resolution at once. Give
-	// every publication a CSPRNG-backed staging qpath so one client cannot
-	// truncate another client's in-progress TGA before either atomic rename.
-	// Stage below a short root-level namespace rather than beside the final
-	// loadscreen. The source and destination still share fs_savepath (and thus a
-	// filesystem), preserving atomic cross-directory rename while leaving enough
-	// path budget for legacy Windows stdio under deeply nested save roots. The
-	// 128-bit nonce is the complete collision identity; no predictable shared
-	// staging name or process-local sequence is needed.
-	const idStr stagingPath = va( "_oq4/%016llx%016llx.tmp",
-		static_cast<unsigned long long>( stagingNonce[0] ),
-		static_cast<unsigned long long>( stagingNonce[1] ) );
-	bool published = R_WriteTGA( stagingPath.c_str(), composite.Ptr(), outputWidth, outputHeight, false, "fs_savepath" );
-	if ( published ) {
-		published = fileSystem->PromoteFile( stagingPath.c_str(), generatedPath.c_str(), "fs_savepath" );
-	}
-	if ( !published ) {
-		// A short or interrupted direct write used to leave a truncated final TGA.
-		// Loading that generated file raises a fatal "incomplete file" error on
-		// the next material lookup. Keep the old final intact and fall back to the
-		// source levelshot whenever publication cannot complete (GitHub issue #102).
-		fileSystem->RemoveFileChecked( stagingPath.c_str(), "fs_savepath" );
-		common->Warning( "Could not publish expanded loading background '%s'; using the source levelshot",
-			generatedPath.c_str() );
-	} else if ( !Session_FileExistsInSearchPaths( generatedPath.c_str() ) ) {
-		// A pure server deliberately excludes loose image files even when this
-		// client just authored them under fs_savepath.  Publication alone is not
-		// permission to consume the file: require the active VFS policy to expose
-		// it before handing its name to the loading GUI/material system.  Keeping
-		// published=false leaves the caller's stock levelshot selected.
-		common->DPrintf( "Expanded loading background '%s' is unavailable through the active VFS; using the source levelshot\n",
-			generatedPath.c_str() );
-		published = false;
-	} else {
-		const idMaterial *generatedMaterial = declManager->FindMaterial( generatedPath.c_str() );
-		if ( generatedMaterial == NULL || generatedMaterial->TestMaterialFlag( MF_DEFAULTED ) ) {
-			common->DPrintf( "Expanded loading background '%s' has no usable material; using the source levelshot\n",
-				generatedPath.c_str() );
-			published = false;
-		}
-	}
-
 	R_StaticFree( centerPic );
 	if ( leftPic ) {
 		R_StaticFree( leftPic );
@@ -2698,7 +2731,64 @@ static bool Session_PrepareExpandedLoadingBackground( const idStr &backgroundPat
 		R_StaticFree( bottomPic );
 	}
 
-	return published;
+	idList<byte> pixels;
+	pixels.SetNum( outputWidth * outputHeight * 4 );
+	memcpy( pixels.Ptr(), composite.Ptr(), pixels.Num() );
+
+	// The picture is composed at the levelshot's resolution and held without
+	// mipmaps. Halve it, as a mip chain would, while it is at least twice the
+	// window, so drawing it minifies by less than two and stays smooth, and
+	// while it exceeds the device's texture size.
+	const int maxTextureSize = renderSystem->GetGLConfig().maxTextureSize;
+	while ( outputWidth >= 2 && outputHeight >= 2 &&
+		( ( outputWidth >= 2 * viewportWidth && outputHeight >= 2 * viewportHeight ) ||
+			( maxTextureSize > 0 && ( outputWidth > maxTextureSize || outputHeight > maxTextureSize ) ) ) ) {
+		const int halfWidth = outputWidth / 2;
+		const int halfHeight = outputHeight / 2;
+		byte *halved = R_ResampleTexture( pixels.Ptr(), outputWidth, outputHeight, halfWidth, halfHeight );
+		if ( halved == NULL ) {
+			break;
+		}
+		pixels.SetNum( halfWidth * halfHeight * 4 );
+		memcpy( pixels.Ptr(), halved, pixels.Num() );
+		R_StaticFree( halved );
+		outputWidth = halfWidth;
+		outputHeight = halfHeight;
+	}
+	if ( maxTextureSize > 0 && ( outputWidth > maxTextureSize || outputHeight > maxTextureSize ) ) {
+		common->DPrintf( "Expanded loading background for '%s' exceeds the texture size; using the source levelshot\n",
+			backgroundPath.c_str() );
+		return false;
+	}
+
+	sessionLoadingBackground_t &background = sessionLoadingBackground;
+	const idStr name = va( SESSION_LOADING_BACKGROUND_IMAGE "_%dx%d", outputWidth, outputHeight );
+	if ( background.imageName.Icmp( name ) != 0 ) {
+		Session_ReleaseLoadingBackground( true );
+	}
+	background.imageName = name;
+	background.pixels.Swap( pixels );
+	background.width = outputWidth;
+	background.height = outputHeight;
+
+	bool uploaded = Session_UploadLoadingBackground();
+	if ( !uploaded ) {
+		common->Warning( "Could not upload expanded loading background '%s'; using the source levelshot", name.c_str() );
+	} else {
+		const idMaterial *material = declManager->FindMaterial( name.c_str() );
+		if ( material == NULL || material->TestMaterialFlag( MF_DEFAULTED ) ) {
+			common->DPrintf( "Expanded loading background '%s' has no usable material; using the source levelshot\n",
+				name.c_str() );
+			uploaded = false;
+		}
+	}
+	if ( !uploaded ) {
+		Session_ReleaseLoadingBackground( true );
+		return false;
+	}
+	common->DPrintf( "Expanded loading background '%s' composed in memory from '%s'\n", name.c_str(), resolvedCenterPath.c_str() );
+	imageName = name;
+	return true;
 }
 
 void idSessionLocal::SetMainMenuBackgroundMontageGuiVars( void ) {
@@ -4426,6 +4516,7 @@ void idSessionLocal::Shutdown() {
 	arenaCampaign.Shutdown();
 #endif
 	ShutdownDemoSystem();
+	Session_ReleaseLoadingBackground( false );
 
 	Clear();
 }
@@ -6905,9 +6996,11 @@ void idSessionLocal::LoadLoadingGui( const char *mapName ) {
 	}
 
 	idStr expandedLoadingBackground;
-	if ( Session_PrepareExpandedLoadingBackground( loadingBackground, stripped.c_str(), expandedLoadingBackground ) ) {
+	if ( Session_PrepareExpandedLoadingBackground( loadingBackground, expandedLoadingBackground ) ) {
 		loadingBackground = expandedLoadingBackground;
 		loadingBackgroundCanvasFill = true;
+	} else {
+		Session_ReleaseLoadingBackground( true );
 	}
 
 	char guiMap[ MAX_STRING_CHARS ];
@@ -7926,6 +8019,13 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 			guiLoading->StateChanged( common->GetPresentationTime() );
 			Sys_GenerateEvents();
 			UpdateScreen();
+		}
+		// Diagnostic: the finished loading screen, as the screenshot command
+		// draws it while the load still owns the screen. Console commands do
+		// not run inside a load, so nothing else can capture it.
+		if ( com_captureLoadingScreen.GetBool() ) {
+			static int loadingScreenCaptures = 0;
+			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "screenshot \"screenshots/loading_%d.tga\"", ++loadingScreenCaptures ) );
 		}
 	}
 
@@ -9863,6 +9963,7 @@ idSessionLocal::Draw
 */
 void idSessionLocal::Draw() {
 	if ( guiActive != NULL || mapSpawned ) RetainedUI_EndInitialization();
+	Session_RestoreLoadingBackground();
 	static const int fallbackMenuDelayMs = 3000;
 	const int presentationTime = common->GetPresentationTime();
 	if ( guiDemoMenu != NULL && ( IsDemoPlaybackActive() || guiActive == guiDemoMenu ) ) {
