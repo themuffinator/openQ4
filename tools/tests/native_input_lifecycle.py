@@ -80,8 +80,10 @@ def main():
             for name,file,old,new in mutations:
                 text=includes[file]
                 if name=='setter-too-late':
-                    old='if (nameString.Icmp("com_asyncInput") == 0) openq4::NativeInputBeforeInputBlockerChange();\n\tCVar_AssignString( valueString, newValue, ( flags & CVAR_PRIVATE ) != 0 );'
-                    new='CVar_AssignString( valueString, newValue, ( flags & CVAR_PRIVATE ) != 0 );\n\tif (nameString.Icmp("com_asyncInput") == 0) openq4::NativeInputBeforeInputBlockerChange();'
+                    # The renderer-module sync between the hook and the assignment (8ed86d2d9)
+                    # stays in place; only the hook moves past the value change.
+                    old='if (nameString.Icmp("com_asyncInput") == 0) openq4::NativeInputBeforeInputBlockerChange();\n#ifndef ID_DEDICATED\n\tif ( flags & CVAR_RENDERER ) R_RendererModule_SyncConfiguration();\n#endif\n\tCVar_AssignString( valueString, newValue, ( flags & CVAR_PRIVATE ) != 0 );'
+                    new='#ifndef ID_DEDICATED\n\tif ( flags & CVAR_RENDERER ) R_RendererModule_SyncConfiguration();\n#endif\n\tCVar_AssignString( valueString, newValue, ( flags & CVAR_PRIVATE ) != 0 );\n\tif (nameString.Icmp("com_asyncInput") == 0) openq4::NativeInputBeforeInputBlockerChange();'
                 expected=2 if name=='setter-missing' else 1
                 if text.count(old)!=expected:raise RuntimeError('Mutation anchor '+name+' count='+str(text.count(old)))
                 case(name,{file:text.replace(old,new)},True)

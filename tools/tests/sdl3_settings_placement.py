@@ -24,7 +24,7 @@ struct PlacementCvar {
     void SetInteger(int next){++placementWrites;if(refusedPlacement!=name){value=next;modified=true;}}
     void ClearModified(){++clearedFlags;modified=false;}
 };
-struct Win32 { bool cdsFullscreen=false;PlacementCvar win_xpos{"x",42},win_ypos{"y",43}; } win32;
+struct Win32 { bool cdsFullscreen=false;void* hWnd=reinterpret_cast<void*>(0x1234);PlacementCvar win_xpos{"x",42},win_ypos{"y",43}; } win32;
 static PlacementCvar r_windowWidth{"width",1280},r_windowHeight{"height",720};
 '''
 EXTRA = r'''
@@ -94,8 +94,16 @@ int main() {
 
 def main():
     source = (ROOT / 'src/sys/sdl3/sdl3_backend.cpp').read_text(encoding='utf-8')
-    support = window_test.SUPPORT.replace('struct Win32 { bool cdsFullscreen=false; } win32;', CVARS)
-    support = support.replace('static bool Sys_WindowPlacementLeaseActive() { return false; }', '')
+    # Swap the placement CVars into the shared harness's window state. A silent
+    # miss leaves the CVars undeclared, so require each anchor exactly once.
+    support = window_test.SUPPORT
+    for anchor, replacement in (
+        ('struct Win32 { bool cdsFullscreen=false;void* hWnd=reinterpret_cast<void*>(0x1234); } win32;', CVARS),
+        ('static bool Sys_WindowPlacementLeaseActive() { return false; }', ''),
+    ):
+        if support.count(anchor) != 1:
+            raise RuntimeError('sdl3_strict_window.SUPPORT anchor changed: ' + anchor)
+        support = support.replace(anchor, replacement)
     signatures = ('static bool SDL3_PlacementError(', 'static sysWindowPlacementSnapshot_t SDL3_ReadPlacementSettings(',
                   'static bool SDL3_SamePlacement(', 'bool Sys_WindowPlacementLeaseActive(',
                   'bool Sys_BeginWindowPlacementLease(', 'bool Sys_ReadWindowPlacementLease(',

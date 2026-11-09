@@ -86,9 +86,14 @@ def validate_tree(tree: str) -> dict[str, str]:
 
     medic = strip_comments(body(cpp, "stateResult_t rvAIMedic::State_Medic ( const stateParms_t& parms )"))
     move_stage = medic[medic.index("case STAGE_MOVE:"):medic.index("case STAGE_PRE_HEAL_ANIM_WAIT:")]
-    first_statement = move_stage[len("case STAGE_MOVE:"):].lstrip()
-    if not first_statement.startswith("if ( PatientApproachStalled() )"):
-        raise AssertionError(f"{context} must check the watchdog before anything else in the approach stage")
+    # Statements may precede the watchdog (asking a blocking ally to step aside,
+    # b8f1806f1), but none may leave the stage before the watchdog has run.
+    watchdog = move_stage.find("if ( PatientApproachStalled() )")
+    if watchdog < 0:
+        raise AssertionError(f"{context} approach stage does not check the watchdog")
+    preamble = move_stage[len("case STAGE_MOVE:"):watchdog]
+    if re.search(r"\b(return|break|continue|goto)\b", preamble):
+        raise AssertionError(f"{context} must check the watchdog before the approach stage can return")
     giving_up = move_stage[:move_stage.index("return SRESULT_DONE;")]
     for token in ("StopMove( MOVE_STATUS_DONE );", "DropPatient();", "patientRetryTime =", "ExecScriptFunction( mPostHealScript );"):
         if token not in giving_up:

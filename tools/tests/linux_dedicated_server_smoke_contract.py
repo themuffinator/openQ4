@@ -127,7 +127,9 @@ def main() -> None:
     )
     require(
         vertex_cache,
-        "void idVertexCache::Shutdown() {\n\tif ( staticHeaders.next == NULL || deferredFreeList.next == NULL ) {",
+        # deferredFreeList became one list per vertex frame (8ed86d2d9); Init links
+        # every slot, so the current slot's sentinel still marks "never initialized".
+        "void idVertexCache::Shutdown() {\n\tif ( staticHeaders.next == NULL || deferredFreeList[listNum].next == NULL ) {",
         "uninitialized vertex-cache shutdown guard",
     )
 

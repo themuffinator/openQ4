@@ -44,6 +44,10 @@ public final class SetupTaskTest {
     }
     static class GameActivity extends SDLActivity {
         private boolean setupOpening;
+        int orientations;
+        // Production onResume() reapplies the saved orientation (AND-04); the
+        // orientation policy itself is covered by android_interface_setup.py.
+        private void applyScreenOrientation(){++orientations;}
         // PRODUCTION_SETUP_REENTRY
     }
     static void reentry() throws Exception {
@@ -54,7 +58,7 @@ public final class SetupTaskTest {
         require(game.starts==1 && game.finishes==0 && storage.activityActive(),"duplicate setup launch or game torn down");
         try{storage.beginSetup();throw new AssertionError("setup entered live game files");}catch(StorageSession.Busy expected){}
         game.onResume();game.onUnhandledMessage(0x8000,0);
-        require(game.resumes==1 && game.starts==2,"SDL resume or second handoff lost");
+        require(game.resumes==1 && game.orientations==1 && game.starts==2,"SDL resume, orientation reapply or second handoff lost");
         game.onResume();game.fail=true;game.onUnhandledMessage(0x8000,0);game.fail=false;game.onUnhandledMessage(0x8000,0);
         require(Toast.shown==1 && game.starts==3,"failed handoff was not reported/retryable");
         for(int state=0;state<3;++state){

@@ -230,6 +230,11 @@ jobs:
             tools/tests/savegame_restore_render_handles.py \
             tools/tests/savegame_restore_spawn_refs.py \
             tools/tests/savegame_restore_threads.py \
+            tools/tests/savegame_restore_af.py \
+            tools/tests/savegame_restore_animation.py \
+            tools/tests/savegame_restore_events.py \
+            tools/tests/savegame_restore_physics.py \
+            tools/tests/vehicle_hud.py \
             tools/tests/ui_engine_thread.py \
             tools/tests/ui_generated_images.py \
             tools/tests/arena_sound_runtime.py \
@@ -263,6 +268,7 @@ jobs:
             tools/tests/clip_empty_model_behavior.py \
             tools/tests/medic_yield_behavior.py \
             tools/tests/awakening_m07_behavior.py \
+            tools/tests/awakening_chapter_behavior.py \
             tools/tests/awakening_m01_cinematic.py \
             tools/tests/awakening_status_runtime.py \
             tools/tests/monster_hit_materials.py \
@@ -368,6 +374,7 @@ jobs:
             tools/tests/mp_bot_server_menu.py \
             tools/tests/mp_bot_team_balance.py \
             tools/tests/mp_bot_team_orders.py \
+            tools/tests/mp_bot_hazards.py \
             tools/tests/mp_client_combat_effects.py \
             tools/tests/bse_retail_parity.py \
             tools/tests/mp_lag_compensation_contract.py \
@@ -771,6 +778,11 @@ jobs:
           python tools/tests/savegame_restore_render_handles.py
           python tools/tests/savegame_restore_spawn_refs.py
           python tools/tests/savegame_restore_threads.py
+          python tools/tests/savegame_restore_af.py
+          python tools/tests/savegame_restore_animation.py
+          python tools/tests/savegame_restore_events.py
+          python tools/tests/savegame_restore_physics.py
+          python tools/tests/vehicle_hud.py
           python tools/tests/ui_engine_thread.py
           python tools/tests/ui_generated_images.py
           python tools/tests/filesystem_case_segments.py
@@ -792,6 +804,7 @@ jobs:
           python tools/tests/clip_empty_model_behavior.py
           python tools/tests/medic_yield_behavior.py
           python tools/tests/awakening_m07_behavior.py
+          python tools/tests/awakening_chapter_behavior.py
           python tools/tests/generated_animation_cache.py
           python tools/tests/level_load_cache.py
           python tools/tests/lightgrid_map_identity.py
@@ -891,6 +904,7 @@ jobs:
           python tools/tests/mp_bot_server_menu.py
           python tools/tests/mp_bot_team_balance.py
           python tools/tests/mp_bot_team_orders.py
+          python tools/tests/mp_bot_hazards.py
           python tools/tests/mp_client_combat_effects.py
           python tools/tests/bse_retail_parity.py
           python tools/tests/mp_lag_compensation_contract.py

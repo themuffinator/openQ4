@@ -873,6 +873,52 @@ def validate_validation_wiring() -> None:
         # The NumPy reference the PBR laboratory oracles import; its fitted
         # kernels are tested natively in PBRMathTest.
         "pbr_reference.py",
+        # Awakening campaign drivers launch the staged SP client on the
+        # user-supplied expansion assets; awakening_chapter_behavior.py and the
+        # *_behavior.py extractions cover their production paths in CI.
+        "awakening_alarm_runtime.py",
+        "awakening_chapter_followup.py",
+        "awakening_finale_runtime.py",
+        "awakening_m03_m04_runtime.py",
+        "awakening_m05_m06_runtime.py",
+        "awakening_m07_runtime.py",
+        "awakening_missions_runtime.py",
+        "awakening_prison_runtime.py",
+        "awakening_route_runtime.py",
+        # Content-pack drivers host or join staged binaries with chosen packs.
+        "content_pack_split_smoke.py",
+        "content_pack_status_smoke.py",
+        "lightgrid_pack_load_test.py",
+        "loadscreen_format_audit.py",
+        # Recorded bot recovery replays launch a staged MP server and client.
+        "mp_bot_air_recovery_replay.py",
+        "mp_bot_hit_recovery_replay.py",
+        "mp_bot_pad_traffic_replay.py",
+        # Need a staged OpenXR client, the built test runtime and retail assets.
+        "openxr_vr_playspace_smoke.py",
+        "openxr_vr_stereo_cost.py",
+        "openxr_vr_stereo_share_smoke.py",
+        "openxr_vr_temporal_smoke.py",
+        # Benchmark and engine-capture drivers need a staged client, a GPU and
+        # retail assets.
+        "performance_suite.py",
+        "ui_scope_performance.py",
+        "renderer_debug_capture.py",
+        "renderer_stencil_debug_capture.py",
+        "renderer_tiled_capture.py",
+        "renderer_view_capture.py",
+        "renderer_hdr_stock_fallback.py",
+        "renderer_motion_blur_qualification.py",
+        "renderer_screen_space_effects_qualification.py",
+        "renderer_shadow_motion_qualification.py",
+        "renderer_temporal_qualification.py",
+        "renderer_vulkan_descriptor_pressure.py",
+        "renderer_vulkan_pipeline_pressure.py",
+        "renderer_vulkan_uniform_pressure.py",
+        # Optional Windows evidence helpers imported by
+        # renderer_vulkan_presentation.py, whose --self-test is wired.
+        "renderer_foreground_observer.py",
+        "renderer_presentmon.py",
     }
     discovered_tests = sorted(path.name for path in (ROOT / "tools" / "tests").glob("*.py"))
     if not discovered_tests:

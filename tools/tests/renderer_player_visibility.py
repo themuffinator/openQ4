@@ -762,9 +762,23 @@ def test_the_outline_only_list_is_read_by_the_outline_pass_alone():
             readers[path.name] = hits
 
     assert_true(
-        set(readers) == {"tr_light.cpp", "tr_local.h", "draw_common.cpp"},
-        "only the writer (tr_light.cpp), the declaration (tr_local.h) and the outline pass "
-        f"(draw_common.cpp) may name the list; found {sorted(readers)}",
+        set(readers) == {"tr_light.cpp", "tr_local.h", "draw_common.cpp", "FrameSnapshot.cpp"},
+        "only the writer (tr_light.cpp), the declaration (tr_local.h), the outline pass "
+        f"(draw_common.cpp) and the frame snapshot (FrameSnapshot.cpp) may name the list; found {sorted(readers)}",
+    )
+
+    # The render-thread frame snapshot retains the list's surfaces in place for
+    # the overlapped frame; it may only copy them, never hand them to a pass.
+    snapshot_uses = [
+        line.strip() for line in read(RENDERER / "FrameSnapshot.cpp").splitlines() if "outlineDrawSurfs" in line
+    ]
+    retained = (
+        "snapshot.Surface( view->outlineDrawSurfs[i]",
+        "prepareMaterial( view->outlineDrawSurfs[i]->material )",
+    )
+    assert_true(
+        all(any(use in line for use in retained) for line in snapshot_uses),
+        f"the frame snapshot may only retain outline-only surfaces, not route them; found {snapshot_uses}",
     )
 
     source = read(RENDERER / "draw_common.cpp")

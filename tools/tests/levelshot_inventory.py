@@ -11,6 +11,7 @@ the index from an installed/source asset tree containing ``maps.def`` and
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import re
@@ -23,7 +24,7 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INDEX = ROOT / "tools" / "tests" / "data" / "retail_levelshot_mapdefs.tsv"
-DEFAULT_CONTENT_ROOT = ROOT / "content" / "baseoq4" / "pak1"
+CONTENT_PACKS = ROOT / "tools" / "build" / "content_packs.json"
 CLASS_SOURCES = {"base": "maps.def", "map-pack": "raven_mappack.def"}
 EXPECTED_COUNTS = {"base": 56, "map-pack": 7}
 VARIANTS = ("", "_left", "_right", "_top", "_bottom")
@@ -266,10 +267,21 @@ def validate_coverage(entries: list[Entry], content_root: Path) -> list[tuple[En
     return incomplete
 
 
+def loadscreen_pack_root() -> Path:
+    """Source folder of the content pack that ships the loadscreens (pak2 since PKG-02)."""
+    packs = json.loads(CONTENT_PACKS.read_text(encoding="utf-8"))["packs"]
+    roots = [ROOT / pack["source"] for pack in packs
+             if any(name.startswith("gfx/guis/loadscreens/") for name in pack.get("required_files", ()))]
+    if len(roots) != 1:
+        raise SystemExit(f"expected exactly one loadscreen content pack in {CONTENT_PACKS.name}, found {len(roots)}")
+    return roots[0]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--index", type=Path, default=DEFAULT_INDEX)
-    parser.add_argument("--content-root", type=Path, default=DEFAULT_CONTENT_ROOT)
+    parser.add_argument("--content-root", type=Path, default=None,
+                        help="loadscreen pack source (default: the pack content_packs.json assigns them to)")
     parser.add_argument(
         "--retail-def-root",
         type=Path,
@@ -286,6 +298,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.content_root is None:
+        args.content_root = loadscreen_pack_root()
     entries = read_index(args.index)
     if args.retail_def_root is not None:
         compare_retail_sources(entries, args.retail_def_root)

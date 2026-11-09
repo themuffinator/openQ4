@@ -368,8 +368,10 @@ def make_macos_archive_entries(
             0o644,
         ),
         f"{prefix}openQ4.app/Contents/Resources/{package.GAME_DIR_NAME}/mod.json": (b'{"version":"0.2.000"}\n', 0o644),
-        f"{prefix}openQ4.app/Contents/Resources/{package.GAME_DIR_NAME}/pak0.pk4": (b"pk4\n", 0o644),
-        f"{prefix}openQ4.app/Contents/Resources/{package.GAME_DIR_NAME}/pak1.pk4": (b"pk4\n", 0o644),
+        **{
+            f"{prefix}openQ4.app/Contents/Resources/{package.GAME_DIR_NAME}/{pak_name}": (b"pk4\n", 0o644)
+            for pak_name in package.OPENQ4_PACK_NAMES
+        },
         f"{prefix}openQ4.app/Contents/Resources/assets/splash/quake4_rt_bitmap_4001.bmp": (b"bmp\n", 0o644),
         f"{prefix}openQ4.app/Contents/Info.plist": (plist_bytes, 0o644),
         f"{prefix}openQ4.app/Contents/PkgInfo": (package.MACOS_PKGINFO_BYTES, 0o644),
@@ -631,8 +633,8 @@ def validate_macos_app_bundle_validator_runtime() -> None:
         write_test_file(app_contents / "Resources" / "openQ4.icns", b"icns\n")
         write_test_file(app_contents / "Resources" / "VERSION.txt", b"openQ4\n")
         write_test_file(app_contents / "Resources" / package.GAME_DIR_NAME / "mod.json", b"{}\n")
-        write_test_file(app_contents / "Resources" / package.GAME_DIR_NAME / "pak0.pk4", b"pk4\n")
-        write_test_file(app_contents / "Resources" / package.GAME_DIR_NAME / "pak1.pk4", b"pk4\n")
+        for pak_name in package.OPENQ4_PACK_NAMES:
+            write_test_file(app_contents / "Resources" / package.GAME_DIR_NAME / pak_name, b"pk4\n")
         write_test_file(
             app_contents / "Resources" / "assets" / "splash" / "quake4_rt_bitmap_4001.bmp",
             b"bmp\n",
@@ -740,8 +742,8 @@ def validate_macos_app_bundle_validator_runtime() -> None:
         missing_icon_install = work / "missing-icon-install"
         write_test_file(missing_icon_package / f"openQ4-client_{arch}", client_bytes, 0o755)
         write_test_file(missing_icon_package / package.GAME_DIR_NAME / "mod.json", b"{}\n")
-        write_test_file(missing_icon_package / package.GAME_DIR_NAME / "pak0.pk4", b"pk4\n")
-        write_test_file(missing_icon_package / package.GAME_DIR_NAME / "pak1.pk4", b"pk4\n")
+        for pak_name in package.OPENQ4_PACK_NAMES:
+            write_test_file(missing_icon_package / package.GAME_DIR_NAME / pak_name, b"pk4\n")
         write_test_file(
             missing_icon_package / package.GAME_DIR_NAME / f"game-sp_{arch}.dylib",
             b"sp-module\n",
@@ -809,8 +811,8 @@ def validate_macos_self_contained_app_creation_runtime() -> None:
     try:
         write_test_file(package_root / f"openQ4-client_{arch}", b"client\n", 0o755)
         write_test_file(package_root / package.GAME_DIR_NAME / "mod.json", b"{}\n")
-        write_test_file(package_root / package.GAME_DIR_NAME / "pak0.pk4", b"pak0\n")
-        write_test_file(package_root / package.GAME_DIR_NAME / "pak1.pk4", b"pak1\n")
+        for pak_name in package.OPENQ4_PACK_NAMES:
+            write_test_file(package_root / package.GAME_DIR_NAME / pak_name, pak_name.removesuffix(".pk4").encode() + b"\n")
         write_test_file(
             package_root / package.GAME_DIR_NAME / f"game-sp_{arch}.dylib",
             b"sp\n",
@@ -858,8 +860,7 @@ def validate_macos_self_contained_app_creation_runtime() -> None:
             raise AssertionError("macOS package must not retain the renderer module beside the app")
         for relative_path in (
             package.MACOS_APP_GAME_DATA_DIR / "mod.json",
-            package.MACOS_APP_GAME_DATA_DIR / "pak0.pk4",
-            package.MACOS_APP_GAME_DATA_DIR / "pak1.pk4",
+            *(package.MACOS_APP_GAME_DATA_DIR / pak_name for pak_name in package.OPENQ4_PACK_NAMES),
             package.MACOS_APP_SPLASH_DIR / "quake4_rt_bitmap_4001.bmp",
             package.MACOS_APP_FRAMEWORKS_DIR / f"game-sp_{arch}.dylib",
             package.MACOS_APP_FRAMEWORKS_DIR / f"game-mp_{arch}.dylib",
@@ -3131,7 +3132,18 @@ def validate_packaging_and_release_contract() -> None:
     require(package, "code signature verification", "macOS code-sign validation")
     require(package, "game-sp_{arch}.dylib", "macOS archive game module validation")
     require(package, "game-mp_{arch}.dylib", "macOS archive game module validation")
-    require(package, "pak1.pk4", "macOS archive level pack validation")
+    # Since PKG-02 the archive check expects every pack content_packs.json lists
+    # (core pak0, light-grid pak1, loadscreen pak2) rather than naming each one.
+    require(
+        python_function_body(package, "def validate_macos_archive_contents("),
+        "for pak_name in OPENQ4_PACK_NAMES",
+        "macOS archive content pack validation",
+    )
+    require(
+        pak_helper,
+        "OPENQ4_PACK_NAMES = tuple(spec.name for spec in OPENQ4_CONTENT_PACKS)",
+        "macOS archive content pack list",
+    )
     require(package, "macOS archive contains non-runtime metadata/debug entries", "macOS archive metadata validation")
     require(package, "MACOS_FORBIDDEN_ARCHIVE_PREFIXES", "macOS archive metadata validation")
     require(package, "MACOS_FORBIDDEN_ARCHIVE_SUFFIXES", "macOS archive metadata validation")
@@ -4042,8 +4054,8 @@ def validate_macos_game_layer_bundle_runtime() -> None:
         shutil.rmtree(package_root, ignore_errors=True)
         write_test_file(package_root / f"openQ4-client_{arch}", b"client\n", 0o755)
         write_test_file(package_root / package.GAME_DIR_NAME / "mod.json", b"{}\n")
-        write_test_file(package_root / package.GAME_DIR_NAME / "pak0.pk4", b"pak0\n")
-        write_test_file(package_root / package.GAME_DIR_NAME / "pak1.pk4", b"pak1\n")
+        for pak_name in package.OPENQ4_PACK_NAMES:
+            write_test_file(package_root / package.GAME_DIR_NAME / pak_name, pak_name.removesuffix(".pk4").encode() + b"\n")
         write_test_file(package_root / package.GAME_DIR_NAME / f"game-sp_{arch}.dylib", b"sp\n", 0o755)
         write_test_file(package_root / package.GAME_DIR_NAME / f"game-mp_{arch}.dylib", b"mp\n", 0o755)
         write_test_file(package_root / f"renderer-vk_{arch}.dylib", b"renderer-vk\n", 0o755)

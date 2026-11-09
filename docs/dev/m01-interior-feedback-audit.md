@@ -50,7 +50,7 @@ python tools/tests/awakening_m01_cinematic.py --runtime .install --retail "E:/St
 ### Sound exists, but the scene has little evolving environmental detail
 
 The eight helper cues in
-[the sound declarations](../../content/baseoq4/pak0/sound/openq4_m01_cinematic.sndshd)
+the sound declarations (`content/baseoq4/pak0/sound/openq4_m01_cinematic.sndshd`)
 use deliberately restrained gains: cabin -18 dB, wind -22, impact -14, breach
 -10, engine failure -17, alarm -25, harness -17 and welding -24. The cabin loses
 another 5 dB after the breach. All are global and bypass occlusion, including
@@ -89,10 +89,10 @@ take `GetViewParms` from the active camera. The render-time refresh can obtain
 those camera parameters again. Adding sound shake data alone therefore does not
 establish that a cinematic shot will respond.
 
-Relevant implementation points are [Camera.cpp](../../src/game/Camera.cpp),
-[Player.cpp](../../src/game/Player.cpp),
-[PlayerView.cpp](../../src/game/PlayerView.cpp) and
-[sound emitter shake evaluation](../../src/sound/snd_emitter.cpp).
+Relevant implementation points are `src/game/Camera.cpp`,
+`src/game/Player.cpp`,
+`src/game/PlayerView.cpp` and the
+sound emitter shake evaluation in `src/sound/snd_emitter.cpp`.
 Any added response needs one owner at the final camera-sampling stage, composed
 with authored movement rather than written back into the camera entity. It must
 not be overwritten by a later refresh or applied twice to the view/listener.
