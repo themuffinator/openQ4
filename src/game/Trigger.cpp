@@ -381,21 +381,6 @@ void idTrigger_Multi::Spawn( void ) {
 		GetPhysics()->SetContents( CONTENTS_TRIGGER );
 	}
 
-	if ( name == "trigger_once_47" ) {
-		const idBounds b = GetPhysics()->GetAbsBounds();
-		gameLocal.Printf(
-			"DBG trigger spawn name='%s' wait=%.2f delay=%.2f random=%.2f random_delay=%.2f contents=0x%x boundsMins=(%.1f %.1f %.1f) boundsMaxs=(%.1f %.1f %.1f)\n",
-			name.c_str(),
-			wait,
-			delay,
-			random,
-			random_delay,
-			GetPhysics()->GetContents(),
-			b[0].x, b[0].y, b[0].z,
-			b[1].x, b[1].y, b[1].z
-		);
-	}
-
 	BecomeActive( TH_THINK );
 }
 
@@ -436,18 +421,6 @@ idTrigger_Multi::TriggerAction
 ================
 */
 void idTrigger_Multi::TriggerAction( idEntity *activator ) {
-	if ( name == "trigger_once_47" ) {
-		gameLocal.Printf(
-			"DBG trigger action name='%s' activator='%s' triggerWithSelf=%d wait=%.2f nextTriggerTime=%d now=%d targets=%d\n",
-			name.c_str(),
-			activator ? activator->name.c_str() : "<null>",
-			triggerWithSelf ? 1 : 0,
-			wait,
-			nextTriggerTime,
-			gameLocal.time,
-			targets.Num()
-		);
-	}
 // RAVEN BEGIN
 // jdischler: added for Aweldon.  The trigger, when activated, will call the listed func with all attached targets, then return.
 	if ( spawnArgs.GetBool( "_callWithTargets", "0" )) 
@@ -498,16 +471,6 @@ so wait for the delay time before firing
 ================
 */
 void idTrigger_Multi::Event_Trigger( idEntity *activator ) {
-	if ( name == "trigger_once_47" ) {
-		gameLocal.Printf(
-			"DBG trigger event name='%s' activator='%s' now=%d nextTriggerTime=%d triggerFirst=%d\n",
-			name.c_str(),
-			activator ? activator->name.c_str() : "<null>",
-			gameLocal.time,
-			nextTriggerTime,
-			triggerFirst ? 1 : 0
-		);
-	}
 // RAVEN BEGIN
 // bdube: moved trigger first 
 	if ( triggerFirst ) {
@@ -659,21 +622,6 @@ idTrigger_Multi::Event_Touch
 ================
 */
 void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
-	if ( name == "trigger_once_47" ) {
-		gameLocal.Printf(
-			"DBG trigger touch name='%s' by='%s' now=%d nextTriggerTime=%d touchClient=%d touchOther=%d touchVehicle=%d traceId=%d otherWorld=%d triggerWorld=%d\n",
-			name.c_str(),
-			other ? other->name.c_str() : "<null>",
-			gameLocal.time,
-			nextTriggerTime,
-			touchClient ? 1 : 0,
-			touchOther ? 1 : 0,
-			touchVehicle ? 1 : 0,
-			trace ? trace->c.id : -1,
-			other ? other->GetClipWorld() : -1,
-			GetClipWorld()
-		);
-	}
 
 	if( triggerFirst ) {
 		return;
