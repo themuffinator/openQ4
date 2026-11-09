@@ -6,6 +6,40 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Graphics presets rebuilt around frame rates (FPS-02), 9 November 2026
+
+- **Ultra, Quality and Enhanced now hold a frame rate.** On the reference laptop
+  (RTX 4060 Laptop GPU, 2560x1440) Enhanced averages at least 144 fps with 1% lows of
+  90, Quality 100 and 60, and Ultra 75 and 45, in every scene of the performance suite
+  on both OpenGL and Vulkan. Measured: Enhanced 166-298 fps, Quality 120-238, Ultra
+  91-188, where the previous Ultra ran 19-58 fps on OpenGL.
+- **New Maximum preset.** The previous Ultra, with every effect at its maximum
+  (16x MSAA request, 2048 point-light shadows, shadow cascades, motion blur), is now
+  **Maximum**. It makes no frame-rate promise and is only chosen by hand.
+- **What each tier changed.** Ultra uses 4x MSAA, smaller point-light shadows and no
+  cascades or motion blur. Quality uses 2x MSAA and smaller point-light shadows.
+  Enhanced replaces MSAA with SMAA and gives point lights the original stencil shadows
+  while keeping shadow maps for other lights. Every modern tier uses 16x anisotropic
+  filtering. Enhanced's cap rises from 120 to 144 fps.
+- **Fresh installs match your display.** The automatic recommendation caps the frame
+  rate at your display's refresh rate, so a 240 Hz monitor is no longer held at 120.
+  Choosing a preset by name keeps that preset's own cap.
+- **Clearer startup report.** The console's `Quality profile:` line marks the
+  first-launch placeholder as such and then reports the detected profile with the real
+  video memory.
+- **Upgrade note: select your preset again.** Saved settings keep their old values
+  until you pick a preset. If you liked the old Ultra, choose **Maximum**; choose
+  **Ultra**, **Quality** or **Enhanced** to get the new recipes. Setting
+  `com_performancePreset` alone does not reapply a preset; use the menu or
+  `applyPerformancePreset <name>`.
+- Fix: on Vulkan with point-light shadow maps off, the console no longer reports
+  false `shadow map pass failed` errors.
+- Validation: the preset self-test (eight presets), `ui_performance_presets.py`,
+  the SYSTEM catalog and preset tests, the in-game preset smoke on both backends,
+  `renderer_vulkan_shadow_compatibility.py`, and the FPS-02 reference run with 42
+  redeclared budgets in `docs/dev/performance-budgets.json`
+  ([performance report section 11](performance-report.md#11-re-tiered-presets-fps-02)).
+
 ## Frame-rate budgets on the reference machine (FPS-01), 8 November 2026
 
 - Developer tooling and evidence, no shipped default changes. The RTX 4060 Laptop
@@ -26,8 +60,9 @@ See [player release status](../user/release-status.md).
   rerun before it counts (report section 10.4). If the release changes a preset on
   purpose, redeclare with `budgets` and commit the new file. The enforced gate
   remains FPS-09.
-- Known caveat: the Vulkan convoy1 p99 budgets at Quality and Enhanced include an
-  intermittent warm-window stall (FPS-07).
+- Known caveat: the Vulkan convoy1 p99 budgets at Quality and Enhanced include a
+  Vulkan presentation stall: slow presents while the frame work stays short, sometimes
+  with a swapchain recreation (FPS-07). It is not a game-side hitch.
 
 ## Android portrait play and orientation ownership (AND-01, AND-04), 8 November 2026
 

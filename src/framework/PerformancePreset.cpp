@@ -10,47 +10,68 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		50, 0, 0, 30,
 		1, 512, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
-		0, 1, 24, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0 },
+		0, 1, 24, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1 },
 	{ "lowpower", 0, "low",
 		75, 0, 0, 30,
 		1, 1024, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
-		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0 },
+		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1 },
 	{ "performance", 1, "baseline",
 		85, 0, 1, 60,
 		2, 0, 0, 0, 1, 0,
 		0, 1024, 2, 0, 0, 0, 0, 0, 1, 16, 4,
-		0, 1, 40, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0 },
+		0, 1, 40, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1 },
 	{ "balanced", 2, "baseline",
 		100, 2, 1, 120,
 		4, 0, 0, 0, 1, 0,
 		0, 1024, 0, 0, 0, 0, 0, 0, 1, 16, 4,
-		0, 1, 48, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0 },
-	// Native-resolution modern effects without Quality's 4x MSAA, PCSS and larger
-	// maps. Keep unlimited updates: a low budget can make moving shadows stale.
+		0, 1, 48, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1 },
+	// The three top recipes are built from measured feature costs to hold a
+	// refresh class on the reference machine (RTX 4060 Laptop, 2560x1440, both
+	// backends, every timed scene; docs/dev/performance-report.md section 11):
+	// Enhanced 144 Hz average / 90 Hz 1% low, Quality 100/60, Ultra 75/45.
+	//
+	// Enhanced spends its budget on the modern effects: projected and parallel
+	// lights keep 1024 shadow maps, point lights keep the stencil shadows retail
+	// used (their cube maps were its largest cost), and SMAA high replaces MSAA.
+	// Keep unlimited updates: a low budget can make moving shadows stale.
 	{ "enhanced", 2, "modern",
-		100, 2, 2, 120,
-		4, 0, 0, 0, 1, 0,
+		100, 0, 2, 144,
+		16, 0, 0, 0, 1, 0,
 		1, 1024, 0, 1, 1, 1, 0, 0, 1, 16, 4,
-		0, 1, 48, 512, 5, 5, 0, 0, 4096, 12, 5, 8, 0 },
+		0, 1, 48, 512, 5, 5, 0, 0, 4096, 12, 5, 8, 0, 0 },
+	// Quality shadow-maps every light class: 2048 projected maps with PCSS and
+	// 512 point cubes, with 2x MSAA under SMAA high.
 	{ "quality", 3, "modern",
-		100, 4, 2, 144,
-		8, 0, 0, 0, 1, 0,
+		100, 2, 2, 144,
+		16, 0, 0, 0, 1, 0,
 		1, 2048, 0, 1, 1, 1, 0, 0, 1, 32, 4,
-		0, 1, 48, 1024, 9, 9, 2, 0, 4096, 20, 5, 8, 0 },
+		0, 1, 48, 512, 9, 9, 2, 0, 4096, 20, 5, 8, 0, 1 },
 	// image_usePrecompressedTextures stays at 1 here even though retail's top
 	// machine spec used 0. In openQ4 that cvar also gates user-supplied DDS
 	// replacement packs, so 0 silently discarded a player's high-resolution BC7
 	// art the moment they touched the settings menu - the reverse of what the
 	// highest preset should do.
-	// Ultra requests every supported quality maximum; hardware clamps MSAA.
-	// Render scale stays native. CRT and exposure/strength controls are artistic
-	// preferences, not quality levels; experimental rendering modes stay opt-in.
+	//
+	// Ultra is the best image that still holds 75 Hz: 4x MSAA under SMAA ultra,
+	// 4096 projected maps with 13-tap PCSS in an 8192 atlas, and 32 SSAO samples.
+	// Point cubes stay at 512 (larger cubes cost more than every other upgrade
+	// together), and cascades and motion blur are left to Maximum.
 	{ "ultra", 3, "high-end",
+		100, 4, 3, 240,
+		16, 0, 0, 0, 1, 0,
+		1, 4096, 0, 1, 1, 1, 0, 0, 1, 32, 4,
+		0, 1, 48, 512, 13, 9, 2, 0, 8192, 32, 5, 8, 0, 1 },
+	// Maximum requests every supported quality maximum and carries no frame-rate
+	// target (FPS-02): it is the choice for players who want everything on.
+	// Hardware clamps MSAA. Render scale stays native. CRT and exposure/strength
+	// controls are artistic preferences, not quality levels; experimental
+	// rendering modes stay opt-in.
+	{ "maximum", 3, "high-end",
 		100, 16, 3, 240,
 		16, 0, 0, 0, 1, 0,
 		1, 4096, 0, 1, 1, 1, 1, 0, 1, 32, 4,
-		0, 1, 48, 2048, 13, 13, 2, 1, 16384, 32, 5, 16, 1 }
+		0, 1, 48, 2048, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1 }
 }};
 static const std::array<const char*,PerformancePresetTargetCount> Targets{{
 	"com_performancePreset",
@@ -159,7 +180,7 @@ bool ExpandPerformancePreset(const PerformancePreset& preset,PerformancePresetAs
   {"r_ssaoSamples",preset.ssaoSamples},
   {"r_bloomMipCount",preset.bloomMipCount},
   {"r_motionBlurSamples",preset.motionBlurSamples},
-  {"r_shadowMapPointLights",1},
+  {"r_shadowMapPointLights",preset.shadowMapPointLights},
   {"r_hdrSceneTarget",preset.hdrToneMap},
   {"r_shadows",1},
   {"r_skipBump",0},
@@ -233,6 +254,11 @@ PerformancePresetDetection DetectPerformancePreset(const PerformancePresetSignal
  if((signals.logicalCpus<4||signals.logicalCpus>4096)&&tier>2){tier=2;result.reason=Reason::Cpu;}
  result.preset=&Presets[tier];
  result.screenFraction=result.preset->screenFraction;
+ // The tier's cap is a default for a manual choice; a detected start presents
+ // at the display's own rate instead, so a 240 Hz panel is not held at 120.
+ result.maxFps=result.preset->maxFps;
+ if(signals.displayRefreshHz>=PerformancePresetMinDisplayRefreshHz&&signals.displayRefreshHz<=PerformancePresetMaxDisplayRefreshHz)
+  result.maxFps=signals.displayRefreshHz;
  result.postAA=(signals.postAAAvailable||signals.modernEffects)?result.preset->postAA:0;
  // A tier change alone leaves Performance rendering 6 million pixels on a
  // 4K iGPU. Bound scene work as well, using existing selectable scale steps.
@@ -256,9 +282,10 @@ PerformancePresetDetection DetectPerformancePreset(const PerformancePresetSignal
 }
 bool ResolveDetectedPerformancePreset(const PerformancePresetDetection& detection,PerformancePreset& output) noexcept{
  if(!detection.preset||detection.screenFraction<10||detection.screenFraction>detection.preset->screenFraction||
-    detection.postAA<0||detection.postAA>detection.preset->postAA)return false;
+    detection.postAA<0||detection.postAA>detection.preset->postAA||
+    detection.maxFps<0||detection.maxFps>PerformancePresetMaxDisplayRefreshHz)return false;
  auto resolved=*detection.preset;
- resolved.screenFraction=detection.screenFraction;resolved.postAA=detection.postAA;
+ resolved.screenFraction=detection.screenFraction;resolved.postAA=detection.postAA;resolved.maxFps=detection.maxFps;
  output=resolved;return true;
 }
 } // namespace openq4

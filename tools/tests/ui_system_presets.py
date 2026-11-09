@@ -12,7 +12,7 @@ sys.path.insert(0,str(ROOT/'tools/ui'))
 import build_retained_screens as screens
 import retained_system as system
 SOURCE=screens.OUTPUTS['system']
-PROFILES=('minimum','lowpower','performance','balanced','enhanced','quality','ultra')
+PROFILES=('minimum','lowpower','performance','balanced','enhanced','quality','ultra','maximum')
 GRAPHICS=0  # page.tab of the GRAPHICS tab, which holds the preset and the renderer rows
 
 def load(path):
@@ -127,7 +127,7 @@ class Presets(unittest.TestCase):
                 self.assertEqual(self.nodes[new+'-'+part],expected)
         for id,node in self.nodes.items():
             if id.startswith(('settings_preset','settings_autodetect')):self.assertNotEqual(node['type'],'image')
-    def test_all_locales_have_exact_seven_labels(self):
+    def test_all_locales_have_exact_eight_labels(self):
         files=sorted((ROOT/'content/baseoq4/pak0/strings').glob('*_openq4.lang'))
         self.assertEqual({f.stem for f in files},{n+'_openq4' for n in ('english','french','german','italian','spanish','polish','russian',
             'brazilian','czech','hungarian','turkish','ukrainian')})
@@ -135,7 +135,7 @@ class Presets(unittest.TestCase):
             for id in ('229976','229977','229978','230010'):
                 values=re.findall(r'"#str_'+id+r'"\s+"([^"\r\n]+)"',file.read_text(encoding='utf-8'))
                 self.assertEqual(len(values),1,file.name+id)
-                if id=='229977':self.assertEqual(len(values[0].split(';')),7)
+                if id=='229977':self.assertEqual(len(values[0].split(';')),len(PROFILES))
     def test_no_duplicate_profile_values_in_page(self):
         self.assertEqual(self.page['actions']['preset']['arguments'],{'name':{'input':'value'}})
         self.assertEqual(self.page['events']['autoDetect'][0]['then'],[{'op':'action','action':'autoDetect'}])

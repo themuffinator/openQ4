@@ -67,6 +67,7 @@ COMMON_SUPPORT=r'''
 #include <vector>
 #include "src/framework/PerformancePreset.h"
 #include "src/framework/CVarAssignmentCapture.h"
+#include "src/sys/DisplayModeRule.h"
 static int checks=0;
 static void Check(bool v,const char* m){++checks;if(!v){std::fprintf(stderr,"FAIL: %s\n",m);std::exit(1);}}
 struct idStr:std::string{
@@ -86,6 +87,7 @@ struct Cvars{
  idCVar* Find(const char* name){auto i=vars.find(name);return i==vars.end()?nullptr:&i->second;}
  void SetCVarString(const char* key,const char* value,int flags){calls.push_back(key);if(refuse==key)return;openq4::CVarAssignmentCapture::Record(key);auto& v=vars.at(key);v.value=std::string(key)=="com_performancePreset"&&!*value?"balanced":value;v.flags|=flags;modified|=flags;}
  void SetCVarInteger(const char* key,int value,int flags){if(std::string(key)=="image_anisotropy"&&value>16)value=16;SetCVarString(key,std::to_string(value).c_str(),flags);}
+ float GetCVarFloat(const char* key){auto i=vars.find(key);return i==vars.end()?0.0f:(float)std::atof(i->second.value.c_str());}
  int GetModifiedFlags()const{return modified;}void ClearModifiedFlags(int f){modified&=~f;}void SetModifiedFlags(int f){modified|=f;}
 } cvars,*cvarSystem=&cvars;
 struct Common{int warnings=0,prints=0;void Warning(const char*,...){++warnings;}void Printf(const char*,...){++prints;}void SetMachineSpec();} instance,*common=&instance;
@@ -106,6 +108,9 @@ static int SDL_GetSystemRAM(){observations.push_back("ram");return raw.systemRam
 static int Sys_GetVideoRam(){observations.push_back("vram");return raw.videoRamMB;}
 #define USE_SDL3 1
 static int SDL_GetNumLogicalCPUCores(){observations.push_back("cpu");return raw.logicalCpus;}
+// The display rate a detected start caps at (FPS-02); not an observation the
+// ordering checks count.
+static float Sys_SDL_GetWindowRefreshHz(){return (float)raw.displayRefreshHz;}
 struct Config{bool isInitialized=true;int dedicatedVideoMemoryMB=0,vidWidth=0,vidHeight=0,maxTextureSize=0;RendererGpuClass gpuClass=RendererGpuClass::Unknown;const char* version_string="OpenGL";bool GLSL130Available=true,GLSLProgramAvailable=true,ARBVertexProgramAvailable=true,ARBFragmentProgramAvailable=true;struct{bool hasFBO=true;}backendCaps;};
 struct Renderer{
  bool initialized=true;

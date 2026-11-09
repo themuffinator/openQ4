@@ -45,9 +45,12 @@ struct PerformancePreset {
 	int bloomMipCount;
 	int motionBlurSamples;
 	int shadowMapCSM;
+	// 0 leaves point lights on the stencil shadows retail used; spot and
+	// parallel lights keep their shadow maps (FPS-02 Enhanced).
+	int shadowMapPointLights;
 };
 inline constexpr const char* PerformancePresetDefaultName = "balanced";
-inline constexpr int PerformancePresetCount = 7;
+inline constexpr int PerformancePresetCount = 8;
 inline constexpr int PerformancePresetTargetCount = 55;
 const std::array<PerformancePreset,PerformancePresetCount>& PerformancePresets() noexcept;
 const std::array<const char*,PerformancePresetTargetCount>& PerformancePresetTargets() noexcept;
@@ -74,6 +77,8 @@ struct PerformancePresetSignals {
  RendererGpuClass gpuClass=RendererGpuClass::Unknown;
  bool modernEffects=false, postAAAvailable=false;
  int logicalCpus=0, drawableWidth=0, drawableHeight=0;
+ // Whole-hertz refresh of the display the window is on, 0 when unknown.
+ int displayRefreshHz=0;
 };
 enum class PerformancePresetReason { ExplicitLowPower, RaspberryPi, SteamDeck, Mobile, LegacyRenderer,
  Software, Virtual, LowMemory, ModestMemory, Dedicated, Shared, Unknown, Resolution, Cpu };
@@ -84,11 +89,17 @@ struct PerformancePresetDetection {
  // Automatic recommendations can reduce the template's scene scale and omit
  // unsupported post AA. Manual presets remain immutable and hardware-neutral.
  int screenFraction=100, postAA=0, scenePixelBudget=0;
+ // A first launch presents at the display's rate rather than the tier's
+ // manual-choice cap (FPS-02); the tier's cap when the rate is unknown.
+ int maxFps=0;
 };
 inline constexpr int PerformancePresetUnknownSystemRamMB=0;
 inline constexpr int PerformancePresetUnknownVideoRamMB=0;
 inline constexpr int PerformancePresetMaxSystemRamMB=4*1024*1024;
 inline constexpr int PerformancePresetMaxVideoRamMB=256*1024;
+// Display rates a detected frame cap follows; the com_maxfps range bounds the top.
+inline constexpr int PerformancePresetMinDisplayRefreshHz=30;
+inline constexpr int PerformancePresetMaxDisplayRefreshHz=1000;
 int SanitizePerformancePresetMemoryMB(int raw,int fallback,int maximum) noexcept;
 PerformancePresetDetection DetectPerformancePreset(const PerformancePresetSignals&) noexcept;
 bool ResolveDetectedPerformancePreset(const PerformancePresetDetection&,PerformancePreset&) noexcept;
