@@ -2988,6 +2988,11 @@ completed release material here and publish curated notes in `releases/`.
   show a reflection instead of horizontal streaks. Vulkan was unaffected.
   [Details](platform-recovery-review.md#opengl-portal-sky-and-mirror-fixes-9-november-2026).
 
+- [x] VR: nearby ground, wreckage and other large parts of a level no longer
+  disappear from the headset view, leaving distant desert showing where they
+  should be. Both renderers were affected; flat play was not.
+  [Details](platform-recovery-review.md#vr-eye-culling-restored-9-november-2026).
+
 - [x] Recover safely when a damaged save fails partway through physics or
   vehicle data. Partial physics state no longer points cleanup at another
   entity or indexes unset contacts, and failed vehicle-part reads release their

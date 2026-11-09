@@ -1727,6 +1727,12 @@ and AND-05.
   runtime; see the [integration evidence](platform-recovery-review.md#vulkan-egl-and-world-gui-xr-integration-6-november-2026).
   Quest (`65aa9bd88`) is not integrated: by decision it waits on AND-05's
   distribution decision. Physical headsets remain VR-02.
+  9 November: the review missed two fixes on that branch. The off-axis culling
+  planes fix (`ea85bdd7b`) is restored in `3a40f705c`; without it the eyes lost
+  near terrain and wreckage on both renderers
+  ([evidence](platform-recovery-review.md#vr-eye-culling-restored-9-november-2026)).
+  `383eebfc5` (a VR seat follows the turn a script makes as it seats the
+  player) is still unreviewed.
 - [ ] **VR-02 — P1, qualification: real headset gameplay and comfort.** Qualify
   available PC runtimes/headsets for refresh pacing, tracking latency, aim/grip,
   handedness, two-hand weapons, haptics, room-scale collision/MP prediction, crouch,

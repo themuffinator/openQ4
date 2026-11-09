@@ -302,6 +302,37 @@ off, and Vulkan's capture. The mirror shows the reflected scene in flat views
 and in both eyes. The share smoke now requires the GUI in each eye on both
 backends.
 
+### VR eye culling restored (9 November 2026)
+
+The share smoke's eye captures showed flat, smeared desert to the left of the
+dropship where the flat view at the same pose shows dark, rocky near ground and
+the wrecked dropship's side. OpenGL and Vulkan agreed, so the renderers were not
+the cause. A same-run A/B at the share pose (`10310.89 -6950.34 6.96 150.7`,
+game time stopped, base captures bracketing each change and reading exactly 0
+between them) found culling:
+
+| Change | Left eye | Right eye | Flat view |
+|---|---|---|---|
+| `r_useCulling 0` + `r_useEntityCulling 0`, OpenGL | 36.0% of pixels | 47.8% | 0.00% |
+| the same, Vulkan | 33.7% | 46.5% | 0.00% |
+| `r_useCulling 0` alone, OpenGL | 35.4% | 46.7% | |
+| `r_useEntityCulling 0` alone, OpenGL | 9.0% | 27.2% | |
+
+The cause was fixed once, on 4 October (`ea85bdd7b`): the off-axis branch of
+`R_SetupViewFrustum`, which VR eyes and levelshot tiles take, builds its side
+planes from near-plane extents, so their normals are `zNear * sqrt( 1 + tan^2 )`
+long instead of unit length, and `R_RadiusCullLocalBox` compares those inflated
+distances with world radii. That commit stayed on
+`archive/worktree-wtq-quest-vr`, which the VR-01 recovery reviewed for its
+Vulkan, EGL, Quest and GUI-pointing commits; the culling fix was not among them,
+so main and the 0.13.2 and 0.14.0 releases never had it. `3a40f705c` restores the
+normalization, its source pin and the VR smoke's culling check (turning
+`r_useCulling` off over the open ground at `10094 -6825 130 150.7` must change
+under 0.5% of either eye).
+
+With the fix, every row above reads 0.00% on both renderers, and the eyes show
+the near ground and the wreck the flat view shows.
+
 ## Android selection and package matrix
 
 | Variant | Selected ABI/API/render scope | Distribution and prerequisite |
