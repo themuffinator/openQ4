@@ -229,9 +229,7 @@ look the same as on your monitor.
 Mirrors and other reflective surfaces show each eye its own reflection.
 Screens in the world are drawn once per frame for both eyes, which saves CPU
 time without changing what you see; `r_vrStereoGuiShare 0` draws them for
-each eye separately. With the OpenGL renderer, world screens can disappear
-behind the scenery beyond them in the headset, and mirrors show streaks;
-Vulkan (`r_renderApi vulkan`) draws both correctly.
+each eye separately.
 
 Multiplayer objective markers show flag bases and DeadZone zones on the stereo
 HUD. Their symbols express status, with distance as the only text. They follow

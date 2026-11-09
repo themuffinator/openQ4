@@ -723,9 +723,22 @@ const void	RB_CopyRender( const void *data ) {
 		if ( cmd->copyDepth ) {
 			cmd->image->CopyDepthbuffer( cmd->x, cmd->y, cmd->imageWidth,
 				cmd->imageHeight, cmd->cubeFace );
-		} else {
-			cmd->image->CopyFramebuffer( cmd->x, cmd->y, cmd->imageWidth,
-				cmd->imageHeight, cmd->cubeFace );
+		} else if ( cmd->image->CopyFramebuffer( cmd->x, cmd->y, cmd->imageWidth,
+				cmd->imageHeight, cmd->cubeFace )
+				&& cmd->image->GetOpts().textureType == TT_2D
+				&& ( cmd->image->GetRepeat() == TR_REPEAT
+					|| cmd->image->GetRepeat() == TR_MIRRORED_REPEAT ) ) {
+			// The copy clamps a texture it resizes; a capture keeps the wrap
+			// its material declared. A mirrorRenderMap's screen texgen runs
+			// past [0,1] and relies on TR_REPEAT, as on Vulkan; clamped, it
+			// drew the edge texels out as horizontal streaks. Only the wrap:
+			// the copy has one level, so a mipmapped filter would leave it
+			// incomplete.
+			const GLint wrap = cmd->image->GetRepeat() == TR_MIRRORED_REPEAT
+				? GL_MIRRORED_REPEAT : GL_REPEAT;
+			cmd->image->Bind();
+			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap );
+			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap );
 		}
 	}
 }

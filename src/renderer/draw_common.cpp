@@ -902,6 +902,13 @@ static int rbSceneRenderTargetPortalSkyFrame = -1;
 static idScreenRect rbSceneRenderTargetPortalSkyViewport;
 static int rbSceneRenderTargetPortalSkyWidth = 0;
 static int rbSceneRenderTargetPortalSkyHeight = 0;
+// the root view whose scene target already holds the window's portal-sky backdrop
+static int rbSceneRenderTargetBackdropImportedFrame = -1;
+static const viewDef_t *rbSceneRenderTargetBackdropImportedView = NULL;
+// the window's portal-sky backdrop, copied as the portal-sky view finishes
+static int rbPortalSkyBackdropFrame = -1;
+static idScreenRect rbPortalSkyBackdropViewport;
+static idImage *rbPortalSkyBackdropImage = NULL;
 static idImage *rbSceneRenderTargetPreserveDepthImage = NULL;
 static int rbSceneRenderTargetPreserveDepthFrame = -1;
 static int rbSceneRenderTargetPreserveDepthWidth = 0;
@@ -1765,6 +1772,11 @@ static bool RB_HasPortalSkyBackdropForSceneTarget( const viewDef_t *viewDef ) {
 
 static bool RB_ShouldPreserveSceneRenderTargetFarDepth( const viewDef_t *viewDef ) {
 	if ( viewDef == NULL ) {
+		return false;
+	}
+	// the backdrop is already under the scene: nothing to let through
+	if ( rbSceneRenderTargetBackdropImportedFrame == backEnd.frameCount
+		&& rbSceneRenderTargetBackdropImportedView == viewDef ) {
 		return false;
 	}
 	if ( rbSceneRenderTargetPreserveFarDepthFrame == backEnd.frameCount
@@ -8113,6 +8125,10 @@ void RB_ShutdownScenePostProcess( void ) {
 	rbSceneRenderTargetPreserveDepthImage = NULL;
 	rbSceneRenderTargetPreserveFarDepthFrame = -1;
 	rbSceneRenderTargetPreserveFarDepthView = NULL;
+	rbSceneRenderTargetBackdropImportedFrame = -1;
+	rbSceneRenderTargetBackdropImportedView = NULL;
+	rbPortalSkyBackdropFrame = -1;
+	rbPortalSkyBackdropImage = NULL;
 	rbSceneRenderTargetPortalSkyFrame = -1;
 	rbSceneRenderTargetPortalSkyViewport.Clear();
 	rbSceneRenderTargetPortalSkyWidth = 0;
@@ -16243,6 +16259,94 @@ static void RB_RecordARB2InteractionBypassFramePhase( rendererStartupPhase_t pha
 
 /*
 =============
+RB_CopyPortalSkyBackdrop / RB_DrawPortalSkyBackdrop
+
+A portal sky draws straight into the window and the root view then renders
+into the scene target. The present used to discard every far-depth pixel of
+the scene so the sky underneath showed through, which also discarded
+everything that writes no depth in front of the sky: world GUIs, particles and
+glass. Most visible in VR eye views, where more sky sits behind a GUI.
+Instead the window's backdrop goes under the scene before the root draws, as
+it does when the root renders straight into the window, and the present
+copies the scene whole.
+
+The portal-sky view itself takes the copy as it finishes: the root's
+render-map subviews (a mirror, a remote camera) draw into the window's
+lower-left corner after it and would otherwise land in the sky. A root that
+finds no such copy takes one from the window as it starts, while the window is
+still the bound target. The draw follows once the scene target and its scaled
+viewport are current.
+=============
+*/
+static bool RB_PortalSkyBackdropAllowed( void ) {
+	// a linear scene would take the display-encoded window as linear colour
+	return globalImages != NULL && backEnd.renderTexture == NULL && tr.tiledViewport[0] == 0
+		&& !R_ModernGLExecutor_PBRLinearSceneActive();
+}
+
+static idImage *RB_CopyWindowToPortalSkyBackdrop( const idScreenRect &viewport ) {
+	const int width = viewport.x2 - viewport.x1 + 1;
+	const int height = viewport.y2 - viewport.y1 + 1;
+	if ( width <= 0 || height <= 0 ) {
+		return NULL;
+	}
+
+	idImageOpts opts;
+	opts.textureType = TT_2D;
+	opts.format = FMT_RGBA8;
+	opts.width = width;
+	opts.height = height;
+	opts.numLevels = 1;
+	opts.numMSAASamples = 0;
+	opts.isPersistant = true;
+	idImage *backdrop = globalImages->ScratchImage( "_scenePortalSkyBackdrop", &opts, TF_LINEAR, TR_CLAMP, TD_DEFAULT );
+	if ( backdrop == NULL || !backdrop->CopyFramebuffer(
+			tr.viewportOffset[0] + viewport.x1, tr.viewportOffset[1] + viewport.y1, width, height ) ) {
+		return NULL;
+	}
+	return backdrop;
+}
+
+static void RB_CapturePortalSkyBackdrop( const viewDef_t *viewDef ) {
+	if ( !RB_IsPortalSkyView( viewDef ) || !RB_PortalSkyBackdropAllowed()
+			|| tr.primaryView == NULL || !RB_ViewRequestsSceneRenderTarget( tr.primaryView ) ) {
+		return;
+	}
+	rbPortalSkyBackdropImage = RB_CopyWindowToPortalSkyBackdrop( viewDef->viewport );
+	if ( rbPortalSkyBackdropImage != NULL ) {
+		rbPortalSkyBackdropFrame = backEnd.frameCount;
+		rbPortalSkyBackdropViewport = viewDef->viewport;
+	}
+}
+
+static idImage *RB_CopyPortalSkyBackdrop( const viewDef_t *viewDef ) {
+	if ( viewDef == NULL || !RB_PortalSkyBackdropAllowed()
+			|| !RB_ShouldPreserveSceneRenderTargetFarDepth( viewDef ) ) {
+		return NULL;
+	}
+	if ( rbPortalSkyBackdropFrame == backEnd.frameCount && rbPortalSkyBackdropImage != NULL
+			&& rbPortalSkyBackdropViewport.Equals( viewDef->viewport ) ) {
+		// each eye draws its own portal sky, so a copy serves one root
+		rbPortalSkyBackdropFrame = -1;
+		return rbPortalSkyBackdropImage;
+	}
+	return RB_CopyWindowToPortalSkyBackdrop( viewDef->viewport );
+}
+
+static void RB_DrawPortalSkyBackdrop( idImage *backdrop ) {
+	if ( backdrop == NULL || !RB_IsSceneRenderTexture( backEnd.renderTexture ) ) {
+		return;
+	}
+	const idScreenRect &viewport = backEnd.viewDef->viewport;
+	RB_VR_DrawImageRect( backdrop, viewport.x1, viewport.y1,
+		viewport.x2 - viewport.x1 + 1, viewport.y2 - viewport.y1 + 1,
+		0.0f, 0.0f, 1.0f, 1.0f );
+	rbSceneRenderTargetBackdropImportedFrame = backEnd.frameCount;
+	rbSceneRenderTargetBackdropImportedView = backEnd.viewDef;
+}
+
+/*
+=============
 RB_STD_DrawView
 
 =============
@@ -16296,6 +16400,8 @@ void	RB_STD_DrawView( void ) {
 	const bool sceneRenderTargetReady =
 		( rootSceneRenderTargetRequested || inlineSubviewSceneRenderTargetRequested )
 		&& RB_EnsureSceneRenderTexture( sceneTargetView );
+	idImage *portalSkyBackdrop = sceneRenderTargetReady && rootSceneRenderTargetRequested
+		? RB_CopyPortalSkyBackdrop( backEnd.viewDef ) : NULL;
 	if ( sceneRenderTargetReady ) {
 		backEnd.renderTexture = rbSceneRenderTexture;
 		RB_BeginSceneScaling( sceneScaleState, sceneTargetView );
@@ -16319,6 +16425,7 @@ void	RB_STD_DrawView( void ) {
 	{
 		backEnd.renderTexture->MakeCurrent();
 	}
+	RB_DrawPortalSkyBackdrop( portalSkyBackdrop );
 
 	// gfxInfo reports the MSAA this scene got: the color samples of the render
 	// texture it drew into (the game's forward target, the renderer's own scene
@@ -16559,6 +16666,8 @@ void	RB_STD_DrawView( void ) {
 		backEnd.renderTexture = NULL;
 		idRenderTexture::BindNull();
 	}
+
+	RB_CapturePortalSkyBackdrop( backEnd.viewDef );
 
 // jmarshall - stupid OpenGL
 	GL_State(GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO);

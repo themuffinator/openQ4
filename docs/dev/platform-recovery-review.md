@@ -259,7 +259,48 @@ the eye views a world GUI loses to the geometry behind it, while the remote
 screen beside it at the same depth draws (flat views draw the GUI whole), and
 a mirror render map shows horizontal streaks in flat views too. Vulkan draws
 both correctly in each eye. Evidence: `.tmp/stage-vr/2026-11-08/`
-(share-smoke reports and captures per API, Quality cost reports).
+(share-smoke reports and captures per API, Quality cost reports). Both are
+fixed; see the next section.
+
+### OpenGL portal sky and mirror fixes (9 November 2026)
+
+**World GUIs in front of a portal sky.** A portal sky draws straight into the
+window, and the root view then renders into the scene target whenever a
+post-process effect needs one (SSAO, on by default, does). The present step
+discarded every pixel whose scene depth was still at the far plane so that the
+sky underneath showed through. Anything in front of the sky that writes no
+depth was discarded with it: world GUIs, and also particles and glass. The eye
+views see more sky behind a screen, which is why the GUI vanished there and
+only partly in flat views. `r_skipPostProcess 1` restored it, because the
+root then draws straight into the window over the sky. A diagnostic run that
+switched passes off one at a time isolated that toggle. The authored
+post-process surfaces in the view (one heat-haze sprite) were not the cause.
+
+The root view now copies the backdrop into its scene target before drawing,
+and the present copies the scene whole. The portal-sky view takes that copy
+itself as it finishes. Otherwise the root's render-map subviews, which draw
+into the window's lower-left corner after the sky, landed in it: a 256x256
+leftover of the mirror's render showed in the eyes. A root without such a copy
+takes one from the window as it starts. A linear (PBR) scene keeps the old
+discard, since it would read the display-encoded window as linear colour.
+
+**Mirror streaks.** A `mirrorRenderMap` stage samples its capture through
+screen texgen, whose coordinates run from -1 to 1 and rely on the image's
+declared `TR_REPEAT`. The OpenGL framebuffer copy sets clamp-to-edge whenever
+it resizes its texture, and the mirror shared `_scratch` with OpenGL's
+post-process passes, which resize it every frame. Clamped, the out-of-range
+coordinates stretched the edge texels into horizontal streaks. Captures now
+restore the declared wrap after the copy (wrap only: the copy has a single
+level). The mirror captures into its own `_mirrorRender`, so it is no longer
+reallocated against the post passes every frame. Vulkan already sampled with
+the declared wrap.
+
+Verification on the simulated runtime, airdefense1 with the share-smoke
+fixtures: each OpenGL eye shows the GUI's blue backdrop over about 25,000
+pixels, up from about 1,300 before. That matches the eye with post-processing
+off, and Vulkan's capture. The mirror shows the reflected scene in flat views
+and in both eyes. The share smoke now requires the GUI in each eye on both
+backends.
 
 ## Android selection and package matrix
 

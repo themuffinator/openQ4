@@ -46,7 +46,7 @@ bool R_IsMutableRenderImageName( const char *name ) {
 	}
 	static const char *prefixes[] = {
 		"_cinematic", "_scratch", "_accum",
-		"_reflectionRender", "_refractionRender",
+		"_reflectionRender", "_refractionRender", "_mirrorRender",
 		"_currentRender", "_originalCurrentRender", "_currentDepth",
 		"_forwardRenderResolved", "_postProcessAlbedo",
 		"_scenePreserveDepth", "_hdrScene", "_ssao", "_cel",

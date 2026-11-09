@@ -2945,10 +2945,13 @@ completed release material here and publish curated notes in `releases/`.
   reflection in VR; before, the right eye saw the left eye's (VR-04). Screens
   in the world are now drawn once per frame for both eyes instead of once per
   eye, saving CPU time in stereo without changing the picture
-  (`r_vrStereoGuiShare 0` turns this off). Known, OpenGL only and not new: in the headset, screens in the world
-  can disappear behind the scenery beyond them, and mirrors show streaks.
-  Vulkan is unaffected.
+  (`r_vrStereoGuiShare 0` turns this off).
   [Evidence](platform-recovery-review.md#stereo-work-sharing-8-november-2026).
+
+- [x] OpenGL: screens in the world, smoke and glass no longer vanish where the
+  sky is behind them, which was most noticeable in the VR headset, and mirrors
+  show a reflection instead of horizontal streaks. Vulkan was unaffected.
+  [Details](platform-recovery-review.md#opengl-portal-sky-and-mirror-fixes-9-november-2026).
 
 - [x] Recover safely when a damaged save fails partway through physics or
   vehicle data. Partial physics state no longer points cleanup at another

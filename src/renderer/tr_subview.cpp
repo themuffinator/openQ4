@@ -452,7 +452,9 @@ void R_MirrorRender( drawSurf_t *surf, textureStage_t *stage, idScreenRect sciss
 	// copy this rendering to the image
 	stage->dynamicFrameCount = R_VR_EyeSubviewFrameKey();
 	tr.pc.c_eyeSubviews++;
-	stage->image = globalImages->scratchImage;
+	// its own image: OpenGL's post passes resize _scratch every frame, which
+	// reallocated it and reset the wrap the mirror's screen texgen needs
+	stage->image = globalImages->ImageFromFile( "_mirrorRender", TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
 
 	tr.CaptureRenderToImage( stage->image->GetName() );
 	tr.UnCrop();

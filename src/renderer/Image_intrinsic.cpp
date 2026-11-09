@@ -658,6 +658,7 @@ void idImageManager::CreateIntrinsicImages() {
 	accumImage = ImageFromFunction("_accum", R_RGBA8Image);
 	ImageFromFunction("_reflectionRender", R_RGBA8Image);
 	ImageFromFunction("_refractionRender", R_RGBA8Image);
+	ImageFromFunction("_mirrorRender", R_RGBA8Image);
 	//scratchCubeMapImage = ImageFromFunction("_scratchCubeMap", makeNormalizeVectorCubeMap);
 
 	currentRenderImage = ImageFromFunction("_currentRender", R_RGBA16FImage);

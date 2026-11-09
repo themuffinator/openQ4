@@ -1739,9 +1739,10 @@ and AND-05.
   preset static shadow maps are already reused by both eyes (no fresh
   renders); each eye composes its own dynamic casters, one composition per eye
   in airdefense1, too small to justify sharing it across both backends yet.
-  Found on the way, OpenGL only and older than this work: in the eye views a
-  world GUI loses to the geometry behind it, and a mirror render map shows
-  streaks in flat views too. Vulkan draws both.
+  Found on the way and fixed 9 November, OpenGL only and older than this work
+  ([fixes](platform-recovery-review.md#opengl-portal-sky-and-mirror-fixes-9-november-2026)):
+  a world GUI vanished wherever the portal sky sat behind it, most of all in
+  the eye views, and a mirror render map drew streaks in every view.
 - [x] **VR-05 — P3, decision and implementation: per-eye temporal features and
   further interaction.** TAA/dynamic resolution require independent eye histories,
   motion vectors, resets and scale control before enablement. Hand presence and

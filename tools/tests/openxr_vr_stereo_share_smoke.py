@@ -24,11 +24,10 @@ further from either of two captures with it off, taken the same number of
 frames before and after, than those two are from each other: on OpenGL the
 sky and the mirror keep moving with game time stopped.
 
-On OpenGL, seen from the eyes, a world GUI loses to the geometry behind it
-while the remote screen beside it at the same depth draws (the flat view draws
-it whole), and the mirror shows streaks in flat views too. The build before
-stereo sharing does the same. Vulkan draws all three screens in each eye, so
-its captures compare the GUI's pixels.
+Each eye must also show the GUI's blue backdrop. On OpenGL the eyes once lost
+the GUI wherever the portal sky sat behind it: the scene target's present
+discarded every far-depth pixel to let the sky through, and a GUI writes no
+depth. The sky now goes under the scene before the root draws.
 """
 from __future__ import annotations
 
@@ -116,6 +115,16 @@ def screen_spawns() -> list[str]:
     return [camera] + [f'spawn func_static name vr_share_{kind} model "{MODEL}" shader "{PREFIX}/{kind}" '
                        f'origin "{at(240, lateral, up)}" angle {facing} solid 0{extra}'
                        for lateral, up, kind, extra in screens]
+
+
+# The GUI's backdrop covers about 25,000 pixels of an 800x880 eye; a GUI lost to
+# the sky behind it kept about 1,300.
+GUI_MIN_PIXELS = 8000
+
+
+def gui_backdrop_pixels(image) -> int:
+    """Pixels of the fixture GUI's blue backdrop (backcolor 0.1, 0.3, 0.6)."""
+    return sum(1 for r, g, b in image.getdata() if b > 110 and b > r + 50 and b > g + 20)
 
 
 def frame_counts(text: str, begin: str, end: str) -> dict:
@@ -254,8 +263,10 @@ def main(argv: list[str] | None = None) -> None:
         assert sum(ImageStat.Stat(on).mean[:3]) / 3 > 8.0, f"the {side} eye is dark"
         control = difference(first, second)
         shared = max(difference(on, first), difference(on, second))
-        images[side] = {"control": round(control, 4), "share_vs_off": round(shared, 4)}
+        gui = gui_backdrop_pixels(on)
+        images[side] = {"control": round(control, 4), "share_vs_off": round(shared, 4), "gui_pixels": gui}
         assert shared <= control + 0.01, f"the {side} eye changed with GUI sharing ({shared:.4f}, control {control:.4f})"
+        assert gui >= GUI_MIN_PIXELS, f"the {side} eye lost the world GUI ({gui} backdrop pixels)"
     report = {"status": "pass", "render_api": options.render_api, "counts": counts, "images": images,
               "source": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
     (profile / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
