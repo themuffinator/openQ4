@@ -723,11 +723,13 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	if ( scratchImage ) {
 		DeriveOpts();
 		AllocImage();
+		generatedCacheContent = false;
 		return;
 	}
 
 	if ( generatorFunction ) {
 		generatorFunction( this );
+		generatedCacheContent = false;
 		return;
 	}
 
@@ -754,6 +756,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
                     SubImageUpload(part.level,0,0,part.destZ,part.width,part.height,prepared->GetImageData(i));}
             }
             loadedSourceName=descriptor.file.qpath;
+            generatedCacheContent = source == ICS_GENERATED;
             consumedLoad.Loaded(source);
             return;
         }
@@ -1035,6 +1038,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 				}
 
 				defaulted = true;
+				generatedCacheContent = false;
 				return;
 			}
 
@@ -1132,6 +1136,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 					}
 
 					defaulted = true;
+					generatedCacheContent = false;
 					return;
 				}
 
@@ -1170,6 +1175,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 		}
 	}
 	loadedSourceName = selectedSourceName;
+	generatedCacheContent = consumedSource == ICS_GENERATED;
     consumedLoad.Reduction(consumedReduction);
 	consumedLoad.Loaded(consumedSource);
 }

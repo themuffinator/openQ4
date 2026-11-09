@@ -985,6 +985,7 @@ public:
 	virtual bool BeginSavePreview();
 	virtual int PollSavePreview( const char *fileName );
 	virtual void CancelSavePreview();
+	virtual bool ReloadGeneratedCacheImages();
 	virtual void			SetPortalSkyCaptureViewCallback( renderPortalSkyCaptureViewCallback_t callback );
 	virtual void			UnCrop();
 	virtual void			GetCardCaps( bool &oldCard, bool &nv10or20 );

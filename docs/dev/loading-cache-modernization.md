@@ -440,6 +440,13 @@ legacy `0` header and showed the new texture.
 image pipeline. `filesystem_length_probe_contract.py` checks that the probe
 and a full open agree.
 
+A content stamp is a staleness key, not an integrity check. It says which
+source an entry claims to come from, and anyone can copy it into an entry with
+edited pixels. That is why the image cache is never read on a pure server, and
+why a client reloads its cached images when it takes a pure lock, instead of
+restarting the engine
+([decision](mp-network-qualification.md#generated-image-cache-on-pure-servers-9-november-2026)).
+
 ## Evidence status
 
 The implementation contract above is source-backed. Focused native format and

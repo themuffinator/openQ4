@@ -96,7 +96,12 @@
 //      the Vulkan device and renderVRFrame_t the VkImage swapchain images.
 //      renderVRGraphicsBinding_t also carries an EGL context (an OpenGL
 //      renderer on native Wayland) for XR_MNDX_egl_enable.
-#define RENDER_API_VERSION			32
+// 33 - A pure connect no longer restarts the engine over generated image cache
+//      reads: idFileSystem appends TakePureImageCacheEviction and
+//      idRenderSystem appends ReloadGeneratedCacheImages, which the client
+//      must run once the lock is in place (a stale module would leave cache
+//      pixels on the GPU of a pure session).
+#define RENDER_API_VERSION			33
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
