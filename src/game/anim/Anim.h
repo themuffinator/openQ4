@@ -269,6 +269,7 @@ private:
 	idStr					name;
 	idVec3					totaldelta;
 	mutable int				ref_count;
+	bool					fromGeneratedCache;	// decoded from generated/animations; see idAnimManager::ReloadGeneratedCacheAnims
 
 	bool					LoadGeneratedAnim( const char *filename );
 	void					WriteGeneratedAnim( const char *filename ) const;
@@ -282,6 +283,7 @@ public:
 	size_t					Allocated( void ) const;
 	size_t					Size( void ) const { return sizeof( *this ) + Allocated(); };
 	bool					LoadAnim( const char *filename );
+	bool					FromGeneratedCache( void ) const { return fromGeneratedCache; }
 
 	void					IncreaseRefs( void ) const;
 	void					DecreaseRefs( void ) const;
@@ -809,6 +811,7 @@ public:
 	void						Shutdown( void );
 	idMD5Anim *					GetAnim( const char *name );
 	void						ReloadAnims( void );
+	int							ReloadGeneratedCacheAnims( void );
 	void						ListAnims( void ) const;
 	void						PrintMemInfo( MemInfo *mi );
 	int							JointIndex( const char *name );

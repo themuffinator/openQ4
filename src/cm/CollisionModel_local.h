@@ -217,6 +217,7 @@ public:
 	int						usedMemory;
 
 	bool					isTrmModel;
+	bool					fromGeneratedCache;	// decoded from the generated cache; see PurgeGeneratedCacheModels
 };
 
 /*
@@ -482,6 +483,7 @@ private:			// CollisionMap_load.cpp
 	void			EnsureModelTable( void );
 	void			AddToMapModelReferenceCounts( const char *mapName, int add );
 	void			FreeProcClipModels( void );
+	int				PurgeGeneratedCacheModels( void );
 	void			FreeTrmModelStructure( void );
 	void			DestroyModel( idCollisionModelLocal *model );
 					// model deallocation

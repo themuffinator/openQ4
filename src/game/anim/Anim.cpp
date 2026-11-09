@@ -325,6 +325,7 @@ idMD5Anim::idMD5Anim
 */
 idMD5Anim::idMD5Anim() {
 	ref_count	= 0;
+	fromGeneratedCache = false;
 	numFrames	= 0;
 	numJoints	= 0;
 	frameRate	= 24;
@@ -352,6 +353,7 @@ void idMD5Anim::Free( void ) {
 	frameRate	= 24;
 	animLength	= 0;
 	name		= "";
+	fromGeneratedCache = false;
 
 	totaldelta.Zero();
 
@@ -438,6 +440,12 @@ idMD5Anim::LoadGeneratedAnim
 ====================
 */
 bool idMD5Anim::LoadGeneratedAnim( const char *filename ) {
+	// No generated cache is read while a pure lock or fs_restrict holds. An
+	// animation decoded before then is re-derived at the next map load; see
+	// idAnimManager::ReloadGeneratedCacheAnims.
+	if ( !fileSystem->GeneratedCacheReadsEnabled( GENERATED_CACHE_ANIMATION ) ) {
+		return false;
+	}
 	idStr cachePath;
 	if ( !GetGeneratedAnimPath( filename, cachePath ) ) {
 		return false;
@@ -646,6 +654,7 @@ bool idMD5Anim::LoadGeneratedAnim( const char *filename ) {
 
 	Free();
 	name = filename;
+	fromGeneratedCache = true;
 	numFrames = cachedNumFrames;
 	numJoints = cachedNumJoints;
 	frameRate = cachedFrameRate;
@@ -1743,6 +1752,34 @@ void idAnimManager::ReloadAnims( void ) {
 			( *animptr )->Reload();
 		}
 	}
+}
+
+/*
+================
+idAnimManager::ReloadGeneratedCacheAnims
+
+Re-derives from source every resident animation that was decoded from the
+generated animation cache, and returns how many it reloaded. idGameLocal::LoadMap
+calls it once the filesystem refuses generated-cache reads (a pure lock or
+fs_restrict), so an animation decoded before the lock cannot outlive it. The
+cache is refused by then, so LoadAnim parses the source from the pure paks;
+reloading in place keeps every model definition's pointer valid.
+================
+*/
+int idAnimManager::ReloadGeneratedCacheAnims( void ) {
+	int reloaded = 0;
+	for ( int i = 0; i < animations.Num(); i++ ) {
+		idMD5Anim **animptr = animations.GetIndex( i );
+		if ( animptr == NULL || *animptr == NULL || !( *animptr )->FromGeneratedCache() ) {
+			continue;
+		}
+		const idStr animName = ( *animptr )->Name();
+		if ( !( *animptr )->Reload() ) {
+			gameLocal.Warning( "Could not reload animation '%s' from its source", animName.c_str() );
+		}
+		reloaded++;
+	}
+	return reloaded;
 }
 
 /*

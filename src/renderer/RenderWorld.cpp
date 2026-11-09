@@ -127,6 +127,7 @@ idRenderWorldLocal::idRenderWorldLocal
 idRenderWorldLocal::idRenderWorldLocal() {
 	mapName.Clear();
 	mapTimeStamp = FILE_NOT_FOUND_TIMESTAMP;
+	worldFromGeneratedCache = false;
 	mapFileCRC = 0u;
 
 	generateAllInteractionsCalled = false;

@@ -1696,6 +1696,16 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 
 	networkSystem->SetLoadingText( mapName );
 
+	// Animations decoded from the generated cache must not outlive a pure lock
+	// (or fs_restrict): once the filesystem refuses those reads, derive them
+	// again from the pure paks before this map uses them.
+	if ( !fileSystem->GeneratedCacheReadsEnabled( GENERATED_CACHE_ANIMATION ) ) {
+		const int reloadedAnims = animationLib->ReloadGeneratedCacheAnims();
+		if ( reloadedAnims > 0 ) {
+			Printf( "%i animations decoded from the generated cache reloaded: generated-cache reads are refused\n", reloadedAnims );
+		}
+	}
+
 	InitAsyncNetwork();
 
 	// these can changed based upon sp / mp

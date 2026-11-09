@@ -231,6 +231,7 @@ public:
 
 	idStr					mapName;				// ie: maps/tim_dm2.proc, written to demoFile
 	ID_TIME_T					mapTimeStamp;			// for fast reloads of the same level
+	bool					worldFromGeneratedCache;	// decoded from the generated cache: not retained once those reads are refused
 	unsigned int			mapFileCRC;				// retail PROC / MD5RProc header CRC token
 
 	areaNode_t *			areaNodes;

@@ -516,13 +516,88 @@ player.
 
 ### Outside this decision
 
-- With the experimental `com_levelLoadModernization 1` (off by default), the
-  level-load model, world, collision and animation caches are read outside the
-  VFS ([contract](loading-cache-modernization.md#compatibility-boundary)). Pure
-  mode neither refuses them nor restarts over them, which contradicts the rule
-  above. They should be refused while pure before that mode is promoted.
+- The level-load caches of the experimental `com_levelLoadModernization 1`
+  follow the same rule since the
+  [change below](#level-load-caches-on-pure-servers-9-november-2026).
 - The Vulkan pipeline cache is opened by explicit OS path and validated by the
   driver. It never reaches the VFS, before or after this change.
+
+## Level-load caches on pure servers, 9 November 2026
+
+**Decision: the experimental level-load caches follow the image cache's rule.
+None is read while pure, and what was decoded from them before the lock is
+derived again at the next level load, without an engine restart.** With
+`com_levelLoadModernization 1` (off by default), openQ4 keeps render-model,
+render-world and collision caches, and the game modules keep an animation
+cache, under `generated/` in the save path. Their owners open these files by OS
+path, outside the search paths, so pure mode's directory gate never saw them: a
+pure client read them, and a forged entry would have passed, for the reasons
+[given above](#why-the-cache-cannot-be-trusted).
+
+What changed ([contract](loading-cache-modernization.md#pure-servers)):
+
+- While a pure lock or `fs_restrict` holds,
+  `idFileSystem::GeneratedCacheReadsEnabled` answers false for every kind, so
+  `OpenGeneratedCacheRead` returns nothing. The game's animation reader asks
+  the same gate, as the appended `GENERATED_CACHE_ANIMATION` kind; no
+  interface slot changed.
+- A resident decoded from one of these caches before the lock is derived again
+  at the next level load, which always follows the lock. The model manager
+  purges cache-sourced models, including MD5R models converted from one and
+  whatever reloadable flag the payload carried. The render world is reloaded
+  instead of retained, the collision manager frees cache-sourced models
+  (normally already purged at map shutdown), and the game reloads
+  cache-sourced animations in place before the map spawns anything. The lock
+  is only taken when every pak the session has read from is in the server's
+  list, so every source can be read again.
+- Model, world and collision entries are no longer written under a pure lock.
+  Their content key includes the lock, so no session could read them back.
+  Animation entries are keyed by their source alone and are still written from
+  the pure paks, as image cache entries are.
+- Learned manifests stay readable while pure. They only schedule reads: each
+  entry is opened again through the pure search paths and must match its
+  recorded identity before any of its bytes are used.
+- `pure_level_load_cache_contract.py` compiles the gate functions against
+  doubles, runs a truth table (open, pure lock, `fs_restrict`, each cvar), and
+  pins every eviction link in both game trees. Its `--mutations` mode breaks
+  each of 18 links and requires the check that owns it to fail. Both CI
+  workflows run it.
+
+### Evidence
+
+A `builddir` dedicated server (`si_pure 1`, `net_LANServer 1`, `mp/q4dm1`) and
+a `builddir` client with `com_levelLoadModernization 1`, each with its own save
+path under `.tmp/pure-levelload-cache/`, and a base path of hard links to the
+retail PK4s only. The client ran two sessions on one save path, in a hidden
+window with `ui_autoJoin 1`. The first spawned a local non-pure listen server
+on `mp/q4dm1`, which wrote 94 caches (92 model files, the world, the collision
+set) and the animation caches. The second spawned the same local server again,
+now loading from those caches, then disconnected and joined the pure server,
+with `fs_debug 1` listing every explicit file open.
+
+| Client | Before the connect | After the connect | Engine reloads | Result |
+| --- | --- | --- | --- | --- |
+| OpenGL 640x480 (two runs) | 90 cache hits: 95 model, 1 world, 1 collision and 222 animation opens | No cache opened; 91 models purged, world reloaded, 222 animations reloaded, 100 cached images reloaded | 0 | Active player, no warnings |
+| Vulkan 640x480 | Same | Same as OpenGL 640x480 | 0 | Active player, no warnings |
+| OpenGL 640x360 | Same | No cache opened; the restart below flushed everything | 1 | Active player, no warnings |
+
+- In every pure session the level-load report for the pure map load showed
+  0 hits, 0 misses and 0 writes, so the coordinator was never consulted. The
+  only file opened under `generated/` after the connect was the learned
+  manifest for the pure search state. The game rewrote the 222 animation
+  caches from the pure paks.
+- Engine screenshots in pure gameplay on OpenGL and Vulkan show the world,
+  static props, the weapon view model and the HUD intact after the purge.
+- Every client became an active player, and every process exited cleanly.
+
+### Outside this decision
+
+- A client that loaded a map in a non-4:3 window before connecting restarts on
+  its pure connect. The session publishes an expanded loading background
+  (`guis/assets/generated/loadscreens/<map>_<w>x<h>.tga`) under the save path
+  and loads it back through the search paths, which counts as a directory
+  read. That is independent of the level-load caches and of
+  `com_levelLoadModernization`; it is why the 640x360 run restarted.
 
 ## Still open
 

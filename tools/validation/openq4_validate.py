@@ -578,6 +578,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "filesystem_find_file_contract.py",
         root / "tools" / "tests" / "filesystem_length_probe_contract.py",
         root / "tools" / "tests" / "generated_image_pak_content_stamp.py",
+        root / "tools" / "tests" / "pure_image_cache_eviction_contract.py",
+        root / "tools" / "tests" / "pure_level_load_cache_contract.py",
         root / "tools" / "tests" / "parser_include_paths_contract.py",
         root / "tools" / "tests" / "filesystem_mod_manifest.py",
         root / "tools" / "tests" / "filesystem_write_qpath_safety.py",

@@ -4181,8 +4181,10 @@ Completion substeps:
   gameplay in 7–10 s instead of 50–58 s
   ([decision and evidence](mp-network-qualification.md#generated-image-cache-on-pure-servers-9-november-2026)).
   The level-load caches of the experimental `com_levelLoadModernization 1`
-  are still read outside pure mode's gate and must be refused before that mode
-  is promoted.
+  follow the same rule: none is read while pure, and models, worlds, collision
+  and animations decoded from them before the lock are derived again at the
+  next level load
+  ([evidence](mp-network-qualification.md#level-load-caches-on-pure-servers-9-november-2026)).
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,

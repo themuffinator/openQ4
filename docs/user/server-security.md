@@ -149,6 +149,12 @@ those images are rebuilt. A loose file read from a game folder before
 connecting, such as an extracted texture or map, still makes the client restart
 into pure mode.
 
+The experimental level-load option (`com_levelLoadModernization 1`, off by
+default) keeps similar caches of decoded models, maps, collision data and
+animations under `generated/`. A pure server's clients never read those either.
+Anything a client loaded from them before connecting is loaded again from the
+original game files when the server's map loads.
+
 ## Malformed network traffic
 
 The shared bit-message reader records attempts to read beyond the received

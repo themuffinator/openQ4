@@ -680,15 +680,35 @@ idRenderModelManagerLocal::BeginLevelLoad
 void idRenderModelManagerLocal::BeginLevelLoad() {
 	insideLevelLoad = true;
 
+	// Models decoded from the generated cache must not outlive a pure lock
+	// (or fs_restrict): once the filesystem refuses those reads, purge them so
+	// this level derives them again from the pure paks. See
+	// idFileSystemLocal::GeneratedCacheReadsRefused.
+	const bool purgeGeneratedCacheContent =
+		!fileSystem->GeneratedCacheReadsEnabled( GENERATED_CACHE_RENDER_MODEL );
+	int generatedCachePurges = 0;
+
 	for ( int i = 0 ; i < models.Num() ; i++ ) {
 		idRenderModel *model = models[i];
+		const idRenderModelStatic *staticModel = dynamic_cast<const idRenderModelStatic *>( model );
+		const bool cacheContent = purgeGeneratedCacheContent && staticModel != NULL
+			&& staticModel->HoldsGeneratedCacheContent();
 
-		if ( com_purgeAll.GetBool() && model->IsReloadable() ) {
+		// a cache payload carries its own reloadable flag, so it is not
+		// consulted here; every cached model came from a file it can reload
+		if ( ( com_purgeAll.GetBool() && model->IsReloadable() ) || cacheContent ) {
 			R_CheckForEntityDefsUsingModel( model );
 			model->PurgeModel();
+			if ( cacheContent ) {
+				generatedCachePurges++;
+			}
 		}
 
 		model->SetLevelLoadReferenced( false );
+	}
+	if ( generatedCachePurges > 0 ) {
+		common->Printf( "%i models decoded from the generated cache purged: generated-cache reads are refused\n",
+			generatedCachePurges );
 	}
 
 	// purge unused triangle surface memory

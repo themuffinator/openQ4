@@ -389,6 +389,11 @@ bool R_TryReadGeneratedRenderModelCache( idRenderModel &model, const char *sourc
 	const bool decoded = cacheModel->ReadLevelLoadCachePayload( *cache );
 	const bool consumedPayload = decoded && cache->Tell() == cache->Length();
 	fileSystem->CloseFile( cache );
+	if ( decoded ) {
+		// the payload now lives in the model; a caller that re-derives it
+		// purges first, which clears this again
+		cacheModel->SetGeneratedCacheContent( true );
+	}
 	if ( !consumedPayload ) {
 		fileSystem->DiscardGeneratedCache( GENERATED_CACHE_RENDER_MODEL,
 			sourcePath, parserVersion, settingsKey != NULL ? settingsKey : "" );
@@ -1243,6 +1248,7 @@ idRenderModelStatic::idRenderModelStatic() {
 	fastLoad = false;
 	reloadable = true;
 	procSky = false;
+	generatedCacheContent = false;
 	levelLoadReferenced = false;
 	timeStamp = 0;
 }
@@ -3570,6 +3576,7 @@ void idRenderModelStatic::PurgeModel() {
 
 	purged = true;
 	procSky = false;
+	generatedCacheContent = false;
 }
 
 /*

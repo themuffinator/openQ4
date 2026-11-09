@@ -1682,6 +1682,7 @@ private:
 	void					CopyFile( idFile *src, const char *toOSPath );
 	void					AddAssetLogEntry( const char *relativePath );
 	void					BuildLevelLoadContentKey( idStr &key ) const;
+	bool					GeneratedCacheReadsRefused( void ) const;
 	void					RecordOpenedLevelLoadSource( const char *relativePath, idFile *file );
 	idFile *				UsePreloadedLevelLoadSource( const char *relativePath, idFile *file );
 	idFile *				OpenFileReadSearch( const char *relativePath, int searchFlags, pack_t **foundInPak, bool allowCopyFiles, const char* gamedir, packMemberProbe_t *probe );
@@ -2061,11 +2062,46 @@ void idFileSystemLocal::DiscardGeneratedCache( const generatedCacheKind_t kind,
 		settingsKey, contentKey.c_str() );
 }
 
+/*
+================
+idFileSystemLocal::GeneratedCacheReadsRefused
+
+The level-load caches (render models, worlds, collision, and the game's
+animation cache) are openQ4's own derived data. Their owners read them from
+fs_savepath with OpenExplicitFileRead, outside the search paths, so the pure
+directory gate in OpenFileReadSearch never sees them. Like a generated image
+cache entry, an entry names its source by public pak metadata and binds its
+payload to nothing, so a forged entry would pass every check. None is read
+while a pure lock or fs_restrict holds. A resident decoded from one before
+the lock is re-derived from its source at the next level load, once its owner
+sees reads refused: idRenderModelManagerLocal::BeginLevelLoad,
+idRenderWorldLocal::InitFromMap, idCollisionModelManagerLocal::LoadMap and the
+game's idGameLocal::LoadMap. The lock is only taken when every pak the session
+has read from is in the server's list, so each source can be read again.
+
+The learned manifests stay readable: they only schedule reads, and each entry
+is opened again through the pure search paths and must match its recorded
+identity before a byte of it is used.
+================
+*/
+bool idFileSystemLocal::GeneratedCacheReadsRefused( void ) const {
+	return fs_restrict.GetBool() || serverPaks.Num() > 0;
+}
+
 bool idFileSystemLocal::GeneratedCacheReadsEnabled( const generatedCacheKind_t kind ) const {
+	if ( GeneratedCacheReadsRefused() ) {
+		return false;
+	}
 	return levelLoadCache != NULL && levelLoadCache->GeneratedCacheReadsEnabled( kind );
 }
 
 bool idFileSystemLocal::GeneratedCacheWritesEnabled( const generatedCacheKind_t kind ) const {
+	// An entry written under a pure lock carries the lock in its content key
+	// (BuildLevelLoadContentKey), and nothing is read while a lock holds, so
+	// no session could ever read it back: skip the serialization.
+	if ( serverPaks.Num() > 0 ) {
+		return false;
+	}
 	return levelLoadCache != NULL && levelLoadCache->GeneratedCacheWritesEnabled( kind );
 }
 

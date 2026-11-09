@@ -31,11 +31,45 @@ The installed Quake 4 and mod sources remain authoritative:
   result is absent, late, rejected, malformed, or cancelled, the owner
   continues with the ordinary VFS handle.
 - Generated model, world, collision, and animation files are private derived
-  data under `fs_savepath`. They do not participate in VFS search or pure-PK4
-  negotiation and are always disposable.
+  data under `fs_savepath` and are always disposable. Their owners open them by
+  OS path, outside VFS search, so pure mode's directory gate never sees them.
+  The filesystem refuses them itself while a pure lock or `fs_restrict` holds
+  (see [Pure servers](#pure-servers)).
 
 This keeps source parsing as the correctness path and makes the entire feature
 reversible without converting or modifying retail assets.
+
+### Pure servers
+
+openQ4's derived caches are never trusted on a pure server: an entry names its
+source by public pak metadata, and nothing binds its payload to that source
+([decision](mp-network-qualification.md#level-load-caches-on-pure-servers-9-november-2026)).
+For the level-load caches that means:
+
+- While a pure lock (the server's pak list) or `fs_restrict` holds,
+  `idFileSystem::GeneratedCacheReadsEnabled` answers false for every kind and
+  `OpenGeneratedCacheRead` returns nothing. The game's animation reader asks
+  the same gate, as `GENERATED_CACHE_ANIMATION`, before it opens a file.
+- Model, world and collision entries are not written under a pure lock. Their
+  content key carries the lock, and nothing is read while it holds, so no
+  session could read them back. The animation cache is keyed by its source
+  alone, so the game still writes it from the pure paks.
+- A resident decoded from a cache before the lock is derived again from its
+  source at the next level load, which always follows the lock. The model
+  manager purges every cache-sourced model in `BeginLevelLoad` (including
+  MD5R models converted from one, and whatever reloadable flag the payload
+  carried), `InitFromMap` reloads a cache-sourced world instead of retaining
+  it, `LoadMap` frees cache-sourced collision models, and the game reloads
+  cache-sourced animations in place before the map spawns anything. The lock
+  is only taken when every pak the session has read from is in the server's
+  list, so each source can be read again.
+- Learned manifests stay readable. They only schedule reads: each entry is
+  opened again through the pure search paths and must match its recorded
+  identity before any of its bytes are used.
+
+`pure_level_load_cache_contract.py` compiles the gates against doubles, runs
+them through a truth table and pins every eviction link, with mutation
+controls.
 
 ## Learned manifest identity
 
@@ -446,6 +480,7 @@ edited pixels. That is why the image cache is never read on a pure server, and
 why a client reloads its cached images when it takes a pure lock, instead of
 restarting the engine
 ([decision](mp-network-qualification.md#generated-image-cache-on-pure-servers-9-november-2026)).
+The level-load caches follow the same rule ([Pure servers](#pure-servers)).
 
 ## Evidence status
 

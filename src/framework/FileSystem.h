@@ -165,10 +165,14 @@ typedef enum {
 	LEVEL_LOAD_RESOURCE_RAW
 } levelLoadResourceType_t;
 
+// Append new values; the existing ones cross the module boundary.
 typedef enum {
 	GENERATED_CACHE_RENDER_MODEL = 1,
 	GENERATED_CACHE_RENDER_WORLD,
-	GENERATED_CACHE_COLLISION_MODEL
+	GENERATED_CACHE_COLLISION_MODEL,
+	// The game module's generated/animations cache. The game reads and writes
+	// it in its own format; the filesystem only answers whether it may be read.
+	GENERATED_CACHE_ANIMATION
 } generatedCacheKind_t;
 
 typedef struct urlDownload_s {
@@ -449,6 +453,10 @@ public:
 	// return, or WriteGeneratedCache store, a cache of this kind right now.
 	// Owners ask before decoding or encoding a payload, so a disabled cache
 	// costs a cvar check instead of a serialization that is thrown away.
+	// No generated cache is read while a pure lock or fs_restrict holds, and a
+	// resident decoded from one before then is re-derived from its source at
+	// the next level load once reads return false (see
+	// idFileSystemLocal::GeneratedCacheReadsRefused).
 	virtual bool			GeneratedCacheReadsEnabled( generatedCacheKind_t kind ) const = 0;
 	virtual bool			GeneratedCacheWritesEnabled( generatedCacheKind_t kind ) const = 0;
 	// Appended for RENDER_API_VERSION 33. Reading a generated/images cache

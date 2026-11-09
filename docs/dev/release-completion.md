@@ -6,6 +6,26 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Pure servers also refuse the experimental level-load caches, 9 November 2026
+
+- **Pure checking now covers the fast-loading caches too.** The experimental
+  level-load option (`com_levelLoadModernization 1`, off by default) keeps its
+  own copies of decoded models, maps, collision data and animations. A client
+  on a pure server (`si_pure 1`) used to read them anyway. Now it never does,
+  and anything it loaded from them before connecting is loaded again from the
+  original game files when the server's map loads. An edited cache file cannot
+  be told apart from a genuine one, so it cannot be trusted where pure mode
+  applies, the same rule the image cache follows.
+- **Nothing to change.** Only the affected models, map data and animations
+  are rebuilt; the game does not restart for them. With the option off,
+  nothing changes.
+- Validation: a pure dedicated `mp/q4dm1` server and a client that first
+  loaded the same map from warm caches, on OpenGL and Vulkan. After connecting,
+  the client opened no model, map, collision or animation cache file, rebuilt
+  91 models, the map and 222 animations instead, and reached the match without
+  an engine reload. Details are in the
+  [pure-server cache decision](mp-network-qualification.md#level-load-caches-on-pure-servers-9-november-2026).
+
 ## Joining a pure server no longer restarts the game, 9 November 2026
 
 - **Much faster first join to a pure server.** Joining a server with pure
