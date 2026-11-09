@@ -73,6 +73,7 @@ See [player release status](../user/release-status.md).
   three fail on unrelated in-progress or older work), and the affected Python
   contract tests.
 
+
 ## Rebuilt maps keep their textures where patches meet (CORE-05, #209), 9 November 2026
 
 - **No more smeared strips on rebuilt maps.** Where flat patches meet end to end
