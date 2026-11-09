@@ -4,17 +4,88 @@
 	was missing in the alpha.
 
 	While q4xbase is the active game, idGameLocal::FindEntityDef finds
-	"<name>_q4x_openq4" ahead of <name>, so the turret's weapon part picks up
-	the definition below. It inherits the expansion's own weapon, so the
-	turret's damage, rate of fire and spread are unchanged; only what the
-	player sees and hears is added: a heavier Strogg muzzle flash and its
-	light, tracers, ejected casings and barrel smoke after a long burst.
-	Outside The Awakening these definitions are never looked up.
+	"<name>_q4x_openq4" ahead of <name>, so the turret, its parts and its
+	weapon pick up the definitions below. Each inherits the expansion's own,
+	so its damage per round and rate of fire are unchanged. Added: a heavier
+	Strogg muzzle flash and its light, tracers, ejected casings, barrel smoke
+	after a long burst, servo sound as the gun traverses, rounds that meet
+	the crosshair, a zoom, and barrel heat (idVehicleTurretGun) with its own
+	HUD. Outside The Awakening these definitions are never looked up.
 */
+
+entityDef vehicle_q4x_turret_chaingun_q4x_openq4
+{
+	"inherit"				"vehicle_q4x_turret_chaingun"
+	"gui_hud"				"guis/vehicles/turret_hud.gui"
+}
+
+entityDef vehicle_q4x_turret_chaingun_trench_q4x_openq4
+{
+	"inherit"				"vehicle_q4x_turret_chaingun_trench"
+	"gui_hud"				"guis/vehicles/turret_hud.gui"
+}
+
+// The traverse servos: the parts' defs name a move sound and its volume range,
+// which no vehicle code ever played. m01's trench turret turns on its own
+// parts, m04's on the acid gun's (the expansion's turnrate edit to the acid
+// gun's yaw never took effect: retail's acidgun.def is read first).
+entityDef vehicle_q4x_turret_chaingun_yaw_q4x_openq4
+{
+	"inherit"				"vehicle_q4x_turret_chaingun_yaw"
+	"playMoveSound"			"1"
+}
+
+entityDef vehicle_q4x_turret_chaingun_pitch_q4x_openq4
+{
+	"inherit"				"vehicle_q4x_turret_chaingun_pitch"
+	"playMoveSound"			"1"
+}
+
+entityDef vehicle_acidgun_turret_yaw_q4x_openq4
+{
+	"inherit"				"vehicle_acidgun_turret_yaw"
+	"playMoveSound"			"1"
+}
+
+entityDef vehicle_acidgun_turret_pitch_q4x_openq4
+{
+	"inherit"				"vehicle_acidgun_turret_pitch"
+	"playMoveSound"			"1"
+}
 
 entityDef vehicle_chaingun_weapon_q4x_openq4
 {
 	"inherit"				"vehicle_chaingun_weapon"
+	"spawnclass"			"idVehicleTurretGun"
+
+	// the muzzle sits 14 units off the gunner's eye line: bend each round
+	// onto the point under the crosshair instead of firing parallel to it
+	"convergence"			"1"
+
+	// zoom: the player machinegun's magnification, at half the spread
+	"zoomFov"				"50"
+	"zoomTime"				"0.15"
+	"zoomSpreadScale"		"0.5"
+
+	// barrel heat, for a player gunner only (m04's scripted gunner never
+	// overheats). A cold gun throws its rounds within the 2 degrees the
+	// expansion's turret position asked for (its "spread", which nothing
+	// read); the weapon's 5 degrees is the spread of a gun at its limit.
+	// About five seconds of fire overheats it; a pause of 0.35 s starts the
+	// barrel cooling, from full in about two seconds. Overheated, it vents
+	// until it is back under 40% (about two seconds) and will not fire.
+	"spreadCold"			"2"
+	"heatPerShot"			"1.2"
+	"heatTolerance"			"100"
+	"safeHeatLevel"			"40"
+	"heatCoolDelay"			"0.35"
+	"heatDissipationPerSecond"	"45"
+	"overheatDissipationPerSecond"	"30"
+	"heatWarnLevel"			"0.75"
+	"snd_overheat"			"space_cannon_overheat"
+	"snd_overheatFire"		"space_cannon_overheatfire"
+	"snd_overheatRecover"	"space_cannon_recover"
+	"fx_overheat"			"effects/openq4/awakening/turret_overheat.fx"
 
 	"def_hitscan"			"hitscan_awakening_turret_chaingun"
 	"fx_muzzleflash"		"effects/openq4/awakening/turret_muzzleflash.fx"
@@ -50,6 +121,52 @@ entityDef hitscan_awakening_turret_chaingun
 
 	"fx_tracer"				"effects/openq4/awakening/turret_tracer.fx"
 	"tracerchance"			"0.6"
+
+	"def_damage"			"damage_awakening_turret_chaingun"
+}
+
+// The expansion's turret file sets the turret's 40 damage a round by
+// redefining damage_machinegun, which every hitscan_bullet weapon shares:
+// read first, it replaced retail's for the player's machinegun too, which
+// then hit for 40 (more than its zoomed 20), lost its bleeding, flesh sounds,
+// knockback and view kick (damage_bullet), and its zoom did half the damage.
+// The turret keeps its 40 here; the player's machinegun gets retail's back.
+entityDef damage_awakening_turret_chaingun
+{
+	"inherit"				"damage_bullet"
+	"damage"				"40"
+
+	"deathPush"				"100"
+	"deathPushMin"			"3000 350"
+	"deathPushMax"			"5000 500"
+}
+
+entityDef damage_machinegun_q4x_openq4
+{
+	"inherit"				"damage_bullet"
+	"damage"				"15"
+
+	"deathPush"				"100"
+	"deathPushMin"			"3000 350"
+	"deathPushMax"			"5000 500"
+}
+
+entityDef damage_machinegun_flesh_q4x_openq4
+{
+	"inherit"				"damage_machinegun_q4x_openq4"
+	"damage"				"18"
+}
+
+entityDef damage_machinegun_zoom_q4x_openq4
+{
+	"inherit"				"damage_machinegun_q4x_openq4"
+	"damage"				"20"
+}
+
+entityDef damage_machinegun_zoom_flesh_q4x_openq4
+{
+	"inherit"				"damage_machinegun_q4x_openq4"
+	"damage"				"24"
 }
 
 entityDef debris_brass_awakening_turret

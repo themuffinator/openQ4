@@ -140,7 +140,8 @@ void rvVehicleController::DrawHUD ( void ) {
 		}
 		rvVehicleWeapon * weapon = mVehicle->GetPosition( mPosition )->GetActiveWeapon();
 		if ( weapon ) {
-			if ( weapon->CanZoom() && player->IsZoomed() && player == gameLocal.GetLocalPlayer() ) {
+			// openQ4: a zoom need not have a scope GUI (the Awakening turret's has none)
+			if ( weapon->CanZoom() && weapon->GetZoomGui() && player->IsZoomed() && player == gameLocal.GetLocalPlayer() ) {
 				weapon->UpdateRetainedScope();
 				weapon->GetZoomGui()->SetStateFloat( "playerYaw", player->viewAngles.yaw );
 				weapon->GetZoomGui()->StateChanged( gameLocal.time );

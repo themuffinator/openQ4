@@ -2824,6 +2824,17 @@ Completion substeps must keep three forms of evidence distinct:
   game libraries. See [vehicle evidence and limits](retail-baseline-ledger.md#awakening-vehicle-saves-and-hud-fractions-4-november-2026).
   Walker repair completion, unlock and traversal, sustained turret bursts and
   visual/audio parity remain open; this checks one shot and its engine capture.
+  Progress, 9 November (chaingun turret): the expansion's turret file redefined
+  `damage_machinegun`, so the player's machinegun hit for 40 without
+  `damage_bullet`'s bleeding, sounds or knockback; it is retail's again and the
+  turret keeps 40 through its own damage. The turret gained barrel heat
+  (`idVehicleTurretGun`: player gunners only, saved), crosshair convergence, a
+  zoom, its parts' servo loop and openQ4's turret HUD (Classic
+  `turret_hud.gui`, Remastered `remastered_chaingun_turret.q4ui`: the gunner's
+  gauges and the heat). Hidden, input-free M01 and M04 runs measured the heat
+  cycle (overheat after 5.3 s of fire, 2.0 s vent), the 40/15/20 damage, one
+  hot-gun save/reload and both HUD layouts; a sustained wave defence and
+  audio listening remain.
   Arena was covered only as `game_mp` on `baseoq4`, not as a switch from the
   Awakening menu. Full playthroughs remain.
   M01/M02 scrutiny, 4 November: fire volumes now use projectile/touch collision
@@ -4216,10 +4227,11 @@ Completion substeps:
   and animations decoded from them before the lock are derived again at the
   next level load
   ([evidence](mp-network-qualification.md#level-load-caches-on-pure-servers-9-november-2026)).
-  So do the session's expanded loading backgrounds for windows that are not
-  4:3: none is composed or read while pure, and one read before the lock is
-  purged at it, so a widescreen client that loaded a map first no longer
-  restarts on its pure connect
+  The session's expanded loading background for windows that are not 4:3 is
+  now composed in memory from VFS reads the lock admits and never saved, so
+  pure clients show it too and a widescreen client that loaded a map first no
+  longer restarts on its pure connect; files older builds saved are still
+  purged at the lock
   ([evidence](mp-network-qualification.md#expanded-loading-backgrounds-on-pure-servers-9-november-2026)).
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)

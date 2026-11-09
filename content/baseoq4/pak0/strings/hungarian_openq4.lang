@@ -1582,4 +1582,7 @@
 	"#str_231705"	"A(z) %s (%s) a(z) %s mappában nem egyezik az openQ4 ezen verziójával."
 	"#str_231706"	"Telepítsd a teljes openQ4 %s csomagot, vagy töltsd le a felsorolt csomagokat ehhez a verzióhoz innen: %s, és mentsd őket azonos néven a(z) %s mappába."
 	"#str_231707"	"Részletek:"
+	"#str_231708"	"HŐ"
+	"#str_231709"	"TÚLMELEGEDETT"
+	"#str_231710"	"ÉLETERŐ"
 }

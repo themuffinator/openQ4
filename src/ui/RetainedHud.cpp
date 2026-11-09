@@ -104,7 +104,8 @@ bool idRetainedHud::Eligible(const char* source) {
 		"guis/cinematic.gui","guis/e3cinematic.gui","guis/vehicles/hud.gui","guis/vehicles/airdef_cannon.gui",
 		"guis/vehicles/medchange.gui","guis/vehicles/mdisp.gui","guis/vehicles/strogg_noise.gui","guis/vehicles/blank.gui",
 		"guis/q4xhud.gui","guis/q4xhud_strogg.gui","guis/q4x_cannon_hud.gui","guis/dropshiphealth.gui","guis/mcchealth.gui","guis/introcinematic.gui",
-		"guis/vehicles/speederplayerhud.gui","guis/vehicles/gev_hud.gui","guis/vehicles/mcc/cannonplayerhud.gui","guis/vehicles/airassault/turretplayerhud.gui"};
+		"guis/vehicles/speederplayerhud.gui","guis/vehicles/gev_hud.gui","guis/vehicles/mcc/cannonplayerhud.gui","guis/vehicles/airassault/turretplayerhud.gui",
+		"guis/vehicles/turret_hud.gui"};
 	if (!roots.contains(Key(source))) return false;
 	return true;
 }
@@ -219,6 +220,8 @@ constexpr RemasteredRoute RemasteredRoutes[]={
 	{"guis/vehicles/airassault/turretplayerhud.gui","guis/hud/remastered_turret.q4ui"},
 	// The Awakening's MCC cannon with the MCC's hull readout (14.12).
 	{"guis/vehicles/mcc/cannonplayerhud.gui","guis/hud/remastered_mcc.q4ui"},
+	// openQ4's HUD for the Awakening's chaingun turret: the gunner's gauges and the barrel heat (14.12).
+	{"guis/vehicles/turret_hud.gui","guis/hud/remastered_chaingun_turret.q4ui"},
 	// The Awakening's speeder bike with the m07 race display (14.12).
 	{"guis/vehicles/speederplayerhud.gui","guis/hud/remastered_speeder.q4ui"},
 	// The Awakening's GEV, drawn from scratch since its art never shipped (14.12).

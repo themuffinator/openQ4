@@ -1582,4 +1582,7 @@
 	"#str_231705"	"%s (%s) in the %s folder does not match this version of openQ4."
 	"#str_231706"	"Install the full openQ4 %s package, or download each listed pack for that version from %s and save it in the %s folder under the same name."
 	"#str_231707"	"Details:"
+	"#str_231708"	"HEAT"
+	"#str_231709"	"OVERHEATED"
+	"#str_231710"	"HEALTH"
 }

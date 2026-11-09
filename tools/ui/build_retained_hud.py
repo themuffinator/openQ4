@@ -480,8 +480,11 @@ def build():
            'vehicles/hud','vehicles/airdef_cannon','vehicles/medchange','vehicles/mdisp','vehicles/strogg_noise','vehicles/blank']
     expansion=['q4xhud','q4xhud_strogg','q4x_cannon_hud','dropshiphealth','mcchealth','introcinematic',
                'vehicles/speederplayerhud','vehicles/gev_hud','vehicles/mcc/cannonplayerhud','vehicles/airassault/turretplayerhud']
+    # HUDs openQ4 itself ships (content/baseoq4), audited from the repository's own files.
+    own=['vehicles/turret_hud']
     registry={'version':1,'roots':['guis/'+n+'.gui' for n in roots],'materials':dict(sorted(materials.items())),'images':sorted(set(images)),
               'expansionRoots':['guis/'+n+'.gui' for n in expansion],
+              'openq4Roots':['guis/'+n+'.gui' for n in own],
               'imageAliases':{'gfx/guis/mainmenu/e3_0_add':'q4-add/gfx/guis/mainmenu/e3_0', **dict(sorted(image_aliases.items()))}}
     return {'artwork.q4ui':document,'coverage.json':registry}
 

@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.38, 5 November 2026 (1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.39, 9 November 2026 (1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -2860,6 +2860,26 @@ whatever its first frame happened to show.
   gun's HUD lacks, fills the track in proportion (the stock track is static)
   and, at or below 25%, turns it #FF3300 at 0.60 with a 2 Hz pulse, as the
   vehicle gauges warn. Exit shows in the HUD prompt.
+- **Chaingun turret.** The mannable Strogg chaingun of m01's trench and m04's
+  prison cannot be damaged, but its gunner stands exposed behind it, and the
+  expansion gave it the plain on-foot HUD with its ammunition gauge left empty.
+  openQ4's turret HUD (`guis/vehicles/turret_hud.gui`) reports the gunner and
+  the gun's barrel heat. Remastered keeps the on-foot Marine status bar: health
+  and armor in their places and, on the gauge where ammunition shows, the heat
+  in the same construction, track 0.20 and fill 0.35 in #FF9E1A, the heat as a
+  percentage of the gun's limit in Chain 0.5 where the clip shows, the gun's
+  glyph where the weapon render sits and HEAT in Low Pixel at the label's
+  place. From the warning level (75%) and while the gun vents, the track and
+  fill turn #FF3300 at 0.35 and 0.60 and pulse at 2 Hz and the figures turn
+  #FF3300. Once the barrel is warm, a 40x3 u bar at black 0.45 sits 22 u under
+  the crosshair, filling from its leading edge in #FF9E1A at 0.85, #FF3300 at
+  the warning level; while the gun vents, OVERHEATED in Marine #FF3300 with
+  the stock drop shadow pulses between 100% and 55% at 2 Hz beneath it. Minimal keeps the gauges and the crosshair's heat; the
+  transmission display, damage direction, notices and Exit in the HUD prompt
+  complete it. Classic builds it on the stock vehicle HUD: the hull and shield
+  gauges become HEALTH and ARMOR with their values in Chain 0.45, and the
+  weapon panel carries the gun's glyph with HEAT over the charge bar, which
+  shows the heat, and OVERHEATED over it while the gun vents.
 - **Speeder bike.** The m07 race keeps the stock vehicle HUD and centers a
   progress bar at the top: a 45% black plate whose raised tab carries the race
   timer, gold Marine 0.65 seconds and Marine 0.55 hundredths, and ten
@@ -4113,6 +4133,15 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.39: the Awakening chaingun turret
+
+Section 14.12 adds the HUD of The Awakening's mannable Strogg chaingun (m01, m04).
+The expansion gave it the on-foot HUD with its ammunition gauge left empty and
+nothing for the barrel heat openQ4 adds to the gun; it now reports the exposed
+gunner's health and armor and the heat, on the gauges and under the crosshair,
+with OVERHEATED while the gun vents. The Awakening's vehicle displays are
+already required; no requirement changes, and nothing is accepted.
 
 ### Version 1.38: the black frame
 

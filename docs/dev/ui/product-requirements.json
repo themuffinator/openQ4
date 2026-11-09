@@ -920,7 +920,7 @@
       "scope": "Classic canvas and gauge artwork, clipped family-specific traces, repeating Strogg grain, per-readout ammo gains and notice separation; compact readiness/live match cards, complete round clocks, respawn countdowns, vote glyphs, arena sudden-death state, Tourney wording/instructions/banners, and bounded chat. Native and Windows engine evidence is limited to the cases in the linked record. The remaining HUD review, full aspect/device/backend matrix and product acceptance remain open.",
       "local_capture_summary": ".tmp/claude-continuation/hud/validation-summary.json",
       "local_capture_summary_sha256": "835d3b0f478bc9d5b9f9863f3e6e9b2c6f3831d2b3b9e9ebc322ab41ef5f428f",
-      "sha256": "a02369804fed9b0f43b04b855449858428d8e27a651640c31427b2cbe1ad7145"
+      "sha256": "6eaccd2f1d063bb3953fa457bea00d61a70a441175402b70a13065c1299dc0fa"
     },
     "retained-loadgame-evidence": {
       "kind": "implementation_checkpoint",
@@ -1082,7 +1082,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/remastered-hud.md",
       "scope": "The Remastered HUD documents as recorded: the objectives display held on the scores button in play (every objective three at a time, a COMPLETED section, weapon-cycle scrolling, Toggle Objectives through g_objectivesToggle with its HUD prompt), the new-objective and objective-complete notices on their own timers and OBJECTIVE FAILED, in both families; The Awakening's on-foot documents (the expansion's strip roster, Falcon's squad emblem on the transmission display, the ship panel on foot) and vehicle documents (the space cannon's ship-status panel, the MCC cannon's hull readout, the speeder's status bar, race display, boost and prompts, the GEV's cluster), with the capture scenarios that drive each (objectives, objectives-toggle, turret, mcc, speeder, gev). A documentation checkpoint of work landed with the Remastered HUD; it does not qualify the aspect-ratio, layout or device matrices.",
-      "sha256": "a02369804fed9b0f43b04b855449858428d8e27a651640c31427b2cbe1ad7145"
+      "sha256": "6eaccd2f1d063bb3953fa457bea00d61a70a441175402b70a13065c1299dc0fa"
     },
     "inventory-stage-one": {
       "kind": "source_inventory_revision",
@@ -1277,7 +1277,7 @@
       "baseline_engine_revision": "53e31d1e90b2284dc6fe6b16472caf81bad16714",
       "companion_revision": "53e31d1e90b2284dc6fe6b16472caf81bad16714",
       "scope": "UI-04/FLOW-062: the retained implant overlay driven through the Medical Labs script itself (nanocyteFade and determineScream through `script`, the level's own functions) and a real save, at 4:3, 16:9, 21:9, 32:9 and 9:16 and in German: activation, the hide by 4650 ms, a mid-sequence restart, the hurt pulse while hidden, the localized save notice and reduced motion.",
-      "sha256": "a02369804fed9b0f43b04b855449858428d8e27a651640c31427b2cbe1ad7145",
+      "sha256": "6eaccd2f1d063bb3953fa457bea00d61a70a441175402b70a13065c1299dc0fa",
       "local_capture_summary": ".tmp/ui/implant-overlay/validation-evidence.json",
       "local_capture_summary_sha256": "1c1e411486a484bbee29a4fde2c2d27ee482cc6bd75aef5b0db8d5800a1a9980"
     },

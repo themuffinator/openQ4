@@ -1642,6 +1642,7 @@ if build_engine or get_option('build_native_tests')
              meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/remastered_airdef.q4ui',
              meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/remastered_turret.q4ui',
              meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/remastered_mcc.q4ui',
+             meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/remastered_chaingun_turret.q4ui',
              meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/remastered_speeder.q4ui',
              meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/remastered_gev.q4ui',
              meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/remastered_medchange.q4ui',

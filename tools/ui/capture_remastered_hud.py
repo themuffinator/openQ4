@@ -139,6 +139,26 @@ def mcc_cannon():
     ]
 
 
+def chaingun_turret():
+    """openQ4's HUD for the Awakening's chaingun turret (guis/vehicles/turret_hud.gui):
+    the player boards m01's trench turret through enterVehicle and the gun's own
+    fire heats it, past the warning level and then its limit; the script's
+    setHealth gives the gunner low health, which god mode then keeps."""
+    gui = 'guis/vehicles/turret_hud.gui'
+    return [
+        'set g_autoExecAfterMapLoad ""', 'notarget', 'god', 'waitMsec 2500',
+        'script "$player1.enterVehicle($vehicle_q4x_turret_chaingun_1)"', 'waitMsec 2000', shot('chaingun'),
+        'openq4_testInput 7000 attack', 'waitMsec 2500', shot('chaingun-warm'),
+        'waitMsec 1800', shot('chaingun-hot'), 'waitMsec 1400', shot('chaingun-overheat'), 'waitMsec 3000',
+        'script "$player1.setHealth( 20 );"', *hud(gui, 'state rhinochatter 1', 'event radioChatterUp'), 'waitMsec 700',
+        shot('chaingun-low'),
+        *hud(gui, 'event radioChatterDown'),
+        'openq4_testInput 4500 attack', 'waitMsec 4300',
+        'set ui_hudLayout 0', 'waitMsec 300', shot('chaingun-classic'), 'set ui_hudLayout 1', 'waitMsec 400', shot('chaingun-restored'),
+        'set ui_hudLayout 2', 'waitMsec 400', shot('chaingun-minimal'), 'set ui_hudLayout 1',
+    ]
+
+
 def speeder():
     """The Awakening's speeder bike (guis/vehicles/speederplayerhud.gui): m07's
     race seats the player on the bike and runs the timer itself; the race's
@@ -357,6 +377,7 @@ SCENARIOS = {
     'airdef': ('game/mcc_landing', cannon()),
     'turret': ('game/m03_airassault', space_cannon()),
     'mcc': ('game/m06_mcc_invasion', mcc_cannon()),
+    'chaingun': ('game/m01_stranarus_trench1', chaingun_turret()),
     'speeder': ('game/m07_race1', speeder()),
     'gev': ('game/m09_valkaryne', gev()),
     'medchange': ('game/medlabs', medchange()),
@@ -481,7 +502,7 @@ SCENARIOS = {
 }
 
 
-AWAKENING = {'turret', 'mcc', 'speeder', 'gev'}
+AWAKENING = {'turret', 'mcc', 'chaingun', 'speeder', 'gev'}
 COMPETITIVE = {'mp-competitive', 'mp-competitive-ctf', 'mp-competitive-spec', 'mp-competitive-matrix'}
 
 

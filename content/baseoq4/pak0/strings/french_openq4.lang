@@ -1591,4 +1591,7 @@
 	"#str_231705"	"%s (%s) dans le dossier %s ne correspond pas à cette version d'openQ4."
 	"#str_231706"	"Installez le paquet complet d'openQ4 %s, ou téléchargez chaque pack indiqué pour cette version depuis %s et enregistrez-le dans le dossier %s sous le même nom."
 	"#str_231707"	"Détails :"
+	"#str_231708"	"CHALEUR"
+	"#str_231709"	"SURCHAUFFE"
+	"#str_231710"	"SANTÉ"
 }

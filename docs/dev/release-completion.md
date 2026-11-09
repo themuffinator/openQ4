@@ -6,6 +6,33 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## The Awakening's chaingun turret gets heat, its own HUD and a fair machinegun, 9 November 2026
+
+- **The machinegun hits as it does in Quake 4 again.** In The Awakening the
+  player's machinegun hit for 40 a round (more than its zoomed 20) and lost
+  its bleeding, flesh sounds and knockback, because the expansion's turret
+  file reused the machinegun's damage for the turret. It is back to 15, 20
+  zoomed; the turret keeps its 40.
+- **The chaingun turret you man in Stranarus Trench and the prison heats up.**
+  About five seconds of continuous fire overheats it; it vents steam and will
+  not fire for about two seconds. Short bursts never overheat it, a cold gun
+  is more accurate than before and spreads as it heats, and the zoom button
+  now magnifies its view. Its rounds land under the crosshair (the alpha fired
+  them parallel to it, well to the side), and its servos sound as it turns.
+- **Its own HUD.** Instead of the on-foot HUD with an empty ammunition gauge,
+  the turret shows your health and armor and its barrel heat, also as a bar
+  under the crosshair with OVERHEATED while it vents, in the Remastered,
+  Minimal and Classic layouts and the classic interface.
+- **Upgrade note.** Saves made before this change keep the old turret until
+  the level is restarted or reached again; the machinegun's damage applies at
+  once.
+- Evidence: hidden, input-free M01 and M04 runs (heat cycle, damage
+  definitions, a hot-gun save and reload, the scripted prison gunner, HUD
+  captures with `tools/ui/capture_remastered_hud.py --scenario chaingun`),
+  the native Remastered HUD checks and `tools/tests/awakening_turret_skin_contract.py`.
+  A sustained wave defence and audio listening remain; see Q4-04 in the
+  [roadmap](roadmap.md).
+
 ## Vulkan drops unused shadow volumes like OpenGL (FPS-03), 9 November 2026
 
 - **Vulkan now treats lights without baked shadows as OpenGL does.** This covers

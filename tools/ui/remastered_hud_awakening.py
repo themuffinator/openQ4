@@ -338,6 +338,152 @@ def mcc_document() -> dict:
                                                       "stock": "guis/vehicles/mcc/cannonplayerhud.gui"}}})
 
 
+# ------------------------------------------------------ the chaingun turret
+
+# Barrel heat (idVehicleTurretGun): #FF9E1A, the vehicle charge bar's orange,
+# and #FF3300, the HUD's warning red, from vehicle_heatwarn and while it vents.
+HEAT, HEAT_HOT = "#FF9E1A", "#FF3300"
+HEAT_KEY, OVERHEATED_KEY = "#str_231708", "#str_231709"
+
+
+def heat_gauge(doc: HudDocument) -> dict:
+    """The barrel heat on the Marine gauge where the on-foot status bar shows
+    ammunition (101, 420 u): its track at 0.20 and the trailing-anchored fill
+    at 0.35 in #FF9E1A, both #FF3300 (0.35 and 0.60) and pulsing at 2 Hz
+    once the heat reaches vehicle_heatwarn or the gun vents; the heat as a
+    percentage of the gun's limit in Chain 0.5 where the clip shows, the
+    gun's traced glyph (veh_mgun) where the weapon render sits and HEAT in
+    the label's place."""
+    from remastered_hud_status import BACK, MARINE, backing_nodes, fill_window, gauge_surface, legacy_readout
+    from remastered_hud_status import full as full_group
+    w, h, k = 125, 59, -0.22
+    heat = op("clamp", S("vehicle_heat"), 0, 1)
+    hot = OR(op(">=", heat, S("vehicle_heatwarn")), op("!=", S("vehicle_overheat"), 0))
+    plate = backing_nodes(doc, "heat", BACK)
+    tracks, fills = [], []
+    for name, colour, shown, track_alpha, fill_alpha in (("cool", HEAT, NOT(hot), 0.2, 0.35),
+                                                         ("hot", HEAT_HOT, hot, 0.35, 0.6)):
+        track = gauge_surface(f"heat-track-{name}", "ammo", False, colour, track_alpha)
+        doc.show(track["id"], shown)
+        tracks.append(track)
+        fill = gauge_surface(f"heat-fill-{name}", "ammo", False, colour, fill_alpha)
+        doc.show(fill["id"], shown)
+        fills.append(fill)
+    # Only the hot paint pulses; it is hidden while the gun is cool.
+    for node in (tracks[1], fills[1]):
+        node["properties"]["opacity"] = num(1)
+    doc.timeline("heat-pulse", 500, [tr(node["id"], "opacity", [(0, num(1)), (250, num(0.5)), (500, num(1))])
+                                     for node in (tracks[1], fills[1])], iterations=0)
+    doc.joins.append(play("heat-pulse"))
+    plate += tracks
+    plate.append(fill_window(doc, "heat-fill", w, h, "vehicle_heat", fills, 5.4, 115, 120))
+    pulse = shear_group("heat-plate", 0, 0, u(w), u(h), k, plate)
+    ink = rgb(MARINE["ink"])
+    number = legacy_readout(doc, "heat-num", op("*", heat, 100), face="chain", rect=(66, 9, 52, 26), scale=.5, colour=ink,
+                            shear=k)
+    numerals = full_group("heat-numerals", [number], color=ui.colour(ink))
+    doc.bind("heat-numerals.color", "heat-numerals", "color", [sel(hot, c, d) for c, d in zip(rgb(HEAT_HOT), ink)])
+    gun = full_group("heat-gun", hud_svg.icon_nodes("veh_mgun", "heat-gun-g", u(9), u(17), u(22), tint=MARINE["gun"]))
+    label = text_box("heat-label", HEAT_KEY, face="lowpixel", size=10.08, colour=MARINE["icon"], baseline=u(47), x=u(9),
+                     width=u(70))
+    doc.bind("heat-label.color", "heat-label", "color", [sel(hot, c, d) for c, d in zip(rgb(HEAT_HOT, 0.8), MARINE["icon"])])
+    return box("heat-gauge", u(101), u(420), u(w), u(h), [pulse, gun, numerals, label])
+
+
+def heat_reticle(doc: HudDocument) -> dict:
+    """Under the crosshair, once the barrel is warm: a 40x3 u bar at black
+    0.45 filling from its leading edge in #FF9E1A at 0.85, #FF3300 from the
+    warning level, and OVERHEATED in Marine 10.5 u #FF3300 with the stock drop
+    shadow, pulsing between 100% and 55% at 2 Hz, while the gun vents.
+    Minimal keeps it: the gun cannot be used without it."""
+    from remastered_hud_vehicle import rect_path
+    heat = op("clamp", S("vehicle_heat"), 0, 1)
+    overheated = op("!=", S("vehicle_overheat"), 0)
+    hot = OR(op(">=", heat, S("vehicle_heatwarn")), overheated)
+    track = vec("xheat-track", [rect_path("track", ui.solid([0, 0, 0, 0.45]))],
+                ui.absolute(left=u(300), top=u(262), width=u(40), height=u(3)))
+    bars = []
+    for name, colour, shown in (("cool", rgb(HEAT, 0.85), NOT(hot)), ("hot", rgb(HEAT_HOT, 0.9), hot)):
+        bar = vec(f"xheat-{name}", [rect_path("bar", ui.solid(colour))],
+                  {**ui.absolute(left=u(300), top=u(262), width=u(40), height=u(3)), "transform": ui.transform()})
+        # Scaled about its leading edge: the box centre sits 20 u in.
+        doc.bind(f"xheat-{name}.scale", bar["id"], "transform", [op("*", u(-20), op("-", 1, heat)), 0, heat, 1, 0])
+        doc.show(bar["id"], shown)
+        bars.append(bar)
+    from remastered_hud_base import shadowed
+    over = ui.group("xheat-over", {**ui.FULL, "display": ui.keyword("none"), "opacity": num(1)},
+                    shadowed("xheat-over-text", OVERHEATED_KEY, face="marine", size=u(10.5), colour=rgb(HEAT_HOT, 1),
+                             baseline=u(281), center=u(320), width=u(220)))
+    doc.show("xheat-over", overheated)
+    doc.timeline("xheat-over-pulse", 500, [tr("xheat-over", "opacity", [(0, num(1)), (250, num(0.55)), (500, num(1))])],
+                 iterations=0)
+    doc.joins.append(play("xheat-over-pulse"))
+    group = ui.group("xheat", {**ui.FULL, "display": ui.keyword("none")}, [track, *bars, over])
+    doc.show("xheat", OR(op(">", heat, 0.02), overheated))
+    return group
+
+
+def chaingun_turret_document() -> dict:
+    """The Awakening's Strogg chaingun turret (guis/vehicles/turret_hud.gui,
+    14.12; m01's trench turret and m04's prison turrets). The gun cannot be
+    damaged, but its gunner stands exposed behind it, so the status bar is
+    the gunner's: the on-foot Marine health and armor gauges in their places,
+    and the barrel heat on the gauge where ammunition shows on foot. The
+    heat also shows under the crosshair. With them the transmission display,
+    the damage direction, the notices and the HUD prompt's Exit. The HUD
+    exists only while the gun is crewed."""
+    from remastered_hud_base import status_scale
+    from remastered_hud_groups import hit_indicator, notices, transmission
+    from remastered_hud_status import marine_gauge
+    from remastered_hud_vehicle import hud_prompt
+    doc = HudDocument("openq4.hud.remastered.chaingun_turret")
+    layout_state(doc)
+    for key in ("player_health", "player_healthpct", "player_armor", "player_armorpct", "player_healthDelta",
+                "player_armorDelta"):
+        doc.number(key, 0)
+    doc.number("player_healthpct", 1)
+    doc.number("vehicle_heat", 0)
+    doc.number("vehicle_overheat", 0)
+    doc.number("vehicle_heatwarn", 0.75)
+    doc.number("vehicle_zoom", 0)
+    doc.boolean("mp")
+    doc.boolean("oq4.low")
+    doc.boolean("oq4.teamStrogg")
+    gauges = [heat_gauge(doc), marine_gauge(doc, "health", 278, 420, mp_variants=False),
+              marine_gauge(doc, "armor", 414, 420, mp_variants=False)]
+    doc.show("armor-gauge", op(">", S("player_armor"), 0))
+    reticle = heat_reticle(doc)
+    radio = transmission(doc, strogg=False, emblem="squad_falcon")
+    hit = hit_indicator(doc)
+    exit_notice, saved, missile_text = notices(doc)
+    prompt = hud_prompt(doc)
+    # Low health below 26% of the maximum, and the gain pops, as on foot.
+    doc.on("updateHealth",
+           {"op": "setState", "values": {"oq4.low": op("<", S("player_healthpct"), 0.26)}},
+           {"op": "if", "condition": op("<", S("player_healthDelta"), 0), "then": [play("health-gain")]})
+    doc.on("updateArmor", {"op": "if", "condition": op("<", S("player_armorDelta"), 0), "then": [play("armor-gain")]})
+    doc.joins.append({"op": "setState", "values": {"oq4.low": op("<", S("player_healthpct"), 0.26)}})
+    doc.on("showExitmessage", {"op": "setState", "values": {"oq4.vehicle": True}})
+    doc.on("hideExitmessage", {"op": "setState", "values": {"oq4.vehicle": False}})
+    doc.on("showLockmessage", {"op": "setState", "values": {"oq4.locked": True}})
+    doc.on("hideLockmessage", {"op": "setState", "values": {"oq4.locked": False}})
+    doc.joins.append({"op": "setState", "values": {"oq4.vehicle": True}})
+    doc.on("hudJoin", *doc.joins)
+    doc.on("onInit", *doc.joins)
+    joins = join_events(doc, [("p_radio::visible", "radioChatterUp"), ("lock_msg::visible", "showLockmessage")])
+    # Minimal (ui_hudLayout 2) keeps the gauges, the crosshair's heat, the prompt and the save notice.
+    root = gameplay_root(doc, "hud-root", [
+        anchor(doc, "bc", gauges, scale=status_scale(S("mp"))),
+        anchor(doc, "cc", [reticle, beyond_minimal(doc, "cc-full", [hit])]),
+        anchor(doc, "tr", [beyond_minimal(doc, "tr-full", [radio])]),
+        anchor(doc, "tc", [beyond_minimal(doc, "tc-full", [missile_text, exit_notice]), saved]),
+        anchor(doc, "br", [prompt]),
+    ])
+    return doc.build(root, {"canvas": {"height": 720, "minWidth": 960},
+                            "extensions": {"openq4": {"reference": "ui-visual-design.md 14.12",
+                                                      "stock": "guis/vehicles/turret_hud.gui", "joinEvents": joins}}})
+
+
 # ------------------------------------------------------------ the speeder bike
 
 # The bike lists its machinegun first (vehicle_weapon 0) and its cannon second,
