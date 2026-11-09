@@ -1818,6 +1818,7 @@ bool idCollisionModelManagerLocal::LoadGeneratedCollisionCache( const char *sour
 		builtModels[modelIndex] = model;
 		model->name = stage.name;
 		model->fileTime = mapFileCRC;
+		model->fromGeneratedCache = true;
 		model->numPrimitives = stage.numPrimitives;
 		model->isConvex = stage.isConvex;
 		model->maxVertices = model->numVertices = static_cast<int>( stage.vertices.size() );

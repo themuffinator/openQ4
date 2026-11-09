@@ -1574,6 +1574,98 @@ static idRenderModel *R_ViewLightPrelightModel( viewLight_t *vLight ) {
 	return prelightModel;
 }
 
+#ifdef OPENQ4_RENDERER_VK_MODULE
+/*
+=================
+R_InteractionReceiverNeedsStencil
+
+Whether a receiver surface of a built (or building) interaction uses
+authored GLSL lighting (VK_MaterialPrograms_NeedsStencil). A finished
+interaction counts only its filled slots: a NULL slot is a surface with no
+geometry, no shader or no contact with the light frustum, which receives
+nothing. While CreateInteraction runs, the later slots are still NULL, so
+the verdict covers every model surface with geometry instead, a superset of
+the slots it can fill. Cached for the interaction's surface set.
+=================
+*/
+static bool R_InteractionReceiverNeedsStencil( const idInteraction *inter, const int generation ) {
+	if ( inter->stencilReceiverGeneration == generation ) {
+		return inter->stencilReceiverNeeded;
+	}
+	bool needed = false;
+	if ( inter->buildModel != NULL ) {
+		const idRenderModel *model = inter->buildModel;
+		const renderEntity_t &parms = inter->entityDef->parms;
+		for ( int i = 0; i < model->NumSurfaces() && !needed; ++i ) {
+			const modelSurface_t *surf = model->Surface( i );
+			if ( surf == NULL || surf->geometry == NULL ) {
+				continue;
+			}
+			needed = VK_MaterialPrograms_NeedsStencil(
+				R_RemapShaderBySkin( surf->shader, parms.customSkin, parms.customShader ), NULL );
+		}
+	} else {
+		for ( int i = 0; i < inter->numSurfaces && !needed; ++i ) {
+			needed = VK_MaterialPrograms_NeedsStencil( inter->surfaces[i].shader, NULL );
+		}
+	}
+	inter->stencilReceiverGeneration = generation;
+	inter->stencilReceiverNeeded = needed;
+	return needed;
+}
+
+/*
+=================
+R_ShadowMapReceiversAllowMaps
+
+Authored lighting has no engine shadow-map sampler in its shader ABI. Its
+receiver chain uses stencil, so retain volumes before any entity's
+interaction is submitted. Checking only the currently submitted surface is
+too late: earlier entities may already have discarded their volumes. An
+unbuilt interaction is conservatively unknown, never evidence that every
+receiver supports maps. This also covers newly spawned receivers.
+
+Two unbuilt interactions cannot gain receivers in this view and are skipped:
+one whose entity is not a view entity (R_AddModelSurfaces never visits it,
+and entities that become view entities later, such as through-world
+outlines, build no interactions), and one that AddActiveInteraction already
+left unbuilt (it runs once per interaction per view). An interaction still
+waiting for its entity's turn stays unknown; that only costs volumes, never
+a missing shadow.
+
+The verdict is asked once per surface while interactions are built and
+linked, so it is memoized on the view light and recomputed only after one of
+the light's interactions changes state (idInteraction invalidates it).
+=================
+*/
+static bool R_ShadowMapReceiversAllowMaps( const idRenderLightLocal *lightDef ) {
+	viewLight_t *vLight = lightDef->viewCount == tr.viewCount ? lightDef->viewLight : NULL;
+	if ( vLight != NULL && vLight->shadowMapReceiverScanValid ) {
+		return vLight->shadowMapReceiverScanAllowsMaps;
+	}
+	const int generation = VK_MaterialPrograms_NeedsStencilGeneration();
+	bool allowsMaps = true;
+	for ( const idInteraction *inter = lightDef->firstInteraction; inter != NULL; inter = inter->lightNext ) {
+		if ( inter->IsDeferred() ) {
+			if ( inter->entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {
+				continue;
+			}
+			allowsMaps = false;
+			break;
+		}
+		if ( R_InteractionReceiverNeedsStencil( inter, generation ) ) {
+			allowsMaps = false;
+			break;
+		}
+	}
+	if ( vLight != NULL ) {
+		vLight->shadowMapReceiverScanValid = true;
+		vLight->shadowMapReceiverScanAllowsMaps = allowsMaps;
+	}
+	return allowsMaps;
+}
+#endif
+
 /*
 =================
 R_ShadowMapLightWillUseShadowMaps
@@ -1636,19 +1728,8 @@ bool R_ShadowMapLightWillUseShadowMaps( const idRenderLightLocal *lightDef ) {
 	}
 	if ( !RB_ShadowMapResourcesKnownGood( pointLightPath ) ) { return false; }
 #ifdef OPENQ4_RENDERER_VK_MODULE
-	// Authored lighting has no engine shadow-map sampler in its shader ABI.
-	// Its receiver chain uses stencil, so retain volumes before any entity's
-	// interaction is submitted. Checking only the currently submitted surface
-	// is too late: earlier entities may already have discarded their volumes.
-	// An unbuilt interaction is conservatively unknown, never evidence that
-	// every receiver supports maps. This also covers newly spawned receivers.
-	for ( const idInteraction *inter = lightDef->firstInteraction; inter != NULL; inter = inter->lightNext ) {
-		if ( inter->numSurfaces < 0 ) { return false; }
-		for ( int i = 0; i < inter->numSurfaces; ++i ) {
-			if ( inter->surfaces[i].shader == NULL
-					|| VK_MaterialPrograms_NeedsStencil( inter->surfaces[i].shader, NULL ) ) { return false; }
-		}
-	}
+	// Lights with an authored-lighting receiver keep their stencil chain.
+	if ( !R_ShadowMapReceiversAllowMaps( lightDef ) ) { return false; }
 #endif
 	return true;
 }

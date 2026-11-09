@@ -1569,6 +1569,7 @@ void idRenderWorldLocal::FreeWorld() {
 
 	mapName = "<FREED>";
 	mapFileCRC = 0u;
+	worldFromGeneratedCache = false;
 }
 
 /*
@@ -2300,7 +2301,17 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 	// and try to skip all the work
 	const ID_TIME_T currentTimeStamp = hasMD5RProcCompanion ? md5rProcTimeStamp : procTimeStamp;
 
-	if ( name == mapName ) {
+	// A world decoded from the generated cache must not outlive a pure lock
+	// (or fs_restrict): once those reads are refused, load it again from the
+	// pure paks instead of retaining it. See
+	// idFileSystemLocal::GeneratedCacheReadsRefused.
+	const bool retainedWorldRefused = worldFromGeneratedCache
+		&& !fileSystem->GeneratedCacheReadsEnabled( GENERATED_CACHE_RENDER_WORLD );
+	if ( name == mapName && retainedWorldRefused ) {
+		common->Printf( "idRenderWorldLocal::InitFromMap: reloading a world decoded from the generated cache: generated-cache reads are refused\n" );
+	}
+
+	if ( name == mapName && !retainedWorldRefused ) {
 		if ( currentTimeStamp != FILE_NOT_FOUND_TIMESTAMP && currentTimeStamp == mapTimeStamp ) {
 			common->Printf( "idRenderWorldLocal::InitFromMap: retaining existing map\n" );
 			FreeDefs();
@@ -2373,6 +2384,7 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 			const bool loadedFromCache = ReadLevelLoadCachePayload( *cacheFile, name, procTimeStamp );
 			fileSystem->CloseFile( cacheFile );
 			if ( loadedFromCache ) {
+				worldFromGeneratedCache = true;
 				fileSystem->RecordLevelLoadResource(
 					LEVEL_LOAD_RESOURCE_WORLD,
 					procCacheSource,

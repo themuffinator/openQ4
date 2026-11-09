@@ -284,6 +284,9 @@ public:
 	float					GetCurrentCharge	( void ) const;
 
 	virtual void			UpdateCursorGUI		( idUserInterface* gui ) const;
+							// openQ4: the selected weapon's own state on its vehicle's HUD,
+							// after the position's (the Awakening turret's barrel heat)
+	virtual void			UpdateHUD			( idUserInterface* gui ) { }
 							// openQ4 VR: where the next shot leaves, for the aim beam
 	bool					GetMuzzleOrigin		( idVec3& origin ) const;
 
@@ -430,6 +433,20 @@ protected:
 	// openQ4: The Awakening's "allowDisableMovement" (from the def, not saved)
 	bool			allowDisableMovement;
 	void			ReadMovementLock	( void );
+
+	// openQ4: a def that sets "playMoveSound" loops its "snd_move" while the
+	// turret turns, between "moveMinVolume" and "moveMaxVolume" dB by speed.
+	// Read from the def and transient, so nothing here is saved: a loaded
+	// turret starts the sound again the next time it turns.
+	void			ReadMoveSound		( void );
+	void			UpdateMoveSound		( float degrees );
+	void			StopMoveSound		( void );
+	const idSoundShader*	moveSound;
+	float			moveMinVolume;
+	float			moveMaxVolume;
+	bool			moveSoundOn;
+	bool			moveSoundFading;
+	int				moveSoundLastTurn;
 
 	// openQ4 VR: input rotation the turn rate has not applied yet, the aim it
 	// last saw, and whether the turret has turned to the aim since the seat

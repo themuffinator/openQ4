@@ -1583,4 +1583,7 @@
 	"#str_231705"	"%s (%s), %s klasöründe bu openQ4 sürümüyle eşleşmiyor."
 	"#str_231706"	"Tam openQ4 %s paketini yükleyin veya listelenen her paketi o sürüm için %s adresinden indirip aynı adla %s klasörüne kaydedin."
 	"#str_231707"	"Ayrıntılar:"
+	"#str_231708"	"ISI"
+	"#str_231709"	"AŞIRI ISINDI"
+	"#str_231710"	"SAĞLIK"
 }

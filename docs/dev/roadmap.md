@@ -1502,7 +1502,7 @@ optimization has landed.
 | --- | --- | --- |
 | FPS-01 — Closed | Suite (nine scripted stock-map scenarios, per-frame traces, cold/warm passes, toggle ladders, attribution, hitch events, transitions, idle-launch retry), 0.13.2 and current baselines on both backends, report with the settings/code split; the RTX 4060 Laptop named the reference machine; 42 budgets (7 scenarios x Ultra/Quality/Enhanced x OpenGL/Vulkan, warm mean and p99) declared from 126 launches of 94e0b14ec in `docs/dev/performance-budgets.json` and report section 10; `budgets` and `check` subcommands. | Budgets redeclared by FPS-02 (report section 11); the gate itself is FPS-09. |
 | FPS-02 — Closed | Refresh classes declared at 2560x1440 on the reference machine (Enhanced 144/90, Quality 100/60, Ultra 75/45 fps average/1% low); candidates screened on both backends; the three recipes rebuilt (point cubes 512 or stencil, MSAA 0/2/4, no cascades or motion blur below Maximum); `maximum` added as the everything-on preset without a frame-rate claim; detected starts capped at the display refresh; the startup banner reports the bootstrap and the detected profile with corrected video memory; Vulkan point-policy admission fixed; 42 budgets redeclared from 126 launches, every tier inside its class in every scene. | Closed. |
-| FPS-03 — Not started | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. FPS-02 sized the tiers around them: 512 cubes at Quality and Ultra, stencil point shadows at Enhanced, 2048 only at Maximum. | Dynamic-caster composition for point lights, per-face culling, tier budgets and sizes, Vulkan light scan. |
+| FPS-03 — Partial | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. FPS-02 sized the tiers around them: 512 cubes at Quality and Ultra, stencil point shadows at Enhanced, 2048 only at Maximum. The Vulkan light scan no longer keeps the stencil volumes of non-prelit mapped lights, including lights with an interaction left unbuilt in the view (identical images, CPU-neutral on the stock scenes). | Dynamic-caster composition for point lights, per-face culling, tier budgets and sizes. |
 | FPS-04 — Not started | SSAO, motion blur, HDR tone map, bloom and SMAA priced per scene on both backends (the chain is 10-14 ms per frame at 16 samples on OpenGL, 4-6 ms at 8 samples on Vulkan). | Half-resolution SSAO on OpenGL, pass merging, MSAA-aware resolves, tone-map cost. |
 | FPS-05 — Not started | 16x MSAA measured as the largest single Ultra cost on OpenGL; the Vulkan backend found to clamp the preset's 16 samples to the device's 8, so the two backends render different Ultra images. FPS-02's Ultra uses 4x MSAA with SMAA ultra, which both backends honour; only Maximum still requests 16. | Sample-count policy per tier, resolve cost, one sample count on both backends, MSAA 4 + SMAA as the Ultra candidate. |
 | FPS-06 — Not started | Equal-settings deltas attributed: in storage2 the retained HUD's layer composition (17 two-dimensional views and 34 render-target commands per frame against the classic HUD's 7 and 17; about 0.4 ms of main-thread time); on Vulkan the soft-particle depth capture (1.3 ms in airdefense1). The 2 October build equals 0.13.2 and the 15 October build carries the storage2 step, bracketing the 8 October retained-HUD commit (bisection); interpolation, light grid, reverb, portal cull and the five new Vulkan backend features cost nothing measurable. | Bisection pass 2 for the remainder, the retained HUD composed in one pass, the Vulkan soft-particle capture made cheap, closure within 3% average and 10% p99 of 0.13.2 on every suite scene on both backends. |
@@ -1598,6 +1598,51 @@ optimization has landed.
   re-tiered Ultra spend less than a declared share of the frame on shadow maps on both
   backends, with image comparisons showing no shadow regression at the stock maps'
   reference poses.
+  Completed so far: the Vulkan light scan (9 November 2026). On Vulkan,
+  `R_ShadowMapLightWillUseShadowMaps` treated any NULL surface slot of a light's
+  interactions as unknown. A finished interaction leaves every surface with no geometry
+  or outside the light NULL, so Vulkan kept and linked the stencil volumes of every
+  non-prelit shadow-mapped light that OpenGL drops. The scan now counts only the filled
+  slots of a finished interaction, answers for the whole model while one is being built,
+  and still treats an unbuilt one as unknown. It is memoized on the view light,
+  invalidated by every interaction state change and by a GLSL program reload, which
+  replaces the per-surface rescan; `renderer_vulkan_shadow_compatibility.py` pins the
+  contract. At the Quality preset on Vulkan, hub2 now drops the volumes of 3.4-3.8
+  non-prelit mapped lights per view (none before) and storage2 of 0.3; Air Defense 1 has
+  no such light. Eight frozen poses on hub2, storage2 and Air Defense 1 render
+  byte-identical images with the old and the new scan (a ninth did not freeze), and
+  the shadow-map counters match. **The CPU result is neutral within measurement.** An
+  ABBA frozen-pose A/B in hub2 (hidden 2560x1440, `profileFrameWork` draw time) differs
+  by -0.10 ms (sd 0.26) and +0.07 ms (sd 0.65). `tools/debug/cpu_sampler.py` puts
+  `R_RenderView` at 7.9% against 8.3% of main-thread samples (-0.07 ms per frame) and
+  the scan itself at no samples. The fullscreen `performance_suite.py` ladder at
+  `own-quality` stayed within -0.08/+0.15 ms in the one hub2 round that held the
+  foreground; those frames are GPU-bound. The saving is small for two reasons. Prelit
+  lights, 12-19 of hub2's shadowing lights per view, keep their volumes by design before
+  the scan, so the separate 2.6% prelit fallback-volume share is untouched. Dynamic
+  volumes are still built while another entity's interaction on the same light is
+  unbuilt (`createShadowVolumes` per frame did not fall), and a light with an
+  interaction that is never built in the view keeps its volumes. With its volumes
+  dropped, a light whose map pass fails draws unshadowed for one frame before the sticky
+  fallback restores them, as on OpenGL. This was seen once, for the weapon flashlight,
+  in about twenty launches, and did not recur in four targeted runs.
+  Unbuilt interactions (9 November 2026, follow-up). An unbuilt interaction no longer
+  holds a light's volumes once it cannot gain receivers in the view: either its entity
+  is not a view entity, or `AddActiveInteraction`, the only builder, which runs once
+  per interaction per view, returned leaving it unbuilt (`unbuiltVisitView`). At the
+  end of each view every non-prelit mapped light can now drop its volumes. Airdefense2
+  with the flashlight has 2,723 elided and 0 kept light-views against 1,811 and 912;
+  hub2 has 8,121 and 0 against 7,901 and 183. Ten frozen poses on hub2, storage2, Air
+  Defense 1 and airdefense2 render byte-identical images with the rule on and off (an
+  eleventh did not freeze). An interaction still waiting for its entity's turn in
+  `R_AddModelSurfaces` stays unknown, so entities processed before it keep their
+  volumes; that costs work but never a shadow. On the stock scenes no dynamic volume is
+  built under a non-prelit mapped light (`createShadowVolumes` did not change), so this
+  ordering costs nothing measurable there. The CPU change could not be measured above
+  the noise of a machine at 76% load. `cpu_sampler.py` puts the shadow-volume linking it
+  removes at 0.03% against 0.11% of airdefense2's main-thread samples. A light whose
+  map is not ready in the frame `r_shadows` or `r_useShadowMap` is switched back on now
+  draws unshadowed for that one frame, as on OpenGL.
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur
@@ -1731,8 +1776,10 @@ and AND-05.
   planes fix (`ea85bdd7b`) is restored in `3a40f705c`; without it the eyes lost
   near terrain and wreckage on both renderers
   ([evidence](platform-recovery-review.md#vr-eye-culling-restored-9-november-2026)).
-  `383eebfc5` (a VR seat follows the turn a script makes as it seats the
-  player) is still unreviewed.
+  The seat-turn fix (`383eebfc5`: when a script turns a vehicle in the same
+  frame it seats the player, the seat missed that turn, leaving The
+  Awakening's m07 speeder bike facing backwards) is restored in `00c2addb7`
+  ([evidence](platform-recovery-review.md#vr-seat-turn-restored-9-november-2026)).
 - [ ] **VR-02 — P1, qualification: real headset gameplay and comfort.** Qualify
   available PC runtimes/headsets for refresh pacing, tracking latency, aim/grip,
   handedness, two-hand weapons, haptics, room-scale collision/MP prediction, crouch,
@@ -2479,7 +2526,9 @@ Completion must advance through the existing dependencies:
   pickup merge, chat and standing, and save-compat revisions
   ([stock interface HUD layout](ui/legacy-hud-layout.md)). This does not migrate
   or accept a GUI. The next inventory refresh (UI-10) picks up the edited
-  GUIs and their revisions.
+  GUIs and their revisions. The same day the stock multiplayer HUD gained the
+  team modes' panels and flags, Tourney's strip and message bar, and the kill
+  feed ([multiplayer groups](ui/legacy-hud-layout.md#multiplayer-groups)).
 - [ ] **UI-05 — P1, decision and qualification: resolve visual policy conflicts.**
   Reconcile SP/MP hit-marker defaults with visual specification section 14.7 and
   other recorded deviations before acceptance. Preserve editable vector framing,
@@ -2804,6 +2853,17 @@ Completion substeps must keep three forms of evidence distinct:
   game libraries. See [vehicle evidence and limits](retail-baseline-ledger.md#awakening-vehicle-saves-and-hud-fractions-4-november-2026).
   Walker repair completion, unlock and traversal, sustained turret bursts and
   visual/audio parity remain open; this checks one shot and its engine capture.
+  Progress, 9 November (chaingun turret): the expansion's turret file redefined
+  `damage_machinegun`, so the player's machinegun hit for 40 without
+  `damage_bullet`'s bleeding, sounds or knockback; it is retail's again and the
+  turret keeps 40 through its own damage. The turret gained barrel heat
+  (`idVehicleTurretGun`: player gunners only, saved), crosshair convergence, a
+  zoom, its parts' servo loop and openQ4's turret HUD (Classic
+  `turret_hud.gui`, Remastered `remastered_chaingun_turret.q4ui`: the gunner's
+  gauges and the heat). Hidden, input-free M01 and M04 runs measured the heat
+  cycle (overheat after 5.3 s of fire, 2.0 s vent), the 40/15/20 damage, one
+  hot-gun save/reload and both HUD layouts; a sustained wave defence and
+  audio listening remain.
   Arena was covered only as `game_mp` on `baseoq4`, not as a switch from the
   Awakening menu. Full playthroughs remain.
   M01/M02 scrutiny, 4 November: fire volumes now use projectile/touch collision
@@ -4192,8 +4252,16 @@ Completion substeps:
   gameplay in 7–10 s instead of 50–58 s
   ([decision and evidence](mp-network-qualification.md#generated-image-cache-on-pure-servers-9-november-2026)).
   The level-load caches of the experimental `com_levelLoadModernization 1`
-  are still read outside pure mode's gate and must be refused before that mode
-  is promoted.
+  follow the same rule: none is read while pure, and models, worlds, collision
+  and animations decoded from them before the lock are derived again at the
+  next level load
+  ([evidence](mp-network-qualification.md#level-load-caches-on-pure-servers-9-november-2026)).
+  The session's expanded loading background for windows that are not 4:3 is
+  now composed in memory from VFS reads the lock admits and never saved, so
+  pure clients show it too and a widescreen client that loaded a map first no
+  longer restarts on its pure connect; files older builds saved are still
+  purged at the lock
+  ([evidence](mp-network-qualification.md#expanded-loading-backgrounds-on-pure-servers-9-november-2026)).
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,

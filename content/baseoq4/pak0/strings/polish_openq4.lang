@@ -1639,4 +1639,7 @@
 	"#str_231705"	"%s (%s) w folderze %s nie pasuje do tej wersji openQ4."
 	"#str_231706"	"Zainstaluj pełny pakiet openQ4 %s albo pobierz każdy wymieniony pakiet dla tej wersji z %s i zapisz go w folderze %s pod tą samą nazwą."
 	"#str_231707"	"Szczegóły:"
+	"#str_231708"	"ŻAR"
+	"#str_231709"	"PRZEGRZANA"
+	"#str_231710"	"ZDROWIE"
 }

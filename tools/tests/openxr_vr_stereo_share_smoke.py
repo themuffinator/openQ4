@@ -49,7 +49,9 @@ from generate_pbr_validation_map import backface_plane_ase  # noqa: E402
 
 MAP = "game/airdefense1"
 EYE = (10310.89, -6950.34, 6.96)
-YAW = 150.7
+# 40 degrees left of the start's facing, away from the dropship hull: with every
+# eye culling correctly, the hull, the wreck and the dune hid the screens there
+YAW = 190.7
 PREFIX = "textures/openq4/vr_share"
 MODEL = "models/openq4/vr_share/screen.ase"
 MATERIALS = f"""{PREFIX}/gui
@@ -109,9 +111,9 @@ def screen_spawns() -> list[str]:
     # the camera looks away from the screens, so its view holds no test GUI
     camera = f'spawn func_cameraview name vr_share_camera origin "{at(0, 0, 160)}" angle {(YAW + 180.0) % 360.0:.1f}'
     # 144-unit screens: the GUI and remote camera side by side, the mirror above the GUI against the
-    # sky (the dropship hull hides anything further right)
-    screens = [(-155, 158.0, "mirror", ""), (0, 8.0, "remote", " cameraTarget vr_share_camera"),
-               (-155, 8.0, "gui", ' gui "guis/openq4_vr_share.gui"')]
+    # sky, all raised clear of the ground (lower, the terrain cuts into their bottom edges)
+    screens = [(-155, 230.0, "mirror", ""), (0, 80.0, "remote", " cameraTarget vr_share_camera"),
+               (-155, 80.0, "gui", ' gui "guis/openq4_vr_share.gui"')]
     return [camera] + [f'spawn func_static name vr_share_{kind} model "{MODEL}" shader "{PREFIX}/{kind}" '
                        f'origin "{at(240, lateral, up)}" angle {facing} solid 0{extra}'
                        for lateral, up, kind, extra in screens]

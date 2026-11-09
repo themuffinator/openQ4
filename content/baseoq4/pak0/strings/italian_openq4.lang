@@ -1592,4 +1592,7 @@
 	"#str_231705"	"%s (%s) nella cartella %s non corrisponde a questa versione di openQ4."
 	"#str_231706"	"Installa il pacchetto completo di openQ4 %s, oppure scarica ciascun pacchetto elencato per quella versione da %s e salvalo nella cartella %s con lo stesso nome."
 	"#str_231707"	"Dettagli:"
+	"#str_231708"	"CALORE"
+	"#str_231709"	"SURRISCALDATA"
+	"#str_231710"	"SALUTE"
 }

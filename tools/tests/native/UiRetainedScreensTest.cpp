@@ -5990,6 +5990,7 @@ int main(int argc, char** argv) {
          if (path.find("_mp") != std::string::npos) { CheckRemasteredMpHud(host,argv[i]); CheckRemasteredCompetitiveHud(host,argv[i]); continue; }
          if (path.find("_vehicle") != std::string::npos) { CheckRemasteredVehicleHud(host,argv[i]); continue; }
          if (path.find("_airdef") != std::string::npos) { CheckRemasteredAirdefHud(host,argv[i]); continue; }
+         if (path.find("_chaingun_turret") != std::string::npos) { CheckRemasteredChaingunTurretHud(host,argv[i]); continue; }
          if (path.find("_turret") != std::string::npos) { CheckRemasteredTurretHud(host,argv[i]); continue; }
          if (path.find("_mcc") != std::string::npos) { CheckRemasteredMccHud(host,argv[i]); continue; }
          if (path.find("_speeder") != std::string::npos) { CheckRemasteredSpeederHud(host,argv[i]); continue; }

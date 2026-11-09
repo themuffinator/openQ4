@@ -119,6 +119,20 @@ public:
 	idInteraction *			entityNext;				// for entityDef chains
 	idInteraction *			entityPrev;
 
+	// Vulkan shadow-map admission (R_ShadowMapLightWillUseShadowMaps): whether
+	// a receiver surface of this interaction uses authored GLSL lighting, which
+	// only the light's stencil chain can shadow. Cached for the current surface
+	// set; a generation of -1 means not computed yet. While CreateInteraction
+	// fills the slots, buildModel names the model being built so the verdict
+	// can cover every surface the interaction may still fill.
+	mutable int				stencilReceiverGeneration;
+	mutable bool			stencilReceiverNeeded;
+	const idRenderModel *	buildModel;
+	// The view in which AddActiveInteraction returned with this interaction still
+	// unbuilt. It links no receivers in that view, so the receiver scan need not
+	// wait for it; -1 once its surfaces are freed.
+	int						unbuiltVisitView;
+
 public:
 							idInteraction( void );
 

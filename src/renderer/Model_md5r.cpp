@@ -3754,6 +3754,8 @@ bool rvRenderModelMD5R::InitFromMD5Model( const idRenderModelMD5 &sourceModel ) 
 		}
 	}
 	timeStamp = sourceModel.Timestamp();
+	// converted data is only as trustworthy as the model it came from
+	SetGeneratedCacheContent( sourceModel.HoldsGeneratedCacheContent() );
 
 #ifndef ID_DEDICATED
 	R_WriteGeneratedRenderModelCache( *this, sourceModel.Name(),
@@ -3929,6 +3931,8 @@ bool rvRenderModelMD5R::InitFromStaticModelInternal(
 	if ( !GenerateStaticSurfaces() || geometrySectionsSkipped ) {
 		return false;
 	}
+	// converted data is only as trustworthy as the model it came from
+	SetGeneratedCacheContent( sourceModel.HoldsGeneratedCacheContent() );
 
 	return true;
 }

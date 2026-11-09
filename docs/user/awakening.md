@@ -211,8 +211,19 @@ fixes them:
   sensor lens.
   Firing it now has the weight of the game's other mounted guns: a heavier
   muzzle flash that lights the gun, tracers, heavier impacts, ejected casings
-  and smoke from the muzzle after a long burst. Its damage, rate of fire and
-  accuracy are unchanged.
+  and smoke from the muzzle after a long burst. Its servos whine as it turns,
+  and its rounds now land under the crosshair: the alpha fired them parallel
+  to your line of sight from a muzzle well to the side, so close targets were
+  missed. The zoom button magnifies its view, as the machinegun's does.
+  It also has its own HUD instead of the alpha's on-foot HUD with an empty
+  ammunition gauge: your health and armor, since you stand exposed behind
+  the gun, and its barrel heat (see the next section).
+- **The machinegun hits as hard as in Quake 4 again.** The alpha's turret
+  file set the turret's damage by redefining the damage the player's
+  machinegun shares, so in the alpha your machinegun hit for 40 a round
+  instead of 15, more than its zoomed shots (20), and lost its bleeding, flesh
+  hit sounds and knockback. The machinegun is back to Quake 4's values; the
+  turret keeps its own 40.
 
 ## Deliberate differences from the alpha
 
@@ -252,6 +263,18 @@ scenes, keep your settings or keep the game fair:
   later hits feed up to three times its strength.
 - **The Retch's fallback.** Where a level lacks the Retch's own navigation
   data, it uses the next size down, which its body fits.
+- **The chaingun turret heats up.** The alpha's turret fired at full rate and
+  full accuracy for as long as you held the trigger. Now about five seconds of
+  continuous fire overheats it: it vents steam and will not fire for about
+  two seconds, until it has cooled to 40%. A third of a second off the
+  trigger starts it cooling, and it cools from full in about two seconds, so
+  bursts never overheat it. Cold, it is tighter than the alpha's gun (the 2
+  degrees its turret position asked for, which nothing read); as it heats it
+  spreads to the alpha's 5 degrees, and zoomed rounds spread half as much.
+  The HUD shows the heat on the gauge where your ammunition usually shows and
+  as a bar under the crosshair, red from 75% and while the gun vents, with
+  OVERHEATED. Its damage per round and rate of fire are unchanged, and the
+  prison's scripted gunner never overheats.
 - **An overheating pulse cannon says so.** The alpha's overheat signal reached
   none of the cannon's screens; openQ4 shows their JAMMED warning while it
   cools, and never clears the scripted ammo jam's warning early.
@@ -307,6 +330,10 @@ so stock behaviour is unchanged):
 | `fx_altmuzzleflash`, `useAltFireAnim` | weapon | Alternate-fire muzzle flash and player torso pose. |
 | `useGodMode`, `resetOnExit` | vehicle | Protect the gunner; recentre turrets when the gunner leaves. |
 | `allowDisableMovement` | vehicle turret | `0` keeps a turret turning while its vehicle's movement is disabled. |
+| `playMoveSound` | vehicle turret | `1` loops the part's `snd_move` while it turns, between `moveMinVolume` and `moveMaxVolume` dB by speed. |
+| `heatPerShot`, `heatTolerance`, `safeHeatLevel`, `heatCoolDelay`, `heatDissipationPerSecond`, `overheatDissipationPerSecond`, `heatWarnLevel` | `idVehicleTurretGun` | Barrel heat for a player gunner: heat per round, the overheat limit and the level it must cool to, the pause before it cools and how fast it cools, and the HUD's warning fraction. |
+| `spreadCold`, `zoomSpreadScale`, `snd_overheat`, `snd_overheatFire`, `snd_overheatRecover`, `fx_overheat` | `idVehicleTurretGun` | The spread of a cold gun (heat opens it to `spread`), the zoomed spread, and the overheat's sounds and venting effect. |
+| `convergence` | vehicle weapon | `1` sends rounds from an offset muzzle to the point under the crosshair. |
 | `velscale` | `trigger_hurt` | Scales the speed of what it hurts. |
 | `traceRelativeDirection` | hover pad | Probe along a direction in the vehicle's frame. |
 | `g_splineRollLookahead`, `g_splineRollMultiplier` (settings) | spline movers | How far ahead a mover facing along its spline looks to bank into a turn (500 is five spline points), and how hard it banks (2.0). |
@@ -319,8 +346,12 @@ them fires the same, with still barrels.
 openQ4's additions to Awakening content live in its own files and never
 replace the expansion's. While The Awakening is running, any definition
 lookup of `<name>` first tries `<name>_q4x_openq4`; openQ4's turret weapon
-(`vehicle_chaingun_weapon_q4x_openq4`) inherits the expansion's and adds only
-effects. Material files named `materials/*_openq4.mtr` that sort ahead of a
+(`vehicle_chaingun_weapon_q4x_openq4`) inherits the expansion's, keeps its
+damage and rate of fire and adds the effects, heat, zoom and convergence, and
+`damage_machinegun_q4x_openq4` gives the player's machinegun Quake 4's damage
+back. The turret's HUD is `guis/vehicles/turret_hud.gui`; the vehicle's HUD
+reads the gun's `vehicle_heat`, `vehicle_overheat`, `vehicle_heatwarn` and
+`vehicle_zoom`, and `g_debugTurretGun 1` prints its heat. Material files named `materials/*_openq4.mtr` that sort ahead of a
 game's own file (`00_` names) supply the material instead of it; the turret's
 skin works this way and keeps the expansion's normal maps. Any vehicle weapon
 can now eject casings (`def_ejectBrass`, `joint_view_eject`, `ejectOffset`)

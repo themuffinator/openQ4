@@ -292,6 +292,9 @@ def check_engine() -> None:
     # an eye's off-axis culling planes are unit planes, so the radius test keeps boxes reaching into the eye
     require(read("src/renderer/tr_main.cpp"), "\t\tfor ( i = 0; i < 4; i++ ) {\n\t\t\ttr.viewDef->frustum[i].Normal().Normalize();",
             "the off-axis frustum's side planes are normalized")
+    # a vehicle's turns carry the seat from boarding: scripts turn vehicles as they seat the player
+    require(player, "// the seat follows the vehicle's turns from here, not from the first",
+            "the seat's turn carry starts when the player boards")
     # world GUIs, characters and usable things answer the weapon hand where it points
     require(player, "start = GetEyePosition();\n\t// openQ4 VR: the weapon hand points at world GUIs",
             "the focus trace starts where the weapon hand aims")

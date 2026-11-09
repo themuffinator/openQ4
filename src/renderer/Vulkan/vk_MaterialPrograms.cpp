@@ -61,6 +61,9 @@ std::map<std::string, int> currentPrograms;
 std::map<std::string, uint64_t> rejectedKeys;
 std::mutex nativeFamilyMutex;
 std::map<std::string, vkGLSLProgramFamily_t> nativeFamilies;
+// Advances whenever nativeFamilies is cleared, so verdicts cached from
+// VK_MaterialPrograms_NeedsStencil are recomputed against the new sources.
+int nativeFamilyGeneration = 0;
 std::map<std::string, bool> arbTranslatable;
 std::mutex diagnosticMutex;
 std::set<std::string> diagnostics;
@@ -524,6 +527,11 @@ bool VK_MaterialPrograms_NeedsStencil( const idMaterial *material, const float *
     return false;
 }
 
+int VK_MaterialPrograms_NeedsStencilGeneration() {
+    std::lock_guard<std::mutex> lock( nativeFamilyMutex );
+    return nativeFamilyGeneration;
+}
+
 bool VK_MaterialPrograms_ReportOnce( const char *subject, const char *reason ) {
     return Report( subject != NULL ? subject : "", reason != NULL ? reason : "" );
 }
@@ -532,7 +540,11 @@ void VK_MaterialPrograms_Reload() {
     R_RenderThread_Sync( "material program reload" );
     currentPrograms.clear();
     rejectedKeys.clear();
-    nativeFamilies.clear();
+    {
+        std::lock_guard<std::mutex> lock( nativeFamilyMutex );
+        nativeFamilies.clear();
+        ++nativeFamilyGeneration;
+    }
     arbTranslatable.clear();
     diagnostics.clear();
     suppressedDiagnostics = 0;
@@ -750,7 +762,12 @@ void VK_MaterialPrograms_Shutdown() {
     if ( uniformLayout != VK_NULL_HANDLE ) { vkDestroyDescriptorSetLayout( vkCtx.device, uniformLayout, NULL ); }
     if ( textureLayout != VK_NULL_HANDLE ) { vkDestroyDescriptorSetLayout( vkCtx.device, textureLayout, NULL ); }
     pipelineLayout = VK_NULL_HANDLE; uniformLayout = textureLayout = VK_NULL_HANDLE;
-    programs.clear(); currentPrograms.clear(); rejectedKeys.clear(); nativeFamilies.clear(); arbTranslatable.clear();
+    programs.clear(); currentPrograms.clear(); rejectedKeys.clear(); arbTranslatable.clear();
+    {
+        std::lock_guard<std::mutex> lock( nativeFamilyMutex );
+        nativeFamilies.clear();
+        ++nativeFamilyGeneration;
+    }
     diagnostics.clear(); suppressedDiagnostics = capacityRejections = evictions = peakDraws = 0;
     compilerBytes = 0; frameSerial = 1;
 }

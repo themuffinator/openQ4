@@ -682,6 +682,7 @@ void idCollisionModelManagerLocal::FreeModelMemory( idCollisionModelLocal *model
 	model->numMergedPolys = 0;
 	model->usedMemory = 0;
 	model->isTrmModel = false;
+	model->fromGeneratedCache = false;
 }
 
 static void CM_ReleaseRenderModelReference( idCollisionModelLocal *model );
@@ -753,6 +754,31 @@ void idCollisionModelManagerLocal::PurgeModels( void ) {
 		}
 		FreeModelMemory( model );
 	}
+}
+
+/*
+================
+idCollisionModelManagerLocal::PurgeGeneratedCacheModels
+
+Frees every model decoded from the generated collision cache, leaving each
+slot in the purged state PurgeModels leaves. LoadMap calls it once the
+filesystem refuses those reads (a pure lock or fs_restrict), so collision data
+read before the lock cannot outlive it. MapShutdown already purges a map's
+models with its last reference; this covers a reference that kept one
+resident. Only LoadMap calls it, after the previous map's clip models are gone.
+================
+*/
+int idCollisionModelManagerLocal::PurgeGeneratedCacheModels( void ) {
+	int purged = 0;
+	for ( int i = 0; i < numModels; i++ ) {
+		idCollisionModelLocal *model = models != NULL ? models[i] : NULL;
+		if ( model == NULL || !model->fromGeneratedCache ) {
+			continue;
+		}
+		FreeModelMemory( model );
+		purged++;
+	}
+	return purged;
 }
 
 /*
@@ -920,6 +946,7 @@ idCollisionModelLocal *idCollisionModelManagerLocal::AllocModel( void ) {
 	model->numSharpEdges = model->numRemovedPolys =
 	model->numMergedPolys = model->usedMemory = 0;
 	model->isTrmModel = false;
+	model->fromGeneratedCache = false;
 
 	return model;
 }
@@ -4277,6 +4304,16 @@ void idCollisionModelManagerLocal::LoadMap( const idMapFile *mapFile, bool force
 
 	EnsureModelTable();
 	SetupTrmModelStructure();
+
+	// Collision data decoded from the generated cache must not outlive a pure
+	// lock (or fs_restrict); a purged world model is rebuilt below. See
+	// idFileSystemLocal::GeneratedCacheReadsRefused.
+	if ( !fileSystem->GeneratedCacheReadsEnabled( GENERATED_CACHE_COLLISION_MODEL ) ) {
+		const int purged = PurgeGeneratedCacheModels();
+		if ( purged > 0 ) {
+			common->Printf( "%i collision models decoded from the generated cache purged: generated-cache reads are refused\n", purged );
+		}
+	}
 
 	worldModel = static_cast<idCollisionModelLocal *>( FindModel( GetFullModelName( mapFile->GetName(), WORLD_MODEL_NAME, worldModelName ) ) );
 	if ( worldModel == NULL || worldModel->fileTime == static_cast<ID_TIME_T>( -1 ) || forceCreateMap ) {

@@ -1763,6 +1763,70 @@ static void CheckRemasteredMccHud(ScreenHost& host, const char* path) {
 	runtime.Shutdown();
 }
 
+// openQ4's HUD for the Awakening's chaingun turret (turret_hud.gui, 14.12): the
+// gunner's health and armor gauges, the barrel heat on the gauge where ammunition
+// shows on foot and under the crosshair, warning from vehicle_heatwarn, OVERHEATED
+// while the gun vents, and the HUD prompt's Exit.
+static void CheckRemasteredChaingunTurretHud(ScreenHost& host, const char* path) {
+	const auto source = Read(path);
+	Document document; std::vector<Diagnostic> diagnostics;
+	if (!document.Load(source,diagnostics)) for (const auto& d : diagnostics) std::fprintf(stderr,"%s %u:%u %s\n",path,unsigned(d.line),unsigned(d.column),d.message.c_str());
+	Check(diagnostics.empty() && document.Model().id == "openq4.hud.remastered.chaingun_turret","Remastered chaingun turret HUD validates");
+	RemasteredLayoutPreference(host,1);
+	Runtime runtime(host);
+	Check(runtime.Initialize(),"retained runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_chaingun_turret.q4ui",diagnostics),"Remastered chaingun turret HUD loads into a runtime");
+	std::string error;
+	Runtime::EventEffects effects;
+	StateValues values = RemasteredLayout(1280,720);
+	values.insert({{"oq4_key_jump",std::string("SPACE")},{"player_health",100.0},{"player_healthpct",1.0},
+		{"player_armor",50.0},{"player_armorpct",.5},{"vehicle_heat",0.0},{"vehicle_overheat",0.0},{"vehicle_heatwarn",.75}});
+	Check(runtime.SetState(values,error,0),error.c_str());
+	Check(runtime.RunEvent("hudJoin",0,effects,error),"the join program runs");
+	runtime.Frame(RemasteredViewport(1280,720),.1);
+	Check(host.errors == 0,"the chaingun turret HUD frames without runtime errors");
+	// The three gauges sit where the on-foot status bar's do: heat where ammunition shows.
+	Bounds heat, health, armor;
+	Check(runtime.GetBounds("heat-gauge",heat) && runtime.GetBounds("health-gauge",health) && runtime.GetBounds("armor-gauge",armor) &&
+		Near(heat.y,health.y,.5f) && Near(health.x-heat.x,(278-101)*1.5f,1.f) && Near(armor.x-health.x,(414-278)*1.5f,1.f) &&
+		Near(heat.width,125*1.5f,1.f),"heat, health and armor take the on-foot gauges' places");
+	auto number = runtime.PresentedValue("heat-num-text","text");
+	auto life = runtime.PresentedValue("health-num-text","text");
+	Check(number && number->text == "0" && life && life->text == "100","a cold gun reads 0 beside the gunner's 100");
+	Check(!Shown(runtime,"xheat") && Shown(runtime,"heat-fill-cool") && !Shown(runtime,"heat-fill-hot") && Shown(runtime,"vpr") &&
+		Shown(runtime,"vpr-exit"),"a cold gun shows no crosshair bar, the cool track and Exit");
+	// Half the limit: the crosshair bar shows, scaled to half from its leading edge.
+	Check(runtime.SetState({{"vehicle_heat",.5}},error,.2),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),.25);
+	number = runtime.PresentedValue("heat-num-text","text");
+	const auto scale = runtime.PresentedValue("xheat-cool","transform");
+	Check(number && number->text == "50" && Shown(runtime,"xheat") && Shown(runtime,"xheat-cool") && !Shown(runtime,"xheat-hot") &&
+		scale && Near(float(scale->data[2]),.5f,.01f) && Near(float(scale->data[0]),-20*1.5f*.5f,.1f),"half the limit fills half the bar");
+	// From the warning level the heat turns #FF3300.
+	Check(runtime.SetState({{"vehicle_heat",.8}},error,.3),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),.35);
+	const auto colour = runtime.PresentedValue("heat-numerals","color");
+	Check(Shown(runtime,"heat-fill-hot") && Shown(runtime,"heat-track-hot") && !Shown(runtime,"heat-fill-cool") &&
+		Shown(runtime,"xheat-hot") && !Shown(runtime,"xheat-over") && colour && Near(float(colour->data[0]),1) &&
+		Near(float(colour->data[1]),.2f,.01f),"a hot gun warns in #FF3300");
+	// Overheated: OVERHEATED under the crosshair while it vents, whatever the heat.
+	Check(runtime.SetState({{"vehicle_heat",.6},{"vehicle_overheat",1.0}},error,.4),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),.45);
+	Check(Shown(runtime,"xheat-over") && Shown(runtime,"xheat-hot") && Shown(runtime,"heat-fill-hot"),"a venting gun says OVERHEATED");
+	// The gunner's armor gauge goes with the last of the armor, as on foot.
+	Check(runtime.SetState({{"player_armor",0.0},{"player_armorpct",0.0}},error,.5),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),.55);
+	Check(!Shown(runtime,"armor-gauge") && Shown(runtime,"heat-gauge"),"no armor, no armor gauge");
+	// Minimal keeps the gauges, the crosshair's heat and the prompt.
+	RemasteredLayoutPreference(host,2);
+	runtime.Frame(RemasteredViewport(1280,720),.6);
+	Check(!Shown(runtime,"tr-full") && Shown(runtime,"xheat") && Shown(runtime,"heat-gauge") && Shown(runtime,"vpr"),
+		"Minimal keeps the gauges, the crosshair's heat and the prompt");
+	RemasteredLayoutPreference(host,1);
+	Check(host.errors == 0,"no runtime diagnostics across the chaingun turret exercise");
+	runtime.Shutdown();
+}
+
 // The Awakening's speeder bike (speederplayerhud.gui, 14.12): the vehicle status
 // bar with the bike's own glyphs, the race display 18 u lower with its padded
 // timer and last-10-seconds red, the boost in the HUD prompt and the streak.

@@ -149,6 +149,22 @@ those images are rebuilt. A loose file read from a game folder before
 connecting, such as an extracted texture or map, still makes the client restart
 into pure mode.
 
+The experimental level-load option (`com_levelLoadModernization 1`, off by
+default) keeps similar caches of decoded models, maps, collision data and
+animations under `generated/`. A pure server's clients never read those either.
+Anything a client loaded from them before connecting is loaded again from the
+original game files when the server's map loads.
+
+In a window that is not 4:3, openQ4 widens each map's loading screen to fit.
+It builds that picture in memory from the game files the server allows and
+saves nothing, so a pure server's clients see the wide loading screen too.
+Versions before 9 November saved it in the save folder
+(`guis/assets/generated/loadscreens/`), which a pure server cannot trust: their
+clients showed the map's standard picture there, and at first restarted the
+whole engine on connect. Those saved files are no longer used and can be
+deleted; one that is somehow still read before connecting is dropped on
+connect rather than restarting the engine.
+
 ## Malformed network traffic
 
 The shared bit-message reader records attempts to read beyond the received

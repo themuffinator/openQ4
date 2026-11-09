@@ -402,7 +402,8 @@ void rvVehiclePosition::UpdateHUD ( idUserInterface* gui ) {
 		weapon = static_cast<rvVehicleWeapon*>(mWeapons[mCurrentWeapon]);
 		gui->SetStateFloat ( "vehicle_weaponcharge", weapon->GetCurrentCharge() );
 		gui->SetStateInt ( "vehicle_weaponammo", weapon->GetCurrentAmmo() );
-	}	
+		weapon->UpdateHUD ( gui );
+	}
 
 	// Calculate the rotation of the view in relation to the vehicle itself			
 	gui->SetStateFloat ( "vehicle_rotate", -idMath::AngleDelta ( mEyeAxis.ToAngles()[YAW], mParent->GetAxis ( ).ToAngles()[YAW] ) );

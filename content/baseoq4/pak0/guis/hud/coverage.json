@@ -1027,6 +1027,9 @@
     "guis/vehicles/mcc/cannonplayerhud.gui",
     "guis/vehicles/airassault/turretplayerhud.gui"
   ],
+  "openq4Roots": [
+    "guis/vehicles/turret_hud.gui"
+  ],
   "imageAliases": {
     "gfx/guis/mainmenu/e3_0_add": "q4-add/gfx/guis/mainmenu/e3_0",
     "gfx/guis/hud/icons/gun_blaster.tga": "gfx/guis/hud/icons/gun_blaster",

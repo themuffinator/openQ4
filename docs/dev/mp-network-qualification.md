@@ -516,13 +516,247 @@ player.
 
 ### Outside this decision
 
-- With the experimental `com_levelLoadModernization 1` (off by default), the
-  level-load model, world, collision and animation caches are read outside the
-  VFS ([contract](loading-cache-modernization.md#compatibility-boundary)). Pure
-  mode neither refuses them nor restarts over them, which contradicts the rule
-  above. They should be refused while pure before that mode is promoted.
+- The level-load caches of the experimental `com_levelLoadModernization 1`
+  follow the same rule since the
+  [change below](#level-load-caches-on-pure-servers-9-november-2026).
 - The Vulkan pipeline cache is opened by explicit OS path and validated by the
   driver. It never reaches the VFS, before or after this change.
+
+## Level-load caches on pure servers, 9 November 2026
+
+**Decision: the experimental level-load caches follow the image cache's rule.
+None is read while pure, and what was decoded from them before the lock is
+derived again at the next level load, without an engine restart.** With
+`com_levelLoadModernization 1` (off by default), openQ4 keeps render-model,
+render-world and collision caches, and the game modules keep an animation
+cache, under `generated/` in the save path. Their owners open these files by OS
+path, outside the search paths, so pure mode's directory gate never saw them: a
+pure client read them, and a forged entry would have passed, for the reasons
+[given above](#why-the-cache-cannot-be-trusted).
+
+What changed ([contract](loading-cache-modernization.md#pure-servers)):
+
+- While a pure lock or `fs_restrict` holds,
+  `idFileSystem::GeneratedCacheReadsEnabled` answers false for every kind, so
+  `OpenGeneratedCacheRead` returns nothing. The game's animation reader asks
+  the same gate, as the appended `GENERATED_CACHE_ANIMATION` kind; no
+  interface slot changed.
+- A resident decoded from one of these caches before the lock is derived again
+  at the next level load, which always follows the lock. The model manager
+  purges cache-sourced models, including MD5R models converted from one and
+  whatever reloadable flag the payload carried. The render world is reloaded
+  instead of retained, the collision manager frees cache-sourced models
+  (normally already purged at map shutdown), and the game reloads
+  cache-sourced animations in place before the map spawns anything. The lock
+  is only taken when every pak the session has read from is in the server's
+  list, so every source can be read again.
+- Model, world and collision entries are no longer written under a pure lock.
+  Their content key includes the lock, so no session could read them back.
+  Animation entries are keyed by their source alone and are still written from
+  the pure paks, as image cache entries are.
+- Learned manifests stay readable while pure. They only schedule reads: each
+  entry is opened again through the pure search paths and must match its
+  recorded identity before any of its bytes are used.
+- `pure_level_load_cache_contract.py` compiles the gate functions against
+  doubles, runs a truth table (open, pure lock, `fs_restrict`, each cvar), and
+  pins every eviction link in both game trees. Its `--mutations` mode breaks
+  each of 18 links and requires the check that owns it to fail. Both CI
+  workflows run it.
+
+### Evidence
+
+A `builddir` dedicated server (`si_pure 1`, `net_LANServer 1`, `mp/q4dm1`) and
+a `builddir` client with `com_levelLoadModernization 1`, each with its own save
+path under `.tmp/pure-levelload-cache/`, and a base path of hard links to the
+retail PK4s only. The client ran two sessions on one save path, in a hidden
+window with `ui_autoJoin 1`. The first spawned a local non-pure listen server
+on `mp/q4dm1`, which wrote 94 caches (92 model files, the world, the collision
+set) and the animation caches. The second spawned the same local server again,
+now loading from those caches, then disconnected and joined the pure server,
+with `fs_debug 1` listing every explicit file open.
+
+| Client | Before the connect | After the connect | Engine reloads | Result |
+| --- | --- | --- | --- | --- |
+| OpenGL 640x480 (two runs) | 90 cache hits: 95 model, 1 world, 1 collision and 222 animation opens | No cache opened; 91 models purged, world reloaded, 222 animations reloaded, 100 cached images reloaded | 0 | Active player, no warnings |
+| Vulkan 640x480 | Same | Same as OpenGL 640x480 | 0 | Active player, no warnings |
+| OpenGL 640x360 | Same | No cache opened; the restart below flushed everything | 1 | Active player, no warnings |
+
+- In every pure session the level-load report for the pure map load showed
+  0 hits, 0 misses and 0 writes, so the coordinator was never consulted. The
+  only file opened under `generated/` after the connect was the learned
+  manifest for the pure search state. The game rewrote the 222 animation
+  caches from the pure paks.
+- Engine screenshots in pure gameplay on OpenGL and Vulkan show the world,
+  static props, the weapon view model and the HUD intact after the purge.
+- Every client became an active player, and every process exited cleanly.
+
+### Outside this decision
+
+- A client that loaded a map in a non-4:3 window before connecting restarted
+  on its pure connect. The session publishes an expanded loading background
+  (`guis/assets/generated/loadscreens/<map>_<w>x<h>.tga`) under the save path
+  and loads it back through the search paths, which counted as a directory
+  read. That is independent of the level-load caches and of
+  `com_levelLoadModernization`; it is why the 640x360 run restarted. The
+  [next decision](#expanded-loading-backgrounds-on-pure-servers-9-november-2026)
+  resolves it.
+
+## Expanded loading backgrounds on pure servers, 9 November 2026
+
+**Decision: the session composes the expanded loading background in memory.
+Nothing is written to the save path or read back from it, so pure clients show
+the wide background like everyone else and a pure connect has nothing to
+evict. Files that earlier builds saved are still purged at a pure lock rather
+than restarting the engine.** In a window that is not 4:3, the session
+composes the map's levelshot and any `_left`, `_right`, `_top` and `_bottom`
+tiles into one picture of the window's shape
+(`Session_PrepareExpandedLoadingBackground`). Until this change it wrote that
+picture under the save path as
+`guis/assets/generated/loadscreens/<map>_<w>x<h>.tga` and loaded it back
+through the search paths. That made it openQ4's own derived data read from a
+directory: a client that had loaded any map in such a window ran a full
+`ReloadEngine` on its first pure connect, and the first revision below
+replaced that restart with a purge but left pure clients on the framed 4:3
+levelshot.
+
+The inputs were never the problem: the levelshot and its tiles are VFS reads,
+and under a pure lock the VFS serves them only from paks the lock admits (the
+client-only loadscreen pack is allowed). Only the round trip through a
+directory was. What changed:
+
+- The session uploads the composite with `renderSystem->CreateImage` and
+  `UploadImage` to a scratch image named `_expandedLoadingBackground_<w>x<h>`
+  (one RGBA8 level, persistent), as the retained interface's generated
+  textures are, and gives that name to `loading_bkgnd` and `loading_levelshot`.
+  `idImageManager::ImageFromFile` returns a `_` image by name whatever the
+  material asks for, so the stock GUI's implicit material and the retained
+  screen's `_retained/` material both bind it. No interface changed. The size
+  is part of the name because the retained interface keeps an image's
+  dimensions by its name, and a window of another shape needs its own.
+- Nothing in the session asks the pure gate any more:
+  `FS_GeneratedDataReadsRefused`, added for the first revision, is gone.
+- The image has no mip chain, so the session halves the composite, as a mip
+  level would, while it is at least twice the window: a 640x360 window holds
+  910x512 rather than the levelshot's 1820x1024. Larger windows keep the
+  levelshot's resolution. The texture size limit halves it too.
+- A video restart reallocates scratch images without their contents. The
+  session keeps the pixels and uploads them again when
+  `GetVideoRestartCount` moves, checked at the top of every session `Draw`
+  before any GUI draws, so a loading screen that outlives a restart (the
+  retained screen held over a multiplayer join) keeps its picture. Checked
+  image-policy restarts and recoverable device restarts move the count too. A
+  console `reloadImages` does not; it blanks the picture as it does the
+  retained interface's own generated textures, until the next load composes a
+  new one. Level loads keep the image (it is persistent) and the texture
+  reduction reload skips scratch images.
+- A load that shows the stock levelshot shrinks the held image to one black
+  pixel and drops the pixels. A failed upload or a defaulted material leaves
+  the stock levelshot selected, with a warning for the upload
+  (`Could not upload expanded loading background`, or `restore` after a video
+  restart). The gameplay benchmark, the validation matrix and the shadow
+  compatibility contract count both as the `expandedLoadscreenUpload`
+  signature.
+- `FS_IsGeneratedLoadscreenPath` and the renderer's purge of
+  `guis/assets/generated/loadscreens/` stay for files earlier builds left in
+  players' save folders. This build never names them, but a stray reference
+  can still open one before a lock (a level-load manifest learned by an
+  earlier build with `com_levelLoadModernization 1`, for example); without the
+  classifier that read would restart the engine again.
+- `com_captureLoadingScreen 1` is a new diagnostic: it captures each map's
+  finished loading screen with the engine `screenshot` command, as
+  `screenshots/loading_<n>.tga`. Console commands do not run inside a load, so
+  nothing else can capture one; `loadscreen_format_audit.py` uses it in place
+  of the TGA it used to read.
+- `pure_expanded_loadscreen_contract.py` now pins the in-memory path (no
+  save-path writer or pure gate in the session, the `_`-prefixed sized name,
+  the upload, the restart restore before the loading GUIs draw, the stock
+  levelshot after a failure, the built-in lookup) as well as the legacy
+  classifier and purge. Its `--mutations` mode breaks 20 links.
+  `filesystem_write_qpath_safety.py` drops the publication and staging-path
+  checks, keeps the TGA writer's result contract, and rejects any save-path
+  write in the session's composer.
+
+### Evidence
+
+The same setup as the first revision below: a `builddir` dedicated server
+(`si_pure 1`, `net_LANServer 1`, `mp/q4dm1`) and a `builddir` client with
+`com_levelLoadModernization 1` in a hidden 640x360 window, each with its own
+save path under `.tmp/pure-loadscreen/`, on a base path of hard links to the
+retail PK4s only. The client's first session hosted `mp/q4dm1` locally; its
+second hosted it again, then disconnected and joined the pure server with
+`fs_debug 1`. `com_captureLoadingScreen 1` captured every finished loading
+screen. Driver: `.tmp/pure-loadscreen/inmemory_probe.py`.
+
+| Client, 640x360 | Pure map's loading screen | Engine reloads | Pure session | Connect to gameplay | Result |
+| --- | --- | --- | --- | --- | --- |
+| OpenGL, retained | Wide background, `_expandedLoadingBackground_910x512` | 0 | 51.8 s | 28.7 s | Active player, no warnings |
+| OpenGL, stock (`ui_retained 0`) | Wide background in `mplevel.gui` | 0 | 46.7 s | 25.3 s | Active player, no warnings |
+| Vulkan, stock | Same | 0 | 49.1 s | 26.1 s | Active player, no warnings |
+| Vulkan, retained | Same as OpenGL, retained | 0 | 162.2 s* | 81.4 s* | Active player, no warnings |
+
+- Every load composed `_expandedLoadingBackground_910x512` (the 1820x1024
+  composite halved for the 360-pixel window) from `gfx/guis/loadscreens/q4dm1`
+  and its `_left`/`_right` tiles. After the connect, `fs_debug` shows those
+  reads served from `pak2.pk4`, the client-only loadscreen pack, and no open of
+  anything under `guis/assets/generated/loadscreens/`. Neither that folder nor
+  `_oq4/` exists in the client's save path after both sessions.
+- The pure lock reloaded the 100 cached images, as the image cache decision
+  requires, and evicted no loading background: there is none to evict.
+- Captures of the pure map's loading screen (`screenshots/loading_2.tga`) show
+  the wide picture filling the 16:9 window on both renderers, in the retained
+  screen and in the stock one.
+- Timings are comparable with the first revision's 45.8 s OpenGL pure session,
+  and well under the 88.0 s of the old restart. \* The Vulkan retained run
+  overlapped other sessions' emulator and benchmark runs and used the build
+  just before the restore log line was added; it shows behaviour, not timing.
+- A video restart: `.tmp/pure-loadscreen/restart_probe.py` hosted `mp/q4dm1`
+  in a 640x360 window, read the held image back with `screenshot image`, ran
+  `vid_restart` and read it again. On OpenGL and Vulkan the log shows the image
+  reallocated (`reallocating scratch`) and then `restored after a video
+  restart`, and both readbacks are byte-identical.
+- The picture is the one the previous build published: the 910x512 readback
+  against that build's `q4dm1_1820x1024.tga`, box-filtered to the same size,
+  scores 51.3 dB PSNR.
+- A 4:3 window composes nothing; its loading screen shows the stock levelshot as
+  before, and its pure join also ran without an engine reload.
+
+### First revision: purge at the lock
+
+Earlier the same day (86bc257f4) the session still published the picture under
+the save path. That revision stopped composing while pure, made a read before
+the lock an eviction instead of a restart, and left pure clients on the framed
+4:3 levelshot. Its evidence, with the
+[level-load probe](#level-load-caches-on-pure-servers-9-november-2026)
+setup, unchanged except for its window and counters: a `builddir` dedicated server (`si_pure 1`, `net_LANServer 1`,
+`mp/q4dm1`), a `builddir` client with `com_levelLoadModernization 1` in a
+hidden 640x360 window, each with its own save path under
+`.tmp/pure-loadscreen/`, and a base path of hard links to the retail PK4s only.
+The client's first session hosted `mp/q4dm1` locally. Its second hosted it
+again, published and read the 1820x1024 background, then disconnected and
+joined the pure server with `fs_debug 1` listing every open.
+
+| Client, 640x360 | At the lock | Engine reloads | Pure map load | Pure session | Result |
+| --- | --- | --- | --- | --- | --- |
+| OpenGL, before (77c519cdc) | Restart required by `q4dm1_1820x1024.tga` | 1 | 22.6 s, after the reload | 88.0 s | Active player |
+| OpenGL, after | 100 cached images reloaded, 2 loading backgrounds purged | 0 | 16.1 s | 45.8 s | Active player, no warnings |
+| Vulkan, after | Same | 0 | 49.0 s* | 83.4 s* | Active player, no warnings |
+| OpenGL, after, repeat | Same | 0 | 44.7 s* | 94.3 s* | Active player, no warnings |
+
+- Every run read the background from the save path five times before the
+  connect. After the connect, no file under
+  `guis/assets/generated/loadscreens/` was opened or written; the pure map's
+  loading screen used the stock levelshot, logged as
+  `Expanded loading background ... skipped while pure`.
+- Without the restart, the 16:9 pure map load (16.1 s) is in line with the
+  4:3 run's 18.1 s in the level-load evidence above.
+- \* The Vulkan run and the repeat overlapped another session's build and a
+  benchmark on the same machine; every load phase took two to three times
+  longer, image probing included (9.2 s against 3.5 s). They show the
+  behaviour, not timing.
+- Engine screenshots in pure gameplay on OpenGL and Vulkan show the world, the
+  weapon view model and the HUD intact.
+- "Pure session" runs from the client's start to active play and includes the
+  local load before the connect.
 
 ## Still open
 

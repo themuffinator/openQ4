@@ -1583,4 +1583,7 @@
 	"#str_231705"	"%s (%s) im Ordner %s passt nicht zu dieser openQ4-Version."
 	"#str_231706"	"Installieren Sie das vollständige openQ4-%s-Paket oder laden Sie jedes aufgeführte Paket für diese Version von %s herunter und speichern Sie es unter demselben Namen im Ordner %s."
 	"#str_231707"	"Details:"
+	"#str_231708"	"HITZE"
+	"#str_231709"	"ÜBERHITZT"
+	"#str_231710"	"GESUNDHEIT"
 }

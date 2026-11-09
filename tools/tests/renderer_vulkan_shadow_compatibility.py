@@ -898,7 +898,7 @@ def validate_runtime_failure_gates() -> None:
 
     signature_lines = {
         "binaryImageCacheWrite": "^3WARNING: ^1idBinaryImage: Could not open generated cache 'generated/images/fixture.bimage' or compact fallback 'generated/images/_compact/v1/fixture.bimage'",
-        "expandedLoadscreenPublish": "^3WARNING: ^1Could not publish expanded loading background 'guis/assets/generated/loadscreens/fixture_1820x1024.tga'; using the source levelshot",
+        "expandedLoadscreenUpload": "^3WARNING: ^1Could not upload expanded loading background '_expandedLoadingBackground_1820x1024'; using the source levelshot",
         "vulkanValidation": "Vulkan validation: descriptor binding mismatch",
         "vulkanVuid": "Validation ID VUID-vkCmdDrawIndexed-commandBuffer-recording",
         "vulkanCallFailed": "Vulkan: vkCreateGraphicsPipelines failed (-3)",
@@ -918,8 +918,12 @@ def validate_runtime_failure_gates() -> None:
         "or compact fallback 'generated/images/_compact/v1/fixture.bimage'"
     )
     expanded_loadscreen_near_miss = (
-        "Could not publish expanded loading background "
-        "'guis/assets/generated/loadscreens/fixture_1820x1024.tga'; using the source levelshot"
+        "Could not upload expanded loading background "
+        "'_expandedLoadingBackground_1820x1024'; using the source levelshot"
+    )
+    expanded_loadscreen_restore = (
+        "^3WARNING: ^1Could not restore expanded loading background "
+        "'_expandedLoadingBackground_1820x1024' after a video restart"
     )
 
     for module, counter_name, context in (
@@ -984,9 +988,13 @@ def validate_runtime_failure_gates() -> None:
             raise AssertionError(
                 f"{context} must require WARNING: for binary-image cache write failures"
             )
-        if counter(expanded_loadscreen_near_miss).get("expandedLoadscreenPublish") != 0:
+        if counter(expanded_loadscreen_near_miss).get("expandedLoadscreenUpload") != 0:
             raise AssertionError(
-                f"{context} must require WARNING: for expanded-loadscreen publication failures"
+                f"{context} must require WARNING: for expanded-loadscreen upload failures"
+            )
+        if counter(expanded_loadscreen_restore).get("expandedLoadscreenUpload") != 1:
+            raise AssertionError(
+                f"{context} must count an expanded-loadscreen restore failure after a video restart"
             )
 
     checks_ok, missing = matrix.evaluate_checks(
@@ -7085,6 +7093,62 @@ def validate_map_investigation_repairs() -> None:
     require(binding, "glActiveTextureARB( GL_TEXTURE0_ARB );", "extra sampler restores tracked active unit")
 
 
+def validate_vulkan_receiver_scan_contract() -> None:
+    # FPS-03: the Vulkan front end keeps a light's stencil volumes only while a
+    # receiver may use authored GLSL lighting. A finished interaction's NULL
+    # slot (no geometry, no shader, outside the light) receives nothing and must
+    # not keep them; an unbuilt interaction stays unknown; an interaction being
+    # built answers for every surface of its model. The verdict is memoized per
+    # view light, so every interaction state change must invalidate it.
+    light = read("src/renderer/tr_light.cpp")
+    admission = braced_body(light, "bool R_ShadowMapLightWillUseShadowMaps(",
+                            "front-end shadow-map stencil-elision admission")
+    require_compact(admission, "if ( !R_ShadowMapReceiversAllowMaps( lightDef ) ) { return false; }",
+                    "Vulkan receiver scan gates volume elision")
+    if "surfaces[i].shader == NULL" in admission:
+        raise AssertionError("a finished interaction's NULL slot must not keep every stencil volume of the light")
+    scan = braced_body(light, "static bool R_ShadowMapReceiversAllowMaps(", "Vulkan receiver scan")
+    require_order(scan, ("vLight->shadowMapReceiverScanValid", "return vLight->shadowMapReceiverScanAllowsMaps;",
+                         "VK_MaterialPrograms_NeedsStencilGeneration()",
+                         "if ( inter->IsDeferred() ) {",
+                         "if ( inter->entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {",
+                         "continue;", "allowsMaps = false;",
+                         "if ( R_InteractionReceiverNeedsStencil( inter, generation ) ) {", "allowsMaps = false;",
+                         "vLight->shadowMapReceiverScanValid = true;"),
+                  "memoized Vulkan receiver scan keeps unbuilt interactions that may still gain receivers unknown")
+    verdict = braced_body(light, "static bool R_InteractionReceiverNeedsStencil(", "per-interaction receiver verdict")
+    require_order(verdict, ("if ( inter->buildModel != NULL ) {", "surf->geometry == NULL",
+                            "R_RemapShaderBySkin( surf->shader, parms.customSkin, parms.customShader ), NULL );",
+                            "VK_MaterialPrograms_NeedsStencil( inter->surfaces[i].shader, NULL );"),
+                  "building interactions answer for the whole model, built ones for their filled slots")
+
+    interaction = read("src/renderer/Interaction.cpp")
+    for marker, context in (("idInteraction *idInteraction::AllocAndLink(", "new unbuilt interaction"),
+                            ("void idInteraction::FreeSurfaces(", "freed surfaces"),
+                            ("void idInteraction::Unlink(", "unlinked or emptied interaction")):
+        require(braced_body(interaction, marker, context), "R_InvalidateShadowMapReceiverScan(",
+                f"{context} invalidates the memoized receiver scan")
+    # Only an interaction AddActiveInteraction leaves unbuilt in this view may be
+    # skipped; freeing its surfaces makes it unknown again.
+    active = braced_body(interaction, "void idInteraction::AddActiveInteraction(", "interaction submission")
+    require_order(active, ("struct unbuiltVisitMark_t {", "if ( inter->IsDeferred() ) {",
+                           "inter->unbuiltVisitView = tr.viewCount;", "R_InvalidateShadowMapReceiverScan( inter->lightDef );",
+                           "} unbuiltVisitMark = { this };", "CreateInteraction( model );"),
+                  "unbuilt-visit mark is recorded on every return of the only interaction builder")
+    require(braced_body(interaction, "void idInteraction::FreeSurfaces(", "freed surfaces"), "this->unbuiltVisitView = -1;",
+            "freed surfaces forget the unbuilt visit")
+    create = braced_body(interaction, "void idInteraction::CreateInteraction(", "interaction creation")
+    require_order(create, ("buildModel = model;", "R_InvalidateShadowMapReceiverScan( lightDef );",
+                           "const bool suppressDynamicShadowVolume =", "buildModel = NULL;",
+                           "R_InvalidateShadowMapReceiverScan( lightDef );", "MakeEmpty();"),
+                  "interaction creation brackets its slots with the build model")
+
+    programs = read("src/renderer/Vulkan/vk_MaterialPrograms.cpp")
+    for marker in ("void VK_MaterialPrograms_Reload()", "void VK_MaterialPrograms_Shutdown()"):
+        require(braced_body(programs, marker, marker), "++nativeFamilyGeneration;",
+                f"{marker} invalidates cached NeedsStencil verdicts")
+
+
 def validate_live_cutout_and_point_culling_contract() -> None:
     gl = read("src/renderer/draw_arb2.cpp")
     cache_view = braced_body(gl, "bool RB_ShadowMapPrepareCacheView(", "shadow cache view ownership")
@@ -7254,6 +7318,7 @@ def main() -> None:
     validate_projection_cache_precision_and_derivatives()
     validate_gl_shadow_coverage_contract()
     validate_map_investigation_repairs()
+    validate_vulkan_receiver_scan_contract()
     validate_live_cutout_and_point_culling_contract()
     validate_translucent_moment_contract()
     validate_ci_registration()

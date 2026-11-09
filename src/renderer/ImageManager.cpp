@@ -1343,8 +1343,22 @@ anyone can copy, so nothing it put on the GPU before a pure lock may stay there
 afterwards. Called with the lock already in place: the directory gate then
 refuses every generated/images read, and the forced reload derives each image
 from the pure paks (and rewrites its cache entry).
+
+Expanded loading backgrounds that builds until 9 November 2026 published under
+fs_savepath (guis/assets/generated/loadscreens/, FS_IsGeneratedLoadscreenPath)
+are derived data with no source in any pak, and the lock refuses those files
+too. One a stray reference loaded is purged rather than reloaded; should
+anything bind it again, its load is refused and the image defaults. The
+session's own wide loading screen is an in-memory scratch image
+(_expandedLoadingBackground_<w>x<h>), composed from reads the lock admits, and
+is left alone.
 ===============
 */
+static bool R_IsGeneratedLoadscreenImage( const char *name ) {
+	static const char prefix[] = "guis/assets/generated/loadscreens/";
+	return name != NULL && idStr::Icmpn( name, prefix, static_cast<int>( sizeof( prefix ) - 1 ) ) == 0;
+}
+
 bool idImageManager::ReloadGeneratedCacheImages() {
 	if ( !R_ImagePolicyOperationAllowed() ) {
 		return false;
@@ -1354,9 +1368,20 @@ bool idImageManager::ReloadGeneratedCacheImages() {
 	R_SetDDSProbeCacheActive( false );
 
 	int reloaded = 0;
+	int purged = 0;
 	int failed = 0;
 	for ( int i = 0; i < images.Num(); i++ ) {
 		idImage *image = images[ i ];
+		if ( image != NULL && image->IsLoaded() && R_IsGeneratedLoadscreenImage( image->GetName() ) ) {
+			image->PurgeImage();
+			if ( image->IsLoaded() ) {
+				common->Warning( "Could not evict loading background %s", image->GetName() );
+				failed++;
+			} else {
+				purged++;
+			}
+			continue;
+		}
 		if ( image == NULL || !image->HoldsGeneratedCacheContent() ) {
 			continue;
 		}
@@ -1368,7 +1393,8 @@ bool idImageManager::ReloadGeneratedCacheImages() {
 			reloaded++;
 		}
 	}
-	common->Printf( "Reloaded %d cached image%s from pure content%s\n", reloaded, reloaded == 1 ? "" : "s",
+	common->Printf( "Reloaded %d cached image%s from pure content%s%s\n", reloaded, reloaded == 1 ? "" : "s",
+		purged ? va( "; evicted %d loading background%s", purged, purged == 1 ? "" : "s" ) : "",
 		failed ? va( "; %d could not be reloaded", failed ) : "" );
 	return failed == 0;
 }

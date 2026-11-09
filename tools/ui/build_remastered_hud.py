@@ -27,7 +27,8 @@ from remastered_hud_status import air_gauge, full, status_bar
 from remastered_hud_objectives import objectives_document
 from remastered_hud_scoreboard import scoreboard_document
 from remastered_hud_vehicle import airdef_document, ride_gauge, vehicle_document
-from remastered_hud_awakening import gev_document, mcc_document, ship_panel, speeder_document, turret_document
+from remastered_hud_awakening import (chaingun_turret_document, gev_document, mcc_document, ship_panel, speeder_document,
+                                      turret_document)
 from remastered_hud_medchange import medchange_document
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -140,6 +141,7 @@ DOCUMENTS = {
     "remastered_airdef.q4ui": airdef_document,
     "remastered_turret.q4ui": turret_document,
     "remastered_mcc.q4ui": mcc_document,
+    "remastered_chaingun_turret.q4ui": chaingun_turret_document,
     "remastered_speeder.q4ui": speeder_document,
     "remastered_gev.q4ui": gev_document,
     "remastered_medchange.q4ui": medchange_document,

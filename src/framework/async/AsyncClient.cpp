@@ -2325,9 +2325,12 @@ bool idAsyncClient::ValidatePureServerChecksums( const netadr_t from, const idBi
 	inGamePakChecksum = msg.ReadLong();
 
 	fsPureReply_t reply = fileSystem->SetPureServerChecksums( inChecksums, inGamePakChecksum, missingChecksums, &missingGamePakChecksum );
-	// Images drawn from the generated image cache before the lock must not
-	// outlive it. The lock already refuses the cache, so this reload derives
-	// them from the pure paks; if any cannot be replaced, restart as before.
+	// Images drawn from the generated image cache, or from an expanded loading
+	// background file an older build left in the save folder, before the lock
+	// must not outlive it. The lock already refuses both, so this reload
+	// derives cached images from the pure paks and purges such backgrounds; if
+	// any cannot be replaced, restart as before. (The session's own wide
+	// loading screen is composed in memory and needs nothing here.)
 	if ( reply == PURE_OK && fileSystem->TakePureImageCacheEviction() ) {
 		if ( renderSystem == NULL || !renderSystem->ReloadGeneratedCacheImages() ) {
 			common->Printf( "Cached images could not be reloaded for the pure server; restarting\n" );

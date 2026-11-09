@@ -169,7 +169,13 @@ public:
 	void						MakeDefaultModel();
 	void						SetProcSky( bool value );
 	bool						HasProcSky() const;
-	
+	// Whether the resident data was decoded from openQ4's generated cache,
+	// directly or by converting a model that was; purging clears it. Once
+	// generated-cache reads are refused (a pure lock), BeginLevelLoad purges
+	// such models so they are derived again from their source.
+	bool						HoldsGeneratedCacheContent() const { return generatedCacheContent; }
+	void						SetGeneratedCacheContent( bool value ) { generatedCacheContent = value; }
+
 	bool						LoadASE( const char *fileName );
 	bool						LoadLWO( const char *fileName );
 	bool						LoadFLT( const char *fileName );
@@ -208,6 +214,7 @@ protected:
 	bool						fastLoad;				// don't generate tangents and shadow data
 	bool						reloadable;				// if not, reloadModels won't check timestamp
 	bool						procSky;				// Quake 4 .proc / MD5RProc area needs portal-sky PVS
+	bool						generatedCacheContent;	// resident data came from the generated cache
 	bool						levelLoadReferenced;	// for determining if it needs to be freed
 	ID_TIME_T						timeStamp;
 

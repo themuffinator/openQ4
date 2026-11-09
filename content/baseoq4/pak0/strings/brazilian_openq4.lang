@@ -1583,4 +1583,7 @@
 	"#str_231705"	"%s (%s) na pasta %s não corresponde a esta versão do openQ4."
 	"#str_231706"	"Instale o pacote completo do openQ4 %s ou baixe cada pacote listado para essa versão em %s e salve-o na pasta %s com o mesmo nome."
 	"#str_231707"	"Detalhes:"
+	"#str_231708"	"CALOR"
+	"#str_231709"	"SUPERAQUECIDA"
+	"#str_231710"	"SAÚDE"
 }

@@ -487,6 +487,7 @@ def main() -> None:
     helpers = "\n".join(function_body(source, signature) for signature in (
         "static void FS_AppendLooseDirectoryKey(",
         "static bool FS_IsGeneratedImageCachePath(",
+        "static bool FS_IsGeneratedLoadscreenPath(",
     ))
     bodies = "\n".join(function_body(source, signature) for signature in (
         "int idFileSystemLocal::ReadFile(",

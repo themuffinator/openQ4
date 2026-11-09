@@ -1655,6 +1655,81 @@ rvVehicleTurret::rvVehicleTurret ( void ) {
 	vrLastAim.Zero ( );
 	vrAimTaken = false;
 	vrAimFromHead = false;
+	moveSound = NULL;
+	moveMinVolume = 0.0f;
+	moveMaxVolume = 0.0f;
+	moveSoundOn = false;
+	moveSoundFading = false;
+	moveSoundLastTurn = 0;
+}
+
+/*
+=====================
+rvVehicleTurret::ReadMoveSound
+=====================
+*/
+void rvVehicleTurret::ReadMoveSound ( void ) {
+	moveSound = NULL;
+	if ( spawnArgs.GetBool( "playMoveSound" ) && *spawnArgs.GetString( "snd_move", "" ) ) {
+		moveSound = declManager->FindSound( spawnArgs.GetString( "snd_move" ), false );
+	}
+	moveMinVolume = spawnArgs.GetFloat( "moveMinVolume", "0" );
+	moveMaxVolume = Max( moveMinVolume, spawnArgs.GetFloat( "moveMaxVolume", "0" ) );
+	moveSoundOn = false;
+	moveSoundFading = false;
+	moveSoundLastTurn = 0;
+}
+
+/*
+=====================
+rvVehicleTurret::UpdateMoveSound
+
+openQ4: "degrees" is how far the turret turned this frame. The loop runs
+louder the nearer the turret is to its turn rate, fades once the turret
+has been still for a moment and stops after the fade.
+=====================
+*/
+void rvVehicleTurret::UpdateMoveSound ( float degrees ) {
+	if ( !moveSound || !parent.GetEntity() ) {
+		return;
+	}
+	const float frameTurn = turnRate * MS2SEC( gameLocal.GetMSec() );
+	const float speed = frameTurn > 0.0f ? idMath::ClampFloat( 0.0f, 1.0f, degrees / frameTurn ) : 0.0f;
+	idSoundEmitter* emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, parent->GetSoundEmitter() );
+	if ( speed > 0.02f && IsActive() ) {
+		if ( !moveSoundOn ) {
+			parent->StartSoundShader( moveSound, soundChannel, 0, false, NULL );
+			moveSoundOn = true;
+		}
+		moveSoundFading = false;
+		moveSoundLastTurn = gameLocal.time;
+		if ( emitter ) {
+			emitter->FadeSound( soundChannel, moveMinVolume + ( moveMaxVolume - moveMinVolume ) * speed, 0.08f );
+		}
+	} else if ( moveSoundOn ) {
+		const int still = gameLocal.time - moveSoundLastTurn;
+		if ( still >= TURRET_MOVESOUND_FADE ) {
+			StopMoveSound();
+		} else if ( still > 50 && !moveSoundFading ) {
+			if ( emitter ) {
+				emitter->FadeSound( soundChannel, -40.0f, MS2SEC( TURRET_MOVESOUND_FADE - 50 ) );
+			}
+			moveSoundFading = true;
+		}
+	}
+}
+
+/*
+=====================
+rvVehicleTurret::StopMoveSound
+=====================
+*/
+void rvVehicleTurret::StopMoveSound ( void ) {
+	if ( moveSoundOn && parent.GetEntity() ) {
+		parent->StopSound( soundChannel, false );
+	}
+	moveSoundOn = false;
+	moveSoundFading = false;
 }
 
 /*
@@ -1683,6 +1758,7 @@ void rvVehicleTurret::Spawn ( void ) {
 	currentAngles.Zero ( );
 
 	ReadMovementLock ( );
+	ReadMoveSound ( );
 
 	//the parent is *not* stuck on spawn.
 	parentStuck = false;
@@ -1723,6 +1799,9 @@ void rvVehicleTurret::Activate ( bool active ) {
 
 	if ( !IsActive() && soundPart >= 0 ) {
 		static_cast<rvVehicleSound*>(position->GetPart(soundPart))->Stop ( );
+	}
+	if ( !IsActive() ) {
+		StopMoveSound ( );
 	}
 
 	// openQ4: The Awakening's "resetOnExit" vehicles (its space cannons) swing
@@ -1820,6 +1899,14 @@ void rvVehicleTurret::RunPostPhysics ( void ) {
 	}	
 	if ( vrDriver != NULL ) {
 		vrLastAim = vrSeatAim;
+	}
+
+	// openQ4: the def's servo loop ("playMoveSound")
+	if ( moveSound ) {
+		float turned = idMath::Fabs( idMath::AngleDelta( oldAngles[YAW], currentAngles[YAW] ) );
+		turned = Max( turned, idMath::Fabs( idMath::AngleDelta( oldAngles[PITCH], currentAngles[PITCH] ) ) );
+		turned = Max( turned, idMath::Fabs( idMath::AngleDelta( oldAngles[ROLL], currentAngles[ROLL] ) ) );
+		UpdateMoveSound ( turned );
 	}
 
 	// Update the turret moving sound
@@ -1987,9 +2074,10 @@ void rvVehicleTurret::Restore ( idRestoreGame* savefile ) {
 	savefile->ReadInt ( moveTime );
 	savefile->ReadFloat ( turnRate );
 
-	savefile->ReadInt ( soundPart );	
+	savefile->ReadInt ( soundPart );
 
 	ReadMovementLock ( );
+	ReadMoveSound ( );
 
 	vrPendingInput.Zero ( );
 	vrLastAim.Zero ( );

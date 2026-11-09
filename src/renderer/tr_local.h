@@ -301,6 +301,10 @@ typedef struct viewLight_s {
 	int						shadowMapPrelightStencilRequiredMask;
 	int						shadowMapPrelightStencilReadyMask;
 	const struct drawSurf_s	*translucentInteractions;	// get shadows from everything
+	// Front end only (Vulkan): the receiver scan of R_ShadowMapLightWillUseShadowMaps
+	// for this view, kept until one of the light's interactions changes state.
+	bool					shadowMapReceiverScanValid;
+	bool					shadowMapReceiverScanAllowsMaps;
 } viewLight_t;
 
 

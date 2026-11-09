@@ -53,9 +53,11 @@ Checks:
   at it (the pointer is drawn where the ray meets the screen) and the trigger
   clicks Resume there, which closes the menu even though the desktop window
   holds no focus;
-- a vehicle in stereo: a walker, spawned and entered by script, turns its
-  cockpit 45 degrees after the head while the eye, on the cockpit's turning
-  axis, stays put, and the headset keeps the stereo view;
+- a vehicle in stereo: a walker, spawned and entered by script and turned 45
+  degrees in the same breath (as m07's race turns its speeder), seats the
+  player facing its new heading, turns its cockpit 45 degrees after the head
+  while the eye, on the cockpit's turning axis, stays put, and the headset
+  keeps the stereo view;
 - the runtime can end VR: the game carries on on the desktop, keeps
   vr_enable for the next launch and waits for vr_restart;
 - the log carries no errors.
@@ -365,7 +367,10 @@ def main(argv: list[str] | None = None) -> None:
         "condump vr_marker_unclick.txt", "waitMsec 2000",
         # a walker in stereo: the cockpit turns after the head, about the eye
         f'spawn vehicle_walker name vr_smoke_walker origin "{VEHICLE_ORIGIN}" angle 150.7', "waitMsec 2500",
-        'script "$player1.enterVehicle( $vr_smoke_walker );"', "waitMsec 3000",
+        # turned in the same breath as the seating, as m07's race turns its
+        # speeder: the seat must follow the turn, not the facing it boarded at
+        'script "$player1.enterVehicle( $vr_smoke_walker ); $vr_smoke_walker.setAngles( \'0 105.7 0\' );"',
+        "waitMsec 3000",
         "echo VR_VEHICLE_IN", "getviewpos",
         "condump vr_marker_vehicle_look.txt", "waitMsec 2500",
         "echo VR_VEHICLE_LOOKED", "getviewpos",
@@ -707,6 +712,10 @@ def main(argv: list[str] | None = None) -> None:
         assert found, f"getviewpos after {after} printed no view position"
         return [float(found.group(i)) for i in range(1, 5)]
     seated, looked = view_pose("VR_VEHICLE_IN"), view_pose("VR_VEHICLE_LOOKED")
+    # the script turned the walker 45 degrees as it seated the player; a seat
+    # that kept its boarding facing would leave the cockpit chasing 150.7
+    assert abs(yaw_delta(seated[3], 105.7)) < 3.0, \
+        f"the seat should follow the walker's turn right after boarding and look along 105.7, not {seated[3]:.1f}"
     cockpit_turn = yaw_delta(seated[3], looked[3])
     assert abs(cockpit_turn + 45.0) < 3.0, f"the walker's cockpit should turn 45 degrees right after the head, not {cockpit_turn:.1f}"
     eye_moved = math.dist(seated[:3], looked[:3])

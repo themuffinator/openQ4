@@ -1015,11 +1015,23 @@ idFile *idLevelLoadCacheManager::OpenPreloadedSource( const char *path,
 }
 
 bool idLevelLoadCacheManager::GeneratedCacheReadsEnabled( const generatedCacheKind_t kind ) const {
-	return impl != nullptr && com_levelLoadModernization.GetBool() &&
-		com_levelLoadCache.GetBool() && IsValidCacheKind( kind );
+	if ( impl == nullptr || !com_levelLoadModernization.GetBool() ) {
+		return false;
+	}
+	// The game module reads its own animation cache under
+	// g_useGeneratedAnimCache; com_levelLoadCache has never governed it.
+	if ( kind == GENERATED_CACHE_ANIMATION ) {
+		return true;
+	}
+	return com_levelLoadCache.GetBool() && IsValidCacheKind( kind );
 }
 
 bool idLevelLoadCacheManager::GeneratedCacheWritesEnabled( const generatedCacheKind_t kind ) const {
+	// only the envelope kinds are written here; the game module writes its
+	// animation cache itself under g_writeGeneratedAnimCache
+	if ( !IsValidCacheKind( kind ) ) {
+		return false;
+	}
 	return GeneratedCacheReadsEnabled( kind ) && com_levelLoadCacheWrite.GetBool();
 }
 
@@ -1027,7 +1039,7 @@ idFile *idLevelLoadCacheManager::OpenGeneratedCacheRead(
 		const generatedCacheKind_t kind, const char *sourcePath,
 		const unsigned int parserVersion, const char *settingsKey,
 		const char *contentKey ) {
-	if ( !GeneratedCacheReadsEnabled( kind ) || parserVersion == 0 ) {
+	if ( !IsValidCacheKind( kind ) || !GeneratedCacheReadsEnabled( kind ) || parserVersion == 0 ) {
 		return nullptr;
 	}
 	std::string normalized;

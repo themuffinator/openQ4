@@ -122,6 +122,8 @@ jobs:
             tools/tests/filesystem_length_probe_contract.py \
             tools/tests/generated_image_pak_content_stamp.py \
             tools/tests/pure_image_cache_eviction_contract.py \
+            tools/tests/pure_level_load_cache_contract.py \
+            tools/tests/pure_expanded_loadscreen_contract.py \
             tools/tests/generate_file_memory_test.py \
             tools/tests/generate_aas_tactical_test.py \
             tools/tests/generate_bitmsg_test.py \
@@ -706,6 +708,8 @@ jobs:
           python tools/tests/filesystem_length_probe_contract.py
           python tools/tests/generated_image_pak_content_stamp.py
           python tools/tests/pure_image_cache_eviction_contract.py
+          python tools/tests/pure_level_load_cache_contract.py --mutations
+          python tools/tests/pure_expanded_loadscreen_contract.py --mutations
           python tools/tests/gui_clipping_contract.py
           python tools/tests/gui_transition_operand_contract.py --mutations
           python tools/tests/gui_state_debug_log_contract.py --mutations

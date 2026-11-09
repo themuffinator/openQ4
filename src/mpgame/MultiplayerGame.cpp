@@ -10554,7 +10554,12 @@ void idMultiplayerGame::ReceiveDeathMessage( idPlayer *attacker, int attackerSco
 		line.SetBool( "youVictim", localPlayer && victim == localPlayer );
 		line.SetBool( "teamkill", gameLocal.IsTeamGame() && attacker && victim && attacker != victim && attacker->team == victim->team );
 		remasteredKills.Add( line, gameLocal.realClientTime, gameLocal.gameType == GAME_TOURNEY ? 2 : 4 );
-		hud->HandleNamedEvent ( "addDeathLine" );
+		// The stock interface's Remastered layout draws the kill feed in
+		// mphud.gui from these fields, so the player HUD's own lines (hud.gui,
+		// whose window tree saves keep) stay empty until Classic returns.
+		if ( !hud->GetStateBool( "oq4_hudRemastered" ) ) {
+			hud->HandleNamedEvent ( "addDeathLine" );
+		}
 	}
 
 	// echo to console. Liquid methods live in a shared def rather than every player def.

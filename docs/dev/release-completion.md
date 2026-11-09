@@ -6,6 +6,114 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## The Awakening's chaingun turret gets heat, its own HUD and a fair machinegun, 9 November 2026
+
+- **The machinegun hits as it does in Quake 4 again.** In The Awakening the
+  player's machinegun hit for 40 a round (more than its zoomed 20) and lost
+  its bleeding, flesh sounds and knockback, because the expansion's turret
+  file reused the machinegun's damage for the turret. It is back to 15, 20
+  zoomed; the turret keeps its 40.
+- **The chaingun turret you man in Stranarus Trench and the prison heats up.**
+  About five seconds of continuous fire overheats it; it vents steam and will
+  not fire for about two seconds. Short bursts never overheat it, a cold gun
+  is more accurate than before and spreads as it heats, and the zoom button
+  now magnifies its view. Its rounds land under the crosshair (the alpha fired
+  them parallel to it, well to the side), and its servos sound as it turns.
+- **Its own HUD.** Instead of the on-foot HUD with an empty ammunition gauge,
+  the turret shows your health and armor and its barrel heat, also as a bar
+  under the crosshair with OVERHEATED while it vents, in the Remastered,
+  Minimal and Classic layouts and the classic interface.
+- **Upgrade note.** Saves made before this change keep the old turret until
+  the level is restarted or reached again; the machinegun's damage applies at
+  once.
+- Evidence: hidden, input-free M01 and M04 runs (heat cycle, damage
+  definitions, a hot-gun save and reload, the scripted prison gunner, HUD
+  captures with `tools/ui/capture_remastered_hud.py --scenario chaingun`),
+  the native Remastered HUD checks and `tools/tests/awakening_turret_skin_contract.py`.
+  A sustained wave defence and audio listening remain; see Q4-04 in the
+  [roadmap](roadmap.md).
+
+## Vulkan drops unused shadow volumes like OpenGL (FPS-03), 9 November 2026
+
+- **Vulkan now treats lights without baked shadows as OpenGL does.** This covers
+  the weapon flashlight, moving lights and lights the game spawns. When such a light
+  renders a shadow map, Vulkan no longer keeps its old-style stencil shadow volumes
+  as well, even when the light also reaches objects that are out of view. Shadows
+  look the same; nothing needs to be changed.
+- **No measurable frame-rate change on the stock maps.** Most map lights have baked
+  shadows and are unaffected, so this is a correctness step for FPS-03 rather than a
+  speed-up.
+- **What to expect if a shadow map fails.** As on OpenGL, such a light can draw
+  unshadowed for one frame before it falls back to stencil shadows.
+- Evidence: FPS-03 in the [roadmap](roadmap.md);
+  `tools/tests/renderer_vulkan_shadow_compatibility.py`.
+
+## Widescreen loading screens on pure servers, without a restart, 9 November 2026
+
+- **No more restart on the first pure join in a widescreen window.** If you
+  played or hosted a map in a window that is not 4:3 before joining a server
+  with pure checking on (`si_pure 1`), the game restarted itself on the
+  connect, which cost about 30 seconds. The cause was the widened loading
+  screen openQ4 saved in your settings folder and read back. openQ4 now builds
+  that picture in memory and saves nothing, so the game goes straight on to
+  the match. Nothing needs to be changed.
+- **Pure servers show the wide loading screen too.** Their loading screens
+  used to fall back to the map's standard 4:3 picture in a frame. The widened
+  picture is made only from game files the server allows, so it now fills the
+  window there as everywhere else.
+- **Pure checking is as strict as before.** Any loose file read from a game
+  folder before connecting still restarts the game into pure mode. Older
+  versions left saved loading screens in `guis/assets/generated/loadscreens/`
+  in your settings folder; they are no longer used and you can delete them.
+- Validation: a pure dedicated `mp/q4dm1` server and a 640x360 client that
+  first hosted the same map locally, on OpenGL and Vulkan, with the retained
+  and the stock interface. Engine captures of the pure map's loading screen
+  show the wide picture; the client wrote nothing to its settings folder and
+  reached the match without an engine reload. Details are in the
+  [pure-server decision](mp-network-qualification.md#expanded-loading-backgrounds-on-pure-servers-9-november-2026).
+
+## Pure servers also refuse the experimental level-load caches, 9 November 2026
+
+- **Pure checking now covers the fast-loading caches too.** The experimental
+  level-load option (`com_levelLoadModernization 1`, off by default) keeps its
+  own copies of decoded models, maps, collision data and animations. A client
+  on a pure server (`si_pure 1`) used to read them anyway. Now it never does,
+  and anything it loaded from them before connecting is loaded again from the
+  original game files when the server's map loads. An edited cache file cannot
+  be told apart from a genuine one, so it cannot be trusted where pure mode
+  applies, the same rule the image cache follows.
+- **Nothing to change.** Only the affected models, map data and animations
+  are rebuilt; the game does not restart for them. With the option off,
+  nothing changes.
+- Validation: a pure dedicated `mp/q4dm1` server and a client that first
+  loaded the same map from warm caches, on OpenGL and Vulkan. After connecting,
+  the client opened no model, map, collision or animation cache file, rebuilt
+  91 models, the map and 222 animations instead, and reached the match without
+  an engine reload. Details are in the
+  [pure-server cache decision](mp-network-qualification.md#level-load-caches-on-pure-servers-9-november-2026).
+
+## Every multiplayer mode gets the Remastered HUD in the classic interface, 9 November 2026
+
+- **Team modes, Tourney and the kill feed join the new layout.** With
+  `ui_retained 0`, the layout that Deathmatch and Duel received earlier today now
+  covers the rest of multiplayer, keeping the original artwork:
+  - Team DM, CTF, One Flag, Arena CTF, Dead Zone, Clan Arena, Freeze Tag and Red
+    Rover show compact team panels with your team first and the score against
+    the limit. The flags show who carries them, the round modes show who is
+    still standing, and Dead Zone names the team holding the zone.
+  - The match timer sits under the panels, with the round number and round
+    clock in the round modes.
+  - Tourney shows its bracket strip on plates, with your match highlighted and
+    each finished match's winner ticked. The message bar names the round, and
+    the round and arena sit beside the timer.
+  - The kill feed sits in the top-right corner, each line on its own plate with
+    the weapon icon, team colors and a TEAM tag on team kills. Lines that
+    involve you stand out, and a long name no longer pushes the victim off the
+    screen.
+- **Minimal now hides the multiplayer extras too,** as it does in the modern HUD.
+- Choose the Classic layout (`ui_hudLayout 0`) to keep the original positions.
+- Evidence: [stock interface HUD layout](ui/legacy-hud-layout.md#multiplayer-groups).
+
 ## Joining a pure server no longer restarts the game, 9 November 2026
 
 - **Much faster first join to a pure server.** Joining a server with pure
@@ -3128,6 +3236,11 @@ completed release material here and publish curated notes in `releases/`.
   disappear from the headset view, leaving distant desert showing where they
   should be. Both renderers were affected; flat play was not.
   [Details](platform-recovery-review.md#vr-eye-culling-restored-9-november-2026).
+
+- [x] VR: The Awakening's speeder-bike race no longer leaves you looking
+  backwards over the bike when it seats you. Any vehicle a level turns as it
+  seats you now faces where the level points it.
+  [Details](platform-recovery-review.md#vr-seat-turn-restored-9-november-2026).
 
 - [x] Recover safely when a damaged save fails partway through physics or
   vehicle data. Partial physics state no longer points cleanup at another

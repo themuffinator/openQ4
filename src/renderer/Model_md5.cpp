@@ -2085,6 +2085,7 @@ void idRenderModelMD5::PurgeModel() {
 	skinSpaceToLocalMats.Clear();
 	meshes.Clear();
 	viewEnt = NULL;
+	generatedCacheContent = false;
 }
 
 /*
