@@ -200,6 +200,10 @@ private:
 	idWindow *					bindHandler;
 
 	idStr						source;
+	// openQ4: the file the windows were parsed from (idLegacyHudLayout::DefinitionFor),
+	// and whether to parse the named file itself: a save's earlier definition.
+	idStr						definition;
+	bool						literalDefinition = false;
 	idStr						activateStr;
 	idStr						pendingCmd;
 	idStr						returnCmd;

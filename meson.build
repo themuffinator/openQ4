@@ -1679,6 +1679,9 @@ if build_engine or get_option('build_native_tests')
              meson.project_source_root() / 'content/baseoq4/pak0/guis/hud/remastered_scoreboard.q4ui'], timeout: 240)
     test('openq4-ui-remastered-hud-generated', py,
       args: [meson.project_source_root() / 'tools/ui/build_remastered_hud.py', '--check'], timeout: 120)
+    # The stock interface's HUD for The Awakening, generated from guis/hud.gui.
+    test('openq4-ui-awakening-legacy-hud-generated', py,
+      args: [meson.project_source_root() / 'tools/ui/build_awakening_legacy_hud.py', '--check'], timeout: 60)
     test('openq4-ui-hud-coverage', py,
       args: [meson.project_source_root() / 'tools/tests/ui_hud_coverage.py'], timeout: 30)
     openq4_ui_value_schema_test = executable(

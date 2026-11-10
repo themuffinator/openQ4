@@ -50,6 +50,11 @@ public:
 	// Whether the HUD scale sizes a covered GUI: the HUDs whose windows follow
 	// the Remastered layout and name their scale anchors.
 	static bool Scales(const char* source);
+	// The definition a GUI is parsed from. The Awakening's on-foot HUD is the
+	// stock HUD of its day and knows no layout, so guis/q4xhud.gui is read
+	// from openQ4's own definition of it (tools/ui/build_awakening_legacy_hud.py)
+	// unless a mod owns that GUI. Every other GUI is its own definition.
+	static const char* DefinitionFor(const char* source);
 	// A mod that ships its own copy of a stock-named GUI owns its artwork,
 	// layout and scripts: Classic, with no peer and no bridge. A mod without
 	// one gets the HUD its base game has. Opens files: resolve once per GUI.

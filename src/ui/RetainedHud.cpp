@@ -734,8 +734,21 @@ bool idLegacyHudLayout::Fades(const char* source) {
 	return Covers(source) && !SourceIs(source,{"guis/wristcomm.gui","guis/wristcomm_strogg.gui","guis/scoreboard.gui"});
 }
 
+namespace {
+const char* const AwakeningHud="guis/q4xhud.gui";
+const char* const AwakeningHudDefinition="guis/openq4/awakening/q4xhud.gui";
+}
+
 bool idLegacyHudLayout::Scales(const char* source) {
-	return SourceIs(source,{"guis/hud.gui","guis/hud_strogg.gui","guis/mphud.gui","guis/vehicles/hud.gui"});
+	// By definition: the expansion's own q4xhud.gui names no scale anchors.
+	return SourceIs(source,{"guis/hud.gui","guis/hud_strogg.gui","guis/mphud.gui","guis/vehicles/hud.gui",AwakeningHudDefinition});
+}
+
+const char* idLegacyHudLayout::DefinitionFor(const char* source) {
+	if (!SourceIs(source,{AwakeningHud})) return source;
+	// Only beside the expansion's own HUD, whose content the definition draws.
+	if (ModOwns(source) || fileSystem->ReadFile(source,nullptr)<0 || fileSystem->ReadFile(AwakeningHudDefinition,nullptr)<0) return source;
+	return AwakeningHudDefinition;
 }
 
 bool idLegacyHudLayout::ModOwns(const char* source) {
@@ -804,7 +817,7 @@ const idUserInterfaceLocal::HudRoute& idUserInterfaceLocal::ResolveHudRoute() {
 		hudRoute.coverage=idRetainedHud::Covers(source.c_str());
 		if (hudRoute.document || hudRoute.coverage) hudRoute.modOwned=idLegacyHudLayout::ModOwns(source.c_str());
 		hudRoute.fades=hudRoute.document && idLegacyHudLayout::Fades(source.c_str());
-		hudRoute.scales=hudRoute.document && idLegacyHudLayout::Scales(source.c_str());
+		hudRoute.scales=hudRoute.document && idLegacyHudLayout::Scales(definition.c_str());
 	}
 	return hudRoute;
 }

@@ -119,7 +119,13 @@ def on_foot_document(*, strogg: bool, awakening: bool) -> dict:
     ])
     # The stock windows that hold an event's lasting effect (hud.gui and its family).
     ride = ("p_tram::visible", "enterTram") if strogg else ("p_flatbed::visible", "enterFlatbed")
-    ship_joins = [("shipstatus::visible", "aa_showShipStatusOn")] if awakening else []
+    # The dropship panel's damage and markers, which openQ4's definition of the
+    # expansion's HUD keeps in its windows (tools/ui/build_awakening_legacy_hud.py);
+    # the panel's own visibility comes last, since each of those also shows it.
+    ship_joins = [*[(f"ship_core_{n + 1:02d}::visible", f"ship_health_{n:02d}_on") for n in range(1, 6)],
+                  *[(f"ship_target_{n:02d}::visible", f"ship_target_{n:02d}_on") for n in range(1, 6)],
+                  ("shipstatus::visible", "aa_showShipStatusOn"),
+                  ("!shipstatus::visible", "aa_showShipStatusOff")] if awakening else []
     joins = join_events(doc, [("desktop::hidden", "hideHud"), ("p_radio::visible", "radioChatterUp"),
                               ("BossBar::visible", "showBossBar"), ("p_boss_shield_bar_left::visible", "showBossShieldBar"),
                               ("brackets::visible", "showBrackets"), ("missile_indicator::visible", "missileThreatUp"), ride, *ship_joins])

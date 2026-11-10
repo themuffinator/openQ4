@@ -6,8 +6,8 @@ the Remastered layout of [visual specification](../ui-visual-design.md) 14.4–1
 whenever `ui_hudLayout` is not Classic. They keep their original bitmap
 artwork. Since 10 November 2026 the HUD scale, opacity and reduced motion
 settings apply there too, and the multiplayer HUD has the Remastered follow
-card, vote card and respawn prompt. `ui_hudLayout 0` keeps the stock
-rectangles and anchors. The retained
+card, vote card and respawn prompt, and The Awakening's on-foot HUD follows
+the layout as well. `ui_hudLayout 0` keeps the stock rectangles and anchors. The retained
 interface's own Classic is unchanged too: its peer-less stock GUI draws on the
 centered 4:3 canvas. Its Remastered layouts never draw these windows.
 
@@ -23,6 +23,16 @@ copy gets the HUD of its base game in either interface (`ModOwns`, resolved
 once per GUI). Before 10 November the stock interface treated any mod as
 Classic while the retained one looked for the file.
 
+- **Definitions.** A GUI is parsed from `idLegacyHudLayout::DefinitionFor`.
+  The Awakening's on-foot HUD, `guis/q4xhud.gui`, is the stock HUD of its day
+  with a few additions and knows no layout, and q4xbase mounts above openQ4's
+  own content. So while that file is present and no mod owns it, the engine
+  parses `guis/openq4/awakening/q4xhud.gui` in its place. The GUI keeps the
+  name `guis/q4xhud.gui`, which the game, the Remastered route and saves use.
+  `tools/ui/build_awakening_legacy_hud.py` generates that definition from
+  `guis/hud.gui` (`--check` runs as `openq4-ui-awakening-legacy-hud-generated`),
+  so an edit to `hud.gui` reaches it once it is regenerated. Every other GUI
+  is its own definition.
 - **Layout state.** `idUserInterfaceLocal::Redraw` publishes these keys each frame:
   - `oq4_hudLayout`: 0 to 3.
   - `oq4_hudRemastered`: any layout but Classic.
@@ -37,8 +47,9 @@ Classic while the retained one looked for the file.
 
   Competitive uses the Remastered positions. The keys are written when one
   changes, not every frame.
-- **Scale.** `ui_hudScale` sizes the four laid-out HUDs (`hud.gui`,
-  `hud_strogg.gui`, `mphud.gui` and `vehicles/hud.gui`) as it sizes the
+- **Scale.** `ui_hudScale` sizes the laid-out HUDs (`hud.gui`,
+  `hud_strogg.gui`, `mphud.gui`, `vehicles/hud.gui` and openQ4's definition
+  of `q4xhud.gui`) as it sizes the
   retained documents: each group scales about its screen anchor. A window
   that an alignment moves to a screen edge starts a group anchored on that
   edge, and an axis it leaves alone keeps its ancestors' anchor, the centre by
@@ -116,6 +127,7 @@ wrapper windows: `p_radio_layout`, `p_powerups_layout`, `p_alerts_layout`,
 | --- | --- |
 | `hud.gui` | Gauges +88 u (ammo at 101 u); the ride gauge centered; the strip's slots at 350 u with the name above them; two fitted pickup lines at 401 and 377 u that merge repeats; exit, save and missile notices stacked below the boss plate; powerups 61 u higher |
 | `hud_strogg.gui` | The same, with the Strogg gauges +85.5 u, the tram gauge centered and R_Strogg lines |
+| `q4xhud.gui` (The Awakening) | Everything `hud.gui` does, since its definition is generated from it, plus the expansion's additions: strip slots 11 and 12 (13 weapons, 388 u wide), the death fade sized to the whole view, the failed-objective title, and the dropship panel at the top trailing edge under the transmission display. On foot the panel now answers m03's damage, marker and warning events, which the expansion's HUD had windows for but no handlers; Remastered lets the view through its disc (0.85) and leaves out the gun's view cone, as the retained panel does |
 | `mphud.gui` | See [multiplayer groups](#multiplayer-groups) |
 | `vehicles/hud.gui` | The status bar +170.5 u on the bottom edge; electrical warnings at the side edges; the keycap and Exit prompt (or Vehicle locked) on a fitted plate at the bottom-trailing corner; the squad stencil in #FFFF00 |
 
@@ -192,8 +204,13 @@ Each of these needs vector art or a layout a GUI script cannot express:
 - The voice plates keep their stock construction, and the follow card has no
   chevrons at its ends.
 - The powerups' tick rings and the scoreboard keep their stock construction.
-- The Awakening's `q4xhud*.gui` and the air-defence cannon (which has no
-  transmission display) keep the expansion's and stock layouts.
+- The Awakening's dropship panel keeps the expansion's bitmap ship, markers
+  and darts, which sit up to 2 u from the vector ones. Its
+  `q4xhud_strogg.gui` keeps the expansion's layout: nothing loads it (the
+  expansion's Strogg player names `guis/hud_strogg.gui`, which is laid out).
+  The Awakening's vehicle HUDs (the turrets, the MCC gun, the speeder and
+  the GEV) and the air-defence cannon, which has no transmission display,
+  keep the expansion's and stock layouts.
 - Text uses the bitmap fonts at scales matched by eye to the Remastered TTF
   layout, about 10% under the 72 dp-per-textscale rule.
 
@@ -215,6 +232,16 @@ refuses a register whose expression index moved), so the definitions that
 builds from 2280 saved are kept as `hud_r3.gui`, `hud_strogg_r3.gui` and
 `vehicle_hud_r2.gui`, with the marker windows `hit_chevron` and
 `oq4_prompt_padlock`.
+
+The Awakening's HUD record was written from the expansion's own
+`guis/q4xhud.gui` until build 2330. Its revision entry names that file as
+the saved definition, and `ReadFromSaveGameWithLayout` parses a saved
+definition as written, so an earlier record is read through the expansion's
+script and its state carries over to openQ4's definition (marker window
+`p_pickup0`). A GUI still parsed from the saved definition, such as a mod's
+own `q4xhud.gui`, reads its record directly. From here on `q4xhud.gui`'s
+definition changes whenever `hud.gui` does, and needs its own
+`guis/savecompat/` revision each time.
 
 ## Evidence, 9 November 2026
 
@@ -337,3 +364,34 @@ scale group), `ui_stock_level_load.py` (the peers' rejoin),
 `competitive_match_layer.py`, `arena_campaign.py`, `remastered_hud_behavior.py`,
 `weapon_wheel_behavior.py`, `key_bind_presentation.py`, `ui_hud_coverage.py`
 and `docs_link_integrity.py`.
+
+## The Awakening, 10 November 2026
+
+Debugoptimized `builddir` (main at `e9022bef1` plus the working tree) at
+1280x720 on OpenGL, from the candidate runtime with q4xbase read from the local
+expansion files (`fs_awakeningpath`). `.tmp/hud-round/run.py` stage `awk`
+(`m01_stranarus_trench1`) with `st_pairs.py` (`PAIRS=awk`) shot each state with
+the retained HUD and then the stock interface's, in a hidden window with no
+host input. Captures are in `.tmp/hud-round/out/awk-pairs/` (untracked).
+
+| Pair | What it shows |
+| --- | --- |
+| `a-base`, `a-strip`, `a-pickups` | Gauges, the 13-slot strip with its name line, a merged pickup line, at the retained positions |
+| `a-ship`, `a-ship-events` | The dropship panel at the top trailing edge; forged m03 events light the left wing and nose, two markers and the north-east and west darts in both |
+| `a-ship-radio`, `a-notices` | The panel under the transmission display; boss bar, exit and save notices |
+| `a-scaled`, `a-small` | HUD scale 1.25 with a 4% inset, and 0.75: the panel scales about the top trailing corner |
+| `a-minimal`, `a-classic` | Minimal keeps the panel; Classic keeps the stock rectangles, the opaque disc and the view cone |
+| `a-ship-off` | `aa_showShipStatusOff` hides the panel in both |
+
+The pairs also showed the retained HUD dropping the panel's damage and markers
+whenever its document was rebuilt (a layout switch, a level change or a
+restore): only events carried them, and the expansion's HUD had no windows
+holding them. openQ4's definition does, so the Awakening documents now replay
+them as join events (`tools/ui/build_remastered_hud.py`).
+
+Saves, with `.tmp/q4xhud/savecompat_awk.py`: a save written on
+`m01_stranarus_trench1` by a 4 November build (`.tmp/runtime/awakening-missions`),
+with the boss bar and the panel showing, restored in the candidate ("Restored
+'guis/q4xhud.gui' from a save written for its earlier definition (72 changed
+window values)") with both still showing in the Remastered layout; a save the
+candidate wrote restored directly.

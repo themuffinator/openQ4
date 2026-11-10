@@ -1243,6 +1243,9 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 	}
 
 	source = qpath;
+	// openQ4: The Awakening's on-foot HUD is parsed from openQ4's laid-out
+	// definition of it; the GUI keeps the name the game and its saves know.
+	definition = literalDefinition ? qpath : idLegacyHudLayout::DefinitionFor( qpath );
 	state.Set( "text", "Test Text!" );
 
 	bool parseOk = true;
@@ -1253,7 +1256,7 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 	//Load the timestamp so reload guis will work correctly
 	fileSystem->ReadFile(qpath, NULL, &timeStamp);
 
-	if (!UI_LegacyObservationLoad(this,src,qpath)) src.LoadFile( qpath );
+	if (!UI_LegacyObservationLoad(this,src,qpath)) src.LoadFile( definition );
 
 	if ( src.IsLoaded() ) {
 		idToken token;
@@ -2058,8 +2061,14 @@ bool idUserInterfaceLocal::ReadFromSaveGameWithLayout( idFile *savefile, const c
 	// normal check, the other shows what that definition starts with. A window
 	// value that differs between them was changed while the game ran -- a boss bar
 	// a script made visible, for example -- and is what this GUI must keep.
+	// openQ4: a GUI that is still parsed from the saved definition (a mod's own
+	// q4xhud.gui, which no openQ4 definition replaces) reads its record directly.
+	if ( definition.Icmp( layoutPath ) == 0 ) {
+		return ReadFromSaveGame( savefile );
+	}
 	idUserInterfaceLocal saved( false );
 	idUserInterfaceLocal initial( false );
+	saved.literalDefinition = initial.literalDefinition = true;
 	if ( !saved.InitFromFile( layoutPath, true, false ) || !initial.InitFromFile( layoutPath, true, false ) ||
 		 saved.desktop == NULL || initial.desktop == NULL ) {
 		common->Warning( "idUserInterfaceLocal::ReadFromSaveGameWithLayout: gui '%s' could not parse its saved layout '%s'",

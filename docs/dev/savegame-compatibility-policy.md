@@ -264,6 +264,7 @@ only the current revision has:
 | `guis/hud.gui` | 2323 | `guis/savecompat/hud_r3.gui` | `hit_chevron` |
 | `guis/hud_strogg.gui` | 2323 | `guis/savecompat/hud_strogg_r3.gui` | `hit_chevron` |
 | `guis/vehicles/hud.gui` | 2323 | `guis/savecompat/vehicle_hud_r2.gui` | `oq4_prompt_padlock` |
+| `guis/q4xhud.gui` | 2330 | `guis/q4xhud.gui` (The Awakening's own file) | `p_pickup0` |
 
 A GUI edited more than once lists its revisions oldest first, and a record is
 read through the first one whose build its payload predates. The 2280
@@ -274,6 +275,15 @@ prompt's lock, and text sizes, offsets, scale anchors and notice stacking. An
 edit that only changes an expression counts too: a restore refuses a register
 whose expression index differs from the parsed GUI's, so a constant that
 becomes an expression moves every later index in its window.
+
+`guis/q4xhud.gui` is The Awakening's on-foot HUD, which openQ4 does not ship.
+From build 2330 the engine parses openQ4's definition of it,
+`guis/openq4/awakening/q4xhud.gui`, in the expansion file's place
+(`idLegacyHudLayout::DefinitionFor`), so the saved definition of its earlier
+records is the expansion's own file, parsed as written. That definition is
+generated from `guis/hud.gui` (`tools/ui/build_awakening_legacy_hud.py`): an
+edit to `hud.gui` changes it too, and it then needs its own revision under
+`guis/savecompat/` beside `hud.gui`'s.
 
 A record from a payload whose layout build predates the revision, and whose blob
 does not name that window, is read through `idUserInterface::ReadFromSaveGameWithLayout`.

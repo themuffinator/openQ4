@@ -37,6 +37,16 @@ See [player release status](../user/release-status.md).
   - A dead player's health reads 0, not -100.
   - A failed mission's fade to black covers the whole screen; on a wide
     screen it left lit strips at the sides.
+- **The Awakening's HUD follows in the classic interface.** On foot in the
+  expansion, the classic-interface HUD now sits where the modern one does,
+  with all 13 weapons in the strip, and takes the HUD layout, Size and
+  Opacity settings. On the dropship mission its status panel shows hull
+  damage, objective markers and attack warnings while you are on foot; before,
+  only the gun's display showed them. Saves made before this update load as
+  usual.
+- **The Awakening, modern interface.** The dropship panel keeps its damage and
+  objective markers after you load a save or change the HUD layout; it used
+  to come back empty.
 - **Fixes in both interfaces.**
   - In the modern interface, the vote, statistics and managed-match cards
     have their dark plate behind the whole card; it drew as a thin band

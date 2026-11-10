@@ -123,7 +123,11 @@ alpha's own code:
   the crosshair shows when a marine is too busy to talk. With the Remastered HUD
   the dropship guns (m03) show the ship-status panel under the radio display,
   with its damage, objective markers and attack warnings, and an Exit prompt;
-  the same panel appears on your own HUD while you move about the dropship. The
+  the same panel appears on your own HUD while you move about the dropship.
+  The classic interface (`ui_retained 0`) lays your on-foot HUD out the same
+  way: the gauges, the 13-weapon strip and the pickup lines sit where the
+  modern HUD has them, the HUD Size, Opacity and layout settings apply, and
+  the dropship panel shows the same damage, markers and warnings. The
   MCC cannon (m06) shows the MCC's hull under the radio display, its gauge
   filling with the hull and turning red at a quarter, with an Exit prompt.
   The speeder bike (m07) shows its race clock and checkpoints at the top, the

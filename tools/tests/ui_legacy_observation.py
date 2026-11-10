@@ -112,7 +112,7 @@ def source():
     # These containing methods are not replaced by synthetic production code.
     for text in ['UI_LegacyObservationParse(this,true,false);','UI_LegacyObservationParse(this,false,ret);','UI_LegacyObservationDestroyed(this);']:
         assert window.count(text)==1,text
-    assert 'if (!UI_LegacyObservationLoad(this,src,qpath)) src.LoadFile( qpath );' in manager
+    assert 'if (!UI_LegacyObservationLoad(this,src,qpath)) src.LoadFile( definition );' in manager  # the file a GUI is parsed from (idLegacyHudLayout::DefinitionFor)
     assert manager.count('UI_LegacyObservationLoaded(this,src.IsLoaded());')==1
     assert manager.count('AddCommand("ui_observeLegacy",UI_ObserveLegacy')==1 and manager.count('RemoveCommand("ui_observeLegacy")')==1
     generated=legacy.build_source().replace(legacy.TEST,'').replace(legacy.OBSERVATION_STUBS,(ROOT/'src/ui/LegacyGuiImport.h').read_text().replace('#pragma once','').replace('class id','struct id'))

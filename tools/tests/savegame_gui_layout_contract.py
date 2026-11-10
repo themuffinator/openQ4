@@ -45,6 +45,9 @@ SERIALIZED_GUIS: dict[str, str] = {
     "guis/cinematic.gui": "63d5f187afe545a3533f14780605a7e614463f5c",
     "guis/hud.gui": "79d25f0c7b5035f118655e1f9f01db89157e6140",
     "guis/hud_strogg.gui": "51981879a988f53c7b884a84036b6ef66968a37a",
+    # The Awakening's guis/q4xhud.gui, which the engine reads from this definition
+    # (idLegacyHudLayout::DefinitionFor; generated from guis/hud.gui).
+    "guis/openq4/awakening/q4xhud.gui": "56a23a1fc2515b0ade85217725d68684d0f8bde6",
     "guis/vehicles/airdef_cannon.gui": "e92ae101f581b82a2885ac970b8755a92e1cbcae",
     "guis/vehicles/hud.gui": "816270928d67d8825d15add0b235727f7f9adb97",
     "guis/vehicles/strogg_noise.gui": "d0777427b93ec45c90c6dfdf3ba6352aec981dc6",
@@ -138,6 +141,17 @@ GUI_REVISIONS: list[dict[str, object]] = [
         "savedBlob": "95493b94ce52d5ff87683c94e2b09a318bc5f3e9",
         "shippedIn": "9cc5e67a4",
     },
+    # A GUI another game ships, read from openQ4's own definition of it: `definition`
+    # is that file, and the saved definition is the game's own file (`external`),
+    # which openQ4 does not ship and the engine parses as written.
+    {
+        "gui": "guis/q4xhud.gui",
+        "firstBuild": 2330,
+        "savedDefinition": "guis/q4xhud.gui",
+        "marker": "p_pickup0",
+        "definition": "guis/openq4/awakening/q4xhud.gui",
+        "external": "The Awakening (q4xbase)",
+    },
 ]
 
 # openQ4 GUIs that single-player saves never contain: menus, loading screens and
@@ -169,7 +183,7 @@ NEVER_SERIALIZED_GUIS = {
 }
 
 REVISION_ENTRY = re.compile(
-    r'\{\s*"(guis/[^"]+\.gui)"\s*,\s*(\d+)\s*,\s*"(guis/savecompat/[^"]+\.gui)"\s*,\s*"([^"]+)"\s*\}'
+    r'\{\s*"(guis/[^"]+\.gui)"\s*,\s*(\d+)\s*,\s*"(guis/[^"]+\.gui)"\s*,\s*"([^"]+)"\s*\}'
 )
 
 
@@ -268,9 +282,22 @@ def validate_revisions(guis: dict[str, Path]) -> None:
             raise AssertionError(f"{gui}'s revisions are not listed oldest first with distinct builds: {builds}")
 
     for entry in GUI_REVISIONS:
-        gui = str(entry["gui"])
+        gui = str(entry.get("definition", entry["gui"]))
         if gui not in SERIALIZED_GUIS:
             raise AssertionError(f"{gui} has a saved revision but is not classified as serialized")
+        marker = str(entry["marker"]).lower()
+        if "external" in entry:
+            # The saved definition is another game's file: the record's name, parsed as written.
+            if entry["savedDefinition"] != entry["gui"] or "definition" not in entry:
+                raise AssertionError(f"{entry['gui']}: an external saved definition is the game's own file, "
+                                     "read through an openQ4 definition")
+            if (PAK0 / str(entry["savedDefinition"])).exists():
+                raise AssertionError(f"{entry['savedDefinition']} ships with openQ4; keep its revision under {REVISION_ROOT}/")
+            if marker not in window_names(guis[gui].read_text(encoding="latin-1")):
+                raise AssertionError(f"{gui} no longer has marker window '{entry['marker']}'")
+            continue
+        if not str(entry["savedDefinition"]).startswith(REVISION_ROOT + "/"):
+            raise AssertionError(f"{entry['savedDefinition']} is not under {REVISION_ROOT}/")
         saved_path = PAK0 / str(entry["savedDefinition"])
         if not saved_path.is_file():
             raise AssertionError(f"{entry['savedDefinition']} is missing; saves written before build "
@@ -279,7 +306,6 @@ def validate_revisions(guis: dict[str, Path]) -> None:
         if saved_blob != entry["savedBlob"]:
             raise AssertionError(f"{entry['savedDefinition']} is {saved_blob} without its header, not the "
                                  f"definition earlier builds shipped ({entry['savedBlob']})")
-        marker = str(entry["marker"]).lower()
         if marker not in window_names(guis[gui].read_text(encoding="latin-1")):
             raise AssertionError(f"{gui} no longer has marker window '{entry['marker']}'; the reader could "
                                  "not tell its records from the earlier revision's")
@@ -295,6 +321,8 @@ def validate_revisions(guis: dict[str, Path]) -> None:
 def validate_release_provenance() -> None:
     """Optional: each saved revision is what a commit before its change shipped."""
     for entry in GUI_REVISIONS:
+        if "external" in entry:
+            continue
         gui = entry["gui"]
         shipped = entry["shippedIn"] if "shippedIn" in entry else f"{entry['shippedBefore']}^"
         result = subprocess.run(
@@ -344,6 +372,28 @@ def validate_eval_transfer() -> None:
             raise AssertionError(f"GUI revision migration lacks {token!r}; restored overrides would be re-evaluated")
 
 
+def validate_external_definitions() -> None:
+    """A GUI read from openQ4's definition restores earlier records through the game's own file."""
+    hud = read(ROOT / "src" / "ui" / "RetainedHud.cpp")
+    interface = read(ROOT / "src" / "ui" / "UserInterface.cpp")
+    for entry in GUI_REVISIONS:
+        if "external" not in entry:
+            continue
+        for token in (f'"{entry["gui"]}"', f'"{entry["definition"]}"'):
+            if token not in hud:
+                raise AssertionError(f"idLegacyHudLayout::DefinitionFor no longer names {token}")
+    for token, why in (
+        ("definition = literalDefinition ? qpath : idLegacyHudLayout::DefinitionFor( qpath );",
+         "a GUI is parsed from its definition"),
+        ("saved.literalDefinition = initial.literalDefinition = true;",
+         "a saved definition is parsed as written, or an earlier record would be read through the current definition"),
+        ("if ( definition.Icmp( layoutPath ) == 0 ) {",
+         "a GUI still parsed from the saved definition reads its record directly"),
+    ):
+        if token not in interface:
+            raise AssertionError(f"UserInterface.cpp lacks {token!r}: {why}")
+
+
 def main() -> None:
     guis = shipped_guis()
     validate_classification(guis)
@@ -352,6 +402,7 @@ def main() -> None:
     validate_release_provenance()
     validate_engine_migration()
     validate_eval_transfer()
+    validate_external_definitions()
     print("savegame_gui_layout_contract: ok")
 
 

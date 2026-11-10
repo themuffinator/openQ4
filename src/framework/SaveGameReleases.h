@@ -167,7 +167,9 @@ static inline bool OpenQ4_SaveGameHasInterpolatorCacheFlag( int layoutBuild ) {
 	A GUI's saved state follows the structure of the .gui file that built it,
 	so an edit to a GUI that saves leaves older payloads with records in the
 	previous structure. Each such file keeps its previous revision under
-	guis/savecompat/. A record from a payload whose layout build predates the
+	guis/savecompat/ (a GUI openQ4 reads from its own definition in place of a
+	game's file names that file itself, which is parsed as written). A record
+	from a payload whose layout build predates the
 	edit, and whose blob does not name a window only the current revision has
 	(a build of uncommitted work may already carry the edit), is read into a
 	copy built from that revision, and its state carries over to the current
@@ -198,6 +200,9 @@ static const openQ4SaveGameGuiRevision_t OPENQ4_SAVEGAME_GUI_REVISIONS[] = {
 	{ "guis/hud.gui",			2323,	"guis/savecompat/hud_r3.gui",			"hit_chevron" },
 	{ "guis/hud_strogg.gui",	2323,	"guis/savecompat/hud_strogg_r3.gui",	"hit_chevron" },
 	{ "guis/vehicles/hud.gui",	2323,	"guis/savecompat/vehicle_hud_r2.gui",	"oq4_prompt_padlock" },
+	// The Awakening's on-foot HUD is read from openQ4's laid-out definition of it
+	// (idLegacyHudLayout::DefinitionFor); earlier records follow the expansion's own file
+	{ "guis/q4xhud.gui",		2330,	"guis/q4xhud.gui",						"p_pickup0" },
 };
 
 static inline const openQ4SaveGameGuiRevision_t *OpenQ4_FindSaveGameGuiRevision( const char *guiName, int layoutBuild ) {
