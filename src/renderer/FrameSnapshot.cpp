@@ -292,11 +292,19 @@ void R_RetireRenderSnapshots( frameData_t *frame ) {
 		const idRenderLightLocal *snapshot = receipt->snapshot;
 		// Deletion of live light defs is deferred until this receipt retires.
 		// Ignore a reused handle or a light whose parameters changed meanwhile.
+		// A snapshot carries the flag the light had when it was taken, so the
+		// flag alone says nothing new, and copied back it would undo a release
+		// the front end decided meanwhile. Only a failure the back end stamped
+		// on the snapshot after that is news: it marks the light and restarts
+		// its wait.
 		if ( snapshot->shadowMapStencilFallbackSticky && snapshot->world != NULL
 			&& snapshot->index >= 0 && snapshot->index < snapshot->world->lightDefs.Num()
 			&& snapshot->world->lightDefs[snapshot->index] == source
-			&& source->lastModifiedFrameNum == snapshot->lastModifiedFrameNum ) {
+			&& source->lastModifiedFrameNum == snapshot->lastModifiedFrameNum
+			&& snapshot->shadowMapStencilFallbackFrame > source->shadowMapStencilFallbackFrame ) {
 			source->shadowMapStencilFallbackSticky = true;
+			source->shadowMapStencilFallbackFrame = snapshot->shadowMapStencilFallbackFrame;
+			source->shadowMapStencilFallbackCleanViews = 0;
 		}
 	}
 	frame->lightReceipts = NULL;

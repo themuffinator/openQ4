@@ -1572,6 +1572,7 @@ extern idCVar r_shadowMapStaticHysteresisFrames;	// frames after dynamic casters
 extern idCVar r_shadowMapResidentFrames;	// frames a resident static shadow map may remain unused
 extern idCVar r_shadowMapProjectedCacheSize;	// projected static cache size, in full-size maps
 extern idCVar r_shadowMapPointCacheSize;	// point shadow-map static cache slots
+extern idCVar r_shadowMapStencilFallbackViews;	// views without a failure before a light leaves the stencil fallback
 extern idCVar r_shadowMapPointCacheMegs;	// memory bound on those slots, MiB
 extern idCVar r_shadowMapPointCompose;	// 1 = compose live casters over a cached static cube
 extern idCVar r_shadowMapStaticCutouts;	// 1 = cutout casters with unchanging coverage are cached as static

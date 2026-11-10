@@ -2589,6 +2589,8 @@ void idInteraction::AddActiveInteraction( void ) {
 			// partial ownership map with per-surface missing-caster volumes,
 			// or fall back to the combined prelight volume.
 			lightDef->shadowMapStencilFallbackSticky = true;
+			lightDef->shadowMapStencilFallbackFrame = tr.frameCount;
+			lightDef->shadowMapStencilFallbackCleanViews = 0;
 		}
 		const bool volumeElidedForShadowMaps =
 			shadowTris != NULL &&

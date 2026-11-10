@@ -3174,7 +3174,13 @@ static int g_shadowMapSubviewFallbackPasses = 0;
 // would otherwise repeat every frame with an empty fallback; the sticky flag
 // restores volume generation for that light from the next frame on.
 static void RB_ShadowMapMarkStencilFallbackSticky( const viewLight_t *vLight ) {
-	if ( vLight == NULL || vLight->lightDef == NULL || vLight->lightDef->shadowMapStencilFallbackSticky ) {
+	if ( vLight == NULL || vLight->lightDef == NULL ) {
+		return;
+	}
+	// every failure restarts the wait before the light may leave the fallback
+	vLight->lightDef->shadowMapStencilFallbackFrame = backEnd.frameCount;
+	vLight->lightDef->shadowMapStencilFallbackCleanViews = 0;
+	if ( vLight->lightDef->shadowMapStencilFallbackSticky ) {
 		return;
 	}
 	vLight->lightDef->shadowMapStencilFallbackSticky = true;

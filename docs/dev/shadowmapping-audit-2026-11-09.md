@@ -73,7 +73,7 @@ cache (sixteen at most) against forty cubes in view.
 |---|---|
 | **Quality and Ultra give the projected atlas four cells** (2048 cells in 4096, 4096 in 8192) while Enhanced has sixteen. A light with local casters takes two. OpenGL re-renders the overflow every view; Vulkan marks the light for stencil permanently and can draw it unshadowed for a frame. convoy2's start view does this: up to four projected lights, five lights sent to stencil for good and one drawn unshadowed. | **Fixed, both backends.** A tile size per light, assigned per view. See "Atlas tile sizes" below. No preset changed. |
 | Vulkan: cascades in an 8192 atlas always fail (one CSM block is the whole atlas). | **Open**; no preset uses it. |
-| The stencil-fallback flag on a light is never cleared. | **Open.** Costs the light its volume elision only. |
+| The stencil-fallback flag on a light was never cleared: one failed map pass cost the light its volume elision for the rest of the level. | **Fixed, both backends.** A light leaves the fallback after 240 views without another failure. See "Leaving the stencil fallback" below. |
 | OpenGL point cubes carry a colour cube the default receiver never samples: half their memory. The opt-in modern executor still reads it. | **Fixed.** Cubes are depth only while nothing samples the colour. See "Depth-only point cubes on OpenGL" below. At 512 the cache holds 64 cubes in 384 MiB, as on Vulkan; it held 42 in 504 MiB. |
 | Vulkan hub2: one light (`lights/squarelight1`) logs "required shadow resource unavailable" once and falls back; OpenGL maps it. | **Open**, present before this round. |
 | Vulkan's scratch cube pool only grows. A view takes a scratch cube for each uncached or composed point pass, up to 512 of them, and none is released until the cube size changes. A noclip walk out of the airdefense1 arena into the void, from where every area is visible, mapped 289 point lights in one view and left 2.0 GB resident at Quality's 512 faces. The cache has a memory bound; this pool had none. | **Fixed (Vulkan).** The pool has the cache's memory figure again as its ceiling, and gives back what recent views did not need. See "Scratch cube pool" below. |
@@ -714,7 +714,8 @@ changed.
 - **A ceiling.** The pool has `r_shadowMapPointCacheMegs` again, the figure
   that bounds the cache, with the cache's floor of twelve cubes: 85 cubes at
   Quality's 512 faces, twelve at Maximum's 2048. A pass beyond it fails as an
-  allocation does, and its light keeps its stencil shadow.
+  allocation does: its light is shadowed by stencil in that view and tries
+  its map again in the next.
 - **A trim.** Between frames, cubes that no view has needed for a window of
   five seconds are released, keeping what the last two windows used and a
   quarter more. No command buffer in flight can still name a cube that went
@@ -731,14 +732,48 @@ airdefense1 arena, Quality, with one view from outside the level:
 
 A second excursion grows the pool again and the validation layers stay silent
 through both. Ordinary views use three to a few dozen cubes and never meet
-the ceiling at the shipped sizes. An overcrowded view at 2048 faces does, and
-the lights beyond it stay on stencil for the level, because that fallback is
-never cleared (see the list below).
+the ceiling at the shipped sizes. An overcrowded view at 2048 faces does: the
+lights beyond it are shadowed by stencil while it lasts. (This section first
+said they stayed on stencil for the level. They do not: a light in the
+fallback still tries its map every view. What it kept for the level was the
+cost of building its volumes, which "Leaving the stencil fallback" ends.)
 
 Checked for this change, on the final build: the excursion above under the
 validation layers; the fourteen scenarios on both back ends, all passing; the
 continuous-motion qualification on Vulkan; the in-engine self-tests; and the
 seventy-seven static tests that read the touched files.
+
+### Leaving the stencil fallback
+
+Added on 10 November. A light whose shadow map fails (no cube or tile to be
+had, a pass the back end could not draw, a caster its map cannot hold) is
+marked, and from then on builds its stencil volumes again so that it has a
+fallback. It still tries its map in every view. The mark was never removed,
+so one bad frame cost the light its volume elision for the rest of the level.
+
+- **A marked light counts the views it goes through with nothing asking for
+  the fallback**, and after 240 of them stops building volumes
+  (`r_shadowMapStencilFallbackViews`; 0 keeps the old behaviour). A failed
+  pass in either renderer, or a caster the map cannot hold, restarts the
+  count, so a light that keeps failing is never released. A light out of
+  view is not counted.
+- **The release is decided once a view, before any of the light's
+  interactions are looked at**, so a view never has some of its volumes and
+  not others.
+- **A render-thread snapshot does not undo it.** A snapshot carries the mark
+  it was taken with, and was copied back when its frame retired; only a
+  failure stamped on the snapshot after it was taken marks the light now.
+
+airdefense1 arena on Vulkan, with the view taken outside the level twice: 150
+lights are marked there and none is released while the view lasts; back
+inside, the two of them that are in view are released after their 240 views;
+the second excursion marks no light anew and draws no light unshadowed. The
+validation layers are silent. A released light that fails again behaves as
+any light does at its first failure.
+
+Checked for this change, on the final build: that run; the fourteen scenarios
+on both back ends; the in-engine self-tests; and the static tests that read
+the touched files.
 
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
@@ -770,23 +805,20 @@ whether Enhanced can now map point lights on Vulkan.
    Also left of membership: the world's own geometry joins and leaves a
    light's casters area by area as the player moves (seen on those two
    lights; not measured on still ones).
-3. A light whose map pass fails keeps its stencil shadow for the rest of the
-   level: the fallback flag is never cleared. The scratch pool's ceiling now
-   sends the lights of an overcrowded view down that path.
-4. Static-world volumes are still built once for every mapped light and kept
+3. Static-world volumes are still built once for every mapped light and kept
    for the fallback. Leaving them out too would need the same rebuild on
    return, for every surface the light touches.
-5. The OpenGL projected cache is the atlas, four full tiles at Quality and
+4. The OpenGL projected cache is the atlas, four full tiles at Quality and
    Ultra, so it holds one crowded view and nothing of the view just left.
    Vulkan holds eight maps' worth.
-6. On Vulkan a projected light's tile size is fitted as if every map of the
+5. On Vulkan a projected light's tile size is fitted as if every map of the
    view needed an atlas block. Maps read where they live need none, so a
    crowded view could keep more of its lights at full size. The fit decides
    the cache key, so it must not follow what happens to be cached.
-7. One static cube for both ownerships of a composed Vulkan light, as on
+6. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. Measured on a walk: 4 of 24 fresh maps and up to ten resident
    cubes. It needs a resident entry two passes of a view can share.
-8. storage2 renders two or three maps fresh in every view. Not looked into.
+7. storage2 renders two or three maps fresh in every view. Not looked into.
 
 Set aside after measurement: cube faces the view cannot see (see "Static
 cutout casters").

@@ -462,7 +462,13 @@ bool VK_ShadowMap_ResourcesKnownGood( bool pointLight ) {
 // retains same-frame fallback volumes. The shared bit tells later front-end
 // frames to retain volumes too; it does not suppress mapped retries.
 void VK_ShadowMap_MarkStencilFallbackSticky( const viewLight_t *vLight ) {
-	if ( vLight == NULL || vLight->lightDef == NULL || vLight->lightDef->shadowMapStencilFallbackSticky ) {
+	if ( vLight == NULL || vLight->lightDef == NULL ) {
+		return;
+	}
+	// every failure restarts the wait before the light may leave the fallback
+	vLight->lightDef->shadowMapStencilFallbackFrame = backEnd.frameCount;
+	vLight->lightDef->shadowMapStencilFallbackCleanViews = 0;
+	if ( vLight->lightDef->shadowMapStencilFallbackSticky ) {
 		return;
 	}
 	vLight->lightDef->shadowMapStencilFallbackSticky = true;

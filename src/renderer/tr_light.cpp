@@ -952,6 +952,25 @@ viewLight_t *R_SetLightDefViewLight( idRenderLightLocal *light ) {
 	}
 	light->viewCount = tr.viewCount;
 
+	// A light whose map failed builds its stencil volumes again so that it has
+	// a fallback. It still tries its map in every view, and once it has been
+	// through enough views with nothing asking for the fallback (a failed pass
+	// in either renderer, or a caster its map cannot hold) it stops building
+	// them. Kept for good, one bad frame cost the light its volume elision for
+	// the rest of the level. Decided here, before any of the light's
+	// interactions are looked at for this view, so that a view never has some
+	// volumes and not others.
+	if ( light->shadowMapStencilFallbackSticky ) {
+		const int holdViews = r_shadowMapStencilFallbackViews.GetInteger();
+		if ( holdViews > 0
+				&& ++light->shadowMapStencilFallbackCleanViews > holdViews ) {
+			light->shadowMapStencilFallbackSticky = false;
+			light->shadowMapStencilFallbackCleanViews = 0;
+			common->DPrintf( "shadow map light %d left the stencil fallback after %d views without a failure\n",
+				light->index, holdViews );
+		}
+	}
+
 	// add to the view light chain
 	vLight = (viewLight_t *)R_ClearedFrameAlloc( sizeof( *vLight ) );
 	vLight->lightDef = light;

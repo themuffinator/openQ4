@@ -1754,9 +1754,11 @@ optimization has landed.
   what no view has needed for five seconds: 1.1 GB at that view, 0.6 GB ten seconds
   after it. Remaining, in order:
   the fullscreen budgets, including whether Enhanced can map point lights; lights
-  that move every frame, which still go through the cache each frame; the stencil
-  fallback flag, which is never cleared; and static-world volumes, which are still
-  built once per mapped light for the fallback.
+  that move every frame, which still go through the cache each frame; and
+  static-world volumes, which are still built once per mapped light for the
+  fallback. (A light whose map failed once now stops building its stencil volumes
+  again after 240 views without another failure, `r_shadowMapStencilFallbackViews`;
+  before, it built them for the rest of the level.)
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur

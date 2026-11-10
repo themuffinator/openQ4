@@ -8866,6 +8866,102 @@ def validate_static_signature_view_independence_contract() -> None:
             "a new snapshot still changes the signature")
 
 
+def validate_stencil_fallback_release_contract() -> None:
+    """A light leaves the stencil fallback once it stops failing.
+
+    A light whose shadow map fails builds its stencil volumes again so that it
+    has a fallback. It keeps trying its map in every view, so it is not stuck
+    on stencil shadows, but the flag was never cleared and one bad frame cost
+    the light its volume elision for the rest of the level.
+
+    The light now counts the views it goes through with nothing asking for the
+    fallback. A failed pass in either renderer, or a caster its map cannot
+    hold, restarts the count, so a light that keeps failing is never released
+    and never flickers; a light out of view is not counted at all. The release
+    is decided before any of the light's interactions are looked at for a
+    view, so that a view never has some volumes and not others.
+    """
+    light = read("src/renderer/tr_light.cpp")
+    set_view = braced_body(light, "viewLight_t *R_SetLightDefViewLight(", "light set up for a view")
+    require_order(
+        set_view,
+        (
+            "if ( light->viewCount == tr.viewCount ) {",
+            "return light->viewLight;",
+            "light->viewCount = tr.viewCount;",
+            "if ( light->shadowMapStencilFallbackSticky ) {",
+            "const int holdViews = r_shadowMapStencilFallbackViews.GetInteger();",
+            "if ( holdViews > 0",
+            "&& ++light->shadowMapStencilFallbackCleanViews > holdViews ) {",
+            "light->shadowMapStencilFallbackSticky = false;",
+            "light->shadowMapStencilFallbackCleanViews = 0;",
+            "vLight = (viewLight_t *)R_ClearedFrameAlloc( sizeof( *vLight ) );",
+        ),
+        "the release is decided once a view, before the light's interactions",
+    )
+    if light.count("shadowMapStencilFallbackSticky = false;") != 1:
+        raise AssertionError("A light leaves the stencil fallback in one place only")
+
+    # everything that asks for the fallback restarts the count
+    interaction = read("src/renderer/Interaction.cpp")
+    require_compact(
+        interaction,
+        """lightDef->shadowMapStencilFallbackSticky = true;
+            lightDef->shadowMapStencilFallbackFrame = tr.frameCount;
+            lightDef->shadowMapStencilFallbackCleanViews = 0;""",
+        "a caster the map cannot hold restarts the count",
+    )
+    for path, marker in (("src/renderer/draw_arb2.cpp", "static void RB_ShadowMapMarkStencilFallbackSticky("),
+                         ("src/renderer/Vulkan/vk_ShadowMap.cpp", "void VK_ShadowMap_MarkStencilFallbackSticky(")):
+        require_order(
+            braced_body(read(path), marker, "back-end failure mark"),
+            (
+                "if ( vLight == NULL || vLight->lightDef == NULL ) {",
+                "return;",
+                # before the early return for a light already marked
+                "vLight->lightDef->shadowMapStencilFallbackFrame = backEnd.frameCount;",
+                "vLight->lightDef->shadowMapStencilFallbackCleanViews = 0;",
+                "if ( vLight->lightDef->shadowMapStencilFallbackSticky ) {",
+                "return;",
+                "vLight->lightDef->shadowMapStencilFallbackSticky = true;",
+            ),
+            f"{path}: every failed pass restarts the count, marked or not",
+        )
+
+    # A render-thread snapshot carries the flag it was taken with. Copied back
+    # as it stands it would undo a release decided meanwhile; only a failure
+    # stamped on the snapshot afterwards is news.
+    retire = braced_body(read("src/renderer/FrameSnapshot.cpp"), "void R_RetireRenderSnapshots(", "snapshot retire")
+    require_order(
+        retire,
+        (
+            "snapshot->shadowMapStencilFallbackSticky && snapshot->world != NULL",
+            "&& source->lastModifiedFrameNum == snapshot->lastModifiedFrameNum",
+            "&& snapshot->shadowMapStencilFallbackFrame > source->shadowMapStencilFallbackFrame ) {",
+            "source->shadowMapStencilFallbackSticky = true;",
+            "source->shadowMapStencilFallbackFrame = snapshot->shadowMapStencilFallbackFrame;",
+            "source->shadowMapStencilFallbackCleanViews = 0;",
+        ),
+        "a retiring snapshot marks the light only for a failure newer than the light knows",
+    )
+    header = read("src/rendergeo/RenderGeometry.h")
+    for token in ("shadowMapStencilFallbackFrame;", "shadowMapStencilFallbackCleanViews;"):
+        require(header, token, "light fields")
+    defs = read("src/rendergeo/RenderGeometryLocalDefs.cpp")
+    require_order(
+        defs,
+        ("shadowMapStencilFallbackSticky = false;", "shadowMapStencilFallbackFrame = 0;",
+         "shadowMapStencilFallbackCleanViews = 0;"),
+        "a new light starts outside the fallback",
+    )
+    require_compact(
+        read("src/renderer/RenderSystem_init.cpp"),
+        'idCVar r_shadowMapStencilFallbackViews( "r_shadowMapStencilFallbackViews", "240", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,',
+        "240 views by default; 0 keeps the old behaviour",
+    )
+    require(read("docs/user/shadow-mapping.md"), "`r_shadowMapStencilFallbackViews`", "the setting is in the user guide")
+
+
 def validate_scratch_cube_pool_contract() -> None:
     """Vulkan's scratch point cubes have a memory ceiling and are given back.
 
@@ -9190,6 +9286,7 @@ def main() -> None:
     validate_depth_only_point_cube_contract()
     validate_static_cutout_caster_contract()
     validate_static_signature_view_independence_contract()
+    validate_stencil_fallback_release_contract()
     validate_scratch_cube_pool_contract()
     validate_resident_projected_sampling_contract()
     validate_ci_registration()

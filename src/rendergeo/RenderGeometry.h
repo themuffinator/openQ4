@@ -154,6 +154,8 @@ public:
 
 	bool					shadowMapStencilFallbackSticky;	// the backend hit a shadow-map render failure on this
 													// light; keep generating stencil volumes for its fallback
+	int						shadowMapStencilFallbackFrame;	// the frame something last asked for that fallback
+	int						shadowMapStencilFallbackCleanViews;	// views the light has been through since
 
 	float					modelMatrix[16];		// this is just a rearrangement of parms.axis and parms.origin
 

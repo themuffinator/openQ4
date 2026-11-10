@@ -103,6 +103,8 @@ idRenderLightLocal::idRenderLightLocal() {
 
 	lightHasMoved			= false;
 	shadowMapStencilFallbackSticky = false;
+	shadowMapStencilFallbackFrame = 0;
+	shadowMapStencilFallbackCleanViews = 0;
 	world					= NULL;
 	index					= 0;
 	areaNum					= 0;
