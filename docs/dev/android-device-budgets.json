@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "description": "AND-02 physical-device budgets read by tools/tests/android_device_qualification.py --check-budgets. Limits are the worst reference measurement plus headroom: +25% frame p99, +30% load time, about +15% PSS. Thermal status is Android's PowerManager status (0 none, 1 light, 2 moderate). A new device or a deliberate preset change gets its own measured entry.",
+  "devices": {
+    "SM-S931B": {
+      "device": "Samsung Galaxy S25 (SM8750, Adreno 830, OpenGL ES 3.2, Android 16 / API 36)",
+      "reference": "build 2316, cold and warm campaign runs, 10 November 2026; platform-recovery-review.md#android-device-qualification-s25-10-november-2026",
+      "phases": {
+        "campaign": {
+          "frames": {
+            "hangar1": {"p99_ms": 29},
+            "hangar2": {"p99_ms": 81},
+            "mcc_landing": {"p99_ms": 28},
+            "airdefense1": {"p99_ms": 29},
+            "convoy1": {"p99_ms": 35},
+            "process1": {"p99_ms": 103}
+          },
+          "load_ms": {
+            "game/hangar1": 19000,
+            "game/hangar2": 10000,
+            "game/mcc_landing": 19000,
+            "game/airdefense1": 16000,
+            "game/convoy1": 18000,
+            "game/process1": 20000
+          },
+          "pss_peak_kib": 3300000,
+          "thermal_status_max": 1
+        }
+      }
+    }
+  }
+}

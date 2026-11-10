@@ -143,6 +143,46 @@ continues to require a nondebuggable ARM64 phone release and rejects this APK.
 An ABI label alone does not qualify a binary: ELF machine/API and every
 packaged library's bytes are checked.
 
+## Physical device qualification
+
+`tools/tests/android_device_qualification.py` is the AND-02 device harness. It is
+opt-in and needs a USB-connected phone that is unlocked when each phase starts,
+plus a debuggable APK. It sends no OS touch or keyboard input. To start the game
+it sends setup the debuggable-only `diagnostic_launch` extra (`sp` or `mp`).
+Setup still runs its own installed-data check first, and release builds ignore
+the extra. A pending diagnostic launch or a `hold` keeps the screen on, so a
+phone's display timeout cannot stall a run between phases. Setup also keeps the
+screen on while it checks or extracts data.
+
+```powershell
+python tools/tests/android_device_qualification.py --adb "C:/Program Files (x86)/Android/android-sdk/platform-tools/adb.exe" --serial <serial> --phases campaign,sustain,mp --output .tmp/and02/<run> --check-budgets
+```
+
+The harness has three phases:
+
+- `campaign` plays stock single-player maps in order: `hangar1`, `hangar2` and
+  `mcc_landing` through each level's own end trigger, then fresh loads of
+  `airdefense1`, `convoy1` and `process1`. It finishes with a save and reload on
+  `process1`.
+- `sustain` runs `--sustain-minutes` of view sweeps and sends one
+  `RUNNING_CRITICAL` memory-trim request halfway through.
+- `mp` runs a Q4DM1 listen server with `--bots` bots.
+
+What each part records:
+
+- **Every stage:** a frame trace, a timed view sweep, `listSounds` audio
+  residency and a capture.
+- **Each phase:** device, GLES and OpenAL device facts, and storage before and
+  after.
+- **Every 15 seconds:** thermal status, temperatures, app PSS and battery.
+
+`--cold` moves the generated image cache aside for the campaign and restores
+it afterwards. The harness preserves the player's config and log. It removes
+every script, save, capture and trace it creates. `report.json` lands under the
+given `.tmp` directory. With `--check-budgets` it compares the run against the
+per-model limits in
+[`android-device-budgets.json`](android-device-budgets.json).
+
 ## Meta Quest flavor verification
 
 The standalone headset build is the phone build declared as an immersive

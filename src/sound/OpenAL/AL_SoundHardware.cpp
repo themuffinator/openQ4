@@ -1818,6 +1818,35 @@ void idSoundHardware_OpenAL::Init()
 	common->Printf( "OpenAL renderer: %s\n", alGetString( AL_RENDERER ) );
 	common->Printf( "OpenAL version: %s\n", alGetString( AL_VERSION ) );
 	common->Printf( "OpenAL extensions: %s\n", alGetString( AL_EXTENSIONS ) );
+	// What the device granted rather than what was asked for: a mobile provider
+	// (OpenSL ES/AAudio on Android) can choose its own mixing rate, update
+	// period and source limits (AND-02 qualifies the provider on devices).
+	{
+		ALCint attributeCount = 0;
+		alcGetIntegerv( openalDevice, ALC_ATTRIBUTES_SIZE, 1, &attributeCount );
+		if( CheckALCErrors( openalDevice ) == ALC_NO_ERROR && attributeCount > 0 && attributeCount <= 256 )
+		{
+			ALCint attributes[256] = {};
+			alcGetIntegerv( openalDevice, ALC_ALL_ATTRIBUTES, attributeCount, attributes );
+			if( CheckALCErrors( openalDevice ) == ALC_NO_ERROR )
+			{
+				int frequency = 0, refresh = 0, monoSources = 0, stereoSources = 0;
+				for( int i = 0; i + 1 < attributeCount && attributes[i] != 0; i += 2 )
+				{
+					switch( attributes[i] )
+					{
+						case ALC_FREQUENCY: frequency = attributes[i + 1]; break;
+						case ALC_REFRESH: refresh = attributes[i + 1]; break;
+						case ALC_MONO_SOURCES: monoSources = attributes[i + 1]; break;
+						case ALC_STEREO_SOURCES: stereoSources = attributes[i + 1]; break;
+						default: break;
+					}
+				}
+				common->Printf( "OpenAL device attributes: frequency=%d refresh=%d monoSources=%d stereoSources=%d\n",
+					frequency, refresh, monoSources, stereoSources );
+			}
+		}
+	}
 
 	deferredUpdatesAvailable = alIsExtensionPresent( "AL_SOFT_deferred_updates" ) == AL_TRUE && openQ4_LoadDeferredUpdateProcs();
 	deferredUpdatesActive = false;

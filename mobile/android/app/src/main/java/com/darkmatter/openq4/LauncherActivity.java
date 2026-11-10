@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
@@ -17,6 +18,7 @@ import android.text.format.Formatter;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowManager;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -33,6 +35,10 @@ import java.util.Locale;
 public final class LauncherActivity extends Activity implements SetupTask.Observer<RetailData.Report> {
     private static final int PICK_FOLDER = 1, EXPORT_SAVES = 2, EXPORT_LOGS = 3;
     static final String EXTRA_PAGE = "setup_page", PAGE_TOUCH_LAYOUT = "touch_layout";
+    /** Debuggable builds only: "sp" or "mp" starts the game once setup's own data check succeeds (device qualification). */
+    static final String EXTRA_DIAGNOSTIC_LAUNCH = "diagnostic_launch";
+    /** Debuggable builds only: "hold" keeps setup's screen on between qualification runs. */
+    static final String DIAGNOSTIC_HOLD = "hold";
     private static Session retained;
 
     private static final class Session {
@@ -63,6 +69,9 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
     private boolean controlsPage;
     private boolean interfacePage;
     private boolean layoutPage;
+    private Boolean diagnosticLaunch;	// requested multiplayer flag, or null
+    private boolean diagnosticCheckStarted;
+    private boolean diagnosticHold;
     private final Handler refresh = new Handler(Looper.getMainLooper());
     private final Runnable refreshState = () -> { if (started) changed(session.task.state()); };
     private final SetupTask.Observer<DocumentExport.Result> exportObserver = ignored -> changed(session.task.state());
@@ -104,6 +113,8 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
             layoutPage = state.getBoolean("layout_page", false);
         } else {
             layoutPage = PAGE_TOUCH_LAYOUT.equals(getIntent().getStringExtra(EXTRA_PAGE));
+            diagnosticLaunch = diagnosticLaunch(getIntent(), getApplicationInfo().flags);
+            diagnosticHold = diagnosticHold(getIntent(), getApplicationInfo().flags);
         }
         theme = new SetupTheme(this);
         build();
@@ -111,9 +122,29 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
     }
 
     /** singleTask: the game's request for the layout editor reaches a running setup here. */
+    /**
+     * The device-qualification launch request: a debuggable build only, "sp" or
+     * "mp" only. Release builds ignore it, so the exported setup entry point can
+     * never start the game without the player's choice.
+     */
+    static Boolean diagnosticLaunch(Intent intent, int applicationFlags) {
+        if ((applicationFlags & ApplicationInfo.FLAG_DEBUGGABLE) == 0 || intent == null) return null;
+        String mode = intent.getStringExtra(EXTRA_DIAGNOSTIC_LAUNCH);
+        return "sp".equals(mode) ? Boolean.FALSE : "mp".equals(mode) ? Boolean.TRUE : null;
+    }
+
+    static boolean diagnosticHold(Intent intent, int applicationFlags) {
+        return (applicationFlags & ApplicationInfo.FLAG_DEBUGGABLE) != 0 && intent != null
+                && DIAGNOSTIC_HOLD.equals(intent.getStringExtra(EXTRA_DIAGNOSTIC_LAUNCH));
+    }
+
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        Boolean requested = diagnosticLaunch(intent, getApplicationInfo().flags);
+        diagnosticHold = diagnosticHold(intent, getApplicationInfo().flags);
+        if (requested != null) { diagnosticLaunch = requested; diagnosticCheckStarted = false; }
+        changed(session.task.state());
         if (PAGE_TOUCH_LAYOUT.equals(intent.getStringExtra(EXTRA_PAGE)) && !layoutPage) {
             controlsPage = interfacePage = false; layoutPage = true;
             build(); changed(session.task.state());
@@ -403,6 +434,11 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
         if (status == null) return;
         SetupTask.State<?> operation = session.exporting ? session.export.state() : state;
         boolean busy = operation.busy();
+        // A check, import or export reads gigabytes; the screen stays on until it
+        // ends, as it does for a pending diagnostic launch, so it never pauses
+        // behind the lock screen. Play keeps its own (SDL) wake state.
+        if (busy || diagnosticLaunch != null || diagnosticHold) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         boolean ready = !session.consumed && state.status == SetupTask.Status.SUCCEEDED && state.result != null && state.result.ready();
         if (!busy && operation.status != SetupTask.Status.IDLE && session.prefs.getBoolean("pending", false))
             session.prefs.edit().putBoolean("pending", false).apply();
@@ -412,6 +448,16 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
         cancel.setVisibility(busy ? View.VISIBLE : View.GONE);
         cancel.setEnabled(operation.status == SetupTask.Status.RUNNING);
         sp.setVisibility(ready && !game ? View.VISIBLE : View.GONE); mp.setVisibility(sp.getVisibility());
+        if (diagnosticLaunch != null && ready && !game && available()) {
+            boolean multiplayer = diagnosticLaunch; diagnosticLaunch = null;
+            Log.i("openQ4", "Diagnostic launch: " + (multiplayer ? "multiplayer" : "single player"));
+            refresh.post(() -> launch(multiplayer));
+        } else if (diagnosticLaunch != null && !diagnosticCheckStarted && !busy && !game && available()
+                && state.status != SetupTask.Status.SUCCEEDED) {
+            // The ordinary installed-data check, once; the launch follows its success.
+            diagnosticCheckStarted = true;
+            refresh.post(() -> run(false));
+        }
         sp.setEnabled(available()); mp.setEnabled(available());
         progress.setVisibility(busy && !game ? View.VISIBLE : View.GONE);
         amount.setVisibility(progress.getVisibility());

@@ -518,6 +518,23 @@ there is no double-click word selection.
   Vulkan presentation stall: slow presents while the frame work stays short, sometimes
   with a swapchain recreation (FPS-07). It is not a game-side hitch.
 
+## Android device qualification (AND-02), 10 November 2026
+
+- [x] Android setup keeps the screen on while it checks or unpacks the game
+  data, so the phone no longer locks part-way through a long check.
+- Developer: `tools/tests/android_device_qualification.py` plays stock single
+  player, sustained play and a bot match on a connected debug phone, without
+  touch input. It starts the game through setup's debuggable-only
+  `diagnostic_launch` extra and compares the results with the per-model limits
+  in `docs/dev/android-device-budgets.json`. The OpenAL log now records the
+  output device's rate and source counts. The Galaxy S25 campaign passes cold
+  and warm. Its sustain and multiplayer phases, Mali and API-floor devices, and
+  audible and controller checks remain open. See the
+  [recovery review](platform-recovery-review.md#android-device-qualification-s25-10-november-2026).
+
+Candidate player wording: Android setup keeps the screen awake while it checks
+your game files.
+
 ## Android touch layout editor, background saves and multiplayer resume (AND-01), 9 November 2026
 
 - [x] A touch layout editor in Android setup moves, resizes (75-150%), fades

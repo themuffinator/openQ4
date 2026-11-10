@@ -1700,3 +1700,80 @@ engine's touch commands; earlier S25 rounds covered finger move/look/fire in
 landscape), audible resume (audio was disabled), a short multiplayer stay on
 the phone (covered on the emulator) and Adreno/Mali breadth, which AND-02 and
 AND-04 own.
+
+## Android device qualification (S25), 10 November 2026
+
+AND-02's device harness, `tools/tests/android_device_qualification.py`, now
+plays stock content on a physical phone without OS input. Setup gains a
+debuggable-only `diagnostic_launch` extra: `sp` or `mp` starts the game once
+setup's own installed-data check succeeds, and `hold` only keeps the screen on.
+Release builds ignore it. `android_setup_task.py` checks that gate in the
+production Java: debuggable versus release, the two modes, and that the launch
+waits for the data check. Setup now also keeps the screen on while it checks or
+extracts data. Before this, a phone's display timeout locked it mid-check and
+the run stalled behind the lock screen. The OpenAL backend now logs the
+device's negotiated attributes. The S25 and the API 35 emulator both report the
+OpenSL device at 48 kHz, with a 93 Hz refresh, 255 mono sources and 1 stereo
+source.
+
+**Device:** Galaxy S25 (SM-S931B), Android 16/API 36, SM8750 with Adreno 830,
+OpenGL ES 3.2, 16384-texel textures and ETC2/EAC. It has 11 GB of RAM and a
+4 KiB page size, and runs 2237x1080 after the cutout. It used debug ARM64 build
+2316: APK `0061ccff…efaa5` for the cold run and `11106cdf…5ba179` (the
+keep-screen-on change) for the warm run. Audio was on, using Android's own
+OpenAL Soft 1.25.2 through OpenSL in basic stereo. Both campaign runs
+preserved and restored the player's configuration and log, removed every
+script, save and capture they made, and left the existing saves untouched.
+
+**Campaign** (stock single player with sound): `hangar1`, `hangar2` and
+`mcc_landing` were played through each level's own end trigger, with inventory
+carried. Then `airdefense1`, `convoy1` and `process1` were loaded fresh. Each
+stage ran a 1,200-frame trace and a 15 s view sweep. Both runs completed with
+no fatal error and no low-memory event. The `process1` save reloaded in under
+0.7 s with the pose unchanged (0.0 u).
+
+| Stage | Load cold / warm | Mean fps | p99 cold / warm |
+| --- | --- | --- | --- |
+| hangar1 | 11.6 / 14.6 s | 60 | 23.0 / 21.6 ms |
+| hangar2 (trigger) | 7.4 / 7.6 s | 53 | 64.2 / 64.5 ms |
+| mcc_landing (trigger) | 14.7 / 12.6 s | 60 | 22.3 / 22.6 ms |
+| airdefense1 | 11.3 / 12.3 s | 60 | 21.2 / 22.8 ms |
+| convoy1 | 13.7 / 13.1 s | 60 | 27.8 / 28.2 ms |
+| process1 | — / 15.0 s | 27 | 82.0 / 82.1 ms |
+
+- **Cold vs warm cache.** The cold run moved the generated image cache aside
+  and rebuilt 93 MB of it. The warm run used the player's own cache, which it
+  extended from 85 MB to 127 MB. Load times stay within about 25% either way,
+  so image-cache generation is not the main load cost on this phone.
+- **Frame rate.** Frame rates are identical between the runs. Most stages hold
+  the 60 Hz cap. `hangar2`'s sweep crosses a costly view. `process1` is
+  render-bound at 27 fps, with draw work around 31 ms; that belongs to AND-04's
+  preset scope, not to correctness.
+- **Thermal.** Thermal status stayed at 0 (none), with the SoC at most 49.9 °C
+  and the battery at 32.2 °C.
+- **Memory.** App PSS peaked at 2.83 GB.
+- **Audio residency.** OpenAL held all decoded PCM, with no CPU-side PCM copy
+  retained. The peak was 171 MiB of PCM beside 81 MiB of compressed streams on
+  `mcc_landing`. That is 253 MiB of sample data, just under the 256 MiB audio
+  budget, and is the stage to watch.
+- **Warnings.** The 366 log warnings per run are mostly uppercase asset paths
+  that don't match the files' case on portable filesystems.
+
+The per-model limits in
+[`android-device-budgets.json`](android-device-budgets.json) are these
+measurements plus headroom, and both runs pass them.
+
+**Sustain and multiplayer (not finished):** the ten-minute sustain phase,
+including its memory-trim request, and the Q4DM1 listen server with bots were
+under way when the player disconnected the phone. The run was stopped and the
+phone restored: scripts removed, configuration checksum and log restored, no
+new saves left, app stopped. Both phases ran on the emulator only.
+
+Evidence (reports, logs, captures, traces and APK hashes) is under
+`.tmp/android-evidence/2026-11-10-and02/` in the main checkout. Still open for AND-02:
+
+- sustained thermal and frame budgets, the trim-memory reaction and
+  multiplayer on the phone;
+- an audible check and controller, mouse and keyboard input, which need the
+  player;
+- a Mali GPU and an API 24-floor device, which are unavailable for now.

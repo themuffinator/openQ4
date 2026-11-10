@@ -1905,7 +1905,7 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | AND-01 — Closed | Phone/emulator scope, startup ownership, UI-thread binding, background handling, Back/cutouts and touch controls repaired; S25 save/touch/audio checks exist; host-owned orientation and the portrait thumb deck pass a mid-match emulator rotation; the per-orientation layout editor, suspension save, multiplayer resume/reconnect and Quest flavor package checks pass native/JVM and emulator probes. | None; S25 hardware checks pass (layout, portrait, suspension save, background kill/restore, multiplayer reconnect, editor by hand). Residuals moved to AND-02/AND-04. |
-| AND-02 — Partial | GLES3 build/package infrastructure and narrow S25/emulator gameplay evidence exist. | Physical Adreno/Mali and API breadth; SP/MP transitions, device input/audio, thermal/storage/aggregate memory and sustained performance. |
+| AND-02 — Partial | The device harness and S25 (Adreno 830, API 36) campaign pass cold and warm: real level transitions, save/load, audio residency, storage, thermal and per-model budgets. | S25 sustain and multiplayer phases; audible and gamepad/mouse/keyboard checks; Mali and API-floor devices. |
 | AND-03 — Partial | Verified package repair/import, localized setup, settings return, control/interface setup and save/log export implemented; scoped device round trips pass. | Release-signing continuity; cloud/removable providers; interrupted-process recovery; physical setup/accessibility and upgrade matrix. |
 | AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas, HUD safe-area and thumb-deck positioning and the per-orientation layout editor exist. | Device-based presets and GLES limits; keyboard/touch targets, human-finger portrait play, the weapon control over the portrait readouts, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
 | AND-05 — Not integrated | Quest recovery sources are identified under VR-01/AND-01; the archived Quest change (`65aa9bd88`) moved here from VR-01 on 6 November, on top of the integrated PC Vulkan/EGL XR path. | Dedicated verified flavor, installation/assets, stereo/controller UI, comfort/session recovery and sustained thermal/refresh budgets; distribution decision. |
@@ -2010,6 +2010,19 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
   Include compressed input, pending decode, retained CPU PCM and uploaded OpenAL
   residency together. Qualify Android's own OpenAL provider/capabilities rather
   than inheriting desktop provider assumptions; depend on AUD-03/CORE-03 limits.
+  [Device harness and S25 campaign](platform-recovery-review.md#android-device-qualification-s25-10-november-2026):
+  `android_device_qualification.py` drives stock play through setup's
+  debuggable-only `diagnostic_launch`, with no OS input. On the S25 the campaign
+  passes cold and warm. It plays `hangar1` to `mcc_landing` through the levels'
+  own end triggers, loads `airdefense1`, `convoy1` and `process1` fresh, and
+  restores a `process1` save exactly. Five stages hold about 60 fps;
+  `process1` is render-bound at 27 fps (AND-04 presets). Thermal status stays
+  at 0 and PSS peaks at 2.83 GB. Android's OpenAL Soft through OpenSL keeps
+  decoded PCM in OpenAL only, at most 253 MiB of sample data on `mcc_landing`.
+  [`android-device-budgets.json`](android-device-budgets.json) holds the
+  per-model limits. Still open: the phone's sustain and multiplayer phases
+  (interrupted), audible and gamepad/mouse/keyboard checks, and Mali and
+  API-floor hardware.
 - [ ] **AND-03 — P1, implementation and qualification: player setup and upgrades.**
   Finish scoped-storage onboarding, retail-pak validation, localized insufficient
   space/extraction/retry messages, accessible logs and save backup/export. Validate

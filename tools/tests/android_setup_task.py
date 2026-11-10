@@ -27,6 +27,25 @@ public final class SetupTaskTest {
         final Class<?> target;final Map<String,String> extras=new HashMap<>();
         Intent(Object owner,Class<?> target){this.target=target;}
         Intent putExtra(String key,String value){extras.put(key,value);return this;}
+        String getStringExtra(String key){return extras.get(key);}
+    }
+    static class ApplicationInfo {static final int FLAG_DEBUGGABLE=2;}
+    static final String EXTRA_DIAGNOSTIC_LAUNCH="diagnostic_launch",DIAGNOSTIC_HOLD="hold";
+    // PRODUCTION_DIAGNOSTIC_LAUNCH
+    static void diagnosticLaunchGate() {
+        // Debuggable builds only, and only the two modes: a release build's exported
+        // setup entry point never starts the game without the player's choice.
+        for(String mode:new String[]{"sp","mp","SP","map","",null}){
+            Intent intent=new Intent(null,LauncherActivity.class);if(mode!=null)intent.putExtra(EXTRA_DIAGNOSTIC_LAUNCH,mode);
+            Boolean debug=diagnosticLaunch(intent,ApplicationInfo.FLAG_DEBUGGABLE|1),release=diagnosticLaunch(intent,1);
+            require(release==null,"a release build honoured a diagnostic launch: "+mode);
+            require("sp".equals(mode)?Boolean.FALSE.equals(debug):"mp".equals(mode)?Boolean.TRUE.equals(debug):debug==null,
+                    "diagnostic launch mode mismatch: "+mode);
+        }
+        require(diagnosticLaunch(null,ApplicationInfo.FLAG_DEBUGGABLE)==null,"a missing intent launched");
+        Intent hold=new Intent(null,LauncherActivity.class).putExtra(EXTRA_DIAGNOSTIC_LAUNCH,"hold");
+        require(diagnosticHold(hold,ApplicationInfo.FLAG_DEBUGGABLE) && !diagnosticHold(hold,1) && diagnosticLaunch(hold,ApplicationInfo.FLAG_DEBUGGABLE)==null,
+                "hold must keep the screen on in debuggable builds only, and never launch");
     }
     static class LauncherActivity {static final String EXTRA_PAGE="setup_page",PAGE_TOUCH_LAYOUT="touch_layout";}
     static class R {static class string {static final int setup_open_failed=1;}}
@@ -96,6 +115,7 @@ public final class SetupTaskTest {
     }
     public static void main(String[] args)throws Exception {
         reentry();
+        diagnosticLaunchGate();
         Thread main=Thread.currentThread();Queue queue=new Queue();SetupTask<String> task=new SetupTask<>(queue);
         List<SetupTask.State<String>> oldViews=new ArrayList<>(),newViews=new ArrayList<>();
         SetupTask.Observer<String> old=state->{require(Thread.currentThread()==main,"worker called UI observer");oldViews.add(state);};
@@ -227,7 +247,17 @@ def main() -> None:
         activity = (ROOT/'mobile/android/app/src/main/java/com/darkmatter/openq4/OpenQ4Activity.java').read_text()
         methods = '\n'.join(function_body(activity, signature) for signature in (
             'protected boolean onUnhandledMessage(', 'protected void onResume('))
-        source.write_text(JAVA.replace('// PRODUCTION_SETUP_REENTRY', methods))
+        launcher = (ROOT/'mobile/android/app/src/main/java/com/darkmatter/openq4/LauncherActivity.java').read_text(encoding='utf-8')
+        gate = function_body(launcher, 'static Boolean diagnosticLaunch(') + '\n' + function_body(launcher, 'static boolean diagnosticHold(')
+        changed = function_body(launcher, 'public void changed(')
+        # The launch waits for setup's own successful data check, never bypasses it.
+        assert 'diagnosticLaunch != null && ready && !game && available()' in changed, 'diagnostic launch skips the data check'
+        assert 'state.status != SetupTask.Status.SUCCEEDED' in changed and 'run(false)' in changed, 'diagnostic launch never checks data'
+        # Long setup work and a pending diagnostic launch keep the screen on, so
+        # they never stall behind the lock screen.
+        assert 'if (busy || diagnosticLaunch != null || diagnosticHold) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);' in changed
+        assert 'else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);' in changed
+        source.write_text(JAVA.replace('// PRODUCTION_SETUP_REENTRY', methods).replace('// PRODUCTION_DIAGNOSTIC_LAUNCH', gate))
         classes = scratch/'classes'
         classes.mkdir()
         javac = Path(args.javac).resolve()
