@@ -55,7 +55,8 @@ See [player release status](../user/release-status.md).
   1 GB graphics card, which used to get Low Power and its 30 FPS cap. The stock
   menu's Low quality uses it too.
 - **Minimum and Low Power now draw no shadows.** They used to lower only the
-  resolution and texture size; they now also skip shadow rendering. They are for
+  resolution and texture size; they now also skip shadow rendering, which took
+  12 to 16 percent off each frame on the integrated GPU we measured. They are for
   software renderers, Raspberry Pi-class boards, low-memory phones and battery
   saving. If you already use one of them and want the change, select the
   preset again; your current settings are not altered until you do.

@@ -615,14 +615,42 @@ Evidence is under `.tmp/preset-scrutiny/`.
 
 Limits:
 
-- **What dropping shadows saves is not measured.** A `performance_suite.py`
-  toggle ladder at Low on the Iris Xe was run while other sessions were
-  building on the same machine; windows with identical settings ranged from 20
-  to 95 Hz, so the results were discarded (`low-ladder/`, `shadow-cost/`).
-  Minimum and Low Power drop shadows as a design choice for hardware below the
-  minimum requirements, and a quiet fullscreen run on a weak GPU has to price
-  it before any claim is made.
+- **What dropping shadows saves is measured on one integrated GPU only.** See
+  [the shadow saving](#the-shadow-saving-on-integrated-graphics) below. A
+  weaker or tile-based GPU (Raspberry Pi, a phone) may differ and has not run
+  it.
 - The 12, 16 and 24 GiB recommendations, the phone rules, Raspberry Pi and
   macOS are covered by the model suite only. No such device ran this build.
 - Today's shadow-map commits changed what Quality, Ultra and Maximum cost; the
   FPS-02 budgets the capacity table leans on have not been re-measured since.
+
+### The shadow saving on integrated graphics
+
+Measured later on 10 November with `performance_suite.py`, fullscreen 1920x1080
+on the Intel Iris Xe through Vulkan (`low+r_vkDevice=2`, a 1440x810 scene, frame
+cap and VSync off). Each launch is a ladder of six-second windows: Low, Low
+with `r_shadows 0`, Low, Low at 50% scene scale, Low. A toggle is compared with
+the mean of the Low windows on either side of it, using the frame time from
+`profileFrameWork`.
+
+| Launch (`shadow-ladder-1/`) | Low | No shadows | 50% scene |
+|---|---:|---:|---:|
+| `combat_airdefense1`, round 1 | 16.4 ms | 13.8 ms (-15.5%) | 13.1 ms (-21.6%) |
+| `indoor_hub2`, round 2 | 11.4 ms | 9.8 ms (-14.1%) | 9.1 ms (-19.5%) |
+| `combat_airdefense1`, round 2 | 16.4 ms | 14.5 ms (-12.4%) | 14.9 ms (-8.3%) |
+
+Dropping stencil shadows removes 12 to 16 percent of the frame, about what the
+step from a 75% to a 50% scene removes (8 to 22 percent). The Low windows of a
+launch agree within 4 to 6 percent. That supports the shadowless floor: the two
+profiles below the minimum requirements now shed about as much again as their
+resolution step, and Low keeps the shadows for a PC that can afford them.
+
+Only these three launches count. The other three of that run (both
+`indoor_storage2` launches and one `indoor_hub2`) lost the foreground and were
+held at the 60 Hz background cap, which shows as `bound=presentation-cap` in
+the pacing snapshot; their GPU was never saturated, so they price CPU work
+only (under 1 ms either way). A second run (`shadow-ladder-2/`) overlapped
+another session's build and is not counted. The earlier windowed attempts
+(`low-ladder/`, `shadow-cost/`) ran during builds, ranged from 20 to 95 Hz at
+identical settings and were discarded. The suite's idle-GPU check reads the
+NVIDIA adapter, so on an Intel run read `bound` instead.
