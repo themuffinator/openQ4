@@ -120,7 +120,10 @@ def validate_binding_formatter() -> None:
     require(menu, "int omitted = 0", "omitted menu-binding count")
     require(menu, "for ( int i = 0; i < MAX_KEYS; i++ )", "full menu binding/count scan")
     require(menu, "if ( shown < MAX_MENU_BINDINGS )", "graphical-token cap gate")
-    require(menu, "Key_AppendBindingPresentation( keyName, i )", "capped menu token emission")
+    # A settings row lists its keys with a space between the glyphs; the
+    # localized word stays between a HUD hint's alternatives.
+    require(menu, 'Key_AppendBindingPresentation( keyName, i, false, " " )', "capped menu token emission")
+    require(append, "separator != NULL ? separator :", "caller-chosen separator")
     require(menu, "shown++", "shown menu-binding accounting")
     require(menu, "omitted++", "omitted menu-binding accounting")
     require(menu, "if ( omitted > 0 )", "omitted-count suffix gate")

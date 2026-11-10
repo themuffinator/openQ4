@@ -251,6 +251,8 @@ public:
 	void ClearFlag(unsigned int f);
 	unsigned GetFlags() {return flags;};
 	bool IsVisible() const { return visible; }
+	// The window's rectangle within its parent, as last laid out.
+	const idRectangle &GetDrawRect() const { return drawRect; }
 	bool HasNoEvents() const { return noEvents; }
 	unsigned char GetScreenAlignX() const { return screenAlignX; }
 	unsigned char GetScreenAlignY() const { return screenAlignY; }

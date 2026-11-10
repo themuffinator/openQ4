@@ -82,6 +82,10 @@ private:
 	idRectangle			thumbRect;
 	const idMaterial *	thumbMat;
 	bool				vertical;
+public:
+	// A slider that runs top to bottom: a page's scroll bar.
+	bool				IsVertical() const { return vertical; }
+private:
 	bool				verticalFlip;
 	bool				scrollbar;
 	idWindow *			buddyWin;

@@ -54,6 +54,8 @@ public:
 	virtual void 		HandleBuddyUpdate(idWindow *buddy);
 	virtual void		Activate(bool activate, idStr &act);
 	bool				GetTextInputState( idRectangle &area, float &cursorOffset );
+	// Whether the field holds several lines, which Up and Down scroll.
+	bool				IsMultiLine() const { return wrap; }
 	
 	void				RunNamedEvent( const char* eventName );
 	

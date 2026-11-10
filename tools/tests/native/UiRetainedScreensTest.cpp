@@ -4672,12 +4672,47 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		const auto found = runtime.PresentedValue(node,property); return found ? found->text : std::string("?");
 	};
 	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a CONTROLS page node is laid out"); return b; };
-	Check(runtime.SetState({{"controls.0.keys",std::string("W, UPARROW")},{"controls.48.keys",std::string("V")}},error,0.1),
+	// Move Forward's keys as the adapter publishes them, a slot each: W, the
+	// up arrow and a controller's A; the last row's V.
+	Check(runtime.SetState({{"controls.0.keys.key0",std::string("W")},{"controls.0.keys.key0.glyph",0.0},
+		{"controls.0.keys.key1",std::string("UPARROW")},{"controls.0.keys.key1.glyph",0.0},{"controls.0.keys.key1.arrow",1.0},
+		{"controls.0.keys.keyCount",2.0},{"controls.0.keys.pad0",std::string("A")},{"controls.0.keys.pad0.glyph",1.0},
+		{"controls.0.keys.padCount",1.0},{"controls.0.keys.more",std::string("+1")},
+		{"controls.48.keys.key0",std::string("V")},{"controls.48.keys.keyCount",1.0}},error,0.1),
 		"the session publishes the keys");
 	Check(runtime.RunEvent("onActivate",0.2,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.5);
-	Check(runtime.FocusedControl() == "controls_bind_0" && text("controls_bind_0-value","text") == "W, UPARROW",
-		"the page opens on Move Forward, showing its keys");
+	Check(runtime.FocusedControl() == "controls_bind_0" && text("controls_bind_0-key0","display") == "flex" &&
+		text("controls_bind_0-key0-cap","display") == "block" && text("controls_bind_0-key0-cap-name","text") == "W",
+		"the page opens on Move Forward, its first key a keycap");
+	Check(text("controls_bind_0-key1-cap","display") == "none" && text("controls_bind_0-key1-arrow-1","display") == "block" &&
+		text("controls_bind_0-key1-arrow-2","display") == "none","an arrow key draws its arrow in place of its name");
+	Check(text("controls_bind_0-pad0","display") == "flex" && text("controls_bind_0-pad0-kind-1","display") == "block" &&
+		text("controls_bind_0-pad0-name","text") == "A" && text("controls_bind_0-pad0-name","display") == "block" &&
+		text("controls_bind_0-pad0-kind-10","display") == "none" && text("controls_bind_0-pad1","display") == "none",
+		"a controller button draws its family's glyph with the engine's label");
+	Check(text("controls_bind_0-more","text") == "+1" && text("controls_bind_0-none","display") == "none" &&
+		text("controls_bind_1-none","display") == "block" && text("controls_bind_1-key0","display") == "none",
+		"a count stands for further keys, and a dash for an action with none");
+	{
+		// The glyphs' art is the document's symbols, drawn by every slot.
+		const auto* arrow = document.Model().FindNode("controls_bind_0-key1-arrow-1");
+		const auto* other = document.Model().FindNode("controls_bind_7-key0-arrow-1");
+		Check(arrow && other && arrow->paths.size() == 2 && other->paths.size() == 2 && arrow->paths[1].id == other->paths[1].id,
+			"each slot draws the shared symbol");
+	}
+	// While the session waits for the row's key the glyphs give way to the request.
+	Check(runtime.SetState({{"controls.capture",0.0}},error,0.51),"the session waits for a key");
+	runtime.Frame(viewport,0.52);
+	Check(text("controls_bind_0-keys","display") == "none" && text("controls_bind_0-waiting","display") == "block" &&
+		text("controls_bind_1-waiting","display") == "none","the waiting row asks for a key");
+	Check(runtime.SetState({{"controls.capture",-1.0}},error,0.53),"the wait ends");
+	runtime.Frame(viewport,0.54);
+	Check(text("controls_bind_0-keys","display") == "flex" && text("controls_bind_0-waiting","display") == "none","the glyphs return");
+	// The columns' outer edges hold the focus: Left from the leading column
+	// has nowhere to go, and must not go looking for a tab.
+	press(MenuInput::Left,0.55);
+	Check(runtime.FocusedControl() == "controls_bind_0","Left at the leading column's edge keeps the focus");
 	// Two columns: Move Forward leads the first, the sixth row the second.
 	const auto first = bounds("controls_bind_0"), second = bounds("controls_bind_5");
 	Check(second.x > first.x+first.width && std::abs(second.y-first.y) < .5f,"the tab's rows stand in two columns");
@@ -4693,6 +4728,8 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(runtime.FocusControl("controls_bind_4",0.71),"focus the first column's last row");
 	press(MenuInput::Down,0.72);
 	Check(runtime.FocusedControl() == "controls_bind_5","Down goes on to the second column");
+	press(MenuInput::Right,0.731);
+	Check(runtime.FocusedControl() == "controls_bind_5","Right at the trailing column's edge keeps the focus");
 	// The next tab: Weapons, its first row focused; Movement's rows rest.
 	Check(runtime.RunEvent("onTabNext",0.75,effects,error),"the next tab");
 	runtime.Frame(viewport,0.76);
@@ -4703,7 +4740,8 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,0.8);
 	Check(std::get<double>(runtime.GetState().at("page.tab")) == 3 && runtime.FocusedControl() == "controls_bind_36",
 		"the tabs wrap to the last");
-	Check(text("controls_bind_48-value","text") == "V","the last tab shows its keys");
+	Check(text("controls_bind_48-key0-cap-name","text") == "V" && text("controls_bind_48-key0","display") == "flex",
+		"the last tab shows its keys");
 	// TOUCH LAYOUT closes the Other tab only where the session reports the
 	// built-in touch controls (Android); it asks for the layout editor.
 	{

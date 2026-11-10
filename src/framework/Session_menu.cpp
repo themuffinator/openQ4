@@ -3151,8 +3151,8 @@ idSessionLocal::RetainedControlsKey
 
 While the CONTROLS page waits for a key it takes the next key pressed, as
 the stock binding field does: Escape, Start or Back cancel, Backspace or
-Delete clear the row, any other key joins its keys (at most two, as the stock
-bindunbindtwo keeps). The key's release and characters are its own. Out of
+Delete clear the row, any other key joins its keys (at most two of each device
+family, idKeyInput::BindForMenu). The key's release and characters are its own. Out of
 a wait, Delete or Backspace on a row clears it.
 ===============
 */
@@ -3186,10 +3186,7 @@ bool idSessionLocal::RetainedControlsKey( const sysEvent_t *event ) {
 	if ( key == K_BACKSPACE || key == K_DEL ) {
 		idKeyInput::UnbindBinding( binding );
 	} else if ( key != K_ESCAPE && key != K_JOY7 && key != K_JOY8 ) {
-		if ( idKeyInput::NumBinds( binding ) >= 2 && !idKeyInput::KeyIsBoundTo( key, binding ) ) {
-			idKeyInput::UnbindBinding( binding );
-		}
-		idKeyInput::SetBinding( key, binding );
+		idKeyInput::BindForMenu( key, binding );
 	}
 	if ( guiMainMenu != NULL ) {
 		guiMainMenu->SetKeyBindingNames();
@@ -4866,10 +4863,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			if ( args.Argc() - icmd >= 2 ) {
 				int key = atoi( args.Argv( icmd++ ) );
 				idStr bind = args.Argv( icmd++ );
-				if ( idKeyInput::NumBinds( bind ) >= 2 && !idKeyInput::KeyIsBoundTo( key, bind ) ) {
-					idKeyInput::UnbindBinding( bind );
-				}
-				idKeyInput::SetBinding( key, bind );
+				idKeyInput::BindForMenu( key, bind );
 				guiMainMenu->SetKeyBindingNames();
 			}
 			continue;
@@ -5691,6 +5685,17 @@ static int MainMenuSettingsSectionChoiceForScroll( const mainMenuSettingsScrollP
 	return 0;
 }
 
+// A page's content height and scroll step: the DISPLAY page is shorter with
+// one display, whose rows the multi-monitor section leaves out.
+static void MainMenuSettingsScrollGeometry( idUserInterface *gui, const mainMenuSettingsScrollPage_t &page, int &contentHeight, float &stepY ) {
+	contentHeight = page.contentHeight;
+	stepY = page.stepY;
+	if ( idStr::Icmp( page.name, "system" ) == 0 && gui->GetStateInt( "display_count", "0" ) <= 1 ) {
+		contentHeight = 902;
+		stepY = 19.5f;
+	}
+}
+
 static bool ApplyMainMenuSettingsScrollPage( idUserInterface *gui, const mainMenuSettingsScrollPage_t &page, int requestedValue, bool requireVisiblePage ) {
     if (!NativeInput_SessionCurrent()) return false;
 	if ( gui == NULL ) {
@@ -5726,10 +5731,7 @@ static bool ApplyMainMenuSettingsScrollPage( idUserInterface *gui, const mainMen
 
 	int contentHeight = page.contentHeight;
 	float stepY = page.stepY;
-	if ( idStr::Icmp( page.name, "system" ) == 0 && gui->GetStateInt( "display_count", "0" ) <= 1 ) {
-		contentHeight = 902;
-		stepY = 19.5f;
-	}
+	MainMenuSettingsScrollGeometry( gui, page, contentHeight, stepY );
 
 	const int scrollOffset = idMath::Ftoi( stepY * static_cast<float>( scrollValue ) + 0.5f );
 	const int contentY = page.baseY - scrollOffset;
@@ -5852,6 +5854,67 @@ static bool HandleMainMenuSettingsScrollInput( idUserInterface *gui, int key ) {
 	return false;
 }
 
+/*
+===============
+ScrollMainMenuSettingsFocusIntoView
+
+A stock settings page scrolls under a fixed view, and the keyboard and the
+controller step its focus through every row, shown or not. When the focus
+moves to a row outside the view the page scrolls just far enough to show it,
+with a little room so the row's plate is whole. Only a change of focus
+scrolls: the wheel, the bar and the section list stay free to move the page
+away from a row that keeps the focus.
+===============
+*/
+static void ScrollMainMenuSettingsFocusIntoView( idUserInterface *gui ) {
+	static idStr lastFocus;
+	static const float margin = 6.0f;
+	for ( int i = 0; i < static_cast<int>( sizeof( MAINMENU_SETTINGS_SCROLL_PAGES ) / sizeof( MAINMENU_SETTINGS_SCROLL_PAGES[ 0 ] ) ); ++i ) {
+		const mainMenuSettingsScrollPage_t &page = MAINMENU_SETTINGS_SCROLL_PAGES[ i ];
+		if ( page.maxValue <= page.minValue || !MainMenuWindowStateIsNonZero( gui, page.pageVisibleState ) ) {
+			continue;
+		}
+		idStr content = page.contentRectState;
+		const int member = content.Find( "::" );
+		if ( member > 0 ) {
+			content.CapLength( member );
+		}
+		idStr focus;
+		idRectangle rect;
+		float viewHeight = 0.0f;
+		if ( !UI_LegacyFocusWithin( gui, content.c_str(), focus, rect, viewHeight ) || viewHeight <= 0.0f ) {
+			continue;
+		}
+		if ( focus == lastFocus ) {
+			return;
+		}
+		lastFocus = focus;
+		int contentHeight = 0;
+		float stepY = 0.0f;
+		MainMenuSettingsScrollGeometry( gui, page, contentHeight, stepY );
+		if ( stepY <= 0.0f ) {
+			return;
+		}
+		// The content stands at baseY less the scroll's offset in the view.
+		const int current = idMath::ClampInt( page.minValue, page.maxValue, gui->GetStateInt( page.scrollStateName, va( "%d", page.scrollCvar->GetInteger() ) ) );
+		const int highest = static_cast<int>( idMath::Floor( ( rect.y - margin + page.baseY ) / stepY ) );
+		const int lowest = static_cast<int>( idMath::Ceil( ( rect.y + rect.h + margin + page.baseY - viewHeight ) / stepY ) );
+		int next = current;
+		if ( next > highest ) {
+			next = highest;
+		}
+		if ( next < lowest ) {
+			next = lowest;
+		}
+		next = idMath::ClampInt( page.minValue, page.maxValue, next );
+		if ( next != current ) {
+			ApplyMainMenuSettingsScrollPage( gui, page, next, true );
+		}
+		return;
+	}
+	lastFocus.Clear();
+}
+
 static void SyncMainMenuSettingsScrollPages( idUserInterface *gui ) {
 	if ( gui == NULL ) {
 		return;
@@ -5860,6 +5923,7 @@ static void SyncMainMenuSettingsScrollPages( idUserInterface *gui ) {
 	for ( int i = 0; i < static_cast<int>( sizeof( MAINMENU_SETTINGS_SCROLL_PAGES ) / sizeof( MAINMENU_SETTINGS_SCROLL_PAGES[ 0 ] ) ); ++i ) {
 		ApplyMainMenuSettingsScrollPage( gui, MAINMENU_SETTINGS_SCROLL_PAGES[ i ], idMath::INT_MIN, true );
 	}
+	ScrollMainMenuSettingsFocusIntoView( gui );
 }
 
 void idSessionLocal::MenuEvent( const sysEvent_t *event ) {

@@ -82,9 +82,12 @@ untouched.
   does and light the item they reach (`KeyboardMenuFocusDirection`,
   `src/ui/Window.cpp`). The stock menus answered only Tab, and Tab showed
   nothing. A key the focused control uses itself stays with it: a list's
-  rows, a slider's or choice's value, an edit field's caret and a key being
-  bound. Only a menu's desktop window turns arrows into steps, so in-world
-  GUIs and HUDs are unaffected.
+  rows, a slider's or choice's value and an edit field's caret. Only a
+  menu's desktop window turns arrows into steps, so in-world GUIs and HUDs
+  are unaffected. A [second round](key-bind-glyphs.md#focus-in-the-stock-menus)
+  the same day walked the pages in the engine and fixed four faults this
+  left: the arrows held on a key row and on a number field, focus stepped in
+  file order, and a settings page did not follow the focus.
 - **Demo filters.** Every filter looked chosen, because the GUI compared the
   filter's name and a GUI expression compares numbers only. The session
   publishes `demo_filterIndex` (0 All to 4 Incomplete) and the tags' rails
@@ -144,6 +147,8 @@ Three items the pass first left open, fixed the same day:
 Captures: `y1/settings-system` and `y1/settings-subpages`.
 
 ## Found, not fixed
+
+See also the [second round's list](key-bind-glyphs.md#found-not-fixed).
 
 - Hungarian names both the Arena's SKILL and DIFFICULTY rows NEHÉZSÉG.
 - The retained Join Game's JOIN SERVER, SPECTATE and favorite plates end at

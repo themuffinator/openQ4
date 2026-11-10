@@ -2688,8 +2688,11 @@ Completion must advance through the existing dependencies:
   The stock interface's Single Player, Campaign, Arena and Demos pages stand in
   the stock page frame the retained pages share, its Multiplayer page lists the
   retained page's sections, and its menus answer the arrow keys
-  ([stock interface menus](ui/legacy-menu-layout.md)). This does not migrate or
-  accept a GUI either.
+  ([stock interface menus](ui/legacy-menu-layout.md)). Both CONTROLS pages
+  draw keys as glyphs and keep an action's controller buttons when a key is
+  bound, and the stock menus step their focus as a page reads and scroll a
+  settings page to it ([key glyphs and focus](ui/key-bind-glyphs.md)). This
+  does not migrate or accept a GUI either.
 - [ ] **UI-05 — P1, decision and qualification: resolve visual policy conflicts.**
   Reconcile SP/MP hit-marker defaults with visual specification section 14.7 and
   other recorded deviations before acceptance. Preserve editable vector framing,

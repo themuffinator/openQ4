@@ -1430,6 +1430,13 @@ float idDeviceContext::GetKeyBindingIconWidth( int keyNum, float textScale, floa
 		const float labelWidth = static_cast<float>( TextWidth( info.label, labelScale, -1 ) );
 		const float maximumWidth = height * ( info.kind == Q4_KEY_BINDING_PAD_GENERIC ? 1.90f : 2.20f );
 		width = Min( maximumWidth, Max( width, labelWidth + sidePadding * 2.0f ) );
+		if ( keyBindingWideLabels && info.kind == Q4_KEY_BINDING_KEYBOARD ) {
+			// A settings row: the keycap takes its name at the size the draw
+			// path gives a label that fits (0.68 of the text scale against the
+			// 0.54 measured above), up to four heights.
+			const float drawnWidth = labelWidth * ( 0.68f / 0.54f );
+			width = Max( width, Min( height * 4.0f, drawnWidth + sidePadding * 2.0f ) );
+		}
 		SetFontByScale( textScale );
 	}
 
@@ -1831,6 +1838,7 @@ void idDeviceContext::Clear() {
 	aspectCorrect = true;
 	drawTextColor.Zero();
 	drawTextColorAdjust = 0.0f;
+	keyBindingWideLabels = false;
 	icons.Clear();
 }
 

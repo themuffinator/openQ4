@@ -25,6 +25,38 @@ See [player release status](../user/release-status.md).
   `tools/tests/material_constant_registers_contract.py`; the
   `rendererPBRMaterialSelfTest` command.
 
+## Key pictures on the Controls page, and menus that step the way they read, 10 November 2026
+
+- **The new interface's Controls page shows keys as pictures.** Each action
+  shows keycaps for its keyboard keys, a mouse with the bound button marked,
+  and your controller's own buttons, where it used to print names such as
+  `JOY3`. A row that is waiting for a key says so in orange.
+- **Binding a key no longer unbinds your controller.** An action keeps up to
+  two keyboard or mouse keys and up to two controller buttons. A third key
+  replaces the two of its own kind only. Before, binding any key to an
+  action such as Jump cleared its controller buttons as well. This applies
+  to both interfaces.
+- **The classic Controls page is easier to read.** Long key names such as
+  LEFT SHIFT and RIGHT ALT get a keycap wide enough to read, and the word
+  "or" between keys is gone, so every key of an action fits its row.
+- **Keyboard and controller navigation in the classic settings.**
+  - The arrow keys no longer get stuck on the first key row of Controls, on
+    a number box such as Brightness, or on the scroll bar.
+  - Focus moves down a page in the order it reads. On Display it used to
+    jump between rows far apart.
+  - The Display, Audio and Game Options pages scroll to the row you move
+    to. Before, focus could move to rows that were off the screen.
+- **Fixes in the new interface's settings.**
+  - Pressing Right on the last column, or Left towards a hidden row, no
+    longer jumps up to a tab.
+  - A few English labels now use the same capitals as their neighbours, for
+    example UI Scale, Rendering Backend and Enable Shadows.
+- Not changed: Display in the new interface still opens the classic Display
+  page unless `ui_retainedSystem 1` is set.
+- Evidence: [key glyphs and focus](ui/key-bind-glyphs.md#evidence-10-november-2026);
+  `tools/tests/key_bind_presentation.py`,
+  `tools/tests/menu_controller_navigation.py`.
+
 ## Classic menus that match the new ones, and easier to drive from the keyboard, 10 November 2026
 
 - **The classic Single Player, Campaign, Arena and Demos pages look like the

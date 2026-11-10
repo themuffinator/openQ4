@@ -142,6 +142,9 @@ void idBindWindow::Draw(int time, float x, float y) {
 	// fit its bounded graphical summary into the stock 149x17/18 rows.  Common
 	// configurations stay at authored size; denser sets scale only as far as
 	// remains comfortably legible.
+	// A row names each key in full: a long name widens its keycap here, where
+	// an inline hint squeezes it.
+	dc->SetKeyBindingWideLabels( true );
 	float drawScale = textScale;
 	if ( !waitingOnKey && str.Find( "^ik" ) >= 0 ) {
 		const int naturalWidth = dc->TextWidth( str, drawScale, -1, Q4_BIND_WINDOW_TEXT_SPACING );
@@ -150,6 +153,7 @@ void idBindWindow::Draw(int time, float x, float y) {
 		}
 	}
 	dc->DrawText( str, drawScale, textAlign, color, textRect, false, -1, false, NULL, 0, Q4_BIND_WINDOW_TEXT_SPACING, style );
+	dc->SetKeyBindingWideLabels( false );
 }
 
 void idBindWindow::Activate( bool activate, idStr &act ) {

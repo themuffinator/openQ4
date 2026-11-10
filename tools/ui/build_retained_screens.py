@@ -839,6 +839,8 @@ class Document:
         self.actions: dict = {}
         self.events: dict = {}
         self.bindings: list = []
+        # Vector art several nodes draw (a vector node's "symbol" names one): ID -> paths.
+        self.symbols: dict = {}
         # The document's detail card (state, card, none): see Document.h's DetailSpec.
         self.detail: dict | None = None
 
@@ -878,6 +880,8 @@ class Document:
             result["bindings"] = self.bindings
         if self.detail:
             result["detail"] = self.detail
+        if self.symbols:
+            result["symbols"] = self.symbols
         result["timelines"] = self.timelines.items
         result["root"] = root
         if extras:
@@ -2334,7 +2338,7 @@ def check_page_prompts(select: bool, face: str, size: float, verbs: tuple = (), 
 def page_prompts(doc: Document, back: str | None = None, *, action: str | None = None, event: str | None = None,
                  select: bool = True, in_canvas: bool = True, ident: str = "prompts", cap_tint: list[float] | None = None,
                  verb_face: tuple = ("marine", 14, [1, 1, 1, 0.8]), hot: str = ORANGE, verbs: tuple = (),
-                 lead_limit: float = PAGE_BAR_LEFT) -> dict:
+                 lead_limit: float = PAGE_BAR_LEFT, accept_shown: dict | None = None) -> dict:
     """A page's prompt bar (section 13.4): Accept, then BACK at the trailing
     end, in the glyphs of the active device. Accept names what the focused
     control does: its own prompt verb (one of the page's `verbs`), SELECT for
@@ -2345,7 +2349,9 @@ def page_prompts(doc: Document, back: str | None = None, *, action: str | None =
     insets it 1 dp. Otherwise both are legends. Legends never take the
     pointer. `select` False leaves Accept out where it has nothing to do.
     The bar sits in a 4:3 canvas group, or with `in_canvas` False in a node
-    spanning the view; Accept starts after `lead_limit` (canvas dp)."""
+    spanning the view; Accept starts after `lead_limit` (canvas dp).
+    `accept_shown` adds a condition to Accept's own: a page whose Accept
+    does nothing for a while takes it off the bar."""
     face, size, verb_tint = verb_face
     check_page_prompts(select, face, size, verbs, lead_limit)
     tint = cap_tint or [1, 1, 1, 0.85]
@@ -2361,8 +2367,10 @@ def page_prompts(doc: Document, back: str | None = None, *, action: str | None =
         lead = [prompt_glyph(doc, name, KEY_ENTER, tint), verb_label(f"{name}-verb", PROMPT_SELECT)]
         doc.state[PROMPT_ACCEPT] = {"type": "string", "initial": PROMPT_SELECT}
         doc.bind(f"{name}-verb.text", f"{name}-verb", "text", {"state": PROMPT_ACCEPT})
-        doc.bind(f"{ident}-lead.display", f"{ident}-lead", "display",
-                 {"op": "select", "args": [{"op": "==", "args": [{"state": PROMPT_ACCEPT}, ""]}, "none", "flex"]})
+        idle = {"op": "==", "args": [{"state": PROMPT_ACCEPT}, ""]}
+        if accept_shown is not None:
+            idle = {"op": "||", "args": [idle, {"op": "!", "args": [accept_shown]}]}
+        doc.bind(f"{ident}-lead.display", f"{ident}-lead", "display", {"op": "select", "args": [idle, "none", "flex"]})
     leading = group(f"{ident}-lead", {**absolute(top=middle, height=22, right=PAGE_BAR_W - back_x + 22), "display": keyword("flex"),
                                       "flex-direction": keyword("row"), "align-items": keyword("center"),
                                       "pointer-events": keyword("none")}, lead)

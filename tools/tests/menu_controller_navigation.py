@@ -32,6 +32,7 @@ template<class T> struct idList : std::vector<T> {
     using std::vector<T>::operator=;
     int Num() const { return static_cast<int>(this->size()); }
     void Append(T v) { this->push_back(v); }
+    void SetNum(int n) { this->resize(static_cast<size_t>(n)); }
     int FindIndex(T v) const {
         auto i = std::find(this->begin(), this->end(), v);
         return i == this->end() ? -1 : static_cast<int>(i - this->begin());
@@ -49,8 +50,13 @@ struct Gui {
     void SetControllerNavigation(bool v) { controller = v; }
     Text& GetPendingCmd() { return pending; }
 };
+struct idRectangle { float x = 0, y = 0, w = 0, h = 0; };
+template<class T> T Min(T a, T b) { return a < b ? a : b; }
+template<class T> T Max(T a, T b) { return a > b ? a : b; }
 struct idWindow {
     idList<idWindow*> children;
+    idRectangle drawRect;
+    const idRectangle& GetDrawRect() const { return drawRect; }
     idWindow *focusedChild = nullptr, *overChild = nullptr, *capture = nullptr;
     Gui *gui;
     Text cmd;
@@ -73,9 +79,9 @@ struct idWindow {
     void UpdateOwnership(bool controllerEvent, const sysEvent_t* event);
 };
 struct idChoiceWindow : idWindow { using idWindow::idWindow; };
-struct idSliderWindow : idWindow { using idWindow::idWindow; };
+struct idSliderWindow : idWindow { using idWindow::idWindow; bool vertical = false; bool IsVertical() const { return vertical; } };
 struct idListWindow : idWindow { using idWindow::idWindow; };
-struct idEditWindow : idWindow { using idWindow::idWindow; };
+struct idEditWindow : idWindow { using idWindow::idWindow; bool wrap = false; bool IsMultiLine() const { return wrap; } };
 struct idBindWindow : idWindow { using idWindow::idWindow; };
 '''
 
@@ -154,11 +160,37 @@ int main() {
     root.focusedChild = &list; // up and down walk a list's rows
     assert(!KeyboardMenuFocusDirection(&root, &up, direction) && !KeyboardMenuFocusDirection(&root, &down, direction));
     assert(KeyboardMenuFocusDirection(&root, &right, direction) && direction == 1);
-    root.focusedChild = &edit; // an edit field keeps its caret keys
-    assert(!KeyboardMenuFocusDirection(&root, &left, direction) && !KeyboardMenuFocusDirection(&root, &down, direction));
-    root.focusedChild = &bind; // a key being bound is never a step
-    assert(!KeyboardMenuFocusDirection(&root, &down, direction) && !KeyboardMenuFocusDirection(&root, &left, direction));
-    assert(direction == 1); // a refused key leaves the direction alone
+    root.focusedChild = &edit; // an edit field keeps its caret keys; a one-line field lets Up and Down step
+    assert(!KeyboardMenuFocusDirection(&root, &left, direction) && !KeyboardMenuFocusDirection(&root, &right, direction));
+    assert(KeyboardMenuFocusDirection(&root, &down, direction) && direction == 1);
+    edit.wrap = true; // several lines scroll with Up and Down
+    assert(!KeyboardMenuFocusDirection(&root, &down, direction) && !KeyboardMenuFocusDirection(&root, &up, direction));
+    direction = 7;
+    assert(!KeyboardMenuFocusDirection(&root, &left, direction) && direction == 7); // a refused key leaves the direction alone
+    // A key row steps on: the GUI gives a row that waits for its key the next
+    // key before the desktop sees it, so a row at rest must not hold the focus.
+    root.focusedChild = &bind;
+    assert(KeyboardMenuFocusDirection(&root, &down, direction) && direction == 1);
+    assert(KeyboardMenuFocusDirection(&root, &up, direction) && direction == -1);
+    {
+        // Focus order: columns from the leading edge, each in reading order,
+        // whatever order the GUI lists its windows in; a page's scroll bar is
+        // no step.
+        Gui page; idWindow desk(page);
+        auto place = [](idWindow& w, float x, float y, float width, float height) { w.drawRect.x = x; w.drawRect.y = y; w.drawRect.w = width; w.drawRect.h = height; };
+        idWindow tier0(page, true), tier1(page, true), match0(page, true), match1(page, true), start(page, true), back(page, true);
+        idWindow value(page, true), button(page, true);
+        idSliderWindow bar(page, true); bar.vertical = true;
+        place(tier0, 18, 76, 162, 36); place(tier1, 18, 120, 162, 36);
+        place(match0, 198, 76, 190, 34); place(match1, 198, 116, 190, 34);
+        place(start, 400, 367, 230, 36); place(back, 536, 444, 105, 23);
+        place(value, 432, 106, 88, 18); place(button, 526, 104, 79, 20); place(bar, 622, 104, 16, 253);
+        for (idWindow* w : {&back, &match1, &button, &tier1, &start, &value, &match0, &tier0, static_cast<idWindow*>(&bar)}) desk.children.Append(w);
+        idList<idWindow*> order;
+        CollectFocusWindows(&desk, order);
+        const idList<idWindow*> expected = [&] { idList<idWindow*> list; for (idWindow* w : {&tier0, &tier1, &match0, &match1, &value, &button, &start, &back}) list.Append(w); return list; }();
+        assert(order == expected);
+    }
     std::puts("menu_controller_navigation: behavioral checks passed");
 }
 '''
@@ -167,7 +199,7 @@ int main() {
 def main() -> None:
     source = (ROOT / 'src/ui/Window.cpp').read_text(encoding='utf-8')
     snippets = '\n'.join(extract(source, sig) for sig in (
-        'static void CollectFocusWindows(', 'static bool NavigateFocus(',
+        'static void SortFocusRows(', 'static void SortFocusOrder(', 'static void CollectFocusWindows(', 'static bool NavigateFocus(',
         'static bool WindowConsumesDirectionalNavigation(', 'static bool KeyboardMenuFocusDirection(',
         'void idWindow::ClearMouseHover()'))
     # Only a menu's desktop turns arrow keys into steps: a nested window, an

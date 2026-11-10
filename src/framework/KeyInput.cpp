@@ -597,9 +597,9 @@ static idStr &Key_NextBindingPresentationBuffer( void ) {
 	return result;
 }
 
-static void Key_AppendBindingPresentation( idStr &result, int keynum, bool emphasized = false ) {
+static void Key_AppendBindingPresentation( idStr &result, int keynum, bool emphasized = false, const char *separator = NULL ) {
 	if ( result.Length() > 0 ) {
-		result.Append( common->GetLanguageDict()->GetString( "#str_07183" ) );
+		result.Append( separator != NULL ? separator : common->GetLanguageDict()->GetString( "#str_07183" ) );
 	}
 	result.Append( va( "^i%c%02x", emphasized ? 'K' : 'k', keynum & 0xff ) );
 }
@@ -852,7 +852,9 @@ const char *idKeyInput::KeysFromBindingForMenu( const char *bind ) {
 		for ( int i = 0; i < MAX_KEYS; i++ ) {
 			if ( BindingsEquivalent( keys[i].binding.c_str(), bind ) ) {
 				if ( shown < MAX_MENU_BINDINGS ) {
-					Key_AppendBindingPresentation( keyName, i );
+					// A row of key glyphs reads as a list without a word between
+					// them, and the word cost the row a glyph's width each time.
+					Key_AppendBindingPresentation( keyName, i, false, " " );
 					shown++;
 				} else {
 					omitted++;
@@ -931,6 +933,50 @@ bool idKeyInput::KeyIsBoundTo( int keynum, const char *binding ) {
 		return BindingsEquivalent( keys[keynum].binding.c_str(), binding );
 	}
 	return false;
+}
+
+/*
+============
+idKeyInput::IsControllerKey
+============
+*/
+bool idKeyInput::IsControllerKey( int keynum ) {
+	return Key_IsValidKeyNum( keynum ) && Key_IsControllerKey( keynum );
+}
+
+/*
+============
+idKeyInput::BindForMenu
+
+A settings menu's bind: the key joins the action's keys. An action keeps two
+keys of each device family, so a third keyboard or mouse key replaces the two
+it has and leaves its controller buttons, and a third controller button
+replaces those and leaves the keyboard's. The stock bindunbindtwo counted both
+families together, so binding a key to an action that came with a key and a
+button of each cleared the controller.
+============
+*/
+void idKeyInput::BindForMenu( int keynum, const char *binding ) {
+	if ( !Key_IsValidKeyNum( keynum ) || binding == NULL || !*binding ) {
+		return;
+	}
+	if ( !KeyIsBoundTo( keynum, binding ) ) {
+		const bool controller = Key_IsControllerKey( keynum );
+		int family = 0;
+		for ( int i = 0; i < MAX_KEYS; i++ ) {
+			if ( Key_IsControllerKey( i ) == controller && BindingsEquivalent( keys[i].binding.c_str(), binding ) ) {
+				family++;
+			}
+		}
+		if ( family >= 2 ) {
+			for ( int i = 0; i < MAX_KEYS; i++ ) {
+				if ( Key_IsControllerKey( i ) == controller && BindingsEquivalent( keys[i].binding.c_str(), binding ) ) {
+					SetBinding( i, "" );
+				}
+			}
+		}
+	}
+	SetBinding( keynum, binding );
 }
 
 /*

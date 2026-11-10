@@ -5005,6 +5005,26 @@ static void Session_OpenQ4GuiAction_f( const idCmdArgs &args ) {
 	}
 }
 
+/*
+================
+Session_OpenQ4GuiFocus_f
+
+openQ4: openq4_guiFocus [next|previous] steps the active classic GUI's focus
+as a menu's Down or Up arrow does and reports where it stands, touching no
+device; without an argument it only reports.
+================
+*/
+static void Session_OpenQ4GuiFocus_f( const idCmdArgs &args ) {
+	idUserInterface *gui = session->GetActiveGUI();
+	const int direction = args.Argc() != 2 ? 0 : !idStr::Icmp( args.Argv( 1 ), "next" ) ? 1 : !idStr::Icmp( args.Argv( 1 ), "previous" ) ? -1 : 0;
+	idStr report;
+	if ( gui == NULL || args.Argc() > 2 || ( args.Argc() == 2 && direction == 0 ) || !UI_StepLegacyFocus( gui, direction, report ) ) {
+		common->Printf( "usage: openq4_guiFocus [next|previous] with an active classic GUI\n" );
+		return;
+	}
+	common->Printf( "GUI_FOCUS %s\n", report.c_str() );
+}
+
 static void Session_RetainedGui_f( const idCmdArgs &args ) {
 #ifndef ID_DEDICATED
 	// While a retained home screen covers the legacy menu, or the multiplayer
@@ -10866,6 +10886,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "openq4_guiSet", Session_OpenQ4GuiSet_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "sets an existing active GUI variable for engine-scripted layout validation" );
 	cmdSystem->AddCommand( "openq4_guiGet", Session_OpenQ4GuiGet_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "reports an existing active GUI variable for engine-scripted layout validation" );
 	cmdSystem->AddCommand( "openq4_guiAction", Session_OpenQ4GuiAction_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "runs a classic GUI window's onAction, or onBackAction with back, as a click would, for engine-scripted validation" );
+	cmdSystem->AddCommand( "openq4_guiFocus", Session_OpenQ4GuiFocus_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "steps a classic GUI's focus as a menu's arrow key does (next, previous) and reports the focused window, for engine-scripted validation" );
 	cmdSystem->AddCommand( "openq4_browser", Session_OpenQ4Browser_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "reports and exercises main-menu server-browser operations for engine-scripted validation" );
 	cmdSystem->AddCommand( "saveGame", SaveGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "saves a game" );
 	cmdSystem->AddCommand( "testAutoSave", TestAutoSave_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "writes a named autosave for developer lifecycle validation" );

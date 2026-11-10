@@ -12072,7 +12072,7 @@
                   "thumb": "audio_volume-thumb",
                   "value": "audio_volume-value"
                  },
-                 "navigation": {"down": "audio_music", "up": "audio_subtitle_speakers", "right": "audio_eax"}
+                 "navigation": {"down": "audio_music", "up": "audio_subtitle_speakers", "right": "audio_eax", "left": "audio_volume"}
                 }
                },
                {
@@ -12647,7 +12647,7 @@
                   "thumb": "audio_music-thumb",
                   "value": "audio_music-value"
                  },
-                 "navigation": {"down": "audio_dialogue", "up": "audio_volume", "right": "audio_speakers"}
+                 "navigation": {"down": "audio_dialogue", "up": "audio_volume", "right": "audio_speakers", "left": "audio_music"}
                 }
                },
                {
@@ -13222,7 +13222,7 @@
                   "thumb": "audio_dialogue-thumb",
                   "value": "audio_dialogue-value"
                  },
-                 "navigation": {"down": "audio_backend", "up": "audio_music", "right": "audio_hrtf"}
+                 "navigation": {"down": "audio_backend", "up": "audio_music", "right": "audio_hrtf", "left": "audio_dialogue"}
                 }
                },
                {
@@ -13799,7 +13799,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "audio_device", "up": "audio_dialogue", "right": "audio_subtitles"}
+                 "navigation": {"down": "audio_device", "up": "audio_dialogue", "right": "audio_subtitles", "left": "audio_backend"}
                 }
                },
                {
@@ -15616,7 +15616,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "audio_eax", "up": "audio_backend", "right": "audio_subtitle_size"}
+                 "navigation": {"down": "audio_eax", "up": "audio_backend", "right": "audio_subtitle_size", "left": "audio_device"}
                 }
                }
               ]
@@ -15870,7 +15870,7 @@
                   "disabled": "audio_eax.disabled"
                  },
                  "parts": {"checked": "audio_eax-checked"},
-                 "navigation": {"down": "audio_speakers", "up": "audio_device", "left": "audio_volume"}
+                 "navigation": {"down": "audio_speakers", "up": "audio_device", "left": "audio_volume", "right": "audio_eax"}
                 }
                },
                {
@@ -16516,7 +16516,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "audio_hrtf", "up": "audio_eax", "left": "audio_music"}
+                 "navigation": {"down": "audio_hrtf", "up": "audio_eax", "left": "audio_music", "right": "audio_speakers"}
                 }
                },
                {
@@ -17157,7 +17157,7 @@
                  ],
                  "placementBounds": "screen",
                  "scrollbar": {"track": "audio_hrtf-scroll-track", "thumb": "audio_hrtf-scroll-thumb", "lineStep": 22.0, "minimumThumb": 24},
-                 "navigation": {"down": "audio_subtitles", "up": "audio_speakers", "left": "audio_dialogue"}
+                 "navigation": {"down": "audio_subtitles", "up": "audio_speakers", "left": "audio_dialogue", "right": "audio_hrtf"}
                 }
                },
                {
@@ -17378,7 +17378,7 @@
                   "disabled": "audio_subtitles.disabled"
                  },
                  "parts": {"checked": "audio_subtitles-checked"},
-                 "navigation": {"down": "audio_subtitle_size", "up": "audio_hrtf", "left": "audio_backend"}
+                 "navigation": {"down": "audio_subtitle_size", "up": "audio_hrtf", "left": "audio_backend", "right": "audio_subtitles"}
                 }
                },
                {
@@ -17953,7 +17953,12 @@
                   "thumb": "audio_subtitle_size-thumb",
                   "value": "audio_subtitle_size-value"
                  },
-                 "navigation": {"down": "audio_subtitle_background", "up": "audio_subtitles", "left": "audio_device"}
+                 "navigation": {
+                  "down": "audio_subtitle_background",
+                  "up": "audio_subtitles",
+                  "left": "audio_device",
+                  "right": "audio_subtitle_size"
+                 }
                 }
                },
                {
@@ -18528,7 +18533,12 @@
                   "thumb": "audio_subtitle_background-thumb",
                   "value": "audio_subtitle_background-value"
                  },
-                 "navigation": {"down": "audio_subtitle_speakers", "up": "audio_subtitle_size", "left": "audio_device"}
+                 "navigation": {
+                  "down": "audio_subtitle_speakers",
+                  "up": "audio_subtitle_size",
+                  "left": "audio_device",
+                  "right": "audio_subtitle_background"
+                 }
                 }
                },
                {
@@ -18749,7 +18759,12 @@
                   "disabled": "audio_subtitle_speakers.disabled"
                  },
                  "parts": {"checked": "audio_subtitle_speakers-checked"},
-                 "navigation": {"down": "audio_volume", "up": "audio_subtitle_background", "left": "audio_device"}
+                 "navigation": {
+                  "down": "audio_volume",
+                  "up": "audio_subtitle_background",
+                  "left": "audio_device",
+                  "right": "audio_subtitle_speakers"
+                 }
                 }
                }
               ]

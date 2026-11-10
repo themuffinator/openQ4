@@ -5,6 +5,7 @@
 #include <atomic>
 #include <charconv>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
@@ -1546,6 +1547,9 @@ void Interaction::Navigate(MenuInput input) {
 	}
 	const auto& item = items.at(focused);
 	if (const auto authored = Authored(focused,name); !authored.empty()) { Focus(authored); return; }
+	// A control that names itself in a direction is an authored edge: the
+	// focus stays rather than looking for the nearest control that way.
+	if (const auto edge = item.control.navigation.find(name); edge != item.control.navigation.end() && edge->second == focused) return;
 	const auto next = ordered ? Following(focused,input) : Remembered(Toward(item.bounds,focused,input));
 	if (!next.empty()) Focus(next);
 }
@@ -1563,11 +1567,26 @@ std::string Interaction::Remembered(const std::string& next) const {
 }
 std::string Interaction::Authored(const std::string& from, const char* name) const {
 	std::set<std::string> visited{from};
+	std::string hidden;
 	for (auto found = items.find(from); found != items.end();) {
 		const auto target = found->second.control.navigation.find(name);
-		if (target == found->second.control.navigation.end() || !visited.insert(target->second).second) return {};
+		if (target == found->second.control.navigation.end() || !visited.insert(target->second).second) break;
 		if (Eligible(target->second)) return target->second;
+		if (hidden.empty()) hidden = target->second;
 		found = items.find(target->second);
+	}
+	// A step across to a row that is hidden lands on the row that took its
+	// place: the next one its column shows below it, else above. Without
+	// this the step went looking for the nearest control that way, which
+	// from a settings column is a tab.
+	if (!hidden.empty() && (!std::strcmp(name,"left") || !std::strcmp(name,"right"))) for (const char* along : {"down","up"}) {
+		std::set<std::string> walked{from,hidden};
+		for (auto found = items.find(hidden); found != items.end();) {
+			const auto target = found->second.control.navigation.find(along);
+			if (target == found->second.control.navigation.end() || !walked.insert(target->second).second) break;
+			if (Eligible(target->second)) return target->second;
+			found = items.find(target->second);
+		}
 	}
 	return {};
 }

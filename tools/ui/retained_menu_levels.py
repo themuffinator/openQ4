@@ -7,7 +7,7 @@ def fit_page(ui, root):
     """Keep the two frame edges on the viewport and center the isotropic body."""
     for node in root['children']:
         if node['id']=='band-bottom':
-            for path in node['paths']:
+            for path in node.get('paths',[]):
                 for command in path['commands']:
                     for point in command.get('points',[]):
                         if isinstance(point[1],(int,float)):

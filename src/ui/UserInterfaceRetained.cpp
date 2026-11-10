@@ -1425,18 +1425,50 @@ bool idUserInterfaceRetained::GetMaxTextIndex(const char* name, const char* text
 	info.maxIndex = fit.maxIndex; info.lastWhitespace = fit.lastWhitespace;
 	return fit.overflow;
 }
+// A binding state's keys, each in a slot of its own for a page that draws them
+// as glyphs (ui-visual-design.md 13.5). Beside a state with a keyBinding, a
+// document may declare, all optional:
+//   <state>.key0, .key1, ...   the action's keyboard and mouse keys in key
+//                              order, each a key state: with "<slot>.glyph"
+//                              it receives the glyph's kind and its label, as
+//                              a prompt's key does, and "" past the last key;
+//   <state>.pad0, .pad1, ...   its controller buttons, the same way;
+//   <slot>.arrow               1-4 for the keyboard's up, down, left and right
+//                              arrows, which a keycap draws, else 0;
+//   <state>.keyCount, .padCount how many of each family the action has;
+//   <state>.more               "+N" for the keys past the declared slots, else "".
 void idUserInterfaceRetained::SetKeyBindingNames() {
 	if (!impl->Prepare()) return;
-	for (const auto& [name,declaration] : impl->document.Model().state) {
+	const auto& states = impl->document.Model().state;
+	for (const auto& [name,declaration] : states) {
 		if (declaration.keyBinding.empty()) continue;
 		idStr names;
+		std::vector<int> keys[2];
 		for (int key = 0; key < K_LAST_KEY; ++key) {
 			if (!idKeyInput::KeyIsBoundTo(key,declaration.keyBinding.c_str())) continue;
 			idStr label = idKeyInput::KeyNumToString(key,true);
 			if (label.Length() == 1) label.ToUpper();
 			names = names.IsEmpty() ? label : idStr(va(common->GetLanguageDict()->GetString("#str_231533"),names.c_str(),label.c_str()));
+			keys[idKeyInput::IsControllerKey(key) ? 1 : 0].push_back(key);
 		}
 		SetStateString(name.c_str(),names.IsEmpty() ? common->GetLanguageDict()->GetString("#str_07133") : names.c_str());
+		static const char* const families[2] = {".key",".pad"};
+		static const char* const counts[2] = {".keyCount",".padCount"};
+		size_t hidden = 0;
+		for (int family = 0; family < 2; ++family) {
+			size_t slot = 0;
+			for (;; ++slot) {
+				const std::string slotName = name + families[family] + std::to_string(slot);
+				if (!states.contains(slotName)) break;
+				const int key = slot < keys[family].size() ? keys[family][slot] : -1;
+				SetStateString(slotName.c_str(),key >= 0 ? va("^ik%02x",key & 0xff) : "");
+				if (states.contains(slotName + ".arrow")) SetStateInt((slotName + ".arrow").c_str(),
+					key == K_UPARROW ? 1 : key == K_DOWNARROW ? 2 : key == K_LEFTARROW ? 3 : key == K_RIGHTARROW ? 4 : 0);
+			}
+			if (keys[family].size() > slot) hidden += keys[family].size() - slot;
+			if (states.contains(name + counts[family])) SetStateInt((name + counts[family]).c_str(),static_cast<int>(keys[family].size()));
+		}
+		if (states.contains(name + ".more")) SetStateString((name + ".more").c_str(),hidden ? va("+%d",static_cast<int>(hidden)) : "");
 	}
 }
 

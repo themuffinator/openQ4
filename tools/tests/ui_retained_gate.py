@@ -5565,9 +5565,22 @@ def main() -> int:
     assert {name: action['arguments']['command'] for name, action in controls_document['actions'].items()} == \
         {'controlsBind': 'controlsBind', 'controlsClear': 'controlsClear', 'controlsTouchLayout': 'controlsTouchLayout',
          'back': 'controlsBack'}
+    # A new key joins its action's keys through the menus' shared rule, two
+    # keys of each device family (idKeyInput::BindForMenu): a keyboard key
+    # never clears the action's controller buttons. The stock page binds the
+    # same way.
     controls_key = function_body(menu, 'bool idSessionLocal::RetainedControlsKey(')
-    assert 'idKeyInput::NumBinds( binding ) >= 2 && !idKeyInput::KeyIsBoundTo( key, binding )' in controls_key
+    assert 'idKeyInput::BindForMenu( key, binding );' in controls_key and 'NumBinds' not in controls_key
     assert 'key != K_ESCAPE && key != K_JOY7 && key != K_JOY8' in controls_key and 'idKeyInput::UnbindBinding( binding );' in controls_key
+    key_input = (ROOT / 'src/framework/KeyInput.cpp').read_text(encoding='utf-8')
+    bind_for_menu = function_body(key_input, 'void idKeyInput::BindForMenu(')
+    assert 'Key_IsControllerKey( i ) == controller && BindingsEquivalent( keys[i].binding.c_str(), binding )' in bind_for_menu
+    assert 'if ( family >= 2 )' in bind_for_menu and bind_for_menu.rstrip(' }' + chr(10) + chr(13) + chr(9)).endswith('SetBinding( keynum, binding );')
+    assert 'idKeyInput::BindForMenu( key, bind );' in main_menu, 'the stock CONTROLS page binds by the same rule'
+    # Each row's keys reach the page a slot at a time, as glyphs.
+    assert all(f'controls.{row}.keys.{slot}' in controls_document['state'] and f'controls.{row}.keys.{slot}.glyph' in controls_document['state']
+               for row in range(49) for slot in ('key0', 'key1', 'pad0', 'pad1'))
+    assert {'key-arrow-1', 'key-mouse-23', 'key-pad-1', 'key-pad-10', 'key-pad-12'} <= set(controls_document['symbols'])
     # The SETTINGS page: its sections are the session's table and the
     # document's plates, each with the stock panel that stands in for it; the
     # stock main menu's routes: openSettingsPage presents the screen on the

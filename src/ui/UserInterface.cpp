@@ -790,6 +790,73 @@ bool UI_RunLegacyWindowAction( idUserInterface *gui, const char *windowName, boo
 	return legacy->RunWindowAction( windowName, back, command );
 }
 
+bool idUserInterfaceLocal::StepFocus( int direction, idStr &report ) {
+	report.Clear();
+	if ( desktop == NULL ) {
+		return false;
+	}
+	if ( direction != 0 ) {
+		// The same event a menu's arrow key delivers, raised here rather than by a device.
+		sysEvent_t event;
+		memset( &event, 0, sizeof( event ) );
+		event.evType = SE_KEY;
+		event.evValue = direction > 0 ? K_DOWNARROW : K_UPARROW;
+		event.evValue2 = 1;
+		HandleEvent( &event, time, NULL );
+		event.evValue2 = 0;
+		HandleEvent( &event, time, NULL );
+	}
+	idWindow *focus = desktop->GetFocusedChild();
+	if ( focus == NULL ) {
+		report = "focus=- ";
+		return true;
+	}
+	bool shown = true;
+	for ( idWindow *reach = focus; reach != NULL; reach = reach->GetParent() ) {
+		shown = shown && reach->visible && !reach->noEvents;
+	}
+	const idRectangle &rect = focus->drawRect;
+	report = va( "focus=%s rect=%.0f,%.0f,%.0f,%.0f shown=%d", focus->GetName(), rect.x, rect.y, rect.w, rect.h, shown ? 1 : 0 );
+	return true;
+}
+
+bool idUserInterfaceLocal::FocusWithin( const char *ancestorName, idStr &focusName, idRectangle &rect, float &viewHeight ) {
+	if ( desktop == NULL || ancestorName == NULL || ancestorName[ 0 ] == '\0' ) {
+		return false;
+	}
+	idWindow *focus = desktop->GetFocusedChild();
+	drawWin_t *found = desktop->FindChildByName( ancestorName );
+	idWindow *ancestor = found != NULL ? found->win : NULL;
+	if ( focus == NULL || ancestor == NULL || ancestor->GetParent() == NULL ) {
+		return false;
+	}
+	rect = focus->drawRect;
+	for ( idWindow *reach = focus->GetParent(); reach != ancestor; reach = reach->GetParent() ) {
+		if ( reach == NULL ) {
+			return false;
+		}
+		rect.x += reach->drawRect.x;
+		rect.y += reach->drawRect.y;
+	}
+	focusName = focus->GetName();
+	viewHeight = ancestor->GetParent()->drawRect.h;
+	return true;
+}
+
+bool UI_LegacyFocusWithin( idUserInterface *gui, const char *ancestorName, idStr &focusName, idRectangle &rect, float &viewHeight ) {
+	idUserInterfaceLocal *legacy = dynamic_cast<idUserInterfaceLocal *>( gui );
+	return legacy != NULL && legacy->FocusWithin( ancestorName, focusName, rect, viewHeight );
+}
+
+bool UI_StepLegacyFocus( idUserInterface *gui, int direction, idStr &report ) {
+	idUserInterfaceLocal *legacy = dynamic_cast<idUserInterfaceLocal *>( gui );
+	if ( legacy == NULL ) {
+		report.Clear();
+		return false;
+	}
+	return legacy->StepFocus( direction, report );
+}
+
 bool idUserInterfaceLocal::HasWindow( const char *windowName ) const {
 	return desktop != NULL && windowName != NULL && windowName[ 0 ] != '\0' && desktop->FindChildByName( windowName ) != NULL;
 }

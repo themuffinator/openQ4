@@ -13,8 +13,8 @@ each tab holds at most two columns of section 7 setting rows on the stock
 column, its label taking two lines where a language needs them. Up and Down
 read the rows down the first column and on down the second, then wrap; Up
 from the first row reaches the tab, and Left and Right cross between the
-columns where the row has no value to change. The prompt bar holds Select and
-Back, Back the page's button.
+columns where the row has no value to change, and stop at the columns' outer
+edges. The prompt bar holds Select and Back, Back the page's button.
 
 A portrait view of 3:4 or taller (the runtime's view.aspect source) gives the
 rows its height instead of shrinking the two columns into it: the columns
@@ -369,7 +369,7 @@ def _note_line(ident: str, key: str, lead: float) -> dict:
 def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, note: str | None = None,
                      activate=None, overlays: list = (), back_event: str | None = None, back_id: str | None = None,
                      slots: int = COLUMN_SLOTS, footer: list = (), body: str | None = None,
-                     first_focus: dict | None = None, portrait: bool = True) -> dict:
+                     first_focus: dict | None = None, portrait: bool = True, prompts: dict | None = None) -> dict:
     """The page: `tabs` holds each tab's (id, label, columns), a column a list
     of rows, notes and headings (heading()), at most two columns a tab. One
     tab shows no strip: its columns' first headings stand in the header band.
@@ -380,7 +380,8 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
     its rows' lists unfold within; `first_focus` gives a tab whose first rows
     may be hidden the steps that focus its first row shown. Without
     `portrait` the two columns keep their places in every view, shrinking in
-    a portrait one.
+    a portrait one. `prompts` are more of page_prompts' arguments: the page's
+    own verbs and legends.
     onActivate   the sub-page's arrival, then the current tab's first row
                  takes the focus: the steps `activate` makes of those;
     tab_<id>     switches to a tab at once, cross-fades the pages over 150 ms
@@ -497,6 +498,16 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
                 other = order[1 - side]
                 for slot, unit in enumerate(rows):
                     unit[0]["control"]["navigation"]["right" if side == 0 else "left"] = other[min(slot, len(other) - 1)][0]["id"]
+        # The columns' outer edges hold the focus: a row with no value to
+        # change would otherwise send Left or Right looking for the nearest
+        # control in that direction, which from the trailing column is a tab.
+        columns = [rows for rows in order if rows]
+        for side, rows in enumerate(columns):
+            for unit in rows:
+                if side == 0:
+                    unit[0]["control"]["navigation"].setdefault("left", unit[0]["id"])
+                if side == len(columns) - 1:
+                    unit[-1]["control"]["navigation"].setdefault("right", unit[-1]["id"])
         firsts.append(sequence[0])
         if tabbed:
             for control in sequence:
@@ -514,9 +525,9 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
                   "then": list(focus[index]), "else": steps}]
     if back_event is None:
         doc.events["onBack"] = [{"op": "action", "action": "back"}]
-        back = page_prompts(doc, back_id or f"{prefix}_back", action="back")
+        back = page_prompts(doc, back_id or f"{prefix}_back", action="back", **(prompts or {}))
     else:
-        back = page_prompts(doc, back_id or f"{prefix}_back", event=back_event)
+        back = page_prompts(doc, back_id or f"{prefix}_back", event=back_event, **(prompts or {}))
     if body is not None:
         pages = [group(body, FULL, pages)]
     return subpage_document(doc, prefix, CRUMB, title_key, firsts[0], [*chrome, *pages, *footer, back, *above], list(overlays),

@@ -230,6 +230,11 @@ public:
 	static const char *	KeysFromBindingForMenu( const char *bind );
 	static const char *	BindingFromKey( const char *key );
 	static bool			KeyIsBoundTo( int keyNum, const char *binding );
+	// The settings menus keep at most two keys of each device family on an
+	// action: two keyboard or mouse keys and two controller buttons. A third
+	// of a family replaces that family's two and leaves the other family's.
+	static bool			IsControllerKey( int keyNum );
+	static void			BindForMenu( int keyNum, const char *binding );
 	static void			WriteBindings( idFile *f );
 };
 

@@ -82,6 +82,11 @@ public:
 
 	void				SetSize(float width, float height);
 	void				SetAspectCorrection( bool enabled );
+	// A settings row lists an action's keys and has the room to name each in
+	// full: while this is set, a keyboard keycap grows as wide as its name
+	// needs (LEFT SHIFT, RIGHT ALT) instead of squeezing it into the compact
+	// width an inline hint keeps.
+	void				SetKeyBindingWideLabels( bool wide ) { keyBindingWideLabels = wide; }
 	float				GetCanvasAspect() const;
 	void				GetVirtualScreenExpansion( float width, float height, float &xExpand, float &yExpand ) const;
 	void				GetCinematic16x9Bars( float width, float height, idRectangle &topBar, idRectangle &bottomBar, idRectangle &leftBar, idRectangle &rightBar, idRectangle &visibleArea ) const;
@@ -247,6 +252,7 @@ private:
 	bool				overStrikeMode;
 	idVec4				drawTextColor;
 	float				drawTextColorAdjust;
+	bool				keyBindingWideLabels;	// a settings row's keycaps take the width their names need
 
 	idMat3				mat;
 	idVec3				origin;

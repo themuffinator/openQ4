@@ -36505,7 +36505,7 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_autodetect", "up": "tab-graphics", "right": "settings_ui_scale"}
+                   "navigation": {"down": "settings_autodetect", "up": "tab-graphics", "right": "settings_ui_scale", "left": "settings_preset"}
                   }
                  },
                  {
@@ -36656,7 +36656,12 @@
                     "pressed": "settings_autodetect.pressed",
                     "disabled": "settings_autodetect.disabled"
                    },
-                   "navigation": {"down": "settings_backend", "up": "settings_preset", "right": "settings_text_scale"}
+                   "navigation": {
+                    "down": "settings_backend",
+                    "up": "settings_preset",
+                    "right": "settings_text_scale",
+                    "left": "settings_autodetect"
+                   }
                   }
                  },
                  {
@@ -37396,7 +37401,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_gpu", "up": "settings_autodetect", "right": "settings_ui_aspect"}
+                   "navigation": {
+                    "down": "settings_gpu",
+                    "up": "settings_autodetect",
+                    "right": "settings_ui_aspect",
+                    "left": "settings_backend"
+                   }
                   }
                  },
                  {
@@ -40848,7 +40858,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_renderer", "up": "settings_backend", "right": "settings_reset_sizes"}
+                   "navigation": {
+                    "down": "settings_renderer",
+                    "up": "settings_backend",
+                    "right": "settings_reset_sizes",
+                    "left": "settings_gpu"
+                   }
                   }
                  },
                  {
@@ -41404,7 +41419,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_restart_renderer", "up": "settings_gpu", "right": "settings_reset_sizes"}
+                   "navigation": {
+                    "down": "settings_restart_renderer",
+                    "up": "settings_gpu",
+                    "right": "settings_reset_sizes",
+                    "left": "settings_renderer"
+                   }
                   }
                  },
                  {
@@ -41576,7 +41596,12 @@
                     "pressed": "settings_restart_renderer.pressed",
                     "disabled": "settings_restart_renderer.disabled"
                    },
-                   "navigation": {"down": "settings_ui_scale", "up": "settings_renderer", "right": "settings_reset_sizes"}
+                   "navigation": {
+                    "down": "settings_ui_scale",
+                    "up": "settings_renderer",
+                    "right": "settings_reset_sizes",
+                    "left": "settings_restart_renderer"
+                   }
                   }
                  },
                  {
@@ -42477,7 +42502,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_text_scale", "up": "settings_restart_renderer", "left": "settings_preset"}
+                   "navigation": {
+                    "down": "settings_text_scale",
+                    "up": "settings_restart_renderer",
+                    "left": "settings_preset",
+                    "right": "settings_ui_scale"
+                   }
                   }
                  },
                  {
@@ -43213,7 +43243,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_ui_aspect", "up": "settings_ui_scale", "left": "settings_autodetect"}
+                   "navigation": {
+                    "down": "settings_ui_aspect",
+                    "up": "settings_ui_scale",
+                    "left": "settings_autodetect",
+                    "right": "settings_text_scale"
+                   }
                   }
                  },
                  {
@@ -43434,7 +43469,12 @@
                     "disabled": "settings_ui_aspect.disabled"
                    },
                    "parts": {"checked": "settings_ui_aspect-checked"},
-                   "navigation": {"down": "settings_reset_sizes", "up": "settings_text_scale", "left": "settings_backend"}
+                   "navigation": {
+                    "down": "settings_reset_sizes",
+                    "up": "settings_text_scale",
+                    "left": "settings_backend",
+                    "right": "settings_ui_aspect"
+                   }
                   }
                  },
                  {
@@ -43585,7 +43625,12 @@
                     "pressed": "settings_reset_sizes.pressed",
                     "disabled": "settings_reset_sizes.disabled"
                    },
-                   "navigation": {"down": "settings_preset", "up": "settings_ui_aspect", "left": "settings_gpu"}
+                   "navigation": {
+                    "down": "settings_preset",
+                    "up": "settings_ui_aspect",
+                    "left": "settings_gpu",
+                    "right": "settings_reset_sizes"
+                   }
                   }
                  },
                  {
@@ -44885,7 +44930,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_multiscreen", "up": "tab-screen", "right": "settings_window_width"}
+                   "navigation": {
+                    "down": "settings_multiscreen",
+                    "up": "tab-screen",
+                    "right": "settings_window_width",
+                    "left": "settings_display_device"
+                   }
                   }
                  },
                  {
@@ -45460,7 +45510,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_fullscreen", "up": "settings_display_device", "right": "settings_window_height"}
+                   "navigation": {
+                    "down": "settings_fullscreen",
+                    "up": "settings_display_device",
+                    "right": "settings_window_height",
+                    "left": "settings_multiscreen"
+                   }
                   }
                  },
                  {
@@ -45702,7 +45757,12 @@
                     "disabled": "settings_fullscreen.disabled"
                    },
                    "parts": {"checked": "settings_fullscreen-checked"},
-                   "navigation": {"down": "settings_borderless", "up": "settings_multiscreen", "right": "settings_display_mode"}
+                   "navigation": {
+                    "down": "settings_borderless",
+                    "up": "settings_multiscreen",
+                    "right": "settings_display_mode",
+                    "left": "settings_fullscreen"
+                   }
                   }
                  },
                  {
@@ -45923,7 +45983,12 @@
                     "disabled": "settings_borderless.disabled"
                    },
                    "parts": {"checked": "settings_borderless-checked"},
-                   "navigation": {"down": "settings_fullscreen_policy", "up": "settings_fullscreen", "right": "settings_custom_width"}
+                   "navigation": {
+                    "down": "settings_fullscreen_policy",
+                    "up": "settings_fullscreen",
+                    "right": "settings_custom_width",
+                    "left": "settings_borderless"
+                   }
                   }
                  },
                  {
@@ -46479,7 +46544,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_msaa", "up": "settings_borderless", "right": "settings_custom_height"}
+                   "navigation": {
+                    "down": "settings_msaa",
+                    "up": "settings_borderless",
+                    "right": "settings_custom_height",
+                    "left": "settings_fullscreen_policy"
+                   }
                   }
                  },
                  {
@@ -47305,7 +47375,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_vsync", "up": "settings_fullscreen_policy", "right": "settings_display_refresh"}
+                   "navigation": {
+                    "down": "settings_vsync",
+                    "up": "settings_fullscreen_policy",
+                    "right": "settings_display_refresh",
+                    "left": "settings_msaa"
+                   }
                   }
                  },
                  {
@@ -47861,7 +47936,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_window_width", "up": "settings_msaa", "right": "settings_display_refresh"}
+                   "navigation": {
+                    "down": "settings_window_width",
+                    "up": "settings_msaa",
+                    "right": "settings_display_refresh",
+                    "left": "settings_vsync"
+                   }
                   }
                  }
                 ]
@@ -48225,7 +48305,12 @@
                     "disabled": "settings_window_width.disabled"
                    },
                    "integer": true,
-                   "navigation": {"down": "settings_window_height", "up": "settings_vsync", "left": "settings_display_device"}
+                   "navigation": {
+                    "down": "settings_window_height",
+                    "up": "settings_vsync",
+                    "left": "settings_display_device",
+                    "right": "settings_window_width"
+                   }
                   }
                  },
                  {
@@ -48556,7 +48641,12 @@
                     "disabled": "settings_window_height.disabled"
                    },
                    "integer": true,
-                   "navigation": {"down": "settings_display_mode", "up": "settings_window_width", "left": "settings_multiscreen"}
+                   "navigation": {
+                    "down": "settings_display_mode",
+                    "up": "settings_window_width",
+                    "left": "settings_multiscreen",
+                    "right": "settings_window_height"
+                   }
                   }
                  },
                  {
@@ -52493,7 +52583,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_custom_width", "up": "settings_window_height", "left": "settings_fullscreen"}
+                   "navigation": {
+                    "down": "settings_custom_width",
+                    "up": "settings_window_height",
+                    "left": "settings_fullscreen",
+                    "right": "settings_display_mode"
+                   }
                   }
                  },
                  {
@@ -52845,7 +52940,12 @@
                     "disabled": "settings_custom_width.disabled"
                    },
                    "integer": true,
-                   "navigation": {"down": "settings_custom_height", "up": "settings_display_mode", "left": "settings_borderless"}
+                   "navigation": {
+                    "down": "settings_custom_height",
+                    "up": "settings_display_mode",
+                    "left": "settings_borderless",
+                    "right": "settings_custom_width"
+                   }
                   }
                  },
                  {
@@ -53176,7 +53276,12 @@
                     "disabled": "settings_custom_height.disabled"
                    },
                    "integer": true,
-                   "navigation": {"down": "settings_display_refresh", "up": "settings_custom_width", "left": "settings_fullscreen_policy"}
+                   "navigation": {
+                    "down": "settings_display_refresh",
+                    "up": "settings_custom_width",
+                    "left": "settings_fullscreen_policy",
+                    "right": "settings_custom_height"
+                   }
                   }
                  },
                  {
@@ -54977,7 +55082,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_display_device", "up": "settings_custom_height", "left": "settings_msaa"}
+                   "navigation": {
+                    "down": "settings_display_device",
+                    "up": "settings_custom_height",
+                    "left": "settings_msaa",
+                    "right": "settings_display_refresh"
+                   }
                   }
                  }
                 ]
@@ -55642,7 +55752,12 @@
                       "thumb": "settings_brightness-thumb",
                       "value": "settings_brightness-value"
                      },
-                     "navigation": {"down": "settings_brightness_number", "up": "tab-image", "right": "settings_ambient_enabled"}
+                     "navigation": {
+                      "down": "settings_brightness_number",
+                      "up": "tab-image",
+                      "right": "settings_ambient_enabled",
+                      "left": "settings_brightness"
+                     }
                     }
                    },
                    {
@@ -56116,7 +56231,12 @@
                     "disabled": "settings_shadows.disabled"
                    },
                    "parts": {"checked": "settings_shadows-checked"},
-                   "navigation": {"down": "settings_specular", "up": "settings_brightness_number", "right": "settings_ambient"}
+                   "navigation": {
+                    "down": "settings_specular",
+                    "up": "settings_brightness_number",
+                    "right": "settings_ambient",
+                    "left": "settings_shadows"
+                   }
                   }
                  },
                  {
@@ -56337,7 +56457,7 @@
                     "disabled": "settings_specular.disabled"
                    },
                    "parts": {"checked": "settings_specular-checked"},
-                   "navigation": {"down": "settings_bump", "up": "settings_shadows", "right": "settings_crt"}
+                   "navigation": {"down": "settings_bump", "up": "settings_shadows", "right": "settings_crt", "left": "settings_specular"}
                   }
                  },
                  {
@@ -56558,7 +56678,7 @@
                     "disabled": "settings_bump.disabled"
                    },
                    "parts": {"checked": "settings_bump-checked"},
-                   "navigation": {"down": "settings_sky", "up": "settings_specular", "right": "settings_irradiance"}
+                   "navigation": {"down": "settings_sky", "up": "settings_specular", "right": "settings_irradiance", "left": "settings_bump"}
                   }
                  },
                  {
@@ -56779,7 +56899,12 @@
                     "disabled": "settings_sky.disabled"
                    },
                    "parts": {"checked": "settings_sky-checked"},
-                   "navigation": {"down": "settings_bloom", "up": "settings_bump", "right": "settings_lightgrid_preload"}
+                   "navigation": {
+                    "down": "settings_bloom",
+                    "up": "settings_bump",
+                    "right": "settings_lightgrid_preload",
+                    "left": "settings_sky"
+                   }
                   }
                  },
                  {
@@ -57000,7 +57125,12 @@
                     "disabled": "settings_bloom.disabled"
                    },
                    "parts": {"checked": "settings_bloom-checked"},
-                   "navigation": {"down": "settings_ssao", "up": "settings_sky", "right": "settings_lightgrid_preload"}
+                   "navigation": {
+                    "down": "settings_ssao",
+                    "up": "settings_sky",
+                    "right": "settings_lightgrid_preload",
+                    "left": "settings_bloom"
+                   }
                   }
                  },
                  {
@@ -57221,7 +57351,12 @@
                     "disabled": "settings_ssao.disabled"
                    },
                    "parts": {"checked": "settings_ssao-checked"},
-                   "navigation": {"down": "settings_tonemap", "up": "settings_bloom", "right": "settings_lightgrid_preload"}
+                   "navigation": {
+                    "down": "settings_tonemap",
+                    "up": "settings_bloom",
+                    "right": "settings_lightgrid_preload",
+                    "left": "settings_ssao"
+                   }
                   }
                  },
                  {
@@ -57442,7 +57577,12 @@
                     "disabled": "settings_tonemap.disabled"
                    },
                    "parts": {"checked": "settings_tonemap-checked"},
-                   "navigation": {"down": "settings_postaa", "up": "settings_ssao", "right": "settings_lightgrid_preload"}
+                   "navigation": {
+                    "down": "settings_postaa",
+                    "up": "settings_ssao",
+                    "right": "settings_lightgrid_preload",
+                    "left": "settings_tonemap"
+                   }
                   }
                  },
                  {
@@ -58268,7 +58408,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_resolution_scale", "up": "settings_tonemap", "right": "settings_lightgrid_preload"}
+                   "navigation": {
+                    "down": "settings_resolution_scale",
+                    "up": "settings_tonemap",
+                    "right": "settings_lightgrid_preload",
+                    "left": "settings_postaa"
+                   }
                   }
                  },
                  {
@@ -59454,7 +59599,12 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_ambient_enabled", "up": "settings_postaa", "right": "settings_lightgrid_preload"}
+                   "navigation": {
+                    "down": "settings_ambient_enabled",
+                    "up": "settings_postaa",
+                    "right": "settings_lightgrid_preload",
+                    "left": "settings_resolution_scale"
+                   }
                   }
                  }
                 ]
@@ -59708,7 +59858,12 @@
                     "disabled": "settings_ambient_enabled.disabled"
                    },
                    "parts": {"checked": "settings_ambient_enabled-checked"},
-                   "navigation": {"down": "settings_ambient", "up": "settings_resolution_scale", "left": "settings_brightness"}
+                   "navigation": {
+                    "down": "settings_ambient",
+                    "up": "settings_resolution_scale",
+                    "left": "settings_brightness",
+                    "right": "settings_ambient_enabled"
+                   }
                   }
                  },
                  {
@@ -60546,7 +60701,7 @@
                         "pressed": "settings_ambient_number.pressed",
                         "disabled": "settings_ambient_number.disabled"
                        },
-                       "navigation": {"down": "settings_crt", "up": "settings_ambient"}
+                       "navigation": {"down": "settings_crt", "up": "settings_ambient", "right": "settings_ambient_number"}
                       }
                      }
                     ]
@@ -60771,7 +60926,12 @@
                     "disabled": "settings_crt.disabled"
                    },
                    "parts": {"checked": "settings_crt-checked"},
-                   "navigation": {"down": "settings_irradiance", "up": "settings_ambient_number", "left": "settings_specular"}
+                   "navigation": {
+                    "down": "settings_irradiance",
+                    "up": "settings_ambient_number",
+                    "left": "settings_specular",
+                    "right": "settings_crt"
+                   }
                   }
                  },
                  {
@@ -60992,7 +61152,12 @@
                     "disabled": "settings_irradiance.disabled"
                    },
                    "parts": {"checked": "settings_irradiance-checked"},
-                   "navigation": {"down": "settings_lightgrid_preload", "up": "settings_crt", "left": "settings_bump"}
+                   "navigation": {
+                    "down": "settings_lightgrid_preload",
+                    "up": "settings_crt",
+                    "left": "settings_bump",
+                    "right": "settings_irradiance"
+                   }
                   }
                  },
                  {
@@ -61213,7 +61378,12 @@
                     "disabled": "settings_lightgrid_preload.disabled"
                    },
                    "parts": {"checked": "settings_lightgrid_preload-checked"},
-                   "navigation": {"down": "settings_brightness", "up": "settings_irradiance", "left": "settings_sky"}
+                   "navigation": {
+                    "down": "settings_brightness",
+                    "up": "settings_irradiance",
+                    "left": "settings_sky",
+                    "right": "settings_lightgrid_preload"
+                   }
                   }
                  },
                  {

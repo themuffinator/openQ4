@@ -518,6 +518,28 @@ static void CheckSpeedStreak(TestHost& host) {
 	 "events":{"boost":[{"op":"playTimeline","timeline":"boost"}]}})json";
 	Document document; std::vector<Diagnostic> diagnostics;
 	Check(document.Load(source,diagnostics),"a streak document compiles");
+	{
+		// Shared vector art: a vector node draws the symbol it names, and a
+		// document refuses an unknown symbol, a node with both a symbol and
+		// its own paths, and a symbol on a node that is no vector.
+		const auto symbols = [](const char* node) {
+			return std::string(R"json({"format":"openq4-ui","version":1,"id":"symbols","symbols":{"dash":[{"id":"line","commands":[
+				{"id":"a","op":"move","points":[[0,0]]},{"id":"b","op":"line","points":[[{"fraction":1},0]]}],
+				"stroke":{"paint":{"type":"solid","color":{"type":"color","value":[1,1,1,1]}},"widthDp":1,"join":"miter","cap":"butt"}}]},
+				"root":{"id":"root","type":"group","children":[)json")+node+R"json(]}})json";
+		};
+		Document shared; std::vector<Diagnostic> found;
+		Check(shared.Load(symbols(R"json({"id":"one","type":"vector","symbol":"dash"},{"id":"two","type":"vector","symbol":"dash"})json"),found) &&
+			found.empty(),"a document with shared symbols loads");
+		const auto* one = shared.Model().FindNode("one"); const auto* two = shared.Model().FindNode("two");
+		Check(one && two && one->paths.size() == 1 && two->paths.size() == 1 && one->paths[0].id == "line" && two->paths[0].id == "line",
+			"each node draws the symbol's paths");
+		for (const char* bad : {R"json({"id":"one","type":"vector","symbol":"dot"})json",
+			R"json({"id":"one","type":"vector","symbol":"dash","paths":[]})json", R"json({"id":"one","type":"group","symbol":"dash"})json"}) {
+			Document refused; found.clear();
+			Check(!refused.Load(symbols(bad),found) && !found.empty(),"an unknown or misplaced symbol refuses the document");
+		}
+	}
 	Check(!document.Load(R"json({"format":"openq4-ui","version":1,"id":"speed-streak-range","root":{"id":"root","type":"group",
 		"properties":{"backdrop-streak":{"type":"number","value":1.5}}}})json",diagnostics),"a streak beyond full strength is rejected");
 	Runtime runtime(host);

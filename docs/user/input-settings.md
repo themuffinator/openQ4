@@ -27,6 +27,8 @@ This guide covers the main ways to configure keyboard, mouse, and controller inp
 
 To rebind an action, select its row and press the key, mouse button, or controller button you want to use. Analog sticks are configured through the controller settings instead of being rebound as buttons.
 
+Each row shows its keys as pictures: keycaps for the keyboard, a mouse with the bound button marked, and your controller's own buttons. An action keeps up to two keyboard or mouse keys and up to two controller buttons. Binding a third key replaces the two keys of that kind and leaves the other kind alone, so giving Jump a new keyboard key never unbinds it from your controller. Press Delete or Backspace on a row (X or Square on a controller) to clear it, and Escape to cancel while it waits for a key.
+
 ## Where openQ4 Stores Input Settings
 
 At startup, openQ4 loads input-related config in this order:

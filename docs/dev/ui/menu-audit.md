@@ -147,6 +147,23 @@ the HUD tab's Crosshair Size and Crosshair Color rows labels without the
 stock colon, and let the retained gate admit a setting only the retained
 interface honors.
 
+A [second round](key-bind-glyphs.md) that day took the settings tree:
+
+| Severity | Interface | Was | Now |
+| --- | --- | --- | --- |
+| High | Stock | The arrow keys never left a key row on CONTROLS, nor a number field on DISPLAY. | Both step on. |
+| High | Stock | Focus stepped onto settings rows outside the view; on the scroll bar it stayed. | The page scrolls to the focused row; the bar is no step. |
+| Medium | Stock | Focus stepped in file order: V-Sync after Ambient brightness. | Columns from the leading edge, each in reading order. |
+| Medium | Both | Binding a keyboard key to an action with two keys cleared its controller buttons too. | An action keeps two keys of each family. |
+| Medium | Retained | CONTROLS named keys as text, a controller button by its key code (`JOY3`). | Keycaps, the mouse and the controller's own glyphs. |
+| Medium | Retained | Right from a settings page's trailing column, or Left to a hidden row, reached a tab. | The columns' outer edges hold the focus; a hidden row gives way to the one in its place. |
+| Low | Stock | CONTROLS joined its key glyphs with "or" and squeezed long key names; Jump's fourth glyph was cut. | A space between glyphs; a keycap as wide as its name. |
+| Low | Both | Some English setting labels were in sentence case beside Title Case rows. | Title Case. |
+
+Left open there: DISPLAY in the retained interface still opens the stock
+page until a Performance Preset can be applied on the retained one, and the
+stock DISPLAY page's Section list does not name the page's headings.
+
 Left open: the stock pause's order, the stock Settings screen's
 arrangement and the campaign levels, which stay as the stock composition
 ([deliberate differences](legacy-menu-layout.md#deliberate-differences)), and

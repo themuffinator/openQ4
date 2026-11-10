@@ -6,7 +6,7 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 TEXT = {
     'english': [
-        'Rendering backend', 'Rendering device', 'Automatic;OpenGL;Vulkan;OpenGL ES',
+        'Rendering Backend', 'Rendering Device', 'Automatic;OpenGL;Vulkan;OpenGL ES',
         'Automatic (high performance)',
         'Automatic prefers compatible high-performance hardware. Choosing a GPU uses Vulkan.',
         'OpenGL uses system GPU routing. Choosing a GPU switches to Vulkan.',
@@ -15,7 +15,7 @@ TEXT = {
         'Return to the main menu to restart with your saved selection.',
         'The saved GPU is unavailable. Choose Automatic or another device.',
         'A diagnostic GPU override is active. Restart without r_vkDevice to select a device here.',
-        'Active renderer', 'Restart renderer', 'Unavailable device',
+        'Active renderer', 'Restart Renderer', 'Unavailable device',
         'Rendering', 'The requested renderer is unavailable. The active fallback is shown above.'],
     'french': [
         'Moteur de rendu', 'Périphérique de rendu', 'Automatique;OpenGL;Vulkan;OpenGL ES',
