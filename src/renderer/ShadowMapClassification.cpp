@@ -327,19 +327,106 @@ int R_ShadowMapPointCacheSlotLimit( int faceSize, int bytesPerTexel,
 		faceSize, bytesPerTexel, maxSlots );
 }
 
-// Pins the two pure policies above: the point cache holds a dense view's
-// lights at the shipped cube size inside its memory bound, never fewer than
-// the twelve slots it always had, and the live-caster window spans a game tic
-// at every display rate.
-int R_ShadowMapAtlasBlockCapacity( int atlasSize, int tileSize, int atlasDiv ) {
-	if ( atlasSize <= 0 || tileSize <= 0 || atlasDiv <= 0 ) {
+int R_ShadowMapAtlasBlockEdge( int tileSize, int atlasDiv ) {
+	if ( tileSize <= 0 || atlasDiv <= 0 ) {
 		return 0;
 	}
 	const long long blockSize = static_cast<long long>( tileSize ) * atlasDiv;
-	const long long perRow = atlasSize / blockSize;
-	return static_cast<int>( perRow * perRow );
+	long long edge = 1;
+	while ( edge < blockSize ) {
+		edge <<= 1;
+	}
+	return edge > 0x40000000 ? 0 : static_cast<int>( edge );
 }
 
+int R_ShadowMapAtlasRootEdge( int atlasSize ) {
+	if ( atlasSize <= 0 ) {
+		return 0;
+	}
+	int edge = 1;
+	while ( edge <= atlasSize / 2 ) {
+		edge <<= 1;
+	}
+	return edge;
+}
+
+int R_ShadowMapAtlasBlockCapacity( int atlasSize, int tileSize, int atlasDiv ) {
+	const int blockEdge = R_ShadowMapAtlasBlockEdge( tileSize, atlasDiv );
+	const int rootEdge = R_ShadowMapAtlasRootEdge( atlasSize );
+	if ( blockEdge <= 0 || rootEdge <= 0 ) {
+		return 0;
+	}
+	const int perRow = rootEdge / blockEdge;
+	return perRow * perRow;
+}
+
+int R_ShadowMapAtlasMinTileSize( int tileSize ) {
+	return Min( tileSize, Max( 128, tileSize / 4 ) );
+}
+
+static long long R_ShadowMapAtlasRequestArea( const shadowMapAtlasRequest_t &request ) {
+	const long long edge = R_ShadowMapAtlasBlockEdge( request.tileSize, request.atlasDiv );
+	return edge * edge * Max( 1, request.passes );
+}
+
+bool R_ShadowMapFitAtlasTiles( int atlasSize, shadowMapAtlasRequest_t *requests, int count ) {
+	const long long rootEdge = R_ShadowMapAtlasRootEdge( atlasSize );
+	const long long capacity = rootEdge * rootEdge;
+	if ( requests == NULL || count <= 0 ) {
+		return true;
+	}
+	count = Min( count, SHADOWMAP_ATLAS_MAX_REQUESTS );
+
+	long long demand = 0;
+	int order[SHADOWMAP_ATLAS_MAX_REQUESTS];
+	for ( int i = 0; i < count; ++i ) {
+		demand += R_ShadowMapAtlasRequestArea( requests[i] );
+		// ascending extent; among equals the later light gives way first
+		int slot = i;
+		while ( slot > 0 && requests[order[slot - 1]].extent >= requests[i].extent ) {
+			order[slot] = order[slot - 1];
+			--slot;
+		}
+		order[slot] = i;
+	}
+
+	// One halving for each light in turn before any light takes a second:
+	// the view loses resolution evenly from its smallest lights up.
+	while ( demand > capacity ) {
+		bool halved = false;
+		for ( int i = 0; i < count && demand > capacity; ++i ) {
+			shadowMapAtlasRequest_t &request = requests[order[i]];
+			const int smaller = request.tileSize / 2;
+			if ( smaller < request.minTileSize || smaller < 1 ) {
+				continue;
+			}
+			demand -= R_ShadowMapAtlasRequestArea( request );
+			request.tileSize = smaller;
+			demand += R_ShadowMapAtlasRequestArea( request );
+			halved = true;
+		}
+		if ( !halved ) {
+			break;
+		}
+	}
+	return demand <= capacity;
+}
+
+int R_ShadowMapProjectedTileSize( const viewLight_t *vLight, int atlasDiv, int maxBlockSize ) {
+	const int maxTileSize = maxBlockSize / Max( 1, atlasDiv );
+	if ( maxTileSize < 128 ) {
+		return 0;
+	}
+	const int wanted = ( vLight != NULL && vLight->shadowMapTileSize > 0 )
+		? vLight->shadowMapTileSize : r_shadowMapSize.GetInteger();
+	return idMath::ClampInt( 128, maxTileSize, wanted );
+}
+
+// Pins the pure policies above: the point cache holds a dense view's lights
+// at the shipped cube size inside its memory bound, never fewer than the
+// twelve slots it always had; the live-caster window spans a game tic at
+// every display rate; and a view's atlas lights are cut down, smallest first,
+// until they fit.
 bool R_ShadowMapCachePolicySelfTest( void ) {
 	// Quality and Ultra cut four tiles, Enhanced sixteen; Maximum's cascades
 	// take a quarter of its atlas each
@@ -350,8 +437,55 @@ bool R_ShadowMapCachePolicySelfTest( void ) {
 			|| R_ShadowMapAtlasBlockCapacity( 4096, 2048, 2 ) != 1
 			|| R_ShadowMapAtlasBlockCapacity( 4096, 4096, 2 ) != 0
 			|| R_ShadowMapAtlasBlockCapacity( 0, 1024, 1 ) != 0
-			|| R_ShadowMapAtlasBlockCapacity( 4096, 0, 1 ) != 0 ) {
+			|| R_ShadowMapAtlasBlockCapacity( 4096, 0, 1 ) != 0
+			// blocks are power-of-two squares inside a power-of-two root
+			|| R_ShadowMapAtlasBlockEdge( 1500, 1 ) != 2048
+			|| R_ShadowMapAtlasBlockEdge( 1024, 2 ) != 2048
+			|| R_ShadowMapAtlasRootEdge( 6000 ) != 4096
+			|| R_ShadowMapAtlasRootEdge( 4096 ) != 4096
+			|| R_ShadowMapAtlasMinTileSize( 2048 ) != 512
+			|| R_ShadowMapAtlasMinTileSize( 256 ) != 128
+			|| R_ShadowMapAtlasMinTileSize( 128 ) != 128 ) {
 		return false;
+	}
+	{
+		// Quality: two lights with both ownerships fill the four tiles and
+		// keep their size
+		shadowMapAtlasRequest_t fits[2] = {
+			{ 2048, 512, 1, 2, 300.0f }, { 2048, 512, 1, 2, 900.0f } };
+		if ( !R_ShadowMapFitAtlasTiles( 4096, fits, 2 )
+				|| fits[0].tileSize != 2048 || fits[1].tileSize != 2048 ) {
+			return false;
+		}
+		// a third light: the two smallest halve, the largest keeps its tile
+		shadowMapAtlasRequest_t three[3] = {
+			{ 2048, 512, 1, 2, 900.0f }, { 2048, 512, 1, 2, 300.0f }, { 2048, 512, 1, 2, 600.0f } };
+		if ( !R_ShadowMapFitAtlasTiles( 4096, three, 3 )
+				|| three[0].tileSize != 2048 || three[1].tileSize != 1024 || three[2].tileSize != 1024 ) {
+			return false;
+		}
+		// thirty-two lights at the floor are the most the atlas takes
+		shadowMapAtlasRequest_t many[33];
+		for ( int i = 0; i < 33; ++i ) {
+			const shadowMapAtlasRequest_t request = { 2048, 512, 1, 2, static_cast<float>( i ) };
+			many[i] = request;
+		}
+		if ( !R_ShadowMapFitAtlasTiles( 4096, many, 32 ) || many[0].tileSize != 512 || many[31].tileSize != 512 ) {
+			return false;
+		}
+		for ( int i = 0; i < 33; ++i ) {
+			many[i].tileSize = 2048;
+		}
+		if ( R_ShadowMapFitAtlasTiles( 4096, many, 33 ) || many[32].tileSize != 512 ) {
+			return false;
+		}
+		// a cascaded light's block is the whole Quality atlas until it halves
+		shadowMapAtlasRequest_t cascaded[2] = {
+			{ 2048, 512, 2, 1, 1.0e9f }, { 2048, 512, 1, 1, 400.0f } };
+		if ( !R_ShadowMapFitAtlasTiles( 4096, cascaded, 2 )
+				|| cascaded[0].tileSize != 1024 || cascaded[1].tileSize != 1024 ) {
+			return false;
+		}
 	}
 	const int maxSlots = SHADOWMAP_POINT_CACHE_MAX_SLOTS;
 	// 512 cubes of colour and depth are 12 MiB each: 42 fit in 512 MiB

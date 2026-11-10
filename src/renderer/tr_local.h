@@ -305,6 +305,11 @@ typedef struct viewLight_s {
 	// for this view, kept until one of the light's interactions changes state.
 	bool					shadowMapReceiverScanValid;
 	bool					shadowMapReceiverScanAllowsMaps;
+	// The edge of this light's projected atlas tile in this view, set once the
+	// view's lights are final (R_ShadowMapAssignAtlasTiles) so every atlas light
+	// of the view fits. 0 for a point cube light or one that was not assigned;
+	// back ends read it through R_ShadowMapProjectedTileSize.
+	int						shadowMapTileSize;
 } viewLight_t;
 
 
@@ -1553,6 +1558,8 @@ extern idCVar r_shadowMapSkipStencilShadows;	// 1 = skip stencil volume generati
 bool R_ShadowMapLightWillUseShadowMaps( const idRenderLightLocal *lightDef, const bool applySubviewPolicy = true );
 // remembers, for the Vulkan receiver scan, whether the model an entity's interactions are built from has a surface only stencil can shadow
 void R_ShadowMapNoteEntityModel( idRenderEntityLocal *def, const idRenderModel *model );
+// sizes the projected atlas tiles of a finished view so its lights all fit (tr_light.cpp)
+void R_ShadowMapAssignAtlasTiles( viewDef_t *viewDef );
 // backend-published: shadow-map resources were successfully prepared this video generation (draw_arb2.cpp)
 bool RB_ShadowMapResourcesKnownGood( bool pointLight );
 extern idCVar r_shadowMapStaticCache;		// 1 = reuse resident static-only shadow-map passes

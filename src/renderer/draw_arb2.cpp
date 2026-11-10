@@ -3422,13 +3422,11 @@ static int RB_ShadowMapAtlasDivForLight( const viewLight_t *vLight ) {
 
 static bool RB_ShadowMapValidateProjectedStateContract( const viewLight_t *vLight, const shadowMapProjectedLightState_t &state, const char **reason );
 
+// The tile the front end gave this light for the view
+// (R_ShadowMapAssignAtlasTiles), else r_shadowMapSize.
 static int RB_ShadowMapTileSizeForLight( const viewLight_t *vLight ) {
-	const int atlasDiv = RB_ShadowMapAtlasDivForLight( vLight );
-	const int maxTileSize = glConfig.maxTextureSize / atlasDiv;
-	if ( maxTileSize < 128 ) {
-		return 0;
-	}
-	return idMath::ClampInt( 128, maxTileSize, r_shadowMapSize.GetInteger() );
+	return R_ShadowMapProjectedTileSize( vLight, RB_ShadowMapAtlasDivForLight( vLight ),
+		glConfig.maxTextureSize );
 }
 
 bool RB_ShadowMapBuildArb2ParityState( const viewLight_t *vLight, const viewDef_t *viewDef, const int shadowMapSize, shadowMapArb2ParityState_t &state ) {
@@ -3952,9 +3950,24 @@ static pointShadowMapCacheEntry_t *RB_ShadowMapFindPointCacheEntry( const int li
 }
 
 // Atlas cell grid bookkeeping: entries occupy span x span cell blocks inside
-// the shared atlas. The grid is small (<= 8x8), so occupancy is re-derived
+// the shared atlas. The grid is small (<= 32x32), so occupancy is re-derived
 // from the valid entries on every allocation.
-static const int SHADOWMAP_ATLAS_MAX_GRID = 8;
+static const int SHADOWMAP_ATLAS_MAX_GRID = 32;
+
+// The cells a block of blockPixels a side spans. A cell is the smallest tile
+// a light is given (RB_ShadowMapEnsureResources), so a full-size light spans
+// four cells and a cascaded one eight.
+static int RB_ShadowMapAtlasSpanForBlock( const int blockPixels ) {
+	if ( g_shadowMapAtlasCellSize <= 0 || blockPixels <= 0 ) {
+		return 0;
+	}
+	return ( blockPixels + g_shadowMapAtlasCellSize - 1 ) / g_shadowMapAtlasCellSize;
+}
+
+static int RB_ShadowMapAtlasSpanForLight( const viewLight_t *vLight ) {
+	return RB_ShadowMapAtlasSpanForBlock(
+		RB_ShadowMapTileSizeForLight( vLight ) * RB_ShadowMapAtlasDivForLight( vLight ) );
+}
 
 static int RB_ShadowMapAtlasSizeValue( void ) {
 	const int maxTextureSize =
@@ -3994,8 +4007,10 @@ static bool RB_ShadowMapAtlasFindFreeBlock( const int span, int &cellX, int &cel
 			}
 		}
 	}
-	for ( int y = 0; y + span <= gridDim; y++ ) {
-		for ( int x = 0; x + span <= gridDim; x++ ) {
+	// blocks sit on multiples of their own span, so the cells a small block
+	// leaves free still line up into a larger one
+	for ( int y = 0; y + span <= gridDim; y += span ) {
+		for ( int x = 0; x + span <= gridDim; x += span ) {
 			bool blockFree = true;
 			for ( int by = 0; by < span && blockFree; by++ ) {
 				for ( int bx = 0; bx < span; bx++ ) {
@@ -4033,6 +4048,14 @@ static projectedShadowMapCacheEntry_t *RB_ShadowMapAllocProjectedCacheEntry(
 				if ( freeEntry == NULL ) {
 					freeEntry = entry;
 				}
+				continue;
+			}
+			// As for point cubes: a tile sampled this frame or the last belongs
+			// to a light still on screen. Evicting it makes that light miss in
+			// turn and evict the next, so a view with more passes than the cache
+			// holds re-rendered all of them. Leave it; the caller renders into
+			// the scratch target.
+			if ( entry->lastUsedFrame >= tr.frameCount - 1 ) {
 				continue;
 			}
 			if ( oldest == NULL || entry->lastUsedFrame < oldest->lastUsedFrame ) {
@@ -4310,9 +4333,9 @@ static shadowMapSchedule_t RB_ShadowMapSchedulePass( const viewLight_t *vLight, 
 			}
 			RB_ShadowMapSelectPointCacheEntry( schedule.pointEntry );
 		} else {
-			schedule.projectedEntry = RB_ShadowMapRecycleProjectedCacheEntry( lightIndex, passKind, RB_ShadowMapAtlasDivForLight( vLight ) );
+			schedule.projectedEntry = RB_ShadowMapRecycleProjectedCacheEntry( lightIndex, passKind, RB_ShadowMapAtlasSpanForLight( vLight ) );
 			if ( schedule.projectedEntry == NULL ) {
-				schedule.projectedEntry = RB_ShadowMapAllocProjectedCacheEntry( RB_ShadowMapAtlasDivForLight( vLight ) );
+				schedule.projectedEntry = RB_ShadowMapAllocProjectedCacheEntry( RB_ShadowMapAtlasSpanForLight( vLight ) );
 			}
 			RB_ShadowMapSelectProjectedCacheEntry( schedule.projectedEntry );
 		}
@@ -6219,9 +6242,12 @@ static bool RB_ShadowMapEnsureResources( const viewLight_t *vLight ) {
 
 	// keep the shared atlas resident whenever the projected path is live: its
 	// cell size tracks r_shadowMapSize, and a cell-size change invalidates
-	// every cached tile placement
+	// every cached tile placement. A cell is the smallest tile a light of a
+	// crowded view is cut down to, so such a light takes one cell where a
+	// light at the full r_shadowMapSize takes a block of sixteen.
 	{
-		const int atlasCellSize = idMath::ClampInt( 128, glConfig.maxTextureSize > 0 ? glConfig.maxTextureSize : 4096, r_shadowMapSize.GetInteger() );
+		const int atlasCellSize = R_ShadowMapAtlasMinTileSize(
+			idMath::ClampInt( 128, glConfig.maxTextureSize > 0 ? glConfig.maxTextureSize : 4096, r_shadowMapSize.GetInteger() ) );
 		const int atlasSize = RB_ShadowMapAtlasSizeValue();
 		if ( atlasCellSize != g_shadowMapAtlasCellSize ) {
 			for ( int i = 0; i < SHADOWMAP_CACHE_MAX_SLOTS; i++ ) {
@@ -6277,8 +6303,22 @@ static bool RB_ShadowMapEnsureResources( const viewLight_t *vLight ) {
 				// shadow targets are expendable: incompleteness falls back to stencil
 				g_shadowMapScratchRenderTexture->SetAllowIncomplete();
 			}
-		} else if ( g_shadowMapScratchRenderTexture->GetWidth() != shadowMapSize || g_shadowMapScratchRenderTexture->GetHeight() != shadowMapSize ) {
-			tr.ResizeRenderTexture( g_shadowMapScratchRenderTexture, shadowMapSize, shadowMapSize );
+		} else {
+			// The lights of a view no longer share one tile size, and resizing
+			// for each of them would reallocate the target several times a
+			// frame. It grows to the largest block asked for and stays: a
+			// smaller block renders into its corner and is sampled through its
+			// rectangle, as an atlas cell is. A changed r_shadowMapSize sizes
+			// it afresh, so a lower setting gives the memory back.
+			static int scratchSizedForSetting = 0;
+			const int setting = r_shadowMapSize.GetInteger();
+			const int width = g_shadowMapScratchRenderTexture->GetWidth();
+			const int height = g_shadowMapScratchRenderTexture->GetHeight();
+			if ( width < shadowMapSize || height < shadowMapSize
+					|| ( scratchSizedForSetting != setting && ( width != shadowMapSize || height != shadowMapSize ) ) ) {
+				tr.ResizeRenderTexture( g_shadowMapScratchRenderTexture, shadowMapSize, shadowMapSize );
+			}
+			scratchSizedForSetting = setting;
 		}
 		g_shadowMapDepthImage = g_shadowMapScratchDepthImage;
 		g_shadowMapRenderTexture = g_shadowMapScratchRenderTexture;
@@ -6399,7 +6439,12 @@ static bool RB_ShadowMapEnsureTranslucentResources( const viewLight_t *vLight ) 
 	}
 
 	const int shadowMapAtlasDiv = RB_ShadowMapAtlasDivForLight( vLight );
-	const int shadowMapSize = shadowMapTileSize * shadowMapAtlasDiv;
+	// Moments are sampled through the rectangle of the depth map they were
+	// rendered with, which is the scratch target (translucent casters are
+	// never cached). That target may be larger than this light's block, so
+	// the moment target takes its size and the block the same corner of it.
+	const int shadowMapSize = Max( shadowMapTileSize * shadowMapAtlasDiv,
+		g_shadowMapScratchRenderTexture != NULL ? g_shadowMapScratchRenderTexture->GetWidth() : 0 );
 
 	static const char *imageNames[3] = {
 		"_translucentShadowMapR",
@@ -14027,11 +14072,13 @@ static bool RB_SharedWorldInteractionGLScheduleSealedMapPass(
 			schedule.pointEntry = NULL;
 		}
 	} else {
+		const int cellSpan = RB_ShadowMapAtlasSpanForBlock(
+			pass.projected.state.tileSize * pass.projected.state.atlasDiv );
 		schedule.projectedEntry = RB_ShadowMapRecycleProjectedCacheEntry(
-			cacheLightIndex, passKind, pass.projected.state.atlasDiv );
+			cacheLightIndex, passKind, cellSpan );
 		if ( schedule.projectedEntry == NULL ) {
 			schedule.projectedEntry = RB_ShadowMapAllocProjectedCacheEntry(
-				pass.projected.state.atlasDiv, false );
+				cellSpan, false );
 		}
 	}
 	if ( pass.point.valid ? schedule.pointEntry == NULL
@@ -14152,7 +14199,8 @@ static bool RB_SharedWorldInteractionGLProjectedEntryMatches(
 			sizeof( entry->state ) ) == 0
 		&& preparedPass.projectedDepthImage == g_shadowMapAtlasDepthImage
 		&& preparedPass.renderTexture == g_shadowMapAtlasRenderTexture
-		&& entry->atlasCellSpan == pass.projected.state.atlasDiv
+		&& entry->atlasCellSpan == RB_ShadowMapAtlasSpanForBlock(
+			pass.projected.state.tileSize * pass.projected.state.atlasDiv )
 		&& preparedPass.projectedOriginX
 			== entry->atlasCellX * g_shadowMapAtlasCellSize
 		&& preparedPass.projectedOriginY

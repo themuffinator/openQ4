@@ -1983,17 +1983,18 @@ static int ShadowMapReceiverMask(
 		? SHADOWMAP_RECEIVER_MASK_LOCAL : SHADOWMAP_RECEIVER_MASK_GLOBAL;
 }
 
-static int ShadowMapProjectedTileSize(
+// The tile the front end gave the light for this view
+// (R_ShadowMapAssignAtlasTiles), else r_shadowMapSize: the same edge both
+// back ends read, so the sealed state matches what they allocate.
+static int ShadowMapProjectedTileSize( const viewLight_t *viewLight,
 		const shadowMapLightClassification_t &classification ) {
 	const int atlasDiv = Max( 1, classification.atlasDiv );
 	const int maxTextureSize = glConfig.maxTextureSize > 0
 		? glConfig.maxTextureSize : 4096;
 	const int atlasSize = idMath::ClampInt( 2048, 16384,
 		r_shadowMapAtlasSize.GetInteger() );
-	const int maxTileSize = Min( maxTextureSize, atlasSize ) / atlasDiv;
-	return maxTileSize >= 128
-		? idMath::ClampInt( 128, maxTileSize,
-			r_shadowMapSize.GetInteger() ) : 0;
+	return R_ShadowMapProjectedTileSize( viewLight, atlasDiv,
+		Min( maxTextureSize, atlasSize ) );
 }
 
 static std::uint64_t MakeShadowMapResourcePlanId( int passIndex ) {
@@ -2053,7 +2054,7 @@ static bool BuildShadowMapPasses(
 		point.depthCompare = r_shadowMapPointDepthCompare.GetBool();
 		point.highPrecision = r_shadowMapPointHighPrecision.GetBool();
 	} else if ( classSupported ) {
-		const int tileSize = ShadowMapProjectedTileSize( classification );
+		const int tileSize = ShadowMapProjectedTileSize( viewLight, classification );
 		if ( tileSize <= 0 ) {
 			SetError( error, CLASSIC_INTERACTION_FAILURE_SHADOW_MAP,
 				tileSize, view.shadowMapPassPacketIndex, -1,

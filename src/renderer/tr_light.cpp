@@ -1763,18 +1763,110 @@ void R_ShadowMapNoteEntityModel( idRenderEntityLocal *def, const idRenderModel *
 
 /*
 =================
+R_ShadowMapGatherAtlasRequests
+
+The view's atlas lights: projected, parallel and distant point lights, which
+share one projected atlas that Vulkan allocates afresh for every view. Point
+lights take cubes from a pool no view exhausts and are not among them.
+
+Before the view's interactions are known every such light is counted for two
+blocks, one per receiver ownership, at the smallest tile it may be given: the
+most the finished view can ask for. Once they are known a light counts for
+the ownerships that will need a block of their own, at the tile it has alone,
+and a light with no shadowed receiver is left out.
+
+Returns the count, or -1 when the view has more atlas lights than fit the
+request list.
+=================
+*/
+static int R_ShadowMapGatherAtlasRequests( const viewDef_t *viewDef, const bool interactionsKnown,
+		const int atlasSize, shadowMapAtlasRequest_t *requests, viewLight_t **lights ) {
+	int count = 0;
+	for ( viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
+		const idRenderLightLocal *lightDef = vLight->lightDef;
+		if ( lightDef == NULL || lightDef->lightShader == NULL
+				|| !lightDef->lightShader->LightCastsShadows()
+				|| !R_ShadowMapsNeedPerSurfaceStencilVolumes( lightDef ) ) {
+			continue;
+		}
+		const shadowMapLightClassification_t classification = R_ClassifyShadowMapLight( vLight );
+		if ( classification.pointLight ) {
+			continue;
+		}
+		const int atlasDiv = idMath::ClampInt( 1, 2, classification.atlasDiv );
+		const int tileSize = R_ShadowMapProjectedTileSize( NULL, atlasDiv, atlasSize );
+		if ( tileSize <= 0 ) {
+			continue;
+		}
+
+		int passes = 2;
+		if ( interactionsKnown ) {
+			// VK_ShadowMap_PrepareViewLights: GLOBAL shares the LOCAL block
+			// when the light has no local caster of any kind
+			const bool localReceivers = vLight->localInteractions != NULL;
+			const bool globalReceivers = vLight->globalInteractions != NULL
+				|| ( r_shadowMapTranslucentReceivers.GetBool() && vLight->translucentInteractions != NULL );
+			const bool localCasters = vLight->localShadowMapCasters != NULL
+				|| vLight->localShadowMapDynamicCasters != NULL
+				|| vLight->localTranslucentShadowMapCasters != NULL;
+			passes = ( localReceivers ? 1 : 0 ) + ( globalReceivers ? 1 : 0 );
+			if ( passes == 0 ) {
+				continue;
+			}
+			if ( passes == 2 && !localCasters ) {
+				passes = 1;
+			}
+		}
+		if ( count >= SHADOWMAP_ATLAS_MAX_REQUESTS ) {
+			return -1;
+		}
+
+		// What the light covers: the width of an ordinary projector's far
+		// face. Sunlight, global and distant point sources are fitted to the
+		// view or to the world and give up resolution last.
+		float extent = idMath::INFINITY;
+		if ( classification.ordinaryProjectedLight ) {
+			const renderLight_t &parms = lightDef->parms;
+			const float targetLength = parms.target.Length();
+			const float endLength = parms.end.Length();
+			extent = 2.0f * Max( parms.right.Length(), parms.up.Length() );
+			if ( targetLength > 0.0f && endLength > targetLength ) {
+				extent *= endLength / targetLength;
+			}
+		}
+
+		shadowMapAtlasRequest_t &request = requests[count];
+		request.minTileSize = R_ShadowMapAtlasMinTileSize( tileSize );
+		request.tileSize = interactionsKnown ? tileSize : request.minTileSize;
+		request.atlasDiv = atlasDiv;
+		request.passes = passes;
+		request.extent = extent;
+		if ( lights != NULL ) {
+			lights[count] = vLight;
+		}
+		count++;
+	}
+	return count;
+}
+
+// the atlas edge both back ends create (RB_ShadowMapAtlasSizeValue, VK_ShadowMap_AtlasSizeValue)
+static int R_ShadowMapAtlasSizeValue( void ) {
+	return Min( idMath::ClampInt( 2048, 16384, r_shadowMapAtlasSize.GetInteger() ),
+		glConfig.maxTextureSize > 0 ? glConfig.maxTextureSize : 4096 );
+}
+
+/*
+=================
 R_ShadowMapAtlasHoldsView
 
-Projected, parallel and distant point lights render into tiles of one atlas
-that is allocated afresh for every view, in view-light order. On Vulkan a
-light that finds no tile left has only its stencil volumes to fall back on in
-that frame, so an atlas light may shed them only in a view whose atlas lights
-are certain to fit. Each is counted for two blocks, one per receiver
-ownership, although most need one. Quality and Ultra cut four tiles; the
-largest block any light of the view asks for sets how many the atlas holds.
-
-Point lights take cubes from a pool no view exhausts and are not counted.
-Lights the view drops later are, which only errs towards keeping volumes.
+On Vulkan a light that finds no block left in the atlas has only its stencil
+volumes to fall back on in that frame, so an atlas light may shed them only in
+a view whose atlas lights are certain to fit. The view's interactions are not
+known yet when this is asked, so it asks whether every atlas light of the view
+would fit with two blocks at its smallest tile: if that holds,
+R_ShadowMapAssignAtlasTiles finds sizes that fit once the view is finished.
+Lights the view drops later are counted too, which only errs towards keeping
+volumes.
 =================
 */
 static bool R_ShadowMapAtlasHoldsView( void ) {
@@ -1790,36 +1882,48 @@ static bool R_ShadowMapAtlasHoldsView( void ) {
 		return cachedHolds;
 	}
 
-	const int atlasSize = Min( idMath::ClampInt( 2048, 16384, r_shadowMapAtlasSize.GetInteger() ),
-		glConfig.maxTextureSize > 0 ? glConfig.maxTextureSize : 4096 );
-	int blocks = 0;
-	int largestBlock = 0;
-	for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {
-		const idRenderLightLocal *lightDef = vLight->lightDef;
-		if ( lightDef == NULL || lightDef->lightShader == NULL
-				|| !lightDef->lightShader->LightCastsShadows()
-				|| !R_ShadowMapsNeedPerSurfaceStencilVolumes( lightDef ) ) {
-			continue;
-		}
-		const shadowMapLightClassification_t classification = R_ClassifyShadowMapLight( vLight );
-		if ( classification.pointLight ) {
-			continue;
-		}
-		// the tile and block a backend gives this light (VK_ShadowMap_PrepareViewLights)
-		const int atlasDiv = idMath::ClampInt( 1, 2, classification.atlasDiv );
-		const int maxTileSize = atlasSize / atlasDiv;
-		if ( maxTileSize < 128 ) {
-			continue;
-		}
-		const int tileSize = idMath::ClampInt( 128, maxTileSize, r_shadowMapSize.GetInteger() );
-		largestBlock = Max( largestBlock, tileSize * atlasDiv );
-		blocks += 2;
-	}
+	const int atlasSize = R_ShadowMapAtlasSizeValue();
+	shadowMapAtlasRequest_t requests[SHADOWMAP_ATLAS_MAX_REQUESTS];
+	const int count = R_ShadowMapGatherAtlasRequests( viewDef, false, atlasSize, requests, NULL );
 
 	cachedView = viewDef;
 	cachedFrame = tr.frameCount;
-	cachedHolds = blocks <= R_ShadowMapAtlasBlockCapacity( atlasSize, largestBlock, 1 );
+	cachedHolds = count >= 0 && R_ShadowMapFitAtlasTiles( atlasSize, requests, count );
 	return cachedHolds;
+}
+
+/*
+=================
+R_ShadowMapAssignAtlasTiles
+
+Sets the tile size of every atlas light of the finished view, so that the
+blocks both back ends cut for them fit the atlas together. A view that fits
+as it is leaves every light the tile it has alone. Four tiles are all Quality
+and Ultra cut, and a light with both receiver ownerships takes two, so a view
+of three projected lights used to leave one of them on stencil for the rest
+of the level on Vulkan and re-rendering every view on OpenGL.
+
+A light that was not assigned (a point cube light, a light with nothing to
+shadow, a view with shadow maps off) keeps 0 and the back ends use
+r_shadowMapSize.
+=================
+*/
+void R_ShadowMapAssignAtlasTiles( viewDef_t *viewDef ) {
+	if ( viewDef == NULL || !r_shadows.GetBool() || !r_useShadowMap.GetBool() ) {
+		return;
+	}
+	const int atlasSize = R_ShadowMapAtlasSizeValue();
+	shadowMapAtlasRequest_t requests[SHADOWMAP_ATLAS_MAX_REQUESTS];
+	viewLight_t *lights[SHADOWMAP_ATLAS_MAX_REQUESTS];
+	const int count = R_ShadowMapGatherAtlasRequests( viewDef, true, atlasSize, requests, lights );
+	if ( count <= 0 ) {
+		// none, or more than the list holds: every light keeps r_shadowMapSize
+		return;
+	}
+	R_ShadowMapFitAtlasTiles( atlasSize, requests, count );
+	for ( int i = 0; i < count; ++i ) {
+		lights[i]->shadowMapTileSize = requests[i].tileSize;
+	}
 }
 
 /*
