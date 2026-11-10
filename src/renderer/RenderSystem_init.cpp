@@ -6654,6 +6654,11 @@ static bool R_InitRendererDevice( bool legacyPolicy, bool forceWindow, char *err
 			common->Printf( "glGetError() = 0x%x\n", err );
 		}
 #endif
+		// Every image the device holds was just built under the image settings
+		// in effect, and one loaded later reads them then. A change made
+		// before this start is therefore applied: swallow its modified state so
+		// the next frame's check does not reload every image a second time.
+		globalImages->PrimeCvars();
 	}
 	r_initialRendererDevicePending = false;
 	if ( glConfig.isInitialized ) {

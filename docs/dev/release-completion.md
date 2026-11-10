@@ -16,6 +16,10 @@ See [player release status](../user/release-status.md).
   and the sound device restarts if the speaker layout or reverb setting
   changed. A preset that changes anti-aliasing asks you to keep or revert, as
   any display change does. Other presets apply without a question.
+- **Textures load once, not twice.** After a preset, after a `vid_restart`
+  that follows a texture quality change, and at a start with reduced
+  textures, the game used to load its textures twice in a row. It now loads
+  them once.
 - **Two details wait for the next start.** High-quality texture flags and the
   per-sound sample limit fully change when the game next starts, as they
   always have. The page tells you when your changes include one of them.

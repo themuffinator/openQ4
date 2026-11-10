@@ -373,7 +373,7 @@
     "settings-effect-foundations": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "aa97b276e4aa6718aef531561ce5de187efa105b6f5aa69dee5894ddce70d60f",
+      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
       "baseline_engine_revision": "efcfdb0ffe6eaffa11dbf2ced026495539156478",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Automatic completion waits for real effect readiness and a fresh present; owner close during commit preparation restores before persistence. Checked OpenAL leases gain untouched cancellation and non-releasing finalization. Schema2 adds strict versioned effect-plan envelopes and immutable decoding while the production host remains schema1. Full mixed execution, portable renderer/audio reconstruction and live recovery remain required.",
@@ -403,7 +403,7 @@
     "renderer-image-recovery": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "aa97b276e4aa6718aef531561ce5de187efa105b6f5aa69dee5894ddce70d60f",
+      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
       "baseline_engine_revision": "d6abeabc7e2e348ea11ce50a7671b830e77a15b1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Checked coalesced image/material restart, original failed-recovery inventory, monotonic resource instance IDs and metadata mutation invalidation. Full engine/modules and49 UI suites pass. Four render-target images after SP/OpenGL125% and MP/Vulkan200% gameplay/ordinary restart qualify compatibility only. Actual checked-policy Apply, portable consumed-policy/content reconstruction, complete settings/editor/migration remain unaccepted.",
@@ -423,7 +423,7 @@
     "consumed-settings-recovery": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "aa97b276e4aa6718aef531561ce5de187efa105b6f5aa69dee5894ddce70d60f",
+      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
       "baseline_engine_revision": "b2cb00dfb87cc8663cd8e895dcccce37d9c1faa1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Portable no-effect audio requested/observed state and captured renderer policy/output completion records. Full build and56 UI suites pass; four reviewed render-target images after windowed gameplay and ordinary video restart qualify compatibility only. Content identity, DDS/cube exact reduction, cold recovery, full EFX and mixed settings Apply remain unaccepted.",
@@ -443,7 +443,7 @@
     "checked-image-reduction": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "aa97b276e4aa6718aef531561ce5de187efa105b6f5aa69dee5894ddce70d60f",
+      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
       "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "DDS mip reachability resolves once from the original source; decoded cube reduction is atomic across six faces, resampling is exact or refused, and binary 2D/cube assembly checks every allocation/caller. Full build and ordinary windowed GL/Vulkan gameplay/restart qualify compatibility. Content identity, portable reconstruction, checked driver failure and mixed SYSTEM Apply remain unaccepted.",
@@ -453,7 +453,7 @@
     "checked-upload-storage": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "aa97b276e4aa6718aef531561ce5de187efa105b6f5aa69dee5894ddce70d60f",
+      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
       "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Actual GL dynamic upload allocation metadata, partial cleanup and persistent-to-streaming fallback bookkeeping are qualified by production-method tests and ordinary gameplay. Queries preserve outputs on refusal and call no graphics getter. Upload completion, Vulkan allocation readback and complete renderer resource accounting remain required.",
@@ -778,13 +778,13 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
       "scope": "Render API 20 settings reports: the renderer's r_renderer resolution and each level load's light-grid outcome, with the committed preload policy pulled from the settings service once per load. Qualified by a contract test, the settings service harness and SP map loads on OpenGL and Vulkan.",
-      "sha256": "aa97b276e4aa6718aef531561ce5de187efa105b6f5aa69dee5894ddce70d60f"
+      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550"
     },
     "deferred-light-grid-executor": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
       "scope": "Deferred executor for the next map's light-grid preload: one executor per Apply, a schema-2 next-map journal with automatic completion after a later presented frame, the committed policy for level loads until persistence, Apply and Exit on a committed target, cold-start replay in both directions, and the neutral recovery title. Qualified by production-body service, host, catalog and controller tests, a mutation pass and a cold-recovery probe.",
-      "sha256": "aa97b276e4aa6718aef531561ce5de187efa105b6f5aa69dee5894ddce70d60f"
+      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550"
     },
     "system-render-options": {
       "kind": "implementation_checkpoint",
@@ -796,7 +796,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
       "scope": "Renderer fallback executor: r_renderer applies automatically through a checked device restart on the captured display, proved by the renderer's own selection report, with schema-2 renderer-domain recovery and startup replay. Qualified by the host, service and exact-value harnesses, a mutation pass and the full Meson suite.",
-      "sha256": "aa97b276e4aa6718aef531561ce5de187efa105b6f5aa69dee5894ddce70d60f"
+      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550"
     },
     "system-renderer-fallback": {
       "kind": "implementation_checkpoint",

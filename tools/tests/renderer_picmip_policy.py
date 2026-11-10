@@ -27,6 +27,7 @@ IMAGE_LOAD_CPP = Path("src") / "renderer" / "Image_load.cpp"
 IMAGE_PROCESS_CPP = Path("src") / "imagetools" / "Image_process.cpp"
 IMAGE_FILES_CPP = Path("src") / "imagetools" / "Image_files.cpp"
 RENDER_SYSTEM_CPP = Path("src") / "renderer" / "RenderSystem.cpp"
+RENDER_SYSTEM_INIT_CPP = Path("src") / "renderer" / "RenderSystem_init.cpp"
 
 
 def test_picmip_cvars_are_declared_with_explicit_ranges():
@@ -282,6 +283,23 @@ def test_reduction_changes_reload_images_without_a_restart():
     assert_true("void idImageManager::PrimeCvars() {" in image_manager, "startup should swallow the born-modified state")
     assert_true("\tPrimeCvars();" in image_manager, "idImageManager::Init should prime the reduction cvars")
     assert_true("void				PrimeCvars();" in image_h, "PrimeCvars should be part of the image manager interface")
+
+    # A device start rebuilds every image under the settings in effect, so it
+    # swallows the modified state as well. Without that, the frame after a
+    # restart that follows a change (a Performance Preset's Apply, vid_restart,
+    # a launch whose configuration sets a reduction) reloads every image again.
+    render_init = read_repo_file(RENDER_SYSTEM_INIT_CPP)
+    start = render_init.index("static bool R_InitRendererDevice( bool legacyPolicy, bool forceWindow, char *error, int errorSize ) {")
+    device = render_init[start:render_init.index("void idRenderSystemLocal::InitOpenGL( void ) {", start)]
+    assert_true(
+        device.count("globalImages->ReloadImages") == 2 and device.count("globalImages->PrimeCvars();") == 1,
+        "a device start should reload the images on each backend and prime the image cvars once",
+    )
+    assert_true(
+        device.rindex("globalImages->ReloadImages") < device.index("#endif\n\t\t// Every image the device holds")
+        < device.index("globalImages->PrimeCvars();") < device.index("r_initialRendererDevicePending = false;"),
+        "the prime follows both backends' reload, inside the block that started the device",
+    )
 
 
 def test_picmip_is_documented_for_players():

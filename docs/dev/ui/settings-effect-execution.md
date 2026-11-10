@@ -660,9 +660,15 @@ later presented frame. It does not read back image dimensions, upload
 allocations or the speaker layout the device chose. Those foundations remain
 for a stricter executor.
 
-One cost is unchanged from the stock path: on the frame after the restart the
-image manager sees the changed reduction settings and reloads the file-backed
-images a second time (`idImageManager::CheckCvars`).
+The restart is the only image reload. Until the follow-up of the same day the
+frame after it reloaded the file-backed images a second time, as the stock
+path always had: the image manager's per-frame check
+(`idImageManager::CheckCvars`) still saw the changed reduction settings as
+modified. A device start now swallows that state once its own reload is done
+(`R_InitRendererDevice` calls `PrimeCvars`). That also spares the second
+reload after a `vid_restart` that follows a texture setting change, and at a
+launch whose configuration sets a reduction. A change made without a restart
+still reloads through the per-frame check.
 
 ### Combined executor qualification
 
@@ -723,12 +729,22 @@ images a second time (`idImageManager::CheckCvars`).
   - **The notice.** With Minimum drafted from Maximum the status line reads
     the next-start notice on two lines beside an enabled APPLY CHANGES
     (engine screenshot reviewed).
-- Not covered: a map was not loaded, so the reload inside a level was not
-  timed; a failed device restart was exercised in the harness only; the
-  window was hidden, so no visible exclusive-fullscreen Apply ran.
+  - **One reload.** Before the follow-up each preset run logged four second
+    reloads (`Texture reduction changed, reloading images`) and one more at
+    the relaunch. After it both runs, repeated on both renderers with the
+    same results as above, log none. In `game/airdefense1`,
+    `image_downSizeLimit 64` followed at once by `vid_restart` shrank 432
+    of 477 world textures with no reload after the restart, and a later
+    `image_downSizeLimit 128` without a restart reloaded once and grew the
+    same 432, on OpenGL and on Vulkan.
+- Not covered: a preset was not applied inside a map (the in-map check used
+  the console); a failed device restart was exercised in the harness only;
+  the window was hidden, so no visible exclusive-fullscreen Apply ran. The
+  interrupted Apply and the Revert ran before the follow-up and were not
+  repeated.
 
 Evidence: `.tmp/ui/retained-display-default/validation-evidence.json`,
-SHA-256 `a573f60c480599dcc3ad5e2721c23a6362051f85b56b7a3e202b5dc7025a9aef`.
+SHA-256 `82734e2d995324a16e00f03540e64af51a51c5fbbd57d83e5c49dd63d5e0c9c0`.
 
 ## Qualification
 

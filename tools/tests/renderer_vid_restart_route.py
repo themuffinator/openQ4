@@ -37,7 +37,7 @@ static bool R_ImagePolicyFinish(char*,int){return true;}
 static std::vector<std::string> events;
 static bool deviceAlive=false, fontsAlive=false, configuredFullscreen=true;
 static bool createdFullscreen=false;
-static int imageReloads=0, imagePurges=0, deviceStarts=0;
+static int imageReloads=0, imagePurges=0, imagePrimes=0, deviceStarts=0;
 static int failure=0, inputStarts=0;
 static bool nestRestart=false;
 static bool contextCurrent=true;
@@ -126,6 +126,11 @@ struct Images {
         assert(force && deviceAlive && glConfig.isInitialized && !fontsAlive);
         ++imageReloads; Record("reload");
         if(failure==6)pendingGLError=1;
+    }
+    // A device start swallows the image cvars' modified state once its reload is done.
+    void PrimeCvars() {
+        assert(deviceAlive && glConfig.isInitialized);
+        ++imagePrimes; assert(imagePrimes<=imageReloads);
     }
 } images, *globalImages=&images;
 struct VertexCache {
@@ -371,7 +376,7 @@ static void ColdInitialize() {
     assert(!R_TryInitializeDisplay(&request,error,sizeof(error)) && events.empty());
     // Reset stand-in counters for the legacy/restart cases below, without
     // granting cold-start permission after a successful device shutdown.
-    deviceStarts=imageReloads=imagePurges=0;devicePresentation={};
+    deviceStarts=imageReloads=imagePurges=imagePrimes=0;devicePresentation={};
     std::puts("Strict first device: Init-only gate, immutable request, preflight, GL/VK failure cleanup, explicit cold retry, no world/font/action replay or false present passed");
 }
 int main() {
@@ -382,7 +387,7 @@ int main() {
 #endif
     ColdInitialize();
     tr.InitOpenGL();
-    assert(deviceStarts==1 && imageReloads==1 && createdFullscreen);
+    assert(deviceStarts==1 && imageReloads==1 && imagePrimes==1 && createdFullscreen);
     assert(Position(backend)<Position("reload"));
     events.clear();
     tr.InitOpenGL();
@@ -403,7 +408,7 @@ int main() {
             R_PerformFullVidRestart(forceWindow);
             assert(configuredFullscreen==fullscreen);
             assert(createdFullscreen==(fullscreen && !forceWindow));
-            assert(deviceStarts==startsBefore+1 && imageReloads==reloadsBefore+1);
+            assert(deviceStarts==startsBefore+1 && imageReloads==reloadsBefore+1 && imagePrimes==imageReloads);
             assert(imagePurges==imageReloads-1 && fontsAlive && deviceAlive);
             assert(Position("targets-shutdown")<Position("fonts-shutdown"));
             assert(Position("fonts-shutdown")<Position("purge"));
