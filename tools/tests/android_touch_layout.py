@@ -168,8 +168,8 @@ def compare(cpp_lines: list[str], java_lines: list[str], cases: list[str]) -> in
         assert len(fa) == len(fb), (case, a, b)
         assert fa[:5] == fb[:5], f'flags differ for {case}:\n  C++  {a}\n  Java {b}'
         for index, (x, y) in enumerate(zip(fa[5:], fb[5:])):
-            # Positions and radii agree to 0.02 px (an ARM64 compiler may
-            # contract to FMA); opacities are exact percentages.
+            # Positions and radii agree to 0.02 px; opacities are exact
+            # percentages.
             exact = index >= 2 and (index - 2) % 4 == 3
             assert (x == y) if exact else abs(float(x) - float(y)) <= 0.02, \
                 f'placement differs for {case}:\n  C++  {a}\n  Java {b}'
@@ -203,8 +203,12 @@ def main() -> None:
     cpp = out / 'layout.cpp'
     binary = out / ('layout.exe' if os.name == 'nt' else 'layout')
     cpp.write_text(CPP, encoding='utf-8')
-    subprocess.run([args.cxx, '-std=c++17', '-O1', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT), str(cpp), '-o', str(binary)],
-                   cwd=out, env=env, check=True)
+    # -ffp-contract=off, as meson.build gives every engine source: a compiler
+    # that fuses a*b+c by default (Apple's ARM64 clang) otherwise rounds the
+    # two sides of an equal-distance choice in PlaceButton differently and
+    # places a control 80 px from where the engine and the Java model put it.
+    subprocess.run([args.cxx, '-std=c++17', '-O1', '-ffp-contract=off', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT), str(cpp),
+                    '-o', str(binary)], cwd=out, env=env, check=True)
     cpp_out = subprocess.run([str(binary)], input='\n'.join(cases + grammar) + '\n', capture_output=True, text=True,
                              check=True).stdout.splitlines()
 
