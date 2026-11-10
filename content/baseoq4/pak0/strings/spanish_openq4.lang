@@ -1239,7 +1239,7 @@
 	"#str_230073"	"Aplicando ajustes…"
 	"#str_230074"	"Restaurando los ajustes anteriores…"
 	"#str_230075"	"Guardando ajustes…"
-	"#str_230076"	"Aplica por separado los cambios de pantalla, renderizado e iluminación."
+	"#str_230076"	"Algunos cambios de textura y sonido se completan al reiniciar el juego."
 	"#str_230077"	"Los ajustes requieren atención"
 	"#str_230078"	"Este mapa mantiene el ajuste anterior de iluminación hasta que se cargue el siguiente mapa."
 	"#str_230079"	"Este mapa precarga su iluminación."

@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "snd_local.h"
 #include "SoundSettings.h"
+#include "SoundRestart.h"
 #include "SoundMemoryTrim.h"
 #include "VoiceChat.h"
 
@@ -511,6 +512,44 @@ void idSoundSystemLocal::Restart()
 	}
 
 	SetMute( wasMuted );
+}
+
+/*
+========================
+Sound_OutputState
+========================
+*/
+soundOutputState_t Sound_OutputState( void )
+{
+	// A failed open also sets s_noSound, so ask the device first.
+	if( soundSystemLocal.hardware.InitFailed() )
+	{
+		return SOUND_OUTPUT_FAILED;
+	}
+	if( s_noSound.GetBool() )
+	{
+		return SOUND_OUTPUT_OFF;
+	}
+	if( soundSystemLocal.needsRestart )
+	{
+		return SOUND_OUTPUT_RESTARTING;
+	}
+	return soundSystemLocal.hardware.GetOpenALDevice() != NULL ? SOUND_OUTPUT_READY : SOUND_OUTPUT_OFF;
+}
+
+/*
+========================
+Sound_RequestOutputRestart
+========================
+*/
+bool Sound_RequestOutputRestart( void )
+{
+	if( Sound_OutputState() != SOUND_OUTPUT_READY )
+	{
+		return false;
+	}
+	soundSystemLocal.SetNeedsRestart();
+	return true;
 }
 
 /*

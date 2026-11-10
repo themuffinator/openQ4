@@ -239,9 +239,12 @@ MAIN = r'''
 int main(){
     {
         Scenario s;ui_retainedSystem.value=false;CHECK(!s.session.OpenSystemSettings());CHECK(s.manager.loads==0 && s.parent->deactivates==0);
-        // The gate includes the SYSTEM page only once it offers every stock setting and each one works there.
-        ui_retained.value=true;CHECK((RETAINED_SYSTEM_MISSING_SETTINGS[0]!=NULL || RETAINED_SYSTEM_INCOMPLETE_SETTINGS[0]!=NULL) && !s.session.OpenSystemSettings() && s.manager.loads==0);
-        ui_retainedSystem.value=true;CHECK(s.session.OpenSystemSettings() && s.manager.loads==1);CHECK(s.session.ReturnSystemSettings());ui_retained.value=false;
+        // The gate includes the SYSTEM page while it offers every stock setting and each one works there:
+        // with both lists empty ui_retained alone opens it, and with a setting in either only the opt-in does.
+        const bool complete=RETAINED_SYSTEM_MISSING_SETTINGS[0]==NULL && RETAINED_SYSTEM_INCOMPLETE_SETTINGS[0]==NULL;
+        ui_retained.value=true;CHECK(s.session.OpenSystemSettings()==complete && s.manager.loads==(complete?1:0));
+        if(complete)CHECK(s.session.ReturnSystemSettings());
+        ui_retainedSystem.value=true;CHECK(s.session.OpenSystemSettings() && s.manager.loads==(complete?2:1));CHECK(s.session.ReturnSystemSettings());ui_retained.value=false;
         s.manager.loads=0;s.manager.frees=0;s.parent->deactivates=0;
         ui_retainedSystem.value=true;s.session.guiTest=s.parent;CHECK(!s.session.OpenSystemSettings());s.session.guiTest=nullptr;
         preview=true;CHECK(!s.session.OpenSystemSettings());preview=false;

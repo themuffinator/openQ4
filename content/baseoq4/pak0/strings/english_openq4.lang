@@ -1239,7 +1239,7 @@
 	"#str_230073"	"Applying settings…"
 	"#str_230074"	"Restoring previous settings…"
 	"#str_230075"	"Saving settings…"
-	"#str_230076"	"Apply display, renderer and light-grid changes separately."
+	"#str_230076"	"Some texture and sound detail changes finish when the game next starts."
 	"#str_230077"	"Settings need attention"
 	"#str_230078"	"This map keeps the previous light-grid setting until the next map loads."
 	"#str_230079"	"This map preloads its light grids."

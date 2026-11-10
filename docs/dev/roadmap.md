@@ -2368,7 +2368,7 @@ seven final gates remain pending.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| UI-01 — Partial | Settings hub, GAME/CONTROLS/AUDIO, Load Defaults, opt-in DISPLAY and Player Setup exist; current scaling/tall layouts and effect/readback increments recorded. | Complete settings transactions/failure/restart/capability matrix; real-font/state coverage; production SYSTEM editor round trip and device/platform acceptance. |
+| UI-01 — Partial | Settings hub, GAME/CONTROLS/AUDIO, Load Defaults, DISPLAY (with presets applied there) and Player Setup exist; current scaling/tall layouts and effect/readback increments recorded. | Complete settings transactions/failure/restart/capability matrix; real-font/state coverage; production SYSTEM editor round trip and device/platform acceptance. |
 | UI-02 — Partial | Binding capture, contextual prompts, controller navigation, touch scrolling and right-stick detail/preview handling exist. | Production native IME wiring, shaping/fallback/graphemes, accessibility exposure; physical controller families, composition/focus/hotplug and locale/layout matrix. |
 | UI-03 — Partial | Roster scrolling/identity guards, save-browser/details, Strogg confirmations, server focus/empty states and objective markers have scoped evidence. | Tourney/watch and Match Control flows, catalogs beyond 128, remaining target-identity/role operations, handoffs and actual task/failure completion. |
 | UI-04 — Partial | Retained menus/HUDs and specific implant/vehicle/cinematic surfaces have implementation or captures. | Accept every required source/include variant's behavior and artwork; world terminals, script/timeline provenance, per-instance state and exactly-once commands. |
@@ -2397,8 +2397,8 @@ Completion must advance through the existing dependencies:
 - [ ] **UI-01 — P1, implementation: complete production settings and essential
   pages.** GAME, CONTROLS, AUDIO, Load Defaults and Player Setup are implemented
   in the retained interface, with the bounded evidence below. Finish their full
-  transaction and qualification scope; complete preset and mixed-effect
-  transactions before SYSTEM leaves its current opt-in scope. Demonstrate real
+  transaction and qualification scope. Preset and mixed-effect transactions
+  apply since 10 November, when SYSTEM left its opt-in scope (below). Demonstrate real
   effect/readback, persistence, cancel/revert, failed Apply,
   interrupted writes, restart, device/capability changes and stale-owner rejection
   in SP/MP. Localize every display string and preserve current working pages.
@@ -2518,6 +2518,15 @@ Completion must advance through the existing dependencies:
   [Opaque Menu Backing](ui/retained-screens.md#opaque-menu-backing-5-november-2026),
   the accessibility alternative to the softened backdrop, on the retained and
   stock pages in every shipped language.
+  Progress, 10 November: the retained DISPLAY page is the default under
+  `ui_retained`. A Performance Preset or Auto-Detect chosen there applies
+  through the [combined executor](ui/settings-effect-execution.md#combined-executor):
+  one journaled attempt with a device restart, a sound restart for a layout or
+  EFX change and cold recovery in both directions. That emptied
+  `RETAINED_SYSTEM_INCOMPLETE_SETTINGS`
+  ([the gate](ui/system-resolution-rows.md#the-gate)). The checked image and
+  audio results, a visible exclusive-fullscreen Apply, the editor round trip
+  and platform acceptance remain open.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

@@ -9,8 +9,8 @@ label into the title slot, and at 550 ms the page presents in the page state,
 that label its title. It is the stock settings screen's level: its buttons
 CONTROLS, GAME OPTIONS, DISPLAY, AUDIO and LOAD DEFAULTS on the home
 navigation plates, with BACK under them. CONTROLS, GAME OPTIONS and AUDIO
-open their retained pages, and DISPLAY the retained SYSTEM page where it is
-on (ui_retainedSystem); each returns here onto its section. Where one cannot, the page leaves as
+open their retained pages, and DISPLAY the retained SYSTEM page (the gate's
+Session_RetainedSystemEnabled); each returns here onto its section. Where one cannot, the page leaves as
 the Multiplayer page does for a stock page (its plates fade over 150 ms as it
 sweeps 640 u toward the trailing edge over 300 ms) and the stock settings
 screen takes over at 500 ms on that panel; its Back returns here

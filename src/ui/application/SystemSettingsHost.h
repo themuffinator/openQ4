@@ -16,11 +16,16 @@ enum SystemSettingEffect : unsigned {
 	SystemSettingEngineRestart = 1 << 6 // Saved preference; consumed only at next engine startup.
 };
 
-// How an Apply runs. Immediate settings ride along with any class. Display
-// changes need the user's confirmation; the renderer fallback and the next-map
-// light-grid preload complete automatically once their effect is proved. Any
-// two of those together are Mixed, and every other effect is Unsupported.
-enum class SystemApplyClass { None, Immediate, Display, Renderer, Deferred, Mixed, Unsupported };
+// How an Apply runs. Immediate settings ride along with any class, as does the
+// preset marker, which only names the profile the draft was filled from.
+// A display change alone needs the user's confirmation; the renderer fallback
+// alone and the next-map light-grid preload alone complete automatically once
+// their effect is proved. Every other batch is Combined: an image, audio,
+// renderer-resource or load-policy change (what a Performance Preset writes),
+// or any two of the classes above together. One executor journals it, writes
+// it, restarts the renderer device and the sound device once each as the
+// batch needs, and asks for confirmation only when the display changed.
+enum class SystemApplyClass { None, Immediate, Display, Renderer, Deferred, Combined };
 
 struct SystemSettingDescriptor {
 	std::string key;
@@ -48,6 +53,11 @@ public:
 	static bool ChangedRequiresDisplayRestart(const StateValues& before, const StateValues& target);
 	static SystemApplyClass ApplyClassOf(const StateValues& before, const StateValues& target);
 	static bool RequiresDeviceWork(const StateValues& before, const StateValues& target);
+	// The changed settings that a Combined apply writes but this session cannot
+	// finish: image_ignoreHighQuality and s_maxSoundsPerShader are read when a
+	// material or a sound shader is parsed, so declarations already parsed keep
+	// the old value until the game next starts.
+	static bool ChangedNeedsNextStart(const StateValues& before, const StateValues& target);
 
  // Pure typed profile expansion. Caller publishes with EditGenerated so
  // ownership and complete merged validation enclose capability observation.

@@ -235,10 +235,10 @@ See [release status](../../user/release-status.md) and the
   frame, breadcrumbs and transitions as Multiplayer's pages, instead of
   full-screen panels. Long pages are split into tabs (switch with Q and E,
   the shoulder buttons or a click), and no page uses more than two columns.
-  Game Options' tabs replace its Section list. The new Display page (opt in
-  with `ui_retainedSystem 1`) follows suit: Graphics, Screen and Image Quality
-  tabs, with Apply Changes and the Keep or Revert countdown working as
-  before. At larger text sizes the settings rows now grow with the text
+  Game Options' tabs replace its Section list. Display is a page of the new
+  interface too: Graphics, Screen and Image Quality tabs, with Apply Changes
+  and the Keep or Revert countdown. A performance preset or Auto-Detect
+  chosen there applies with Apply Changes. At larger text sizes the settings rows now grow with the text
   (switching to one scrolling column), and the button prompts at the bottom
   of every menu stay on screen.
 - **Larger text across the menus.** With a larger text size (up to 200 %),

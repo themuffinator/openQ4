@@ -5100,7 +5100,7 @@ static void Session_SystemSettings_f( const idCmdArgs &args ) {
 			return;
 		}
 	}
-	common->Printf( "usage: openq4_system open | report | back (requires ui_retainedSystem 1, or ui_retained 1 once every stock setting works on the retained page, and the normal main menu)\n" );
+	common->Printf( "usage: openq4_system open | report | back (requires ui_retained 1 or ui_retainedSystem 1, and the normal main menu)\n" );
 }
 
 // Reports the ui_retained gate, the retained screen presenting now and the

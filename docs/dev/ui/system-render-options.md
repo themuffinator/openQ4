@@ -20,8 +20,10 @@ explanation, and the plate and focus frame grow around it.
 - **Apply.** The change completes through the
   [deferred executor](settings-effect-execution.md#deferred-light-grid-executor)
   without a Keep/Revert question. The page reports Applying, Restoring or
-  Saving settings while it runs, and a draft that also changes display or
-  renderer settings is refused with a notice to apply them separately.
+  Saving settings while it runs. A draft that also changes display or
+  renderer settings applies through the
+  [combined executor](settings-effect-execution.md#combined-executor); at
+  this increment it was refused with a notice to apply them separately.
 - **Status.** The line is hidden until a map is loaded. It then reads:
 
   | State | Text |
@@ -46,8 +48,9 @@ ARB2 (`arb2`), the values the settings catalog accepts from the page.
   [renderer executor](settings-effect-execution.md#renderer-fallback-executor)
   without a Keep/Revert question: the renderer restarts on the same display,
   and the attempt completes once the renderer's own report agrees. A draft
-  that also changes display or preload settings is refused with the notice to
-  apply them separately.
+  that also changes display or preload settings applies through the
+  [combined executor](settings-effect-execution.md#combined-executor), which
+  asks for the same report; at this increment it was refused.
 - **Availability.** Only a presenting OpenGL renderer that has reported its
   selection can prove the change. Elsewhere (on Vulkan, which has one back
   end, or while the renderer is not ready) the row is disabled and dims to

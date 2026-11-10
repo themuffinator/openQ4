@@ -3,9 +3,11 @@
 The retained SYSTEM page now offers **Display Resolution** and **Refresh
 Rate**, the last settings of the stock SYSTEM page it had no control for. Both
 rows read the [SYSTEM display lists](system-display-catalog.md), as
-[Display Device](system-display-rows.md) does. The page still stays opt-in
-(`ui_retainedSystem 1`): a control for every stock setting is not yet the same
-as every setting working there ([the gate](#the-gate)). The increment also
+[Display Device](system-display-rows.md) does. At this increment the page
+stayed opt-in (`ui_retainedSystem 1`): a control for every stock setting was
+not yet the same as every setting working there. Since 10 November 2026 a
+Performance Preset applies there too, and `ui_retained` opens the page
+([the gate](#the-gate)). The increment also
 makes Auto refresh mean the same rate on every display path, lets MSAA apply on
 Vulkan, and fixes three ways a display Apply or Revert failed.
 
@@ -109,39 +111,53 @@ rate, Auto now takes the desktop rate.
 
 ## The gate
 
-The stock page stays the default until the retained page does what it did:
+The stock page was the default until the retained page did what it did. Since
+10 November 2026 it does, so with default settings SETTINGS > DISPLAY opens
+the retained page:
 
 - `RETAINED_SYSTEM_MISSING_SETTINGS`, the stock settings the page has no
-  control for, is now empty.
-- `RETAINED_SYSTEM_INCOMPLETE_SETTINGS` lists the settings it has a control
-  for that cannot yet do what the stock page did:
-  - `com_performancePreset`: a preset or Auto-Detect only fills the draft.
-    The settings a preset writes include image, audio and renderer resource
-    effects with no apply path, so `ApplyClassOf` reports Unsupported and
-    Apply stays disabled ([performance presets](performance-presets.md)).
+  control for, is empty.
+- `RETAINED_SYSTEM_INCOMPLETE_SETTINGS`, the settings it has a control for
+  that cannot do what the stock page did, is empty too. Its entries left as
+  their reasons were fixed:
+  - `com_performancePreset` left on 10 November 2026. A preset or Auto-Detect
+    used to fill the draft only: the settings a preset writes include image,
+    audio and renderer resource effects, which had no apply path, so
+    `ApplyClassOf` reported Unsupported and Apply stayed disabled. The
+    [combined executor](settings-effect-execution.md#combined-executor) now
+    applies such a batch as the stock page's preset and APPLY did.
   - `r_windowWidth`, `r_windowHeight`, `r_customWidth`, `r_customHeight`
-    left the list when committed characters began to reach retained fields
+    left when committed characters began to reach retained fields
     ([typed characters](numeric-fields.md#typed-characters)): only number
     fields offer them, and they now take typed digits as well as pasted ones.
-
-  MSAA now applies on Vulkan, so `r_multiSamples` left the list.
-- `Session_RetainedSystemEnabled()` includes the page in `ui_retained` only
-  when both lists are empty. `ui_retainedSystem 1` opens it regardless.
+  - `r_multiSamples` left when MSAA began to apply on Vulkan.
+- `Session_RetainedSystemEnabled()` includes the page in `ui_retained` while
+  both lists are empty. `ui_retainedSystem 1` opens it regardless, also with
+  `ui_retained 0`. The stock page still stands in where the retained document
+  is missing or cannot load.
 - `tools/tests/ui_retained_gate.py` derives both lists from the code:
   - A setting is offered when a control value reads its draft, or a list
     selection standing for it (`RETAINED_SYSTEM_DERIVED_STATE`), and the
     control's action writes it (`OPERATION_WRITES`, checked against each
     branch of `SystemDisplaySelectionPatch`).
-  - A setting is incomplete when its catalog effect has no apply path (a
-    statement-by-statement mirror of `ApplyClassOf`), when only number fields
+  - A setting is incomplete when its catalog effect has no apply path, when
+    only number fields
     offer it while typed characters reach no retained Number field, or
     when its control needs `settings.msaaAvailable` and
     `SupportsMultisampling` no longer holds the statement that publishes it for
-    Vulkan (the display service test proves that statement's behaviour). A
-    preset counts as incomplete when any setting it writes has no apply path
-    or its settings span more than one apply class. Typed characters count as
-    delivered once the adapter routes them into Number fields or engine code
-    drives the native text owner.
+    Vulkan (the display service test proves that statement's behaviour). Typed
+    characters count as delivered once the adapter routes them into Number
+    fields or engine code drives the native text owner.
+  - An effect has an apply path when `ApplyClassOf` gives it an executor. The
+    test mirrors that function statement by statement
+    (`APPLY_CLASS_STATEMENTS`). An image, audio, renderer-resource or
+    load-policy effect applies through the combined executor only while the
+    service admits and dispatches a Combined batch, the host prepares,
+    restarts and recovers it (`COMBINED_ROUTE`), and `CombinedPolicy` gives
+    that effect a domain in the record (`COMBINED_DOMAINS`).
+  - A preset counts as incomplete when any setting it writes has no apply
+    path, or when its settings span more than one apply class without the
+    combined executor.
   - Fixing a reason makes the test demand the entry's removal; a new reason
     makes it demand an entry. A control whose enabled binding is the literal
     false fails, a control that neither acts nor names an event counts for no
@@ -218,8 +234,8 @@ The stock page stays the default until the retained page does what it did:
   `ui_system_settings_host.py` covers the up-front refusal of a stale rate and
   the rollback that skips it.
 - `ui_retained_gate.py` checks both lists against the derivation above and
-  that the gate follows them. `ui_system_session_route.py` keeps the gate
-  closed while either list holds a setting.
+  that the gate follows them. `ui_system_session_route.py` opens the page
+  under `ui_retained` alone exactly when both lists are empty.
 - A Vulkan run on Windows/NVIDIA (`game/airdefense2`, hidden window, console
   menu verbs only) applied and kept a V-Sync change under 4x, MSAA 4x to off
   and off to 8x; the scene target followed each (`Forward render target MSAA:

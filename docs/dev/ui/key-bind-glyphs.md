@@ -151,14 +151,12 @@ Other languages follow their own conventions and are unchanged.
 
 ## Found, not fixed
 
-- **DISPLAY in the retained interface still opens the stock page.** The
-  retained DISPLAY page is behind `ui_retainedSystem` until a Performance
-  Preset can be applied there: a preset writes image, audio and renderer
-  resource settings whose effects have no apply path in the settings
-  transaction ([the gate](system-resolution-rows.md#the-gate)). Until then
-  the default DISPLAY is the stock page in the stock frame, with the stock
-  category list beside it. Closing that gap is engine work on the apply
-  path, not menu work, and was left for its own task.
+- **DISPLAY in the retained interface still opened the stock page.** Fixed
+  later the same day: a Performance Preset now applies on the retained
+  DISPLAY page through the
+  [combined executor](settings-effect-execution.md#combined-executor), so the
+  page joined the `ui_retained` gate and SETTINGS > DISPLAY opens it
+  ([the gate](system-resolution-rows.md#the-gate)).
 - **The stock DISPLAY page's Section list** names its sections Video, Window,
   Rendering, Quality, Post FX and Sizing, which are not the page's headings
   (GRAPHICS, SCREEN, IMAGE QUALITY, RENDERING, ADVANCED RENDERING, DISPLAY

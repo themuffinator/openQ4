@@ -6,6 +6,29 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Display settings open in the new interface, 10 November 2026
+
+- **Settings > Display is now the new page.** In the new interface, Display
+  opens with Graphics, Screen and Image Quality tabs, like the other settings
+  pages. It used to hand over to the classic Display page.
+- **Performance presets and Auto-Detect apply from it.** Choose a preset and
+  press Apply Changes. The renderer restarts once and reloads its textures,
+  and the sound device restarts if the speaker layout or reverb setting
+  changed. A preset that changes anti-aliasing asks you to keep or revert, as
+  any display change does. Other presets apply without a question.
+- **Two details wait for the next start.** High-quality texture flags and the
+  per-sound sample limit fully change when the game next starts, as they
+  always have. The page tells you when your changes include one of them.
+- **Your previous settings come back if applying fails.** This also holds if
+  the game closes while it is applying or waiting for Keep: the next start
+  restores them.
+- **Nothing to do.** The classic interface (`ui_retained 0`) keeps the classic
+  Display page.
+- Evidence: [the combined executor](ui/settings-effect-execution.md#combined-executor)
+  and [the gate](ui/system-resolution-rows.md#the-gate);
+  `tools/tests/ui_settings_display_service.py`,
+  `tools/tests/ui_settings_service.py`, `tools/tests/ui_retained_gate.py`.
+
 ## Materials that never change are worked out once, 10 November 2026
 
 - **An engine repair with no visible change.** Most materials have settings
@@ -51,8 +74,9 @@ See [player release status](../user/release-status.md).
     longer jumps up to a tab.
   - A few English labels now use the same capitals as their neighbours, for
     example UI Scale, Rendering Backend and Enable Shadows.
-- Not changed: Display in the new interface still opens the classic Display
-  page unless `ui_retainedSystem 1` is set.
+- Not changed in this round: Display in the new interface still opened the
+  classic Display page. It opens the new page since later the same day
+  ([above](#display-settings-open-in-the-new-interface-10-november-2026)).
 - Evidence: [key glyphs and focus](ui/key-bind-glyphs.md#evidence-10-november-2026);
   `tools/tests/key_bind_presentation.py`,
   `tools/tests/menu_controller_navigation.py`.

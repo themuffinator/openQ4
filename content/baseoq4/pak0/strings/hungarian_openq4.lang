@@ -1239,7 +1239,7 @@
 	"#str_230073"	"Beállítások alkalmazása…"
 	"#str_230074"	"Az előző beállítások visszaállítása…"
 	"#str_230075"	"Beállítások mentése…"
-	"#str_230076"	"A megjelenítés, a renderelő és a fényrácsok módosításait külön alkalmazd."
+	"#str_230076"	"Egyes textúra- és hangbeállítások csak újraindítás után érvényesek."
 	"#str_230077"	"A beállítások figyelmet igényelnek"
 	"#str_230078"	"Ez a pálya a következő pályabetöltésig megtartja a fényrácsok korábbi beállítását."
 	"#str_230079"	"Ez a pálya előre betölti a fényrácsait."

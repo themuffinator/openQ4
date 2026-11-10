@@ -72,12 +72,16 @@ and the visual contract's 18/24 dp action typography. Its counted host does not 
 engine font, device or settings-service route; gameplay captures provide
 separate evidence for those integration boundaries.
 
-Complete Apply remains gated until every changed effect has a checked execution and
-recovery path. Image/material policy, renderer resources, audio and deferred
-load policy need actual observed results beyond CVar readback, as described in
-[effect execution](settings-effect-execution.md). The complete
-page, editor, supported platforms, all 271 migrations and final product gates
-remain unaccepted.
+Apply was gated at this increment. Since 10 November 2026 a preset or
+Auto-Detect drafted on the page applies through the
+[combined executor](settings-effect-execution.md#combined-executor): one
+journaled attempt that restarts the renderer device and, for a speaker layout
+or EFX change, the sound device, as the stock page's `applyPerformancePreset`
+and APPLY did. Two settings finish at the next start and the page says so
+(`image_ignoreHighQuality`, `s_maxSoundsPerShader`). The checked image and
+audio results described in [effect execution](settings-effect-execution.md)
+are not part of that executor. The complete page, editor, supported platforms,
+all 271 migrations and final product gates remain unaccepted.
 
 ## Maximum-quality revision, 27 October 2026
 

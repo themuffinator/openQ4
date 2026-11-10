@@ -45,6 +45,11 @@ public:
 	// renderer's own selection report, so it needs a presenting OpenGL renderer
 	// that has already reported one for its current module.
 	bool SupportsRendererSelection() const;
+	// A combined attempt (a Performance Preset, or any batch that mixes apply
+	// classes) proves itself with later presented frames, so it needs a
+	// presenting renderer; one that changes r_renderer also needs the
+	// renderer's selection report.
+	bool SupportsCombined(const openq4::ui::StateValues& baseline, const openq4::ui::StateValues& target) const;
 	// The renderer's latest selection report for its current module.
 	bool RendererSelection(renderRendererSelection_t& selection, std::uint64_t& serial) const;
 	// The display lists' inputs. The stamp moves with the display topology, the
@@ -69,6 +74,21 @@ private:
 	bool StartupDeferred(const std::string& bytes, const openq4::ui::SettingsEffectRecoveryJournal& saved, std::string& error);
 	bool PrepareRenderer(const openq4::ui::SettingsAttempt&, std::string& error);
 	bool StartupRenderer(const std::string& bytes, const openq4::ui::SettingsEffectRecoveryJournal& record, std::string& error);
+	bool PrepareCombined(const openq4::ui::SettingsAttempt&, std::string& error);
+	bool StartupCombined(const std::string& bytes, const openq4::ui::SettingsEffectRecoveryJournal& record, std::string& error);
+	// The display half of a cold start, for the record now held in journal.
+	bool StartupDisplay(const std::string& bytes, bool combined, std::string& error);
+	// The attempt restarts the renderer device; changes the display itself
+	// (Keep/Revert, and the window may take the target's size); or changes
+	// r_renderer, which the restarted renderer must report it resolved.
+	bool DeviceWork() const;
+	bool DisplayOwned() const;
+	bool RendererOwned() const;
+	// A combined attempt that changed the speaker layout or EFX reopens the
+	// sound device; its attempt waits for that restart and fails if the device
+	// does not come back.
+	void RestartSound(bool restoring);
+	bool SoundReady(bool& ready, std::string& error) const;
 	// The renderer resolved r_renderer as asked; serial names its report.
 	bool RendererAgrees(const std::string& request, std::uint64_t& serial, std::string& error) const;
 	bool RendererCurrent(bool restoring, std::string& error) const;
@@ -82,13 +102,18 @@ private:
 	// record with only its deferred domain; nothing restarts, and a later
 	// presented frame proves the engine still runs before it commits. A
 	// renderer attempt (the renderer fallback) journals a schema-2 record with
-	// the renderer domain and restarts the device on the same display.
-	enum class Kind { Display, Deferred, Renderer };
+	// the renderer domain and restarts the device on the same display. A
+	// combined attempt journals a schema-2 record with every domain its batch
+	// changes: one device restart covers its display, image and renderer
+	// resource changes, the sound device reopens for a layout or EFX change,
+	// and load-policy changes wait for the loads that read them.
+	enum class Kind { Display, Deferred, Renderer, Combined };
 	Kind kind = Kind::Display;
 	std::uint64_t selectionSerial = 0; // the selection report the last restart produced
 	openq4::ui::SettingsEffectRecoveryJournal effects;
-	// A deferred or renderer record replays catalog values only: the engine
-	// starts the normal way, and the first full frame commits.
+	// A deferred or renderer record, and a combined one that changed no
+	// display, replays catalog values only: the engine starts the normal way,
+	// and the first full frame commits.
 	bool catalogStartup = false;
 	openq4::ui::SystemDisplayPlan targetPlan, restorePlan;
 	rendererDisplayState_t baselineDevice{}, currentDevice{};
@@ -97,6 +122,7 @@ private:
 	std::uint64_t placementToken = 0;
 	std::string journalPath, lockPath, writtenBytes, attemptedBytes, recoveryError;
 	bool ownsJournal = false, placed = false, blocked = false, startup = false, startupReady = false;
+	bool soundRequested = false; // this attempt's last restart asked the sound device to reopen
 	bool startupConfirmed = false;
 	double startupDeadline = 0, startupLastTime = -1;
 };

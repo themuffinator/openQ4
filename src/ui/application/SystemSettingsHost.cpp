@@ -350,21 +350,25 @@ bool SystemSettingsHost::ChangedRequiresDisplayRestart(const StateValues& before
 	return (ChangedEffects(before,target) & SystemSettingDisplayRestart) != 0;
 }
 SystemApplyClass SystemSettingsHost::ApplyClassOf(const StateValues& before, const StateValues& target) {
-	bool changed=false,display=false,renderer=false,deferred=false,unsupported=false;
+	bool changed=false,display=false,renderer=false,deferred=false,combined=false;
 	for (const auto& item:Catalog()) {
 		if (!Changed(before,target,item.key)) continue;
 		changed=true;
 		if (item.effects==SystemSettingImmediate || item.effects==SystemSettingEngineRestart) continue;
+		// The preset marker names the profile a draft was filled from; its targets carry the effects.
+		if (item.effects==SystemSettingPresetExpansion) continue;
 		if (item.effects==SystemSettingDisplayRestart) display=true;
 		else if (item.key=="r_renderer") renderer=true;
 		else if (item.key=="r_lightGridPreload") deferred=true;
-		else unsupported=true;
+		else combined=true;
 	}
 	if (!changed) return SystemApplyClass::None;
-	if (unsupported) return SystemApplyClass::Unsupported;
-	if (int(display)+int(renderer)+int(deferred)>1) return SystemApplyClass::Mixed;
+	if (combined || int(display)+int(renderer)+int(deferred)>1) return SystemApplyClass::Combined;
 	return display ? SystemApplyClass::Display : renderer ? SystemApplyClass::Renderer :
 		deferred ? SystemApplyClass::Deferred : SystemApplyClass::Immediate;
+}
+bool SystemSettingsHost::ChangedNeedsNextStart(const StateValues& before, const StateValues& target) {
+	return Changed(before,target,"image_ignoreHighQuality") || Changed(before,target,"s_maxSoundsPerShader");
 }
 bool SystemSettingsHost::RequiresDeviceWork(const StateValues& before, const StateValues& target) {
 	return (ChangedEffects(before,target) & ~SystemSettingEngineRestart) != 0;

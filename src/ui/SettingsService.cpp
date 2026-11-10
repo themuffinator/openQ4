@@ -186,9 +186,8 @@ void DisplayCatalogStatus(Service& service, std::uint64_t owner, StateValues& va
 bool DisplayOperation(const std::string& operation) {
     return operation == "settings.system.display" || operation == "settings.system.displayMode" || operation == "settings.system.displayRefresh";
 }
-bool Supported(Service& service,std::uint64_t owner,bool* invalidDraft = nullptr,bool* mixed = nullptr) {
+bool Supported(Service& service,std::uint64_t owner,bool* invalidDraft = nullptr) {
     if (invalidDraft) *invalidDraft = false;
-    if (mixed) *mixed = false;
     const auto kind=SystemSettingsHost::ApplyClassOf(service.transaction.Baseline(),service.transaction.Draft());
     const auto samples=service.transaction.Draft().find("r_multiSamples");
     if (samples!=service.transaction.Draft().end() && std::get<double>(samples->second)!=0 &&
@@ -207,8 +206,12 @@ bool Supported(Service& service,std::uint64_t owner,bool* invalidDraft = nullptr
     case SystemApplyClass::Renderer:
         if (!service.confirmationOwners.contains(owner) || !service.device.SupportsRendererSelection()) return false;
         break;
-    case SystemApplyClass::Mixed: if (mixed) *mixed = true; return false;
-    case SystemApplyClass::Unsupported: return false;
+    // A preset, or any batch that mixes classes: one journaled attempt that
+    // restarts the renderer device and the sound device as its changes need.
+    case SystemApplyClass::Combined:
+        if (!service.confirmationOwners.contains(owner) ||
+            !service.device.SupportsCombined(service.transaction.Baseline(),service.transaction.Draft())) return false;
+        break;
     }
     if (service.transaction.Owner() == owner && !PickedDisplayCurrent(service,owner)) {
         if (invalidDraft) *invalidDraft = true;
@@ -723,6 +726,10 @@ bool UI_SettingsDispatch(std::uint64_t owner, const ActionInvocation& action, st
             // effect and a later frame are proved.
             else if (kind == SystemApplyClass::Deferred || kind == SystemApplyClass::Renderer)
                 result = service.display.Apply(owner,Now(),SettingsCompletion::Automatic);
+            // A combined batch asks for confirmation only when it changes the display.
+            else if (kind == SystemApplyClass::Combined)
+                result = service.display.Apply(owner,Now(),service.host.NeedsConfirmation(transaction.Baseline(),transaction.Draft()) ?
+                    SettingsCompletion::UserConfirmation : SettingsCompletion::Automatic);
             else result = transaction.Apply(owner,Now());
         }
     }
@@ -783,9 +790,9 @@ bool UI_SettingsRead(std::uint64_t owner, StateValues& values) {
     const auto result = service.results.find(owner);
     const auto code = refresh.code != SettingsCode::Ok ? refresh.code :
         result == service.results.end() ? SettingsCode::Ok : result->second.code;
-    bool invalidDraft = false, mixed = false;
+    bool invalidDraft = false;
     const bool canApply = own && phase == SettingsPhase::Editing && dirty && refresh.code == SettingsCode::Ok && !service.display.Active() &&
-        Supported(service,owner,&invalidDraft,&mixed);
+        Supported(service,owner,&invalidDraft);
     StateValues candidate{{"settings.open",own},{"settings.dirty",dirty},
         {"settings.busy",(transaction.Owner() != 0 && !own) || (own && service.display.Active()) || service.device.StartupActive()},
         {"settings.canApply",canApply},
@@ -799,8 +806,11 @@ bool UI_SettingsRead(std::uint64_t owner, StateValues& values) {
         {"settings.phase",static_cast<double>(phase)},
         {"settings.message",std::string(Message(code,phase,dirty))}};
     if (invalidDraft && code == SettingsCode::Ok) candidate["settings.message"] = std::string("#str_230023");
-    // Display, renderer and light-grid changes apply one class at a time.
-    if (mixed && dirty && code == SettingsCode::Ok && !service.display.Active()) candidate["settings.message"] = std::string("#str_230076");
+    // Apply writes these two, but declarations already parsed keep the old
+    // value: the draft says so while it holds such a change.
+    else if (own && dirty && code == SettingsCode::Ok && !service.display.Active() &&
+        SystemSettingsHost::ChangedNeedsNextStart(transaction.Baseline(),transaction.Draft()))
+        candidate["settings.message"] = std::string("#str_230076");
     // An automatic attempt changes no display, so its status names settings.
     const bool automatic = service.display.Completion() == SettingsCompletion::Automatic;
     if (own) switch (service.display.Stage()) {

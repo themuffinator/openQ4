@@ -1251,7 +1251,7 @@
 	"#str_230073"	"Stosowanie ustawień…"
 	"#str_230074"	"Przywracanie poprzednich ustawień…"
 	"#str_230075"	"Zapisywanie ustawień…"
-	"#str_230076"	"Zmiany ekranu, renderera i siatek światła zastosuj osobno."
+	"#str_230076"	"Niektóre zmiany tekstur i dźwięku zadziałają po ponownym uruchomieniu gry."
 	"#str_230077"	"Ustawienia wymagają uwagi"
 	"#str_230078"	"Ta mapa zachowuje poprzednie ustawienie siatek światła do wczytania następnej mapy."
 	"#str_230079"	"Ta mapa wczytuje siatki światła z góry."

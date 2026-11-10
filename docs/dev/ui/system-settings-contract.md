@@ -430,7 +430,7 @@ in the menu's status text.
 | `#str_230073` | Applying settings… |
 | `#str_230074` | Restoring previous settings… |
 | `#str_230075` | Saving settings… |
-| `#str_230076` | Apply display, renderer and light-grid changes separately. |
+| `#str_230076` | Some texture and sound detail changes finish when the game next starts. |
 
 The confirmation panel's title is `#str_229993` (Keep these display settings?)
 except during RecoveryRequired, when it reads `#str_230077` (Settings need

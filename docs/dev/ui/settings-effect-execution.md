@@ -8,8 +8,12 @@ not each commit the same draft. Until the required executors are available,
 reject an unsupported batch before any live write.
 
 This document records the implementation direction from the source audit and
-the separately qualified foundations below. Mixed Apply is not enabled. Preset
-draft expansion is described separately in [performance presets](performance-presets.md).
+the separately qualified foundations below. Since 10 November 2026 a batch
+that mixes effects, such as a Performance Preset, applies through the
+[combined executor](#combined-executor), which restarts the devices as the
+stock page did and does not use the checked image and audio foundations.
+Preset draft expansion is described separately in
+[performance presets](performance-presets.md).
 
 ## Actual effects
 
@@ -419,10 +423,10 @@ next load, and no Keep/Revert question to answer.
   renderer, deferred, mixed or unsupported. Immediate keys ride along with
   any class. A display change keeps its Keep/Revert confirmation. A deferred
   change needs an owning view and a renderer that is presenting now
-  (`ReadyForAutomatic`). A draft that combines display, renderer and
-  light-grid changes is refused before any work, with a notice asking for
-  them to be applied separately. The renderer fallback, image, audio and
-  preset effects remain refused until their executors exist.
+  (`ReadyForAutomatic`). At this increment a draft that combined display,
+  renderer and light-grid changes was refused before any work, as were the
+  renderer fallback, image, audio and preset effects. Such drafts now take
+  the [combined executor](#combined-executor).
 - **Attempt.** Apply journals a schema-2 Pending record with only the
   next-map domain (mask 8): exact snapshots, the patch, and the portable
   policy in each direction (`deferredRestore`/`deferredTarget`
@@ -512,8 +516,9 @@ describe (a borderless window on Wayland), before anything is written.
 - **Admission.** A draft whose only non-immediate change is `r_renderer`
   needs an owning view and a renderer that can report its selection: a ready,
   presenting OpenGL renderer that has reported one for its current module.
-  Vulkan has one back end, so it cannot. Mixing it with display, preload or
-  any other effect is refused before any work.
+  Vulkan has one back end, so it cannot. With display, preload or any other
+  effect it joins the [combined executor](#combined-executor), which keeps
+  the same requirement.
 - **Attempt.** Apply journals a schema-2 Pending record with the renderer
   domain (mask 16): exact snapshots, both display directions capturing the
   same actual display, the leased window placement for both directions, and
@@ -556,6 +561,174 @@ mutants.
 The executor was qualified by the host, service and exact-value harnesses, a
 mutation pass and the full Meson suite. Evidence:
 `.tmp/ui/renderer-fallback-executor/validation-evidence.json`, SHA-256 `7213f4abf2a342f6665306862afa3a19139c09e32e835795985a14866cbea819`.
+
+## Combined executor
+
+A Performance Preset writes 55 settings across every effect: MSAA (a display
+restart), nine image settings, three renderer-resource settings, three audio
+settings, two load-policy settings and its own marker. Until 10 November 2026
+`ApplyClassOf` classed such a batch Unsupported, or Mixed when it only
+combined classes that each had an executor, and Apply stayed disabled. The
+batch is now `SystemApplyClass::Combined` and one executor in
+`EngineSettingsDisplayHost` applies it, as the stock page's
+`applyPerformancePreset` followed by its APPLY (`vid_restart`) did. A preset
+or Auto-Detect chosen on the retained SYSTEM page therefore applies there, and
+the page [joined the `ui_retained` gate](system-resolution-rows.md#the-gate).
+
+- **Class.** Immediate settings, saved engine-restart preferences and the
+  preset marker ride along with any class. `com_performancePreset` only names
+  the profile a draft was filled from; its targets carry the effects. A
+  display change alone, `r_renderer` alone and `r_lightGridPreload` alone keep
+  their own executors and records. Every other batch is Combined: any image,
+  audio, renderer-resource or other load-policy change, and any two classes
+  together.
+- **What Apply does with each setting.**
+
+  | Effect | Settings | In this session |
+  | --- | --- | --- |
+  | Display | `r_multiSamples` and the display rows | One device restart on the target display, then Keep or Revert. |
+  | Image | `image_downSize*`, `image_picmip`, `image_usePrecompressedTextures` | The same device restart reloads every image the menus and the level hold, under the new values. |
+  | Image | `image_ignoreHighQuality` | Written and saved. A material reads it when it is parsed, so materials already parsed keep the old value until the game next starts. |
+  | Renderer resources | `r_rendererUploadMegs`, `r_rendererUploadFrameBuffers` | The restarted device allocates its upload storage from them. |
+  | Renderer resources | `r_rendererBenchmarkPreset` | Read on each use. |
+  | Renderer resources | `r_renderer`, when the batch holds it | The restarted renderer must report that it resolved the request (OpenGL). |
+  | Audio | `s_numberOfSpeakers`, `s_useEAXReverb` | The sound device closes and reopens on the next sound frame, as `s_restart` does, and reloads the samples in use. The attempt waits for it. |
+  | Audio | `s_maxEmitterChannels` | Read by every sound update. |
+  | Next load | `r_lightGridPreload` | The next map load, through the committed policy. |
+  | Next load | `image_writeGeneratedImages` | Later cache writes. |
+  | Next load | `s_maxSoundsPerShader` | Written and saved. A sound shader reads it when it is parsed, so shaders already parsed keep the old value until the game next starts. |
+
+  The stock page behaved the same way for the two settings that wait for the
+  next start. The retained page says so: while the draft holds a change to
+  either, its status line reads `#str_230076` (Some texture and sound detail
+  changes finish when the game next starts). The notice does not block Apply.
+- **Admission.** A Combined draft needs an owning view and a renderer that is
+  presenting now. With `r_renderer` in the batch it also needs the renderer's
+  selection report, so such a batch cannot apply on Vulkan.
+- **Attempt.** Apply journals a schema-2 Pending record:
+  - the plan with every changed domain, exact snapshots and the patch;
+  - each participating domain's settings in both directions, under their
+    catalog names (the image, audio, next-load and renderer-resource maps);
+  - when the display, image or renderer-resource domain takes part, both
+    captured displays and the leased window placement.
+
+  It then writes the patch and restarts the device once: on the target
+  display when the display changed, otherwise on the display the renderer has
+  now. A speaker layout or EFX change asks the sound device to reopen. The
+  attempt reports its effects not ready until the device has reopened, and a
+  device that does not come back fails the attempt. A batch of audio and
+  load-policy settings alone restarts no renderer and leases no placement.
+- **Completion.** A batch that changes the display shows Keep or Revert with
+  the countdown, as a display change alone does. Any other batch completes
+  automatically after ready effects and a later presented frame. Either way
+  the Confirmed record is written first, then the configuration, then the
+  journal is removed.
+- **Failure.** A failed restart, a failed observation, a sound device that
+  did not reopen, Revert, the countdown and closing the page all restore the
+  baseline settings with the same restarts and never save the candidate. A
+  save that did not finish keeps the record and offers Retry.
+- **Startup.** A combined record replays its owned settings before the
+  renderer and the sound system start: Pending restores the baseline and
+  Confirmed keeps the target. Both systems read their settings as they open,
+  so the ordinary start recovers every domain.
+  - Without a display change the engine starts the normal way, and the first
+    full frame commits the configuration and removes the record. An
+    `r_renderer` in the batch must agree with the started OpenGL renderer's
+    report first.
+  - With a display change the record takes the display route: the saved
+    display is initialized with its placement, and the recovery commits after
+    it presents.
+  - A record whose domain maps contradict its snapshots, or whose owned
+    settings changed outside the attempt, is refused before any write.
+
+### What the combined executor does not prove
+
+It restarts the devices as `vid_restart` and `s_restart` do. It does not use
+the checked image-policy restart or the checked in-place audio transition
+described above, because neither can run a preset on stock content:
+
+- `R_PrepareImagePolicyRecovery` refuses a session that holds any default,
+  procedural or scratch image, and any change to `image_ignoreHighQuality` or
+  `image_usePrecompressedTextures`.
+- `SoundSettings_Begin` refuses while sound is off or a restart is pending,
+  and its portable record refuses a device with EFX resources.
+
+The executor's evidence is therefore exact CVar readback, a new device
+generation that matches the planned display, the renderer's selection report
+where `r_renderer` changed, the sound device's state after its restart, and a
+later presented frame. It does not read back image dimensions, upload
+allocations or the speaker layout the device chose. Those foundations remain
+for a stricter executor.
+
+One cost is unchanged from the stock path: on the frame after the restart the
+image manager sees the changed reduction settings and reloads the file-backed
+images a second time (`idImageManager::CheckCvars`).
+
+### Combined executor qualification
+
+- `tools/tests/ui_settings_display_service.py` runs the real host and codec
+  (1,336 checks in all):
+  - support on OpenGL and Vulkan, with and without a renderer change, and the
+    completion each batch must ask for;
+  - the Pending record's plan, both displays, the placement and every domain
+    map;
+  - one device restart and one sound restart, the wait for the sound device,
+    Confirmed before the configuration, and Finish;
+  - a sound device that fails, a restore while its restart is pending, sound
+    and load policy alone, the emitter limit alone and sound that is off;
+  - a display change with Keep and the committed placement;
+  - a renderer change that agrees, disagrees or is reported again later;
+  - cold starts in both directions with and without a display change, a
+    disagreeing renderer, each domain map contradicting its snapshots and a
+    divergent owned setting.
+- `tools/tests/ui_settings_service.py` drives the service route (117
+  scenarios): a combined batch with and without an owning view or a
+  presenting renderer, the wait for effects, the automatic commit, the
+  confirmation and restore for a batch with a display change, a combined
+  renderer change without a selection report, and the next-start notice.
+- `tools/tests/ui_system_settings_host.py` classes every key of the real
+  catalog: the marker rides along, `r_lightGridPreload` is deferred,
+  `r_renderer` needs the renderer, and every other effect is Combined.
+- `tools/tests/ui_retained_gate.py` mirrors `ApplyClassOf` and the combined
+  route statement by statement ([the gate](system-resolution-rows.md#the-gate)).
+- Engine runs on Windows 11 with an RTX 4060 Laptop GPU: a hidden 1280x720
+  window at the title menu, installed stock assets, console verbs only
+  (`openq4_retainedGui`, `openq4_system report`, `screenshot`), no gate
+  setting on the command line.
+  - **The default.** `OPENQ4_RETAINED ... system=1`, and SETTINGS > DISPLAY
+    opens `guis/menu/settings/system.q4ui` as the SETTINGS page's child.
+  - **Presets.** Starting from Enhanced, each run steps the Performance
+    Preset row through all nine presets and applies each, then applies
+    Performance and Auto-Detect. After every Apply the 55 preset settings are
+    printed, the console command of the same name is run
+    (`applyPerformancePreset`, `autoDetectPerformancePreset`) and they are
+    printed again: the two lists are identical for every preset and for
+    Auto-Detect, on OpenGL and on Vulkan. Each run made eleven applies with
+    ten device restarts and six Keeps (the batches that changed MSAA).
+  - **Sound.** The OpenGL run had sound on at volume 0 with a stereo layout.
+    The first preset returned the layout to the device's own, the sound
+    device reopened (`4 sound samples reloaded`) and the attempt completed
+    after it. The Vulkan run had sound off and asked for no restart.
+  - **Restart.** A second launch on the same save path prints the same 55
+    values as the last Apply, on both renderers.
+  - **Interrupted Apply.** Enhanced to Quality changes MSAA. The process was
+    killed while Keep or Revert was showing, with the Quality values live and
+    a schema-2 Pending record on disk. The next launch logged
+    `UI_SETTINGS startup_recovery=complete`, printed the 55 Enhanced values
+    and removed the record.
+  - **Revert and expiry.** In an earlier Vulkan run the script activated
+    Revert before Keep was enabled, and once let the countdown run out. Both
+    restored the previous preset with one device restart, and the 55 values
+    printed afterwards were the previous preset's.
+  - **The notice.** With Minimum drafted from Maximum the status line reads
+    the next-start notice on two lines beside an enabled APPLY CHANGES
+    (engine screenshot reviewed).
+- Not covered: a map was not loaded, so the reload inside a level was not
+  timed; a failed device restart was exercised in the harness only; the
+  window was hidden, so no visible exclusive-fullscreen Apply ran.
+
+Evidence: `.tmp/ui/retained-display-default/validation-evidence.json`,
+SHA-256 `a573f60c480599dcc3ad5e2721c23a6362051f85b56b7a3e202b5dc7025a9aef`.
 
 ## Qualification
 

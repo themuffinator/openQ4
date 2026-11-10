@@ -89,7 +89,7 @@ idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER,
 // CVAR_NOCHEAT, because the engine counts any other unarchived CVar as a
 // cheat: joining or hosting a server without cheats resets it to its default,
 // and a player cannot set it during a match, where both pages open.
-idCVar ui_retainedSystem( "ui_retainedSystem", "0", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT, "use the in-development retained SYSTEM page, which ui_retained includes only once every stock setting works there" );
+idCVar ui_retainedSystem( "ui_retainedSystem", "0", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT, "use the retained SYSTEM page even while ui_retained is 0; ui_retained includes it while every stock setting works there" );
 idCVar ui_retainedMultiplayer( "ui_retainedMultiplayer", "0", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT, "use the in-development retained multiplayer menu card, which ui_retained includes only once all its pages are built" );
 // The single gate for the retained (RmlUi) interface, enabled by default. Each
 // screen presents its stock GUI instead when its retained document is missing
@@ -120,14 +120,13 @@ static const char *const RETAINED_SYSTEM_MISSING_SETTINGS[] = {
 	NULL
 };
 // Settings the retained page has a control for that cannot yet do what the
-// stock page did, which keep it out of the gate too: a Performance Preset or
-// Auto-Detect cannot be applied (its image, audio and renderer resource
-// effects have no apply path). The size fields take typed digits since the
-// adapter types committed characters into the focused field.
-// ui_retained_gate.py derives this list from those reasons, so the page joins
-// the gate once both lists are empty.
+// stock page did, which keep it out of the gate too. None remain: a
+// Performance Preset or Auto-Detect applies through the combined executor
+// (SystemApplyClass::Combined), and the size fields take typed digits.
+// ui_retained_gate.py derives this list from the code, so the page stays in
+// the gate while both lists are empty and leaves it when a reason returns.
 static const char *const RETAINED_SYSTEM_INCOMPLETE_SETTINGS[] = {
-	"com_performancePreset", NULL
+	NULL
 };
 
 static bool Session_RetainedSystemEnabled( void ) {

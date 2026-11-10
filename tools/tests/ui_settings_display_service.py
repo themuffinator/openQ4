@@ -26,6 +26,7 @@ BOUNDARIES = r'''
 #include "tools/tests/native/FloatFlushMode.h"
 #include "src/ui/SettingsDisplayService.h"
 #include "src/framework/SettingsPersistence.h"
+#include "src/sound/SoundRestart.h"
 using namespace openq4;
 static int checks=0;
 static void Check(bool condition,const char* message) {
@@ -163,6 +164,10 @@ static bool VulkanRefuses(const renderWindowRequest_t* r,char* error,int size){
 bool R_RendererModule_TryDeviceRestart(const renderWindowRequest_t* r,char* error,int size){
     trace.push_back("restart");++restarts;if(!restartOkay)return GeometryError(error,size,"restart failed");if(VulkanRefuses(r,error,size))return false;ApplyActual(*r);PublishSelection();return true;
 }
+// The sound device: a restart request leaves it restarting until a case reopens or fails it.
+static soundOutputState_t soundState=SOUND_OUTPUT_READY;static int soundRestarts=0;
+soundOutputState_t Sound_OutputState(){return soundState;}
+bool Sound_RequestOutputRestart(){if(soundState!=SOUND_OUTPUT_READY)return false;trace.push_back("sound-restart");++soundRestarts;soundState=SOUND_OUTPUT_RESTARTING;return true;}
 bool R_RendererModule_TryInitializeDisplay(const renderWindowRequest_t* r,char* error,int size){
     trace.push_back("initialize");++initializations;if(!restartOkay)return GeometryError(error,size,"initialize failed");if(VulkanRefuses(r,error,size))return false;ApplyActual(*r);PublishSelection();return true;
 }
@@ -178,6 +183,7 @@ static void ResetFixture(){
     geometry={actual.window.windowX,actual.window.windowY,1280,720,actual.window.windowX,actual.window.windowY,1280,720,true};
     trace.clear();writes=0;moduleStatus.activeApi=RENDER_MODULE_API_GL;lastRequest={};
     selectionFault=0;selectionReportValid=true;selectionReport={};selectionReportSerial=0;PublishSelection();
+    soundState=SOUND_OUTPUT_READY;soundRestarts=0;
 }
 static void MultisamplingCapability(){
     ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
@@ -706,6 +712,184 @@ static void RendererCases(){
      Check(!host.Startup(error) && writes==0 && files.contains(journalFile),"a renderer record contradicting its snapshots is refused before replay");host.Shutdown();}
 }
 
+// The combined executor: what a Performance Preset writes, and any batch that
+// mixes apply classes. A schema-2 record with every domain the batch changes,
+// one device restart, a sound restart for a layout or EFX change, and
+// confirmation only when the display itself changed.
+static SettingsAttempt CombinedAttempt(SystemSettingsHost& settings,bool display,bool renderer=false){
+    SettingsAttempt a{41,131,Live(settings),{},{}};a.target=a.baseline;
+    a.completion=display?SettingsCompletion::UserConfirmation:SettingsCompletion::Automatic;
+    a.target["image_downSize"]=true;a.target["image_picmip"]=1.0;a.target["image_ignoreHighQuality"]=true;
+    a.target["r_rendererUploadMegs"]=32.0;a.target["s_numberOfSpeakers"]=2.0;a.target["s_maxEmitterChannels"]=32.0;
+    a.target["s_maxSoundsPerShader"]=1.0;a.target["r_lightGridPreload"]=true;a.target["r_brightness"]=1.25;
+    a.target["com_performancePreset"]=std::string("low");
+    if(renderer)a.target["r_renderer"]=std::string("arb2");
+    if(display){a.target["r_multiSamples"]=4.0;a.target["r_windowWidth"]=960.0;a.target["r_windowHeight"]=540.0;}
+    for(const auto& [key,value]:a.target)if(value!=a.baseline.at(key))a.patch[key]=value;
+    Check(settings.Validate(a.baseline,a.target,error) && SystemSettingsHost::ApplyClassOf(a.baseline,a.target)==SystemApplyClass::Combined,
+          "validate combined attempt fixture");
+    return a;
+}
+static SettingsAttempt CombinedForStartup(SystemSettingsHost& settings,bool confirmed,bool display,bool renderer=false){
+    EngineSettingsDisplayHost preparing(settings);auto a=CombinedAttempt(settings,display,renderer);
+    Check(preparing.Prepare(a,error),"prepare combined startup fixture");
+    if(confirmed){Check(settings.Write(a.patch,error),"write confirmed combined fixture");SettingsDisplayObservation observed;
+        Check(preparing.Restart(false,observed,error),"restart confirmed combined fixture");soundState=SOUND_OUTPUT_READY;Present();
+        Check(preparing.PersistConfirmation(a,error),"persist confirmed combined fixture");}
+    preparing.Shutdown();Check(files.contains(journalFile) && leases.empty() && !geometryToken,"shutdown keeps the combined evidence and releases the leases");
+    configWrites=0;writes=0;restarts=0;soundRestarts=0;soundState=SOUND_OUTPUT_READY;trace.clear();return a;
+}
+static void CombinedCases(){
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     auto a=CombinedAttempt(settings,false);auto withRenderer=CombinedAttempt(settings,false,true);
+     Check(host.SupportsCombined(a.baseline,a.target) && host.SupportsCombined(withRenderer.baseline,withRenderer.target),
+           "a presenting OpenGL renderer supports a combined attempt, with or without a renderer change");
+     moduleStatus.activeApi=RENDER_MODULE_API_VULKAN;
+     Check(host.SupportsCombined(a.baseline,a.target) && !host.SupportsCombined(withRenderer.baseline,withRenderer.target),
+           "Vulkan supports a combined attempt unless it changes the renderer fallback");
+     Check(!host.Prepare(withRenderer,error) && writes==0 && !files.contains(journalFile) && !geometryToken,"Prepare refuses a combined renderer change Vulkan cannot report");
+     Check(host.CancelPreparation(error) && leases.empty(),"the refused combined preparation releases its lease");
+     moduleStatus.activeApi=RENDER_MODULE_API_GL;
+     actual.presentation.available=false;Check(!host.SupportsCombined(a.baseline,a.target),"no presentation, no combined attempt");actual.presentation.available=true;
+     auto wrong=a;wrong.completion=SettingsCompletion::UserConfirmation;auto shown=CombinedAttempt(settings,true);shown.completion=SettingsCompletion::Automatic;
+     Check(!host.Prepare(wrong,error) && !host.Prepare(shown,error) && leases.empty() && files.empty() && !geometryToken && writes==0,
+           "a combined attempt asks for confirmation exactly when it changes the display");}
+    // Without a display change: one restart on the same display, automatic.
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=CombinedAttempt(settings,false);
+     Check(host.Prepare(a,error),"prepare a combined attempt");
+     Check(writes==0 && restarts==0 && soundRestarts==0 && configWrites==0 && leases.contains(lockFile) && geometryToken,
+           "combined preparation journals under both leases without writes or restarts");
+     const auto j=EffectJournal();
+     Check(j.state==SettingsJournalState::Pending && j.baseline==a.baseline && j.target==a.target && j.patch==a.patch &&
+           j.plan.domainMask==(SystemSettingImageReload|SystemSettingAudioRestart|SystemSettingNextMap|SystemSettingRendererResources) &&
+           j.plan.completion==SettingsEffectCompletion::Automatic && j.plan.rendererStrategy==SettingsRendererStrategy::CoalescedDevice,
+           "the Pending record carries exact snapshots and every changed domain");
+     Check(j.displayRestore==j.displayTarget && j.placement.size()==18,"both directions keep the captured display and its placement");
+     std::size_t image=0,audio=0,deferred=0,resource=0;
+     for(const auto& item:SystemSettingsHost::Catalog()){
+         const StateValues* restore=nullptr;const StateValues* target=nullptr;
+         if(item.effects==SystemSettingImageReload){restore=&j.imageRestore;target=&j.imageTarget;++image;}
+         else if(item.effects==SystemSettingAudioRestart){restore=&j.audioRestore;target=&j.audioTarget;++audio;}
+         else if(item.effects==SystemSettingNextMap){restore=&j.deferredRestore;target=&j.deferredTarget;++deferred;}
+         else if(item.effects==SystemSettingRendererResources){restore=&j.resourceRestore;target=&j.resourceTarget;++resource;}
+         else continue;
+         Check(restore->at(item.key)==a.baseline.at(item.key) && target->at(item.key)==a.target.at(item.key),"each domain holds its settings in both directions");
+     }
+     Check(j.imageRestore.size()==image && j.audioTarget.size()==audio && j.deferredRestore.size()==deferred && j.resourceTarget.size()==resource &&
+           image==9 && audio==3 && deferred==3 && resource==4,"each domain holds exactly its catalog settings");
+     Check(settings.Write(a.patch,error),"write the combined patch");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==1 && soundRestarts==1 && seen.ready,"one device restart and one sound restart apply the batch");
+     Present();Check(host.Observe(false,seen,error) && !seen.effectsReady,"the attempt waits while the sound device restarts");
+     soundState=SOUND_OUTPUT_READY;Check(host.Observe(false,seen,error) && seen.effectsReady,"a reopened sound device completes the effects");
+     Check(host.PersistConfirmation(a,error) && EffectJournal().state==SettingsJournalState::Confirmed && configWrites==1,"Confirmed precedes the configuration");
+     const auto config=std::find(trace.begin(),trace.end(),"config"),replace=std::find(trace.rbegin(),trace.rend(),"replace-journal").base()-1;
+     Check(replace<config,"the durable Confirmed record precedes the configuration write");
+     Check(host.Finish(false,error) && !host.RecoveryActive() && !files.contains(journalFile) && !geometryToken && leases.empty(),"Finish retires the record and both leases");}
+    // A sound device that does not come back fails the attempt.
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=CombinedAttempt(settings,false);
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a combined attempt whose sound device fails");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error),"the device restarts");soundState=SOUND_OUTPUT_FAILED;
+     Check(!host.Observe(false,seen,error),"a sound device that did not reopen fails the attempt");
+     // The restore asks nothing of a device that is not open; the sound system retries on its own.
+     StateValues back;for(const auto& [key,value]:a.patch)back[key]=a.baseline.at(key);
+     Check(settings.Write(back,error) && host.Restart(true,seen,error) && restarts==2 && soundRestarts==1,"restore restarts the device on the baseline");
+     Present();Check(host.Observe(true,seen,error) && seen.effectsReady && host.Finish(true,error) && configWrites==0 && !files.contains(journalFile) && !geometryToken,
+           "a restored combined attempt never archives its candidate");}
+    // A restore while the forward sound restart is still pending waits for it too.
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=CombinedAttempt(settings,false);
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a combined attempt to restore early");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error),"apply the combined batch");
+     StateValues back;for(const auto& [key,value]:a.patch)back[key]=a.baseline.at(key);
+     Check(settings.Write(back,error) && host.Restart(true,seen,error) && soundRestarts==1,"the pending sound restart serves the restore");
+     Present();Check(host.Observe(true,seen,error) && !seen.effectsReady,"the restore waits for the sound device");
+     soundState=SOUND_OUTPUT_READY;Check(host.Observe(true,seen,error) && seen.effectsReady && host.Finish(true,error),"the restore completes once it reopened");}
+    // Sound and load policy only: no device restart, no geometry lease.
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     SettingsAttempt a{43,137,Live(settings),{},{}};a.completion=SettingsCompletion::Automatic;a.target=a.baseline;
+     a.target["s_useEAXReverb"]=true;a.target["s_maxSoundsPerShader"]=2.0;
+     for(const auto& [key,value]:a.target)if(value!=a.baseline.at(key))a.patch[key]=value;
+     Check(host.Prepare(a,error) && !geometryToken,"a sound-only combined attempt leases no geometry");
+     const auto j=EffectJournal();
+     Check(j.plan.domainMask==(SystemSettingAudioRestart|SystemSettingNextMap) && j.plan.rendererStrategy==SettingsRendererStrategy::None &&
+           j.displayRestore.empty() && j.placement.empty() && j.imageRestore.empty() && j.resourceRestore.empty(),"its record holds only the sound and load-policy domains");
+     Check(settings.Write(a.patch,error),"write the sound patch");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==0 && soundRestarts==1,"only the sound device restarts");
+     soundState=SOUND_OUTPUT_READY;Present();
+     Check(host.Observe(false,seen,error) && seen.effectsReady && host.PersistConfirmation(a,error) && host.Finish(false,error) && configWrites==1 && leases.empty(),
+           "the sound-only attempt commits");}
+    // The emitter limit is read by every sound update; sound that is off waits for its next start.
+    for(bool off:{false,true}){ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     SettingsAttempt a{47,139,Live(settings),{},{}};a.completion=SettingsCompletion::Automatic;a.target=a.baseline;
+     a.target["s_maxEmitterChannels"]=24.0;if(off){a.target["s_numberOfSpeakers"]=2.0;soundState=SOUND_OUTPUT_OFF;}
+     for(const auto& [key,value]:a.target)if(value!=a.baseline.at(key))a.patch[key]=value;
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare an attempt that restarts no sound device");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==0 && soundRestarts==0,"no device restarts");
+     Present();Check(host.Observe(false,seen,error) && seen.effectsReady && host.PersistConfirmation(a,error) && host.Finish(false,error),"the attempt commits at once");}
+    // With a display change: the target display, and the user's confirmation.
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=CombinedAttempt(settings,true);
+     Check(host.Prepare(a,error) && geometryToken,"prepare a combined attempt that changes the display");
+     auto j=EffectJournal();
+     Check((j.plan.domainMask & SystemSettingDisplayRestart) && j.plan.completion==SettingsEffectCompletion::DisplayConfirmed &&
+           !(j.displayRestore==j.displayTarget),"its record holds the display domain and both displays");
+     Check(settings.Write(a.patch,error),"write the combined display patch");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==1 && actual.presentation.samples==4 && actual.window.logicalWidth==960,"one restart applies the display and the resources");
+     soundState=SOUND_OUTPUT_READY;Present();
+     Check(host.Observe(false,seen,error) && seen.effectsReady && host.PersistConfirmation(a,error),"Keep persists the combined display attempt");
+     j=EffectJournal();Check(j.state==SettingsJournalState::Confirmed && configWrites==1 && j.placement.at("target.width")==StateValue(960.0),"the Confirmed record holds the committed placement");
+     Check(host.Finish(false,error) && !files.contains(journalFile) && !geometryToken && leases.empty(),"Finish retires the combined display attempt");}
+    // A renderer change inside a combined attempt still needs the renderer's report.
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=CombinedAttempt(settings,false,true);
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a combined attempt with a renderer change");
+     selectionFault=1;SettingsDisplayObservation seen;
+     Check(!host.Restart(false,seen,error) && host.RecoveryActive(),"a selection that ignores the combined request is refused");host.Shutdown();}
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=CombinedAttempt(settings,false,true);
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare an agreeing combined renderer change");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error),"the renderer reports the combined request");soundState=SOUND_OUTPUT_READY;Present();
+     ++selectionReportSerial;Check(!host.Observe(false,seen,error),"a later selection is refused");--selectionReportSerial;
+     Check(host.Observe(false,seen,error) && host.PersistConfirmation(a,error) && host.Finish(false,error),"the combined renderer change commits");}
+    // Cold start without a display change: replay before the devices start, commit on a full frame.
+    for(bool confirmed:{false,true})for(bool renderer:{false,true}){ResetFixture();SystemSettingsHost settings;auto a=CombinedForStartup(settings,confirmed,false,renderer);
+     for(const auto& [key,value]:a.patch)localCVarSystem.variables.at(key).value=FormatPresentationValue(StatePresentation(confirmed?a.baseline.at(key):value));
+     localCVarSystem.variables.at("r_bloom").value="1";
+     EngineSettingsDisplayHost host(settings);Check(host.Startup(error),"startup replays the combined record before the devices start");
+     const auto current=Live(settings);bool chosen=true;
+     for(const auto& [key,value]:a.patch)chosen=chosen && current.at(key)==(confirmed?a.target:a.baseline).at(key);
+     Check(chosen && current.at("r_bloom")==StateValue(true) && !host.StartupActive() && host.RecoveryActive() && configWrites==0,
+           "every owned setting takes the recovered side and unrelated settings stay");
+     Check(host.InitializeDisplay(error) && initializations==0 && !geometryToken && restarts==0 && soundRestarts==0,
+           "a combined record without a display change starts the devices the normal way");
+     PublishSelection();host.StartupFrame(1,false);Check(configWrites==0,"a loading frame never commits combined recovery");
+     traceEnabled=true;host.StartupFrame(1,true);
+     Check(configWrites==1 && !host.RecoveryActive() && !files.contains(journalFile),"a full frame commits and removes the combined record");
+     Check(Traced(std::string("UI_SETTINGS_STARTUP approved=")+(confirmed?"1":"0")+" combined=1"),"the completion trace names the combined executor");}
+    {ResetFixture();SystemSettingsHost settings;CombinedForStartup(settings,true,false,true);
+     EngineSettingsDisplayHost host(settings);Check(host.Startup(error),"startup replays a combined record whose renderer will disagree");
+     selectionFault=1;PublishSelection();host.StartupFrame(1,true);
+     Check(configWrites==0 && host.RecoveryActive() && files.contains(journalFile),"a disagreeing selection blocks the combined recovery");host.Shutdown();}
+    // Cold start with a display change: the recorded display, then a presented frame.
+    for(bool confirmed:{false,true}){ResetFixture();SystemSettingsHost settings;auto a=CombinedForStartup(settings,confirmed,true);
+     for(const auto& [key,value]:a.patch)localCVarSystem.variables.at(key).value=FormatPresentationValue(StatePresentation(confirmed?a.baseline.at(key):value));
+     EngineSettingsDisplayHost host(settings);Check(host.Startup(error),"startup replays the combined display record");
+     const auto current=Live(settings);bool chosen=true;
+     for(const auto& [key,value]:a.patch)chosen=chosen && current.at(key)==(confirmed?a.target:a.baseline).at(key);
+     Check(chosen && host.StartupActive() && configWrites==0,"the display route recovers every owned setting, not only the display's");
+     Check(host.InitializeDisplay(error) && initializations==1 && actual.presentation.samples==(confirmed?4:0),"it initializes the recovered display");
+     host.StartupFrame(1,true);Check(configWrites==0,"it waits for a new presented frame");
+     Present();host.StartupFrame(2,true);
+     Check(configWrites==1 && !host.RecoveryActive() && !files.contains(journalFile) && !geometryToken,"the presented recovery commits and retires the record");}
+    // A record whose domain policy contradicts its snapshots is refused before replay.
+    for(int domain=0;domain<4;++domain){ResetFixture();SystemSettingsHost settings;CombinedForStartup(settings,false,false);auto j=EffectJournal();
+     if(domain==0)j.imageTarget["image_picmip"]=7.0;
+     else if(domain==1)j.audioRestore["s_numberOfSpeakers"]=6.0;
+     else if(domain==2)j.deferredTarget.erase("s_maxSoundsPerShader");
+     else j.resourceTarget["r_rendererUploadMegs"]=64.0;
+     StoreEffect(j);EngineSettingsDisplayHost host(settings);
+     Check(!host.Startup(error) && writes==0 && files.contains(journalFile),"a combined record contradicting its snapshots is refused before replay");host.Shutdown();}
+    {ResetFixture();SystemSettingsHost settings;CombinedForStartup(settings,false,false);
+     localCVarSystem.variables.at("image_picmip").value="5";EngineSettingsDisplayHost host(settings);
+     Check(!host.Startup(error) && writes==0 && files.contains(journalFile),"a divergent owned key blocks combined replay");host.Shutdown();}
+}
+
 // The display lists' inputs: the stamp, the topology, the window's display
 // (the primary without one) and the labels, English where a string is missing.
 static void CatalogInputCases(){
@@ -768,7 +952,7 @@ static void EmitDeferredJournals(const std::string& directory){
 
 int main(){
     if(const char* directory=std::getenv("OPENQ4_EMIT_DEFERRED_JOURNALS")){EmitDeferredJournals(directory);std::printf("Deferred recovery journals emitted: %d checks\n",checks);return 0;}
-    MultisamplingCapability();VulkanMultisampling();ExactCatalogCases();RuntimeJournal();StartupCases();GeometryAndStartupFailures();StartupClockCases();CommitOwnershipCases();ReindexedStartupRetry();UnusedTopologyCases();DeferredCases();DeferredExactCases();RendererCases();RendererExactCases();CatalogInputCases();std::printf("UI settings display service passed: %d checks\n",checks);}
+    MultisamplingCapability();VulkanMultisampling();ExactCatalogCases();RuntimeJournal();StartupCases();GeometryAndStartupFailures();StartupClockCases();CommitOwnershipCases();ReindexedStartupRetry();UnusedTopologyCases();DeferredCases();DeferredExactCases();RendererCases();RendererExactCases();CombinedCases();CatalogInputCases();std::printf("UI settings display service passed: %d checks\n",checks);}
 
 '''
 
@@ -829,7 +1013,7 @@ def main(production_mutations=(), emit_directory=None):
         environment["OPENQ4_EMIT_DEFERRED_JOURNALS"] = str(Path(emit_directory).resolve()).replace("\\", "/")
     inputs = [Path(__file__), Path(host_test.__file__), Path(display_test.__file__),
               *(ROOT / name for name in (
-                  "src/ui/SettingsDisplayService.h", "src/ui/SettingsDisplayService.cpp",
+                  "src/ui/SettingsDisplayService.h", "src/ui/SettingsDisplayService.cpp", "src/sound/SoundRestart.h",
                   "src/ui/application/SystemDisplay.h", "src/ui/application/SystemDisplay.cpp",
                   "src/framework/PerformancePreset.h", "src/framework/PerformancePreset.cpp", "src/ui/application/SystemSettingsHost.h", "src/ui/application/SystemSettingsHost.cpp",
                   "src/ui/application/SettingsJournal.h", "src/ui/application/SettingsJournal.cpp",

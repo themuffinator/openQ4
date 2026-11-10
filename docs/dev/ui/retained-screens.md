@@ -246,15 +246,16 @@ present every screen exactly as before. Developer commands that name a
 document explicitly (`testGUI`, `ui_retainedPreview`) remain the runtime's
 test and preview tools and load it regardless of the gate.
 
-`ui_retainedSystem` opts into the SYSTEM page, which `ui_retained` includes
-only once every setting of the stock SYSTEM page works there, so the default
-never loses one. The session lists the stock settings the page has no control
-for in `RETAINED_SYSTEM_MISSING_SETTINGS`, now empty, and those it has a control
-for that cannot yet do what the stock page did in
-`RETAINED_SYSTEM_INCOMPLETE_SETTINGS`: a Performance Preset cannot be applied
-([SYSTEM resolution rows](system-resolution-rows.md#the-gate)). The window and
-custom size fields take typed digits since committed characters reach
-retained fields. The gate test derives both lists from the code.
+`ui_retained` includes the SYSTEM page (SETTINGS > DISPLAY) while every
+setting of the stock SYSTEM page works there, so the default never loses one.
+The session lists the stock settings the page has no control for in
+`RETAINED_SYSTEM_MISSING_SETTINGS`, and those it has a control for that cannot
+do what the stock page did in `RETAINED_SYSTEM_INCOMPLETE_SETTINGS`. Both are
+empty since 10 November 2026, when a Performance Preset began to apply there
+([SYSTEM resolution rows](system-resolution-rows.md#the-gate)), so the gate
+opens the page. The gate test derives both lists from the code, and a reason
+that returns closes the gate again. `ui_retainedSystem` opens the page
+regardless, also with `ui_retained 0`.
 
 `ui_retainedMultiplayer` likewise opts into the multiplayer menu card, which
 covers the game's in-match menu; `ui_retained` includes it only once none of

@@ -477,7 +477,7 @@ On a standard local setup, logs are written under `fs_savepath/baseoq4/logs/`.
 
 Use **Settings > Display > Post FX > Preload Light Grids** to load all baked light-grid atlases during the next map load. This can avoid upload-related pauses when entering new areas, at the cost of longer loading and more video memory. The default remains off. From the console, use `r_lightGridPreload 1`, then reload the map or load a save.
 
-The modern SYSTEM page (opt-in with `ui_retainedSystem 1`) offers the same **Preload Light Grids** toggle under Irradiance Volumes. **Apply Changes** saves it without asking you to keep it, since nothing changes until the next map loads. A line under the toggle tells you whether the current map preloads or streams its light grids, has none, or keeps the previous setting until the next map loads.
+The modern interface's Display page offers the same **Preload Light Grids** toggle under Irradiance Volumes. **Apply Changes** saves it without asking you to keep it, since nothing changes until the next map loads. A line under the toggle tells you whether the current map preloads or streams its light grids, has none, or keeps the previous setting until the next map loads.
 
 ## Related Documentation
 

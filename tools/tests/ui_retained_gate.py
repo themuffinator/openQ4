@@ -2771,6 +2771,9 @@ int main() {
         s.ReturnRetainedAudio(); commonObject.time += 300; s.UpdateRetainedSubpage();
         CHECK(s.guiActive == page && page->named.back() == "subpageReturn" && s.retainedAudioParent == nullptr);
         const size_t sounds = s.played.size();
+        // DISPLAY where the SYSTEM page fell back to its stock screen: the
+        // page leaves for the stock panel (dest 22).
+        s.retainedStock.Append("guis/menu/settings/system.q4ui");
         s.HandleRetainedSessionRequest(page, "settingsDisplay");
         CHECK(s.systemOpens == 0 && page->named.back() == "depart" && s.retainedSettingsDest == 22 && page->state["from_display"] == "1" &&
               s.played.size() == sounds + 1);
@@ -3702,15 +3705,54 @@ def check_retained_system_control_writes() -> None:
     assert 'result["r_displayRefresh"]=double(catalog.refresh[size_t(index)].rate);' in rate, 'a rate pick no longer writes its rate'
 
 
-# ApplyClassOf, statement by statement: a change applies when its setting is
-# Immediate, persists an EngineRestart preference, restarts the display, or
-# is r_renderer or r_lightGridPreload;
-# any other effect makes it Unsupported. retained_system_incomplete mirrors it.
+# ApplyClassOf, statement by statement: a change rides along when its setting
+# is Immediate, persists an EngineRestart preference or is the preset marker;
+# a display restart, r_renderer and r_lightGridPreload each have an executor of
+# their own; any other effect, and any two of those classes together, make the
+# batch Combined. retained_system_incomplete mirrors it.
 APPLY_CLASS_STATEMENTS = ('if (item.effects==SystemSettingImmediate || item.effects==SystemSettingEngineRestart) continue;',
+                          'if (item.effects==SystemSettingPresetExpansion) continue;',
                           'if (item.effects==SystemSettingDisplayRestart) display=true;',
                           'else if (item.key=="r_renderer") renderer=true;',
                           'else if (item.key=="r_lightGridPreload") deferred=true;',
-                          'else unsupported=true;')
+                          'else combined=true;',
+                          'if (combined || int(display)+int(renderer)+int(deferred)>1) return SystemApplyClass::Combined;')
+# The combined executor. A Combined batch applies only while the service admits
+# and dispatches it and the host prepares and recovers it; an effect applies
+# through it only while CombinedPolicy gives that effect a domain in the
+# record. A missing route or domain is a reason again, as Unsupported was.
+COMBINED_ROUTE = {'src/ui/SettingsService.cpp': (
+                      ('bool Supported(Service& service,std::uint64_t owner,bool* invalidDraft = nullptr) {',
+                       'case SystemApplyClass::Combined:\n        if (!service.confirmationOwners.contains(owner) ||\n'
+                       '            !service.device.SupportsCombined(service.transaction.Baseline(),service.transaction.Draft())) return false;\n        break;'),
+                      ('bool UI_SettingsDispatch(std::uint64_t owner, const ActionInvocation& action, std::string& error) {',
+                       'else if (kind == SystemApplyClass::Combined)\n                result = service.display.Apply(owner,Now(),')),
+                  'src/ui/SettingsDisplayService.cpp': (
+                      ('bool EngineSettingsDisplayHost::Prepare(const SettingsAttempt& attempt, std::string& error) {',
+                       'if (combined) return PrepareCombined(attempt,error);'),
+                      ('bool EngineSettingsDisplayHost::Startup(std::string& error) {',
+                       'case SystemApplyClass::Combined: return StartupCombined(bytes,effect,error);'),
+                      ('bool EngineSettingsDisplayHost::Restart(bool restoring, SettingsDisplayObservation& output, std::string& error) {',
+                       'if (!R_RendererModule_TryDeviceRestart(&plan.request,diagnostic,sizeof(diagnostic))) return Fail(error,diagnostic);'),
+                      ('bool EngineSettingsDisplayHost::Restart(bool restoring, SettingsDisplayObservation& output, std::string& error) {',
+                       'RestartSound(restoring);'))}
+COMBINED_DOMAINS = {'ImageReload': 'case SystemSettingImageReload: restore=&record.imageRestore; target=&record.imageTarget; break;',
+                    'AudioRestart': 'case SystemSettingAudioRestart: restore=&record.audioRestore; target=&record.audioTarget; break;',
+                    'NextMap': 'case SystemSettingNextMap: restore=&record.deferredRestore; target=&record.deferredTarget; break;',
+                    'RendererResources': 'case SystemSettingRendererResources: restore=&record.resourceRestore; target=&record.resourceTarget; break;'}
+
+
+def combined_effects() -> set[str]:
+    """The effects the combined executor applies: none unless every route statement
+    holds, then each effect CombinedPolicy still gives a domain."""
+    for path, statements in COMBINED_ROUTE.items():
+        source = (ROOT / path).read_text(encoding='utf-8')
+        for signature, statement in statements:
+            if statement not in function_body(source, signature):
+                return set()
+    policy = function_body((ROOT / 'src/ui/SettingsDisplayService.cpp').read_text(encoding='utf-8'),
+                           'void CombinedPolicy(SettingsEffectRecoveryJournal& record) {')
+    return {effect for effect, statement in COMBINED_DOMAINS.items() if statement in policy}
 # Page states that enable a control only on some renderers, with the function
 # that publishes each one and the statement that makes it hold on every renderer
 # the stock page's control worked on (ui_settings_display_service.py proves the
@@ -3803,27 +3845,32 @@ def retained_system_incomplete(adapter: str) -> dict[str, str]:
         assert statement in apply_class, f'ApplyClassOf changed ({statement}); update APPLY_CLASS_STATEMENTS and the mirror below'
     effects = retained_system_catalog_effects()
     typed = typed_text_reaches_numbers(adapter)
+    combined = combined_effects()
 
     def applies(key: str) -> bool:
-        return effects[key] in ('Immediate', 'EngineRestart', 'DisplayRestart') or key in ('r_renderer', 'r_lightgridpreload')
+        return (effects[key] in ('Immediate', 'EngineRestart', 'PresetExpansion', 'DisplayRestart') or
+                key in ('r_renderer', 'r_lightgridpreload') or effects[key] in combined)
 
     def apply_class(key: str) -> str:
-        return 'immediate' if effects[key] in ('Immediate', 'EngineRestart') else 'display' if effects[key] == 'DisplayRestart' else key
+        if effects[key] in ('Immediate', 'EngineRestart', 'PresetExpansion'):
+            return 'immediate'
+        return 'display' if effects[key] == 'DisplayRestart' else key if key in ('r_renderer', 'r_lightgridpreload') else 'combined'
 
     targets = [target.lower() for target in preset_targets()]
     reasons = {}
     for key in sorted(stock & set(roles)):
         assert key in effects, f'{key} has a retained control but no SystemSettingsHost catalog entry'
         if key == 'com_performancepreset':
-            # A preset writes its targets: Apply needs every one to apply, in one class.
+            # A preset writes its targets: Apply needs every one to apply, and
+            # the combined executor for the classes they mix.
             assert targets and all(target in effects for target in targets), 'a preset target has no SystemSettingsHost catalog entry'
             blocked = sorted(target for target in targets if not applies(target))
             classes = {apply_class(target) for target in targets if applies(target)} - {'immediate'}
-            if blocked or not applies(key) or len(classes) > 1:
+            if blocked or not applies(key) or (len(classes) > 1 and not combined):
                 reasons[key] = (f'a preset writes {", ".join(blocked) or "settings"} whose effects have no apply path, '
-                                'or mixes apply classes (ApplyClassOf: Unsupported or Mixed)')
+                                'or mixes apply classes without the combined executor')
         elif not applies(key):
-            reasons[key] = f'its {effects[key]} effect has no apply path (ApplyClassOf: Unsupported)'
+            reasons[key] = f'its {effects[key]} effect has no apply path (no executor of its own and no combined domain)'
         elif not typed and roles[key] == {'number'}:
             reasons[key] = 'only number fields offer it, and typed characters reach no retained Number field'
         else:

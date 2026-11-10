@@ -58,6 +58,7 @@ static struct HostData {
     bool failRead=false,failDefaults=false,refuseWrite=false,partialWrite=false,confirm=false;
     bool allowNearZero=false; // Comparison-only fixture: continuous zero-capable numeric setting.
     bool unsupportedTuple=false,throwPreflight=false;
+    bool nextStart=false; // The draft holds a change that finishes at the next start.
 } host;
 namespace openq4::ui {
 // The display builders compiled in below link the catalog; the service never reads it.
@@ -145,7 +146,8 @@ unsigned SystemSettingsHost::ChangedEffects(const StateValues& before,const Stat
 }
 // Production's apply class over this catalog: r_mode and r_multiSamples restart
 // the display, r_renderer reloads renderer resources, r_lightGridPreload waits
-// for the next map, s_numberOfSpeakers has no executor, and the rest apply
+// for the next map, s_numberOfSpeakers restarts the sound device through the
+// combined executor, as any two classes together do, and the rest apply
 // immediately.
 SystemApplyClass SystemSettingsHost::ApplyClassOf(const StateValues& before,const StateValues& target) {
     bool changed=false;
@@ -155,15 +157,17 @@ SystemApplyClass SystemSettingsHost::ApplyClassOf(const StateValues& before,cons
     }
     if(!changed)return SystemApplyClass::None;
     const unsigned effects=ChangedEffects(before,target);
-    if(effects&SystemSettingAudioRestart)return SystemApplyClass::Unsupported;
     const bool display=(effects&SystemSettingDisplayRestart)!=0,renderer=(effects&SystemSettingRendererResources)!=0,
         deferred=(effects&SystemSettingNextMap)!=0;
-    if(int(display)+int(renderer)+int(deferred)>1)return SystemApplyClass::Mixed;
+    if((effects&SystemSettingAudioRestart) || int(display)+int(renderer)+int(deferred)>1)return SystemApplyClass::Combined;
     return display?SystemApplyClass::Display:renderer?SystemApplyClass::Renderer:
         deferred?SystemApplyClass::Deferred:SystemApplyClass::Immediate;
 }
 bool SystemSettingsHost::ChangedRequiresDisplayRestart(const StateValues& before,const StateValues& target) {
     return (ChangedEffects(before,target)&SystemSettingDisplayRestart)!=0;
+}
+bool SystemSettingsHost::ChangedNeedsNextStart(const StateValues& before,const StateValues& target) {
+    return host.nextStart && before!=target;
 }
 bool SystemSettingsHost::NeedsConfirmation(const StateValues&,const StateValues&) const {
     return host.confirm; // Fault-injected service state, never a device result.
@@ -271,6 +275,9 @@ public:
     bool SupportsMultisampling()const{return deviceData.msaaSupported;}
     bool ReadyForAutomatic()const{return deviceData.automaticReady;}
     bool SupportsRendererSelection()const{return deviceData.rendererSelection;}
+    bool SupportsCombined(const StateValues& before,const StateValues& target)const{
+        return deviceData.automaticReady && (before.at("r_renderer")==target.at("r_renderer") || deviceData.rendererSelection);
+    }
     void CatalogStamp(SystemDisplayCatalogStamp& stamp)const{stamp={deviceData.topologyGeneration,deviceData.currentDisplay,deviceData.text};}
     bool CaptureCatalogInput(const SystemDisplayCatalogStamp& stamp,SystemDisplayCatalogInput& input,std::string& error)const{
         ++deviceData.captures;if(deviceData.captureFails){error="topology capture failed";return false;}
@@ -670,10 +677,11 @@ static void ConfirmationCapability() {
         }
     }
     UI_SettingsConfirmationDocument(owner,valid);Expect(owner,"canApply",true);
-    Check(Dispatch(owner,"edit",{{"s_numberOfSpeakers",6.0},{"r_brightness",1.5}}),"mixed unsupported resource batch can be drafted");
-    Expect(owner,"canApply",false);
-    Check(!Dispatch(owner,"apply") && host.writes.empty() && deviceData.prepares==0,"capability cannot authorize unsupported effects in a mixed batch");
-    UI_SettingsConfirmationDocument(owner,DocumentModel{});Check(Dispatch(owner,"revert"),"clear mixed draft");
+    Check(Dispatch(owner,"edit",{{"s_numberOfSpeakers",6.0},{"r_brightness",1.5}}),"a combined batch can be drafted");
+    Expect(owner,"canApply",true);
+    UI_SettingsConfirmationDocument(owner,DocumentModel{});Expect(owner,"canApply",false);
+    Check(!Dispatch(owner,"apply") && host.writes.empty() && deviceData.prepares==0,"a combined batch needs an owning view as a display change does");
+    Check(Dispatch(owner,"revert"),"clear combined draft");
     Check(Dispatch(owner,"edit",{{"r_mode",1.0}}),"display redraft");Expect(owner,"canApply",false);
 }
 static void MultisamplingCapability() {
@@ -884,13 +892,31 @@ static void DeferredApply() {
     Expect(owner,"baseline.r_brightness",1.5);
     Check(UI_SettingsLevelLoadPolicy(preload,token) && preload,"a load after the commit uses the new choice");
 }
+// A display change with the preload: one combined attempt that shows the
+// confirmation, as a display change alone does, and restores both on close.
 static void DeferredMixed() {
-    const auto owner=Begin();UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
+    const auto owner=Begin();
     Check(Dispatch(owner,"edit",{{"r_lightGridPreload",true},{"r_mode",1.0}}),"draft a display and a deferred change");
-    Expect(owner,"canApply",false);Expect(owner,"message",std::string("#str_230076"));
-    Check(!Dispatch(owner,"apply") && deviceData.prepares==0 && host.writes.empty(),"a mixed batch refuses before any preparation or write");
-    Check(Dispatch(owner,"edit",{{"r_mode",0.0}}),"take the display change back");
+    Expect(owner,"canApply",false);
+    UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
     Expect(owner,"canApply",true);Expect(owner,"message",std::string("#str_230014"));
+    UI_SettingsConfirmationDocument(owner,DocumentModel{});
+    Check(!Dispatch(owner,"apply") && deviceData.prepares==0 && host.writes.empty(),"no owning view refuses the combined apply");
+    UI_SettingsConfirmationDocument(owner,ConfirmationDocument());deviceData.automaticReady=false;Expect(owner,"canApply",false);
+    Check(!Dispatch(owner,"apply") && deviceData.prepares==0 && host.writes.empty(),"no presenting renderer refuses the combined apply");
+    deviceData.automaticReady=true;Expect(owner,"canApply",true);
+    host.confirm=true; // The real host asks for confirmation whenever the display changes.
+    Check(Dispatch(owner,"apply"),"a combined batch with a display change applies");
+    Expect(owner,"phase",static_cast<double>(SettingsPhase::Applying));Expect(owner,"message",std::string("#str_229990"));
+    UI_SettingsFrame(false);Check(host.writes.empty() && deviceData.prepares==0,"a loading frame starts no combined work");
+    UI_SettingsFrame();
+    Check(host.writes.size()==1 && deviceData.prepares==1 && deviceData.restarts==1 && UI_SettingsBlocksConfigWrite(),"a full frame journals, writes and restarts once");
+    Expect(owner,"confirmationVisible",true);
+    bool preload=true;std::uint64_t token=0;
+    Check(UI_SettingsLevelLoadPolicy(preload,token) && !preload,"a load during the combined attempt keeps the committed preload");
+    UI_SettingsCloseOwner(owner);UI_SettingsFrame();PresentFrame();UI_SettingsFrame();
+    Check(deviceData.restores==1 && deviceData.persists==0 && deviceData.finishes==1 && host.live==Initial(),
+          "closing the owner restores the whole combined batch without persisting it");
 }
 static void DeferredNotReady() {
     const auto owner=Begin();
@@ -952,16 +978,38 @@ static void DeferredApplyExitRestore() {
     Expect(owner,"phase",static_cast<double>(SettingsPhase::Editing));Expect(owner,"baseline.r_lightGridPreload",false);
     Check(host.live.at("r_lightGridPreload")==StateValue(false) && host.live.at("r_brightness")==StateValue(1.0),"the restore returns both keys");
 }
+// An audio restart, alone or with the preload: the combined executor applies
+// it without a confirmation and waits for its effects before committing.
 static void UnsupportedEffects() {
-    const auto owner=Begin();UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
+    const auto owner=Begin();
     Check(Dispatch(owner,"edit",{{"s_numberOfSpeakers",6.0}}),"draft an audio restart");
-    Expect(owner,"canApply",false);Expect(owner,"message",std::string("#str_230014"));
-    Check(!Dispatch(owner,"apply") && deviceData.prepares==0 && host.writes.empty(),"an effect without an executor refuses before any preparation or write");
-    Check(Dispatch(owner,"edit",{{"r_lightGridPreload",true}}),"add the preload to the audio restart");
-    Expect(owner,"canApply",false);Expect(owner,"message",std::string("#str_230014"));
-    Check(Dispatch(owner,"edit",{{"s_numberOfSpeakers",2.0},{"r_lightGridPreload",false},{"r_renderer",std::string("arb2")}}),"draft only the renderer fallback");
     Expect(owner,"canApply",false);
-    Check(!Dispatch(owner,"apply") && deviceData.prepares==0 && host.writes.empty(),"the renderer fallback needs a renderer that reports its selection");
+    UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
+    Expect(owner,"canApply",true);Expect(owner,"message",std::string("#str_230014"));
+    // The notice names what Apply cannot finish in this session; it does not block Apply.
+    host.nextStart=true;Expect(owner,"canApply",true);Expect(owner,"message",std::string("#str_230076"));
+    host.nextStart=false;Expect(owner,"message",std::string("#str_230014"));
+    Check(Dispatch(owner,"edit",{{"r_lightGridPreload",true},{"r_renderer",std::string("arb2")}}),"add the preload and the renderer fallback");
+    Expect(owner,"canApply",false);
+    Check(!Dispatch(owner,"apply") && deviceData.prepares==0 && host.writes.empty(),"a combined renderer change needs a renderer that reports its selection");
+    Check(Dispatch(owner,"edit",{{"r_renderer",std::string("best")}}),"take the renderer change back");
+    Expect(owner,"canApply",true);
+    Check(Dispatch(owner,"apply"),"the audio restart and the preload apply together");
+    Expect(owner,"phase",static_cast<double>(SettingsPhase::Applying));Expect(owner,"confirmationVisible",false);
+    Expect(owner,"message",std::string("#str_230073"));
+    UI_SettingsFrame();
+    Check(host.writes.size()==1 && deviceData.prepares==1 && deviceData.restarts==1 && UI_SettingsBlocksConfigWrite(),"a full frame journals, writes and restarts");
+    // The sound device is still reopening: presented frames alone do not commit.
+    deviceData.observation.effectsReady=false;PresentFrame();UI_SettingsFrame();
+    Check(deviceData.persists==0 && UI_SettingsBlocksConfigWrite(),"the attempt waits for its effects");
+    Expect(owner,"message",std::string("#str_230073"));
+    deviceData.observation.effectsReady=true;PresentFrame();UI_SettingsFrame();UI_SettingsFrame();
+    Check(deviceData.persists==1 && deviceData.finishes==1 && !deviceData.held && !UI_SettingsBlocksConfigWrite(),"ready effects and a presented frame commit");
+    Expect(owner,"phase",static_cast<double>(SettingsPhase::Editing));Expect(owner,"baseline.s_numberOfSpeakers",6.0);
+    Expect(owner,"baseline.r_lightGridPreload",true);Expect(owner,"dirty",false);
+    Check(Dispatch(owner,"edit",{{"r_renderer",std::string("arb2")}}),"draft only the renderer fallback");
+    Expect(owner,"canApply",false);
+    Check(!Dispatch(owner,"apply") && deviceData.prepares==1 && host.writes.size()==1,"the renderer fallback needs a renderer that reports its selection");
 }
 // The light-grid row's status: what the loaded map did with its light grids
 // and whether a saved choice waits for the next load.
@@ -1154,10 +1202,12 @@ static void RendererStatus() {
 // the renderer's selection agrees; it never mixes with another executor.
 static void RendererRoute() {
     const auto owner=Begin();UI_SettingsConfirmationDocument(owner,ConfirmationDocument());deviceData.rendererSelection=true;
+    // With another class the renderer joins the combined executor.
     Check(Dispatch(owner,"edit",{{"r_renderer",std::string("arb2")},{"r_lightGridPreload",true}}),"draft the renderer with the preload");
-    Expect(owner,"canApply",false);Expect(owner,"message",std::string("#str_230076"));
+    Expect(owner,"canApply",true);Expect(owner,"message",std::string("#str_230014"));
     Check(Dispatch(owner,"edit",{{"r_lightGridPreload",false},{"r_mode",1.0}}),"draft the renderer with a display change");
-    Expect(owner,"canApply",false);Expect(owner,"message",std::string("#str_230076"));
+    Expect(owner,"canApply",true);Expect(owner,"message",std::string("#str_230014"));
+    deviceData.rendererSelection=false;Expect(owner,"canApply",false);deviceData.rendererSelection=true;
     Check(Dispatch(owner,"edit",{{"r_mode",0.0},{"r_brightness",1.5}}),"draft the renderer with an immediate edit");
     deviceData.rendererSelection=false;Expect(owner,"canApply",false);
     Check(!Dispatch(owner,"apply") && deviceData.prepares==0 && host.writes.empty(),"without a selection report the renderer cannot apply");
@@ -1282,7 +1332,7 @@ static void ExitInvalidate(const std::string& operation) {
 static void ExitFailure(const std::string& failure) {
     const auto owner=Begin();
     Check(Dispatch(owner,"edit",{{"r_brightness",1.5},{"r_shadows",false}}),"draft before failed apply-exit");
-    if(failure=="unsupported")Check(Dispatch(owner,"edit",{{"s_numberOfSpeakers",6.0}}),"unsupported effect remains a valid draft");
+    if(failure=="unsupported")Check(Dispatch(owner,"edit",{{"s_numberOfSpeakers",6.0}}),"a combined effect without an owning view remains a valid draft");
     else if(failure=="no_view")Check(Dispatch(owner,"edit",{{"r_mode",1.0}}),"display draft without owner confirmation view");
     else if(failure=="write")host.refuseWrite=true;
     else if(failure=="partial")host.partialWrite=true;
@@ -1438,7 +1488,7 @@ static void Presets(const std::string& scenario) {
         Check(Dispatch(owner,scenario=="auto"?"autodetect":"preset",scenario=="auto"?StateValues{}:StateValues{{"name",std::string("performance")}}),"profile staged");
         Expect(owner,"draft.r_brightness",1.5);Expect(owner,"draft.r_shadows",false);
         Expect(owner,"baseline.r_brightness",1.0);Expect(owner,"canApply",false);
-        Check(!Dispatch(owner,"apply")&&!Dispatch(owner,"applyExit"),"unsupported profile effects remain refused");
+        Check(!Dispatch(owner,"apply")&&!Dispatch(owner,"applyExit"),"a profile without an owning view and a reporting renderer stays a draft");
     }
     Check(host.live==original&&host.writes.empty(),"all generated service paths have zero live writes");
 }

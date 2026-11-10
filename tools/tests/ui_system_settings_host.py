@@ -251,21 +251,32 @@ int main() {
         candidate=original;candidate[key]=true;assert(host.RequiresDeviceWork(original,candidate));
         assert(!host.NeedsConfirmation(original,candidate));
     }
-    // One executor per Apply; immediate keys ride along with any class, and an
-    // effect without an executor refuses the whole batch.
+    // One executor per Apply; immediate keys and the preset marker ride along
+    // with any class. A class alone keeps its own executor; an image, audio,
+    // renderer-resource or load-policy change, and any two classes together,
+    // take the combined one.
     const auto classOf=[&]{return SystemSettingsHost::ApplyClassOf(original,candidate);};
     candidate=original;assert(classOf()==SystemApplyClass::None);
     candidate["r_brightness"]=1.4;assert(classOf()==SystemApplyClass::Immediate);
     candidate["r_lightGridPreload"]=true;assert(classOf()==SystemApplyClass::Deferred);
-    candidate["r_multiSamples"]=std::get<double>(original.at("r_multiSamples"))+1;assert(classOf()==SystemApplyClass::Mixed);
+    candidate["r_multiSamples"]=std::get<double>(original.at("r_multiSamples"))+1;assert(classOf()==SystemApplyClass::Combined);
     candidate=original;candidate["r_brightness"]=1.4;candidate["r_multiSamples"]=std::get<double>(original.at("r_multiSamples"))+1;
     assert(classOf()==SystemApplyClass::Display);
     candidate=original;candidate["r_renderer"]=std::string("arb2");assert(classOf()==SystemApplyClass::Renderer);
-    candidate["r_lightGridPreload"]=true;assert(classOf()==SystemApplyClass::Mixed);
-    candidate=original;candidate["image_downSize"]=true;assert(classOf()==SystemApplyClass::Unsupported);
-    candidate["r_lightGridPreload"]=true;assert(classOf()==SystemApplyClass::Unsupported);
-    candidate=original;candidate["s_useEAXReverb"]=true;assert(classOf()==SystemApplyClass::Unsupported);
-    candidate=original;candidate["com_performancePreset"]=std::string("ultra");assert(classOf()==SystemApplyClass::Unsupported);
+    candidate["r_lightGridPreload"]=true;assert(classOf()==SystemApplyClass::Combined);
+    candidate=original;candidate["image_downSize"]=true;assert(classOf()==SystemApplyClass::Combined);
+    candidate["r_lightGridPreload"]=true;assert(classOf()==SystemApplyClass::Combined);
+    candidate=original;candidate["s_useEAXReverb"]=!std::get<bool>(original.at("s_useEAXReverb"));assert(classOf()==SystemApplyClass::Combined);
+    // The marker names the profile a draft was filled from and has no effect of its own.
+    candidate=original;candidate["com_performancePreset"]=std::string("ultra");assert(classOf()==SystemApplyClass::Immediate);
+    candidate["r_multiSamples"]=std::get<double>(original.at("r_multiSamples"))+1;assert(classOf()==SystemApplyClass::Display);
+    candidate["image_picmip"]=std::get<double>(original.at("image_picmip"))+1;assert(classOf()==SystemApplyClass::Combined);
+    // Only these two wait for the next start: declarations already parsed keep the old value.
+    candidate=original;assert(!SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
+    candidate["image_downSize"]=!std::get<bool>(original.at("image_downSize"));assert(!SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
+    candidate["image_ignoreHighQuality"]=!std::get<bool>(original.at("image_ignoreHighQuality"));assert(SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
+    candidate=original;candidate["s_maxSoundsPerShader"]=std::get<double>(original.at("s_maxSoundsPerShader"))+1;
+    assert(SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
     std::vector<std::string> deferredKeys,rendererKeys;
     for(const auto& item:SystemSettingsHost::Catalog()) {
         candidate=original;auto& value=candidate.at(item.key);
@@ -275,9 +286,12 @@ int main() {
         const auto kind=classOf();
         if(kind==SystemApplyClass::Deferred)deferredKeys.push_back(item.key);
         if(kind==SystemApplyClass::Renderer)rendererKeys.push_back(item.key);
-        if(item.effects==SystemSettingImmediate || item.effects==SystemSettingEngineRestart)assert(kind==SystemApplyClass::Immediate);
+        if(item.effects==SystemSettingImmediate || item.effects==SystemSettingEngineRestart || item.effects==SystemSettingPresetExpansion)
+            assert(kind==SystemApplyClass::Immediate);
         else if(item.effects==SystemSettingDisplayRestart)assert(kind==SystemApplyClass::Display);
-        else assert(kind==SystemApplyClass::Unsupported || kind==SystemApplyClass::Deferred || kind==SystemApplyClass::Renderer);
+        else if(item.key=="r_lightGridPreload")assert(kind==SystemApplyClass::Deferred);
+        else if(item.key=="r_renderer")assert(kind==SystemApplyClass::Renderer);
+        else assert(kind==SystemApplyClass::Combined);
     }
     assert(deferredKeys==std::vector<std::string>{"r_lightGridPreload"} && rendererKeys==std::vector<std::string>{"r_renderer"});
     candidate=original;candidate["r_screen"]=1.0;

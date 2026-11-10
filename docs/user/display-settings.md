@@ -80,7 +80,9 @@ MSAA is clamped to the highest sample count supported by the active device and r
 
 To adopt the revised settings on an existing configuration, select the preset again or run `applyPerformancePreset ultra`. Merely storing `com_performancePreset=ultra` does not reapply the profile. A configuration saved with the earlier Ultra keeps those settings until you select a preset again; select **Maximum** to keep that everything-on image, or **Ultra** for the new 75 FPS recipe.
 
-Performance presets write video, texture-allocation, texture-sampling, and audio backend cvars. Anisotropy is capped to the maximum supported by the active GPU. Run `vid_restart` after applying one so renderer, texture allocation, and sampler changes take effect; run `s_restart` as well if you want speaker/EAX/emitter-budget changes to rebuild the active sound backend immediately.
+Performance presets write video, texture-allocation, texture-sampling, and audio backend cvars. Anisotropy is capped to the maximum supported by the active GPU. Run `vid_restart` after applying one from the console so renderer, texture allocation, and sampler changes take effect; run `s_restart` as well if you want speaker/EAX/emitter-budget changes to rebuild the active sound backend immediately.
+
+In the modern interface, choose the preset on **Settings > Display** and press **Apply Changes**. That restarts the renderer once and, when the speaker layout or reverb setting changed, the sound device. A preset that changes anti-aliasing asks you to keep or revert. High-quality texture flags and the per-sound sample limit fully change when the game next starts; the page tells you when your changes include one of them.
 
 `autoDetectPerformancePreset` takes no arguments. It recommends and applies a starting point using the **active renderer and GPU**, system RAM, CPU concurrency, platform power hints and current drawable resolution. It does not run a benchmark or promise a particular frame rate. Every preset but Maximum can be recommended; Maximum has no frame-rate target and remains a manual choice.
 

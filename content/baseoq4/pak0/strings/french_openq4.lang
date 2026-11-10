@@ -1239,7 +1239,7 @@
 	"#str_230073"	"Application des paramètres…"
 	"#str_230074"	"Restauration des paramètres précédents…"
 	"#str_230075"	"Enregistrement des paramètres…"
-	"#str_230076"	"Appliquez séparément les changements d’affichage, de rendu et de lumière."
+	"#str_230076"	"Certains changements de texture et de son s’appliquent au prochain lancement."
 	"#str_230077"	"Les paramètres demandent votre attention"
 	"#str_230078"	"Cette carte garde l’ancien réglage des grilles de lumière jusqu’au prochain chargement."
 	"#str_230079"	"Cette carte précharge ses grilles de lumière."
