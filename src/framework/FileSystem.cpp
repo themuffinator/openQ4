@@ -3767,7 +3767,10 @@ int idFileSystemLocal::GetFileList( const char *relativePath, const idStrList &e
 				}
  
 				// ensure we have a path, and not just a filename containing the path
-				if ( name[ pathLength ] == '\0' || name[pathLength - 1] != '/' ) {
+				// openQ4: only when there is a path. For the root, name[-1] was
+				// read from before the string and every file in a pak was
+				// skipped, so completing "exec" never offered a pak's configs.
+				if ( pathLength && ( name[ pathLength ] == '\0' || name[pathLength - 1] != '/' ) ) {
 					continue;
 				}
  

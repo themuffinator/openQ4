@@ -106,6 +106,15 @@ int main(){try {
     reset();com_preciseTic.value=0;now=3600000;common->Async();require(com_ticNumber==1,"imprecise timer no longer emits one tic");
     reset();lastTicMsecValid=false;now=100;common->Async();require(com_ticNumber==1,"initial timer phase changed");
     reset();com_shuttingDown=true;common->Async();require(!asyncCalls && !com_ticNumber,"shutdown advanced the timer");
+    // The millisecond clock is an int and wraps after 24.86 days. The last
+    // tic's time is a double and does not, so without an answer to the step
+    // back no tic runs again for 49.7 days.
+    reset();now=2147483600;lastTicMsec=2147483580;common->Async();
+    const int beforeWrap=com_ticNumber;require(beforeWrap>=1,"no tic before the clock wraps");
+    now=-2147483647-1+40;common->Async();
+    require(com_ticNumber>beforeWrap && perCall<=10,"tics stopped when the millisecond clock wrapped");
+    const int afterWrap=com_ticNumber;now+=1000;common->Async();
+    require(com_ticNumber>afterWrap,"tics did not resume their cadence after the wrap");
     std::puts("Async lifecycle: foreground cadence, background intervals, frozen/accelerated catch-up, wake counts and bounded shutdown passed");return 0;
 }catch(const std::exception& e){std::fprintf(stderr,"%s\n",e.what());return 1;}}
 '''

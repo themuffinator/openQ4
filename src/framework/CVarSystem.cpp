@@ -382,10 +382,6 @@ idInternalCVar::Set
 ============
 */
 void idInternalCVar::Set( const char *newValue, bool force, bool fromServer ) {
-	if ( nameString.Icmp( "g_autoScreenshot" ) == 0 || nameString.Icmp( "com_autoScreenshot" ) == 0 ) {
-		common->Printf( "CVar change: %s -> %s (fromServer=%d, force=%d, flags=0x%x)\n",
-			nameString.c_str(), newValue ? newValue : "<null>", fromServer ? 1 : 0, force ? 1 : 0, flags );
-	}
 	if ( session && session->IsMultiplayer() && !fromServer ) {
 #ifndef ID_TYPEINFO
 		if ( ( flags & CVAR_NETWORKSYNC ) && idAsyncNetwork::client.IsActive() ) {

@@ -6828,6 +6828,16 @@ void idCommonLocal::Async( void ) {
 	const bool boundCatchup = smoothSlowTime || timescale == 1.0f;
 	const double clampedCatchupMsec = 10.0 * GetUserCmdMsecFloat();
 #endif
+	// openQ4: Sys_Milliseconds is an int and wraps to a large negative number
+	// after 24.86 days of uptime. The last tic used to be an int as well and
+	// wrapped with it; as a double it stays up near 2^31, every test below is
+	// then false for the next 49.7 days, and no tic runs - a server that has
+	// been up that long stops dead. The clock never goes backwards otherwise,
+	// so a step back is the wrap: carry on from the new reading.
+	if ( static_cast<double>( msec ) < lastTicMsec - clampedCatchupMsec ) {
+		lastTicMsec = static_cast<double>( msec ) - ticMsec;
+	}
+
 	if ( boundCatchup && lastTicMsec + clampedCatchupMsec < static_cast<double>( msec ) ) {
 		lastTicMsec = static_cast<double>( msec ) - clampedCatchupMsec;
 	}
