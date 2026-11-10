@@ -6,6 +6,69 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Servers that outlast 25 days, safer custom content and quicker starts from a third audit round, 10 November 2026
+
+- **A server left running no longer stops after 25 days.** The game's clock
+  counter wraps after 24.86 days of uptime, and from that moment no game tic
+  ran for the next seven weeks: the server was up but frozen. It now carries
+  on across the wrap. Nothing needs to be changed.
+- **A failed join no longer hides your files.** Joining a pure server locks
+  the game to the server's list of packs. If the join then ended early (a
+  full server, a refusal, a cancelled download or backing out), the lock
+  stayed on: loose files and any pack the server had not listed were missing
+  from the menus, from single player and on the next server, until a later
+  server was joined and left or the game was restarted. The lock is now
+  released when the attempt ends.
+- **Custom maps, models and textures are checked as they load.** These files
+  could make the game write outside its own tables, so a download could
+  crash it or worse. Each is now refused or read safely:
+  - an animation or mesh declaring more frames, weights or joints than its
+    tables were sized for;
+  - a collision file, bot navigation file or map patch naming entries
+    outside itself;
+  - LightWave and MD3 models with out-of-range indices or offsets;
+  - a JPEG that ends early, an image program whose inner image is missing,
+    and a material table given an invalid index.
+- **Multiplayer fixes.**
+  - A passed vote to shuffle teams could end the match as a forfeit, because
+    one side was briefly empty while players were being moved.
+  - A passed vote for a game type few maps support could end the server's
+    session with an error instead of picking one of those maps.
+  - Dying to the map within a second of being knocked by a player who then
+    disconnected read freed memory to award the kill.
+  - A bot's grudge passed to whoever joined into the slot of the player it
+    was against.
+- **Clients stand up better to hostile servers.** A server could crash a
+  client by following a disconnect with more messages in the same packet, or
+  end it with an error by listing one pack twice.
+- **Scripts and saves.** The script function `sys.strFind` misread memory on
+  every call; `%` with a divisor between -1 and 1 crashed the game; an error
+  message containing `%` printed garbage or crashed; four animation frame
+  commands crashed when written without their argument; weapons naming a
+  joint their model lacks corrupted memory. A game saved during a lightning
+  death now restores that effect correctly, and a save naming an impossible
+  local player is refused.
+- **Console.** Completing `exec` now lists configuration files inside packs.
+- **Faster.**
+  - Starting the game reads its definition files in about a fifth less time
+    (592 to 462 ms on this development machine, median of four hidden starts).
+  - Freeing a dictionary string no longer walks every string in the game;
+    clearing a level's data did that once for each string it freed.
+  - A server with no bots no longer rebuilds the bots' view of the world
+    every frame, and each shot no longer searches every weapon slot by name.
+- **For developers.** `untrusted_file_bounds.py` pins the loader, script and
+  save properties above, and `network_security.py` the client ones; both run
+  in CI.
+- Validation: the native suite passes 338 of 338. The tic harness now runs
+  the clock across its wrap and fails without the fix. All 1,205 stock models
+  load through the changed model readers. Hidden, input-free probes: four
+  campaign maps on OpenGL and one on Vulkan, each with a demo recorded and
+  replayed, with the same warnings as the build before this round; a
+  multiplayer listen server with four bots and a remote client on both
+  renderers; and the loopback reconnect smoke. Listing the root for `.cfg`
+  files returns 45 names where the build before returned 3.
+  The 252 Python contract tests that read the changed files pass.
+
 ## Shadow maps cost far less, and match the original shadows in more places, 9 November 2026
 
 - **Busy rooms run faster with shadow maps on.** In Quake 4 nineteen in twenty
