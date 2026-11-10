@@ -856,6 +856,8 @@ def validate_validation_wiring() -> None:
         "sound_distance_runtime.py",
         # Drives a rooted x86_64 Android emulator; the workflows py_compile it.
         "android_emulator_smoke.py",
+        # Drives a USB-connected debug phone; the workflows py_compile it.
+        "android_device_qualification.py",
         "renderer_milestone_d_acceptance.py",
         "renderer_milestone_d_fixture.py",
         # Requires a staged Vulkan client and installed retail assets.

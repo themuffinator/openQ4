@@ -198,6 +198,7 @@ jobs:
             tools/tests/fatal_error_startup_safety.py \
             tools/tests/android_build.py \
             tools/tests/android_emulator_smoke.py \
+            tools/tests/android_device_qualification.py \
             tools/tests/android_touch_input.py \
             tools/tests/android_touch_controls.py \
             tools/tests/audio_payload_restore.py \
