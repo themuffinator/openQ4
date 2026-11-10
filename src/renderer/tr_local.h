@@ -1549,6 +1549,7 @@ extern idCVar r_shadowMapPointLights;	// 1 = shadow-map point lights (the domina
 extern idCVar r_shadowMapPointSize;	// point-light cube face resolution, separate from r_shadowMapSize
 extern idCVar r_shadowMapAtlasSize;	// shared projected-light shadow atlas edge size
 extern idCVar r_shadowMapPointDepthCompare;	// 1 = use samplerCubeShadow depth compare for point maps when supported
+extern idCVar r_shadowMapPointDepthOnly;	// 1 = OpenGL point cubes drop the colour cube while nothing samples it
 extern idCVar r_shadowMapStableAlphaHash;	// 1 = seed hashed alpha from stable world coordinates
 extern idCVar r_shadowMapMaxUpdatesPerView;	// shadow-map pass budget per backend view, 0 = unlimited
 extern idCVar r_shadowMapSkipStencilShadows;	// 1 = skip stencil volume generation/linking for lights that will render shadow maps

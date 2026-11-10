@@ -2158,6 +2158,13 @@ static bool				g_projectedTranslucentShadowPassReady = false;
 static bool				g_pointTranslucentShadowPassReady = false;
 static bool				g_pointShadowMapDepthCompareAvailable = true;
 static int				g_pointShadowMapDepthCompareAvailableGeneration = -1;
+// Depth-only point cubes (RB_PointShadowMapColorCubeNeeded) are given up for
+// the video generation if a target without a colour attachment is incomplete.
+static bool				g_pointShadowMapDepthOnlyAvailable = true;
+static int				g_pointShadowMapDepthOnlyAvailableGeneration = -1;
+// Whether the resident cubes were made with a colour image, and when.
+static bool				g_pointShadowMapCubesHaveColor = true;
+static int				g_pointShadowMapCubesColorGeneration = -1;
 
 typedef enum {
 	SHADOWMAP_SUPPORT_OK = 0,
@@ -2765,6 +2772,36 @@ static bool RB_PointShadowMapDepthCompareEnabled( void ) {
 static void RB_PointShadowMapDisableDepthCompareForGeneration( void ) {
 	g_pointShadowMapDepthCompareAvailable = false;
 	g_pointShadowMapDepthCompareAvailableGeneration = tr.videoRestartCount;
+}
+
+// A point cube's colour image holds radial depth packed into RGBA, for the
+// receivers that compare by hand: the classic receiver when hardware compare
+// is off (which the compare-delta debug mode also forces), the opt-in modern
+// renderers, which always decode the packed value, the shared interaction
+// stream, whose slots carry both images, and the debug overlay, which draws
+// it. The shipped configuration has none of them: the receiver reads the
+// depth cube through a shadow sampler and nothing reads the colour. The cube
+// is then depth only, four bytes a texel where it was eight (twelve with the
+// fp16 cube), and the caster pass writes no colour.
+static bool RB_PointShadowMapColorCubeNeeded( void ) {
+	if ( !r_shadowMapPointDepthOnly.GetBool() ) {
+		return true;
+	}
+	if ( g_pointShadowMapDepthOnlyAvailableGeneration == tr.videoRestartCount && !g_pointShadowMapDepthOnlyAvailable ) {
+		return true;
+	}
+	return !RB_PointShadowMapDepthCompareEnabled()
+		|| r_shadowMapDebugOverlay.GetBool()
+		|| r_rendererSharedWorldInteraction.GetBool()
+		|| r_rendererModernVisible.GetBool()
+		|| r_rendererModernVisibleDepth.GetBool()
+		|| r_rendererModernDeferred.GetBool()
+		|| r_rendererForwardPlus.GetBool();
+}
+
+static void RB_PointShadowMapDisableDepthOnlyForGeneration( void ) {
+	g_pointShadowMapDepthOnlyAvailable = false;
+	g_pointShadowMapDepthOnlyAvailableGeneration = tr.videoRestartCount;
 }
 
 static float RB_PointShadowMapDepthModeValue( void ) {
@@ -3765,12 +3802,13 @@ static int RB_ShadowMapProjectedCacheSlotLimit( void ) {
 	return r_shadowMapProjectedCacheSize.GetInteger() > 0 ? SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS : 0;
 }
 
-// Six faces of packed colour depth plus the depth cube the caster pass tests
-// against: eight bytes a texel, twelve with the fp16 colour cube.
+// Six faces of depth, four bytes a texel. A cube that also carries packed
+// colour depth costs eight, twelve with the fp16 colour cube.
 static int RB_ShadowMapPointCacheSlotLimit( void ) {
+	const int bytesPerTexel = !RB_PointShadowMapColorCubeNeeded() ? 4
+		: ( RB_PointShadowMapHighPrecisionEnabled() ? 12 : 8 );
 	return R_ShadowMapPointCacheSlotLimit( RB_ShadowMapPointSizeValue(),
-		RB_PointShadowMapHighPrecisionEnabled() ? 12 : 8,
-		SHADOWMAP_POINT_CACHE_MAX_SLOTS );
+		bytesPerTexel, SHADOWMAP_POINT_CACHE_MAX_SLOTS );
 }
 
 // Approximate resident shadow GPU memory, for the SM cache report line: the
@@ -3859,28 +3897,44 @@ static bool RB_ShadowMapProjectedCacheEntryStorageValid(
 		&& g_shadowMapAtlasRenderTexture->GetHeight() > 0;
 }
 
+// The colour image of a cube, when it has one, must still be the storage the
+// render filled.
+static bool RB_ShadowMapPointCacheEntryColorValid(
+		const pointShadowMapCacheEntry_t *entry ) {
+	return entry->colorImage != NULL
+		&& entry->colorStorageGeneration != 0
+		&& entry->colorImage->GetStorageGeneration()
+			== entry->colorStorageGeneration
+		&& entry->colorImage->IsLoaded()
+		&& !entry->colorImage->IsDefaulted()
+		&& entry->colorImage->GetDeviceHandle() != 0
+		&& entry->colorImage->GetOpts().textureType == TT_CUBIC
+		&& entry->colorImage->GetOpts().format
+			== ( entry->highPrecision ? FMT_RGBA16F : FMT_RGBA8 );
+}
+
+// A cube has a colour image exactly when something samples it
+// (RB_PointShadowMapColorCubeNeeded): a depth-only cube cannot serve a
+// receiver that decodes colour, and a cube made with colour is rebuilt
+// without it rather than kept at twice the memory.
 static bool RB_ShadowMapPointCacheEntryStorageValid(
 		const pointShadowMapCacheEntry_t *entry ) {
 	return entry != NULL && entry->valid
 		&& entry->size > 0
-		&& entry->colorImage != NULL && entry->depthImage != NULL
+		&& entry->depthImage != NULL
 		&& entry->renderTexture != NULL
-		&& entry->colorStorageGeneration != 0
+		&& ( entry->colorImage != NULL ) == RB_PointShadowMapColorCubeNeeded()
+		&& ( entry->colorImage == NULL
+			|| RB_ShadowMapPointCacheEntryColorValid( entry ) )
+		&& ( entry->renderTexture->GetNumColorImages() > 0 )
+			== ( entry->colorImage != NULL )
 		&& entry->depthStorageGeneration != 0
-		&& entry->colorImage->GetStorageGeneration()
-			== entry->colorStorageGeneration
 		&& entry->depthImage->GetStorageGeneration()
 			== entry->depthStorageGeneration
-		&& entry->colorImage->IsLoaded()
-		&& !entry->colorImage->IsDefaulted()
-		&& entry->colorImage->GetDeviceHandle() != 0
 		&& entry->depthImage->IsLoaded()
 		&& !entry->depthImage->IsDefaulted()
 		&& entry->depthImage->GetDeviceHandle() != 0
-		&& entry->colorImage->GetOpts().textureType == TT_CUBIC
 		&& entry->depthImage->GetOpts().textureType == TT_CUBIC
-		&& entry->colorImage->GetOpts().format
-			== ( entry->highPrecision ? FMT_RGBA16F : FMT_RGBA8 )
 		&& entry->depthImage->GetOpts().format == FMT_DEPTH
 		&& entry->renderTexture->GetWidth() == entry->size
 		&& entry->renderTexture->GetHeight() == entry->size;
@@ -6393,6 +6447,21 @@ static bool RB_ShadowMapEnsureResources( const viewLight_t *vLight ) {
 	return true;
 }
 
+static void RB_ShadowMapPurgeImage( idImage *image );
+
+// A cube's two images and its target are made together and resized together.
+// When the cube has to change shape (with or without a colour image) all
+// three go, and the next pass makes them again at the current size. Keeping
+// the depth image across that would wrap a target around whatever size it
+// was left at.
+static void RB_PointShadowMapReleaseCube( idImage *&colorImage, idImage *&depthImage, idRenderTexture *&renderTexture ) {
+	RB_ShadowMapDestroyRenderTexture( renderTexture );
+	RB_ShadowMapPurgeImage( colorImage );
+	colorImage = NULL;
+	RB_ShadowMapPurgeImage( depthImage );
+	depthImage = NULL;
+}
+
 static bool RB_PointShadowMapEnsureResources( void ) {
 	if ( !glConfig.cubeMapAvailable ) {
 		return false;
@@ -6407,7 +6476,16 @@ static bool RB_PointShadowMapEnsureResources( void ) {
 	idRenderTexture **renderTexture = g_activePointShadowMapCache != NULL ? &g_activePointShadowMapCache->renderTexture : &g_pointShadowMapScratchRenderTexture;
 	const int cacheSlot = g_activePointShadowMapCache != NULL ? static_cast<int>( g_activePointShadowMapCache - g_pointShadowMapCache ) : -1;
 
-	if ( *colorImage == NULL ) {
+	// The programs above settle whether hardware compare works in this video
+	// generation, so the answer is read after them. A cube made for the other
+	// answer has the wrong attachments and is rebuilt whole.
+	const bool wantColor = RB_PointShadowMapColorCubeNeeded();
+	if ( ( *colorImage != NULL ) != wantColor
+			|| ( *renderTexture != NULL && ( ( *renderTexture )->GetNumColorImages() > 0 ) != wantColor ) ) {
+		RB_PointShadowMapReleaseCube( *colorImage, *depthImage, *renderTexture );
+	}
+	// depth only: nothing samples the packed colour, so it is not stored
+	if ( wantColor && *colorImage == NULL ) {
 		idImageOpts opts;
 		opts.textureType = TT_CUBIC;
 		opts.format = RB_PointShadowMapHighPrecisionEnabled() ? FMT_RGBA16F : FMT_RGBA8;
@@ -6416,7 +6494,7 @@ static bool RB_PointShadowMapEnsureResources( void ) {
 		opts.numLevels = 1;
 		opts.isPersistant = true;
 		*colorImage = globalImages->ScratchImage( cacheSlot >= 0 ? va( "_pointShadowMapColorCache%d", cacheSlot ) : "_pointShadowMapColor", &opts, TF_NEAREST, TR_CLAMP, TD_DEFAULT );
-	} else if ( ( *colorImage )->GetOpts().format != ( RB_PointShadowMapHighPrecisionEnabled() ? FMT_RGBA16F : FMT_RGBA8 ) ) {
+	} else if ( wantColor && ( *colorImage )->GetOpts().format != ( RB_PointShadowMapHighPrecisionEnabled() ? FMT_RGBA16F : FMT_RGBA8 ) ) {
 		idImageOpts opts;
 		opts.textureType = TT_CUBIC;
 		opts.format = RB_PointShadowMapHighPrecisionEnabled() ? FMT_RGBA16F : FMT_RGBA8;
@@ -6439,19 +6517,23 @@ static bool RB_PointShadowMapEnsureResources( void ) {
 	}
 
 	if ( *renderTexture == NULL ) {
-		*renderTexture = tr.CreateRenderTexture( *colorImage, *depthImage );
+		*renderTexture = tr.CreateRenderTexture( wantColor ? *colorImage : NULL, *depthImage );
 		if ( *renderTexture != NULL ) {
 			// shadow targets are expendable: incompleteness falls back to stencil
 			( *renderTexture )->SetAllowIncomplete();
 		}
-	} else if ( ( *renderTexture )->GetWidth() != shadowMapSize || ( *renderTexture )->GetHeight() != shadowMapSize ) {
+	}
+	// a new target as much as an old one: it takes the size of the images it wraps
+	if ( *renderTexture != NULL
+			&& ( ( *renderTexture )->GetWidth() != shadowMapSize || ( *renderTexture )->GetHeight() != shadowMapSize ) ) {
 		tr.ResizeRenderTexture( *renderTexture, shadowMapSize, shadowMapSize );
 	}
 	g_pointShadowMapColorImage = *colorImage;
 	g_pointShadowMapDepthImage = *depthImage;
 	g_pointShadowMapRenderTexture = *renderTexture;
 
-	const bool resourcesOk = g_pointShadowMapColorImage != NULL && g_pointShadowMapDepthImage != NULL && g_pointShadowMapRenderTexture != NULL;
+	const bool resourcesOk = ( !wantColor || g_pointShadowMapColorImage != NULL )
+		&& g_pointShadowMapDepthImage != NULL && g_pointShadowMapRenderTexture != NULL;
 	if ( resourcesOk ) {
 		g_shadowMapPointResourcesOkGeneration = tr.videoRestartCount;
 		// seamless cube filtering removes the face-border discontinuities PCF
@@ -6642,6 +6724,35 @@ static void RB_ShadowMapPurgeImage( idImage *image ) {
 	}
 }
 
+// Whether point cubes carry colour changes with a cvar or a debug view, never
+// in ordinary play. Every resident cube was made for the old answer: give
+// them back now, so the memory does not wait for each slot to be reused.
+// They are made and rendered again as the lights come up.
+static void RB_PointShadowMapSyncColorCubes( void ) {
+	const bool wantColor = RB_PointShadowMapColorCubeNeeded();
+	if ( g_pointShadowMapCubesColorGeneration == tr.videoRestartCount && g_pointShadowMapCubesHaveColor == wantColor ) {
+		return;
+	}
+	if ( g_pointShadowMapCubesColorGeneration == tr.videoRestartCount ) {
+		RB_PointShadowMapReleaseCube( g_pointShadowMapScratchColorImage,
+			g_pointShadowMapScratchDepthImage, g_pointShadowMapScratchRenderTexture );
+		for ( int i = 0; i < SHADOWMAP_POINT_CACHE_MAX_SLOTS; i++ ) {
+			pointShadowMapCacheEntry_t &entry = g_pointShadowMapCache[i];
+			RB_PointShadowMapReleaseCube( entry.colorImage, entry.depthImage, entry.renderTexture );
+			entry.colorStorageGeneration = 0;
+			entry.depthStorageGeneration = 0;
+			entry.valid = false;
+		}
+		g_activePointShadowMapCache = NULL;
+		g_pointShadowMapColorImage = NULL;
+		g_pointShadowMapDepthImage = NULL;
+		g_pointShadowMapRenderTexture = NULL;
+		g_shadowMapGlobalPassMapped = SHADOWMAP_GLOBAL_MAPPED_NONE;
+	}
+	g_pointShadowMapCubesHaveColor = wantColor;
+	g_pointShadowMapCubesColorGeneration = tr.videoRestartCount;
+}
+
 static bool RB_ShadowMapAnyResidentResources( void ) {
 	if ( g_shadowMapScratchRenderTexture != NULL || g_pointShadowMapScratchRenderTexture != NULL || g_shadowMapAtlasRenderTexture != NULL
 		|| g_translucentShadowMapRenderTexture != NULL || g_pointTranslucentShadowMapRenderTexture != NULL ) {
@@ -6719,6 +6830,7 @@ static void RB_ShadowMapStatsReset( void ) {
 		g_shadowMapSubviewFallbackPasses = 0;
 	}
 
+	RB_PointShadowMapSyncColorCubes();
 	RB_ShadowMapExpireCaches();
 	RB_ShadowMapCountCacheSlots();
 	g_shadowMapReportThisFrame = false;
@@ -6899,7 +7011,7 @@ static void RB_ShadowMapStatsReport( void ) {
 		g_shadowMapStats.gpuTimerPhasePending[SHADOWMAP_TIMING_RECEIVER_FALLBACK],
 		g_shadowMapStats.gpuTimerPhasePending[SHADOWMAP_TIMING_STENCIL_FALLBACK] );
 	common->Printf(
-		"SM cache: hit=%d miss=%d reuse=%d budgetReuse=%d evict=%d expired=%d hysteresis=%d projected=%d/%d point=%d/%d projectedCells=%d/%d vramMB=%.1f\n",
+		"SM cache: hit=%d miss=%d reuse=%d budgetReuse=%d evict=%d expired=%d hysteresis=%d projected=%d/%d point=%d/%d projectedCells=%d/%d pointColorCube=%d vramMB=%.1f\n",
 		g_shadowMapStats.cacheHitPasses,
 		g_shadowMapStats.cacheMissPasses,
 		g_shadowMapStats.cacheReusePasses,
@@ -6914,6 +7026,8 @@ static void RB_ShadowMapStatsReport( void ) {
 		// the projected cache against the atlas that holds it, in cells
 		RB_ShadowMapProjectedCacheCellsUsed(),
 		RB_ShadowMapAtlasCellCount(),
+		// 0 = point cubes are depth only
+		RB_PointShadowMapColorCubeNeeded() ? 1 : 0,
 		RB_ShadowMapResidentBytes() / ( 1024.0 * 1024.0 ) );
 	{
 		// modern consumption of the persistent atlas (5c): how many lights
@@ -8674,6 +8788,14 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 	// fallback instead of FatalError'ing the whole session
 	g_pointShadowMapRenderTexture->MakeCurrent( 0 );
 	if ( g_pointShadowMapRenderTexture->IsKnownIncomplete() ) {
+		if ( g_pointShadowMapRenderTexture->GetNumColorImages() == 0 ) {
+			// A cube target without a colour attachment should be complete on
+			// every driver that offers hardware compare. Where it is not, keep
+			// the colour cube for this video generation: the next pass rebuilds
+			// the target with one.
+			common->Warning( "Depth-only point shadow cube target is incomplete; keeping the colour cube for this video generation" );
+			RB_PointShadowMapDisableDepthOnlyForGeneration();
+		}
 		if ( backEnd.renderTexture != NULL ) {
 			backEnd.renderTexture->MakeCurrent();
 		} else {
@@ -8965,6 +9087,11 @@ bool RB_ModernShadowMapRender( const viewDef_t *view, modernShadowLightDescripto
 			light->globalShadowMapDynamicCasters, light->localShadowMapDynamicCasters )
 		: RB_RenderShadowMap( light->globalShadowMapCasters, light->localShadowMapCasters,
 			light->globalShadowMapDynamicCasters, light->localShadowMapDynamicCasters );
+	if ( descriptor.pointLight && complete
+			&& ( g_pointShadowMapRenderTexture == NULL || g_pointShadowMapRenderTexture->GetNumColorImages() == 0 ) ) {
+		// the copy below reads packed colour depth; a depth-only cube has none
+		complete = false;
+	}
 	if ( !descriptor.pointLight && complete ) {
 		// Matrix provenance is as important as texture provenance. Never pair
 		// a freshly fitted cascade with the planner's different projection.

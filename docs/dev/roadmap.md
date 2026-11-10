@@ -1687,8 +1687,15 @@ optimization has landed.
   its share; OpenGL's cache is bounded by its atlas instead. All eleven passes are
   reused on Vulkan and OpenGL misses none. The frame-time gain
   there is small, 0.24 ms of Vulkan GPU across six alternating pairs and nothing
-  resolved on OpenGL. Remaining,
-  in order: depth-only cubes on OpenGL, faces the view cannot see,
+  resolved on OpenGL.
+  Depth-only point cubes on OpenGL (10 November 2026). An OpenGL point cube also
+  kept a colour cube of packed depth that only the receivers without hardware
+  compare, the opt-in modern renderers and the debug overlay read. It is now made
+  only while one of those needs it (`r_shadowMapPointDepthOnly`, on by default):
+  resident shadow memory in the combat view 212 to 152 MiB, 64 cubes in the 512 MiB
+  bound where 42 fitted, and GPU frames 0.45 ms shorter there and 0.21 ms in hub2
+  over six alternating pairs. Remaining,
+  in order: faces the view cannot see,
   the fullscreen budgets, including whether Enhanced can map point lights, one
   static cube for both ownerships of a composed Vulkan light, and static-world
   volumes, which are still built once per mapped light for the fallback.

@@ -3302,23 +3302,44 @@ def validate_shadow_contact_and_gl_robustness_contract() -> None:
         "static bool RB_ShadowMapPointCacheEntryStorageValid(",
         "point-cube physical storage validation",
     )
+    # A cube is depth only unless something samples its packed colour, so the
+    # colour image's identity is checked where it exists and its presence has
+    # to match what the receivers need.
     require_order(
-        point_storage,
+        braced_body(
+            gl,
+            "static bool RB_ShadowMapPointCacheEntryColorValid(",
+            "point-cube colour storage validation",
+        ),
         (
+            "entry->colorImage != NULL",
             "entry->colorStorageGeneration != 0",
-            "entry->depthStorageGeneration != 0",
             "entry->colorImage->GetStorageGeneration()",
-            "entry->depthImage->GetStorageGeneration()",
             "entry->colorImage->IsLoaded()",
             "!entry->colorImage->IsDefaulted()",
             "entry->colorImage->GetDeviceHandle() != 0",
+            "entry->colorImage->GetOpts().textureType == TT_CUBIC",
+            "entry->colorImage->GetOpts().format",
+            "entry->highPrecision ? FMT_RGBA16F : FMT_RGBA8",
+        ),
+        "point-cube colour identity is generation/type/format exact",
+    )
+    require_order(
+        point_storage,
+        (
+            "entry->depthImage != NULL",
+            "entry->renderTexture != NULL",
+            "( entry->colorImage != NULL ) == RB_PointShadowMapColorCubeNeeded()",
+            "entry->colorImage == NULL",
+            "RB_ShadowMapPointCacheEntryColorValid( entry )",
+            "( entry->renderTexture->GetNumColorImages() > 0 )",
+            "== ( entry->colorImage != NULL )",
+            "entry->depthStorageGeneration != 0",
+            "entry->depthImage->GetStorageGeneration()",
             "entry->depthImage->IsLoaded()",
             "!entry->depthImage->IsDefaulted()",
             "entry->depthImage->GetDeviceHandle() != 0",
-            "entry->colorImage->GetOpts().textureType == TT_CUBIC",
             "entry->depthImage->GetOpts().textureType == TT_CUBIC",
-            "entry->colorImage->GetOpts().format",
-            "entry->highPrecision ? FMT_RGBA16F : FMT_RGBA8",
             "entry->depthImage->GetOpts().format == FMT_DEPTH",
             "entry->renderTexture->GetWidth() == entry->size",
             "entry->renderTexture->GetHeight() == entry->size",
@@ -8304,6 +8325,169 @@ def validate_projected_cache_memory_bound_contract() -> None:
     )
 
 
+def validate_depth_only_point_cube_contract() -> None:
+    """OpenGL point cubes carry no colour image while nothing samples it.
+
+    A cube's colour image holds radial depth packed into RGBA for receivers
+    that compare by hand. With hardware compare, which is the default, the
+    receiver reads the depth cube through a shadow sampler and the colour was
+    written, cached and copied for nothing: half the memory of every cube.
+    The colour cube stays wherever something does read it.
+    """
+    gl = read("src/renderer/draw_arb2.cpp")
+
+    needed = braced_body(gl, "static bool RB_PointShadowMapColorCubeNeeded(", "point colour cube need")
+    require_order(
+        needed,
+        (
+            # the switch, and the fallback for a driver whose depth-only cube target is incomplete
+            "if ( !r_shadowMapPointDepthOnly.GetBool() ) {",
+            "return true;",
+            "g_pointShadowMapDepthOnlyAvailableGeneration == tr.videoRestartCount && !g_pointShadowMapDepthOnlyAvailable",
+            "return true;",
+            # every consumer of the packed colour
+            "return !RB_PointShadowMapDepthCompareEnabled()",
+            "|| r_shadowMapDebugOverlay.GetBool()",
+            "|| r_rendererSharedWorldInteraction.GetBool()",
+            "|| r_rendererModernVisible.GetBool()",
+            "|| r_rendererModernVisibleDepth.GetBool()",
+            "|| r_rendererModernDeferred.GetBool()",
+            "|| r_rendererForwardPlus.GetBool();",
+        ),
+        "the colour cube stays for every receiver that decodes it",
+    )
+    # the consumers the predicate names really are the ones that read the colour image
+    require_compact(
+        gl,
+        """if ( RB_PointShadowMapDepthCompareEnabled() && g_pointShadowMapDepthImage != NULL ) {
+            g_pointShadowMapDepthImage->Bind();""",
+        "the classic receiver samples the depth cube under hardware compare",
+    )
+    require_compact(
+        braced_body(gl, "bool RB_ShadowMapTextureBindings(", "modern shadow bindings"),
+        "idImage *pointAtlasImage = g_pointShadowMapColorImage;",
+        "the modern programs decode the colour cube",
+    )
+    require_order(
+        braced_body(gl, "static bool RB_SharedWorldInteractionGLAssignPointCacheResource(", "sealed point resource"),
+        ("entry->colorImage == NULL", "return false;"),
+        "the shared interaction stream requires both images",
+    )
+
+    # A cube changes shape whole. Its images and its target are made and
+    # resized together; keeping the depth image across a change wrapped a new
+    # target around whatever size it had been left at, and door-point, which
+    # lowers the cube size and then toggles the debug overlay, could no longer
+    # compose its light (the cached cube came back at 512 beside a 256 scratch).
+    require_order(
+        braced_body(gl, "static void RB_PointShadowMapReleaseCube(", "point cube release"),
+        (
+            "RB_ShadowMapDestroyRenderTexture( renderTexture );",
+            "RB_ShadowMapPurgeImage( colorImage );",
+            "colorImage = NULL;",
+            "RB_ShadowMapPurgeImage( depthImage );",
+            "depthImage = NULL;",
+        ),
+        "a cube gives up both images and its target together",
+    )
+
+    # resources: no colour image, no colour attachment
+    ensure = braced_body(gl, "static bool RB_PointShadowMapEnsureResources(", "point cube resources")
+    require_order(
+        ensure,
+        (
+            "RB_PointShadowMapLoadProgram() || !RB_PointShadowMapLoadCasterProgram()",
+            # read after the programs settled hardware compare for the generation
+            "const bool wantColor = RB_PointShadowMapColorCubeNeeded();",
+            "if ( ( *colorImage != NULL ) != wantColor",
+            "( ( *renderTexture )->GetNumColorImages() > 0 ) != wantColor",
+            "RB_PointShadowMapReleaseCube( *colorImage, *depthImage, *renderTexture );",
+            "if ( wantColor && *colorImage == NULL ) {",
+            "if ( *depthImage == NULL ) {",
+            "tr.CreateRenderTexture( wantColor ? *colorImage : NULL, *depthImage );",
+            # the size is checked for a new target as for an old one
+            "if ( *renderTexture != NULL",
+            "( *renderTexture )->GetWidth() != shadowMapSize || ( *renderTexture )->GetHeight() != shadowMapSize",
+            "tr.ResizeRenderTexture( *renderTexture, shadowMapSize, shadowMapSize );",
+            "g_pointShadowMapColorImage = *colorImage;",
+            "const bool resourcesOk = ( !wantColor || g_pointShadowMapColorImage != NULL )",
+        ),
+        "a cube is built with a colour image only when one is needed, at the current size",
+    )
+
+    # a change of configuration gives the old cubes back at once
+    require_order(
+        braced_body(gl, "static void RB_PointShadowMapSyncColorCubes(", "point cube configuration change"),
+        (
+            "const bool wantColor = RB_PointShadowMapColorCubeNeeded();",
+            "g_pointShadowMapCubesHaveColor == wantColor",
+            "return;",
+            "RB_PointShadowMapReleaseCube( g_pointShadowMapScratchColorImage,",
+            "g_pointShadowMapScratchDepthImage, g_pointShadowMapScratchRenderTexture );",
+            "RB_PointShadowMapReleaseCube( entry.colorImage, entry.depthImage, entry.renderTexture );",
+            "entry.depthStorageGeneration = 0;",
+            "entry.valid = false;",
+            "g_activePointShadowMapCache = NULL;",
+            "g_pointShadowMapCubesHaveColor = wantColor;",
+        ),
+        "cubes made for the other configuration are released, not left for slot reuse",
+    )
+    require_order(
+        gl,
+        ("RB_PointShadowMapSyncColorCubes();", "RB_ShadowMapExpireCaches();", "RB_ShadowMapCountCacheSlots();"),
+        "the configuration is settled before a view looks anything up",
+    )
+
+    # the memory bound counts what a cube really costs
+    require_compact(
+        braced_body(gl, "static int RB_ShadowMapPointCacheSlotLimit( void ) {", "GL point cache slot limit"),
+        """const int bytesPerTexel = !RB_PointShadowMapColorCubeNeeded() ? 4
+            : ( RB_PointShadowMapHighPrecisionEnabled() ? 12 : 8 );
+        return R_ShadowMapPointCacheSlotLimit( RB_ShadowMapPointSizeValue(),
+            bytesPerTexel, SHADOWMAP_POINT_CACHE_MAX_SLOTS );""",
+        "a depth-only cube is four bytes a texel",
+    )
+
+    # the caster pass: an incomplete depth-only target falls back to colour cubes
+    render = braced_body(gl, "static bool RB_RenderPointShadowMap(", "point cube render")
+    require_order(
+        render,
+        (
+            "g_pointShadowMapRenderTexture->MakeCurrent( 0 );",
+            "if ( g_pointShadowMapRenderTexture->IsKnownIncomplete() ) {",
+            "if ( g_pointShadowMapRenderTexture->GetNumColorImages() == 0 ) {",
+            "RB_PointShadowMapDisableDepthOnlyForGeneration();",
+            "return false;",
+            # the static cube is copied without a colour plane it does not have
+            "const GLbitfield composeCopyMask = GL_DEPTH_BUFFER_BIT",
+            "g_pointShadowMapRenderTexture->GetNumColorImages() > 0 ? GL_COLOR_BUFFER_BIT : 0",
+        ),
+        "a depth-only cube renders and composes without a colour plane, and fails closed",
+    )
+    # the modern copy reads the colour attachment
+    require_order(
+        braced_body(gl, "bool RB_ModernShadowMapRender(", "modern current shadow map"),
+        (
+            "g_pointShadowMapRenderTexture->GetNumColorImages() == 0",
+            "complete = false;",
+            "glReadBuffer( GL_COLOR_ATTACHMENT0 );",
+        ),
+        "the modern copy never reads a colour attachment that is not there",
+    )
+
+    require(gl, "pointColorCube=%d", "the report states whether cubes carry colour")
+    require(
+        read("src/renderer/RenderSystem_init.cpp"),
+        'idCVar r_shadowMapPointDepthOnly( "r_shadowMapPointDepthOnly", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,',
+        "depth-only cubes are on by default and can be switched off",
+    )
+    require(
+        read("docs/user/shadow-mapping.md"),
+        "| `r_shadowMapPointDepthOnly` | `1` |",
+        "the switch is documented",
+    )
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -8356,6 +8540,7 @@ def main() -> None:
     validate_stencil_elision_contract()
     validate_atlas_tile_assignment_contract()
     validate_projected_cache_memory_bound_contract()
+    validate_depth_only_point_cube_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

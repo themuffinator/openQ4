@@ -69,7 +69,7 @@ cache (sixteen at most) against forty cubes in view.
 | **Quality and Ultra give the projected atlas four cells** (2048 cells in 4096, 4096 in 8192) while Enhanced has sixteen. A light with local casters takes two. OpenGL re-renders the overflow every view; Vulkan marks the light for stencil permanently and can draw it unshadowed for a frame. convoy2's start view does this: up to four projected lights, five lights sent to stencil for good and one drawn unshadowed. | **Fixed, both backends.** A tile size per light, assigned per view. See "Atlas tile sizes" below. No preset changed. |
 | Vulkan: cascades in an 8192 atlas always fail (one CSM block is the whole atlas). | **Open**; no preset uses it. |
 | The stencil-fallback flag on a light is never cleared. | **Open.** Costs the light its volume elision only. |
-| OpenGL point cubes carry a colour cube the default receiver never samples: half their memory. The opt-in modern executor still reads it. | **Open.** At 512 the cache can now reach 504 MiB on OpenGL (42 cubes) against 384 MiB on Vulkan (64). |
+| OpenGL point cubes carry a colour cube the default receiver never samples: half their memory. The opt-in modern executor still reads it. | **Fixed.** Cubes are depth only while nothing samples the colour. See "Depth-only point cubes on OpenGL" below. At 512 the cache holds 64 cubes in 384 MiB, as on Vulkan; it held 42 in 504 MiB. |
 | Vulkan hub2: one light (`lights/squarelight1`) logs "required shadow resource unavailable" once and falls back; OpenGL maps it. | **Open**, present before this round. |
 
 ## Measured
@@ -323,6 +323,79 @@ touched files. Two scenario runs cannot share `.install` at once: the second
 one's clients exit at once without a log, which reads as every capture
 missing.
 
+### Depth-only point cubes on OpenGL
+
+Added on 10 November. An OpenGL point cube was two cubemaps: depth, and a
+colour cube holding the same radial depth packed into RGBA for receivers that
+compare by hand. With hardware compare, the default, the receiver reads the
+depth cube through a shadow sampler. The colour cube was still written by
+every caster pass, kept in the cache, and copied face by face by every
+composed pass, for nothing.
+
+- **A cube has a colour image only while something samples it**
+  (`RB_PointShadowMapColorCubeNeeded`): the classic receiver without hardware
+  compare (GL 2.1, a driver whose compare shader fails,
+  `r_shadowMapPointDepthCompare 0`, the compare-delta debug mode), the opt-in
+  modern renderers, the shared interaction stream, and the debug overlay.
+  Otherwise the cube's target has no colour attachment.
+- **A change of that answer gives the old cubes back at once**
+  (`RB_PointShadowMapSyncColorCubes`) and they are made and rendered again.
+  It changes with a cvar or a debug view, never in ordinary play.
+- **A cube changes shape whole**: both images and the target
+  (`RB_PointShadowMapReleaseCube`). The first version kept the depth image
+  and wrapped a new target around it, at whatever size it had been left.
+  `door-point` lowers the cube size to 256 and later toggles the debug
+  overlay; its light's cached cube came back at 512 beside a 256 scratch
+  cube, could not be composed, failed its pass and went to stencil. A new
+  target is now checked for size like an old one.
+- **The memory bound counts four bytes a texel** for such a cube, so
+  `r_shadowMapPointCacheMegs 512` holds all 64 cubes at 512 where it held 42.
+- **It fails closed.** If a target without a colour attachment is incomplete,
+  the colour cube is kept for that video generation.
+  `r_shadowMapPointDepthOnly 0` keeps it always.
+
+Quality, OpenGL. The two states were alternated in one process with
+`r_shadowMapPointDepthOnly`, six pairs of five-second windows, the view held
+still unless noted:
+
+| | With colour cube | Depth only | |
+|---|---:|---:|---|
+| Combat view: resident shadow memory | 212 MiB | 152 MiB | ten cached cubes |
+| Combat view: GPU frame | 6.88 ms | 6.43 ms | 0.45 ms less, spread 0.11 ms, six of six |
+| Combat view: CPU frame | 11.02 ms | 10.07 ms | 0.95 ms less, spread 0.53 ms, six of six |
+| hub2: resident shadow memory | 212 MiB | 158 MiB | |
+| hub2: GPU frame | 5.90 ms | 5.70 ms | 0.21 ms less, spread 0.10 ms, six of six |
+| hub2: CPU frame | 7.59 ms | 7.66 ms | not resolved (spread 0.49 ms) |
+| hub2, view turning: cubes cached | 42 of 42 | 55 to 58 of 64 | one run, not paired |
+| hub2, view turning: resident shadow memory | 686 MiB | 428 to 440 MiB | one run, not paired |
+
+The GPU time saved is the colour plane of the face copies that composed
+passes make and the colour writes of the caster pass. The images agree: the
+combat view captured with and without the colour cube differs by 0.039 on
+average in 8-bit colour units, which is what two captures of the same state
+differ by (0.038 and 0.039, from animated surfaces), against 2.81 with shadows
+off.
+
+The frame times were taken on a quiet machine, before the correction to the
+release path described above, which a steady frame does not run. The memory
+figures are from the final build. A repeat of the timing on the final build
+ran beside another session's client and tests, with frames half as long
+again, and added nothing: 0.54 ms less GPU in the combat view with a spread
+of 0.69 ms, five of six pairs in favour, and nothing resolved in hub2.
+
+Checked for this change, on the final build: the fourteen scenarios on both
+back ends, twenty-seven of twenty-eight cases passing. The other is
+`door-portal` on OpenGL, whose cached capture of one phase differed from the
+fresh one by 0.262 against a tolerance of 0.25; three reruns passed, and that
+scenario's captures vary by up to 0.26 between any two on both back ends,
+Vulkan included, which this change does not touch. Every way the answer
+changes was switched in one process without a failed pass: the cvar off and
+on at cube sizes 512 and 256, the debug overlay, no hardware compare, the
+shared interaction stream, the modern forward+ path, and a `vid_restart`. The
+in-engine self-tests and the sixty-two static tests that read the touched
+files pass. Not run: macOS and Linux drivers, where a depth-only cube target
+is expected to be complete and falls back to the colour cube if it is not.
+
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
 (caster counts, cache reuse, cached against fresh images byte-identical; run
@@ -343,17 +416,16 @@ whether Enhanced can now map point lights on Vulkan.
 
 ## Still open, in order of value
 
-1. Depth-only point cubes on OpenGL while nothing samples the colour cube.
-2. Cube faces the view cannot see; fullscreen budgets for the three tiers.
-3. One static cube for both ownerships of a composed Vulkan light, as on
+1. Cube faces the view cannot see; fullscreen budgets for the three tiers.
+2. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. It needs a resident entry two passes of a view can share.
-4. Static-world volumes are still built once for every mapped light and kept
+3. Static-world volumes are still built once for every mapped light and kept
    for the fallback. Leaving them out too would need the same rebuild on
    return, for every surface the light touches.
-5. A reused projected pass on Vulkan copies its resident tile into the view's
+4. A reused projected pass on Vulkan copies its resident tile into the view's
    atlas even when it has no live casters to draw over it. Sampling the
    resident tile in place would save the copy; convoy2's eleven cached passes
    together save only 0.3 ms of GPU against drawing them fresh.
-6. The OpenGL projected cache is the atlas, four full tiles at Quality and
+5. The OpenGL projected cache is the atlas, four full tiles at Quality and
    Ultra, so it holds one crowded view and nothing of the view just left.
    Vulkan holds eight maps' worth.

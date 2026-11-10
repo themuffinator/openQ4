@@ -222,6 +222,14 @@ there is no double-click word selection.
   same memory as before. The saving in that view is small, about a fifth of a
   millisecond of GPU time on Vulkan. `r_shadowMapProjectedCacheSize` keeps its
   default and now counts full-size maps' worth of memory.
+- **Point-light shadows take half the video memory on OpenGL.** Each point
+  light's shadow was stored twice: once as depth, and once as a colour copy
+  that only older graphics paths and debug views read. The copy is no longer
+  made where nothing reads it. In a busy room that is about 250 MiB less, the
+  shadows of every light in view stay cached where 42 fitted before, and
+  frames are 0.2 to 0.45 ms shorter on the graphics card. Nothing needs
+  changing; `r_shadowMapPointDepthOnly 0` brings the copy back if a driver
+  objects.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.
