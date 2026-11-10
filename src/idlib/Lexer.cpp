@@ -1825,6 +1825,26 @@ const char *idLexer::ParseBracedSectionExact( idStr &out, int tabs ) {
 	skipWhite = false;
 	doTabs = tabs >= 0;
 
+	// openQ4: without re-indenting, the loop below copies every character as
+	// it stands, so find the end and take the section in one append. Appending
+	// a character at a time regrew and recopied the string every 32 bytes,
+	// which is quadratic in the section's size, and every decl is read this way.
+	if ( !doTabs ) {
+		const char *start = idLexer::script_p;
+		while( depth && *idLexer::script_p ) {
+			const char c = *(idLexer::script_p++);
+			if ( c == '\n' ) {
+				line++;
+			} else if ( c == '{' ) {
+				depth++;
+			} else if ( c == '}' ) {
+				depth--;
+			}
+		}
+		out.Append( start, static_cast<int>( idLexer::script_p - start ) );
+		return out.c_str();
+	}
+
 	while( depth && *idLexer::script_p ) {
 		char c = *(idLexer::script_p++);
 

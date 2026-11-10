@@ -9788,7 +9788,12 @@ void rvBotManager::Think( void ) {
 
 	const double thinkStart = idLib::sys->GetClockTicks();
 
-	RefreshWorldCache();
+	// openQ4: only bots read this cache, and it was rebuilt every frame on
+	// servers that have none: a walk over every spawned entity, and a weapon
+	// definition lookup for each player firing.
+	if ( NumBots() > 0 ) {
+		RefreshWorldCache();
+	}
 
 	// The engine hands the game a const view of its own user command array for
 	// this frame; a bot's slot is ours to fill in, exactly where a remote

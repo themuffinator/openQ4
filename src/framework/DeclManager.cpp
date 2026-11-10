@@ -1785,6 +1785,21 @@ bool idDeclManagerLocal::EvaluateGuide( idStr &name, idLexer *src, idStr &defini
 }
 
 bool idDeclManagerLocal::EvaluateInlineGuide( idStr &name, idStr &definition ) {
+	// openQ4: every decl comes through here as its file is read, and without
+	// this test each body was copied and tokenised from end to end to look for
+	// a keyword almost none of them has. The loop below matches the keyword as
+	// a whole token, so a body that does not contain it cannot match.
+	bool mentioned = false;
+	for ( const char *p = definition.c_str(); *p; p++ ) {
+		if ( ( *p == 'i' || *p == 'I' ) && idStr::Icmpn( p, "inlineGuide", 11 ) == 0 ) {
+			mentioned = true;
+			break;
+		}
+	}
+	if ( !mentioned ) {
+		return true;
+	}
+
 	idStr store = definition;
 	idLexer lexer;
 	if ( !lexer.LoadMemory( store.c_str(), store.Length(), name.c_str() ) ) {

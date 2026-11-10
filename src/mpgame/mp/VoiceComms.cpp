@@ -160,8 +160,9 @@ void idMultiplayerGame::XmitVoiceData() {
 	}
 	if ( !active ) return;
 	// Flush locally on mute/receive changes, including already queued samples.
+	const bool receive = cvarSystem->GetCVarBool( "s_voiceChatReceive" );	// once, not by name per client
 	for ( int i = 0; i < gameLocal.numClients; ++i ) {
-		if ( !gameLocal.entities[i] || player->IsPlayerMuted( i ) || !cvarSystem->GetCVarBool( "s_voiceChatReceive" ) ) soundSystem->StopVoiceData( i );
+		if ( !gameLocal.entities[i] || player->IsPlayerMuted( i ) || !receive ) soundSystem->StopVoiceData( i );
 	}
 	if ( send && cvarSystem->GetCVarBool( "s_voiceChatSend" ) ) {
 		byte packet[MAX_VOICE_PACKET_SIZE];

@@ -852,7 +852,13 @@ idUsercmdGenLocal::GetZoomLookSensitivityScale
 =================
 */
 float idUsercmdGenLocal::GetZoomLookSensitivityScale( void ) const {
-	const int zoomedSlowPercent = cvarSystem->GetCVarInteger( "pm_isZoomed" );
+	// openQ4: the game module registers this cvar; find it once it exists
+	// rather than by name for every usercmd and every late-look sample
+	static idCVar *zoomedCVar = NULL;
+	if ( zoomedCVar == NULL ) {
+		zoomedCVar = cvarSystem->Find( "pm_isZoomed" );
+	}
+	const int zoomedSlowPercent = zoomedCVar != NULL ? zoomedCVar->GetInteger() : 0;
 	if ( zoomedSlowPercent <= 0 ) {
 		return 1.0f;
 	}
