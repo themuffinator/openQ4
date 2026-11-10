@@ -6,6 +6,51 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## A console that stops scrolling when you let go, 10 November 2026
+
+- **Page Up and Page Down stop when the key is released** (GitHub issue
+  #214). Holding either for half a second on a long listing such as
+  `listImages` left the log scrolling for many seconds afterwards. Two things
+  combined: the game repeated the key itself once per drawn frame, on top of
+  the system's key repeat, so a short hold asked for hundreds of lines; and
+  the scrolling animation moved at a fixed 24 lines a second, so it took as
+  long as that distance needed, up to half a minute for a full log. A held
+  key now repeats at your system's key-repeat rate only, and the animation
+  finishes within half a second whatever the distance. The same repeat also
+  ran with the console closed, so holding a key bound to Page Up or Page Down
+  in a game scrolled the hidden log away from its newest line; that is gone
+  too.
+- **Escape closes the console.** With a completion list showing it closes the
+  list first. Before, Escape in a game closed the console and opened the menu
+  in the same press, and over a menu it did nothing.
+- **Command history keeps what you were typing.** Pressing Up and then Down
+  returns to the unfinished line. Before, Down past the newest command showed
+  the oldest one once 64 commands had been run, and Up on an empty history
+  erased the line. Blank lines and a command run twice in a row no longer
+  take a history slot each.
+- **Home, End and the mouse wheel do what they do elsewhere.** Home and End
+  move the caret even while the completion list is showing, where they used to
+  jump through the list. The wheel scrolls the log unless the pointer is over
+  the list. Ctrl+Home and Ctrl+End jump to the oldest and newest line of the
+  log; the edit line used to take both keys first, so they never did.
+- **Smaller fixes.** Running a command returns the log to its newest line, so
+  the answer is in view. The caret stays visible while it is being moved
+  instead of blinking through it. Pasting turns a tab or line break between
+  two words into a space instead of joining them, and no longer stalls on a
+  long line. A long command is no longer drawn through the version number.
+  The scrollbar's hover animation takes the same time at any frame rate.
+
+Nothing needs to be changed. `con_scrollSmoothSpeed` keeps its value and now
+sets the slowest speed of the animation; see
+[Using the Console](../user/input-settings.md#using-the-console) for every key.
+Covered by the `openq4-console-input` native test and
+`tools/tests/console_input_contract.py`.
+
+Not changed, and still open: text copied from the log is in the console font's
+8-bit codepage, so non-ASCII characters do not survive the clipboard; a
+selection dragged past the top or bottom of the log does not scroll it; and
+there is no double-click word selection.
+
 ## Servers that outlast 25 days, safer custom content and quicker starts from a third audit round, 10 November 2026
 
 - **A server left running no longer stops after 25 days.** The game's clock

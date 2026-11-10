@@ -9491,8 +9491,10 @@ bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
     if (!NativeInput_SessionCurrent()) return false;
 	if ( event->evType == SE_RETAINED_UI ) return RetainedUI_ProcessEvent( event );
 	// hitting escape anywhere brings up the menu
+	// openQ4: except with the console down, where Escape first puts away the
+	// console (idConsoleLocal::KeyDownEvent); a second press brings up the menu
 	if ( !guiActive && !guiTest && !RetainedUI_IsOpen() && event->evType == SE_KEY && event->evValue2 == 1 &&
-		( event->evValue == K_ESCAPE || event->evValue == K_JOY7 || event->evValue == K_JOY8 ) ) {
+		( ( event->evValue == K_ESCAPE && !console->Active() ) || event->evValue == K_JOY7 || event->evValue == K_JOY8 ) ) {
 		console->Close();
 		if (!NativeInput_SessionCurrent()) return true;
 		if ( IsDemoPlaybackActive() ) {

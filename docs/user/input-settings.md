@@ -341,6 +341,34 @@ writeConfig my-input-backup.cfg
 
 Most input cvars are archived, so changes made through the menu or with `seta` persist after exit.
 
+## Using the Console
+
+The console takes the keyboard and the mouse while it is open.
+
+| Key | What it does |
+|---|---|
+| `` ` `` or `~` | Opens and closes the console. Hold `Shift` to open it at a reduced height. |
+| `Esc` | Closes the completion list if one is showing, otherwise the console. |
+| `Enter` | Runs the line. If the highlighted completion would change the line, takes it first. |
+| `Tab`, `Shift+Tab` | Completes the word at the caret and steps through the matches. |
+| `Up`, `Down` | Steps through the commands you ran before; `Down` returns to the line you were typing. While the completion list shows, they move through the list. |
+| `Page Up`, `Page Down`, mouse wheel | Scrolls the log by `con_scrollLines` lines. Holding a page key repeats at your system's key-repeat rate. While the completion list shows, the page keys move through it a page at a time, and the wheel moves through it when the pointer is over it. |
+| `Ctrl+Home`, `Ctrl+End` | Jumps to the oldest and the newest line of the log. |
+| `Home`, `End`, `Left`, `Right` | Moves the caret; with `Ctrl`, `Left` and `Right` move a word. Add `Shift` to select. |
+| `Ctrl+A`, `Ctrl+C`, `Ctrl+X`, `Ctrl+V` | Select all, copy, cut and paste. `Shift+Insert` also pastes; `Insert` switches between inserting and overwriting. |
+| `Ctrl+L` | Clears the log. |
+
+With the mouse you can click in the edit line to place the caret and drag to select, drag across the log to select text and copy it with `Ctrl+C` (`Shift`+click extends the selection), drag selected text onto the edit line, drag the scrollbar, and click a completion to take it. A click below the console closes it.
+
+Running a command returns the log to its newest line. Blank lines and a command repeated straight after itself are not added to the command history.
+
+| Setting | What it does |
+|---|---|
+| `con_height` | How far down the screen the console opens, `0.1` to `1` (default `0.5`). |
+| `con_scrollLines` | Lines scrolled per wheel notch or page key (default `6`). |
+| `con_scrollSmooth` | `1` animates scrolling, `0` jumps. The animation finishes within half a second whatever the distance. |
+| `con_completionPopup` | `1` shows the completion list while you type, `0` leaves completion to `Tab`. |
+
 ## Example Tweaks
 
 ### CPI-Normalized Mouse With Acceleration Disabled

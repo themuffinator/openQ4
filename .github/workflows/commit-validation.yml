@@ -170,6 +170,7 @@ jobs:
             tools/tests/clang_tidy_input_safety.py \
             tools/tests/cmdargs_append_contract.py \
             tools/tests/console_completion_contract.py \
+            tools/tests/console_input_contract.py \
             tools/tests/arb_color_zero_floor_contract.py \
             tools/tests/renderer_show_shadows_color_contract.py \
             tools/tests/renderer_md5r_conversion_contract.py \
@@ -731,6 +732,7 @@ jobs:
           python tools/tests/clang_tidy_input_safety.py
           python tools/tests/cmdargs_append_contract.py
           python tools/tests/console_completion_contract.py
+          python tools/tests/console_input_contract.py
           python tools/tests/arb_color_zero_floor_contract.py
           python tools/tests/renderer_show_shadows_color_contract.py
           python tools/tests/renderer_md5r_conversion_contract.py

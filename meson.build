@@ -1133,6 +1133,18 @@ if get_option('build_native_tests')
     timeout: 30,
   )
 
+  openq4_console_input_test = executable(
+    'openq4-console-input-test',
+    files('tools/tests/native/ConsoleInputTest.cpp'),
+    include_directories: root_include_dir,
+    install: false,
+  )
+  test(
+    'openq4-console-input',
+    openq4_console_input_test,
+    timeout: 30,
+  )
+
   openq4_arb_color_zero_floor_test = executable(
     'openq4-arb-color-zero-floor-test',
     files('tools/tests/native/ARBColorZeroFloorTest.cpp'),

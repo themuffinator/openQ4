@@ -503,6 +503,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "clang_tidy_input_safety.py",
         root / "tools" / "tests" / "cmdargs_append_contract.py",
         root / "tools" / "tests" / "console_completion_contract.py",
+        root / "tools" / "tests" / "console_input_contract.py",
         root / "tools" / "tests" / "arb_color_zero_floor_contract.py",
         root / "tools" / "tests" / "renderer_show_shadows_color_contract.py",
         root / "tools" / "tests" / "renderer_md5r_conversion_contract.py",
