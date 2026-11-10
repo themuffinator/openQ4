@@ -25,10 +25,14 @@ SUPPORT = r'''
 struct Fault : std::runtime_error { Fault() : std::runtime_error("interrupted restore") {} };
 int failAt=-1,steps=0,savedValue=123;
 void boundary() { if(steps++==failAt)throw Fault(); }
-struct Data { template<class T> void Restore(T*) { boundary(); } const char* GetName() { return "fixture"; } };
+struct Data { bool noShadows=false; template<class T> void Restore(T*) { boundary(); } const char* GetName() { return "fixture"; } };
 struct Args { const char* GetString(const char*,const char* fallback) { return fallback; } };
 struct Decl { void FindType(int,const char*,bool,bool) { boundary(); } } decl,*declManager=&decl;
 constexpr int DECL_ENTITYDEF=1,WPLIGHT_MAX=3,ENTITYNUM_CLIENT=0;
+// Two of the three fixture slots stand in for the flashlight pair, whose shadow
+// flag the weapon restore re-derives from the current setting.
+constexpr int WPLIGHT_FLASHLIGHT=1,WPLIGHT_FLASHLIGHT_WORLD=2;
+bool G_FlashlightShadowsEnabled() { return true; }
 struct { void* entities[1]={nullptr}; } gameLocal;
 struct World {
     int next=10000;
