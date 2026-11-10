@@ -694,7 +694,11 @@ static void R_RecordShadowMapCaster( viewLight_t *vLight,
 	hash = R_ShadowMapHashInt( hash,
 		shader != NULL ? static_cast<int>( shader->GetCullType() ) : -1 );
 	hash = R_ShadowMapHashInt( hash, translucent ? 1 : 0 );
-	hash = R_ShadowMapHashInt( hash, expandedCaster ? 1 : 0 );
+	// expandedCaster is not part of it. It says whether this view also sees
+	// the caster's stencil volume, which changes as the camera moves, and the
+	// depth the caster writes into the map is the same either way. Hashed, it
+	// re-rendered every map of a light each time a static caster's volume
+	// entered or left the view.
 	// a static cutout's coverage is baked into the map with it
 	hash = R_ShadowMapCutoutCoverageSignature( shader, hash );
 	if ( casterTris != NULL ) {

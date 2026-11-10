@@ -44,6 +44,7 @@ cache (sixteen at most) against forty cubes in view.
 | **Point lights with any moving or alpha-tested caster re-rendered six faces every view** and dropped their cached cube. Alpha-tested casters are always classed live, so a static light touching one grate never cached. | **Fixed, both backends.** The cached cube keeps static depth; each view copies it to a scratch cube and draws the live chains over the copy (`r_shadowMapPointCompose`). OpenGL blits face by face and shares one static entry between the LOCAL and GLOBAL ownerships when the light has no static local caster; 0.15 ms of GPU per composed pass in hub2. Vulkan copies the six faces in one transfer and keeps a static cube per ownership, because a resident entry is reserved by one pass per view. It does not compose under the opt-in shared interaction stream, which draws every pass's whole caster plan. See "Vulkan point composition" below. |
 | **Every cutout caster was live.** A caster with holes cut by an alpha test was treated as if the holes could move, so every light that reaches a grate, a railing or a wire cap copied its cached map and redrew the cutout every view, for the same result. In convoy2's start view 25 passes were composed each frame, and 20 of them had no other live caster: every lamp there sits in a wire cap. | **Fixed, both backends.** A cutout is live only while its coverage can change. See "Static cutout casters" below. |
 | **Vulkan copied every reused projected map into the view's atlas**, each view, only to sample it there. The copy serves a view that has moving casters to draw over the map and nothing else. With static cutouts it was the largest shadow phase left in convoy2's start view: 0.54 ms for eleven maps, ten of which had nothing live. | **Fixed (Vulkan).** A reused map with no moving caster is read where it lives. See "Resident projected tiles on Vulkan" below. |
+| **A light's cached maps were rendered again whenever a static caster's stencil volume entered or left the view.** The signature that names the cached depth hashed, for each static caster, whether the view also saw that caster's volume. It flips as the player walks past, and the depth does not change. On a walk through hub2 one light with 77 static casters re-rendered both of its cubes nine times in five seconds for it. | **Fixed, both backends.** The signature no longer carries that bit; about half of the maps rendered fresh on a walk were for it. See "Walking" below. |
 | **GL timer queries ran in every shadow phase of every light**, whether or not anything read them. A view with more phases than the 64 query slots polled all 64 unfinished queries for each further phase. | **Fixed.** Queries are issued only while `r_shadowMapReport` or `r_shadowMapDebugOverlay` is on. This alone was about half of the OpenGL CPU frame in hub2. |
 | **The point receiver's per-texel path was the common path.** Each of the nine taps compared four texels against their own point on the receiver plane, with a cube-face selection each: 36 comparisons that read a four-by-four block of texels. | **Fixed, both backends.** The default kernel (nine fixed taps, one texel radius, hardware comparison) is one pass over the sixteen texels with the same weights, or nine plain bilinear lookups where the bias covers the block. Other tap counts, radii and the rotated mode keep the tap-by-tap path. 1.6 to 2.6 ms of GPU in hub2 against the old path, in two launches. |
 | **Receivers filtered shadows for fragments the light does not reach** (outside the falloff, turned away). | **Fixed, both backends**, in the stock-material path. The PBR variants still sample first. |
@@ -61,6 +62,7 @@ cache (sixteen at most) against forty cubes in view.
 | **Packed point depth wrapped at the far envelope**: `fract(1.0)` stored the nearest depth for a caster at or beyond far. Manual (non-comparison) OpenGL path only. | **Fixed.** |
 | **Shadow passes restored the viewport without the tiled-capture offset.** | **Fixed** (OpenGL). |
 | Casters are not clipped to the light volume. For a point light whose origin lies outside its box (388 authored), geometry between origin and box can shadow the box in a map and never in stencil. | **Open, unconfirmed.** convoy2's `light_9020` captured mapped and stencilled shows no such difference. mcc_landing's `light_9081` view does differ, but those captures were not controlled for the player's own shadow or the scene's animation. A fragment clip in the cube caster is the fix if a case is confirmed; Vulkan's caster push block has no room for the box. |
+| **A soft shadow's grain followed its tile around.** The projected filter turns its kernel by a hash of the texel, and the texel was counted within the sampled image. The grain therefore changed whenever the light's tile took another place in the atlas, and a cached map differed from the same map drawn fresh: in hub2's start view one light alone changed 19,000 pixels between the two, by up to 147 levels, on both renderers. Reading cached maps where they live on Vulkan added a third place. | **Fixed, both backends.** The hash takes the texel within the tile. See "Walking" below. |
 | Light-facing one-sided geometry casts in maps and never in stencil. | **By design** (the September contact-detail decision). Recorded, not changed. |
 | CSM lights are unshadowed past `r_shadowMapCascadeDistance`. Maximum only. | **Open.** |
 
@@ -73,6 +75,7 @@ cache (sixteen at most) against forty cubes in view.
 | The stencil-fallback flag on a light is never cleared. | **Open.** Costs the light its volume elision only. |
 | OpenGL point cubes carry a colour cube the default receiver never samples: half their memory. The opt-in modern executor still reads it. | **Fixed.** Cubes are depth only while nothing samples the colour. See "Depth-only point cubes on OpenGL" below. At 512 the cache holds 64 cubes in 384 MiB, as on Vulkan; it held 42 in 504 MiB. |
 | Vulkan hub2: one light (`lights/squarelight1`) logs "required shadow resource unavailable" once and falls back; OpenGL maps it. | **Open**, present before this round. |
+| Vulkan's scratch cube pool only grows. A view takes a scratch cube for each uncached or composed point pass, up to 512 of them, and none is released until the cube size changes. A noclip walk out of the airdefense1 arena into the void, from where every area is visible, mapped 289 point lights in one view and left 2.0 GB resident at Quality's 512 faces. The cache has a memory bound; this pool has none. | **Open.** Ordinary views use a handful. One crowded view pays for the rest of the level. |
 
 ## Measured
 
@@ -532,7 +535,9 @@ that are not read in place are the ones with a moving caster.
 The picture is the same to the byte. In convoy2's start view, paused, two
 captures each of the maps read in place, copied, and drawn again without the
 cache agree in every pixel above the HUD; with shadows off 158,701 of 2.66
-million pixels differ.
+million pixels differ. That held for convoy2's lights, which filter with a
+fixed kernel. A light whose kernel turns per texel did not agree until the
+turn was taken from the texel within the tile: see "Walking" below.
 
 The validation layers stayed silent in convoy2 and hub2 while the view turned
 and, in one process, the switch, the map size (1024 and 512), the cache
@@ -547,6 +552,98 @@ query; a view held on the no-work return for several hundred frames and then
 made to copy again, with no query dropped; the in-engine self-tests; and the
 seventy-one static tests that read the touched files. Not run: any graphics
 card but the reference one, and Linux or macOS.
+
+### Walking
+
+Added on 10 November, from the measurement meant to price one static cube for
+both ownerships of a composed Vulkan light. Every cache figure above was taken
+with the camera turning on the spot. Here the player is moved through the
+level four units a frame (teleported, no input), which enters and leaves
+lights as walking does, and the shadow maps rendered fresh are counted.
+
+On the first walk, 1,200 units through hub2, one light with 77 static casters
+rendered both of its cubes again nine times, with the same casters each time.
+
+- **The static signature followed the camera.** It hashed, for each static
+  caster, whether the view also saw that caster's stencil volume. A caster the
+  map needs but whose volume is off screen is kept for the map alone, and that
+  state flips as the player walks past: here, the small light fixtures along
+  the route. The depth a caster writes is the same either way, so the bit is
+  no longer hashed (`R_RecordShadowMapCaster`). Both renderers share the
+  front end.
+
+Quality, 300 steps unless noted, the old signature against the new in separate
+launches of one build:
+
+| Walk | Maps rendered fresh | Views that rendered any |
+|---|---:|---:|
+| hub2, +x, Vulkan | 48 to 24 | 19 to 4 of 411 |
+| hub2, +x, OpenGL | 41 to 18 | 21 to 7 of 310 |
+| hub2, +y, Vulkan | 716 to 296 | 204 to 84 |
+| hub2, -y, Vulkan | 137 to 79 | 62 to 28 |
+| airdefense1 arena, -x, 120 steps | 20 to 10 | 8 to 3 |
+| airdefense1 arena, +y, 120 steps | 39 to 8 | 18 to 2 |
+| airdefense1 arena, -y, 120 steps | 28 to 11 | 14 to 4 |
+| airdefense1 arena, +x, 120 steps | 6 to 5 | 3 to 3 |
+| storage2, three directions, 150 steps | 478 to 475, 155 to 151, 458 to 454 | every view |
+
+A fresh map is six faces, or one tile, of every static caster of its light.
+There is no frame-time figure: other sessions were building, and the walks'
+frame means moved by more than the maps cost. storage2 renders two or three
+maps in every view for another reason, not looked into.
+
+What is left on these walks is membership that really changes, and that also
+follows the camera: a caster joins a light's map when the player comes within
+its shadow LOD distance, and an animated model that stands still joins a
+quarter of a second after it is first instanced. Each renders the light's
+maps again.
+
+**One static cube for both ownerships was not built.** On the first walk it
+would have saved 2 of the 48 fresh maps, 4 of the 24 left after this change,
+and Vulkan held up to 25 cubes where OpenGL held 15. The light that rendered
+most often cannot share at all: it has static casters of its own in the
+second ownership.
+
+The picture check for this change turned up a second fault. After a walk, and
+then without one, the cached and the fresh pictures of hub2's start view
+differed in 19,000 pixels, on both renderers, and all of it was one projected
+light with a soft filter.
+
+- **The filter's grain followed the tile.** The projected filter turns its
+  kernel by a hash of the texel so that neighbouring pixels sample
+  differently, and it counted the texel within the sampled image. The same
+  map in another place therefore filtered with another pattern: a cached cell
+  against the scratch target on OpenGL; one atlas block against another, or
+  against the cached map read in place, on Vulkan. The shadow's shape was
+  right in each. The hash now takes the texel within the tile, in both
+  receiver shaders, so the grain stays put when the tile moves.
+
+hub2 start view, paused, pixels above the HUD that differ between the cached
+and the fresh picture, of 2.66 million:
+
+| | Before | After |
+|---|---:|---:|
+| Vulkan, cached against fresh | 19,400, by up to 147 levels | 1, by one level |
+| Vulkan, read in place against copied | 19,200 | 1 |
+| OpenGL, cached against fresh | 20,000 | 77, by up to 24 levels |
+| Two captures of one state | 0 to 1,800 (an animated HUD icon) | 0 |
+
+Found on the way and not changed: Vulkan's scratch cube pool only grows (see
+the resources table).
+
+Checked for these two changes, on the final build: the walks and pictures
+above; the fourteen scenarios on both back ends, all passing; the
+continuous-motion qualification on both back ends, whose image case compares
+the cache a moving camera leaves behind with a fresh render at eight poses;
+the validation layers silent on a Vulkan walk; the in-engine self-tests; the
+shader header pin; and the eighty static tests that read the touched files.
+The motion qualification needed two repairs of its own first. It took the
+host's preset, which keeps point lights on stencil on OpenGL, so it mapped
+nothing there; and it froze game time in the frame it placed the camera, so
+its first capture could show the view still turning or the exposure still
+settling. It now sets `r_shadowMapPointLights 1` and lets the view settle for
+a second before freezing. Not run: any graphics card but the reference one,
+and Linux or macOS.
 
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
@@ -570,18 +667,27 @@ whether Enhanced can now map point lights on Vulkan.
 
 1. Fullscreen budgets for the three tiers, on the reference machine with
    nothing else running. Every change of this round moved what they cost.
-2. One static cube for both ownerships of a composed Vulkan light, as on
-   OpenGL. It needs a resident entry two passes of a view can share.
-3. Static-world volumes are still built once for every mapped light and kept
+2. Static caster membership still follows the camera: the shadow LOD
+   distance admits a caster as the player approaches, and a model first
+   instanced counts as moving for a quarter of a second. Each change renders
+   the light's maps again, and these are most of what is left on a walk (296
+   maps in 472 views on one hub2 route).
+3. Vulkan's scratch cube pool only grows: up to 512 cubes, 2.0 GB seen after
+   one view from outside the level, against a cache bounded at 512 MB.
+4. Static-world volumes are still built once for every mapped light and kept
    for the fallback. Leaving them out too would need the same rebuild on
    return, for every surface the light touches.
-4. The OpenGL projected cache is the atlas, four full tiles at Quality and
+5. The OpenGL projected cache is the atlas, four full tiles at Quality and
    Ultra, so it holds one crowded view and nothing of the view just left.
    Vulkan holds eight maps' worth.
-5. On Vulkan a projected light's tile size is fitted as if every map of the
+6. On Vulkan a projected light's tile size is fitted as if every map of the
    view needed an atlas block. Maps read where they live need none, so a
    crowded view could keep more of its lights at full size. The fit decides
    the cache key, so it must not follow what happens to be cached.
+7. One static cube for both ownerships of a composed Vulkan light, as on
+   OpenGL. Measured on a walk: 4 of 24 fresh maps and up to ten resident
+   cubes. It needs a resident entry two passes of a view can share.
+8. storage2 renders two or three maps fresh in every view. Not looked into.
 
 Set aside after measurement: cube faces the view cannot see (see "Static
 cutout casters").

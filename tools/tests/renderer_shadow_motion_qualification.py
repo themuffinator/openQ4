@@ -53,7 +53,11 @@ TOUR = (
     "10900 -9000 550 12 175 0",
     "8100 -11800 650 15 90 0",
 )
-SHADOWS = {"r_shadows": "1", "r_useShadowMap": "1", "r_shadowMapReport": "1",
+# Every setting the cases depend on is set here. The tour's lights are point
+# lights, and a host whose preset keeps point lights on stencil (Enhanced does
+# on OpenGL) would otherwise map nothing and qualify nothing.
+SHADOWS = {"r_shadows": "1", "r_useShadowMap": "1", "r_shadowMapPointLights": "1",
+           "r_shadowMapReport": "1",
            "r_shadowMapReportInterval": "15", "r_motionBlur": "0", "r_temporalAA": "0"}
 
 FAILURE_PATTERNS = (
@@ -100,7 +104,11 @@ def build_cfg(case: Case) -> str:
     for index, pose in enumerate(TOUR):
         lines += [f"setviewpos {pose}", "wait 90"]
         if case.images:
-            lines += ["benchmarkViewSweep 0 0", f"setviewpos {pose}", "g_stopTime 1", "wait 3",
+            # The teleport lands on the next game tic and the exposure then
+            # settles on the new view. Let both happen before time is frozen:
+            # frozen at once, the first capture could still show the turning
+            # view, or differ from the second by a drifting exposure.
+            lines += ["benchmarkViewSweep 0 0", f"setviewpos {pose}", "wait 60", "g_stopTime 1", "wait 3",
                       f"screenshot screenshots/warm{index}.tga", "wait 3",
                       f"screenshot screenshots/again{index}.tga",
                       "set r_shadowMapStaticCache 0", "wait 10",

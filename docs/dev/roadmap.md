@@ -1727,10 +1727,25 @@ optimization has landed.
   with no moving caster is now read where it lives (`r_vkShadowSampleResident`, on
   by default): in convoy2's start view the cache phase fell from 0.54 to 0.04 ms and
   all shadow phases from 0.68 to 0.18 ms, with captures identical to the byte and
-  the validation layers silent. Remaining, in order:
-  the fullscreen budgets, including whether Enhanced can map point lights, one
-  static cube for both ownerships of a composed Vulkan light, and static-world
-  volumes, which are still built once per mapped light for the fallback.
+  the validation layers silent.
+  Walking (10 November 2026). The cache had only been measured with the camera
+  turning on the spot. Moving the player through the level showed lights rendering
+  their maps again with unchanged casters: the static signature hashed whether the
+  view also saw each caster's stencil volume, which flips as the player walks past.
+  Without that bit a 1,200 unit walk through hub2 renders 24 fresh maps where it
+  rendered 48 on Vulkan and 18 where it rendered 41 on OpenGL, and the views that
+  render any fall from about 20 to 4 to 7. The picture check for it found the
+  projected filter's grain following a light's tile around the atlas, so a cached
+  map and the same map drawn fresh differed (19,000 pixels in hub2's start view,
+  both renderers); the kernel now turns by the texel within the tile and they agree
+  to within 1 pixel on Vulkan and 77 on OpenGL. One static cube for both ownerships
+  of a composed Vulkan light was measured at 4 of 24 fresh maps on that walk and
+  not built. Remaining, in order:
+  the fullscreen budgets, including whether Enhanced can map point lights; static
+  caster membership that still follows the camera (shadow LOD distance, the
+  quarter second a newly instanced model counts as moving); Vulkan's scratch cube
+  pool, which only grows; and static-world volumes, which are still built once per
+  mapped light for the fallback.
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur

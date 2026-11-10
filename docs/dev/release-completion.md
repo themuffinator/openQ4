@@ -448,6 +448,17 @@ there is no double-click word selection.
   the shadow work each frame falls from 0.68 to 0.18 ms of graphics-card time,
   and the picture is identical. Nothing needs changing;
   `r_vkShadowSampleResident 0` brings the copy back for comparison.
+- **Walking past lights no longer redraws their shadows.** A light's stored
+  shadow was thrown away and drawn again each time a nearby object's old-style
+  shadow came into or went out of view, which happens constantly on the move
+  and changes nothing in the stored shadow. On a walk through the Nexus Hub
+  about half of all shadow redraws were of this kind, on both renderers; they
+  no longer happen, so far fewer frames spend time on shadows while you move.
+- **Soft shadow edges no longer shimmer when nothing in them moves.** The fine
+  grain that softens a spotlight's shadow edge was tied to where the shadow
+  happened to be stored, so it changed pattern as you looked around or as
+  other lights came and went. It is now tied to the shadow itself and stays
+  put.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.

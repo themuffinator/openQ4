@@ -2067,12 +2067,45 @@ def validate_shadow_filtering_contract() -> None:
         (
             "if (shadow.filterParams.z < 0.5)",
             "StableShadowHash(vec3(",
-            "floor(uv / max(shadow.texelSize.x, 1.0e-6))",
+            # the texel within the tile, not within the sampled image
+            "floor(tileTexel)",
             "floor(depth * 1024.0)",
             "* 6.2831853",
             "return mat2(c, s, -s, c);",
         ),
         "projected stable Poisson rotation",
+    )
+    # A soft shadow's grain must not follow where its tile lives: an atlas
+    # block, another block the next view, or the cached map read in place.
+    # Keyed on the image texel, cached and fresh pictures of one light
+    # differed in 19,000 pixels in hub2 and the grain moved with the tile.
+    if "texelSize" in projected_rotation or "uv" in projected_rotation.replace("tileTexel", ""):
+        raise AssertionError("The projected kernel rotation must hash the tile-local texel only")
+    require_order(
+        braced_body(projected, "float SampleShadowCascade(", "projected cascade sampling"),
+        (
+            "vec2 uv = mix(atlasRect.xy, atlasRect.zw, localUv);",
+            "vec2 tileTexels = floor(abs(atlasRect.zw - atlasRect.xy)",
+            "/ max(abs(shadow.texelSize.xy), vec2(1.0e-6)) + vec2(0.5));",
+            "vec2 tileTexel = clamp(localUv * tileTexels, vec2(guardRadius),",
+            "mat2 rotation = ShadowOffsetRotation(tileTexel, depth);",
+        ),
+        "the rotation is taken from the tile-local texel",
+    )
+    gl_projected_source = read("content/baseoq4/pak0/glprogs/shadow_interaction.fs")
+    gl_rotation = braced_body(gl_projected_source, "mat2 ShadowOffsetRotation(", "OpenGL projected rotation")
+    require(gl_rotation, "floor( tileTexel )", "OpenGL hashes the tile-local texel")
+    if "uShadowTexelSize" in gl_rotation:
+        raise AssertionError("The OpenGL projected kernel rotation must hash the tile-local texel only")
+    require_order(
+        braced_body(gl_projected_source, "vec4 SampleShadowCascade(", "OpenGL projected cascade sampling"),
+        (
+            "vec2 uv = atlasMin + localUv * ( atlasMax - atlasMin );",
+            "vec2 tileTexels = floor( abs( atlasMax - atlasMin ) / shadowTexel + vec2( 0.5 ) );",
+            "vec2 tileTexel = clamp( localUv * tileTexels, guardTexels, max( tileTexels - guardTexels, guardTexels ) );",
+            "mat2 rotation = ShadowOffsetRotation( tileTexel, depth );",
+        ),
+        "OpenGL takes the rotation from the tile-local texel",
     )
 
     receiver_bias = braced_body(
@@ -2275,7 +2308,7 @@ def validate_shadow_filtering_contract() -> None:
     require_order(
         gl_projected_samples,
         (
-            "mat2 rotation = ShadowOffsetRotation( uv, depth );",
+            "mat2 rotation = ShadowOffsetRotation( tileTexel, depth );",
             "ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax, rotation )",
             "shadow += SampleShadowCompare( uv, depth, cascadeIndex, 0.0 );",
             "if ( uShadowFilterTaps <= 1.0 )",
@@ -8720,6 +8753,63 @@ def validate_ci_registration() -> None:
         require(workflow, f"python {TEST_PATH}", context)
 
 
+def validate_static_signature_view_independence_contract() -> None:
+    """A light's static caster signature does not follow the camera.
+
+    The signature names the depth a light's cached maps hold. It used to hash,
+    for each static caster, whether the view also saw that caster's stencil
+    volume (a caster kept for the map alone is "expanded"). That bit flips as
+    the player walks past a caster, the depth it writes does not change, and
+    every flip rendered all of the light's maps again: on a walk through hub2
+    half of the shadow maps rendered fresh, on both renderers, were for this.
+
+    The caster's identity, material, geometry and placement stay hashed, and
+    the count of expanded casters is still kept for the reports.
+    """
+    interaction = read("src/renderer/Interaction.cpp")
+    record = braced_body(interaction, "static void R_RecordShadowMapCaster(", "static caster signature")
+    require_order(
+        record,
+        (
+            "const bool dynamicCaster = R_ShadowMapCasterIsDynamic( entityDef, shader );",
+            # counted for the reports, live or static
+            "if ( expandedCaster ) {",
+            "vLight->shadowMapExpandedCasterCount++;",
+            # live casters never reach the signature
+            "if ( dynamicCaster ) {",
+            "return;",
+            "hash = R_ShadowMapHashInt( hash, entityDef != NULL ? entityDef->index : -1 );",
+            "hash = R_ShadowMapHashString( hash, shader != NULL ? shader->GetName() : NULL );",
+            "hash = R_ShadowMapHashInt( hash, translucent ? 1 : 0 );",
+            "hash = R_ShadowMapCutoutCoverageSignature( shader, hash );",
+            "hash = R_ShadowMapHashInt( hash, casterTris->numVerts );",
+            "hash = R_ShadowMapHashInt( hash, casterTris->numIndexes );",
+            "hash = R_ShadowMapHashInt( hash, entityDef->lastModifiedFrameNum );",
+            "hash = R_ShadowMapHashInt( hash, entityDef->dynamicModelFrameCount );",
+            "hash = R_ShadowMapHashFloat( hash, entityDef->modelMatrix[i] );",
+            "vLight->shadowMapCasterSignature = hash;",
+        ),
+        "what a static caster contributes to the signature",
+    )
+    hashed = [line for line in record.splitlines() if "Hash" in line and "expandedCaster" in line]
+    if hashed:
+        raise AssertionError(
+            "The caster-only state follows the view and must not enter the static signature: " + hashed[0].strip()
+        )
+    # The state only decides stencil work: whether the volume is linked and culled.
+    add = braced_body(interaction, "void idInteraction::AddActiveInteraction(", "active interaction")
+    require_compact(
+        add,
+        "const bool shadowMapCasterOnly = ( shadowScissorWasEmpty || shadowMapViewFrustumCulled ) && shadowMapConservativeCandidate;",
+        "caster-only is a property of the view",
+    )
+    for backend in ("src/renderer/Vulkan/vk_ShadowMap.cpp",):
+        source = read(backend)
+        for token in ("surf->scissorRect", "caster->scissorRect"):
+            if token in source:
+                raise AssertionError(f"{backend} must not read a caster's view scissor when it draws a map")
+
+
 def validate_resident_projected_sampling_contract() -> None:
     """An exact projected hit with nothing live over it is read where it lives.
 
@@ -8955,6 +9045,7 @@ def main() -> None:
     validate_projected_cache_memory_bound_contract()
     validate_depth_only_point_cube_contract()
     validate_static_cutout_caster_contract()
+    validate_static_signature_view_independence_contract()
     validate_resident_projected_sampling_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")

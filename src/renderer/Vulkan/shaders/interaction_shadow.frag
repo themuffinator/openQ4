@@ -218,12 +218,16 @@ float StableShadowHash(vec3 value) {
         * 43758.5453);
 }
 
-mat2 ShadowOffsetRotation(vec2 uv, float depth) {
+// The kernel turns by a hash of the texel within the tile, not within the
+// image, so a soft shadow's grain is the same wherever its tile lives: one
+// atlas block this view, another the next, or the cached map read in place.
+// Keyed on the image texel, the grain changed each time the tile moved.
+mat2 ShadowOffsetRotation(vec2 tileTexel, float depth) {
     if (shadow.filterParams.z < 0.5) {
         return mat2(1.0, 0.0, 0.0, 1.0);
     }
     float angle = StableShadowHash(vec3(
-        floor(uv / max(shadow.texelSize.x, 1.0e-6)),
+        floor(tileTexel),
         floor(depth * 1024.0))) * 6.2831853;
     float s = sin(angle);
     float c = cos(angle);
@@ -446,7 +450,14 @@ float SampleShadowCascade(vec4 shadowCoord, vec4 atlasRect,
     uv = clamp(uv, clampMin, clampMax);
     // Blocker search and PCF use the same stable kernel orientation. Compute
     // the hash/trigonometry once so PCSS has one bounded rotation per receiver.
-    mat2 rotation = ShadowOffsetRotation(uv, depth);
+    // localUv is the same bit for bit in every placement of the tile, and the
+    // tile's edge in texels is exact, so the rotation is too. The clamp is
+    // the guard band's, in texels.
+    vec2 tileTexels = floor(abs(atlasRect.zw - atlasRect.xy)
+        / max(abs(shadow.texelSize.xy), vec2(1.0e-6)) + vec2(0.5));
+    vec2 tileTexel = clamp(localUv * tileTexels, vec2(guardRadius),
+        max(tileTexels - vec2(guardRadius), vec2(guardRadius)));
+    mat2 rotation = ShadowOffsetRotation(tileTexel, depth);
 
     float filterRadius = ProjectedPCSSRadius(uv, depth, cascadeIndex,
         clampMin, clampMax, texelStep, rotation);
