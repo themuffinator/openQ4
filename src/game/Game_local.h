@@ -183,6 +183,7 @@ void gameDebugLogDamage( const char *source, idEntity *victim, idEntity *inflict
 #include "FreeView.h"
 
 #include "HitMarker.h"
+#include "gamesys/AnimatedCrosshair.h"
 
 #include "ClassicLights.h"
 

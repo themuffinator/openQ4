@@ -377,7 +377,7 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"in_swapConfirmBack",{0,0,2,true,{},{0,1,2}}},{"g_crosshairCustom",{2,0,0,false,{"0","1"}}},
 		{"g_crosshairSize",{0,16,48,true,{},{16,24,32,40,48}}},
 		{"g_crosshairColor",{2,0,0,false,{"1 1 1 1","1 0 0 1","1 0.5 0 1","1 1 0 1","0 1 0 1","0 1 1 1","0 0 1 1","1 0 0.5 1"}}},
-		{"hud_hitMarker",{1}},{"ui_hudLayout",{0,0,3,true,{},{0,1,2,3}}},{"ui_hudScale",{0,0.5,2,false}},
+		{"hud_hitMarker",{1}},{"hud_crosshairAnimated",{1}},{"ui_hudLayout",{0,0,3,true,{},{0,1,2,3}}},{"ui_hudScale",{0,0.5,2,false}},
 		{"ui_hudWidth",{0,0,2,true,{},{0,1,2}}},{"ui_hudSafeInset",{0,0,10,false}},{"g_objectivesToggle",{1}},
 		{"ui_hudOpacity",{0,0.25,1,false}},{"ui_hudDamageDirection",{1}},{"ui_hudPickups",{1}},{"ui_hudWeaponStrip",{1}},
 		{"ui_reducedFlashing",{1}},{"ui_retainedOpaqueBacking",{1}},{"g_corpseSink",{0,0,2,true,{},{0,1,2}}},{"con_allowConsole",{0,0,1,true,{},{0,1}}},

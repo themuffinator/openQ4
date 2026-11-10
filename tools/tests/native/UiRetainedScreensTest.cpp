@@ -298,7 +298,7 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","cl_player_ou
 	"in_weaponWheelSensitivity","ui_weaponWheelOffset","in_joystickLookCurve","in_joystickInvertLook","in_joystickTriggerThreshold",
 	"in_joystickRumble","in_joystickRumbleScale","in_gyro","in_gyroSensitivity","in_touchpadMode","in_touchpadSensitivity",
 	"in_touchscreen","in_joystickLowBatteryRumbleThreshold","in_joystickLowBatteryRumbleScale","in_promptStyle","in_swapConfirmBack",
-	"g_crosshairCustom","g_crosshairSize","g_crosshairColor","hud_hitMarker","ui_hudLayout","ui_hudScale","ui_hudWidth",
+	"g_crosshairCustom","g_crosshairSize","g_crosshairColor","hud_hitMarker","hud_crosshairAnimated","ui_hudLayout","ui_hudScale","ui_hudWidth",
 	"ui_hudSafeInset","g_objectivesToggle","ui_hudOpacity","ui_hudDamageDirection","ui_hudPickups","ui_hudWeaponStrip",
 	"ui_reducedFlashing","ui_retainedOpaqueBacking","g_corpseSink","con_allowConsole","g_autoSkipCinematics","ui_cinematicShake","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
 	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",

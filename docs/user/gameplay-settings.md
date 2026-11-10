@@ -30,6 +30,7 @@ The auto-skip cinematics, corpse cleanup, and corpse sink controls are also avai
 | `hud_hitMarker` | `1` | SP and MP client | Crosshair hit marker on hits you land. On by default. |
 | `hud_hitMarkerScale` | `1` | SP and MP client | Hit marker size multiplier, `0.25` to `4`, on top of `g_crosshairSize`. |
 | `hud_crosshairHitFlash` | `0` | SP and MP client | Recolours the crosshair on a hit, as stock Quake 4 does. Implied when `hud_hitMarker` is off. |
+| `hud_crosshairAnimated` | `0` | SP and MP client | Draws the weapon's crosshair live, answering shots, charge, reload and hits. New interface only. See [Animated Crosshair](#animated-crosshair). |
 | `g_hitFeedback` | `2` | Multiplayer server | Whether the server tells attackers about their hits at all. `0` none, `1` without the amount, `2` with the amount. |
 
 ## Multiplayer objective markers
@@ -308,6 +309,70 @@ In multiplayer the marker sizes itself from the same server-permitted hit
 information as damage numbers, so with `g_hitFeedback 1` or `0` you still get a
 marker on every hit - just always the normal one, because the server is not
 telling you what the hit was worth.
+
+## Animated Crosshair
+
+`Settings -> Game Options -> HUD -> Animated Crosshair` (`hud_crosshairAnimated 1`)
+draws each weapon's own Quake 4 crosshair live instead of as a still picture. The
+designs are the originals. Each one comes apart into the pieces it was drawn from,
+arcs, ticks, bars, darts and brackets, and those pieces follow the weapon, so the
+crosshair tells you what the gun is doing without a second readout to look at.
+It is off by default.
+
+Every design does these:
+
+- **Assembles when the weapon is ready.** The pieces sweep, slide or turn into
+  place as the weapon comes up, and fold away while you switch weapons or while
+  the use hand, the talk frame or another context cursor is showing.
+- **Kicks with each shot** and settles before the next one.
+- **Stands down while you can't fire.** Reloading dims the design and shows the
+  reload: one pip for each round where the weapon is loaded a round at a time,
+  a sweep otherwise. Out of ammunition, a design with a cross turns it into an X.
+- **Takes the hit.** A hit squeezes the design and tints it in the hit's color
+  for the length of the pulse; a kill also sends one thin ring out from its edge.
+
+And each design has its own behavior:
+
+| Crosshair | What it shows |
+| --- | --- |
+| Blaster | The four arcs wind shut into an unbroken ring as the blaster charges, and a thin outer ring breathes while a full charge is held. |
+| Hyperblaster | The same arcs turn with the barrels for as long as they spin. |
+| Machinegun | The ticks walk out under sustained fire and back as it stops, and draw in to the ring while you sight the weapon. |
+| Shotgun | The ring is thrown wide by the shot and sends a faint echo out to the edge of the pattern; reloading counts the shells back in. |
+| Grenade launcher | The quarters break open top from bottom on the shot, like a breech, and stand apart left from right until the next round is ready. |
+| Dark matter gun | The same quarters turn and draw tight as the core charges, then spring back to rest when it is ready. |
+| Nailgun | The brackets draw together as the drum comes up to speed, and clamp shut with four pips between them on a seeker lock. |
+| Rocket launcher | The faint halo of the original design sweeps round as the launcher cycles and closes when the next rocket is ready. |
+| Railgun | The shot throws the four bars out and the recharge draws them back: they are home, with a brief flash, when the next slug is. |
+| Lightning gun | The beam draws the four darts in and sets them crackling. They already sit where a hit marker would, so they are the hit marker: every hit drives them home in the hit's color. |
+| Napalm launcher | The splatter ring turns into place and swells with each shot. |
+| Gauntlet | Three teeth turn round the disc while the blade spins. |
+
+**Hit feedback** follows the [Hit Marker](#hit-marker) setting. With the marker on,
+its four marks dock into the clear space of the design in hand, between the
+machinegun's ticks, inside the rocket launcher's ring, between the nailgun's
+brackets, with the same sizes, colors and timing as before. With the marker off
+you still get the squeeze and the tint. `hud_hitMarkerScale` applies to the docked
+marks too.
+
+**Vehicles** get the same treatment for the gun of your seat. A cannon that
+recharges between shots shows the recharge as a measured sweep, and a gun with a
+target closes four corners on its crosshair. Hits you land from a vehicle show on
+its crosshair, which the still picture never did.
+
+Things to know:
+
+- It needs the new interface (`ui_retained 1`, the default). The classic interface
+  keeps the still crosshair, and the setting has no effect there.
+- It follows `g_crosshairSize` and `g_crosshairColor`. Black outlines stay black
+  at every color, as in the original art.
+- With a custom crosshair chosen, that design is the one animated on every
+  weapon. The ten simple marks of the custom set animate as one piece.
+- `Reduced Flashing` softens the hit tint and drops the flashes. Reduced motion
+  (`ui_retainedReducedMotion 1`) fades the design in where it belongs instead of
+  flying it there, and stops the turning and the tremble.
+- The Awakening's space cannon keeps its own lock-on reticule, which already
+  changes with the lock.
 
 ## Damage Numbers
 

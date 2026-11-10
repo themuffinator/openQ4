@@ -1024,11 +1024,36 @@ void rvVehicleWeapon::UpdateCursorGUI ( idUserInterface* gui ) const {
 			material->SetSort( SS_GUI );
 		}			
 		
-		gui->SetStateString ( "crossColor", g_crosshairColor.GetString() );
+		gui->SetStateString ( "crossColor", rvAnimatedCrosshair::CursorColor( spawnArgs.GetString ( "mtr_crosshair" ) ) );
 		gui->SetStateInt ( "crossOffsetX", spawnArgs.GetInt ( "crosshairOffsetX", "0" ) );
 		gui->SetStateInt ( "crossOffsetY", spawnArgs.GetInt ( "crosshairOffsetY", "0" ) ); 			
  		gui->StateChanged ( gameLocal.time );
 	//}
+}
+
+/*
+=====================
+rvVehicleWeapon::GetCrosshairSignals
+
+openQ4: presentation only, read on drawn frames by the animated crosshair.
+A gun that fires a magazine and then recharges reports the recharge as a
+reload it can measure.
+=====================
+*/
+void rvVehicleWeapon::GetCrosshairSignals( crosshairSignals_t &signals ) const {
+	signals.design = spawnArgs.GetString( "mtr_crosshair" );
+	signals.weaponKey = 0x10000 + (int)( ( (size_t)this >> 4 ) & 0xffff );
+	signals.raised = true;
+	signals.nextAttackTime = nextFireTime;
+	if ( currentAmmo >= 0 && ammoPerCharge > 0 ) {
+		signals.clip = currentAmmo;
+		signals.clipSize = ammoPerCharge;
+		if ( currentAmmo == 0 && chargeTime > 0 ) {
+			signals.reloading = true;
+			signals.reloadProgress = GetCurrentCharge();
+		}
+	}
+	signals.lock = targetEnt.IsValid() ? 1.0f : 0.0f;
 }
 
 /*

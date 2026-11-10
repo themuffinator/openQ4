@@ -333,6 +333,7 @@ extern idCVar	g_crosshairCharInfoFar;
 extern idCVar	hud_hitMarker;
 extern idCVar	hud_hitMarkerScale;
 extern idCVar	hud_crosshairHitFlash;
+extern idCVar	hud_crosshairAnimated;
 // openQ4 END
 // bdube: hud popups
 extern idCVar	g_showHudPopups;

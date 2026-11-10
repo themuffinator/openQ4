@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Preserved from openQ4-game; Quake 4 SDK EULA applies. See docs/dev/game-test-coverage.md.
-"""Static contract checks for applying crosshair cvar changes to the cursor GUI at once."""
+"""Static contract checks for applying crosshair cvar changes to the cursor GUI at once,
+and for the animated crosshair that draws the combat picture in the cursor GUI's place."""
 
 from __future__ import annotations
 
@@ -95,6 +96,64 @@ def check_source_root(source_root: str) -> str:
         f"{player_path} DrawHUD cursor refresh",
     )
 
+    # The animated crosshair (hud_crosshairAnimated) draws the combat picture
+    # itself.  Switching it reaches the cursor through the same refresh as a
+    # color change, and it draws after that refresh and before the hit marker,
+    # whose pulse it docks into the design: on foot from the weapon in hand,
+    # in a vehicle from the gun of the seat.
+    toggle = "if ( rvAnimatedCrosshair::ConsumeToggle() ) { g_crosshairColor.SetModified(); }"
+    require_order(
+        normalized(draw),
+        (
+            toggle,
+            "Player_RefreshCrosshairGUI( cursor, weapon, true );",
+            "rvAnimatedCrosshair::Draw( cursor, NULL, crosshairSeat != NULL ? crosshairSeat->GetActiveWeapon() : NULL );",
+            toggle,
+            "Player_RefreshCrosshairGUI( cursor, weapon, false );",
+            "rvAnimatedCrosshair::Draw( cursor, weapon, NULL );",
+            "rvHitMarker::Draw();",
+        ),
+        f"{player_path} DrawHUD animated crosshair",
+    )
+
+    # While it draws a design the cursor GUI's own copy goes transparent, for
+    # the weapon in hand and for a vehicle's gun alike.
+    weapon_path = f"{source_root}/Weapon.cpp"
+    require(
+        function(read(weapon_path), "void rvWeapon::UpdateCrosshairGUI( idUserInterface* gui ) const", weapon_path),
+        'gui->SetStateString( "crossColor", rvAnimatedCrosshair::CursorColor( ',
+        f"{weapon_path} UpdateCrosshairGUI",
+    )
+    vehicle_path = f"{source_root}/vehicle/VehicleParts.cpp"
+    require(
+        function(read(vehicle_path), "void rvVehicleWeapon::UpdateCursorGUI ( idUserInterface* gui ) const", vehicle_path),
+        'gui->SetStateString ( "crossColor", rvAnimatedCrosshair::CursorColor( ',
+        f"{vehicle_path} UpdateCursorGUI",
+    )
+
+    # Off by default, so a fresh profile keeps the stock picture; and the hit
+    # marker stands aside only while the animated crosshair owns its pulse.
+    require(
+        read(f"{source_root}/gamesys/SysCvar.cpp"),
+        'idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL,',
+        f"{source_root}/gamesys/SysCvar.cpp",
+    )
+    marker_path = f"{source_root}/HitMarker.cpp"
+    marker = read(marker_path)
+    require_order(
+        function(marker, "void rvHitMarker::Draw( void )", marker_path),
+        ("if ( AnimatedCrosshair_OwnsMarker() ) {", "return;", "if ( !hud_hitMarker.GetBool() ) {"),
+        f"{marker_path} rvHitMarker::Draw",
+    )
+    require(
+        function(marker, "void rvHitMarker::Trigger( int damage, int flags, hitMarkerSource_t source )", marker_path),
+        "if ( !hud_hitMarker.GetBool() && !rvAnimatedCrosshair::Enabled() ) {",
+        f"{marker_path} rvHitMarker::Trigger",
+    )
+    shared = "gamesys/AnimatedCrosshair.inl" if source_root == "src/game" else "../game/gamesys/AnimatedCrosshair.inl"
+    if not marker.rstrip().endswith(f'#include "{shared}"'):
+        raise AssertionError(f"{marker_path} must end by including {shared}")
+
     # The stock per-think refresh was Xbox 360 only and never ran on MP clients.
     think = function(player, "void idPlayer::Think( void )", player_path)
     if "g_crosshairColor.IsModified()" in think:
@@ -107,6 +166,17 @@ def main() -> None:
     bodies = {source_root: check_source_root(source_root) for source_root in SOURCE_ROOTS}
     if bodies[SOURCE_ROOTS[0]] != bodies[SOURCE_ROOTS[1]]:
         raise AssertionError("SP/MP drift in Player_RefreshCrosshairGUI")
+
+    # One implementation for both trees, and only under the retained interface:
+    # its pieces are windows onto vector art the stock interface does not have.
+    shared = read("src/game/gamesys/AnimatedCrosshair.inl")
+    require(
+        normalized(function(shared, "bool rvAnimatedCrosshair::Enabled( void )", "AnimatedCrosshair.inl")),
+        'retained = cvarSystem->Find( "ui_retained" ); } return hud_crosshairAnimated.GetBool() && retained != NULL && retained->GetBool();',
+        "AnimatedCrosshair.inl rvAnimatedCrosshair::Enabled",
+    )
+    if (ROOT / "src/mpgame/gamesys/AnimatedCrosshair.inl").exists():
+        raise AssertionError("The animated crosshair has one implementation, under src/game/gamesys")
 
     # Suite membership and CI execution are checked by game_regression_suite.py.
     print("crosshair_cvar_refresh_contract: ok")

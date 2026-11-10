@@ -4465,7 +4465,14 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 
 				vehicleController.UpdateCursorGUI( cursor );
 				cursor->Redraw( gameLocal.time );
+				if ( rvAnimatedCrosshair::ConsumeToggle() ) {
+					g_crosshairColor.SetModified();
+				}
 				Player_RefreshCrosshairGUI( cursor, weapon, true );
+				// openQ4: the gun of the seat, drawn live in place of its picture
+				rvVehicle *crosshairVehicle = vehicleController.GetVehicle();
+				rvVehiclePosition *crosshairSeat = crosshairVehicle != NULL ? crosshairVehicle->GetPosition( vehicleController.GetPosition() ) : NULL;
+				rvAnimatedCrosshair::Draw( cursor, NULL, crosshairSeat != NULL ? crosshairSeat->GetActiveWeapon() : NULL );
 			}
 		}
 		_hud = GetHud();
@@ -4516,7 +4523,16 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 				cursor->SetStateInt( "g_crosshairSize", crossSize );
 // RAVEN END
 				cursor->Redraw( gameLocal.time );
+				// openQ4: switching the animated crosshair hands the combat picture
+				// over, or back, through the same refresh as a color change
+				if ( rvAnimatedCrosshair::ConsumeToggle() ) {
+					g_crosshairColor.SetModified();
+				}
 				Player_RefreshCrosshairGUI( cursor, weapon, false );
+
+				// openQ4: the weapon's design drawn live in place of the cursor's
+				// picture; it takes the hit marker's pulse with it
+				rvAnimatedCrosshair::Draw( cursor, weapon, NULL );
 
 				// openQ4: over the crosshair, and under the crosshair's own
 				// gating - no marker in a gui, a vehicle, or while dead

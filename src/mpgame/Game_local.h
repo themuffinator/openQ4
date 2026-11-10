@@ -258,6 +258,7 @@ extern idRepeaterReliableMessageSender repeaterReliableSender;
 
 #include "Lagometer.h"
 #include "HitMarker.h"
+#include "../game/gamesys/AnimatedCrosshair.h"
 
 #include "ClassicLights.h"
 

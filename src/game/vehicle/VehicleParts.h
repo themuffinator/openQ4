@@ -284,6 +284,8 @@ public:
 	float					GetCurrentCharge	( void ) const;
 
 	virtual void			UpdateCursorGUI		( idUserInterface* gui ) const;
+							// openQ4: what the animated crosshair reads from the seat's gun
+	void					GetCrosshairSignals	( struct crosshairSignals_t &signals ) const;
 							// openQ4: the selected weapon's own state on its vehicle's HUD,
 							// after the position's (the Awakening turret's barrel heat)
 	virtual void			UpdateHUD			( idUserInterface* gui ) { }

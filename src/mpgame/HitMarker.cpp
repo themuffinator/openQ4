@@ -133,6 +133,11 @@ typedef struct hitMarkerPulse_s {
 static hitMarkerPulse_t		hitMarkerPulse = { 0, 0, HITMARKER_TIER_NORMAL, 0, false, 0.0f };
 static const idMaterial *	hitMarkerMaterial = NULL;
 
+// openQ4: while the animated crosshair is drawing the weapon's design it owns
+// this pulse and docks it into that design; see gamesys/AnimatedCrosshair.inl,
+// included at the end of this file.
+static bool AnimatedCrosshair_OwnsMarker( void );
+
 /*
 ================
 HitMarkerTierForHit
@@ -334,6 +339,7 @@ void rvHitMarker::Clear( void ) {
 	memset( &hitMarkerPulse, 0, sizeof( hitMarkerPulse ) );
 	hitMarkerPulse.tier = HITMARKER_TIER_NORMAL;
 	hitMarkerMaterial = NULL;
+	rvAnimatedCrosshair::Clear();
 }
 
 /*
@@ -342,6 +348,10 @@ rvHitMarker::CrosshairFlashEnabled
 ================
 */
 bool rvHitMarker::CrosshairFlashEnabled( void ) {
+	// the animated crosshair is the combat picture, and answers the hit itself
+	if ( AnimatedCrosshair_OwnsMarker() ) {
+		return false;
+	}
 	// with the marker off there is no other cue on the crosshair, so stock
 	// Quake 4's flash comes back on its own rather than leaving the player with
 	// nothing
@@ -361,7 +371,7 @@ void rvHitMarker::Trigger( int damage, int flags, hitMarkerSource_t source ) {
 	int		tier;
 	float	fraction;
 
-	if ( !hud_hitMarker.GetBool() ) {
+	if ( !hud_hitMarker.GetBool() && !rvAnimatedCrosshair::Enabled() ) {
 		return;
 	}
 
@@ -436,6 +446,11 @@ void rvHitMarker::Draw( void ) {
 	int		pass;
 	int		i;
 
+	if ( AnimatedCrosshair_OwnsMarker() ) {
+		// drawn already, docked in the design
+		return;
+	}
+
 	if ( !hud_hitMarker.GetBool() ) {
 		hitMarkerPulse.startTime = 0;
 		return;
@@ -493,3 +508,5 @@ void rvHitMarker::Draw( void ) {
 
 	presentation.Draw("native/hit-marker");
 }
+
+#include "../game/gamesys/AnimatedCrosshair.inl"

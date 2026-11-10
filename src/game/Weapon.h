@@ -32,6 +32,7 @@ class idItem;
 class idAnimatedEntity;
 class idProjectile;
 class rvWeapon;
+struct crosshairSignals_t;
 
 class rvViewWeapon : public idAnimatedEntity {
 public:
@@ -287,6 +288,10 @@ public:
 
 	void				UpdateGUI					( void );
 	void				UpdateCrosshairGUI			( idUserInterface* gui ) const;
+	// openQ4: what the animated crosshair reads from the weapon in hand on a
+	// drawn frame.  A weapon with a charge, a spin or a lock adds it in the detail.
+	void				GetCrosshairSignals			( crosshairSignals_t &signals ) const;
+	virtual void		GetCrosshairDetail			( crosshairSignals_t &signals ) const { }
 	int					GetFirstPersonShadowSuppressLightId( void ) const;
 
 	idMat3				ForeshortenAxis				( const idMat3& axis ) const;

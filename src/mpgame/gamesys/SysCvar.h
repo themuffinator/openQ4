@@ -188,6 +188,7 @@ extern idCVar	hud_damageNumberScale;
 extern idCVar	hud_hitMarker;
 extern idCVar	hud_hitMarkerScale;
 extern idCVar	hud_crosshairHitFlash;
+extern idCVar	hud_crosshairAnimated;
 // openQ4 END
 
 extern idCVar	ik_enable;

@@ -32,6 +32,7 @@ private:
 	idVec2				chargeGlow;
 	bool				fireForced;
 	int					fireHeldTime;
+	virtual void		GetCrosshairDetail	( crosshairSignals_t &signals ) const;
 
 	stateResult_t		State_Raise				( const stateParms_t& parms );
 	stateResult_t		State_Lower				( const stateParms_t& parms );
@@ -46,6 +47,25 @@ private:
 
 CLASS_DECLARATION( rvWeapon, rvWeaponBlaster )
 END_CLASS
+
+/*
+================
+rvWeaponBlaster::GetCrosshairDetail
+
+openQ4: see rvWeapon::GetCrosshairSignals
+================
+*/
+void rvWeaponBlaster::GetCrosshairDetail( crosshairSignals_t &signals ) const {
+	signals.charge = 0.0f;
+	if ( fireHeldTime != 0 ) {
+		// the trigger is held: the charge runs from the end of the delay to
+		// chargeTime, and the shot is the release, not the press that stepped
+		// the attack time
+		const int span = Max( 1, chargeTime - chargeDelay );
+		signals.charge = idMath::ClampFloat( 0.0f, 1.0f, (float)( gameLocal.time - fireHeldTime - chargeDelay ) / (float)span );
+		signals.nextAttackTime = 0;
+	}
+}
 
 /*
 ================

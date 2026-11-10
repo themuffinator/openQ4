@@ -250,6 +250,11 @@ idCVar hud_damageNumberScale(		"hud_damageNumberScale",	"1",			CVAR_GAME | CVAR_
 idCVar hud_hitMarker(				"hud_hitMarker",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "crosshair hit marker on hits you land" );
 idCVar hud_hitMarkerScale(			"hud_hitMarkerScale",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT, "hit marker size multiplier, on top of g_crosshairSize", 0.25f, 4.0f );
 idCVar hud_crosshairHitFlash(		"hud_crosshairHitFlash",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "recolour the crosshair on a hit, as stock Quake 4 does; implied when hud_hitMarker is off" );
+// openQ4: the weapon's own crosshair design drawn live.  Its pieces assemble as
+// the weapon is raised, kick with each shot, close as it charges, wait while it
+// cycles and stand down while it reloads, and hit feedback docks into the design.
+// Retained interface only: the stock interface keeps the still picture.
+idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "animated crosshair: the weapon's crosshair drawn live, answering shots, charge, reload and hits; needs ui_retained 1" );
 // openQ4 END
 
 // change anytime vars

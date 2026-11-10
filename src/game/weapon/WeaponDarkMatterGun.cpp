@@ -49,6 +49,7 @@ protected:
 	void				InitRing		( darkMatterRing_t ring, const char* name );
 	void				StartRings		( bool chargeUp );
 	void				StopRings		( void );
+	virtual void		GetCrosshairDetail	( crosshairSignals_t &signals ) const;
 
 private:
 
@@ -61,6 +62,25 @@ private:
 
 CLASS_DECLARATION( rvWeapon, rvWeaponDarkMatterGun )
 END_CLASS
+
+/*
+================
+rvWeaponDarkMatterGun::GetCrosshairDetail
+
+openQ4: see rvWeapon::GetCrosshairSignals
+================
+*/
+void rvWeaponDarkMatterGun::GetCrosshairDetail( crosshairSignals_t &signals ) const {
+	// its reload is the core charging: the design draws tight as the rings come
+	// up to speed and springs back to rest when the charge is in, in place of a
+	// reload gauge
+	signals.charge = 0.0f;
+	if ( status == WP_RELOAD ) {
+		const int span = Max( 1, 2 * chargeDuration );
+		signals.charge = ( ringStartTime != -1 ) ? idMath::ClampFloat( 0.05f, 1.0f, (float)( gameLocal.time - ringStartTime ) / (float)span ) : 0.05f;
+		signals.reloading = false;
+	}
+}
 
 /*
 ================

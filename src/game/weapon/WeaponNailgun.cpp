@@ -63,6 +63,7 @@ protected:
 	float								drumMultiplier;
 
 	virtual void		OnLaunchProjectile		( idProjectile* proj );
+	virtual void		GetCrosshairDetail		( crosshairSignals_t &signals ) const;
 	
 private:
 
@@ -87,6 +88,22 @@ private:
 
 CLASS_DECLARATION( rvWeapon, rvWeaponNailgun )
 END_CLASS
+
+/*
+================
+rvWeaponNailgun::GetCrosshairDetail
+
+openQ4: see rvWeapon::GetCrosshairSignals
+================
+*/
+void rvWeaponNailgun::GetCrosshairDetail( crosshairSignals_t &signals ) const {
+	signals.spin = (float)drumSpeed / (float)NAILGUN_DRUMSPEED_FAST;
+	if ( guideEnt.IsValid() ) {
+		// a seeker target: acquiring until the guide locks
+		signals.lock = guideLocked ? 1.0f : 0.9f * idMath::ClampFloat( 0.0f, 1.0f,
+			(float)( gameLocal.time - guideStartTime ) / (float)Max( 1, guideTime ) );
+	}
+}
 
 /*
 ================

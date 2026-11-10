@@ -2537,6 +2537,21 @@ static void Cmd_TestHudOverlays_f(const idCmdArgs& args) {
 
 /*
 ==================
+Cmd_TestCrosshair_f
+
+Holds the animated crosshair in a state - a design, a charge, a reload, a lock -
+so it can be looked at and captured without a weapon in that state.
+==================
+*/
+static void Cmd_TestCrosshair_f( const idCmdArgs &args ) {
+	if ( gameLocal.GetLocalPlayer() == NULL || !gameLocal.CheatsOk() ) {
+		return;
+	}
+	rvAnimatedCrosshair::Test( args );
+}
+
+/*
+==================
 Cmd_WeaponSplat_f
 ==================
 */
@@ -4239,6 +4254,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "testClassicLight",	Cmd_TestClassicLight_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"raises the classic dynamic lights in front of the player" );
 	cmdSystem->AddCommand( "testDeath",				Cmd_TestDeath_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"tests death" );
 	cmdSystem->AddCommand( "testHitMarker",		Cmd_TestHitMarker_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"tests the crosshair hit marker" );
+	cmdSystem->AddCommand( "testCrosshair",		Cmd_TestCrosshair_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"holds the animated crosshair in a state" );
 	cmdSystem->AddCommand("testHudOverlays",Cmd_TestHudOverlays_f,CMD_FL_GAME|CMD_FL_CHEAT,"stages damage numbers, hit feedback and one network graph sample without input");
 	cmdSystem->AddCommand( "testSave",				Cmd_TestSave_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"writes out a test savegame" );
 	cmdSystem->AddCommand( "testModel",				idTestModel::TestModel_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"tests a model", idTestModel::ArgCompletion_TestModel );

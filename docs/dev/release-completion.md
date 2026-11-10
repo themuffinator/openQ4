@@ -6,6 +6,47 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Animated crosshairs for the new interface, 10 November 2026
+
+- **Each weapon's crosshair now answers the weapon.** A new option,
+  `Settings -> Game Options -> HUD -> Animated Crosshair`
+  (`hud_crosshairAnimated`, off by default), draws the original Quake 4
+  crosshair designs live. Every design assembles as the weapon comes up, kicks
+  with each shot, dims and shows the reload while you can't fire, and folds
+  away for the use hand and the other context cursors.
+- **Each design shows its own weapon's state.** The blaster's arcs wind shut
+  into a ring as it charges, the hyperblaster's turn with its barrels, the
+  machinegun's ticks walk out under sustained fire, the shotgun's ring is
+  thrown wide and its reload counts the shells back in, the rocket launcher's
+  halo sweeps round until the next rocket is ready, the railgun's bars come
+  home as it recharges, the nailgun's brackets close with the drum and clamp
+  on a seeker lock, the lightning gun's darts are drawn in by the beam, and
+  the dark matter gun's quarters draw tight as its core charges.
+- **Hit feedback sits inside the crosshair.** With the hit marker on, its marks
+  dock into the clear space of the design in hand instead of being laid over
+  it, with the same sizes, colors and timing; the lightning gun's darts are the
+  marks. Every hit also squeezes and tints the design, and a kill sends a thin
+  ring out from its edge. This works with the hit marker off too.
+- **Vehicle guns are covered.** The gun of your seat gets the same treatment,
+  a cannon shows its recharge as a measured sweep, and hits you land from a
+  vehicle now show on its crosshair.
+- **Requirements and limits.** New interface only (`ui_retained 1`, the
+  default); the classic interface keeps the still crosshair. It follows the
+  crosshair size and color settings, a chosen custom crosshair, Reduced
+  Flashing and reduced motion. The Awakening's space cannon keeps its own
+  lock-on reticule.
+- **Validation.** Captured headless from the debug build at 1920x1080 on
+  OpenGL: all twelve designs through deploy, shot, cycle, hit, kill, reload,
+  empty, charge and lock; the ten campaign weapons fired through the game's
+  own test input; the hover tank's cannon and machinegun on `game/convoy1`;
+  the context-cursor handoff, the option toggled in play and from the retained
+  menu, the scoped machinegun, sizes 16 and 48, a tinted color, reduced motion
+  and the classic interface. `crosshair_cvar_refresh_contract.py` pins the
+  wiring in both game trees. The multiplayer module, which shares the
+  single-player implementation, was captured on a listen server with bots:
+  the weapon in hand, hits, kills and held states. Weapons fired under a
+  remote client's prediction were not exercised.
+
 ## Graphics presets that cover the whole range of hardware, 10 November 2026
 
 - **A new Low preset for PCs at the minimum requirements.** Low keeps the

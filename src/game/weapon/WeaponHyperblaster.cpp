@@ -27,6 +27,7 @@ protected:
 
 	void					SpinUp				( void );
 	void					SpinDown			( void );
+	virtual void			GetCrosshairDetail	( crosshairSignals_t &signals ) const;
 
 private:
 
@@ -39,6 +40,17 @@ private:
 
 CLASS_DECLARATION( rvWeapon, rvWeaponHyperblaster )
 END_CLASS
+
+/*
+================
+rvWeaponHyperblaster::GetCrosshairDetail
+
+openQ4: see rvWeapon::GetCrosshairSignals
+================
+*/
+void rvWeaponHyperblaster::GetCrosshairDetail( crosshairSignals_t &signals ) const {
+	signals.spin = spinning ? 1.0f : 0.0f;
+}
 
 /*
 ================

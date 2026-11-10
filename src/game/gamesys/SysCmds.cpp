@@ -3749,6 +3749,21 @@ static void Cmd_TestHitMarker_f( const idCmdArgs &args ) {
 
 /*
 ==================
+Cmd_TestCrosshair_f
+
+Holds the animated crosshair in a state - a design, a charge, a reload, a lock -
+so it can be looked at and captured without a weapon in that state.
+==================
+*/
+static void Cmd_TestCrosshair_f( const idCmdArgs &args ) {
+	if ( gameLocal.GetLocalPlayer() == NULL || !gameLocal.CheatsOk() ) {
+		return;
+	}
+	rvAnimatedCrosshair::Test( args );
+}
+
+/*
+==================
 Cmd_WeaponSplat_f
 ==================
 */
@@ -4815,6 +4830,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "testClassicLight",	Cmd_TestClassicLight_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"raises the classic dynamic lights in front of the player" );
 	cmdSystem->AddCommand( "testDeath",				Cmd_TestDeath_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"tests death" );
 	cmdSystem->AddCommand( "testHitMarker",		Cmd_TestHitMarker_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"tests the crosshair hit marker" );
+	cmdSystem->AddCommand( "testCrosshair",		Cmd_TestCrosshair_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"holds the animated crosshair in a state" );
 	cmdSystem->AddCommand( "testHitMaterials", Cmd_TestHitMaterials_f, CMD_FL_GAME|CMD_FL_CHEAT, "sample a posed entity's material types and hitscan effects", idGameLocal::ArgCompletion_EntityName );
 	cmdSystem->AddCommand( "testWeaponScope", Cmd_TestWeaponScope_f, CMD_FL_GAME|CMD_FL_CHEAT, "report the current scope and optionally set its zoom state", idCmdSystem::ArgCompletion_Boolean );
 	cmdSystem->AddCommand( "testSave",				Cmd_TestSave_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"writes out a test savegame" );
