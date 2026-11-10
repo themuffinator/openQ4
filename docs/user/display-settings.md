@@ -206,7 +206,7 @@ seta image_filter GL_NEAREST_MIPMAP_NEAREST
 
 Nearest-texel modes automatically avoid anisotropic filtering so
 `image_anisotropy` cannot blur the requested pixel edges. The same values work
-with the supported OpenGL renderer and the experimental Vulkan renderer.
+with the OpenGL and Vulkan renderers.
 
 ## Renderer Backend (automatic selection; Vulkan stable on Windows)
 
@@ -235,6 +235,8 @@ checks on every push. The differences under
 [What Vulkan does not do yet](#what-vulkan-does-not-do-yet) remain, and OpenGL
 remains available on desktop systems. Existing explicit OpenGL choices stay on
 OpenGL; changing the default does not extend physical platform qualification.
+While [VR](vr.md) is on, Automatic uses OpenGL; set `r_renderApi vulkan` to
+play VR on Vulkan.
 
 | Setting | Default | What it does |
 |---|---:|---|
@@ -297,7 +299,6 @@ Notes:
   decals, so the setting changes nothing there. (PBR materials are not on this
   list: both renderers draw them by the same rules; see
   [PBR materials](pbr-materials.md).)
-- **VR.** The [OpenXR VR mode](vr.md) needs the OpenGL renderer.
 - **Pixel readbacks in the debug views.** A Vulkan frame cannot stop halfway
   to read pixels back, so the overdraw averages that `r_showLightCount 3` and
   `r_showShadowCount 2` to `4` print arrive a frame or two late, and

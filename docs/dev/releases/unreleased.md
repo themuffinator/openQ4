@@ -348,10 +348,10 @@ See [release status](../../user/release-status.md) and the
   stable alternative to OpenGL on Windows instead of an experiment: it draws
   the stock campaign and multiplayer with OpenGL's effects, recovers on its own from graphics driver
   resets, and has been tested on NVIDIA and Intel graphics across every stock
-  single-player map and 20 multiplayer maps. Set `r_renderApi vulkan` and
-  restart to use it; OpenGL remains the default, and Vulkan stays experimental
-  on Linux and macOS. See
-  [Renderer Backend](../../user/display-settings.md#renderer-backend-opengl-default-vulkan-stable-on-windows).
+  single-player map and 20 multiplayer maps. Saved OpenGL choices stay, and
+  new desktop installs start on it through Automatic, with OpenGL as the
+  fallback. Vulkan stays experimental on Linux and macOS. See
+  [Renderer Backend](../../user/display-settings.md#renderer-backend-automatic-selection-vulkan-stable-on-windows).
 - **Cleaner outdoor shadows.** Shadow mapping removes repeating terrain lines in Sandstorm and restores terrain brightness and debris shadows in Air Defense 1's opening, on OpenGL and Vulkan. Keep cascaded shadow maps enabled for distant outdoor lighting.
 - Railings and other objects first seen at a distance now regain their mapped shadows as you approach, fixing missing entrance shadows in Air Defense 1.
 - **Shadow maps come on with the top presets.** Choosing **Quality** or **Ultra** in Settings > System now turns shadow maps on. Shadows from projected lights, such as the flashlight, stay sharp where an object touches a surface and soften with distance. Lower presets keep Quake 4's original shadows.
@@ -739,7 +739,7 @@ See [release status](../../user/release-status.md) and the
   focus; partly transparent controls and drags started in visible regions remain
   usable.
 
-- Improved experimental Vulkan startup on systems with multiple GPUs: automatic
+- Improved Vulkan startup on systems with multiple GPUs: automatic
   selection now skips adapters missing required rendering or presentation
   capabilities. The preliminary startup check handles changing device lists
   and preserves explicit GPU choices when the chosen adapter is unavailable.
@@ -757,9 +757,9 @@ See [release status](../../user/release-status.md) and the
   diagnosing stutters. Performance qualification remains in progress.
 - Storage1 performance tests now distinguish the opening sequence from a
   settled gameplay view, helping avoid misleading renderer comparisons.
-- Improved point-light shadow-edge consistency in experimental Vulkan at
+- Improved point-light shadow-edge consistency in Vulkan at
   native rendering resolution. Broader shadow compatibility remains in testing.
-- Experimental Vulkan can now render an initial subset of custom GLSL material
+- Vulkan can now render an initial subset of custom GLSL material
   effects, including texture sampling, material colors, vertex movement and
   per-light effects with stencil shadows. Supported effects can also override
   stock shader names. Broader shader compatibility and complete rendering
@@ -944,7 +944,7 @@ See [release status](../../user/release-status.md) and the
   alpha cutoff is exactly 1.0. Image reloads and video restarts preserve the fix.
 - Reduced Vulkan PBR cutout edge differences by correcting offscreen framebuffer
   orientation through depth sampling and presentation. Some filtered edges and
-  baked-lighting comparisons still differ; Vulkan remains experimental.
+  baked-lighting comparisons still differ.
 - Fixed a bright edge artifact in Vulkan PBR previews at 125% resolution with
   8x MSAA, without changing the scene's intended brightness.
 - Experimental Vulkan PBR now supports filtered environment reflections and diffuse lighting, including on see-through materials when direct lights are off. Authored reflection probes have passed local LDR checks with and without MSAA, and the default light-grid setting now preserves environment lighting on maps without baked grids. Broader material and hardware qualification remain in progress. Vulkan remains opt-in.
@@ -972,7 +972,7 @@ See [release status](../../user/release-status.md) and the
 - Added complete German translations for bundled menu and gameplay text, with umlauts and sharp s supported by the existing fonts.
 - Changing language now refreshes cached menu labels immediately and keeps the menu visible.
 - The language you choose in Settings is kept when your game data comes from a GOG installer. Extracted GOG data can include a `q4base/autoexec.cfg` that switched the game back to French at every launch; it now sets only the first launch's language. Thanks to tomkidd for finding the cause.
-- Improved experimental Vulkan render-target compatibility: cube faces, depth-only targets and multiple color buffers now render and capture correctly, including resizing and multisample resolves. Heavy render-target resizing also avoids releasing images before the GPU has finished with them. Vulkan remains an opt-in renderer while broader compatibility and hardware qualification continue.
+- Improved Vulkan render-target compatibility: cube faces, depth-only targets and multiple color buffers now render and capture correctly, including resizing and multisample resolves. Heavy render-target resizing also avoids releasing images before the GPU has finished with them.
 - If Vulkan cannot create its window, surface, swapchain or startup resources, openQ4 now continues with OpenGL in the same launch. Your Vulkan preference is kept for the next launch, and the log retains the recovery reason.
 - Looping effect sounds, such as crackling electrical arcs, no longer play an extra copy each time you load a saved game.
 - Bullet impacts, ricochets and explosions play their full range of sounds again, as in the original game, instead of repeating the same one every time. Thanks to Emile Belanger for finding this.

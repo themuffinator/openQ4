@@ -97,7 +97,7 @@ static bool rm_selectionReloadPending = false;
 
 static rendererModuleApi_t RM_AutomaticApi(bool vrRequested) {
 #if defined(OPENQ4_OPENXR) && !defined(__ANDROID__)
-	// The implemented PC OpenXR graphics binding requires desktop OpenGL.
+	// Automatic keeps VR on OpenGL; Vulkan VR is an explicit r_renderApi choice.
 	if (vrRequested) return RENDER_MODULE_API_GL;
 #else
 	(void)vrRequested;
