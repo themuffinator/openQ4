@@ -155,8 +155,9 @@ int main(){
  Check(!Common_AutoDetectPerformancePresetCommand({{"autoDetectPerformancePreset","extra"}},true)&&cvars.calls.empty(),"auto extra arguments refused");
  for(int spec=0;spec<4;++spec){
   Seed();com_machineSpec.value=std::to_string(spec);Com_ExecMachineSpec_f({{"execMachineSpec"}});
-  const char* names[]={"lowpower","performance","balanced","ultra"};
+  const char* names[]={"low","performance","balanced","ultra"};
   Check(cvars.calls.size()==55&&cvars.vars.at("com_performancePreset").value==names[spec],"actual compatibility command uses complete canonical expansion only");
+  Check(cvars.vars.at("r_shadows").value=="1","every stock quality choice keeps the original shadows");
  }
  for(const char* spec:{"-1","4","2147483647"}){
   Seed();com_machineSpec.value=spec;Com_ExecMachineSpec_f({{"execMachineSpec"}});Check(cvars.calls.empty(),"unset or invalid stock spec is nondestructive");
@@ -286,7 +287,7 @@ def programs():
  menu=source('src/framework/Session_menu.cpp')
  video=menu[menu.index('if ( !idStr::Icmp( cmd, "video" ) )'):]
  video=video[:video.index('if ( idStr::Icmp( vcmd, "restart" )')]
- for command in ('applyPerformancePreset lowpower','applyPerformancePreset performance','applyPerformancePreset balanced','applyPerformancePreset ultra','autoDetectPerformancePreset'):
+ for command in ('applyPerformancePreset low\\n','applyPerformancePreset performance','applyPerformancePreset balanced','applyPerformancePreset ultra','autoDetectPerformancePreset'):
   assert command in video, 'stock video choices must route through shared profiles'
  assert 'oldSpec' not in video and 'execMachineSpec' not in video and 'setMachineSpec' not in video
  assert init.index('Common_BootstrapStartupPerformancePreset( startupPresetBootstrap )',init.index('exec openq4_defaults.cfg'))<init.index('Common_BuildPlatformProfileConfigName(')
@@ -381,7 +382,14 @@ def main():
    mutations=[
     ('lattice-profile','native','src/framework/PerformancePreset.cpp','85, 0, 1, 60,','86, 0, 1, 60,'),
     ('detection-boundary','native','src/framework/PerformancePreset.cpp','ram>0&&ram<=4096','ram>0&&ram<4096'),
-    ('classic-uma-demotion','native','src/framework/PerformancePreset.cpp','tier=3;result.reason=Reason::Shared;','tier=signals.modernEffects?3:2;result.reason=Reason::Shared;'),
+    ('classic-uma-demotion','native','src/framework/PerformancePreset.cpp','tier=Balanced;result.reason=Reason::Shared;','tier=signals.modernEffects?Balanced:Performance;result.reason=Reason::Shared;'),
+    ('shadowless-floor','native','src/framework/PerformancePreset.cpp','{"r_shadows",preset.shadows}','{"r_shadows",1}'),
+    ('phone-keeps-shadows','native','src/framework/PerformancePreset.cpp','tier=signals.mobile?LowPower:Low;','tier=Low;'),
+    ('top-tier-without-cpu','native','src/framework/PerformancePreset.cpp','if(signals.logicalCpus>=8&&signals.logicalCpus<=4096){','if(true){'),
+    ('capacity-class','native','src/framework/PerformancePreset.cpp','else if(vram>=PerformancePresetVram12GiB)tier=Quality;','else if(vram>=PerformancePresetVram8GiB)tier=Quality;'),
+    ('resolution-step','native','src/framework/PerformancePreset.cpp','ceiling=Balanced+capacity;','ceiling=Ultra;'),
+    ('power-cap-ignored','native','src/framework/PerformancePreset.cpp','if(!powerLimited||signals.displayRefreshHz<result.maxFps)','if(true)'),
+    ('phone-scene-budget','native','src/framework/PerformancePreset.cpp','if(ram<PerformancePresetMobileFlagshipRamMB)budget','if(false)budget'),
     ('fixed-specular','native','src/framework/PerformancePreset.cpp','{"image_downSizeSpecularLimit",64}','{"image_downSizeSpecularLimit",63}'),
     ('omit-edit','native','src/ui/application/SettingsTransaction.cpp','candidate[key]=value;','candidate[key]=declaration->second;'),
     ('merged-validation','native','src/ui/application/SettingsTransaction.cpp','if(!ValidateDraft(candidate,error))return false;','if(false)return false;'),
@@ -390,7 +398,7 @@ def main():
     ('wrong-owner','native','src/ui/application/SettingsTransaction.cpp','if (requestedOwner != owner) return Result','if (false) return Result'),
     ('host-extra-key','host',None,'candidate.size()!=openq4::PerformancePresetTargetCount','(candidate["r_brightness"]=1.0,candidate.size()!=openq4::PerformancePresetTargetCount+1)'),
     ('host-detection-ignored','host',None,'return BuildPerformancePresetPatch(resolved,patch,error);','return BuildPreset(detection.preset->name,patch,error);'),
-    ('scene-budget-ignored','native','src/framework/PerformancePreset.cpp','if(pixels*scale*scale<=1LL*budget*10000||scale==10)','if(true)'),
+    ('scene-budget-ignored','native','src/framework/PerformancePreset.cpp','if(pixels*scale*scale<=budget*10000||scale==10)','if(true)'),
     ('unsupported-aa-enabled','native','src/framework/PerformancePreset.cpp','(signals.postAAAvailable||signals.modernEffects)?result.preset->postAA:0','result.preset->postAA'),
     ('common-detection-ignored','common','src/framework/PerformancePreset.cpp','output=resolved;return true;','output=*detection.preset;return true;'),
     ('marker-on-failure','common',None,'if ( applied ) {','if ( true ) {'),

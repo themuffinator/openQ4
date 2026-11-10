@@ -28,7 +28,7 @@ These requirements are practical guidance for the current beta packages. openQ4 
 | Assets | Official retail Quake 4 `q4base/` PK4 files from Steam or GOG | The same assets left unmodified so default validation can confirm them cleanly |
 | Input and audio | Keyboard/mouse and a working audio output | Controller optional; Steam Deck controls use the Deck profile; broadband network recommended for online multiplayer |
 
-Use the `Settings -> System` Performance Preset dropdown or its adjacent Auto-Detect button after first launch if you are unsure where to start. The console command is `autoDetectPerformancePreset`. Systems near the minimum should use `minimum`, `lowpower`, or `performance` before enabling expensive options such as high MSAA, high resolution scale, shadow maps, or heavier post-processing.
+Use the `Settings -> System` Performance Preset dropdown or its adjacent Auto-Detect button after first launch if you are unsure where to start. The console command is `autoDetectPerformancePreset`. Auto-Detect places a system at these minimum requirements on `low`, which keeps the original shadows at a reduced scene size. Systems below them should use `lowpower` or `minimum`, which draw no shadows, and systems a little above them `performance`, before enabling expensive options such as high MSAA, high resolution scale, shadow maps, or heavier post-processing.
 
 ## Recommended Install Flow
 

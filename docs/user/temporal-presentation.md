@@ -12,7 +12,7 @@ back to your screen far more cleanly than a plain stretch.
 when the 3D scene renders below your screen's resolution, either because
 `r_screenFraction` is below `100` or because dynamic resolution is on. At
 native resolution it stays off, and your MSAA and SMAA settings apply as
-before. The **Performance**, **Low Power** and **Minimum** presets render below
+before. The **Performance**, **Low**, **Low Power** and **Minimum** presets render below
 native resolution, so they now get temporal upscaling.
 
 Automatic mode leaves the `0` (cropped) and `3` (nearest-neighbour) scale modes

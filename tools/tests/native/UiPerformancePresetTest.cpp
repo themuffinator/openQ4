@@ -49,16 +49,18 @@ static void Profiles(){
  const std::vector<std::string> keys={"com_machineSpec","r_rendererBenchmarkPreset","r_screenFraction","r_multiSamples","r_postAA","com_maxfps","image_anisotropy","image_usePrecompressedTextures","image_downSize","image_downSizeLimit","image_downSizeSpecular","image_downSizeBump","image_downSizeSpecularLimit","image_downSizeBumpLimit","image_ignoreHighQuality","image_writeGeneratedImages","s_maxSoundsPerShader","r_useShadowMap","r_shadowMapSize","r_shadowMapMaxUpdatesPerView","r_bloom","r_ssao","r_hdrToneMap","r_motionBlur","r_crt","r_useLightGrid","r_rendererUploadMegs","r_rendererUploadFrameBuffers","s_numberOfSpeakers","s_useEAXReverb","s_maxEmitterChannels","r_shadowMapPointSize","r_shadowMapFilterTaps","r_shadowMapPointFilterTaps","r_shadowMapFilterMode","r_shadowMapPointFilterMode","r_shadowMapAtlasSize","r_ssaoSamples","r_bloomMipCount","r_motionBlurSamples","r_shadowMapPointLights","r_hdrSceneTarget","r_shadows","r_skipBump","r_skipSpecular","r_skipSky","image_picmip","r_shadowMapCSM","r_shadowMapCascadeCount","r_shadowMapProjectedCSM","r_shadowMapCascadeStabilize","r_motionBlurObjectVectors","r_shadowMapHashedAlpha","r_shadowMapTranslucentReceivers","com_performancePreset"};
  // Independent golden setter values for the revised quality progression.
  const std::vector<std::vector<int>> numbers={
- {0,50,0,0,30,1,1,1,512,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,24,512,1,1,0,0,2048,4,1,4,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
- {0,75,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
+ {0,50,0,0,30,1,1,1,512,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,24,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
+ {0,75,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
+ {0,75,0,0,60,2,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {1,85,0,1,60,2,1,0,0,0,0,64,0,0,1,0,0,1024,2,0,0,0,0,0,1,16,4,0,1,40,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {2,100,2,1,120,4,1,0,0,0,0,64,0,0,1,0,0,1024,0,0,0,0,0,0,1,16,4,0,1,48,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {2,100,0,2,144,16,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,0,1,1,0,0,0,0,0,4,1,1,1,1,1},
  {3,100,2,2,144,16,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,512,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
  {3,100,4,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,0,0,1,32,4,0,1,48,512,13,9,2,0,8192,32,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
  {3,100,16,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,2048,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1}};
- const char* names[]={"minimum","lowpower","performance","balanced","enhanced","quality","ultra","maximum"};
- const char* renderer[]={"low","low","baseline","baseline","modern","modern","high-end","high-end"};
+ const char* names[]={"minimum","lowpower","low","performance","balanced","enhanced","quality","ultra","maximum"};
+ const char* renderer[]={"low","low","low","baseline","baseline","modern","modern","high-end","high-end"};
+ Check(PerformancePresetCount==9&&numbers.size()==9,"nine profiles");
  std::set<std::string> targets;for(const auto* key:PerformancePresetTargets())targets.insert(key);
  Check(targets.size()==55,"exact unique target count");
  for(int n=0;n<PerformancePresetCount;++n){
@@ -79,7 +81,7 @@ static void Profiles(){
  auto saved=output;auto invalid=PerformancePresets()[1];invalid.name=nullptr;
  Check(!ExpandPerformancePreset(invalid,output,error),"invalid source name");
  for(size_t i=0;i<output.size();++i)Check(output[i].key==saved[i].key && output[i].value==saved[i].value,"failed expansion unchanged");
- auto normalization=PerformancePresets()[2];normalization.anisotropy=17;
+ auto normalization=*FindPerformancePreset("performance");normalization.anisotropy=17;
  Check(ExpandPerformancePreset(normalization,output,error)&&std::get<int>(output[6].value)==17,"legacy normalization probe reaches setter unchanged");
 }
 static void Detection(){
@@ -98,23 +100,46 @@ static void Detection(){
  s=desktop;s.gpuClass=GPU::Integrated;s.videoRamMB=128;expect(s,"balanced");
  s.arm64=true;expect(s,"balanced"); // Apple Silicon is not penalized for ISA/UMA.
  s.modernEffects=false;expect(s,"balanced"); // Apple GL 2.1 still runs classic quality.
+ s.drawableWidth=1920;s.drawableHeight=1200;expect(s,"balanced"); // A 16:10 panel is the 1080p class.
+ s.drawableWidth=2256;s.drawableHeight=1504;expect(s,"performance");
  s.drawableWidth=2560;s.drawableHeight=1600;expect(s,"performance");
  s=desktop;s.gpuClass=GPU::Unknown;expect(s,"performance");
  s.gpuClass=GPU::Virtual;expect(s,"performance");
  s.gpuClass=GPU::Software;s.steamDeck=true;expect(s,"minimum");
  s=desktop;s.legacyRenderer=true;s.explicitLowPower=true;expect(s,"minimum");
  s=desktop;s.explicitLowPower=true;expect(s,"lowpower");
- s=desktop;s.raspberryPi=true;expect(s,"lowpower");s.systemRamMB=2048;expect(s,"minimum");
+ s=desktop;s.raspberryPi=true;expect(s,"lowpower");s.systemRamMB=4096;expect(s,"lowpower");s.systemRamMB=2048;expect(s,"minimum");
  s=desktop;s.steamDeck=true;expect(s,"performance");
  s.videoRamMB=512;expect(s,"minimum");s.explicitLowPower=true;expect(s,"minimum");
  s=desktop;s.videoRamMB=512;s.raspberryPi=true;expect(s,"minimum");
- s=desktop;s.systemRamMB=4096;s.steamDeck=true;expect(s,"lowpower");
+ // The documented minimum PC keeps its stencil shadows; a phone that small does not.
+ s=desktop;s.systemRamMB=4096;expect(s,"low");s.steamDeck=true;expect(s,"low");
+ s=desktop;s.videoRamMB=1024;expect(s,"low");s.explicitLowPower=true;expect(s,"lowpower");
  s=desktop;s.mobile=true;expect(s,"performance");
  s.gpuClass=GPU::Integrated;expect(s,"performance");
  s.systemRamMB=4096;expect(s,"lowpower");s.systemRamMB=2048;expect(s,"minimum");
  s=desktop;s.modernEffects=false;expect(s,"balanced");
- for(const auto& [ram,name]:std::vector<std::pair<int,const char*>>{{0,"performance"},{2048,"minimum"},{2049,"lowpower"},{4096,"lowpower"},{4097,"performance"},{8191,"performance"},{8192,"balanced"},{15359,"balanced"},{15360,"enhanced"},{16383,"enhanced"},{16384,"enhanced"},{4194305,"performance"}}){s=desktop;s.systemRamMB=ram;expect(s,name);}
- for(const auto& [vram,name]:std::vector<std::pair<int,const char*>>{{-1,"performance"},{0,"performance"},{1,"minimum"},{512,"minimum"},{513,"lowpower"},{1024,"lowpower"},{1025,"performance"},{2048,"performance"},{2049,"balanced"},{7679,"balanced"},{7680,"enhanced"},{8188,"enhanced"},{8191,"enhanced"},{8192,"enhanced"},{262144,"enhanced"},{262145,"performance"}}){s=desktop;s.videoRamMB=vram;expect(s,name);}
+ for(const auto& [ram,name]:std::vector<std::pair<int,const char*>>{{0,"performance"},{2048,"minimum"},{2049,"low"},{4096,"low"},{4097,"performance"},{8191,"performance"},{8192,"balanced"},{15359,"balanced"},{15360,"enhanced"},{16383,"enhanced"},{16384,"enhanced"},{4194305,"performance"}}){s=desktop;s.systemRamMB=ram;expect(s,name);}
+ for(const auto& [vram,name]:std::vector<std::pair<int,const char*>>{{-1,"performance"},{0,"performance"},{1,"minimum"},{512,"minimum"},{513,"low"},{1024,"low"},{1025,"performance"},{2048,"performance"},{2049,"balanced"},{7679,"balanced"},{7680,"enhanced"},{8188,"enhanced"},{8191,"enhanced"},{8192,"enhanced"},{11519,"enhanced"},{11520,"quality"},{12288,"quality"},{15359,"quality"},{15360,"ultra"},{16384,"ultra"},{32768,"ultra"},{262144,"ultra"},{262145,"performance"}}){s=desktop;s.videoRamMB=vram;expect(s,name);}
+ // High-end cards: each capacity class takes the tier above, and each
+ // resolution class above 1440p costs one. 24 GiB carries Ultra through 4K.
+ struct Size{int width,height;};
+ const Size p1080{1920,1080},p1440{2560,1440},wide{3440,1440},p2160{3840,2160},p2880{5120,2880},p4320{7680,4320};
+ const auto at=[&](int vram,Size size,const char* name){auto h=desktop;h.videoRamMB=vram;h.drawableWidth=size.width;h.drawableHeight=size.height;expect(h,name);};
+ at(8192,p1440,"enhanced");at(8192,wide,"balanced");at(8192,p2160,"balanced");at(8192,p2880,"performance");
+ at(12288,p1080,"quality");at(12288,p1440,"quality");at(12288,wide,"enhanced");at(12288,p2160,"enhanced");at(12288,p2880,"balanced");at(12288,p4320,"balanced");
+ at(16384,p1080,"ultra");at(16384,p1440,"ultra");at(16384,wide,"quality");at(16384,p2160,"quality");at(16384,p2880,"enhanced");at(16384,p4320,"enhanced");
+ at(24576,p1440,"ultra");at(24576,p2160,"ultra");at(24576,p2880,"quality");at(32768,p2160,"ultra");at(32768,p4320,"quality");
+ at(8192,{2560,1600},"enhanced");at(16384,{2560,1600},"ultra");at(16384,{3840,2400},"quality");
+ // Memory alone never reaches the shadow-mapped tiers: they need system RAM,
+ // the modern effects and, above Enhanced, eight CPU threads.
+ s=desktop;s.videoRamMB=24576;s.logicalCpus=6;expect(s,"enhanced");s.logicalCpus=7;expect(s,"enhanced");s.logicalCpus=8;expect(s,"ultra");
+ s.logicalCpus=3;expect(s,"performance");s.logicalCpus=4097;expect(s,"performance");
+ s=desktop;s.videoRamMB=24576;s.systemRamMB=15359;expect(s,"balanced");s.systemRamMB=15360;expect(s,"ultra");
+ s=desktop;s.videoRamMB=24576;s.modernEffects=false;expect(s,"balanced");
+ s=desktop;s.videoRamMB=24576;s.gpuClass=GPU::Integrated;expect(s,"balanced"); // Shared memory is never a VRAM class.
+ s.gpuClass=GPU::Unknown;expect(s,"performance");
+ s=desktop;s.videoRamMB=24576;s.steamDeck=true;expect(s,"performance");
  for(const auto& [name,type]:std::vector<std::pair<const char*,GPU>>{
   {"NVIDIA GeForce RTX 4060 Laptop GPU",GPU::Discrete},{"AMD Radeon RX 6800",GPU::Discrete},
   {"ANGLE (Intel, Intel(R) Iris(R) Xe Graphics, D3D11)",GPU::Integrated},
@@ -126,18 +151,38 @@ static void Detection(){
   {"Adreno (TM) 740",GPU::Integrated},{"V3D 7.1",GPU::Integrated},
   {"llvmpipe (LLVM 19)",GPU::Software},{"SwiftShader Device",GPU::Software},
   {"SVGA3D; build",GPU::Virtual},{"virgl",GPU::Virtual},{"Future Unknown GPU",GPU::Unknown},
+  // Trademark marks and spacing vary by driver and must not change the class.
+  {"AMD Radeon(TM) 780M",GPU::Integrated},{"AMD Radeon(TM) 8060S Graphics",GPU::Integrated},
+  {"Radeon (TM) RX 480 Graphics",GPU::Discrete},{"AMD Radeon(TM) RX 6600 XT",GPU::Discrete},
+  {"Mesa Intel(R) Xe Graphics (TGL GT2)",GPU::Integrated},{"Intel(R) UHD Graphics 620",GPU::Integrated},
+  {"Mesa Intel(R) Graphics (RPL-P)",GPU::Integrated},{"Mesa Intel(R) Arc(tm) A770 Graphics (DG2)",GPU::Discrete},
+  {"Intel(R) Arc(TM) 140V GPU (16GB)",GPU::Integrated},{"Intel(R) Arc(TM) B390 GPU",GPU::Integrated},
+  {"Intel(R) Arc(TM) B580 Graphics",GPU::Discrete},{"NVIDIA TITAN RTX/PCIe/SSE2",GPU::Discrete},
+  {"Mali-G925-Immortalis MC12",GPU::Integrated},{"Immortalis-G720",GPU::Integrated},
+  {"ANGLE (Samsung Xclipse 940) on Vulkan 1.3",GPU::Integrated},{"Adreno (TM) 830",GPU::Integrated},
+  {"AMD Custom GPU 0405 (radeonsi, vangogh, LLVM 17.0.6)",GPU::Integrated},
+  {"D3D12 (Microsoft Basic Render Driver)",GPU::Software},
   {"",GPU::Unknown}})Check(RendererClassifyGLDevice(name)==type,"active GL driver classification");
+ Check(RendererClassifyGLDevice(std::string(4096,'x')+" GeForce")==GPU::Unknown,"an overlong name is bounded, not overrun");
  // Memory cannot override hardware/power constraints, and ISA never ranks a GPU.
  for(int flags=0;flags<64;++flags)for(auto gpu:{GPU::Unknown,GPU::Integrated,GPU::Discrete,GPU::Virtual,GPU::Software})
- for(int ram:{-1,0,2048,4096,8192,16384,4194305})for(int vram:{-1,0,512,1024,2048,8192,262145}){
+ for(int ram:{-1,0,2048,4096,8192,16384,4194305})for(int vram:{-1,0,512,1024,2048,8192,12288,16384,32768,262145}){
   s=desktop;s.explicitLowPower=flags&1;s.raspberryPi=flags&2;s.steamDeck=flags&4;s.legacyRenderer=flags&8;s.arm64=flags&16;s.mobile=flags&32;
   s.gpuClass=gpu;s.systemRamMB=ram;s.videoRamMB=vram;const auto result=DetectPerformancePreset(s);
-  Check(result.preset>=&PerformancePresets()[0]&&result.preset<=&PerformancePresets()[4],"auto never selects unmeasured top tiers");
+  Check(result.preset>=&PerformancePresets()[0]&&result.preset<FindPerformancePreset("maximum"),"auto never selects Maximum, which has no frame-rate target");
+  if(gpu!=GPU::Discrete||vram<PerformancePresetVram12GiB||vram>262144)Check(result.preset<=FindPerformancePreset("enhanced"),"only a verified 12 GiB class card passes Enhanced");
   s.arm64=!s.arm64;Check(DetectPerformancePreset(s).preset==result.preset,"CPU ISA cannot rank graphics");
   if(gpu==GPU::Software||s.legacyRenderer)Check(result.preset==FindPerformancePreset("minimum"),"capability limits dominate environment hints");
   if(gpu==GPU::Discrete&&vram>0&&vram<=512)Check(result.preset==FindPerformancePreset("minimum"),"dedicated memory limits dominate all power hints");
-  if(s.mobile)Check(result.preset<=FindPerformancePreset("performance"),"mobile power ceiling across hardware combinations");
+  if(s.mobile)Check(result.preset<=FindPerformancePreset("performance")&&result.preset!=FindPerformancePreset("low"),"mobile power ceiling across hardware combinations");
+  if(s.steamDeck)Check(result.preset<=FindPerformancePreset("performance"),"Deck power ceiling across hardware combinations");
+  if(s.explicitLowPower||s.raspberryPi)Check(result.preset<=FindPerformancePreset("lowpower"),"low-power ceiling across hardware combinations");
   Check(result.systemRamMB>=0&&result.systemRamMB<=4194304&&result.videoRamMB>=0&&result.videoRamMB<=262144,"bounded telemetry");
+ }
+ // Shadows are the one feature the two lowest tiers drop, and nothing above does.
+ for(const auto& preset:PerformancePresets()){
+  const std::string name=preset.name;
+  Check(preset.shadows==(name=="minimum"||name=="lowpower"?0:1),"only Minimum and Low Power draw no shadows");
  }
 }
 static void DetectionResolution(){
@@ -151,40 +196,64 @@ static void DetectionResolution(){
   Check(std::string(resolved.name)==name&&resolved.screenFraction==scale&&resolved.postAA==aa,"independent automatic scene/AA expectation");
   Check(resolved.screenFraction<=detection.preset->screenFraction,"automatic scale never supersamples or exceeds template");
  };
+ Check(PerformancePresetClassPixels(540)==656100&&PerformancePresetClassPixels(720)==1166400&&PerformancePresetClassPixels(1080)==2624400&&
+  PerformancePresetClassPixels(1440)==4665600&&PerformancePresetClassPixels(2160)==10497600,"resolution classes");
  expect("balanced",100,1);
+ s.drawableWidth=1920;s.drawableHeight=1200;expect("balanced",100,1);
  s.drawableWidth=2560;s.drawableHeight=1440;expect("performance",75,1);
+ s.drawableWidth=2560;s.drawableHeight=1600;expect("performance",75,1);
+ s.drawableWidth=2560;s.drawableHeight=1664;expect("performance",75,1); // A 13-inch Retina panel renders 1920x1248.
+ s.drawableWidth=3024;s.drawableHeight=1964;expect("performance",50,1);
  s.drawableWidth=3840;s.drawableHeight=2160;expect("performance",50,1);
  s.drawableWidth=5120;s.drawableHeight=2880;expect("performance",25,1);
  s.drawableWidth=1920;s.drawableHeight=1080;s.modernEffects=false;expect("balanced",100,0);
  s.postAAAvailable=true;expect("balanced",100,1); // AA can exist without all modern effects.
  s.modernEffects=true;s.gpuClass=GPU::Discrete;s.videoRamMB=4096;
- s.drawableWidth=3840;s.drawableHeight=2160;expect("balanced",50,1);
+ s.drawableWidth=3840;s.drawableHeight=2160;expect("balanced",75,1); // A 1620p scene: the 1440p class.
  s.videoRamMB=8192;expect("balanced",100,1);
  s.drawableWidth=7680;s.drawableHeight=4320;expect("performance",50,1);
+ s.videoRamMB=16384;expect("enhanced",50,2);s.drawableWidth=5120;s.drawableHeight=2880;expect("enhanced",75,2);
+ s.videoRamMB=8192;
  s.drawableWidth=3840;s.drawableHeight=2160;s.steamDeck=true;expect("performance",50,1);
  s.steamDeck=false;s.raspberryPi=true;expect("lowpower",25,0);
  s.raspberryPi=false;s.gpuClass=GPU::Software;expect("minimum",25,0);
  s.gpuClass=GPU::Unknown;expect("performance",50,1);
- s.gpuClass=GPU::Integrated;s.mobile=true;expect("performance",25,1);
- s.drawableWidth=2560;s.drawableHeight=1440;expect("performance",50,1);
- s.mobile=false;
+ // The documented minimum PC on a 1080p display renders 1440x810 with shadows.
+ s.gpuClass=GPU::Discrete;s.videoRamMB=1024;s.drawableWidth=1920;s.drawableHeight=1080;expect("low",75,0);
+ s.drawableWidth=1366;s.drawableHeight=768;expect("low",75,0);s.drawableWidth=2560;s.drawableHeight=1440;expect("low",50,0);
+ s.videoRamMB=8192;s.raspberryPi=true;s.drawableWidth=1920;s.drawableHeight=1080;expect("lowpower",75,0);s.raspberryPi=false;
+ // Phones: a 12 GiB flagship keeps the 1080p class, smaller ones a 720p scene.
+ s.gpuClass=GPU::Integrated;s.mobile=true;s.systemRamMB=11400;
+ s.drawableWidth=2340;s.drawableHeight=1080;expect("performance",85,1);
+ s.drawableWidth=3120;s.drawableHeight=1440;expect("performance",75,1);
+ s.drawableWidth=3840;s.drawableHeight=2160;expect("performance",50,1);
+ s.systemRamMB=10239;s.drawableWidth=2340;s.drawableHeight=1080;expect("performance",50,1);
+ s.systemRamMB=7600;s.drawableWidth=2400;s.drawableHeight=1080;expect("performance",50,1);
+ s.drawableWidth=1600;s.drawableHeight=720;expect("performance",85,1);
+ s.drawableWidth=3840;s.drawableHeight=2160;expect("performance",25,1);
+ s.systemRamMB=3700;s.drawableWidth=1600;s.drawableHeight=720;expect("lowpower",75,0);
+ s.drawableWidth=2400;s.drawableHeight=1080;expect("lowpower",50,0);
+ s.systemRamMB=1900;expect("minimum",50,0);
+ s.mobile=false;s.systemRamMB=16384;s.videoRamMB=128;
  for(int bad:{-1,0,32769,2147483647}){
   s.drawableWidth=bad;s.drawableHeight=1080;expect("performance",85,1);
   s.drawableWidth=1920;s.drawableHeight=bad;expect("performance",85,1);
  }
  // Pixel arithmetic stays bounded, scale is monotonic and selected from the UI
  // catalog. Huge, valid drawables may exhaust the supported 10% scale floor.
- for(auto gpu:{GPU::Unknown,GPU::Integrated,GPU::Discrete,GPU::Virtual,GPU::Software}){
-  s.gpuClass=gpu;int previous=100;
+ for(auto gpu:{GPU::Unknown,GPU::Integrated,GPU::Discrete,GPU::Virtual,GPU::Software})for(int vram:{128,8192,32768})for(bool mobile:{false,true}){
+  s.gpuClass=gpu;s.videoRamMB=vram;s.mobile=mobile;int previous=100;
   for(int width:{320,640,1280,1920,2560,3840,5120,7680,16384,32768}){
    s.drawableWidth=width;s.drawableHeight=width*9/16;
    const auto d=DetectPerformancePreset(s);
    Check(d.screenFraction<=previous&&std::set<int>({10,25,50,75,85,100}).contains(d.screenFraction),"monotonic selectable automatic scale");
    const long long work=1LL*s.drawableWidth*s.drawableHeight*d.screenFraction*d.screenFraction;
    Check(d.screenFraction==10||work<=1LL*d.scenePixelBudget*10000,"scene pixel budget or supported minimum scale");
+   Check(d.scenePixelBudget>=PerformancePresetClassPixels(540)&&d.scenePixelBudget<=PerformancePresetClassPixels(2160),"budget is a known class");
    previous=d.screenFraction;
   }
  }
+ s.gpuClass=GPU::Software;s.videoRamMB=128;s.mobile=false;s.drawableWidth=32768;s.drawableHeight=18432;
  auto output=*FindPerformancePreset("ultra");PerformancePresetDetection missing;
  Check(!ResolveDetectedPerformancePreset(missing,output)&&std::string(output.name)=="ultra","failed resolution leaves output unchanged");
  auto invalid=DetectPerformancePreset(s);invalid.screenFraction=201;
@@ -203,9 +272,22 @@ static void DetectionResolution(){
   d.displayRefreshHz=240;auto bad=DetectPerformancePreset(d);bad.maxFps=1001;PerformancePreset untouched=*FindPerformancePreset("ultra");
   Check(!ResolveDetectedPerformancePreset(bad,untouched)&&untouched.maxFps==FindPerformancePreset("ultra")->maxFps,"out-of-range detected cap refused");
   Check(FindPerformancePreset("enhanced")->maxFps==tierCap,"detection leaves the manual cap immutable");
+  // A power-limited device keeps its tier's cap when the display is faster,
+  // and still follows a slower display.
+  const auto cap=[&](const PerformancePresetSignals& signals,int hz){auto copy=signals;copy.displayRefreshHz=hz;return DetectPerformancePreset(copy).maxFps;};
+  auto phone=d;phone.mobile=true;phone.gpuClass=RendererGpuClass::Integrated;
+  Check(cap(phone,120)==60&&cap(phone,90)==60&&cap(phone,60)==60&&cap(phone,48)==48&&cap(phone,0)==60,"a phone keeps Performance's 60 on a 120 Hz panel");
+  auto deck=d;deck.steamDeck=true;
+  Check(cap(deck,90)==60&&cap(deck,40)==40,"a handheld keeps its tier cap");
+  auto pi=d;pi.raspberryPi=true;
+  Check(cap(pi,60)==30&&cap(pi,30)==30&&cap(pi,0)==30,"a small board keeps Low Power's 30");
+  auto request=d;request.explicitLowPower=true;
+  Check(cap(request,144)==30,"an explicit low-power request keeps its cap");
+  auto small=d;small.systemRamMB=4096;
+  Check(cap(small,75)==75&&cap(small,0)==60,"the minimum PC follows its display");
  }
  for(int spec=0;spec<4;++spec){
-  const char* names[]={"lowpower","performance","balanced","ultra"};
+  const char* names[]={"low","performance","balanced","ultra"};
   Check(PerformancePresetForMachineSpec(spec)==FindPerformancePreset(names[spec]),"stock quality maps to canonical recipe");
  }
  for(int spec:{-2147483647,-1,4,2147483647})Check(!PerformancePresetForMachineSpec(spec),"invalid stock classification cannot apply a recipe");

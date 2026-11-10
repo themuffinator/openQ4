@@ -4922,6 +4922,58 @@
    }
   },
   {
+   "id": "tall.settings_preset-option-8.height",
+   "node": "settings_preset-option-8",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_preset-option-8-label.padding-left",
+   "node": "settings_preset-option-8-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_preset-option-8-label.font-size",
+   "node": "settings_preset-option-8-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_preset-option-8-label.line-height",
+   "node": "settings_preset-option-8-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
    "id": "tall.settings_preset-scroll-track.width",
    "node": "settings_preset-scroll-track",
    "property": "width",
@@ -36157,6 +36209,84 @@
                             }
                            }
                           ]
+                         },
+                         {
+                          "id": "settings_preset-option-8",
+                          "type": "group",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                          },
+                          "children": [
+                           {
+                            "id": "settings_preset-option-8-selected",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_preset-option-8-highlight",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_preset-option-8-label",
+                            "type": "text",
+                            "properties": {
+                             "text": {"type": "text", "value": "#str_229977"},
+                             "position": {"type": "keyword", "value": "relative"},
+                             "display": {"type": "keyword", "value": "block"},
+                             "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                             "font-family": {"type": "font", "value": "lowpixel"},
+                             "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                             "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                             "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                             "white-space": {"type": "keyword", "value": "nowrap"},
+                             "overflow": {"type": "keyword", "value": "hidden"}
+                            }
+                           }
+                          ]
                          }
                         ]
                        }
@@ -36287,7 +36417,7 @@
                      "id": "settings_preset-option-2",
                      "node": "settings_preset-option-2",
                      "label": "#str_229977",
-                     "value": "performance",
+                     "value": "low",
                      "parts": {
                       "label": "settings_preset-option-2-label",
                       "selected": "settings_preset-option-2-selected",
@@ -36299,7 +36429,7 @@
                      "id": "settings_preset-option-3",
                      "node": "settings_preset-option-3",
                      "label": "#str_229977",
-                     "value": "balanced",
+                     "value": "performance",
                      "parts": {
                       "label": "settings_preset-option-3-label",
                       "selected": "settings_preset-option-3-selected",
@@ -36311,7 +36441,7 @@
                      "id": "settings_preset-option-4",
                      "node": "settings_preset-option-4",
                      "label": "#str_229977",
-                     "value": "enhanced",
+                     "value": "balanced",
                      "parts": {
                       "label": "settings_preset-option-4-label",
                       "selected": "settings_preset-option-4-selected",
@@ -36323,7 +36453,7 @@
                      "id": "settings_preset-option-5",
                      "node": "settings_preset-option-5",
                      "label": "#str_229977",
-                     "value": "quality",
+                     "value": "enhanced",
                      "parts": {
                       "label": "settings_preset-option-5-label",
                       "selected": "settings_preset-option-5-selected",
@@ -36335,7 +36465,7 @@
                      "id": "settings_preset-option-6",
                      "node": "settings_preset-option-6",
                      "label": "#str_229977",
-                     "value": "ultra",
+                     "value": "quality",
                      "parts": {
                       "label": "settings_preset-option-6-label",
                       "selected": "settings_preset-option-6-selected",
@@ -36347,13 +36477,25 @@
                      "id": "settings_preset-option-7",
                      "node": "settings_preset-option-7",
                      "label": "#str_229977",
-                     "value": "maximum",
+                     "value": "ultra",
                      "parts": {
                       "label": "settings_preset-option-7-label",
                       "selected": "settings_preset-option-7-selected",
                       "highlight": "settings_preset-option-7-highlight"
                      },
                      "labelIndex": 7
+                    },
+                    {
+                     "id": "settings_preset-option-8",
+                     "node": "settings_preset-option-8",
+                     "label": "#str_229977",
+                     "value": "maximum",
+                     "parts": {
+                      "label": "settings_preset-option-8-label",
+                      "selected": "settings_preset-option-8-selected",
+                      "highlight": "settings_preset-option-8-highlight"
+                     },
+                     "labelIndex": 8
                     }
                    ],
                    "placementBounds": "settings-body",

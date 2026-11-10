@@ -57,13 +57,20 @@ See [release status](../../user/release-status.md) and the
   gap between Balanced and Quality with lighter modern shadows and effects.
   Auto-Detect uses the active GPU, distinguishes shared memory, and accounts for
   resolution and CPU capacity. Unknown hardware gets a conservative starting
-  point; Quality and maximum-setting Ultra remain manual choices. Reapply a
+  point. High-end cards start on Quality (12 GB) or Ultra (16 GB) at up to
+  1440p and one preset lower at 4K; Maximum remains a manual choice. Reapply a
   preset to adopt the revised values, and replace engine and renderer modules
   together.
+  A new **Low** preset suits PCs at the minimum requirements: the original
+  shadows at 60 FPS with a reduced scene size. **Minimum** and **Low Power**
+  now draw no shadows, for software renderers, small boards, low-memory phones
+  and battery saving.
   Fresh installations now use that same detector after the GPU initializes;
   existing saved settings and launch overrides are preserved. Android gets a
   conservative mobile limit, and platform hints no longer override a smaller
-  verified memory budget.
+  verified memory budget. Phones, Steam Deck and Raspberry Pi keep their
+  preset's frame cap on a faster display, and 16:10 laptop panels are treated
+  like their 16:9 siblings.
   Capable Macs using Apple's compatibility renderer are no longer forced to
   Minimum because modern post effects are unavailable. An unset legacy quality
   marker no longer resets saved graphics settings at startup.

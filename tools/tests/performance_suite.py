@@ -1528,7 +1528,7 @@ def cmd_report(args: argparse.Namespace) -> int:
 BUDGET_SCHEMA = 1
 BUDGET_TOLERANCE_MEAN = 0.05   # a candidate fails when its warm mean frame time exceeds the budget by more than this
 BUDGET_TOLERANCE_P99 = 0.10    # ... or its p99 frame time by more than this
-TIER_ORDER = ("ultra", "quality", "enhanced", "balanced", "lowpower", "minimum")
+TIER_ORDER = ("ultra", "quality", "enhanced", "balanced", "low", "lowpower", "minimum")
 
 
 def settings_tier(settings_name: str) -> str:

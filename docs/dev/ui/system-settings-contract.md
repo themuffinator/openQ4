@@ -77,7 +77,7 @@ authoritative; numeric values and device names are data.
 
 | Option / native control | Label | Host representation and declared default |
 | --- | --- | --- |
-| Performance / `set_sys_perf_preset_val` | `#str_229976` | String `com_performancePreset=balanced`; minimum, lowpower, performance, balanced, quality, ultra; choice labels `#str_229977` |
+| Performance / `set_sys_perf_preset_val` | `#str_229976` | String `com_performancePreset=balanced`; minimum, lowpower, low, performance, balanced, enhanced, quality, ultra, maximum; choice labels `#str_229977` |
 | Resolution / `set_sys_screensize_val_0` | `#str_229975` | Coupled integer `r_mode=-2`, dimensions below; host-provided mode list, not a fixed integer range |
 | Fullscreen / `set_sys_fullscreen_val` | `#str_200147` | Boolean `r_fullscreen=1` |
 | Brightness / `set_sys_gamma_slider`, `set_sys_gamma_value` | `#str_200148` | Float `r_brightness=1`, 0.5..2; slider step 0.1; the widget name does not make this `r_gamma` |

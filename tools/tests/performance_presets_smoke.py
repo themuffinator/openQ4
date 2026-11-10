@@ -17,7 +17,7 @@ import renderer_gameplay_benchmark as benchmark
 from mp_round_remote_smoke import verify_runtime_is_current, write_script
 
 ROOT = Path(__file__).resolve().parents[2]
-PROFILES = ('minimum', 'lowpower', 'performance', 'balanced', 'enhanced', 'quality', 'ultra', 'maximum')
+PROFILES = ('minimum', 'lowpower', 'low', 'performance', 'balanced', 'enhanced', 'quality', 'ultra', 'maximum')
 
 
 def main():
@@ -83,10 +83,10 @@ def main():
     for name in sequence:
         lines += [f'echo PRESET_AUDIT_BEGIN_{name}', f'applyPerformancePreset {name}',
                   'vid_restart', 'waitMsec 3000', 'viewpos', 'gfxInfo', 'r_fullscreen',
-                  'com_performancePreset', 'r_useShadowMap', 'r_ssao', 'r_hdrSceneTarget',
+                  'com_performancePreset', 'r_shadows', 'r_useShadowMap', 'r_ssao', 'r_hdrSceneTarget',
                   'r_ssaoSamples', 'r_shadowMapFilterTaps', 'r_shadowMapSize',
                   f'screenshot "screenshots/{name}.tga"', 'wait 3', f'echo PRESET_AUDIT_END_{name}']
-    legacy = (('lowpower',75,0),('performance',85,0),('balanced',100,2),('ultra',100,16))
+    legacy = (('low',75,0),('performance',85,0),('balanced',100,2),('ultra',100,4))
     if args.legacy_commands:
         for level,(name,scale,msaa) in enumerate(legacy):
             lines += [f'echo PRESET_LEGACY_BEGIN_{level}', f'com_machineSpec {level}', 'execMachineSpec',
@@ -110,7 +110,7 @@ def main():
     identities = json.loads((output/'runtime.json').read_text(encoding='utf-8'))
     if any(hashlib.sha256((runtime/name).read_bytes()).hexdigest() != digest for name, digest in identities.items()):
         failures.append('staged runtime changed during test')
-    for marker in ['PerformancePreset self-test passed (presets=8', 'PRESET_AUDIT_COMPLETE']:
+    for marker in ['PerformancePreset self-test passed (presets=9', 'PRESET_AUDIT_COMPLETE']:
         if marker not in text:
             failures.append('missing ' + marker)
     if args.expected_startup:
@@ -143,7 +143,9 @@ def main():
             continue
         section = match[1]
         modern = name in ('enhanced', 'quality', 'ultra', 'maximum')
+        # Only the two tiers below the documented minimum hardware draw no shadows.
         expected = {'com_performancePreset': name, 'r_fullscreen': '0',
+            'r_shadows': str(int(name not in ('minimum', 'lowpower'))),
             'r_useShadowMap': str(int(modern)), 'r_ssao': str(int(modern)), 'r_hdrSceneTarget': str(int(modern))}
         for key, value in expected.items():
             if re.findall(rf'^"{key}" is:"([^"\n]+)"', section, re.M) != [value]:
@@ -151,7 +153,7 @@ def main():
         if not re.search(r'^origin: ', section, re.M) or 'Renderer AA:' not in section:
             failures.append(name + ': missing gameplay/device observation')
     auto = re.findall(r"Auto-detected performance preset '([^']+)' \(([^\n]+)\)", text)
-    if not auto or auto[-1][0] not in PROFILES[:5]:
+    if not auto or auto[-1][0] not in PROFILES[:-1]:  # never Maximum
         failures.append('missing or unsafe automatic recommendation')
     elif args.expected_auto and auto[-1][0] != args.expected_auto:
         failures.append('unexpected automatic recommendation ' + auto[-1][0])

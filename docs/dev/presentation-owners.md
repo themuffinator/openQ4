@@ -235,12 +235,13 @@ Before 25 October 2026 only Windows applied it, and only to hidden windows: a
 minimized client, such as a full-screen game minimized on leaving it, kept
 drawing at its cap. The `hidden` runtime case (a hidden window capped at 240
 presented 60.0 Hz, p95 17.4 ms) and the `minimized` case (the cheat-gated
-`windowMinimizeTest` minimizes the window) check it. A headset paces itself. The presets set `minimum`/`lowpower` 30,
+`windowMinimizeTest` minimizes the window) check it. A headset paces itself. The presets set `minimum`/`lowpower` 30, `low` 60,
 `performance` 60, `balanced` 120, `enhanced` and `quality` 144, and `ultra` and
 `maximum` 240, and a detected Steam Deck starts on `performance`. An automatic
 recommendation (Auto-Detect or a fresh installation) instead caps at the whole-hertz
 refresh rate of the window's display, keeping the tier cap when that rate is unknown
-or outside 30-1000 Hz (FPS-02). Use
+or outside 30-1000 Hz (FPS-02), and on a power-limited device (phone, Deck, Pi,
+explicit low-power request) whenever the tier cap is the lower of the two. Use
 [`presentation_look_runtime.py`](https://github.com/themuffinator/openQ4/blob/master/tools/tests/presentation_look_runtime.py)
 for engine-side latency and smoothness, `com_showFramePacing 2` for p50/p95/p99
 intervals and the gameplay benchmark for frame times, all in a visible

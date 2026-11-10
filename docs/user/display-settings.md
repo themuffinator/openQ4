@@ -52,8 +52,9 @@ Running `applyPerformancePreset` without a name applies the stored `com_performa
 
 | Preset | Display and AA | Texture and audio profile | Intended use |
 |---|---|---|---|
-| `minimum` | 50% scale, no AA, 30 FPS cap | Aggressive texture downsizing, 1x anisotropy, one sound sample per shader, automatic speaker layout, room reverb, lower emitter budget | Most constrained systems. |
-| `lowpower` | 75% scale, no AA, 30 FPS cap | Texture downsizing, 1x anisotropy, one sound sample per shader, automatic speaker layout, room reverb, lower emitter budget | Raspberry Pi-class and other low-power systems. |
+| `minimum` | 50% scale, no AA, no shadows, 30 FPS cap | Aggressive texture downsizing, 1x anisotropy, one sound sample per shader, automatic speaker layout, room reverb, lower emitter budget | The floor: software or limited renderers, and systems below the minimum requirements. |
+| `lowpower` | 75% scale, no AA, no shadows, 30 FPS cap | Texture downsizing, 1x anisotropy, one sound sample per shader, automatic speaker layout, room reverb, lower emitter budget | Raspberry Pi-class boards, low-memory phones and battery saving. |
+| `low` | 75% scale, no AA, the original stencil shadows, 60 FPS cap | Texture downsizing, 2x anisotropy, one sound sample per shader, automatic speaker layout, room reverb, lower emitter budget | PCs at the [minimum requirements](getting-started.md#system-requirements). |
 | `performance` | 85% scale, SMAA medium, 60 FPS cap | Full-size textures, 2x anisotropy, automatic speaker layout, room reverb, moderate emitter budget | Modest desktops and handhelds aiming for smoother frame pacing. |
 | `balanced` | 100% scale, 2x MSAA, SMAA medium, 120 FPS cap | Full-size textures, 4x anisotropy, automatic speaker layout, room reverb, full emitter budget | General desktop default. |
 | `enhanced` | 100% scale, SMAA high (no MSAA), 144 FPS cap, 1024 projected shadow maps; point lights keep stencil shadows | 16x anisotropy, full-size textures, automatic speaker layout, room reverb | High-refresh play with modern effects: holds 144 FPS on the reference laptop. |
@@ -61,7 +62,7 @@ Running `applyPerformancePreset` without a name applies the stored `com_performa
 | `ultra` | 100% scale, 4x MSAA, SMAA Ultra, 240 FPS cap, 4096 projected / 512 point shadows | 16x anisotropy, full-size textures and DDS replacements enabled, high-end benchmark tag, automatic speaker layout, room reverb | The best image that holds 75 FPS on the reference laptop. Manual choice. |
 | `maximum` | 100% scale, 16x MSAA request, SMAA Ultra, 240 FPS cap, 4096 projected / 2048 point shadows | As Ultra | Everything on. No frame-rate target. Manual choice. |
 
-`enhanced`, `quality`, `ultra` and `maximum` enable [shadow maps](shadow-mapping.md), bloom, SSAO and tone mapping. Enhanced shadow-maps projected and parallel lights with 5-tap fixed filtering in a 4096 atlas, keeps the original stencil shadows for point lights, and uses 12 SSAO samples. Quality shadow-maps every light: 2048 projected maps with 9-tap PCSS, 512 point cubes, a 4096 atlas and 20 SSAO samples. Ultra raises projected maps to 4096 with 13-tap PCSS in an 8192 atlas and uses 32 SSAO samples; its point cubes stay at 512 because larger cubes cost more than every other upgrade together. None of these three uses cascades or motion blur. Maximum requests every supported maximum: 2048 point cubes, 13-tap projected and point filtering, four stabilized cascades, a 16384 shadow atlas, 32 SSAO samples and 16-sample motion blur with object vectors. All modern-effects tiers keep unlimited shadow updates and five bloom levels; reducing the level count changes the glow's appearance, not just sampling quality. The lower presets retain the original stencil shadows and leave these post effects and the HDR scene target off. Changing down from Maximum restores the lower tier's sample counts and shadow sizes, including settings for effects currently disabled.
+`enhanced`, `quality`, `ultra` and `maximum` enable [shadow maps](shadow-mapping.md), bloom, SSAO and tone mapping. Enhanced shadow-maps projected and parallel lights with 5-tap fixed filtering in a 4096 atlas, keeps the original stencil shadows for point lights, and uses 12 SSAO samples. Quality shadow-maps every light: 2048 projected maps with 9-tap PCSS, 512 point cubes, a 4096 atlas and 20 SSAO samples. Ultra raises projected maps to 4096 with 13-tap PCSS in an 8192 atlas and uses 32 SSAO samples; its point cubes stay at 512 because larger cubes cost more than every other upgrade together. None of these three uses cascades or motion blur. Maximum requests every supported maximum: 2048 point cubes, 13-tap projected and point filtering, four stabilized cascades, a 16384 shadow atlas, 32 SSAO samples and 16-sample motion blur with object vectors. All modern-effects tiers keep unlimited shadow updates and five bloom levels; reducing the level count changes the glow's appearance, not just sampling quality. Low, Performance and Balanced retain the original stencil shadows and leave these post effects and the HDR scene target off. Minimum and Low Power draw no shadows at all, so that the two presets below the minimum requirements remove rendering work rather than only resolution. Changing down from Maximum restores the lower tier's sample counts and shadow sizes, including settings for effects currently disabled.
 
 ### Frame-rate targets
 
@@ -75,34 +76,45 @@ Enhanced, Quality and Ultra are each built to hold a frame-rate class on the pro
 
 Maximum carries no target. Faster or slower hardware, other resolutions and heavier scenes move these numbers; they describe the reference machine, not a guarantee. The measured results are in the [performance report](../dev/performance-report.md).
 
-MSAA is clamped to the highest sample count supported by the active device and render-target formats; inspect `gfxInfo` for requested and effective counts. Every preset from Balanced up renders at native resolution (100% scale). Brightness, exposure, effect strength and experimental renderer modes are separate controls; CRT filtering stays off. Presets restore full material detail and clear any diffuse `image_picmip` reduction. DDS replacement packs remain available at every tier.
+MSAA is clamped to the highest sample count supported by the active device and render-target formats; inspect `gfxInfo` for requested and effective counts. Every preset from Balanced up renders at native resolution (100% scale). Brightness, exposure, effect strength and experimental renderer modes are separate controls; CRT filtering stays off. Presets restore full material detail and clear any diffuse `image_picmip` reduction; every preset from Low up also turns shadows back on. DDS replacement packs remain available at every tier.
 
 To adopt the revised settings on an existing configuration, select the preset again or run `applyPerformancePreset ultra`. Merely storing `com_performancePreset=ultra` does not reapply the profile. A configuration saved with the earlier Ultra keeps those settings until you select a preset again; select **Maximum** to keep that everything-on image, or **Ultra** for the new 75 FPS recipe.
 
 Performance presets write video, texture-allocation, texture-sampling, and audio backend cvars. Anisotropy is capped to the maximum supported by the active GPU. Run `vid_restart` after applying one so renderer, texture allocation, and sampler changes take effect; run `s_restart` as well if you want speaker/EAX/emitter-budget changes to rebuild the active sound backend immediately.
 
-`autoDetectPerformancePreset` takes no arguments. It recommends and applies a conservative starting point using the **active renderer and GPU**, system RAM, CPU concurrency, platform power hints and current drawable resolution. It does not run a benchmark or promise a particular frame rate. Quality, Ultra and Maximum remain manual choices; Enhanced is the highest automatic recommendation.
+`autoDetectPerformancePreset` takes no arguments. It recommends and applies a starting point using the **active renderer and GPU**, system RAM, CPU concurrency, platform power hints and current drawable resolution. It does not run a benchmark or promise a particular frame rate. Every preset but Maximum can be recommended; Maximum has no frame-rate target and remains a manual choice.
 
-- Software rendering, insufficient classic material/texture capabilities and systems with at most 2 GiB RAM select Minimum. Raspberry Pi and explicit `OPENQ4_LOWPOWER=1` / `OPENQ4_RASPBERRYPI=1` select Low Power unless that stricter constraint applies.
-- Steam Deck selects Performance. Shared-memory GPUs, including Apple Silicon, can select Balanced at up to 1080p with sufficient RAM and classic-rendering capabilities. Apple's OpenGL 2.1 path is not forced to Minimum just because it cannot run modern post effects; Auto-Detect leaves unsupported SMAA off. ARM and x86 use the same graphics policy.
-- Android is limited to Performance automatically to respect mobile power budgets. Known memory and renderer limits can still choose a lower preset. Discrete GPUs with at most 512 MiB of verified dedicated memory select Minimum, regardless of platform hints.
-- Discrete GPUs with roughly 8 GiB of **verified active-device dedicated memory**, 16 GiB RAM and modern effects can select Enhanced through 1440p. Modest dedicated-memory budgets select Performance or Balanced. Larger drawables and fewer than four logical CPUs lower the recommendation.
+- Software rendering, insufficient classic material/texture capabilities and systems with at most 2 GiB RAM select Minimum. A PC at the minimum requirements, with at most 4 GiB RAM or a discrete GPU with at most 1 GiB of verified dedicated memory, selects Low. Raspberry Pi and explicit `OPENQ4_LOWPOWER=1` / `OPENQ4_RASPBERRYPI=1` select Low Power unless the Minimum constraint applies.
+- Steam Deck selects Performance. Shared-memory GPUs, including Apple Silicon, can select Balanced at up to the 1080p class with sufficient RAM and classic-rendering capabilities. Apple's OpenGL 2.1 path is not forced to Minimum just because it cannot run modern post effects; Auto-Detect leaves unsupported SMAA off. ARM and x86 use the same graphics policy.
+- Android is limited to Performance automatically to respect mobile power budgets. A phone with about 12 GB of RAM or more renders a 1080p-class scene; smaller phones render a 720p-class scene, and one with at most 4 GiB selects Low Power. Known renderer limits can still choose Minimum. Discrete GPUs with at most 512 MiB of verified dedicated memory select Minimum, regardless of platform hints.
+- Discrete GPUs are placed by their **verified active-device dedicated memory**, with 16 GiB RAM and modern effects. The reference 8 GB laptop GPU holds Quality at 100 FPS and Ultra at 75 FPS at 1440p, and a larger card is at least that fast, so each memory class takes the preset above; each resolution class above 1440p costs one preset:
+
+  | Dedicated memory | Up to 1440p | Up to 4K | Above 4K |
+  |---|---|---|---|
+  | 8 GB | Enhanced | Balanced | Performance |
+  | 12 GB | Quality | Enhanced | Balanced |
+  | 16 GB | Ultra | Quality | Enhanced |
+  | 24 GB or more | Ultra | Ultra | Quality |
+
+  A class starts at 15/16 of its nominal size, because drivers report slightly less than the card's label. Quality and Ultra also need eight logical CPUs. Smaller dedicated-memory budgets select Performance or Balanced, and fewer than four logical CPUs lower any recommendation to Performance.
+- A resolution class is named by its 16:9 size and includes the taller shapes beside it, so 1920x1200 counts as 1080p and 2560x1600 as 1440p. A 3440x1440 ultrawide has a third more pixels than 2560x1440 and counts as the 4K class.
 - Unknown, implausible or unavailable observations never manufacture extra VRAM. Drivers without active-device memory reporting conservatively select Performance; choose a higher preset manually after checking gameplay. Shared RAM is not counted as dedicated VRAM, and another adapter's memory is not used on hybrid systems. Supported SDL3 builds also keep failed system-memory queries unknown instead of guessing a small RAM size.
 - Detection before renderer initialization leaves settings unchanged. Resolution, fullscreen policy, refresh, VSync, backend selection, input and interface preferences remain yours. Preset FPS caps are power/pacing ceilings, not performance guarantees.
-- An automatic recommendation caps the frame rate at the refresh rate of the display the window is on, in whole hertz (a 59.94 Hz display caps at 60), so a fresh installation never renders frames the display cannot show. When the refresh rate is unknown or outside 30-1000 Hz, the chosen preset's own cap applies. Selecting a preset by name always uses its table cap.
+- An automatic recommendation caps the frame rate at the refresh rate of the display the window is on, in whole hertz (a 59.94 Hz display caps at 60), so a fresh installation never renders frames the display cannot show. When the refresh rate is unknown or outside 30-1000 Hz, the chosen preset's own cap applies. A power-limited device (a phone, Steam Deck, Raspberry Pi or an explicit low-power request) never caps above its preset: a 120 Hz phone stays at Performance's 60. Selecting a preset by name always uses its table cap.
 
 Auto-Detect can lower the **scene render scale** below the preset's table value
 on large displays. For example, shared-memory graphics at 1440p use Performance
 at 75%, and at 4K use Performance at 50% (a 1080p scene). The window and UI keep
-their native resolution. Minimum, Low Power and mobile devices use smaller
-scene budgets; verified discrete memory permits larger ones. Automatic scale
+their native resolution. Minimum, Low Power, Low and most phones use smaller
+scene budgets (a 1080p display renders 1440x810 on Low); verified discrete
+memory permits larger ones. Automatic scale
 uses the existing menu steps and never exceeds the chosen preset's scale.
 Selecting a named preset manually restores its table values. VR headset scale
 remains a separate [VR setting](vr.md); desktop detection is not a headset
 performance qualification.
 
 The stock four-choice quality controls and `execMachineSpec` now use these same
-recipes: Low maps to Low Power, Medium to Performance, High to Balanced, and
+recipes: Low maps to Low, Medium to Performance, High to Balanced, and
 Ultra to Ultra. Stock **Recommended** runs Auto-Detect even if the old quality
 classification has not changed. These paths preserve your display mode and
 VSync preference.
@@ -113,7 +125,7 @@ gameplay. The console's `Quality profile:` line reports the bootstrap preset as 
 settings are preserved, including when their old detection marker is missing
 or their legacy `com_machineSpec` classification is unset.
 
-For package or platform validation, `performancePresetSelfTest` checks that the preset commands are registered, every preset is known to the menu-facing cvar and command completion lists, auto-detect returns and applies a supported preset below Quality, command arguments behave correctly, all preset targets are registered and covered by backup/restore, rejected target normalization rolls back atomically, the preset progression stays coherent, the preset cvar mappings apply correctly, and the test restores touched cvar values, flags, and modified-state bookkeeping before finishing.
+For package or platform validation, `performancePresetSelfTest` checks that the preset commands are registered, every preset is known to the menu-facing cvar and command completion lists, auto-detect returns and applies a supported preset other than Maximum, command arguments behave correctly, all preset targets are registered and covered by backup/restore, rejected target normalization rolls back atomically, the preset progression stays coherent, the preset cvar mappings apply correctly, and the test restores touched cvar values, flags, and modified-state bookkeeping before finishing.
 
 ## Core Display Settings
 

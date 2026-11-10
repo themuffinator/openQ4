@@ -6,6 +6,37 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Graphics presets that cover the whole range of hardware, 10 November 2026
+
+- **A new Low preset for PCs at the minimum requirements.** Low keeps the
+  original shadows and a 60 FPS cap at a reduced scene size and texture
+  budget. Auto-Detect now chooses it for a PC with at most 4 GB of RAM or a
+  1 GB graphics card, which used to get Low Power and its 30 FPS cap. The stock
+  menu's Low quality uses it too.
+- **Minimum and Low Power now draw no shadows.** They used to lower only the
+  resolution and texture size; they now also skip shadow rendering. They are for
+  software renderers, Raspberry Pi-class boards, low-memory phones and battery
+  saving. If you already use one of them and want the change, select the
+  preset again; your current settings are not altered until you do.
+- **Auto-Detect now recognizes high-end graphics cards.** It used to stop at
+  Enhanced. A 12 GB card now starts on Quality and a 16 GB card on Ultra at up
+  to 1440p, stepping down one preset at 4K; a 24 GB card keeps Ultra at 4K.
+  Maximum is still yours to choose.
+- **Better starting points on laptops and ultrawide displays.** 1920x1200 and
+  2560x1600 panels are treated like 1080p and 1440p, so integrated graphics on
+  a 16:10 laptop start on Balanced at native resolution instead of a reduced
+  scene.
+- **Phones.** A phone with about 12 GB of RAM renders at 85% of its panel
+  instead of half, and a detected frame cap no longer rises to a 120 Hz panel:
+  phones, Steam Deck and Raspberry Pi keep their preset's cap to save power.
+- **More GPUs are identified correctly under OpenGL**, including recent AMD
+  and Intel integrated graphics whose driver names were not recognized.
+
+Run **Auto-Detect** in `Settings -> System` to get the new recommendation; an
+existing configuration is never changed on its own. Details are in the
+[display settings guide](../user/display-settings.md#performance-presets) and
+the [audit notes](ui/performance-presets.md#hardware-range-audit-10-november-2026).
+
 ## VR: shots that stay on the laser, a weapon wheel that answers your hand, and a pause when the headset comes off, 10 November 2026
 
 - **Shots land on the laser dot after a save, a ride or a cutscene.** Loading

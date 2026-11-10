@@ -48,14 +48,18 @@ struct PerformancePreset {
 	// 0 leaves point lights on the stencil shadows retail used; spot and
 	// parallel lights keep their shadow maps (FPS-02 Enhanced).
 	int shadowMapPointLights;
+	// 0 draws no shadows at all: Minimum and Low Power, for hardware below
+	// the documented minimum. Every tier from Low up keeps them.
+	int shadows;
 };
 inline constexpr const char* PerformancePresetDefaultName = "balanced";
-inline constexpr int PerformancePresetCount = 8;
+inline constexpr int PerformancePresetCount = 9;
 inline constexpr int PerformancePresetTargetCount = 55;
 const std::array<PerformancePreset,PerformancePresetCount>& PerformancePresets() noexcept;
 const std::array<const char*,PerformancePresetTargetCount>& PerformancePresetTargets() noexcept;
 const PerformancePreset* FindPerformancePreset(std::string_view name) noexcept;
-// Compatibility for the four stock quality choices; all use the same recipes.
+// Compatibility for the four stock quality choices; all use the same recipes:
+// Low, Performance, Balanced and Ultra.
 const PerformancePreset* PerformancePresetForMachineSpec(int machineSpec) noexcept;
 
 struct PerformancePresetAssignment {
@@ -82,6 +86,19 @@ struct PerformancePresetSignals {
 };
 enum class PerformancePresetReason { ExplicitLowPower, RaspberryPi, SteamDeck, Mobile, LegacyRenderer,
  Software, Virtual, LowMemory, ModestMemory, Dedicated, Shared, Unknown, Resolution, Cpu };
+// Verified dedicated memory of the active GPU, as capacity classes. Each floor
+// is 15/16 of the nominal size, because drivers report a little less than the
+// card's label (an 8 GiB card reports 7956-8188 MiB).
+inline constexpr int PerformancePresetVram8GiB=7680;
+inline constexpr int PerformancePresetVram12GiB=11520;
+inline constexpr int PerformancePresetVram16GiB=15360;
+inline constexpr int PerformancePresetVram24GiB=23040;
+// Phones report less than their label too: a 12 GiB flagship is above 10 GiB.
+inline constexpr int PerformancePresetMobileFlagshipRamMB=10240;
+// The scene pixels of a resolution class named by its 16:9 height. A class
+// spans shapes up to 20.25:9, so 16:10 and 3:2 laptop panels and 20:9 phones
+// share the class of their 16:9 sibling, and the next class up fits at 75%.
+constexpr long long PerformancePresetClassPixels(int height) noexcept{return 9LL*height*height/4;}
 struct PerformancePresetDetection {
  const PerformancePreset* preset=nullptr; // Immutable shared profile, never a mutable host view.
  PerformancePresetReason reason=PerformancePresetReason::Unknown;
@@ -90,7 +107,8 @@ struct PerformancePresetDetection {
  // unsupported post AA. Manual presets remain immutable and hardware-neutral.
  int screenFraction=100, postAA=0, scenePixelBudget=0;
  // A first launch presents at the display's rate rather than the tier's
- // manual-choice cap (FPS-02); the tier's cap when the rate is unknown.
+ // manual-choice cap (FPS-02); the tier's cap when the rate is unknown. A
+ // power-limited device (phone, Deck, Pi, explicit request) keeps the lower.
  int maxFps=0;
 };
 inline constexpr int PerformancePresetUnknownSystemRamMB=0;

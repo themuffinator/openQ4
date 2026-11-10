@@ -1585,6 +1585,13 @@ optimization has landed.
   SYSTEM catalog tests and the in-game preset smoke pass on both backends. Player
   guidance and re-selection notes are in [display settings](../user/display-settings.md)
   and [release-completion.md](release-completion.md).
+  Follow-up, 10 November: the [hardware-range audit](ui/performance-presets.md#hardware-range-audit-10-november-2026)
+  extends the ladder to nine presets without changing these three recipes or
+  their budgets. A new **Low** preset serves the documented minimum PC, Minimum
+  and Low Power draw no shadows, and Auto-Detect places 12, 16 and 24 GiB cards
+  on Quality and Ultra by memory and resolution class (Maximum stays manual).
+  The reference laptop still detects Enhanced. The larger classes are policy
+  derived from this item's measurements, not measured on such cards.
 - [ ] **FPS-03 — P1, implementation: shadow-map cost.** In hub2 the shadow maps are 33 of
   the current Ultra's 54 ms per frame and 30 ms of that is point lights: a point light
   with any moving caster in range re-renders all six cube faces every frame, because
@@ -2148,6 +2155,13 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
   the Touch HUD preset as a whole and readouts behind a raised weapon control
   remain; the S25 (19.5:9) shows the weapon control over the armour readout
   too, and human-finger portrait play moved here from AND-01.
+  Mobile defaults, 10 November: the [hardware-range audit](ui/performance-presets.md#hardware-range-audit-10-november-2026)
+  uses the S25's AND-02 results. A phone in the 12 GB class keeps the
+  Performance ceiling with a 1080p-class scene (85% on the S25 instead of 50%),
+  smaller phones a 720p-class scene, phones with at most 4 GiB the shadowless
+  Low Power, and a detected cap stays at the preset's 60 on a 120 Hz panel.
+  This is policy from one device: a Mali phone, a mid-range phone and a fresh
+  first launch on the S25 still have to confirm it.
 - [ ] **AND-05 — P2, integration and qualification: standalone Quest.** After
   VR-01/AND-01, qualify real installation, assets, stereo gameplay, controller/UI
   interaction, comfort, session recovery and sustained refresh/thermal budgets.

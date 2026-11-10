@@ -5070,7 +5070,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 
 			const char *presetCommand = NULL;
 			if ( idStr::Icmp( vcmd, "low" ) == 0 ) {
-				presetCommand = "applyPerformancePreset lowpower\n";
+				presetCommand = "applyPerformancePreset low\n";
 			} else if ( idStr::Icmp( vcmd, "medium" ) == 0 ) {
 				presetCommand = "applyPerformancePreset performance\n";
 			} else  if ( idStr::Icmp( vcmd, "high" ) == 0 ) {

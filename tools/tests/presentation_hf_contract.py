@@ -223,10 +223,12 @@ def check_frame_rate_policy(common: str | None = None) -> None:
     caps = {}
     for name, fps in re.findall(r'\{ "(\w+)", \d+, "[\w-]+",\s*\d+, \d+, \d+, (\d+),', presets):
         caps[name] = int(fps)
-    expected = {"minimum": 30, "lowpower": 30, "performance": 60, "balanced": 120, "enhanced": 144, "quality": 144, "ultra": 240, "maximum": 240}
+    expected = {"minimum": 30, "lowpower": 30, "low": 60, "performance": 60, "balanced": 120, "enhanced": 144, "quality": 144, "ultra": 240, "maximum": 240}
     if caps != expected:
         raise AssertionError(f"{context}: preset caps {caps} differ from the declared {expected}")
-    require(presets, 'if(signals.steamDeck&&tier>2){tier=2;', f"{context}: Steam Deck is capped at performance without raising a lower tier")
+    require(presets, 'if(signals.steamDeck&&tier>Performance){tier=Performance;', f"{context}: Steam Deck is capped at performance without raising a lower tier")
+    require(presets, 'if(!powerLimited||signals.displayRefreshHz<result.maxFps)result.maxFps=signals.displayRefreshHz;',
+            f"{context}: a detected start follows the display, and a power-limited device never above its tier's cap")
 
 
 def check_present_timing(device: str | None = None) -> None:

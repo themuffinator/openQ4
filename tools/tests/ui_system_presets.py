@@ -12,7 +12,7 @@ sys.path.insert(0,str(ROOT/'tools/ui'))
 import build_retained_screens as screens
 import retained_system as system
 SOURCE=screens.OUTPUTS['system']
-PROFILES=('minimum','lowpower','performance','balanced','enhanced','quality','ultra','maximum')
+PROFILES=('minimum','lowpower','low','performance','balanced','enhanced','quality','ultra','maximum')
 GRAPHICS=0  # page.tab of the GRAPHICS tab, which holds the preset and the renderer rows
 
 def load(path):
@@ -127,7 +127,7 @@ class Presets(unittest.TestCase):
                 self.assertEqual(self.nodes[new+'-'+part],expected)
         for id,node in self.nodes.items():
             if id.startswith(('settings_preset','settings_autodetect')):self.assertNotEqual(node['type'],'image')
-    def test_all_locales_have_exact_eight_labels(self):
+    def test_all_locales_have_every_profile_label(self):
         files=sorted((ROOT/'content/baseoq4/pak0/strings').glob('*_openq4.lang'))
         self.assertEqual({f.stem for f in files},{n+'_openq4' for n in ('english','french','german','italian','spanish','polish','russian',
             'brazilian','czech','hungarian','turkish','ukrainian')})

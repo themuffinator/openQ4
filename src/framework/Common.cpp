@@ -122,9 +122,9 @@ idCVar com_version( "si_version", version.string, CVAR_SYSTEM|CVAR_ROM|CVAR_SERV
 idCVar com_buildInfo( "com_buildInfo", buildInfo.string, CVAR_SYSTEM|CVAR_ROM, "detailed engine build information" );
 idCVar com_skipRenderer( "com_skipRenderer", "0", CVAR_BOOL|CVAR_SYSTEM, "skip the renderer completely" );
 idCVar com_machineSpec( "com_machineSpec", "-1", CVAR_INTEGER | CVAR_ARCHIVE | CVAR_SYSTEM, "hardware classification, -1 = not detected, 0 = low quality, 1 = medium quality, 2 = high quality, 3 = ultra quality" );
-const char *com_performancePresetArgs[] = { "minimum", "lowpower", "performance", "balanced", "enhanced", "quality", "ultra", "maximum", NULL };
-static const char *com_performancePresetValueStrings[] = { "balanced", "minimum", "lowpower", "performance", "enhanced", "quality", "ultra", "maximum", NULL };
-idCVar com_performancePreset( "com_performancePreset", "balanced", CVAR_ARCHIVE | CVAR_SYSTEM, "coherent system performance preset: minimum, lowpower, performance, balanced, enhanced, quality, ultra, maximum (everything on, no frame-rate target)", com_performancePresetValueStrings, idCmdSystem::ArgCompletion_String<com_performancePresetArgs> );
+const char *com_performancePresetArgs[] = { "minimum", "lowpower", "low", "performance", "balanced", "enhanced", "quality", "ultra", "maximum", NULL };
+static const char *com_performancePresetValueStrings[] = { "balanced", "minimum", "lowpower", "low", "performance", "enhanced", "quality", "ultra", "maximum", NULL };
+idCVar com_performancePreset( "com_performancePreset", "balanced", CVAR_ARCHIVE | CVAR_SYSTEM, "coherent system performance preset: minimum, lowpower (both without shadows), low, performance, balanced, enhanced, quality, ultra, maximum (everything on, no frame-rate target)", com_performancePresetValueStrings, idCmdSystem::ArgCompletion_String<com_performancePresetArgs> );
 idCVar com_purgeAll( "com_purgeAll", "0", CVAR_BOOL | CVAR_ARCHIVE | CVAR_SYSTEM, "purge everything between level loads" );
 idCVar com_WriteSingleDeclFile( "com_WriteSingleDeclFile", "0", CVAR_SYSTEM | CVAR_BOOL, "write a packed decl file after startup or map loads; use com_singleDeclFileWriteMode for openQ4 or exact-retail game-type coverage" );
 idCVar com_memoryMarker( "com_memoryMarker", "-1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_INIT, "used as a marker for memory stats" );
@@ -3746,8 +3746,13 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointLights", preset.shadowMapPointLights, Common_PerformancePresetIsNamed( preset, "enhanced" ) ? 0 : 1 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_crt", preset.crt, 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_useLightGrid", preset.useLightGrid, 1 );
+	// Only the two tiers below the documented minimum hardware draw no shadows;
+	// Low restores the stencil shadows every tier above it keeps.
+	const bool shadowlessTier = Common_PerformancePresetIsNamed( preset, "minimum" ) || Common_PerformancePresetIsNamed( preset, "lowpower" );
+	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadows", preset.shadows, shadowlessTier ? 0 : 1 );
 
-	if ( Common_PerformancePresetIsNamed( preset, "minimum" ) || Common_PerformancePresetIsNamed( preset, "lowpower" ) ) {
+	if ( shadowlessTier || Common_PerformancePresetIsNamed( preset, "low" ) ) {
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_maxfps", preset.maxFps, shadowlessTier ? 30 : 60 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_machineSpec", preset.machineSpec, 0 );
 		passed &= Common_PerformancePresetCheckBenchmarkPreset( preset, "low" );
 		passed &= Common_PerformancePresetCheckIntAtMost( preset, "r_screenFraction", preset.screenFraction, 75 );
@@ -3902,6 +3907,7 @@ static bool Common_ValidatePerformancePresetProgression( void ) {
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "image_anisotropy", previousPreset.anisotropy, preset.anisotropy );
 		passed &= Common_PerformancePresetCheckNonDecreasingBudget( previousPreset, preset, "image_downSizeLimit", previousPreset.downSizeLimit, preset.downSizeLimit );
 		passed &= Common_PerformancePresetCheckNonDecreasingBudget( previousPreset, preset, "s_maxSoundsPerShader", previousPreset.maxSoundsPerShader, preset.maxSoundsPerShader );
+		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadows", previousPreset.shadows, preset.shadows );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_useShadowMap", previousPreset.useShadowMap, preset.useShadowMap );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapSize", previousPreset.shadowMapSize, preset.shadowMapSize );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapPointSize", previousPreset.shadowMapPointSize, preset.shadowMapPointSize );
@@ -3949,6 +3955,7 @@ static bool Common_ValidatePerformancePresetDefinition( const openQ4PerformanceP
 		 preset.usePrecompressedTextures < 0 || preset.usePrecompressedTextures > 2 ||
 		 preset.maxSoundsPerShader < 0 ||
 		 ( preset.useShadowMap != 0 && preset.useShadowMap != 1 ) ||
+		 ( preset.shadows != 0 && preset.shadows != 1 ) ||
 		 preset.shadowMapSize < 128 || preset.shadowMapSize > 4096 ||
 		 preset.shadowMapPointSize < 128 || preset.shadowMapPointSize > 2048 ||
 		 preset.shadowMapFilterTaps < 1 || preset.shadowMapFilterTaps > 13 ||
@@ -4092,7 +4099,7 @@ static bool Common_ValidatePerformancePresetApplied( const openQ4PerformancePres
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_motionBlurSamples", preset.motionBlurSamples );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointLights", preset.shadowMapPointLights );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_hdrSceneTarget", preset.hdrToneMap );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadows", 1 );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadows", preset.shadows );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_skipBump", 0 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_skipSpecular", 0 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_skipSky", 0 );
@@ -4140,8 +4147,8 @@ static void Com_PerformancePresetSelfTest_f( const idCmdArgs &args ) {
 		common->Printf( "PerformancePreset self-test failed: auto-detect returned unknown preset '%s'\n", detectedPresetName != NULL ? detectedPresetName : "" );
 		passed = false;
 	}
-	if ( idStr::Icmp( detectedPresetName, "maximum" ) == 0 || idStr::Icmp( detectedPresetName, "ultra" ) == 0 || idStr::Icmp( detectedPresetName, "quality" ) == 0 ) {
-		common->Printf( "PerformancePreset self-test failed: auto-detect selected an unmeasured top tier\n" );
+	if ( idStr::Icmp( detectedPresetName, "maximum" ) == 0 ) {
+		common->Printf( "PerformancePreset self-test failed: auto-detect selected Maximum, which has no frame-rate target\n" );
 		passed = false;
 	}
 	if ( Common_SanitizePerformancePresetMemoryMB( 0, OPENQ4_PERFORMANCE_PRESET_UNKNOWN_VIDEO_RAM_MB, OPENQ4_PERFORMANCE_PRESET_MAX_REASONABLE_VIDEO_RAM_MB ) != OPENQ4_PERFORMANCE_PRESET_UNKNOWN_VIDEO_RAM_MB ||
