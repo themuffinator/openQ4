@@ -121,16 +121,30 @@ untouched.
 - **Band tiles.** The stock band tiles show faint seam lines at the leading
   edge of a wide view on every stock page, the stock ones included.
 
+## Follow-up, 10 November 2026
+
+Three items the pass first left open, fixed the same day:
+
+- **The retained gate.** `tools/tests/ui_retained_gate.py` failed on main
+  since `d81433266`: the retained GAME OPTIONS page gained
+  `hud_crosshairAnimated`, and the gate expects every retained row on the
+  stock page. The animated crosshair draws only under the retained interface
+  (`rvAnimatedCrosshair::Enabled`), so the stock page owes it no row. The
+  gate now admits a setting listed as retained-only, provided the game gates
+  it on `ui_retained` and the stock page has no row for it; every other
+  setting still needs its stock row.
+- **The DISPLAY page's Interface heading** was mixed case beside upper-case
+  headings. `#str_230018` is upper case in all twelve tables, as every other
+  section heading on the settings pages is.
+- **Crosshair Size and Crosshair Color** ended in the colon of the stock
+  rows' labels, which no other retained row has. The retained rows read
+  `#str_231764` and `#str_231765`, each language's stock label without the
+  colon; the stock page keeps its own.
+
+Captures: `y1/settings-system` and `y1/settings-subpages`.
+
 ## Found, not fixed
 
-- `tools/tests/ui_retained_gate.py` fails on main since `d81433266`: the
-  retained GAME OPTIONS page gained `hud_crosshairAnimated`, a retained-only
-  setting, and the gate expects every retained row on the stock page. The
-  rest of the gate passes with this round's changes when that one setting is
-  exempted (`.tmp/menu-round/gate_probe.py`).
-- The retained DISPLAY page's `Interface` heading is mixed case beside
-  upper-case headings, and the HUD tab's `Crosshair Size:` and
-  `Crosshair Color:` rows end in a colon no other row has.
 - Hungarian names both the Arena's SKILL and DIFFICULTY rows NEHÉZSÉG.
 - The retained Join Game's JOIN SERVER, SPECTATE and favorite plates end at
   one trailing edge, so their leading edges differ. That arrangement was

@@ -1179,7 +1179,7 @@
 	"#str_230015"	"UI scale"
 	"#str_230016"	"Text size"
 	"#str_230017"	"Reset UI sizes"
-	"#str_230018"	"Interface"
+	"#str_230018"	"INTERFACE"
 	"#str_230019"	"Large sizes may be reduced to fit the window."
 	"#str_230020"	"Off;2x;4x;8x;16x"
 	"#str_230021"	"Enter a whole number from 320 to 16384."
@@ -1587,4 +1587,6 @@
 	"#str_231709"	"OVERHEATED"
 	"#str_231710"	"HEALTH"
 	"#str_231763"	"Animated Crosshair"
+	"#str_231764"	"Crosshair Size"
+	"#str_231765"	"Crosshair Color"
 }

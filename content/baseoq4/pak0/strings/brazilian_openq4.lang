@@ -1179,7 +1179,7 @@
 	"#str_230015"	"Escala da interface"
 	"#str_230016"	"Tamanho do texto"
 	"#str_230017"	"Redefinir tamanhos"
-	"#str_230018"	"Interface"
+	"#str_230018"	"INTERFACE"
 	"#str_230019"	"Tamanhos grandes podem ser reduzidos para caber na janela."
 	"#str_230020"	"Desativado;2x;4x;8x;16x"
 	"#str_230021"	"Digite um número inteiro de 320 a 16384."
@@ -1587,4 +1587,6 @@
 	"#str_231709"	"SUPERAQUECIDA"
 	"#str_231710"	"SAÚDE"
 	"#str_231763"	"Mira animada"
+	"#str_231764"	"Tamanho da mira"
+	"#str_231765"	"Cor da mira"
 }

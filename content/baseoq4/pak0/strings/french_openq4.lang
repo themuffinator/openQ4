@@ -1179,7 +1179,7 @@
 	"#str_230015"	"Taille de l’interface"
 	"#str_230016"	"Taille du texte"
 	"#str_230017"	"Réinitialiser les tailles"
-	"#str_230018"	"Interface"
+	"#str_230018"	"INTERFACE"
 	"#str_230019"	"Les grandes tailles peuvent être réduites pour tenir dans la fenêtre."
 	"#str_230020"	"Non;2x;4x;8x;16x"
 	"#str_230021"	"Entrez un nombre entier de 320 à 16384."
@@ -1596,4 +1596,6 @@
 	"#str_231709"	"SURCHAUFFE"
 	"#str_231710"	"SANTÉ"
 	"#str_231763"	"Viseur animé"
+	"#str_231764"	"Taille réticule"
+	"#str_231765"	"Couleur réticule"
 }

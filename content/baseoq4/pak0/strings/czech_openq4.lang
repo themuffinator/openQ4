@@ -1179,7 +1179,7 @@
 	"#str_230015"	"Měřítko UI"
 	"#str_230016"	"Velikost textu"
 	"#str_230017"	"Obnovit velikosti UI"
-	"#str_230018"	"Rozhraní"
+	"#str_230018"	"ROZHRANÍ"
 	"#str_230019"	"Velké rozměry se mohou zmenšit, aby se vešly do okna."
 	"#str_230020"	"Vypnuto;2x;4x;8x;16x"
 	"#str_230021"	"Zadej celé číslo od 320 do 16384."
@@ -1587,4 +1587,6 @@
 	"#str_231709"	"PŘEHŘÁTO"
 	"#str_231710"	"ZDRAVÍ"
 	"#str_231763"	"Animovaný zaměřovač"
+	"#str_231764"	"Velikost zaměřovače"
+	"#str_231765"	"Barva zaměřovače"
 }

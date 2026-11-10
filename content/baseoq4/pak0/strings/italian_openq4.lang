@@ -1179,7 +1179,7 @@
 	"#str_230015"	"Scala interfaccia"
 	"#str_230016"	"Dimensione testo"
 	"#str_230017"	"Ripristina dimensioni"
-	"#str_230018"	"Interfaccia"
+	"#str_230018"	"INTERFACCIA"
 	"#str_230019"	"Le dimensioni maggiori possono essere ridotte per adattarsi alla finestra."
 	"#str_230020"	"No;2x;4x;8x;16x"
 	"#str_230021"	"Inserisci un numero intero da 320 a 16384."
@@ -1596,4 +1596,6 @@
 	"#str_231709"	"SURRISCALDATA"
 	"#str_231710"	"SALUTE"
 	"#str_231763"	"Mirino animato"
+	"#str_231764"	"Dimensione mirino"
+	"#str_231765"	"Colore mirino"
 }

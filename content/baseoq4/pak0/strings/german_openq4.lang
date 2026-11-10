@@ -1179,7 +1179,7 @@
 	"#str_230015"	"Oberflächenskalierung"
 	"#str_230016"	"Textgröße"
 	"#str_230017"	"Oberflächengrößen zurücksetzen"
-	"#str_230018"	"Oberfläche"
+	"#str_230018"	"OBERFLÄCHE"
 	"#str_230019"	"Große Elemente werden bei Bedarf an das Fenster angepasst."
 	"#str_230020"	"Aus;2x;4x;8x;16x"
 	"#str_230021"	"Geben Sie eine ganze Zahl von 320 bis 16384 ein."
@@ -1587,4 +1587,6 @@
 	"#str_231709"	"ÜBERHITZT"
 	"#str_231710"	"GESUNDHEIT"
 	"#str_231763"	"Animiertes Fadenkreuz"
+	"#str_231764"	"Fadenkreuzgröße"
+	"#str_231765"	"Fadenkreuzfarbe"
 }

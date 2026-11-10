@@ -1179,7 +1179,7 @@
 	"#str_230015"	"Escala de interfaz"
 	"#str_230016"	"Tamaño del texto"
 	"#str_230017"	"Restablecer tamaños"
-	"#str_230018"	"Interfaz"
+	"#str_230018"	"INTERFAZ"
 	"#str_230019"	"Los tamaños grandes pueden reducirse para caber en la ventana."
 	"#str_230020"	"No;2x;4x;8x;16x"
 	"#str_230021"	"Introduce un número entero de 320 a 16384."
@@ -1587,4 +1587,6 @@
 	"#str_231709"	"SOBRECALENTADA"
 	"#str_231710"	"SALUD"
 	"#str_231763"	"Mira animada"
+	"#str_231764"	"Tamaño de Mira"
+	"#str_231765"	"Color de Punto de Mira"
 }

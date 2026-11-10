@@ -88539,7 +88539,7 @@
                     "id": "game_crosshairsize-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_201010"},
+                     "text": {"type": "text", "value": "#str_231764"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -89155,7 +89155,7 @@
                 ],
                 "control": {
                  "role": "choice",
-                 "label": "#str_201010",
+                 "label": "#str_231764",
                  "action": "set.g_crosshairSize",
                  "value": {"state": "cvar.g_crosshairSize"},
                  "states": {
@@ -89365,7 +89365,7 @@
                     "id": "game_crosshaircolor-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200299"},
+                     "text": {"type": "text", "value": "#str_231765"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -90215,7 +90215,7 @@
                 ],
                 "control": {
                  "role": "choice",
-                 "label": "#str_200299",
+                 "label": "#str_231765",
                  "action": "set.g_crosshairColor",
                  "value": {"state": "cvar.g_crosshairColor"},
                  "states": {

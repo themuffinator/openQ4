@@ -141,6 +141,12 @@ record.
 | Low | Stock | The four pages' backdrop faded to black at the edges of a wide view. | They stand on the retained pages' backdrop, the same at every width. |
 | Low | Stock | Arena's progress line and path, and the Demos filters, were cut in longer languages once laid out. | Sized for the longest of the twelve languages. |
 
+A [follow-up](legacy-menu-layout.md#follow-up-10-november-2026) the same
+day gave the retained DISPLAY page's Interface heading its upper case and
+the HUD tab's Crosshair Size and Crosshair Color rows labels without the
+stock colon, and let the retained gate admit a setting only the retained
+interface honors.
+
 Left open: the stock pause's order, the stock Settings screen's
 arrangement and the campaign levels, which stay as the stock composition
 ([deliberate differences](legacy-menu-layout.md#deliberate-differences)), and

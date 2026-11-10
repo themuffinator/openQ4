@@ -5517,11 +5517,19 @@ def main() -> int:
     assert re.findall(r'"([a-z]+)"', re.search(r'RETAINED_GAME_LANGUAGES\[\] = \{([^}]*)\};', menu).group(1)) == stock_languages
     assert len(stock_languages) == retained_game.LANGUAGES
     rules = player_setting_rules(adapter)
+    # A setting only the retained interface honors has no stock row: the game
+    # must gate it on ui_retained, or the stock page owes players the row.
+    RETAINED_ONLY_GAME_SETTINGS = {'hud_crosshairAnimated': ('src/game/gamesys/AnimatedCrosshair.inl',
+                                                             'hud_crosshairAnimated.GetBool() && retained != NULL && retained->GetBool()')}
+    for cvar, (source, gate) in RETAINED_ONLY_GAME_SETTINGS.items():
+        gated = (ROOT / source).read_text(encoding='utf-8', errors='replace')
+        assert gate in gated and 'cvarSystem->Find( "ui_retained" )' in gated, f'{cvar} is not gated on ui_retained'
+        assert not re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} has a stock row: drop its exemption'
     for cvar, kind, extra in retained_game.setting_rows():
         action = game_document['actions'][f'set.{cvar}']
         assert action['operation'] == 'settings.player.set' and action['arguments'] == {'cvar': cvar, 'value': {'input': 'value'}}, cvar
         assert cvar in rules and (kind != 'choice' or not isinstance(extra[1][0], str) or rules[cvar] == list(extra[1])), cvar
-        assert re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
+        assert cvar in RETAINED_ONLY_GAME_SETTINGS or re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
     # The CONTROLS page: the button's and the multiplayer menu's routes as
     # GAME OPTIONS'; its rows are the stock page's bindings in its order, the
     # session's table follows them; a binding keeps at most two keys, as the

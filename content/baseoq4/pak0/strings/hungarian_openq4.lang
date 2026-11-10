@@ -1179,7 +1179,7 @@
 	"#str_230015"	"Felület mérete"
 	"#str_230016"	"Szövegméret"
 	"#str_230017"	"Méretek visszaállítása"
-	"#str_230018"	"Felület"
+	"#str_230018"	"FELÜLET"
 	"#str_230019"	"A nagy méretek csökkenhetnek, hogy elférjenek az ablakban."
 	"#str_230020"	"Ki;2x;4x;8x;16x"
 	"#str_230021"	"Adj meg egy egész számot 320 és 16384 között."
@@ -1587,4 +1587,6 @@
 	"#str_231709"	"TÚLMELEGEDETT"
 	"#str_231710"	"ÉLETERŐ"
 	"#str_231763"	"Animált célkereszt"
+	"#str_231764"	"Célkereszt mérete"
+	"#str_231765"	"Célkereszt színe"
 }

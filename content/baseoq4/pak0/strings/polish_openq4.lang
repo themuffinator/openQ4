@@ -1191,7 +1191,7 @@
 	"#str_230015"	"Skala interfejsu"
 	"#str_230016"	"Rozmiar tekstu"
 	"#str_230017"	"Przywróć rozmiary"
-	"#str_230018"	"Interfejs"
+	"#str_230018"	"INTERFEJS"
 	"#str_230019"	"Duże rozmiary mogą zostać zmniejszone, aby zmieścić się w oknie."
 	"#str_230020"	"Wył.;2x;4x;8x;16x"
 	"#str_230021"	"Wpisz liczbę całkowitą od 320 do 16384."
@@ -1643,4 +1643,6 @@
 	"#str_231709"	"PRZEGRZANA"
 	"#str_231710"	"ZDROWIE"
 	"#str_231763"	"Animowany celownik"
+	"#str_231764"	"Rozmiar celownika"
+	"#str_231765"	"Kolor celownika"
 }

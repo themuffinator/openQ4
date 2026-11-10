@@ -31,6 +31,9 @@ See [player release status](../user/release-status.md).
     were marked at once.
   - In the new interface, the server browser no longer shows a bright orange
     bar under the list while no scan is running.
+  - In the new interface's settings, the Interface heading is in capitals
+    like the other headings, and Crosshair Size and Crosshair Color no longer
+    end in a colon.
   - The classic pages no longer fade to black at the edges of a widescreen
     view, and their labels fit in all twelve languages.
 - Evidence: [stock interface menus](ui/legacy-menu-layout.md#evidence-10-november-2026);

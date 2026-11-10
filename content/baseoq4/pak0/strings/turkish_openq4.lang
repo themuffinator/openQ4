@@ -1179,7 +1179,7 @@
 	"#str_230015"	"Arayüz ölçeği"
 	"#str_230016"	"Metin boyutu"
 	"#str_230017"	"Arayüz boyutlarını sıfırla"
-	"#str_230018"	"Arayüz"
+	"#str_230018"	"ARAYÜZ"
 	"#str_230019"	"Büyük boyutlar pencereye sığması için küçültülebilir."
 	"#str_230020"	"Kapalı;2x;4x;8x;16x"
 	"#str_230021"	"320 ile 16384 arasında bir tam sayı gir."
@@ -1587,4 +1587,6 @@
 	"#str_231709"	"AŞIRI ISINDI"
 	"#str_231710"	"SAĞLIK"
 	"#str_231763"	"Hareketli nişangâh"
+	"#str_231764"	"Nişangâh boyutu"
+	"#str_231765"	"Nişangâh rengi"
 }
