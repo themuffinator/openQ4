@@ -27,6 +27,7 @@ typedef struct {
   struct jpeg_source_mgr pub;	/* public fields */
 
   unsigned char *infile;		/* source stream */
+  unsigned char *infileEnd;	/* openQ4: one past the last byte of it */
   JOCTET * buffer;		/* start of buffer */
   boolean start_of_file;	/* have we gotten any data yet? */
 } my_source_mgr;
@@ -91,13 +92,25 @@ METHODDEF boolean
 fill_input_buffer (j_decompress_ptr cinfo)
 {
   my_src_ptr src = (my_src_ptr) cinfo->src;
+  size_t count = (size_t) (src->infileEnd - src->infile);
 
-  memcpy( src->buffer, src->infile, INPUT_BUF_SIZE );
-
-  src->infile += INPUT_BUF_SIZE;
+  /* openQ4: stop at the end of the data. This copied INPUT_BUF_SIZE bytes on
+   * every call whatever was left, so a file that ended early, or whose markers
+   * asked to skip more than it held, was read on past its buffer. Out of data,
+   * hand the decoder an end-of-image marker, as stock libjpeg does. */
+  if (count > INPUT_BUF_SIZE)
+    count = INPUT_BUF_SIZE;
+  if (count > 0) {
+    memcpy( src->buffer, src->infile, count );
+    src->infile += count;
+  } else {
+    src->buffer[0] = (JOCTET) 0xFF;
+    src->buffer[1] = (JOCTET) JPEG_EOI;
+    count = 2;
+  }
 
   src->pub.next_input_byte = src->buffer;
-  src->pub.bytes_in_buffer = INPUT_BUF_SIZE;
+  src->pub.bytes_in_buffer = count;
   src->start_of_file = FALSE;
 
   return TRUE;
@@ -171,7 +184,7 @@ term_source (j_decompress_ptr cinfo)
  */
 
 GLOBAL void
-jpeg_stdio_src (j_decompress_ptr cinfo, unsigned char *infile)
+jpeg_stdio_src (j_decompress_ptr cinfo, unsigned char *infile, size_t length)
 {
   my_src_ptr src;
 
@@ -199,6 +212,7 @@ jpeg_stdio_src (j_decompress_ptr cinfo, unsigned char *infile)
   src->pub.resync_to_restart = jpeg_resync_to_restart; /* use default method */
   src->pub.term_source = term_source;
   src->infile = infile;
+  src->infileEnd = infile + length;
   src->pub.bytes_in_buffer = 0; /* forces fill_input_buffer on first read */
   src->pub.next_input_byte = NULL; /* until buffer loaded */
 }

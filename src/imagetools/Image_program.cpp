@@ -499,6 +499,11 @@ static bool R_ParseImageProgram_r(idLexer& src, byte** pic, int* width, int* hei
 		return true;
 	}
 
+	// openQ4: in the five operations below the inner program can fail and leave
+	// *pic NULL with the first image's size still in *width and *height (add
+	// and addnormals do, when their second image is missing), and each went on
+	// to write through it. They skip the work then, as they always have when
+	// the size came back zero.
 	if (!token.Icmp("scale")) {
 		float	scale[4];
 		int		i;
@@ -515,7 +520,7 @@ static bool R_ParseImageProgram_r(idLexer& src, byte** pic, int* width, int* hei
 		}
 
 		// process it
-		if (pic) {
+		if (pic && *pic) {
 			R_ImageScale(*pic, *width, *height, scale);
 		}
 
@@ -529,7 +534,7 @@ static bool R_ParseImageProgram_r(idLexer& src, byte** pic, int* width, int* hei
 		R_ParseImageProgram_r(src, pic, width, height, timestamps, usage);
 
 		// process it
-		if (pic) {
+		if (pic && *pic) {
 			R_InvertAlpha(*pic, *width, *height);
 		}
 
@@ -543,7 +548,7 @@ static bool R_ParseImageProgram_r(idLexer& src, byte** pic, int* width, int* hei
 		R_ParseImageProgram_r(src, pic, width, height, timestamps, usage);
 
 		// process it
-		if (pic) {
+		if (pic && *pic) {
 			R_InvertColor(*pic, *width, *height);
 		}
 
@@ -559,7 +564,7 @@ static bool R_ParseImageProgram_r(idLexer& src, byte** pic, int* width, int* hei
 		R_ParseImageProgram_r(src, pic, width, height, timestamps, usage);
 
 		// copy red to green, blue, and alpha
-		if (pic) {
+		if (pic && *pic) {
 			int		c;
 			c = *width * *height * 4;
 			for (i = 0; i < c; i += 4) {
@@ -664,7 +669,7 @@ static bool R_ParseImageProgram_r(idLexer& src, byte** pic, int* width, int* hei
 		R_ParseImageProgram_r(src, pic, width, height, timestamps, usage);
 
 		// average RGB into alpha, then set RGB to white
-		if (pic) {
+		if (pic && *pic) {
 			int		c;
 			c = *width * *height * 4;
 			for (i = 0; i < c; i += 4) {

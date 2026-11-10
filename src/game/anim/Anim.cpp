@@ -889,6 +889,14 @@ bool idMD5Anim::LoadAnim( const char *filename ) {
 	if ( ( numAnimatedComponents < 0 ) || ( numAnimatedComponents > numJoints * 6 ) ) {
 		parser.Error( "Invalid number of animated components: %d", numAnimatedComponents );
 	}
+	// openQ4: the frame table below holds numAnimatedComponents * numFrames
+	// floats. The product was taken in int, so a file naming 65536 frames of
+	// 65537 components got 65536 floats and the frame loop wrote the file's
+	// values past them. The generated-anim reader already holds to these limits.
+	if ( numFrames > MAX_GENERATED_ANIM_FRAMES || numJoints > MAX_GENERATED_ANIM_JOINTS ||
+			static_cast<long long>( numAnimatedComponents ) * numFrames > 0x7fffffff / static_cast<int>( sizeof( float ) ) ) {
+		parser.Error( "Animation is too large: %d frames, %d joints, %d components", numFrames, numJoints, numAnimatedComponents );
+	}
 
 	// parse the hierarchy
 	jointInfo.SetGranularity( 1 );

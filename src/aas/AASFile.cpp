@@ -273,6 +273,12 @@ bool idAASSettings::ParseBBoxes( idLexer &src ) {
 		}
 		src.Parse1DMatrix( 3, bounds[1].ToFloatPtr() );
 
+		// openQ4: the file decides how many boxes follow, and each one past the
+		// array's four was written over the settings and the file object after it
+		if ( numBoundingBoxes >= MAX_AAS_BOUNDING_BOXES ) {
+			src.Error( "more than %d bounding boxes", MAX_AAS_BOUNDING_BOXES );
+			return false;
+		}
 		boundingBoxes[numBoundingBoxes++] = bounds;
 	}
 	return false;
@@ -1186,6 +1192,17 @@ bool idAASFileLocal::ParseAreas( idLexer &src ) {
 		return false;
 	}
 	isDummy[AAS_DUMMY_AREAS] = ( numAreas == 0 );
+
+	// openQ4: a reachability's target area is a number from the file, and the
+	// link below stores a pointer in areas[] through it
+	for ( i = 0; i < areas.Num(); i++ ) {
+		for ( const idReachability *reach = areas[i].reach; reach; reach = reach->next ) {
+			if ( reach->toAreaNum < 0 || reach->toAreaNum >= areas.Num() ) {
+				src.Error( "area %d has a reachability to area %d of %d", i, reach->toAreaNum, areas.Num() );
+				return false;
+			}
+		}
+	}
 
 	LinkReversedReachability();
 

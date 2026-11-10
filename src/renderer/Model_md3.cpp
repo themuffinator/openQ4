@@ -42,6 +42,96 @@ If you have questions concerning this license or the applicable additional terms
 
 /*
 =================
+MD3_RangeInside
+
+True when count items of itemSize bytes starting at offset lie inside limit bytes.
+=================
+*/
+static bool MD3_RangeInside( int offset, int count, int itemSize, int limit ) {
+	if ( offset < 0 || count < 0 || offset > limit ) {
+		return false;
+	}
+	return static_cast<long long>( count ) * itemSize <= static_cast<long long>( limit ) - offset;
+}
+
+/*
+=================
+MD3_FileIsConsistent
+
+Checks every table InitFromFile touches against the file, using the sizes of
+the structures it reads them through.
+=================
+*/
+static bool MD3_FileIsConsistent( const byte *buffer, int size ) {
+	if ( size < (int)sizeof( md3Header_t ) ) {
+		return false;
+	}
+	const md3Header_t *header = (const md3Header_t *)buffer;
+	const int ofsEnd = LittleLong( header->ofsEnd );
+	const int numFrames = LittleLong( header->numFrames );
+	const int numTags = LittleLong( header->numTags );
+	const int numSurfaces = LittleLong( header->numSurfaces );
+
+	if ( ofsEnd < (int)sizeof( md3Header_t ) || ofsEnd > size ) {
+		return false;
+	}
+	if ( numFrames < 0 || numFrames > MD3_MAX_FRAMES || numTags < 0 || numTags > MD3_MAX_TAGS ||
+			numSurfaces < 0 || numSurfaces > MD3_MAX_SURFACES ) {
+		return false;
+	}
+	if ( !MD3_RangeInside( LittleLong( header->ofsFrames ), numFrames, sizeof( md3Frame_t ), ofsEnd ) ||
+			!MD3_RangeInside( LittleLong( header->ofsTags ), numTags * numFrames, sizeof( md3Tag_t ), ofsEnd ) ) {
+		return false;
+	}
+
+	int surfaceOffset = LittleLong( header->ofsSurfaces );
+	for ( int i = 0; i < numSurfaces; i++ ) {
+		if ( !MD3_RangeInside( surfaceOffset, 1, sizeof( md3Surface_t ), ofsEnd ) ) {
+			return false;
+		}
+		const md3Surface_t *surf = (const md3Surface_t *)( buffer + surfaceOffset );
+		const int surfaceEnd = LittleLong( surf->ofsEnd );
+		const int surfaceFrames = LittleLong( surf->numFrames );
+		const int numVerts = LittleLong( surf->numVerts );
+		const int numTriangles = LittleLong( surf->numTriangles );
+
+		if ( surfaceEnd < (int)sizeof( md3Surface_t ) || surfaceEnd > ofsEnd - surfaceOffset ) {
+			return false;
+		}
+		if ( memchr( surf->name, '\0', sizeof( surf->name ) ) == NULL ) {
+			return false;
+		}
+		if ( surfaceFrames < 0 || surfaceFrames > MD3_MAX_FRAMES || numVerts < 0 || numVerts > MD3_MAX_VERTS ) {
+			return false;
+		}
+		if ( !MD3_RangeInside( LittleLong( surf->ofsShaders ), LittleLong( surf->numShaders ), sizeof( md3Shader_t ), surfaceEnd ) ||
+				!MD3_RangeInside( LittleLong( surf->ofsTriangles ), numTriangles, sizeof( md3Triangle_t ), surfaceEnd ) ||
+				!MD3_RangeInside( LittleLong( surf->ofsSt ), numVerts, sizeof( md3St_t ), surfaceEnd ) ||
+				!MD3_RangeInside( LittleLong( surf->ofsXyzNormals ), numVerts * surfaceFrames, sizeof( md3XyzNormal_t ), surfaceEnd ) ) {
+			return false;
+		}
+		const md3Shader_t *shader = (const md3Shader_t *)( (const byte *)surf + LittleLong( surf->ofsShaders ) );
+		for ( int j = 0; j < LittleLong( surf->numShaders ); j++, shader++ ) {
+			if ( memchr( shader->name, '\0', sizeof( shader->name ) ) == NULL ) {
+				return false;
+			}
+		}
+		const md3Triangle_t *tri = (const md3Triangle_t *)( (const byte *)surf + LittleLong( surf->ofsTriangles ) );
+		for ( int j = 0; j < numTriangles; j++, tri++ ) {
+			for ( int k = 0; k < 3; k++ ) {
+				const int index = LittleLong( tri->indexes[k] );
+				if ( index < 0 || index >= numVerts ) {
+					return false;
+				}
+			}
+		}
+		surfaceOffset += surfaceEnd;
+	}
+	return true;
+}
+
+/*
+=================
 idRenderModelMD3::InitFromFile
 =================
 */
@@ -64,6 +154,15 @@ void idRenderModelMD3::InitFromFile( const char *fileName ) {
 
 	size = fileSystem->ReadFile( fileName, &buffer, NULL );
 	if (!size || size<0 ) {
+		return;
+	}
+
+	// openQ4: every offset and count below is the file's, and the loader used
+	// them as they came: it copied ofsEnd bytes whatever the file's size, and
+	// wrote material pointers and swapped values at offsets the file chose.
+	if ( !MD3_FileIsConsistent( (const byte *)buffer, size ) ) {
+		fileSystem->FreeFile( buffer );
+		common->Warning( "InitFromFile: %s is truncated or has tables outside the file", fileName );
 		return;
 	}
 

@@ -136,6 +136,14 @@ idMapPatch *idMapPatch::Parse( Lexer &src, const idVec3 &origin, bool patchDef3,
 		}
 	}
 
+	// openQ4: the control points are stored as width * height vertices. The
+	// product was taken in int from the file's numbers, so a patch declared
+	// 65537 by 65536 got 65536 of them and its rows were written past the end.
+	if ( !( info[0] >= 1.0f && info[0] <= 1024.0f && info[1] >= 1.0f && info[1] <= 1024.0f ) ) {
+		src.Error( "idMapPatch::Parse: bad size" );
+		return NULL;
+	}
+
 	idMapPatch *patch = new idMapPatch( info[0], info[1] );
 	patch->SetSize( info[0], info[1] );
 	if ( version < 2 ) {

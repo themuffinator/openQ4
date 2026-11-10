@@ -379,6 +379,9 @@ void idCollisionModelManagerLocal::ParseVertices( Lexer *src, idCollisionModelLo
 
 	src->ExpectTokenString( "{" );
 	model->numVertices = src->ParseInt();
+	if ( model->numVertices < 0 ) {
+		src->Error( "ParseVertices: bad vertex count %d", model->numVertices );
+	}
 	model->maxVertices = model->numVertices;
 	model->vertices = (cm_vertex_t *) Mem_Alloc( model->maxVertices * sizeof( cm_vertex_t ) );
 	for ( i = 0; i < model->numVertices; i++ ) {
@@ -400,6 +403,14 @@ void idCollisionModelManagerLocal::ParseEdges( Lexer *src, idCollisionModelLocal
 
 	src->ExpectTokenString( "{" );
 	model->numEdges = src->ParseInt();
+	// openQ4: the counts and indices in a .cm are the file's own. Nothing
+	// checked them, and CalculateEdgeNormals writes a normal through every
+	// polygon's edge numbers as the model loads, so a map's collision file
+	// could write twelve bytes at an offset of its choosing. The generated
+	// cache already holds what it reads and writes to these ranges.
+	if ( model->numEdges < 0 ) {
+		src->Error( "ParseEdges: bad edge count %d", model->numEdges );
+	}
 	model->maxEdges = model->numEdges;
 	model->edges = (cm_edge_t *) Mem_Alloc( model->maxEdges * sizeof( cm_edge_t ) );
 	for ( i = 0; i < model->numEdges; i++ ) {
@@ -407,6 +418,11 @@ void idCollisionModelManagerLocal::ParseEdges( Lexer *src, idCollisionModelLocal
 		model->edges[i].vertexNum[0] = src->ParseInt();
 		model->edges[i].vertexNum[1] = src->ParseInt();
 		src->ExpectTokenString( ")" );
+		// edge 0 is a placeholder no polygon refers to
+		if ( i > 0 && ( model->edges[i].vertexNum[0] < 0 || model->edges[i].vertexNum[0] >= model->numVertices ||
+				model->edges[i].vertexNum[1] < 0 || model->edges[i].vertexNum[1] >= model->numVertices ) ) {
+			src->Error( "ParseEdges: edge %d names a vertex outside the model's %d", i, model->numVertices );
+		}
 		model->edges[i].side = 0;
 		model->edges[i].sideSet = 0;
 		model->edges[i].internal = src->ParseInt();
@@ -481,11 +497,17 @@ void idCollisionModelManagerLocal::ParsePolygons( Lexer *src, idCollisionModelLo
 	while ( !src->CheckTokenString( "}" ) ) {
 		// parse polygon
 		numEdges = src->ParseInt();
+		if ( numEdges < 1 || numEdges > 65536 ) {
+			src->Error( "ParsePolygons: bad edge count %d", numEdges );
+		}
 		p = AllocPolygon( model, numEdges );
 		p->numEdges = numEdges;
 		src->ExpectTokenString( "(" );
 		for ( i = 0; i < p->numEdges; i++ ) {
 			p->edges[i] = src->ParseInt();
+			if ( p->edges[i] <= -model->numEdges || p->edges[i] >= model->numEdges ) {
+				src->Error( "ParsePolygons: edge %d is outside the model's %d", p->edges[i], model->numEdges );
+			}
 		}
 		src->ExpectTokenString( ")" );
 		src->Parse1DMatrix( 3, normal.ToFloatPtr() );
@@ -564,6 +586,9 @@ void idCollisionModelManagerLocal::ParseBrushes( Lexer *src, idCollisionModelLoc
 	while ( !src->CheckTokenString( "}" ) ) {
 		// parse brush
 		numPlanes = src->ParseInt();
+		if ( numPlanes < 1 || numPlanes > 65536 ) {
+			src->Error( "ParseBrushes: bad plane count %d", numPlanes );
+		}
 		b = AllocBrush( model, numPlanes );
 		b->numPlanes = numPlanes;
 		src->ExpectTokenString( "{" );

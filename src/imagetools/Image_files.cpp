@@ -474,6 +474,7 @@ static void LoadJPG( const char *filename, unsigned char **pic, int *width, int 
   int row_stride;		/* physical row width in output buffer */
   unsigned char *out;
   byte	*fbuffer;
+  int	fbufferLength = 0;	// openQ4: the file's bytes in fbuffer, without its padding
   byte  *bbuf;
 
   /* In this example we want to open the input file before doing anything else,
@@ -510,6 +511,7 @@ static void LoadJPG( const char *filename, unsigned char **pic, int *width, int 
 		// body a truncated file would otherwise leave uninitialized heap for
 		// libjpeg to parse.
 		fbuffer = (byte *)Mem_Alloc( len + 4096 );
+		fbufferLength = len;
 		memset( fbuffer + len, 0, 4096 );
 		if ( f->Read( fbuffer, len ) != len ) {
 			Mem_Free( fbuffer );
@@ -535,7 +537,7 @@ static void LoadJPG( const char *filename, unsigned char **pic, int *width, int 
 
   /* Step 2: specify data source (eg, a file) */
 
-  jpeg_stdio_src(&cinfo, fbuffer);
+  jpeg_stdio_src(&cinfo, fbuffer, fbufferLength);
 
   /* Step 3: read file parameters with jpeg_read_header() */
 
