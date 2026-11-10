@@ -268,6 +268,10 @@ only the current revision has:
 | `guis/vehicles/airassault/turretplayerhud.gui` | 2334 | the same file (The Awakening's own) | `oq4_prompt` |
 | `guis/vehicles/mcc/cannonplayerhud.gui` | 2334 | the same file (The Awakening's own) | `oq4_prompt` |
 | `guis/vehicles/speederplayerhud.gui` | 2334 | the same file (The Awakening's own) | `oq4_prompt` |
+| `guis/vehicles/hud.gui` | 2342 | `guis/savecompat/vehicle_hud_r3.gui` | `lock_state_msg` |
+| `guis/vehicles/airassault/turretplayerhud.gui` | 2342 | `guis/savecompat/q4x_turretplayerhud_r1.gui` | `lock_state_msg` |
+| `guis/vehicles/mcc/cannonplayerhud.gui` | 2342 | `guis/savecompat/q4x_cannonplayerhud_r1.gui` | `lock_state_msg` |
+| `guis/vehicles/speederplayerhud.gui` | 2342 | `guis/savecompat/q4x_speederplayerhud_r1.gui` | `lock_state_msg` |
 
 A GUI edited more than once lists its revisions oldest first, and a record is
 read through the first one whose build its payload predates. The 2280
@@ -288,7 +292,10 @@ generated from `guis/hud.gui` (`tools/ui/build_awakening_legacy_hud.py`): an
 edit to `hud.gui` changes it too, and it then needs its own revision under
 `guis/savecompat/` beside `hud.gui`'s. From build 2334 the same holds for the
 HUDs of The Awakening's dropship guns, MCC gun and speeder bike, whose
-definitions are generated from `guis/vehicles/hud.gui`.
+definitions are generated from `guis/vehicles/hud.gui`. The 2342 revisions
+are the first such case: the vehicle prompt began to follow the game's
+`vehicle_locked`, so `vehicles/hud.gui` and the three definitions generated
+from it each kept their previous definition.
 
 A record from a payload whose layout build predates the revision, and whose blob
 does not name that window, is read through `idUserInterface::ReadFromSaveGameWithLayout`.

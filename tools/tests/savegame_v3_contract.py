@@ -360,8 +360,10 @@ def validate_release_layout_contract(session: str, sp: str, mp: str, minimum_bui
     if not revisions:
         raise AssertionError("SaveGameReleases.h lists no GUI content revisions")
     pak0 = ROOT / "content/baseoq4/pak0"
+    # A GUI another game ships is read from openQ4's definition of it (idLegacyHudLayout::DefinitionFor).
+    definitions = dict(re.findall(r'\{"(guis/[^"]+\.gui)","(guis/openq4/[^"]+\.gui)"\}', read(ROOT / "src/ui/RetainedHud.cpp")))
     for name, _build, saved_definition, current_window in revisions:
-        current = read(pak0 / name)
+        current = read(pak0 / definitions.get(name, name))
         saved = read(pak0 / saved_definition)
         if f"windowDef {current_window}" not in current:
             raise AssertionError(f"{name} no longer defines {current_window}, its current-revision signature")

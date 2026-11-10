@@ -207,6 +207,12 @@ static const openQ4SaveGameGuiRevision_t OPENQ4_SAVEGAME_GUI_REVISIONS[] = {
 	{ "guis/vehicles/airassault/turretplayerhud.gui",	2334,	"guis/vehicles/airassault/turretplayerhud.gui",	"oq4_prompt" },
 	{ "guis/vehicles/mcc/cannonplayerhud.gui",	2334,	"guis/vehicles/mcc/cannonplayerhud.gui",	"oq4_prompt" },
 	{ "guis/vehicles/speederplayerhud.gui",	2334,	"guis/vehicles/speederplayerhud.gui",	"oq4_prompt" },
+	// The stock vehicle HUD's prompt and exit line follow the game's vehicle_locked, and with it
+	// the Awakening definitions generated from that HUD
+	{ "guis/vehicles/hud.gui",	2342,	"guis/savecompat/vehicle_hud_r3.gui",	"lock_state_msg" },
+	{ "guis/vehicles/airassault/turretplayerhud.gui",	2342,	"guis/savecompat/q4x_turretplayerhud_r1.gui",	"lock_state_msg" },
+	{ "guis/vehicles/mcc/cannonplayerhud.gui",	2342,	"guis/savecompat/q4x_cannonplayerhud_r1.gui",	"lock_state_msg" },
+	{ "guis/vehicles/speederplayerhud.gui",	2342,	"guis/savecompat/q4x_speederplayerhud_r1.gui",	"lock_state_msg" },
 };
 
 static inline const openQ4SaveGameGuiRevision_t *OpenQ4_FindSaveGameGuiRevision( const char *guiName, int layoutBuild ) {

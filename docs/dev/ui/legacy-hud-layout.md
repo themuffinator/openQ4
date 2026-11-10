@@ -139,12 +139,8 @@ wrapper windows: `p_radio_layout`, `p_powerups_layout`, `p_alerts_layout`,
 | `turretplayerhud.gui` (The Awakening's dropship guns) | `vehicles/hud.gui` without its status bar, damage flash and electrical warnings, so the gun has the transmission display, boss bar, notices and the Exit prompt, with the dropship panel always shown under the transmission display. Remastered turns the view cone relative to the ship's nose and draws it under the ship; the stock layout keeps it over the ship on the view's yaw. The expansion's HUD was a copy of the on-foot HUD with its gauges hidden; nothing it kept from that HUD is sent to a vehicle's HUD |
 | `cannonplayerhud.gui` (The Awakening's MCC gun) | The same base without the boss bar, with the U.S.S. Hannibal's hull readout at the top trailing edge. Remastered stacks it 36 u higher under the transmission display, fills the track with the hull (`mcchealth` of 2000) and turns the track and number red at a quarter with the vehicle gauges' pulse; the stock layout keeps the static track |
 | `speederplayerhud.gui` (The Awakening's speeder bike) | `vehicles/hud.gui` with the bike's weapons (0 the machinegun, 1 the cannon with its charge bar), the race display on the top edge under the boss bar and notices (18 u lower in Remastered, the timer at the Remastered sizes and red in the last ten seconds, shown only once the race runs it), and the boost in the HUD prompt before Exit: the crouch key and Boost while one is ready, the hazard and Boosting while it pushes. The stock layout names the crouch key on a line above the exit line and shows the expansion's hazard while boosting, which its own timelines hid for good |
-
-The three vehicle definitions read the game's `vehicle_locked` in the HUD
-prompt as well as the lock events, as the Remastered documents do: the race
-locks the bike and m06 the side gun without sending an event.
 | `mphud.gui` | See [multiplayer groups](#multiplayer-groups) |
-| `vehicles/hud.gui` | The status bar +170.5 u on the bottom edge; electrical warnings at the side edges; the keycap and Exit prompt (or Vehicle locked) on a fitted plate at the bottom-trailing corner; the squad stencil in #FFFF00 |
+| `vehicles/hud.gui` | The status bar +170.5 u on the bottom edge; electrical warnings at the side edges; the keycap and Exit prompt (or Vehicle locked) on a fitted plate at the bottom-trailing corner; the squad stencil in #FFFF00. The prompt and the stock layout's exit line follow the game's `vehicle_locked` as well as the lock events, as the Remastered documents do: a script that locks a vehicle sends no event (the Awakening's race locks the bike, m06 the side gun). The definitions generated from this HUD inherit that |
 
 ### Multiplayer groups
 
@@ -227,10 +223,6 @@ Each of these needs vector art or a layout a GUI script cannot express:
   for 8.05 s; a GUI script cannot pad a number), its red is immediate, not
   a 100 ms transition, and the speed streak of the boost is not drawn. The
   pips are the expansion's bitmaps, a little darker than the vector ones.
-- The stock `vehicles/hud.gui` still follows the lock events alone, so a
-  stock vehicle that a script locks without an event shows Exit where the
-  retained prompt shows Vehicle locked; the stock layout's exit line does the
-  same on the Awakening's vehicles.
 - The Awakening's GEV HUD (`gev_hud.gui`) keeps the expansion's script: no
   map places that vehicle, and ten of its materials ship with neither game.
   The air-defence cannon, which has no transmission display, keeps the stock
@@ -271,6 +263,15 @@ The dropship gun, MCC gun and speeder bike HUDs are saved with their vehicles,
 whether or not the player rides them. Their records followed the expansion's
 scripts until build 2334 and are read the same way (marker window
 `oq4_prompt`); their definitions change whenever `vehicles/hud.gui` does.
+
+It did the same day: the prompt and exit line began to follow `vehicle_locked`
+(a new window, `lock_state_msg`, and changed expressions). The definitions
+that builds up to then saved are kept as `vehicle_hud_r3.gui` and, for the
+three Awakening vehicles, `q4x_turretplayerhud_r1.gui`,
+`q4x_cannonplayerhud_r1.gui` and `q4x_speederplayerhud_r1.gui`, with the
+marker window `lock_state_msg`. An Awakening vehicle therefore has two
+entries: the expansion's own script for records older than build 2334, then
+openQ4's first definition for records up to build 2342.
 
 ## Evidence, 9 November 2026
 
@@ -456,3 +457,22 @@ definition (29 changed window values)", the gun's with 5, the MCC gun's with
 Not captured: the timer and pips driven by a race actually run (the pips and
 the low timer were forged events), the darts fired by the level's own flyers,
 and any of this on a 4:3 or ultrawide view.
+
+## Locked vehicles, 10 November 2026
+
+`.tmp/hud-round/run.py tank` with `.tmp/q4xhud/st_lock.py` on `convoy1`: the
+tank boarded, then locked through its `lock` script event, which sends the HUD
+no event. Pairs in `.tmp/hud-round/out/lock/` (untracked): `lk-open` shows Exit
+in both; `lk-locked` shows Vehicle locked with the padlock in both, where the
+stock interface showed Exit before; `lk-locked-classic` shows the stock
+layout's lock line in place of the exit line; `lk-open-classic` shows the exit
+line again once unlocked.
+
+Saves: with `.tmp/hud-round/savecompat.py tank`, a save written with the
+previous `vehicles/hud.gui` restored through `vehicle_hud_r3.gui` (12 changed
+window values, the boss bar and lock line among them). With
+`.tmp/q4xhud/savecompat_awk.py speeder|turret|mcc previous`, saves written with
+openQ4's first definitions of the three Awakening vehicles restored through
+their `q4x_*_r1.gui` revisions (106, 13 and 7 changed window values), and the
+4 November Awakening save on `m07_race` still restored through the expansion's
+script.

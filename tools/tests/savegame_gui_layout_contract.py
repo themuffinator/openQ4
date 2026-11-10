@@ -48,11 +48,11 @@ SERIALIZED_GUIS: dict[str, str] = {
     # The Awakening's guis/q4xhud.gui, which the engine reads from this definition
     # (idLegacyHudLayout::DefinitionFor; generated from guis/hud.gui).
     "guis/openq4/awakening/q4xhud.gui": "56a23a1fc2515b0ade85217725d68684d0f8bde6",
-    "guis/openq4/awakening/cannonplayerhud.gui": "d2ed3e80e9b377b455f3d8232ded903c2de0f6b7",
-    "guis/openq4/awakening/speederplayerhud.gui": "8c51b2aef073eb06156e596cd35b9e18c84dc235",
-    "guis/openq4/awakening/turretplayerhud.gui": "1450369bf59ac72a8f611ad495b60f5f1a8771bd",
+    "guis/openq4/awakening/cannonplayerhud.gui": "c9534629a60ffedf211207d5f979c7e8c5ecf598",
+    "guis/openq4/awakening/speederplayerhud.gui": "91ce8efaf287ba39fa72ad03b77173142609befe",
+    "guis/openq4/awakening/turretplayerhud.gui": "e108d7a8aa51171cea6f77e9b923d629d42aad44",
     "guis/vehicles/airdef_cannon.gui": "e92ae101f581b82a2885ac970b8755a92e1cbcae",
-    "guis/vehicles/hud.gui": "816270928d67d8825d15add0b235727f7f9adb97",
+    "guis/vehicles/hud.gui": "fcea89c5dd4a1a0b0afcb46ae3cdd4ea2beb42b1",
     "guis/vehicles/strogg_noise.gui": "d0777427b93ec45c90c6dfdf3ba6352aec981dc6",
     "guis/vehicles/turret_hud.gui": "7da86966bf5b66f3e5c90f926cf0a739eaf231e4",
     "guis/weapons/machinegun_scope.gui": "d2690deda0fc05b110508071a34051631df8c1c9",
@@ -178,6 +178,41 @@ GUI_REVISIONS: list[dict[str, object]] = [
         "marker": "oq4_prompt",
         "definition": "guis/openq4/awakening/speederplayerhud.gui",
         "external": "The Awakening (q4xbase)",
+    },
+    {
+        "gui": "guis/vehicles/hud.gui",
+        "firstBuild": 2342,
+        "savedDefinition": "guis/savecompat/vehicle_hud_r3.gui",
+        "marker": "lock_state_msg",
+        "savedBlob": "816270928d67d8825d15add0b235727f7f9adb97",
+        "shippedIn": "9dc0fecf8",
+    },
+    {
+        "gui": "guis/vehicles/airassault/turretplayerhud.gui",
+        "firstBuild": 2342,
+        "savedDefinition": "guis/savecompat/q4x_turretplayerhud_r1.gui",
+        "marker": "lock_state_msg",
+        "savedBlob": "1450369bf59ac72a8f611ad495b60f5f1a8771bd",
+        "shippedIn": "9dc0fecf8",
+        "definition": "guis/openq4/awakening/turretplayerhud.gui",
+    },
+    {
+        "gui": "guis/vehicles/mcc/cannonplayerhud.gui",
+        "firstBuild": 2342,
+        "savedDefinition": "guis/savecompat/q4x_cannonplayerhud_r1.gui",
+        "marker": "lock_state_msg",
+        "savedBlob": "d2ed3e80e9b377b455f3d8232ded903c2de0f6b7",
+        "shippedIn": "9dc0fecf8",
+        "definition": "guis/openq4/awakening/cannonplayerhud.gui",
+    },
+    {
+        "gui": "guis/vehicles/speederplayerhud.gui",
+        "firstBuild": 2342,
+        "savedDefinition": "guis/savecompat/q4x_speederplayerhud_r1.gui",
+        "marker": "lock_state_msg",
+        "savedBlob": "8c51b2aef073eb06156e596cd35b9e18c84dc235",
+        "shippedIn": "9dc0fecf8",
+        "definition": "guis/openq4/awakening/speederplayerhud.gui",
     },
 ]
 
@@ -350,7 +385,7 @@ def validate_release_provenance() -> None:
     for entry in GUI_REVISIONS:
         if "external" in entry:
             continue
-        gui = entry["gui"]
+        gui = entry.get("definition", entry["gui"])
         shipped = entry["shippedIn"] if "shippedIn" in entry else f"{entry['shippedBefore']}^"
         result = subprocess.run(
             ["git", "-C", str(ROOT), "rev-parse", "--verify", "--quiet",

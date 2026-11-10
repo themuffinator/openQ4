@@ -225,7 +225,9 @@ the [audit notes](ui/performance-presets.md#hardware-range-audit-10-november-202
     boost key and shows a hazard while you boost; the expansion's own boost
     warning never appeared. The race timer no longer shows placeholder
     digits before a race starts.
-  - A vehicle the level has locked shows "Vehicle locked", not "Exit".
+  - A vehicle the level has locked shows "Vehicle locked", not "Exit". The
+    same now holds for the walker and the hover tank in Quake 4's own
+    campaign.
 - **The Awakening, modern interface.** The dropship panel keeps its damage and
   objective markers after you load a save or change the HUD layout; it used
   to come back empty.

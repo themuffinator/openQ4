@@ -739,7 +739,7 @@ windowDef Desktop
 		hudanchorx	right
 		hudanchory	bottom
 		visible	0
-		forecolor	1,1,1,1 - "gui::oq4_hudRemastered"
+		forecolor	1,1,1,(1 - "gui::oq4_hudRemastered") * ("gui::vehicle_locked" == 0)
 		text	"#str_200909"
 		textscale	0.25
 		font	"fonts/lowpixel"
@@ -759,19 +759,36 @@ windowDef Desktop
 		textalign	2
 		textstyle	1
 	}
+	// openQ4: a script that locks a vehicle sends no lock event; the game
+	// reports the lock as vehicle_locked. The stock layout then shows this
+	// line in place of the exit line, and the Remastered prompt Vehicle locked.
+	windowDef lock_state_msg
+	{
+		rect	310 + "gui::oq4_hudEdgeRight",457 + "gui::oq4_hudEdgeBottom",319,19
+		hudanchorx	right
+		hudanchory	bottom
+		visible	"gui::vehicle_locked" * (1 - "lock_msg::visible")
+		forecolor	1,0.5,0,1 - "gui::oq4_hudRemastered"
+		text	"#str_200913"
+		textscale	0.25
+		font	"fonts/lowpixel"
+		textalign	2
+		textstyle	1
+	}
 	// openQ4: the Remastered HUD prompt (14.8): one sheared plate at black 0.50
 	// at the bottom-trailing corner, never wider than its content: the jump
 	// key's cap (the engine's inline keycap) and Exit, or Vehicle locked in
-	// #FF8000 while a script locks the vehicle.
+	// #FF8000 while a script locks the vehicle (its lock events or the game's
+	// vehicle_locked).
 	windowDef oq4_prompt
 	{
 		rect	0,0,640,480
 		hudanchorx	right
 		hudanchory	bottom
 		noclip	1
-		visible	"gui::oq4_hudRemastered" * ("exit_msg::visible" + "lock_msg::visible")
+		visible	"gui::oq4_hudRemastered" * (("exit_msg::visible" * ("gui::vehicle_locked" == 0)) + (("lock_msg::visible" + "gui::vehicle_locked") > 0))
 		definefloat	"chip"	"oq4_prompt_key::textwidth"
-		definefloat	"width"	"exit_msg::visible" * (15 + "oq4_prompt::chip" + "oq4_prompt_exit::textwidth") + "lock_msg::visible" * (23 + "oq4_prompt_locked::textwidth")
+		definefloat	"width"	("exit_msg::visible" * ("gui::vehicle_locked" == 0)) * (15 + "oq4_prompt::chip" + "oq4_prompt_exit::textwidth") + (("lock_msg::visible" + "gui::vehicle_locked") > 0) * (23 + "oq4_prompt_locked::textwidth")
 		definefloat	"left"	629 + "gui::oq4_hudEdgeRight" - "oq4_prompt::width"
 		definefloat	"top"	460 + "gui::oq4_hudEdgeBottom"
 		windowDef oq4_prompt_plate
@@ -788,7 +805,7 @@ windowDef Desktop
 			font	"fonts/lowpixel"
 			textscale	0.2
 			forecolor	1,1,1,0.92
-			visible	"exit_msg::visible"
+			visible	("exit_msg::visible" * ("gui::vehicle_locked" == 0))
 			nowrap	1
 		}
 		windowDef oq4_prompt_exit
@@ -798,7 +815,7 @@ windowDef Desktop
 			font	"fonts/lowpixel"
 			textscale	0.2
 			forecolor	1,1,1,0.92
-			visible	"exit_msg::visible"
+			visible	("exit_msg::visible" * ("gui::vehicle_locked" == 0))
 			nowrap	1
 		}
 		// openQ4: the lock before Vehicle locked (14.8), the stock padlock in the notice's #FF8000.
@@ -807,7 +824,7 @@ windowDef Desktop
 			rect	"oq4_prompt::left" + 5,"oq4_prompt::top" + 2.5,11,11
 			background	"gfx/guis/mainmenu/icon_locked"
 			matcolor	1,0.5,0,1
-			visible	"lock_msg::visible"
+			visible	(("lock_msg::visible" + "gui::vehicle_locked") > 0)
 		}
 		windowDef oq4_prompt_locked
 		{
@@ -816,7 +833,7 @@ windowDef Desktop
 			font	"fonts/lowpixel"
 			textscale	0.2
 			forecolor	1,0.5,0,1
-			visible	"lock_msg::visible"
+			visible	(("lock_msg::visible" + "gui::vehicle_locked") > 0)
 			nowrap	1
 		}
 	}

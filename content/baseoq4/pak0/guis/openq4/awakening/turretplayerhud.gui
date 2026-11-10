@@ -859,7 +859,7 @@ windowDef Desktop
 		hudanchorx	right
 		hudanchory	bottom
 		visible	0
-		forecolor	1,1,1,1 - "gui::oq4_hudRemastered"
+		forecolor	1,1,1,(1 - "gui::oq4_hudRemastered") * ("gui::vehicle_locked" == 0)
 		text	"#str_200909"
 		textscale	0.25
 		font	"fonts/lowpixel"
@@ -879,10 +879,27 @@ windowDef Desktop
 		textalign	2
 		textstyle	1
 	}
+	// openQ4: a script that locks a vehicle sends no lock event; the game
+	// reports the lock as vehicle_locked. The stock layout then shows this
+	// line in place of the exit line, and the Remastered prompt Vehicle locked.
+	windowDef lock_state_msg
+	{
+		rect	310 + "gui::oq4_hudEdgeRight",457 + "gui::oq4_hudEdgeBottom",319,19
+		hudanchorx	right
+		hudanchory	bottom
+		visible	"gui::vehicle_locked" * (1 - "lock_msg::visible")
+		forecolor	1,0.5,0,1 - "gui::oq4_hudRemastered"
+		text	"#str_200913"
+		textscale	0.25
+		font	"fonts/lowpixel"
+		textalign	2
+		textstyle	1
+	}
 	// openQ4: the Remastered HUD prompt (14.8): one sheared plate at black 0.50
 	// at the bottom-trailing corner, never wider than its content: the jump
 	// key's cap (the engine's inline keycap) and Exit, or Vehicle locked in
-	// #FF8000 while a script locks the vehicle.
+	// #FF8000 while a script locks the vehicle (its lock events or the game's
+	// vehicle_locked).
 	windowDef oq4_prompt
 	{
 		rect	0,0,640,480

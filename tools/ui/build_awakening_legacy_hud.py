@@ -336,20 +336,6 @@ def set_visible(text: str, name: str, expression: str) -> str:
     return text[:match.start()] + f"\t\tvisible\t{expression}" + text[match.end():]
 
 
-def lock_from_state(text: str) -> str:
-    """The HUD prompt follows the game's vehicle_locked as well as the lock
-    events, as the Remastered documents' prompt does: a script that locks a
-    vehicle sends no event (the race locks the bike, m06 the side gun)."""
-    start = window_start(text, "oq4_prompt")
-    end = block_end(text, start)
-    prompt = text[start:end]
-    if prompt.count('"lock_msg::visible"') != 4 or prompt.count('"exit_msg::visible"') != 4:
-        raise ValueError("the HUD prompt no longer reads the exit and lock lines four times each")
-    prompt = prompt.replace('"lock_msg::visible"', '(("lock_msg::visible" + "gui::vehicle_locked") > 0)')
-    prompt = prompt.replace('"exit_msg::visible"', '("exit_msg::visible" * ("gui::vehicle_locked" == 0))')
-    return text[:start] + prompt + text[end:]
-
-
 def add_windows_before(text: str, name: str, block: str) -> str:
     at = window_start(text, name)
     return text[:at] + block.lstrip("\n") + text[at:]
@@ -433,7 +419,6 @@ def generate_turret(source: str) -> str:
 	// (ui-visual-design.md 14.12), which also lets the view through the disc.
 """ + ship_panel(visible="1", cone_visible='1 - "gui::oq4_hudRemastered"', cone_under='"gui::oq4_hudRemastered"',
                  cone_rotate='"gui::playerYaw" - "gui::oq4_shipYaw" * "gui::oq4_hudRemastered"'))
-    text = lock_from_state(text)
     return finish(text, vehicle_header("guis/vehicles/airassault/turretplayerhud.gui", "dropship guns"))
 
 
@@ -541,7 +526,6 @@ def generate_mcc(source: str) -> str:
     for name in GUN_HIDDEN + ("p_boss_layout",):
         text = set_visible(text, name, "0")
     text = add_windows(text, MCC_READOUT)
-    text = lock_from_state(text)
     return finish(text, vehicle_header("guis/vehicles/mcc/cannonplayerhud.gui", "MCC gun"))
 
 
@@ -816,11 +800,13 @@ def generate_speeder(source: str) -> str:
     start = window_start(text, "oq4_prompt")
     end = block_end(text, start)
     prompt = text[start:end]
-    prompt = replace_once(prompt, 'visible	"gui::oq4_hudRemastered" * ("exit_msg::visible" + "lock_msg::visible")',
-                          'visible	"gui::oq4_hudRemastered" * ("exit_msg::visible" + "lock_msg::visible" + ("gui::oq4_boost" < 2))')
+    shown = re.search(r'^\t\tvisible\t"gui::oq4_hudRemastered" \* \((.*)\)$', prompt, re.MULTILINE)
+    if shown is None:
+        raise ValueError("the HUD prompt no longer shows by the Remastered layout and its lines")
+    prompt = prompt[:shown.end(1)] + ' + ("gui::oq4_boost" < 2)' + prompt[shown.end(1):]
     prompt = replace_once(prompt, '\t\tdefinefloat\t"chip"\t"oq4_prompt_key::textwidth"\n',
                           '\t\tdefinefloat\t"chip"\t"oq4_prompt_key::textwidth"\n\t\tdefinefloat\t"boost"\t' + BOOST_WIDTH + "\n")
-    prompt = replace_once(prompt, '\t\tdefinefloat\t"width"\t"exit_msg::visible"', '\t\tdefinefloat\t"width"\t"oq4_prompt::boost" + "exit_msg::visible"')
+    prompt = replace_once(prompt, '\t\tdefinefloat\t"width"\t', '\t\tdefinefloat\t"width"\t"oq4_prompt::boost" + ')
     if prompt.count('"oq4_prompt::left" + ') != 4:
         raise ValueError("the HUD prompt no longer places four items from its leading edge")
     prompt = prompt.replace('"oq4_prompt::left" + ', '"oq4_prompt::left" + "oq4_prompt::boost" + ')
@@ -828,7 +814,6 @@ def generate_speeder(source: str) -> str:
     prompt = prompt[:at] + BOOST_ITEMS + "\t}"
     text = text[:start] + prompt + text[end:]
 
-    text = lock_from_state(text)
     text = add_events(text, race_events())
     # Under the boss bar and the notices, as the Remastered display is.
     race, boost = race_windows()
