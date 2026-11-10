@@ -261,6 +261,20 @@ public:
 	idInteraction *			lastInteraction;
 
 	bool					needsPortalSky;
+
+	// Vulkan shadow-map admission (R_ShadowMapReceiversAllowMaps): whether a
+	// surface of the model this entity last drew uses authored GLSL lighting,
+	// which only a light's stencil chain can shadow. An animating entity's
+	// interactions are freed on every update, so the verdict is kept here,
+	// with the model instance and the model, skin and custom shader it was
+	// taken from. A generation of -1 means none was taken yet.
+	int						stencilReceiverGeneration;
+	bool					stencilReceiverNeeded;
+	const idRenderModel *	stencilReceiverInstance;
+	int						stencilReceiverInstanceFrame;
+	const idRenderModel *	stencilReceiverModel;
+	const idDeclSkin *		stencilReceiverSkin;
+	const idMaterial *		stencilReceiverShader;
 };
 
 /*

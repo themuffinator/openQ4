@@ -46,7 +46,7 @@ cache (sixteen at most) against forty cubes in view.
 | **The point receiver's per-texel path was the common path.** Each of the nine taps compared four texels against their own point on the receiver plane, with a cube-face selection each: 36 comparisons that read a four-by-four block of texels. | **Fixed, both backends.** The default kernel (nine fixed taps, one texel radius, hardware comparison) is one pass over the sixteen texels with the same weights, or nine plain bilinear lookups where the bias covers the block. Other tap counts, radii and the rotated mode keep the tap-by-tap path. 1.6 to 2.6 ms of GPU in hub2 against the old path, in two launches. |
 | **Receivers filtered shadows for fragments the light does not reach** (outside the falloff, turned away). | **Fixed, both backends**, in the stock-material path. The PBR variants still sample first. |
 | **Entities the game updates once a tic flipped between live and static** whenever the display outran the tic rate, because "live" meant "changed in the last frame". Each flip changed the static caster signature and forced a static re-render. | **Fixed.** A caster is live for the frames of a quarter second (`R_ShadowMapDynamicCasterFrames`). |
-| Mapped lights still do the stencil front-end work: dynamic volumes are generated for mapped lights (the suppression tests the instantiated model, which is always static), and prelit lights, nine in ten, never elide volume linking. | **Open.** See "Still open". |
+| **Mapped lights still did the stencil front-end work.** Three causes. Prelit lights, nine in ten, never shed their volumes. Dynamic volumes were never left out, because the test asked the instantiated snapshot, which is always a static model. And a caster beyond its shadow LOD distance (768 units for every game entity) left the map while its volume stayed, which read as a caster the map cannot hold and put the light on its stencil supplement for the rest of the level; the main light of the airdefense1 arena was one. On Vulkan a fourth: the player's own body and head, never seen in first person, kept every light near the camera "unknown" until their turn in the entity walk. | **Fixed, both backends.** See "Stencil front-end work" below. |
 
 ### Agreement with stencil
 
@@ -120,6 +120,66 @@ composed pass trades its static draws for a copy, five layout transitions and
 six more render scopes. The validation layers reported nothing in hub2 or the
 arena with composition on, or with the shared interaction stream on.
 
+### Stencil front-end work
+
+Added on 10 November. What changed:
+
+- **Prelit lights shed their volumes like any other.** A mapped light casts
+  from per-surface volumes whether or not dmap baked a prelight, so the
+  exclusion protected nothing. Point lights always qualify. An atlas light
+  (projected, parallel, distant point) does when every atlas light of the view
+  is certain of a tile, counted at two blocks a light: Vulkan gives a light
+  that finds the atlas full nothing but its volumes in that frame, and Quality
+  and Ultra cut four tiles. This also covers lights without a prelight, which
+  used to shed their volumes whether or not the atlas could hold the view.
+- **Dynamic models get no volumes under a mapped light**, by the entity's own
+  model. An entity that stops animating keeps those surfaces, so they are
+  built again, with volumes, when the light returns to stencil (sticky
+  fallback, update budget, a receiver that needs stencil). A subview policy
+  alone does not rebuild: there the missing volumes already make the map
+  required.
+- **The map and the stencil volume agree on shadow LOD.** A surface that got a
+  volume when its interaction was built stays a map caster, as it stays a
+  stencil caster. A surface built without one still joins the map when a view
+  admits it. Static casters therefore no longer drop out of cached maps as the
+  camera moves away, which also spares the cache a re-render at each crossing.
+- **Vulkan's receiver scan answers for entities it has not built yet.** An
+  entity the view does not see links no receivers and is skipped; a static
+  model answers for itself; an animating entity is answered by the verdict of
+  the model it last drew, while it still names the same model, skin and custom
+  shader. A surface an entity gains without changing any of those (an
+  overlay, a suppression mask) is seen one view late, which for a material
+  with authored GLSL lighting means one frame without the volumes of entities
+  walked before it.
+
+airdefense1 arena, Quality, about ten animated characters in view:
+
+| | OpenGL | Vulkan |
+|---|---:|---:|
+| Shadow volumes built a frame, before | 31 to 36 | 31 to 36 |
+| Shadow volumes built a frame, after | 0 | 0 |
+| The same with `r_shadowMapSkipStencilShadows 0` | 34 | 33 |
+| CPU frame, ms, switch off against on | 5.23 to 5.09 | 3.70 to 3.55 |
+
+The CPU row is the median frame at a fixed view, alternating windows in one
+launch, after the first pair. Against the build before the change the sampler
+(`cpu_sampler.py`, OpenGL, view sweep, one launch each) puts the front end at
+1.33 ms a frame from 2.06, of which linking and building interactions is 0.28
+from 0.72 and shadow-volume generation nothing from 0.20; with the switch off
+in the new build it reads 1.75 ms. The two methods do not agree on the size,
+0.14 ms against 0.4, so take the smaller as measured and the larger as an
+upper bound. Scenes with fewer animated casters gain less.
+
+Checked for this change: all fourteen `renderer_shadow_mapping_maps.py`
+scenarios on both backends (`door-projected` failed once on OpenGL, for a
+missed cache reuse, while other tests loaded the machine, and passed twice run
+alone). Under an update budget of one the volumes are built again (27 to 29 a
+frame) and the frame is stencil-shadowed; back at zero they stop. The
+validation layers reported nothing through that cycle. No stock view with a
+mirror or camera screen was exercised, so the subview rule rests on the code:
+missing volumes mark the stencil fallback incomplete, which makes the map
+required there on both backends.
+
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
 (caster counts, cache reuse, cached against fresh images byte-identical; run
@@ -140,10 +200,13 @@ whether Enhanced can now map point lights on Vulkan.
 
 ## Still open, in order of value
 
-1. Front-end elision for prelit lights and suppression of dynamic volumes for
-   mapped lights, with a rebuild when a light returns to stencil.
-2. A tile size per projected light, so the atlas holds a view at every tier.
-3. Depth-only point cubes on OpenGL while nothing samples the colour cube.
-4. Cube faces the view cannot see; fullscreen budgets for the three tiers.
-5. One static cube for both ownerships of a composed Vulkan light, as on
+1. A tile size per projected light, so the atlas holds a view at every tier.
+   Until then atlas lights keep their volumes in any view with more than two
+   of them at Quality and Ultra.
+2. Depth-only point cubes on OpenGL while nothing samples the colour cube.
+3. Cube faces the view cannot see; fullscreen budgets for the three tiers.
+4. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. It needs a resident entry two passes of a view can share.
+5. Static-world volumes are still built once for every mapped light and kept
+   for the fallback. Leaving them out too would need the same rebuild on
+   return, for every surface the light touches.

@@ -5451,7 +5451,7 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
             surfaceCanCastStencilShadowVolume && shadowLODAdmitted &&
             ( surfaceCanCastDedicatedShadowMap ||
                 surfaceCanCastTranslucentShadowMap ) &&
-            model->IsDynamicModel() != DM_STATIC &&
+            entityModelIsDynamic &&
             !forcePointEmitterStencilGeneration &&
             R_ShadowMapLightWillUseShadowMaps( lightDef );""",
         "point-emitter volume probe before dynamic elision",
@@ -5636,14 +5636,28 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
         "bool R_ShadowMapLightWillUseShadowMaps(",
         "front-end shadow-map stencil-elision admission",
     )
-    require_compact(
+    # A mapped prelit light casts from per-surface volumes like any other, so
+    # it sheds them the same way. What an atlas light cannot count on is its
+    # tile: it keeps its volumes unless the view's atlas lights all fit.
+    require_order(
         map_admission,
-        """if ( r_useOptimizedShadows.GetBool()
-                && R_LightHasRealPrelightModel( lightDef->parms ) ) {
-            return false;
-        }""",
-        "optimized-prelight complete stencil fallback retention",
+        (
+            """const bool pointLightPath = lightDef->parms.pointLight && !lightDef->parms.parallel
+                && !R_ShadowMapUsesDistantPointProjection( lightDef->parms );""",
+            """if ( pointLightPath ) {
+                if ( !r_shadowMapPointLights.GetBool() || !glConfig.cubeMapAvailable ) {
+                    return false;
+                }
+            } else if ( !R_ShadowMapAtlasHoldsView() ) {""",
+            "return false;",
+            "if ( !RB_ShadowMapResourcesKnownGood( pointLightPath ) ) { return false; }",
+        ),
+        "atlas lights shed their volumes only in a view whose atlas holds them all",
     )
+    if "R_LightHasRealPrelightModel" in map_admission:
+        raise AssertionError(
+            "A mapped prelit light has per-surface volumes and must shed them like any other light"
+        )
     if "protectStaticWorldNoSelfReceivers" in prelight:
         raise AssertionError(
             "Combined optimized prelights cannot conditionally lose LOCAL receiver ownership"
@@ -7310,19 +7324,54 @@ def validate_vulkan_receiver_scan_contract() -> None:
     if "surfaces[i].shader == NULL" in admission:
         raise AssertionError("a finished interaction's NULL slot must not keep every stencil volume of the light")
     scan = braced_body(light, "static bool R_ShadowMapReceiversAllowMaps(", "Vulkan receiver scan")
+    # An unbuilt interaction that may still link receivers in this view keeps
+    # the light unknown. Three cannot: an entity outside the view set, an
+    # interaction already visited and left unbuilt, an entity the view does not
+    # see. One still waiting for its visible entity's turn is answered by that
+    # entity's model: the model itself when static, the remembered verdict of
+    # the model it last drew when it animates.
     require_order(scan, ("vLight->shadowMapReceiverScanValid", "return vLight->shadowMapReceiverScanAllowsMaps;",
                          "VK_MaterialPrograms_NeedsStencilGeneration()",
                          "if ( inter->IsDeferred() ) {",
-                         "if ( inter->entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {",
+                         "if ( entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {",
+                         "continue;",
+                         "if ( entityDef->viewEntity == NULL || entityDef->viewEntity->scissorRect.IsEmpty() ) {",
+                         "continue;",
+                         "if ( hModel != NULL && hModel->IsDynamicModel() == DM_STATIC && entityDef->parms.callback == NULL ) {",
+                         "R_ShadowMapNoteEntityModel( entityDef, hModel );",
+                         "if ( R_EntityReceiverVerdict( entityDef, generation, entityNeedsStencil )",
+                         "&& !entityNeedsStencil ) {",
                          "continue;", "allowsMaps = false;",
                          "if ( R_InteractionReceiverNeedsStencil( inter, generation ) ) {", "allowsMaps = false;",
                          "vLight->shadowMapReceiverScanValid = true;"),
                   "memoized Vulkan receiver scan keeps unbuilt interactions that may still gain receivers unknown")
+    model_verdict = braced_body(light, "static bool R_ModelReceiverNeedsStencil(", "whole-model receiver verdict")
+    require_order(model_verdict, ("surf->geometry == NULL",
+                                  "R_RemapShaderBySkin( surf->shader, parms.customSkin, parms.customShader ), NULL )",
+                                  "return true;"),
+                  "a model answers for every surface with geometry, under the entity's skin and shader")
     verdict = braced_body(light, "static bool R_InteractionReceiverNeedsStencil(", "per-interaction receiver verdict")
-    require_order(verdict, ("if ( inter->buildModel != NULL ) {", "surf->geometry == NULL",
-                            "R_RemapShaderBySkin( surf->shader, parms.customSkin, parms.customShader ), NULL );",
+    require_order(verdict, ("if ( inter->buildModel != NULL ) {",
+                            "R_ModelReceiverNeedsStencil( inter->buildModel, inter->entityDef->parms );",
                             "VK_MaterialPrograms_NeedsStencil( inter->surfaces[i].shader, NULL );"),
                   "building interactions answer for the whole model, built ones for their filled slots")
+    # The remembered verdict is only as good as the identity it was taken for.
+    entity_verdict = braced_body(light, "static bool R_EntityReceiverVerdict(", "remembered entity receiver verdict")
+    require_order(entity_verdict, ("def->stencilReceiverGeneration != generation",
+                                   "def->stencilReceiverModel != def->parms.hModel",
+                                   "def->stencilReceiverSkin != def->parms.customSkin",
+                                   "def->stencilReceiverShader != def->parms.customShader",
+                                   "return false;", "needed = def->stencilReceiverNeeded;"),
+                  "a remembered verdict stands only for the same model, skin, shader and program generation")
+    note = braced_body(light, "void R_ShadowMapNoteEntityModel(", "entity receiver verdict recorder")
+    require_order(note, ("#ifdef OPENQ4_RENDERER_VK_MODULE",
+                         "def->stencilReceiverInstance == model",
+                         "def->stencilReceiverInstanceFrame == def->dynamicModelFrameCount",
+                         "def->stencilReceiverNeeded = R_ModelReceiverNeedsStencil( model, def->parms );"),
+                  "the verdict is taken again from every model instance")
+    require(braced_body(light, "void R_AddModelSurfaces(", "view entity submission"),
+            "R_ShadowMapNoteEntityModel( vEntity->entityDef, model );",
+            "a visible entity whose interactions are all culled still records its model")
 
     interaction = read("src/renderer/Interaction.cpp")
     for marker, context in (("idInteraction *idInteraction::AllocAndLink(", "new unbuilt interaction"),
@@ -7340,7 +7389,8 @@ def validate_vulkan_receiver_scan_contract() -> None:
     require(braced_body(interaction, "void idInteraction::FreeSurfaces(", "freed surfaces"), "this->unbuiltVisitView = -1;",
             "freed surfaces forget the unbuilt visit")
     create = braced_body(interaction, "void idInteraction::CreateInteraction(", "interaction creation")
-    require_order(create, ("buildModel = model;", "R_InvalidateShadowMapReceiverScan( lightDef );",
+    require_order(create, ("R_ShadowMapNoteEntityModel( entityDef, model );",
+                           "buildModel = model;", "R_InvalidateShadowMapReceiverScan( lightDef );",
                            "const bool suppressDynamicShadowVolume =", "buildModel = NULL;",
                            "R_InvalidateShadowMapReceiverScan( lightDef );", "MakeEmpty();"),
                   "interaction creation brackets its slots with the build model")
@@ -7739,6 +7789,117 @@ def validate_point_cache_parity_and_receiver_cost_contract() -> None:
     )
 
 
+def validate_stencil_elision_contract() -> None:
+    """A mapped light sheds the stencil work it no longer draws.
+
+    Three things kept that from happening for most lights: a prelit light
+    never shed anything, a dynamic model's volumes were never left out
+    (the test looked at the instantiated snapshot, which is always static),
+    and a caster the camera had moved away from dropped out of the map while
+    its volume stayed, which read as a caster the map cannot hold and turned
+    the light to stencil for good.
+    """
+    light = read("src/renderer/tr_light.cpp")
+    interaction = read("src/renderer/Interaction.cpp")
+    classification = read("src/renderer/ShadowMapClassification.cpp")
+    classification_h = read("src/renderer/ShadowMapClassification.h")
+
+    require(read("src/renderer/tr_local.h"),
+            "bool R_ShadowMapLightWillUseShadowMaps( const idRenderLightLocal *lightDef, const bool applySubviewPolicy = true );",
+            "the admission can be asked for every view of the frame")
+    admission = braced_body(light, "bool R_ShadowMapLightWillUseShadowMaps(",
+                            "front-end shadow-map stencil-elision admission")
+    require_compact(admission,
+        """if ( applySubviewPolicy && tr.viewDef != NULL && tr.viewDef->isSubview
+                && r_shadowMapSubviewPolicy.GetInteger() > 0 ) {""",
+        "only the subview clause differs between the views of a frame")
+
+    # The atlas is allocated per view; an atlas light sheds its volumes only
+    # when every atlas light of the view is certain of a tile.
+    holds = braced_body(light, "static bool R_ShadowMapAtlasHoldsView(", "per-view atlas capacity")
+    require_order(
+        holds,
+        (
+            "const viewDef_t *viewDef = tr.viewDef != NULL ? tr.viewDef : backEnd.viewDef;",
+            "for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {",
+            "!lightDef->lightShader->LightCastsShadows()",
+            "!R_ShadowMapsNeedPerSurfaceStencilVolumes( lightDef )",
+            "if ( classification.pointLight ) {",
+            "continue;",
+            "const int maxTileSize = atlasSize / atlasDiv;",
+            "largestBlock = Max( largestBlock, tileSize * atlasDiv );",
+            "blocks += 2;",
+            "cachedHolds = blocks <= R_ShadowMapAtlasBlockCapacity( atlasSize, largestBlock, 1 );",
+        ),
+        "two blocks for every atlas light of the view against what the atlas is certain to hold",
+    )
+    require(classification_h, "int R_ShadowMapAtlasBlockCapacity( int atlasSize, int tileSize, int atlasDiv );",
+            "shared atlas capacity policy")
+    capacity = braced_body(classification, "int R_ShadowMapAtlasBlockCapacity(", "atlas block capacity")
+    require_order(capacity, ("atlasSize <= 0 || tileSize <= 0 || atlasDiv <= 0", "return 0;",
+                             "static_cast<long long>( tileSize ) * atlasDiv", "atlasSize / blockSize",
+                             "perRow * perRow"), "atlas block capacity")
+    selftest = braced_body(classification, "bool R_ShadowMapCachePolicySelfTest(", "shared policy self-test")
+    for case in ("R_ShadowMapAtlasBlockCapacity( 4096, 2048, 1 ) != 4",
+                 "R_ShadowMapAtlasBlockCapacity( 8192, 4096, 1 ) != 4",
+                 "R_ShadowMapAtlasBlockCapacity( 4096, 1024, 1 ) != 16",
+                 "R_ShadowMapAtlasBlockCapacity( 16384, 4096, 2 ) != 4"):
+        require(selftest, case, "the self-test pins each preset's atlas capacity")
+
+    # Dynamic volumes are left out by the entity's own model, and come back
+    # when the light returns to stencil.
+    create = braced_body(interaction, "void idInteraction::CreateInteraction(", "interaction creation")
+    require_order(
+        create,
+        (
+            "shadowVolumesSuppressed = false;",
+            """const bool entityModelIsDynamic =
+                entityDef->parms.hModel != NULL &&
+                entityDef->parms.hModel->IsDynamicModel() != DM_STATIC;""",
+            "if ( suppressDynamicShadowVolume ) {",
+            "interactionGenerated = true;",
+            "shadowVolumesSuppressed = true;",
+            "} else if ( sint->shadowStencilEligible ) {",
+        ),
+        "a dynamic model's volumes are left out while its light renders shadow maps",
+    )
+    if "model->IsDynamicModel() != DM_STATIC" in create:
+        raise AssertionError(
+            "The instantiated snapshot is always static: ask the entity's own model whether it is dynamic"
+        )
+    active = braced_body(interaction, "void idInteraction::AddActiveInteraction(", "interaction submission")
+    require_order(
+        active,
+        (
+            "dynamicModelFrameCount = entityDef->dynamicModelFrameCount;",
+            """if ( !IsDeferred() && shadowVolumesSuppressed
+                    && !R_ShadowMapLightWillUseShadowMaps( lightDef, false ) ) {
+                FreeSurfaces();
+            }""",
+            "if ( IsDeferred() ) {",
+            "CreateInteraction( model );",
+        ),
+        "surfaces built without volumes are built again when the light returns to stencil",
+    )
+    for marker, context in (("idInteraction::idInteraction( void ) {", "new interaction"),
+                            ("idInteraction *idInteraction::AllocAndLink(", "linked interaction"),
+                            ("void idInteraction::FreeSurfaces(", "freed surfaces")):
+        require(braced_body(interaction, marker, context), "shadowVolumesSuppressed",
+                f"{context} forgets suppressed volumes")
+
+    # The map and the stencil volume agree on which casters LOD admitted.
+    require_compact(
+        active,
+        """const bool casterLODAdmitted = sint->shadowStencilEligible
+            || R_CachedInteractionShadowLODAdmitted( sint, entityDef );""",
+        "a surface with a stencil volume stays a map caster",
+    )
+    if compact(active).count(compact("casterLODAdmitted;")) != 2:
+        raise AssertionError("opaque and translucent map admission must both use the agreed LOD verdict")
+    if active.count("R_CachedInteractionShadowLODAdmitted( sint, entityDef )") != 1:
+        raise AssertionError("map caster admission must not ask this view's LOD apart from the stencil verdict")
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -7788,6 +7949,7 @@ def main() -> None:
     validate_live_cutout_and_point_culling_contract()
     validate_translucent_moment_contract()
     validate_point_cache_parity_and_receiver_cost_contract()
+    validate_stencil_elision_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

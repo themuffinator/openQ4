@@ -82,6 +82,16 @@ See [player release status](../user/release-status.md).
   the stored map. Grates and fences no longer keep a light from storing its
   map either. On Vulkan this is a small gain, about a tenth of a millisecond
   of graphics-card time in a busy fight.
+- **Shadow maps no longer pay for the original shadows as well.** With shadow
+  maps on, the game still built the original shadow shapes for every animated
+  character under most lights, every frame, and never drew them. It now
+  builds none; in a fight with ten characters on screen that was over thirty
+  a frame. The saving is about a tenth of a millisecond of processor time per
+  frame there.
+- **Distant scenery keeps a soft shadow.** Once a door frame or prop was far
+  enough away to look small on screen, its shadow switched to the original
+  hard-edged kind, and the light around it stayed on the slower mixed path for
+  the rest of the level.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.

@@ -132,6 +132,10 @@ public:
 	// unbuilt. It links no receivers in that view, so the receiver scan need not
 	// wait for it; -1 once its surfaces are freed.
 	int						unbuiltVisitView;
+	// CreateInteraction left out a dynamic model's stencil volumes because the
+	// light was going to render shadow maps. The surfaces are built again, with
+	// their volumes, when the light returns to stencil.
+	bool					shadowVolumesSuppressed;
 
 public:
 							idInteraction( void );

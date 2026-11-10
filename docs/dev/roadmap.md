@@ -1660,13 +1660,22 @@ optimization has landed.
   CPU frame. Hub2 at Quality on OpenGL: 12.0 to 6.6 ms of GPU and 11.8 to 5.2 ms of
   CPU, the premium over stencil point shadows down from 5.7/4.1 ms to 1.1/0.8 ms;
   on Vulkan the mapped frame is within 0.1 ms of GPU of the stencil one in hub2 and
-  storage2. These are hidden-window probe figures, not fullscreen budgets. Remaining,
-  in order: elision for prelit lights together with suppression of
-  dynamic volumes (`suppressDynamicShadowVolume` tests the instantiated model, which
-  is always static, so it never fires), a tile size per projected light (Quality and
+  storage2. These are hidden-window probe figures, not fullscreen budgets.
+  Stencil front-end work (10 November 2026). A mapped light no longer builds or
+  submits the volumes it does not draw: prelit lights shed them like any other, an
+  animated model gets none (the old test asked the instantiated snapshot, always
+  static) and has them rebuilt when its light returns to stencil, and a caster beyond
+  its shadow LOD distance stays in the map with its volume instead of putting the
+  light on the stencil supplement for good. Atlas lights shed volumes only in a view
+  whose atlas is certain to hold them all, and Vulkan's receiver scan no longer waits
+  for entities the view cannot see. In the airdefense1 arena shadow volumes built per
+  frame went from over thirty to none on both backends; the CPU frame is 0.14 ms
+  shorter on OpenGL and 0.1 ms on Vulkan against the switch. Remaining,
+  in order: a tile size per projected light (Quality and
   Ultra have four atlas cells), depth-only cubes on OpenGL, faces the view cannot see,
-  the fullscreen budgets, including whether Enhanced can map point lights, and one
-  static cube for both ownerships of a composed Vulkan light.
+  the fullscreen budgets, including whether Enhanced can map point lights, one
+  static cube for both ownerships of a composed Vulkan light, and static-world
+  volumes, which are still built once per mapped light for the fallback.
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur

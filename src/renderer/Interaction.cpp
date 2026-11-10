@@ -1357,6 +1357,7 @@ idInteraction::idInteraction( void ) {
 	stencilReceiverNeeded		= false;
 	buildModel				= NULL;
 	unbuiltVisitView		= -1;
+	shadowVolumesSuppressed	= false;
 }
 
 /*
@@ -1404,6 +1405,7 @@ idInteraction *idInteraction::AllocAndLink( idRenderEntityLocal *edef, idRenderL
 	interaction->stencilReceiverNeeded = false;
 	interaction->buildModel = NULL;
 	interaction->unbuiltVisitView = -1;
+	interaction->shadowVolumesSuppressed = false;
 
 	// link at the start of the entity's list
 	interaction->lightNext = ldef->firstInteraction;
@@ -1481,6 +1483,7 @@ void idInteraction::FreeSurfaces( void ) {
 	this->stencilReceiverGeneration = -1;
 	this->buildModel = NULL;
 	this->unbuiltVisitView = -1;
+	this->shadowVolumesSuppressed = false;
 	R_InvalidateShadowMapReceiverScan( this->lightDef );
 }
 
@@ -1775,6 +1778,8 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 
 	tr.pc.c_createInteractions++;
 
+	R_ShadowMapNoteEntityModel( entityDef, model );
+
 	bounds = model->Bounds( &entityDef->parms );
 
 	// if it doesn't contact the light frustum, none of the surfaces will
@@ -1805,6 +1810,14 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 	buildModel = model;
 	stencilReceiverGeneration = -1;
 	R_InvalidateShadowMapReceiverScan( lightDef );
+	shadowVolumesSuppressed = false;
+
+	// The model handed in is the entity's instantiated snapshot, which is
+	// always a static model. Whether its volumes are regenerated every time
+	// the entity animates is a property of the model it was instantiated from.
+	const bool entityModelIsDynamic =
+		entityDef->parms.hModel != NULL &&
+		entityDef->parms.hModel->IsDynamicModel() != DM_STATIC;
 
 	interactionGenerated = false;
 	const bool interactionHasShadows = HasShadows();
@@ -1930,20 +1943,22 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 			interactionGenerated = true;
 		}
 
-		// Dynamic-model volumes are regenerated every frame, so they can be
-		// elided while the light renders shadow maps; the next regeneration
-		// restores them if the backend flags a fallback. Static volumes are
-		// built once and kept so the per-light stencil fallback stays instant.
+		// Dynamic-model volumes are regenerated every time the entity
+		// animates, so they are left out while the light renders shadow maps.
+		// AddActiveInteraction builds the surfaces again, with their volumes,
+		// once the light returns to stencil. Static volumes are built once
+		// and kept so the per-light stencil fallback stays instant.
 		const bool suppressDynamicShadowVolume =
 			surfaceCanCastStencilShadowVolume && shadowLODAdmitted &&
 			( surfaceCanCastDedicatedShadowMap ||
 				surfaceCanCastTranslucentShadowMap ) &&
-			model->IsDynamicModel() != DM_STATIC &&
+			entityModelIsDynamic &&
 			!forcePointEmitterStencilGeneration &&
 			R_ShadowMapLightWillUseShadowMaps( lightDef );
 		if ( suppressDynamicShadowVolume ) {
 			// shadow ownership stays with this interaction even without volumes
 			interactionGenerated = true;
+			shadowVolumesSuppressed = true;
 		} else if ( sint->shadowStencilEligible ) {
 
 			// if the light has an optimized shadow volume, don't create shadows for any models that are part of the base areas
@@ -2166,6 +2181,18 @@ void idInteraction::AddActiveInteraction( void ) {
 		FreeSurfaces();
 	}
 	dynamicModelFrameCount = entityDef->dynamicModelFrameCount;
+
+	// These surfaces were built without their dynamic volumes for a light that
+	// was going to render shadow maps. An entity that has stopped animating
+	// keeps them, so build them again once the light returns to stencil for
+	// every view: the sticky fallback, an update budget, a receiver that needs
+	// stencil. A subview policy alone is not such a return. There the missing
+	// volumes already make the map required, and rebuilding would repeat for
+	// every frame the main view and a subview share an animating entity.
+	if ( !IsDeferred() && shadowVolumesSuppressed
+			&& !R_ShadowMapLightWillUseShadowMaps( lightDef, false ) ) {
+		FreeSurfaces();
+	}
 
 	// actually create the interaction if needed, building light and shadow surfaces as needed
 	if ( IsDeferred() ) {
@@ -2410,6 +2437,17 @@ void idInteraction::AddActiveInteraction( void ) {
 		// backend never consumed)
 		if ( shadowMapCasterPolicyActive ) {
 			const bool shadowMapNoSelfShadow = materialNoSelfShadow;
+			// The stencil representation settles its LOD verdict when the
+			// surfaces are built: one that got a volume casts from it for as
+			// long as the interaction lives. The map has to agree. Asked
+			// again for every view, it dropped a caster the camera had moved
+			// away from (shadow_lod_distance is 768 units for every game
+			// entity) while the volume stayed, which reads as a caster the
+			// map cannot hold and turned the light to its stencil supplement
+			// for good. A surface built without a volume still joins the map
+			// once a view's coverage or distance admits it.
+			const bool casterLODAdmitted = sint->shadowStencilEligible
+				|| R_CachedInteractionShadowLODAdmitted( sint, entityDef );
 			const bool skipPointLightEmitterCaster =
 				R_CachedShouldSkipPointLightEmitterCaster( sint, vLight, shadowShader, localLightOrigin, lightDef->parms.lightRadius );
 			const bool sameSpectrumShadowMapCaster =
@@ -2427,7 +2465,7 @@ void idInteraction::AddActiveInteraction( void ) {
 				!skipPointLightEmitterCaster &&
 				( R_ShadowMapShaderCanCastOpaque( shadowShader ) ||
 					( !translucentShadowMapSupported && R_ShadowMapShaderCanCastStencilParityTranslucent( shadowShader ) ) ) &&
-				R_CachedInteractionShadowLODAdmitted( sint, entityDef );
+				casterLODAdmitted;
 			const bool allowTranslucentShadowMapCaster =
 				translucentShadowMapSupported &&
 				!entityDef->parms.noShadow &&
@@ -2436,13 +2474,13 @@ void idInteraction::AddActiveInteraction( void ) {
 				sint->ambientTris != NULL &&
 				sameSpectrumShadowMapCaster &&
 				R_ShadowMapShaderCanCastTranslucent( shadowShader ) &&
-				R_CachedInteractionShadowLODAdmitted( sint, entityDef );
+				casterLODAdmitted;
 			admittedShadowMapCaster =
 				allowShadowMapCaster ||
 				allowTranslucentShadowMapCaster;
 
 			if ( sint->ambientTris != NULL && !allowShadowMapCaster && !allowTranslucentShadowMapCaster ) {
-				R_RecordShadowMapRejectedCaster( vLight, R_ClassifyShadowMapCasterReject( entityDef, vEntity, sint, shadowShader, isViewOnlyEntity, translucentShadowMapSupported, skipPointLightEmitterCaster, sameSpectrumShadowMapCaster, R_CachedInteractionShadowLODAdmitted( sint, entityDef ) ) );
+				R_RecordShadowMapRejectedCaster( vLight, R_ClassifyShadowMapCasterReject( entityDef, vEntity, sint, shadowShader, isViewOnlyEntity, translucentShadowMapSupported, skipPointLightEmitterCaster, sameSpectrumShadowMapCaster, casterLODAdmitted ) );
 			}
 
 			if ( allowShadowMapCaster ) {

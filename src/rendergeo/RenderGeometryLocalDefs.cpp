@@ -59,6 +59,13 @@ idRenderEntityLocal::idRenderEntityLocal() {
 	firstInteraction		= NULL;
 	lastInteraction			= NULL;
 	needsPortalSky			= false;
+	stencilReceiverGeneration	= -1;
+	stencilReceiverNeeded		= false;
+	stencilReceiverInstance		= NULL;
+	stencilReceiverInstanceFrame = 0;
+	stencilReceiverModel		= NULL;
+	stencilReceiverSkin			= NULL;
+	stencilReceiverShader		= NULL;
 }
 
 void idRenderEntityLocal::FreeRenderEntity() {

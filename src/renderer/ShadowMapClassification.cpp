@@ -331,7 +331,28 @@ int R_ShadowMapPointCacheSlotLimit( int faceSize, int bytesPerTexel,
 // lights at the shipped cube size inside its memory bound, never fewer than
 // the twelve slots it always had, and the live-caster window spans a game tic
 // at every display rate.
+int R_ShadowMapAtlasBlockCapacity( int atlasSize, int tileSize, int atlasDiv ) {
+	if ( atlasSize <= 0 || tileSize <= 0 || atlasDiv <= 0 ) {
+		return 0;
+	}
+	const long long blockSize = static_cast<long long>( tileSize ) * atlasDiv;
+	const long long perRow = atlasSize / blockSize;
+	return static_cast<int>( perRow * perRow );
+}
+
 bool R_ShadowMapCachePolicySelfTest( void ) {
+	// Quality and Ultra cut four tiles, Enhanced sixteen; Maximum's cascades
+	// take a quarter of its atlas each
+	if ( R_ShadowMapAtlasBlockCapacity( 4096, 2048, 1 ) != 4
+			|| R_ShadowMapAtlasBlockCapacity( 8192, 4096, 1 ) != 4
+			|| R_ShadowMapAtlasBlockCapacity( 4096, 1024, 1 ) != 16
+			|| R_ShadowMapAtlasBlockCapacity( 16384, 4096, 2 ) != 4
+			|| R_ShadowMapAtlasBlockCapacity( 4096, 2048, 2 ) != 1
+			|| R_ShadowMapAtlasBlockCapacity( 4096, 4096, 2 ) != 0
+			|| R_ShadowMapAtlasBlockCapacity( 0, 1024, 1 ) != 0
+			|| R_ShadowMapAtlasBlockCapacity( 4096, 0, 1 ) != 0 ) {
+		return false;
+	}
 	const int maxSlots = SHADOWMAP_POINT_CACHE_MAX_SLOTS;
 	// 512 cubes of colour and depth are 12 MiB each: 42 fit in 512 MiB
 	if ( R_ShadowMapPointCacheSlotLimitFor( 64, 512, 512, 8, maxSlots ) != 42 ) {

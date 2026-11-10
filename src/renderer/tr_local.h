@@ -1548,8 +1548,11 @@ extern idCVar r_shadowMapStableAlphaHash;	// 1 = seed hashed alpha from stable w
 extern idCVar r_shadowMapMaxUpdatesPerView;	// shadow-map pass budget per backend view, 0 = unlimited
 extern idCVar r_shadowMapSkipStencilShadows;	// 1 = skip stencil volume generation/linking for lights that will render shadow maps
 
-// mirrors the backend shadow-map admission policy for front-end stencil-volume elision (tr_light.cpp)
-bool R_ShadowMapLightWillUseShadowMaps( const idRenderLightLocal *lightDef );
+// mirrors the backend shadow-map admission policy for front-end stencil-volume elision (tr_light.cpp);
+// applySubviewPolicy false leaves out the one clause that differs between the views of a frame
+bool R_ShadowMapLightWillUseShadowMaps( const idRenderLightLocal *lightDef, const bool applySubviewPolicy = true );
+// remembers, for the Vulkan receiver scan, whether the model an entity's interactions are built from has a surface only stencil can shadow
+void R_ShadowMapNoteEntityModel( idRenderEntityLocal *def, const idRenderModel *model );
 // backend-published: shadow-map resources were successfully prepared this video generation (draw_arb2.cpp)
 bool RB_ShadowMapResourcesKnownGood( bool pointLight );
 extern idCVar r_shadowMapStaticCache;		// 1 = reuse resident static-only shadow-map passes

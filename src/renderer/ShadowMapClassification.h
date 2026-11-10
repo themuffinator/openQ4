@@ -121,7 +121,12 @@ int R_ShadowMapDynamicCasterFrames( void );
 // The pure form, for the self-test: the window in frames for a smoothed frame
 // interval in milliseconds.
 int R_ShadowMapDynamicCasterFramesFor( float frameMsec );
-// pins the cache-size and live-caster window policies
+// How many blocks, each atlasDiv tiles on a side, a projected atlas cut into
+// tiles of tileSize is certain to hold. A cascaded light's block is two tiles
+// on a side, and a row-scan allocator packs any mix of the two block sizes at
+// least as tightly as blocks of the larger one.
+int R_ShadowMapAtlasBlockCapacity( int atlasSize, int tileSize, int atlasDiv );
+// pins the cache-size, live-caster window and atlas capacity policies
 bool R_ShadowMapCachePolicySelfTest( void );
 // Conservative cube-face rejection, shared by GL and Vulkan. Invalid bounds
 // or transforms remain visible. Face order is +X,-X,+Y,-Y,+Z,-Z.
