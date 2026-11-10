@@ -434,6 +434,7 @@ jobs:
             tools/tests/renderer_native_ui_output.py \
             tools/tests/renderer_mp_flat_items.py \
             tools/tests/renderer_pbr_materials.py \
+            tools/tests/material_constant_registers_contract.py \
             tools/tests/renderer_classic_gui_domain.py \
             tools/tests/renderer_classic_cinematic_post_domain.py \
             tools/tests/renderer_milestone_d_acceptance.py \
@@ -967,6 +968,7 @@ jobs:
           python tools/tests/renderer_native_ui_output.py
           python tools/tests/renderer_mp_flat_items.py
           python tools/tests/renderer_pbr_materials.py
+          python tools/tests/material_constant_registers_contract.py
           python tools/tests/renderer_classic_gui_domain.py
           python tools/tests/renderer_classic_cinematic_post_domain.py
           python tools/tests/renderer_classic_special_frame_domain.py

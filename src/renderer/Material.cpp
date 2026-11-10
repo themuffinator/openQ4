@@ -3510,6 +3510,12 @@ void idMaterial::ParseMaterial( idLexer &src ) {
 		pd->registerIsTemporary[i] = true;		// they aren't constants that can be folded
 	}
 	numStages = 0;
+	// The parse data is zeroed before every parse, so without this line no
+	// material was ever constant and every surface evaluated its registers
+	// every view. Each term that can vary at run time clears it: time, the
+	// entity and global parms, their decal and vertex aliases, "sound",
+	// "glslPrograms", and the "colored" stage shorthand.
+	pd->registersAreConstant = true;	// until shown otherwise
 
 	textureRepeat_t	trpDefault = TR_REPEAT;		// allow a global setting for repeat
 
@@ -5307,6 +5313,121 @@ bool R_SpecularProbeMaterialParserSelfTest( void ) {
 
 /*
 ===================
+R_MaterialConstantRegistersSelfTest
+
+A material hands every surface the one register block evaluated at parse time
+(idMaterial::ConstantRegisters) only when no term in it can vary at run time.
+Every such term has to withhold the block; a material built from literals and
+parse-time constants has to supply one equal to a fresh evaluation under any
+view and entity; and r_useConstantMaterials 0 withholds them all.
+===================
+*/
+static bool R_MaterialConstantRegistersSelfTest( void ) {
+	// keep in step with idMaterial::ParseTerm and the "colored" stage shorthand
+	static const char *const varyingStages[] = {
+		"rgb time",
+		"rgb parm0", "rgb parm1", "rgb parm2", "rgb parm3", "rgb parm4", "rgb parm5",
+		"rgb parm6", "rgb parm7", "rgb parm8", "rgb parm9", "rgb parm10", "rgb parm11",
+		"rgb global0", "rgb global1", "rgb global2", "rgb global3",
+		"rgb global4", "rgb global5", "rgb global6", "rgb global7",
+		"rgb DecalLife", "rgb DecalSpawn", "rgb VertexRandomizer",
+		"rgb sound", "rgb glslPrograms",
+		"rgb 0.5 + 0.25 * ( time > 2 )", "alphaTest 0.25 + parm3", "if ( global2 )",
+		"colored",
+	};
+	// folded to a literal while parsing, so a surface that evaluates reads the
+	// same number as the block does
+	static const char *const constantStages[] = {
+		"rgb 0.25",
+		"rgb 0.75 - 0.25", "rgb ( 3 / 4 ) > 0.5", "alphaTest 7 % 4",
+		"rgb fragmentPrograms", "rgb POTCorrectionX", "rgb POTCorrectionY",
+		"rgb VideoWidth", "rgb VideoHeight", "rgb IsMultiplayer",
+	};
+
+	auto parseStage = []( const char *stageText, idDecl *&decl ) -> idMaterial * {
+		decl = declManager->AllocateDecl( DECL_MATERIAL );
+		if ( decl == NULL ) {
+			return NULL;
+		}
+		const idStr text = va( "material _selftest_constant_registers {\n {\n  blend add\n  map _white\n  %s\n }\n}\n", stageText );
+		idMaterial *material = static_cast<idMaterial *>( decl );
+		if ( !material->Parse( text.c_str(), text.Length() ) ) {
+			DeclManager_FreeAllocatedDecl( decl );
+			decl = NULL;
+			return NULL;
+		}
+		return material;
+	};
+
+	const bool savedConstantMaterials = r_useConstantMaterials.GetBool();
+	r_useConstantMaterials.SetBool( true );
+	const char *failure = NULL;
+	const char *failedStage = "";
+
+	for ( int i = 0; failure == NULL && i < static_cast<int>( sizeof( varyingStages ) / sizeof( varyingStages[0] ) ); ++i ) {
+		idDecl *decl = NULL;
+		const idMaterial *material = parseStage( varyingStages[i], decl );
+		if ( material == NULL ) {
+			failure = "did not parse";
+		} else if ( material->ConstantRegisters() != NULL ) {
+			failure = "varies at run time but was given a constant block";
+		}
+		failedStage = varyingStages[i];
+		if ( decl != NULL ) {
+			DeclManager_FreeAllocatedDecl( decl );
+		}
+	}
+
+	for ( int i = 0; failure == NULL && i < static_cast<int>( sizeof( constantStages ) / sizeof( constantStages[0] ) ); ++i ) {
+		idDecl *decl = NULL;
+		const idMaterial *material = parseStage( constantStages[i], decl );
+		failedStage = constantStages[i];
+		if ( material == NULL ) {
+			failure = "did not parse";
+			continue;
+		}
+		const float *constants = material->ConstantRegisters();
+		if ( constants == NULL ) {
+			failure = "is constant but was given no block";
+		} else {
+			// a view and an entity that would move any register that reads them
+			float evaluated[MAX_EXPRESSION_REGISTERS];
+			float entityParms[MAX_ENTITY_SHADER_PARMS];
+			viewDef_t evaluationView;
+			memset( evaluated, 0, sizeof( evaluated ) );
+			memset( &evaluationView, 0, sizeof( evaluationView ) );
+			evaluationView.floatTime = 3.25f;
+			for ( int parm = 0; parm < MAX_ENTITY_SHADER_PARMS; ++parm ) {
+				entityParms[parm] = 0.125f * ( parm + 1 );
+			}
+			for ( int parm = 0; parm < MAX_GLOBAL_SHADER_PARMS; ++parm ) {
+				evaluationView.renderView.shaderParms[parm] = 0.0625f * ( parm + 1 );
+			}
+			material->EvaluateRegisters( evaluated, entityParms, &evaluationView );
+			const int count = material->GetNumRegisters() - EXP_REG_NUM_PREDEFINED;
+			if ( count <= 0 || memcmp( constants + EXP_REG_NUM_PREDEFINED, evaluated + EXP_REG_NUM_PREDEFINED,
+					count * sizeof( float ) ) != 0 ) {
+				failure = "constant block differs from an evaluation";
+			}
+		}
+		r_useConstantMaterials.SetBool( false );
+		if ( failure == NULL && material->ConstantRegisters() != NULL ) {
+			failure = "r_useConstantMaterials 0 still hands out the constant block";
+		}
+		r_useConstantMaterials.SetBool( true );
+		DeclManager_FreeAllocatedDecl( decl );
+	}
+
+	r_useConstantMaterials.SetBool( savedConstantMaterials );
+	if ( failure != NULL ) {
+		common->Printf( "RendererPBRMaterial parser self-test: constant registers: stage '%s' %s\n", failedStage, failure );
+		return false;
+	}
+	return true;
+}
+
+/*
+===================
 R_PBRMaterialParserSelfTest
 
 Runtime parser test using only intrinsic images.  It proves metadata parsing,
@@ -5437,6 +5558,9 @@ bool R_PBRMaterialParserSelfTest( void ) {
 	DeclManager_FreeAllocatedDecl( mixedDecl );
 	if ( !ok ) {
 		common->Printf( "RendererPBRMaterial parser self-test: individual constant-register proof failed\n" );
+		return false;
+	}
+	if ( !R_MaterialConstantRegistersSelfTest() ) {
 		return false;
 	}
 

@@ -6,6 +6,25 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Materials that never change are worked out once, 10 November 2026
+
+- **An engine repair with no visible change.** Most materials have settings
+  that never change while you play. The engine was meant to work those out
+  once, when the material loads; a missing line made it redo them for every
+  surface in every frame, on OpenGL and on Vulkan. It now does them once, as
+  the original engine did.
+- **Do not expect a higher frame rate from it.** In the three scenes measured
+  it saves 5 to 22 millionths of a second per frame, 0.1 to 0.5 percent of the
+  frame's processor time, which whole-frame timings on the test machine cannot
+  resolve. Pictures taken with the repair on and off are identical in every
+  pixel on both renderers.
+- **Nothing to change.** `r_useConstantMaterials 0` restores the earlier
+  behaviour without a restart, should a material ever look wrong.
+- Evidence: [Constant material registers](material-constant-registers.md);
+  FPS-08 in the [roadmap](roadmap.md);
+  `tools/tests/material_constant_registers_contract.py`; the
+  `rendererPBRMaterialSelfTest` command.
+
 ## Classic menus that match the new ones, and easier to drive from the keyboard, 10 November 2026
 
 - **The classic Single Player, Campaign, Arena and Demos pages look like the

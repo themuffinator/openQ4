@@ -8576,10 +8576,10 @@ def validate_static_cutout_caster_contract() -> None:
     result was the same every frame.
 
     The rule asks about the registers the coverage is read from, one by one.
-    idMaterial::ConstantRegisters() cannot be asked: it is NULL for every
-    material in this engine (ParseMaterial never marks a material's registers
-    constant), and it would also refuse a cutout for an animated glow stage
-    that does not move its holes.
+    idMaterial::ConstantRegisters() is not asked: it would refuse a cutout for
+    an animated glow stage that does not move its holes, and its answer follows
+    r_useConstantMaterials. (When this rule was written it was also NULL for
+    every material; material_constant_registers_contract.py pins its repair.)
     """
     policy = read("src/renderer/ShadowMapClassification.cpp")
     interaction = read("src/renderer/Interaction.cpp")
@@ -8626,7 +8626,7 @@ def validate_static_cutout_caster_contract() -> None:
         "every register the coverage is read from has to be a parse-time literal",
     )
     if "ConstantRegisters()" in animates or "ConstantRegisters()" in registers.replace("idMaterial::ConstantRegisters()", ""):
-        raise AssertionError("idMaterial::ConstantRegisters() is NULL for every material here; ask per register")
+        raise AssertionError("whole-material constness refuses cutouts with an animated glow stage; ask per register")
     material = read("src/renderer/Material.cpp")
     require_order(
         braced_body(material, "bool idMaterial::GetConstantRegisterValue(", "per-register constness"),

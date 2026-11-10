@@ -1084,7 +1084,11 @@ int idScenePacketFrame::FindOrAddInstanceRecord( const drawSurf_t *drawSurf, sce
 	record.legacyBridge = activeScene >= 0 && scenes[activeScene].legacyBridge;
 	record.temporalCaptureFrame = instanceView != NULL
 		&& instanceView->temporalCaptureFrame;
-	if ( shaderRegisters != NULL ) {
+	// A material whose registers are all constant hands every surface the one
+	// block evaluated at parse time, which holds no entity parms.
+	const bool sharedConstantRegisters = shaderRegisters != NULL && drawSurf->material != NULL
+		&& shaderRegisters == drawSurf->material->ConstantRegisters();
+	if ( shaderRegisters != NULL && !sharedConstantRegisters ) {
 		record.entityColor[0] = shaderRegisters[EXP_REG_PARM0];
 		record.entityColor[1] = shaderRegisters[EXP_REG_PARM1];
 		record.entityColor[2] = shaderRegisters[EXP_REG_PARM2];

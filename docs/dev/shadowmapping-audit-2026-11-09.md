@@ -466,7 +466,8 @@ Two things found on the way:
   idTech 4 starts each material with its registers marked constant "until
   shown otherwise"; that line is missing here and in the upstream base, so no
   material is ever constant and every surface evaluates its registers every
-  view, on both renderers. Not a shadow matter and not changed here.
+  view, on both renderers. Not a shadow matter and not changed here; restored
+  afterwards, see [Constant material registers](material-constant-registers.md).
 
 Hidden cube faces, the item this started from, were measured after the change
 and set aside. All per-view point-cube work on Vulkan is then 0.13 ms of GPU
@@ -587,4 +588,4 @@ cutout casters").
 
 Outside the shadow system, found in passing: `idMaterial::ConstantRegisters()`
 is NULL for every material, so every surface evaluates its registers every
-view.
+view (since restored: [Constant material registers](material-constant-registers.md)).

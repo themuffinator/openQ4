@@ -676,9 +676,9 @@ bool R_ShadowMapCasterOutsidePointFace( const viewLight_t *vLight,
 // is constant when the parser folded it to a literal; one that follows time,
 // an entity parm, a global or a table is written by an expression every view
 // (idMaterial::GetConstantRegisterValue). The material's whole-register
-// constness is not asked: an animated glow stage beside a fixed alpha stage
-// does not move the holes, and idMaterial::ConstantRegisters() is NULL for
-// every material in this engine.
+// constness (idMaterial::ConstantRegisters()) is not asked: an animated glow
+// stage beside a fixed alpha stage does not move the holes, and that answer
+// also follows r_useConstantMaterials.
 static bool R_ShadowMapCutoutStageRegistersConstant( const idMaterial *shader, const shaderStage_t *pStage ) {
 	float value = 0.0f;
 	if ( !shader->GetConstantRegisterValue( pStage->conditionRegister, value )
