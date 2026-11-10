@@ -2238,7 +2238,7 @@ struct Runtime::Impl {
 				else {
 					const float inset = source.view == "safeLeft" ? viewport.safeLeft : source.view == "safeTop" ? viewport.safeTop :
 						source.view == "safeRight" ? viewport.safeRight : viewport.safeBottom;
-					const float extent = source.view == "safeLeft" || source.view == "safeRight" ? viewport.width : viewport.height;
+					const float extent = static_cast<float>(source.view == "safeLeft" || source.view == "safeRight" ? viewport.width : viewport.height);
 					value = static_cast<double>(std::isfinite(inset) ? std::clamp(inset,0.f,extent) : 0.f)/viewport.DpRatio();
 				}
 			} else if (!host.ReadCVar(source.cvar,source.type,value)) {

@@ -102,6 +102,7 @@ static int LangDict_EncodeUtf8(unsigned int codePoint,char out[UTF8_MAX_BYTES]) 
 struct idKeyInput {
     static inline std::map<int,std::string> bindings;
     static bool KeyIsBoundTo(int key,const char* binding) { return bindings.contains(key) && bindings.at(key)==binding; }
+    static bool IsControllerKey(int key) { return key>=K_JOY1 && key<=K_JOY16; }
     static inline bool shift=false,swapped=false;
     static bool IsDown(int key) { return key==K_SHIFT && shift; }
     static int MenuControllerKey(int key) { return swapped && (key==K_JOY3 || key==K_JOY4) ? (key==K_JOY3 ? K_JOY4 : K_JOY3) : key; }
@@ -900,12 +901,25 @@ static void CheckPublicTextQueries() {
     const auto original=modelTemplate;
     modelTemplate.state["binding.forward"]={std::string{},"","","_forward"};
     modelTemplate.state["binding.save"]={std::string{},"","","savegame quick"};
+    // A page that draws its keys as glyphs declares a slot per key beside the
+    // binding state: keyboard and mouse keys, the controller's buttons, how
+    // many of each, and a count of those past the slots.
+    for (const char* slot : {"key0","key1","pad0","more"}) modelTemplate.state[std::string("binding.forward.")+slot]={std::string{},"","",""};
+    for (const char* count : {"keyCount","padCount"}) modelTemplate.state[std::string("binding.forward.")+count]={0.0,"","",""};
     {
         idUserInterfaceRetained gui;
         assert(gui.InitFromFile("test.q4ui",true,true));
+        const auto text=[](const char* name) { return std::get<std::string>(Live().state.at(std::string("binding.forward.")+name)); };
+        const auto number=[](const char* name) { return std::get<double>(Live().state.at(std::string("binding.forward.")+name)); };
+        idKeyInput::bindings={{101,"_forward"},{102,"_forward"},{103,"_forward"},{K_JOY3,"_forward"}};
+        gui.SetKeyBindingNames(); gui.StateChanged(0);
+        assert(text("key0")=="KEY101" && text("key1")=="KEY102" && text("pad0")=="JOY3" && text("more")=="+1");
+        assert(number("keyCount")==3 && number("padCount")==1);
         idKeyInput::bindings={{101,"_forward"},{102,"_forward"}};
         gui.SetStateString("text","untouched");
         gui.SetKeyBindingNames(); gui.StateChanged(0);
+        assert(text("key0")=="KEY101" && text("key1")=="KEY102" && text("pad0").empty() && text("more").empty());
+        assert(number("keyCount")==2 && number("padCount")==0);
         assert(std::get<std::string>(Live().state.at("binding.forward"))=="KEY101 / KEY102");
         assert(std::get<std::string>(Live().state.at("binding.save"))=="None");
         assert(std::string(gui.GetStateString("text"))=="untouched");
