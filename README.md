@@ -22,7 +22,7 @@ An open-source engine and game-code replacement that runs the original retail ga
 </div>
 
 <p align="center">
-  <img src="assets/docs/img/readme-airdefense1-cinematic.png" alt="The airdefense1 intro cinematic: the human fleet approaching Stroggos" width="92%">
+  <img src="assets/docs/img/readme-airdefense1-cinematic-framed.png" alt="The airdefense1 intro cinematic: the human fleet approaching Stroggos" width="100%">
 </p>
 
 ## What is openQ4?
@@ -66,17 +66,17 @@ Read the full [0.13.2 release notes](docs/dev/releases/v0.13.2.md). Development 
 ## Screenshots
 
 <p align="center">
-  <img src="assets/docs/img/readme-bloom-hdr.png" alt="Bloom and HDR comparison on q4dm2" width="92%"><br>
+  <img src="assets/docs/img/readme-bloom-hdr-framed.png" alt="Bloom and HDR comparison on q4dm2" width="100%"><br>
   <sub><b>Bloom and HDR</b> on q4dm2: standard rendering left, enhanced post-processing right.</sub>
 </p>
 
 <p align="center">
-  <img src="assets/docs/img/readme-lightgrid.png" alt="Light-grid indirect lighting off and on" width="92%"><br>
+  <img src="assets/docs/img/readme-lightgrid-framed.png" alt="Light-grid indirect lighting off and on" width="100%"><br>
   <sub><b>Baked light grids</b> on q4dm2, off and on.</sub>
 </p>
 
 <p align="center">
-  <img src="assets/docs/img/readme-crt.png" alt="CRT filter off and on on q4dm8" width="92%"><br>
+  <img src="assets/docs/img/readme-crt-framed.png" alt="CRT filter off and on on q4dm8" width="100%"><br>
   <sub><b>The CRT filter</b> on q4dm8, off and on.</sub>
 </p>
 
