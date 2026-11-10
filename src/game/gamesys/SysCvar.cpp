@@ -508,7 +508,7 @@ idCVar pm_vehicleSoundLerpScale(	"pm_vehicleSoundLerpScale",		"10",		CVAR_GAME |
 idCVar g_showPlayerShadow(			"g_showPlayerShadow",		"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "enables shadow of player model" );
 idCVar g_showPresentationPose(		"g_showPresentationPose",	"0",			CVAR_GAME | CVAR_BOOL, "report whether the local player's body reaches the presentation clock" );
 idCVar g_presentationClockCapture(	"g_presentationClockCapture",	"0",		CVAR_GAME | CVAR_INTEGER, "capture this many presentation-clock samples, then dump them once" );
-idCVar g_dynamicLightShadows(		"g_dynamicLightShadows",	"-1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_INTEGER, "gun flashlight and projectile lights request shadows: -1 = auto (high machine spec, the retail behavior), 0 = never, 1 = always", -1, 1 );
+idCVar g_dynamicLightShadows(		"g_dynamicLightShadows",	"-1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_INTEGER, "gun flashlight and projectile lights request shadows: -1 = auto (the flashlight wherever shadows are drawn, projectile lights at the highest machine spec as in retail), 0 = never, 1 = always", -1, 1 );
 
 bool G_DynamicLightShadowsEnabled( void ) {
 	const int mode = g_dynamicLightShadows.GetInteger();
@@ -518,6 +518,17 @@ bool G_DynamicLightShadowsEnabled( void ) {
 		return cvarSystem->GetCVarInteger( "com_machineSpec" ) >= 3;
 	}
 	return mode != 0;
+}
+
+// The flashlight is one projected light that follows the player, not a crowd
+// of short-lived projectile lights, so auto asks for its shadow on every
+// preset. Shadow-mapped presets draw it as a single projected map; the stencil
+// presets draw the volumes retail drew at its top machine spec. Presets that
+// draw no shadows at all (r_shadows 0) skip it in the renderer, and the flag
+// does not need refreshing when the preset changes.
+bool G_FlashlightShadowsEnabled( void ) {
+	// auto (-1) and always (1) both ask for it
+	return g_dynamicLightShadows.GetInteger() != 0;
 }
 
 // Gibs, dissolving/sinking corpses, and fading client moveables forced

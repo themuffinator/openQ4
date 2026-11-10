@@ -1036,7 +1036,8 @@ void rvWeapon::InitLights ( void ) {
 // dluetscher: added detail levels to render lights
 		light->detailLevel = DEFAULT_LIGHT_DETAIL_LEVEL;
 // dluetscher: changed lights to no shadow for performance reasons
-		light->noShadows = !G_DynamicLightShadowsEnabled();
+// openQ4: the flashlight casts on every preset that draws shadows
+		light->noShadows = !G_FlashlightShadowsEnabled();
 // RAVEN END
 		light->pointLight = spawnArgs.GetBool( "flashlightPointLight", "1" );
 		if ( !light->pointLight ) {
@@ -2134,6 +2135,11 @@ void rvWeapon::Restore ( idRestoreGame *savefile ) {
 		int savedLightHandle;
 		savefile->ReadInt( savedLightHandle );
 		savefile->ReadRenderLight( lights[i] );
+		if ( i == WPLIGHT_FLASHLIGHT || i == WPLIGHT_FLASHLIGHT_WORLD ) {
+			// openQ4: a save written under an older gate keeps a shadowless
+			// flashlight; follow the current setting instead
+			lights[i].noShadows = !G_FlashlightShadowsEnabled();
+		}
 		if ( savedLightHandle != -1 ) {
 			//get the handle again as it's out of date after a restore!
 			rvNormalizeProjectedRenderLight( lights[i], owner ? owner->GetName() : weaponDef->GetName(), "weapon-restored-light" );

@@ -314,7 +314,7 @@ void idProjectile::Create( idEntity* _owner, const idVec3 &start, const idVec3 &
 // dluetscher: added detail levels to render lights
 		renderLight.detailLevel = DEFAULT_LIGHT_DETAIL_LEVEL;
 // dluetscher: set the projectile lights to be no shadows
-		renderLight.noShadows = cvarSystem->GetCVarInteger("com_machineSpec") < 3;
+		renderLight.noShadows = !G_DynamicLightShadowsEnabled();
 // RAVEN END
 	}
 // openQ4 BEGIN

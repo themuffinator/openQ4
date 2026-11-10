@@ -6,6 +6,25 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## The flashlight casts shadows on every preset that draws them, 10 November 2026
+
+- **Low, Performance, Balanced and Enhanced now give the flashlight its
+  shadows.** As in the original game, it used to cast them only on the top
+  quality setting (Quality, Ultra and Maximum). Every preset that draws shadows
+  now includes the flashlight: Enhanced and above draw it as one shadow map,
+  the presets with the original stencil shadows draw it the way the original
+  game's top setting did. Minimum and Low Power still draw no shadows.
+- **Projectile lights keep the original rule.** Rockets, plasma and other
+  glowing projectiles still cast shadows only on Quality, Ultra and Maximum.
+- **Saved games follow the new setting.** A game saved while the flashlight
+  had no shadow gets it back when the save is loaded.
+- **Nothing to do.** `g_dynamicLightShadows 0` still turns these shadows off,
+  and `1` turns projectile-light shadows on everywhere. Multiplayer follows
+  the same rule.
+- Evidence: Air Defense 1 under Vulkan on Balanced (stencil) and Enhanced
+  (one projected shadow map reported for the flashlight), each against
+  `g_dynamicLightShadows 0`; no new warnings.
+
 ## Display settings open in the new interface, 10 November 2026
 
 - **Settings > Display is now the new page.** In the new interface, Display

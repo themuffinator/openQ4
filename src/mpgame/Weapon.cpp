@@ -1083,7 +1083,8 @@ void rvWeapon::InitLights ( void ) {
 // dluetscher: added detail levels to render lights
 		light->detailLevel = DEFAULT_LIGHT_DETAIL_LEVEL;
 // dluetscher: changed lights to no shadow for performance reasons
-		light->noShadows = cvarSystem->GetCVarInteger("com_machineSpec") < 3;
+// openQ4: the flashlight casts on every preset that draws shadows
+		light->noShadows = !G_FlashlightShadowsEnabled();
 // RAVEN END
 		light->pointLight = spawnArgs.GetBool( "flashlightPointLight", "1" );
 		if ( !light->pointLight ) {
