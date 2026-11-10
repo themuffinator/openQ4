@@ -16292,6 +16292,10 @@ static bool VK_Exec_CheckMRT( idRenderTexture &target, int size, int layers,
 	}
 	bool passed = allocationInfo.pMappedData != NULL
 			&& vmaInvalidateAllocation( vkCtx.allocator, allocation, 0, VK_WHOLE_SIZE ) == VK_SUCCESS;
+	// target_test.vert draws at clip z 0.25 with w 1. Window depth is that z
+	// where pipelines clip 0 <= z <= w and (z + w) / 2 where they clip like
+	// OpenGL (VK_EXT_depth_clip_control); both are exact in D32.
+	const float drawnDepth = vkCtx.depthClipNegativeOneToOne ? 0.625f : 0.25f;
 	for ( uint32_t i = 0; i < count && passed; i++ ) {
 		const byte *pixels = (const byte *)allocationInfo.pMappedData + offsets[ i ];
 		for ( int face = 0; face < layers && passed; face++ ) {
@@ -16299,7 +16303,7 @@ static bool VK_Exec_CheckMRT( idRenderTexture &target, int size, int layers,
 				const int index = face * size * size + pixel;
 				const bool drawn = pixel % size < size / 2;
 				if ( i == attachments.colorCount ) {
-					passed = ( (const float *)pixels )[ index ] == ( drawn ? 0.25f : 1.0f );
+					passed = ( (const float *)pixels )[ index ] == ( drawn ? drawnDepth : 1.0f );
 				} else {
 					for ( int component = 0; component < 4; component++ ) {
 						const bool enabled = drawn && ( component == 3 || ( ( face + 1 + i ) & ( 1 << component ) ) != 0 );
