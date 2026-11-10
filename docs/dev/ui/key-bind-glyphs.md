@@ -134,6 +134,11 @@ Down, Right and Left in the engine found one fault:
   outer edges: a row names itself there, and the runtime treats a control
   that names itself in a direction as an authored edge
   (`Interaction::Navigate`).
+- **Left towards a hidden row reached a tab too.** On the SCREEN tab Window
+  Width stands beside the display list, which a machine with one display
+  hides. A step across to a hidden row now lands on the row its column shows
+  in its place, the next one below it or else above
+  (`Interaction::Authored`): Left from Window Width reaches Fullscreen.
 
 ## Labels
 
@@ -186,7 +191,8 @@ in `.tmp/menu-round/`, the runtime `.tmp/runtime/ui-menus`, built from
   (stuck on Move Forward), `s3/l-walk-display` (stuck on Brightness's
   number, then on the scroll bar).
 - Retained focus walks: the title and SETTINGS (`s7/s-walk-hub`), DISPLAY's
-  three tabs, GAME OPTIONS' five and AUDIO (`s9`).
+  three tabs (`s10/s-walk-display`), GAME OPTIONS' five and AUDIO (`s9`).
+- Both CONTROLS pages in German, from the packed build: `s11-de`.
 
 Tests: `key_bind_presentation.py`, `menu_controller_navigation.py` (now
 covers a key row, a one-line field, the focus order and the scroll bar),
