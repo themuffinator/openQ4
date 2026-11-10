@@ -409,6 +409,14 @@ there is no double-click word selection.
   frames are 0.2 to 0.45 ms shorter on the graphics card. Nothing needs
   changing; `r_shadowMapPointDepthOnly 0` brings the copy back if a driver
   objects.
+- **Lights behind grates, railings and wire caps no longer redraw their
+  shadows every frame.** Any shadow caster with holes cut in it by its texture
+  was treated as if the holes could move, so every light reaching one copied
+  and redrew its shadow map each frame. Most such surfaces never change, and
+  they are now drawn into the shadow map once and kept. At the start of
+  Convoy 2, where every lamp sits in a wire cap, frames are about 1.75 ms
+  shorter on the graphics card on OpenGL and 0.5 ms on Vulkan. Surfaces whose
+  holes do animate are still redrawn each frame, and the picture is unchanged.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.

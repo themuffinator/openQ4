@@ -1655,7 +1655,9 @@ static bool VK_ShadowMap_StaticCacheable(
 		return false;
 	}
 
-	// Perforated surfaces are in the live dynamic chains, never resident depth.
+	// Perforated surfaces whose coverage can animate are in the live dynamic
+	// chains, never resident depth; the others are static casters like any
+	// opaque one (R_ShadowMapCutoutCoverageAnimates).
 	// Translucent moment maps still bypass this opaque cache. View-fitted CSM
 	// reuse follows the GL gate (RB_ShadowMapStaticCacheable): a resident
 	// cascade block must match the current fitted projection. The signature

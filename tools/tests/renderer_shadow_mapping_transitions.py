@@ -84,8 +84,11 @@ def transition_commands(scenario: str) -> tuple[list[str], tuple[str, ...]]:
             commands.extend(["r_singleLight 168", "testFlashlight 0"])
         else:
             commands.append("testFlashlight 1")
-        # A static entity with perforated coverage must stay live in shadow
-        # depth even after its transform has settled. Use a shipped material.
+        # A static entity with perforated coverage must keep casting through
+        # its holes after its transform has settled. This shipped material's
+        # coverage cannot change, so it is cached with the static depth
+        # (R_ShadowMapCutoutCoverageAnimates); the cached and fresh captures
+        # below are what hold the baked cutout to the live one.
         material = (" shader textures/terminal/square_hole" if scenario in CUTOUT_CYCLES
                     else f" shader {TRANSLUCENT_MATERIAL}" if scenario in TRANSLUCENT_CYCLES else "")
         if scenario in TRANSLUCENT_CYCLES:

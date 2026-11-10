@@ -263,6 +263,14 @@ def main() -> int:
                 # when they spawn; the retail default (-1) follows com_machineSpec,
                 # which a fresh test profile may detect below 3.
                 "g_dynamicLightShadows": 1,
+                # Sound-reactive lights (the *_snd light shaders) follow the audio,
+                # which keeps playing while g_stopTime holds the game. Two captures
+                # of one paused pose then differ by where the sound was, by up to a
+                # quarter of an 8-bit level over the frame: enough to fail a cached
+                # against fresh comparison, or to pass a wrong one. Hold them at a
+                # constant level; silencing the sound would switch them off and
+                # take the lights out of the scene.
+                "s_constantAmplitude": 1,
             }.items():
                 setting(args, key, new_value)
             if opts.basepath:

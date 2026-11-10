@@ -181,6 +181,25 @@ long long R_ShadowMapProjectedCacheTexelBudgetFor( int cacheSize, int tileSize )
 // that already holds residentTexels.
 bool R_ShadowMapProjectedCacheAdmits( long long budgetTexels, long long residentTexels, int tileSize );
 
+// A cutout (perforated) caster's coverage can change while its entity does
+// not: through a stage condition, alpha reference, alpha scale or texture
+// matrix that follows time or a parm, through a video or render-target image,
+// or through a deform. Such a caster has to be drawn every view, over the
+// cached static depth. Most cutouts of the stock world (grates, railings,
+// fences) have none of those: the registers their alpha stages read are
+// literals and those stages sample ordinary images. They are as static as their entity and
+// belong in the cached depth, like any opaque caster. Treating every cutout
+// as live made each light that reaches one copy and redraw its map every
+// view for the same result: eleven of the fourteen point lights composed in
+// convoy2's start view had no other live caster.
+//
+// False for a material that is not perforated.
+bool R_ShadowMapCutoutCoverageAnimates( const idMaterial *shader );
+// What the baked coverage of a static cutout depends on beyond its material:
+// the storage of its alpha images and the hashed-alpha settings. Folded into
+// the static caster signature so a change renders the map again.
+int R_ShadowMapCutoutCoverageSignature( const idMaterial *shader, int hash );
+
 // pins the cache-size, live-caster window and atlas policies
 bool R_ShadowMapCachePolicySelfTest( void );
 // Conservative cube-face rejection, shared by GL and Vulkan. Invalid bounds

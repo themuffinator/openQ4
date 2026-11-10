@@ -620,8 +620,10 @@ static int R_ShadowMapHashString( int hash, const char *value ) {
 static bool R_ShadowMapCasterIsDynamic( const idRenderEntityLocal *entityDef, const idMaterial *shader ) {
 	// Cutout coverage can change through stage conditions, image animation,
 	// or texture matrices without an entity update. Keep that depth live while
-	// allowing the opaque static scene to remain resident.
-	if ( shader != NULL && shader->Coverage() == MC_PERFORATED ) {
+	// allowing the opaque static scene to remain resident. A cutout whose
+	// coverage cannot change that way is as static as its entity
+	// (R_ShadowMapCutoutCoverageAnimates) and is cached with it.
+	if ( R_ShadowMapCutoutCoverageAnimates( shader ) ) {
 		return true;
 	}
 	if ( entityDef == NULL || entityDef->parms.hModel == NULL ) {
@@ -693,6 +695,8 @@ static void R_RecordShadowMapCaster( viewLight_t *vLight,
 		shader != NULL ? static_cast<int>( shader->GetCullType() ) : -1 );
 	hash = R_ShadowMapHashInt( hash, translucent ? 1 : 0 );
 	hash = R_ShadowMapHashInt( hash, expandedCaster ? 1 : 0 );
+	// a static cutout's coverage is baked into the map with it
+	hash = R_ShadowMapCutoutCoverageSignature( shader, hash );
 	if ( casterTris != NULL ) {
 		// Automatic caster culling depends on these live geometry properties.
 		// Include them in the physical cache identity so model/decl reloads or

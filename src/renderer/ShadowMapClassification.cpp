@@ -671,6 +671,85 @@ bool R_ShadowMapCasterOutsidePointFace( const viewLight_t *vLight,
 	return false;
 }
 
+// The registers a cutout stage's coverage is read from: whether the stage is
+// on, its alpha scale, its alpha reference and its texture matrix. A register
+// is constant when the parser folded it to a literal; one that follows time,
+// an entity parm, a global or a table is written by an expression every view
+// (idMaterial::GetConstantRegisterValue). The material's whole-register
+// constness is not asked: an animated glow stage beside a fixed alpha stage
+// does not move the holes, and idMaterial::ConstantRegisters() is NULL for
+// every material in this engine.
+static bool R_ShadowMapCutoutStageRegistersConstant( const idMaterial *shader, const shaderStage_t *pStage ) {
+	float value = 0.0f;
+	if ( !shader->GetConstantRegisterValue( pStage->conditionRegister, value )
+			|| !shader->GetConstantRegisterValue( pStage->color.registers[3], value )
+			|| !shader->GetConstantRegisterValue( pStage->alphaTestRegister, value ) ) {
+		return false;
+	}
+	if ( pStage->texture.hasMatrix ) {
+		for ( int row = 0; row < 2; ++row ) {
+			for ( int column = 0; column < 3; ++column ) {
+				if ( !shader->GetConstantRegisterValue( pStage->texture.matrix[row][column], value ) ) {
+					return false;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+bool R_ShadowMapCutoutCoverageAnimates( const idMaterial *shader ) {
+	if ( shader == NULL || shader->Coverage() != MC_PERFORATED ) {
+		return false;
+	}
+	if ( !r_shadowMapStaticCutouts.GetBool() || shader->Deform() != DFRM_NONE ) {
+		return true;
+	}
+	const int stageCount = shader->GetNumStages();
+	for ( int stage = 0; stage < stageCount; ++stage ) {
+		const shaderStage_t *pStage = shader->GetStage( stage );
+		if ( pStage == NULL || !pStage->hasAlphaTest ) {
+			continue;
+		}
+		if ( !R_ShadowMapCutoutStageRegistersConstant( shader, pStage ) ) {
+			return true;
+		}
+		// a video or a render target changes under a constant material
+		if ( pStage->texture.cinematic != NULL || pStage->texture.dynamic != DI_STATIC ) {
+			return true;
+		}
+		// An image that is not there yet is not the coverage the cutout will
+		// have: stay live until it is, and the signature then renders the map.
+		const idImage *image = pStage->texture.image;
+		if ( image == NULL || !image->IsLoaded() || image->IsDefaulted() ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+int R_ShadowMapCutoutCoverageSignature( const idMaterial *shader, int hash ) {
+	if ( shader == NULL || shader->Coverage() != MC_PERFORATED ) {
+		return hash;
+	}
+	unsigned int h = static_cast<unsigned int>( hash );
+	const int stageCount = shader->GetNumStages();
+	for ( int stage = 0; stage < stageCount; ++stage ) {
+		const shaderStage_t *pStage = shader->GetStage( stage );
+		if ( pStage == NULL || !pStage->hasAlphaTest ) {
+			continue;
+		}
+		const idImage *image = pStage->texture.image;
+		const uint64_t generation = image != NULL ? image->GetStorageGeneration() : 0;
+		h = ( h ^ static_cast<unsigned int>( generation ) ) * 16777619u;
+		h = ( h ^ static_cast<unsigned int>( generation >> 32 ) ) * 16777619u;
+		h = ( h ^ static_cast<unsigned int>( pStage->alphaTestMode ) ) * 16777619u;
+	}
+	h = ( h ^ ( r_shadowMapHashedAlpha.GetBool() ? 1u : 0u ) ) * 16777619u;
+	h = ( h ^ ( r_shadowMapStableAlphaHash.GetBool() ? 1u : 0u ) ) * 16777619u;
+	return static_cast<int>( h );
+}
+
 const char *R_ShadowMapLightClassName( shadowMapLightClass_t lightClass ) {
 	switch ( lightClass ) {
 	case SHADOWMAP_LIGHT_POINT:

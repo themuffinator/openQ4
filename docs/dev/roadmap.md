@@ -1701,8 +1701,16 @@ optimization has landed.
   only while one of those needs it (`r_shadowMapPointDepthOnly`, on by default):
   resident shadow memory in the combat view 212 to 152 MiB, 64 cubes in the 512 MiB
   bound where 42 fitted, and GPU frames 0.45 ms shorter there and 0.21 ms in hub2
-  over six alternating pairs. Remaining,
-  in order: faces the view cannot see,
+  over six alternating pairs.
+  Static cutout casters (10 November 2026). Every cutout (alpha-tested) caster was
+  classed live, so a light that reaches a grate or a wire cap copied its cached map
+  and redrew the cutout every view: 25 passes a frame in convoy2's start view, 20 of
+  them with no other live caster. A cutout is now live only while its coverage can
+  change (`r_shadowMapStaticCutouts`, on by default): 3 passes composed there, the
+  Vulkan shadow phases 1.36 to 0.71 ms, and the OpenGL frame 1.75 ms shorter on the
+  GPU over six alternating pairs. Skipping the cube faces a view cannot see was
+  measured afterwards and set aside: all per-view cube work is then 0.07 to 0.16 ms
+  of Vulkan GPU in four scenes. Remaining, in order:
   the fullscreen budgets, including whether Enhanced can map point lights, one
   static cube for both ownerships of a composed Vulkan light, and static-world
   volumes, which are still built once per mapped light for the fallback.

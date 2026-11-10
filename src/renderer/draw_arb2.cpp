@@ -3741,8 +3741,9 @@ static bool RB_ShadowMapStaticCacheable( const viewLight_t *vLight, const shadow
 	// be composed keeps the old rule and re-renders every view.
 	const bool dynamicsDefeatCache = pointLight && vLight->shadowMapDynamicCasterCount > 0
 		&& !RB_ShadowMapPointComposeAvailable();
-	// Perforated surfaces always live in the dynamic chains. Their animated
-	// coverage is composed over cached opaque depth for projected lights.
+	// Perforated surfaces whose coverage can animate live in the dynamic
+	// chains and are composed over the cached depth; the others are cached
+	// with it (R_ShadowMapCutoutCoverageAnimates).
 	if ( haveTranslucentCasters || dynamicsDefeatCache
 			|| vLight->shadowMapStaticCasterCount <= 0 ) {
 		const int lightIndex = RB_ShadowMapLightIndex( vLight );

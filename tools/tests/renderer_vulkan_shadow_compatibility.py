@@ -3999,8 +3999,8 @@ def validate_shadow_contact_and_gl_robustness_contract() -> None:
             raise AssertionError("Live cutouts must not disable opaque projected cache composition")
     interaction = read("src/renderer/Interaction.cpp")
     classification = braced_body(interaction, "static bool R_ShadowMapCasterIsDynamic(", "live caster classification")
-    require_compact(classification, "if ( shader != NULL && shader->Coverage() == MC_PERFORATED ) { return true; }",
-                    "animated cutout coverage is always live")
+    require_compact(classification, "if ( R_ShadowMapCutoutCoverageAnimates( shader ) ) { return true; }",
+                    "a cutout whose coverage can animate is always live")
     require(interaction, "R_ShadowMapCasterIsDynamic( entityDef, shadowShader )", "cutout chain routing")
     require(interaction, "R_ShadowMapCasterIsDynamic( entityDef, shader )", "cutout signature exclusion")
     stats_reset = braced_body(gl, "static void RB_ShadowMapStatsReset( void )", "shadow frame reset")
@@ -8488,6 +8488,143 @@ def validate_depth_only_point_cube_contract() -> None:
     )
 
 
+def validate_static_cutout_caster_contract() -> None:
+    """A cutout caster is live only while its coverage can change.
+
+    Every perforated caster used to be live, because cutout coverage can
+    change without an entity update. A light that reaches one then copied its
+    cached map and redrew the cutouts every view. In convoy2's start view
+    eleven of the fourteen point lights composed each frame, and nine of
+    eleven projected passes, had no other live caster: the registers their
+    wire caps read are literals and their alpha images are plain, so the
+    result was the same every frame.
+
+    The rule asks about the registers the coverage is read from, one by one.
+    idMaterial::ConstantRegisters() cannot be asked: it is NULL for every
+    material in this engine (ParseMaterial never marks a material's registers
+    constant), and it would also refuse a cutout for an animated glow stage
+    that does not move its holes.
+    """
+    policy = read("src/renderer/ShadowMapClassification.cpp")
+    interaction = read("src/renderer/Interaction.cpp")
+    gl = read("src/renderer/draw_arb2.cpp")
+    vk = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+
+    animates = braced_body(policy, "bool R_ShadowMapCutoutCoverageAnimates(", "cutout coverage policy")
+    require_order(
+        animates,
+        (
+            "if ( shader == NULL || shader->Coverage() != MC_PERFORATED ) {",
+            "return false;",
+            # the switch, and a deform moves the geometry itself
+            "if ( !r_shadowMapStaticCutouts.GetBool() || shader->Deform() != DFRM_NONE ) {",
+            "return true;",
+            "if ( pStage == NULL || !pStage->hasAlphaTest ) {",
+            "continue;",
+            # stage condition, alpha scale, alpha reference, texture matrix
+            "if ( !R_ShadowMapCutoutStageRegistersConstant( shader, pStage ) ) {",
+            "return true;",
+            # a video or a render target changes under a constant material
+            "if ( pStage->texture.cinematic != NULL || pStage->texture.dynamic != DI_STATIC ) {",
+            "return true;",
+            # an image still to come is not the coverage that will be baked
+            "if ( image == NULL || !image->IsLoaded() || image->IsDefaulted() ) {",
+            "return true;",
+            "return false;",
+        ),
+        "a cutout is static only with literal coverage registers, plain loaded alpha images and no deform",
+    )
+    registers = braced_body(policy, "static bool R_ShadowMapCutoutStageRegistersConstant(", "cutout stage registers")
+    require_order(
+        registers,
+        (
+            "!shader->GetConstantRegisterValue( pStage->conditionRegister, value )",
+            "!shader->GetConstantRegisterValue( pStage->color.registers[3], value )",
+            "!shader->GetConstantRegisterValue( pStage->alphaTestRegister, value )",
+            "return false;",
+            "if ( pStage->texture.hasMatrix ) {",
+            "!shader->GetConstantRegisterValue( pStage->texture.matrix[row][column], value )",
+            "return false;",
+            "return true;",
+        ),
+        "every register the coverage is read from has to be a parse-time literal",
+    )
+    if "ConstantRegisters()" in animates or "ConstantRegisters()" in registers.replace("idMaterial::ConstantRegisters()", ""):
+        raise AssertionError("idMaterial::ConstantRegisters() is NULL for every material here; ask per register")
+    material = read("src/renderer/Material.cpp")
+    require_order(
+        braced_body(material, "bool idMaterial::GetConstantRegisterValue(", "per-register constness"),
+        ("registerIndex < EXP_REG_NUM_PREDEFINED", "return false;",
+         "if ( ops[i].c == registerIndex ) { return false; }", "value = expressionRegisters[registerIndex];"),
+        "a register is a literal when it is not predefined and no expression writes it",
+    )
+
+    # everything the two caster paths read to evaluate coverage is covered by that rule
+    for source, marker, context in (
+        (gl, "static void RB_PointShadowMapDrawPerforatedCaster(", "OpenGL cutout caster"),
+        (vk, "static bool VK_ShadowMap_DrawResolvedCaster(", "Vulkan cutout caster"),
+    ):
+        body = braced_body(source, marker, context)
+        for register in ("regs[ pStage->conditionRegister ]", "regs[ pStage->color.registers[ 3 ] ]"
+                         if source is vk else "regs[ pStage->color.registers[3] ]"):
+            require(body, register, f"{context} reads coverage from material registers")
+    require(
+        braced_body(gl, "static bool RB_PointShadowMapPrepareAlphaTestStage(", "OpenGL cutout stage"),
+        "regs[ pStage->alphaTestRegister ]",
+        "the alpha reference is a register",
+    )
+    require_order(
+        braced_body(vk, "static bool VK_ShadowMap_PerforatedCasterSupported(", "Vulkan cutout support"),
+        ("pStage->texture.cinematic != NULL", "pStage->texture.dynamic != DI_STATIC"),
+        "Vulkan refuses the animated images the static rule excludes",
+    )
+
+    # one rule decides the chain and the signature; the static chains draw cutouts as cutouts
+    classification = braced_body(interaction, "static bool R_ShadowMapCasterIsDynamic(", "live caster classification")
+    require_order(
+        classification,
+        ("if ( R_ShadowMapCutoutCoverageAnimates( shader ) ) {", "return true;",
+         "entityDef->lastModifiedFrameNum >= recentFrame"),
+        "a static cutout is then as live as its entity",
+    )
+    record = braced_body(interaction, "static void R_RecordShadowMapCaster(", "caster signature")
+    require_order(
+        record,
+        ("const bool dynamicCaster = R_ShadowMapCasterIsDynamic( entityDef, shader );",
+         "if ( dynamicCaster ) {", "return;",
+         "hash = R_ShadowMapCutoutCoverageSignature( shader, hash );",
+         "entityDef->lastModifiedFrameNum"),
+        "what a static cutout's baked coverage depends on is in the map's signature",
+    )
+    require_order(
+        braced_body(policy, "int R_ShadowMapCutoutCoverageSignature(", "cutout coverage signature"),
+        ("image->GetStorageGeneration()", "pStage->alphaTestMode",
+         "r_shadowMapHashedAlpha.GetBool()", "r_shadowMapStableAlphaHash.GetBool()"),
+        "alpha image storage and the hashed-alpha settings change the signature",
+    )
+    require_order(
+        braced_body(gl, "static bool RB_PointShadowMapDrawCasterChain(", "OpenGL point caster chain"),
+        ("shader->Coverage() == MC_PERFORATED", "RB_PointShadowMapDrawPerforatedCaster( surf, casterGeo, ac );"),
+        "every OpenGL chain draws a cutout through its alpha stages",
+    )
+    require_order(
+        braced_body(vk, "static bool VK_ShadowMap_DrawResolvedCaster(", "Vulkan caster tail"),
+        ("shader->Coverage() == MC_PERFORATED", "VK_ShadowMap_PerforatedCasterSupported( surf, true,"),
+        "every Vulkan chain draws a cutout through its alpha stages",
+    )
+
+    require(
+        read("src/renderer/RenderSystem_init.cpp"),
+        'idCVar r_shadowMapStaticCutouts( "r_shadowMapStaticCutouts", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,',
+        "static cutouts are on by default and can be switched off",
+    )
+    require(
+        read("docs/user/shadow-mapping.md"),
+        "| `r_shadowMapStaticCutouts` | `1` |",
+        "the switch is documented",
+    )
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -8541,6 +8678,7 @@ def main() -> None:
     validate_atlas_tile_assignment_contract()
     validate_projected_cache_memory_bound_contract()
     validate_depth_only_point_cube_contract()
+    validate_static_cutout_caster_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 
