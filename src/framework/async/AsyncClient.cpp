@@ -555,6 +555,17 @@ void idAsyncClient::DisconnectFromServer( void ) {
 	idBitMsg	msg;
 	byte		msgBuf[MAX_MESSAGE_SIZE];
 
+	// openQ4: the pure lock is taken while still connecting, when the server's
+	// pak list arrives. It was only released from a full connection, so an
+	// attempt that ended first - a full server, a refusal, a cancelled download
+	// or the player backing out - left it on: loose files and every pak the
+	// server had not listed stayed hidden in the menus, in single player and
+	// on the next server. A pure restart is in CS_PURERESTART by the time it
+	// reconnects, and keeps the list it rebuilt.
+	if ( clientState == CS_CHALLENGING || clientState == CS_CONNECTING ) {
+		fileSystem->ClearPureChecksums();
+	}
+
 	if ( clientState >= CS_CONNECTED ) {
 		// if we were actually connected, clear the pure list
 		fileSystem->ClearPureChecksums();
@@ -1662,7 +1673,8 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 
 	msg.Init( msgBuf, sizeof( msgBuf ) );
 
-	while ( channel.GetReliableMessage( msg ) ) {
+	// openQ4: and none of the reliable messages queued behind that one
+	while ( clientState >= CS_CONNECTED && channel.GetReliableMessage( msg ) ) {
 		id = msg.ReadByte();
 		if ( msg.IsReadOverflowed() ) {
 			common->Warning( "server sent an empty reliable message; disconnecting safely" );
@@ -2314,6 +2326,15 @@ bool idAsyncClient::ValidatePureServerChecksums( const netadr_t from, const idBi
 	numChecksums = 0;
 	do {
 		i = msg.ReadLong( );
+		// openQ4: a list naming one pak twice passes every check here, asks for
+		// a pure restart, and the restart then cannot match the second copy to
+		// a pak and ends the client with a fatal error. Refuse the list.
+		for ( int j = 0; i != 0 && j < numChecksums; j++ ) {
+			if ( inChecksums[ j ] == i ) {
+				common->Warning( "server sent pak checksum 0x%x twice in its pure list; ignoring the list", i );
+				return false;
+			}
+		}
 		inChecksums[ numChecksums++ ] = i;
 		// just to make sure a broken message doesn't crash us
 		if ( numChecksums >= MAX_PURE_PAKS ) {
@@ -2613,6 +2634,14 @@ void idAsyncClient::ProcessMessage( const netadr_t from, idBitMsg &msg ) {
 
 	lastPacketTime = clientTime;
 	ProcessReliableServerMessages();
+	// openQ4: a reliable message can end the connection - a disconnect, or
+	// one this client refuses - and that shuts the channel down. The packet's
+	// unreliable part was processed all the same: a ping then answered through
+	// the dead channel's compressor, and a snapshot was read into a game whose
+	// map had just been shut down.
+	if ( clientState < CS_CONNECTED ) {
+		return;
+	}
 	ProcessUnreliableServerMessage( msg );
 }
 

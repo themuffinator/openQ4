@@ -9024,6 +9024,15 @@ void rvBotManager::OnClientDisconnect( int clientNum ) {
 	nextReplySourceTime[clientNum] = 0;
 	ClearOrder( clientNum );
 
+	// openQ4: a grudge is kept as a client slot. Left alone, it passed to
+	// whoever joined into the slot next, who was hunted and taunted for a
+	// kill they never made.
+	for ( int i = 0; i < MAX_CLIENTS; i++ ) {
+		if ( bots[i].revengeTarget == clientNum ) {
+			bots[i].revengeTarget = -1;
+		}
+	}
+
 	bots[clientNum].Shutdown();
 }
 

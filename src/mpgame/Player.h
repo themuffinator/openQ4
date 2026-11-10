@@ -1144,7 +1144,10 @@ private:
  	
 	int						aimClientNum;			// player num in aim
 
-	idPlayer*				lastImpulsePlayer;		// the last player who gave me an impulse, may be null
+	// openQ4: an entity pointer, so it reads as NULL once that player has left.
+	// It was a raw pointer kept for a second after a knock, and a death in that
+	// second credited the kill through it: freed memory if they had disconnected.
+	idEntityPtr<idPlayer>	lastImpulsePlayer;		// the last player who gave me an impulse, may be null
 	
 	int						arena;					// current arena for tourney gameplay
 

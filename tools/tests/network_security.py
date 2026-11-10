@@ -1009,6 +1009,32 @@ def validate_channel_and_message_abuse_bounds() -> None:
     for token in ("TestZeroRunDrySource", "TestLZWCorrupt", "zero-run output stays within twice its input"):
         require(native, token, "native compressor coverage")
 
+    # A reliable message that ends the connection ends the packet: nothing
+    # queued behind it, and not the packet's unreliable part, is processed.
+    client = read("src/framework/async/AsyncClient.cpp")
+    require(
+        function_body(client, "void idAsyncClient::ProcessReliableServerMessages(", "client reliable dispatcher"),
+        "while ( clientState >= CS_CONNECTED && channel.GetReliableMessage( msg ) )",
+        "client reliable dispatch stops at a disconnect",
+    )
+    process = function_body(client, "void idAsyncClient::ProcessMessage(", "client packet entry")
+    tail = process[process.index("ProcessReliableServerMessages();") :]
+    require_before(tail, "if ( clientState < CS_CONNECTED ) {", "ProcessUnreliableServerMessage( msg );",
+                   "client drops the unreliable part after a disconnect")
+
+    # A pure list naming one pak twice is refused, not carried into a restart
+    # that cannot satisfy it; and the lock taken while connecting is released
+    # when the attempt ends before a full connection.
+    pure_list = function_body(client, "bool idAsyncClient::ValidatePureServerChecksums(", "client pure list")
+    require_before(pure_list, "if ( inChecksums[ j ] == i ) {", "fileSystem->SetPureServerChecksums(",
+                   "duplicate pure checksum refused before the list is applied")
+    disconnect = function_body(client, "void idAsyncClient::DisconnectFromServer(", "client disconnect")
+    require(
+        disconnect,
+        "if ( clientState == CS_CHALLENGING || clientState == CS_CONNECTING ) {\n\t\tfileSystem->ClearPureChecksums();",
+        "pure lock released when a connection attempt ends",
+    )
+
     # Client-side handlers bound what a server or a demo indexes with.
     for tree in ("src/game", "src/mpgame"):
         network = (ROOT / tree / "Game_network.cpp").read_text(encoding="latin-1")

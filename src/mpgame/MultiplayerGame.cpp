@@ -24614,6 +24614,11 @@ void idMultiplayerGame::MapRestart( void ) {
 	mapRestartCount++;
 }
 
+// openQ4: set while ShuffleTeams moves players, which it does one at a time.
+// A side can be empty between two of those moves; checked then, a running
+// match ended as a forfeit by the side that was about to be refilled.
+static bool mpShufflingTeams = false;
+
 /*
 ================
 idMultiplayerGame::SwitchToTeam
@@ -24663,7 +24668,9 @@ void idMultiplayerGame::SwitchToTeam( int clientNum, int oldteam, int newteam ) 
 			gameState->PlayerWithdrew( p );
 		}
 		p->Kill( true, true );
-		CheckAbortGame();
+		if ( !mpShufflingTeams ) {
+			CheckAbortGame();
+		}
 	}
 }
 
@@ -26381,6 +26388,7 @@ void idMultiplayerGame::ShuffleTeams( void ) {
 	int loosingTeam = teamScore[ TEAM_MARINE ] < teamScore[ TEAM_STROGG ] ? TEAM_MARINE : TEAM_STROGG;
 	int winningTeam = loosingTeam == TEAM_MARINE ? TEAM_STROGG : TEAM_MARINE;
 
+	mpShufflingTeams = true;
 	for( int i = 0; i < rankedPlayers.Num(); i++ ) {
 		if( !(i % 2) ) {
 			// switch even players to losing team
@@ -26395,6 +26403,9 @@ void idMultiplayerGame::ShuffleTeams( void ) {
 			}
 		}
 	}
+	mpShufflingTeams = false;
+	// once, with both sides as the shuffle leaves them
+	CheckAbortGame();
 
 	if( autoBalance ) {
 		gameLocal.serverInfo.SetBool( "si_autoBalance", true );
@@ -26563,6 +26574,7 @@ bool idMultiplayerGame::PickMap( idStr gameType, bool checkOnly ) {
 		fixedExtension.SetFileExtension("map");
 		fileList.AddUnique( va( "mp/%s", fixedExtension.c_str() ) );
 	}
+	fileSystem->FreeFileList( files );
 
 	fileList.Sort();
 
@@ -26579,27 +26591,27 @@ bool idMultiplayerGame::PickMap( idStr gameType, bool checkOnly ) {
 	}
 	maps.Sort();
 
+	// openQ4: look at every map once, from a random place. This drew a hundred
+	// maps at random and raised an error when none of the draws supported the
+	// game type - with few such maps among many, or none, a passed game type
+	// vote ended the server's session. The callers handle "no map".
 	if(maps.Num() > 0)
 	{
-		while(miss < 100)
+		index = gameLocal.random.RandomInt( maps.Num() );
+		for ( miss = 0; miss < maps.Num(); miss++ )
 		{
-			index = gameLocal.random.RandomInt( maps.Num() );
-			mapName = maps[index].c_str();
-			
+			mapName = maps[ ( index + miss ) % maps.Num() ].c_str();
+
 			mapDict = MultiplayerResolveMapDecl( mapName );
 			if ( MPMapSupportsGameTypeName( mapDict, gameType ) ) {
 				cvarSystem->SetCVarString("si_map",mapName);
 				si_map.SetString( mapName );
 				return true;
 			}
-			miss++;
-		
 		}
-	
 	}
 
-	//something is wrong and there are no maps for this game type.  This should never happen.
-	gameLocal.Error( "No maps found for game type: %s.\n", gameType.c_str() );
+	gameLocal.Warning( "No maps found for game type: %s.", gameType.c_str() );
 	return false;
 }
 
