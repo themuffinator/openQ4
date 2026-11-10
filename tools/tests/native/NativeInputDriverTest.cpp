@@ -46,7 +46,7 @@ struct DriverFixture {
     void* payload=nullptr;
     explicit DriverFixture(NativeDispositionSchedule schedule=NativeDispositionSchedule::BeforeSessionDrain, unsigned extraKeys=0,bool withPayload=false,bool prefix=false,unsigned keyWindow=5,int firstKey='a',SDL_Scancode scan=SDL_SCANCODE_A,bool firstDown=true,bool modifier=true) {
         Sys_ClearEvents();SDL3_ClearInputQueues();CHECK(Sys_BindEventDispositionThread());eventLoop=&loop;
-        std::fill_n(idKeyInput::down,K_LAST_KEY,false);localUsercmdGen=idUsercmdGenLocal{};effects.clear();sessionObject.callback={};consoleObject.callback={};consoleObject.closeCallback={};commandObject.callback={};consoleObject.consumes=false;sessionObject.guiActive=&guiEndpoint;sessionObject.game=nullptr;
+        std::fill_n(idKeyInput::down,K_LAST_KEY,false);localUsercmdGen=idUsercmdGenLocal{};effects.clear();sessionObject.callback={};consoleObject.callback={};consoleObject.closeCallback={};consoleObject.active=false;commandObject.callback={};consoleObject.consumes=false;sessionObject.guiActive=&guiEndpoint;sessionObject.game=nullptr;
         n.source.status.engineToken=Sys_EventQueueToken();
         n.store.Seal(1);n.source.status.pending=OQ4_NativeFence{1,3,n.f.dispatch,n.f.fence};
         n.source.Add(SDL_EVENT_KEY_DOWN,OQ4_QUEUE_COLLECTION,1);
@@ -81,7 +81,7 @@ struct DriverFixture {
     }
     void Install(){CHECK(driver->Install(nativeResult.completion,error));CHECK(NativeInput_OwnsPump());}
     ~DriverFixture(){
-        sessionObject.callback={};consoleObject.callback={};consoleObject.closeCallback={};commandObject.callback={};sessionObject.game=nullptr;facts.callback={};n.hooks.callback={};onFree={};
+        sessionObject.callback={};consoleObject.callback={};consoleObject.closeCallback={};consoleObject.active=false;commandObject.callback={};sessionObject.game=nullptr;facts.callback={};n.hooks.callback={};onFree={};
         if(driver){driver->Abort();for(unsigned i=0;i<4;++i){driver->BeginFrame(100000+i);driver->Checkpoint();}CHECK(driver->Uninstall());}
         Sys_ClearEvents();SDL3_ClearInputQueues();eventLoop=nullptr;
     }
@@ -173,12 +173,17 @@ static void MultiCallbackReplacement() {
   const auto buffers=commandObject.buffers;commandObject.callback=[&]{f.n.owner.replaced=true;};
   f.loop.RunEventLoop(false);CHECK(commandObject.buffers==buffers+1 && Freed(text));
   CHECK(f.driver->Faulted() && !f.n.fence.acks);f.driver->Checkpoint();CHECK(f.route.State()==NativeInputRoute::Phase::Empty);}
- for(int stage=0;stage<3;++stage){DriverFixture f;GameEndpoint game;game.reply=stage==2?ESC_MAIN:ESC_GUI;
+ // Stage 3: with the console down, Escape is the console's to take (it puts
+ // itself away); the session must not close it, ask the game or open a menu.
+ for(int stage=0;stage<4;++stage){DriverFixture f;GameEndpoint game;game.reply=stage==2?ESC_MAIN:ESC_GUI;
   sessionObject.game=&game;sessionObject.guiActive=nullptr;
   sysEvent_t escape{SE_KEY,K_ESCAPE,1,0,nullptr};f.loop.PushEvent(&escape);f.Install();
   const auto setGui=sessionObject.setGuiCalls,menu=sessionObject.startMenuCalls;
-  if(stage==0)consoleObject.closeCallback=[&]{f.n.owner.replaced=true;};else game.callback=[&]{f.n.owner.replaced=true;};
-  f.loop.RunEventLoop(false);CHECK(game.calls==(stage?1u:0u));
+  bool closed=false;
+  if(stage==0)consoleObject.closeCallback=[&]{f.n.owner.replaced=true;};
+  else if(stage==3){consoleObject.active=true;consoleObject.closeCallback=[&]{closed=true;};consoleObject.callback=[&]{f.n.owner.replaced=true;};}
+  else game.callback=[&]{f.n.owner.replaced=true;};
+  f.loop.RunEventLoop(false);CHECK(game.calls==((stage==1 || stage==2)?1u:0u) && !closed);
   CHECK(sessionObject.setGuiCalls==setGui && sessionObject.startMenuCalls==menu && f.driver->Faulted() && !f.n.fence.acks);
   f.driver->Checkpoint();CHECK(f.route.State()==NativeInputRoute::Phase::Empty);}
 }

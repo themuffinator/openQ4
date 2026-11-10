@@ -52,6 +52,12 @@ def mover_commands(scenario: str) -> tuple[list[str], tuple[str, ...]]:
 
     def compare(label: str) -> None:
         budget = 1 if scenario == "door-budget" and label != "closed" else 0
+        # A caster counts as live for a quarter second of real time after it
+        # last changed (SHADOWMAP_DYNAMIC_CASTER_WINDOW_MSEC), then joins the
+        # static set and the resident map is rendered once more. Frame counts
+        # do not bound that: at a high frame rate the cached capture could land
+        # on the very frame of that re-render and report no reuse.
+        commands.append("waitMsec 350")
         capture(label + "_cached", "r_shadows 1", "r_useShadowMap 1",
                 "r_shadowMapStaticCache 1", f"r_shadowMapMaxUpdatesPerView {budget}")
         capture(label + "_fresh", "r_shadowMapMaxUpdatesPerView 0", "r_shadowMapStaticCache 0")

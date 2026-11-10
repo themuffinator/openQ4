@@ -1470,20 +1470,46 @@ def validate_csm_atlas_and_receiver_contract() -> None:
         "static bool VK_ShadowMap_AllocTileBlock(",
         "contiguous shadow-atlas block allocator",
     )
+    # The lights of a view no longer share one tile size, so blocks are cut
+    # by buddy allocation: power-of-two squares inside a power-of-two root,
+    # with the same edges the front end counts with. A row scan wastes the
+    # space under a small block that follows a large one.
     require_order(
         allocator,
         (
-            "blockSize <= 0 || blockSize > vkShadow.atlasSize",
-            "vkShadow.nextTileX + blockSize > vkShadow.atlasSize",
-            "vkShadow.nextTileY += vkShadow.nextTileRowHeight;",
-            "vkShadow.nextTileY + blockSize > vkShadow.atlasSize",
-            "tileX = vkShadow.nextTileX;",
-            "tileY = vkShadow.nextTileY;",
-            "vkShadow.nextTileX += blockSize;",
-            "vkShadow.nextTileRowHeight = Max( vkShadow.nextTileRowHeight, blockSize );",
+            "const int rootEdge = R_ShadowMapAtlasRootEdge( vkShadow.atlasSize );",
+            "const int blockEdge = R_ShadowMapAtlasBlockEdge( blockSize, 1 );",
+            "blockSize <= 0 || blockEdge <= 0 || blockEdge > rootEdge",
+            "return false;",
+            "while ( ( rootEdge >> level ) > blockEdge ) {",
+            "return VK_ShadowMap_TakeAtlasBlock( level, rootEdge, tileX, tileY );",
         ),
         "contiguous shadow-atlas block allocator",
     )
+    take = braced_body(
+        shadow_map,
+        "static bool VK_ShadowMap_TakeAtlasBlock(",
+        "shadow-atlas buddy allocation",
+    )
+    require_order(
+        take,
+        (
+            "if ( vkShadow.atlasFreeCount[ level ] > 0 ) {",
+            "return true;",
+            "if ( level == 0 ) {",
+            "if ( !vkShadow.atlasRootFree ) {",
+            "return false;",
+            "vkShadow.atlasRootFree = false;",
+            "if ( !VK_ShadowMap_TakeAtlasBlock( level - 1, rootEdge, x, y ) ) {",
+            "const int edge = rootEdge >> level;",
+            "for ( int quarter = 3 ; quarter >= 1 ; quarter-- ) {",
+            "vkShadow.atlasFreeX[ level ][ slot ] = x + ( quarter & 1 ) * edge;",
+            "vkShadow.atlasFreeY[ level ][ slot ] = y + ( quarter >> 1 ) * edge;",
+        ),
+        "a free block of the size is taken, else the next larger one is split in four",
+    )
+    if shadow_map.count("VK_ShadowMap_ResetAtlasBlocks();") != 2:
+        raise AssertionError("every prepared view and every release must cut the atlas afresh")
 
     projected_alloc = braced_body(
         shadow_map,
@@ -1519,7 +1545,8 @@ def validate_csm_atlas_and_receiver_contract() -> None:
         prepare,
         (
             "const int requestedAtlasDiv = idMath::ClampInt( 1, 2, classification.atlasDiv );",
-            "const int maxTileSize = vkShadow.atlasSize / requestedAtlasDiv;",
+            "const int tileSize = R_ShadowMapProjectedTileSize( vLight, requestedAtlasDiv, vkShadow.atlasSize );",
+            "if ( tileSize <= 0 ) {",
             "R_BuildShadowMapProjectedLightState( vLight, viewDef, tileSize, projectedState );",
             "projectedState.cascadeCount > SHADOWMAP_PROJECTED_MAX_CASCADES",
             "projectedState.atlasDiv < 1 || projectedState.atlasDiv > 2",
@@ -5500,7 +5527,7 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
     require_compact(
         gl_backend,
         """schedule.projectedEntry = RB_ShadowMapAllocProjectedCacheEntry(
-            pass.projected.state.atlasDiv, false );""",
+            cellSpan, false );""",
         "GL sealed projected shadow transaction cache preservation",
     )
     # A projected cache miss re-renders into the light's own idle entry and
@@ -5525,9 +5552,9 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
     )
     for recycle_call in (
         """schedule.projectedEntry = RB_ShadowMapRecycleProjectedCacheEntry(
-            cacheLightIndex, passKind, pass.projected.state.atlasDiv );
+            cacheLightIndex, passKind, cellSpan );
         if ( schedule.projectedEntry == NULL ) {""",
-        """schedule.projectedEntry = RB_ShadowMapRecycleProjectedCacheEntry( lightIndex, passKind, RB_ShadowMapAtlasDivForLight( vLight ) );
+        """schedule.projectedEntry = RB_ShadowMapRecycleProjectedCacheEntry( lightIndex, passKind, RB_ShadowMapAtlasSpanForLight( vLight ) );
             if ( schedule.projectedEntry == NULL ) {""",
     ):
         require_compact(gl_backend, recycle_call, "GL projected shadow miss keeps the light's atlas cell")
@@ -7815,30 +7842,24 @@ def validate_stencil_elision_contract() -> None:
         "only the subview clause differs between the views of a frame")
 
     # The atlas is allocated per view; an atlas light sheds its volumes only
-    # when every atlas light of the view is certain of a tile.
+    # when every atlas light of the view is certain of a block: two each at
+    # the smallest tile it may be given, which is the most the finished view
+    # can ask for (validate_atlas_tile_assignment_contract pins the rest).
     holds = braced_body(light, "static bool R_ShadowMapAtlasHoldsView(", "per-view atlas capacity")
     require_order(
         holds,
         (
             "const viewDef_t *viewDef = tr.viewDef != NULL ? tr.viewDef : backEnd.viewDef;",
-            "for ( const viewLight_t *vLight = viewDef->viewLights; vLight != NULL; vLight = vLight->next ) {",
-            "!lightDef->lightShader->LightCastsShadows()",
-            "!R_ShadowMapsNeedPerSurfaceStencilVolumes( lightDef )",
-            "if ( classification.pointLight ) {",
-            "continue;",
-            "const int maxTileSize = atlasSize / atlasDiv;",
-            "largestBlock = Max( largestBlock, tileSize * atlasDiv );",
-            "blocks += 2;",
-            "cachedHolds = blocks <= R_ShadowMapAtlasBlockCapacity( atlasSize, largestBlock, 1 );",
+            "const int count = R_ShadowMapGatherAtlasRequests( viewDef, false, atlasSize, requests, NULL );",
+            "cachedHolds = count >= 0 && R_ShadowMapFitAtlasTiles( atlasSize, requests, count );",
         ),
-        "two blocks for every atlas light of the view against what the atlas is certain to hold",
+        "two blocks at the smallest tile for every atlas light of the view against what the atlas holds",
     )
     require(classification_h, "int R_ShadowMapAtlasBlockCapacity( int atlasSize, int tileSize, int atlasDiv );",
             "shared atlas capacity policy")
     capacity = braced_body(classification, "int R_ShadowMapAtlasBlockCapacity(", "atlas block capacity")
-    require_order(capacity, ("atlasSize <= 0 || tileSize <= 0 || atlasDiv <= 0", "return 0;",
-                             "static_cast<long long>( tileSize ) * atlasDiv", "atlasSize / blockSize",
-                             "perRow * perRow"), "atlas block capacity")
+    require_order(capacity, ("R_ShadowMapAtlasBlockEdge( tileSize, atlasDiv )", "R_ShadowMapAtlasRootEdge( atlasSize )",
+                             "return 0;", "rootEdge / blockEdge", "perRow * perRow"), "atlas block capacity")
     selftest = braced_body(classification, "bool R_ShadowMapCachePolicySelfTest(", "shared policy self-test")
     for case in ("R_ShadowMapAtlasBlockCapacity( 4096, 2048, 1 ) != 4",
                  "R_ShadowMapAtlasBlockCapacity( 8192, 4096, 1 ) != 4",
@@ -7900,6 +7921,180 @@ def validate_stencil_elision_contract() -> None:
         raise AssertionError("map caster admission must not ask this view's LOD apart from the stencil verdict")
 
 
+def validate_atlas_tile_assignment_contract() -> None:
+    """A tile size per atlas light, so the atlas holds a view at every tier.
+
+    Quality and Ultra cut four tiles of r_shadowMapSize and a light with both
+    receiver ownerships takes two. A view of three projected lights left one
+    on stencil for the rest of the level on Vulkan (convoy2's start does) and
+    re-rendering every view on OpenGL. The front end now sizes each light's
+    tile once the view is finished; both back ends read that size and cut
+    blocks that fit by construction.
+    """
+    light = read("src/renderer/tr_light.cpp")
+    classification = read("src/renderer/ShadowMapClassification.cpp")
+    classification_h = read("src/renderer/ShadowMapClassification.h")
+    vk = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+    gl = read("src/renderer/draw_arb2.cpp")
+
+    # the policy: full size while the view fits, then one halving at a time
+    # from the lights that cover the least, never below the floor
+    fit = braced_body(classification, "bool R_ShadowMapFitAtlasTiles(", "atlas tile fit")
+    require_order(
+        fit,
+        (
+            "const long long capacity = rootEdge * rootEdge;",
+            "requests[order[slot - 1]].extent >= requests[i].extent",
+            "while ( demand > capacity ) {",
+            "for ( int i = 0; i < count && demand > capacity; ++i ) {",
+            "const int smaller = request.tileSize / 2;",
+            "if ( smaller < request.minTileSize || smaller < 1 ) {",
+            "request.tileSize = smaller;",
+            "if ( !halved ) {",
+            "return demand <= capacity;",
+        ),
+        "lights give up resolution one halving at a time, smallest extent first",
+    )
+    require_compact(
+        braced_body(classification, "int R_ShadowMapAtlasMinTileSize(", "atlas tile floor"),
+        "return Min( tileSize, Max( 128, tileSize / 4 ) );",
+        "no light is cut below a quarter of its tile or 128",
+    )
+    tile = braced_body(classification, "int R_ShadowMapProjectedTileSize(", "per-light tile size")
+    require_order(
+        tile,
+        (
+            "const int maxTileSize = maxBlockSize / Max( 1, atlasDiv );",
+            "if ( maxTileSize < 128 ) {",
+            "vLight->shadowMapTileSize > 0",
+            "? vLight->shadowMapTileSize : r_shadowMapSize.GetInteger();",
+            "return idMath::ClampInt( 128, maxTileSize, wanted );",
+        ),
+        "back ends read the assigned tile, else r_shadowMapSize",
+    )
+    selftest = braced_body(classification, "bool R_ShadowMapCachePolicySelfTest(", "shared policy self-test")
+    for case in (
+        "R_ShadowMapAtlasBlockEdge( 1500, 1 ) != 2048",
+        "R_ShadowMapAtlasRootEdge( 6000 ) != 4096",
+        "R_ShadowMapAtlasMinTileSize( 2048 ) != 512",
+        "fits[0].tileSize != 2048 || fits[1].tileSize != 2048",
+        "three[0].tileSize != 2048 || three[1].tileSize != 1024 || three[2].tileSize != 1024",
+        "!R_ShadowMapFitAtlasTiles( 4096, many, 32 )",
+        "R_ShadowMapFitAtlasTiles( 4096, many, 33 )",
+        "cascaded[0].tileSize != 1024 || cascaded[1].tileSize != 1024",
+    ):
+        require(selftest, case, "the self-test pins the atlas fit")
+    require(classification_h, "static const int SHADOWMAP_ATLAS_MAX_REQUESTS = 64;", "atlas request bound")
+
+    # the front end: counted before the interactions are known, assigned after
+    gather = braced_body(light, "static int R_ShadowMapGatherAtlasRequests(", "atlas request gathering")
+    require_order(
+        gather,
+        (
+            "!R_ShadowMapsNeedPerSurfaceStencilVolumes( lightDef )",
+            "if ( classification.pointLight ) {",
+            "const int tileSize = R_ShadowMapProjectedTileSize( NULL, atlasDiv, atlasSize );",
+            "int passes = 2;",
+            "if ( interactionsKnown ) {",
+            "passes = ( localReceivers ? 1 : 0 ) + ( globalReceivers ? 1 : 0 );",
+            "if ( passes == 2 && !localCasters ) {",
+            "if ( count >= SHADOWMAP_ATLAS_MAX_REQUESTS ) {",
+            "return -1;",
+            "if ( classification.ordinaryProjectedLight ) {",
+            "extent = 2.0f * Max( parms.right.Length(), parms.up.Length() );",
+            "request.minTileSize = R_ShadowMapAtlasMinTileSize( tileSize );",
+            "request.tileSize = interactionsKnown ? tileSize : request.minTileSize;",
+        ),
+        "two blocks at the floor before interactions are known, the real ownerships at full size after",
+    )
+    assign = braced_body(light, "void R_ShadowMapAssignAtlasTiles(", "atlas tile assignment")
+    require_order(
+        assign,
+        (
+            "R_ShadowMapGatherAtlasRequests( viewDef, true, atlasSize, requests, lights );",
+            "R_ShadowMapFitAtlasTiles( atlasSize, requests, count );",
+            "lights[i]->shadowMapTileSize = requests[i].tileSize;",
+        ),
+        "the finished view's atlas lights are sized together",
+    )
+    require_order(
+        read("src/renderer/tr_main.cpp"),
+        ("R_RemoveUnecessaryViewLights();", "R_ShadowMapAssignAtlasTiles( tr.viewDef );", "R_SortDrawSurfs();"),
+        "tiles are assigned once the view's lights are final",
+    )
+
+    # every consumer reads the same per-light size
+    require_compact(
+        braced_body(gl, "static int RB_ShadowMapTileSizeForLight(", "GL projected tile size"),
+        """return R_ShadowMapProjectedTileSize( vLight, RB_ShadowMapAtlasDivForLight( vLight ),
+            glConfig.maxTextureSize );""",
+        "OpenGL reads the assigned tile",
+    )
+    require_compact(
+        vk,
+        "resourceSize = R_ShadowMapProjectedTileSize( vLight, atlasDiv, atlasEdge );",
+        "the Vulkan admission estimate reads the assigned tile",
+    )
+    require_compact(
+        braced_body(read("src/renderer/ClassicInteractionDomain.cpp"), "static int ShadowMapProjectedTileSize(",
+                    "sealed projected tile size"),
+        "return R_ShadowMapProjectedTileSize( viewLight, atlasDiv, Min( maxTextureSize, atlasSize ) );",
+        "the sealed stream reads the assigned tile",
+    )
+
+    # Vulkan: resident tiles of different sizes coexist, and a tile a light
+    # on screen is using is not evicted
+    if "projectedCacheTileSize" in vk or "VK_ShadowMap_EnsureProjectedCacheConfiguration" in vk:
+        raise AssertionError("one tile size for the whole projected cache throws every resident tile away when a light's differs")
+    vk_alloc = braced_body(vk, "static int VK_ShadowMap_AllocProjectedCacheEntry(", "Vulkan projected cache allocation")
+    require_order(
+        vk_alloc,
+        ("if ( entry.reserved ) {", "if ( !entry.valid ) {", "entry.lastUsedFrame >= backEnd.frameCount - 1", "continue;"),
+        "Vulkan projected cache allocation",
+    )
+
+    gl_alloc = braced_body(gl, "static projectedShadowMapCacheEntry_t *RB_ShadowMapAllocProjectedCacheEntry(",
+                           "GL projected cache allocation")
+    require_order(
+        gl_alloc,
+        ("if ( !entry->valid ) {", "entry->lastUsedFrame >= tr.frameCount - 1", "continue;",
+         "if ( oldest == NULL || entry->lastUsedFrame < oldest->lastUsedFrame ) {"),
+        "GL projected cache allocation",
+    )
+
+    # OpenGL: a cell is the smallest tile, blocks sit on multiples of their
+    # span, and the scratch target keeps its size
+    ensure = braced_body(gl, "static bool RB_ShadowMapEnsureResources(", "GL projected resources")
+    require_order(
+        ensure,
+        (
+            "const int atlasCellSize = R_ShadowMapAtlasMinTileSize(",
+            "static int scratchSizedForSetting = 0;",
+            "width < shadowMapSize || height < shadowMapSize",
+            "scratchSizedForSetting != setting",
+            "tr.ResizeRenderTexture( g_shadowMapScratchRenderTexture, shadowMapSize, shadowMapSize );",
+        ),
+        "a cell is the smallest tile, and the scratch target only grows within a setting",
+    )
+    require(gl, "static const int SHADOWMAP_ATLAS_MAX_GRID = 32;", "atlas grid bound")
+    require_compact(
+        braced_body(gl, "static int RB_ShadowMapAtlasSpanForBlock(", "atlas cell span"),
+        "return ( blockPixels + g_shadowMapAtlasCellSize - 1 ) / g_shadowMapAtlasCellSize;",
+        "a block spans the cells it covers",
+    )
+    require_order(
+        braced_body(gl, "static bool RB_ShadowMapAtlasFindFreeBlock(", "atlas free block search"),
+        ("for ( int y = 0; y + span <= gridDim; y += span ) {", "for ( int x = 0; x + span <= gridDim; x += span ) {"),
+        "blocks sit on multiples of their own span",
+    )
+    require_compact(
+        braced_body(gl, "static bool RB_ShadowMapEnsureTranslucentResources(", "GL moment target"),
+        """const int shadowMapSize = Max( shadowMapTileSize * shadowMapAtlasDiv,
+            g_shadowMapScratchRenderTexture != NULL ? g_shadowMapScratchRenderTexture->GetWidth() : 0 );""",
+        "the moment target matches the scratch depth target it is sampled with",
+    )
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -7950,6 +8145,7 @@ def main() -> None:
     validate_translucent_moment_contract()
     validate_point_cache_parity_and_receiver_cost_contract()
     validate_stencil_elision_contract()
+    validate_atlas_tile_assignment_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

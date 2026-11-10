@@ -45,6 +45,8 @@ struct idSessionLocal {
     void SetGUI(idUserInterface*,HandleGuiCommand_t);
     void ExitMenu();
     void GuiFrameEvents();
+    // idSessionLocal::GuiFrameEvents consumes an Android app suspension first; no desktop harness has one.
+    void HandleAppResume(bool) {}
     void PumpApplicationActions(idUserInterface* = nullptr);
     void DispatchCommand(idUserInterface*,const char*,bool=true);
     void SetSaveGameGuiVars() {}

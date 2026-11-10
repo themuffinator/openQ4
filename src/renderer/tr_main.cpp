@@ -1494,6 +1494,9 @@ void R_RenderView( viewDef_t *parms ) {
 
 	// any viewLight that didn't have visible surfaces can have it's shadows removed
 	R_RemoveUnecessaryViewLights();
+	// the lights that remain share the projected shadow atlas: size their tiles
+	// so they all fit, before anything reads a tile size
+	R_ShadowMapAssignAtlasTiles( tr.viewDef );
 	if ( reportViewBuildTimes ) {
 		const int now = Sys_Milliseconds();
 		viewBuildPruneMsec = now - viewBuildLastMark;

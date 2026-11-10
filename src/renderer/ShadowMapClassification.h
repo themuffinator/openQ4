@@ -121,12 +121,43 @@ int R_ShadowMapDynamicCasterFrames( void );
 // The pure form, for the self-test: the window in frames for a smoothed frame
 // interval in milliseconds.
 int R_ShadowMapDynamicCasterFramesFor( float frameMsec );
-// How many blocks, each atlasDiv tiles on a side, a projected atlas cut into
-// tiles of tileSize is certain to hold. A cascaded light's block is two tiles
-// on a side, and a row-scan allocator packs any mix of the two block sizes at
-// least as tightly as blocks of the larger one.
+// The projected atlas is shared by every projected, parallel and distant point
+// light of a view, and each of them asks for one block per receiver ownership.
+// Blocks are placed as power-of-two squares inside the largest power-of-two
+// square the atlas holds, so a set of them fits exactly when their areas do,
+// in whatever order they are asked for.
+//
+// The edge a block of atlasDiv tiles a side occupies, and the edge of the
+// square the blocks of an atlas are cut from.
+int R_ShadowMapAtlasBlockEdge( int tileSize, int atlasDiv );
+int R_ShadowMapAtlasRootEdge( int atlasSize );
+// How many such blocks the atlas holds.
 int R_ShadowMapAtlasBlockCapacity( int atlasSize, int tileSize, int atlasDiv );
-// pins the cache-size, live-caster window and atlas capacity policies
+
+// One atlas light of a view. A light keeps the tile it would have alone
+// (r_shadowMapSize) while the view fits. When it does not, lights give up
+// resolution one halving at a time, those covering the least world first,
+// because a small light spends the same texels on less surface. No light goes
+// below minTileSize.
+typedef struct shadowMapAtlasRequest_s {
+	int		tileSize;		// in: the tile edge the light has alone; out: its edge in this view
+	int		minTileSize;	// the smallest edge it may be given
+	int		atlasDiv;		// 1, or 2 for the four-tile block of a cascaded light
+	int		passes;			// receiver ownerships that need a block of their own, 1 or 2
+	float	extent;			// world size of what the light covers
+} shadowMapAtlasRequest_t;
+
+static const int SHADOWMAP_ATLAS_MAX_REQUESTS = 64;
+// The smallest tile a light is cut down to: two halvings, never under 128.
+int R_ShadowMapAtlasMinTileSize( int tileSize );
+// Returns whether the requests fit the atlas once their tile sizes are set.
+bool R_ShadowMapFitAtlasTiles( int atlasSize, shadowMapAtlasRequest_t *requests, int count );
+// The tile edge a back end gives a light: the one assigned for this view
+// (viewLight_t::shadowMapTileSize), else r_shadowMapSize, and never more than
+// maxBlockSize allows. 0 when no tile of 128 fits.
+int R_ShadowMapProjectedTileSize( const viewLight_t *vLight, int atlasDiv, int maxBlockSize );
+
+// pins the cache-size, live-caster window and atlas policies
 bool R_ShadowMapCachePolicySelfTest( void );
 // Conservative cube-face rejection, shared by GL and Vulkan. Invalid bounds
 // or transforms remain visible. Face order is +X,-X,+Y,-Y,+Z,-Z.

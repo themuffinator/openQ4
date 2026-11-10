@@ -48,6 +48,7 @@ SERIALIZED_GUIS: dict[str, str] = {
     "guis/vehicles/airdef_cannon.gui": "e92ae101f581b82a2885ac970b8755a92e1cbcae",
     "guis/vehicles/hud.gui": "95493b94ce52d5ff87683c94e2b09a318bc5f3e9",
     "guis/vehicles/strogg_noise.gui": "d0777427b93ec45c90c6dfdf3ba6352aec981dc6",
+    "guis/vehicles/turret_hud.gui": "7da86966bf5b66f3e5c90f926cf0a739eaf231e4",
     "guis/weapons/machinegun_scope.gui": "d2690deda0fc05b110508071a34051631df8c1c9",
     "guis/weapons/nailgun_scope.gui": "ae6876c4199d6d252ea11d80ce284bc6d145d34a",
     "guis/weapons/railgun_scope.gui": "baaa7a75e8daac09597f201c6836a54dafd19f9b",

@@ -66,7 +66,7 @@ cache (sixteen at most) against forty cubes in view.
 
 | Finding | State |
 |---|---|
-| **Quality and Ultra give the projected atlas four cells** (2048 cells in 4096, 4096 in 8192) while Enhanced has sixteen. A light with local casters takes two. OpenGL re-renders the overflow every view; Vulkan marks the light for stencil permanently and can draw it unshadowed for a frame. | **Open.** The prelight ownership fix removes many second cells. The structural fix is a tile size per light; a preset change needs the budgets redeclared. |
+| **Quality and Ultra give the projected atlas four cells** (2048 cells in 4096, 4096 in 8192) while Enhanced has sixteen. A light with local casters takes two. OpenGL re-renders the overflow every view; Vulkan marks the light for stencil permanently and can draw it unshadowed for a frame. convoy2's start view does this: up to four projected lights, five lights sent to stencil for good and one drawn unshadowed. | **Fixed, both backends.** A tile size per light, assigned per view. See "Atlas tile sizes" below. No preset changed. |
 | Vulkan: cascades in an 8192 atlas always fail (one CSM block is the whole atlas). | **Open**; no preset uses it. |
 | The stencil-fallback flag on a light is never cleared. | **Open.** Costs the light its volume elision only. |
 | OpenGL point cubes carry a colour cube the default receiver never samples: half their memory. The opt-in modern executor still reads it. | **Open.** At 512 the cache can now reach 504 MiB on OpenGL (42 cubes) against 384 MiB on Vulkan (64). |
@@ -132,6 +132,7 @@ Added on 10 November. What changed:
   that finds the atlas full nothing but its volumes in that frame, and Quality
   and Ultra cut four tiles. This also covers lights without a prelight, which
   used to shed their volumes whether or not the atlas could hold the view.
+  (With the tile sizes below the count is made at each light's smallest tile.)
 - **Dynamic models get no volumes under a mapped light**, by the entity's own
   model. An entity that stops animating keeps those surfaces, so they are
   built again, with volumes, when the light returns to stencil (sticky
@@ -180,6 +181,62 @@ mirror or camera screen was exercised, so the subview rule rests on the code:
 missing volumes mark the stencil fallback incomplete, which makes the map
 required there on both backends.
 
+### Atlas tile sizes
+
+Added on 10 November. Every projected, parallel and distant point light took a
+tile of `r_shadowMapSize`, one per receiver ownership, and Quality and Ultra cut
+four. A survey of fifteen stock views found most ask for four passes or fewer,
+and one that does not: convoy2's start, with up to eight such lights in view.
+
+- **The front end sizes each atlas light's tile once the view is finished**
+  (`R_ShadowMapAssignAtlasTiles`, `viewLight_t::shadowMapTileSize`). A view
+  that fits keeps every light at `r_shadowMapSize`, so nothing changes where
+  nothing overflowed. Otherwise lights halve, one step each in turn, those
+  covering the least world first (the width of a projector's far face;
+  sunlight and other fitted sources last), down to a quarter and never under
+  128. Both back ends, the sealed stream and the cache signature read the
+  same size (`R_ShadowMapProjectedTileSize`).
+- **Vulkan cuts the atlas by buddy allocation** instead of a row scan, so any
+  set of power-of-two blocks whose areas fit is placed, in any order. Its
+  projected cache now holds tiles of different sizes; it used to discard every
+  resident tile when one light's size differed.
+- **OpenGL's atlas grid cell is the smallest tile**, a full-size light spanning
+  a block of sixteen cells, and its scratch target keeps the largest size
+  asked for instead of being reallocated for each light.
+- **Neither back end evicts a projected tile a light on screen is using**, the
+  rule the point cube cache already had.
+- **The stencil-shedding rule follows**: an atlas light sheds its volumes when
+  the view's atlas lights would fit at their smallest tiles, two blocks each.
+  That is thirty-two lights at Quality and Ultra where it was two.
+
+convoy2 start view, Quality, view sweep:
+
+| Vulkan | Before | After |
+|---|---:|---:|
+| Atlas passes mapped in one view, most | 4 | 11 |
+| Lights sent to stencil for the level | 5 | 0 |
+| Lights drawn unshadowed (the warning prints once) | at least 1 | 0 |
+
+The small projectors there drop to 1024 while the view is crowded and the
+distant source keeps 2048. On OpenGL the same view maps its seven projected
+lights with the eight cache slots in use and no evictions. The validation
+layers reported nothing.
+
+What this costs: a light changes resolution when the view becomes crowded or
+clears, which re-renders its map once at the new size and can be seen as a
+change in shadow sharpness on the smallest lights. There is no hysteresis.
+
+Checked for this change: the fourteen scenarios on both backends, the crowded
+convoy2 view captured mapped, stencilled and unshadowed on both (six lights at
+1024, two at 2048, soft shadows where the stencil frame has hard ones), hub2
+unchanged at 2048 with four passes, and the in-engine self-test, which now
+pins the fit. `door-projected` again failed once on OpenGL for a missed cache
+reuse. That was the scenario, not the renderer: it waited six frames before
+its cached capture, and since the live-caster window became a quarter second
+of real time the capture could land on the frame the map is re-rendered. It
+now waits that window out (`renderer_shadow_mapping_movers.py`) and passed
+seven runs in a row.
+
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
 (caster counts, cache reuse, cached against fresh images byte-identical; run
@@ -200,9 +257,10 @@ whether Enhanced can now map point lights on Vulkan.
 
 ## Still open, in order of value
 
-1. A tile size per projected light, so the atlas holds a view at every tier.
-   Until then atlas lights keep their volumes in any view with more than two
-   of them at Quality and Ultra.
+1. The projected cache has eight slots (`r_shadowMapProjectedCacheSize`). A
+   view with more atlas passes keeps those and re-renders the rest each view;
+   convoy2's start has eleven. More slots need a memory bound like the point
+   cache's: a 4096 tile is 64 MiB on Vulkan.
 2. Depth-only point cubes on OpenGL while nothing samples the colour cube.
 3. Cube faces the view cannot see; fullscreen budgets for the three tiers.
 4. One static cube for both ownerships of a composed Vulkan light, as on

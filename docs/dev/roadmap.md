@@ -1670,9 +1670,18 @@ optimization has landed.
   whose atlas is certain to hold them all, and Vulkan's receiver scan no longer waits
   for entities the view cannot see. In the airdefense1 arena shadow volumes built per
   frame went from over thirty to none on both backends; the CPU frame is 0.14 ms
-  shorter on OpenGL and 0.1 ms on Vulkan against the switch. Remaining,
-  in order: a tile size per projected light (Quality and
-  Ultra have four atlas cells), depth-only cubes on OpenGL, faces the view cannot see,
+  shorter on OpenGL and 0.1 ms on Vulkan against the switch.
+  Atlas tile sizes (10 November 2026). Quality and Ultra cut four projected atlas
+  tiles and a light with both receiver ownerships takes two; convoy2's start view
+  has up to eight such lights, and on Vulkan five went to stencil for the level and
+  one was drawn unshadowed. The front end now sizes each atlas light's tile once the
+  view is finished: full size while the view fits, else halved from the lights that
+  cover the least world up, to a quarter at most. Vulkan cuts the atlas by buddy
+  allocation, OpenGL's grid cell is the smallest tile, and neither evicts a projected
+  tile in use. That view now maps eleven atlas passes with none on stencil; no preset
+  changed and a view that fitted before renders as before. Remaining,
+  in order: a memory-bounded projected cache (eight slots; passes beyond them
+  re-render each view), depth-only cubes on OpenGL, faces the view cannot see,
   the fullscreen budgets, including whether Enhanced can map point lights, one
   static cube for both ownerships of a composed Vulkan light, and static-world
   volumes, which are still built once per mapped light for the fallback.

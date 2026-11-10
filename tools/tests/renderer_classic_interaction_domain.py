@@ -1125,7 +1125,9 @@ def main() -> None:
         "RB_ShadowMapFindProjectedCacheEntry(",
         "RB_ShadowMapAllocPointCacheEntry( false )",
         "RB_ShadowMapAllocProjectedCacheEntry(",
-        "pass.projected.state.atlasDiv, false",
+        # the sealed tile and block decide the atlas cells, not atlasDiv alone
+        "pass.projected.state.tileSize * pass.projected.state.atlasDiv );",
+        "cellSpan, false",
         "schedule.cacheable = false",
     ):
         require(gl_map_schedule, token, "OpenGL sealed cache scheduler")

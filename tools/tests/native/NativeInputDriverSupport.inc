@@ -36,7 +36,8 @@ struct GameEndpoint {
     escReply_t HandleESC(idUserInterface** gui){++calls;*gui=&guiEndpoint;auto call=std::move(callback);if(call)call();return reply;}
 };
 struct ConsoleEndpoint {
-    std::function<void()> callback,closeCallback;bool consumes=false;
+    std::function<void()> callback,closeCallback;bool consumes=false,active=false;
+    bool Active() const{return active;}
     void Close(){auto call=std::move(closeCallback);if(call)call();}
     bool ProcessEvent(const sysEvent_t*,bool){auto call=std::move(callback);if(call)call();return consumes;}
 } consoleObject,*console=&consoleObject;

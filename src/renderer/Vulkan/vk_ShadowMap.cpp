@@ -150,6 +150,8 @@ Module state
 ====================
 */
 static const int VK_SHADOW_LIGHT_HISTORY_SLOTS = 256;
+// Halvings from the largest atlas root (16384) down to the smallest tile (128).
+static const int VK_SHADOW_ATLAS_LEVELS = 8;
 
 // mirror of the shared 128B caster push block; the alpha matrix rows' unused
 // z components carry the two caster depth-offset scalars
@@ -238,15 +240,20 @@ typedef struct vkShadowMapState_s {
 	const idRenderWorldLocal *cacheRenderWorld;
 	unsigned int		cacheMapFileCRC;
 	int					cacheMapNameHash;
-	int					projectedCacheTileSize;
 
 	// per-view resource allocators + light table (reset every
 	// PrepareViewLights). pointCubesUsed counts scratch cubes: uncached
 	// ownership maps and the composed copies of cached ones; freshUpdates is
 	// the r_shadowMapMaxUpdatesPerView admission count.
-	int					nextTileX;
-	int					nextTileY;
-	int					nextTileRowHeight;
+	//
+	// The atlas is cut by buddy allocation (VK_ShadowMap_AllocTileBlock):
+	// atlasFree lists the unused blocks of each level, level 0 being the whole
+	// root square. A level only receives the three siblings of a split when it
+	// has none left, so three slots a level are enough.
+	bool				atlasRootFree;
+	int					atlasFreeCount[ VK_SHADOW_ATLAS_LEVELS ];
+	int					atlasFreeX[ VK_SHADOW_ATLAS_LEVELS ][ 3 ];
+	int					atlasFreeY[ VK_SHADOW_ATLAS_LEVELS ][ 3 ];
 	int					pointCubesUsed;
 	int					freshUpdates;
 	int					projectedCacheHits;
@@ -375,6 +382,12 @@ static void VK_ShadowMap_ClearProjectedEntryMetadata(
 		vkProjectedShadowCacheEntry_t &entry );
 static void VK_ShadowMap_ClearPointEntryMetadata(
 		vkPointShadowCacheEntry_t &entry );
+
+// every view cuts the atlas afresh
+static void VK_ShadowMap_ResetAtlasBlocks( void ) {
+	vkShadow.atlasRootFree = true;
+	memset( vkShadow.atlasFreeCount, 0, sizeof( vkShadow.atlasFreeCount ) );
+}
 
 /*
 ====================
@@ -510,9 +523,7 @@ static void VK_ShadowMap_ReleasePreparedLights( const bool markSticky ) {
 	vkShadow.numLights = 0;
 	vkShadow.preparedView = NULL;
 	vkShadow.preparedFrame = -1;
-	vkShadow.nextTileX = 0;
-	vkShadow.nextTileY = 0;
-	vkShadow.nextTileRowHeight = 0;
+	VK_ShadowMap_ResetAtlasBlocks();
 	vkShadow.pointCubesUsed = 0;
 	vkShadow.freshUpdates = 0;
 	vkShadow.projectedCacheHits = 0;
@@ -555,7 +566,6 @@ static void VK_ShadowMap_DestroyProjectedCaches( bool deferred = false ) {
 	}
 	memset( vkShadow.projectedCache, 0,
 			sizeof( vkShadow.projectedCache ) );
-	vkShadow.projectedCacheTileSize = 0;
 }
 
 static void VK_ShadowMap_DestroyAtlas( void ) {
@@ -1746,29 +1756,17 @@ static void VK_ShadowMap_BeginCacheView( const viewDef_t *viewDef ) {
 	}
 }
 
-static bool VK_ShadowMap_EnsureProjectedCacheConfiguration(
-		const int tileSize ) {
-	if ( tileSize <= 0 || vkCtx.device == VK_NULL_HANDLE ) {
-		return false;
-	}
-	if ( vkShadow.projectedCacheTileSize != 0
-			&& vkShadow.projectedCacheTileSize != tileSize ) {
-		// Earlier views of the recording frame may have copied from these
-		// images; the deferred queue retires them after that frame's fence.
-		VK_ShadowMap_DestroyProjectedCaches( true );
-	}
-	vkShadow.projectedCacheTileSize = tileSize;
-	return true;
-}
-
 // blockSize is the resident content's edge: one tile for an ordinary
-// projected light, tileSize * atlasDiv for a cached CSM block. A slot reused
-// at a different block edge retires its image first; the device is idled
-// because frames in flight may still reference it.
+// projected light, tileSize * atlasDiv for a cached CSM block. The lights of
+// a view no longer share one tile size, so every slot is sized for the entry
+// it holds: a slot reused at a different block edge retires its image first,
+// behind the frame fence because frames in flight may still reference it.
+// (One size for the whole cache meant a single differently sized light threw
+// every resident tile away.)
 static bool VK_ShadowMap_EnsureProjectedCacheImage( const int index,
 		const int blockSize ) {
 	if ( index < 0 || index >= VK_SHADOW_MAX_CACHE_SLOTS
-			|| vkShadow.projectedCacheTileSize <= 0 || blockSize <= 0 ) {
+			|| vkCtx.device == VK_NULL_HANDLE || blockSize <= 0 ) {
 		return false;
 	}
 	vkProjectedShadowCacheEntry_t &entry =
@@ -1871,9 +1869,7 @@ static int VK_ShadowMap_FindPointCacheEntry(
 static int VK_ShadowMap_AllocProjectedCacheEntry(
 		const int tileSize, const int blockSize ) {
 	const int limit = VK_ShadowMap_ProjectedCacheSlotLimit();
-	if ( limit <= 0
-			|| !VK_ShadowMap_EnsureProjectedCacheConfiguration(
-					tileSize ) ) {
+	if ( limit <= 0 || tileSize <= 0 ) {
 		return -1;
 	}
 	int selected = -1;
@@ -1886,6 +1882,13 @@ static int VK_ShadowMap_AllocProjectedCacheEntry(
 		if ( !entry.valid ) {
 			selected = i;
 			break;
+		}
+		// As for point cubes: a tile sampled this frame or the last belongs
+		// to a light still on screen, and evicting it only makes that light
+		// miss later in this view and evict the next one in turn. Leave it;
+		// the caller renders this pass without publishing it.
+		if ( entry.lastUsedFrame >= backEnd.frameCount - 1 ) {
+			continue;
 		}
 		if ( selected < 0 || entry.lastUsedFrame
 				< vkShadow.projectedCache[ selected ].lastUsedFrame ) {
@@ -2168,27 +2171,64 @@ static void VK_ShadowMap_CancelScheduledPass(
 
 /*
 ====================
-Tile allocator (row scan, reset per view)
+Tile allocator (buddy, reset per view)
+
+The lights of a view no longer share one tile size (the front end sizes each
+so the view fits, R_ShadowMapAssignAtlasTiles), and a row scan wastes the
+space under a small block that follows a large one. Blocks are instead
+power-of-two squares cut from the largest power-of-two square in the atlas:
+a free block of the wanted size is taken if there is one, else the next
+larger block is split in four. Nothing is freed within a view, so a request
+fails only when the blocks already cut leave less area than it needs: any
+set of blocks whose areas fit the root is placed, in any order. The front
+end counts with the same edges (R_ShadowMapAtlasBlockEdge and RootEdge).
 ====================
 */
+static bool VK_ShadowMap_TakeAtlasBlock( const int level, const int rootEdge,
+		int &x, int &y ) {
+	if ( level < 0 || level >= VK_SHADOW_ATLAS_LEVELS ) {
+		return false;
+	}
+	if ( vkShadow.atlasFreeCount[ level ] > 0 ) {
+		const int last = --vkShadow.atlasFreeCount[ level ];
+		x = vkShadow.atlasFreeX[ level ][ last ];
+		y = vkShadow.atlasFreeY[ level ][ last ];
+		return true;
+	}
+	if ( level == 0 ) {
+		if ( !vkShadow.atlasRootFree ) {
+			return false;
+		}
+		vkShadow.atlasRootFree = false;
+		x = 0;
+		y = 0;
+		return true;
+	}
+	// split the next larger block: keep its first quarter, free the other three
+	if ( !VK_ShadowMap_TakeAtlasBlock( level - 1, rootEdge, x, y ) ) {
+		return false;
+	}
+	const int edge = rootEdge >> level;
+	for ( int quarter = 3 ; quarter >= 1 ; quarter-- ) {
+		const int slot = vkShadow.atlasFreeCount[ level ]++;
+		vkShadow.atlasFreeX[ level ][ slot ] = x + ( quarter & 1 ) * edge;
+		vkShadow.atlasFreeY[ level ][ slot ] = y + ( quarter >> 1 ) * edge;
+	}
+	return true;
+}
+
 static bool VK_ShadowMap_AllocTileBlock( const int blockSize,
 		int &tileX, int &tileY ) {
-	if ( blockSize <= 0 || blockSize > vkShadow.atlasSize ) {
+	const int rootEdge = R_ShadowMapAtlasRootEdge( vkShadow.atlasSize );
+	const int blockEdge = R_ShadowMapAtlasBlockEdge( blockSize, 1 );
+	if ( blockSize <= 0 || blockEdge <= 0 || blockEdge > rootEdge ) {
 		return false;
 	}
-	if ( vkShadow.nextTileX + blockSize > vkShadow.atlasSize ) {
-		vkShadow.nextTileX = 0;
-		vkShadow.nextTileY += vkShadow.nextTileRowHeight;
-		vkShadow.nextTileRowHeight = 0;
+	int level = 0;
+	while ( ( rootEdge >> level ) > blockEdge ) {
+		level++;
 	}
-	if ( vkShadow.nextTileY + blockSize > vkShadow.atlasSize ) {
-		return false;
-	}
-	tileX = vkShadow.nextTileX;
-	tileY = vkShadow.nextTileY;
-	vkShadow.nextTileX += blockSize;
-	vkShadow.nextTileRowHeight = Max( vkShadow.nextTileRowHeight, blockSize );
-	return true;
+	return VK_ShadowMap_TakeAtlasBlock( level, rootEdge, tileX, tileY );
 }
 
 // The translucent chains are only populated when the front end admitted the
@@ -2951,12 +2991,11 @@ static bool VK_ShadowMap_EstimateUpdateCost( const viewLight_t *vLight,
 		const int atlasEdge = vkShadow.atlasSize > 0 ? vkShadow.atlasSize
 				: idMath::ClampInt( 2048, 16384,
 						r_shadowMapAtlasSize.GetInteger() );
-		const int maxTileSize = atlasEdge / atlasDiv;
-		if ( maxTileSize < 128 ) {
+		resourceSize = R_ShadowMapProjectedTileSize( vLight, atlasDiv,
+				atlasEdge );
+		if ( resourceSize <= 0 ) {
 			return false;
 		}
-		resourceSize = idMath::ClampInt( 128, maxTileSize,
-				r_shadowMapSize.GetInteger() );
 		cascadeCount = idMath::ClampInt( 1,
 				SHADOWMAP_PROJECTED_MAX_CASCADES,
 				classification.cascadeCount );
@@ -3121,9 +3160,7 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 	vkShadow.numLights = 0;
 	vkShadow.preparedView = viewDef;
 	vkShadow.preparedFrame = backEnd.frameCount;
-	vkShadow.nextTileX = 0;
-	vkShadow.nextTileY = 0;
-	vkShadow.nextTileRowHeight = 0;
+	VK_ShadowMap_ResetAtlasBlocks();
 	vkShadow.pointCubesUsed = 0;
 	vkShadow.freshUpdates = 0;
 	vkShadow.projectedCacheHits = 0;
@@ -3354,19 +3391,19 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 			continue;
 		}
 
-		// Match RB_ShadowMapTileSizeForLight: r_shadowMapSize is the edge of
-		// one cascade tile, while a CSM light needs a contiguous atlasDiv^2
+		// Match RB_ShadowMapTileSizeForLight: the light's tile is the edge of
+		// one cascade tile (the size the front end gave it for this view, else
+		// r_shadowMapSize), while a CSM light needs a contiguous atlasDiv^2
 		// block. Clamp against the backend atlas so admitting CSM can never
 		// produce an allocation that is structurally impossible.
 		const int requestedAtlasDiv = idMath::ClampInt( 1, 2,
 				classification.atlasDiv );
-		const int maxTileSize = vkShadow.atlasSize / requestedAtlasDiv;
-		if ( maxTileSize < 128 ) {
+		const int tileSize = R_ShadowMapProjectedTileSize( vLight,
+				requestedAtlasDiv, vkShadow.atlasSize );
+		if ( tileSize <= 0 ) {
 			VK_ShadowMap_MarkStencilFallbackSticky( vLight );
 			continue;
 		}
-		const int tileSize = idMath::ClampInt( 128, maxTileSize,
-				r_shadowMapSize.GetInteger() );
 
 		shadowMapProjectedLightState_t projectedState;
 		R_BuildShadowMapProjectedLightState( vLight, viewDef, tileSize, projectedState );

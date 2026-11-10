@@ -137,6 +137,14 @@ there is no double-click word selection.
   enough away to look small on screen, its shadow switched to the original
   hard-edged kind, and the light around it stayed on the slower mixed path for
   the rest of the level.
+- **Rooms with several spotlights keep all of them on shadow maps.** At the
+  Quality and Ultra presets only four spotlight shadow maps fitted at once. A
+  view with more (the start of Convoy 2 has up to eight spotlights) dropped
+  the rest to the original hard-edged shadows for the rest of the level on
+  Vulkan, with a frame where one cast no shadow at all, and redrew them every
+  frame on OpenGL. The smallest spotlights in such a view now use a half or
+  quarter resolution map so that all of them fit. Views that fitted before
+  look the same as before.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.
