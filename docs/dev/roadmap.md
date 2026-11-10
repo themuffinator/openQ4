@@ -646,6 +646,17 @@ and untested drivers remain open, with no tolerance or support-tier change.
   now records hidden/offscreen versus synchronous-benchmark scope explicitly and
   refuses configuration overrides of its window/input/filesystem invariants.
   Physical AMD, Linux and Apple hardware results are still required.
+  Progress, 10 November: Windows x64 support was rechecked on a clean
+  debugoptimized build of `8735ad1b`, the first since the 4 October sign-off,
+  with OpenGL as the warning reference on the RTX 4060 (591.74) and Iris Xe
+  (101.5590). All 29 SP maps passed (87 runs), as did the two-cycle, eight-map
+  soak with a video restart: process growth at most 1.09x on NVIDIA, 1.15x on
+  Intel and 1.11x on OpenGL. The MP sweep passed 59 of 60 runs. The NVIDIA
+  q4dm6 run logged three bot-dependent decl and ragdoll warnings that OpenGL
+  did not, and a full rerun of that map passed on all three. The validation
+  layers logged nothing in any of the 102 Vulkan runs. This does not cover
+  later Vulkan back-end commits on main, AMD, VK-02 pacing or the VK-04 image
+  gates.
 - [ ] **VK-02 — P1, investigation and qualification: visible presentation pacing.**
   Reproduce the hybrid-adapter/power-state conditions using current foreground
   windowed workloads and unchanged budgets. Separate host scheduling, fence waits,
