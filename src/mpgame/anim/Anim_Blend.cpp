@@ -663,27 +663,33 @@ const char *idAnim::AddFrameCommand( const idDeclModelDef *modelDef, const idLis
 		{
 			fc.string = new idStr( token );
 		}
+	// openQ4: these four took their argument as optional and then played the
+	// command through a NULL string. Refuse the line as the others do.
 	} else if ( token == "speak" )  {
 		fc.type = FC_AI_SPEAK;
-		if( src.ReadTokenOnLine( &token ) ) {
-			fc.string = new idStr( token );
+		if( !src.ReadTokenOnLine( &token ) ) {
+			return "Unexpected end of line";
 		}
+		fc.string = new idStr( token );
 	} else if ( token == "speak_random" )  {
 		fc.type = FC_AI_SPEAK_RANDOM;
-		if( src.ReadTokenOnLine( &token ) ) {
-			fc.string = new idStr( token );
+		if( !src.ReadTokenOnLine( &token ) ) {
+			return "Unexpected end of line";
 		}
+		fc.string = new idStr( token );
 //MCG - added attachment frame commands
 	} else if ( token == "attachment_hide" )  {
 		fc.type = FC_ACT_ATTACH_HIDE;
-		if( src.ReadTokenOnLine( &token ) ) {
-			fc.string = new idStr( token );
+		if( !src.ReadTokenOnLine( &token ) ) {
+			return "Unexpected end of line";
 		}
+		fc.string = new idStr( token );
 	} else if ( token == "attachment_show" )  {
 		fc.type = FC_ACT_ATTACH_SHOW;
-		if( src.ReadTokenOnLine( &token ) ) {
-			fc.string = new idStr( token );
+		if( !src.ReadTokenOnLine( &token ) ) {
+			return "Unexpected end of line";
 		}
+		fc.string = new idStr( token );
 // RAVEN END
 	} else {
 		return va( "Unknown command '%s'", token.c_str() );
@@ -4343,6 +4349,14 @@ idAnimator::AimJointAt
 void idAnimator::AimJointAt ( jointHandle_t jointnum, const idVec3& pos, const int currentTime ) {
 	jointMod_t *jointMod;
 
+	// openQ4: SetJointPos and SetJointAxis refuse a joint the model does not
+	// have; these four did not, and a mod made for INVALID_JOINT has CreateFrame
+	// read and write joint -1. Weapons pass handles looked up by name on the
+	// world model (the gauntlet's blade, the nailgun's drum) without checking.
+	if ( !modelDef || !modelDef->ModelHandle() || ( jointnum < 0 ) || ( jointnum >= numJoints ) ) {
+		return;
+	}
+
 	jointMod = FindJointMod ( jointnum );	
 
 	idVec3	offset;
@@ -4374,6 +4388,10 @@ idAnimator::SetJointAngularVelocity
 void idAnimator::SetJointAngularVelocity ( jointHandle_t jointnum, const idAngles& vel, const int currentTime, const int blendTime ) {
 	jointMod_t *jointMod;
 
+	if ( !modelDef || !modelDef->ModelHandle() || ( jointnum < 0 ) || ( jointnum >= numJoints ) ) {
+		return;
+	}
+
 	jointMod = FindJointMod ( jointnum );
 
 	if ( !jointMod->lastTime ) {
@@ -4399,6 +4417,10 @@ idAnimator::GetJointAngularVelocity
 =====================
 */
 idAngles idAnimator::GetJointAngularVelocity ( jointHandle_t jointnum, const int currentTime ) {
+	if ( !modelDef || !modelDef->ModelHandle() || ( jointnum < 0 ) || ( jointnum >= numJoints ) ) {
+		return ang_zero;
+	}
+
 	jointMod_t *jointMod = FindJointMod ( jointnum );
 
 	return jointMod->angularVelocity.GetCurrentValue( currentTime );
@@ -4410,6 +4432,10 @@ idAnimator::GetJointAngularVelocity
 =====================
 */
 void idAnimator::ClearJointAngularVelocity ( jointHandle_t jointnum ) {
+	if ( !modelDef || !modelDef->ModelHandle() || ( jointnum < 0 ) || ( jointnum >= numJoints ) ) {
+		return;
+	}
+
 	jointMod_t *jointMod = FindJointMod ( jointnum );
 
 	jointMod->angularVelocity.Init( 0, 0, 0, 0, jointMod->angularVelocity.GetStartValue() - jointMod->angularVelocity.GetStartValue(), jointMod->angularVelocity.GetStartValue() - jointMod->angularVelocity.GetStartValue() );

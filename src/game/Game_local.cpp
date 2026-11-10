@@ -2816,6 +2816,10 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 // RAVEN END
 
 	savegame.ReadInt( localClientNum );
+	// openQ4: GetLocalPlayer indexes entities[] with this
+	if ( localClientNum < -1 || localClientNum >= MAX_CLIENTS ) {
+		savegame.Error( "idGameLocal::InitFromSaveGame: invalid local client %d", localClientNum );
+	}
 
 	// snapshotEntities is used for multiplayer only
 

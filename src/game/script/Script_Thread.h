@@ -182,7 +182,7 @@ private:
 	void						Event_ClampFloat( float min, float max, float val );
 	void						Event_MinFloat( float val1, float val2 );
 	void						Event_MaxFloat( float val1, float val2 );
-	void						Event_StrFind( idStr& sourceStr, idStr& subStr );
+	void						Event_StrFind( const char *sourceStr, const char *subStr );
 	void						Event_RandomInt( float range ) const;
 
 // rjohnson: new blur special effect

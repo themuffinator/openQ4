@@ -949,7 +949,9 @@ void idThread::Error( const char *fmt, ... ) const {
 	vsprintf( text, fmt, argptr );
 	va_end( argptr );
 
-	interpreter.Error( text );
+	// openQ4: the text is already formatted; as a format, a '%' in a script's
+	// own message or in an entity's name read arguments that were not there
+	interpreter.Error( "%s", text );
 }
 
 /*
@@ -965,7 +967,7 @@ void idThread::Warning( const char *fmt, ... ) const {
 	vsprintf( text, fmt, argptr );
 	va_end( argptr );
 
-	interpreter.Warning( text );
+	interpreter.Warning( "%s", text );
 }
 
 /*
@@ -2193,8 +2195,11 @@ void idThread::Event_MaxFloat( float val1, float val2 ) {
 idThread::Event_StrFind
 ================
 */
-void idThread::Event_StrFind( idStr& sourceStr, idStr& subStr ) {
-	idThread::ReturnInt( sourceStr.Find(subStr.c_str()) );
+void idThread::Event_StrFind( const char *sourceStr, const char *subStr ) {
+	// openQ4: a "ss" event hands over C strings. This was declared to take two
+	// idStr references, so every call read the text itself as a string object
+	// and searched through whatever its bytes pointed at.
+	idThread::ReturnInt( idStr::FindText( sourceStr, subStr ) );
 }
 
 // asalmon: award achievement

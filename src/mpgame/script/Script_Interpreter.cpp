@@ -1260,11 +1260,20 @@ bool idInterpreter::Execute( void ) {
 			var_b = GetVariable( st->b );
 			var_c = GetVariable ( st->c );
 
-			if ( *var_b.floatPtr == 0.0f ) {
-				Warning( "Divide by zero" );
-				*var_c.floatPtr = *var_a.floatPtr;
-			} else {
-				*var_c.floatPtr = static_cast<int>( *var_a.floatPtr ) % static_cast<int>( *var_b.floatPtr );
+			// openQ4: test the integer that divides. The float was tested, so a
+			// divisor between -1 and 1 passed as non-zero, truncated to 0 and
+			// raised an integer divide fault that took the game down. -1 is
+			// answered here too: INT_MIN % -1 faults the same way.
+			{
+				const int divisor = static_cast<int>( *var_b.floatPtr );
+				if ( divisor == 0 ) {
+					Warning( "Divide by zero" );
+					*var_c.floatPtr = *var_a.floatPtr;
+				} else if ( divisor == -1 ) {
+					*var_c.floatPtr = 0.0f;
+				} else {
+					*var_c.floatPtr = static_cast<int>( *var_a.floatPtr ) % divisor;
+				}
 			}
 			break;
 
@@ -1537,11 +1546,16 @@ bool idInterpreter::Execute( void ) {
 			var_a = GetVariable( st->a );
 			var_b = GetVariable( st->b );
 
-			if ( *var_a.floatPtr == 0.0f ) {
-				Warning( "Divide by zero" );
-				*var_b.floatPtr = *var_a.floatPtr;
-			} else {
-				*var_b.floatPtr = static_cast<int>( *var_b.floatPtr ) % static_cast<int>( *var_a.floatPtr );
+			{
+				const int divisor = static_cast<int>( *var_a.floatPtr );
+				if ( divisor == 0 ) {
+					Warning( "Divide by zero" );
+					*var_b.floatPtr = *var_a.floatPtr;
+				} else if ( divisor == -1 ) {
+					*var_b.floatPtr = 0.0f;
+				} else {
+					*var_b.floatPtr = static_cast<int>( *var_b.floatPtr ) % divisor;
+				}
 			}
 			break;
 

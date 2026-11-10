@@ -935,8 +935,11 @@ void idActor::Restore( idRestoreGame *savefile ) {
 		}
 	}
 
-	savefile->ReadInt( lightningEffects );
+	// openQ4: in the order Save writes them. They were read crossed, so a game
+	// saved during a lightning death came back with the effect count and the
+	// next effect's time exchanged.
 	savefile->ReadInt( lightningNextTime );
+	savefile->ReadInt( lightningEffects );
 
 	savefile->ReadFloat( fovDot );
 	savefile->ReadFloat( fovCloseDot );
