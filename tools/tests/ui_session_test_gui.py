@@ -102,6 +102,8 @@ struct idSessionLocal {
     int dispatches=0;
     void TestGUI(const char* guiName);
     void GuiFrameEvents();
+    // idSessionLocal::GuiFrameEvents consumes an Android app suspension first; no desktop harness has one.
+    void HandleAppResume(bool) {}
     // Pending typed-action delivery has its own production-method harness.
     void PumpApplicationActions(idUserInterface* = nullptr) {}
     // ui_retained home screens never present while a test GUI owns the session.

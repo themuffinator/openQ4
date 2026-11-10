@@ -157,6 +157,8 @@ struct idSessionLocal {
     bool OpenSystemSettings();bool ReturnSystemSettings();void CloseSystemSettings();void ReportSystemSettings();
     bool RetainedSystemAvailable() const;void OpenSystemSettingsRoute(bool fromMultiplayer);
     void SetGUI(idUserInterface*,HandleGuiCommand_t);void ExitMenu();void GuiFrameEvents();
+    // idSessionLocal::GuiFrameEvents consumes an Android app suspension first; no desktop harness has one.
+    void HandleAppResume(bool) {}
     void SetPlayingSoundWorld();void SetPlayingSoundWorld(Sound* sound){requestedSoundWorld=sound;}
     bool IsMultiplayer(){return multiplayer;}
     // The session's stock fallback (qualified by ui_retained_gate.py): a page that
