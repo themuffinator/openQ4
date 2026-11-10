@@ -2334,8 +2334,8 @@ typedef enum {
 	SHADOWMAP_PASS_RESULT_SCHEDULED_SKIP
 } shadowMapPassResult_t;
 
-// Projected cache records and the shared-stream scratch slots. The point cube
-// cache has its own, larger bound (SHADOWMAP_POINT_CACHE_MAX_SLOTS).
+// The shared-stream scratch slots. The caches have their own record counts:
+// SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS and SHADOWMAP_POINT_CACHE_MAX_SLOTS.
 static const int SHADOWMAP_CACHE_MAX_SLOTS = 16;
 
 // point cubes carry six faces of color+depth per slot, so they get their own
@@ -2423,7 +2423,7 @@ typedef struct {
 	int							issuedFrame;
 } shadowMapGpuTimerQuery_t;
 
-static projectedShadowMapCacheEntry_t	g_projectedShadowMapCache[SHADOWMAP_CACHE_MAX_SLOTS];
+static projectedShadowMapCacheEntry_t	g_projectedShadowMapCache[SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS];
 static pointShadowMapCacheEntry_t		g_pointShadowMapCache[SHADOWMAP_POINT_CACHE_MAX_SLOTS];
 static sharedInteractionProjectedScratch_t
 	g_sharedInteractionProjectedScratch[SHADOWMAP_CACHE_MAX_SLOTS];
@@ -3626,7 +3626,7 @@ static void RB_ShadowMapInvalidateLightCaches( const int lightIndex ) {
 	if ( lightIndex < 0 ) {
 		return;
 	}
-	for ( int i = 0; i < SHADOWMAP_CACHE_MAX_SLOTS; i++ ) {
+	for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
 		if ( g_projectedShadowMapCache[i].valid && g_projectedShadowMapCache[i].lightIndex == lightIndex ) {
 			g_projectedShadowMapCache[i].valid = false;
 		}
@@ -3657,7 +3657,7 @@ bool RB_ShadowMapPrepareCacheView( const viewDef_t *viewDef ) {
 		return false;
 	}
 
-	for ( int i = 0; i < SHADOWMAP_CACHE_MAX_SLOTS; i++ ) {
+	for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
 		g_projectedShadowMapCache[i].valid = false;
 	}
 	for ( int i = 0; i < SHADOWMAP_POINT_CACHE_MAX_SLOTS; i++ ) {
@@ -3756,8 +3756,13 @@ static bool RB_ShadowMapStaticCacheableReadOnly( const viewLight_t *vLight, cons
 	return true;
 }
 
+// Entry records the projected cache may use. r_shadowMapProjectedCacheSize no
+// longer counts them. The cache lives in the atlas, which is allocated whole,
+// so the atlas is its bound and the cvar only turns it on or off here; Vulkan
+// keeps resident tiles in images of their own and counts them against it
+// (R_ShadowMapProjectedCacheTexelBudget).
 static int RB_ShadowMapProjectedCacheSlotLimit( void ) {
-	return idMath::ClampInt( 0, SHADOWMAP_CACHE_MAX_SLOTS, r_shadowMapProjectedCacheSize.GetInteger() );
+	return r_shadowMapProjectedCacheSize.GetInteger() > 0 ? SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS : 0;
 }
 
 // Six faces of packed colour depth plus the depth cube the caster pass tests
@@ -3807,7 +3812,7 @@ static void RB_ShadowMapExpireCaches( void ) {
 	const int residentFrames = Max( 1, r_shadowMapResidentFrames.GetInteger() );
 	const int projectedLimit = RB_ShadowMapProjectedCacheSlotLimit();
 	const int pointLimit = RB_ShadowMapPointCacheSlotLimit();
-	for ( int i = 0; i < SHADOWMAP_CACHE_MAX_SLOTS; i++ ) {
+	for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
 		// Cache-size cvars are live. Entries outside a reduced limit must stop
 		// occupying atlas cells immediately or in-range allocation can evict
 		// forever without finding a block that the stale metadata still marks.
@@ -3996,7 +4001,7 @@ static bool RB_ShadowMapAtlasFindFreeBlock( const int span, int &cellX, int &cel
 	}
 	bool occupied[SHADOWMAP_ATLAS_MAX_GRID][SHADOWMAP_ATLAS_MAX_GRID];
 	memset( occupied, 0, sizeof( occupied ) );
-	for ( int i = 0; i < SHADOWMAP_CACHE_MAX_SLOTS; i++ ) {
+	for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
 		const projectedShadowMapCacheEntry_t &entry = g_projectedShadowMapCache[i];
 		if ( !RB_ShadowMapProjectedCacheEntryStorageValid( &entry ) ) {
 			continue;
@@ -4030,10 +4035,45 @@ static bool RB_ShadowMapAtlasFindFreeBlock( const int span, int &cellX, int &cel
 	return false;
 }
 
+// The cache lives in the atlas and may fill it: every cell is memory already
+// allocated, so leaving some unused would save nothing.
+static int RB_ShadowMapAtlasCellCount( void ) {
+	const int gridDim = RB_ShadowMapAtlasGridDim();
+	return gridDim * gridDim;
+}
+
+static int RB_ShadowMapProjectedCacheCellsUsed( void ) {
+	int cells = 0;
+	for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
+		const projectedShadowMapCacheEntry_t &entry = g_projectedShadowMapCache[i];
+		if ( RB_ShadowMapProjectedCacheEntryStorageValid( &entry ) ) {
+			cells += entry.atlasCellSpan * entry.atlasCellSpan;
+		}
+	}
+	return cells;
+}
+
+// The cache is bounded by the atlas cells it fills, not by a count of entries:
+// the tiles of a view differ in size, and a crowded view's small tiles fit
+// many times over in the cells a few full ones take.
 static projectedShadowMapCacheEntry_t *RB_ShadowMapAllocProjectedCacheEntry(
 		const int cellSpan, const bool allowEviction = true ) {
 	const int slotLimit = RB_ShadowMapProjectedCacheSlotLimit();
-	if ( slotLimit <= 0 || g_shadowMapAtlasCellSize <= 0 ) {
+	const int atlasCells = RB_ShadowMapAtlasCellCount();
+	if ( slotLimit <= 0 || g_shadowMapAtlasCellSize <= 0
+			|| cellSpan <= 0 || cellSpan * cellSpan > atlasCells ) {
+		return NULL;
+	}
+	// Nothing is evicted for a block that would not fit even then: the tiles
+	// of lights that left the view stay for their return.
+	int pinnedCells = 0;
+	for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
+		const projectedShadowMapCacheEntry_t &entry = g_projectedShadowMapCache[i];
+		if ( RB_ShadowMapProjectedCacheEntryStorageValid( &entry ) && entry.lastUsedFrame >= tr.frameCount - 1 ) {
+			pinnedCells += entry.atlasCellSpan * entry.atlasCellSpan;
+		}
+	}
+	if ( pinnedCells + cellSpan * cellSpan > atlasCells ) {
 		return NULL;
 	}
 
@@ -6250,7 +6290,7 @@ static bool RB_ShadowMapEnsureResources( const viewLight_t *vLight ) {
 			idMath::ClampInt( 128, glConfig.maxTextureSize > 0 ? glConfig.maxTextureSize : 4096, r_shadowMapSize.GetInteger() ) );
 		const int atlasSize = RB_ShadowMapAtlasSizeValue();
 		if ( atlasCellSize != g_shadowMapAtlasCellSize ) {
-			for ( int i = 0; i < SHADOWMAP_CACHE_MAX_SLOTS; i++ ) {
+			for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
 				g_projectedShadowMapCache[i].valid = false;
 			}
 			g_shadowMapAtlasCellSize = atlasCellSize;
@@ -6272,7 +6312,7 @@ static bool RB_ShadowMapEnsureResources( const viewLight_t *vLight ) {
 			}
 		} else if ( g_shadowMapAtlasRenderTexture != NULL && ( g_shadowMapAtlasRenderTexture->GetWidth() != atlasSize || g_shadowMapAtlasRenderTexture->GetHeight() != atlasSize ) ) {
 			tr.ResizeRenderTexture( g_shadowMapAtlasRenderTexture, atlasSize, atlasSize );
-			for ( int i = 0; i < SHADOWMAP_CACHE_MAX_SLOTS; i++ ) {
+			for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
 				g_projectedShadowMapCache[i].valid = false;
 			}
 		}
@@ -6647,6 +6687,8 @@ static void RB_ShadowMapPurgeIdleResources( void ) {
 			g_sharedInteractionPointScratch[i].colorImage );
 		RB_ShadowMapPurgeImage(
 			g_sharedInteractionPointScratch[i].depthImage );
+	}
+	for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
 		g_projectedShadowMapCache[i].valid = false;
 	}
 	RB_ShutdownShadowMapResources();
@@ -6857,7 +6899,7 @@ static void RB_ShadowMapStatsReport( void ) {
 		g_shadowMapStats.gpuTimerPhasePending[SHADOWMAP_TIMING_RECEIVER_FALLBACK],
 		g_shadowMapStats.gpuTimerPhasePending[SHADOWMAP_TIMING_STENCIL_FALLBACK] );
 	common->Printf(
-		"SM cache: hit=%d miss=%d reuse=%d budgetReuse=%d evict=%d expired=%d hysteresis=%d projected=%d/%d point=%d/%d vramMB=%.1f\n",
+		"SM cache: hit=%d miss=%d reuse=%d budgetReuse=%d evict=%d expired=%d hysteresis=%d projected=%d/%d point=%d/%d projectedCells=%d/%d vramMB=%.1f\n",
 		g_shadowMapStats.cacheHitPasses,
 		g_shadowMapStats.cacheMissPasses,
 		g_shadowMapStats.cacheReusePasses,
@@ -6869,6 +6911,9 @@ static void RB_ShadowMapStatsReport( void ) {
 		g_shadowMapStats.projectedCacheSlotsTotal,
 		g_shadowMapStats.pointCacheSlotsUsed,
 		g_shadowMapStats.pointCacheSlotsTotal,
+		// the projected cache against the atlas that holds it, in cells
+		RB_ShadowMapProjectedCacheCellsUsed(),
+		RB_ShadowMapAtlasCellCount(),
 		RB_ShadowMapResidentBytes() / ( 1024.0 * 1024.0 ) );
 	{
 		// modern consumption of the persistent atlas (5c): how many lights

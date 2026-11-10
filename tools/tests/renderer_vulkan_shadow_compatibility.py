@@ -4670,37 +4670,90 @@ def validate_exact_static_cache_and_admission_contract() -> None:
         "runtime alias check across every local caster class",
     )
 
-    for marker, context, ensure_call, cache_name in (
-        (
-            "static int VK_ShadowMap_AllocProjectedCacheEntry(",
-            "projected cache LRU allocation",
-            "VK_ShadowMap_EnsureProjectedCacheImage( selected, blockSize )",
-            "projectedCache",
-        ),
-        (
+    # Point cubes are one size, so their cache is a count of slots and the
+    # least recently used one gives way.
+    require_order(
+        braced_body(
+            shadow_map,
             "static int VK_ShadowMap_AllocPointCacheEntry(",
             "point cache LRU allocation",
-            "VK_ShadowMap_EnsurePointCacheCube( selected )",
-            "pointCache",
         ),
-    ):
-        allocation = braced_body(shadow_map, marker, context)
-        require_order(
-            allocation,
-            (
-                "if ( entry.reserved )",
-                "continue;",
-                "if ( !entry.valid )",
-                "selected = i;",
-                "entry.lastUsedFrame",
-                f"vkShadow.{cache_name}[ selected ].lastUsedFrame",
-                ensure_call,
-                f"VK_ShadowMap_Clear{'Projected' if cache_name == 'projectedCache' else 'Point'}EntryMetadata(",
-                f"vkShadow.{cache_name}[ selected ].reserved = true;",
-                "return selected;",
-            ),
-            context,
-        )
+        (
+            "if ( entry.reserved )",
+            "continue;",
+            "if ( !entry.valid )",
+            "selected = i;",
+            "entry.lastUsedFrame",
+            "vkShadow.pointCache[ selected ].lastUsedFrame",
+            "VK_ShadowMap_EnsurePointCacheCube( selected )",
+            "VK_ShadowMap_ClearPointEntryMetadata(",
+            "vkShadow.pointCache[ selected ].reserved = true;",
+            "return selected;",
+        ),
+        "point cache LRU allocation",
+    )
+    # Projected tiles differ in size, so their cache is bounded by the texels
+    # it holds: an idle image of the wanted size is taken as it is, and room
+    # for a new one comes from idle images first, then from the least
+    # recently used tiles no light on screen is using.
+    require_order(
+        braced_body(
+            shadow_map,
+            "static int VK_ShadowMap_OldestEvictableProjectedEntry(",
+            "projected cache LRU victim",
+        ),
+        (
+            "if ( entry.reserved ) {",
+            "continue;",
+            "if ( !entry.valid ) {",
+            "continue;",
+            "entry.lastUsedFrame >= backEnd.frameCount - 1",
+            "continue;",
+            "vkShadow.projectedCache[ oldest ].lastUsedFrame",
+            "return oldest;",
+        ),
+        "projected cache LRU victim",
+    )
+    require_order(
+        braced_body(
+            shadow_map,
+            "static int VK_ShadowMap_AllocProjectedCacheEntry(",
+            "projected cache memory-bounded allocation",
+        ),
+        (
+            "const long long budget = R_ShadowMapProjectedCacheTexelBudget();",
+            "!R_ShadowMapProjectedCacheAdmits( budget, 0, tileSize )",
+            "return -1;",
+            "if ( entry.reserved || entry.valid ) {",
+            "continue;",
+            "entry.blockSize == blockSize",
+            "entry.imageTileSize == tileSize",
+            "selected = i;",
+            "long long resident = VK_ShadowMap_ProjectedCacheTexels();",
+            # nothing is released for a block that would not fit even then
+            "long long reclaimable = 0;",
+            "entry.lastUsedFrame < backEnd.frameCount - 1",
+            "reclaimable += VK_ShadowMap_ProjectedEntryTexels( entry );",
+            "resident - reclaimable, tileSize ) ) {",
+            "return -1;",
+            "!R_ShadowMapProjectedCacheAdmits( budget, resident,",
+            "i != idle && !entry.valid && !entry.reserved",
+            "VK_ShadowMap_ReleaseProjectedCacheImage( entry );",
+            "while ( idle < 0 || !R_ShadowMapProjectedCacheAdmits( budget,",
+            "VK_ShadowMap_OldestEvictableProjectedEntry( limit );",
+            "return -1;",
+            "if ( victim.blockSize == blockSize",
+            "victim.imageTileSize == tileSize",
+            "selected = oldest;",
+            "VK_ShadowMap_ReleaseProjectedCacheImage( victim );",
+            "selected = idle;",
+            "VK_ShadowMap_EnsureProjectedCacheImage( selected, tileSize, blockSize )",
+            "VK_ShadowMap_ClearProjectedEntryMetadata(",
+            "vkShadow.projectedCache[ selected ].reserved = true;",
+            "return selected;",
+        ),
+        "projected cache memory-bounded allocation",
+    )
 
     schedule = braced_body(
         shadow_map,
@@ -6095,17 +6148,36 @@ def validate_csm_static_cache_contract() -> None:
     require_order(
         ensure_image,
         (
-            # a slot reused at a different block edge retires its image first,
-            # behind the frame fence: an earlier view of the recording frame
-            # may have copied with it, and a device wait cannot cover that
+            # a slot reused at a different block edge retires its image first
             "if ( entry.image != VK_NULL_HANDLE && entry.blockSize != blockSize )",
-            "VK_Device_DeferDestroy( entry.image, VK_NULL_HANDLE, VK_NULL_HANDLE, entry.allocation );",
-            "VK_ShadowMap_ClearProjectedEntryMetadata( entry );",
+            "VK_ShadowMap_ReleaseProjectedCacheImage( entry );",
+            # the same block made of other tiles keeps its image at the new cost
+            "entry.imageTileSize = tileSize;",
+            "return true;",
             "ici.extent.width = (uint32_t)blockSize;",
             "ici.extent.height = (uint32_t)blockSize;",
             "entry.blockSize = blockSize;",
+            "entry.imageTileSize = tileSize;",
         ),
         "block-sized resident images retire on a size change",
+    )
+    require_order(
+        braced_body(
+            shadow_map,
+            "static void VK_ShadowMap_ReleaseProjectedCacheImage(",
+            "projected cache image release",
+        ),
+        (
+            # behind the frame fence: an earlier view of the recording frame
+            # may have copied with it, and a device wait cannot cover that
+            "VK_Device_DeferDestroy( entry.image, VK_NULL_HANDLE, VK_NULL_HANDLE, entry.allocation );",
+            "entry.image = VK_NULL_HANDLE;",
+            "entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;",
+            "entry.blockSize = 0;",
+            "entry.imageTileSize = 0;",
+            "VK_ShadowMap_ClearProjectedEntryMetadata( entry );",
+        ),
+        "a released resident image retires behind the frame fence",
     )
 
     find_entry = braced_body(
@@ -8046,11 +8118,11 @@ def validate_atlas_tile_assignment_contract() -> None:
     # on screen is using is not evicted
     if "projectedCacheTileSize" in vk or "VK_ShadowMap_EnsureProjectedCacheConfiguration" in vk:
         raise AssertionError("one tile size for the whole projected cache throws every resident tile away when a light's differs")
-    vk_alloc = braced_body(vk, "static int VK_ShadowMap_AllocProjectedCacheEntry(", "Vulkan projected cache allocation")
+    vk_alloc = braced_body(vk, "static int VK_ShadowMap_OldestEvictableProjectedEntry(", "Vulkan projected cache eviction")
     require_order(
         vk_alloc,
         ("if ( entry.reserved ) {", "if ( !entry.valid ) {", "entry.lastUsedFrame >= backEnd.frameCount - 1", "continue;"),
-        "Vulkan projected cache allocation",
+        "Vulkan projected cache eviction",
     )
 
     gl_alloc = braced_body(gl, "static projectedShadowMapCacheEntry_t *RB_ShadowMapAllocProjectedCacheEntry(",
@@ -8092,6 +8164,143 @@ def validate_atlas_tile_assignment_contract() -> None:
         """const int shadowMapSize = Max( shadowMapTileSize * shadowMapAtlasDiv,
             g_shadowMapScratchRenderTexture != NULL ? g_shadowMapScratchRenderTexture->GetWidth() : 0 );""",
         "the moment target matches the scratch depth target it is sampled with",
+    )
+
+
+def validate_projected_cache_memory_bound_contract() -> None:
+    """The projected cache is bounded by tile texels, not by a count of entries.
+
+    A view's atlas tiles are no longer one size. Eight slots held eight full
+    maps, and held no more than eight of the quarter-area ones a crowded view
+    is cut to, so that view's remaining passes drew their static casters again
+    every view. r_shadowMapProjectedCacheSize now counts full-size maps' worth,
+    and a map cut down takes its share of one.
+
+    A map is counted by its tile. Counting a cascaded light's block of four
+    tiles as four starved every other light as soon as cascade caching was on
+    (door-portal: two cached blocks filled the cache and the flashlight's map
+    was drawn again every view), where one slot had always been enough.
+
+    Only Vulkan needs the bound. OpenGL caches into the atlas, which is
+    allocated whole: holding part of it back would save nothing.
+    """
+    policy_h = read("src/renderer/ShadowMapClassification.h")
+    policy = read("src/renderer/ShadowMapClassification.cpp")
+    gl = read("src/renderer/draw_arb2.cpp")
+    vk = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+
+    require(policy_h, "static const int SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS = 64;", "projected cache record count")
+    require_compact(
+        braced_body(policy, "long long R_ShadowMapProjectedCacheTexelBudgetFor(", "projected cache budget"),
+        """const long long tiles = idMath::ClampInt( 0, 16, cacheSize );
+        const long long edge = idMath::ClampInt( 128, 4096, tileSize );
+        return tiles * edge * edge;""",
+        "the budget is the cvar's count of full-size tiles, in texels",
+    )
+    require_order(
+        braced_body(policy, "long long R_ShadowMapProjectedCacheTexelBudget(", "projected cache budget cvars"),
+        ("r_shadowMapProjectedCacheSize.GetInteger()", "r_shadowMapSize.GetInteger()"),
+        "the budget follows both live cvars",
+    )
+    require_order(
+        braced_body(policy, "bool R_ShadowMapProjectedCacheAdmits(", "projected cache admission"),
+        ("if ( tileSize <= 0 || budgetTexels <= 0 ) {", "return false;",
+         "const long long tile = static_cast<long long>( tileSize ) * tileSize;",
+         "+ tile <= budgetTexels;"),
+        "a map is admitted while its tile's texels fit",
+    )
+    require_order(
+        braced_body(policy, "bool R_ShadowMapCachePolicySelfTest(", "cache policy self-test"),
+        ("const long long quality = R_ShadowMapProjectedCacheTexelBudgetFor( 8, 2048 );",
+         "!R_ShadowMapProjectedCacheAdmits( quality, 7 * full, 2048 )",
+         "R_ShadowMapProjectedCacheAdmits( quality, 8 * full, 2048 )",
+         "!R_ShadowMapProjectedCacheAdmits( quality, 31 * ( full / 4 ), 1024 )",
+         "R_ShadowMapProjectedCacheAdmits( quality, 32 * ( full / 4 ), 1024 )",
+         "!R_ShadowMapProjectedCacheAdmits( quality, 2 * full + 23 * ( full / 4 ), 1024 )",
+         "R_ShadowMapProjectedCacheTexelBudgetFor( 0, 2048 ) != 0"),
+        "eight full maps, thirty-two half-size ones, a mix, and none at 0",
+    )
+
+    # neither back end counts entries with the cvar any more
+    for source, marker, limit, context in (
+        (vk, "static int VK_ShadowMap_ProjectedCacheSlotLimit(",
+         "? Min( SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS, VK_SHADOW_MAX_CACHE_SLOTS )", "Vulkan projected records"),
+        (gl, "static int RB_ShadowMapProjectedCacheSlotLimit(",
+         "? SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS : 0;", "OpenGL projected records"),
+    ):
+        body = braced_body(source, marker, context)
+        require_order(body, ("r_shadowMapProjectedCacheSize.GetInteger() > 0", limit), context)
+        if "ClampInt" in body:
+            raise AssertionError(f"{context}: the cvar is a memory bound, not a count of entries")
+    require(gl, "static projectedShadowMapCacheEntry_t\tg_projectedShadowMapCache[SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS];",
+            "OpenGL projected record array")
+
+    # Vulkan: idle images count, and a shrunk bound is enforced at the next view
+    require_order(
+        braced_body(vk, "static long long VK_ShadowMap_ProjectedCacheTexels(", "Vulkan projected cache texels"),
+        ("for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS ; i++ ) {", "VK_ShadowMap_ProjectedEntryTexels("),
+        "every image the cache holds counts, in use or idle",
+    )
+    require_compact(
+        braced_body(vk, "static long long VK_ShadowMap_ProjectedEntryTexels(", "Vulkan projected entry texels"),
+        """return entry.image != VK_NULL_HANDLE
+            ? static_cast<long long>( entry.imageTileSize ) * entry.imageTileSize
+            : 0;""",
+        "an image costs one tile of its map, whether its content is valid or not",
+    )
+    require(vk, "int\t\t\t\t\timageTileSize;", "a record keeps the tile size its image was made for")
+    require_order(
+        braced_body(vk, "static void VK_ShadowMap_BeginCacheView(", "Vulkan per-view cache upkeep"),
+        ("const long long budget = R_ShadowMapProjectedCacheTexelBudget();",
+         "long long resident = VK_ShadowMap_ProjectedCacheTexels();",
+         "resident > budget ; i++ ) {",
+         "if ( !projected.valid ) {",
+         "VK_ShadowMap_ReleaseProjectedCacheImage( projected );",
+         "while ( resident > budget ) {",
+         "vkShadow.projectedCache[ oldest ].lastUsedFrame",
+         "VK_ShadowMap_ReleaseProjectedCacheImage("),
+        "a lowered bound releases idle images, then the least recently used tiles",
+    )
+    require(vk, "projectedTiles=%.2f/%.0f", "the Vulkan report states the cache against its bound")
+
+    # OpenGL: the atlas is the bound, and the cache may fill it
+    require_compact(
+        braced_body(gl, "static int RB_ShadowMapAtlasCellCount(", "OpenGL atlas cells"),
+        """const int gridDim = RB_ShadowMapAtlasGridDim();
+        return gridDim * gridDim;""",
+        "every atlas cell may hold a cached tile",
+    )
+    if "R_ShadowMapProjectedCacheTexelBudget(" in gl:
+        raise AssertionError("OpenGL's projected cache is the atlas: a texel budget below it saves no memory")
+    require_order(
+        braced_body(gl, "static int RB_ShadowMapProjectedCacheCellsUsed(", "OpenGL projected cells used"),
+        ("RB_ShadowMapProjectedCacheEntryStorageValid( &entry )", "cells += entry.atlasCellSpan * entry.atlasCellSpan;"),
+        "resident entries count by the cells they fill",
+    )
+    require_order(
+        braced_body(gl, "static projectedShadowMapCacheEntry_t *RB_ShadowMapAllocProjectedCacheEntry(",
+                    "OpenGL projected cache allocation"),
+        ("const int atlasCells = RB_ShadowMapAtlasCellCount();",
+         "cellSpan <= 0 || cellSpan * cellSpan > atlasCells",
+         "return NULL;",
+         # nothing is evicted for a block that would not fit even then
+         "int pinnedCells = 0;",
+         "entry.lastUsedFrame >= tr.frameCount - 1",
+         "pinnedCells += entry.atlasCellSpan * entry.atlasCellSpan;",
+         "if ( pinnedCells + cellSpan * cellSpan > atlasCells ) {",
+         "return NULL;",
+         "if ( freeEntry != NULL && RB_ShadowMapAtlasFindFreeBlock( cellSpan, cellX, cellY ) ) {",
+         "oldest->valid = false;"),
+        "a block is placed where the atlas has room, else the least recently used tile gives way",
+    )
+    require(gl, "projectedCells=%d/%d", "the OpenGL report states the cache against the atlas")
+
+    require(
+        read("src/renderer/RenderSystem_init.cpp"),
+        'idCVar r_shadowMapProjectedCacheSize( "r_shadowMapProjectedCacheSize", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, '
+        '"how many full-size (r_shadowMapSize) static projected-light shadow maps the cache keeps; '
+        'a map cut down for a crowded view takes its share of one, and 0 turns the cache off.',
+        "the cvar says what it counts, and keeps its default",
     )
 
 
@@ -8146,6 +8355,7 @@ def main() -> None:
     validate_point_cache_parity_and_receiver_cost_contract()
     validate_stencil_elision_contract()
     validate_atlas_tile_assignment_contract()
+    validate_projected_cache_memory_bound_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

@@ -204,6 +204,14 @@ there is no double-click word selection.
   frame on OpenGL. The smallest spotlights in such a view now use a half or
   quarter resolution map so that all of them fit. Views that fitted before
   look the same as before.
+- **A room full of spotlights no longer redraws some of their shadows every
+  frame.** The memory kept for spotlight shadows that do not change held eight
+  maps whatever their size, so the Convoy 2 view above redrew three of its
+  eleven each frame. It is now measured by size: the smaller maps of a crowded
+  view take a quarter of the room each and all of them stay cached, in the
+  same memory as before. The saving in that view is small, about a fifth of a
+  millisecond of GPU time on Vulkan. `r_shadowMapProjectedCacheSize` keeps its
+  default and now counts full-size maps' worth of memory.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.

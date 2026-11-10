@@ -157,6 +157,30 @@ bool R_ShadowMapFitAtlasTiles( int atlasSize, shadowMapAtlasRequest_t *requests,
 // maxBlockSize allows. 0 when no tile of 128 fits.
 int R_ShadowMapProjectedTileSize( const viewLight_t *vLight, int atlasDiv, int maxBlockSize );
 
+// The static projected cache keeps the depth of a light's static casters; a
+// pass without an entry draws them again every view. It is not bounded by a
+// count of entries, because the tiles of a view are no longer one size:
+// r_shadowMapProjectedCacheSize says how many full-size (r_shadowMapSize)
+// maps' worth of tile texels may stay resident, and a map cut down for a
+// crowded view takes its share of one. Eight hold eight full-size maps, as
+// eight slots always did, or the thirty-two half-size ones of a crowded view.
+//
+// A map is counted by its tile, so a cascaded light's block of four tiles
+// costs what its one slot cost: the memory ceiling is what it was, eight
+// blocks of the largest kind at full size.
+//
+// Both back ends keep this many entry records. Only Vulkan needs the bound:
+// its resident tiles are images of their own. OpenGL keeps them in the atlas,
+// which is allocated whole and so is the bound there.
+static const int SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS = 64;
+// Tile texels the cache may hold; 0 turns it off.
+long long R_ShadowMapProjectedCacheTexelBudget( void );
+// The pure form, for the self-test.
+long long R_ShadowMapProjectedCacheTexelBudgetFor( int cacheSize, int tileSize );
+// Whether a map with tiles of tileSize texels a side may be added to a cache
+// that already holds residentTexels.
+bool R_ShadowMapProjectedCacheAdmits( long long budgetTexels, long long residentTexels, int tileSize );
+
 // pins the cache-size, live-caster window and atlas policies
 bool R_ShadowMapCachePolicySelfTest( void );
 // Conservative cube-face rejection, shared by GL and Vulkan. Invalid bounds

@@ -1679,9 +1679,16 @@ optimization has landed.
   cover the least world up, to a quarter at most. Vulkan cuts the atlas by buddy
   allocation, OpenGL's grid cell is the smallest tile, and neither evicts a projected
   tile in use. That view now maps eleven atlas passes with none on stencil; no preset
-  changed and a view that fitted before renders as before. Remaining,
-  in order: a memory-bounded projected cache (eight slots; passes beyond them
-  re-render each view), depth-only cubes on OpenGL, faces the view cannot see,
+  changed and a view that fitted before renders as before.
+  Projected cache memory (10 November 2026). The projected cache counted eight
+  entries whatever their size, so that view drew three of its eleven atlas passes
+  again every view. `r_shadowMapProjectedCacheSize` now counts full-size maps' worth
+  of tile texels (default eight, the same memory ceiling) and a map cut down takes
+  its share; OpenGL's cache is bounded by its atlas instead. All eleven passes are
+  reused on Vulkan and OpenGL misses none. The frame-time gain
+  there is small, 0.24 ms of Vulkan GPU across six alternating pairs and nothing
+  resolved on OpenGL. Remaining,
+  in order: depth-only cubes on OpenGL, faces the view cannot see,
   the fullscreen budgets, including whether Enhanced can map point lights, one
   static cube for both ownerships of a composed Vulkan light, and static-world
   volumes, which are still built once per mapped light for the fallback.

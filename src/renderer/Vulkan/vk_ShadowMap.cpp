@@ -185,6 +185,8 @@ typedef struct vkProjectedShadowCacheEntry_s {
 	int					tileSize;
 	int					blockSize;	// tileSize * atlasDiv: a CSM light's resident
 									// content is the whole contiguous cascade block
+	int					imageTileSize;	// the tile edge the image was made for:
+									// what the record costs the cache, in use or idle
 	int					lastUsedFrame;
 	int					lastUpdatedFrame;	// content write, not view touch
 	shadowMapProjectedLightState_t projectedState;
@@ -1688,11 +1690,51 @@ static bool VK_ShadowMap_StaticCacheable(
 	return true;
 }
 
+// Entry records the projected cache may use. r_shadowMapProjectedCacheSize no
+// longer counts them: it is the memory bound
+// (R_ShadowMapProjectedCacheTexelBudget), and 0 turns the cache off.
 static int VK_ShadowMap_ProjectedCacheSlotLimit( void ) {
-	// the record array is sized for point cubes; projected tiles keep their
-	// own sixteen-slot ceiling
-	return idMath::ClampInt( 0, Min( 16, VK_SHADOW_MAX_CACHE_SLOTS ),
-			r_shadowMapProjectedCacheSize.GetInteger() );
+	return r_shadowMapProjectedCacheSize.GetInteger() > 0
+			? Min( SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS, VK_SHADOW_MAX_CACHE_SLOTS )
+			: 0;
+}
+
+// What a record costs the cache: the texels of one tile of the map its image
+// was made for. A cascaded block is four tiles of memory and counts as one, as
+// its slot always did (R_ShadowMapProjectedCacheTexelBudget).
+static long long VK_ShadowMap_ProjectedEntryTexels(
+		const vkProjectedShadowCacheEntry_t &entry ) {
+	return entry.image != VK_NULL_HANDLE
+			? static_cast<long long>( entry.imageTileSize ) * entry.imageTileSize
+			: 0;
+}
+
+// The cost of every image the cache holds. A record keeps its image when its
+// content is retired, ready for the next map of that size, so the idle ones
+// count as well.
+static long long VK_ShadowMap_ProjectedCacheTexels( void ) {
+	long long texels = 0;
+	for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS ; i++ ) {
+		texels += VK_ShadowMap_ProjectedEntryTexels(
+				vkShadow.projectedCache[ i ] );
+	}
+	return texels;
+}
+
+// The reservation flags are per view, so the record can be one an earlier view
+// of this same frame recorded copies with, and frames in flight may still read
+// it: retire the image behind the frame fence rather than under that recording.
+static void VK_ShadowMap_ReleaseProjectedCacheImage(
+		vkProjectedShadowCacheEntry_t &entry ) {
+	if ( entry.image != VK_NULL_HANDLE ) {
+		VK_Device_DeferDestroy( entry.image, VK_NULL_HANDLE, VK_NULL_HANDLE, entry.allocation );
+	}
+	entry.image = VK_NULL_HANDLE;
+	entry.allocation = NULL;
+	entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	entry.blockSize = 0;
+	entry.imageTileSize = 0;
+	VK_ShadowMap_ClearProjectedEntryMetadata( entry );
 }
 
 static double VK_ShadowMap_DepthBytesPerPixel( void );
@@ -1754,35 +1796,65 @@ static void VK_ShadowMap_BeginCacheView( const viewDef_t *viewDef ) {
 			VK_ShadowMap_ClearPointEntryMetadata( point );
 		}
 	}
+
+	// r_shadowMapProjectedCacheSize and r_shadowMapSize are live and the memory
+	// bound follows both. Allocation never exceeds it, so there is only work
+	// here after one of them shrank: the images no record is using go first,
+	// then the tiles used longest ago.
+	const long long budget = R_ShadowMapProjectedCacheTexelBudget();
+	long long resident = VK_ShadowMap_ProjectedCacheTexels();
+	for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS && resident > budget ; i++ ) {
+		vkProjectedShadowCacheEntry_t &projected =
+				vkShadow.projectedCache[ i ];
+		if ( !projected.valid ) {
+			resident -= VK_ShadowMap_ProjectedEntryTexels( projected );
+			VK_ShadowMap_ReleaseProjectedCacheImage( projected );
+		}
+	}
+	while ( resident > budget ) {
+		int oldest = -1;
+		for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS ; i++ ) {
+			const vkProjectedShadowCacheEntry_t &projected =
+					vkShadow.projectedCache[ i ];
+			if ( projected.image != VK_NULL_HANDLE
+					&& ( oldest < 0 || projected.lastUsedFrame
+						< vkShadow.projectedCache[ oldest ].lastUsedFrame ) ) {
+				oldest = i;
+			}
+		}
+		if ( oldest < 0 ) {
+			break;
+		}
+		resident -= VK_ShadowMap_ProjectedEntryTexels(
+				vkShadow.projectedCache[ oldest ] );
+		VK_ShadowMap_ReleaseProjectedCacheImage(
+				vkShadow.projectedCache[ oldest ] );
+	}
 }
 
 // blockSize is the resident content's edge: one tile for an ordinary
 // projected light, tileSize * atlasDiv for a cached CSM block. The lights of
 // a view no longer share one tile size, so every slot is sized for the entry
-// it holds: a slot reused at a different block edge retires its image first,
-// behind the frame fence because frames in flight may still reference it.
-// (One size for the whole cache meant a single differently sized light threw
-// every resident tile away.)
+// it holds: a slot reused at a different block edge retires its image first
+// (VK_ShadowMap_ReleaseProjectedCacheImage). One size for the whole cache
+// meant a single differently sized light threw every resident tile away.
 static bool VK_ShadowMap_EnsureProjectedCacheImage( const int index,
-		const int blockSize ) {
+		const int tileSize, const int blockSize ) {
 	if ( index < 0 || index >= VK_SHADOW_MAX_CACHE_SLOTS
-			|| vkCtx.device == VK_NULL_HANDLE || blockSize <= 0 ) {
+			|| vkCtx.device == VK_NULL_HANDLE
+			|| tileSize <= 0 || blockSize <= 0 ) {
 		return false;
 	}
 	vkProjectedShadowCacheEntry_t &entry =
 			vkShadow.projectedCache[ index ];
 	if ( entry.image != VK_NULL_HANDLE
 			&& entry.blockSize != blockSize ) {
-		// The reservation flags are per view, so the least-recently-used slot
-		// can be one an earlier view of this same frame recorded copies with.
-		// Retire it behind the frame fence rather than under that recording.
-		VK_Device_DeferDestroy( entry.image, VK_NULL_HANDLE, VK_NULL_HANDLE, entry.allocation );
-		entry.image = VK_NULL_HANDLE;
-		entry.allocation = NULL;
-		entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VK_ShadowMap_ClearProjectedEntryMetadata( entry );
+		VK_ShadowMap_ReleaseProjectedCacheImage( entry );
 	}
 	if ( entry.image != VK_NULL_HANDLE ) {
+		// the same block made of other tiles (one tile, or a cascade of
+		// half-size ones): the image serves, at the new map's cost
+		entry.imageTileSize = tileSize;
 		return true;
 	}
 
@@ -1812,6 +1884,7 @@ static bool VK_ShadowMap_EnsureProjectedCacheImage( const int index,
 	}
 	entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	entry.blockSize = blockSize;
+	entry.imageTileSize = tileSize;
 	return true;
 }
 
@@ -1866,13 +1939,9 @@ static int VK_ShadowMap_FindPointCacheEntry(
 	return -1;
 }
 
-static int VK_ShadowMap_AllocProjectedCacheEntry(
-		const int tileSize, const int blockSize ) {
-	const int limit = VK_ShadowMap_ProjectedCacheSlotLimit();
-	if ( limit <= 0 || tileSize <= 0 ) {
-		return -1;
-	}
-	int selected = -1;
+// The least recently used resident tile that may be retired, or -1.
+static int VK_ShadowMap_OldestEvictableProjectedEntry( const int limit ) {
+	int oldest = -1;
 	for ( int i = 0 ; i < limit ; i++ ) {
 		const vkProjectedShadowCacheEntry_t &entry =
 				vkShadow.projectedCache[ i ];
@@ -1880,8 +1949,7 @@ static int VK_ShadowMap_AllocProjectedCacheEntry(
 			continue;
 		}
 		if ( !entry.valid ) {
-			selected = i;
-			break;
+			continue;
 		}
 		// As for point cubes: a tile sampled this frame or the last belongs
 		// to a light still on screen, and evicting it only makes that light
@@ -1890,14 +1958,113 @@ static int VK_ShadowMap_AllocProjectedCacheEntry(
 		if ( entry.lastUsedFrame >= backEnd.frameCount - 1 ) {
 			continue;
 		}
-		if ( selected < 0 || entry.lastUsedFrame
-				< vkShadow.projectedCache[ selected ].lastUsedFrame ) {
+		if ( oldest < 0 || entry.lastUsedFrame
+				< vkShadow.projectedCache[ oldest ].lastUsedFrame ) {
+			oldest = i;
+		}
+	}
+	return oldest;
+}
+
+// The cache is bounded by the tile texels it holds, not by a count of entries
+// (R_ShadowMapProjectedCacheTexelBudget): the maps of a view differ in size,
+// and a crowded view's small ones fit many times over in the memory a few
+// full ones take. An idle record that already holds an image for such a map
+// is taken as it is. Otherwise room is made for a new image, first from the
+// images idle records still hold and then from the maps used longest ago.
+static int VK_ShadowMap_AllocProjectedCacheEntry(
+		const int tileSize, const int blockSize ) {
+	const int limit = VK_ShadowMap_ProjectedCacheSlotLimit();
+	const long long budget = R_ShadowMapProjectedCacheTexelBudget();
+	if ( limit <= 0 || tileSize <= 0
+			|| !R_ShadowMapProjectedCacheAdmits( budget, 0, tileSize ) ) {
+		return -1;
+	}
+	int selected = -1;
+	int idle = -1;
+	for ( int i = 0 ; i < limit ; i++ ) {
+		const vkProjectedShadowCacheEntry_t &entry =
+				vkShadow.projectedCache[ i ];
+		if ( entry.reserved || entry.valid ) {
+			continue;
+		}
+		if ( entry.image != VK_NULL_HANDLE
+				&& entry.blockSize == blockSize
+				&& entry.imageTileSize == tileSize ) {
 			selected = i;
+			break;
+		}
+		// a bare record first: an idle image stays for a map of its own size
+		if ( idle < 0 || ( entry.image == VK_NULL_HANDLE
+				&& vkShadow.projectedCache[ idle ].image
+					!= VK_NULL_HANDLE ) ) {
+			idle = i;
+		}
+	}
+	if ( selected < 0 ) {
+		// The record chosen gives up whatever image it holds, so that image
+		// does not count against the new one.
+		long long resident = VK_ShadowMap_ProjectedCacheTexels();
+		if ( idle >= 0 ) {
+			resident -= VK_ShadowMap_ProjectedEntryTexels(
+					vkShadow.projectedCache[ idle ] );
+		}
+		// Nothing is given up for a block that would not fit even then: the
+		// tiles of lights that left the view stay for their return.
+		long long reclaimable = 0;
+		for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS ; i++ ) {
+			const vkProjectedShadowCacheEntry_t &entry =
+					vkShadow.projectedCache[ i ];
+			if ( i != idle && !entry.reserved
+					&& ( !entry.valid || entry.lastUsedFrame
+						< backEnd.frameCount - 1 ) ) {
+				reclaimable += VK_ShadowMap_ProjectedEntryTexels( entry );
+			}
+		}
+		if ( !R_ShadowMapProjectedCacheAdmits( budget,
+				resident - reclaimable, tileSize ) ) {
+			return -1;
+		}
+		for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS
+				&& !R_ShadowMapProjectedCacheAdmits( budget, resident,
+						tileSize ) ; i++ ) {
+			vkProjectedShadowCacheEntry_t &entry =
+					vkShadow.projectedCache[ i ];
+			if ( i != idle && !entry.valid && !entry.reserved
+					&& entry.image != VK_NULL_HANDLE ) {
+				resident -= VK_ShadowMap_ProjectedEntryTexels( entry );
+				VK_ShadowMap_ReleaseProjectedCacheImage( entry );
+			}
+		}
+		while ( idle < 0 || !R_ShadowMapProjectedCacheAdmits( budget,
+				resident, tileSize ) ) {
+			const int oldest =
+					VK_ShadowMap_OldestEvictableProjectedEntry( limit );
+			if ( oldest < 0 ) {
+				// every resident tile belongs to a light on screen
+				return -1;
+			}
+			vkProjectedShadowCacheEntry_t &victim =
+					vkShadow.projectedCache[ oldest ];
+			if ( victim.blockSize == blockSize
+					&& victim.imageTileSize == tileSize ) {
+				// its image is the one wanted: the record changes hands
+				selected = oldest;
+				break;
+			}
+			resident -= VK_ShadowMap_ProjectedEntryTexels( victim );
+			VK_ShadowMap_ReleaseProjectedCacheImage( victim );
+			if ( idle < 0 ) {
+				idle = oldest;
+			}
+		}
+		if ( selected < 0 ) {
+			selected = idle;
 		}
 	}
 	if ( selected < 0
 			|| !VK_ShadowMap_EnsureProjectedCacheImage( selected,
-					blockSize ) ) {
+					tileSize, blockSize ) ) {
 		return -1;
 	}
 	VK_ShadowMap_ClearProjectedEntryMetadata(
@@ -2840,8 +3007,12 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 		pointSlots += ( vkShadow.pointCache[ i ].valid
 				|| vkShadow.pointCache[ i ].reserved ) ? 1 : 0;
 	}
+	// the projected cache against its bound, in full-size maps
+	const double fullTileTexels = static_cast<double>(
+			R_ShadowMapProjectedCacheTexelBudgetFor( 1,
+					r_shadowMapSize.GetInteger() ) );
 	common->Printf(
-			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point casterFaces=%d/%d culled/tested\n",
+			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point projectedTiles=%.2f/%.0f casterFaces=%d/%d culled/tested\n",
 			( viewDef != NULL && viewDef->isSubview )
 				? "subview" : "main",
 			vkShadow.projectedCacheHits,
@@ -2858,6 +3029,10 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 			VK_ShadowMap_ResidentBytes() / ( 1024.0 * 1024.0 ),
 			projectedSlots, projectedLimit,
 			pointSlots, pointLimit,
+			static_cast<double>( VK_ShadowMap_ProjectedCacheTexels() )
+				/ fullTileTexels,
+			static_cast<double>( R_ShadowMapProjectedCacheTexelBudget() )
+				/ fullTileTexels,
 			vkShadow.pointCasterFaceCulled, vkShadow.pointCasterFaceTests );
 	// GPU shadow-pass timings. The numbers are what resolved during this
 	// view, so they lag the work by a frame or more -- the same lagged

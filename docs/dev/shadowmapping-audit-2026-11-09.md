@@ -237,6 +237,92 @@ of real time the capture could land on the frame the map is re-rendered. It
 now waits that window out (`renderer_shadow_mapping_movers.py`) and passed
 seven runs in a row.
 
+### Projected cache memory
+
+Added on 10 November, after the tile sizes. The projected cache counted
+entries: eight slots (`r_shadowMapProjectedCacheSize`), whatever the size of
+the tile in each. That bounded memory while every tile was `r_shadowMapSize`.
+Once a crowded view's tiles are cut to a half or a quarter it is the wrong
+unit: convoy2's start view has eleven atlas passes, ten of them at 1024, and
+three were drawn again every view while the eight resident tiles filled a
+fraction of the memory eight slots were meant to allow.
+
+- **The bound is tile texels** (`R_ShadowMapProjectedCacheTexelBudget`):
+  `r_shadowMapProjectedCacheSize` full-size maps' worth, eight by default as
+  before. A map takes the texels of its tile, so one cut to half size takes a
+  quarter of a full one. The entry records no longer limit anything (64 on
+  both back ends).
+- **A cascaded block counts as one map**, by its tile, as its one slot did.
+  The first version counted it as the four tiles of memory it is, and
+  `door-portal`, which turns cascade caching on, failed on OpenGL: two cached
+  blocks filled the cache and the flashlight's map was drawn again every
+  view. Vulkan passed the scenario but with its cache full at five entries
+  and four cacheable passes drawn again each view. So the ceiling stays what
+  eight slots allowed, eight
+  blocks of the largest kind at full size, and no set of maps that was
+  cached before is refused now.
+- **Vulkan** counts every resident image, including those idle records keep
+  for the next map of their size, and makes room in that order: idle images
+  first, then the maps used longest ago that no light on screen is using.
+  Nothing is given up for a map that would not fit even then. A lowered cvar
+  or `r_shadowMapSize` gives the memory back at the next view; images used
+  to stay until a `vid_restart`.
+- **OpenGL's bound is the atlas.** Its cached tiles live there and the atlas
+  is allocated whole, so holding cells back would save nothing: the cvar only
+  turns the cache on or off. That is sixty-four cells at Quality and Ultra,
+  four full tiles.
+- **Memory is unchanged**: at most 128 MiB at Quality and 512 MiB at Ultra on
+  Vulkan with 32-bit depth, four times that if every cached map is a
+  cascaded block (`r_shadowMapCacheCSM 1`, off by default).
+
+convoy2 start view, Quality, the view held still:
+
+| | Before | After |
+|---|---:|---:|
+| Vulkan: atlas passes reused from the cache, of 11 | 8 | 11 |
+| Vulkan: atlas passes drawn again each view | 3 | 0 |
+| Vulkan: cache in use | 8 of 8 slots | 3.5 of 8 maps' worth, 11 entries (4.75 with idle images) |
+| OpenGL: cacheable passes missed each view | 1 to 2 | 0 |
+| OpenGL: cache in use | 8 of 8 slots | 52 of 64 cells, 10 entries |
+
+The gain in frame time is small. The old count and the new were alternated in
+one process, six pairs of five-second windows, the old one reproduced with a
+lower cvar: `2` on Vulkan caches the same eight of eleven. The OpenGL rows
+come from the first version of this change, where the cvar still limited the
+atlas and `3` left one pass uncached:
+
+| | Old count | New | Difference between pairs |
+|---|---:|---:|---|
+| Vulkan GPU | 5.97 ms | 5.74 ms | 0.24 ms less, spread 0.26 ms, five of six in favour |
+| Vulkan CPU | 4.18 ms | 4.03 ms | not resolved (spread 0.72 ms) |
+| OpenGL GPU | 9.20 ms | 9.14 ms | not resolved (spread 0.43 ms) |
+| OpenGL CPU | 12.87 ms | 12.94 ms | not resolved (spread 0.56 ms) |
+
+Another session was building and running a client on the machine during these
+runs, which widens the spread. Caching is cheap rather than free here: a
+reused pass on Vulkan copies its cached depth into the view's atlas before the
+live casters are drawn over it, and with the cache off altogether the same
+view costs 5.92 ms of GPU against 5.62 ms with all eleven cached. The change
+matters more the more crowded a view is, since the old count redrew every
+pass past the eighth.
+
+The cvar is live in both directions on Vulkan: set to `0` the resident shadow
+memory fell from 560 MiB to 484 MiB at the next view and the report showed
+`projectedTiles=0.00/0`; `2` held exactly `2.00/2` with eight entries; and
+`8` restored the full set each time. With the view turning, the cache fills
+to `8.00/8` with fourteen entries, 128 MiB, which is the ceiling eight slots
+had at Quality.
+
+Checked for this change, on the final build: the fourteen scenarios on both
+back ends, all passing; the convoy2 counts above; the Vulkan validation
+layers, silent while the view turned and the cvar went 8, 1, 0, 2, 8 and
+`r_shadowMapSize` to 1024 and back; the same on OpenGL without the layers
+(off at `0`, unchanged at `3`, no failed pass); the in-engine self-tests on
+both, which now pin the count; and the sixty-two static tests that read the
+touched files. Two scenario runs cannot share `.install` at once: the second
+one's clients exit at once without a log, which reads as every capture
+missing.
+
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
 (caster counts, cache reuse, cached against fresh images byte-identical; run
@@ -257,14 +343,17 @@ whether Enhanced can now map point lights on Vulkan.
 
 ## Still open, in order of value
 
-1. The projected cache has eight slots (`r_shadowMapProjectedCacheSize`). A
-   view with more atlas passes keeps those and re-renders the rest each view;
-   convoy2's start has eleven. More slots need a memory bound like the point
-   cache's: a 4096 tile is 64 MiB on Vulkan.
-2. Depth-only point cubes on OpenGL while nothing samples the colour cube.
-3. Cube faces the view cannot see; fullscreen budgets for the three tiers.
-4. One static cube for both ownerships of a composed Vulkan light, as on
+1. Depth-only point cubes on OpenGL while nothing samples the colour cube.
+2. Cube faces the view cannot see; fullscreen budgets for the three tiers.
+3. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. It needs a resident entry two passes of a view can share.
-5. Static-world volumes are still built once for every mapped light and kept
+4. Static-world volumes are still built once for every mapped light and kept
    for the fallback. Leaving them out too would need the same rebuild on
    return, for every surface the light touches.
+5. A reused projected pass on Vulkan copies its resident tile into the view's
+   atlas even when it has no live casters to draw over it. Sampling the
+   resident tile in place would save the copy; convoy2's eleven cached passes
+   together save only 0.3 ms of GPU against drawing them fresh.
+6. The OpenGL projected cache is the atlas, four full tiles at Quality and
+   Ultra, so it holds one crowded view and nothing of the view just left.
+   Vulkan holds eight maps' worth.

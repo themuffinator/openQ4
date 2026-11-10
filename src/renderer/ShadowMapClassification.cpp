@@ -422,11 +422,31 @@ int R_ShadowMapProjectedTileSize( const viewLight_t *vLight, int atlasDiv, int m
 	return idMath::ClampInt( 128, maxTileSize, wanted );
 }
 
+long long R_ShadowMapProjectedCacheTexelBudgetFor( int cacheSize, int tileSize ) {
+	const long long tiles = idMath::ClampInt( 0, 16, cacheSize );
+	const long long edge = idMath::ClampInt( 128, 4096, tileSize );
+	return tiles * edge * edge;
+}
+
+long long R_ShadowMapProjectedCacheTexelBudget( void ) {
+	return R_ShadowMapProjectedCacheTexelBudgetFor(
+		r_shadowMapProjectedCacheSize.GetInteger(), r_shadowMapSize.GetInteger() );
+}
+
+bool R_ShadowMapProjectedCacheAdmits( long long budgetTexels, long long residentTexels, int tileSize ) {
+	if ( tileSize <= 0 || budgetTexels <= 0 ) {
+		return false;
+	}
+	const long long tile = static_cast<long long>( tileSize ) * tileSize;
+	return Max( 0LL, residentTexels ) + tile <= budgetTexels;
+}
+
 // Pins the pure policies above: the point cache holds a dense view's lights
 // at the shipped cube size inside its memory bound, never fewer than the
 // twelve slots it always had; the live-caster window spans a game tic at
-// every display rate; and a view's atlas lights are cut down, smallest first,
-// until they fit.
+// every display rate; a view's atlas lights are cut down, smallest first,
+// until they fit; and the projected cache is counted in texels, so smaller
+// tiles take a proportional share of it.
 bool R_ShadowMapCachePolicySelfTest( void ) {
 	// Quality and Ultra cut four tiles, Enhanced sixteen; Maximum's cascades
 	// take a quarter of its atlas each
@@ -484,6 +504,30 @@ bool R_ShadowMapCachePolicySelfTest( void ) {
 			{ 2048, 512, 2, 1, 1.0e9f }, { 2048, 512, 1, 1, 400.0f } };
 		if ( !R_ShadowMapFitAtlasTiles( 4096, cascaded, 2 )
 				|| cascaded[0].tileSize != 1024 || cascaded[1].tileSize != 1024 ) {
+			return false;
+		}
+	}
+	{
+		// The projected cache is counted in full-size maps. Quality's eight
+		// hold eight maps of 2048 tiles and no ninth, as eight slots did, or
+		// thirty-two of the 1024 tiles a crowded view is cut to.
+		const long long quality = R_ShadowMapProjectedCacheTexelBudgetFor( 8, 2048 );
+		const long long full = 2048LL * 2048LL;
+		if ( quality != 8 * full
+				|| !R_ShadowMapProjectedCacheAdmits( quality, 7 * full, 2048 )
+				|| R_ShadowMapProjectedCacheAdmits( quality, 8 * full, 2048 )
+				|| !R_ShadowMapProjectedCacheAdmits( quality, 31 * ( full / 4 ), 1024 )
+				|| R_ShadowMapProjectedCacheAdmits( quality, 32 * ( full / 4 ), 1024 )
+				// a mixed view: two full maps and twenty-four half-size ones
+				|| !R_ShadowMapProjectedCacheAdmits( quality, 2 * full + 23 * ( full / 4 ), 1024 )
+				// a tile larger than the whole budget is never resident
+				|| R_ShadowMapProjectedCacheAdmits( R_ShadowMapProjectedCacheTexelBudgetFor( 1, 1024 ), 0, 2048 )
+				// 0 turns the cache off; the count and the tile are clamped
+				|| R_ShadowMapProjectedCacheTexelBudgetFor( 0, 2048 ) != 0
+				|| R_ShadowMapProjectedCacheAdmits( 0, 0, 128 )
+				|| R_ShadowMapProjectedCacheAdmits( quality, 0, 0 )
+				|| R_ShadowMapProjectedCacheTexelBudgetFor( 99, 2048 ) != 16 * full
+				|| R_ShadowMapProjectedCacheTexelBudgetFor( 8, 16 ) != 8LL * 128 * 128 ) {
 			return false;
 		}
 	}
