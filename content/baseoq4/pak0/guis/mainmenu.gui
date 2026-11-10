@@ -540,9 +540,9 @@ windowDef Desktop
 			set "main_b6_corner::matcolor_w" "0.4" ; 
 			set "main_t_b7::forecolor_w" "0.5" ; 
 			set "main_b7_corner::matcolor_w" "0.4" ;
-			set "main_b9::matcolor_w" "0.4" ;
-			set "main_t_b9::forecolor_w" "0.8" ;
-			set "main_b9_corner::matcolor_w" "0.4" ;
+			set "main_b9::matcolor_w" "0" ;
+			set "main_t_b9::forecolor_w" "0" ;
+			set "main_b9_corner::matcolor_w" "0" ;
 			
 			set "main_b_returnmp::visible" "0" ;		
 			set "main_b_newgame::visible" "1" ;
@@ -556,7 +556,7 @@ windowDef Desktop
 			set "main_t_b10::forecolor_w" "0" ;
 			set "main_b10_corner::matcolor_w" "0" ;
 			set "main_motd::visible" "1" ;
-			set "main_b_demos::visible" "1" ;
+			set "main_b_demos::visible" "0" ;
 			set "main_b_mods::visible" "1" ;
 			set "main_b_updates::visible" "1" ;
 			set "main_b_credits::visible" "1" ;
@@ -2392,14 +2392,14 @@ windowDef Desktop
 			}
 			windowDef mp_b2
 			{
-				rect	0,199,413,52
+				rect	0,229,413,52
 				visible	1
 				background	"gfx/guis/mainmenu/b1_dark"
 				matcolor	1,1,1,0.4
 			}
 			windowDef mp_b3
 			{
-				rect	0,229,413,52
+				rect	0,199,413,52
 				visible	1
 				background	"gfx/guis/mainmenu/b1_dark"
 				matcolor	1,1,1,0.4
@@ -2416,22 +2416,22 @@ windowDef Desktop
 				rect	44,181,320,23
 				visible	1
 				forecolor	1,1,1,0.8
-				text	"#str_200023"
+				text	"#str_200187"
 				textscale	.31
 				font	"fonts/marine"
 			}
 			windowDef mp_t_b2
 			{
-				rect	44,211,320,23
+				rect	44,241,320,23
 				visible	1
 				forecolor	1,1,1,0.8
-				text	"#str_200024"
+				text	"#str_41500"
 				textscale	.31
 				font	"fonts/marine"
 			}
 			windowDef mp_t_b3
 			{
-				rect	44,241,320,23
+				rect	44,211,320,23
 				visible	1
 				forecolor	1,1,1,0.8
 				text	"#str_200026"
@@ -2443,7 +2443,7 @@ windowDef Desktop
 				rect	44,271,320,23
 				visible	1
 				forecolor	1,1,1,0.8
-				text	"#str_200009"
+				text	"#str_231122"
 				textscale	.31
 				font	"fonts/marine"
 			}
@@ -2456,14 +2456,14 @@ windowDef Desktop
 			}
 			windowDef mp_b2_corner
 			{
-				rect	32,218,12,12
+				rect	32,248,12,12
 				visible	1
 				background	"gfx/guis/mainmenu/corner"
 				matcolor	0.564,0.603,0.286,0.4
 			}
 			windowDef mp_b3_corner
 			{
-				rect	32,248,12,12
+				rect	32,218,12,12
 				visible	1
 				background	"gfx/guis/mainmenu/corner"
 				matcolor	0.564,0.603,0.286,0.4
@@ -13002,9 +13002,9 @@ windowDef Desktop
 				set "main_t_b3::forecolor"  "$desktop::white_8" ; 
 				set "main_b3_corner::matcolor" "$desktop::corner" ;
 				set "main_t_b3::textscale" "0.33" ; 
-				set "main_b9::matcolor" "$desktop::white_4" ;
-				set "main_t_b9::forecolor" "$desktop::white_8" ;
-				set "main_b9_corner::matcolor" "$desktop::corner" ;
+				set "main_b9::matcolor" "$desktop::white_0" ;
+				set "main_t_b9::forecolor" "$desktop::white_0" ;
+				set "main_b9_corner::matcolor" "$desktop::corner_0" ;
 				set "main_t_b9::textscale" "0.33" ;
 				set "main_t_b9::text" "#str_41500" ;
 				set "main_b10::matcolor" "$desktop::white_0" ;
@@ -13655,9 +13655,9 @@ windowDef Desktop
 					transition "main_b6_corner::matcolor_w"  "0" "0.4" "150" ; 
 					transition "main_t_b7::forecolor_w"  "0" "0.5" "150" ; 
 					transition "main_b7_corner::matcolor_w"  "0" "0.4" "150" ;					
-					transition "main_b9::matcolor_w" "0" "0.4" "150" ;
-					transition "main_t_b9::forecolor_w" "0" "0.8" "150" ;
-					transition "main_b9_corner::matcolor_w" "0" "0.4" "150" ;
+					set "main_b9::matcolor_w" "0" ;
+					set "main_t_b9::forecolor_w" "0" ;
+					set "main_b9_corner::matcolor_w" "0" ;
 					
 					set "main_t_b1::text" "#str_42000" ;
 					set "main_t_b2::text" "#str_200001" ;
@@ -13745,9 +13745,9 @@ windowDef Desktop
 					transition "main_b6_corner::matcolor_w"  "0.4" "0" "50" ; 
 					transition "main_t_b7::forecolor_w"  "0.5" "0" "50" ; 
 					transition "main_b7_corner::matcolor_w"  "0.4" "0" "50" ; 
-					transition "main_b9::matcolor_w" "0.4" "0" "250" ;
-					transition "main_t_b9::forecolor_w" "0.8" "0" "250" ;
-					transition "main_b9_corner::matcolor_w" "0.4" "0" "250" ;
+					set "main_b9::matcolor_w" "0" ;
+					set "main_t_b9::forecolor_w" "0" ;
+					set "main_b9_corner::matcolor_w" "0" ;
 				}
 				
 			}
@@ -16194,7 +16194,7 @@ windowDef Desktop
 				set "main_b_multiplayer::visible" "1" ;
 				set "main_b_return::visible" "0" ;
 				set "main_b_difficulty::visible" "0" ;
-				set "main_b_demos::visible" "1" ;
+				set "main_b_demos::visible" "0" ;
 				set "main_b_mods::visible" "1" ;
 				set "main_b_updates::visible" "1" ;
 				set "main_b_credits::visible" "1" ;
@@ -20769,47 +20769,9 @@ windowDef Desktop
 			}
 
 		}
-		windowDef mp_b_friendslist
-		{
-			rect	24,211,333,26
-			visible	0
-
-			onMouseEnter {
-				if ("desktop::active" == 0) {
-					stoptransitions "mp_b_friendslist" ;
-					
-					set "mp_b2::matcolor_w" "1" ;
-					transition "mp_t_b2::forecolor" "$desktop::white_8" "$desktop::orange" "0" ; 
-					transition "mp_b2_corner::matcolor" "$desktop::corner" "$desktop::orange" "0" ;
-					
-					set "mp_t_b2::textscale" "0.32" ; 
-					
-					set "cmd" "play main_menu_mouseover" ;	
-				}
-			}
-
-			onMouseExit {
-				if ("desktop::active" == 0) {
-					transition "mp_b2::matcolor_w" "1" "0.4" "300" ;
-					transition "mp_t_b2::forecolor"  "$desktop::orange" "$desktop::white_8" "300" ; 
-					transition "mp_b2_corner::matcolor"  "$desktop::orange" "$desktop::corner" "300" ; 
-					
-					transition "mp_t_b2::textscale" "0.32" "0.31" "300" ;
-				}
-			}
-
-			onAction {
-				set "desktop::active" "1" ;
-				resettime "anim_mpOut" "0" ;
-				set "desktop::dest" "15" ;
-				
-				set "cmd" "play main_menu_selection" ;
-			}
-
-		}
 		windowDef mp_b_createserver
 		{
-			rect	24,241,333,26
+			rect	24,211,333,26
 			visible	0
 
 			onMouseEnter {
@@ -20861,6 +20823,42 @@ windowDef Desktop
 				set "mp_create_server::textscale" "0.32" ;
 				
 				set "cmd" "play main_menu_selection" ;
+			}
+
+		}
+		// openQ4: DEMOS stands on the Multiplayer page, where the retained page has it;
+		// the window keeps the stock FRIENDS LIST name the menu's scripts use.
+		windowDef mp_b_friendslist
+		{
+			rect	24,241,333,26
+			visible	0
+
+			onMouseEnter {
+				if ("desktop::active" == 0) {
+					stoptransitions "mp_b_friendslist" ;
+					
+					set "mp_b2::matcolor_w" "1" ;
+					transition "mp_t_b2::forecolor" "$desktop::white_8" "$desktop::orange" "0" ; 
+					transition "mp_b2_corner::matcolor" "$desktop::corner" "$desktop::orange" "0" ;
+					
+					set "mp_t_b2::textscale" "0.32" ; 
+					
+					set "cmd" "play main_menu_mouseover" ;	
+				}
+			}
+
+			onMouseExit {
+				if ("desktop::active" == 0) {
+					transition "mp_b2::matcolor_w" "1" "0.4" "300" ;
+					transition "mp_t_b2::forecolor"  "$desktop::orange" "$desktop::white_8" "300" ; 
+					transition "mp_b2_corner::matcolor"  "$desktop::orange" "$desktop::corner" "300" ; 
+					
+					transition "mp_t_b2::textscale" "0.32" "0.31" "300" ;
+				}
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoOpen" ;
 			}
 
 		}

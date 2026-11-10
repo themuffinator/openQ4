@@ -768,9 +768,10 @@ def validate_menu_hooks() -> None:
         "#str_42010",
         "#str_42011",
         "#str_42026",
-        "#str_42027",
-        "#str_42028",
-        "#str_42029",
+        # The Single Player page: its description and its sections' summaries.
+        "#str_230044",
+        "#str_231552",
+        "#str_231553",
         "#str_42032",
         "#str_42033",
         "#str_42034",

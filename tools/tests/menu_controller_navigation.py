@@ -38,7 +38,9 @@ template<class T> struct idList : std::vector<T> {
     }
 };
 struct Text : std::string { void Clear() { clear(); } };
-enum { WIN_CANFOCUS = 1, SE_MOUSE, SE_KEY, K_MOUSE1 = 187, K_MWHEELUP = 196 };
+enum { WIN_CANFOCUS = 1, SE_MOUSE, SE_KEY, K_MOUSE1 = 187, K_MWHEELUP = 196,
+       K_UPARROW = 133, K_DOWNARROW, K_LEFTARROW, K_RIGHTARROW, K_KP_UPARROW = 160, K_KP_DOWNARROW, K_KP_LEFTARROW,
+       K_KP_RIGHTARROW, K_PGUP, K_PGDN, K_HOME, K_END, K_DEL, K_INS, K_BACKSPACE, K_ENTER };
 struct sysEvent_t { int evType, evValue, evValue2; };
 struct Gui {
     bool controller = false;
@@ -55,6 +57,7 @@ struct idWindow {
     bool visible = true, noEvents = false, hover = false;
     int flags = 0, enters = 0, exits = 0, routes = 0;
     explicit idWindow(Gui& g, bool focusable = false) : gui(&g), flags(focusable ? WIN_CANFOCUS : 0) {}
+    virtual ~idWindow() {}
     int GetChildCount() const { return children.Num(); }
     idWindow* GetChild(int i) { return children[i]; }
     bool IsVisible() const { return visible; }
@@ -69,6 +72,11 @@ struct idWindow {
     void ClearMouseHover();
     void UpdateOwnership(bool controllerEvent, const sysEvent_t* event);
 };
+struct idChoiceWindow : idWindow { using idWindow::idWindow; };
+struct idSliderWindow : idWindow { using idWindow::idWindow; };
+struct idListWindow : idWindow { using idWindow::idWindow; };
+struct idEditWindow : idWindow { using idWindow::idWindow; };
+struct idBindWindow : idWindow { using idWindow::idWindow; };
 '''
 
 TESTS = r'''
@@ -122,6 +130,35 @@ int main() {
     root.capture = &a;
     root.UpdateOwnership(true, &controllerDown);
     assert(!gui.controller); // do not interrupt an active mouse drag
+
+    // The arrow keys ask a menu for the D-pad's focus steps, except while the
+    // focused control uses that key itself or a control holds the capture.
+    int direction = 0;
+    sysEvent_t up{SE_KEY, K_UPARROW, 1}, down{SE_KEY, K_DOWNARROW, 1}, left{SE_KEY, K_KP_LEFTARROW, 1}, right{SE_KEY, K_RIGHTARROW, 1};
+    sysEvent_t enter{SE_KEY, K_ENTER, 1}, moved{SE_MOUSE, 4, 0};
+    assert(!KeyboardMenuFocusDirection(&root, &down, direction)); // a drag owns the keys
+    root.capture = nullptr; root.focusedChild = &a;
+    assert(KeyboardMenuFocusDirection(&root, &down, direction) && direction == 1);
+    assert(KeyboardMenuFocusDirection(&root, &up, direction) && direction == -1);
+    assert(KeyboardMenuFocusDirection(&root, &left, direction) && direction == -1);
+    assert(KeyboardMenuFocusDirection(&root, &right, direction) && direction == 1);
+    direction = 7;
+    assert(!KeyboardMenuFocusDirection(&root, &enter, direction) && !KeyboardMenuFocusDirection(&root, &moved, direction));
+    idChoiceWindow choice(gui, true); idSliderWindow slider(gui, true); idListWindow list(gui, true);
+    idEditWindow edit(gui, true); idBindWindow bind(gui, true);
+    root.focusedChild = &choice; // left and right change a choice; up and down leave it
+    assert(!KeyboardMenuFocusDirection(&root, &left, direction) && !KeyboardMenuFocusDirection(&root, &right, direction));
+    assert(KeyboardMenuFocusDirection(&root, &down, direction) && direction == 1);
+    root.focusedChild = &slider;
+    assert(!KeyboardMenuFocusDirection(&root, &right, direction) && KeyboardMenuFocusDirection(&root, &up, direction));
+    root.focusedChild = &list; // up and down walk a list's rows
+    assert(!KeyboardMenuFocusDirection(&root, &up, direction) && !KeyboardMenuFocusDirection(&root, &down, direction));
+    assert(KeyboardMenuFocusDirection(&root, &right, direction) && direction == 1);
+    root.focusedChild = &edit; // an edit field keeps its caret keys
+    assert(!KeyboardMenuFocusDirection(&root, &left, direction) && !KeyboardMenuFocusDirection(&root, &down, direction));
+    root.focusedChild = &bind; // a key being bound is never a step
+    assert(!KeyboardMenuFocusDirection(&root, &down, direction) && !KeyboardMenuFocusDirection(&root, &left, direction));
+    assert(direction == 1); // a refused key leaves the direction alone
     std::puts("menu_controller_navigation: behavioral checks passed");
 }
 '''
@@ -131,7 +168,12 @@ def main() -> None:
     source = (ROOT / 'src/ui/Window.cpp').read_text(encoding='utf-8')
     snippets = '\n'.join(extract(source, sig) for sig in (
         'static void CollectFocusWindows(', 'static bool NavigateFocus(',
+        'static bool WindowConsumesDirectionalNavigation(', 'static bool KeyboardMenuFocusDirection(',
         'void idWindow::ClearMouseHover()'))
+    # Only a menu's desktop turns arrow keys into steps: a nested window, an
+    # in-world GUI or a HUD never does.
+    assert ('( flags & WIN_DESKTOP ) && ( flags & WIN_MENUGUI ) && '
+            'KeyboardMenuFocusDirection( this, event, controllerFocusDirection )') in source
     ownership = extract(source, 'if ( controllerEvent && event->evValue2')
     next_start = source.index(ownership) + len(ownership)
     ownership += ' else ' + extract(source[next_start:], 'if ( gui->ControllerNavigation() )')

@@ -36046,6 +36046,12 @@
    "value": {"op": "*", "args": [{"op": "clamp", "args": [{"state": "join.progress"}, 0, 1]}, 889.5]}
   },
   {
+   "id": "join-load-fill.display",
+   "node": "join-load-fill",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "join.progress"}, 0]}, "block", "none"]}
+  },
+  {
    "id": "join-load-notice.text",
    "node": "join-load-notice",
    "property": "text",
@@ -145455,6 +145461,7 @@
          "width": {"type": "length", "value": 0, "unit": "dp"},
          "height": {"type": "length", "value": 21.0, "unit": "dp"},
          "overflow": {"type": "keyword", "value": "hidden"},
+         "display": {"type": "keyword", "value": "none"},
          "bottom": {"type": "length", "value": 229.5, "unit": "dp"}
         },
         "children": [

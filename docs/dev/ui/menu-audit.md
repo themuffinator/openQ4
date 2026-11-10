@@ -121,3 +121,27 @@ Highest impact first.
   focused control can act. The bars still list no contextual action: the
   west and north buttons of Join Game and the Save and Load pages refresh
   and sort with no prompt, and the title's and pauses' bars keep SELECT.
+
+## Stock interface round, 10 November 2026
+
+A paired review of the stock (`ui_retained 0`) and retained menus: every
+front-end page of each at 1280x720, the rebuilt stock pages at 4:3 and 21:9
+and in German and Hungarian. The method, measurements and the differences
+kept on purpose are in the [stock interface menus](legacy-menu-layout.md)
+record.
+
+| Severity | Interface | Finding | Fix |
+| --- | --- | --- | --- |
+| High | Stock | The Single Player, Campaign, Arena and Demos pages did not follow the stock page frame the other pages and the retained ones share: home-position bands, centered headlines, bordered cards and boxes, BACK at the bottom-leading corner without its marker. | Each stands in the page frame: docked bands, the title (and the path over it) in the top band's slot, stock plates, the summary in the content column and BACK in the bottom band's raised section. The Arena page takes the retained page's arrangement. |
+| Medium | Stock | FRIENDS LIST on the Multiplayer page opened a page nothing fills, and DEMOS stood on the title where the retained interface has it under Multiplayer. | The Multiplayer page reads JOIN GAME, CREATE SERVER, DEMOS and PLAYER SETUP; the title keeps four sections. |
+| Medium | Stock | Every Demos filter looked chosen: the GUI compared the filter's name, and GUI expressions compare numbers. | The session publishes `demo_filterIndex`; one tag carries the rail. |
+| Medium | Stock | The arrow keys did nothing in the menus; Tab moved the focus without showing it. | The arrow keys step a menu's focus as the D-pad does and light the item reached; a control that uses a key keeps it. |
+| Medium | Retained | Join Game showed a full, bright scan bar while no scan ran: under the page's transform a clipping box with no width has no clip mask, so the fill drew whole over its track. | The fill leaves the page until there is progress; the idle track matches the stock one. |
+| Low | Stock | Choice rows showed their quotes: MSAA read `'Off'` and the sound device began with a quote. | Quoted choices show without their quotes, as retail read them. |
+| Low | Stock | The four pages' backdrop faded to black at the edges of a wide view. | They stand on the retained pages' backdrop, the same at every width. |
+| Low | Stock | Arena's progress line and path, and the Demos filters, were cut in longer languages once laid out. | Sized for the longest of the twelve languages. |
+
+Left open: the stock pause's order, the stock Settings screen's
+arrangement and the campaign levels, which stay as the stock composition
+([deliberate differences](legacy-menu-layout.md#deliberate-differences)), and
+the items under [found, not fixed](legacy-menu-layout.md#found-not-fixed).

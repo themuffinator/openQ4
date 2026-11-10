@@ -34,27 +34,13 @@ windowDef Desktop
 		}
 	}
 
-	// Browser backdrop.
+	// Browser backdrop, the retained pages' own: black, the stock screen's light
+	// band across the middle and a quiet grid, the same at every width.
 	windowDef demo_browser_backdrop
 	{
 		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
 		visible		( "gui::demo_browserMode" == 1 && "gui::demo_interactive" == 1 )
-		background	"gfx/guis/mainmenu/bg_darkgrad2"
-		matcolor	0.12,0.15,0.1,1
-		noevents	1
-	}
-
-	// The browser deliberately borrows the stock Load Game rail treatment: a
-	// dark grid/screen field bounded by the familiar top and bottom bars.
-	windowDef demo_browser_grid
-	{
-		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
-		visible		( "gui::demo_browserMode" == 1 && "gui::demo_interactive" == 1 )
-		// The stock main-menu grid keeps the library visually tied to Load Game;
-		// it is deliberately quiet beneath the more data-dense browser.
-		background	"gfx/guis/mainmenu/bg_grid"
-		matcolor	0.45,0.52,0.3,0.1
-		naturalmatscale	1
+		backcolor	0,0,0,1
 		noevents	1
 	}
 
@@ -63,13 +49,23 @@ windowDef Desktop
 		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
 		visible		( "gui::demo_browserMode" == 1 && "gui::demo_interactive" == 1 )
 		background	"gfx/guis/mainmenu/screen"
-		matcolor	0.45,0.52,0.3,0.16
+		matcolor	0.64,0.64,0.64,1
+		noevents	1
+	}
+
+	windowDef demo_browser_grid
+	{
+		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
+		visible		( "gui::demo_browserMode" == 1 && "gui::demo_interactive" == 1 )
+		background	"gfx/guis/loading/bg_grid_tiled"
+		matcolor	0.35,0.42,0.22,0.16
+		naturalmatscale	1
 		noevents	1
 	}
 
 	windowDef demo_browser_topbar
 	{
-		rect		-400,0,1045,129
+		rect		-77,-63,1045,129
 		visible		( "gui::demo_browserMode" == 1 && "gui::demo_interactive" == 1 )
 		noclip		1
 		background	"gfx/guis/mainmenu/topbar"
@@ -97,7 +93,7 @@ windowDef Desktop
 
 	windowDef demo_browser_btmbar
 	{
-		rect		-399,351,1045,129
+		rect		-26,386,1045,129
 		visible		( "gui::demo_browserMode" == 1 && "gui::demo_interactive" == 1 )
 		noclip		1
 		background	"gfx/guis/mainmenu/btmbar"
@@ -128,64 +124,361 @@ windowDef Desktop
 		rect		0,0,640,480
 		visible		( "gui::demo_browserMode" == 1 && "gui::demo_interactive" == 1 )
 
-		windowDef demo_browser_header_glow
+		windowDef demo_browser_crumb
 		{
-			rect		20,14,600,28
-			background	"gfx/guis/mainmenu/b1_dark"
-			matcolor	0.46,0.52,0.29,0.45
-			noevents	1
-		}
-
-		windowDef demo_browser_header_line
-		{
-			rect		217,75,410,6
-			background	"gfx/guis/mainmenu/horiz_line2"
-			matcolor	0.545,0.588,0.294,0.34
+			rect		39,7,400,11
+			forecolor	1,1,1,0.35
+			text		"#str_200002"
+			textscale	0.17
+			font		"fonts/marine"
 			noevents	1
 		}
 
 		windowDef demo_browser_title
 		{
-			rect		39,19,314,16
-			forecolor	0.96,0.96,0.9,1
-			text		"#str_41501"
+			rect		39,19,400,16
+			forecolor	1,1,1,0.5
+			text		"#str_41500"
 			textscale	0.25
 			font		"fonts/marine"
 			noevents	1
 		}
 
-		windowDef demo_filter_label
+		windowDef demo_selected_heading
 		{
-			rect		20,66,66,16
-			forecolor	0.68,0.72,0.57,0.9
-			text		"#str_41530"
-			textscale	0.19
+			rect		20,62,180,12
+			forecolor	0.68,0.72,0.57,0.95
+			text		"#str_41559"
+			textscale	0.18
 			font		"fonts/lowpixel"
 			noevents	1
 		}
 
+		windowDef demo_selected_name
+		{
+			rect		20,76,180,16
+			forecolor	0.95,0.93,0.8,1
+			text		"gui::demo_selectedName"
+			textscale	0.2
+			font		"fonts/marine"
+			noevents	1
+		}
+
+		windowDef demo_detail_rule
+		{
+			rect		20,94,180,1
+			backcolor	0.4,0.45,0.25,0.8
+			noevents	1
+		}
+
+		windowDef demo_detail_status_label
+		{
+			rect		20,100,50,12
+			forecolor	0.57,0.63,0.45,1
+			text		"#str_41511"
+			textscale	0.16
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_detail_status
+		{
+			rect		72,100,128,24
+			forecolor	0.95,0.93,0.8,1
+			text		"gui::demo_status"
+			textscale	0.16
+			font		"fonts/lowpixel"
+			wrap		1
+			noevents	1
+		}
+
+		windowDef demo_detail_label
+		{
+			rect		20,128,180,12
+			forecolor	0.57,0.63,0.45,1
+			text		"#str_41558"
+			textscale	0.16
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_detail_text
+		{
+			rect		20,141,180,28
+			forecolor	0.84,0.86,0.78,1
+			text		"gui::demo_details"
+			textscale	0.16
+			font		"fonts/lowpixel"
+			wrap		1
+			noevents	1
+		}
+
+		windowDef demo_cap_seek_off
+		{
+			rect		20,172,62,14
+			forecolor	1,1,1,0.22
+			text		"#str_41567"
+			textscale	0.16
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_cap_seek_on
+		{
+			rect		20,172,62,14
+			visible		( "gui::demo_canSeek" == 1 )
+			background	"gfx/guis/mainmenu/b2_dark"
+			matcolor	0.545,0.588,0.294,0.5
+			forecolor	0.86,0.9,0.7,1
+			text		"#str_41567"
+			textscale	0.16
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_cap_follow_off
+		{
+			rect		84,172,58,14
+			forecolor	1,1,1,0.22
+			text		"#str_41560"
+			textscale	0.16
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_cap_follow_on
+		{
+			rect		84,172,58,14
+			visible		( "gui::demo_canFollow" == 1 )
+			background	"gfx/guis/mainmenu/b2_dark"
+			matcolor	0.545,0.588,0.294,0.5
+			forecolor	0.86,0.9,0.7,1
+			text		"#str_41560"
+			textscale	0.16
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_cap_free_off
+		{
+			rect		144,172,56,14
+			forecolor	1,1,1,0.22
+			text		"#str_41568"
+			textscale	0.16
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_cap_free_on
+		{
+			rect		144,172,56,14
+			visible		( "gui::demo_canFreeRoam" == 1 )
+			background	"gfx/guis/mainmenu/b2_dark"
+			matcolor	0.545,0.588,0.294,0.5
+			forecolor	0.86,0.9,0.7,1
+			text		"#str_41568"
+			textscale	0.16
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_play_disabled
+		{
+			rect		18,196,184,34
+			visible		( "gui::demo_canPlay" != 1 )
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.2
+
+			windowDef demo_play_disabled_corner
+			{
+				rect		11,10,14,14
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.25
+				noevents	1
+			}
+
+			windowDef demo_play_disabled_label
+			{
+				rect		32,6,142,22
+				forecolor	1,1,1,0.3
+				text		"#str_231523"
+				textscale	0.28
+				font		"fonts/marine"
+				noevents	1
+			}
+
+		}
+
+		windowDef demo_play
+		{
+			rect		18,196,184,34
+			visible		( "gui::demo_canPlay" == 1 )
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
+
+			onMouseEnter {
+				set "matcolor" "0.95,0.49,0.06,0.82" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoPlay" ;
+			}
+
+			windowDef demo_play_corner
+			{
+				rect		11,10,14,14
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.6
+				noevents	1
+			}
+
+			windowDef demo_play_label
+			{
+				rect		32,6,142,22
+				forecolor	1,1,1,0.9
+				text		"#str_231523"
+				textscale	0.28
+				font		"fonts/marine"
+				noevents	1
+			}
+
+		}
+
+		windowDef demo_delete_disabled
+		{
+			rect		18,234,184,34
+			visible		( "gui::demo_canDelete" != 1 )
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.2
+
+			windowDef demo_delete_disabled_corner
+			{
+				rect		11,10,14,14
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.25
+				noevents	1
+			}
+
+			windowDef demo_delete_disabled_label
+			{
+				rect		32,6,142,22
+				forecolor	1,1,1,0.3
+				text		"#str_231521"
+				textscale	0.28
+				font		"fonts/marine"
+				noevents	1
+			}
+
+		}
+
+		windowDef demo_delete
+		{
+			rect		18,234,184,34
+			visible		( "gui::demo_canDelete" == 1 )
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
+
+			onMouseEnter {
+				set "matcolor" "0.95,0.49,0.06,0.82" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoDelete" ;
+			}
+
+			windowDef demo_delete_corner
+			{
+				rect		11,10,14,14
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.6
+				noevents	1
+			}
+
+			windowDef demo_delete_label
+			{
+				rect		32,6,142,22
+				forecolor	1,1,1,0.9
+				text		"#str_231521"
+				textscale	0.28
+				font		"fonts/marine"
+				noevents	1
+			}
+
+		}
+
+		windowDef demo_refresh
+		{
+			rect		18,272,184,34
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
+
+			onMouseEnter {
+				set "matcolor" "0.95,0.49,0.06,0.82" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoRefresh" ;
+			}
+
+			windowDef demo_refresh_corner
+			{
+				rect		11,10,14,14
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.6
+				noevents	1
+			}
+
+			windowDef demo_refresh_label
+			{
+				rect		32,6,142,22
+				forecolor	1,1,1,0.9
+				text		"#str_231536"
+				textscale	0.28
+				font		"fonts/marine"
+				noevents	1
+			}
+
+		}
+
 		windowDef demo_filter_all
 		{
-			rect		20,83,66,25
+			rect		216,58,62,18
 			background	"gfx/guis/mainmenu/b2_dark"
 			matcolor	0.545,0.588,0.294,0.44
-			bordercolor	0.36,0.4,0.24,1
-			bordersize	1
 			forecolor	0.92,0.93,0.86,1
 			text		"#str_41502"
-			textscale	0.22
+			textscale	0.17
 			textalign	1
 			font		"fonts/lowpixel"
 
 			onMouseEnter {
 				transition "demo_filter_all::matcolor" "$demo_filter_all::matcolor" "0.95,0.49,0.06,0.88" "120" ;
-				transition "demo_filter_all::bordercolor" "$demo_filter_all::bordercolor" "0.95,0.49,0.06,1" "120" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
 				transition "demo_filter_all::matcolor" "$demo_filter_all::matcolor" "0.545,0.588,0.294,0.44" "180" ;
-				transition "demo_filter_all::bordercolor" "$demo_filter_all::bordercolor" "0.36,0.4,0.24,1" "180" ;
 			}
 
 			onAction {
@@ -194,37 +487,31 @@ windowDef Desktop
 
 			windowDef demo_filter_all_active
 			{
-				rect		1,1,64,23
-				visible		( "gui::demo_filter" == "all" )
-				backcolor	0.95,0.49,0.06,0.12
-				bordercolor	0.95,0.49,0.06,0.94
-				bordersize	1
+				rect		0,16,62,2
+				visible		( "gui::demo_filterIndex" == 0 )
+				backcolor	0.95,0.49,0.06,0.94
 				noevents	1
 			}
 		}
 
 		windowDef demo_filter_mvd
 		{
-			rect		90,83,92,25
+			rect		281,58,100,18
 			background	"gfx/guis/mainmenu/b2_dark"
 			matcolor	0.545,0.588,0.294,0.44
-			bordercolor	0.36,0.4,0.24,1
-			bordersize	1
 			forecolor	0.92,0.93,0.86,1
 			text		"#str_41503"
-			textscale	0.2
+			textscale	0.17
 			textalign	1
 			font		"fonts/lowpixel"
 
 			onMouseEnter {
 				transition "demo_filter_mvd::matcolor" "$demo_filter_mvd::matcolor" "0.95,0.49,0.06,0.88" "120" ;
-				transition "demo_filter_mvd::bordercolor" "$demo_filter_mvd::bordercolor" "0.95,0.49,0.06,1" "120" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
 				transition "demo_filter_mvd::matcolor" "$demo_filter_mvd::matcolor" "0.545,0.588,0.294,0.44" "180" ;
-				transition "demo_filter_mvd::bordercolor" "$demo_filter_mvd::bordercolor" "0.36,0.4,0.24,1" "180" ;
 			}
 
 			onAction {
@@ -233,37 +520,31 @@ windowDef Desktop
 
 			windowDef demo_filter_mvd_active
 			{
-				rect		1,1,90,23
-				visible		( "gui::demo_filter" == "mvd" )
-				backcolor	0.95,0.49,0.06,0.12
-				bordercolor	0.95,0.49,0.06,0.94
-				bordersize	1
+				rect		0,16,100,2
+				visible		( "gui::demo_filterIndex" == 1 )
+				backcolor	0.95,0.49,0.06,0.94
 				noevents	1
 			}
 		}
 
 		windowDef demo_filter_render
 		{
-			rect		186,83,78,25
+			rect		384,58,74,18
 			background	"gfx/guis/mainmenu/b2_dark"
 			matcolor	0.545,0.588,0.294,0.44
-			bordercolor	0.36,0.4,0.24,1
-			bordersize	1
 			forecolor	0.92,0.93,0.86,1
 			text		"#str_41504"
-			textscale	0.2
+			textscale	0.17
 			textalign	1
 			font		"fonts/lowpixel"
 
 			onMouseEnter {
 				transition "demo_filter_render::matcolor" "$demo_filter_render::matcolor" "0.95,0.49,0.06,0.88" "120" ;
-				transition "demo_filter_render::bordercolor" "$demo_filter_render::bordercolor" "0.95,0.49,0.06,1" "120" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
 				transition "demo_filter_render::matcolor" "$demo_filter_render::matcolor" "0.545,0.588,0.294,0.44" "180" ;
-				transition "demo_filter_render::bordercolor" "$demo_filter_render::bordercolor" "0.36,0.4,0.24,1" "180" ;
 			}
 
 			onAction {
@@ -272,37 +553,31 @@ windowDef Desktop
 
 			windowDef demo_filter_render_active
 			{
-				rect		1,1,76,23
-				visible		( "gui::demo_filter" == "render" )
-				backcolor	0.95,0.49,0.06,0.12
-				bordercolor	0.95,0.49,0.06,0.94
-				bordersize	1
+				rect		0,16,74,2
+				visible		( "gui::demo_filterIndex" == 2 )
+				backcolor	0.95,0.49,0.06,0.94
 				noevents	1
 			}
 		}
 
 		windowDef demo_filter_legacy
 		{
-			rect		268,83,70,25
+			rect		461,58,68,18
 			background	"gfx/guis/mainmenu/b2_dark"
 			matcolor	0.545,0.588,0.294,0.44
-			bordercolor	0.36,0.4,0.24,1
-			bordersize	1
 			forecolor	0.92,0.93,0.86,1
 			text		"#str_41505"
-			textscale	0.2
+			textscale	0.17
 			textalign	1
 			font		"fonts/lowpixel"
 
 			onMouseEnter {
 				transition "demo_filter_legacy::matcolor" "$demo_filter_legacy::matcolor" "0.95,0.49,0.06,0.88" "120" ;
-				transition "demo_filter_legacy::bordercolor" "$demo_filter_legacy::bordercolor" "0.95,0.49,0.06,1" "120" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
 				transition "demo_filter_legacy::matcolor" "$demo_filter_legacy::matcolor" "0.545,0.588,0.294,0.44" "180" ;
-				transition "demo_filter_legacy::bordercolor" "$demo_filter_legacy::bordercolor" "0.36,0.4,0.24,1" "180" ;
 			}
 
 			onAction {
@@ -311,37 +586,31 @@ windowDef Desktop
 
 			windowDef demo_filter_legacy_active
 			{
-				rect		1,1,68,23
-				visible		( "gui::demo_filter" == "legacy" )
-				backcolor	0.95,0.49,0.06,0.12
-				bordercolor	0.95,0.49,0.06,0.94
-				bordersize	1
+				rect		0,16,68,2
+				visible		( "gui::demo_filterIndex" == 3 )
+				backcolor	0.95,0.49,0.06,0.94
 				noevents	1
 			}
 		}
 
 		windowDef demo_filter_incomplete
 		{
-			rect		342,83,90,25
+			rect		532,58,88,18
 			background	"gfx/guis/mainmenu/b2_dark"
 			matcolor	0.545,0.588,0.294,0.44
-			bordercolor	0.36,0.4,0.24,1
-			bordersize	1
 			forecolor	0.92,0.93,0.86,1
 			text		"#str_41506"
-			textscale	0.19
+			textscale	0.17
 			textalign	1
 			font		"fonts/lowpixel"
 
 			onMouseEnter {
 				transition "demo_filter_incomplete::matcolor" "$demo_filter_incomplete::matcolor" "0.95,0.49,0.06,0.88" "120" ;
-				transition "demo_filter_incomplete::bordercolor" "$demo_filter_incomplete::bordercolor" "0.95,0.49,0.06,1" "120" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
 				transition "demo_filter_incomplete::matcolor" "$demo_filter_incomplete::matcolor" "0.545,0.588,0.294,0.44" "180" ;
-				transition "demo_filter_incomplete::bordercolor" "$demo_filter_incomplete::bordercolor" "0.36,0.4,0.24,1" "180" ;
 			}
 
 			onAction {
@@ -350,80 +619,58 @@ windowDef Desktop
 
 			windowDef demo_filter_incomplete_active
 			{
-				rect		1,1,88,23
-				visible		( "gui::demo_filter" == "incomplete" )
-				backcolor	0.95,0.49,0.06,0.12
-				bordercolor	0.95,0.49,0.06,0.94
-				bordersize	1
+				rect		0,16,88,2
+				visible		( "gui::demo_filterIndex" == 4 )
+				backcolor	0.95,0.49,0.06,0.94
 				noevents	1
 			}
 		}
 
-		windowDef demo_list_panel
-		{
-			rect		18,116,602,216
-			background	"gfx/guis/mainmenu/bg2"
-			matcolor	0.25,0.3,0.16,0.72
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
-			noevents	1
-		}
-
 		windowDef demo_heading_name
 		{
-			rect		23,120,142,14
+			rect		220,83,132,12
 			forecolor	0.62,0.67,0.5,1
-			text		"#str_41507"
-			textscale	0.16
+			text		"#str_231530"
+			textscale	0.15
 			font		"fonts/lowpixel"
 			noevents	1
 		}
 
 		windowDef demo_heading_type
 		{
-			rect		171,120,60,14
+			rect		356,83,50,12
 			forecolor	0.62,0.67,0.5,1
 			text		"#str_41508"
-			textscale	0.16
+			textscale	0.15
 			font		"fonts/lowpixel"
 			noevents	1
 		}
 
 		windowDef demo_heading_map
 		{
-			rect		237,120,98,14
+			rect		408,83,92,12
 			forecolor	0.62,0.67,0.5,1
-			text		"#str_41509"
-			textscale	0.16
+			text		"#str_200040"
+			textscale	0.15
 			font		"fonts/lowpixel"
 			noevents	1
 		}
 
 		windowDef demo_heading_date
 		{
-			rect		343,120,70,14
+			rect		504,83,62,12
 			forecolor	0.62,0.67,0.5,1
-			text		"#str_41557"
-			textscale	0.16
+			text		"#str_200243"
+			textscale	0.15
 			font		"fonts/lowpixel"
 			noevents	1
 		}
 
 		windowDef demo_heading_duration
 		{
-			rect		421,120,64,14
+			rect		568,83,50,12
 			forecolor	0.62,0.67,0.5,1
-			text		"#str_41510"
-			textscale	0.14
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_heading_status
-		{
-			rect		492,120,108,14
-			forecolor	0.62,0.67,0.5,1
-			text		"#str_41511"
+			text		"#str_231531"
 			textscale	0.15
 			font		"fonts/lowpixel"
 			noevents	1
@@ -431,28 +678,28 @@ windowDef Desktop
 
 		windowDef demo_heading_rule
 		{
-			rect		22,134,594,1
+			rect		216,96,404,1
 			backcolor	0.4,0.45,0.25,0.8
 			noevents	1
 		}
 
 		listDef demoList
 		{
-			rect		22,138,594,190
+			rect		216,99,404,300
 			visible		1
 			listname	demoList
 			itemheight	20
 			scrollbar	1
 			tabValigns	"0,0,0,0,0,0"
 			tabaligns	"0,0,0,0,0,0"
-			tabstops	"0,148,214,320,398,468,576"
+			tabstops	"0,136,188,284,348,420,600"
 			backgroundHover	"gfx/guis/mainmenu/bg_hover"
 			backgroundLine	"gfx/guis/mainmenu/bg_line"
 			backgroundFocus	"gfx/guis/mainmenu/bg_focus"
 			backgroundGreyed	"gfx/guis/mainmenu/bg_line"
 			forecolor	0.92,0.94,0.88,1
 			hovercolor	1,0.66,0.18,1
-			textscale	0.17
+			textscale	0.18
 			font		"fonts/lowpixel"
 
 			onMouseEnter {
@@ -470,322 +717,50 @@ windowDef Desktop
 			}
 		}
 
-		windowDef demo_detail_panel
+		windowDef demo_browser_close_plate
 		{
-			rect		18,338,602,62
-			background	"gfx/guis/mainmenu/b1_dark"
-			matcolor	0.42,0.48,0.26,0.5
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
-			noevents	1
-		}
-
-		windowDef demo_selected_heading
-		{
-			rect		28,346,156,18
-			forecolor	0.95,0.49,0.06,1
-			text		"#str_41559"
-			textscale	0.21
-			font		"fonts/marine"
-			noevents	1
-		}
-
-		windowDef demo_detail_rule
-		{
-			rect		28,365,156,1
-			backcolor	0.4,0.45,0.25,0.8
-			noevents	1
-		}
-
-		windowDef demo_detail_status_label
-		{
-			rect		28,371,42,14
-			forecolor	0.62,0.67,0.5,1
-			text		"#str_41511"
-			textscale	0.16
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_detail_status
-		{
-			rect		72,368,112,22
-			forecolor	0.95,0.93,0.8,1
-			text		"gui::demo_status"
-			textscale	0.16
-			font		"fonts/lowpixel"
-			wrap		1
-			noevents	1
-		}
-
-		windowDef demo_selected_name
-		{
-			rect		194,345,248,18
-			forecolor	0.95,0.93,0.8,1
-			text		"gui::demo_selectedName"
-			textscale	0.2
-			font		"fonts/marine"
-			noevents	1
-		}
-
-		windowDef demo_detail_rule_right
-		{
-			rect		194,365,248,1
-			backcolor	0.4,0.45,0.25,0.8
-			noevents	1
-		}
-
-		windowDef demo_detail_label
-		{
-			rect		194,368,248,10
-			forecolor	0.62,0.67,0.5,1
-			text		"#str_41558"
-			textscale	0.13
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_detail_text
-		{
-			rect		194,380,248,13
-			forecolor	0.84,0.86,0.78,1
-			text		"gui::demo_details"
-			textscale	0.14
-			font		"fonts/lowpixel"
-			wrap		0
-			noevents	1
-		}
-
-		windowDef demo_cap_seek_off
-		{
-			rect		452,356,48,22
-			backcolor	0.08,0.08,0.07,0.9
-			bordercolor	0.2,0.2,0.17,1
-			bordersize	1
-			forecolor	0.4,0.4,0.36,1
-			text		"#str_41567"
-			textscale	0.15
-			textalign	1
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_cap_seek_on
-		{
-			rect		452,356,48,22
-			visible		( "gui::demo_canSeek" == 1 )
-			backcolor	0.15,0.18,0.1,0.95
-			bordercolor	0.5,0.56,0.28,1
-			bordersize	1
-			forecolor	0.86,0.9,0.7,1
-			text		"#str_41567"
-			textscale	0.15
-			textalign	1
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_cap_follow_off
-		{
-			rect		504,356,50,22
-			backcolor	0.08,0.08,0.07,0.9
-			bordercolor	0.2,0.2,0.17,1
-			bordersize	1
-			forecolor	0.4,0.4,0.36,1
-			text		"#str_41560"
-			textscale	0.15
-			textalign	1
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_cap_follow_on
-		{
-			rect		504,356,50,22
-			visible		( "gui::demo_canFollow" == 1 )
-			backcolor	0.15,0.18,0.1,0.95
-			bordercolor	0.5,0.56,0.28,1
-			bordersize	1
-			forecolor	0.86,0.9,0.7,1
-			text		"#str_41560"
-			textscale	0.15
-			textalign	1
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_cap_free_off
-		{
-			rect		558,356,52,22
-			backcolor	0.08,0.08,0.07,0.9
-			bordercolor	0.2,0.2,0.17,1
-			bordersize	1
-			forecolor	0.4,0.4,0.36,1
-			text		"#str_41568"
-			textscale	0.135
-			textalign	1
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_cap_free_on
-		{
-			rect		558,356,52,22
-			visible		( "gui::demo_canFreeRoam" == 1 )
-			backcolor	0.15,0.18,0.1,0.95
-			bordercolor	0.5,0.56,0.28,1
-			bordersize	1
-			forecolor	0.86,0.9,0.7,1
-			text		"#str_41568"
-			textscale	0.135
-			textalign	1
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef demo_play_disabled
-		{
-			rect		20,410,124,42
-			visible		( "gui::demo_canPlay" != 1 )
+			rect		532,441,109,30
 			background	"gfx/guis/mainmenu/b4_light"
-			matcolor	0.2,0.22,0.16,0.24
-			bordercolor	0.2,0.2,0.17,1
-			bordersize	1
-			forecolor	0.38,0.38,0.34,1
-			text		"#str_41512"
+			matcolor	0.545,0.588,0.294,0.4
+			noevents	1
+		}
+
+		windowDef demo_browser_close_corner
+		{
+			rect		542,449,11,11
+			background	"gfx/guis/mainmenu/corner"
+			matcolor	0.564,0.603,0.286,0.4
+			noevents	1
+		}
+
+		windowDef demo_browser_close_title
+		{
+			rect		552,443,88,17
+			forecolor	1,1,1,0.8
+			text		"#str_42005"
 			textscale	0.28
-			textalign	1
 			font		"fonts/marine"
 			noevents	1
-		}
-
-		windowDef demo_play
-		{
-			rect		20,410,124,42
-			visible		( "gui::demo_canPlay" == 1 )
-			background	"gfx/guis/mainmenu/b4_light"
-			matcolor	0.545,0.588,0.294,0.68
-			bordercolor	0.5,0.56,0.28,1
-			bordersize	1
-			forecolor	0.96,0.96,0.9,1
-			text		"#str_41512"
-			textscale	0.28
-			textalign	1
-			font		"fonts/marine"
-
-			onMouseEnter {
-				transition "demo_play::matcolor" "$demo_play::matcolor" "0.95,0.49,0.06,0.98" "120" ;
-				transition "demo_play::bordercolor" "$demo_play::bordercolor" "1,0.58,0.08,1" "120" ;
-				set "cmd" "play main_menu_mouseover" ;
-			}
-
-			onMouseExit {
-				transition "demo_play::matcolor" "$demo_play::matcolor" "0.545,0.588,0.294,0.68" "180" ;
-				transition "demo_play::bordercolor" "$demo_play::bordercolor" "0.5,0.56,0.28,1" "180" ;
-			}
-
-			onAction {
-				set "cmd" "play main_menu_selection ; demoPlay" ;
-			}
-		}
-
-		windowDef demo_delete_disabled
-		{
-			rect		152,410,100,42
-			visible		( "gui::demo_canDelete" != 1 )
-			background	"gfx/guis/mainmenu/b4_light"
-			matcolor	0.2,0.22,0.16,0.24
-			bordercolor	0.2,0.2,0.17,1
-			bordersize	1
-			forecolor	0.38,0.38,0.34,1
-			text		"#str_41513"
-			textscale	0.24
-			textalign	1
-			font		"fonts/marine"
-			noevents	1
-		}
-
-		windowDef demo_delete
-		{
-			rect		152,410,100,42
-			visible		( "gui::demo_canDelete" == 1 )
-			background	"gfx/guis/mainmenu/b4_light"
-			matcolor	0.7,0.28,0.08,0.62
-			bordercolor	0.43,0.4,0.24,1
-			bordersize	1
-			forecolor	0.9,0.9,0.83,1
-			text		"#str_41513"
-			textscale	0.24
-			textalign	1
-			font		"fonts/marine"
-
-			onMouseEnter {
-				transition "demo_delete::matcolor" "$demo_delete::matcolor" "1,0.42,0.12,0.98" "120" ;
-				transition "demo_delete::bordercolor" "$demo_delete::bordercolor" "0.86,0.3,0.12,1" "120" ;
-				set "cmd" "play main_menu_mouseover" ;
-			}
-
-			onMouseExit {
-				transition "demo_delete::matcolor" "$demo_delete::matcolor" "0.7,0.28,0.08,0.62" "180" ;
-				transition "demo_delete::bordercolor" "$demo_delete::bordercolor" "0.43,0.4,0.24,1" "180" ;
-			}
-
-			onAction {
-				set "cmd" "play main_menu_selection ; demoDelete" ;
-			}
-		}
-
-		windowDef demo_refresh
-		{
-			rect		420,410,100,42
-			background	"gfx/guis/mainmenu/b4_light"
-			matcolor	0.545,0.588,0.294,0.54
-			bordercolor	0.36,0.4,0.24,1
-			bordersize	1
-			forecolor	0.9,0.91,0.84,1
-			text		"#str_41514"
-			textscale	0.22
-			textalign	1
-			font		"fonts/marine"
-
-			onMouseEnter {
-				transition "demo_refresh::matcolor" "$demo_refresh::matcolor" "0.95,0.49,0.06,0.92" "120" ;
-				transition "demo_refresh::bordercolor" "$demo_refresh::bordercolor" "0.95,0.49,0.06,1" "120" ;
-				set "cmd" "play main_menu_mouseover" ;
-			}
-
-			onMouseExit {
-				transition "demo_refresh::matcolor" "$demo_refresh::matcolor" "0.545,0.588,0.294,0.54" "180" ;
-				transition "demo_refresh::bordercolor" "$demo_refresh::bordercolor" "0.36,0.4,0.24,1" "180" ;
-			}
-
-			onAction {
-				set "cmd" "play main_menu_selection ; demoRefresh" ;
-			}
 		}
 
 		windowDef demo_browser_close
 		{
-			rect		528,410,92,42
-			background	"gfx/guis/mainmenu/b4_light"
-			matcolor	0.545,0.588,0.294,0.54
-			bordercolor	0.36,0.4,0.24,1
-			bordersize	1
-			forecolor	0.9,0.91,0.84,1
-			text		"#str_41515"
-			textscale	0.24
-			textalign	1
-			font		"fonts/marine"
+			rect		536,444,105,23
 
 			onMouseEnter {
-				transition "demo_browser_close::matcolor" "$demo_browser_close::matcolor" "0.95,0.49,0.06,0.92" "120" ;
-				transition "demo_browser_close::bordercolor" "$demo_browser_close::bordercolor" "0.95,0.49,0.06,1" "120" ;
+				stoptransitions "demo_browser_close" ;
+				set "demo_browser_close_plate::matcolor_w" "0.8" ;
+				transition "demo_browser_close_title::forecolor" "1,1,1,0.8" "0.890,0.537,0,1" "0" ;
+				transition "demo_browser_close_corner::matcolor" "0.564,0.603,0.286,0.4" "0.890,0.537,0,1" "0" ;
+				set "demo_browser_close_title::textscale" "0.29" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
-				transition "demo_browser_close::matcolor" "$demo_browser_close::matcolor" "0.545,0.588,0.294,0.54" "180" ;
-				transition "demo_browser_close::bordercolor" "$demo_browser_close::bordercolor" "0.36,0.4,0.24,1" "180" ;
+				transition "demo_browser_close_plate::matcolor_w" "0.8" "0.4" "300" ;
+				transition "demo_browser_close_title::forecolor" "0.890,0.537,0,1" "1,1,1,0.8" "300" ;
+				transition "demo_browser_close_corner::matcolor" "0.890,0.537,0,1" "0.564,0.603,0.286,0.4" "300" ;
+				transition "demo_browser_close_title::textscale" "0.29" "0.28" "300" ;
 			}
 
 			onAction {

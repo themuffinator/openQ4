@@ -404,8 +404,12 @@ def validate_gui_and_localization() -> None:
         "listDef demoList",
         "demo_browser_reveal_timeline",
         "demo_browser_exit_timeline",
-        "gfx/guis/mainmenu/bg_darkgrad2",
-        "gfx/guis/mainmenu/bg_grid",
+        # The retained pages' backdrop: the stock screen's light band and a grid.
+        "gfx/guis/mainmenu/screen",
+        "gfx/guis/loading/bg_grid_tiled",
+        # The filters' rails follow a number: GUI expressions cannot compare strings.
+        '"gui::demo_filterIndex" == 0',
+        '"gui::demo_filterIndex" == 4',
         "gfx/guis/mainmenu/topbar",
         "gfx/guis/mainmenu/btmbar",
         "demo_browser_topbar_tile_left",
@@ -467,6 +471,7 @@ def validate_gui_and_localization() -> None:
         "demo_browserMode",
         "demo_interactive",
         "demo_filter",
+        "demo_filterIndex",
     ):
         require(gui, f"gui::{state}", "capability-gated demo menu")
         require(source, f'"{state}"', "demo menu state producer")
@@ -517,6 +522,13 @@ def validate_gui_and_localization() -> None:
     # The long-form seek caption remains in the language tables for existing
     # consumers; the tight capability chip deliberately uses its compact sibling.
     expected_ids.remove("#str_41538")
+    # The browser stands in the retained Demos page's layout and takes that
+    # page's upper-case title, column and plate labels; its earlier mixed-case
+    # ones stay in the language tables for a mod's copy of the stock browser.
+    for retired in (41501, 41507, 41509, 41510, 41512, 41513, 41514, 41515, 41530, 41557):
+        expected_ids.remove(f"#str_{retired}")
+    for label in ("#str_231523", "#str_231521", "#str_231536", "#str_231530", "#str_231531"):
+        require(gui, label, "demo browser labels shared with the retained page")
     missing_usage = sorted(expected_ids - used_ids)
     if missing_usage:
         raise AssertionError(f"Demo string contract is not referenced: {missing_usage}")

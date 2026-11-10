@@ -6,6 +6,37 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Classic menus that match the new ones, and easier to drive from the keyboard, 10 November 2026
+
+- **The classic Single Player, Campaign, Arena and Demos pages look like the
+  rest of the menus.** With `ui_retained 0`, or whenever a new-interface
+  screen cannot be shown, these pages now use the same frame as every other
+  page: the title at the top left, plates down the left, the description
+  beside them and BACK at the bottom right. They had their own centered
+  headlines, bordered cards and a BACK button in the opposite corner. The
+  Arena page is arranged as in the new interface, with tiers and matches as
+  plates and the chosen match on the right.
+- **Demos sits under Multiplayer in both interfaces.** The classic
+  Multiplayer page now reads JOIN GAME, CREATE SERVER, DEMOS and PLAYER
+  SETUP, as the new one does. It replaces FRIENDS LIST, which opened an empty
+  page. Back from Demos returns to the Multiplayer page.
+- **Arrow keys work in the classic menus.** Up, Down, Left and Right move
+  between menu items and highlight the one they reach, and Enter chooses it.
+  Before, only Tab moved, and nothing showed where it was. Lists, sliders,
+  choices and text fields keep the arrow keys they use.
+- **Fixes.**
+  - Classic settings no longer show stray quote marks: MSAA reads Off, not
+    'Off', and the sound device no longer starts with a quote.
+  - In the classic Demos page only the filter you chose is marked. All five
+    were marked at once.
+  - In the new interface, the server browser no longer shows a bright orange
+    bar under the list while no scan is running.
+  - The classic pages no longer fade to black at the edges of a widescreen
+    view, and their labels fit in all twelve languages.
+- Evidence: [stock interface menus](ui/legacy-menu-layout.md#evidence-10-november-2026);
+  `tools/tests/choice_gui_value_contract.py`,
+  `tools/tests/menu_controller_navigation.py`.
+
 ## Animated crosshairs for the new interface, 10 November 2026
 
 - **Each weapon's crosshair now answers the weapon.** A new option,

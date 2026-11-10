@@ -2645,6 +2645,11 @@ Completion must advance through the existing dependencies:
   `vehicles/hud.gui`
   ([evidence](ui/legacy-hud-layout.md#the-awakenings-vehicles-10-november-2026)).
   Its GEV HUD, which no map uses, keeps the expansion's script.
+  The stock interface's Single Player, Campaign, Arena and Demos pages stand in
+  the stock page frame the retained pages share, its Multiplayer page lists the
+  retained page's sections, and its menus answer the arrow keys
+  ([stock interface menus](ui/legacy-menu-layout.md)). This does not migrate or
+  accept a GUI either.
 - [ ] **UI-05 — P1, decision and qualification: resolve visual policy conflicts.**
   Reconcile SP/MP hit-marker defaults with visual specification section 14.7 and
   other recorded deviations before acceptance. Preserve editable vector framing,

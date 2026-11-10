@@ -681,6 +681,12 @@ def load_progress(doc: Document) -> list:
         vector("join-load-fill-tube", absolute(left=0, top=0, width=bar_w, height=tube_h), [tube("fill", 0.50)])])
     doc.bind("join-load-fill.width", "join-load-fill", "width",
              {"op": "*", "args": [{"op": "clamp", "args": [{"state": "join.progress"}, 0, 1]}, round(bar_w, 4)]})
+    # The page carries a transform, so this box clips through a clip mask, and
+    # a box with no width has no mask geometry: at no progress the fill drew
+    # whole over the track. It leaves the page until the scan has some.
+    fill["properties"]["display"] = keyword("none")
+    doc.bind("join-load-fill.display", "join-load-fill", "display",
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "join.progress"}, 0]}, "block", "none"]})
     notice = label("join-load-notice", PLACEHOLDER, {**absolute(left=U * LOAD_NOTICE[0], top=U * LOAD_NOTICE[1], width=U * LOAD_NOTICE[2],
                                                                 height=U * 16), **typeface("lowpixel", 15, U * 16, [1, 1, 1, 0.8]),
                                                      "white-space": keyword("nowrap"), "overflow": keyword("hidden")})

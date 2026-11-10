@@ -84,6 +84,47 @@ int main() {
 }
 '''
 
+# The production choice-list splitter: the stock tables quote their choices
+# ('Off';'2x') and the engine quotes the names it lists ("Default Device").
+LABELS = r"""
+#include <cassert>
+#include <cstdio>
+#include <string>
+#include <vector>
+struct idStr {
+    std::string s;
+    idStr() {}
+    idStr(const char *text) : s(text) {}
+    int Length() const { return int(s.size()); }
+    char operator[](int index) const { return s[size_t(index)]; }
+    void Append(char c) { s.push_back(c); }
+    void Clear() { s.clear(); }
+    const char *c_str() const { return s.c_str(); }
+    void Strip(char c) { while (!s.empty() && s.front() == c) s.erase(s.begin()); while (!s.empty() && s.back() == c) s.pop_back(); }
+    void StripTrailingWhitespace() { while (!s.empty() && (unsigned char)s.back() <= ' ') s.pop_back(); }
+    idStr &operator=(const char *text) { s = text; return *this; }
+};
+struct idStrList { std::vector<std::string> data; void Append(const idStr &v) { data.push_back(v.s); } };
+struct Dict { const char *GetString(const char *key) const { return std::string(key) == "#str_1" ? "Translated" : key; } };
+struct Common { Dict dict; const Dict *GetLanguageDict() const { return &dict; } } commonLocal, *common = &commonLocal;
+@FUNCTIONS@
+static std::vector<std::string> Split(const char *text) { idStrList list; SplitChoiceList(idStr(text), list); return list.data; }
+int main() {
+    typedef std::vector<std::string> V;
+    assert(Split("'Off';'2x';'4x';'8x';'16x'") == V({"Off", "2x", "4x", "8x", "16x"}));
+    assert(Split("No;Yes") == V({"No", "Yes"}));
+    assert(Split(" 'Standard (4:3)' ; 'Widescreen (16:9)' ") == V({"Standard (4:3)", "Widescreen (16:9)"}));
+    // The engine's own lists: double quotes, a separator and an escaped quote inside.
+    assert(Split("\"Default Device (OpenAL Soft)\";\"Speakers; front \\\"A\\\"\"") ==
+           V({"Default Device (OpenAL Soft)", "Speakers; front \"A\""}));
+    // An apostrophe that only begins or ends a plain word opens nothing.
+    assert(Split("'tis fine;don't;rock 'n' roll") == V({"'tis fine", "don't", "rock 'n' roll"}));
+    assert(Split("#str_1;'#str_1';plain") == V({"Translated", "Translated", "plain"}));
+    assert(Split("''; ;last") == V({"last"}));
+    puts("choice labels: quoted stock and engine lists show without their quotes: PASS");
+}
+"""
+
 
 def main():
     production = (ROOT / "src/ui/ChoiceWindow.cpp").read_text(encoding="utf-8")
@@ -101,6 +142,11 @@ def main():
         command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", str(cpp), "-o", str(exe)]
         if os.environ.get("MP_MATCH_TEST_SANITIZERS") == "1":
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
+        subprocess.run(command, check=True)
+        subprocess.run([str(exe)], check=True)
+        functions = "\n".join(function_body(production, "static " + signature) for signature in (
+            "void AppendChoiceListSegment", "int ChoiceListQuoteEnd", "void SplitChoiceList"))
+        cpp.write_text(LABELS.replace("@FUNCTIONS@", functions), encoding="utf-8")
         subprocess.run(command, check=True)
         subprocess.run([str(exe)], check=True)
 

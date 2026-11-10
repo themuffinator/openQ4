@@ -276,6 +276,47 @@ static bool WindowConsumesDirectionalNavigation( idWindow *window, int key ) {
 	return false;
 }
 
+/*
+================
+KeyboardMenuFocusDirection
+
+The focus step an arrow key asks of a menu: none while the focused control
+uses that key itself (a list's rows, a slider's or choice's value, an edit
+field's caret) or while a control holds the capture.
+================
+*/
+static bool KeyboardMenuFocusDirection( idWindow *desktop, const sysEvent_t *event, int &focusDirection ) {
+	if ( desktop == NULL || event == NULL || event->evType != SE_KEY ) {
+		return false;
+	}
+	int direction = 0;
+	switch ( event->evValue ) {
+		case K_UPARROW:
+		case K_KP_UPARROW:
+		case K_LEFTARROW:
+		case K_KP_LEFTARROW:
+			direction = -1;
+			break;
+		case K_DOWNARROW:
+		case K_KP_DOWNARROW:
+		case K_RIGHTARROW:
+		case K_KP_RIGHTARROW:
+			direction = 1;
+			break;
+		default:
+			return false;
+	}
+	if ( desktop->GetCaptureChild() != NULL ) {
+		return false;
+	}
+	idWindow *focused = desktop->GetFocusedChild();
+	if ( dynamic_cast<idBindWindow *>( focused ) != NULL || WindowConsumesDirectionalNavigation( focused, event->evValue ) ) {
+		return false;
+	}
+	focusDirection = direction;
+	return true;
+}
+
 static bool WindowHasNativeEnterHandling( idWindow *window ) {
 	return dynamic_cast<idBindWindow *>( window ) != NULL ||
 		dynamic_cast<idEditWindow *>( window ) != NULL ||
@@ -1297,9 +1338,13 @@ const char *idWindow::HandleEvent(const sysEvent_t *event, bool *updateVisuals) 
 		return "";
 	}
 
-	const bool controllerEvent = TranslateControllerMenuKey( event, translatedEvent, controllerFocusDirection );
+	bool controllerEvent = TranslateControllerMenuKey( event, translatedEvent, controllerFocusDirection );
 	if ( controllerEvent ) {
 		event = &translatedEvent;
+	} else if ( ( flags & WIN_DESKTOP ) && ( flags & WIN_MENUGUI ) && KeyboardMenuFocusDirection( this, event, controllerFocusDirection ) ) {
+		// The arrow keys move a menu's focus and light the item they reach,
+		// as the D-pad does. The stock menus answered only Tab, unseen.
+		controllerEvent = true;
 	}
 
 	cmd = "";

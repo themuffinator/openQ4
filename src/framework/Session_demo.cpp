@@ -1056,6 +1056,19 @@ void idSessionLocal::UpdateDemoMenuGui() {
 	guiDemoMenu->SetStateBool( "demo_browserMode", demoBrowserMode );
 	guiDemoMenu->SetStateBool( "demo_interactive", guiActive == guiDemoMenu );
 	guiDemoMenu->SetStateString( "demo_filter", demoLibraryFilter.c_str() );
+	// A GUI expression compares numbers only: against a string every filter
+	// read as the chosen one. The tags' rails follow this index.
+	int filterIndex = 0;
+	if ( !demoLibraryFilter.Icmp( DEMO_FILTER_MVD ) ) {
+		filterIndex = 1;
+	} else if ( !demoLibraryFilter.Icmp( DEMO_FILTER_RENDER ) ) {
+		filterIndex = 2;
+	} else if ( !demoLibraryFilter.Icmp( DEMO_FILTER_LEGACY ) ) {
+		filterIndex = 3;
+	} else if ( !demoLibraryFilter.Icmp( DEMO_FILTER_INCOMPLETE ) ) {
+		filterIndex = 4;
+	}
+	guiDemoMenu->SetStateInt( "demo_filterIndex", filterIndex );
 	guiDemoMenu->StateChanged( common->GetPresentationTime() );
 }
 

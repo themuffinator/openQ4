@@ -12,6 +12,7 @@ windowDef Desktop
 	float		"arena_browserRevealing"	0
 	float		"arena_navigationAnimating"	0
 	float		"arena_navigationAction"	0
+	float		"arena_modeSubject"	0
 	float		"arena_resetPresentation"	0
 	float		"arena_resetAnimating"	0
 	float		"arena_resetContentVisible"	0
@@ -38,6 +39,7 @@ windowDef Desktop
 		set "Desktop::arena_browserRevealing" "0" ;
 		set "Desktop::arena_navigationAnimating" "1" ;
 		set "Desktop::arena_navigationAction" "0" ;
+		set "Desktop::arena_modeSubject" "0" ;
 		set "Desktop::arena_resetPresentation" "0" ;
 		set "Desktop::arena_resetAnimating" "0" ;
 		set "Desktop::arena_resetContentVisible" "0" ;
@@ -283,21 +285,12 @@ windowDef Desktop
 		}
 	}
 
-	// Shared widescreen-safe backdrop.
+	// Shared backdrop, the retained pages' own: black, the stock screen's light
+	// band across the middle and a quiet grid, the same at every width.
 	windowDef arena_backdrop
 	{
 		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
-		background	"gfx/guis/mainmenu/bg_darkgrad2"
-		matcolor	0.2,0.25,0.16,1
-		noevents	1
-	}
-
-	windowDef arena_grid
-	{
-		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
-		background	"gfx/guis/loading/bg_grid_tiled"
-		matcolor	0.35,0.42,0.22,0.24
-		naturalmatscale	1
+		backcolor	0,0,0,1
 		noevents	1
 	}
 
@@ -305,14 +298,23 @@ windowDef Desktop
 	{
 		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
 		background	"gfx/guis/mainmenu/screen"
-		matcolor	0.44,0.48,0.3,0.18
+		matcolor	0.64,0.64,0.64,1
 		noclip		1
+		noevents	1
+	}
+
+	windowDef arena_grid
+	{
+		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
+		background	"gfx/guis/loading/bg_grid_tiled"
+		matcolor	0.35,0.42,0.22,0.16
+		naturalmatscale	1
 		noevents	1
 	}
 
 	windowDef arena_topbar
 	{
-		rect		-400,0,1045,129
+		rect		-77,-63,1045,129
 		noclip		1
 		background	"gfx/guis/mainmenu/topbar"
 		matcolor	1,1,1,0.9
@@ -339,7 +341,7 @@ windowDef Desktop
 
 	windowDef arena_btmbar
 	{
-		rect		-399,351,1045,129
+		rect		-26,386,1045,129
 		noclip		1
 		background	"gfx/guis/mainmenu/btmbar"
 		matcolor	1,1,1,0.9
@@ -364,242 +366,214 @@ windowDef Desktop
 		}
 	}
 
-	// First level: choose the story mission or the arena circuit.
+	// First level: the Single Player page, laid out as the stock pages are and
+	// as the retained interface shows it: the title in the docked top band's
+	// slot, the sections on the stock plates from 181 u, the subject's summary
+	// in the content column and BACK in the bottom band's raised section.
 	windowDef arena_mode_selector
 	{
 		rect		0,0,640,480
 		visible		( "gui::arena_view" == 0 )
 
-		windowDef arena_mode_header_glow
-		{
-			rect		0,28,640,76
-			background	"gfx/guis/mainmenu/b1_dark"
-			matcolor	0.4,0.47,0.24,0.56
-			noevents	1
-		}
-
-		windowDef arena_mode_header_line
-		{
-			rect		28,96,584,6
-			background	"gfx/guis/mainmenu/horiz_line2"
-			matcolor	0.95,0.49,0.06,0.68
-			noevents	1
-		}
-
 		windowDef arena_mode_title
 		{
-			rect		30,42,580,34
-			forecolor	0.96,0.97,0.9,1
+			rect		39,19,314,16
+			forecolor	1,1,1,0.5
 			text		"#str_42000"
-			textscale	0.48
-			textalign	1
+			textscale	0.25
 			font		"fonts/marine"
 			noevents	1
 		}
 
-		windowDef arena_mode_subtitle
+		windowDef arena_mode_description
 		{
-			rect		30,78,580,18
-			forecolor	0.72,0.76,0.59,0.95
-			text		"#str_42027"
-			textscale	0.19
-			textalign	1
+			rect		395,186,218,120
+			visible		( "Desktop::arena_modeSubject" == 0 )
+			forecolor	0.62,0.68,0.36,1
+			text		"#str_230044"
+			textscale	0.27
 			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef arena_mode_mission_description
+		{
+			rect		395,186,218,120
+			visible		( "Desktop::arena_modeSubject" == 1 )
+			forecolor	0.62,0.68,0.36,1
+			text		"#str_231552"
+			textscale	0.27
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef arena_mode_arena_description
+		{
+			rect		395,186,218,120
+			visible		( "Desktop::arena_modeSubject" == 2 )
+			forecolor	0.62,0.68,0.36,1
+			text		"#str_231553"
+			textscale	0.27
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef arena_mode_mission_plate
+		{
+			rect		0,169,413,52
+			background	"gfx/guis/mainmenu/b1_dark"
+			matcolor	1,1,1,0.4
+			noevents	1
+		}
+
+		windowDef arena_mode_mission_corner
+		{
+			rect		32,188,12,12
+			background	"gfx/guis/mainmenu/corner"
+			matcolor	0.564,0.603,0.286,0.4
+			noevents	1
+		}
+
+		windowDef arena_mode_mission_title
+		{
+			rect		44,181,320,23
+			forecolor	1,1,1,0.8
+			text		"#str_230038"
+			textscale	0.31
+			font		"fonts/marine"
 			noevents	1
 		}
 
 		windowDef arena_mode_mission_card
 		{
-			rect		38,126,272,260
-			background	"gfx/guis/mainmenu/b1_dark"
-			matcolor	0.42,0.49,0.25,0.66
-			bordercolor	0.3,0.34,0.2,1
-			bordersize	1
+			rect		24,181,333,26
 
 			onMouseEnter {
-				set "matcolor" "0.95,0.49,0.06,0.82" ;
-				set "bordercolor" "0.95,0.49,0.06,1" ;
+				stoptransitions "arena_mode_mission_card" ;
+				set "arena_mode_mission_plate::matcolor_w" "1" ;
+				transition "arena_mode_mission_title::forecolor" "1,1,1,0.8" "0.890,0.537,0,1" "0" ;
+				transition "arena_mode_mission_corner::matcolor" "0.564,0.603,0.286,0.4" "0.890,0.537,0,1" "0" ;
+				set "arena_mode_mission_title::textscale" "0.32" ;
+				set "Desktop::arena_modeSubject" "1" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
-				set "matcolor" "0.42,0.49,0.25,0.66" ;
-				set "bordercolor" "0.3,0.34,0.2,1" ;
+				transition "arena_mode_mission_plate::matcolor_w" "1" "0.4" "300" ;
+				transition "arena_mode_mission_title::forecolor" "0.890,0.537,0,1" "1,1,1,0.8" "300" ;
+				transition "arena_mode_mission_corner::matcolor" "0.890,0.537,0,1" "0.564,0.603,0.286,0.4" "300" ;
+				transition "arena_mode_mission_title::textscale" "0.32" "0.31" "300" ;
+				if ( "Desktop::arena_modeSubject" == 1 ) {
+					set "Desktop::arena_modeSubject" "0" ;
+				}
 			}
 
 			onAction {
 				set "cmd" "play main_menu_selection" ;
 				namedevent "arenaOpenMission" ;
 			}
+		}
 
-			windowDef arena_mode_mission_band
-			{
-				rect		1,1,270,48
-				background	"gfx/guis/mainmenu/b1_dark"
-				matcolor	0.58,0.64,0.36,0.82
-				noevents	1
-			}
+		windowDef arena_mode_arena_plate
+		{
+			rect		0,199,413,52
+			background	"gfx/guis/mainmenu/b1_dark"
+			matcolor	1,1,1,0.4
+			noevents	1
+		}
 
-			windowDef arena_mode_mission_kicker
-			{
-				rect		18,17,236,16
-				forecolor	0.72,0.78,0.6,1
-				text		"#str_42003"
-				textscale	0.18
-				font		"fonts/lowpixel"
-				noevents	1
-			}
+		windowDef arena_mode_arena_corner
+		{
+			rect		32,218,12,12
+			background	"gfx/guis/mainmenu/corner"
+			matcolor	0.564,0.603,0.286,0.4
+			noevents	1
+		}
 
-			windowDef arena_mode_mission_title
-			{
-				rect		18,72,236,34
-				forecolor	0.96,0.97,0.91,1
-				text		"#str_230038"
-				textscale	0.44
-				font		"fonts/marine"
-				noevents	1
-			}
-
-			windowDef arena_mode_mission_rule
-			{
-				rect		18,111,86,2
-				backcolor	0.95,0.49,0.06,0.95
-				noevents	1
-			}
-
-			windowDef arena_mode_mission_description
-			{
-				rect		18,130,234,66
-				forecolor	0.76,0.79,0.68,1
-				text		"#str_42028"
-				textscale	0.22
-				font		"fonts/lowpixel"
-				wrap		1
-				noevents	1
-			}
-
-			windowDef arena_mode_mission_arrow
-			{
-				rect		219,215,28,28
-				background	"gfx/guis/mainmenu/createserver_arrow"
-				matcolor	0.95,0.49,0.06,0.9
-				noevents	1
-			}
-
-			windowDef arena_mode_mission_corner
-			{
-				rect		8,240,12,12
-				background	"gfx/guis/mainmenu/corner"
-				matcolor	0.56,0.6,0.28,0.65
-				noevents	1
-			}
+		windowDef arena_mode_arena_title
+		{
+			rect		44,211,320,23
+			forecolor	1,1,1,0.8
+			text		"#str_42002"
+			textscale	0.31
+			font		"fonts/marine"
+			noevents	1
 		}
 
 		windowDef arena_mode_arena_card
 		{
-			rect		330,126,272,260
-			background	"gfx/guis/mainmenu/b2_dark"
-			matcolor	0.42,0.49,0.25,0.66
-			bordercolor	0.3,0.34,0.2,1
-			bordersize	1
+			rect		24,211,333,26
 
 			onMouseEnter {
-				set "matcolor" "0.95,0.49,0.06,0.82" ;
-				set "bordercolor" "0.95,0.49,0.06,1" ;
+				stoptransitions "arena_mode_arena_card" ;
+				set "arena_mode_arena_plate::matcolor_w" "1" ;
+				transition "arena_mode_arena_title::forecolor" "1,1,1,0.8" "0.890,0.537,0,1" "0" ;
+				transition "arena_mode_arena_corner::matcolor" "0.564,0.603,0.286,0.4" "0.890,0.537,0,1" "0" ;
+				set "arena_mode_arena_title::textscale" "0.32" ;
+				set "Desktop::arena_modeSubject" "2" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
-				set "matcolor" "0.42,0.49,0.25,0.66" ;
-				set "bordercolor" "0.3,0.34,0.2,1" ;
+				transition "arena_mode_arena_plate::matcolor_w" "1" "0.4" "300" ;
+				transition "arena_mode_arena_title::forecolor" "0.890,0.537,0,1" "1,1,1,0.8" "300" ;
+				transition "arena_mode_arena_corner::matcolor" "0.890,0.537,0,1" "0.564,0.603,0.286,0.4" "300" ;
+				transition "arena_mode_arena_title::textscale" "0.32" "0.31" "300" ;
+				if ( "Desktop::arena_modeSubject" == 2 ) {
+					set "Desktop::arena_modeSubject" "0" ;
+				}
 			}
 
 			onAction {
 				set "cmd" "play main_menu_selection" ;
 				namedevent "arenaOpenBrowser" ;
 			}
+		}
 
-			windowDef arena_mode_arena_band
-			{
-				rect		1,1,270,48
-				background	"gfx/guis/mainmenu/b2_dark"
-				matcolor	0.58,0.64,0.36,0.82
-				noevents	1
-			}
+		windowDef arena_mode_back_plate
+		{
+			rect		532,441,109,30
+			background	"gfx/guis/mainmenu/b4_light"
+			matcolor	0.545,0.588,0.294,0.4
+			noevents	1
+		}
 
-			windowDef arena_mode_arena_kicker
-			{
-				rect		18,17,236,16
-				forecolor	0.72,0.78,0.6,1
-				text		"#str_42004"
-				textscale	0.18
-				font		"fonts/lowpixel"
-				noevents	1
-			}
+		windowDef arena_mode_back_corner
+		{
+			rect		542,449,11,11
+			background	"gfx/guis/mainmenu/corner"
+			matcolor	0.564,0.603,0.286,0.4
+			noevents	1
+		}
 
-			windowDef arena_mode_arena_title
-			{
-				rect		18,72,236,34
-				forecolor	0.96,0.97,0.91,1
-				text		"#str_42002"
-				textscale	0.44
-				font		"fonts/marine"
-				noevents	1
-			}
-
-			windowDef arena_mode_arena_rule
-			{
-				rect		18,111,86,2
-				backcolor	0.95,0.49,0.06,0.95
-				noevents	1
-			}
-
-			windowDef arena_mode_arena_description
-			{
-				rect		18,130,234,66
-				forecolor	0.76,0.79,0.68,1
-				text		"#str_42029"
-				textscale	0.22
-				font		"fonts/lowpixel"
-				wrap		1
-				noevents	1
-			}
-
-			windowDef arena_mode_arena_arrow
-			{
-				rect		219,215,28,28
-				background	"gfx/guis/mainmenu/createserver_arrow"
-				matcolor	0.95,0.49,0.06,0.9
-				noevents	1
-			}
-
-			windowDef arena_mode_arena_corner
-			{
-				rect		8,240,12,12
-				background	"gfx/guis/mainmenu/corner"
-				matcolor	0.56,0.6,0.28,0.65
-				noevents	1
-			}
+		windowDef arena_mode_back_title
+		{
+			rect		552,443,88,17
+			forecolor	1,1,1,0.8
+			text		"#str_42005"
+			textscale	0.28
+			font		"fonts/marine"
+			noevents	1
 		}
 
 		windowDef arena_mode_back
 		{
-			rect		38,414,112,27
-			background	"gfx/guis/mainmenu/b4_light"
-			matcolor	0.545,0.588,0.294,0.4
-			forecolor	0.88,0.9,0.8,1
-			text		"#str_42005"
-			textscale	0.21
-			textalign	1
-			font		"fonts/lowpixel"
+			rect		536,444,105,23
 
 			onMouseEnter {
-				set "matcolor" "0.95,0.49,0.06,0.92" ;
+				stoptransitions "arena_mode_back" ;
+				set "arena_mode_back_plate::matcolor_w" "0.8" ;
+				transition "arena_mode_back_title::forecolor" "1,1,1,0.8" "0.890,0.537,0,1" "0" ;
+				transition "arena_mode_back_corner::matcolor" "0.564,0.603,0.286,0.4" "0.890,0.537,0,1" "0" ;
+				set "arena_mode_back_title::textscale" "0.29" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
 			onMouseExit {
-				set "matcolor" "0.545,0.588,0.294,0.4" ;
+				transition "arena_mode_back_plate::matcolor_w" "0.8" "0.4" "300" ;
+				transition "arena_mode_back_title::forecolor" "0.890,0.537,0,1" "1,1,1,0.8" "300" ;
+				transition "arena_mode_back_corner::matcolor" "0.890,0.537,0,1" "0.564,0.603,0.286,0.4" "300" ;
+				transition "arena_mode_back_title::textscale" "0.29" "0.28" "300" ;
 			}
 
 			onAction {
@@ -609,93 +583,37 @@ windowDef Desktop
 		}
 	}
 
-	// Second level: tier and match browser.
+	// Second level: the Arena page, laid out as the retained Arena page is.
 	windowDef arena_browser
 	{
 		rect		0,0,640,480
 		visible		( "gui::arena_view" == 1 )
 
-		windowDef arena_browser_header_glow
+		windowDef arena_browser_crumb
 		{
-			rect		0,27,640,35
-			background	"gfx/guis/mainmenu/b1_dark"
-			matcolor	0.4,0.47,0.24,0.56
-			noevents	1
-		}
-
-		windowDef arena_browser_header_line
-		{
-			rect		18,57,604,6
-			background	"gfx/guis/mainmenu/horiz_line2"
-			matcolor	0.95,0.49,0.06,0.68
+			rect		39,7,400,11
+			forecolor	1,1,1,0.35
+			text		"#str_42000"
+			textscale	0.17
+			font		"fonts/marine"
 			noevents	1
 		}
 
 		windowDef arena_browser_title
 		{
-			rect		20,31,340,27
-			forecolor	0.96,0.97,0.9,1
+			rect		39,19,400,16
+			forecolor	1,1,1,0.5
 			text		"#str_42006"
-			textscale	0.37
+			textscale	0.25
 			font		"fonts/marine"
-			noevents	1
-		}
-
-		windowDef arena_browser_progress
-		{
-			rect		380,33,240,20
-			forecolor	0.95,0.72,0.25,1
-			text		"gui::arena_progress"
-			textscale	0.2
-			textalign	2
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef arena_browser_progress_track
-		{
-			rect		380,55,240,3
-			backcolor	0.17,0.2,0.12,1
-			noevents	1
-		}
-
-		windowDef arena_browser_progress_fill
-		{
-			rect		380,55,( "gui::arenaCampaignProgress" * 12 ),3
-			backcolor	0.75,0.88,0.42,1
-			noevents	1
-		}
-
-		windowDef arena_campaign_complete_banner
-		{
-			rect		384,64,236,18
-			visible		( "gui::arena_campaignComplete" == 1 )
-			backcolor	0.12,0.24,0.08,0.95
-			bordercolor	0.5,0.74,0.28,1
-			bordersize	1
-			forecolor	0.88,1,0.7,1
-			text		"#str_42026"
-			textscale	0.17
-			textalign	1
-			font		"fonts/lowpixel"
 			noevents	1
 		}
 
 		windowDef arena_tiers_heading
 		{
-			rect		18,69,132,16
+			rect		20,62,160,12
 			forecolor	0.68,0.72,0.57,0.95
 			text		"#str_42007"
-			textscale	0.18
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef arena_matches_heading
-		{
-			rect		158,69,146,16
-			forecolor	0.68,0.72,0.57,0.95
-			text		"#str_42008"
 			textscale	0.18
 			font		"fonts/lowpixel"
 			noevents	1
@@ -704,22 +622,19 @@ windowDef Desktop
 		// Tier 0.
 		windowDef arena_tier0
 		{
-			rect		18,87,132,34
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		18,76,162,36
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_tier0_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -730,43 +645,44 @@ windowDef Desktop
 
 			windowDef arena_tier0_selected
 			{
-				rect		1,1,130,32
+				rect		0,0,162,36
 				visible		( "gui::arena_tier0_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_tier0_completed
 			{
-				rect		1,1,4,32
+				rect		0,1,3,27
 				visible		( "gui::arena_tier0_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_tier0_name
-		{
-			rect		9,5,94,14
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42091"
-				textscale	0.18
-				font		"fonts/lowpixel"
+			windowDef arena_tier0_name
+			{
+				rect		14,3,118,16
+				forecolor	1,( 1 - "gui::arena_tier0_selected" * 0.46 ),( 1 - "gui::arena_tier0_selected" ),( 0.92 - "gui::arena_tier0_locked" * 0.5 )
+				text		"#str_42091"
+				textscale	0.24
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_tier0_status
 			{
-				rect		9,20,112,11
+				rect		14,19,118,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_tier0_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_tier0_lock
 			{
-				rect		108,8,14,17
+				rect		138,11,11,14
 				visible		( "gui::arena_tier0_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -775,33 +691,31 @@ windowDef Desktop
 
 			windowDef arena_tier0_check
 			{
-				rect		108,8,15,15
+				rect		137,11,13,13
 				visible		( "gui::arena_tier0_completed" == 1 && "gui::arena_tier0_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
 		}
 
 		// Tier 1.
 		windowDef arena_tier1
 		{
-			rect		18,125,132,34
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		18,120,162,36
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_tier1_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -812,43 +726,44 @@ windowDef Desktop
 
 			windowDef arena_tier1_selected
 			{
-				rect		1,1,130,32
+				rect		0,0,162,36
 				visible		( "gui::arena_tier1_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_tier1_completed
 			{
-				rect		1,1,4,32
+				rect		0,1,3,27
 				visible		( "gui::arena_tier1_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_tier1_name
-		{
-			rect		9,5,94,14
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42092"
-				textscale	0.18
-				font		"fonts/lowpixel"
+			windowDef arena_tier1_name
+			{
+				rect		14,3,118,16
+				forecolor	1,( 1 - "gui::arena_tier1_selected" * 0.46 ),( 1 - "gui::arena_tier1_selected" ),( 0.92 - "gui::arena_tier1_locked" * 0.5 )
+				text		"#str_42092"
+				textscale	0.24
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_tier1_status
 			{
-				rect		9,20,112,11
+				rect		14,19,118,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_tier1_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_tier1_lock
 			{
-				rect		108,8,14,17
+				rect		138,11,11,14
 				visible		( "gui::arena_tier1_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -857,33 +772,31 @@ windowDef Desktop
 
 			windowDef arena_tier1_check
 			{
-				rect		108,8,15,15
+				rect		137,11,13,13
 				visible		( "gui::arena_tier1_completed" == 1 && "gui::arena_tier1_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
 		}
 
 		// Tier 2.
 		windowDef arena_tier2
 		{
-			rect		18,163,132,34
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		18,164,162,36
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_tier2_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -894,43 +807,44 @@ windowDef Desktop
 
 			windowDef arena_tier2_selected
 			{
-				rect		1,1,130,32
+				rect		0,0,162,36
 				visible		( "gui::arena_tier2_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_tier2_completed
 			{
-				rect		1,1,4,32
+				rect		0,1,3,27
 				visible		( "gui::arena_tier2_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_tier2_name
-		{
-			rect		9,5,94,14
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42093"
-				textscale	0.18
-				font		"fonts/lowpixel"
+			windowDef arena_tier2_name
+			{
+				rect		14,3,118,16
+				forecolor	1,( 1 - "gui::arena_tier2_selected" * 0.46 ),( 1 - "gui::arena_tier2_selected" ),( 0.92 - "gui::arena_tier2_locked" * 0.5 )
+				text		"#str_42093"
+				textscale	0.24
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_tier2_status
 			{
-				rect		9,20,112,11
+				rect		14,19,118,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_tier2_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_tier2_lock
 			{
-				rect		108,8,14,17
+				rect		138,11,11,14
 				visible		( "gui::arena_tier2_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -939,33 +853,31 @@ windowDef Desktop
 
 			windowDef arena_tier2_check
 			{
-				rect		108,8,15,15
+				rect		137,11,13,13
 				visible		( "gui::arena_tier2_completed" == 1 && "gui::arena_tier2_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
 		}
 
 		// Tier 3.
 		windowDef arena_tier3
 		{
-			rect		18,201,132,34
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		18,208,162,36
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_tier3_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -976,43 +888,44 @@ windowDef Desktop
 
 			windowDef arena_tier3_selected
 			{
-				rect		1,1,130,32
+				rect		0,0,162,36
 				visible		( "gui::arena_tier3_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_tier3_completed
 			{
-				rect		1,1,4,32
+				rect		0,1,3,27
 				visible		( "gui::arena_tier3_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_tier3_name
-		{
-			rect		9,5,94,14
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42094"
-				textscale	0.18
-				font		"fonts/lowpixel"
+			windowDef arena_tier3_name
+			{
+				rect		14,3,118,16
+				forecolor	1,( 1 - "gui::arena_tier3_selected" * 0.46 ),( 1 - "gui::arena_tier3_selected" ),( 0.92 - "gui::arena_tier3_locked" * 0.5 )
+				text		"#str_42094"
+				textscale	0.24
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_tier3_status
 			{
-				rect		9,20,112,11
+				rect		14,19,118,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_tier3_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_tier3_lock
 			{
-				rect		108,8,14,17
+				rect		138,11,11,14
 				visible		( "gui::arena_tier3_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -1021,33 +934,31 @@ windowDef Desktop
 
 			windowDef arena_tier3_check
 			{
-				rect		108,8,15,15
+				rect		137,11,13,13
 				visible		( "gui::arena_tier3_completed" == 1 && "gui::arena_tier3_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
 		}
 
 		// Tier 4.
 		windowDef arena_tier4
 		{
-			rect		18,239,132,34
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		18,252,162,36
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_tier4_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -1058,43 +969,44 @@ windowDef Desktop
 
 			windowDef arena_tier4_selected
 			{
-				rect		1,1,130,32
+				rect		0,0,162,36
 				visible		( "gui::arena_tier4_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_tier4_completed
 			{
-				rect		1,1,4,32
+				rect		0,1,3,27
 				visible		( "gui::arena_tier4_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_tier4_name
-		{
-			rect		9,5,94,14
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42095"
-				textscale	0.18
-				font		"fonts/lowpixel"
+			windowDef arena_tier4_name
+			{
+				rect		14,3,118,16
+				forecolor	1,( 1 - "gui::arena_tier4_selected" * 0.46 ),( 1 - "gui::arena_tier4_selected" ),( 0.92 - "gui::arena_tier4_locked" * 0.5 )
+				text		"#str_42095"
+				textscale	0.24
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_tier4_status
 			{
-				rect		9,20,112,11
+				rect		14,19,118,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_tier4_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_tier4_lock
 			{
-				rect		108,8,14,17
+				rect		138,11,11,14
 				visible		( "gui::arena_tier4_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -1103,33 +1015,141 @@ windowDef Desktop
 
 			windowDef arena_tier4_check
 			{
-				rect		108,8,15,15
+				rect		137,11,13,13
 				visible		( "gui::arena_tier4_completed" == 1 && "gui::arena_tier4_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
+		}
+
+		windowDef arena_browser_progress
+		{
+			rect		20,303,178,13
+			forecolor	0.95,0.72,0.25,1
+			text		"gui::arena_progress"
+			textscale	0.16
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef arena_browser_progress_track
+		{
+			rect		20,296,160,3
+			backcolor	0.17,0.2,0.12,1
+			noevents	1
+		}
+
+		windowDef arena_browser_progress_fill
+		{
+			rect		20,296,( "gui::arenaCampaignProgress" * 8 ),3
+			backcolor	0.75,0.88,0.42,1
+			noevents	1
+		}
+
+		windowDef arena_campaign_complete_banner
+		{
+			rect		20,318,176,12
+			visible		( "gui::arena_campaignComplete" == 1 )
+			forecolor	0.88,1,0.7,1
+			text		"#str_42026"
+			textscale	0.15
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef arena_browser_reset
+		{
+			rect		18,338,180,16
+			visible		( "gui::arena_canReset" == 1 )
+
+			onMouseEnter {
+				set "arena_browser_reset_label::forecolor" "0.890,0.537,0,1" ;
+				set "arena_browser_reset_corner::matcolor" "0.890,0.537,0,1" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				set "arena_browser_reset_label::forecolor" "1,1,1,0.8" ;
+				set "arena_browser_reset_corner::matcolor" "0.564,0.603,0.286,0.4" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; arenaReset" ;
+			}
+
+			windowDef arena_browser_reset_corner
+			{
+				rect		2,4,9,9
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.4
+				noevents	1
+			}
+
+			windowDef arena_browser_reset_label
+			{
+				rect		14,1,166,14
+				forecolor	1,1,1,0.8
+				text		"#str_42011"
+				textscale	0.18
+				font		"fonts/marine"
+				noevents	1
+			}
+
+		}
+
+		windowDef arena_browser_reset_disabled
+		{
+			rect		18,338,180,16
+			visible		( "gui::arena_canReset" == 0 )
+
+			windowDef arena_browser_reset_disabled_corner
+			{
+				rect		2,4,9,9
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.18
+				noevents	1
+			}
+
+			windowDef arena_browser_reset_disabled_label
+			{
+				rect		14,1,166,14
+				forecolor	1,1,1,0.28
+				text		"#str_42011"
+				textscale	0.18
+				font		"fonts/marine"
+				noevents	1
+			}
+
+		}
+
+		windowDef arena_matches_heading
+		{
+			rect		200,62,188,12
+			forecolor	0.68,0.72,0.57,0.95
+			text		"#str_42008"
+			textscale	0.18
+			font		"fonts/lowpixel"
+			noevents	1
 		}
 
 		// Match 0.
 		windowDef arena_match0
 		{
-			rect		158,87,146,40
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		198,76,190,34
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_match0_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -1140,43 +1160,44 @@ windowDef Desktop
 
 			windowDef arena_match0_selected
 			{
-				rect		1,1,144,38
+				rect		0,0,190,34
 				visible		( "gui::arena_match0_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_match0_completed
 			{
-				rect		1,1,4,38
+				rect		0,1,3,25
 				visible		( "gui::arena_match0_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_match0_name
-		{
-			rect		9,6,104,15
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42088"
-			textscale	0.16
-				font		"fonts/lowpixel"
+			windowDef arena_match0_name
+			{
+				rect		14,3,146,16
+				forecolor	1,( 1 - "gui::arena_match0_selected" * 0.46 ),( 1 - "gui::arena_match0_selected" ),( 0.92 - "gui::arena_match0_locked" * 0.5 )
+				text		"#str_42088"
+				textscale	0.22
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_match0_status
 			{
-				rect		9,23,124,12
+				rect		14,17,146,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_match0_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_match0_lock
 			{
-				rect		121,11,14,17
+				rect		166,10,11,14
 				visible		( "gui::arena_match0_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -1185,33 +1206,31 @@ windowDef Desktop
 
 			windowDef arena_match0_check
 			{
-				rect		121,11,15,15
+				rect		165,10,13,13
 				visible		( "gui::arena_match0_completed" == 1 && "gui::arena_match0_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
 		}
 
 		// Match 1.
 		windowDef arena_match1
 		{
-			rect		158,133,146,40
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		198,116,190,34
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_match1_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -1222,43 +1241,44 @@ windowDef Desktop
 
 			windowDef arena_match1_selected
 			{
-				rect		1,1,144,38
+				rect		0,0,190,34
 				visible		( "gui::arena_match1_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_match1_completed
 			{
-				rect		1,1,4,38
+				rect		0,1,3,25
 				visible		( "gui::arena_match1_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_match1_name
-		{
-			rect		9,6,104,15
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42089"
-			textscale	0.16
-				font		"fonts/lowpixel"
+			windowDef arena_match1_name
+			{
+				rect		14,3,146,16
+				forecolor	1,( 1 - "gui::arena_match1_selected" * 0.46 ),( 1 - "gui::arena_match1_selected" ),( 0.92 - "gui::arena_match1_locked" * 0.5 )
+				text		"#str_42089"
+				textscale	0.22
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_match1_status
 			{
-				rect		9,23,124,12
+				rect		14,17,146,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_match1_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_match1_lock
 			{
-				rect		121,11,14,17
+				rect		166,10,11,14
 				visible		( "gui::arena_match1_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -1267,33 +1287,31 @@ windowDef Desktop
 
 			windowDef arena_match1_check
 			{
-				rect		121,11,15,15
+				rect		165,10,13,13
 				visible		( "gui::arena_match1_completed" == 1 && "gui::arena_match1_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
 		}
 
 		// Match 2.
 		windowDef arena_match2
 		{
-			rect		158,179,146,40
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		198,156,190,34
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_match2_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -1304,43 +1322,44 @@ windowDef Desktop
 
 			windowDef arena_match2_selected
 			{
-				rect		1,1,144,38
+				rect		0,0,190,34
 				visible		( "gui::arena_match2_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_match2_completed
 			{
-				rect		1,1,4,38
+				rect		0,1,3,25
 				visible		( "gui::arena_match2_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_match2_name
-		{
-			rect		9,6,104,15
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42090"
-			textscale	0.16
-				font		"fonts/lowpixel"
+			windowDef arena_match2_name
+			{
+				rect		14,3,146,16
+				forecolor	1,( 1 - "gui::arena_match2_selected" * 0.46 ),( 1 - "gui::arena_match2_selected" ),( 0.92 - "gui::arena_match2_locked" * 0.5 )
+				text		"#str_42090"
+				textscale	0.22
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_match2_status
 			{
-				rect		9,23,124,12
+				rect		14,17,146,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_match2_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_match2_lock
 			{
-				rect		121,11,14,17
+				rect		166,10,11,14
 				visible		( "gui::arena_match2_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -1349,33 +1368,31 @@ windowDef Desktop
 
 			windowDef arena_match2_check
 			{
-				rect		121,11,15,15
+				rect		165,10,13,13
 				visible		( "gui::arena_match2_completed" == 1 && "gui::arena_match2_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
 		}
 
-		// Match 3.
+		// The tier's boss match, on a larger plate.
 		windowDef arena_match3
 		{
-			rect		158,225,146,40
-			backcolor	0.045,0.055,0.04,0.95
-			bordercolor	0.25,0.29,0.17,1
-			bordersize	1
+			rect		198,198,190,44
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.4
 
 			onMouseEnter {
 				if ( "gui::arena_match3_locked" == 0 ) {
-					set "backcolor" "0.18,0.12,0.04,0.98" ;
-					set "bordercolor" "0.95,0.49,0.06,1" ;
+					set "matcolor" "0.95,0.49,0.06,0.82" ;
 					set "cmd" "play main_menu_mouseover" ;
 				}
 			}
 
 			onMouseExit {
-				set "backcolor" "0.045,0.055,0.04,0.95" ;
-				set "bordercolor" "0.25,0.29,0.17,1" ;
+				set "matcolor" "0.545,0.588,0.294,0.4" ;
 			}
 
 			onAction {
@@ -1386,15 +1403,16 @@ windowDef Desktop
 
 			windowDef arena_match3_selected
 			{
-				rect		1,1,144,38
+				rect		0,0,190,44
 				visible		( "gui::arena_match3_selected" == 1 )
-				backcolor	0.95,0.49,0.06,0.23
+				background	"gfx/guis/mainmenu/b6_light"
+				matcolor	0.95,0.49,0.06,0.9
 				noevents	1
 			}
 
 			windowDef arena_match3_boss_accent
 			{
-				rect		1,1,4,38
+				rect		0,1,3,35
 				visible		( "gui::arena_match3_locked" == 0 && "gui::arena_match3_completed" == 0 )
 				backcolor	0.95,0.49,0.06,0.95
 				noevents	1
@@ -1402,7 +1420,7 @@ windowDef Desktop
 
 			windowDef arena_match3_locked_accent
 			{
-				rect		1,1,4,38
+				rect		0,1,3,35
 				visible		( "gui::arena_match3_locked" == 1 )
 				backcolor	0.42,0.3,0.12,0.8
 				noevents	1
@@ -1410,47 +1428,47 @@ windowDef Desktop
 
 			windowDef arena_match3_completed
 			{
-				rect		1,1,4,38
+				rect		0,1,3,35
 				visible		( "gui::arena_match3_completed" == 1 )
 				backcolor	0.55,0.82,0.3,0.95
 				noevents	1
 			}
 
-		windowDef arena_match3_name
-		{
-			rect		9,6,104,15
-			visible		( "gui::arena_match3_locked" == 0 )
-			forecolor	0.92,0.94,0.84,1
-			text		"#str_42024"
-			textscale	0.16
-				font		"fonts/lowpixel"
+			windowDef arena_match3_name
+			{
+				rect		14,4,146,20
+				visible		( "gui::arena_match3_locked" == 0 )
+				forecolor	1,( 1 - "gui::arena_match3_selected" * 0.46 ),( 1 - "gui::arena_match3_selected" ),0.92
+				text		"#str_42024"
+				textscale	0.28
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_match3_locked_name
 			{
-				rect		9,6,104,15
+				rect		14,4,146,20
 				visible		( "gui::arena_match3_locked" == 1 )
-				forecolor	0.66,0.69,0.58,1
+				forecolor	1,1,1,0.42
 				text		"#str_42024"
-				textscale	0.15
-				font		"fonts/lowpixel"
+				textscale	0.28
+				font		"fonts/marine"
 				noevents	1
 			}
 
 			windowDef arena_match3_status
 			{
-				rect		9,23,124,12
+				rect		14,27,146,11
 				forecolor	0.6,0.66,0.48,1
 				text		"gui::arena_match3_status"
-				textscale	0.13
+				textscale	0.15
 				font		"fonts/lowpixel"
 				noevents	1
 			}
 
 			windowDef arena_match3_lock
 			{
-				rect		121,11,14,17
+				rect		166,15,11,14
 				visible		( "gui::arena_match3_locked" == 1 )
 				background	"gfx/guis/mainmenu/icon_locked"
 				matcolor	0.78,0.8,0.7,0.85
@@ -1459,61 +1477,42 @@ windowDef Desktop
 
 			windowDef arena_match3_check
 			{
-				rect		121,11,15,15
+				rect		165,15,13,13
 				visible		( "gui::arena_match3_completed" == 1 && "gui::arena_match3_locked" == 0 )
 				background	"gfx/guis/mainmenu/box_check"
 				matcolor	0.64,0.92,0.38,0.95
 				noevents	1
 			}
+
 		}
 
 		// Tier context stays visible while the player compares its four matches.
-		windowDef arena_tier_briefing_panel
-		{
-			rect		18,279,286,143
-			backcolor	0.025,0.032,0.024,0.96
-			bordercolor	0.28,0.32,0.19,1
-			bordersize	1
-			noevents	1
-		}
-
 		windowDef arena_tier_briefing_heading
 		{
-			// Keep the localized section label separate from the tier name.  The
-			// previous single-line treatment only had room for English before the
-			// two labels ran together.
-			rect		27,287,268,13
-			forecolor	0.95,0.72,0.25,1
+			rect		200,250,188,12
+			forecolor	0.68,0.72,0.57,0.95
 			text		"#str_42070"
-			textscale	0.13
+			textscale	0.18
 			font		"fonts/lowpixel"
 			noevents	1
 		}
 
 		windowDef arena_tier_briefing_title
 		{
-			rect		27,301,268,18
+			rect		200,263,190,16
 			forecolor	0.92,0.94,0.84,1
 			text		"gui::arena_selectedTierName"
-			textscale	0.17
-			textalign	1
+			textscale	0.2
 			font		"fonts/marine"
-			noevents	1
-		}
-
-		windowDef arena_tier_briefing_rule
-		{
-			rect		27,322,268,1
-			backcolor	0.55,0.61,0.34,0.7
 			noevents	1
 		}
 
 		windowDef arena_tier_briefing_description
 		{
-			rect		27,328,268,42
+			rect		200,281,190,44
 			forecolor	0.78,0.82,0.7,1
 			text		"gui::arena_selectedTierDescription"
-			textscale	0.14
+			textscale	0.16
 			font		"fonts/lowpixel"
 			wrap		1
 			noevents	1
@@ -1521,11 +1520,10 @@ windowDef Desktop
 
 		windowDef arena_tier_briefing_path
 		{
-			rect		27,374,268,22
+			rect		200,327,190,26
 			forecolor	0.95,0.72,0.25,1
 			text		"#str_42071"
-			textscale	0.13
-			textalign	1
+			textscale	0.15
 			font		"fonts/lowpixel"
 			wrap		1
 			noevents	1
@@ -1533,38 +1531,28 @@ windowDef Desktop
 
 		windowDef arena_tier_briefing_gate
 		{
-			rect		27,400,268,18
+			rect		200,356,190,44
 			forecolor	0.61,0.67,0.5,1
 			text		"#str_42049"
-			textscale	0.13
-			textalign	1
+			textscale	0.16
 			font		"fonts/lowpixel"
 			wrap		1
 			noevents	1
 		}
 
 		// Selected match details.
-		windowDef arena_detail_panel
-		{
-			rect		314,87,308,335
-			backcolor	0.025,0.032,0.024,0.96
-			bordercolor	0.28,0.32,0.19,1
-			bordersize	1
-			noevents	1
-		}
-
 		windowDef arena_levelshot_frame
 		{
-			rect		322,95,292,110
+			rect		404,58,226,112
 			backcolor	0.015,0.018,0.015,1
-			bordercolor	0.55,0.61,0.34,0.85
+			bordercolor	0.254,0.274,0.141,1
 			bordersize	1
 			noevents	1
 		}
 
 		windowDef arena_levelshot
 		{
-			rect		324,97,288,106
+			rect		405,59,224,110
 			background	"gui::arena_levelshot"
 			matcolor	1,1,1,1
 			noevents	1
@@ -1572,7 +1560,7 @@ windowDef Desktop
 
 		windowDef arena_levelshot_scan
 		{
-			rect		324,97,288,106
+			rect		405,59,224,110
 			background	"gfx/guis/mainmenu/screen"
 			matcolor	0.7,0.77,0.42,0.12
 			noevents	1
@@ -1583,7 +1571,7 @@ windowDef Desktop
 		// locked match has no band.
 		windowDef arena_best_band
 		{
-			rect		324,184,288,19
+			rect		405,148,224,21
 			visible		( "gui::arena_selectedBestVisible" == 1 )
 			backcolor	0.015,0.018,0.015,0.84
 			noevents	1
@@ -1591,7 +1579,7 @@ windowDef Desktop
 
 		windowDef arena_best_rule
 		{
-			rect		324,184,288,1
+			rect		405,148,224,1
 			visible		( "gui::arena_selectedBestVisible" == 1 )
 			backcolor	0.55,0.61,0.34,0.7
 			noevents	1
@@ -1599,22 +1587,22 @@ windowDef Desktop
 
 		windowDef arena_best_label
 		{
-			rect		330,187,110,14
+			rect		410,152,100,14
 			visible		( "gui::arena_selectedBestVisible" == 1 )
 			forecolor	0.57,0.63,0.45,1
 			text		"#str_42040"
-			textscale	0.14
+			textscale	0.15
 			font		"fonts/lowpixel"
 			noevents	1
 		}
 
 		windowDef arena_best_value
 		{
-			rect		400,186,206,16
+			rect		480,151,144,16
 			visible		( "gui::arena_selectedBestVisible" == 1 && "gui::arena_selectedHasBest" == 1 )
 			forecolor	0.95,0.72,0.25,1
 			text		"gui::arena_selectedBest"
-			textscale	0.15
+			textscale	0.16
 			textalign	2
 			font		"fonts/lowpixel"
 			noevents	1
@@ -1622,11 +1610,11 @@ windowDef Desktop
 
 		windowDef arena_best_none
 		{
-			rect		400,186,206,16
+			rect		480,151,144,16
 			visible		( "gui::arena_selectedBestVisible" == 1 && "gui::arena_selectedHasBest" == 0 )
 			forecolor	0.61,0.67,0.5,1
 			text		"gui::arena_selectedBest"
-			textscale	0.15
+			textscale	0.16
 			textalign	2
 			font		"fonts/lowpixel"
 			noevents	1
@@ -1634,24 +1622,24 @@ windowDef Desktop
 
 		windowDef arena_selected_title
 		{
-			rect		322,211,292,25
+			rect		404,177,226,18
 			forecolor	0.98,0.94,0.8,1
 			text		"gui::arena_selectedTitle"
-			textscale	0.3
+			textscale	0.24
 			font		"fonts/marine"
 			noevents	1
 		}
 
 		windowDef arena_selected_rule
 		{
-			rect		322,238,292,1
+			rect		404,196,226,1
 			backcolor	0.95,0.49,0.06,0.75
 			noevents	1
 		}
 
 		windowDef arena_selected_description
 		{
-			rect		322,244,292,50
+			rect		404,201,226,38
 			forecolor	0.72,0.76,0.63,1
 			text		"gui::arena_selectedDescription"
 			textscale	0.17
@@ -1662,7 +1650,7 @@ windowDef Desktop
 
 		windowDef arena_map_label
 		{
-			rect		322,298,70,14
+			rect		404,242,74,14
 			forecolor	0.57,0.63,0.45,1
 			text		"#str_42013"
 			textscale	0.15
@@ -1672,7 +1660,7 @@ windowDef Desktop
 
 		windowDef arena_map_value
 		{
-			rect		397,298,217,14
+			rect		480,242,150,14
 			forecolor	0.9,0.92,0.82,1
 			text		"gui::arena_selectedMap"
 			textscale	0.16
@@ -1682,7 +1670,7 @@ windowDef Desktop
 
 		windowDef arena_gametype_label
 		{
-			rect		322,316,70,14
+			rect		404,256,74,14
 			forecolor	0.57,0.63,0.45,1
 			text		"#str_42014"
 			textscale	0.15
@@ -1692,7 +1680,7 @@ windowDef Desktop
 
 		windowDef arena_gametype_value
 		{
-			rect		397,316,217,14
+			rect		480,256,150,14
 			forecolor	0.9,0.92,0.82,1
 			text		"gui::arena_selectedGameType"
 			textscale	0.16
@@ -1702,7 +1690,7 @@ windowDef Desktop
 
 		windowDef arena_roster_label
 		{
-			rect		322,334,70,14
+			rect		404,270,74,14
 			forecolor	0.57,0.63,0.45,1
 			text		"#str_42015"
 			textscale	0.15
@@ -1712,10 +1700,10 @@ windowDef Desktop
 
 		windowDef arena_roster_value
 		{
-			rect		397,334,217,27
+			rect		480,270,150,27
 			forecolor	0.9,0.92,0.82,1
 			text		"gui::arena_selectedRoster"
-			textscale	0.15
+			textscale	0.16
 			font		"fonts/lowpixel"
 			wrap		1
 			noevents	1
@@ -1723,7 +1711,7 @@ windowDef Desktop
 
 		windowDef arena_limits_label
 		{
-			rect		322,364,70,14
+			rect		404,298,74,14
 			forecolor	0.57,0.63,0.45,1
 			text		"#str_42016"
 			textscale	0.15
@@ -1733,17 +1721,37 @@ windowDef Desktop
 
 		windowDef arena_limits_value
 		{
-			rect		397,364,217,14
+			rect		480,298,150,14
 			forecolor	0.9,0.92,0.82,1
 			text		"gui::arena_selectedLimits"
+			textscale	0.16
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef arena_skill_label
+		{
+			rect		404,312,74,14
+			forecolor	0.57,0.63,0.45,1
+			text		"#str_42035"
 			textscale	0.15
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef arena_skill_value
+		{
+			rect		480,312,150,14
+			forecolor	0.9,0.92,0.82,1
+			text		"gui::arena_selectedSkill"
+			textscale	0.16
 			font		"fonts/lowpixel"
 			noevents	1
 		}
 
 		windowDef arena_difficulty_label
 		{
-			rect		322,383,79,14
+			rect		404,326,150,12
 			forecolor	0.57,0.63,0.45,1
 			text		"#str_42009"
 			textscale	0.15
@@ -1751,30 +1759,9 @@ windowDef Desktop
 			noevents	1
 		}
 
-		windowDef arena_skill_label
-		{
-			rect		322,400,39,12
-			forecolor	0.57,0.63,0.45,1
-			text		"#str_42035"
-			textscale	0.13
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef arena_skill_value
-		{
-			rect		364,400,34,12
-			forecolor	0.9,0.92,0.82,1
-			text		"gui::arena_selectedSkill"
-			textscale	0.14
-			textalign	2
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
 		windowDef arena_difficulty_down
 		{
-			rect		402,383,32,25
+			rect		404,340,22,20
 			backcolor	0.07,0.075,0.055,0.98
 			bordercolor	0.3,0.34,0.2,1
 			bordersize	1
@@ -1802,13 +1789,10 @@ windowDef Desktop
 
 		windowDef arena_difficulty_name
 		{
-			rect		438,383,140,25
-			backcolor	0.035,0.045,0.032,0.98
-			bordercolor	0.45,0.5,0.27,1
-			bordersize	1
+			rect		430,342,174,18
 			forecolor	0.95,0.72,0.25,1
 			text		"gui::arena_difficultyName"
-			textscale	0.17
+			textscale	0.2
 			textalign	1
 			font		"fonts/lowpixel"
 			noevents	1
@@ -1816,7 +1800,7 @@ windowDef Desktop
 
 		windowDef arena_difficulty_up
 		{
-			rect		582,383,32,25
+			rect		608,340,22,20
 			backcolor	0.07,0.075,0.055,0.98
 			bordercolor	0.3,0.34,0.2,1
 			bordersize	1
@@ -1842,19 +1826,15 @@ windowDef Desktop
 			}
 		}
 
-		windowDef arena_browser_back
+		windowDef arena_start_enabled
 		{
-			rect		18,429,104,27
-			background	"gfx/guis/mainmenu/b4_light"
+			rect		400,367,230,36
+			visible		( "gui::arena_canStart" == 1 )
+			background	"gfx/guis/mainmenu/b6_light"
 			matcolor	0.545,0.588,0.294,0.4
-			forecolor	0.84,0.87,0.76,1
-			text		"#str_42005"
-			textscale	0.18
-			textalign	1
-			font		"fonts/lowpixel"
 
 			onMouseEnter {
-				set "matcolor" "0.95,0.49,0.06,0.92" ;
+				set "matcolor" "0.95,0.49,0.06,0.82" ;
 				set "cmd" "play main_menu_mouseover" ;
 			}
 
@@ -1863,97 +1843,106 @@ windowDef Desktop
 			}
 
 			onAction {
-				set "cmd" "play main_menu_selection" ;
-				namedevent "arenaReturnToModes" ;
-			}
-		}
-
-		windowDef arena_browser_reset
-		{
-			rect		130,429,174,27
-			visible		( "gui::arena_canReset" == 1 )
-			backcolor	0.05,0.06,0.045,0.98
-			bordercolor	0.3,0.34,0.2,1
-			bordersize	1
-			forecolor	0.84,0.87,0.76,1
-			text		"#str_42011"
-			textscale	0.17
-			textalign	1
-			font		"fonts/lowpixel"
-
-			onMouseEnter {
-				set "backcolor" "0.22,0.09,0.04,0.98" ;
-				set "bordercolor" "0.9,0.32,0.1,1" ;
-				set "cmd" "play main_menu_mouseover" ;
-			}
-
-			onMouseExit {
-				set "backcolor" "0.05,0.06,0.045,0.98" ;
-				set "bordercolor" "0.3,0.34,0.2,1" ;
-			}
-
-			onAction {
-				set "cmd" "play main_menu_selection ; arenaReset" ;
-			}
-		}
-
-		windowDef arena_browser_reset_disabled
-		{
-			rect		130,429,174,27
-			visible		( "gui::arena_canReset" == 0 )
-			backcolor	0.035,0.04,0.032,0.96
-			bordercolor	0.2,0.22,0.16,1
-			bordersize	1
-			forecolor	0.36,0.39,0.32,1
-			text		"#str_42011"
-			textscale	0.17
-			textalign	1
-			font		"fonts/lowpixel"
-			noevents	1
-		}
-
-		windowDef arena_start_enabled
-		{
-			rect		314,429,308,27
-			visible		( "gui::arena_canStart" == 1 )
-			backcolor	0.34,0.19,0.035,0.98
-			bordercolor	0.95,0.49,0.06,1
-			bordersize	1
-			forecolor	1,0.93,0.75,1
-			text		"#str_42010"
-			textscale	0.22
-			textalign	1
-			font		"fonts/marine"
-
-			onMouseEnter {
-				set "backcolor" "0.58,0.3,0.035,1" ;
-				set "bordercolor" "1,0.7,0.2,1" ;
-				set "cmd" "play main_menu_mouseover" ;
-			}
-
-			onMouseExit {
-				set "backcolor" "0.34,0.19,0.035,0.98" ;
-				set "bordercolor" "0.95,0.49,0.06,1" ;
-			}
-
-			onAction {
 				set "cmd" "play main_menu_selection ; arenaStart" ;
 			}
+
+			windowDef arena_start_enabled_corner
+			{
+				rect		11,11,14,14
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.6
+				noevents	1
+			}
+
+			windowDef arena_start_enabled_label
+			{
+				rect		32,7,192,22
+				forecolor	1,1,1,0.9
+				text		"#str_42010"
+				textscale	0.3
+				font		"fonts/marine"
+				noevents	1
+			}
+
 		}
 
 		windowDef arena_start_disabled
 		{
-			rect		314,429,308,27
+			rect		400,367,230,36
 			visible		( "gui::arena_canStart" == 0 )
-			backcolor	0.045,0.05,0.04,0.96
-			bordercolor	0.22,0.24,0.17,1
-			bordersize	1
-			forecolor	0.38,0.4,0.33,1
-			text		"#str_42010"
-			textscale	0.22
-			textalign	1
+			background	"gfx/guis/mainmenu/b6_light"
+			matcolor	0.545,0.588,0.294,0.2
+
+			windowDef arena_start_disabled_corner
+			{
+				rect		11,11,14,14
+				background	"gfx/guis/mainmenu/corner"
+				matcolor	0.564,0.603,0.286,0.25
+				noevents	1
+			}
+
+			windowDef arena_start_disabled_label
+			{
+				rect		32,7,192,22
+				forecolor	1,1,1,0.3
+				text		"#str_42010"
+				textscale	0.3
+				font		"fonts/marine"
+				noevents	1
+			}
+
+		}
+
+		windowDef arena_browser_back_plate
+		{
+			rect		532,441,109,30
+			background	"gfx/guis/mainmenu/b4_light"
+			matcolor	0.545,0.588,0.294,0.4
+			noevents	1
+		}
+
+		windowDef arena_browser_back_corner
+		{
+			rect		542,449,11,11
+			background	"gfx/guis/mainmenu/corner"
+			matcolor	0.564,0.603,0.286,0.4
+			noevents	1
+		}
+
+		windowDef arena_browser_back_title
+		{
+			rect		552,443,88,17
+			forecolor	1,1,1,0.8
+			text		"#str_42005"
+			textscale	0.28
 			font		"fonts/marine"
 			noevents	1
+		}
+
+		windowDef arena_browser_back
+		{
+			rect		536,444,105,23
+
+			onMouseEnter {
+				stoptransitions "arena_browser_back" ;
+				set "arena_browser_back_plate::matcolor_w" "0.8" ;
+				transition "arena_browser_back_title::forecolor" "1,1,1,0.8" "0.890,0.537,0,1" "0" ;
+				transition "arena_browser_back_corner::matcolor" "0.564,0.603,0.286,0.4" "0.890,0.537,0,1" "0" ;
+				set "arena_browser_back_title::textscale" "0.29" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "arena_browser_back_plate::matcolor_w" "0.8" "0.4" "300" ;
+				transition "arena_browser_back_title::forecolor" "0.890,0.537,0,1" "1,1,1,0.8" "300" ;
+				transition "arena_browser_back_corner::matcolor" "0.890,0.537,0,1" "0.564,0.603,0.286,0.4" "300" ;
+				transition "arena_browser_back_title::textscale" "0.29" "0.28" "300" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection" ;
+				namedevent "arenaReturnToModes" ;
+			}
 		}
 	}
 
