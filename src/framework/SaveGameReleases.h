@@ -203,6 +203,10 @@ static const openQ4SaveGameGuiRevision_t OPENQ4_SAVEGAME_GUI_REVISIONS[] = {
 	// The Awakening's on-foot HUD is read from openQ4's laid-out definition of it
 	// (idLegacyHudLayout::DefinitionFor); earlier records follow the expansion's own file
 	{ "guis/q4xhud.gui",		2330,	"guis/q4xhud.gui",						"p_pickup0" },
+	// The Awakening's dropship gun, MCC gun and speeder bike HUDs, read from openQ4's definitions likewise
+	{ "guis/vehicles/airassault/turretplayerhud.gui",	2334,	"guis/vehicles/airassault/turretplayerhud.gui",	"oq4_prompt" },
+	{ "guis/vehicles/mcc/cannonplayerhud.gui",	2334,	"guis/vehicles/mcc/cannonplayerhud.gui",	"oq4_prompt" },
+	{ "guis/vehicles/speederplayerhud.gui",	2334,	"guis/vehicles/speederplayerhud.gui",	"oq4_prompt" },
 };
 
 static inline const openQ4SaveGameGuiRevision_t *OpenQ4_FindSaveGameGuiRevision( const char *guiName, int layoutBuild ) {

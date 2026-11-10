@@ -6,8 +6,8 @@ the Remastered layout of [visual specification](../ui-visual-design.md) 14.4–1
 whenever `ui_hudLayout` is not Classic. They keep their original bitmap
 artwork. Since 10 November 2026 the HUD scale, opacity and reduced motion
 settings apply there too, and the multiplayer HUD has the Remastered follow
-card, vote card and respawn prompt, and The Awakening's on-foot HUD follows
-the layout as well. `ui_hudLayout 0` keeps the stock rectangles and anchors. The retained
+card, vote card and respawn prompt, and The Awakening's on-foot HUD and its
+dropship gun, MCC gun and speeder bike HUDs follow the layout as well. `ui_hudLayout 0` keeps the stock rectangles and anchors. The retained
 interface's own Classic is unchanged too: its peer-less stock GUI draws on the
 centered 4:3 canvas. Its Remastered layouts never draw these windows.
 
@@ -24,15 +24,23 @@ once per GUI). Before 10 November the stock interface treated any mod as
 Classic while the retained one looked for the file.
 
 - **Definitions.** A GUI is parsed from `idLegacyHudLayout::DefinitionFor`.
-  The Awakening's on-foot HUD, `guis/q4xhud.gui`, is the stock HUD of its day
-  with a few additions and knows no layout, and q4xbase mounts above openQ4's
-  own content. So while that file is present and no mod owns it, the engine
-  parses `guis/openq4/awakening/q4xhud.gui` in its place. The GUI keeps the
-  name `guis/q4xhud.gui`, which the game, the Remastered route and saves use.
-  `tools/ui/build_awakening_legacy_hud.py` generates that definition from
-  `guis/hud.gui` (`--check` runs as `openq4-ui-awakening-legacy-hud-generated`),
-  so an edit to `hud.gui` reaches it once it is regenerated. Every other GUI
-  is its own definition.
+  The Awakening's HUDs are the stock HUDs of their day with a few additions
+  and know no layout, and q4xbase mounts above openQ4's own content. So while
+  the expansion's file is present and no mod owns it, the engine parses an
+  openQ4 definition in its place:
+
+  | The expansion's GUI | Definition under `guis/openq4/awakening/` | Generated from |
+  | --- | --- | --- |
+  | `guis/q4xhud.gui` (on foot) | `q4xhud.gui` | `guis/hud.gui` |
+  | `guis/vehicles/airassault/turretplayerhud.gui` (the dropship's guns, m03) | `turretplayerhud.gui` | `guis/vehicles/hud.gui` |
+  | `guis/vehicles/mcc/cannonplayerhud.gui` (the MCC's side gun, m06) | `cannonplayerhud.gui` | `guis/vehicles/hud.gui` |
+  | `guis/vehicles/speederplayerhud.gui` (the speeder bike, m07) | `speederplayerhud.gui` | `guis/vehicles/hud.gui` |
+
+  The GUI keeps the expansion's name, which the game, the Remastered route
+  and saves use. `tools/ui/build_awakening_legacy_hud.py` generates the
+  definitions (`--check` runs as `openq4-ui-awakening-legacy-hud-generated`),
+  so an edit to `hud.gui` or `vehicles/hud.gui` reaches them once they are
+  regenerated. Every other GUI is its own definition.
 - **Layout state.** `idUserInterfaceLocal::Redraw` publishes these keys each frame:
   - `oq4_hudLayout`: 0 to 3.
   - `oq4_hudRemastered`: any layout but Classic.
@@ -48,8 +56,8 @@ Classic while the retained one looked for the file.
   Competitive uses the Remastered positions. The keys are written when one
   changes, not every frame.
 - **Scale.** `ui_hudScale` sizes the laid-out HUDs (`hud.gui`,
-  `hud_strogg.gui`, `mphud.gui`, `vehicles/hud.gui` and openQ4's definition
-  of `q4xhud.gui`) as it sizes the
+  `hud_strogg.gui`, `mphud.gui`, `vehicles/hud.gui` and openQ4's definitions
+  of The Awakening's HUDs) as it sizes the
   retained documents: each group scales about its screen anchor. A window
   that an alignment moves to a screen edge starts a group anchored on that
   edge, and an axis it leaves alone keeps its ancestors' anchor, the centre by
@@ -128,6 +136,13 @@ wrapper windows: `p_radio_layout`, `p_powerups_layout`, `p_alerts_layout`,
 | `hud.gui` | Gauges +88 u (ammo at 101 u); the ride gauge centered; the strip's slots at 350 u with the name above them; two fitted pickup lines at 401 and 377 u that merge repeats; exit, save and missile notices stacked below the boss plate; powerups 61 u higher |
 | `hud_strogg.gui` | The same, with the Strogg gauges +85.5 u, the tram gauge centered and R_Strogg lines |
 | `q4xhud.gui` (The Awakening) | Everything `hud.gui` does, since its definition is generated from it, plus the expansion's additions: strip slots 11 and 12 (13 weapons, 388 u wide), the death fade sized to the whole view, the failed-objective title, and the dropship panel at the top trailing edge under the transmission display. On foot the panel now answers m03's damage, marker and warning events, which the expansion's HUD had windows for but no handlers; Remastered lets the view through its disc (0.85) and leaves out the gun's view cone, as the retained panel does |
+| `turretplayerhud.gui` (The Awakening's dropship guns) | `vehicles/hud.gui` without its status bar, damage flash and electrical warnings, so the gun has the transmission display, boss bar, notices and the Exit prompt, with the dropship panel always shown under the transmission display. Remastered turns the view cone relative to the ship's nose and draws it under the ship; the stock layout keeps it over the ship on the view's yaw. The expansion's HUD was a copy of the on-foot HUD with its gauges hidden; nothing it kept from that HUD is sent to a vehicle's HUD |
+| `cannonplayerhud.gui` (The Awakening's MCC gun) | The same base without the boss bar, with the U.S.S. Hannibal's hull readout at the top trailing edge. Remastered stacks it 36 u higher under the transmission display, fills the track with the hull (`mcchealth` of 2000) and turns the track and number red at a quarter with the vehicle gauges' pulse; the stock layout keeps the static track |
+| `speederplayerhud.gui` (The Awakening's speeder bike) | `vehicles/hud.gui` with the bike's weapons (0 the machinegun, 1 the cannon with its charge bar), the race display on the top edge under the boss bar and notices (18 u lower in Remastered, the timer at the Remastered sizes and red in the last ten seconds, shown only once the race runs it), and the boost in the HUD prompt before Exit: the crouch key and Boost while one is ready, the hazard and Boosting while it pushes. The stock layout names the crouch key on a line above the exit line and shows the expansion's hazard while boosting, which its own timelines hid for good |
+
+The three vehicle definitions read the game's `vehicle_locked` in the HUD
+prompt as well as the lock events, as the Remastered documents do: the race
+locks the bike and m06 the side gun without sending an event.
 | `mphud.gui` | See [multiplayer groups](#multiplayer-groups) |
 | `vehicles/hud.gui` | The status bar +170.5 u on the bottom edge; electrical warnings at the side edges; the keycap and Exit prompt (or Vehicle locked) on a fitted plate at the bottom-trailing corner; the squad stencil in #FFFF00 |
 
@@ -208,9 +223,18 @@ Each of these needs vector art or a layout a GUI script cannot express:
   and darts, which sit up to 2 u from the vector ones. Its
   `q4xhud_strogg.gui` keeps the expansion's layout: nothing loads it (the
   expansion's Strogg player names `guis/hud_strogg.gui`, which is laid out).
-  The Awakening's vehicle HUDs (the turrets, the MCC gun, the speeder and
-  the GEV) and the air-defence cannon, which has no transmission display,
-  keep the expansion's and stock layouts.
+- The speeder's race timer shows the script's hundredths as written ("8.5"
+  for 8.05 s; a GUI script cannot pad a number), its red is immediate, not
+  a 100 ms transition, and the speed streak of the boost is not drawn. The
+  pips are the expansion's bitmaps, a little darker than the vector ones.
+- The stock `vehicles/hud.gui` still follows the lock events alone, so a
+  stock vehicle that a script locks without an event shows Exit where the
+  retained prompt shows Vehicle locked; the stock layout's exit line does the
+  same on the Awakening's vehicles.
+- The Awakening's GEV HUD (`gev_hud.gui`) keeps the expansion's script: no
+  map places that vehicle, and ten of its materials ship with neither game.
+  The air-defence cannon, which has no transmission display, keeps the stock
+  layout.
 - Text uses the bitmap fonts at scales matched by eye to the Remastered TTF
   layout, about 10% under the 72 dp-per-textscale rule.
 
@@ -242,6 +266,11 @@ script and its state carries over to openQ4's definition (marker window
 own `q4xhud.gui`, reads its record directly. From here on `q4xhud.gui`'s
 definition changes whenever `hud.gui` does, and needs its own
 `guis/savecompat/` revision each time.
+
+The dropship gun, MCC gun and speeder bike HUDs are saved with their vehicles,
+whether or not the player rides them. Their records followed the expansion's
+scripts until build 2334 and are read the same way (marker window
+`oq4_prompt`); their definitions change whenever `vehicles/hud.gui` does.
 
 ## Evidence, 9 November 2026
 
@@ -395,3 +424,35 @@ with the boss bar and the panel showing, restored in the candidate ("Restored
 'guis/q4xhud.gui' from a save written for its earlier definition (72 changed
 window values)") with both still showing in the Remastered layout; a save the
 candidate wrote restored directly.
+
+## The Awakening's vehicles, 10 November 2026
+
+The same build and method, one stage a vehicle (`.tmp/hud-round/run.py` stages
+`awk-speeder`, `awk-turret` and `awk-mcc`; `st_pairs.py` with `PAIRS=speeder`,
+`turret` or `mcc`). The bike is ridden from the start of `m07_race`; the gun
+levels board the player through the console's `script` command. Captures are in
+`.tmp/hud-round/out/awk-speeder/`, `awk-turret/` and `awk-mcc/` (untracked).
+
+| Vehicle | Pairs | What they show |
+| --- | --- | --- |
+| Speeder bike | `sp-base`, `sp-progress`, `sp-last` | The status bar centred, the race display with four pips lit, the timer at the retained size, red under ten seconds |
+| | `sp-boost`, `sp-recharge` | The prompt: crouch key and Boost, the hazard and Boosting while the boost pushes (driven by `openq4_testInput`), then Vehicle locked alone, from the game's `vehicle_locked` |
+| | `sp-radio`, `sp-notices`, `sp-scaled`, `sp-minimal`, `sp-classic` | Transmission display; the boss bar and notices over the race display; scale 1.25; Minimal; the stock layout |
+| Dropship gun | `tu-base`, `tu-events`, `tu-turned` | The panel and the Exit prompt; forged damage, markers and darts; the cone under the ship after a 54 degree turn |
+| | `tu-radio`, `tu-notices`, `tu-scaled`, `tu-minimal`, `tu-classic` | The same groups as the bike |
+| MCC gun | `mc-base`, `mc-hull`, `mc-warn` | The readout under the transmission display; the hull at 1450 of 2000 with the fill at 72%; at 379 the red track and number (the level's own script wrote both after `setHealth`) |
+| | `mc-radio`, `mc-notices`, `mc-scaled`, `mc-minimal`, `mc-classic` | The same groups as the bike |
+
+`awk-speeder-classic` shows the stock layout's boost line ("C Boost" above the
+exit line) and the expansion's hazard with Boosting while the boost pushes.
+
+Saves, with `.tmp/q4xhud/savecompat_awk.py speeder|turret|mcc`: saves written on
+`m07_race`, `m03_airassault` and `m06_mcc_invasion` by the 4 November build
+restored in the candidate through the expansion's scripts ("Restored
+'guis/vehicles/speederplayerhud.gui' from a save written for its earlier
+definition (29 changed window values)", the gun's with 5, the MCC gun's with
+0); saves the candidate wrote restored directly.
+
+Not captured: the timer and pips driven by a race actually run (the pips and
+the low timer were forged events), the darts fired by the level's own flyers,
+and any of this on a 4:3 or ultrawide view.

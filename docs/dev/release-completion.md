@@ -44,6 +44,18 @@ See [player release status](../user/release-status.md).
   damage, objective markers and attack warnings while you are on foot; before,
   only the gun's display showed them. Saves made before this update load as
   usual.
+- **The Awakening's vehicles follow too.** In the classic interface the
+  dropship guns, the MCC gun and the speeder bike now use the same layout as
+  the modern HUD.
+  - The guns gain the radio display, the boss bar, notices and an Exit
+    prompt.
+  - The MCC gun's hull gauge fills with the hull and turns red at a quarter.
+  - The speeder bike shows its hull and shield warnings and its weapon lines
+    again, and the right weapon for each of its guns. Its prompt names the
+    boost key and shows a hazard while you boost; the expansion's own boost
+    warning never appeared. The race timer no longer shows placeholder
+    digits before a race starts.
+  - A vehicle the level has locked shows "Vehicle locked", not "Exit".
 - **The Awakening, modern interface.** The dropship panel keeps its damage and
   objective markers after you load a save or change the HUD layout; it used
   to come back empty.

@@ -1243,8 +1243,8 @@ bool idUserInterfaceLocal::InitFromFile( const char *qpath, bool rebuild, bool c
 	}
 
 	source = qpath;
-	// openQ4: The Awakening's on-foot HUD is parsed from openQ4's laid-out
-	// definition of it; the GUI keeps the name the game and its saves know.
+	// openQ4: The Awakening's HUDs are parsed from openQ4's laid-out
+	// definitions of them; a GUI keeps the name the game and its saves know.
 	definition = literalDefinition ? qpath : idLegacyHudLayout::DefinitionFor( qpath );
 	state.Set( "text", "Test Text!" );
 

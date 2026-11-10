@@ -735,20 +735,32 @@ bool idLegacyHudLayout::Fades(const char* source) {
 }
 
 namespace {
-const char* const AwakeningHud="guis/q4xhud.gui";
-const char* const AwakeningHudDefinition="guis/openq4/awakening/q4xhud.gui";
+// The Awakening's HUDs and openQ4's definitions of them (tools/ui/build_awakening_legacy_hud.py):
+// on foot, the dropship's guns, the MCC's side gun and the speeder bike.
+struct HudDefinition { const char* source; const char* definition; };
+constexpr HudDefinition AwakeningDefinitions[]={
+	{"guis/q4xhud.gui","guis/openq4/awakening/q4xhud.gui"},
+	{"guis/vehicles/airassault/turretplayerhud.gui","guis/openq4/awakening/turretplayerhud.gui"},
+	{"guis/vehicles/mcc/cannonplayerhud.gui","guis/openq4/awakening/cannonplayerhud.gui"},
+	{"guis/vehicles/speederplayerhud.gui","guis/openq4/awakening/speederplayerhud.gui"},
+};
 }
 
 bool idLegacyHudLayout::Scales(const char* source) {
-	// By definition: the expansion's own q4xhud.gui names no scale anchors.
-	return SourceIs(source,{"guis/hud.gui","guis/hud_strogg.gui","guis/mphud.gui","guis/vehicles/hud.gui",AwakeningHudDefinition});
+	if (SourceIs(source,{"guis/hud.gui","guis/hud_strogg.gui","guis/mphud.gui","guis/vehicles/hud.gui"})) return true;
+	// By definition: the expansion's own scripts name no scale anchors.
+	for (const HudDefinition& entry:AwakeningDefinitions) if (SourceIs(source,{entry.definition})) return true;
+	return false;
 }
 
 const char* idLegacyHudLayout::DefinitionFor(const char* source) {
-	if (!SourceIs(source,{AwakeningHud})) return source;
-	// Only beside the expansion's own HUD, whose content the definition draws.
-	if (ModOwns(source) || fileSystem->ReadFile(source,nullptr)<0 || fileSystem->ReadFile(AwakeningHudDefinition,nullptr)<0) return source;
-	return AwakeningHudDefinition;
+	for (const HudDefinition& entry:AwakeningDefinitions) {
+		if (!SourceIs(source,{entry.source})) continue;
+		// Only beside the expansion's own HUD, whose content the definition draws.
+		if (ModOwns(source) || fileSystem->ReadFile(source,nullptr)<0 || fileSystem->ReadFile(entry.definition,nullptr)<0) return source;
+		return entry.definition;
+	}
+	return source;
 }
 
 bool idLegacyHudLayout::ModOwns(const char* source) {

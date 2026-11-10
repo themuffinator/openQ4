@@ -128,6 +128,8 @@ alpha's own code:
   way: the gauges, the 13-weapon strip and the pickup lines sit where the
   modern HUD has them, the HUD Size, Opacity and layout settings apply, and
   the dropship panel shows the same damage, markers and warnings. The
+  dropship guns, the MCC cannon and the speeder bike are laid out the same
+  way there too, with the displays described here. The
   MCC cannon (m06) shows the MCC's hull under the radio display, its gauge
   filling with the hull and turning red at a quarter, with an Exit prompt.
   The speeder bike (m07) shows its race clock and checkpoints at the top, the

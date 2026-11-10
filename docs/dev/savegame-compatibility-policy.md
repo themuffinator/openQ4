@@ -265,6 +265,9 @@ only the current revision has:
 | `guis/hud_strogg.gui` | 2323 | `guis/savecompat/hud_strogg_r3.gui` | `hit_chevron` |
 | `guis/vehicles/hud.gui` | 2323 | `guis/savecompat/vehicle_hud_r2.gui` | `oq4_prompt_padlock` |
 | `guis/q4xhud.gui` | 2330 | `guis/q4xhud.gui` (The Awakening's own file) | `p_pickup0` |
+| `guis/vehicles/airassault/turretplayerhud.gui` | 2334 | the same file (The Awakening's own) | `oq4_prompt` |
+| `guis/vehicles/mcc/cannonplayerhud.gui` | 2334 | the same file (The Awakening's own) | `oq4_prompt` |
+| `guis/vehicles/speederplayerhud.gui` | 2334 | the same file (The Awakening's own) | `oq4_prompt` |
 
 A GUI edited more than once lists its revisions oldest first, and a record is
 read through the first one whose build its payload predates. The 2280
@@ -283,7 +286,9 @@ From build 2330 the engine parses openQ4's definition of it,
 records is the expansion's own file, parsed as written. That definition is
 generated from `guis/hud.gui` (`tools/ui/build_awakening_legacy_hud.py`): an
 edit to `hud.gui` changes it too, and it then needs its own revision under
-`guis/savecompat/` beside `hud.gui`'s.
+`guis/savecompat/` beside `hud.gui`'s. From build 2334 the same holds for the
+HUDs of The Awakening's dropship guns, MCC gun and speeder bike, whose
+definitions are generated from `guis/vehicles/hud.gui`.
 
 A record from a payload whose layout build predates the revision, and whose blob
 does not name that window, is read through `idUserInterface::ReadFromSaveGameWithLayout`.

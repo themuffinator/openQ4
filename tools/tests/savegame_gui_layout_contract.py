@@ -48,6 +48,9 @@ SERIALIZED_GUIS: dict[str, str] = {
     # The Awakening's guis/q4xhud.gui, which the engine reads from this definition
     # (idLegacyHudLayout::DefinitionFor; generated from guis/hud.gui).
     "guis/openq4/awakening/q4xhud.gui": "56a23a1fc2515b0ade85217725d68684d0f8bde6",
+    "guis/openq4/awakening/cannonplayerhud.gui": "d2ed3e80e9b377b455f3d8232ded903c2de0f6b7",
+    "guis/openq4/awakening/speederplayerhud.gui": "8c51b2aef073eb06156e596cd35b9e18c84dc235",
+    "guis/openq4/awakening/turretplayerhud.gui": "1450369bf59ac72a8f611ad495b60f5f1a8771bd",
     "guis/vehicles/airdef_cannon.gui": "e92ae101f581b82a2885ac970b8755a92e1cbcae",
     "guis/vehicles/hud.gui": "816270928d67d8825d15add0b235727f7f9adb97",
     "guis/vehicles/strogg_noise.gui": "d0777427b93ec45c90c6dfdf3ba6352aec981dc6",
@@ -150,6 +153,30 @@ GUI_REVISIONS: list[dict[str, object]] = [
         "savedDefinition": "guis/q4xhud.gui",
         "marker": "p_pickup0",
         "definition": "guis/openq4/awakening/q4xhud.gui",
+        "external": "The Awakening (q4xbase)",
+    },
+    {
+        "gui": "guis/vehicles/airassault/turretplayerhud.gui",
+        "firstBuild": 2334,
+        "savedDefinition": "guis/vehicles/airassault/turretplayerhud.gui",
+        "marker": "oq4_prompt",
+        "definition": "guis/openq4/awakening/turretplayerhud.gui",
+        "external": "The Awakening (q4xbase)",
+    },
+    {
+        "gui": "guis/vehicles/mcc/cannonplayerhud.gui",
+        "firstBuild": 2334,
+        "savedDefinition": "guis/vehicles/mcc/cannonplayerhud.gui",
+        "marker": "oq4_prompt",
+        "definition": "guis/openq4/awakening/cannonplayerhud.gui",
+        "external": "The Awakening (q4xbase)",
+    },
+    {
+        "gui": "guis/vehicles/speederplayerhud.gui",
+        "firstBuild": 2334,
+        "savedDefinition": "guis/vehicles/speederplayerhud.gui",
+        "marker": "oq4_prompt",
+        "definition": "guis/openq4/awakening/speederplayerhud.gui",
         "external": "The Awakening (q4xbase)",
     },
 ]

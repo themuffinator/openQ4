@@ -2611,8 +2611,11 @@ Completion must advance through the existing dependencies:
   ([evidence](ui/legacy-hud-layout.md#evidence-10-november-2026)). The
   Awakening's on-foot HUD follows the layout too, from a definition generated
   from `hud.gui` that the engine reads in place of the expansion's script
-  ([evidence](ui/legacy-hud-layout.md#the-awakening-10-november-2026)); its
-  vehicle HUDs keep the expansion's layout under the stock interface.
+  ([evidence](ui/legacy-hud-layout.md#the-awakening-10-november-2026)), and so
+  do its dropship gun, MCC gun and speeder bike HUDs, generated from
+  `vehicles/hud.gui`
+  ([evidence](ui/legacy-hud-layout.md#the-awakenings-vehicles-10-november-2026)).
+  Its GEV HUD, which no map uses, keeps the expansion's script.
 - [ ] **UI-05 — P1, decision and qualification: resolve visual policy conflicts.**
   Reconcile SP/MP hit-marker defaults with visual specification section 14.7 and
   other recorded deviations before acceptance. Preserve editable vector framing,
