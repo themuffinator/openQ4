@@ -465,7 +465,7 @@ void idSimpleWindow::CalcClientRect(float xofs, float yofs) {
 	const bool applyScreenAlignX = ( mParent == NULL ) || ( ( mParent->GetFlags() & WIN_DESKTOP ) != 0 ) || ( mParent->GetScreenAlignX() == idWindow::SCREEN_ALIGN_X_MIDDLE );
 	const bool applyScreenAlignY = ( mParent == NULL ) || ( ( mParent->GetFlags() & WIN_DESKTOP ) != 0 ) || ( mParent->GetScreenAlignY() == idWindow::SCREEN_ALIGN_Y_MIDDLE );
 	if ( dc != NULL && ( applyScreenAlignX || applyScreenAlignY ) &&
-			!( gui != NULL && idRetainedHud::UsesClassicCanvas( gui->GetSourceFile() ) ) ) {
+			!( gui != NULL && gui->ClassicCanvas() ) ) {
 		float xExpand = 0.0f;
 		float yExpand = 0.0f;
 		dc->GetVirtualScreenExpansion( forceAspectWidth, forceAspectHeight, xExpand, yExpand );

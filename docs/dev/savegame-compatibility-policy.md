@@ -261,11 +261,19 @@ only the current revision has:
 | `guis/hud.gui` | 2280 | `guis/savecompat/hud_r2.gui` | `p_pickup0` |
 | `guis/hud_strogg.gui` | 2280 | `guis/savecompat/hud_strogg_r2.gui` | `p_pickup0` |
 | `guis/vehicles/hud.gui` | 2280 | `guis/savecompat/vehicle_hud_r1.gui` | `oq4_prompt` |
+| `guis/hud.gui` | 2323 | `guis/savecompat/hud_r3.gui` | `hit_chevron` |
+| `guis/hud_strogg.gui` | 2323 | `guis/savecompat/hud_strogg_r3.gui` | `hit_chevron` |
+| `guis/vehicles/hud.gui` | 2323 | `guis/savecompat/vehicle_hud_r2.gui` | `oq4_prompt_padlock` |
 
 A GUI edited more than once lists its revisions oldest first, and a record is
 read through the first one whose build its payload predates. The 2280
 revisions are the stock interface's Remastered HUD layout (the pickup lines,
-the Minimal and HUD-setting wrappers and the vehicle prompt).
+the Minimal and HUD-setting wrappers and the vehicle prompt). The 2323
+revisions are that layout's refinements: the damage direction's mark, the
+prompt's lock, and text sizes, offsets, scale anchors and notice stacking. An
+edit that only changes an expression counts too: a restore refuses a register
+whose expression index differs from the parsed GUI's, so a constant that
+becomes an expression moves every later index in its window.
 
 A record from a payload whose layout build predates the revision, and whose blob
 does not name that window, is read through `idUserInterface::ReadFromSaveGameWithLayout`.

@@ -37,6 +37,7 @@ struct idDeviceContext {
     idList<idRectangle> clipRects;
     std::vector<Quad> submitted;
     float xScale = 1, yScale = 1, xOffset = 0, yOffset = 0;
+    float groupX = 0, groupY = 0, groupScale = 1;  // the HUD scale group (SetGroupScale); off here
     bool ClippedCoords(float *, float *, float *, float *, float *, float *, float *, float *);
     void PaintChar(float, float, float, float, float, float, float, float, float, const idMaterial *);
     void AdjustCoords(float *, float *, float *, float *);
@@ -131,6 +132,28 @@ int main() {
     check(dc, {-100, -100, 900, 700, 0, 0, 1, 1});
     dc.clipRects.values.clear();
     check(dc, {-100, -100, 900, 700, 0, 0, 1, 1});
+    // The stock interface's HUD scale: a group scales about its screen anchor
+    // as coordinates leave virtual space, after clipping, and before the
+    // canvas mapping. The anchor itself never moves.
+    dc.xScale = 0.75f; dc.yScale = 1; dc.xOffset = 80; dc.yOffset = 0;
+    dc.groupX = 320; dc.groupY = 480; dc.groupScale = 1.25f;
+    x = 320; y = 480; w = 0; h = 0;
+    dc.AdjustCoords(&x, &y, &w, &h);
+    near(x, 320 * 0.75f + 80); near(y, 480);
+    x = 220; y = 440; w = 100; h = 40;
+    dc.AdjustCoords(&x, &y, &w, &h);
+    near(x, 195 * 0.75f + 80); near(y, 430); near(w, 125 * 0.75f); near(h, 50);
+    // Clipping happens in unscaled units: a quad its clip rectangle keeps
+    // whole stays whole whatever the scale.
+    dc.clipRects.values = {{0, 0, 640, 480}, {200, 420, 140, 60}};
+    x = 220; y = 440; w = 100; h = 40;
+    float s1 = 0, t1 = 0, s2 = 1, t2 = 1;
+    assert(!dc.ClippedCoords(&x, &y, &w, &h, &s1, &t1, &s2, &t2));
+    near(x, 220); near(w, 100); near(s1, 0); near(s2, 1);
+    dc.groupScale = 1;
+    x = 220; y = 440; w = 100; h = 40;
+    dc.AdjustCoords(&x, &y, &w, &h);
+    near(x, 220 * 0.75f + 80); near(y, 440); near(w, 75); near(h, 40);
     std::printf("gui_clipping_contract: PASS (%u production glyph submissions, viewport bounds and UVs)\n", cases);
 }
 '''

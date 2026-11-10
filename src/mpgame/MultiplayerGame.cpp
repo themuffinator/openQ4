@@ -10492,7 +10492,10 @@ void idMultiplayerGame::ReceiveDeathMessage( idPlayer *attacker, int attackerSco
 	//}
 // RITUAL END
 
-	const char* icon = "";
+	// openQ4: an idStr, not a va() buffer. The kill feed's fields below cycle
+	// through all eight va() buffers, which left the console echo's lookup
+	// key reading a number and every obituary on the generic text.
+	idStr iconName;
 
 	// if methodOfDeath is in range [0, MAX_WEAPONS - 1] it refers to a specific weapon. MAX_WEAPONS refers to
 	// a generic or unknown death (i.e. "Killer killed victim") and values above MAX_WEAPONS + 1 refer
@@ -10500,10 +10503,11 @@ void idMultiplayerGame::ReceiveDeathMessage( idPlayer *attacker, int attackerSco
 
 	// setup to either use weapon icons for a weapon death, or generic death icons
 	if ( methodOfDeath < MAX_WEAPONS ) {
-		icon = va( "w%02d", methodOfDeath );
+		iconName = va( "w%02d", methodOfDeath );
 	} else {
-		icon = va( "dm%d", methodOfDeath - MAX_WEAPONS );
+		iconName = va( "dm%d", methodOfDeath - MAX_WEAPONS );
 	}
+	const char* icon = iconName.c_str();
 
 	char* message = NULL;
 
@@ -21216,52 +21220,45 @@ void idMultiplayerGame::UpdateHud( idUserInterface* _mphud ) {
 	// squirrel: added DeadZone multiplayer mode
 	if( gameLocal.gameType == GAME_DEADZONE ) {
 
-		static int lastMarineScore = teamScore[ TEAM_MARINE ];
-		static int lastStroggScore = teamScore[ TEAM_STROGG ];
-		int marineScore = teamScore[ TEAM_MARINE ];
-		int stroggScore = teamScore[ TEAM_STROGG ];
-		const float asymptoticAverageWeight = 0.95f;
+		const int zoneScores[ 2 ] = { teamScore[ TEAM_MARINE ], teamScore[ TEAM_STROGG ] };
+		float *pulses[ 2 ] = { &marineScoreBarPulseAmount, &stroggScoreBarPulseAmount };
+		static const char *const pulseEvents[ 2 ] = { "oq4_zonePulse0", "oq4_zonePulse1" };
+		static const int pulseTeams[ 2 ] = { TEAM_MARINE, TEAM_STROGG };
 
-		/// Check if Marines have scored since last frame
-		if( marineScore != lastMarineScore )
-		{
-			/// Pulse the bar's color
-			marineScoreBarPulseAmount = 1.0f;
-			// openQ4: the Remastered score's reduced-motion hold
-			_mphud->HandleNamedEvent( "oq4_zonePulse0" );
-
-			// Play the pulse sound
-			idStr pulseSnd = "snd_dzpulse_happy";
-			if ( localPlayer->team != TEAM_MARINE )
-				pulseSnd = "snd_dzpulse_unhappy";
-
-			localPlayer->StartSound( pulseSnd, SND_CHANNEL_ANY, 0, false, NULL );
+		// openQ4: the pulse belongs to this client's HUD. It starts from the
+		// scores of the map in play (function statics kept the last Dead Zone
+		// map's, which pulsed and sounded on the next one's first frame), and it
+		// fades by time: the stock 0.95 a frame is a 60 Hz rate, which at 240 Hz
+		// ended the flash four times sooner.
+		if ( !hudZoneScoresValid ) {
+			hudZoneScoresValid = true;
+			hudZoneScores[ 0 ] = zoneScores[ 0 ];
+			hudZoneScores[ 1 ] = zoneScores[ 1 ];
+			hudZonePulseTime = gameLocal.time;
 		}
-		else
-		{
-			/// Asymptotic-average back to the normal color
-			marineScoreBarPulseAmount *= asymptoticAverageWeight;
-		}
+		const int elapsed = idMath::ClampInt( 0, 250, gameLocal.time - hudZonePulseTime );
+		hudZonePulseTime = gameLocal.time;
+		const float decay = idMath::Pow( 0.95f, elapsed * ( 60.0f / 1000.0f ) );
 
-		/// Check if Strogg have scored since last frame
-		if( stroggScore != lastStroggScore )
-		{
-			/// Pulse the bar's color
-			stroggScoreBarPulseAmount = 1.0f;
-			// openQ4: the Remastered score's reduced-motion hold
-			_mphud->HandleNamedEvent( "oq4_zonePulse1" );
+		for ( int side = 0; side < 2; side++ ) {
+			if ( zoneScores[ side ] != hudZoneScores[ side ] ) {
+				hudZoneScores[ side ] = zoneScores[ side ];
+				/// Pulse the bar's color
+				*pulses[ side ] = 1.0f;
+				// openQ4: the Remastered score's reduced-motion hold
+				_mphud->HandleNamedEvent( pulseEvents[ side ] );
 
-			// Play the pulse sound
-			idStr pulseSnd = "snd_dzpulse_happy";
-			if ( localPlayer->team != TEAM_STROGG )
-				pulseSnd = "snd_dzpulse_unhappy";
-
-			localPlayer->StartSound( pulseSnd, SND_CHANNEL_ANY, 0, false, NULL );
-		}
-		else
-		{
-			/// Asymptotic-average back to the normal color
-			stroggScoreBarPulseAmount *= asymptoticAverageWeight;
+				// Play the pulse sound
+				localPlayer->StartSound( localPlayer->team == pulseTeams[ side ] ? "snd_dzpulse_happy" : "snd_dzpulse_unhappy",
+					SND_CHANNEL_ANY, 0, false, NULL );
+			} else {
+				/// Asymptotic-average back to the normal color
+				*pulses[ side ] *= decay;
+				if ( *pulses[ side ] < 0.004f ) {
+					// below one step of an 8-bit channel: rest, so the HUD state settles
+					*pulses[ side ] = 0.0f;
+				}
+			}
 		}
 
 		/// Set "gameStatus" gui element
@@ -21269,9 +21266,6 @@ void idMultiplayerGame::UpdateHud( idUserInterface* _mphud ) {
 
 		_mphud->SetStateFloat( "marine_pulse_amount", marineScoreBarPulseAmount );
 		_mphud->SetStateFloat( "strogg_pulse_amount", stroggScoreBarPulseAmount );
-
-		lastMarineScore = teamScore[ TEAM_MARINE ];
-		lastStroggScore = teamScore[ TEAM_STROGG ];
 	}
 	// RITUAL END
 
@@ -21468,6 +21462,12 @@ void idMultiplayerGame::ResetRemasteredHudAnnouncements( void ) {
 	hudClockWarn = -1;
 	hudMatchState = -1;
 	hudRespawn = -1;
+	hudZoneScoresValid = false;
+	hudPublishGui = NULL;
+	hudPublishRealTime = 0;
+	hudPublishTime = 0;
+	hudZoneScores[ 0 ] = hudZoneScores[ 1 ] = 0;
+	hudZonePulseTime = 0;
 	remasteredScoreboardScroll = 0;
 	remasteredScoreboardScrollMax = 0;
 	remasteredScoreboardScrolls = false;
@@ -21696,6 +21696,31 @@ void idMultiplayerGame::PublishRemasteredChat( idUserInterface *_mphud, int now 
 
 void idMultiplayerGame::PublishRemasteredHud( idUserInterface *_mphud, idPlayer *localPlayer ) {
 	const int now = gameLocal.realClientTime;
+	// openQ4: Classic reads none of these keys, in either interface. When the
+	// layout returns, the edge-triggered announcements start over.
+	if ( !_mphud->GetStateBool( "oq4_hudRemastered", "1" ) ) {
+		if ( hudPublishGui != NULL ) {
+			hudPublishGui = NULL;
+			for ( int flag = 0; flag < 3; flag++ ) {
+				hudFlagStates[ flag ] = -1;
+			}
+			hudClockWarn = -1;
+			hudMatchState = -1;
+			hudRespawn = -1;
+		}
+		return;
+	}
+	// Everything below follows the game's clocks. A frame drawn between two
+	// tics found nothing new, and wrote some three hundred unchanged keys to
+	// say so: at 240 Hz that was three frames in four. The open chat input
+	// follows the keyboard, so it still publishes every frame.
+	const bool chatting = currentMenu == 2 && msgmodeGui != NULL;
+	if ( _mphud == hudPublishGui && now == hudPublishRealTime && gameLocal.time == hudPublishTime && !chatting ) {
+		return;
+	}
+	hudPublishGui = _mphud;
+	hudPublishRealTime = now;
+	hudPublishTime = gameLocal.time;
 	const bool tourney = gameLocal.gameType == GAME_TOURNEY;
 	const bool teamGame = gameLocal.IsTeamGame();
 	const mpGameState_t state = gameState->GetMPGameState();
@@ -21782,8 +21807,10 @@ void idMultiplayerGame::PublishRemasteredHud( idUserInterface *_mphud, idPlayer 
 	const bool timed = GetMatchLengthMsec() > 0;
 	_mphud->SetStateBool( "oq4_countdown", countdown );
 	_mphud->SetStateBool( "oq4_timed", timed );
-	// 1 in the last minute, 2 in the last ten seconds of a timed match
-	const int clockWarn = ( countdown || !timed || suddenDeath ) ? 0 : clockMs < 10000 ? 2 : clockMs < 60000 ? 1 : 0;
+	// 1 in the last minute, 2 in the last ten seconds of a timed match. Only a
+	// running match counts down: warm-up measures the limit from the map's start
+	// and the review holds the clock at zero, and neither is a last minute.
+	const int clockWarn = ( countdown || !timed || suddenDeath || state != GAMEON ) ? 0 : clockMs < 10000 ? 2 : clockMs < 60000 ? 1 : 0;
 	_mphud->SetStateInt( "oq4_clock_warn", clockWarn );
 	_mphud->SetStateString( "oq4_clock", va( "%d:%02d", clockSeconds / 60, clockSeconds % 60 ) );
 	_mphud->SetStateInt( "oq4_ping", playerState[ localPlayer->entityNumber ].ping );
@@ -22306,8 +22333,11 @@ void idMultiplayerGame::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 
 	isBuyingAllowedRightNow = decodedBuyingAllowed;
 	powerupCount = decodedPowerupCount;
-	marineScoreBarPulseAmount = decodedMarinePulse;
-	stroggScoreBarPulseAmount = decodedStroggPulse;
+	// openQ4: the score pulse is each client's own presentation (UpdateHud).
+	// A dedicated server never draws a HUD, so its snapshot value is always 0
+	// and applying it ended every client's flash at the next snapshot.
+	(void)decodedMarinePulse;
+	(void)decodedStroggPulse;
 	memcpy( teamScore, decodedTeamScore, sizeof( teamScore ) );
 	memcpy( teamDeadZoneScore, decodedTeamDeadZoneScore, sizeof( teamDeadZoneScore ) );
 	for ( i = 0; i < MAX_CLIENTS; i++ ) {

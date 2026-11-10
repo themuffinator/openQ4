@@ -2591,6 +2591,10 @@ Completion must advance through the existing dependencies:
   GUIs and their revisions. The same day the stock multiplayer HUD gained the
   team modes' panels and flags, Tourney's strip and message bar, and the kill
   feed ([multiplayer groups](ui/legacy-hud-layout.md#multiplayer-groups)).
+  Progress, 10 November: the stock HUDs take the HUD scale and opacity, the
+  multiplayer one gained the follow card, vote card and respawn prompt, and
+  sizes and offsets were measured against the retained HUD in paired captures
+  ([evidence](ui/legacy-hud-layout.md#evidence-10-november-2026)).
 - [ ] **UI-05 — P1, decision and qualification: resolve visual policy conflicts.**
   Reconcile SP/MP hit-marker defaults with visual specification section 14.7 and
   other recorded deviations before acceptance. Preserve editable vector framing,

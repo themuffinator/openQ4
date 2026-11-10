@@ -193,6 +193,11 @@ static const openQ4SaveGameGuiRevision_t OPENQ4_SAVEGAME_GUI_REVISIONS[] = {
 	{ "guis/hud.gui",			2280,	"guis/savecompat/hud_r2.gui",			"p_pickup0" },
 	{ "guis/hud_strogg.gui",	2280,	"guis/savecompat/hud_strogg_r2.gui",	"p_pickup0" },
 	{ "guis/vehicles/hud.gui",	2280,	"guis/savecompat/vehicle_hud_r1.gui",	"oq4_prompt" },
+	// The stock interface's HUD refinements: the damage direction's mark, the prompt's lock, and
+	// the sizes, offsets, scale anchors and notice stacking that changed these GUIs' expressions
+	{ "guis/hud.gui",			2323,	"guis/savecompat/hud_r3.gui",			"hit_chevron" },
+	{ "guis/hud_strogg.gui",	2323,	"guis/savecompat/hud_strogg_r3.gui",	"hit_chevron" },
+	{ "guis/vehicles/hud.gui",	2323,	"guis/savecompat/vehicle_hud_r2.gui",	"oq4_prompt_padlock" },
 };
 
 static inline const openQ4SaveGameGuiRevision_t *OpenQ4_FindSaveGameGuiRevision( const char *guiName, int layoutBuild ) {

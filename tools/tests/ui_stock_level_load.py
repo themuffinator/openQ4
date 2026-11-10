@@ -119,6 +119,13 @@ struct idUserInterfaceLocal {
         void Set(const char* key,const char* value) { (*this)[key]=value; }
     } state;
     idStr pendingCmd, returnCmd, source;
+    // The HUD presentations joined to the previous map's windows: a kept GUI
+    // resets what it derived from them and has its peers join again.
+    struct Peer { int rejoined=0; void Rejoin() { ++rejoined; } } peer, air;
+    Peer *remastered=&peer, *essentialHud=&air;
+    int hudResets=0;
+    void ResetHudPresentation(bool sourceChanged) { assert(!sourceChanged); ++hudResets; }
+    struct Evaluated { bool cleared=false; void Clear() { cleared=true; } } evaluatedHudState;
     void Activate(bool,int) {}
     bool KeepForLevelLoad();
 };
@@ -211,6 +218,7 @@ int main() {
     assert(gui.state["text"]=="Test Text!" && gui.state["name"]=="menu.gui" && gui.state["gamePublished"]=="keep me");
     assert(root.page==0 && !gui.initialized && !gui.lightColorVar && !gui.bindHandler);
     assert(gui.pendingCmd.empty() && gui.returnCmd.empty() && gui.interactive);
+    assert(gui.hudResets==1 && gui.peer.rejoined==1 && gui.air.rejoined==1 && gui.evaluatedHudState.cleared);
     vfs.files["menu.gui"]="changed!";
     root.page=2;
     assert(!gui.KeepForLevelLoad() && root.page==2);

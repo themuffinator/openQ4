@@ -1086,6 +1086,9 @@ private:
 	float					dynamicProtectionScale;	// value to scale damage by due to dynamic protection
 	int						lastDamageDef;
 	idVec3					lastDamageDir;
+	// openQ4: when the HUD's damage direction indicator last started. The HUD
+	// follows the view only while it shows; unsaved presentation state.
+	int						hudHitDirTime;
 	int						lastDamageLocation;
 
 	int						predictedFrame;

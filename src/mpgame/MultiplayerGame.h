@@ -1524,6 +1524,16 @@ private:
 	int				hudMatchState;
 	// the respawn prompt last published (oq4_respawn fades it in as it appears)
 	int				hudRespawn;
+	// Dead Zone's score pulse: the scores last seen on this map and when the
+	// pulse last faded, so it starts clean on each map and fades by time
+	// the HUD and game clocks PublishRemasteredHud last published for: a frame
+	// drawn again inside one tic publishes nothing
+	idUserInterface *hudPublishGui;
+	int				hudPublishRealTime;
+	int				hudPublishTime;
+	bool			hudZoneScoresValid;
+	int				hudZoneScores[ 2 ];
+	int				hudZonePulseTime;
 	// the held Remastered scoreboard's scroll in rows, the most it scrolls, and
 	// whether ui_scoreboardScrolls last said it does
 	int				remasteredScoreboardScroll;

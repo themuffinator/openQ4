@@ -227,6 +227,25 @@ static bool openQ4_ExtractKeyBindingIcon( const char *escape, int &keyNum, float
 	return keyNum >= 0 && keyNum <= 0xff;
 }
 
+static bool openQ4_PlainKeyNames( const char *text, idStr &plain ) {
+	plain = text != NULL ? text : "";
+	bool changed = false;
+	for ( int at = plain.Find( "^i" ); at >= 0; at = plain.Find( "^i", true, at + 1 ) ) {
+		int keyNum = 0;
+		if ( at + 5 > plain.Length() || !openQ4_ExtractKeyBindingIcon( plain.c_str() + at, keyNum ) ) {
+			continue;
+		}
+		idStr name = idKeyInput::KeyNumToString( keyNum, true );
+		if ( name.Length() == 1 ) {
+			name.ToUpper();
+		}
+		plain = plain.Left( at ) + name + plain.Right( plain.Length() - at - 5 );
+		at += name.Length() - 1;
+		changed = true;
+	}
+	return changed;
+}
+
 static void openQ4_GetKeyBindingIconInfo( int keyNum, q4KeyBindingIconInfo_t &info ) {
 	info.kind = Q4_KEY_BINDING_KEYBOARD;
 	info.detail = keyNum;
@@ -1683,6 +1702,10 @@ void idDeviceContext::DrawKeyBindingIcon( int keyNum, float x, float baselineY, 
 	SetFontByScale( textScale );
 }
 
+bool idDeviceContext::PlainKeyNames( const char *text, idStr &plain ) {
+	return openQ4_PlainKeyNames( text, plain );
+}
+
 void idDeviceContext::RegisterIcon( const char *code, const char *shader, int x, int y, int w, int h ) {
 	if ( code == NULL || shader == NULL || code[0] == '\0' || shader[0] == '\0' ) {
 		return;
@@ -1927,6 +1950,21 @@ bool idDeviceContext::ClippedCoords(float *x, float *y, float *w, float *h, floa
 
 
 void idDeviceContext::AdjustCoords(float *x, float *y, float *w, float *h) {
+	if ( groupScale != 1.0f ) {
+		// A HUD group's scale about its anchor (SetGroupScale).
+		if ( x ) {
+			*x = groupX + ( *x - groupX ) * groupScale;
+		}
+		if ( y ) {
+			*y = groupY + ( *y - groupY ) * groupScale;
+		}
+		if ( w ) {
+			*w *= groupScale;
+		}
+		if ( h ) {
+			*h *= groupScale;
+		}
+	}
 	if (x) {
 		*x = (*x * xScale) + xOffset;
 	}
@@ -2006,8 +2044,44 @@ void idDeviceContext::CaptureLegacyText(const char* text, const char* family, fl
 	SetDrawColor(savedColour);
 }
 
-void idDeviceContext::SetDrawColor(const idVec4& colour) {
+idVec3 idDeviceContext::GroupOrigin() const {
+	if ( groupScale == 1.0f ) {
+		return origin;
+	}
+	return idVec3( groupX + ( origin.x - groupX ) * groupScale, groupY + ( origin.y - groupY ) * groupScale, origin.z );
+}
+
+// The blend bits of the renderer's draw state (tr_local.h, which interface
+// code does not include): one-plus-one, the additive blend.
+static bool openQ4_MaterialIsAdditive( const idMaterial *material ) {
+	const int srcBlendBits = 0x0000000f, dstBlendBits = 0x000000f0, srcBlendOne = 0x00000000, dstBlendOne = 0x00000020;
+	if ( material == NULL || material->GetNumStages() == 0 ) {
+		return false;
+	}
+	for ( int i = 0; i < material->GetNumStages(); i++ ) {
+		const int bits = material->GetStage( i )->drawStateBits;
+		if ( ( bits & srcBlendBits ) != srcBlendOne || ( bits & dstBlendBits ) != dstBlendOne ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void idDeviceContext::SetDrawColor(const idVec4& colour, const idMaterial* material) {
 	hudColour = colour;
+	if ( drawOpacity < 1.0f ) {
+		// The HUD opacity (SetDrawOpacity): alpha, or the colour of art that
+		// adds its colour whatever its alpha.
+		idVec4 faded = colour;
+		if ( openQ4_MaterialIsAdditive( material ) ) {
+			faded.x *= drawOpacity;
+			faded.y *= drawOpacity;
+			faded.z *= drawOpacity;
+		}
+		faded.w *= drawOpacity;
+		renderSystem->SetColor( faded );
+		return;
+	}
 	renderSystem->SetColor(colour);
 }
 bool idDeviceContext::CaptureHud(const idDrawVert* vertices, const idMaterial* material) {
@@ -2041,8 +2115,9 @@ void idDeviceContext::DrawStretchPic(float x, float y, float w, float h, float s
 	
 	const bool hasTransform = !mat.IsIdentity();
 	if ( hasTransform ) {
+		const idVec3 groupOrigin = GroupOrigin();
 		for ( int i = 0; i < 4; i++ ) {
-			TransformVertInVirtualSpace( verts[i], origin, mat, xScale, yScale, xOffset, yOffset );
+			TransformVertInVirtualSpace( verts[i], groupOrigin, mat, xScale, yScale, xOffset, yOffset );
 		}
 	}
 
@@ -2054,7 +2129,7 @@ void idDeviceContext::DrawStretchPic(float x, float y, float w, float h, float s
 
 void idDeviceContext::DrawMaterial(float x, float y, float w, float h, const idMaterial *mat, const idVec4 &color, float scalex, float scaley) {
 
-	SetDrawColor(color);
+	SetDrawColor(color, mat);
 
 	float	s0, s1, t0, t1;
 // 
@@ -2101,7 +2176,7 @@ void idDeviceContext::DrawMaterial(float x, float y, float w, float h, const idM
 
 void idDeviceContext::DrawMaterialRotated(float x, float y, float w, float h, const idMaterial *mat, const idVec4 &color, float scalex, float scaley, float angle) {
 	
-	SetDrawColor(color);
+	SetDrawColor(color, mat);
 
 	float	s0, s1, t0, t1;
 	// 
@@ -2163,8 +2238,9 @@ void idDeviceContext::DrawStretchPicRotated(float x, float y, float w, float h, 
 
 	const bool ident = !mat.IsIdentity();
 	if ( ident ) {
+		const idVec3 groupOrigin = GroupOrigin();
 		for ( int i = 0; i < 4; i++ ) {
-			TransformVertInVirtualSpace( verts[i], origin, mat, xScale, yScale, xOffset, yOffset );
+			TransformVertInVirtualSpace( verts[i], groupOrigin, mat, xScale, yScale, xOffset, yOffset );
 		}
 	}
 

@@ -1536,6 +1536,7 @@ windowDef Desktop
 			windowDef tourn_topmsg
 			{
 				rect	"gui::oq4_hudEdgeLeft",34,640,32
+				hudanchorx	middle
 				visible	("gui::oq4_hudRemastered" == 0) + "gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * ("oq4_tbar_text::textwidth" > 0)
 				background	"gfx/guis/hud/tourntop_msg"
 				matcolor	0,0,0,0.6
@@ -2917,6 +2918,7 @@ windowDef Desktop
 			windowDef oq4_tourney_rem
 			{
 				rect	"gui::oq4_hudEdgeLeft",0,640,480
+				hudanchorx	middle
 				noclip	1
 				visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras"
 				windowDef oq4_tround1
@@ -2930,14 +2932,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t1b1_plate
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t1b1_blue
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round1_bracket1::matcolor_w" * "desktop::round1_bracket1_done"
 							shear	0,-.22
@@ -2952,7 +2954,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b1_n1
 						{
-							rect	4,3.6,56,12
+							rect	4,1,56,12
+							ellipsis	1
 							text	"gui::name1_round1_bracket1"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -2962,7 +2965,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b1_s1
 						{
-							rect	45,2.68,30,12
+							rect	45,0.9,30,12
 							text	"gui::score1_round1_bracket1"
 							font	"fonts/chain"
 							textscale	0.208
@@ -2994,7 +2997,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b1_n2
 						{
-							rect	4,17.6,56,12
+							rect	4,15,56,12
+							ellipsis	1
 							text	"gui::name2_round1_bracket1"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3004,7 +3008,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b1_s2
 						{
-							rect	45,16.68,30,12
+							rect	45,14.9,30,12
 							text	"gui::score2_round1_bracket1"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3045,14 +3049,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t1b2_plate
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t1b2_blue
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round1_bracket2::matcolor_w" * "desktop::round1_bracket2_done"
 							shear	0,-.22
@@ -3067,7 +3071,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b2_n1
 						{
-							rect	4,3.6,56,12
+							rect	4,1,56,12
+							ellipsis	1
 							text	"gui::name1_round1_bracket2"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3077,7 +3082,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b2_s1
 						{
-							rect	45,2.68,30,12
+							rect	45,0.9,30,12
 							text	"gui::score1_round1_bracket2"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3109,7 +3114,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b2_n2
 						{
-							rect	4,17.6,56,12
+							rect	4,15,56,12
+							ellipsis	1
 							text	"gui::name2_round1_bracket2"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3119,7 +3125,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b2_s2
 						{
-							rect	45,16.68,30,12
+							rect	45,14.9,30,12
 							text	"gui::score2_round1_bracket2"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3160,14 +3166,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t1b3_plate
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t1b3_blue
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round1_bracket3::matcolor_w" * "desktop::round1_bracket3_done"
 							shear	0,-.22
@@ -3182,7 +3188,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b3_n1
 						{
-							rect	4,3.6,56,12
+							rect	4,1,56,12
+							ellipsis	1
 							text	"gui::name1_round1_bracket3"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3192,7 +3199,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b3_s1
 						{
-							rect	45,2.68,30,12
+							rect	45,0.9,30,12
 							text	"gui::score1_round1_bracket3"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3224,7 +3231,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b3_n2
 						{
-							rect	4,17.6,56,12
+							rect	4,15,56,12
+							ellipsis	1
 							text	"gui::name2_round1_bracket3"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3234,7 +3242,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b3_s2
 						{
-							rect	45,16.68,30,12
+							rect	45,14.9,30,12
 							text	"gui::score2_round1_bracket3"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3275,14 +3283,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t1b4_plate
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t1b4_blue
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round1_bracket4::matcolor_w" * "desktop::round1_bracket4_done"
 							shear	0,-.22
@@ -3297,7 +3305,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b4_n1
 						{
-							rect	4,3.6,56,12
+							rect	4,1,56,12
+							ellipsis	1
 							text	"gui::name1_round1_bracket4"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3307,7 +3316,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b4_s1
 						{
-							rect	45,2.68,30,12
+							rect	45,0.9,30,12
 							text	"gui::score1_round1_bracket4"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3339,7 +3348,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b4_n2
 						{
-							rect	4,17.6,56,12
+							rect	4,15,56,12
+							ellipsis	1
 							text	"gui::name2_round1_bracket4"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3349,7 +3359,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b4_s2
 						{
-							rect	45,16.68,30,12
+							rect	45,14.9,30,12
 							text	"gui::score2_round1_bracket4"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3390,14 +3400,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t1b5_plate
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t1b5_blue
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round1_bracket5::matcolor_w" * "desktop::round1_bracket5_done"
 							shear	0,-.22
@@ -3412,7 +3422,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b5_n1
 						{
-							rect	4,3.6,56,12
+							rect	4,1,56,12
+							ellipsis	1
 							text	"gui::name1_round1_bracket5"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3422,7 +3433,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b5_s1
 						{
-							rect	45,2.68,30,12
+							rect	45,0.9,30,12
 							text	"gui::score1_round1_bracket5"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3454,7 +3465,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b5_n2
 						{
-							rect	4,17.6,56,12
+							rect	4,15,56,12
+							ellipsis	1
 							text	"gui::name2_round1_bracket5"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3464,7 +3476,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b5_s2
 						{
-							rect	45,16.68,30,12
+							rect	45,14.9,30,12
 							text	"gui::score2_round1_bracket5"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3505,14 +3517,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t1b6_plate
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t1b6_blue
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round1_bracket6::matcolor_w" * "desktop::round1_bracket6_done"
 							shear	0,-.22
@@ -3527,7 +3539,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b6_n1
 						{
-							rect	4,3.6,56,12
+							rect	4,1,56,12
+							ellipsis	1
 							text	"gui::name1_round1_bracket6"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3537,7 +3550,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b6_s1
 						{
-							rect	45,2.68,30,12
+							rect	45,0.9,30,12
 							text	"gui::score1_round1_bracket6"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3569,7 +3582,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b6_n2
 						{
-							rect	4,17.6,56,12
+							rect	4,15,56,12
+							ellipsis	1
 							text	"gui::name2_round1_bracket6"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3579,7 +3593,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b6_s2
 						{
-							rect	45,16.68,30,12
+							rect	45,14.9,30,12
 							text	"gui::score2_round1_bracket6"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3620,14 +3634,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t1b7_plate
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t1b7_blue
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round1_bracket7::matcolor_w" * "desktop::round1_bracket7_done"
 							shear	0,-.22
@@ -3642,7 +3656,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b7_n1
 						{
-							rect	4,3.6,56,12
+							rect	4,1,56,12
+							ellipsis	1
 							text	"gui::name1_round1_bracket7"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3652,7 +3667,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b7_s1
 						{
-							rect	45,2.68,30,12
+							rect	45,0.9,30,12
 							text	"gui::score1_round1_bracket7"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3684,7 +3699,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b7_n2
 						{
-							rect	4,17.6,56,12
+							rect	4,15,56,12
+							ellipsis	1
 							text	"gui::name2_round1_bracket7"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3694,7 +3710,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b7_s2
 						{
-							rect	45,16.68,30,12
+							rect	45,14.9,30,12
 							text	"gui::score2_round1_bracket7"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3735,14 +3751,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t1b8_plate
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t1b8_blue
 						{
-							rect	0,0,78,30
+							rect	0,-2.3,78,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round1_bracket8::matcolor_w" * "desktop::round1_bracket8_done"
 							shear	0,-.22
@@ -3757,7 +3773,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b8_n1
 						{
-							rect	4,3.6,56,12
+							rect	4,1,56,12
+							ellipsis	1
 							text	"gui::name1_round1_bracket8"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3767,7 +3784,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b8_s1
 						{
-							rect	45,2.68,30,12
+							rect	45,0.9,30,12
 							text	"gui::score1_round1_bracket8"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3799,7 +3816,8 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b8_n2
 						{
-							rect	4,17.6,56,12
+							rect	4,15,56,12
+							ellipsis	1
 							text	"gui::name2_round1_bracket8"
 							font	"fonts/lowpixel"
 							textscale	0.174
@@ -3809,7 +3827,7 @@ windowDef Desktop
 						}
 						windowDef oq4_t1b8_s2
 						{
-							rect	45,16.68,30,12
+							rect	45,14.9,30,12
 							text	"gui::score2_round1_bracket8"
 							font	"fonts/chain"
 							textscale	0.208
@@ -3856,14 +3874,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t2b1_plate
 						{
-							rect	0,0,158,30
+							rect	0,-2.3,158,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t2b1_blue
 						{
-							rect	0,0,158,30
+							rect	0,-2.3,158,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round2_bracket1::matcolor_w" * "desktop::round2_bracket1_done"
 							shear	0,-.22
@@ -3971,14 +3989,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t2b2_plate
 						{
-							rect	0,0,158,30
+							rect	0,-2.3,158,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t2b2_blue
 						{
-							rect	0,0,158,30
+							rect	0,-2.3,158,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round2_bracket2::matcolor_w" * "desktop::round2_bracket2_done"
 							shear	0,-.22
@@ -4086,14 +4104,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t2b3_plate
 						{
-							rect	0,0,158,30
+							rect	0,-2.3,158,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t2b3_blue
 						{
-							rect	0,0,158,30
+							rect	0,-2.3,158,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round2_bracket3::matcolor_w" * "desktop::round2_bracket3_done"
 							shear	0,-.22
@@ -4201,14 +4219,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t2b4_plate
 						{
-							rect	0,0,158,30
+							rect	0,-2.3,158,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t2b4_blue
 						{
-							rect	0,0,158,30
+							rect	0,-2.3,158,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round2_bracket4::matcolor_w" * "desktop::round2_bracket4_done"
 							shear	0,-.22
@@ -4322,14 +4340,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t3b1_plate
 						{
-							rect	0,0,318,30
+							rect	0,-2.3,318,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t3b1_blue
 						{
-							rect	0,0,318,30
+							rect	0,-2.3,318,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round3_bracket1::matcolor_w" * "desktop::round3_bracket1_done"
 							shear	0,-.22
@@ -4437,14 +4455,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t3b2_plate
 						{
-							rect	0,0,318,30
+							rect	0,-2.3,318,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t3b2_blue
 						{
-							rect	0,0,318,30
+							rect	0,-2.3,318,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round3_bracket2::matcolor_w" * "desktop::round3_bracket2_done"
 							shear	0,-.22
@@ -4558,14 +4576,14 @@ windowDef Desktop
 						noclip	1
 						windowDef oq4_t4b1_plate
 						{
-							rect	0,0,638,30
+							rect	0,-2.3,638,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0,0,0,0.55
 							shear	0,-.22
 						}
 						windowDef oq4_t4b1_blue
 						{
-							rect	0,0,638,30
+							rect	0,-2.3,638,34.6
 							background	"gfx/guis/hud/pickupbar"
 							matcolor	0.243,0.341,0.717,"hover_round4_bracket1::matcolor_w" * "desktop::round4_bracket1_done"
 							shear	0,-.22
@@ -4670,27 +4688,31 @@ windowDef Desktop
 				}
 				windowDef oq4_tbar_text
 				{
-					rect	8,37.2,400,16
+					rect	6,35.6,440,16
 					text	"gui::oq4_tourney_label"
 					font	"fonts/lowpixel"
-					textscale	0.2
+					textscale	0.191
 					forecolor	1,1,1,1
 					nowrap	1
+					keynames	1
+					oneline	1
 				}
 				windowDef oq4_thelp1
 				{
-					rect	8,77.28,624,26
+					rect	6,74.6,624,26
 					text	"gui::spectatetext1"
 					font	"fonts/lowpixel"
-					textscale	0.18
+					textscale	0.175
+					keynames	1
 					forecolor	1,1,1,0.7
 				}
 				windowDef oq4_thelp2
 				{
-					rect	8,90.28,624,26
+					rect	6,87.6 + 13 * ("oq4_thelp1::textlines" > 1),624,26
 					text	"gui::spectatetext2"
 					font	"fonts/lowpixel"
-					textscale	0.18
+					textscale	0.175
+					keynames	1
 					forecolor	1,1,1,0.7
 				}
 			}
@@ -4709,7 +4731,7 @@ windowDef Desktop
 				{
 					rect	100 + "gui::oq4_hudEdgeLeft",0,640,62
 					backcolor	0,0,0,0.6
-					visible	"gui::oq4_hudRemastered"
+					visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras"
 				}
 				windowDef tourn_title1
 				{
@@ -4717,7 +4739,7 @@ windowDef Desktop
 					visible	"gui::oq4_hudShowExtras"
 					forecolor	1,1,1,1
 					text	"#str_200943"
-					textscale	0.4
+					textscale	0.4 - 0.028 * "gui::oq4_hudRemastered"
 					font	"fonts/lowpixel"
 					textstyle	1
 					textalign	2
@@ -4728,7 +4750,7 @@ windowDef Desktop
 					visible	"gui::oq4_hudShowExtras"
 					forecolor	1,0.5,0,1
 					text	"#str_200286"
-					textscale	0.4
+					textscale	0.4 - 0.028 * "gui::oq4_hudRemastered"
 					font	"fonts/lowpixel"
 					textstyle	1
 				}
@@ -4773,6 +4795,7 @@ windowDef Desktop
 			windowDef oq4_warmbanner
 			{
 				rect	"gui::oq4_hudEdgeLeft",0,640,480
+				hudanchorx	middle
 				noclip	1
 				visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras"
 				windowDef oq4_warmbanner_slab
@@ -4781,10 +4804,10 @@ windowDef Desktop
 					backcolor	0,0,0,0.6
 					windowDef oq4_warmbanner_title
 					{
-						rect	0,32,640,25
+						rect	0,29.3,640,25
 						text	"#str_200953"
 						font	"fonts/lowpixel"
-						textscale	0.4
+						textscale	0.372
 						textalign	1
 						textstyle	1
 						forecolor	1,1,1,1
@@ -4833,10 +4856,11 @@ windowDef Desktop
 		}
 		windowDef aimText
 		{
-			rect	207,260,215,38
+			rect	207,260 - "gui::oq4_hudEdgeBottom",215,38
 			screenalignx	middle
 			screenaligny	bottom
-			visible	1
+			hudanchory	middle
+			visible	"gui::oq4_hudShowExtras"
 			text	"gui::aim_text"
 			textscale	0.22
 			textalign	1
@@ -4856,10 +4880,11 @@ windowDef Desktop
 		}
 		windowDef aimTextHealth
 		{
-			rect	207,298,215,38
+			rect	207,(298 - 25 * "gui::oq4_hudRemastered") - "gui::oq4_hudEdgeBottom",215,38
 			screenalignx	middle
 			screenaligny	bottom
-			visible	1
+			hudanchory	middle
+			visible	"gui::oq4_hudShowExtras"
 			text	"gui::aim_teammate_health"
 			textscale	0.22
 			textalign	1
@@ -4888,11 +4913,11 @@ windowDef Desktop
 			background	"gfx/guis/hud/pickupbar"
 			matcolor	0,0,0,0.35 * "fragNotice::forecolor_w"
 			shear	0,-.22
-			visible	"gui::oq4_hudRemastered" * ("fragNotice::textwidth" > 0) * "fragNotice::visible"
+			visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * ("fragNotice::textwidth" > 0) * "fragNotice::visible"
 		}
 		windowDef fragNotice
 		{
-			rect	100,81,440,30
+			rect	100,81 - 1000 * "gui::oq4_hudMinimal",440,30
 			screenalignx	middle
 			screenaligny	top
 			visible	0
@@ -5388,31 +5413,40 @@ windowDef Desktop
 						background	"gfx/guis/hud/pickupbar"
 						matcolor	0,0,0,0.5
 						shear	0,-.22
+						visible	("oq4_row1_name::textwidth" > 0)
+					}
+					windowDef oq4_row1_mark
+					{
+						rect	-6.965,4.895,9.43,4.71
+						background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+						matcolor	0.89,0.537,0,1
+						rotate	135
+						visible	"gui::oq4_row1_you" * ("oq4_row1_name::textwidth" > 0)
 					}
 					windowDef oq4_row1_band
 					{
 						rect	2.5,2,145,14
 						backcolor	1,1,0.553,0.16
 						shear	0,-.22
-						visible	"gui::oq4_row1_you"
+						visible	"gui::oq4_row1_you" * ("oq4_row1_name::textwidth" > 0)
 					}
 					windowDef oq4_row1_rim0
 					{
 						rect	2.5,2,145,1
 						backcolor	1,1,0.553,0.32
 						shear	0,-.22
-						visible	"gui::oq4_row1_you"
+						visible	"gui::oq4_row1_you" * ("oq4_row1_name::textwidth" > 0)
 					}
 					windowDef oq4_row1_rim1
 					{
 						rect	2.5,15,145,1
 						backcolor	1,1,0.553,0.32
 						shear	0,-.22
-						visible	"gui::oq4_row1_you"
+						visible	"gui::oq4_row1_you" * ("oq4_row1_name::textwidth" > 0)
 					}
 					windowDef oq4_row1_rank
 					{
-						rect	0,4,28,14
+						rect	1.3,2.7,28,14
 						text	"gui::oq4_rank1"
 						font	"fonts/lowpixel"
 						textscale	0.16
@@ -5422,16 +5456,16 @@ windowDef Desktop
 					}
 					windowDef oq4_row1_name
 					{
-						rect	32,2,76,16
+						rect	30,0,78,16
 						text	"gui::player1_name"
 						font	"fonts/lowpixel"
-						textscale	0.2
+						textscale	0.206
 						forecolor	0.894 + 0.106 * "gui::oq4_row1_you",0.922 + 0.078 * "gui::oq4_row1_you",0.824 + 0.176 * "gui::oq4_row1_you",1
 						nowrap	1
 					}
 					windowDef oq4_row1_score
 					{
-						rect	100 - 13 * ("gui::oq4_limit" > 0),0,44,18
+						rect	101.5 - 13 * ("gui::oq4_limit" > 0),0,44,18
 						text	"gui::player1_score"
 						font	"fonts/chain"
 						textscale	0.27
@@ -5441,7 +5475,7 @@ windowDef Desktop
 					}
 					windowDef oq4_row1_slash
 					{
-						rect	133,6,6,10
+						rect	129.7,3.3,6,10
 						text	"#str_231222"
 						font	"fonts/chain"
 						textscale	0.167
@@ -5450,7 +5484,7 @@ windowDef Desktop
 					}
 					windowDef oq4_row1_limit
 					{
-						rect	138,6,30,10
+						rect	134.7,3.3,30,10
 						text	"gui::oq4_limit"
 						font	"fonts/chain"
 						textscale	0.167
@@ -5512,31 +5546,40 @@ windowDef Desktop
 						background	"gfx/guis/hud/pickupbar"
 						matcolor	0,0,0,0.5
 						shear	0,-.22
+						visible	("oq4_row2_name::textwidth" > 0)
+					}
+					windowDef oq4_row2_mark
+					{
+						rect	-6.965,4.895,9.43,4.71
+						background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+						matcolor	0.89,0.537,0,1
+						rotate	135
+						visible	"gui::oq4_row2_you" * ("oq4_row2_name::textwidth" > 0)
 					}
 					windowDef oq4_row2_band
 					{
 						rect	2.5,2,145,14
 						backcolor	1,1,0.553,0.16
 						shear	0,-.22
-						visible	"gui::oq4_row2_you"
+						visible	"gui::oq4_row2_you" * ("oq4_row2_name::textwidth" > 0)
 					}
 					windowDef oq4_row2_rim0
 					{
 						rect	2.5,2,145,1
 						backcolor	1,1,0.553,0.32
 						shear	0,-.22
-						visible	"gui::oq4_row2_you"
+						visible	"gui::oq4_row2_you" * ("oq4_row2_name::textwidth" > 0)
 					}
 					windowDef oq4_row2_rim1
 					{
 						rect	2.5,15,145,1
 						backcolor	1,1,0.553,0.32
 						shear	0,-.22
-						visible	"gui::oq4_row2_you"
+						visible	"gui::oq4_row2_you" * ("oq4_row2_name::textwidth" > 0)
 					}
 					windowDef oq4_row2_rank
 					{
-						rect	0,4,28,14
+						rect	1.3,2.7,28,14
 						text	"gui::oq4_rank2"
 						font	"fonts/lowpixel"
 						textscale	0.16
@@ -5546,16 +5589,16 @@ windowDef Desktop
 					}
 					windowDef oq4_row2_name
 					{
-						rect	32,2,76,16
+						rect	30,0,78,16
 						text	"gui::player2_name"
 						font	"fonts/lowpixel"
-						textscale	0.2
+						textscale	0.206
 						forecolor	0.894 + 0.106 * "gui::oq4_row2_you",0.922 + 0.078 * "gui::oq4_row2_you",0.824 + 0.176 * "gui::oq4_row2_you",1
 						nowrap	1
 					}
 					windowDef oq4_row2_score
 					{
-						rect	100 - 13 * 0,0,44,18
+						rect	101.5,0,44,18
 						text	"gui::player2_score"
 						font	"fonts/chain"
 						textscale	0.27
@@ -5660,18 +5703,26 @@ windowDef Desktop
 						background	"gfx/guis/mainmenu/marinelogo"
 						matcolor	1,1,1,1
 					}
+					windowDef oq4_team0_mark
+					{
+						rect	-6.965,6.895,9.43,4.71
+						background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+						matcolor	0.89,0.537,0,1
+						rotate	135
+						visible	("gui::oq4_my_team" == 0)
+					}
 					windowDef oq4_team0_name
 					{
-						rect	32,2.38,64,12
+						rect	30,0.4,70,12
 						text	"#str_200197"
 						font	"fonts/lowpixel"
-						textscale	0.13
+						textscale	0.141
 						forecolor	0.667,0.89,0.333,1
 						nowrap	1
 					}
 					windowDef oq4_team0_score
 					{
-						rect	52,-0.56,60,22
+						rect	53.5,-0.56,60,22
 						text	"gui::marine_score"
 						font	"fonts/chain"
 						textscale	0.35
@@ -5681,7 +5732,7 @@ windowDef Desktop
 					}
 					windowDef oq4_team0_slash
 					{
-						rect	112.5,7,6,10
+						rect	112,6.3,6,10
 						text	"#str_231222"
 						font	"fonts/chain"
 						textscale	0.167
@@ -5691,7 +5742,7 @@ windowDef Desktop
 					}
 					windowDef oq4_team0_limit
 					{
-						rect	116,7,30,10
+						rect	115.3,6.3,30,10
 						text	"gui::oq4_limit"
 						font	"fonts/chain"
 						textscale	0.167
@@ -5708,7 +5759,7 @@ windowDef Desktop
 						{
 							rect	-1,-1,20,20
 							background	"gfx/guis/hud/ctf_flag"
-							matcolor	0.416,0.643,0.169,0.45
+							matcolor	0.416,0.643,0.169,0.7
 							shear	0,-.22
 							visible	("gui::oq4_flag0_state" == 0)
 						}
@@ -5873,18 +5924,26 @@ windowDef Desktop
 						background	"gfx/guis/mainmenu/strogglogo"
 						matcolor	1,1,1,1
 					}
+					windowDef oq4_team1_mark
+					{
+						rect	-6.965,6.895,9.43,4.71
+						background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+						matcolor	0.89,0.537,0,1
+						rotate	135
+						visible	("gui::oq4_my_team" == 1)
+					}
 					windowDef oq4_team1_name
 					{
-						rect	32,2.38,64,12
+						rect	30,0.4,70,12
 						text	"#str_200199"
 						font	"fonts/lowpixel"
-						textscale	0.13
+						textscale	0.141
 						forecolor	1,0.557,0,1
 						nowrap	1
 					}
 					windowDef oq4_team1_score
 					{
-						rect	52,-0.56,60,22
+						rect	53.5,-0.56,60,22
 						text	"gui::strogg_score"
 						font	"fonts/chain"
 						textscale	0.35
@@ -5894,7 +5953,7 @@ windowDef Desktop
 					}
 					windowDef oq4_team1_slash
 					{
-						rect	112.5,7,6,10
+						rect	112,6.3,6,10
 						text	"#str_231222"
 						font	"fonts/chain"
 						textscale	0.167
@@ -5904,7 +5963,7 @@ windowDef Desktop
 					}
 					windowDef oq4_team1_limit
 					{
-						rect	116,7,30,10
+						rect	115.3,6.3,30,10
 						text	"gui::oq4_limit"
 						font	"fonts/chain"
 						textscale	0.167
@@ -5921,7 +5980,7 @@ windowDef Desktop
 						{
 							rect	-1,-1,20,20
 							background	"gfx/guis/hud/ctf_flag"
-							matcolor	1,0.482,0.016,0.45
+							matcolor	1,0.482,0.016,0.7
 							shear	0,-.22
 							visible	("gui::oq4_flag1_state" == 0)
 						}
@@ -6174,8 +6233,8 @@ windowDef Desktop
 				definefloat	"review"	("gui::oq4_state" >= 5)
 				definefloat	"timed"	("gui::oq4_countdown" == 0) * ("gui::oq4_state" != 1) * ("gui::oq4_state" != 4) * ("gui::oq4_state" < 5) * ("gui::oq4_timed" != 0) * ("gui::overtime" == 0)
 				definefloat	"over"	("gui::oq4_countdown" == 0) * ("gui::oq4_state" != 1) * ("gui::oq4_state" != 4) * ("gui::oq4_state" < 5) * ("gui::overtime" != 0)
-				definefloat	"untimed"	("gui::oq4_countdown" == 0) * ("gui::oq4_state" != 1) * ("gui::oq4_state" != 4) * ("gui::oq4_state" < 5) * ("gui::oq4_timed" == 0)
-				definefloat	"width"	"oq4_timer::warm" * 112 + "oq4_timer::count" * 104 + "oq4_timer::sudden" * 112 + "oq4_timer::review" * 40 + "oq4_timer::timed" * 60 + "oq4_timer::over" * 120 + "oq4_timer::untimed" * 76
+				definefloat	"untimed"	("gui::oq4_countdown" == 0) * ("gui::oq4_state" != 1) * ("gui::oq4_state" != 4) * ("gui::oq4_state" < 5) * ("gui::oq4_timed" == 0) * ("gui::overtime" == 0)
+				definefloat	"width"	"oq4_timer::warm" * 115 + "oq4_timer::count" * 107 + "oq4_timer::sudden" * 115 + "oq4_timer::review" * 40 + "oq4_timer::timed" * 58 + "oq4_timer::over" * 122 + "oq4_timer::untimed" * 74
 				windowDef oq4_timer_plate
 				{
 					rect	0,0,"oq4_timer::width",16
@@ -6198,71 +6257,71 @@ windowDef Desktop
 				}
 				windowDef oq4_timer_warm
 				{
-					rect	21,3,64,12
+					rect	19,1,72,12
 					text	"#str_231206"
 					font	"fonts/lowpixel"
-					textscale	0.13
+					textscale	0.139
 					forecolor	1,1,1,0.7
 					visible	"oq4_timer::warm"
 					nowrap	1
 				}
 				windowDef oq4_timer_starts
 				{
-					rect	21,3,64,12
+					rect	19,1,72,12
 					text	"#str_231207"
 					font	"fonts/lowpixel"
-					textscale	0.13
+					textscale	0.139
 					forecolor	1,1,1,0.7
 					visible	"oq4_timer::count"
 					nowrap	1
 				}
 				windowDef oq4_timer_sudden
 				{
-					rect	37,3,80,12
+					rect	35,1,80,12
 					text	"#str_231208"
 					font	"fonts/lowpixel"
-					textscale	0.13
+					textscale	0.139
 					forecolor	1,1,1,0.7
 					visible	"oq4_timer::sudden"
 					nowrap	1
 				}
 				windowDef oq4_timer_overtime
 				{
-					rect	21,3,64,12
+					rect	19,1,72,12
 					text	"gui::overtimetext"
 					font	"fonts/lowpixel"
-					textscale	0.13
+					textscale	0.139
 					forecolor	1,1,1,0.7
 					visible	"oq4_timer::over"
 					nowrap	1
 				}
 				windowDef oq4_timer_clock
 				{
-					rect	21 + 16 * "oq4_timer::untimed",0,48,16
+					rect	19.7 + 16 * "oq4_timer::untimed",-2,48,18
 					text	"gui::oq4_clock"
 					font	"fonts/chain"
-					textscale	0.26
+					textscale	0.232
 					forecolor	1 - 0.106 * ("gui::oq4_clock_warn" == 2) * "oq4_timer::timed",1 - (0.255 * ("gui::oq4_clock_warn" == 1) + 0.573 * ("gui::oq4_clock_warn" == 2)) * "oq4_timer::timed",1 - (0.863 * ("gui::oq4_clock_warn" == 1) + 0.663 * ("gui::oq4_clock_warn" == 2)) * "oq4_timer::timed",1 - 0.3 * "oq4_timer::untimed"
 					visible	"oq4_timer::timed" + "oq4_timer::untimed"
 					nowrap	1
 				}
 				windowDef oq4_timer_countdown
 				{
-					rect	"oq4_timer::width" - 52,0,48,16
+					rect	"oq4_timer::width" - 52,-2,48,18
 					text	"gui::oq4_clock"
 					font	"fonts/chain"
-					textscale	0.26
+					textscale	0.232
 					textalign	2
-					forecolor	1,0.745,0.137,1
+					forecolor	1,0.745 + 0.255 * "oq4_timer::over",0.137 + 0.863 * "oq4_timer::over",1
 					visible	"oq4_timer::count" + "oq4_timer::over"
 					nowrap	1
 				}
 				windowDef oq4_timer_ready
 				{
-					rect	"oq4_timer::width" - 64,2,58,12
+					rect	"oq4_timer::width" - 61,-0.4,58,12
 					text	"gui::oq4_mb_ready"
 					font	"fonts/chain"
-					textscale	0.165
+					textscale	0.171
 					textalign	2
 					forecolor	1,1,1,1
 					visible	"oq4_timer::warm" * ("gui::showready" != 0)
@@ -6285,19 +6344,19 @@ windowDef Desktop
 				}
 				windowDef oq4_tplace_round
 				{
-					rect	6,2.91,100,12
+					rect	6,1.6,100,12
 					text	"gui::oq4_tourney_round"
 					font	"fonts/lowpixel"
-					textscale	0.135
+					textscale	0.146
 					forecolor	1,1,1,0.7
 					nowrap	1
 				}
 				windowDef oq4_tplace_arena
 				{
-					rect	"oq4_tplace_round::textwidth" + 14,2.91,100,12
+					rect	"oq4_tplace_round::textwidth" + 14,1.6,100,12
 					text	"gui::oq4_mb_sub"
 					font	"fonts/lowpixel"
-					textscale	0.135
+					textscale	0.146
 					forecolor	1,1,1,0.7
 					nowrap	1
 				}
@@ -6421,12 +6480,21 @@ windowDef Desktop
 					shear	0,-.22
 					visible	"gui::oq4_feed0_you"
 				}
+				windowDef oq4_feed0_mark
+				{
+					rect	"oq4_feed0::left" - 7.965,2.395,9.43,4.71
+					background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+					matcolor	0.89,0.537,0,1
+					rotate	135
+					visible	"gui::oq4_feed0_you"
+				}
 				windowDef oq4_feed0_a
 				{
 					rect	"oq4_feed0::mx" - ("oq4_feed0::qw" + "oq4_feed0::aw"),-1.05,84,17
 					text	"gui::oq4_feed0_attacker"
 					font	"fonts/lowpixel"
 					textscale	0.225
+					ellipsis	1
 					forecolor	"gui::oq4_feed0_youAttacker" + (1 - "gui::oq4_feed0_youAttacker") * ("gui::oq4_feed0_team" * (0.667 + 0.333 * ("gui::oq4_feed0_attackerTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 1),"gui::oq4_feed0_youAttacker" + (1 - "gui::oq4_feed0_youAttacker") * ("gui::oq4_feed0_team" * (0.89 - 0.333 * ("gui::oq4_feed0_attackerTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 1),"gui::oq4_feed0_youAttacker" + (1 - "gui::oq4_feed0_youAttacker") * ("gui::oq4_feed0_team" * (0.333 - 0.333 * ("gui::oq4_feed0_attackerTeam" == 1)) + (1 - "gui::oq4_feed0_team") * 0.553),"gui::oq4_feed0_alpha"
 					visible	"gui::oq4_feed0_hasAttacker"
 					nowrap	1
@@ -6581,12 +6649,21 @@ windowDef Desktop
 					shear	0,-.22
 					visible	"gui::oq4_feed1_you"
 				}
+				windowDef oq4_feed1_mark
+				{
+					rect	"oq4_feed1::left" - 7.965,2.395,9.43,4.71
+					background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+					matcolor	0.89,0.537,0,1
+					rotate	135
+					visible	"gui::oq4_feed1_you"
+				}
 				windowDef oq4_feed1_a
 				{
 					rect	"oq4_feed1::mx" - ("oq4_feed1::qw" + "oq4_feed1::aw"),-1.05,84,17
 					text	"gui::oq4_feed1_attacker"
 					font	"fonts/lowpixel"
 					textscale	0.225
+					ellipsis	1
 					forecolor	"gui::oq4_feed1_youAttacker" + (1 - "gui::oq4_feed1_youAttacker") * ("gui::oq4_feed1_team" * (0.667 + 0.333 * ("gui::oq4_feed1_attackerTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 1),"gui::oq4_feed1_youAttacker" + (1 - "gui::oq4_feed1_youAttacker") * ("gui::oq4_feed1_team" * (0.89 - 0.333 * ("gui::oq4_feed1_attackerTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 1),"gui::oq4_feed1_youAttacker" + (1 - "gui::oq4_feed1_youAttacker") * ("gui::oq4_feed1_team" * (0.333 - 0.333 * ("gui::oq4_feed1_attackerTeam" == 1)) + (1 - "gui::oq4_feed1_team") * 0.553),"gui::oq4_feed1_alpha"
 					visible	"gui::oq4_feed1_hasAttacker"
 					nowrap	1
@@ -6741,12 +6818,21 @@ windowDef Desktop
 					shear	0,-.22
 					visible	"gui::oq4_feed2_you"
 				}
+				windowDef oq4_feed2_mark
+				{
+					rect	"oq4_feed2::left" - 7.965,2.395,9.43,4.71
+					background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+					matcolor	0.89,0.537,0,1
+					rotate	135
+					visible	"gui::oq4_feed2_you"
+				}
 				windowDef oq4_feed2_a
 				{
 					rect	"oq4_feed2::mx" - ("oq4_feed2::qw" + "oq4_feed2::aw"),-1.05,84,17
 					text	"gui::oq4_feed2_attacker"
 					font	"fonts/lowpixel"
 					textscale	0.225
+					ellipsis	1
 					forecolor	"gui::oq4_feed2_youAttacker" + (1 - "gui::oq4_feed2_youAttacker") * ("gui::oq4_feed2_team" * (0.667 + 0.333 * ("gui::oq4_feed2_attackerTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 1),"gui::oq4_feed2_youAttacker" + (1 - "gui::oq4_feed2_youAttacker") * ("gui::oq4_feed2_team" * (0.89 - 0.333 * ("gui::oq4_feed2_attackerTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 1),"gui::oq4_feed2_youAttacker" + (1 - "gui::oq4_feed2_youAttacker") * ("gui::oq4_feed2_team" * (0.333 - 0.333 * ("gui::oq4_feed2_attackerTeam" == 1)) + (1 - "gui::oq4_feed2_team") * 0.553),"gui::oq4_feed2_alpha"
 					visible	"gui::oq4_feed2_hasAttacker"
 					nowrap	1
@@ -6901,12 +6987,21 @@ windowDef Desktop
 					shear	0,-.22
 					visible	"gui::oq4_feed3_you"
 				}
+				windowDef oq4_feed3_mark
+				{
+					rect	"oq4_feed3::left" - 7.965,2.395,9.43,4.71
+					background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+					matcolor	0.89,0.537,0,1
+					rotate	135
+					visible	"gui::oq4_feed3_you"
+				}
 				windowDef oq4_feed3_a
 				{
 					rect	"oq4_feed3::mx" - ("oq4_feed3::qw" + "oq4_feed3::aw"),-1.05,84,17
 					text	"gui::oq4_feed3_attacker"
 					font	"fonts/lowpixel"
 					textscale	0.225
+					ellipsis	1
 					forecolor	"gui::oq4_feed3_youAttacker" + (1 - "gui::oq4_feed3_youAttacker") * ("gui::oq4_feed3_team" * (0.667 + 0.333 * ("gui::oq4_feed3_attackerTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 1),"gui::oq4_feed3_youAttacker" + (1 - "gui::oq4_feed3_youAttacker") * ("gui::oq4_feed3_team" * (0.89 - 0.333 * ("gui::oq4_feed3_attackerTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 1),"gui::oq4_feed3_youAttacker" + (1 - "gui::oq4_feed3_youAttacker") * ("gui::oq4_feed3_team" * (0.333 - 0.333 * ("gui::oq4_feed3_attackerTeam" == 1)) + (1 - "gui::oq4_feed3_team") * 0.553),"gui::oq4_feed3_alpha"
 					visible	"gui::oq4_feed3_hasAttacker"
 					nowrap	1
@@ -7551,7 +7646,7 @@ windowDef Desktop
 			rect	38,132,561,74
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::ig_awards"
+			visible	"gui::ig_awards" * (1 - "gui::oq4_hudMinimal")
 			notime	1
 
 			onTime 2500 {
@@ -7656,7 +7751,7 @@ windowDef Desktop
 		}
 		windowDef p_aud1
 		{
-			rect	4,263,158,16
+			rect	4 + 4 * "gui::oq4_hudRemastered",263 + 134 * "gui::oq4_hudRemastered",158,16
 			screenalignx	left
 			screenaligny	bottom
 			visible	0
@@ -7688,7 +7783,7 @@ windowDef Desktop
 		}
 		windowDef p_aud2
 		{
-			rect	4,286,158,16
+			rect	4 + 4 * "gui::oq4_hudRemastered",286 + 93 * "gui::oq4_hudRemastered",158,16
 			screenalignx	left
 			screenaligny	bottom
 			visible	0
@@ -7727,7 +7822,7 @@ windowDef Desktop
 			screenaligny	top
 			forecolor	1,1,0.549,1
 			textscale	0.38
-			visible	("gui::gametype" != 2)
+			visible	("gui::gametype" != 2) * (1 - "gui::oq4_hudRemastered" * "gui::oq4_spectating")
 			textalign	1
 			textstyle	1
 			textspacing	-1
@@ -7751,9 +7846,9 @@ windowDef Desktop
 			screenalignx	middle
 			screenaligny	top
 			background	"gfx/guis/hud/pickupbar"
-			matcolor	0,0,0,0.35 * "Spectate1::forecolor_w"
+			matcolor	0,0,0,0.35
 			shear	0,-.22
-			visible	"gui::oq4_hudRemastered" * ("Spectate1::textwidth" > 0) * "Spectate1::visible" * ("gui::oq4_state" == 1) * ("gui::oq4_spectating" == 0)
+			visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * ("Spectate1::textwidth" > 0) * "Spectate1::visible" * ("gui::oq4_state" == 1) * ("gui::oq4_spectating" == 0)
 		}
 		windowDef Spectate1
 		{
@@ -7764,7 +7859,9 @@ windowDef Desktop
 			screenaligny	top
 			forecolor	1,1,0.549,1
 			textscale	0.31 - 0.05 * "gui::oq4_hudRemastered"
-			visible	("gui::gametype" != 2)
+			visible	("gui::gametype" != 2) * ((1 - "gui::oq4_hudRemastered") + "gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * ("gui::oq4_state" == 1) * ("gui::oq4_spectating" == 0))
+			keynames	1
+			oneline	1
 			textalign	1
 			textstyle	1
 			textspacing	-1
@@ -7782,12 +7879,573 @@ windowDef Desktop
 			}
 
 		}	
+		// openQ4: the Remastered respawn prompt (ui-visual-design.md 14.9): while you lie dead and the
+		// rules let you back in, the attack control and Respawn on a fitted plate at 0.50 in the lower
+		// third, with the seconds left in Chain while the server holds the respawn.
+		windowDef oq4_respawn
+		{
+			rect	0,318,640,21
+			screenalignx	middle
+			screenaligny	bottom
+			noclip	1
+			visible	"gui::oq4_hudRemastered" * ("gui::oq4_respawn" > 0)
+			definefloat	"held"	("gui::oq4_respawn" == 2) * ("oq4_respawn_in::textwidth" + 8)
+			definefloat	"width"	"oq4_respawn_key::textwidth" + "oq4_respawn_word::textwidth" + "oq4_respawn::held" + 21
+			definefloat	"left"	320 - "oq4_respawn::width" / 2
+			windowDef oq4_respawn_plate
+			{
+				rect	"oq4_respawn::left",0,"oq4_respawn::width",21
+				background	"gfx/guis/hud/pickupbar"
+				matcolor	0,0,0,0.5
+				shear	0,-.22
+			}
+			windowDef oq4_respawn_key
+			{
+				rect	"oq4_respawn::left" + 8,3.4,120,16
+				text	"gui::oq4_key_attack"
+				font	"fonts/lowpixel"
+				textscale	0.2
+				forecolor	1,1,1,0.92
+				nowrap	1
+			}
+			windowDef oq4_respawn_word
+			{
+				rect	"oq4_respawn::left" + 12 + "oq4_respawn_key::textwidth",2.2,160,18
+				text	"#str_231233"
+				font	"fonts/lowpixel"
+				textscale	0.225
+				forecolor	1,1,1,1
+				nowrap	1
+			}
+			windowDef oq4_respawn_in
+			{
+				rect	"oq4_respawn::left" + 20 + "oq4_respawn_key::textwidth" + "oq4_respawn_word::textwidth",1,60,20
+				text	"gui::oq4_respawn_in"
+				font	"fonts/chain"
+				textscale	0.26
+				forecolor	1,0.745,0.137,1
+				visible	("gui::oq4_respawn" == 2)
+				nowrap	1
+			}
+		}
+		// openQ4: the Remastered follow card (ui-visual-design.md 14.9) for spectators: directly above
+		// the status bar, a 236x30 u plate at 0.58 with the followed player's team color at its leading
+		// end, FOLLOWING over the name, their place in #FFBE23 and score in Chain, and the controls
+		// below; free-flying, the card drops toward the bottom edge and reads SPECTATING over Free camera.
+		windowDef oq4_follow
+		{
+			rect	202,360 + 44 * (1 - "gui::oq4_following"),236,50
+			screenalignx	middle
+			screenaligny	bottom
+			noclip	1
+			visible	"gui::oq4_hudRemastered" * "gui::oq4_spectating"
+			windowDef oq4_follow_plate
+			{
+				rect	0,0,236,30
+				background	"gfx/guis/hud/pickupbar"
+				matcolor	0,0,0,0.58
+				shear	0,-.22
+			}
+			windowDef oq4_follow_team0
+			{
+				rect	0,0,7,30
+				backcolor	0.416,0.643,0.169,0.9
+				shear	0,-.22
+				visible	"gui::oq4_following" * ("gui::oq4_follow_team" == 0)
+			}
+			windowDef oq4_follow_team1
+			{
+				rect	0,0,7,30
+				backcolor	1,0.482,0.016,0.9
+				shear	0,-.22
+				visible	"gui::oq4_following" * ("gui::oq4_follow_team" == 1)
+			}
+			windowDef oq4_follow_head
+			{
+				rect	13,2.4,150,10
+				text	"#str_231212"
+				font	"fonts/lowpixel"
+				textscale	0.125
+				forecolor	1,1,1,0.58
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			windowDef oq4_follow_spec
+			{
+				rect	13,2.4,150,10
+				text	"#str_231213"
+				font	"fonts/lowpixel"
+				textscale	0.125
+				forecolor	1,1,1,0.58
+				visible	("gui::oq4_following" == 0)
+				nowrap	1
+			}
+			windowDef oq4_follow_name
+			{
+				rect	13,10.5,152,18
+				text	"gui::oq4_follow_name"
+				font	"fonts/lowpixel"
+				textscale	0.25
+				forecolor	1,1,1,1
+				visible	"gui::oq4_following"
+				nowrap	1
+				ellipsis	1
+			}
+			windowDef oq4_follow_free
+			{
+				rect	13,10.5,152,18
+				text	"#str_231214"
+				font	"fonts/lowpixel"
+				textscale	0.25
+				forecolor	1,1,1,1
+				visible	("gui::oq4_following" == 0)
+				nowrap	1
+			}
+			windowDef oq4_follow_rank
+			{
+				rect	144,13.9,60,14
+				text	"gui::oq4_follow_rank"
+				font	"fonts/lowpixel"
+				textscale	0.16
+				textalign	2
+				forecolor	1,0.745,0.137,1
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			windowDef oq4_follow_score
+			{
+				rect	166,7.8,60,22
+				text	"gui::oq4_follow_score"
+				font	"fonts/chain"
+				textscale	0.29
+				textalign	2
+				forecolor	1,1,1,1
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			// The controls: cycle, previous and free camera while following; follow and scores in the free camera.
+			windowDef oq4_follow_f0_key
+			{
+				rect	(118 - ("oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + "oq4_follow_f1_key::textwidth" + "oq4_follow_f1_word::textwidth" + "oq4_follow_f2_key::textwidth" + "oq4_follow_f2_word::textwidth" + 37) / 2),35.4,120,14
+				text	"gui::oq4_key_attack"
+				font	"fonts/lowpixel"
+				textscale	0.17
+				forecolor	1,1,1,0.92
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			windowDef oq4_follow_f0_word
+			{
+				rect	(118 - ("oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + "oq4_follow_f1_key::textwidth" + "oq4_follow_f1_word::textwidth" + "oq4_follow_f2_key::textwidth" + "oq4_follow_f2_word::textwidth" + 37) / 2) + "oq4_follow_f0_key::textwidth" + 3,35,160,14
+				text	"#str_231215"
+				font	"fonts/lowpixel"
+				textscale	0.16
+				forecolor	1,1,1,0.85
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			windowDef oq4_follow_f1_key
+			{
+				rect	(118 - ("oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + "oq4_follow_f1_key::textwidth" + "oq4_follow_f1_word::textwidth" + "oq4_follow_f2_key::textwidth" + "oq4_follow_f2_word::textwidth" + 37) / 2) + "oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + 17,35.4,120,14
+				text	"gui::oq4_key_prev"
+				font	"fonts/lowpixel"
+				textscale	0.17
+				forecolor	1,1,1,0.92
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			windowDef oq4_follow_f1_word
+			{
+				rect	(118 - ("oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + "oq4_follow_f1_key::textwidth" + "oq4_follow_f1_word::textwidth" + "oq4_follow_f2_key::textwidth" + "oq4_follow_f2_word::textwidth" + 37) / 2) + "oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + 17 + "oq4_follow_f1_key::textwidth" + 3,35,160,14
+				text	"#str_42885"
+				font	"fonts/lowpixel"
+				textscale	0.16
+				forecolor	1,1,1,0.85
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			windowDef oq4_follow_f2_key
+			{
+				rect	(118 - ("oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + "oq4_follow_f1_key::textwidth" + "oq4_follow_f1_word::textwidth" + "oq4_follow_f2_key::textwidth" + "oq4_follow_f2_word::textwidth" + 37) / 2) + "oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + 17 + "oq4_follow_f1_key::textwidth" + "oq4_follow_f1_word::textwidth" + 17,35.4,120,14
+				text	"gui::oq4_key_jump"
+				font	"fonts/lowpixel"
+				textscale	0.17
+				forecolor	1,1,1,0.92
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			windowDef oq4_follow_f2_word
+			{
+				rect	(118 - ("oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + "oq4_follow_f1_key::textwidth" + "oq4_follow_f1_word::textwidth" + "oq4_follow_f2_key::textwidth" + "oq4_follow_f2_word::textwidth" + 37) / 2) + "oq4_follow_f0_key::textwidth" + "oq4_follow_f0_word::textwidth" + 17 + "oq4_follow_f1_key::textwidth" + "oq4_follow_f1_word::textwidth" + 17 + "oq4_follow_f2_key::textwidth" + 3,35,160,14
+				text	"#str_231214"
+				font	"fonts/lowpixel"
+				textscale	0.16
+				forecolor	1,1,1,0.85
+				visible	"gui::oq4_following"
+				nowrap	1
+			}
+			windowDef oq4_follow_s0_key
+			{
+				rect	(118 - ("oq4_follow_s0_key::textwidth" + "oq4_follow_s0_word::textwidth" + "oq4_follow_s1_key::textwidth" + "oq4_follow_s1_word::textwidth" + 20) / 2),35.4,120,14
+				text	"gui::oq4_key_attack"
+				font	"fonts/lowpixel"
+				textscale	0.17
+				forecolor	1,1,1,0.92
+				visible	("gui::oq4_following" == 0)
+				nowrap	1
+			}
+			windowDef oq4_follow_s0_word
+			{
+				rect	(118 - ("oq4_follow_s0_key::textwidth" + "oq4_follow_s0_word::textwidth" + "oq4_follow_s1_key::textwidth" + "oq4_follow_s1_word::textwidth" + 20) / 2) + "oq4_follow_s0_key::textwidth" + 3,35,160,14
+				text	"#str_231216"
+				font	"fonts/lowpixel"
+				textscale	0.16
+				forecolor	1,1,1,0.85
+				visible	("gui::oq4_following" == 0)
+				nowrap	1
+			}
+			windowDef oq4_follow_s1_key
+			{
+				rect	(118 - ("oq4_follow_s0_key::textwidth" + "oq4_follow_s0_word::textwidth" + "oq4_follow_s1_key::textwidth" + "oq4_follow_s1_word::textwidth" + 20) / 2) + "oq4_follow_s0_key::textwidth" + "oq4_follow_s0_word::textwidth" + 17,35.4,120,14
+				text	"gui::oq4_key_scores"
+				font	"fonts/lowpixel"
+				textscale	0.17
+				forecolor	1,1,1,0.92
+				visible	("gui::oq4_following" == 0)
+				nowrap	1
+			}
+			windowDef oq4_follow_s1_word
+			{
+				rect	(118 - ("oq4_follow_s0_key::textwidth" + "oq4_follow_s0_word::textwidth" + "oq4_follow_s1_key::textwidth" + "oq4_follow_s1_word::textwidth" + 20) / 2) + "oq4_follow_s0_key::textwidth" + "oq4_follow_s0_word::textwidth" + 17 + "oq4_follow_s1_key::textwidth" + 3,35,160,14
+				text	"#str_231217"
+				font	"fonts/lowpixel"
+				textscale	0.16
+				forecolor	1,1,1,0.85
+				visible	("gui::oq4_following" == 0)
+				nowrap	1
+			}
+		}
+		// openQ4: the Remastered vote card (ui-visual-design.md 14.9) at the leading edge: the caller,
+		// the fields, the Yes and No keys with their tallies as cells and the time left as a tick ramp,
+		// on a plate at 0.50. After voting only the tallies remain.
+		windowDef oq4_vote
+		{
+			rect	6,150,150,130
+			screenalignx	left
+			noclip	1
+			visible	"gui::oq4_hudRemastered" * ("gui::voteNotice" != 0)
+			definefloat	"rows"	("oq4_vote_l1::textwidth" > 0) + ("oq4_vote_l2::textwidth" > 0) + ("oq4_vote_l3::textwidth" > 0) + ("oq4_vote_l4::textwidth" > 0) + ("oq4_vote_l5::textwidth" > 0) + ("oq4_vote_l6::textwidth" > 0)
+			windowDef oq4_vote_plate
+			{
+				rect	0,0,150,47 + 12 * "oq4_vote::rows"
+				background	"gfx/guis/hud/pickupbar"
+				matcolor	0,0,0,0.5
+				shear	0,-.05
+			}
+			windowDef oq4_vote_title
+			{
+				rect	6,2.6,60,11
+				text	"#str_231209"
+				font	"fonts/lowpixel"
+				textscale	0.142
+				forecolor	1,0.745,0.137,1
+				nowrap	1
+			}
+			windowDef oq4_vote_caller
+			{
+				rect	11 + "oq4_vote_title::textwidth",2.6,90,11
+				text	"gui::oq4_vote_caller"
+				font	"fonts/lowpixel"
+				textscale	0.142
+				forecolor	1,0.745,0.137,1
+				nowrap	1
+				ellipsis	1
+			}
+			windowDef oq4_vote_l1
+			{
+				rect	6,13.5,138,12
+				text	"gui::voteInfo_1"
+				font	"fonts/lowpixel"
+				textscale	0.185
+				forecolor	1,1,1,1
+				nowrap	1
+				ellipsis	1
+			}
+			windowDef oq4_vote_l2
+			{
+				rect	6,25.5,138,12
+				text	"gui::voteInfo_2"
+				font	"fonts/lowpixel"
+				textscale	0.185
+				forecolor	1,1,1,1
+				nowrap	1
+				ellipsis	1
+			}
+			windowDef oq4_vote_l3
+			{
+				rect	6,37.5,138,12
+				text	"gui::voteInfo_3"
+				font	"fonts/lowpixel"
+				textscale	0.185
+				forecolor	1,1,1,1
+				nowrap	1
+				ellipsis	1
+			}
+			windowDef oq4_vote_l4
+			{
+				rect	6,49.5,138,12
+				text	"gui::voteInfo_4"
+				font	"fonts/lowpixel"
+				textscale	0.185
+				forecolor	1,1,1,1
+				nowrap	1
+				ellipsis	1
+			}
+			windowDef oq4_vote_l5
+			{
+				rect	6,61.5,138,12
+				text	"gui::voteInfo_5"
+				font	"fonts/lowpixel"
+				textscale	0.185
+				forecolor	1,1,1,1
+				nowrap	1
+				ellipsis	1
+			}
+			windowDef oq4_vote_l6
+			{
+				rect	6,73.5,138,12
+				text	"gui::voteInfo_6"
+				font	"fonts/lowpixel"
+				textscale	0.185
+				forecolor	1,1,1,1
+				nowrap	1
+				ellipsis	1
+			}
+			windowDef oq4_vote_yes_key
+			{
+				rect	6,(18 + 12 * "oq4_vote::rows") - 0.5,30,12
+				text	"gui::oq4_vote_yes_key"
+				font	"fonts/lowpixel"
+				textscale	0.14
+				forecolor	1,1,1,0.92
+				visible	("gui::oq4_vote_voted" == 0)
+				nowrap	1
+			}
+			windowDef oq4_vote_yes_word
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0),(18 + 12 * "oq4_vote::rows") - 1.6,40,12
+				text	"#str_231210"
+				font	"fonts/lowpixel"
+				textscale	0.155
+				forecolor	0.71,0.78,0.518,1
+				nowrap	1
+			}
+			windowDef oq4_vote_yes_cell0
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 0,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.71,0.78,0.518,0.18 + 0.72 * ("gui::oq4_vote_yes" > 0)
+			}
+			windowDef oq4_vote_yes_cell1
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 6,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.71,0.78,0.518,0.18 + 0.72 * ("gui::oq4_vote_yes" > 1)
+			}
+			windowDef oq4_vote_yes_cell2
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 12,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.71,0.78,0.518,0.18 + 0.72 * ("gui::oq4_vote_yes" > 2)
+			}
+			windowDef oq4_vote_yes_cell3
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 18,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.71,0.78,0.518,0.18 + 0.72 * ("gui::oq4_vote_yes" > 3)
+			}
+			windowDef oq4_vote_yes_cell4
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 24,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.71,0.78,0.518,0.18 + 0.72 * ("gui::oq4_vote_yes" > 4)
+			}
+			windowDef oq4_vote_yes_cell5
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 30,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.71,0.78,0.518,0.18 + 0.72 * ("gui::oq4_vote_yes" > 5)
+			}
+			windowDef oq4_vote_yes_cell6
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 36,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.71,0.78,0.518,0.18 + 0.72 * ("gui::oq4_vote_yes" > 6)
+			}
+			windowDef oq4_vote_yes_cell7
+			{
+				rect	6 + ("oq4_vote_yes_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 42,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.71,0.78,0.518,0.18 + 0.72 * ("gui::oq4_vote_yes" > 7)
+			}
+			windowDef oq4_vote_no_key
+			{
+				rect	74,(18 + 12 * "oq4_vote::rows") - 0.5,30,12
+				text	"gui::oq4_vote_no_key"
+				font	"fonts/lowpixel"
+				textscale	0.14
+				forecolor	1,1,1,0.92
+				visible	("gui::oq4_vote_voted" == 0)
+				nowrap	1
+			}
+			windowDef oq4_vote_no_word
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0),(18 + 12 * "oq4_vote::rows") - 1.6,40,12
+				text	"#str_231211"
+				font	"fonts/lowpixel"
+				textscale	0.155
+				forecolor	0.894,0.427,0.337,1
+				nowrap	1
+			}
+			windowDef oq4_vote_no_cell0
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 0,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.894,0.427,0.337,0.18 + 0.72 * ("gui::oq4_vote_no" > 0)
+			}
+			windowDef oq4_vote_no_cell1
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 6,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.894,0.427,0.337,0.18 + 0.72 * ("gui::oq4_vote_no" > 1)
+			}
+			windowDef oq4_vote_no_cell2
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 12,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.894,0.427,0.337,0.18 + 0.72 * ("gui::oq4_vote_no" > 2)
+			}
+			windowDef oq4_vote_no_cell3
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 18,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.894,0.427,0.337,0.18 + 0.72 * ("gui::oq4_vote_no" > 3)
+			}
+			windowDef oq4_vote_no_cell4
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 24,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.894,0.427,0.337,0.18 + 0.72 * ("gui::oq4_vote_no" > 4)
+			}
+			windowDef oq4_vote_no_cell5
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 30,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.894,0.427,0.337,0.18 + 0.72 * ("gui::oq4_vote_no" > 5)
+			}
+			windowDef oq4_vote_no_cell6
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 36,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.894,0.427,0.337,0.18 + 0.72 * ("gui::oq4_vote_no" > 6)
+			}
+			windowDef oq4_vote_no_cell7
+			{
+				rect	74 + ("oq4_vote_no_key::textwidth" + 4) * ("gui::oq4_vote_voted" == 0) + 42,(18 + 12 * "oq4_vote::rows") + 10,4,4
+				backcolor	0.894,0.427,0.337,0.18 + 0.72 * ("gui::oq4_vote_no" > 7)
+			}
+			windowDef oq4_vote_tick0
+			{
+				rect	6,(18 + 12 * "oq4_vote::rows") + 21,1.4,1
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 0)
+			}
+			windowDef oq4_vote_tick1
+			{
+				rect	13,(18 + 12 * "oq4_vote::rows") + 20.85,1.4,1.15
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 1)
+			}
+			windowDef oq4_vote_tick2
+			{
+				rect	20,(18 + 12 * "oq4_vote::rows") + 20.7,1.4,1.3
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 2)
+			}
+			windowDef oq4_vote_tick3
+			{
+				rect	27,(18 + 12 * "oq4_vote::rows") + 20.55,1.4,1.45
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 3)
+			}
+			windowDef oq4_vote_tick4
+			{
+				rect	34,(18 + 12 * "oq4_vote::rows") + 20.4,1.4,1.6
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 4)
+			}
+			windowDef oq4_vote_tick5
+			{
+				rect	41,(18 + 12 * "oq4_vote::rows") + 20.25,1.4,1.75
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 5)
+			}
+			windowDef oq4_vote_tick6
+			{
+				rect	48,(18 + 12 * "oq4_vote::rows") + 20.1,1.4,1.9
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 6)
+			}
+			windowDef oq4_vote_tick7
+			{
+				rect	55,(18 + 12 * "oq4_vote::rows") + 19.95,1.4,2.05
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 7)
+			}
+			windowDef oq4_vote_tick8
+			{
+				rect	62,(18 + 12 * "oq4_vote::rows") + 19.8,1.4,2.2
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 8)
+			}
+			windowDef oq4_vote_tick9
+			{
+				rect	69,(18 + 12 * "oq4_vote::rows") + 19.65,1.4,2.35
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 9)
+			}
+			windowDef oq4_vote_tick10
+			{
+				rect	76,(18 + 12 * "oq4_vote::rows") + 19.5,1.4,2.5
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 10)
+			}
+			windowDef oq4_vote_tick11
+			{
+				rect	83,(18 + 12 * "oq4_vote::rows") + 19.35,1.4,2.65
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 11)
+			}
+			windowDef oq4_vote_tick12
+			{
+				rect	90,(18 + 12 * "oq4_vote::rows") + 19.2,1.4,2.8
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 12)
+			}
+			windowDef oq4_vote_tick13
+			{
+				rect	97,(18 + 12 * "oq4_vote::rows") + 19.05,1.4,2.95
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 13)
+			}
+			windowDef oq4_vote_tick14
+			{
+				rect	104,(18 + 12 * "oq4_vote::rows") + 18.9,1.4,3.1
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 14)
+			}
+			windowDef oq4_vote_tick15
+			{
+				rect	111,(18 + 12 * "oq4_vote::rows") + 18.75,1.4,3.25
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 15)
+			}
+			windowDef oq4_vote_tick16
+			{
+				rect	118,(18 + 12 * "oq4_vote::rows") + 18.6,1.4,3.4
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 16)
+			}
+			windowDef oq4_vote_tick17
+			{
+				rect	125,(18 + 12 * "oq4_vote::rows") + 18.45,1.4,3.55
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 17)
+			}
+			windowDef oq4_vote_tick18
+			{
+				rect	132,(18 + 12 * "oq4_vote::rows") + 18.3,1.4,3.7
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 18)
+			}
+			windowDef oq4_vote_tick19
+			{
+				rect	139,(18 + 12 * "oq4_vote::rows") + 18.15,1.4,3.85
+				backcolor	1,0.745,0.137,0.15 + 0.65 * ("gui::oq4_vote_left" > 19)
+			}
+		}
 		windowDef voteNotice
 		{
 			rect	4,145,632,31
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::voteNotice"
+			visible	"gui::voteNotice" * (1 - "gui::oq4_hudRemastered")
 			forecolor	1,1,.552,1
 			text	"gui::voteNoticeText"
 			textscale	0.2
@@ -7799,7 +8457,7 @@ windowDef Desktop
 			rect	4,173,632,16
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::voteNotice"
+			visible	"gui::voteNotice" * (1 - "gui::oq4_hudRemastered")
 			forecolor	1,1,1,1
 			text	"gui::voteInfo_1"
 			textscale	0.2
@@ -7811,7 +8469,7 @@ windowDef Desktop
 			rect	4,187,632,16
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::voteNotice"
+			visible	"gui::voteNotice" * (1 - "gui::oq4_hudRemastered")
 			forecolor	1,1,1,1
 			text	"gui::voteInfo_2"
 			textscale	0.2
@@ -7823,7 +8481,7 @@ windowDef Desktop
 			rect	4,201,632,16
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::voteNotice"
+			visible	"gui::voteNotice" * (1 - "gui::oq4_hudRemastered")
 			forecolor	1,1,1,1
 			text	"gui::voteInfo_3"
 			textscale	0.2
@@ -7835,7 +8493,7 @@ windowDef Desktop
 			rect	4,215,632,16
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::voteNotice"
+			visible	"gui::voteNotice" * (1 - "gui::oq4_hudRemastered")
 			forecolor	1,1,1,1
 			text	"gui::voteInfo_4"
 			textscale	0.2
@@ -7847,7 +8505,7 @@ windowDef Desktop
 			rect	4,229,632,16
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::voteNotice"
+			visible	"gui::voteNotice" * (1 - "gui::oq4_hudRemastered")
 			forecolor	1,1,1,1
 			text	"gui::voteInfo_5"
 			textscale	0.2
@@ -7859,7 +8517,7 @@ windowDef Desktop
 			rect	4,243,632,16
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::voteNotice"
+			visible	"gui::voteNotice" * (1 - "gui::oq4_hudRemastered")
 			forecolor	1,1,1,1
 			text	"gui::voteInfo_6"
 			textscale	0.2
@@ -7871,7 +8529,7 @@ windowDef Desktop
 			rect	4,257,632,16
 			screenalignx	middle
 			screenaligny	top
-			visible	"gui::voteNotice"
+			visible	"gui::voteNotice" * (1 - "gui::oq4_hudRemastered")
 			forecolor	1,1,1,1
 			text	"gui::voteInfo_7"
 			textscale	0.2
@@ -7952,12 +8610,18 @@ windowDef Desktop
 		// supplies complete, localized lines from the recipient-scoped match view.
 		// A single gate keeps the stock/casual presentation unchanged when no
 		// managed session is active.
+		// openQ4: in a Remastered layout the card sits under the kill feed (y 90, 106 in Tourney), as the
+		// retained HUD's does; the wrapper moves it, and the card keeps its required rectangle.
+		windowDef oq4_match_context_layout
+		{
+		rect	0,"gui::oq4_hudRemastered" * (82 + 16 * ("gui::gametype" == 2)),640,480
+		noclip	1
 		windowDef oq4_match_context_hud
 		{
 			rect	400,8,232,106
 			screenalignx	right
 			screenaligny	top
-			visible	( "gui::match_context_visible" == 1 )
+			visible	( "gui::match_context_visible" == 1 ) * "gui::oq4_hudShowExtras"
 			backcolor	0.015,0.022,0.014,0.72
 			bordercolor	0.95,0.49,0.06,0.55
 			bordersize	1
@@ -8053,6 +8717,7 @@ windowDef Desktop
 				textscale	0.18
 			}
 		}
+		}
 	}
 
 	windowDef oq4_main_plate
@@ -8063,17 +8728,17 @@ windowDef Desktop
 		background	"gfx/guis/hud/pickupbar"
 		matcolor	0,0,0,0.35 * "mainNotice::forecolor_w"
 		shear	0,-.22
-		visible	"gui::oq4_hudRemastered" * ("mainNotice::textwidth" > 0) * "mainNotice::visible"
+		visible	"gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * ("mainNotice::textwidth" > 0) * "mainNotice::visible"
 	}
 	windowDef mainNotice
 	{
-		rect	120,102 + "gui::oq4_hudRemastered" * (26.4 * ("fragNotice::textwidth" > 0) * "fragNotice::visible" - 21),400,30
+		rect	120,(102 + "gui::oq4_hudRemastered" * (26.4 * ("fragNotice::textwidth" > 0) * "fragNotice::visible" - 23.5)) - 1000 * "gui::oq4_hudMinimal",400,30
 		screenalignx	middle
 		screenaligny	top
 		visible	1
 		text	"gui::main_notice_text"
 		font	"fonts/lowpixel"
-		textscale	0.32
+		textscale	0.32 - 0.021 * "gui::oq4_hudRemastered"
 		textstyle	1
 		textalign	1
 		forecolor	1,1,0.549,1
@@ -8119,6 +8784,7 @@ windowDef Desktop
 	// anything wider than 16:9.
 	windowDef oq4_arena_frame_fit
 	{
+		hudanchorx	none
 		rect	0,0,1,1
 		visible	1
 		notime	1
@@ -8138,6 +8804,7 @@ windowDef Desktop
 	// clipped by the letterbox on any aspect.
 	windowDef oq4_arena_frame_metrics
 	{
+		hudanchorx	none
 		rect	0,0,1,1
 		visible	1
 		notime	1
@@ -8152,6 +8819,7 @@ windowDef Desktop
 	// hard-code the very canvas-relative geometry this layer must derive.
 	windowDef oq4_arena_frame
 	{
+		hudanchorx	none
 		rect	0,0,1,1
 		visible	1
 		notime	1
@@ -8165,6 +8833,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_present_shade
 	{
+		hudanchorx	none
 		rect	( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
 		visible	"Desktop::arena_presentVisible"
 		backcolor	0,0,0,0
@@ -8173,6 +8842,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_letterbox_top
 	{
+		hudanchorx	none
 		rect	( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( "oq4_arena_frame::bar" * "oq4_arena_frame::open" )
 		visible	"Desktop::arena_presentVisible"
 		backcolor	0.005,0.008,0.005,0.98
@@ -8181,6 +8851,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_letterbox_bottom
 	{
+		hudanchorx	none
 		rect	( 0 - "gui::virtual_screen_x_expand" ),( ( 480 + "gui::virtual_screen_y_expand" ) - ( "oq4_arena_frame::bar" * "oq4_arena_frame::open" ) ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( "oq4_arena_frame::bar" * "oq4_arena_frame::open" )
 		visible	"Desktop::arena_presentVisible"
 		backcolor	0.005,0.008,0.005,0.98
@@ -8191,6 +8862,7 @@ windowDef Desktop
 	// grow out to meet them; their own fade carries the reveal.
 	windowDef oq4_arena_rule_top
 	{
+		hudanchorx	none
 		rect	64,( "oq4_arena_frame::top" + 6 ),512,1
 		visible	"Desktop::arena_presentVisible"
 		backcolor	0.95,0.49,0.06,0
@@ -8199,6 +8871,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_rule_bottom
 	{
+		hudanchorx	none
 		rect	64,( "oq4_arena_frame::bottom" - 7 ),512,1
 		visible	"Desktop::arena_presentVisible"
 		backcolor	0.95,0.49,0.06,0
@@ -8207,6 +8880,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_entrance_kicker
 	{
+		hudanchorx	none
 		rect	80,151,480,22
 		visible	( "Desktop::arena_presentVisible" == 1 && ( "Desktop::arena_presentMode" == 1 || "Desktop::arena_presentMode" == 3 ) )
 		forecolor	0.95,0.72,0.25,0
@@ -8219,6 +8893,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_entrance_title
 	{
+		hudanchorx	none
 		rect	48,181,544,56
 		visible	( "Desktop::arena_presentVisible" == 1 && ( "Desktop::arena_presentMode" == 1 || "Desktop::arena_presentMode" == 3 ) )
 		forecolor	1,0.97,0.84,0
@@ -8231,6 +8906,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_entrance_subtitle
 	{
+		hudanchorx	none
 		rect	80,244,480,24
 		visible	( "Desktop::arena_presentVisible" == 1 && ( "Desktop::arena_presentMode" == 1 || "Desktop::arena_presentMode" == 3 ) )
 		forecolor	0.78,0.84,0.69,0
@@ -8243,6 +8919,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_entrance_ready
 	{
+		hudanchorx	none
 		rect	120,288,400,21
 		visible	( "Desktop::arena_presentVisible" == 1 && "Desktop::arena_presentMode" == 1 )
 		forecolor	0.95,0.49,0.06,0
@@ -8259,6 +8936,7 @@ windowDef Desktop
 	// Every offset below reproduces the authored 16:9 position exactly.
 	windowDef oq4_arena_victory_kicker
 	{
+		hudanchorx	none
 		rect	80,( "oq4_arena_frame::top" + 32 ),480,22
 		visible	( "Desktop::arena_presentVisible" == 1 && "Desktop::arena_presentMode" == 2 )
 		forecolor	0.95,0.72,0.25,0
@@ -8271,6 +8949,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_victory_title
 	{
+		hudanchorx	none
 		rect	48,( "oq4_arena_frame::top" + 60 ),544,52
 		visible	( "Desktop::arena_presentVisible" == 1 && "Desktop::arena_presentMode" == 2 )
 		forecolor	1,0.97,0.84,0
@@ -8283,6 +8962,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_victor_card
 	{
+		hudanchorx	none
 		rect	160,( "oq4_arena_frame::bottom" - 118 ),320,76
 		visible	( "Desktop::arena_presentVisible" == 1 && "Desktop::arena_presentMode" == 2 && "gui::arena_presentHasVictor" == 1 )
 		backcolor	0.015,0.022,0.014,0
@@ -8293,6 +8973,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_victor_label
 	{
+		hudanchorx	none
 		rect	176,( "oq4_arena_frame::bottom" - 107 ),288,17
 		visible	( "Desktop::arena_presentVisible" == 1 && "Desktop::arena_presentMode" == 2 && "gui::arena_presentHasVictor" == 1 )
 		forecolor	0.67,0.75,0.56,0
@@ -8305,6 +8986,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_victor_name
 	{
+		hudanchorx	none
 		rect	176,( "oq4_arena_frame::bottom" - 84 ),288,28
 		visible	( "Desktop::arena_presentVisible" == 1 && "Desktop::arena_presentMode" == 2 && "gui::arena_presentHasVictor" == 1 )
 		forecolor	1,0.94,0.76,0
@@ -8317,6 +8999,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_victory_score
 	{
+		hudanchorx	none
 		rect	220,( "oq4_arena_frame::top" + 119 ),200,26
 		visible	( "Desktop::arena_presentVisible" == 1 && "Desktop::arena_presentMode" == 2 )
 		forecolor	0.95,0.72,0.25,0
@@ -8329,6 +9012,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_recording_result
 	{
+		hudanchorx	none
 		rect	160,( "oq4_arena_frame::bottom" - 31 ),320,18
 		visible	( "Desktop::arena_presentVisible" == 1 && "Desktop::arena_presentMode" == 2 )
 		forecolor	0.67,0.75,0.56,0
@@ -8345,6 +9029,7 @@ windowDef Desktop
 	// takes it over, or a clear retires it.
 	windowDef oq4_arena_present_intro
 	{
+		hudanchorx	none
 		rect	0,0,1,1
 		visible	1
 		notime	1
@@ -8385,6 +9070,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_present_entrance
 	{
+		hudanchorx	none
 		rect	0,0,1,1
 		visible	1
 		notime	1
@@ -8460,6 +9146,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_present_victory
 	{
+		hudanchorx	none
 		rect	0,0,1,1
 		visible	1
 		notime	1
@@ -8507,6 +9194,7 @@ windowDef Desktop
 
 	windowDef oq4_arena_present_clear
 	{
+		hudanchorx	none
 		rect	0,0,1,1
 		visible	1
 		notime	1

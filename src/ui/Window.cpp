@@ -752,24 +752,89 @@ float idWindow::GetMaxCharWidth() {
 
 /*
 ================
+idWindow::MeasureText
+
+openQ4: "textwidth" and "textlines" for the windows something reads them from,
+and the "ellipsis" line. The widest of the text's explicit lines, up to the
+text rectangle; a single line too wide for an ellipsis window is shortened to
+fit with "...". Measured again only when the text, its scale, font or spacing
+or the rectangle's width changes: fitted plates read these every frame.
+================
+*/
+void idWindow::MeasureText() {
+	const float scale = textScale;
+	const float spacing = textspacing;
+	const bool remastered = gui != NULL && gui->LegacyRemastered();
+	if ( measuredFont == fontNum && measuredScale == scale && measuredSpacing == spacing && measuredRect == textRect.w &&
+			measuredRemastered == remastered && measuredText.Cmp( text.c_str() ) == 0 ) {
+		return;
+	}
+	measuredRemastered = remastered;
+	measuredFont = fontNum;
+	measuredScale = scale;
+	measuredSpacing = spacing;
+	measuredRect = textRect.w;
+	measuredText = text.c_str();
+	// What draws: the text, with its keys named and its lines joined where a
+	// Remastered layout's window asks for that.
+	measuredShortened = remastered && textKeyNames && idDeviceContext::PlainKeyNames( measuredText.c_str(), measuredDrawn );
+	idStr shownText = measuredShortened ? measuredDrawn : measuredText;
+	if ( remastered && textOneLine && shownText.Find( '\n' ) >= 0 ) {
+		shownText.Replace( "\n", " " );
+		measuredDrawn = shownText;
+		measuredShortened = true;
+	}
+	const int adjust = static_cast<int>( spacing );
+	float widest = 0.0f;
+	int lines = 0;
+	const char *line = shownText.c_str();
+	while ( line != NULL && *line != '\0' ) {
+		const char *end = strchr( line, '\n' );
+		const idStr part = end != NULL ? idStr( line, 0, static_cast<int>( end - line ) ) : idStr( line );
+		widest = Max( widest, static_cast<float>( dc->TextWidth( part, scale, 0, adjust ) ) );
+		++lines;
+		line = end != NULL ? end + 1 : NULL;
+	}
+	if ( textEllipsis && lines == 1 && widest > textRect.w && textRect.w > 0.0f ) {
+		// Drop whole characters (UTF-8 continuation bytes with their lead, a
+		// color escape whole) until the line and its dots fit.
+		const float dots = static_cast<float>( dc->TextWidth( "...", scale, 0, adjust ) );
+		idStr shown = shownText;
+		while ( shown.Length() > 0 ) {
+			int cut = shown.Length() - 1;
+			while ( cut > 0 && ( static_cast<unsigned char>( shown[cut] ) & 0xC0 ) == 0x80 ) {
+				cut--;
+			}
+			shown.CapLength( cut );
+			shown.StripTrailingWhitespace();
+			// never leave half of a "^N" color escape behind
+			if ( shown.Length() > 0 && shown[shown.Length() - 1] == '^' ) {
+				shown.CapLength( shown.Length() - 1 );
+			}
+			widest = static_cast<float>( dc->TextWidth( shown, scale, 0, adjust ) ) + dots;
+			if ( widest <= textRect.w ) {
+				break;
+			}
+		}
+		measuredDrawn = shown + "...";
+		measuredShortened = true;
+	}
+	measuredWidth = Min( textRect.w, widest );
+	measuredLines = static_cast<float>( lines );
+}
+
+/*
+================
 idWindow::Draw
 ================
 */
 void idWindow::Draw( int time, float x, float y ) {
-	if ( measureTextWidth ) {
-		// The widest of its explicit lines, up to the text rectangle.
-		float widest = 0.0f;
-		int lines = 0;
-		const char *line = text.c_str();
-		while ( line != NULL && *line != '\0' ) {
-			const char *end = strchr( line, '\n' );
-			const idStr part = end != NULL ? idStr( line, 0, static_cast<int>( end - line ) ) : idStr( line );
-			widest = Max( widest, static_cast<float>( dc->TextWidth( part, textScale, 0, static_cast<int>( textspacing ) ) ) );
-			++lines;
-			line = end != NULL ? end + 1 : NULL;
+	if ( measureTextWidth || textEllipsis || textKeyNames || textOneLine ) {
+		MeasureText();
+		if ( measureTextWidth ) {
+			textWidth = measuredWidth;
+			textLines = measuredLines;
 		}
-		textWidth = Min( textRect.w, widest );
-		textLines = static_cast<float>( lines );
 	}
 	if ( text.Length() == 0 ) {
 		return;
@@ -777,7 +842,8 @@ void idWindow::Draw( int time, float x, float y ) {
 	const int textAdjust = static_cast<int>( textspacing );
 	const int style = static_cast<int>( textstyle );
 	const bool isChatWindow = ( flags & WIN_CHATWINDOW ) != 0;
-	dc->DrawText( text, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style, isChatWindow );
+	const char *drawn = ( textEllipsis || textKeyNames || textOneLine ) && measuredShortened ? measuredDrawn.c_str() : text.c_str();
+	dc->DrawText( drawn, textScale, textAlign, foreColor, textRect, !( flags & WIN_NOWRAP ), -1, false, NULL, 0, textAdjust, style, isChatWindow );
 
 	if ( gui_edit.GetBool() ) {
 		dc->EnableClipping( false );
@@ -1946,6 +2012,22 @@ void idWindow::Redraw(float x, float y) {
 
 	CalcClientRect(0, 0);
 
+	// openQ4: the stock interface's HUD scale. This window's group scales
+	// about its screen anchor for as long as it and its children draw.
+	const bool hudScaled = !( flags & WIN_DESKTOP ) && gui->LegacyScale() != 1.0f;
+	const idLegacyHudGroup hudGroup( hudScaled ? gui : NULL, dc, hudScaled ? HudGroupAnchorX() : -1, hudScaled ? HudGroupAnchorY() : -1 );
+	// A window that fills the canvas is a full-screen layer (a fade, a damage
+	// vignette), not a HUD group: it draws itself unscaled, so a smaller HUD
+	// leaves no uncovered border, unless it names its anchor. Its children
+	// keep their groups.
+	const bool hudWholeCanvas = hudScaled && hudAnchorX == HUD_ANCHOR_UNSET && hudAnchorY == HUD_ANCHOR_UNSET &&
+		rect.w() >= forceAspectWidth && rect.h() >= forceAspectHeight;
+	float hudGroupX = 0.0f, hudGroupY = 0.0f, hudGroupScale = 1.0f;
+	if ( hudWholeCanvas ) {
+		dc->GetGroupScale( hudGroupX, hudGroupY, hudGroupScale );
+		dc->SetGroupScale( 0.0f, 0.0f, 1.0f );
+	}
+
 	SetFont();
 	//if (flags & WIN_DESKTOP) {
 		// see if this window forces a new aspect ratio
@@ -1993,6 +2075,10 @@ void idWindow::Redraw(float x, float y) {
 
 	if ( gui_debug.GetInteger() ) {
 		DebugDraw(time, x, y);
+	}
+
+	if ( hudWholeCanvas ) {
+		dc->SetGroupScale( hudGroupX, hudGroupY, hudGroupScale );
 	}
 
 	int c = drawWindows.Num();
@@ -2073,6 +2159,31 @@ void idWindow::InitFromDictionary(idDict *dict, bool byName) {
 
 /*
 ================
+idWindow::HudGroupAnchorX / HudGroupAnchorY
+
+openQ4: the anchor this window gives its HUD scale group on each axis: the one
+it names (hudanchorx, hudanchory), else the screen edge its alignment moves it
+to, where that alignment applies (CalcClientRect), else its ancestors'.
+================
+*/
+int idWindow::HudGroupAnchorX() const {
+	if ( hudAnchorX != HUD_ANCHOR_UNSET ) {
+		return hudAnchorX;
+	}
+	const bool applies = ( parent == NULL ) || ( ( parent->GetFlags() & WIN_DESKTOP ) != 0 ) || ( parent->GetScreenAlignX() == SCREEN_ALIGN_X_MIDDLE );
+	return applies && screenAlignX != SCREEN_ALIGN_X_MIDDLE ? screenAlignX : -1;
+}
+
+int idWindow::HudGroupAnchorY() const {
+	if ( hudAnchorY != HUD_ANCHOR_UNSET ) {
+		return hudAnchorY;
+	}
+	const bool applies = ( parent == NULL ) || ( ( parent->GetFlags() & WIN_DESKTOP ) != 0 ) || ( parent->GetScreenAlignY() == SCREEN_ALIGN_Y_MIDDLE );
+	return applies && screenAlignY != SCREEN_ALIGN_Y_MIDDLE ? screenAlignY : -1;
+}
+
+/*
+================
 idWindow::CalcClientRect
 ================
 */
@@ -2101,7 +2212,7 @@ void idWindow::CalcClientRect(float xofs, float yofs) {
 	const bool applyScreenAlignX = ( parent == NULL ) || ( ( parent->GetFlags() & WIN_DESKTOP ) != 0 ) || ( parent->GetScreenAlignX() == SCREEN_ALIGN_X_MIDDLE );
 	const bool applyScreenAlignY = ( parent == NULL ) || ( ( parent->GetFlags() & WIN_DESKTOP ) != 0 ) || ( parent->GetScreenAlignY() == SCREEN_ALIGN_Y_MIDDLE );
 	if ( dc != NULL && ( applyScreenAlignX || applyScreenAlignY ) &&
-			!( gui != NULL && idRetainedHud::UsesClassicCanvas( gui->GetSourceFile() ) ) ) {
+			!( gui != NULL && gui->ClassicCanvas() ) ) {
 		float xExpand = 0.0f;
 		float yExpand = 0.0f;
 		dc->GetVirtualScreenExpansion( forceAspectWidth, forceAspectHeight, xExpand, yExpand );
@@ -3144,6 +3255,48 @@ bool idWindow::ParseInternalVar(const char *_name, idParser *src) {
 		if ( !ParseScreenAlignYToken( token, screenAlignY ) ) {
 			src->Warning( "Unknown screenAlignY value '%s' in window '%s' (expected: middle|top|bottom)", token.c_str(), GetName() );
 		}
+		return true;
+	}
+	if ( idStr::Icmp( _name, "hudanchorx" ) == 0 ) {
+		idToken token;
+		if ( !src->ReadToken( &token ) ) {
+			return false;
+		}
+		unsigned char anchor = SCREEN_ALIGN_X_MIDDLE;
+		if ( token.Icmp( "none" ) == 0 ) {
+			hudAnchorX = HUD_ANCHOR_NONE;
+		} else if ( ParseScreenAlignXToken( token, anchor ) ) {
+			hudAnchorX = anchor;
+		} else {
+			src->Warning( "Unknown hudanchorx value '%s' in window '%s' (expected: middle|left|right)", token.c_str(), GetName() );
+		}
+		return true;
+	}
+	if ( idStr::Icmp( _name, "hudanchory" ) == 0 ) {
+		idToken token;
+		if ( !src->ReadToken( &token ) ) {
+			return false;
+		}
+		unsigned char anchor = SCREEN_ALIGN_Y_MIDDLE;
+		if ( token.Icmp( "none" ) == 0 ) {
+			hudAnchorY = HUD_ANCHOR_NONE;
+		} else if ( ParseScreenAlignYToken( token, anchor ) ) {
+			hudAnchorY = anchor;
+		} else {
+			src->Warning( "Unknown hudanchory value '%s' in window '%s' (expected: middle|top|bottom)", token.c_str(), GetName() );
+		}
+		return true;
+	}
+	if ( idStr::Icmp( _name, "ellipsis" ) == 0 ) {
+		textEllipsis = src->ParseBool();
+		return true;
+	}
+	if ( idStr::Icmp( _name, "keynames" ) == 0 ) {
+		textKeyNames = src->ParseBool();
+		return true;
+	}
+	if ( idStr::Icmp( _name, "oneline" ) == 0 ) {
+		textOneLine = src->ParseBool();
 		return true;
 	}
 	if (idStr::Icmp(_name, "shear") == 0) {

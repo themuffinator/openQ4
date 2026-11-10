@@ -68,7 +68,7 @@ void idChatWindow::History_f(const idCmdArgs &args) {
         return;
     }
     const char *action = args.Argv(1);
-    if (idRemasteredHud::Enabled()) {
+    if (idRemasteredHud::PresentsChat()) {
         const int messages = static_cast<int>(chatHistory.messages.size());
         if (!idStr::Icmp(action, "up")) { activeChat->ScrollMessages(-7); }
         else if (!idStr::Icmp(action, "down")) { activeChat->ScrollMessages(7); }
@@ -212,7 +212,7 @@ const char *idChatWindow::HandleInput(const sysEvent_t *event, bool *updateVisua
             const int now = Sys_Milliseconds();
             if (key != lastScrollKey || now - lastScrollTime >= 120) {
                 int delta = (key == K_PGUP || key == K_MWHEELUP) ? -1 : 1;
-                if (idRemasteredHud::Enabled()) {
+                if (idRemasteredHud::PresentsChat()) {
                     const int messages = static_cast<int>(chatHistory.messages.size());
                     if (key == K_PGUP || key == K_PGDN) { delta *= 7; }
                     if (key == K_HOME) { delta = -messages; }
@@ -297,34 +297,57 @@ void idChatWindow::DrawRemasteredLines(const float edges[4]) {
     // Lowpixel 10.7 u and the tag's 7.2 u, matched to the Remastered type.
     const float scale = 0.2f, tagScale = 0.13f;
     const float pitch = 13.3f, padding = 4.0f, gap = 2.0f;
+    // The slots' state keys, built once: most frames have no line to draw.
+    struct SlotKeys { idStr live, alpha, kind, team, you, name, text; };
+    static SlotKeys keys[slots];
+    static bool keysBuilt = false;
+    if (!keysBuilt) {
+        keysBuilt = true;
+        for (int slot = 0; slot < slots; ++slot) {
+            keys[slot].live = va("oq4_chat%d_live", slot);
+            keys[slot].alpha = va("oq4_chat%d_alpha", slot);
+            keys[slot].kind = va("oq4_chat%d_kind", slot);
+            keys[slot].team = va("oq4_chat%d_team", slot);
+            keys[slot].you = va("oq4_chat%d_you", slot);
+            keys[slot].name = va("oq4_chat%d_name", slot);
+            keys[slot].text = va("oq4_chat%d_text", slot);
+        }
+    }
+    int count = 0;
+    for (int slot = 0; slot < slots; ++slot) {
+        if (gui->GetStateBool(keys[slot].live)) { count = slot + 1; }
+    }
+    if (count == 0) { return; }
+    // The HUD scale sizes the box about its bottom-leading corner, in the room
+    // the scaled status bar leaves it.
+    const float hudScale = gui->LegacyScale();
     const float leading = -edges[0];
-    const float room = 101.0f - 16.0f - leading;
+    const float room = (320.0f - 219.0f * gui->LegacyCenterScale() - 16.0f - leading) / hudScale;
     const bool wide = room >= 180.0f;
     const float boxWidth = wide ? Min(room, 300.0f) : 200.0f;
     const float left = leading + 8.0f;
     float bottom = 480.0f + edges[3] - (wide ? 59.0f : 150.0f);
+    float groupX = 0.0f, groupY = 0.0f, groupScale = 1.0f;
+    dc->GetGroupScale(groupX, groupY, groupScale);
+    if (hudScale != 1.0f) { dc->SetGroupScale(leading, 480.0f + edges[3], hudScale); }
     SetFont();
     const char *tag = common->GetLocalizedString("#str_231001");
     const float tagWidth = static_cast<float>(dc->TextWidth(tag, tagScale, -1)) + 8.0f;
-    int count = 0;
-    for (int slot = 0; slot < slots; ++slot) {
-        if (gui->GetStateBool(va("oq4_chat%d_live", slot))) { count = slot + 1; }
-    }
     for (int slot = count - 1; slot >= 0; --slot) {
-        if (!gui->GetStateBool(va("oq4_chat%d_live", slot))) { continue; }
-        const float alpha = idMath::ClampFloat(0.0f, 1.0f, gui->GetStateFloat(va("oq4_chat%d_alpha", slot)));
-        const int kind = gui->GetStateInt(va("oq4_chat%d_kind", slot));
-        const bool strogg = gui->GetStateInt(va("oq4_chat%d_team", slot), "-1") == 1;
-        const bool you = gui->GetStateBool(va("oq4_chat%d_you", slot));
+        if (!gui->GetStateBool(keys[slot].live)) { continue; }
+        const float alpha = idMath::ClampFloat(0.0f, 1.0f, gui->GetStateFloat(keys[slot].alpha));
+        const int kind = gui->GetStateInt(keys[slot].kind);
+        const bool strogg = gui->GetStateInt(keys[slot].team, "-1") == 1;
+        const bool you = gui->GetStateBool(keys[slot].you);
         const bool teamLine = kind == 1, server = kind == 2;
         // #FFFF8D, white, and the team text colours #AAE355 and #FF8E00.
         const char *teamInk = strogg ? "^c950" : "^c683";
         idStr words;
         if (!server) {
-            words = va("%s%s: ", you || !teamLine ? "^c999" : teamInk, gui->GetStateString(va("oq4_chat%d_name", slot)));
+            words = va("%s%s: ", you || !teamLine ? "^c999" : teamInk, gui->GetStateString(keys[slot].name));
         }
         words += server ? "^c999" : teamLine ? teamInk : "^c995";
-        words += gui->GetStateString(va("oq4_chat%d_text", slot));
+        words += gui->GetStateString(keys[slot].text);
         const float indent = teamLine ? tagWidth + 4.0f : 0.0f;
         const float wordsWidth = Max(32.0f, boxWidth - padding * 2.0f - indent);
         idList<int> breaks;
@@ -356,6 +379,7 @@ void idChatWindow::DrawRemasteredLines(const float edges[4]) {
         }
         bottom = top - gap;
     }
+    dc->SetGroupScale(groupX, groupY, groupScale);
 }
 
 void idChatWindow::Draw(int time, float x, float y) {
@@ -365,8 +389,11 @@ void idChatWindow::Draw(int time, float x, float y) {
     // The match HUD's Arena presentation shots keep only their own cards.
     if (!input && gui->GetStateBool("arena_hudHidden")) { return; }
     // The Remastered layout draws chat in the multiplayer HUD document; this
-    // control keeps the input, its history recall and channel switching.
-    if (idRemasteredHud::Enabled()) { return; }
+    // control keeps the input, its history recall and channel switching. Only
+    // while that document presents: the setting alone also holds when the
+    // document is missing, failed or replaced by a mod's own HUD, which left
+    // no chat lines and no visible input at all.
+    if (input ? idRemasteredHud::PresentsChat() : gui->RemasteredActive()) { return; }
     // The stock interface's HUD in the Remastered layout (idLegacyHudLayout)
     // draws the resting lines in the Remastered construction.
     float edges[4];

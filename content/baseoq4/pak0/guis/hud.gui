@@ -1393,11 +1393,11 @@ windowDef Desktop
 
 		windowDef ws_name
 		{
-			rect	0,42 - 37 * "gui::oq4_hudRemastered",640,40
+			rect	0,42 - 36.3 * "gui::oq4_hudRemastered",640,40
 			forecolor	0.690,0.784,0.568,1
 			textalign	1
 			font	"fonts/marine"
-			textscale	.25
+			textscale	.25 - 0.012 * "gui::oq4_hudRemastered"
 			textstyle	1
 			text	"gui::weaponname"
 		}
@@ -1766,7 +1766,7 @@ windowDef Desktop
 				visible	1
 				forecolor	1,1,1,1
 				text	"#str_200272"
-				textscale	0.2
+				textscale	0.2 - 0.02 * "gui::oq4_hudRemastered"
 				font	"fonts/marine"
 				textspacing	0
 			}
@@ -1776,7 +1776,7 @@ windowDef Desktop
 				visible	1
 				forecolor	1,1,1,1
 				text	"#str_200273"
-				textscale	0.2
+				textscale	0.2 - 0.02 * "gui::oq4_hudRemastered"
 				font	"fonts/marine"
 				textspacing	0
 			}
@@ -1899,16 +1899,16 @@ windowDef Desktop
 		}
 		windowDef pickup0_icon
 		{
-			rect	326 - "p_pickup0::plate" / 2,4,16,16
+			rect	327.7 - "p_pickup0::plate" / 2,4,16,16
 			background	"gui::oq4_pick0_icon"
 			matcolor	0.666,0.674,0.435,0.8
 		}
 		windowDef pickup0_text
 		{
-			rect	345 - "p_pickup0::plate" / 2,3,"p_pickup0::plate",15
+			rect	344.5 - "p_pickup0::plate" / 2,2.2,"p_pickup0::plate",15
 			forecolor	0.862,0.917,0.760,1
 			text	"gui::oq4_pick0_text"
-			textscale	0.2
+			textscale	0.19
 			font	"fonts/marine"
 			textspacing	0
 			nowrap	1
@@ -1942,16 +1942,16 @@ windowDef Desktop
 		}
 		windowDef pickup1_icon
 		{
-			rect	326 - "p_pickup1::plate" / 2,4,16,16
+			rect	327.7 - "p_pickup1::plate" / 2,4,16,16
 			background	"gui::oq4_pick1_icon"
 			matcolor	0.666,0.674,0.435,0.8
 		}
 		windowDef pickup1_text
 		{
-			rect	345 - "p_pickup1::plate" / 2,3,"p_pickup1::plate",15
+			rect	344.5 - "p_pickup1::plate" / 2,2.2,"p_pickup1::plate",15
 			forecolor	0.862,0.917,0.760,1
 			text	"gui::oq4_pick1_text"
-			textscale	0.2
+			textscale	0.19
 			font	"fonts/marine"
 			textspacing	0
 			nowrap	1
@@ -2492,6 +2492,8 @@ windowDef Desktop
 		windowDef missile_indicator
 		{
 			rect	0,0,640,480
+			hudanchorx	middle
+			hudanchory	middle
 			background	"gfx/guis/hud/directional_hit2"
 			matcolor	1,.1,.1,.7
 			rotate	"gui::missiledir"
@@ -2524,11 +2526,11 @@ windowDef Desktop
 			visible	0
 			windowDef p_exit_text
 			{
-				rect	225,36,199,26
+				rect	225,36 - 0.7 * "gui::oq4_hudRemastered",199,26
 				visible	1
 				forecolor	1,0.4,0,1
 				text	"#str_200013"
-				textscale	0.4
+				textscale	0.4 - 0.02 * "gui::oq4_hudRemastered"
 				font	"fonts/marine"
 				textalign	1
 			}
@@ -2567,13 +2569,13 @@ windowDef Desktop
 
 	windowDef quicksave_msg
 	{
-		rect	0,64 + "gui::oq4_hudRemastered" * "gui::oq4_hudShowExtras" * (32 * "Bossbar::visible" + 64 * "p_exit_level::visible"),640,20
+		rect	0,64 + "gui::oq4_hudRemastered" * (2 + "gui::oq4_hudShowExtras" * (32 * "Bossbar::visible" + 64 * "p_exit_level::visible")),640,20
 		screenalignx	middle
 		screenaligny	top
 		visible	0
 		forecolor	1,1,1,1
 		text	"#str_200908"
-		textscale	0.25
+		textscale	0.25 - 0.02 * "gui::oq4_hudRemastered"
 		font	"fonts/lowpixel"
 		textspacing	0
 		textalign	1
@@ -2635,6 +2637,8 @@ windowDef Desktop
 		windowDef hit_indicator
 		{
 			rect		0,0,640,480
+			hudanchorx	middle
+			hudanchory	middle
 			background	"gfx/guis/hud/directional_hit"
 			matcolor	1,.1,.1,.7
 			rotate		"gui::hitdir"
@@ -2652,11 +2656,22 @@ windowDef Desktop
 			{
 				set "visible" "0";
 			}
+			// openQ4: a mark at the dome's peak, so the direction never depends on color (14.7).
+			windowDef hit_chevron
+			{
+				rect	308,42.67,24,10.67
+				background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+				matcolor	1,0.1,0.1,1.2857 * "hit_indicator::matcolor_w"
+				matscaley	-1
+				visible	"gui::oq4_hudRemastered"
+			}
 		}
 
 		windowDef hit_indicator_reduced
 		{
 			rect		0,0,640,480
+			hudanchorx	middle
+			hudanchory	middle
 			background	"gfx/guis/hud/directional_hit"
 			matcolor	1,.1,.1,.4
 			rotate		"gui::hitdir"
@@ -2674,6 +2689,15 @@ windowDef Desktop
 			{
 				set "visible" "0";
 			}
+			// openQ4: a mark at the dome's peak, so the direction never depends on color (14.7).
+			windowDef hit_chevron_reduced
+			{
+				rect	308,42.67,24,10.67
+				background	"gfx/guis/maps/process2/nodecontroller_lil_triangle2"
+				matcolor	1,0.1,0.1,1.2857 * "hit_indicator_reduced::matcolor_w"
+				matscaley	-1
+				visible	"gui::oq4_hudRemastered"
+			}
 		}
 	}
 
@@ -2681,9 +2705,11 @@ windowDef Desktop
 // over top black/failed text
 //-----------------------	
 	
+		// openQ4: the fade covers the whole view, not the 4:3 canvas alone (a wide
+		// screen kept lit strips beside a failed mission's black).
 		windowDef fade
 		{
-			rect	0,0,640,480
+			rect	0 - "gui::virtual_screen_x_expand",0 - "gui::virtual_screen_y_expand",640 + 2 * "gui::virtual_screen_x_expand",480 + 2 * "gui::virtual_screen_y_expand"
 			backcolor	0,0,0,0
 			visible	1
 		}	

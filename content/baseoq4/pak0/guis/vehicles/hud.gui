@@ -104,7 +104,11 @@ windowDef Desktop
 	}
 
 	onNamedEvent vehicleHit {
-		transition "damage::matcolor" "0.333,0,0,1" "0,0,0,1" "500" ;
+		if ( "gui::reducedFlashing" == 1 ) {
+			transition "damage::matcolor" "0.133,0,0,1" "0,0,0,1" "500" ;
+		} else {
+			transition "damage::matcolor" "0.333,0,0,1" "0,0,0,1" "500" ;
+		}
 	}
 
 	onNamedEvent electricWarningOn {
@@ -226,6 +230,7 @@ windowDef Desktop
 		windowDef left_elecwarn
 		{
 			rect	0 - "gui::oq4_hudEdgeLeft",167,128,128
+			hudanchorx	left
 			visible	0
 			background	"gfx/guis/vehicles/veh_elecwarn"
 			matcolor	0.6,0,0,1
@@ -233,6 +238,7 @@ windowDef Desktop
 		windowDef right_elecwarn
 		{
 			rect	512 + "gui::oq4_hudEdgeRight",167,128,128
+			hudanchorx	right
 			visible	0
 			background	"gfx/guis/vehicles/veh_elecwarn"
 			matcolor	0.6,0,0,1
@@ -258,6 +264,7 @@ windowDef Desktop
 	windowDef p_armor
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	1
 		windowDef health_backbar
 		{
@@ -317,6 +324,7 @@ windowDef Desktop
 	windowDef p_shields
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	1
 		windowDef armor_backbar
 		{
@@ -376,6 +384,7 @@ windowDef Desktop
 	windowDef p_ammo
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	1
 		windowDef ammo_backbar
 		{
@@ -389,6 +398,7 @@ windowDef Desktop
 	windowDef p_rockets
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	"gui::vehicle_weapon" == 3
 		windowDef rocket
 		{
@@ -419,6 +429,7 @@ windowDef Desktop
 	windowDef p_mgun
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	"gui::vehicle_weapon" == 1
 		windowDef mgun_tank
 		{
@@ -438,6 +449,7 @@ windowDef Desktop
 	windowDef p_mgun_walker
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	"gui::vehicle_weapon" == 2
 		windowDef mgun_walker
 		{
@@ -457,6 +469,7 @@ windowDef Desktop
 	windowDef p_cannon
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	"gui::vehicle_weapon" == 0
 		windowDef cannon
 		{
@@ -476,6 +489,7 @@ windowDef Desktop
 	windowDef p_weapcharge
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	("gui::vehicle_weapon" == 0 || "gui::vehicle_weapon" == 3)
 		windowDef weapon_charge_bg
 		{
@@ -507,7 +521,7 @@ windowDef Desktop
 		visible	"gui::oq4_hudShowExtras"
 		windowDef p_radio
 		{
-			rect	485,10,144,28
+			rect	485 + 5.8 * "gui::oq4_hudRemastered",10 - 3.2 * "gui::oq4_hudRemastered",144,28
 			screenalignx	right
 			screenaligny	top
 			visible	1
@@ -525,7 +539,7 @@ windowDef Desktop
 				visible	1
 				forecolor	1,1,1,1
 				text	"#str_200272"
-				textscale	0.2
+				textscale	0.2 - 0.02 * "gui::oq4_hudRemastered"
 				font	"fonts/marine"
 				textspacing	0
 			}
@@ -535,7 +549,7 @@ windowDef Desktop
 				visible	1
 				forecolor	1,1,1,1
 				text	"#str_200273"
-				textscale	0.2
+				textscale	0.2 - 0.02 * "gui::oq4_hudRemastered"
 				font	"fonts/marine"
 				textspacing	0
 			}
@@ -568,6 +582,7 @@ windowDef Desktop
 	windowDef p_weapnotification
 	{
 		rect	170.5 * "gui::oq4_hudRemastered","gui::oq4_hudEdgeBottom",640,480
+		hudanchory	bottom
 		visible	1
 		windowDef d_weap_msg
 		{
@@ -669,6 +684,8 @@ windowDef Desktop
 		windowDef missile_indicator
 		{
 			rect	0,0,640,480
+			hudanchorx	middle
+			hudanchory	middle
 			background	"gfx/guis/hud/directional_hit2"
 			matcolor	1,.1,.1,.7
 			rotate	"gui::missiledir"
@@ -690,7 +707,8 @@ windowDef Desktop
 		}
 		windowDef missile_text
 		{
-			rect	0,61,640,33
+			rect	0,(61 + "gui::oq4_hudRemastered" * (36 * "Bossbar::visible" + 64 * "p_exit_level::visible" * "gui::oq4_hudShowExtras" + 28 * "quicksave_msg::visible")) - "gui::oq4_hudEdgeTop",640,33
+			hudanchory	top
 			visible	0
 			notime	1
 			forecolor	1,.1,.1,.7
@@ -718,6 +736,8 @@ windowDef Desktop
 	windowDef exit_msg
 	{
 		rect	310 + "gui::oq4_hudEdgeRight",457 + "gui::oq4_hudEdgeBottom",319,19
+		hudanchorx	right
+		hudanchory	bottom
 		visible	0
 		forecolor	1,1,1,1 - "gui::oq4_hudRemastered"
 		text	"#str_200909"
@@ -729,6 +749,8 @@ windowDef Desktop
 	windowDef lock_msg
 	{
 		rect	310 + "gui::oq4_hudEdgeRight",457 + "gui::oq4_hudEdgeBottom",319,19
+		hudanchorx	right
+		hudanchory	bottom
 		visible	0
 		forecolor	1,0.5,0,1 - "gui::oq4_hudRemastered"
 		text	"#str_200913"
@@ -744,10 +766,12 @@ windowDef Desktop
 	windowDef oq4_prompt
 	{
 		rect	0,0,640,480
+		hudanchorx	right
+		hudanchory	bottom
 		noclip	1
 		visible	"gui::oq4_hudRemastered" * ("exit_msg::visible" + "lock_msg::visible")
 		definefloat	"chip"	"oq4_prompt_key::textwidth"
-		definefloat	"width"	"exit_msg::visible" * (15 + "oq4_prompt::chip" + "oq4_prompt_exit::textwidth") + "lock_msg::visible" * (11 + "oq4_prompt_locked::textwidth")
+		definefloat	"width"	"exit_msg::visible" * (15 + "oq4_prompt::chip" + "oq4_prompt_exit::textwidth") + "lock_msg::visible" * (23 + "oq4_prompt_locked::textwidth")
 		definefloat	"left"	629 + "gui::oq4_hudEdgeRight" - "oq4_prompt::width"
 		definefloat	"top"	460 + "gui::oq4_hudEdgeBottom"
 		windowDef oq4_prompt_plate
@@ -777,9 +801,17 @@ windowDef Desktop
 			visible	"exit_msg::visible"
 			nowrap	1
 		}
+		// openQ4: the lock before Vehicle locked (14.8), the stock padlock in the notice's #FF8000.
+		windowDef oq4_prompt_padlock
+		{
+			rect	"oq4_prompt::left" + 5,"oq4_prompt::top" + 2.5,11,11
+			background	"gfx/guis/mainmenu/icon_locked"
+			matcolor	1,0.5,0,1
+			visible	"lock_msg::visible"
+		}
 		windowDef oq4_prompt_locked
 		{
-			rect	"oq4_prompt::left" + 5.5,"oq4_prompt::top" + 1,160,14
+			rect	"oq4_prompt::left" + 17.5,"oq4_prompt::top" + 1,160,14
 			text	"#str_231230"
 			font	"fonts/lowpixel"
 			textscale	0.2
@@ -790,7 +822,8 @@ windowDef Desktop
 	}
 	windowDef p_exit_level
 	{
-		rect	0,0,640,75
+		rect	0,(92 * "gui::oq4_hudRemastered" * "Bossbar::visible" - 1000 * "gui::oq4_hudMinimal") - "gui::oq4_hudEdgeTop",640,75
+		hudanchory	top
 		visible	0
 		windowDef p_exit_text
 		{
@@ -831,11 +864,12 @@ windowDef Desktop
 	}
 	windowDef quicksave_msg
 	{
-		rect	0,64,640,20
+		rect	0,(64 + "gui::oq4_hudRemastered" * (2 + "gui::oq4_hudShowExtras" * (32 * "Bossbar::visible" + 64 * "p_exit_level::visible"))) - "gui::oq4_hudEdgeTop",640,20
+		hudanchory	top
 		visible	0
 		forecolor	1,1,1,1
 		text	"#str_200908"
-		textscale	0.25
+		textscale	0.25 - 0.02 * "gui::oq4_hudRemastered"
 		font	"fonts/lowpixel"
 		textspacing	0
 		textalign	1
@@ -858,7 +892,8 @@ windowDef Desktop
 		visible	"gui::oq4_hudShowExtras"
 		windowDef Bossbar
 		{
-			rect	0,0,640,480
+			rect	0,0 - "gui::oq4_hudEdgeTop",640,480
+			hudanchory	top
 			visible	0
 			windowDef boss_backbar
 			{

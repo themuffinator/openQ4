@@ -930,11 +930,15 @@ void rvVehicle::Damage ( idEntity *inflictor, idEntity *attacker, const idVec3 &
 			idPlayer & driver = static_cast< idPlayer & >( *pos.mDriver.GetEntity() );
 
 			if ( driver.GetHud() ) {
+				// openQ4: the stock vehicle HUD caps its hit glow under reduced flashing
+				driver.GetHud()->SetStateBool( "reducedFlashing", cvarSystem->GetCVarBool( "ui_reducedFlashing" ) );
 				driver.GetHud()->HandleNamedEvent( "vehicleHit" );
 			}
 
 			if ( !stricmp( damageDef->GetString( "filter" ), "electrical" ) ) {
-				driver.GetHud()->HandleNamedEvent( "electricWarningOn" );
+				if ( driver.GetHud() ) {
+					driver.GetHud()->HandleNamedEvent( "electricWarningOn" );
+				}
 				PostEventMS( &EV_HUDShockWarningOff, spawnArgs.GetInt( "hud_shock_warning_time", "2500" ) );
 
 				if ( damage >= spawnArgs.GetInt( "electric_stall_damage", "20" ) ) {
@@ -1513,7 +1517,9 @@ void rvVehicle::UpdateIncomingProjectiles( void ) {
 		int length;
 
 		GetPosition( 0 )->mEyeAxis.ProjectVector( proj->GetPhysics()->GetOrigin() - GetOrigin(), localDir );
-		GetHud()->SetStateFloat ( "missiledir", localDir.ToAngles()[YAW] );
+		if ( GetHud() ) {
+			GetHud()->SetStateFloat ( "missiledir", localDir.ToAngles()[YAW] );
+		}
 
 		idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
 

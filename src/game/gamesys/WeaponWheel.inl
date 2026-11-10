@@ -1,4 +1,45 @@
 // Shared SP/MP wheel selection and native presentation. Quake 4 SDK EULA.
+
+// Upper-case UTF-8 text for the wheel's weapon name. idStr::ToUpper maps single
+// bytes through a Windows-1252 table, which turns the second byte of a
+// two-byte letter into another character (Spanish "o" with an acute read as
+// "a" with a tilde) and breaks longer sequences. This covers ASCII and the
+// Latin-1, Latin Extended-A, Greek and Cyrillic letters whose capital encodes
+// to the same two bytes; anything else passes through unchanged.
+static void WeaponWheel_UpperUtf8( idStr &text ) {
+	const int length = text.Length();
+	for ( int i = 0; i < length; ) {
+		const unsigned char lead = static_cast<unsigned char>( text[i] );
+		if ( lead < 0x80 ) {
+			if ( lead >= 'a' && lead <= 'z' ) {
+				text[i] = static_cast<char>( lead - 32 );
+			}
+			i++;
+			continue;
+		}
+		const int size = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+		if ( size == 2 && i + 1 < length ) {
+			const int code = ( ( lead & 0x1F ) << 6 ) | ( static_cast<unsigned char>( text[i + 1] ) & 0x3F );
+			int upper = code;
+			if ( ( code >= 0xE0 && code <= 0xFE && code != 0xF7 ) || ( code >= 0x3B1 && code <= 0x3C9 && code != 0x3C2 ) ||
+					( code >= 0x430 && code <= 0x44F ) ) {
+				upper = code - 0x20;
+			} else if ( code >= 0x450 && code <= 0x45F ) {
+				upper = code - 0x50;
+			} else if ( ( ( code >= 0x100 && code <= 0x137 ) || ( code >= 0x14A && code <= 0x177 ) ) && code != 0x131 ) {
+				upper = code & ~1;
+			} else if ( ( code >= 0x139 && code <= 0x148 ) || ( code >= 0x179 && code <= 0x17E ) ) {
+				upper = ( code & 1 ) ? code : code - 1;
+			}
+			if ( upper != code ) {
+				text[i] = static_cast<char>( 0xC0 | ( upper >> 6 ) );
+				text[i + 1] = static_cast<char>( 0x80 | ( upper & 0x3F ) );
+			}
+		}
+		i += size;
+	}
+}
+
 void idPlayer::InitWeaponWheel() {
 	weaponWheelActive = weaponWheelGuiActive = weaponWheelCanceled = weaponWheelDebug = weaponWheelDebugHeld = false;
 	weaponWheelHoveredSlot = weaponWheelGuiSlot = -1;
@@ -89,7 +130,7 @@ bool idPlayer::DrawRetainedWeaponWheel() {
 		weaponWheelGui->SetStateFloat( va( "slot%d.fill", slot ), maximum > 0 ? idMath::ClampFloat( 0, 1, static_cast<float>( reserve ) / maximum ) : 0 );
 		if ( slot == weaponWheelHoveredSlot ) {
 			idStr name = owned && decl ? common->GetLocalizedString( decl->dict.GetString( "inv_name" ) ) : "";
-			name.ToUpper();
+			WeaponWheel_UpperUtf8( name );
 			weaponWheelGui->SetStateString( "weaponName", name );
 			idStr readout;
 			if ( owned && total < 0 ) {

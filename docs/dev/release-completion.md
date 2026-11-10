@@ -6,6 +6,65 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## HUD fixes, and a classic-interface HUD that matches the new one, 10 November 2026
+
+- **HUD size and opacity now work in the classic interface.** With
+  `ui_retained 0`, the HUD Size and HUD Opacity settings (`ui_hudScale`,
+  `ui_hudOpacity`) apply as they do in the modern interface: each group of the
+  HUD grows or shrinks from its own screen edge, and the whole HUD fades.
+- **Spectators, votes and respawns get the new displays there too.** A card
+  above the status bar names the player you follow, with their place and
+  score. A vote shows as a card at the left edge with the Yes and No keys, a
+  tally for each side and the time left. While you wait to respawn, a prompt
+  names the control and counts down.
+- **The classic-interface HUD sits where the new one does.** Text sizes and
+  positions were measured against the modern HUD and corrected in the player,
+  vehicle and multiplayer HUDs. Your standing row, your team's panel and kill
+  feed lines about you carry the orange marker, a locked vehicle shows a
+  padlock, and the damage direction has a mark at its peak, so it no longer
+  depends on color alone.
+- **Classic-interface fixes.**
+  - Tourney bracket names sat low and the second row was cut off; long names
+    now end in "..." in the bracket and the kill feed.
+  - A key named in a notice ("Press F3 to ready") is written out; its keycap
+    used to push the Tourney message bar's text under the bar and split the
+    warm-up notice over two lines.
+  - In a vehicle, the exit notice, the save notice and the missile warning no
+    longer draw over the boss bar.
+  - The Minimal layout now hides the centre notices, awards, aim text and the
+    managed-match card, as the modern HUD's Minimal does, and the
+    managed-match card no longer covers the kill feed.
+  - A dead player's health reads 0, not -100.
+  - A failed mission's fade to black covers the whole screen; on a wide
+    screen it left lit strips at the sides.
+- **Fixes in both interfaces.**
+  - In the modern interface, the vote, statistics and managed-match cards
+    have their dark plate behind the whole card; it drew as a thin band
+    across the top.
+  - Multiplayer obituaries in the console use each weapon's own line again,
+    not "was killed by" for every death.
+  - Dead Zone's score flash lasts as long at 240 Hz as at 60, is no longer
+    cut short by the next update from a dedicated server, and no longer fires
+    with its sound on the first frame of the next Dead Zone map.
+  - The timer no longer turns to its last-minute colors during a long warm-up
+    or after the match ends.
+  - Weapon names with accented or Cyrillic letters are upper-cased correctly
+    in the weapon wheel.
+  - `pm_air 0` no longer crashes single player, and a vehicle without a HUD
+    no longer crashes when it takes electrical damage or a missile locks on.
+  - With a mod that brings its own multiplayer HUD, chat lines and the chat
+    input no longer disappear in the modern interface. A mod that does not
+    replace a HUD now gets the same HUD in both interfaces.
+- **Less HUD work every frame.** The multiplayer HUD's state is published
+  once per game tick, not once per drawn frame, and not at all in the Classic
+  layout. Holding a powerup no longer re-evaluates the HUD every frame, nor
+  does turning the view. Engine-owned layout values are written to each
+  interface only when the view changes.
+- **Older saves still load.** The player and vehicle HUDs changed again, so the
+  previous definitions are kept for saves written before this build.
+- Evidence: [stock interface HUD layout](ui/legacy-hud-layout.md#evidence-10-november-2026);
+  `tools/tests/savegame_gui_layout_contract.py`.
+
 ## A console that stops scrolling when you let go, 10 November 2026
 
 - **Page Up and Page Down stop when the key is released** (GitHub issue

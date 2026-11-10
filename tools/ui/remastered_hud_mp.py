@@ -93,6 +93,16 @@ def tall_plate_path(ident: str, lean: float, r: float, fill) -> dict:
     return {"id": ident, "commands": cmds, "fill": fill}
 
 
+def plated_card(ident: str, place: dict, padding: dict, plate: dict, rows: list) -> dict:
+    """A card whose rows decide its height, on a plate: a block holding the
+    plate and the column of rows. As a direct child of the column the plate
+    was laid out before the rows gave the card its height, and stayed a thin
+    band across the card's top (the vote, statistics and managed-match cards)."""
+    body = ui.group(ident + "-rows", {"position": ui.keyword("relative"), "display": ui.keyword("flex"),
+                                      "flex-direction": ui.keyword("column"), **padding}, rows)
+    return ui.group(ident, {**place, "display": ui.keyword("none")}, [plate, body])
+
+
 def marker_vec(ident: str, x: float, y: float) -> dict:
     """The ◥ marker: a 5 u right triangle in #E38900, at (x, y) u in its parent."""
     return vec(ident, [pts_path("m", [(u(x), u(y)), (u(x + 5), u(y)), (u(x + 5), u(y + 5))], fill=ui.solid(rgb(MARKER)))])
@@ -1018,11 +1028,10 @@ def vote(doc: HudDocument) -> dict:
     ramp_row = flex_row("vote-ramp", ramp, **{"align-items": ui.keyword("flex-end"), "height": ui.length(u(4)),
                                                "margin-top": ui.length(u(4))})
     plate = vec("vote-plate", [tall_plate_path("p", u(0.22 * 8), u(1), ui.solid([0, 0, 0, 0.5]))])
-    card = ui.group("vote", {**ui.absolute(left=u(6), top=u(150), width=u(150)), "display": ui.keyword("none"),
-                             "flex-direction": ui.keyword("column"), "padding-left": ui.length(u(6)), "padding-top": ui.length(u(4)),
-                             "padding-bottom": ui.length(u(5))},
-                    [plate, head, *lines, tallies, ramp_row])
-    doc.bind("vote.display", "vote", "display", sel(op("!=", S("voteNotice"), 0), "flex", "none"))
+    card = plated_card("vote", ui.absolute(left=u(6), top=u(150), width=u(150)),
+                       {"padding-left": ui.length(u(6)), "padding-top": ui.length(u(4)), "padding-bottom": ui.length(u(5))},
+                       plate, [head, *lines, tallies, ramp_row])
+    doc.bind("vote.display", "vote", "display", sel(op("!=", S("voteNotice"), 0), "block", "none"))
     # Competitive: the top-leading corner the standing left (36 u from the top
     # inset, the card's cl anchor rebased onto tl's), clear of the team status.
     rebased = op("+", op("/", op("-", S("hud.top"), op("/", S("hud.height"), 2)), S("hud.scale")), u(240) + u(36))
@@ -1421,10 +1430,9 @@ def match_context(doc: HudDocument) -> dict:
                                            {"id": "d", "op": "line", "points": [[u(8), {"fraction": 1}]]},
                                            {"id": "e", "op": "line", "points": [[0, {"fraction": 1, "dp": -u(8)}]]},
                                            {"id": "f", "op": "close"}]}])
-    card = ui.group("ctx", {**ui.absolute(left=u(470), top=u(90), width=u(164)), "display": ui.keyword("none"),
-                            "flex-direction": ui.keyword("column"), "padding-left": ui.length(u(8)), "padding-top": ui.length(u(3)),
-                            "padding-bottom": ui.length(u(4))}, [edge] + rows)
-    doc.bind("ctx.display", "ctx", "display", sel(op("==", S("match_context_visible"), 1), "flex", "none"))
+    card = plated_card("ctx", ui.absolute(left=u(470), top=u(90), width=u(164)),
+                       {"padding-left": ui.length(u(8)), "padding-top": ui.length(u(3)), "padding-bottom": ui.length(u(4))}, edge, rows)
+    doc.bind("ctx.display", "ctx", "display", sel(op("==", S("match_context_visible"), 1), "block", "none"))
     tourney = AND(op("==", S("gametype"), 2), op("!=", S("hud.layout"), 3))
     doc.bind("ctx.top", "ctx", "top", sel(under_match_bar(), u(90 + UNDER_BAR_DROP), sel(tourney, u(106), u(90))))
     return card
@@ -1786,12 +1794,11 @@ def statistics(doc: HudDocument) -> dict:
         medals.append(medal)
     medal_grid = ui.group("st-medals", {"position": ui.keyword("relative"), "display": ui.keyword("flex"), "flex-direction": ui.keyword("row"),
                                         "flex-wrap": ui.keyword("wrap"), "width": ui.length(u(134))}, medals)
-    card = ui.group("stats", {**ui.absolute(left=u(488), top=u(96), width=u(146)), "display": ui.keyword("none"),
-                              "flex-direction": ui.keyword("column"), "padding-left": ui.length(u(8)), "padding-top": ui.length(u(6)),
-                              "padding-bottom": ui.length(u(8))},
-                    [vec("stats-plate", [tall_plate_path("p", u(0.22 * 8), u(1.5), ui.solid([0, 0, 0, 0.55]))]), head, *accuracy, weapons,
-                     *awards, medal_grid])
-    doc.bind("stats.display", "stats", "display", sel(op("!=", S("stat_visible"), 0), "flex", "none"))
+    card = plated_card("stats", ui.absolute(left=u(488), top=u(96), width=u(146)),
+                       {"padding-left": ui.length(u(8)), "padding-top": ui.length(u(6)), "padding-bottom": ui.length(u(8))},
+                       vec("stats-plate", [tall_plate_path("p", u(0.22 * 8), u(1.5), ui.solid([0, 0, 0, 0.55]))]),
+                       [head, *accuracy, weapons, *awards, medal_grid])
+    doc.bind("stats.display", "stats", "display", sel(op("!=", S("stat_visible"), 0), "block", "none"))
     return card
 
 

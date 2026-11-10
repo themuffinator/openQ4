@@ -43,10 +43,10 @@ REVISION_ROOT = "guis/savecompat"
 # objective and cinematic GUIs, weapon and vehicle zoom GUIs and vehicle HUDs.
 SERIALIZED_GUIS: dict[str, str] = {
     "guis/cinematic.gui": "63d5f187afe545a3533f14780605a7e614463f5c",
-    "guis/hud.gui": "9d918517cc81194d1f9798ccd92ab566d8b4799d",
-    "guis/hud_strogg.gui": "de8ce88cbf1444b424ae27dd093f0d33f30a1144",
+    "guis/hud.gui": "79d25f0c7b5035f118655e1f9f01db89157e6140",
+    "guis/hud_strogg.gui": "51981879a988f53c7b884a84036b6ef66968a37a",
     "guis/vehicles/airdef_cannon.gui": "e92ae101f581b82a2885ac970b8755a92e1cbcae",
-    "guis/vehicles/hud.gui": "95493b94ce52d5ff87683c94e2b09a318bc5f3e9",
+    "guis/vehicles/hud.gui": "816270928d67d8825d15add0b235727f7f9adb97",
     "guis/vehicles/strogg_noise.gui": "d0777427b93ec45c90c6dfdf3ba6352aec981dc6",
     "guis/vehicles/turret_hud.gui": "7da86966bf5b66f3e5c90f926cf0a739eaf231e4",
     "guis/weapons/machinegun_scope.gui": "d2690deda0fc05b110508071a34051631df8c1c9",
@@ -113,6 +113,30 @@ GUI_REVISIONS: list[dict[str, object]] = [
         "marker": "oq4_prompt",
         "savedBlob": "fa96e0421d400e4e880236fe27b623bdfd2e7e2e",
         "shippedIn": "8fdd8f077",
+    },
+    {
+        "gui": "guis/hud.gui",
+        "firstBuild": 2323,
+        "savedDefinition": "guis/savecompat/hud_r3.gui",
+        "marker": "hit_chevron",
+        "savedBlob": "9d918517cc81194d1f9798ccd92ab566d8b4799d",
+        "shippedIn": "9cc5e67a4",
+    },
+    {
+        "gui": "guis/hud_strogg.gui",
+        "firstBuild": 2323,
+        "savedDefinition": "guis/savecompat/hud_strogg_r3.gui",
+        "marker": "hit_chevron",
+        "savedBlob": "de8ce88cbf1444b424ae27dd093f0d33f30a1144",
+        "shippedIn": "9cc5e67a4",
+    },
+    {
+        "gui": "guis/vehicles/hud.gui",
+        "firstBuild": 2323,
+        "savedDefinition": "guis/savecompat/vehicle_hud_r2.gui",
+        "marker": "oq4_prompt_padlock",
+        "savedBlob": "95493b94ce52d5ff87683c94e2b09a318bc5f3e9",
+        "shippedIn": "9cc5e67a4",
     },
 ]
 

@@ -461,6 +461,19 @@ protected:
 	float textAligny;
 	unsigned char screenAlignX;
 	unsigned char screenAlignY;
+	// openQ4: "hudanchorx" and "hudanchory" name the screen anchor a HUD
+	// window's group scales about (idLegacyHudGroup) where its alignment does
+	// not say: a window Remastered places on an edge through oq4_hudEdge* while
+	// the stock layout keeps it centered. HUD_ANCHOR_UNSET follows the alignment.
+	// "none" keeps the window and its children out of the HUD scale: a layer
+	// that is not part of the HUD's groups (the Arena presentation).
+	enum { HUD_ANCHOR_NONE = 3, HUD_ANCHOR_UNSET = 255 };
+	unsigned char hudAnchorX = HUD_ANCHOR_UNSET;
+	unsigned char hudAnchorY = HUD_ANCHOR_UNSET;
+	// The group anchors this window sets: 0 the centre, 1 the leading or top
+	// edge, 2 the trailing or bottom edge, -1 an ancestor's.
+	int HudGroupAnchorX() const;
+	int HudGroupAnchorY() const;
 	idStr	name;
 	idStr	comment;
 	idVec2	shear;
@@ -510,6 +523,25 @@ protected:
 	idWinFloat	textWidth;
 	idWinFloat	textLines;
 	bool		measureTextWidth = false;
+	// openQ4: "ellipsis 1" ends a single line too long for its rectangle with
+	// "..." rather than cutting it at the edge; textwidth then reports the
+	// shortened line. What was last measured, and for which text, scale, font,
+	// spacing and width, so an unchanged line is measured once.
+	bool		textEllipsis = false;
+	// openQ4: in a HUD's Remastered layout (the stock windows keep their
+	// stock look in Classic), "keynames 1" writes a key escape in the text as
+	// the key's name instead of drawing its keycap, for a notice that names a
+	// key in passing, and "oneline 1" joins the text's explicit lines.
+	bool		textKeyNames = false;
+	bool		textOneLine = false;
+	bool		measuredRemastered = false;
+	idStr		measuredText;
+	idStr		measuredDrawn;
+	float		measuredScale = -1.0f, measuredSpacing = 0.0f, measuredRect = -1.0f;
+	float		measuredWidth = 0.0f, measuredLines = 0.0f;
+	int			measuredFont = -1;
+	bool		measuredShortened = false;
+	void		MeasureText();
 	idWinBackground	backGroundName;			// 
 	idWinFloat textspacing;
 	idWinFloat textstyle;

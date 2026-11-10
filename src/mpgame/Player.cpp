@@ -1596,6 +1596,7 @@ idPlayer::idPlayer() {
 
 	lastDamageDef			= 0;
 	lastDamageDir			= vec3_zero;
+	hudHitDirTime			= 0;
 	lastDamageLocation		= 0;
 
 	predictedFrame			= 0;
@@ -4228,10 +4229,16 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 	assert ( _hud );
 	_hud->SetStateInt( "player_air", GetAirReadoutPercent() );
 
+	// openQ4: compare what the HUD shows. Against the raw value, a gibbed
+	// player (health below -100) re-sent updateHealth and a bogus delta every
+	// frame until the respawn.
+	// A Remastered layout reads 0 for the dead, as the retained HUD does;
+	// Classic keeps the stock readout, negative down to -100.
+	const int shownHealth = _hud->GetStateBool( "oq4_hudRemastered" ) ? Max( 0, health ) : ( health < -100 ? -100 : health );
 	temp = _hud->State().GetInt ( "player_health", "-1" );
-	if ( temp != health ) {		
-		_hud->SetStateInt   ( "player_healthDelta", temp == -1 ? 0 : (temp - health) );
-		_hud->SetStateInt	( "player_health", health < -100 ? -100 : health );
+	if ( temp != shownHealth ) {		
+		_hud->SetStateInt   ( "player_healthDelta", temp == -1 ? 0 : (temp - shownHealth) );
+		_hud->SetStateInt	( "player_health", shownHealth );
 		_hud->SetStateFloat	( "player_healthpct", idMath::ClampFloat ( 0.0f, 1.0f, (float)health / (float)inventory.maxHealth ) );
 		_hud->HandleNamedEvent ( "updateHealth" );
 	}
@@ -4261,10 +4268,15 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 	_hud->SetStateString( "player_god", va( "%i", (godmode && g_showGodDamage.GetBool()) ) );
 	_hud->SetStateString( "player_god_damage", va( "%i", godmodeDamage ) );
 
-	// Update the hit direction
-	idVec3 localDir;
-	viewAxis.ProjectVector( lastDamageDir, localDir );
-	_hud->SetStateFloat( "hitdir", localDir.ToAngles()[YAW] + 180.0f );
+	// Update the hit direction. openQ4: only while the indicator shows (it
+	// fades within 600 ms of the hit). Written every frame, the angle changed
+	// with every turn of the view, so the HUD's state never rested and both
+	// HUDs re-evaluated on every frame the player looked around.
+	if ( hudHitDirTime != 0 && gameLocal.time >= hudHitDirTime && gameLocal.time - hudHitDirTime < 1000 ) {
+		idVec3 localDir;
+		viewAxis.ProjectVector( lastDamageDir, localDir );
+		_hud->SetStateFloat( "hitdir", localDir.ToAngles()[YAW] + 180.0f );
+	}
 
 	//_hud->HandleNamedEvent( "updateArmorHealthAir" );
 
@@ -4419,9 +4431,13 @@ void idPlayer::UpdateHudPowerUps( idUserInterface *_hud ) {
 	
 	int i, index;
 
-	// openQ4: what the last update showed (the stock script below clears it).
+	// openQ4: what the last update showed.
 	const bool carried = _hud->GetStateInt( "powerup_flag_visible" ) != 0;
-	_hud->HandleNamedEvent( "clearPowerups" );
+	// The stock clearPowerups event is not sent: every slot and the flag are
+	// written below, shown or hidden. Sent every frame, it ran the script's six
+	// writes, flipped each live slot to 0 and back to 1 (so the HUD's state
+	// never rested and the Remastered document re-evaluated every frame a
+	// powerup was held), and dropped the GUI's evaluated-state cache.
 
 	bool flag = false;
 	for ( i = 0, index = 0; i < POWERUP_MAX; i++ ) {
@@ -16590,6 +16606,7 @@ void idPlayer::ClientDamageEffects ( const idDict& damageDef, const idVec3& dir,
 		// Let the hud know about the hit
 		if ( hud ) {
 			hud->SetStateFloat ( "hitdir", localDir.ToAngles()[YAW] + 180.0f );
+			hudHitDirTime = gameLocal.time;
 // openQ4 BEGIN
 			// The Classic HUD caps its indicator at 0.40 under reduced flashing.
 			hud->SetStateBool ( "reducedFlashing", cvarSystem->GetCVarBool( "ui_reducedFlashing" ) );

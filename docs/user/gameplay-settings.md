@@ -475,8 +475,11 @@ your team first, the flags and their carriers, on compact plates with the timer
 under them. Tourney shows its bracket strip with your match highlighted, and the
 kill feed puts each line on its own plate in the top-right corner. Chat sits at
 the bottom left, clear of the status bar, with each message on its own plate.
-Layout, HUD width, safe area, pickup
-messages, weapon strip and damage direction all work there. Minimal hides the
-same extras, and Competitive uses the Remastered positions. HUD size and opacity
-apply only to the modern UI. `ui_hudLayout 0` keeps the original Quake 4
-positions.
+Spectators get a card above the status bar naming who they follow, with that
+player's place and score; a vote shows as a card at the left edge with the Yes
+and No keys, a tally and the time left; and while you wait to respawn, a prompt
+names the control.
+Layout, HUD size, HUD opacity, HUD width, safe area, pickup messages, weapon
+strip and damage direction all work there. Minimal hides the same extras, and
+Competitive uses the Remastered positions. `ui_hudLayout 0` keeps the original
+Quake 4 positions.

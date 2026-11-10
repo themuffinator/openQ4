@@ -4,7 +4,10 @@ The stock interface (`ui_retained 0`) draws the stock HUD GUIs itself, since no
 retained document replaces them there. Since 9 November 2026 those GUIs follow
 the Remastered layout of [visual specification](../ui-visual-design.md) 14.4–14.12
 whenever `ui_hudLayout` is not Classic. They keep their original bitmap
-artwork. `ui_hudLayout 0` keeps the stock rectangles and anchors. The retained
+artwork. Since 10 November 2026 the HUD scale, opacity and reduced motion
+settings apply there too, and the multiplayer HUD has the Remastered follow
+card, vote card and respawn prompt. `ui_hudLayout 0` keeps the stock
+rectangles and anchors. The retained
 interface's own Classic is unchanged too: its peer-less stock GUI draws on the
 centered 4:3 canvas. Its Remastered layouts never draw these windows.
 
@@ -12,7 +15,13 @@ centered 4:3 canvas. Its Remastered layouts never draw these windows.
 
 `idLegacyHudLayout` (`src/ui/RetainedHud.h`) serves every GUI with a Remastered
 route (`idRemasteredHud::DocumentFor`), that is, the player, multiplayer, vehicle,
-objectives and scoreboard HUDs. It is skipped for an external mod.
+objectives and scoreboard HUDs.
+
+A mod that ships its own copy of a stock-named HUD owns it: that GUI stays
+Classic, with no Remastered peer and no coverage bridge. A mod without its own
+copy gets the HUD of its base game in either interface (`ModOwns`, resolved
+once per GUI). Before 10 November the stock interface treated any mod as
+Classic while the retained one looked for the file.
 
 - **Layout state.** `idUserInterfaceLocal::Redraw` publishes these keys each frame:
   - `oq4_hudLayout`: 0 to 3.
@@ -22,8 +31,37 @@ objectives and scoreboard HUDs. It is skipped for an external mod.
   - `oq4_hudShowPickups`, `oq4_hudShowStrip` and `oq4_hudShowDamage`: always on
     in Classic; otherwise each follows `ui_hudPickups`, `ui_hudWeaponStrip` or
     `ui_hudDamageDirection`, and is off in Minimal.
+  - `oq4_hudReducedMotion`: `ui_retainedReducedMotion` outside Classic, for the
+    looping motion a script starts itself.
+  - `oq4_hudScale`: the HUD scale outside Classic (1 in Classic).
 
-  Competitive uses the Remastered positions.
+  Competitive uses the Remastered positions. The keys are written when one
+  changes, not every frame.
+- **Scale.** `ui_hudScale` sizes the four laid-out HUDs (`hud.gui`,
+  `hud_strogg.gui`, `mphud.gui` and `vehicles/hud.gui`) as it sizes the
+  retained documents: each group scales about its screen anchor. A window
+  that an alignment moves to a screen edge starts a group anchored on that
+  edge, and an axis it leaves alone keeps its ancestors' anchor, the centre by
+  default. The centre column on the bottom edge (the status bar, the strip and
+  the pickup lines) takes `centerScale`, which a narrow view limits. The
+  device context applies the group as coordinates leave virtual space, after
+  clipping, so clip rectangles scale with what they clip
+  (`idDeviceContext::SetGroupScale`, `idLegacyHudGroup`).
+- **`hudanchorx` and `hudanchory`.** A window names its scale anchor
+  (`left`, `middle`, `right`; `top`, `middle`, `bottom`) where its alignment
+  does not say: the vehicle status bar and prompt, which Remastered places on
+  an edge through `oq4_hudEdge*` while the stock layout keeps them centered,
+  and the Tourney strip, which returns to the centre screen inside a
+  leading-edge group. `none` keeps a window and its children out of the scale:
+  the Arena presentation's letterbox and cards. A window that fills the canvas
+  is a full-screen layer (the mission-failed fade, a damage vignette) and
+  draws itself unscaled unless it names an anchor, as the damage direction and
+  missile indicators do; its children keep their groups.
+- **Opacity.** `ui_hudOpacity` fades what the stock windows of a gameplay HUD
+  draw (every covered HUD but the objectives display and the scoreboard, as
+  the retained documents' gameplay roots). Every colour passes through
+  `idDeviceContext::SetDrawColor`, which multiplies its alpha; additive art,
+  which ignores alpha, fades by its colour.
 - **Edges.** Outside Classic, `screenalignx`/`screenaligny` move a window by the
   Remastered edge distances instead of the full expansion. `HudLayoutFor` gives
   those distances, the same rule the retained documents use: side screens capped
@@ -43,7 +81,14 @@ objectives and scoreboard HUDs. It is skipped for an external mod.
   units, and `<window>::textlines`, its line count. The window measures only after
   something references either value, as it draws, so a reader sees the previous
   frame's value. Neither is saved. They fit plates to centre notices, the timer
-  and the vehicle prompt.
+  and the vehicle prompt. The measurement is cached on the text, its scale,
+  font and spacing and the rectangle's width.
+- **`ellipsis`, `keynames` and `oneline`.** `ellipsis 1` ends a single line too
+  long for its rectangle with "..." instead of cutting it at the edge, and
+  `textwidth` then reports the shortened line. In a Remastered layout only
+  (Classic keeps the stock look), `keynames 1` writes a key escape as the key's
+  name instead of drawing its keycap, for a notice that names a key in passing,
+  and `oneline 1` joins the text's explicit lines.
 - **Chat.** In the Remastered and Minimal layouts, the multiplayer HUD's passive
   `idChatWindow` draws the Remastered chat box (14.9) from the lines the game
   publishes for it (`oq4_chat<slot>_*`). The message-mode input keeps its stock
@@ -98,6 +143,12 @@ the kill feed hide in Minimal, as the retained document's do.
 | Kill feed | `oq4_feed` | Top trailing, four lines (two under the Tourney strip), each on its own plate at 0.35, or the header-band plate at 0.30 when it involves you. A line reads attacker, the Quad mark, the weapon's colored icon (a skull for suicides and world deaths, the telefrag mark), a TEAM tag on a team kill, then the victim. Names are white for you, in the team's text color in team modes and #FFFF8D otherwise. The plate fits the line through `textwidth`. The game times the lines and the fade |
 | Centre column | `oq4_frag_plate`, `oq4_main_plate`, `oq4_warm_plate` | The frag notice, main notice and warm-up reason stack from 81 u, each on a fitted 0.35 plate |
 | Chat | `idChatWindow` | As above |
+| Follow card | `oq4_follow` | Spectators: a 236x30 u plate at 0.58 above the status bar (y 360 following, 404 free camera) with the followed player's team colour at its leading end, FOLLOWING over the name (SPECTATING over Free camera), their place in #FFBE23 and score in Chain, and the controls line below. The stock status line gives way to it |
+| Vote | `oq4_vote` | A 150 u card at the leading edge, y 150, at 0.50: VOTE and the caller in #FFBE23, the fields, the Yes and No keys with their tallies as eight cells each, and the time left as a 20-tick ramp. After voting the keys go. The stock vote lines show only in Classic |
+| Respawn prompt | `oq4_respawn` | While you lie dead and may return: the attack control and Respawn on a fitted plate at 0.50, y 318, with the seconds left in Chain while the server holds the respawn |
+| Marker | `oq4_row<n>_mark`, `oq4_team<t>_mark`, `oq4_feed<n>_mark` | The ◥ marker in #E38900 on your standing row, your team's panel and a kill feed line that involves you: the stock triangle turned so its legs lie on the axes |
+| Voice | `p_aud1`, `p_aud2` | The stock bars, moved directly above the chat box |
+| Managed-match card | `oq4_match_context_hud` | Under the kill feed (y 90, 106 in Tourney), and left out in Minimal |
 
 Three GUI script rules shaped these windows:
 
@@ -120,21 +171,26 @@ Three GUI script rules shaped these windows:
 Each of these needs vector art or a layout a GUI script cannot express:
 
 - The rounded and sheared plates reuse the stock `pickupbar` bitmap.
-- The ◥ marker (standing, team panels, bracket and kill feed), the chat's
-  information symbol and the lock icon are left out.
+- The ◥ marker is left out of the bracket and chat, and the chat's
+  information symbol is left out. The standing, team panels and kill feed
+  draw the marker from a stock triangle, and Vehicle locked shows the stock
+  padlock.
 - The flags are the stock flag bitmap. A dropped flag is the solid flag under
   "?" instead of a dashed outline, and every taken flag beats on one shared
   clock.
-- Names in the kill feed and the bracket are clipped at their width (84 u in
-  the feed), because a GUI script cannot add an ellipsis. The victim still
-  always shows.
+- A name too long for the kill feed (84 u) or a bracket cell ends in three
+  full stops, not the ellipsis character. The victim still always shows.
 - The winner's check is two short strokes, and the Competitive match bar is not
   reproduced: Competitive uses the Remastered positions.
-- The stock GUI receives no motion setting, so reduced motion does not hold the
-  flags' beat or the Dead Zone flash. The clock's last ten seconds change color
-  without the 1 Hz pulse.
-- The prompt uses the engine's inline keycap, not the white chip.
-- HUD scale and opacity apply only to the retained interface.
+- The stock GUIs receive `oq4_hudReducedMotion` but do not read it yet: reduced
+  motion does not hold the flags' beat or the Dead Zone flash. The clock's
+  last ten seconds change color without the 1 Hz pulse.
+- The prompt uses the engine's inline keycap, not the white chip, and the
+  follow card's controls are the stock instruction line under the card. The
+  vote card names its keys without chips, and the damage direction's mark is
+  a filled triangle, not a chevron.
+- The voice plates keep their stock construction, and the follow card has no
+  chevrons at its ends.
 - The powerups' tick rings and the scoreboard keep their stock construction.
 - The Awakening's `q4xhud*.gui` and the air-defence cannon (which has no
   transmission display) keep the expansion's and stock layouts.
@@ -153,6 +209,12 @@ revisions oldest first (see the
 A save written by build 2271 restored in the candidate through `hud_r2.gui`,
 carrying 85 changed window values, including a visible boss bar. A save the
 candidate wrote restored on the current definition.
+
+The 10 November refinements changed expressions in all three (a restore
+refuses a register whose expression index moved), so the definitions that
+builds from 2280 saved are kept as `hud_r3.gui`, `hud_strogg_r3.gui` and
+`vehicle_hud_r2.gui`, with the marker windows `hit_chevron` and
+`oq4_prompt_padlock`.
 
 ## Evidence, 9 November 2026
 
@@ -221,3 +283,57 @@ unchanged), `key_bind_presentation.py`, `gui_transition_operand_contract.py`,
 `gui_state_debug_log_contract.py`, `arena_campaign_presentation_contract.py`,
 `competitive_match_layer.py`, `mp_match_control_live_adapter_contract.py`,
 `ui_hud_coverage.py`, `ui_embedded_icons.py` and `docs_link_integrity.py`.
+
+## Evidence, 10 November 2026
+
+Debugoptimized `builddir` (main at `9cc5e67a4` plus the working tree) at 1280x720
+on OpenGL, from the candidate runtime with the HUD GUIs loose. Each state was
+shot twice in one run, first with the retained Remastered HUD and then with the
+stock interface's (`ui_retained 0` set between the shots), so a pair shares
+its scene and state: `.tmp/hud-round/run.py` with `st_pairs.py`, in a hidden
+window with no host input. Multiplayer pairs draw over a flat clear
+(`r_skipRender 1`). Text and plate extents were measured per element
+(`extent.py`) and overlaid (`overlay.py`); sizes and offsets were corrected
+until the pairs agreed to about 1 u. Local captures are in
+`.tmp/hud-round/out/` (untracked):
+
+| Pair set | Directory | What it shows |
+| --- | --- | --- |
+| Marine on foot | `final-sp` | Gauges, strip, pickup lines, transmission, notices, boss bar; HUD scale 1.25 with a 4% inset and 0.75; opacity 0.5; Minimal |
+| Strogg on foot | `final-strogg` | The same for `hud_strogg.gui` |
+| Tank | `final-tank` | Notices stacked under the boss plate, the prompt and padlock, the transmission, scale 1.25, Minimal |
+| Deathmatch | `final-mp` | Standing with the marker, timer, one-line warm-up notice, chat, kill feed, scale 1.25, Minimal, Competitive |
+| Capture the Flag | `final-ctf` | Team panels with the marker, flags at base, timer |
+| Tourney | `final-tourney`, `final-bracket` | Message bar with its key named, timer and ARENA plate, the bracket's cells and names, the round banner |
+| Kill feed | `final-feed` | Forged lines: a long attacker name ending in "...", a team kill, your line with the marker |
+| Spectator | `final-spec` | The follow card in the free camera with its controls |
+| Vote and respawn | `final-vote`, `p7-vote` | The vote card (forged fields), the respawn prompt, a dead player's 0 |
+| Damage direction | `final-hit` | The mark at the dome's peak, turned with the indicator |
+
+`final-fade` shows the stock HUD at 0.75 and 1.25 with the mission-failed fade,
+which now covers the whole view (`hud.gui` and `hud_strogg.gui` sized it to the
+4:3 canvas, leaving lit strips at the sides of a wide view in every layout).
+
+A follow card with a followed player, a called vote's live tally and the voice
+plates were not captured: one machine with bots gave no followed player and no
+accepted vote.
+
+Saves, with `.tmp/hud-round/savecompat.py`: a save the candidate wrote with the
+previous `hud.gui` loose restored with the current one through `hud_r3.gui`
+("Restored 'guis/hud.gui' from a save written for its earlier definition (107
+changed window values)"), keeping a visible boss bar; a save written with the
+current definition restored directly. On `convoy1` the tank's HUD restored
+through `vehicle_hud_r2.gui` the same way (10 changed window values).
+
+The retained multiplayer document changed too: its vote, statistics and
+managed-match cards now hold their plate in a block beside the column of rows.
+As a direct child of the column the plate was laid out before the rows gave
+the card its height, and drew as a thin band across the card's top
+(`p7-vote`, before and after).
+
+Contract checks that passed: `savegame_gui_layout_contract.py`,
+`savegame_v3_contract.py`, `gui_clipping_contract.py` (which now covers the
+scale group), `ui_stock_level_load.py` (the peers' rejoin),
+`competitive_match_layer.py`, `arena_campaign.py`, `remastered_hud_behavior.py`,
+`weapon_wheel_behavior.py`, `key_bind_presentation.py`, `ui_hud_coverage.py`
+and `docs_link_integrity.py`.

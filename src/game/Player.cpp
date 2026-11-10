@@ -1434,6 +1434,7 @@ idPlayer::idPlayer() {
 
 	lastDamageDef			= 0;
 	lastDamageDir			= vec3_zero;
+	hudHitDirTime			= 0;
 	lastDamageLocation		= 0;
 
 	predictedFrame			= 0;
@@ -3919,10 +3920,16 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 	
 	assert ( _hud );
 
+	// openQ4: compare what the HUD shows. Against the raw value, a gibbed
+	// player (health below -100) re-sent updateHealth and a bogus delta every
+	// frame until the respawn.
+	// A Remastered layout reads 0 for the dead, as the retained HUD does;
+	// Classic keeps the stock readout, negative down to -100.
+	const int shownHealth = _hud->GetStateBool( "oq4_hudRemastered" ) ? Max( 0, health ) : ( health < -100 ? -100 : health );
 	temp = _hud->State().GetInt ( "player_health", "-1" );
-	if ( temp != health ) {		
-		_hud->SetStateInt   ( "player_healthDelta", temp == -1 ? 0 : (temp - health) );
-		_hud->SetStateInt	( "player_health", health < -100 ? -100 : health );
+	if ( temp != shownHealth ) {		
+		_hud->SetStateInt   ( "player_healthDelta", temp == -1 ? 0 : (temp - shownHealth) );
+		_hud->SetStateInt	( "player_health", shownHealth );
 		_hud->SetStateFloat	( "player_healthpct", idMath::ClampFloat ( 0.0f, 1.0f, (float)health / (float)inventory.maxHealth ) );
 		_hud->HandleNamedEvent ( "updateHealth" );
 	}
@@ -3952,10 +3959,15 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 	_hud->SetStateString( "player_god", va( "%i", (godmode && g_showGodDamage.GetBool()) ) );
 	_hud->SetStateString( "player_god_damage", va( "%i", godmodeDamage ) );
 
-	// Update the hit direction
-	idVec3 localDir;
-	viewAxis.ProjectVector( lastDamageDir, localDir );
-	_hud->SetStateFloat( "hitdir", localDir.ToAngles()[YAW] + 180.0f );
+	// Update the hit direction. openQ4: only while the indicator shows (it
+	// fades within 600 ms of the hit). Written every frame, the angle changed
+	// with every turn of the view, so the HUD's state never rested and both
+	// HUDs re-evaluated on every frame the player looked around.
+	if ( hudHitDirTime != 0 && gameLocal.time >= hudHitDirTime && gameLocal.time - hudHitDirTime < 1000 ) {
+		idVec3 localDir;
+		viewAxis.ProjectVector( lastDamageDir, localDir );
+		_hud->SetStateFloat( "hitdir", localDir.ToAngles()[YAW] + 180.0f );
+	}
 
 	//_hud->HandleNamedEvent( "updateArmorHealthAir" );
 
@@ -9172,7 +9184,9 @@ void idPlayer::UpdateAir( void ) {
 	airless = newAirless;
 
 	if ( hud ) {
-		hud->SetStateInt( "player_air", 100 * airTics / pm_airTics.GetInteger() );
+		// openQ4: pm_air 0 (no air supply to lose) divided by zero here.
+		const int airCapacity = pm_airTics.GetInteger();
+		hud->SetStateInt( "player_air", airCapacity > 0 ? idMath::ClampInt( 0, 100, (int)( (int64)airTics * 100 / airCapacity ) ) : 100 );
 	}
 }
 
@@ -16052,6 +16066,7 @@ void idPlayer::ClientDamageEffects ( const idDict& damageDef, const idVec3& dir,
 		// Let the hud know about the hit
 		if ( hud ) {
 			hud->SetStateFloat ( "hitdir", localDir.ToAngles()[YAW] + 180.0f );
+			hudHitDirTime = gameLocal.time;
 // openQ4 BEGIN
 			// The Classic HUD caps its indicator at 0.40 under reduced flashing.
 			hud->SetStateBool ( "reducedFlashing", cvarSystem->GetCVarBool( "ui_reducedFlashing" ) );
