@@ -160,6 +160,9 @@ static void SDL3_SyncGLConfigWindowDimensions( const renderModuleWindowInfo_t &w
 	glConfig.uiViewportY = windowInfo.uiViewportY;
 	glConfig.uiViewportWidth = windowInfo.uiViewportWidth;
 	glConfig.uiViewportHeight = windowInfo.uiViewportHeight;
+	// a VR frame restores the window's extent when it finishes: keep that current
+	R_VR_PublishWindowSize( windowInfo.pixelWidth, windowInfo.pixelHeight );
+	R_VR_PublishUIViewport( windowInfo.uiViewportX, windowInfo.uiViewportY, windowInfo.uiViewportWidth, windowInfo.uiViewportHeight );
 }
 
 static bool SDL3_EnsureGLContextCurrent(const char *operation) {

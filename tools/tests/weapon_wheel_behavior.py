@@ -33,7 +33,7 @@ struct idMath {
 #define DEG2RAD(v) ((v)*idMath::PI/180.0f)
 #define MS2SEC(v) ((v)*.001f)
 enum {PITCH,YAW,ROLL};
-constexpr int BUTTON_WEAPONWHEEL=512,BUTTON_QUICKCHAT=2048,BUTTON_ZOOM=2,MAX_WEAPONS=16,SPECIAL_EFFECT_BLUR=0,CMD_EXEC_NOW=0;
+constexpr int BUTTON_WEAPONWHEEL=512,BUTTON_QUICKCHAT=2048,BUTTON_VRAIM=4096,BUTTON_ZOOM=2,MAX_WEAPONS=16,SPECIAL_EFFECT_BLUR=0,CMD_EXEC_NOW=0;
 static int now=1000;
 int Sys_Milliseconds(){return now;}
 float SHORT2ANGLE(short s){return static_cast<unsigned short>(s)*(360.0f/65536.0f);}

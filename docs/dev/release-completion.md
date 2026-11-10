@@ -6,6 +6,69 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## VR: shots that stay on the laser, a weapon wheel that answers your hand, and a pause when the headset comes off, 10 November 2026
+
+- **Shots land on the laser dot after a save, a ride or a cutscene.** Loading
+  a save, leaving a vehicle, sitting through a cutscene, teleporting or
+  clicking the weapon-hand stick could leave every shot, and what you pointed
+  at on world screens, a fixed angle above or below the laser. Nothing you did
+  with your hand took it out again. The game's aim now always has the
+  controller's own pitch. In multiplayer the server applies the same rule, so
+  both the server and the VR player need this build.
+- **Levels and loaded saves start facing the right way.** After snap turns,
+  the next level started turned by as much as you had turned in the level
+  before, and so did a save loaded after turning. Both now start facing the
+  way the level, or the save, faces.
+- **The weapon wheel answers your hand.** With the modern interface (the
+  default), the wheel opened but turning your weapon hand selected nothing,
+  so it could only keep the weapon you held. It follows your hand again, in
+  single player and multiplayer, and so does multiplayer's quick-chat wheel.
+- **Single player pauses when the headset comes off.** Taking the headset off,
+  opening your runtime's own menu (the SteamVR dashboard, the Meta menu) or
+  losing the runtime now opens the pause menu, so nothing happens to you while
+  you can't see or steer. Resume from the menu when you're back.
+  `vr_pauseOnFocusLoss 0` keeps the game running. Multiplayer can't pause.
+- **Your headset's own recentre no longer jumps.** A runtime announces a
+  recentre a moment before it applies it. openQ4 recentred at the
+  announcement, measured against the old position, and the view jumped when
+  the new one arrived. It now follows on the frame the headset applies it.
+- **Zoom eases in and out.** A scoped weapon's zoom held the view still for
+  the length of the zoom and then jumped to full magnification, and jumped
+  back on release. It now eases, as on a monitor.
+- **The Arena's entrance, intro and victory shots play on the floating
+  screen.** They are authored camera shots; the headset showed your own locked
+  view instead, turning with your weapon hand.
+- **Smaller fixes.**
+  - `vr_restart` looks for the runtime and the headset at once. After a failed
+    start it could do nothing for up to nine seconds.
+  - `vr_status` reports the headset's refresh rate.
+  - A session the runtime would not begin is opened again after three seconds;
+    it used to stay idle until `vr_restart`.
+  - Resizing the desktop window in VR resizes its mirror. The mirror kept the
+    old size until VR stopped, and on Vulkan the flat view after VR kept it too.
+  - The Awakening: a jammed turret (the dropship's top gun in the third
+    mission) no longer follows your head or controller while it is jammed.
+  - With `vr_vehicleStereo 0`, aiming a vehicle's turret aside no longer makes
+    the stick drive it sideways.
+  - OpenGL: menu and HUD drawing after a development screenshot taken
+    mid-frame keeps its transparency in the headset.
+  - Vulkan: with the experimental render thread (`r_vkRenderThread`), VR frames
+    render on the main thread. The headset's images were handed back to the
+    runtime while the render thread could still be drawing into them.
+- **Not yet checked on a headset.** These were found by reading the code and
+  verified on the simulated OpenXR runtime; no headset was available. Known
+  and left for later: room-scale walking can shimmer by up to a tic's step
+  against the smoothed view, a save made in a vehicle seat can load facing
+  away from the cockpit, multiplayer's comfort vignette also darkens on real
+  steps, multiplayer damage numbers are placed from the right eye, a demo
+  recorded in VR stores both eyes' overlays, and checkpoint thumbnails show
+  the desktop mirror.
+- Evidence: `openxr_vr_smoke.py` (weapon wheel, focus-loss pause),
+  `openxr_vr_playspace_smoke.py` (runtime recentre, level and save start
+  facing, aim pitch after centring the view and after a load),
+  `openxr_vr_contract.py`, the native XR lifecycle cases;
+  [VR roadmap](roadmap.md#vr-task-evidence-and-acceptance).
+
 ## HUD fixes, and a classic-interface HUD that matches the new one, 10 November 2026
 
 - **HUD size and opacity now work in the classic interface.** With

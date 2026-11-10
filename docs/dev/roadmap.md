@@ -1844,6 +1844,21 @@ and AND-05.
   physical tracking, readable UI or comfort.
   The [headset checklist](vr-headset-qualification.md) covers every point above
   on both renderers, plus the hardware halves of VR-01 and VR-03 through VR-05.
+  10 November: a code audit on the simulated runtime, with no headset, fixed
+  defects a headset run would have met at once
+  ([release record](release-completion.md#vr-shots-that-stay-on-the-laser-a-weapon-wheel-that-answers-your-hand-and-a-pause-when-the-headset-comes-off-10-november-2026)):
+  a pitch offset between shots and the laser after a load, vehicle exit,
+  cutscene or stick click (`BUTTON_VRAIM`, both game modules); levels and
+  saves starting turned by earlier snap turns; a weapon wheel the hand could
+  not steer under the retained interface; the runtime's recentre applied
+  before its change time; no pause when the headset loses focus; zoom that
+  snapped; and a mirror that ignored window resizes. Verified leads left for
+  the headset run or a later round: room-scale steps against the interpolated
+  eye (up to one tic's walk of shimmer), a save made in a vehicle seat loading
+  with an arbitrary seat facing, the multiplayer comfort vignette firing on
+  real room-scale steps, multiplayer damage numbers projected from the right
+  eye, render demos recorded in VR storing both eyes' 2D, and checkpoint
+  thumbnails capturing the desktop mirror.
 - [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and

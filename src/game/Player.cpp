@@ -8654,6 +8654,13 @@ void idPlayer::UpdateDeltaViewAngles( const idAngles &angles ) {
 	for( int i = 0; i < 3; i++ ) {
 		delta[ i ] = angles[ i ] - SHORT2ANGLE( usercmd.angles[ i ] );
 	}
+	// openQ4 VR: a tracked aim's pitch is the controller's (or the head's) own.
+	// An offset on it would send every shot off the line the laser draws, and
+	// nothing the player does with a hand could take it out again.
+	if ( ( usercmd.buttons & BUTTON_VRAIM ) != 0 ) {
+		delta.pitch = 0.0f;
+		delta.roll = 0.0f;
+	}
 	SetDeltaViewAngles( delta );
 }
 
@@ -8779,6 +8786,14 @@ void idPlayer::UpdateViewAngles( void ) {
 //		gameLocal.Printf( "\tUSERCMD: <%d, %d, %d>\n", usercmd.angles[ 0 ], usercmd.angles[ 1 ], usercmd.angles[ 2 ] );
 //		gameLocal.Printf( "\tDELTAVIEW: %s\n", deltaViewAngles.ToString() );
 //	}
+	// openQ4 VR: no pitch offset rides on a tracked aim (UpdateDeltaViewAngles).
+	// A spawn, a loaded save, a teleport or a pusher may have left one before
+	// this command carried the flag.
+	const bool vrAim = ( usercmd.buttons & BUTTON_VRAIM ) != 0;
+	if ( vrAim ) {
+		deltaViewAngles.pitch = 0.0f;
+		deltaViewAngles.roll = 0.0f;
+	}
 	for ( i = 0; i < 3; i++ ) {
 		cmdAngles[i] = SHORT2ANGLE( usercmd.angles[i] );
 		if ( influenceActive == INFLUENCE_LEVEL3 ) {
@@ -8787,7 +8802,8 @@ void idPlayer::UpdateViewAngles( void ) {
 			viewAngles[i] = idMath::AngleNormalize180( SHORT2ANGLE( usercmd.angles[i] ) + deltaViewAngles[i] );
 		}
 	}
-	if ( !centerView.IsDone( gameLocal.time ) ) {
+	// centring the view levels a mouse's pitch; a hand's is wherever the hand is
+	if ( !vrAim && !centerView.IsDone( gameLocal.time ) ) {
 		viewAngles.pitch = centerView.GetCurrentValue( gameLocal.time );
 	}
 //	if( gameLocal.localClientNum == entityNumber ) {
@@ -12884,9 +12900,22 @@ void idPlayer::UpdateVRVehicleFrame( void ) {
 	float trackingYaw;
 	rvVehicle *vehicle = vehicleController.GetVehicle();
 	const rvVehiclePosition *position = vehicle != NULL ? vehicle->GetPosition( vehicleController.GetPosition() ) : NULL;
-	if ( position == NULL || health <= 0 || !GetVRView( frame, trackingYaw ) ) {
+	if ( position == NULL || health <= 0 ) {
 		vrVehicleYawValid = false;
 		return;
+	}
+	const bool stereo = GetVRView( frame, trackingYaw );
+	if ( !stereo ) {
+		vrVehicleYawValid = false;
+		// on the floating screen (vr_vehicleStereo 0) the stick still arrives
+		// turned into the weapon hand's aim
+		if ( vrSystem == NULL || !vrSystem->IsActive() || gameLocal.GetLocalPlayer() != this ) {
+			return;
+		}
+		vrSystem->GetFrameState( frame );
+		if ( !frame.active ) {
+			return;
+		}
 	}
 
 	// the head turns a vehicle's guns, and with them its facing, and the stick
@@ -12900,6 +12929,9 @@ void idPlayer::UpdateVRVehicleFrame( void ) {
 		const float left = -static_cast<float>( usercmd.rightmove );
 		usercmd.forwardmove = idMath::ClampChar( idMath::FtoiFast( c * forward - s * left ) );
 		usercmd.rightmove = idMath::ClampChar( idMath::FtoiFast( -( s * forward + c * left ) ) );
+	}
+	if ( !stereo ) {
+		return;
 	}
 
 	if ( position->TurretAlignsVehicle() ) {
@@ -12953,6 +12985,30 @@ bool idPlayer::GetVRVehicleAim( idAngles &seatAim, idAngles &worldAim ) const {
 	worldAim.Set( idMath::AngleNormalize180( seatAim.pitch + deltaViewAngles.pitch ),
 		idMath::AngleNormalize180( seatAim.yaw + vrVehicleDeltaYaw ), 0.0f );
 	return false;
+}
+
+/*
+===============
+idPlayer::VRZoomScale
+
+openQ4 VR: how far a weapon's zoom narrows each eye's frustum now
+(VR_ZoomTangentScale): 1 unzoomed, eased with the flat screen's field of
+view while the zoom moves. While it moves CalcFov returns the moving value
+whether or not it honours the zoom, so that is measured against the unzoomed
+view; measured against itself, the eyes held still for the zoom's whole
+ease and then jumped to full magnification, and jumped back on release.
+===============
+*/
+float idPlayer::VRZoomScale( void ) {
+	const float current = CalcFov( true );
+	float normal = CalcFov( false );
+	if ( !fxFov && !influenceFov && !zoomFov.IsDone( gameLocal.time ) ) {
+		normal = DefaultFov();
+		if ( vehicleController.IsDriving() && vehicleController.GetVehicle() != NULL ) {
+			normal += vehicleController.GetVehicle()->GetFovOffset();
+		}
+	}
+	return VR_ZoomTangentScale( current, normal );
 }
 
 /*

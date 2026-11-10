@@ -250,6 +250,34 @@ void idRenderSystemLocal::ApplyVRTargetExtent( int width, int height ) {
 
 /*
 ====================
+R_VR_PublishWindowSize, R_VR_PublishUIViewport
+
+A backend learns the window's live size while it presents: a swap polls the
+window, a resize recreates the swapchain. During a VR frame glConfig holds the
+frame's target extent and FinishVRFrame puts the window's back, so the size
+it puts back has to follow, or a window resized in VR kept the size the frame
+began with for as long as VR frames ran: the desktop mirror stayed at the old
+size, and the flat frames after VR used it too.
+====================
+*/
+void R_VR_PublishWindowSize( int width, int height ) {
+	if ( tr.vrFrame.active && width > 0 && height > 0 ) {
+		tr.vrWindowWidth = width;
+		tr.vrWindowHeight = height;
+	}
+}
+
+void R_VR_PublishUIViewport( int x, int y, int width, int height ) {
+	if ( tr.vrFrame.active ) {
+		tr.vrSavedUIViewport[0] = x;
+		tr.vrSavedUIViewport[1] = y;
+		tr.vrSavedUIViewport[2] = width;
+		tr.vrSavedUIViewport[3] = height;
+	}
+}
+
+/*
+====================
 R_VR_FrontEndEye
 ====================
 */

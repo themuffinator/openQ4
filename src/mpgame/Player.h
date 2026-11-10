@@ -477,6 +477,9 @@ public:
 	bool					vrRoomScaleOriginValid;
 	// openQ4 VR: the body crouched by the button, until it stands again
 	mutable bool			vrButtonCrouch;
+	// openQ4 VR: the Arena's presentation camera built the last render view
+	// (entrance, intro, spawn-in, tableau): an authored shot, shown flat
+	bool					vrPresentationCamera;
 	bool					presentationCanInterpolate;
 	idVec3					presentationPrevViewOrigin;
 	idMat3					presentationPrevViewAxis;
@@ -650,6 +653,8 @@ public:
 	// How far the tracking origin sits above the body's eye: a crouch the
 	// tracked head made must not lower the view again.
 	float					VRCrouchLift( const vrFrameState_t &frame ) const;
+	// How far a weapon's zoom narrows each eye now, eased with the zoom.
+	float					VRZoomScale( void );
 	// A pulse in the local player's weapon hand, other hand, or both.
 	void					VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const;
 	// Room scale: report a new tic's predicted progress to the tracking space.

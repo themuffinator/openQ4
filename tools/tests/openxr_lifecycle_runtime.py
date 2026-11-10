@@ -127,6 +127,9 @@ def main() -> int:
         "g_autoSkipCinematics": "1", "g_openQ4Storage1NoDropPodState": "1", "com_loadingContinueAutoAdvance": "1",
         "logFile": "2", "logFileName": "logs/openq4.log", "developer": "1", "vr_enable": "0", "vr_debug": "1",
         "vr_roomScale": "0", "vr_physicalCrouch": "0", "vr_aimMode": "0", "vr_hapticStrength": "0",
+        # the captures compare gameplay before and after the fault: keep single
+        # player running across the loss instead of pausing it on the menu
+        "vr_pauseOnFocusLoss": "0",
         "g_autoExecAfterMapLoad": "xr_fault.cfg", "g_autoExecAfterMapLoadDelayMs": "500",
         "net_port": str(args.port), "net_enableIPv6": "0",
     }

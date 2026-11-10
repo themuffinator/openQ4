@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "NativeInputDispatch.h"
 #include "PresentationLook.h"
 #include "Session_local.h"
+#include "VRSystemLocal.h"
 #include "../idlib/NumericString.h"
 #include "../ui/RetainedUI.h"
 #ifdef __ANDROID__
@@ -1372,6 +1373,7 @@ void idUsercmdGenLocal::MakeCurrent( void ) {
 			if ( vrInput.crouch ) {
 				cmd.buttons |= BUTTON_VRCROUCH;
 			}
+			cmd.buttons |= BUTTON_VRAIM;
 		}
 	} else {
 		mouseDx = 0;
@@ -1456,6 +1458,8 @@ void idUsercmdGenLocal::InitForNewMap( void ) {
 
 	Clear();
 	ClearAngles();
+	// openQ4 VR: the tracked aim starts again from the zeroed angles
+	VR_UsercmdAnglesCleared();
 }
 
 /*

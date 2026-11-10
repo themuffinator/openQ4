@@ -245,6 +245,9 @@ void RB_VR_BeginBackEnd( void ) {
 		idRenderTexture *target = tr.vrTargets[rb_vrTarget + 1];
 		R_SetDefaultRenderTarget( target );
 		if ( R_GetDefaultRenderTarget() == target ) {
+			// setting the target forgot that the virtual screen blends
+			// premultiplied; the rest of its 2D still needs that
+			R_SetDefaultRenderTargetPremultiplied( rb_vrTarget < 0 );
 			return;
 		}
 	}

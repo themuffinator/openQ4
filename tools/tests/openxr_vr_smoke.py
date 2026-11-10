@@ -33,6 +33,10 @@ Checks:
   pulses the weapon hand's controller (a 40 ms vibration on the right hand);
 - the machinegun's zoom magnifies the eyes and puts no scope picture on the
   head-locked HUD;
+- the weapon wheel: the off-hand grip squeezed away from the gun opens it,
+  raising the weapon hand hovers the blaster at its top and releasing the grip
+  switches to it (under the retained interface the hand's turn once went
+  unread, so the wheel could only ever keep the weapon in hand);
 - room scale: half a metre's step forward walks the body after the head, so
   the head ends up within a few units of the tracking origin, while with
   vr_roomScale 0 the same step leaves the whole distance as a lean;
@@ -53,6 +57,8 @@ Checks:
   at it (the pointer is drawn where the ray meets the screen) and the trigger
   clicks Resume there, which closes the menu even though the desktop window
   holds no focus;
+- losing the controllers to the runtime (its own menu, or the headset coming
+  off) pauses single player on the pause menu, which stays up when they return;
 - a vehicle in stereo: a walker, spawned and entered by script and turned 45
   degrees in the same breath (as m07's race turns its speeder), seats the
   player facing its new heading, turns its cockpit 45 degrees after the head
@@ -272,6 +278,13 @@ def main(argv: list[str] | None = None) -> None:
         f"when {marker('vehicle_look')} head -45 0 0",
         f"when {marker('vehicle_cap')} capture {profile / 'xr_vehicle'}",
         f"when {marker('vehicle_back')} head 0 0 0",
+        f"when {marker('wheel_hands')} hand left -0.3 1.2 -0.2 0 0 0",
+        f"when {marker('wheel_open')} button left squeeze 1",
+        f"when {marker('wheel_point')} hand right 0.2 1.25 -0.35 0 20 0",
+        f"when {marker('wheel_close')} button left squeeze 0",
+        f"when {marker('wheel_done')} hand right {LASER_HAND_POSE}",
+        f"when {marker('unfocus')} focus 0",
+        f"when {marker('refocus')} focus 1",
         f"when {marker('exit')} exit",
     ]
     (profile / "xr_script.txt").write_text("\n".join(script) + "\n", encoding="utf-8")
@@ -315,6 +328,13 @@ def main(argv: list[str] | None = None) -> None:
         "condump vr_marker_zoom_off.txt", "waitMsec 400",
         "condump vr_marker_zoom.txt", "waitMsec 1500", "condump vr_marker_zoom_on.txt", "waitMsec 400",
         "condump vr_marker_unzoom.txt", "waitMsec 800",
+        # the weapon wheel: the off hand squeezes away from the gun, the weapon
+        # hand rises to the blaster at the wheel's top, and letting go takes it
+        "condump vr_marker_wheel_hands.txt", "waitMsec 300", "echo VR_WHEEL_BEFORE", "testWeaponWheel",
+        "condump vr_marker_wheel_open.txt", "waitMsec 600",
+        "condump vr_marker_wheel_point.txt", "waitMsec 600", "echo VR_WHEEL_POINTED", "testWeaponWheel",
+        "condump vr_marker_wheel_close.txt", "waitMsec 1500", "echo VR_WHEEL_AFTER", "testWeaponWheel",
+        "condump vr_marker_wheel_done.txt", "_impulse1", "waitMsec 2500",
         # room scale: a step forward walks the body; without it the step is a lean
         "vr_roomScale 1", "condump vr_marker_room_walk.txt", "waitMsec 1200", "echo VR_ROOM_WALKED", "vr_status",
         "vr_roomScale 0", "condump vr_marker_room_lean.txt", "waitMsec 1000", "echo VR_ROOM_LEANED", "vr_status",
@@ -336,7 +356,9 @@ def main(argv: list[str] | None = None) -> None:
         "condump vr_marker_stick_hand_stop.txt", "waitMsec 600", "echo VR_STICK_HAND_DONE", "getviewpos",
         # a world GUI answers the weapon hand where it points, as the laser
         # does, not the eye a forearm above it
-        "vr_moveDirection 0", f"setviewpos {GUI_POSE}", "condump vr_marker_gui_point.txt", "waitMsec 900",
+        # (the hand takes its pose first: the panel takes focus, and logs where,
+        # the moment the aim meets it, and the aim is the hand's at once)
+        "vr_moveDirection 0", "condump vr_marker_gui_point.txt", "waitMsec 400", f"setviewpos {GUI_POSE}", "waitMsec 900",
         "echo VR_GUI_POINTED", "condump vr_marker_gui_done.txt", "waitMsec 300",
         # culling never hides what an eye shows: in a frozen world, turning it
         # off must leave both eyes as they were
@@ -377,6 +399,10 @@ def main(argv: list[str] | None = None) -> None:
         "condump vr_marker_vehicle_cap.txt", "waitMsec 500",
         "condump vr_marker_vehicle_back.txt", "waitMsec 300",
         'script "$player1.exitVehicle( 1 );"', "waitMsec 1000", "echo VR_VEHICLE_OUT",
+        # the runtime's own menu takes the controllers (or the headset comes
+        # off): single player pauses on the menu and stays there when they return
+        "condump vr_marker_unfocus.txt", "waitMsec 1500", "echo VR_UNFOCUSED",
+        "condump vr_marker_refocus.txt", "waitMsec 800", "echo VR_REFOCUSED",
         "condump vr_marker_exit.txt", "waitMsec 1500",
         "echo VR_AFTER_EXIT", "vr_status", "vr_enable",
         "echo VR_SMOKE_COMPLETE", "quit",
@@ -727,6 +753,37 @@ def main(argv: list[str] | None = None) -> None:
     # sight even though the controller aims on foot (where it hangs lower)
     assert abs(vehicle_frames[0]["layers"][1]["y"]) < 0.01, \
         f"in the walker the HUD should hang on the line of sight: {vehicle_frames[0]['layers'][1]}"
+
+    # the weapon wheel follows the weapon hand: raised, it hovers the blaster
+    # (slot 0, at the top) and releasing the grip switches to it
+    def wheel(tag: str) -> dict[str, int]:
+        found = re.search(r"WEAPON_WHEEL active=(\d+) slot=(-?\d+) slots=\d+ current=(-?\d+) ideal=(-?\d+)", text.partition(tag)[2])
+        assert found, f"testWeaponWheel printed no state after {tag}"
+        return dict(zip(("active", "slot", "current", "ideal"), (int(group) for group in found.groups())))
+    wheel_before, wheel_pointed, wheel_after = wheel("VR_WHEEL_BEFORE"), wheel("VR_WHEEL_POINTED"), wheel("VR_WHEEL_AFTER")
+    assert wheel_before["active"] == 0 and wheel_before["current"] > 0, f"the wheel stage should start on the machinegun: {wheel_before}"
+    assert wheel_pointed["active"] == 1, f"the off-hand grip away from the gun did not open the weapon wheel: {wheel_pointed}"
+    assert wheel_pointed["slot"] == 0, f"raising the weapon hand should hover the blaster at the wheel's top: {wheel_pointed}"
+    assert wheel_after["active"] == 0 and wheel_after["ideal"] == 0, \
+        f"releasing the grip should switch to the hovered blaster: {wheel_after}"
+
+    # losing the controllers to the runtime pauses single player: the pause
+    # menu's opaque, world-locked screen replaces the HUD, and it is still there
+    # once the controllers are back, for the player to resume from
+    unfocused_log = menu_log.partition("VR_VEHICLE_OUT")[2].partition("VR_UNFOCUSED")[0]
+    assert "VR: the headset lost input focus; single player is paused on the menu" in unfocused_log, \
+        "losing input focus in gameplay did not pause single player"
+    focus_frames = [e["frame"] for e in events if e.get("event") == "script_command" and e.get("command") == "focus"]
+    assert len(focus_frames) == 2, f"the focus script ran {len(focus_frames)} of 2 commands"
+    paused_frames = [f for f in frames if f["frame"] > focus_frames[0]]
+    first_paused = next((i for i, f in enumerate(paused_frames)
+                         if [layer["type"] for layer in f["layers"]] == ["projection", "quad"]
+                         and not f["layers"][1]["flags"] & 0x2 and abs(f["layers"][1]["z"] + 2.5) < 0.01), None)
+    assert first_paused is not None, \
+        f"after losing focus the pause menu should hang 2.5 m ahead of the paused world: {paused_frames[:3]}"
+    assert not any(layer["type"] == "quad" and layer["flags"] & 0x2
+                   for f in paused_frames[first_paused:] for layer in f["layers"]), \
+        f"the pause menu should stay up once the controllers are back: {paused_frames[first_paused:][:4]}"
 
     # the runtime ends VR: the game carries on and keeps the player's setting
     before_exit, _, after_exit = menu_log.partition("VR_AFTER_EXIT")

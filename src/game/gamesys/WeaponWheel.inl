@@ -368,6 +368,9 @@ static float WeaponWheelDeadzoneRadius() {
 // The native selector uses the actual stick direction. Neutral holds the
 // weapon selection but returns the cursor to the dead zone, which quick chat
 // also uses to cancel on release. Classic retains its cursor sensitivity.
+// openQ4 VR: a tracked aim (BUTTON_VRAIM) steers either selector by turning
+// the weapon hand. Its buttons arrive as a controller's, but it has no stick
+// deflection to read, so it keeps the cursor that follows the aim.
 static void WeaponWheelAdvanceCursor( const usercmd_t &cmd, idVec2 &cursor, int &lastMouseX, int &lastMouseY, idAngles &lastAngles ) {
 	const int mouseDx = cmd.mx - lastMouseX;
 	const int mouseDy = cmd.my - lastMouseY;
@@ -377,6 +380,7 @@ static void WeaponWheelAdvanceCursor( const usercmd_t &cmd, idVec2 &cursor, int 
 	currentCmdAngles[ ROLL ] = SHORT2ANGLE( cmd.angles[ ROLL ] );
 	const float lookDx = idMath::AngleNormalize180( currentCmdAngles[ YAW ] - lastAngles[ YAW ] );
 	const float lookDy = idMath::AngleNormalize180( currentCmdAngles[ PITCH ] - lastAngles[ PITCH ] );
+	const bool trackedAim = ( cmd.buttons & BUTTON_VRAIM ) != 0;
 
 	lastMouseX = cmd.mx;
 	lastMouseY = cmd.my;
@@ -387,10 +391,10 @@ static void WeaponWheelAdvanceCursor( const usercmd_t &cmd, idVec2 &cursor, int 
 	if ( cvarSystem->GetCVarBool( "ui_radialTouchActive" ) ) {
 		cursor.x = cvarSystem->GetCVarFloat( "ui_radialTouchX" ) * WEAPON_WHEEL_CURSOR_RADIUS;
 		cursor.y = cvarSystem->GetCVarFloat( "ui_radialTouchY" ) * WEAPON_WHEEL_CURSOR_RADIUS;
-	} else if ( mouseDx == 0 && mouseDy == 0 && cvarSystem->GetCVarBool( "ui_retained" ) && cvarSystem->GetCVarBool( "ui_radialStickActive" ) ) {
+	} else if ( !trackedAim && mouseDx == 0 && mouseDy == 0 && cvarSystem->GetCVarBool( "ui_retained" ) && cvarSystem->GetCVarBool( "ui_radialStickActive" ) ) {
 		cursor.x = cvarSystem->GetCVarFloat( "ui_radialStickX" ) * WEAPON_WHEEL_CURSOR_RADIUS;
 		cursor.y = cvarSystem->GetCVarFloat( "ui_radialStickY" ) * WEAPON_WHEEL_CURSOR_RADIUS;
-	} else if ( mouseDx == 0 && mouseDy == 0 && !cvarSystem->GetCVarBool( "ui_retained" ) ) {
+	} else if ( mouseDx == 0 && mouseDy == 0 && ( trackedAim || !cvarSystem->GetCVarBool( "ui_retained" ) ) ) {
 		const float sensitivity = idMath::ClampFloat( 0.25f, 16.0f, cvarSystem->GetCVarFloat( "in_weaponWheelSensitivity" ) );
 		// Turning right decreases yaw; wheel coordinates increase to the right.
 		cursor.x -= lookDx * sensitivity;

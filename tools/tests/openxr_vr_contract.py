@@ -207,6 +207,15 @@ def check_play_space() -> None:
     require(read("src/framework/VRMathCore.h"), "inline vrPlaySpaceChoice_t VR_ChoosePlaySpace( int mode, bool haveStage, bool haveLocalFloor ) {",
             "the play-space choice is pure, natively tested math")
     require(read("tools/tests/openxr/OpenXRTestRuntime.cpp"), "OPENQ4_XR_TEST_SPACES", "the test runtime can withhold floor-level spaces")
+    # the headset's own recentre: announced ahead of the frame it applies to
+    require(openxr, "if ( spaceChangePending && time >= spaceChangeTime ) {",
+            "the VR origin follows a runtime recentre from the frame the space moves, not from its announcement")
+    require(openxr, "spaceChangeTime = spaceChangePending ? Max( spaceChangeTime, pending->changeTime ) : pending->changeTime;",
+            "several announced moves recentre once, after the last")
+    require(read("tools/tests/openxr/OpenXRTestRuntime.cpp"), 'command == "recenter"',
+            "the test runtime can recentre its LOCAL spaces ahead of time")
+    require(read("tools/tests/openxr_vr_playspace_smoke.py"), "the head while the runtime's recentre is still pending",
+            "the play-space smoke holds the origin until the runtime's recentre applies")
 
 
 def check_temporal() -> None:
@@ -283,6 +292,11 @@ def check_engine() -> None:
     require(system, 'idCVar vr_aimLaser( "vr_aimLaser", "1",', "the aim dot is on by default")
     require(system, 'idCVar vr_comfortVignette( "vr_comfortVignette", "0.5",', "the comfort vignette is on by default")
     require(system, 'idCVar vr_vehicleStereo( "vr_vehicleStereo", "1",', "vehicles render in stereo by default")
+    require(system, 'idCVar vr_pauseOnFocusLoss( "vr_pauseOnFocusLoss", "1",', "single player pauses when the headset loses focus")
+    require(read("src/framework/Session.cpp"), "if ( !VR_ConsumeFocusLoss() || !vr_pauseOnFocusLoss.GetBool() ) {",
+            "the session consumes every focus loss and pauses only when asked to")
+    require(read("tools/tests/openxr_vr_smoke.py"), "losing input focus in gameplay did not pause single player",
+            "the single-player smoke requires the pause")
     # single player vehicles: the eye sits on the turret's axis and the turret
     # follows the head; multiplayer has no vehicles and keeps them flat
     player = read("src/game/Player.cpp")
@@ -302,8 +316,21 @@ def check_engine() -> None:
             "the focus trace runs from the weapon hand along its aim")
     require(read("src/game/vehicle/VehicleParts.cpp"), "vrDriver->GetVRVehicleAim( vrSeatAim, vrWorldAim )",
             "a turret driven in VR follows the head without dropping rotation")
-    require(read("src/mpgame/Player.cpp"), "|| pm_thirdPerson.GetBool() || IsInVehicle() ) {",
-            "multiplayer, which has no vehicles, keeps them on the floating screen")
+    require(read("src/mpgame/Player.cpp"), "|| pm_thirdPerson.GetBool() || IsInVehicle() || vrPresentationCamera ) {",
+            "multiplayer, which has no vehicles, keeps them and the Arena's authored shots on the floating screen")
+    # the aim's pitch is the tracked hand's own on both ends of the wire
+    require(read("src/framework/UsercmdGen.cpp"), "cmd.buttons |= BUTTON_VRAIM;", "a tracked aim marks its usercmds")
+    for module in ("src/game/Player.cpp", "src/mpgame/Player.cpp"):
+        player = read(module)
+        require(player, "if ( ( usercmd.buttons & BUTTON_VRAIM ) != 0 ) {\n\t\tdelta.pitch = 0.0f;",
+                f"{module} keeps no pitch offset on a tracked aim")
+        require(player, "if ( !vrAim && !centerView.IsDone( gameLocal.time ) ) {",
+                f"{module} does not level a tracked aim when the view is centred")
+    require(read("src/game/gamesys/WeaponWheel.inl"),
+            '( trackedAim || !cvarSystem->GetCVarBool( "ui_retained" ) ) ) {',
+            "turning the weapon hand steers the wheel under either interface")
+    require(read("src/framework/UsercmdGen.cpp"), "\tClearAngles();\n\t// openQ4 VR: the tracked aim starts again from the zeroed angles\n\tVR_UsercmdAnglesCleared();",
+            "a new map takes the body's yaw again, so its start is not turned by the level before")
     # a seat's turret follows the head, so the HUD hangs on the line of sight
     require(read("src/sys/openxr/OpenXRSystem.cpp"),
             "( vr_aimMode.GetInteger() == VR_AIM_HAND && !vr_hudOnSight.GetBool() ) ? vr_hudHeightOffset.GetFloat() : 0.0f;",
@@ -321,7 +348,7 @@ def check_engine() -> None:
         require(read(module), 'cvarSystem->GetCVarFloat( "vr_comfortVignette" )',
                 f"{module} reads the vignette setting without touching the frame state")
         # a zoom magnifies each eye by the weapon's own ratio; the dot alone marks it
-        require(read(module), "VR_ZoomTangentScale( player->CalcFov( true ), player->CalcFov( false ) )",
+        require(read(module), "const float zoomScale = player->VRZoomScale();",
                 f"{module} magnifies the eyes for a weapon's zoom")
 
     openxr = read("src/sys/openxr/OpenXRSystem.cpp")

@@ -56,9 +56,16 @@ The tables below list everything, including the console-only settings.
 If the headset isn't connected yet, openQ4 waits for it and starts VR as soon
 as it appears.
 
+In single player, taking the headset off or opening your runtime's own menu
+(the SteamVR dashboard, the Meta menu) pauses the game on the pause menu, so
+nothing happens to you while you can't see or steer. Resume from the menu when
+you're back. Set `vr_pauseOnFocusLoss 0` to keep the game running instead.
+Multiplayer can't pause, so there the game carries on.
+
 If you quit SteamVR, or the runtime closes VR some other way, the game carries
-on in its desktop window. Enter `vr_restart` to go back into VR; `vr_enable`
-stays on, so the next launch starts in VR as usual.
+on in its desktop window (paused on the menu in single player). Enter
+`vr_restart` to go back into VR; it looks for the runtime and the headset at
+once. `vr_enable` stays on, so the next launch starts in VR as usual.
 
 If an XR frame or session fails, openQ4 clears held VR controls and returns to
 desktop rendering. Session failures retry after three seconds; a stopped or lost
@@ -183,7 +190,8 @@ You can change these settings:
 
 Use `vr_recenter` to make your current position and direction the front. It
 helps to bind it to a key, for example `bind F12 vr_recenter`. Your
-headset's own recenter (for example holding the Oculus button) does the same.
+headset's own recenter (for example holding the Oculus button) does the same,
+at the moment the headset applies it, so the view doesn't jump.
 
 ### Seated or standing
 
@@ -284,14 +292,18 @@ of tipping you onto your back.
 ## Multiplayer
 
 VR players can join any openQ4 server. Your aim reaches the server the same
-way a mouse's does, so servers need no changes. In multiplayer, shots leave
-from your eyes along your controller's aim; in single player they leave from
-the gun in your hand.
+way a mouse's does. In multiplayer, shots leave from your eyes along your
+controller's aim; in single player they leave from the gun in your hand.
+
+A server built before the current development build can leave your shots a
+fixed angle above or below the laser after you respawn or teleport, because
+it adds the offset a mouse would need. Servers on the current build keep
+shots on the laser.
 
 ## Troubleshooting
 
-Enter `vr_status` in the console to see the runtime, headset, session state
-and resolution openQ4 is using. `vr_debug 1` logs session events.
+Enter `vr_status` in the console to see the runtime, headset, session state,
+resolution and refresh rate openQ4 is using. `vr_debug 1` logs session events.
 
 - **"no runtime is available"**: no OpenXR runtime is installed or active.
   Set one as active in its own settings, for example in SteamVR under

@@ -1029,7 +1029,7 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 	const idMaterial *aimMaterial = drawAimMarker ? declManager->FindMaterial( "_white" ) : NULL;
 	// a weapon's zoom magnifies each eye by its own ratio, eased like the flat
 	// screen's field of view; the headset's own field of view cannot narrow
-	const float zoomScale = VR_ZoomTangentScale( player->CalcFov( true ), player->CalcFov( false ) );
+	const float zoomScale = player->VRZoomScale();
 	// zoomed, the dot alone marks the shot: a beam from the hidden gun would
 	// cut across the magnified view
 	const int aimLaser = ( zoomScale < 1.0f && vrFrame.aimLaser == VR_AIM_LASER_BEAM ) ? VR_AIM_LASER_DOT : vrFrame.aimLaser;

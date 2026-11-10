@@ -160,6 +160,8 @@ public:
     bool haveLocalFloor=false,haveEGL=false;
     bool frameOpen=true,frameShouldRender=true,rendererReady=true;
     bool sessionRunning=true,sessionFocused=true,viewsValid=true;
+    bool focusLost=false,spaceChangePending=true;
+    XrDuration frameDisplayPeriod=11111111;
     bool inputValid=true,bodyYawValid=true,twoHanded=true,runtimeStopped=false;
     bool pointerOnScreen=false,physicalCrouch=false,roomScaleWalking=false,roomScaleStickIdle=true;
     bool aimLocalValid[2]={};
@@ -273,8 +275,12 @@ void run(const std::string& test) {
         // Reporting a failure must not destroy resources underneath its caller.
         assert(rt.session && rt.instance);
         assert(!app.frame.active && !app.frame.stereo && !app.inputValid);
+        assert(!app.focusLost);
         assert(app.RecoverIfNeeded());
         assert(!rt.session && (test=="session_pending" || (!rt.instance && app.runtimeStopped)));
+        // the session had the controllers: single player pauses on their loss,
+        // and a space move the lost session announced is forgotten with it
+        assert(app.focusLost && !app.spaceChangePending && app.frameDisplayPeriod==0);
         assert(!app.RecoverIfNeeded());
     } else throw std::runtime_error("unknown case");
     app.DestroyInstance(); app.DestroyInstance();

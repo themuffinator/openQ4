@@ -63,6 +63,10 @@ const int BUTTON_VRCROUCH = BIT(10);
 // openQ4: the multiplayer quick-chat wheel is held open (_quickChat). Like the
 // weapon wheel it freezes the view and the weapon on both ends of the wire.
 const int BUTTON_QUICKCHAT = BIT(11);
+// openQ4 VR: the command's angles are a tracked aim's (the weapon hand's, or
+// the head's). Its pitch is absolute, so the game keeps no pitch offset on it:
+// on both ends of the wire the shot then leaves along the controller's ray.
+const int BUTTON_VRAIM = BIT(12);
 // RAVEN END
 
 // usercmd_t->impulse commands

@@ -1823,7 +1823,9 @@ void rvVehicleTurret::RunPostPhysics ( void ) {
 	idMat3		mat[3];
 	idAngles	oldAngles;
 
-	if ( IsActive ( ) && ( !allowDisableMovement || !parent.GetEntity() || parent->IsMovementEnabled ( ) ) ) {	
+	// a jammed turret (The Awakening's movement lock) follows no gunner
+	const bool follows = IsActive ( ) && ( !allowDisableMovement || !parent.GetEntity() || parent->IsMovementEnabled ( ) );
+	if ( follows ) {	
 		for ( i = 0; i < 3; i++ ) {
 			inputAngles[i] = SHORT2ANGLE( position->mInputCmd.angles[i] );
 			lastInputAngles[i] = SHORT2ANGLE( position->mOldInputCmd.angles[i] );
@@ -1845,8 +1847,9 @@ void rvVehicleTurret::RunPostPhysics ( void ) {
 	// drop the rest and the turret drift off the aim for good; there the
 	// rotation is kept and caught up at the turn rate instead, after the turret
 	// first turns to the aim on taking the seat, or when the aim passes between
-	// head and controller.
-	const idPlayer* vrDriver = IsActive ( ) ? OpenQ4_VRDriver( position ) : NULL;
+	// head and controller. A jammed turret follows neither, and takes the aim
+	// again once it is freed.
+	const idPlayer* vrDriver = follows ? OpenQ4_VRDriver( position ) : NULL;
 	idAngles vrSeatAim;
 	idAngles vrWorldAim;
 	const bool vrHead = vrDriver != NULL && vrDriver->GetVRVehicleAim( vrSeatAim, vrWorldAim );

@@ -419,7 +419,9 @@ R_RenderThread_FrameQualifies
 Only ordinary presented frames run on the render thread. Captures,
 tiled screenshots and loading screens keep the inline backend: they read the
 result back, or interleave with level loading that creates and destroys
-device resources. VR presents only on OpenGL.
+device resources. A VR frame stays inline too: the engine releases the
+headset's swapchain images as soon as EndFrame returns, and the runtime may
+composite them from then on, so the backend has to be done drawing by then.
 ====================
 */
 bool R_RenderThread_FrameQualifies( void ) {
@@ -436,6 +438,7 @@ bool R_RenderThread_FrameQualifies( void ) {
 	// tic adds to and frees. A checked image reload binds image work to the
 	// main thread.
 	return !tr.takingScreenshot
+		&& !tr.vrFrame.active
 		&& tr.tiledViewport[0] == 0
 		&& !R_LoadingScreenActive()
 		&& ( tr.specialEffectsEnabled & SPECIAL_EFFECT_AL ) == 0

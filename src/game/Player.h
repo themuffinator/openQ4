@@ -628,6 +628,8 @@ public:
 	// How far the tracking origin sits above the body's eye: a crouch the
 	// tracked head made must not lower the view again.
 	float					VRCrouchLift( const vrFrameState_t &frame ) const;
+	// How far a weapon's zoom narrows each eye now, eased with the zoom.
+	float					VRZoomScale( void );
 	// A pulse in the local player's weapon hand, other hand, or both.
 	void					VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const;
  	void					OffsetThirdPersonView( float angle, float range, float height, bool clip );

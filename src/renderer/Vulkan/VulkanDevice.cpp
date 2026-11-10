@@ -1221,6 +1221,8 @@ static bool VK_Device_CreateSwapchain( void ) {
 	// new drawable size here for every recreation path.
 	glConfig.vidWidth = (int)extent.width;
 	glConfig.vidHeight = (int)extent.height;
+	// a VR frame restores the window's extent when it finishes: keep that current
+	R_VR_PublishWindowSize( (int)extent.width, (int)extent.height );
 	const int actualInterval = presentMode == VK_PRESENT_MODE_FIFO_RELAXED_KHR ? -1 :
 		presentMode == VK_PRESENT_MODE_FIFO_KHR ? 1 : 0;
 	VK_Device_RecordSwapInterval( requestedInterval );

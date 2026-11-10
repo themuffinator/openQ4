@@ -262,6 +262,7 @@ public:
 
 	virtual void		Frame();
 	void				HandleAppResume( bool afterMapLoad );
+	void				HandleVRFocusLoss();
 
 	virtual bool		IsMultiplayer();
 	virtual bool		IsLoadingSaveGame() const { return loadingSaveGame; }

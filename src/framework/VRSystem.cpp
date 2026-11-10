@@ -84,6 +84,8 @@ idCVar vr_playSpace( "vr_playSpace", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTE
 idCVar vr_standingHeight( "vr_standingHeight", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"standing play: your eye height above the floor in metres, which your character's eye stands for; 0 = learn it at "
 	"the next recentre (vr_calibrateHeight measures it now)", 0.0f, 2.5f );
+idCVar vr_pauseOnFocusLoss( "vr_pauseOnFocusLoss", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
+	"single player: 1 = open the pause menu when the headset comes off or its own menu takes the controllers" );
 idCVar vr_debug( "vr_debug", "0", CVAR_SYSTEM | CVAR_INTEGER,
 	"1 = log OpenXR session and frame events, 2 = also log every submitted frame", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
@@ -153,6 +155,14 @@ bool VR_CreateVulkanDevice( void *getInstanceProcAddr, void *physicalDevice, con
 	(void)outDevice;
 	(void)outResult;
 	return false;
+}
+
+// without OpenXR no session ever has the controllers to lose
+bool VR_ConsumeFocusLoss( void ) {
+	return false;
+}
+
+void VR_UsercmdAnglesCleared( void ) {
 }
 #endif
 

@@ -46,6 +46,10 @@
 //   burst <path prefix> <frames> [scale]            write the left eye of that many consecutive frames,
 //                                                   shrunk by an integer scale (default 4), to catch a
 //                                                   single-frame dropout that one capture can miss
+//   recenter [delayMsec]                            the headset's own recentre: LOCAL (and LOCAL_FLOOR)
+//                                                   move under the head, facing its heading, for frames
+//                                                   displayed delayMsec (default 300) from now on, and the
+//                                                   change is announced at once, as a runtime does
 //   focus <0|1>                                     toggle between FOCUSED and VISIBLE
 //   exit                                            ask the application to quit (STOPPING)
 
@@ -523,6 +527,15 @@ struct RuntimeGlobals {
 	// floor-level reference spaces offered (OPENQ4_XR_TEST_SPACES)
 	bool					offerStage = true;
 	bool					offerLocalFloor = false;
+	// LOCAL's origin in the stage space: a seated origin at the default head
+	// height until the "recenter" script command moves it. The move applies to
+	// locates at or after localChangeTime, as the specification requires of
+	// XrEventDataReferenceSpaceChangePending; locateTime is the time of the
+	// locate call being answered.
+	Pose					localOrigin = { QIdentity(), { 0.0f, 1.6f, 0.0f } };
+	Pose					pendingLocalOrigin = { QIdentity(), { 0.0f, 1.6f, 0.0f } };
+	XrTime					localChangeTime = 0;
+	XrTime					locateTime = 0;
 };
 
 RuntimeGlobals &G() {
@@ -785,15 +798,22 @@ Pose StagePoseOfReference( XrReferenceSpaceType type ) {
 	switch ( type ) {
 		case XR_REFERENCE_SPACE_TYPE_VIEW:
 			return g.head;
-		case XR_REFERENCE_SPACE_TYPE_LOCAL: {
-			// a seated origin at the default head height
-			Pose local = PIdentity();
-			local.p = V( 0.0f, 1.6f, 0.0f );
+		case XR_REFERENCE_SPACE_TYPE_LOCAL:
+		case XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT: {
+			// a seated origin at the default head height, until a recentre moves
+			// it; the move counts for locates from its change time on
+			if ( g.localChangeTime != 0 && g.locateTime >= g.localChangeTime ) {
+				g.localOrigin = g.pendingLocalOrigin;
+				g.localChangeTime = 0;
+				Log( "{\"event\":\"reference_space_changed\",\"locate_time\":%lld}", static_cast<long long>( g.locateTime ) );
+			}
+			Pose local = g.localOrigin;
+			if ( type == XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT ) {
+				// LOCAL's origin dropped to the floor
+				local.p.y = 0.0f;
+			}
 			return local;
 		}
-		case XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT:
-			// LOCAL's origin dropped to the floor
-			return PIdentity();
 		case XR_REFERENCE_SPACE_TYPE_STAGE:
 		default:
 			return PIdentity();
@@ -1361,6 +1381,34 @@ void RunScriptCommand( TRSession *session, const std::vector<std::string> &a ) {
 			g.burstRemaining = std::atoi( a[2].c_str() );
 			g.burstIndex = 0;
 			g.burstScale = a.size() >= 4 ? std::atoi( a[3].c_str() ) : 4;
+		} else if ( command == "recenter" ) {
+			// under the head, level, facing its heading
+			const Vec3 forward = QRotate( g.head.q, V( 0.0f, 0.0f, -1.0f ) );
+			const float yaw = std::atan2( -forward.x, -forward.z ) * 180.0f / 3.14159265358979f;
+			Pose moved;
+			moved.q = QAxisAngle( V( 0.0f, 1.0f, 0.0f ), yaw );
+			moved.p = g.head.p;
+			const Pose previous = g.localChangeTime != 0 ? g.pendingLocalOrigin : g.localOrigin;
+			g.pendingLocalOrigin = moved;
+			// midway between two display times, so no frame sits on the threshold
+			const int64_t delay = static_cast<int64_t>( f( 1, 300.0f ) ) * 1000000;
+			const int64_t periods = session->period > 0 ? ( delay + session->period - 1 ) / session->period : 0;
+			g.localChangeTime = session->nextDisplayTime + periods * session->period + session->period / 2;
+			const XrReferenceSpaceType types[2] = { XR_REFERENCE_SPACE_TYPE_LOCAL, XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT };
+			for ( int i = 0; i < ( g.offerLocalFloor ? 2 : 1 ); ++i ) {
+				XrEventDataBuffer buffer = {};
+				XrEventDataReferenceSpaceChangePending *pending = reinterpret_cast<XrEventDataReferenceSpaceChangePending *>( &buffer );
+				pending->type = XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING;
+				pending->next = nullptr;
+				pending->session = reinterpret_cast<XrSession>( session );
+				pending->referenceSpaceType = types[i];
+				pending->changeTime = g.localChangeTime;
+				pending->poseValid = XR_TRUE;
+				pending->poseInPreviousSpace = ToXr( PMul( PInverse( previous ), moved ) );
+				QueueEvent( session->instance, buffer );
+			}
+			Log( "{\"event\":\"reference_space_change_pending\",\"change_time\":%lld,\"next_display_time\":%lld}",
+				static_cast<long long>( g.localChangeTime ), static_cast<long long>( session->nextDisplayTime ) );
 		} else if ( command == "focus" ) {
 			const bool focus = f( 1, 1.0f ) >= 0.5f;
 			if ( session->running && focus != session->focused ) {
@@ -2179,7 +2227,8 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrDestroySession( XrSession handle ) {
 	DestroySessionLocked( session );
 	std::deque<XrEventDataBuffer> kept;
 	for ( const XrEventDataBuffer &event : instance->events ) {
-		if ( event.type != XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED && event.type != XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED ) {
+		if ( event.type != XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED && event.type != XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED
+				&& event.type != XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING ) {
 			kept.push_back( event );
 		}
 	}
@@ -2384,6 +2433,7 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrLocateSpace( XrSpace spaceHandle, XrSpace ba
 		return XR_ERROR_TIME_INVALID;
 	}
 	Pose spacePose, basePose;
+	G().locateTime = time;
 	const bool spaceTracked = StagePoseOfSpace( space, spacePose );
 	const bool baseTracked = StagePoseOfSpace( base, basePose );
 	if ( !spaceTracked || !baseTracked ) {
@@ -3010,6 +3060,7 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrLocateViews( XrSession handle, const XrViewL
 		return XR_ERROR_SIZE_INSUFFICIENT;
 	}
 	Pose basePose;
+	G().locateTime = locateInfo->displayTime;
 	if ( !StagePoseOfSpace( space, basePose ) ) {
 		viewState->viewStateFlags = 0;
 		return XR_SUCCESS;

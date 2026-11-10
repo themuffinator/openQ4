@@ -84,7 +84,7 @@ def check_frame() -> None:
     require_order(complete, "R_ToggleSmpFrame();", "ApplyPendingDefOps();",
                   "queued render-world changes apply after the frame's memory is released")
     gate = function_body(system, "bool R_RenderThread_FrameQualifies(")
-    for needle in ("tr.takingScreenshot", "tr.tiledViewport[0]", "R_LoadingScreenActive()",
+    for needle in ("tr.takingScreenshot", "!tr.vrFrame.active", "tr.tiledViewport[0]", "R_LoadingScreenActive()",
                    "SPECIAL_EFFECT_AL", "R_ImagePolicyActive()", "!view->frameSnapshot"):
         require(gate, needle, "frames that read back, load or walk live lights stay inline")
     require_sync(system, "void *R_GetCommandBuffer(", "the command chain")

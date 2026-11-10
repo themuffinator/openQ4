@@ -145,7 +145,7 @@ struct idUserInterface {
 };
 @MENU_OPTION@
 enum {PITCH,YAW,ROLL,AXIS_ROLL=0,AXIS_SIDE,AXIS_FORWARD,AXIS_YAW,AXIS_PITCH,AXIS_UP,UB_STRAFE};
-constexpr int BUTTON_WEAPONWHEEL=512,BUTTON_QUICKCHAT=2048;
+constexpr int BUTTON_WEAPONWHEEL=512,BUTTON_QUICKCHAT=2048,BUTTON_VRAIM=4096;
 static int Sys_Milliseconds(){return 0;}
 constexpr float JOYSTICK_AXIS_LOOK_SCALE=1.0f/127.0f;
 float SHORT2ANGLE(short s){return (unsigned short)s*(360.0f/65536.0f);}

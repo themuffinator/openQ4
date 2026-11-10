@@ -1223,6 +1223,10 @@ bool	RB_VR_PresentFrame( void );
 void	R_VR_ShutdownTargets( void );
 // front end (RenderSystem_vr.cpp): destroys the VR targets before an image purge
 void	R_VR_DestroyTargets( void );
+// A backend learned the window's live size or UI viewport while a VR frame
+// holds its own extent in glConfig: FinishVRFrame restores these.
+void	R_VR_PublishWindowSize( int width, int height );
+void	R_VR_PublishUIViewport( int x, int y, int width, int height );
 // The eye the front end is rendering a stereo VR frame for, -1 otherwise.
 int	R_VR_FrontEndEye( void );
 // A frame key for a subview that depends on the eye it is seen from (mirror,

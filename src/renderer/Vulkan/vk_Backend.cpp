@@ -581,6 +581,7 @@ static bool VK_Backend_PollWindowState( renderModuleWindowInfo_t &info ) {
 	glConfig.uiViewportY = info.uiViewportY;
 	glConfig.uiViewportWidth = info.uiViewportWidth;
 	glConfig.uiViewportHeight = info.uiViewportHeight;
+	R_VR_PublishUIViewport( info.uiViewportX, info.uiViewportY, info.uiViewportWidth, info.uiViewportHeight );
 	return true;
 }
 

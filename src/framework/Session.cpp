@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ArenaCampaign.h"
 #include "BuildVersion.h"
 #include "SaveGameReleases.h"
+#include "VRSystemLocal.h"
 #include "../sys/NetworkEndpoint.h"
 #if defined( __has_include )
 #if __has_include( "openq4_savegame_compat_generated.h" )
@@ -10336,9 +10337,29 @@ void idSessionLocal::HandleAppResume( bool afterMapLoad ) {
 #endif
 }
 
+/*
+===============
+idSessionLocal::HandleVRFocusLoss
+
+A player whose headset came off, or whose runtime opened its own menu over
+the game, can neither see nor steer: single player pauses on the menu, as
+Escape would, and waits there for them. Multiplayer cannot pause.
+===============
+*/
+void idSessionLocal::HandleVRFocusLoss() {
+	if ( !VR_ConsumeFocusLoss() || !vr_pauseOnFocusLoss.GetBool() ) {
+		return;
+	}
+	if ( mapSpawned && !insideExecuteMapChange && !IsGUIActive() && !readDemo && !com_editorActive && !idAsyncNetwork::IsActive() ) {
+		common->Printf( "VR: the headset lost input focus; single player is paused on the menu\n" );
+		StartMenu();
+	}
+}
+
 void idSessionLocal::Frame() {
 	FinishPendingSave( false );
 	HandleAppResume( false );
+	HandleVRFocusLoss();
 	// Re-derive the playing sound world from the current focus state before the
 	// mix runs, so s_muteUnfocused can never leave audio switched off once the
 	// window is back.

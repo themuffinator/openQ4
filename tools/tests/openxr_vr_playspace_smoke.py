@@ -29,6 +29,23 @@ Checks, on STAGE:
   once, and leaves the head near the origin, never the step twice;
 then with OPENQ4_XR_TEST_SPACES=local_floor standing play uses LOCAL_FLOOR,
 and with none it falls back to head-relative play with a warning.
+
+The LOCAL_FLOOR run also recentres from the headset: the runtime announces
+that the space will move under the head some seconds ahead, as the
+specification has it. The VR origin must stay where it is until frames are
+displayed in the moved space and follow it then, so the head reads its old
+offset while the move is pending and the origin afterwards.
+
+The no-floor run also checks where a level starts. The body's yaw is absolute
+usercmd yaw and a new map spawns the player against a zeroed usercmd, so two
+snap turns once turned the next level's start, and a loaded save's view, by
+those turns: the map loaded again must start facing the way it first did, and
+a save loaded after a further snap turn must show the view it was saved with.
+The same run holds the aim's pitch to the weapon hand's. Shots follow the
+game's view angles and the laser follows the controller, so an offset between
+them, which centring the view or loading a save once left, sent every shot
+off the laser: with the hand 20 degrees down the aim reads 20 before and
+after `centerview`, and a save made aiming down loads level with a level hand.
 """
 from __future__ import annotations
 
@@ -139,10 +156,35 @@ def status(text: str, tag: str) -> tuple[str, float]:
     return space.group(1).strip(), float(head.group(3))
 
 
+def head_position(text: str, tag: str) -> tuple[float, float, float]:
+    """The tracked head (forward, left, up; units from the VR origin) that vr_status printed after tag."""
+    head = re.search(r"head tracked \( (-?\d+\.\d) (-?\d+\.\d) (-?\d+\.\d) \)", after(text, tag))
+    assert head, f"vr_status after {tag} printed no tracked head"
+    return float(head.group(1)), float(head.group(2)), float(head.group(3))
+
+
 def view(text: str, tag: str) -> tuple[float, float, float]:
     found = re.search(r"\(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)\s+-?\d", after(text, tag))
     assert found, f"getviewpos after {tag} printed no view position"
     return float(found.group(1)), float(found.group(2)), float(found.group(3))
+
+
+def view_yaw(text: str, tag: str) -> float:
+    found = re.search(r"\(\s*-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s*\)\s+(-?\d+(?:\.\d+)?)", after(text, tag))
+    assert found, f"getviewpos after {tag} printed no view yaw"
+    return float(found.group(1))
+
+
+def aim_pitch(text: str, tag: str) -> float:
+    """The pitch of the view angles (pitch yaw roll, positive down) that a script printed after tag."""
+    found = re.search(r"^\s*\(?\s*(-?\d+(?:\.\d+)?)\s+-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s*\)?\s*$", after(text, tag), re.M)
+    assert found, f"no view angles were printed after {tag}"
+    return float(found.group(1))
+
+
+def turned(before: float, after_yaw: float) -> float:
+    """Degrees turned from one yaw to another, in -180..180."""
+    return (after_yaw - before + 180.0) % 360.0 - 180.0
 
 
 def near(value: float, expected: float, tolerance: float, what: str) -> None:
@@ -222,6 +264,7 @@ def main(argv: list[str] | None = None) -> None:
     space, start = status(text, "VR_PS_START")
     assert space.startswith("standing on STAGE, standing eye height 1.60 m") and "play area 2.00 x 2.00 m" in space, space
     near(start, 0.0, 1.0, "the standing head at the start")
+    assert re.search(r"refresh: 90\.0 Hz", after(text, "VR_PS_START")), "vr_status did not report the headset's 90 Hz refresh"
     drop = 0.5 * UNITS_PER_METRE
     _, crouched = status(text, "VR_PS_CROUCHED")
     near(crouched, -drop, 1.5, "the head 0.5 m down")
@@ -270,11 +313,91 @@ def main(argv: list[str] | None = None) -> None:
 
     # --- LOCAL_FLOOR and no floor at all
     short = ["waitMsec 2500", "echo VR_PS_START", "vr_status", "echo VR_PLAYSPACE_COMPLETE", "quit"]
-    floor = run(options, staged, executable, manifest, output / f"local-floor-{options.render_api}", "local_floor", short, [])
+    # LOCAL_FLOOR, and the headset's own recentre: the head steps 0.3 m ahead and
+    # 0.4 m to the right and turns 40 degrees, then the runtime announces that
+    # LOCAL_FLOOR moves there 2.5 s later
+    floor_profile = output / f"local-floor-{options.render_api}"
+    floor_game = floor_profile / "baseoq4"
+    floor_script = [
+        f"when {floor_game / 'vr_marker_move.txt'} head 40 0 0 0.40 1.60 -0.30",
+        f"when {floor_game / 'vr_marker_recenter.txt'} recenter 2500",
+    ]
+    floor_commands = [
+        "waitMsec 2500", "echo VR_PS_START", "vr_status",
+        "condump vr_marker_move.txt", "waitMsec 600", "echo VR_PS_MOVED", "vr_status",
+        "condump vr_marker_recenter.txt", "waitMsec 400", "echo VR_PS_PENDING", "vr_status",
+        "waitMsec 3500", "echo VR_PS_RUNTIME_RECENTRED", "vr_status",
+        "echo VR_PLAYSPACE_COMPLETE", "quit",
+    ]
+    floor = run(options, staged, executable, manifest, floor_profile, "local_floor", floor_commands, floor_script)
     assert "OpenXR: play space standing on LOCAL_FLOOR" in floor, "without a STAGE, standing play should use LOCAL_FLOOR"
     space, _ = status(floor, "VR_PS_START")
     assert space.startswith("standing on LOCAL_FLOOR, standing eye height 1.60 m"), space
-    none = run(options, staged, executable, manifest, output / f"no-floor-{options.render_api}", "none", short, [])
+    step = (0.3 * UNITS_PER_METRE, -0.4 * UNITS_PER_METRE, 0.0)
+    for tag, what in (("VR_PS_MOVED", "the head after its step"),
+                      ("VR_PS_PENDING", "the head while the runtime's recentre is still pending")):
+        moved = head_position(floor, tag)
+        assert math.dist(moved, step) < 1.0, f"{what}: expected {step}, got {moved}"
+    assert "the runtime moves reference space" in after(floor, "VR_PS_MOVED"), "the runtime's recentre was not announced"
+    recentred = head_position(floor, "VR_PS_RUNTIME_RECENTRED")
+    assert math.dist(recentred, (0.0, 0.0, 0.0)) < 1.0, f"the VR origin did not follow the runtime's recentre: the head reads {recentred}"
+    space, _ = status(floor, "VR_PS_RUNTIME_RECENTRED")
+    assert space.startswith("standing on LOCAL_FLOOR, standing eye height 1.60 m"), f"the runtime's recentre moved the floor: {space}"
+    # no floor at all, and where levels start: two snap turns, the map again,
+    # a save, another snap turn, and the save loaded
+    none_profile = output / f"no-floor-{options.render_api}"
+    none_game = none_profile / "baseoq4"
+    none_game.mkdir(parents=True, exist_ok=True)
+
+    def snap(name: str) -> list[str]:
+        return [f"condump vr_marker_{name}.txt", "waitMsec 500", f"condump vr_marker_{name}_back.txt", "waitMsec 500"]
+
+    none_script = []
+    for name in ("snap1", "snap2", "snap3", "snap4"):
+        none_script += [f"when {none_game / f'vr_marker_{name}.txt'} stick right 1 0",
+                        f"when {none_game / f'vr_marker_{name}_back.txt'} stick right 0 0"]
+    # the weapon hand, level and 20 degrees down (twice: a marker fires once)
+    for name, pitch in (("aim_level", 0), ("aim_down", -20), ("aim_level2", 0), ("aim_down2", -20), ("aim_level3", 0)):
+        none_script.append(f"when {none_game / f'vr_marker_{name}.txt'} hand right 0.2 1.25 -0.35 0 {pitch} 0")
+
+    def aim(name: str) -> list[str]:
+        return [f"condump vr_marker_{name}.txt", "waitMsec 500"]
+
+    # the game's aim (pitch yaw roll), which shots follow
+    angles = 'script "sys.println( $player1.getViewAngles() );"'
+    none_commands = ["waitMsec 2500", *aim("aim_level"), "echo VR_PS_START", "vr_status", "getviewpos",
+                     # the aim's pitch is the hand's: centring the view must not offset it
+                     *aim("aim_down"), "echo VR_PS_AIM_DOWN", angles,
+                     "centerview", "waitMsec 1000", "echo VR_PS_CENTRED", angles,
+                     *aim("aim_level2"), "echo VR_PS_AIM_LEVEL", angles,
+                     *snap("snap1"), *snap("snap2"), "echo VR_PS_SNAPPED", "getviewpos",
+                     "set g_autoExecAfterMapLoad openxr_vr_playspace_reload.cfg", "map game/airdefense1"]
+    reload_commands = ["waitMsec 2500", "echo VR_PS_RELOADED", "getviewpos", *snap("snap3"),
+                       # saved aiming 20 degrees down, loaded aiming level. No script
+                       # runs in this session: a save taken after the console ran
+                       # one keeps its thread and does not load
+                       *aim("aim_down2"), "echo VR_PS_PRESAVE", "getviewpos", "savegame vr_playspace_smoke",
+                       "waitMsec 2500", *snap("snap4"), *aim("aim_level3"), "echo VR_PS_PRELOAD", "getviewpos",
+                       "set g_autoExecAfterMapLoad openxr_vr_playspace_loaded.cfg", "loadgame vr_playspace_smoke"]
+    loaded_commands = ["waitMsec 2500", "echo VR_PS_LOADED", "getviewpos", angles, "echo VR_PLAYSPACE_COMPLETE", "quit"]
+    (none_game / "openxr_vr_playspace_reload.cfg").write_text("\n".join(frame_guarded(reload_commands)) + "\n", encoding="utf-8")
+    (none_game / "openxr_vr_playspace_loaded.cfg").write_text("\n".join(frame_guarded(loaded_commands)) + "\n", encoding="utf-8")
+    none = run(options, staged, executable, manifest, none_profile, "none", none_commands, none_script)
+    level_start = view_yaw(none, "VR_PS_START")
+    near(turned(level_start, view_yaw(none, "VR_PS_SNAPPED")), -90.0, 1.0, "two right snap turns")
+    near(turned(level_start, view_yaw(none, "VR_PS_RELOADED")), 0.0, 1.0,
+         "the level loaded again after two snap turns should start facing the way it first did; its start turned")
+    saved_yaw = view_yaw(none, "VR_PS_PRESAVE")
+    near(turned(saved_yaw, view_yaw(none, "VR_PS_PRELOAD")), -45.0, 1.0, "the snap turn after saving")
+    near(turned(saved_yaw, view_yaw(none, "VR_PS_LOADED")), 0.0, 1.0,
+         "a save loaded after a snap turn should show the view it was saved with; it turned")
+    # shots follow the game's aim and the laser the controller: the aim's pitch
+    # must be the hand's, whatever set the view since
+    near(aim_pitch(none, "VR_PS_AIM_DOWN"), 20.0, 0.5, "the aim with the hand 20 degrees down")
+    near(aim_pitch(none, "VR_PS_CENTRED"), 20.0, 0.5, "the aim after centring the view, the hand still 20 degrees down")
+    near(aim_pitch(none, "VR_PS_AIM_LEVEL"), 0.0, 0.5, "the aim with the hand level again after centring the view")
+    # the save was made with the hand 20 degrees down, as at VR_PS_AIM_DOWN
+    near(aim_pitch(none, "VR_PS_LOADED"), 0.0, 0.5, "the aim, with the hand level, after loading a save made aiming 20 degrees down")
     assert "OpenXR: play space seated on LOCAL" in none and "offers no floor-level space" in none, \
         "without a floor-level space, standing play should fall back to head-relative play with a warning"
     space, _ = status(none, "VR_PS_START")
@@ -282,7 +405,8 @@ def main(argv: list[str] | None = None) -> None:
 
     print(f"OpenXR VR play-space smoke ({options.render_api}): PASS (STAGE learned 1.60 m, crouched recentre kept the floor, "
           f"calibrated 1.75 m, seated and back without moving the body, room-scale step walked {walked:.1f} units; "
-          f"LOCAL_FLOOR and no-floor fallback); evidence={output}")
+          f"LOCAL_FLOOR, the headset's own recentre followed when the space moved, no-floor fallback, and a level "
+          f"and a save start facing as they should after snap turns); evidence={output}")
 
 
 if __name__ == "__main__":
