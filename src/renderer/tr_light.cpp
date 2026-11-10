@@ -2427,6 +2427,9 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def, bool collision
 
 	// if we don't have a snapshot of the dynamic model, generate it now
 	if ( !def->dynamicModel ) {
+		// A snapshot that replaces an earlier one is a model changing. The
+		// first one is only the model being looked at for the first time.
+		const bool replacesSnapshot = def->cachedDynamicModel != NULL;
 
 		// instantiate the snapshot of the dynamic model, possibly reusing memory from the cached snapshot
 		def->cachedDynamicModel = model->InstantiateDynamicModel( &def->parms, tr.viewDef, def->cachedDynamicModel,
@@ -2456,6 +2459,9 @@ idRenderModel *R_EntityDefDynamicModel( idRenderEntityLocal *def, bool collision
 
 		def->dynamicModel = def->cachedDynamicModel;
 		def->dynamicModelFrameCount = tr.frameCount;
+		if ( replacesSnapshot ) {
+			def->dynamicModelRegenFrame = tr.frameCount;
+		}
 
 		// record the joint-content hash this snapshot was built from so a later
 		// transform-only UpdateEntityDef can prove the snapshot is still valid

@@ -651,7 +651,11 @@ static bool R_ShadowMapCasterIsDynamic( const idRenderEntityLocal *entityDef, co
 		entityDef->parms.callback != NULL ||
 		entityDef->dynamicModel != NULL ||
 		entityDef->parms.hModel->IsDynamicModel() != DM_STATIC;
-	return hasDynamicGeometry && entityDef->dynamicModelFrameCount >= recentFrame;
+	// The snapshot has to have replaced an earlier one. A model seen for the
+	// first time gets its first snapshot then, and counted as changing it
+	// stood outside the static map for the window and re-rendered the map on
+	// joining it, each time the player came upon a still machine or a corpse.
+	return hasDynamicGeometry && entityDef->dynamicModelRegenFrame >= recentFrame;
 }
 
 static void R_RecordShadowMapCaster( viewLight_t *vLight,
@@ -2454,7 +2458,19 @@ void idInteraction::AddActiveInteraction( void ) {
 			// map cannot hold and turned the light to its stencil supplement
 			// for good. A surface built without a volume still joins the map
 			// once a view's coverage or distance admits it.
+			//
+			// A static caster of a light that holds still does not answer
+			// to the view at all. The LOD saves a far shadow that would be
+			// drawn every frame; such a caster is drawn into its light's map
+			// once and kept, and admitted by distance it re-rendered that map
+			// each time the player crossed its range, in either direction.
+			// A light that moves draws its map every frame whatever is in
+			// it, so its casters keep the LOD.
+			const bool lightHoldsStill = lightDef->lastModifiedFrameNum
+				< tr.frameCount - R_ShadowMapDynamicCasterFrames();
 			const bool casterLODAdmitted = sint->shadowStencilEligible
+				|| ( lightHoldsStill
+					&& !R_ShadowMapCasterIsDynamic( entityDef, shadowShader ) )
 				|| R_CachedInteractionShadowLODAdmitted( sint, entityDef );
 			const bool skipPointLightEmitterCaster =
 				R_CachedShouldSkipPointLightEmitterCaster( sint, vLight, shadowShader, localLightOrigin, lightDef->parms.lightRadius );

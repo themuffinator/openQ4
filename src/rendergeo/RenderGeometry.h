@@ -228,6 +228,8 @@ public:
 	idRenderModel *			dynamicModel;			// if parms.model->IsDynamicModel(), this is the generated data
 	int						dynamicModelFrameCount;	// continuously animating dynamic models will recreate
 													// dynamicModel if this doesn't == tr.viewCount
+	int						dynamicModelRegenFrame;	// the frame a snapshot last replaced an earlier one.
+													// That is a model changing; its first snapshot is not
 	idRenderModel *			cachedDynamicModel;
 	idRenderModel *			dynamicCollisionModel;	// collision-only dynamic snapshot for traces / sil-trace parity
 	idRenderModel *			cachedDynamicCollisionModel;

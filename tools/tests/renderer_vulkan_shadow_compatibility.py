@@ -8110,10 +8110,14 @@ def validate_stencil_elision_contract() -> None:
         require(braced_body(interaction, marker, context), "shadowVolumesSuppressed",
                 f"{context} forgets suppressed volumes")
 
-    # The map and the stencil volume agree on which casters LOD admitted.
+    # The map and the stencil volume agree on which casters LOD admitted: a
+    # surface with a volume is always a map caster. The map may hold more (a
+    # static caster of a still light, whatever the distance), never less.
     require_compact(
         active,
         """const bool casterLODAdmitted = sint->shadowStencilEligible
+            || ( lightHoldsStill
+                && !R_ShadowMapCasterIsDynamic( entityDef, shadowShader ) )
             || R_CachedInteractionShadowLODAdmitted( sint, entityDef );""",
         "a surface with a stencil volume stays a map caster",
     )
@@ -8808,6 +8812,58 @@ def validate_static_signature_view_independence_contract() -> None:
         for token in ("surf->scissorRect", "caster->scissorRect"):
             if token in source:
                 raise AssertionError(f"{backend} must not read a caster's view scissor when it draws a map")
+
+    # Which static casters a still light's map holds does not follow the
+    # camera either. The shadow LOD drops a far entity's shadow to save drawing
+    # it every frame; a static caster is drawn into the map once, and admitted
+    # by distance it rendered the map again each time the player crossed its
+    # range. A light that moves draws its map every frame and keeps the LOD.
+    require_order(
+        add,
+        (
+            "const bool lightHoldsStill = lightDef->lastModifiedFrameNum",
+            "< tr.frameCount - R_ShadowMapDynamicCasterFrames();",
+            "const bool casterLODAdmitted = sint->shadowStencilEligible",
+            "|| ( lightHoldsStill",
+            "&& !R_ShadowMapCasterIsDynamic( entityDef, shadowShader ) )",
+            "|| R_CachedInteractionShadowLODAdmitted( sint, entityDef );",
+        ),
+        "a static caster of a still light is a map caster at any distance",
+    )
+
+    # A model's first snapshot is not the model moving. Counted as a change,
+    # a still machine or a corpse stood outside the static map for a quarter
+    # of a second when first seen and rendered the map again on joining it.
+    dynamic = braced_body(interaction, "static bool R_ShadowMapCasterIsDynamic(", "live caster rule")
+    require_order(
+        dynamic,
+        (
+            "if ( entityDef->lastModifiedFrameNum >= recentFrame ) {",
+            "return true;",
+            "return hasDynamicGeometry && entityDef->dynamicModelRegenFrame >= recentFrame;",
+        ),
+        "a caster is live while it is updated or its snapshot is replaced",
+    )
+    if "dynamicModelFrameCount >= recentFrame" in dynamic:
+        raise AssertionError("A first dynamic-model snapshot must not class a caster as live")
+    light = read("src/renderer/tr_light.cpp")
+    require_order(
+        braced_body(light, "idRenderModel *R_EntityDefDynamicModel(", "dynamic model snapshot"),
+        (
+            "if ( !def->dynamicModel ) {",
+            "const bool replacesSnapshot = def->cachedDynamicModel != NULL;",
+            "def->cachedDynamicModel = model->InstantiateDynamicModel(",
+            "def->dynamicModelFrameCount = tr.frameCount;",
+            "if ( replacesSnapshot ) {",
+            "def->dynamicModelRegenFrame = tr.frameCount;",
+        ),
+        "only a snapshot that replaces an earlier one is stamped as a change",
+    )
+    require(read("src/rendergeo/RenderGeometry.h"), "dynamicModelRegenFrame;", "entity field")
+    require(read("src/rendergeo/RenderGeometryLocalDefs.cpp"), "dynamicModelRegenFrame\t= 0;", "entity field starts at zero")
+    # the signature still follows every snapshot, first or not
+    require(record, "hash = R_ShadowMapHashInt( hash, entityDef->dynamicModelFrameCount );",
+            "a new snapshot still changes the signature")
 
 
 def validate_resident_projected_sampling_contract() -> None:

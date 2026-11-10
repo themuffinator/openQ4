@@ -491,6 +491,12 @@ there is no double-click word selection.
   happened to be stored, so it changed pattern as you looked around or as
   other lights came and went. It is now tied to the shadow itself and stays
   put.
+- **Distant scenery keeps its shadows.** With shadow maps on, the shadows of
+  machines, crates and other still objects were missing beyond a certain
+  distance and appeared as you walked up to them, and each one appearing
+  redrew its light's shadows. Lights that do not move now cast them at any
+  distance, drawn once and kept. Moving objects and moving lights behave as
+  before.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.

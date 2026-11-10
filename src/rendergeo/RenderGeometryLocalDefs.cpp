@@ -43,6 +43,7 @@ idRenderEntityLocal::idRenderEntityLocal() {
 	demoRemoteRenderView	= NULL;
 	dynamicModel			= NULL;
 	dynamicModelFrameCount	= 0;
+	dynamicModelRegenFrame	= 0;
 	cachedDynamicModel		= NULL;
 	dynamicCollisionModel	= NULL;
 	cachedDynamicCollisionModel = NULL;

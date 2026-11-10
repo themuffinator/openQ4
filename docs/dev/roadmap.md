@@ -1740,12 +1740,18 @@ optimization has landed.
   both renderers); the kernel now turns by the texel within the tile and they agree
   to within 1 pixel on Vulkan and 77 on OpenGL. One static cube for both ownerships
   of a composed Vulkan light was measured at 4 of 24 fresh maps on that walk and
-  not built. Remaining, in order:
-  the fullscreen budgets, including whether Enhanced can map point lights; static
-  caster membership that still follows the camera (shadow LOD distance, the
-  quarter second a newly instanced model counts as moving); Vulkan's scratch cube
-  pool, which only grows; and static-world volumes, which are still built once per
-  mapped light for the fallback.
+  not built.
+  Static membership (10 November 2026). Which still casters a map held also
+  followed the camera: the shadow LOD admitted an entity's shadow within 768 units
+  and dropped it beyond, and a model's first snapshot counted as the model moving
+  for a quarter of a second. A static caster of a still light is now in the map at
+  any distance and a first snapshot is not motion; fresh maps on four walks fall
+  from 24 to 18, 79 to 63, 10 to 8 and 11 to 7, and shadow-mapped lights cast the
+  shadows of still scenery beyond 768 units. Remaining, in order:
+  the fullscreen budgets, including whether Enhanced can map point lights; lights
+  that move every frame, which still go through the cache each frame; Vulkan's
+  scratch cube pool, which only grows; and static-world volumes, which are still
+  built once per mapped light for the fallback.
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur

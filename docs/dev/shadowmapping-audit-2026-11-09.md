@@ -45,6 +45,7 @@ cache (sixteen at most) against forty cubes in view.
 | **Every cutout caster was live.** A caster with holes cut by an alpha test was treated as if the holes could move, so every light that reaches a grate, a railing or a wire cap copied its cached map and redrew the cutout every view, for the same result. In convoy2's start view 25 passes were composed each frame, and 20 of them had no other live caster: every lamp there sits in a wire cap. | **Fixed, both backends.** A cutout is live only while its coverage can change. See "Static cutout casters" below. |
 | **Vulkan copied every reused projected map into the view's atlas**, each view, only to sample it there. The copy serves a view that has moving casters to draw over the map and nothing else. With static cutouts it was the largest shadow phase left in convoy2's start view: 0.54 ms for eleven maps, ten of which had nothing live. | **Fixed (Vulkan).** A reused map with no moving caster is read where it lives. See "Resident projected tiles on Vulkan" below. |
 | **A light's cached maps were rendered again whenever a static caster's stencil volume entered or left the view.** The signature that names the cached depth hashed, for each static caster, whether the view also saw that caster's volume. It flips as the player walks past, and the depth does not change. On a walk through hub2 one light with 77 static casters re-rendered both of its cubes nine times in five seconds for it. | **Fixed, both backends.** The signature no longer carries that bit; about half of the maps rendered fresh on a walk were for it. See "Walking" below. |
+| **Which still casters a map held followed the camera too.** The shadow LOD admitted an entity's shadow within 768 units and dropped it beyond, in the static map as anywhere, and a model's first snapshot counted as the model moving for a quarter of a second. Each change rendered the light's maps again. | **Fixed, both backends.** A static caster of a still light is in the map at any distance, and a first snapshot is not motion. See "Static membership" below. |
 | **GL timer queries ran in every shadow phase of every light**, whether or not anything read them. A view with more phases than the 64 query slots polled all 64 unfinished queries for each further phase. | **Fixed.** Queries are issued only while `r_shadowMapReport` or `r_shadowMapDebugOverlay` is on. This alone was about half of the OpenGL CPU frame in hub2. |
 | **The point receiver's per-texel path was the common path.** Each of the nine taps compared four texels against their own point on the receiver plane, with a cube-face selection each: 36 comparisons that read a four-by-four block of texels. | **Fixed, both backends.** The default kernel (nine fixed taps, one texel radius, hardware comparison) is one pass over the sixteen texels with the same weights, or nine plain bilinear lookups where the bias covers the block. Other tap counts, radii and the rotated mode keep the tap-by-tap path. 1.6 to 2.6 ms of GPU in hub2 against the old path, in two launches. |
 | **Receivers filtered shadows for fragments the light does not reach** (outside the falloff, turned away). | **Fixed, both backends**, in the stock-material path. The PBR variants still sample first. |
@@ -645,6 +646,63 @@ settling. It now sets `r_shadowMapPointLights 1` and lets the view settle for
 a second before freezing. Not run: any graphics card but the reference one,
 and Linux or macOS.
 
+### Static membership
+
+Added on 10 November, for the membership that still followed the camera after
+the walking change. Two rules decided, per view, whether a caster that never
+moves was in its light's static map.
+
+- **The shadow LOD dropped it by distance.** Every game entity has a shadow
+  LOD distance of 768 units, beyond which its shadow is not cast, to save
+  drawing it every frame. A caster first seen from farther away was admitted
+  to the map when the player came within that range and left it again beyond
+  it, and each crossing rendered the light's maps again. A static caster of a
+  light that holds still is now a map caster at any distance: it is drawn
+  into the map once and kept. A light that moves draws its map every frame
+  whatever is in it, so its casters keep the LOD, and so do casters that
+  move. The map still never holds less than the stencil volumes do.
+- **A model's first snapshot counted as the model moving.** An animated model
+  is given a snapshot of its pose when first looked at. That was read as a
+  change of pose, so a still machine or a corpse stood outside the static map
+  for a quarter of a second and rendered the map again on joining it. Only a
+  snapshot that replaces an earlier one counts now
+  (`dynamicModelRegenFrame`). The signature still follows every snapshot.
+
+Maps rendered fresh, Vulkan, Quality, the rules switched in separate launches
+of one build:
+
+| Walk | Before | Distance rule | First-snapshot rule | Both |
+|---|---:|---:|---:|---:|
+| hub2, +x | 24 | 22 | 20 | 18 |
+| hub2, -y | 79 | 63 | 79 | 63 |
+| airdefense1 arena, -x | 10 | 8 | 10 | 8 |
+| airdefense1 arena, -y | 11 | 7 | 11 | 7 |
+| airdefense1 arena, +y | 8 | 8 | 8 | 8 |
+| hub2, +y | 651 | 659 | 660 | 658 |
+
+The last route is not about membership. Two lights there ride hub2's moving
+data router: they move every frame, render every frame, and are 460 of the 545
+maps of a run. That is right for a moving light. What is not needed is that
+each frame still goes through the cache: the static casters are drawn into a
+cache cube, copied, and the live ones drawn over the copy, where one direct
+draw would do. Noted below, not changed.
+
+A consequence players can see: a shadow-mapped light now casts the shadows of
+still scenery beyond 768 units, where they used to be missing until approached.
+The other side of it: an object beyond its LOD range that starts to move, and
+is small on screen, loses its shadow while it moves and has it again a quarter
+of a second after it stops.
+
+Checked for this change, on the final build: the walks above; cached against
+fresh pictures of hub2's start view after a walk, on both back ends, differing
+only in the animated HUD icon; the fourteen scenarios and the continuous-motion
+qualification on both back ends; the in-engine self-tests; and the static
+tests that read the touched files. One run of the qualification's Vulkan image
+case failed on 69 faint pixels inside a smoke plume at one pose; two reruns
+passed. One static test fails for a reason outside this change
+(`ui_number_clipboard.py` no longer compiles its extract of the key code). No
+frame-time figure, for the reason given under "Walking".
+
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
 (caster counts, cache reuse, cached against fresh images byte-identical; run
@@ -667,11 +725,14 @@ whether Enhanced can now map point lights on Vulkan.
 
 1. Fullscreen budgets for the three tiers, on the reference machine with
    nothing else running. Every change of this round moved what they cost.
-2. Static caster membership still follows the camera: the shadow LOD
-   distance admits a caster as the player approaches, and a model first
-   instanced counts as moving for a quarter of a second. Each change renders
-   the light's maps again, and these are most of what is left on a walk (296
-   maps in 472 views on one hub2 route).
+2. A light that moves every frame still goes through the cache every frame:
+   publish, copy, compose, and a cache record taken each time, where one
+   direct draw would do. Two such lights are most of the fresh maps on one
+   hub2 route. Neither renderer tells a light whose signature never settles
+   from one that changed once.
+   Also left of membership: the world's own geometry joins and leaves a
+   light's casters area by area as the player moves (seen on those two
+   lights; not measured on still ones).
 3. Vulkan's scratch cube pool only grows: up to 512 cubes, 2.0 GB seen after
    one view from outside the level, against a cache bounded at 512 MB.
 4. Static-world volumes are still built once for every mapped light and kept
