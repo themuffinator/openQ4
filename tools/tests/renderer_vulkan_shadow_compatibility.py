@@ -1811,6 +1811,31 @@ def validate_shadow_descriptor_abi() -> None:
         "fail-closed atlas compare/raw descriptor publication",
     )
 
+    # One writer names a depth image in one frame slot's set: a point cube in
+    # every slot at creation, a resident projected tile in the slot that is
+    # about to read it where it lives.
+    image_set = braced_body(
+        executor,
+        "bool VK_Exec_WriteShadowImageSet(",
+        "shadow image compare/raw descriptors",
+    )
+    require_order(
+        image_set,
+        (
+            "compareSampler == VK_NULL_HANDLE",
+            "rawSampler == VK_NULL_HANDLE",
+            "slot < 0 || slot >= VK_FRAMES_IN_FLIGHT",
+            "bufferInfo.range = VK_SHADOW_UNIFORM_SLICE_BYTES;",
+            "ringWrite.dstBinding = 1;",
+            "imageInfos[ 0 ].sampler = compareSampler;",
+            "imageInfos[ 1 ].sampler = rawSampler;",
+            "imageInfos[ imageIndex ].imageLayout = imageLayout;",
+            "writes[ writeIndex ].dstBinding = writeIndex == 0 ? 0 : 2;",
+            "vkUpdateDescriptorSets( vkCtx.device, 2, writes, 0, NULL );",
+            "VK_Exec_WriteShadowMomentBindings( sets[ slot ] );",
+        ),
+        "fail-closed shadow image compare/raw descriptors",
+    )
     cube_descriptors = braced_body(
         executor,
         "bool VK_Exec_CreateShadowCubeSets(",
@@ -1819,14 +1844,10 @@ def validate_shadow_descriptor_abi() -> None:
     require_order(
         cube_descriptors,
         (
-            "compareSampler == VK_NULL_HANDLE",
-            "rawSampler == VK_NULL_HANDLE",
-            "bufferInfo.range = VK_SHADOW_UNIFORM_SLICE_BYTES;",
-            "ringWrite.dstBinding = 1;",
-            "imageInfos[ 0 ].sampler = compareSampler;",
-            "imageInfos[ 1 ].sampler = rawSampler;",
-            "writes[ writeIndex ].dstBinding = writeIndex == 0 ? 0 : 2;",
-            "vkUpdateDescriptorSets( vkCtx.device, 2, writes, 0, NULL );",
+            "for ( int i = 0; i < VK_FRAMES_IN_FLIGHT; i++ ) {",
+            "!VK_Exec_WriteShadowImageSet( cubeView, compareSampler, rawSampler,",
+            "VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, sets, i )",
+            "return false;",
         ),
         "fail-closed point cube compare/raw descriptors",
     )
@@ -4489,13 +4510,26 @@ def validate_exact_static_cache_and_admission_contract() -> None:
             "entry.passKind == passKind",
             "entry.signature == signature",
             "entry.tileSize == tileSize",
-            "entry.image != VK_NULL_HANDLE",
-            "entry.layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL",
+            "VK_ShadowMap_ProjectedEntryHoldsContent( entry )",
             "entry.lastUsedFrame = backEnd.frameCount;",
             "entry.reserved = true;",
             "return i;",
         ),
         "exact projected cache lookup and hit reservation",
+    )
+    # A resident tile holds its content in either layout a use leaves it in.
+    require_order(
+        braced_body(
+            shadow_map,
+            "static bool VK_ShadowMap_ProjectedEntryHoldsContent(",
+            "resident projected tile content layouts",
+        ),
+        (
+            "entry.image != VK_NULL_HANDLE",
+            "entry.layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL",
+            "entry.layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL",
+        ),
+        "resident projected tile content layouts",
     )
     point_find = braced_body(
         shadow_map,
@@ -4947,29 +4981,33 @@ def validate_exact_static_cache_and_admission_contract() -> None:
     projected_image = braced_body(
         shadow_map,
         "static bool VK_ShadowMap_EnsureProjectedCacheImage(",
-        "transfer-only projected resident image",
+        "copied and sampled projected resident image",
     )
+    # A resident tile is copied to and from the atlas and read where it lives.
+    # Nothing ever renders into it, so it is not an attachment.
     require_compact(
         projected_image,
         """ici.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-            | VK_IMAGE_USAGE_TRANSFER_DST_BIT;""",
-        "projected resident transfer usage",
+            | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+            | VK_IMAGE_USAGE_SAMPLED_BIT;""",
+        "projected resident transfer and sampling usage",
     )
-    for forbidden_usage in (
-        "VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT",
-        "VK_IMAGE_USAGE_SAMPLED_BIT",
-    ):
-        if forbidden_usage in projected_image:
-            raise AssertionError(
-                f"Projected resident tiles must stay transfer-only, not {forbidden_usage}"
-            )
+    if "VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT" in projected_image:
+        raise AssertionError(
+            "Projected resident tiles are never rendered into and must not be attachments"
+        )
     require_order(
         projected_image,
         (
             "vmaCreateImage(",
+            "ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;",
+            "ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;",
+            "&entry.sampleView ) != VK_SUCCESS",
+            "entry.sampleView = VK_NULL_HANDLE;",
+            "entry.imageSerial = ++vkShadow.projectedImageSerial;",
             "entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;",
         ),
-        "projected resident initial layout tracking",
+        "projected resident view, identity and initial layout tracking",
     )
 
     image_barrier = braced_body(
@@ -5020,14 +5058,24 @@ def validate_exact_static_cache_and_admission_contract() -> None:
         (
             "if ( haveCacheUpdates )",
             "VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL",
+            """VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );""",
             """VK_ShadowMap_CopyDepthTile( cmd,
                 vkShadow.atlasImage,
                 pass.tileX, pass.tileY,
                 cache.image, 0, 0,
                 VK_ShadowMap_ProjectedBlockSize( light ) );""",
-            "cache.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;",
+            """VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );""",
             "if ( haveCacheHits )",
-            "VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL",
+            "haveCacheCopies && atlasLayout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL",
+            # a hit read where it lives moves nothing; the others are restored
+            "if ( pass.residentSet != VK_NULL_HANDLE ) {",
+            """VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );""",
+            "continue;",
+            """VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );""",
             """VK_ShadowMap_CopyDepthTile( cmd,
                 cache.image, 0, 0,
                 vkShadow.atlasImage,
@@ -5090,12 +5138,28 @@ def validate_exact_static_cache_and_admission_contract() -> None:
     )
     require_compact(
         render,
-        """if ( projectedCount == 0 && pointFreshCount == 0
-            && pointComposeCount == 0 && pointHitCount > 0 ) {
-            VK_ShadowMap_FinalizeCachePasses( viewDef );
-            return true;
-        }""",
-        "identity-resident point-hit view without scratch rendering",
+        """if ( projectedCount == projectedRestingCount && pointFreshCount == 0
+            && pointComposeCount == 0 ) {""",
+        "resident-hit view (point cubes, projected tiles at rest) without GPU work",
+    )
+    # That return is only reached with at least one hit, and it still collects
+    # the timing spans of earlier views: nothing else reads them, and a long
+    # run of such views would let them age out as dropped.
+    require_order(
+        render,
+        (
+            "if ( projectedCount + pointFreshCount + pointHitCount == 0 ) {",
+            "return false;",
+            "if ( projectedCount == projectedRestingCount && pointFreshCount == 0",
+            "&& pointComposeCount == 0 ) {",
+            "VK_ShadowGpuTiming_BeginView( classicCommit",
+            "? vkClassicShadowTransaction.frameSlot",
+            ": VK_Exec_ActiveFrameSlot() );",
+            "VK_ShadowMap_FinalizeCachePasses( viewDef );",
+            "return true;",
+            "VkCommandBuffer cmd = classicCommit",
+        ),
+        "the resident-hit return collects earlier timing spans and records nothing",
     )
 
     finalize = braced_body(
@@ -6190,9 +6254,11 @@ def validate_csm_static_cache_contract() -> None:
         ),
         (
             # behind the frame fence: an earlier view of the recording frame
-            # may have copied with it, and a device wait cannot cover that
-            "VK_Device_DeferDestroy( entry.image, VK_NULL_HANDLE, VK_NULL_HANDLE, entry.allocation );",
+            # may have copied with it or read it where it lives, and a device
+            # wait cannot cover that. The view goes with its image.
+            "VK_Device_DeferDestroy( entry.image, entry.sampleView, VK_NULL_HANDLE, entry.allocation );",
             "entry.image = VK_NULL_HANDLE;",
+            "entry.sampleView = VK_NULL_HANDLE;",
             "entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;",
             "entry.blockSize = 0;",
             "entry.imageTileSize = 0;",
@@ -7613,15 +7679,25 @@ def validate_translucent_moment_contract() -> None:
             "a translucent-only pass still maps (GL RB_ShadowMapRunPass)")
     require(braced_body(shadow_map, "int VK_ShadowMap_PrepareViewLights(", "prepare lights"),
             "VK_ShadowMap_AllocateMomentBlocks();", "moment blocks per view")
-    require(shadow_map, "pass.momentAtlas[ 0 ] = scale * (float)vkShadow.atlasSize * invMoment;",
-            "projected moment blocks mirror their depth blocks")
+    # depthUV addresses the image the receivers sample: the atlas, or the pass's
+    # own resident block when it is read where it lives
+    require_order(
+        braced_body(shadow_map, "static int VK_ShadowMap_PackMomentBlocks(", "moment packing"),
+        (
+            "const int depthEdge = pass.residentSet != VK_NULL_HANDLE",
+            "? light.tileSize * atlasDiv : vkShadow.atlasSize;",
+            "pass.momentAtlas[ 0 ] = scale * (float)depthEdge * invMoment;",
+        ),
+        "projected moment blocks mirror their depth blocks",
+    )
 
     pipeline = braced_body(executor, "VkPipeline VK_Exec_MomentCasterPipeline(", "moment pipeline")
     for token in ("target.colorCount = 3;", "VK_FORMAT_R16G16B16A16_SFLOAT",
                   "GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE, vkExec.fogBlendPipelineLayout",
                   "offsetof( idDrawVert, color )"):
         require(pipeline, token, "moment caster pipeline")
-    for writer in ("bool VK_Exec_UpdateShadowAtlasDescriptors(", "bool VK_Exec_CreateShadowCubeSets("):
+    # the atlas sets, and the one writer of every cube and resident-tile set
+    for writer in ("bool VK_Exec_UpdateShadowAtlasDescriptors(", "bool VK_Exec_WriteShadowImageSet("):
         body = braced_body(executor, writer, writer)
         require(body, "VK_Exec_ShadowMomentViewsPublished()", writer)
         require(body, "VK_Exec_WriteShadowMomentBindings(", writer)
@@ -8644,6 +8720,206 @@ def validate_ci_registration() -> None:
         require(workflow, f"python {TEST_PATH}", context)
 
 
+def validate_resident_projected_sampling_contract() -> None:
+    """An exact projected hit with nothing live over it is read where it lives.
+
+    Every reused projected pass used to be copied from its cache image into a
+    block of the view's atlas, each view, only to be sampled there. A hit with
+    no moving caster needs none of that: the receivers bind the cache image
+    itself. A view whose maps are all of that kind records no shadow work at
+    all once the images rest in the layout they are read in.
+
+    The risks are the lifetime of the image, of its view and of the descriptor
+    sets that name it. The image and view retire behind the frame fence. The
+    sets belong to the cache record and are rewritten lazily, one frame slot
+    at a time, and never once the recording frame has bound them.
+    """
+    vk = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+    header = read("src/renderer/Vulkan/vk_ShadowMap.h")
+    interactions = read("src/renderer/Vulkan/vk_Interactions.cpp")
+    executor = read("src/renderer/Vulkan/vk_GuiExecutor.cpp")
+
+    require_compact(
+        vk,
+        """static idCVar r_vkShadowSampleResident( "r_vkShadowSampleResident", "1", CVAR_RENDERER | CVAR_BOOL,""",
+        "the switch back to the copy path, on by default",
+    )
+    for token in (
+        "VkDescriptorSet\t\tresidentSet;",
+        "float\t\t\t\tinvMapSize;",
+    ):
+        require(header, token, "a projected pass names the image its receivers sample")
+
+    resident_set = braced_body(
+        vk,
+        "static VkDescriptorSet VK_ShadowMap_ProjectedEntryResidentSet(",
+        "the resident tile's descriptor set for this frame",
+    )
+    require_order(
+        resident_set,
+        (
+            "!r_vkShadowSampleResident.GetBool()",
+            # the sealed stream and the overlay address the atlas
+            "vkClassicShadowTransaction.active",
+            "r_shadowMapDebugOverlay.GetBool()",
+            "entry.image == VK_NULL_HANDLE",
+            "entry.sampleView == VK_NULL_HANDLE",
+            "return VK_NULL_HANDLE;",
+            "const int slot = VK_Exec_ActiveFrameSlot();",
+            "entry.setImageSerial[ slot ] != entry.imageSerial",
+            # bound earlier in the frame being recorded: it must not change
+            "entry.setBoundFrame[ slot ] == vkShadow.frameSerial",
+            "return VK_NULL_HANDLE;",
+            "VK_Exec_WriteShadowImageSet( entry.sampleView,",
+            "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,",
+            "entry.sets, slot )",
+            "return VK_NULL_HANDLE;",
+            "entry.setImageSerial[ slot ] = entry.imageSerial;",
+            "entry.setBoundFrame[ slot ] = vkShadow.frameSerial;",
+            "return entry.sets[ slot ];",
+        ),
+        "a frame slot's set is rewritten only while nothing recorded or in flight names it",
+    )
+    require_order(
+        braced_body(vk, "void VK_ShadowMap_BeginFrame(", "frame begin"),
+        (
+            "vkShadow.frameSerial++;",
+            "if ( vkCtx.device == VK_NULL_HANDLE || VK_GuiExecutor_FrameIsOpen() ) {",
+        ),
+        "every frame begun is counted before anything can return",
+    )
+
+    allocate = braced_body(
+        vk,
+        "static bool VK_ShadowMap_AllocateProjectedPass(",
+        "projected pass allocation",
+    )
+    require_order(
+        allocate,
+        (
+            "VkDescriptorSet residentSet = VK_NULL_HANDLE;",
+            # only an exact hit with nothing live to draw over it
+            "if ( schedule.action == VK_SHADOW_SCHEDULE_REUSE",
+            "&& !VK_ShadowMap_PassHasDynamicCasters( light.vLight, receiverPass ) ) {",
+            "residentSet = VK_ShadowMap_ProjectedEntryResidentSet(",
+            "vkShadow.projectedCache[ schedule.cacheEntry ] );",
+            # every other pass still claims its atlas block
+            "if ( residentSet == VK_NULL_HANDLE",
+            "&& !VK_ShadowMap_AllocTileBlock( blockSize, tileX, tileY ) ) {",
+            "pass.composeDynamic = ( pass.cacheHit || pass.cacheUpdate )",
+            "pass.tileX = tileX;",
+            "pass.tileY = tileY;",
+            "pass.residentSet = residentSet;",
+            "vkShadow.residentPasses++;",
+            # the rects address the image that is sampled
+            "const float invAtlas = residentSet != VK_NULL_HANDLE",
+            "? 1.0f / (float)blockSize : light.invAtlasSize[ 0 ];",
+            "pass.invMapSize = invAtlas;",
+        ),
+        "an in-place pass holds no atlas block and addresses its own image",
+    )
+
+    transition = braced_body(
+        vk,
+        "static void VK_ShadowMap_TransitionProjectedEntry(",
+        "resident tile layout transitions",
+    )
+    require_order(
+        transition,
+        (
+            "if ( entry.image == VK_NULL_HANDLE || entry.layout == newLayout ) {",
+            "return;",
+            "const VkImageLayout layouts[ 2 ] = { entry.layout, newLayout };",
+            "case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:",
+            "access[ i ] = VK_ACCESS_2_TRANSFER_READ_BIT;",
+            "case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:",
+            "access[ i ] = VK_ACCESS_2_TRANSFER_WRITE_BIT;",
+            "case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:",
+            "stages[ i ] = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;",
+            "access[ i ] = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;",
+            "VK_ShadowMap_ImageBarrier( cmd, entry.image, 1, entry.layout, newLayout,",
+            "entry.layout = newLayout;",
+        ),
+        "each transition names the record's last use as its source",
+    )
+
+    render = braced_body(vk, "bool VK_ShadowMap_RenderAtlas(", "cached shadow rendering")
+    require_order(
+        render,
+        (
+            "int projectedRestingCount = 0;",
+            "|| !VK_ShadowMap_ProjectedEntryHoldsContent( *cache ) ) {",
+            "projectedCount++;",
+            "if ( pass.residentSet != VK_NULL_HANDLE",
+            "&& cache->layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) {",
+            "projectedRestingCount++;",
+            "bool haveCacheCopies = false;",
+            "bool haveResidentTransitions = false;",
+            "if ( pass.residentSet == VK_NULL_HANDLE ) {",
+            "haveCacheCopies = true;",
+            "haveResidentTransitions = true;",
+            "const bool haveCacheHits = haveCacheCopies || haveResidentTransitions;",
+        ),
+        "hits split into copies and in-place reads, and resting ones owe nothing",
+    )
+
+    # The record's sets and view have exactly these owners.
+    destroy = braced_body(vk, "static void VK_ShadowMap_DestroyProjectedCaches(", "projected cache teardown")
+    require_order(
+        destroy,
+        (
+            "VK_Exec_FreeShadowCubeSets( entry.sets );",
+            "vkDestroyImageView( vkCtx.device, entry.sampleView, NULL );",
+            "vmaDestroyImage( vkCtx.allocator, entry.image,",
+            "memset( vkShadow.projectedCache, 0,",
+        ),
+        "teardown frees the sets and the view with the image",
+    )
+    if vk.count("VK_Exec_FreeShadowCubeSets( entry.sets );") != 1:
+        raise AssertionError("A projected record's descriptor sets are freed at cache teardown only")
+    require(
+        braced_body(vk, "static bool VK_ShadowMap_PublishMomentViews(", "moment view publication"),
+        "VK_Exec_RefreshShadowMomentSets( vkShadow.projectedCache[ i ].sets );",
+        "resident tile sets follow the moment atlas like every other shadow set",
+    )
+
+    # Receivers: the set and the texel size of the image actually sampled.
+    select = braced_body(interactions, "static void VK_Inter_SelectShadowMode(", "receiver shadow set selection")
+    require_compact(
+        select,
+        """interPass.shadowSet = ( wantMode == 2 ) ? passState->pointSet
+            : ( wantMode == 1 && passState->residentSet != VK_NULL_HANDLE )
+                ? passState->residentSet : interPass.shadowSetAtlas;""",
+        "a projected receiver binds the resident tile when its pass reads it in place",
+    )
+    require_order(
+        interactions,
+        (
+            "const bool residentMap = passState->residentSet != VK_NULL_HANDLE",
+            "&& passState->invMapSize > 0.0f;",
+            "block.texelSize[ 0 ] = residentMap ? passState->invMapSize : state->invAtlasSize[ 0 ];",
+            "block.texelSize[ 1 ] = residentMap ? passState->invMapSize : state->invAtlasSize[ 1 ];",
+        ),
+        "filter taps step by the sampled image's texel",
+    )
+
+    # The pool holds a set per frame slot for every projected record as well.
+    require_compact(
+        executor,
+        """const int shadowSetBudget = ( 1 + VK_SHADOW_MAX_POINT_CUBES
+            + 2 * VK_SHADOW_MAX_CACHE_SLOTS ) * VK_FRAMES_IN_FLIGHT;""",
+        "descriptor pool budget covers resident projected tiles",
+    )
+
+    report = braced_body(vk, "static void VK_ShadowMap_ReportViewCache(", "cache report")
+    require(report, "composed=%d inPlace=%d fallback=%d", "the report counts in-place reads")
+    require_order(
+        report,
+        ("vkShadow.composePasses,", "vkShadow.residentPasses,", "vkShadow.budgetFallbacks,"),
+        "the report counts in-place reads",
+    )
+
+
 def main() -> None:
     validate_shadow_effectiveness_image_gate()
     validate_shared_interaction_shadow_runtime_contract()
@@ -8679,6 +8955,7 @@ def main() -> None:
     validate_projected_cache_memory_bound_contract()
     validate_depth_only_point_cube_contract()
     validate_static_cutout_caster_contract()
+    validate_resident_projected_sampling_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

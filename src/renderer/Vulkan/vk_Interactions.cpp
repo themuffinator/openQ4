@@ -3813,8 +3813,12 @@ static int VK_Inter_WriteShadowSlice( const viewEntity_t *space ) {
 	block.biasParams[ 2 ] = idMath::ClampFloat( 0.0f, 0.5f,
 			r_shadowMapCascadeBlend.GetFloat() );
 	block.biasParams[ 3 ] = (float)cascadeCount;
-	block.texelSize[ 0 ] = state->invAtlasSize[ 0 ];
-	block.texelSize[ 1 ] = state->invAtlasSize[ 1 ];
+	// the texel of the image this pass samples: the view's atlas, or the
+	// resident tile itself when the pass reads it where it lives
+	const bool residentMap = passState->residentSet != VK_NULL_HANDLE
+		&& passState->invMapSize > 0.0f;
+	block.texelSize[ 0 ] = residentMap ? passState->invMapSize : state->invAtlasSize[ 0 ];
+	block.texelSize[ 1 ] = residentMap ? passState->invMapSize : state->invAtlasSize[ 1 ];
 	block.texelSize[ 2 ] = Max( 0.0f, r_shadowMapTexelBiasScale.GetFloat() );
 	const shadowMapProjectedFilterSettings_t filterSettings =
 			R_ShadowMapProjectedFilterSettings( state->vLight );
@@ -3894,7 +3898,11 @@ static void VK_Inter_SelectShadowMode( const vkShadowLightState_t *state,
 	interPass.shadowActive = wantMode != 0;
 	interPass.shadowState = state;
 	interPass.shadowPassState = passState;
-	interPass.shadowSet = ( wantMode == 2 ) ? passState->pointSet : interPass.shadowSetAtlas;
+	// A projected pass binds the view's atlas, or its own resident tile when
+	// the shadow pass left it to be read where it lives.
+	interPass.shadowSet = ( wantMode == 2 ) ? passState->pointSet
+		: ( wantMode == 1 && passState->residentSet != VK_NULL_HANDLE )
+			? passState->residentSet : interPass.shadowSetAtlas;
 	if ( interPass.shadowActive ) {
 		interPass.currentSpace = NULL;
 		interPass.shadowSliceOffset = -1;

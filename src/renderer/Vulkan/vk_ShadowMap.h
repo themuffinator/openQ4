@@ -78,6 +78,12 @@ typedef struct vkShadowPassState_s {
 									// uncached map, or the composed copy receivers
 									// sample while cacheEntry stays its static source
 	VkDescriptorSet		pointSet;		// cube set-7 descriptor set for the active frame slot (pointLight only)
+	VkDescriptorSet		residentSet;	// projected exact hit read where it lives: the cache
+									// entry's own set-7 descriptor set for the active frame
+									// slot. atlasRects then address that image, the pass
+									// holds no atlas block and tileX/tileY stay 0
+	float				invMapSize;		// projected: 1 / edge of the image atlasRects address,
+									// the atlas or the resident block
 	float				atlasRects[ SHADOWMAP_PROJECTED_MAX_CASCADES ][ 4 ];
 										// composed per-cascade UV rects; v spans inverted
 	// r_shadowMapTranslucentMoments: this ownership's translucent casters

@@ -422,6 +422,13 @@ there is no double-click word selection.
   Convoy 2, where every lamp sits in a wire cap, frames are about 1.75 ms
   shorter on the graphics card on OpenGL and 0.5 ms on Vulkan. Surfaces whose
   holes do animate are still redrawn each frame, and the picture is unchanged.
+- **Spotlight shadows that have not changed cost almost nothing on Vulkan.**
+  Vulkan kept each unchanged spotlight shadow in memory, then copied it into
+  a shared texture every frame before using it. It now uses the stored shadow
+  directly unless something is moving in that light. At the start of Convoy 2
+  the shadow work each frame falls from 0.68 to 0.18 ms of graphics-card time,
+  and the picture is identical. Nothing needs changing;
+  `r_vkShadowSampleResident 0` brings the copy back for comparison.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.

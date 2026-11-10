@@ -92,6 +92,8 @@ static idCVar r_vkShadowFullAtlasClear( "r_vkShadowFullAtlasClear", "0", CVAR_RE
 	"clear unused projected shadow atlas space as a validation reference" );
 static idCVar r_vkShadowOwnershipCopy( "r_vkShadowOwnershipCopy", "1", CVAR_RENDERER | CVAR_BOOL,
 	"seed fresh GLOBAL projected shadow maps with the matching LOCAL depth" );
+static idCVar r_vkShadowSampleResident( "r_vkShadowSampleResident", "1", CVAR_RENDERER | CVAR_BOOL,
+	"read a cached projected shadow map where it lives when no moving caster is drawn over it, instead of copying it into the view's atlas" );
 
 static idCVar r_vkShadowOwnershipUnion( "r_vkShadowOwnershipUnion", "1", CVAR_RENDERER | CVAR_BOOL,
 	"combine fresh PCSS ownership depths in the receiver instead of copying them" );
@@ -123,6 +125,7 @@ bool VK_Exec_BeginMainRendering( bool clearColorDepth );
 void VK_Exec_EndMainRendering( void );
 bool VK_Exec_UpdateShadowAtlasDescriptors( VkImageView view, VkSampler compareSampler, VkSampler rawSampler );
 bool VK_Exec_CreateShadowCubeSets( VkImageView cubeView, VkSampler compareSampler, VkSampler rawSampler, VkDescriptorSet sets[ VK_FRAMES_IN_FLIGHT ] );
+bool VK_Exec_WriteShadowImageSet( VkImageView view, VkSampler compareSampler, VkSampler rawSampler, VkImageLayout imageLayout, VkDescriptorSet sets[ VK_FRAMES_IN_FLIGHT ], int slot );
 VkDescriptorSet VK_Exec_ShadowDescriptorSet( void );
 VkPipeline VK_Exec_ShadowOverlayPanelPipeline( bool pointLight );
 VkPipeline VK_Exec_ShadowOverlayTextPipeline( void );
@@ -193,6 +196,14 @@ typedef struct vkProjectedShadowCacheEntry_s {
 	VkImage				image;
 	VmaAllocation		allocation;
 	VkImageLayout		layout;
+	// Reading the tile where it lives (r_vkShadowSampleResident). The view
+	// follows the image; the sets are the record's own and outlive it, each
+	// frame slot's rewritten at its first use after the image changed.
+	VkImageView			sampleView;						// 2D view, depth aspect
+	VkDescriptorSet		sets[ VK_FRAMES_IN_FLIGHT ];	// set-7 sets (tile + shadow-block ring)
+	unsigned int		imageSerial;					// names this image among all the cache made
+	unsigned int		setImageSerial[ VK_FRAMES_IN_FLIGHT ];	// the image each slot's set names
+	unsigned int		setBoundFrame[ VK_FRAMES_IN_FLIGHT ];	// vkShadow.frameSerial of its last use
 } vkProjectedShadowCacheEntry_t;
 
 typedef struct vkPointShadowCacheEntry_s {
@@ -233,10 +244,13 @@ typedef struct vkShadowMapState_s {
 	vkPointShadowCube_t	pointCubes[ VK_SHADOW_MAX_POINT_CUBES ];
 	int					pointCubeFaceSize;
 
-	// Exact-signature persistent static caches. Projected entries are
-	// transfer-only tiles copied into the current per-view atlas; point
-	// entries retain identity-owned sampled cubes.
+	// Exact-signature persistent static caches. A projected entry is a tile
+	// of its own: read where it lives when nothing live is drawn over it,
+	// copied into the current per-view atlas when a view composes its moving
+	// casters. Point entries retain identity-owned sampled cubes.
 	vkProjectedShadowCacheEntry_t projectedCache[ VK_SHADOW_MAX_CACHE_SLOTS ];
+	unsigned int		projectedImageSerial;	// the last imageSerial a projected record was given
+	unsigned int		frameSerial;			// frames begun (VK_ShadowMap_BeginFrame)
 	vkPointShadowCacheEntry_t pointCache[ VK_SHADOW_MAX_CACHE_SLOTS ];
 	vkShadowLightHistory_t lightHistory[ VK_SHADOW_LIGHT_HISTORY_SLOTS ];
 	const idRenderWorldLocal *cacheRenderWorld;
@@ -263,6 +277,7 @@ typedef struct vkShadowMapState_s {
 	int					projectedFreshUpdates;
 	int					pointFreshUpdates;
 	int					composePasses;	// cached static tiles and cubes + this view's dynamics
+	int					residentPasses;	// exact projected hits read where they live
 	int					budgetFallbacks;
 	int					admissionDenied;	// budget spent on higher-scoring lights
 	int					subviewFallbacks;
@@ -533,6 +548,7 @@ static void VK_ShadowMap_ReleasePreparedLights( const bool markSticky ) {
 	vkShadow.projectedFreshUpdates = 0;
 	vkShadow.pointFreshUpdates = 0;
 	vkShadow.composePasses = 0;
+	vkShadow.residentPasses = 0;
 	vkShadow.admissionDenied = 0;
 	vkShadow.atlasTilesRendered = 0;
 	vkShadow.atlasTilesAllocated = 0;
@@ -550,17 +566,20 @@ void VK_ShadowMap_AbandonPreparedLights( void ) {
 Resources
 ====================
 */
-static void VK_ShadowMap_DestroyProjectedCaches( bool deferred = false ) {
+// The device is idle whenever the atlas goes (VK_ShadowMap_DestroyAtlas), so
+// images, views and the records' descriptor sets are released outright.
+static void VK_ShadowMap_DestroyProjectedCaches( void ) {
 	if ( vkCtx.device != VK_NULL_HANDLE ) {
 		for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS ; i++ ) {
 			vkProjectedShadowCacheEntry_t &entry =
 					vkShadow.projectedCache[ i ];
-			if ( entry.image == VK_NULL_HANDLE ) {
-				continue;
+			// a record keeps its sets while its image is retired, so they are
+			// released whether or not it holds one now
+			VK_Exec_FreeShadowCubeSets( entry.sets );
+			if ( entry.sampleView != VK_NULL_HANDLE ) {
+				vkDestroyImageView( vkCtx.device, entry.sampleView, NULL );
 			}
-			if ( deferred ) {
-				VK_Device_DeferDestroy( entry.image, VK_NULL_HANDLE, VK_NULL_HANDLE, entry.allocation );
-			} else {
+			if ( entry.image != VK_NULL_HANDLE ) {
 				vmaDestroyImage( vkCtx.allocator, entry.image,
 						entry.allocation );
 			}
@@ -824,6 +843,9 @@ static bool VK_ShadowMap_PublishMomentViews( void ) {
 	for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS ; i++ ) {
 		VK_Exec_RefreshShadowMomentSets( vkShadow.pointCache[ i ].cube.sets );
 	}
+	for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS ; i++ ) {
+		VK_Exec_RefreshShadowMomentSets( vkShadow.projectedCache[ i ].sets );
+	}
 	return true;
 }
 
@@ -935,6 +957,10 @@ static int VK_ShadowMap_AtlasSizeValue( void );
 static int VK_ShadowMap_PointSizeValue( void );
 
 void VK_ShadowMap_BeginFrame( void ) {
+	// One per frame recorded, whatever number the renderer gives it: what a
+	// resident tile's descriptor sets are aged against
+	// (VK_ShadowMap_ProjectedEntryResidentSet).
+	vkShadow.frameSerial++;
 	if ( vkCtx.device == VK_NULL_HANDLE || VK_GuiExecutor_FrameIsOpen() ) {
 		return;
 	}
@@ -1729,9 +1755,12 @@ static long long VK_ShadowMap_ProjectedCacheTexels( void ) {
 static void VK_ShadowMap_ReleaseProjectedCacheImage(
 		vkProjectedShadowCacheEntry_t &entry ) {
 	if ( entry.image != VK_NULL_HANDLE ) {
-		VK_Device_DeferDestroy( entry.image, VK_NULL_HANDLE, VK_NULL_HANDLE, entry.allocation );
+		// the view goes with the image; the sets stay with the record and
+		// name nothing usable until its next image is read in place
+		VK_Device_DeferDestroy( entry.image, entry.sampleView, VK_NULL_HANDLE, entry.allocation );
 	}
 	entry.image = VK_NULL_HANDLE;
+	entry.sampleView = VK_NULL_HANDLE;
 	entry.allocation = NULL;
 	entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	entry.blockSize = 0;
@@ -1872,8 +1901,12 @@ static bool VK_ShadowMap_EnsureProjectedCacheImage( const int index,
 	ici.arrayLayers = 1;
 	ici.samples = VK_SAMPLE_COUNT_1_BIT;
 	ici.tiling = VK_IMAGE_TILING_OPTIMAL;
+	// Sampled as well as copied: an exact hit with nothing live to draw over
+	// it is read where it lives (VK_ShadowMap_ProjectedEntryResidentSet). It
+	// is never an attachment, so it rests in SHADER_READ_ONLY for that.
 	ici.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-			| VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+			| VK_IMAGE_USAGE_TRANSFER_DST_BIT
+			| VK_IMAGE_USAGE_SAMPLED_BIT;
 
 	VmaAllocationCreateInfo vaci;
 	memset( &vaci, 0, sizeof( vaci ) );
@@ -1884,10 +1917,36 @@ static bool VK_ShadowMap_EnsureProjectedCacheImage( const int index,
 		entry.allocation = NULL;
 		return false;
 	}
+	// Sampled shadow depth selects exactly the depth aspect. Without the view
+	// the tile still serves by copy, as every one did before.
+	VkImageViewCreateInfo ivci;
+	memset( &ivci, 0, sizeof( ivci ) );
+	ivci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	ivci.image = entry.image;
+	ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	ivci.format = vkCtx.shadowDepthFormat;
+	ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	ivci.subresourceRange.levelCount = 1;
+	ivci.subresourceRange.layerCount = 1;
+	if ( vkCreateImageView( vkCtx.device, &ivci, NULL,
+			&entry.sampleView ) != VK_SUCCESS ) {
+		entry.sampleView = VK_NULL_HANDLE;
+	}
+	entry.imageSerial = ++vkShadow.projectedImageSerial;
 	entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	entry.blockSize = blockSize;
 	entry.imageTileSize = tileSize;
 	return true;
+}
+
+// A resident projected tile rests in the layout its last use left it in: a
+// transfer source after publication or a restore into the atlas, shader
+// read-only after being read where it lives. Either holds its content.
+static bool VK_ShadowMap_ProjectedEntryHoldsContent(
+		const vkProjectedShadowCacheEntry_t &entry ) {
+	return entry.image != VK_NULL_HANDLE
+		&& ( entry.layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+			|| entry.layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 }
 
 static int VK_ShadowMap_FindProjectedCacheEntry(
@@ -1906,8 +1965,7 @@ static int VK_ShadowMap_FindProjectedCacheEntry(
 				&& entry.signature == signature
 				&& entry.tileSize == tileSize
 				&& entry.blockSize == blockSize
-				&& entry.image != VK_NULL_HANDLE
-				&& entry.layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
+				&& VK_ShadowMap_ProjectedEntryHoldsContent( entry ) ) {
 			entry.lastUsedFrame = backEnd.frameCount;
 			entry.reserved = true;
 			return i;
@@ -2522,6 +2580,45 @@ static bool VK_ShadowMap_HasLocalCasters( const viewLight_t *vLight ) {
 		|| vLight->localTranslucentShadowMapCasters != NULL;
 }
 
+// The set-7 descriptor set that names a resident projected tile for the frame
+// being recorded, or NULL when the tile has to be copied into the atlas
+// instead. A frame slot's set is rewritten only here, at its first use after
+// the record's image changed, and never once this frame has bound it: the
+// frame that last recorded with the slot has retired (its fence is waited
+// before a frame begins), while a set the commands already recorded name must
+// not change under them. The sealed stream and the debug overlay address the
+// atlas, so they keep the copy.
+static VkDescriptorSet VK_ShadowMap_ProjectedEntryResidentSet(
+		vkProjectedShadowCacheEntry_t &entry ) {
+	if ( !r_vkShadowSampleResident.GetBool()
+			|| vkClassicShadowTransaction.active
+			|| r_shadowMapDebugOverlay.GetBool()
+			|| entry.image == VK_NULL_HANDLE
+			|| entry.sampleView == VK_NULL_HANDLE ) {
+		return VK_NULL_HANDLE;
+	}
+	const int slot = VK_Exec_ActiveFrameSlot();
+	if ( slot < 0 || slot >= VK_FRAMES_IN_FLIGHT ) {
+		return VK_NULL_HANDLE;
+	}
+	if ( entry.sets[ slot ] == VK_NULL_HANDLE
+			|| entry.setImageSerial[ slot ] != entry.imageSerial ) {
+		if ( entry.sets[ slot ] != VK_NULL_HANDLE
+				&& entry.setBoundFrame[ slot ] == vkShadow.frameSerial ) {
+			return VK_NULL_HANDLE;
+		}
+		if ( !VK_Exec_WriteShadowImageSet( entry.sampleView,
+				vkShadow.compareSampler, vkShadow.rawSampler,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				entry.sets, slot ) ) {
+			return VK_NULL_HANDLE;
+		}
+		entry.setImageSerial[ slot ] = entry.imageSerial;
+	}
+	entry.setBoundFrame[ slot ] = vkShadow.frameSerial;
+	return entry.sets[ slot ];
+}
+
 static bool VK_ShadowMap_AllocateProjectedPass( vkShadowLightState_t &light,
 		const vkShadowReceiverPass_t receiverPass,
 		const vkShadowSchedule_t &schedule ) {
@@ -2547,7 +2644,19 @@ static bool VK_ShadowMap_AllocateProjectedPass( vkShadowLightState_t &light,
 	const int atlasDiv = idMath::ClampInt( 1, 2,
 			light.projectedState.atlasDiv );
 	const int blockSize = light.tileSize * atlasDiv;
-	if ( !VK_ShadowMap_AllocTileBlock( blockSize, tileX, tileY ) ) {
+	// An exact hit with nothing live to draw over it is read where it lives:
+	// the receivers bind the entry's own image, the atlas gives up no block
+	// and no copy is recorded. A hit that composes still needs its atlas
+	// tile, and so does one whose descriptor set cannot be named this frame.
+	VkDescriptorSet residentSet = VK_NULL_HANDLE;
+	if ( schedule.action == VK_SHADOW_SCHEDULE_REUSE
+			&& !VK_ShadowMap_PassHasDynamicCasters( light.vLight,
+					receiverPass ) ) {
+		residentSet = VK_ShadowMap_ProjectedEntryResidentSet(
+				vkShadow.projectedCache[ schedule.cacheEntry ] );
+	}
+	if ( residentSet == VK_NULL_HANDLE
+			&& !VK_ShadowMap_AllocTileBlock( blockSize, tileX, tileY ) ) {
 		VK_ShadowMap_CancelScheduledPass( schedule, false );
 		return false;
 	}
@@ -2580,10 +2689,18 @@ static bool VK_ShadowMap_AllocateProjectedPass( vkShadowLightState_t &light,
 	pass.cubeIndex = -1;
 	pass.tileX = tileX;
 	pass.tileY = tileY;
+	pass.residentSet = residentSet;
+	if ( residentSet != VK_NULL_HANDLE ) {
+		vkShadow.residentPasses++;
+	}
 
 	// Every cascade tile uses a negative-height viewport (GL winding
-	// parity), so tile-local v=0 lands on the tile's bottom image row.
-	const float invAtlas = light.invAtlasSize[ 0 ];
+	// parity), so tile-local v=0 lands on the tile's bottom image row. The
+	// rects address the image the receivers sample: the atlas, or the
+	// resident block itself, whose origin is its own corner.
+	const float invAtlas = residentSet != VK_NULL_HANDLE
+			? 1.0f / (float)blockSize : light.invAtlasSize[ 0 ];
+	pass.invMapSize = invAtlas;
 	const int cascadeCount = idMath::ClampInt( 1,
 			SHADOWMAP_PROJECTED_MAX_CASCADES,
 			light.projectedState.cascadeCount );
@@ -2807,7 +2924,11 @@ static int VK_ShadowMap_PackMomentBlocks( const int shift, const bool commit ) {
 					// momentUV = depthUV * k + b maps the depth block onto this
 					// one; both draw with the same viewport convention.
 					const float scale = (float)tile / (float)Max( 1, light.tileSize );
-					pass.momentAtlas[ 0 ] = scale * (float)vkShadow.atlasSize * invMoment;
+					// depthUV addresses the image the receivers sample: the
+					// atlas, or the pass's own resident block (origin 0)
+					const int depthEdge = pass.residentSet != VK_NULL_HANDLE
+						? light.tileSize * atlasDiv : vkShadow.atlasSize;
+					pass.momentAtlas[ 0 ] = scale * (float)depthEdge * invMoment;
 					pass.momentAtlas[ 1 ] = ( (float)nextX - (float)pass.tileX * scale ) * invMoment;
 					pass.momentAtlas[ 2 ] = ( (float)nextY - (float)pass.tileY * scale ) * invMoment;
 				}
@@ -3014,7 +3135,7 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 			R_ShadowMapProjectedCacheTexelBudgetFor( 1,
 					r_shadowMapSize.GetInteger() ) );
 	common->Printf(
-			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point projectedTiles=%.2f/%.0f casterFaces=%d/%d culled/tested\n",
+			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d inPlace=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point projectedTiles=%.2f/%.0f casterFaces=%d/%d culled/tested\n",
 			( viewDef != NULL && viewDef->isSubview )
 				? "subview" : "main",
 			vkShadow.projectedCacheHits,
@@ -3022,6 +3143,7 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 			vkShadow.projectedFreshUpdates,
 			vkShadow.pointFreshUpdates,
 			vkShadow.composePasses,
+			vkShadow.residentPasses,
 			vkShadow.budgetFallbacks,
 			vkShadow.admissionDenied,
 			vkShadow.subviewFallbacks,
@@ -3345,6 +3467,7 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 	vkShadow.projectedFreshUpdates = 0;
 	vkShadow.pointFreshUpdates = 0;
 	vkShadow.composePasses = 0;
+	vkShadow.residentPasses = 0;
 	vkShadow.admissionDenied = 0;
 	vkShadow.atlasTilesRendered = 0;
 	vkShadow.atlasTilesAllocated = 0;
@@ -4573,8 +4696,7 @@ static bool VK_ClassicShadow_ValidatePhysicalPass(
 			&& cache->tileSize == light.tileSize
 			&& cache->blockSize
 				== VK_ShadowMap_ProjectedBlockSize( light )
-			&& cache->image != VK_NULL_HANDLE
-			&& cache->layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			&& VK_ShadowMap_ProjectedEntryHoldsContent( *cache );
 	}
 	return !pass.cacheUpdate || ( pass.cacheEntry >= 0
 		&& pass.cacheEntry < VK_SHADOW_MAX_CACHE_SLOTS
@@ -5094,6 +5216,44 @@ static void VK_ShadowMap_CopyDepthTile( VkCommandBuffer cmd,
 	copy.regionCount = 1;
 	copy.pRegions = &region;
 	vkCmdCopyImage2( cmd, &copy );
+}
+
+// Moves a resident projected tile between the layouts its uses need. The
+// record carries the layout its last use left, in command order, so each
+// transition names that use as its source.
+static void VK_ShadowMap_TransitionProjectedEntry( VkCommandBuffer cmd,
+		vkProjectedShadowCacheEntry_t &entry,
+		const VkImageLayout newLayout ) {
+	if ( entry.image == VK_NULL_HANDLE || entry.layout == newLayout ) {
+		return;
+	}
+	const VkImageLayout layouts[ 2 ] = { entry.layout, newLayout };
+	VkPipelineStageFlags2 stages[ 2 ];
+	VkAccessFlags2 access[ 2 ];
+	for ( int i = 0 ; i < 2 ; i++ ) {
+		switch ( layouts[ i ] ) {
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			stages[ i ] = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+			access[ i ] = VK_ACCESS_2_TRANSFER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			stages[ i ] = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+			access[ i ] = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			stages[ i ] = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+			access[ i ] = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+			break;
+		default:
+			// a new image: nothing to wait for and nothing to keep
+			stages[ i ] = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+			access[ i ] = 0;
+			break;
+		}
+	}
+	VK_ShadowMap_ImageBarrier( cmd, entry.image, 1, entry.layout, newLayout,
+			stages[ 0 ], access[ 0 ], stages[ 1 ], access[ 1 ] );
+	entry.layout = newLayout;
 }
 
 // A resident point cube's depth into a scratch cube, all six faces in one
@@ -5811,6 +5971,9 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 	// Projected passes whose cached tile holds static depth only and still owe
 	// this view's dynamic casters a LOAD-op scope after publication/restore.
 	int projectedComposeCount = 0;
+	// Exact projected hits read where they live whose image already rests in
+	// the layout the receivers read it in: they owe no GPU work at all.
+	int projectedRestingCount = 0;
 	// Point passes that owe the same over a scratch copy of their resident
 	// cube. The sealed stream never prepares one.
 	int pointComposeCount = 0;
@@ -5943,9 +6106,8 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 							|| cache->tileSize != light.tileSize
 							|| cache->blockSize
 								!= VK_ShadowMap_ProjectedBlockSize( light )
-							|| cache->image == VK_NULL_HANDLE
-							|| cache->layout
-								!= VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
+							|| !VK_ShadowMap_ProjectedEntryHoldsContent(
+									*cache ) ) {
 						VK_ShadowMap_InvalidatePassResource(
 								light, receiverPass );
 					} else if ( pass.composeDynamic
@@ -5963,6 +6125,11 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 						projectedCount++;
 						if ( pass.composeDynamic ) {
 							projectedComposeCount++;
+						}
+						if ( pass.residentSet != VK_NULL_HANDLE
+								&& cache->layout
+									== VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) {
+							projectedRestingCount++;
 						}
 					}
 					continue;
@@ -5999,11 +6166,21 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 		return false;
 	}
 
-	// A view made exclusively of resident point hits performs no GPU work:
-	// their identity-owned descriptor cubes are already sampleable. A composed
-	// hit is not one of those: it still owes its copy and live casters.
-	if ( projectedCount == 0 && pointFreshCount == 0
-			&& pointComposeCount == 0 && pointHitCount > 0 ) {
+	// A view made exclusively of resident hits performs no GPU work: the point
+	// ones' identity-owned descriptor cubes are already sampleable, and so is
+	// every projected tile that is read where it lives and already rests in
+	// that layout. A composed hit is not one of those: it still owes its copy
+	// and live casters. (The test above left at least one hit.)
+	if ( projectedCount == projectedRestingCount && pointFreshCount == 0
+			&& pointComposeCount == 0 ) {
+		// The timing report describes what became readable during this view,
+		// and the spans of earlier views are read nowhere else. A view with
+		// nothing to record still collects them: a long run of such views
+		// would otherwise repeat the last report and let them age out as
+		// dropped.
+		VK_ShadowGpuTiming_BeginView( classicCommit
+				? vkClassicShadowTransaction.frameSlot
+				: VK_Exec_ActiveFrameSlot() );
 		VK_ShadowMap_FinalizeCachePasses( viewDef );
 		return true;
 	}
@@ -6327,7 +6504,10 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 				}
 			}
 		}
-		bool haveCacheHits = false;
+		// A hit is either restored into its atlas tile by a copy, or read where
+		// it lives, which owes its image a layout change at most.
+		bool haveCacheCopies = false;
+		bool haveResidentTransitions = false;
 		for ( int i = 0 ; i < vkShadow.numLights ; i++ ) {
 			const vkShadowLightState_t &light =
 					vkShadow.lights[ i ];
@@ -6339,12 +6519,25 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					passIndex++ ) {
 				const vkShadowPassState_t &pass =
 						light.passes[ passIndex ];
-				haveCacheHits = haveCacheHits
-						|| ( pass.valid && pass.cacheHit
-							&& pass.resourcePass
-								== (vkShadowReceiverPass_t)passIndex );
+				if ( !pass.valid || !pass.cacheHit
+						|| pass.resourcePass
+							!= (vkShadowReceiverPass_t)passIndex
+						|| pass.cacheEntry < 0
+						|| pass.cacheEntry
+							>= VK_SHADOW_MAX_CACHE_SLOTS ) {
+					continue;
+				}
+				if ( pass.residentSet == VK_NULL_HANDLE ) {
+					haveCacheCopies = true;
+				} else if ( vkShadow.projectedCache[
+						pass.cacheEntry ].layout
+							!= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ) {
+					haveResidentTransitions = true;
+				}
 			}
 		}
+		const bool haveCacheHits =
+				haveCacheCopies || haveResidentTransitions;
 		// Publication and restore are one phase: both are resident-cache
 		// transfers, and OpenGL reports them together as reuse.
 		vkGpuPhaseScope cacheTiming( cmd, VK_GPU_PHASE_SHADOW_CACHE,
@@ -6397,41 +6590,24 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					vkProjectedShadowCacheEntry_t &cache =
 							vkShadow.projectedCache[
 									pass.cacheEntry ];
-					const VkImageLayout oldCacheLayout =
-							cache.layout;
-					VK_ShadowMap_ImageBarrier( cmd, cache.image, 1,
-							oldCacheLayout,
-							VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-							oldCacheLayout
-								== VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-									? VK_PIPELINE_STAGE_2_TRANSFER_BIT
-									: VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-							oldCacheLayout
-								== VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-									? VK_ACCESS_2_TRANSFER_READ_BIT : 0,
-							VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-							VK_ACCESS_2_TRANSFER_WRITE_BIT );
+					// whatever its last use left it in: new, a transfer
+					// source, or read in place by an earlier view
+					VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
+							VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
 					VK_ShadowMap_CopyDepthTile( cmd,
 							vkShadow.atlasImage,
 							pass.tileX, pass.tileY,
 							cache.image, 0, 0,
 							VK_ShadowMap_ProjectedBlockSize(
 									light ) );
-					VK_ShadowMap_ImageBarrier( cmd, cache.image, 1,
-							VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-							VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-							VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-							VK_ACCESS_2_TRANSFER_WRITE_BIT,
-							VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-							VK_ACCESS_2_TRANSFER_READ_BIT );
-					cache.layout =
-							VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+					VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
+							VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
 				}
 			}
 		}
 
 		if ( haveCacheHits ) {
-			if ( atlasLayout
+			if ( haveCacheCopies && atlasLayout
 					!= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL ) {
 				const bool fromAttachment =
 						atlasLayout
@@ -6476,6 +6652,14 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					vkProjectedShadowCacheEntry_t &cache =
 							vkShadow.projectedCache[
 									pass.cacheEntry ];
+					if ( pass.residentSet != VK_NULL_HANDLE ) {
+						// read where it lives: nothing moves
+						VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
+								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+						continue;
+					}
+					VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
+							VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
 					VK_ShadowMap_CopyDepthTile( cmd,
 							cache.image, 0, 0,
 							vkShadow.atlasImage,

@@ -3637,10 +3637,11 @@ static bool VK_GuiExecutor_Init( void ) {
 	dslci.bindingCount = 1;
 
 	// Shadow-set budget: the atlas set plus scratch and identity-resident
-	// point-cache cubes per frame slot. Each set is five combined image
-	// samplers (compare, raw, three moment maps) plus one dynamic UBO.
+	// point-cache cubes and resident projected tiles per frame slot. Each set
+	// is five combined image samplers (compare, raw, three moment maps) plus
+	// one dynamic UBO.
 	const int shadowSetBudget = ( 1 + VK_SHADOW_MAX_POINT_CUBES
-			+ VK_SHADOW_MAX_CACHE_SLOTS ) * VK_FRAMES_IN_FLIGHT;
+			+ 2 * VK_SHADOW_MAX_CACHE_SLOTS ) * VK_FRAMES_IN_FLIGHT;
 	const int retiredSetBudget = VK_MAX_RETIRED_SETS * VK_FRAMES_IN_FLIGHT;
 	VkDescriptorPoolSize poolSizes[ 3 ];
 	poolSizes[ 0 ].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -10510,70 +10511,85 @@ bool VK_Exec_UpdateShadowAtlasDescriptors( VkImageView view,
 	return true;
 }
 
-// allocates (first call per cube) and points one point-light cube's
-// per-frame-slot shadow sets at the cube view + compare/raw samplers; binding
-// 1 is that slot's uniform ring (the same shadow set layout as the atlas set,
-// so the point pipelines stay set-7 compatible). Called at cube creation,
-// before the sets are ever bound; recreation waits the device idle first.
-bool VK_Exec_CreateShadowCubeSets( VkImageView cubeView,
+// allocates (first use) and points one frame slot's shadow set at a depth
+// image view + compare/raw samplers; binding 1 is that slot's uniform ring
+// (the same shadow set layout as the atlas set, so every shadowed pipeline
+// stays set-7 compatible). imageLayout is the layout the image is in whenever
+// the set is drawn with. The caller answers for the set being bound neither by
+// a frame still in flight nor by the commands already recorded.
+bool VK_Exec_WriteShadowImageSet( VkImageView view,
 		VkSampler compareSampler, VkSampler rawSampler,
-		VkDescriptorSet sets[ VK_FRAMES_IN_FLIGHT ] ) {
-	if ( !vkExec.initialized || cubeView == VK_NULL_HANDLE ||
+		VkImageLayout imageLayout,
+		VkDescriptorSet sets[ VK_FRAMES_IN_FLIGHT ], int slot ) {
+	if ( !vkExec.initialized || view == VK_NULL_HANDLE ||
 			compareSampler == VK_NULL_HANDLE ||
 			rawSampler == VK_NULL_HANDLE ||
+			slot < 0 || slot >= VK_FRAMES_IN_FLIGHT ||
 			!VK_Exec_ShadowMomentViewsPublished() ) {
 		return false;
 	}
-	for ( int i = 0; i < VK_FRAMES_IN_FLIGHT; i++ ) {
-		if ( sets[ i ] == VK_NULL_HANDLE ) {
-			VkDescriptorSetAllocateInfo dsai;
-			memset( &dsai, 0, sizeof( dsai ) );
-			dsai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			dsai.descriptorPool = vkExec.descriptorPool;
-			dsai.descriptorSetCount = 1;
-			dsai.pSetLayouts = &vkExec.shadowSetLayout;
-			if ( vkAllocateDescriptorSets( vkCtx.device, &dsai, &sets[ i ] ) != VK_SUCCESS ) {
-				common->Warning( "Vulkan: point shadow descriptor set allocation failed" );
-				sets[ i ] = VK_NULL_HANDLE;
-				return false;
-			}
-			VkDescriptorBufferInfo bufferInfo;
-			bufferInfo.buffer = vkExec.uniformRings[ i ].buffer;
-			bufferInfo.offset = 0;
-			bufferInfo.range = VK_SHADOW_UNIFORM_SLICE_BYTES;
-			VkWriteDescriptorSet ringWrite;
-			memset( &ringWrite, 0, sizeof( ringWrite ) );
-			ringWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			ringWrite.dstSet = sets[ i ];
-			ringWrite.dstBinding = 1;
-			ringWrite.descriptorCount = 1;
-			ringWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-			ringWrite.pBufferInfo = &bufferInfo;
-			vkUpdateDescriptorSets( vkCtx.device, 1, &ringWrite, 0, NULL );
+	if ( sets[ slot ] == VK_NULL_HANDLE ) {
+		VkDescriptorSetAllocateInfo dsai;
+		memset( &dsai, 0, sizeof( dsai ) );
+		dsai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		dsai.descriptorPool = vkExec.descriptorPool;
+		dsai.descriptorSetCount = 1;
+		dsai.pSetLayouts = &vkExec.shadowSetLayout;
+		if ( vkAllocateDescriptorSets( vkCtx.device, &dsai, &sets[ slot ] ) != VK_SUCCESS ) {
+			common->Warning( "Vulkan: shadow map descriptor set allocation failed" );
+			sets[ slot ] = VK_NULL_HANDLE;
+			return false;
 		}
+		VkDescriptorBufferInfo bufferInfo;
+		bufferInfo.buffer = vkExec.uniformRings[ slot ].buffer;
+		bufferInfo.offset = 0;
+		bufferInfo.range = VK_SHADOW_UNIFORM_SLICE_BYTES;
+		VkWriteDescriptorSet ringWrite;
+		memset( &ringWrite, 0, sizeof( ringWrite ) );
+		ringWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		ringWrite.dstSet = sets[ slot ];
+		ringWrite.dstBinding = 1;
+		ringWrite.descriptorCount = 1;
+		ringWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		ringWrite.pBufferInfo = &bufferInfo;
+		vkUpdateDescriptorSets( vkCtx.device, 1, &ringWrite, 0, NULL );
+	}
 
-		VkDescriptorImageInfo imageInfos[ 2 ];
-		memset( imageInfos, 0, sizeof( imageInfos ) );
-		imageInfos[ 0 ].sampler = compareSampler;
-		imageInfos[ 1 ].sampler = rawSampler;
-		for ( int imageIndex = 0; imageIndex < 2; imageIndex++ ) {
-			imageInfos[ imageIndex ].imageView = cubeView;
-			imageInfos[ imageIndex ].imageLayout =
-					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	VkDescriptorImageInfo imageInfos[ 2 ];
+	memset( imageInfos, 0, sizeof( imageInfos ) );
+	imageInfos[ 0 ].sampler = compareSampler;
+	imageInfos[ 1 ].sampler = rawSampler;
+	for ( int imageIndex = 0; imageIndex < 2; imageIndex++ ) {
+		imageInfos[ imageIndex ].imageView = view;
+		imageInfos[ imageIndex ].imageLayout = imageLayout;
+	}
+	VkWriteDescriptorSet writes[ 2 ];
+	memset( writes, 0, sizeof( writes ) );
+	for ( int writeIndex = 0; writeIndex < 2; writeIndex++ ) {
+		writes[ writeIndex ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[ writeIndex ].dstSet = sets[ slot ];
+		writes[ writeIndex ].dstBinding = writeIndex == 0 ? 0 : 2;
+		writes[ writeIndex ].descriptorCount = 1;
+		writes[ writeIndex ].descriptorType =
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writes[ writeIndex ].pImageInfo = &imageInfos[ writeIndex ];
+	}
+	vkUpdateDescriptorSets( vkCtx.device, 2, writes, 0, NULL );
+	VK_Exec_WriteShadowMomentBindings( sets[ slot ] );
+	return true;
+}
+
+// points one point-light cube's per-frame-slot shadow sets at the cube view.
+// Called at cube creation, before the sets are ever bound; recreation waits
+// the device idle first.
+bool VK_Exec_CreateShadowCubeSets( VkImageView cubeView,
+		VkSampler compareSampler, VkSampler rawSampler,
+		VkDescriptorSet sets[ VK_FRAMES_IN_FLIGHT ] ) {
+	for ( int i = 0; i < VK_FRAMES_IN_FLIGHT; i++ ) {
+		if ( !VK_Exec_WriteShadowImageSet( cubeView, compareSampler, rawSampler,
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, sets, i ) ) {
+			return false;
 		}
-		VkWriteDescriptorSet writes[ 2 ];
-		memset( writes, 0, sizeof( writes ) );
-		for ( int writeIndex = 0; writeIndex < 2; writeIndex++ ) {
-			writes[ writeIndex ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writes[ writeIndex ].dstSet = sets[ i ];
-			writes[ writeIndex ].dstBinding = writeIndex == 0 ? 0 : 2;
-			writes[ writeIndex ].descriptorCount = 1;
-			writes[ writeIndex ].descriptorType =
-					VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			writes[ writeIndex ].pImageInfo = &imageInfos[ writeIndex ];
-		}
-		vkUpdateDescriptorSets( vkCtx.device, 2, writes, 0, NULL );
-		VK_Exec_WriteShadowMomentBindings( sets[ i ] );
 	}
 	return true;
 }
