@@ -5163,7 +5163,7 @@ def validate_exact_static_cache_and_admission_contract() -> None:
             "if ( schedule.cacheEntry >= 0 )",
             "pass.cacheUpdate = true;",
             "cache.reserved = false;",
-            "vkShadow.pointCubesUsed >= VK_SHADOW_MAX_POINT_CUBES",
+            "vkShadow.pointCubesUsed >= VK_ShadowMap_ScratchCubeLimit()",
             "VK_ShadowMap_EnsurePointCube(",
             "vkShadow.pointCubesUsed++;",
         ),
@@ -6116,7 +6116,7 @@ def validate_dynamic_caster_composition_contract() -> None:
     require_order(
         claim,
         (
-            "vkShadow.pointCubesUsed >= VK_SHADOW_MAX_POINT_CUBES",
+            "vkShadow.pointCubesUsed >= VK_ShadowMap_ScratchCubeLimit()",
             "!VK_ShadowMap_EnsurePointCube( vkShadow.pointCubesUsed )",
             "pass.composeDynamic = true;",
             "pass.cubeIndex = cubeIndex;",
@@ -8866,6 +8866,94 @@ def validate_static_signature_view_independence_contract() -> None:
             "a new snapshot still changes the signature")
 
 
+def validate_scratch_cube_pool_contract() -> None:
+    """Vulkan's scratch point cubes have a memory ceiling and are given back.
+
+    A view takes a scratch cube for each point pass that is not read from the
+    resident cache: an uncached map, or the copy a cached one composes over.
+    The pool was created cube by cube up to 512 and never released. One view
+    from outside the level, from where every area is visible, mapped 289 point
+    lights and left 2.0 GB resident for the rest of the session, beside a cache
+    bounded at 512 MiB; at the Maximum preset's 2048 faces the pool could reach
+    51 GB.
+
+    The pool now has the cache's memory figure again as its ceiling, with the
+    cache's floor of twelve, and a pass beyond it fails as an allocation does.
+    Cubes that no view has needed for a whole window of wall time are released
+    between frames, when no command buffer in flight can still name them.
+    """
+    vk = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+
+    limit = braced_body(vk, "static int VK_ShadowMap_ScratchCubeLimit(", "scratch cube ceiling")
+    require_order(
+        limit,
+        (
+            "const double cubeBytes = 6.0 * faceSize * faceSize",
+            "* VK_ShadowMap_DepthBytesPerPixel();",
+            "r_shadowMapPointCacheMegs.GetInteger()",
+            "const double affordable = floor( budgetBytes / cubeBytes );",
+            "return idMath::ClampInt( SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS,",
+            "VK_SHADOW_MAX_POINT_CUBES, cubes );",
+        ),
+        "the pool's ceiling is the cache's memory figure, with its floor",
+    )
+    # both places that claim a scratch cube ask the ceiling
+    if vk.count("vkShadow.pointCubesUsed >= VK_ShadowMap_ScratchCubeLimit()") != 2:
+        raise AssertionError("A composed copy and an uncached map must both respect the scratch cube ceiling")
+    if "vkShadow.pointCubesUsed >= VK_SHADOW_MAX_POINT_CUBES" in vk:
+        raise AssertionError("No scratch cube may be claimed against the array size alone")
+
+    # every view's use is folded into the frame's peak before it is reset
+    if compact(vk).count(compact(
+            "vkShadow.pointCubesPeakFrame = Max( vkShadow.pointCubesPeakFrame, vkShadow.pointCubesUsed ); "
+            "vkShadow.pointCubesUsed = 0;")) != 2:
+        raise AssertionError("Both view resets must record how many scratch cubes the view used")
+
+    trim = braced_body(vk, "static void VK_ShadowMap_TrimScratchCubes(", "scratch cube trim")
+    require_order(
+        trim,
+        (
+            "vkShadow.pointCubesPeakRecent[ 0 ] = Max(",
+            "Max( vkShadow.pointCubesPeakFrame, vkShadow.pointCubesUsed ) );",
+            "vkShadow.pointCubesPeakFrame = 0;",
+            # wall time, so a high refresh rate does not shorten the window
+            "const int now = Sys_Milliseconds();",
+            "if ( now - vkShadow.pointCubesWindowStart < VK_SHADOW_SCRATCH_TRIM_MSEC ) {",
+            "return;",
+            # what this window and the last one needed, and some to spare
+            "const int needed = Max( vkShadow.pointCubesPeakRecent[ 0 ],",
+            "vkShadow.pointCubesPeakRecent[ 1 ] );",
+            "+ Max( VK_SHADOW_SCRATCH_SPARE_CUBES, needed / 4 );",
+            "for ( int i = VK_SHADOW_MAX_POINT_CUBES - 1 ; i >= keep ; i-- ) {",
+            "VK_ShadowMap_DestroyPointCube( vkShadow.pointCubes[ i ] );",
+            "vkShadow.pointCubesPeakRecent[ 1 ] = vkShadow.pointCubesPeakRecent[ 0 ];",
+            "vkShadow.pointCubesPeakRecent[ 0 ] = 0;",
+            "vkShadow.pointCubesWindowStart = now;",
+        ),
+        "only cubes no view needed for a whole window are released",
+    )
+    # between frames only: a recording frame may have bound a cube's sets
+    require_order(
+        braced_body(vk, "void VK_ShadowMap_BeginFrame(", "frame begin"),
+        (
+            "if ( vkCtx.device == VK_NULL_HANDLE || VK_GuiExecutor_FrameIsOpen() ) {",
+            "return;",
+            "VK_ShadowMap_TrimScratchCubes();",
+        ),
+        "the trim runs between frames",
+    )
+    if vk.count("VK_ShadowMap_TrimScratchCubes();") != 1:
+        raise AssertionError("Scratch cubes are released at the frame boundary and nowhere else")
+
+    report = braced_body(vk, "static void VK_ShadowMap_ReportViewCache(", "cache report")
+    require(report, "scratchCubes=%d/%d", "the report shows the pool against its ceiling")
+    require_order(
+        report,
+        ("VK_ShadowMap_ScratchCubesAllocated(),", "VK_ShadowMap_ScratchCubeLimit(),"),
+        "the report shows the pool against its ceiling",
+    )
+
+
 def validate_resident_projected_sampling_contract() -> None:
     """An exact projected hit with nothing live over it is read where it lives.
 
@@ -9102,6 +9190,7 @@ def main() -> None:
     validate_depth_only_point_cube_contract()
     validate_static_cutout_caster_contract()
     validate_static_signature_view_independence_contract()
+    validate_scratch_cube_pool_contract()
     validate_resident_projected_sampling_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")

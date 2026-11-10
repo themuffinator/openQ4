@@ -1747,10 +1747,15 @@ optimization has landed.
   for a quarter of a second. A static caster of a still light is now in the map at
   any distance and a first snapshot is not motion; fresh maps on four walks fall
   from 24 to 18, 79 to 63, 10 to 8 and 11 to 7, and shadow-mapped lights cast the
-  shadows of still scenery beyond 768 units. Remaining, in order:
+  shadows of still scenery beyond 768 units.
+  Scratch cube pool (10 November 2026). Vulkan's pool of scratch point cubes only
+  grew, to 512 cubes: one view from outside a level left 2.0 GB resident. It now has
+  the cache's memory figure again as its ceiling (85 cubes at Quality) and releases
+  what no view has needed for five seconds: 1.1 GB at that view, 0.6 GB ten seconds
+  after it. Remaining, in order:
   the fullscreen budgets, including whether Enhanced can map point lights; lights
-  that move every frame, which still go through the cache each frame; Vulkan's
-  scratch cube pool, which only grows; and static-world volumes, which are still
+  that move every frame, which still go through the cache each frame; the stencil
+  fallback flag, which is never cleared; and static-world volumes, which are still
   built once per mapped light for the fallback.
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the

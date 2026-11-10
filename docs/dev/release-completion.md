@@ -525,6 +525,11 @@ there is no double-click word selection.
   redrew its light's shadows. Lights that do not move now cast them at any
   distance, drawn once and kept. Moving objects and moving lights behave as
   before.
+- **Vulkan gives shadow memory back.** The working copies Vulkan keeps for
+  point-light shadows were never released, so one view of a great many lights
+  (2.0 GB in our test) stayed allocated for the rest of the session. They now
+  share the limit set by `r_shadowMapPointCacheMegs` and are released a few
+  seconds after they stop being needed.
 - **Lights that only cast the map's built-in shadows cast them again.** With
   shadow maps on, these lights (common in the multiplayer maps) had no shadow
   at all and shone through walls.

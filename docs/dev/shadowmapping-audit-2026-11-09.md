@@ -76,7 +76,7 @@ cache (sixteen at most) against forty cubes in view.
 | The stencil-fallback flag on a light is never cleared. | **Open.** Costs the light its volume elision only. |
 | OpenGL point cubes carry a colour cube the default receiver never samples: half their memory. The opt-in modern executor still reads it. | **Fixed.** Cubes are depth only while nothing samples the colour. See "Depth-only point cubes on OpenGL" below. At 512 the cache holds 64 cubes in 384 MiB, as on Vulkan; it held 42 in 504 MiB. |
 | Vulkan hub2: one light (`lights/squarelight1`) logs "required shadow resource unavailable" once and falls back; OpenGL maps it. | **Open**, present before this round. |
-| Vulkan's scratch cube pool only grows. A view takes a scratch cube for each uncached or composed point pass, up to 512 of them, and none is released until the cube size changes. A noclip walk out of the airdefense1 arena into the void, from where every area is visible, mapped 289 point lights in one view and left 2.0 GB resident at Quality's 512 faces. The cache has a memory bound; this pool has none. | **Open.** Ordinary views use a handful. One crowded view pays for the rest of the level. |
+| Vulkan's scratch cube pool only grows. A view takes a scratch cube for each uncached or composed point pass, up to 512 of them, and none is released until the cube size changes. A noclip walk out of the airdefense1 arena into the void, from where every area is visible, mapped 289 point lights in one view and left 2.0 GB resident at Quality's 512 faces. The cache has a memory bound; this pool had none. | **Fixed (Vulkan).** The pool has the cache's memory figure again as its ceiling, and gives back what recent views did not need. See "Scratch cube pool" below. |
 
 ## Measured
 
@@ -703,6 +703,43 @@ passed. One static test fails for a reason outside this change
 (`ui_number_clipboard.py` no longer compiles its extract of the key code). No
 frame-time figure, for the reason given under "Walking".
 
+### Scratch cube pool
+
+Added on 10 November. A view takes a scratch cube for each point pass it does
+not read from the resident cache: an uncached map, or the copy a cached one
+composes its live casters over. The pool was created cube by cube as views
+asked for more, up to 512, and nothing was released until the cube size
+changed.
+
+- **A ceiling.** The pool has `r_shadowMapPointCacheMegs` again, the figure
+  that bounds the cache, with the cache's floor of twelve cubes: 85 cubes at
+  Quality's 512 faces, twelve at Maximum's 2048. A pass beyond it fails as an
+  allocation does, and its light keeps its stencil shadow.
+- **A trim.** Between frames, cubes that no view has needed for a window of
+  five seconds are released, keeping what the last two windows used and a
+  quarter more. No command buffer in flight can still name a cube that went
+  unused that long.
+
+airdefense1 arena, Quality, with one view from outside the level:
+
+| | Before | After |
+|---|---:|---:|
+| Scratch cubes after the outside view | 289 | 85 (the ceiling) |
+| Resident shadow memory then | 2.0 GB | 1.1 GB |
+| Scratch cubes ten seconds after coming back | 289 | 7 |
+| Resident shadow memory then | 2.0 GB | 0.6 GB (the cache, at its own bound) |
+
+A second excursion grows the pool again and the validation layers stay silent
+through both. Ordinary views use three to a few dozen cubes and never meet
+the ceiling at the shipped sizes. An overcrowded view at 2048 faces does, and
+the lights beyond it stay on stencil for the level, because that fallback is
+never cleared (see the list below).
+
+Checked for this change, on the final build: the excursion above under the
+validation layers; the fourteen scenarios on both back ends, all passing; the
+continuous-motion qualification on Vulkan; the in-engine self-tests; and the
+seventy-seven static tests that read the touched files.
+
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
 (caster counts, cache reuse, cached against fresh images byte-identical; run
@@ -733,8 +770,9 @@ whether Enhanced can now map point lights on Vulkan.
    Also left of membership: the world's own geometry joins and leaves a
    light's casters area by area as the player moves (seen on those two
    lights; not measured on still ones).
-3. Vulkan's scratch cube pool only grows: up to 512 cubes, 2.0 GB seen after
-   one view from outside the level, against a cache bounded at 512 MB.
+3. A light whose map pass fails keeps its stencil shadow for the rest of the
+   level: the fallback flag is never cleared. The scratch pool's ceiling now
+   sends the lights of an overcrowded view down that path.
 4. Static-world volumes are still built once for every mapped light and kept
    for the fallback. Leaving them out too would need the same rebuild on
    return, for every surface the light touches.

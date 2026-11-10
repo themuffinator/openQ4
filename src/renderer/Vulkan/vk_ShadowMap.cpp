@@ -271,6 +271,11 @@ typedef struct vkShadowMapState_s {
 	int					atlasFreeX[ VK_SHADOW_ATLAS_LEVELS ][ 3 ];
 	int					atlasFreeY[ VK_SHADOW_ATLAS_LEVELS ][ 3 ];
 	int					pointCubesUsed;
+	// The scratch pool is created cube by cube as views ask for more and used
+	// from index 0, so what recent views used says how much of it is needed.
+	int					pointCubesPeakFrame;	// most any view of the frame being recorded used
+	int					pointCubesPeakRecent[ 2 ];	// the same over this trim window and the last
+	int					pointCubesWindowStart;	// Sys_Milliseconds this trim window began at
 	int					freshUpdates;
 	int					projectedCacheHits;
 	int					pointCacheHits;
@@ -541,6 +546,8 @@ static void VK_ShadowMap_ReleasePreparedLights( const bool markSticky ) {
 	vkShadow.preparedView = NULL;
 	vkShadow.preparedFrame = -1;
 	VK_ShadowMap_ResetAtlasBlocks();
+	vkShadow.pointCubesPeakFrame = Max( vkShadow.pointCubesPeakFrame,
+			vkShadow.pointCubesUsed );
 	vkShadow.pointCubesUsed = 0;
 	vkShadow.freshUpdates = 0;
 	vkShadow.projectedCacheHits = 0;
@@ -956,6 +963,39 @@ static void VK_ShadowMap_UpdateMomentAtlas( void ) {
 static int VK_ShadowMap_AtlasSizeValue( void );
 static int VK_ShadowMap_PointSizeValue( void );
 
+// Scratch cubes a whole trim window has not needed are released, with a few
+// to spare. The pool only ever grew: a single view from outside the level,
+// from where every area is visible, mapped 289 point lights and left 2.0 GB
+// resident for the rest of the session. Called between frames. A cube given
+// up here was claimed by no view for at least a window, so no command buffer
+// still in flight names it or its descriptor sets. The window is wall time:
+// counted in frames it would be eight times shorter at 480 Hz than at 60.
+static const int VK_SHADOW_SCRATCH_TRIM_MSEC = 5000;
+static const int VK_SHADOW_SCRATCH_SPARE_CUBES = 4;
+
+static void VK_ShadowMap_TrimScratchCubes( void ) {
+	vkShadow.pointCubesPeakRecent[ 0 ] = Max(
+			vkShadow.pointCubesPeakRecent[ 0 ],
+			Max( vkShadow.pointCubesPeakFrame, vkShadow.pointCubesUsed ) );
+	vkShadow.pointCubesPeakFrame = 0;
+	const int now = Sys_Milliseconds();
+	if ( now - vkShadow.pointCubesWindowStart < VK_SHADOW_SCRATCH_TRIM_MSEC ) {
+		return;
+	}
+	const int needed = Max( vkShadow.pointCubesPeakRecent[ 0 ],
+			vkShadow.pointCubesPeakRecent[ 1 ] );
+	const int keep = needed
+			+ Max( VK_SHADOW_SCRATCH_SPARE_CUBES, needed / 4 );
+	for ( int i = VK_SHADOW_MAX_POINT_CUBES - 1 ; i >= keep ; i-- ) {
+		if ( vkShadow.pointCubes[ i ].image != VK_NULL_HANDLE ) {
+			VK_ShadowMap_DestroyPointCube( vkShadow.pointCubes[ i ] );
+		}
+	}
+	vkShadow.pointCubesPeakRecent[ 1 ] = vkShadow.pointCubesPeakRecent[ 0 ];
+	vkShadow.pointCubesPeakRecent[ 0 ] = 0;
+	vkShadow.pointCubesWindowStart = now;
+}
+
 void VK_ShadowMap_BeginFrame( void ) {
 	// One per frame recorded, whatever number the renderer gives it: what a
 	// resident tile's descriptor sets are aged against
@@ -964,6 +1004,7 @@ void VK_ShadowMap_BeginFrame( void ) {
 	if ( vkCtx.device == VK_NULL_HANDLE || VK_GuiExecutor_FrameIsOpen() ) {
 		return;
 	}
+	VK_ShadowMap_TrimScratchCubes();
 	VK_ShadowMap_UpdateMomentAtlas();
 	// Size cvars change between frames (console, settings menu). Seen here,
 	// before anything records, the resize needs no fallback frame.
@@ -1776,6 +1817,37 @@ static int VK_ShadowMap_PointCacheSlotLimit( void ) {
 	return R_ShadowMapPointCacheSlotLimit( VK_ShadowMap_PointSizeValue(),
 			static_cast<int>( VK_ShadowMap_DepthBytesPerPixel() ),
 			VK_SHADOW_MAX_CACHE_SLOTS );
+}
+
+// The most scratch cubes a view may hold. A view takes one for each point
+// pass that is not read from the resident cache: an uncached map, or the copy a
+// cached one composes its live casters over. The cache is bounded by
+// r_shadowMapPointCacheMegs and the pool is given the same figure again, with
+// the same floor, so that one crowded view cannot take video memory without
+// limit: 512 cubes of 512 faces are 3.2 GB, and of 2048 faces 51 GB. A pass
+// beyond it fails as an allocation does, and its light keeps its stencil
+// shadow.
+static int VK_ShadowMap_ScratchCubeLimit( void ) {
+	const double faceSize = static_cast<double>(
+			Max( 1, VK_ShadowMap_PointSizeValue() ) );
+	const double cubeBytes = 6.0 * faceSize * faceSize
+			* VK_ShadowMap_DepthBytesPerPixel();
+	const double budgetBytes = static_cast<double>(
+			Max( 0, r_shadowMapPointCacheMegs.GetInteger() ) ) * 1048576.0;
+	const double affordable = floor( budgetBytes / cubeBytes );
+	const int cubes = affordable >= static_cast<double>(
+			VK_SHADOW_MAX_POINT_CUBES )
+		? VK_SHADOW_MAX_POINT_CUBES : static_cast<int>( affordable );
+	return idMath::ClampInt( SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS,
+			VK_SHADOW_MAX_POINT_CUBES, cubes );
+}
+
+static int VK_ShadowMap_ScratchCubesAllocated( void ) {
+	int allocated = 0;
+	for ( int i = 0 ; i < VK_SHADOW_MAX_POINT_CUBES ; i++ ) {
+		allocated += vkShadow.pointCubes[ i ].image != VK_NULL_HANDLE ? 1 : 0;
+	}
+	return allocated;
 }
 
 static void VK_ShadowMap_BeginCacheView( const viewDef_t *viewDef ) {
@@ -2727,7 +2799,7 @@ static bool VK_ShadowMap_AllocateProjectedPass( vkShadowLightState_t &light,
 // static source and cubeIndex as what the receivers sample.
 static bool VK_ShadowMap_ClaimPointComposeTarget( vkShadowPassState_t &pass,
 		const int frameSlot ) {
-	if ( vkShadow.pointCubesUsed >= VK_SHADOW_MAX_POINT_CUBES
+	if ( vkShadow.pointCubesUsed >= VK_ShadowMap_ScratchCubeLimit()
 			|| !VK_ShadowMap_EnsurePointCube( vkShadow.pointCubesUsed ) ) {
 		return false;
 	}
@@ -2844,7 +2916,7 @@ static bool VK_ShadowMap_AllocatePointPass( vkShadowLightState_t &light,
 		cache.reserved = false;
 	}
 
-	if ( vkShadow.pointCubesUsed >= VK_SHADOW_MAX_POINT_CUBES
+	if ( vkShadow.pointCubesUsed >= VK_ShadowMap_ScratchCubeLimit()
 			|| !VK_ShadowMap_EnsurePointCube(
 					vkShadow.pointCubesUsed ) ) {
 		VK_ShadowMap_CancelScheduledPass( schedule, true );
@@ -3135,7 +3207,7 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 			R_ShadowMapProjectedCacheTexelBudgetFor( 1,
 					r_shadowMapSize.GetInteger() ) );
 	common->Printf(
-			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d inPlace=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point projectedTiles=%.2f/%.0f casterFaces=%d/%d culled/tested\n",
+			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d inPlace=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point projectedTiles=%.2f/%.0f scratchCubes=%d/%d casterFaces=%d/%d culled/tested\n",
 			( viewDef != NULL && viewDef->isSubview )
 				? "subview" : "main",
 			vkShadow.projectedCacheHits,
@@ -3157,6 +3229,8 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 				/ fullTileTexels,
 			static_cast<double>( R_ShadowMapProjectedCacheTexelBudget() )
 				/ fullTileTexels,
+			VK_ShadowMap_ScratchCubesAllocated(),
+			VK_ShadowMap_ScratchCubeLimit(),
 			vkShadow.pointCasterFaceCulled, vkShadow.pointCasterFaceTests );
 	// GPU shadow-pass timings. The numbers are what resolved during this
 	// view, so they lag the work by a frame or more -- the same lagged
@@ -3460,6 +3534,8 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 	vkShadow.preparedView = viewDef;
 	vkShadow.preparedFrame = backEnd.frameCount;
 	VK_ShadowMap_ResetAtlasBlocks();
+	vkShadow.pointCubesPeakFrame = Max( vkShadow.pointCubesPeakFrame,
+			vkShadow.pointCubesUsed );
 	vkShadow.pointCubesUsed = 0;
 	vkShadow.freshUpdates = 0;
 	vkShadow.projectedCacheHits = 0;
