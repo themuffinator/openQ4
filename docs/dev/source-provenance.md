@@ -62,6 +62,8 @@ The 37 BFG-marked files currently occupy these groups:
 
 The audit prints every file with its classification. For the six OpenAL files, the pinned RBDOOM tree is an intermediate lineage reference, not proof of the exact commit from which openQ4 first received the file. The optional source-root arguments verify that every configured path actually exists in the identified reference tree. Most Doom 3-marked files came through the historical idTech 4/Quake 4 lineage and do not necessarily have a one-to-one path in the official Doom 3 snapshot, so the inventory intentionally does not invent such a mapping.
 
+One Doom 3-marked file also carries [dhewm3](https://github.com/dhewm/dhewm3) changes. `JPEGBlit()` in `src/renderer/Cinematic.cpp`, with its `ID_USE_LIBJPEG` guard and the fallback warning that names dhewm3, came from dhewm3 through Quake4Doom and has been in openQ4 since its first commit. Quake4Doom itself integrates the Quake 4 SDK with the original Doom 3 GPL release, not with dhewm3, and no other dhewm3 code has been identified in `src/`. openQ4's `dds/` texture-replacement names follow dhewm3's convention for compatibility, but that is a reimplementation, not imported code.
+
 ## Import policy
 
 Before incorporating more external code:
