@@ -9,7 +9,10 @@ tiles are partial, in the SMAA laboratory scene that renderer_image_capture.py
 qualifies.
 
 `direct` draws the view straight into the window (no game post-process
-target: post AA off; the whole batch runs without MSAA). There each backend must, on its own, place every tile's part of the
+target: post AA off; the whole batch runs without MSAA). `linear-post` and
+`linear-direct` repeat `post` and `direct` with PBR materials, tone mapping
+and the linear HDR scene (VK-05); on Vulkan the main view must be admitted to
+that scene, or the case does not exercise it. There each backend must, on its own, place every tile's part of the
 frame (no repeated tile), and a box-filtered 2x capture must reproduce the
 window capture's structure.
 
@@ -37,7 +40,9 @@ lab = image_capture.lab
 smaa = image_capture.smaa
 SIZES = ((2560, 1600), (1920, 1200))
 WINDOW = (1280, 800)
-CASES = ('direct', 'post', 'restored')
+CASES = ('direct', 'post', 'restored', 'linear-post', 'linear-direct')
+LINEAR = {'r_pbrMaterials': '1', 'r_rendererModernSubmit': '1', 'r_rendererModernQuality': '1',
+          'r_pbrDebug': '0', 'r_hdrToneMap': '1', 'r_pbrLinearScene': '1'}
 # Cases whose independent per-backend tile checks are gated: all of them.
 GATED = CASES
 
@@ -74,6 +79,12 @@ def qualify(report, output):
     screenshots = output / 'batch/baseoq4'
     for name, row in rows.items():
         failures += [name + ': ' + error for error in row['failures']]
+        if name.startswith('linear') and row.get('backend') == 'vk':
+            section = log.split(f'TILED_CAPTURE_{name}_BEGIN', 1)[-1].split(f'TILED_CAPTURE_{name}_END', 1)[0]
+            admitted = re.search(r'main view reason=(\S+)', section)
+            checks.setdefault(name, {})['hdrMainView'] = admitted[1] if admitted else None
+            if not admitted or admitted[1] not in ('complete', 'linear'):
+                failures.append(f'{name}: the main view was not admitted to the linear HDR scene')
         shots = written(log, name)
         if len(shots) != 1 + len(SIZES):
             failures.append(f'{name}: expected {1 + len(SIZES)} written captures, found {shots}')
@@ -178,15 +189,22 @@ def main():
     reference = image_capture.configure(manifest, 4)
     base = reference['image-capture-baseline']
     lab.BASE.update(r_vkDevice=args.device)
+    # The laboratory restores every case cvar from BASE between cases.
+    for key in LINEAR:
+        lab.BASE.setdefault(key, base['settings'].get(key, '0'))
     profile = {}
     for suffix in CASES:
         name = 'tiled-capture-' + suffix
         # MSAA keeps the game's resolve target, so the batch runs without it.
         settings = dict(base['settings'], r_multiSamples='0')
-        if suffix == 'direct':
+        if suffix.endswith('direct'):
             settings.update(r_postAA='0', g_renderFastNoPostDirect='1')
+        if suffix.startswith('linear'):
+            settings.update(LINEAR)
         commands = list(base['commands']) if suffix == CASES[0] else []
         commands += ['wait 30', f'echo "TILED_CAPTURE_{suffix}_BEGIN"', f'screenshot "screenshots/{name}-window.tga"']
+        if suffix.startswith('linear') and args.backend == 'vk':
+            commands += ['rendererVulkanHDRInfo']
         commands += [f'screenshot {width} {height}' for width, height in SIZES]
         commands += [f'echo "TILED_CAPTURE_{suffix}_END"']
         profile[name] = dict(settings=settings, commands=commands)
