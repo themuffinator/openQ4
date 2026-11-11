@@ -5882,6 +5882,78 @@ static GLenum R_ClearPendingGLErrors( void ) {
 	return lastErr;
 }
 
+/*
+=================
+R_TryDisplayTransition
+
+Applies a strict display request to the running device. The window changes
+mode, size, display, borders or swap interval in place: OpenGL keeps its
+context and Vulkan rebuilds its swapchain. Every image, buffer and font atlas
+and the world's derived data stay, which is what a full restart spends its
+time rebuilding.
+
+The request is refused before anything changes when it needs a new device: a
+window's sample count is fixed when its context is created. A failure once the
+window has started to change leaves the device running; the caller restores
+the display it captured, or restarts the device on the request.
+=================
+*/
+bool R_TryDisplayTransition( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( R_ImagePolicyActive() ) { R_ImagePolicyObserveError( "Reentrant display transition during image policy work" ); return R_RendererRestartError( error, errorSize, "Image policy restart is active" ); }
+	if ( error != NULL && errorSize > 0 ) error[0] = '\0';
+	if ( request == NULL ) return R_RendererRestartError( error, errorSize, "A display request is required" );
+	R_RenderThread_Sync( "display transition" );
+	if ( r_recoverableRendererRestart ) return R_RendererRestartError( error, errorSize, "A renderer device operation is already in progress" );
+	if ( !glConfig.isInitialized || r_recoverableRendererRestore || frameData == NULL || frameData->cmdHead == NULL ||
+		frameData->cmdHead->commandId != RC_NOP || frameData->cmdHead->next != NULL )
+		return R_RendererRestartError( error, errorSize, "A display transition requires a running renderer with its commands submitted" );
+	const renderWindowRequest_t immutable = *request;
+	if ( immutable.parms.multiSamples != R_NormalizeMultiSamplesValue( immutable.parms.multiSamples ) ||
+		immutable.parms.displayHz < 0 || immutable.parms.displayHz > 1000 )
+		return R_RendererRestartError( error, errorSize, "Requested display samples or refresh rate are invalid" );
+	if ( immutable.displayIndex < -1 || immutable.swapInterval < -1 || immutable.swapInterval > 1 ||
+		immutable.parms.stereo || ( immutable.parms.hiddenWindow && ( immutable.parms.fullScreen || immutable.parms.borderless ) ) ||
+		( immutable.parms.fullScreen && immutable.parms.borderless ) )
+		return R_RendererRestartError( error, errorSize, "Requested display policy is invalid" );
+	renderDisplayPresentation_t before = {};
+	R_GetDisplayPresentation( &before );
+	if ( !before.available || !( before.parametersValid & RDP_PARAMETER_SAMPLES ) || before.samples != immutable.parms.multiSamples )
+		return R_RendererRestartError( error, errorSize, "The requested window samples need a new device" );
+
+	struct Scope {
+		explicit Scope( const renderWindowRequest_t *request ) {
+			r_recoverableRendererRestart = true; r_forceWindowRendererRestart = false; r_recoverableWindowRequest = request;
+		}
+		~Scope() { r_recoverableRendererRestart = false; r_forceWindowRendererRestart = false; r_recoverableWindowRequest = NULL; }
+	} scope( &immutable );
+	glimpParms_t parms;
+	parms.width = immutable.parms.width;
+	parms.height = immutable.parms.height;
+	parms.fullScreen = immutable.parms.fullScreen;
+	parms.borderless = immutable.parms.borderless;
+	parms.hiddenWindow = immutable.parms.hiddenWindow;
+	parms.displayHz = immutable.parms.displayHz;
+	parms.multiSamples = immutable.parms.multiSamples;
+	parms.stereo = false;
+	bool applied = false;
+	try {
+		// Inside the scope both back ends apply the strict request and its swap
+		// interval, and report a new presentation generation.
+		applied = GLimp_SetScreenParms( parms );
+	} catch ( const rendererRestartFailure_t &failure ) {
+		return R_RendererRestartError( error, errorSize, failure.reason.c_str() );
+	}
+	if ( !applied ) return R_RendererRestartError( error, errorSize, "The running device could not take the requested display" );
+	(void)R_ClearPendingGLErrors();
+	// The context survived, but the UI viewport may have changed. Re-rasterise
+	// the fixed-cell sheet at the new display scale; cached GUI fonts and other
+	// size-dependent resources follow videoRestartCount, as after a partial
+	// vid_restart.
+	R_RefreshConsoleFontAtlas();
+	tr.videoRestartCount = tr.videoRestartCount < 0x7fffffff ? tr.videoRestartCount + 1 : 1;
+	return true;
+}
+
 void R_VidRestart_f( const idCmdArgs &args ) {
 	R_RenderThread_Sync( "vid_restart" );
 	int	err;

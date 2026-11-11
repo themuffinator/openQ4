@@ -21,15 +21,23 @@ See [player release status](../user/release-status.md).
 - **The precompressed textures setting applies from the console.** Changing
   `image_usePrecompressedTextures` reloads the textures by itself, without a
   `vid_restart`.
-- **Still a restart.** Resolution, fullscreen, borderless, display, refresh
-  rate and MSAA changes restart the renderer and ask you to keep or revert,
-  as before. High-quality texture flags still finish at the next start.
+- **Resolution and window mode change in place.** Window size, resolution,
+  fullscreen, borderless, display and refresh rate changes now reach the
+  window of the running game: nothing is torn down or reloaded. They still
+  ask you to keep or revert, and the previous display returns if you do not
+  answer. If the running renderer cannot take a change, the game restarts
+  the renderer for it instead, as before.
+- **Still a restart.** An MSAA change restarts the renderer and asks you to
+  keep or revert. High-quality texture flags still finish at the next start.
 - **Nothing to do.** The classic interface (`ui_retained 0`) is unchanged.
 - Evidence: [applying without a device restart](ui/settings-live-apply.md),
   with engine checks on OpenGL and Vulkan: V-Sync toggled twice with no
   restart and no question; a texture ceiling changed 335 of 477 world
   textures in Air Defense 1 on the same device; all nine presets and
-  Auto-Detect, where Vulkan restarted only for the six MSAA changes.
+  Auto-Detect, where Vulkan restarted only for the six MSAA changes; a
+  window size change applied, kept and reverted on the page, and one made
+  in Air Defense 1, each with no device start and every texture kept.
+  Fullscreen and borderless changes were not run on a visible desktop.
   `tools/tests/ui_settings_display_service.py`,
   `tools/tests/ui_settings_effect_journal.py`,
   `tools/tests/ui_system_settings_host.py`.

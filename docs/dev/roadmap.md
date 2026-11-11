@@ -2539,12 +2539,17 @@ Completion must advance through the existing dependencies:
   [applying to the running renderer](ui/settings-live-apply.md). V-Sync is an
   immediate setting, a texture batch reloads images in place, and a
   Performance Preset restarts no device on Vulkan unless it changes MSAA.
-  Remaining, in order: window, size and display changes as in-place window
-  transitions that keep Keep/Revert; MSAA as a scene-target rebuild (Vulkan
-  first; OpenGL's window is itself multisampled) and OpenGL's upload stream
-  in place; a material re-parse so `image_ignoreHighQuality` applies in the
-  session; the rendering API and GPU switch from inside a game; and an image
-  reload spread across frames.
+  The same day a display change (window size, fullscreen, borderless,
+  display, mode, refresh) became a transition on the running device
+  (`TryDisplayTransition`, render API 34), with Keep/Revert, recovery and a
+  fallback to the restart unchanged.
+  Remaining, in order: a visible fullscreen and borderless Apply checked on
+  a desktop (the engine checks ran on a hidden window, which cannot take
+  either); MSAA as a scene-target rebuild (Vulkan first; OpenGL's window is
+  itself multisampled) and OpenGL's upload stream in place; a material
+  re-parse so `image_ignoreHighQuality` applies in the session; the
+  rendering API and GPU switch from inside a game; and an image reload
+  spread across frames.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

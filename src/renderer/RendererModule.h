@@ -108,6 +108,12 @@ bool R_RendererModule_QueryDisplay( rendererDisplayState_t *outState );
 // Does not switch renderer modules, execute console commands or select fallback
 // modes. Caller must drain frame work, retain recovery state and perform rollback.
 bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, char *error, int errorSize );
+// The request applied to the running device: the window changes in place and
+// the device, its images and its buffers stay. False without any change when
+// the request needs a new device or the renderer has no such service. False
+// after the window started to change leaves the device running; the caller
+// then restarts the device on the request or restores its captured display.
+bool R_RendererModule_TryDisplayTransition( const renderWindowRequest_t *request, char *error, int errorSize );
 struct rendererImagePolicyResult_t {
     uint64_t moduleEpoch;
     renderImagePolicyResult_t resources;

@@ -603,6 +603,7 @@ renderExport_t *GetRenderAPI( renderImport_t *moduleImport ) {
 	rgm_export.TryDeviceRestart = R_TryFullVidRestart;
 	rgm_export.GetDisplayPresentation = R_GetDisplayPresentation;
 	rgm_export.TryInitializeDisplay = R_TryInitializeDisplay;
+	rgm_export.TryDisplayTransition = R_TryDisplayTransition;
 	rgm_export.TryImagePolicyRestart = R_TryImagePolicyRestart;
     rgm_export.PrepareImagePolicyRecovery=R_PrepareImagePolicyRecovery;
     rgm_export.CaptureImagePolicyRecovery=R_CaptureImagePolicyRecovery;

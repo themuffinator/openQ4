@@ -32,7 +32,7 @@ def main():
     header = (ROOT / 'src/framework/declManager.h').read_text()
     assert 'FreeMaterialTypeArray( byte *array ) = 0;' in header
     abi = (ROOT / 'src/renderer/RenderModuleAPI.h').read_text()
-    assert '#define RENDER_API_VERSION\t\t\t33' in abi
+    assert '#define RENDER_API_VERSION\t\t\t34' in abi
     scratch = ROOT / '.tmp/material-hit-map-lifetime'
     scratch.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=scratch) as directory:

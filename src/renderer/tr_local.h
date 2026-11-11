@@ -1882,6 +1882,9 @@ struct renderWindowRequest_s;
 bool R_TryFullVidRestartForImagePolicy(const renderWindowRequest_s* request, char* error, int errorSize);
 bool R_TryFullVidRestart( const renderWindowRequest_s *request, char *error, int errorSize );
 bool R_TryInitializeDisplay( const renderWindowRequest_s *request, char *error, int errorSize );
+// The request on the running device, without a teardown. False before any
+// change when the request needs a new device; see the definition.
+bool R_TryDisplayTransition( const renderWindowRequest_s *request, char *error, int errorSize );
 bool R_IsRecoverableRendererRestart( void );
 bool R_ForceWindowForRendererRestart( void );
 const renderWindowRequest_s *R_GetRecoverableWindowRequest( void );

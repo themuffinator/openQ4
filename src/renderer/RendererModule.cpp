@@ -1033,9 +1033,12 @@ static void R_RendererDisplayProbe_f( const idCmdArgs &args ) {
 			rm_displayProbeEpoch = state.moduleEpoch;
 			rm_displayProbeSaved = true;
 		}
-	} else if ( idStr::Icmp( operation, "apply" ) == 0 || idStr::Icmp( operation, "restore" ) == 0
-		|| idStr::Icmp( operation, "missing-display" ) == 0 ) {
-		const bool applying = idStr::Icmp( operation, "apply" ) == 0;
+	} else if ( idStr::Icmp( operation, "apply" ) == 0 || idStr::Icmp( operation, "transition" ) == 0
+		|| idStr::Icmp( operation, "restore" ) == 0 || idStr::Icmp( operation, "missing-display" ) == 0 ) {
+		// transition takes apply's arguments and asks the running device to
+		// take the request in place, where apply restarts the device
+		const bool transitioning = idStr::Icmp( operation, "transition" ) == 0;
+		const bool applying = idStr::Icmp( operation, "apply" ) == 0 || transitioning;
 		const bool missingDisplay = idStr::Icmp( operation, "missing-display" ) == 0;
 		const bool restoring = !applying && !missingDisplay;
 		result = rm_displayProbeSaved && rm_displayProbeEpoch == rm_displayModuleEpoch
@@ -1058,7 +1061,8 @@ static void R_RendererDisplayProbe_f( const idCmdArgs &args ) {
 				}
 			}
 			if ( missingDisplay ) request.displayId = UINT32_MAX;
-			if ( result ) result = R_RendererModule_TryDeviceRestart( &request, error, sizeof( error ) );
+			if ( result ) result = transitioning ? R_RendererModule_TryDisplayTransition( &request, error, sizeof( error ) )
+				: R_RendererModule_TryDeviceRestart( &request, error, sizeof( error ) );
 		}
 	} else if ( idStr::Icmp( operation, "report" ) != 0 || args.Argc() > 2 ) result = false;
 	const bool after = R_RendererModule_QueryDisplay( &state );
@@ -1078,7 +1082,7 @@ static void R_RendererDisplayProbe_f( const idCmdArgs &args ) {
 }
 
 static void RM_RegisterCommands( void ) {
-	cmdSystem->AddCommand( "rendererDisplayProbe", R_RendererDisplayProbe_f, CMD_FL_RENDERER, "observe or exercise a hidden windowed display: report/save/apply width height [interval 0 or 1] [samples 0/2/4/8/16]/restore/missing-display" );
+	cmdSystem->AddCommand( "rendererDisplayProbe", R_RendererDisplayProbe_f, CMD_FL_RENDERER, "observe or exercise a hidden windowed display: report/save/apply width height [interval 0 or 1] [samples 0/2/4/8/16]/transition (apply's arguments, on the running device)/restore/missing-display" );
 	cmdSystem->AddCommand( "rendererModuleSelfTest", R_RendererModuleSelfTest_f, CMD_FL_RENDERER, "run renderer module selection/loading self tests" );
 	cmdSystem->AddCommand( "rendererVkProbe", R_RendererVkProbe_f, CMD_FL_RENDERER, "load the Vulkan renderer module, run its device bring-up probe, and unload it" );
 	cmdSystem->AddCommand( "rendererDevices", R_RendererDevices_f, CMD_FL_RENDERER, "list detected rendering devices, stable IDs and the automatic preference" );
@@ -1346,6 +1350,36 @@ bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, ch
 	}
 	if ( error != NULL && errorSize > 0 ) {
 		idStr::Copynz( error, "active renderer has no recoverable device service", errorSize );
+	}
+	return false;
+}
+
+bool R_RendererModule_TryDisplayTransition( const renderWindowRequest_t *request, char *error, int errorSize ) {
+	if ( error != NULL && errorSize > 0 ) {
+		error[ 0 ] = '\0';
+	}
+	const renderWindowServices_t *windowServices = Sys_GetRenderWindowServices();
+	if ( request == NULL || renderSystem == NULL || rm_displayModuleEpoch == 0 || windowServices == NULL
+		|| windowServices->ApplyScreenParmsStrict == NULL || windowServices->QueryWindowState == NULL ) {
+		if ( error != NULL && errorSize > 0 ) {
+			idStr::Copynz( error, "strict display services are unavailable", errorSize );
+		}
+		return false;
+	}
+	// The device stays alive whatever the outcome, and holds its own reference
+	// to the video subsystem: no identity lease is needed here.
+	bool ( *transition )( const renderWindowRequest_t *, char *, int ) = NULL;
+	if ( rm_state.interfacesPublished && rm_state.moduleExportValid ) transition = rm_state.moduleExport.TryDisplayTransition;
+#if !defined( OPENQ4_RENDERER_MODULE_ONLY ) && !defined( ID_DEDICATED )
+	else if ( rm_state.status.disposition != RENDER_MODULE_DISPOSITION_NONE ) {
+		transition = R_TryDisplayTransition;
+	}
+#endif
+	if ( transition != NULL ) {
+		return transition( request, error, errorSize );
+	}
+	if ( error != NULL && errorSize > 0 ) {
+		idStr::Copynz( error, "active renderer has no in-place display service", errorSize );
 	}
 	return false;
 }

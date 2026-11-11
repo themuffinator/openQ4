@@ -52,7 +52,7 @@ def ordered(text: str, tokens: list[str], context: str) -> None:
 
 def main() -> int:
     api = read("src/renderer/RenderModuleAPI.h")
-    require(api, "#define RENDER_API_VERSION\t\t\t33", "render API version")
+    require(api, "#define RENDER_API_VERSION\t\t\t34", "render API version")
     require(api, '#include "RendererSettingsReports.h"', "the API carries the report types")
     services = body(api, "typedef struct renderModuleServices_s")
     ordered(services, ["( *ResetRenderApiAfterDeviceFailure )( void );",

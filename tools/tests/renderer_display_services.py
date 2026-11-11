@@ -78,6 +78,7 @@ static bool retainOkay=true,destroyDeviceOnFailure=false,unloadOkay=true;
 static bool initializeOkay=true,initialReady=true;
 static int moduleQueries=0,builtinQueries=0,moduleRestarts=0,builtinRestarts=0;
 static int moduleInitializes=0,builtinInitializes=0;
+static int moduleTransitions=0,builtinTransitions=0;static bool transitionOkay=true;
 static int videoRetains=0,videoReleases=0,videoReferences=0;
 static std::vector<std::string> lifetime;
 static void RM_RestorePublishedInterfaces();
@@ -105,6 +106,13 @@ bool R_TryFullVidRestart(const renderWindowRequest_t* request,char* error,int si
     assert(rm_displayVideoPin==&windowServices && videoReferences==1);lifetime.push_back("restart");
     ++builtinRestarts;submitted=*request;if(!restartOkay)idStr::Copynz(error,"builtin refused",size);return restartOkay;
 }
+// A transition keeps the device: it never takes the video identity lease.
+static bool Transition(const renderWindowRequest_t* request,char* error,int size,int& calls,const char* refusal){
+    assert(!rm_displayVideoPin && !videoReferences);lifetime.push_back("transition");
+    ++calls;submitted=*request;if(!transitionOkay)idStr::Copynz(error,refusal,size);return transitionOkay;
+}
+static bool ModuleTransition(const renderWindowRequest_t* request,char* error,int size){return Transition(request,error,size,moduleTransitions,"module kept its display");}
+bool R_TryDisplayTransition(const renderWindowRequest_t* request,char* error,int size){return Transition(request,error,size,builtinTransitions,"builtin kept its display");}
 static bool InitialDevice(const renderWindowRequest_t* request,char* error,int size){
     assert(rm_displayVideoPin==&windowServices && videoReferences==1 && !renderSystem->ready);
     lifetime.push_back("initialize");submitted=*request;
@@ -118,7 +126,8 @@ bool R_TryInitializeDisplay(const renderWindowRequest_t* request,char* error,int
 static renderExport_t Export(){
     renderExport_t result={};result.version=RENDER_API_VERSION;result.backendName="test";
     result.renderSystem=&moduleRenderer;result.renderModelManager=&moduleModels;
-    result.TryDeviceRestart=ModuleRestart;result.GetDisplayPresentation=ModuleQuery;result.TryInitializeDisplay=ModuleInitialize;return result;
+    result.TryDeviceRestart=ModuleRestart;result.GetDisplayPresentation=ModuleQuery;result.TryInitializeDisplay=ModuleInitialize;
+    result.TryDisplayTransition=ModuleTransition;return result;
 }
 static void Reset(){
     assert(!rm_displayVideoPin && !videoReferences);
@@ -127,6 +136,7 @@ static void Reset(){
     servicesAvailable=windowAvailable=restartOkay=true;queryRace=epochRace=throwBackend=false;
     retainOkay=unloadOkay=true;destroyDeviceOnFailure=false;videoRetains=videoReleases=0;lifetime.clear();
     initializeOkay=initialReady=true;moduleInitializes=builtinInitializes=0;
+    moduleTransitions=builtinTransitions=0;transitionOkay=true;
     moduleQueries=builtinQueries=moduleRestarts=builtinRestarts=0;logs.clear();submitted={};
     windowServices={};windowServices.QueryWindowState=QueryWindow;windowServices.ApplyScreenParmsStrict=ApplyWindow;
     windowServices.RetainVideoSystem=RetainVideo;windowServices.ReleaseVideoSystem=ReleaseVideo;
@@ -205,6 +215,29 @@ static void Dispatch(){
 #else
     assert(!R_RendererModule_TryDeviceRestart(&request,error,sizeof(error)) && !builtinRestarts);
     assert(!videoRetains && !videoReleases && !rm_displayVideoPin);
+#endif
+}
+// The in-place service: exact dispatch, no restart, no video lease, and a
+// module without it refuses instead of restarting.
+static void TransitionDispatch(){
+    Reset();Activate();renderWindowRequest_t request={};request.parms.width=800;request.parms.height=600;request.displayId=42;
+    char error[64]="sentinel";assert(R_RendererModule_TryDisplayTransition(&request,error,sizeof(error)) && !*error);
+    assert(moduleTransitions==1 && !builtinTransitions && !moduleRestarts && submitted.parms.width==800 && submitted.displayId==42);
+    assert(!videoRetains && !videoReleases && (lifetime==std::vector<std::string>{"transition"}));
+    transitionOkay=false;assert(!R_RendererModule_TryDisplayTransition(&request,error,sizeof(error)) && std::string(error)=="module kept its display");
+    assert(moduleTransitions==2 && !moduleRestarts && moduleRenderer.ready && !videoRetains);transitionOkay=true;
+    servicesAvailable=false;assert(!R_RendererModule_TryDisplayTransition(&request,error,sizeof(error)) && moduleTransitions==2);servicesAvailable=true;
+    windowServices.QueryWindowState=nullptr;assert(!R_RendererModule_TryDisplayTransition(&request,error,sizeof(error)) && moduleTransitions==2);windowServices.QueryWindowState=QueryWindow;
+    windowServices.ApplyScreenParmsStrict=nullptr;assert(!R_RendererModule_TryDisplayTransition(&request,error,sizeof(error)) && moduleTransitions==2);windowServices.ApplyScreenParmsStrict=ApplyWindow;
+    assert(!R_RendererModule_TryDisplayTransition(nullptr,error,sizeof(error)) && moduleTransitions==2);
+    rm_state.moduleExport.TryDisplayTransition=nullptr;
+    assert(!R_RendererModule_TryDisplayTransition(&request,error,sizeof(error)) && std::string(error)=="active renderer has no in-place display service");
+    assert(moduleTransitions==2 && !moduleRestarts && !builtinTransitions);
+    Reset();rm_state.status.disposition=RENDER_MODULE_DISPOSITION_BUILTIN;
+#if !defined(OPENQ4_RENDERER_MODULE_ONLY) && !defined(ID_DEDICATED)
+    assert(R_RendererModule_TryDisplayTransition(&request,error,sizeof(error)) && builtinTransitions==1 && !builtinRestarts);
+#else
+    assert(!R_RendererModule_TryDisplayTransition(&request,error,sizeof(error)) && !builtinTransitions);
 #endif
 }
 static void VideoLifetime(){
@@ -329,6 +362,12 @@ static void BoundedProbe(){
     assert(Probe({"rendererDisplayProbe","restore"}) && moduleRestarts==2);
     assert(submitted.parms.width==1024 && submitted.parms.height==768 && submitted.maximized);
     assert(Probe({"rendererDisplayProbe","missing-display"}) && submitted.displayId==UINT32_MAX);
+    // transition takes apply's arguments and asks the running device instead of restarting it
+    {const int restarts=moduleRestarts;
+     assert(Probe({"rendererDisplayProbe","transition","640","480","0"}) && moduleTransitions==1 && moduleRestarts==restarts);
+     assert(submitted.parms.width==640 && submitted.parms.height==480 && submitted.swapInterval==0 && submitted.parms.hiddenWindow && !submitted.maximized);
+     assert(!Probe({"rendererDisplayProbe","transition","640"}) && !Probe({"rendererDisplayProbe","transition"}) && moduleTransitions==1);
+     transitionOkay=false;assert(!Probe({"rendererDisplayProbe","transition","640","480"}) && moduleTransitions==2 && moduleRestarts==restarts);transitionOkay=true;}
     assert(Probe({"rendererDisplayProbe","apply","800","600","0"}) && submitted.swapInterval==0);
     assert(Probe({"rendererDisplayProbe","apply","800","600","1"}) && submitted.swapInterval==1);
     for(const char* samples:{"0","2","4","8","16"}){
@@ -349,7 +388,7 @@ static void BoundedProbe(){
     assert(Probe({"rendererDisplayProbe","restore"}) && moduleRestarts==calls+1);
     RM_AdvanceDisplayEpoch();assert(!Probe({"rendererDisplayProbe","restore"}) && moduleRestarts==calls+1);
 }
-int main(){Activation();Query();Dispatch();VideoLifetime();ColdDispatch();BoundedProbe();std::puts("Renderer display services: ABI activation, coherent observation, identity exhaustion, exact backend dispatch, balanced video lease and bounded actual-state probe passed");}
+int main(){Activation();Query();Dispatch();TransitionDispatch();VideoLifetime();ColdDispatch();BoundedProbe();std::puts("Renderer display services: ABI activation, coherent observation, identity exhaustion, exact backend dispatch, balanced video lease and bounded actual-state probe passed");}
 '''
 
 
@@ -365,6 +404,7 @@ def main():
         'void R_RendererModule_Shutdown( void )',
         'bool R_RendererModule_QueryDisplay( rendererDisplayState_t *outState )',
         'bool R_RendererModule_TryDeviceRestart( const renderWindowRequest_t *request, char *error, int errorSize )',
+        'bool R_RendererModule_TryDisplayTransition( const renderWindowRequest_t *request, char *error, int errorSize )',
         'bool R_RendererModule_TryInitializeDisplay( const renderWindowRequest_t *request, char *error, int errorSize )',
         'static bool RM_ParseProbeDimension( const char *text, int minimum, int maximum, int &value )',
         'static void R_RendererDisplayProbe_f( const idCmdArgs &args )',

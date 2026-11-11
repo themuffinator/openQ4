@@ -60,11 +60,26 @@ bool EngineSettingsDisplayHost::DeviceRestart() const {
 	if (!DeviceWork()) return false;
 	// The display itself, and the renderer fallback a new device must resolve.
 	if ((effects.plan.domainMask & SystemSettingDisplayRestart) != 0 || effects.patch.contains("r_renderer")) return true;
+	// Texture settings reload in place on either back end, and the benchmark
+	// budget is read on each use.
+	return UploadStreamChanged();
+}
+bool EngineSettingsDisplayHost::UploadStreamChanged() const {
 	// OpenGL allocates its upload stream when its device starts. Vulkan stages
-	// through its own allocator and reads neither setting. Texture settings
-	// reload in place on either, and the benchmark budget is read on each use.
-	return WindowMultisampling() &&
+	// through its own allocator and reads neither setting.
+	return kind == Kind::Combined && WindowMultisampling() &&
 		(effects.patch.contains("r_rendererUploadMegs") || effects.patch.contains("r_rendererUploadFrameBuffers"));
+}
+bool EngineSettingsDisplayHost::DisplayTransition(const SystemDisplayPlan& plan, const rendererDisplayState_t& before) const {
+	// Only the display itself changed, on a device that is presenting, and the
+	// window keeps its sample count: a count is fixed when the device is
+	// created, and Vulkan's scene targets take r_multiSamples at that point too.
+	if (!DisplayOwned() || RendererOwned() || UploadStreamChanged()) return false;
+	const auto& patch = kind == Kind::Display ? journal.patch : effects.patch;
+	if (patch.contains("r_multiSamples")) return false;
+	return before.rendererReady && before.windowValid && before.presentation.available != 0 &&
+		(before.presentation.parametersValid & RDP_PARAMETER_SAMPLES) != 0 &&
+		before.presentation.samples == plan.request.parms.multiSamples;
 }
 bool EngineSettingsDisplayHost::DisplayOwned() const {
 	return kind == Kind::Display || (kind == Kind::Combined && (effects.plan.domainMask & SystemSettingDisplayRestart) != 0);
@@ -490,7 +505,18 @@ bool EngineSettingsDisplayHost::Restart(bool restoring, SettingsDisplayObservati
 		renderRendererSelection_t ignored{}; std::uint64_t epoch=0;
 		if (!R_RendererModule_QueryRendererSelection(ignored,selectionBefore,epoch)) selectionBefore=0;
 	}
-	if (!R_RendererModule_TryDeviceRestart(&plan.request,diagnostic,sizeof(diagnostic))) return Fail(error,diagnostic);
+	// A display change the running device can take is applied to its window in
+	// place: nothing is torn down or reloaded. A request it refuses, or one that
+	// fails part-way, gets a new device on the same request, which starts from
+	// whatever state the window was left in.
+	bool transitioned=false;
+	if (DisplayTransition(plan,before)) {
+		transitioned=R_RendererModule_TryDisplayTransition(&plan.request,diagnostic,sizeof(diagnostic));
+		if (!transitioned && cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("UI_SETTINGS_TRANSITION_REFUSED restore=%d detail=%s\n",restoring?1:0,diagnostic);
+	}
+	if (!transitioned) {
+		if (!R_RendererModule_TryDeviceRestart(&plan.request,diagnostic,sizeof(diagnostic))) return Fail(error,diagnostic);
+	}
 	rendererDisplayState_t observed{}; SettingsDisplayObservation candidate;
 	if (!ObserveDevice(observed,candidate,error) || candidate.epoch!=baselineDevice.moduleEpoch ||
 		candidate.generation<=before.presentation.generation || !MatchesDisplay(plan,observed,error))
@@ -505,12 +531,14 @@ bool EngineSettingsDisplayHost::Restart(bool restoring, SettingsDisplayObservati
 			restoring?1:0,RendererRequest(restoring).c_str(),static_cast<unsigned long long>(serial));
 	}
 	if (restoring) restorePlan=std::move(plan); else targetPlan=std::move(plan);
-	// The new device loaded every image and its upload resources under the
-	// settings now in effect; the sound device follows on the next sound frame.
+	// A new device loaded every image and its upload resources under the
+	// settings now in effect; after a transition the running device reloads
+	// its images when it ends the next frame, if a texture setting changed too.
+	// The sound device follows on the next sound frame.
 	RestartSound(restoring);
 	currentDevice=observed; output=candidate;
-	if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("UI_SETTINGS_DEVICE restore=%d epoch=%llu generation=%llu submitted=%llu presented=%llu failures=%llu width=%d height=%d\n",
-		restoring?1:0,static_cast<unsigned long long>(candidate.epoch),static_cast<unsigned long long>(candidate.generation),
+	if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("%s restore=%d epoch=%llu generation=%llu submitted=%llu presented=%llu failures=%llu width=%d height=%d\n",
+		transitioned?"UI_SETTINGS_TRANSITION":"UI_SETTINGS_DEVICE",restoring?1:0,static_cast<unsigned long long>(candidate.epoch),static_cast<unsigned long long>(candidate.generation),
 		static_cast<unsigned long long>(candidate.submitted),static_cast<unsigned long long>(candidate.presented),static_cast<unsigned long long>(candidate.failures),
 		observed.window.logicalWidth,observed.window.logicalHeight);
 	return true;

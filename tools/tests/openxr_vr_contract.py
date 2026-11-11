@@ -78,7 +78,7 @@ def check_build() -> None:
 
 def check_abi() -> None:
     api = read("src/renderer/RenderModuleAPI.h")
-    require(api, "#define RENDER_API_VERSION			33", "renderer module ABI v33")
+    require(api, "#define RENDER_API_VERSION			34", "renderer module ABI v34")
     require(api, "void			( *RendererDeviceEvent )( int event );	// renderDeviceEvent_t",
             "the device lifetime service retains its signature")
     services = api[api.index("typedef struct renderModuleServices_s {"):api.index("} renderModuleServices_t;")]

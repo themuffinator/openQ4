@@ -80,7 +80,7 @@ def validate_abi_contract() -> None:
     )
     require(
         read(ROOT, "src/renderer/RenderModuleAPI.h"),
-        "#define RENDER_API_VERSION\t\t\t33",
+        "#define RENDER_API_VERSION\t\t\t34",
         "renderer module ABI",
     )
     require(

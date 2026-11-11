@@ -91,6 +91,14 @@ private:
 	// device start. Such an attempt keeps its record and leases and completes
 	// as one without device work does.
 	bool DeviceRestart() const;
+	// The batch changes OpenGL's upload stream.
+	bool UploadStreamChanged() const;
+	// A DeviceRestart attempt whose only reason is the display itself, on a
+	// presenting device whose window keeps its sample count: the renderer
+	// applies the request to its window in place (mode, size, display, borders)
+	// and keeps the device. The attempt journals, confirms and recovers exactly
+	// as one that restarts, and falls back to a restart if the renderer refuses.
+	bool DisplayTransition(const openq4::ui::SystemDisplayPlan& plan, const rendererDisplayState_t& before) const;
 	bool DisplayOwned() const;
 	bool RendererOwned() const;
 	// A combined attempt that changed the speaker layout or EFX reopens the

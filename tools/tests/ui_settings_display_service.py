@@ -161,6 +161,15 @@ static renderWindowRequest_t lastRequest{};
 static bool VulkanRefuses(const renderWindowRequest_t* r,char* error,int size){
     lastRequest=*r;return moduleStatus.activeApi==RENDER_MODULE_API_VULKAN && r->parms.multiSamples && !GeometryError(error,size,"Vulkan: strict framebuffer request is unsupported");
 }
+// The running device takes a request in place unless it needs another window
+// sample count, which it refuses before any change. A case can make it fail.
+static int transitions=0;static bool transitionOkay=true;
+bool R_RendererModule_TryDisplayTransition(const renderWindowRequest_t* r,char* error,int size){
+    trace.push_back("transition");++transitions;
+    if(r->parms.multiSamples!=actual.presentation.samples)return GeometryError(error,size,"The requested window samples need a new device");
+    if(!transitionOkay)return GeometryError(error,size,"transition failed");
+    lastRequest=*r;ApplyActual(*r);return true;
+}
 bool R_RendererModule_TryDeviceRestart(const renderWindowRequest_t* r,char* error,int size){
     trace.push_back("restart");++restarts;if(!restartOkay)return GeometryError(error,size,"restart failed");if(VulkanRefuses(r,error,size))return false;ApplyActual(*r);PublishSelection();return true;
 }
@@ -183,7 +192,7 @@ static void ResetFixture(){
     geometry={actual.window.windowX,actual.window.windowY,1280,720,actual.window.windowX,actual.window.windowY,1280,720,true};
     trace.clear();writes=0;moduleStatus.activeApi=RENDER_MODULE_API_GL;lastRequest={};
     selectionFault=0;selectionReportValid=true;selectionReport={};selectionReportSerial=0;PublishSelection();
-    soundState=SOUND_OUTPUT_READY;soundRestarts=0;
+    soundState=SOUND_OUTPUT_READY;soundRestarts=0;transitions=0;transitionOkay=true;
 }
 static void MultisamplingCapability(){
     ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
@@ -306,7 +315,7 @@ static void VulkanMultisampling(){
      SettingsAttempt a{17,71,Live(settings),{},{}};a.target=a.baseline;a.target["r_windowWidth"]=960.0;a.target["r_windowHeight"]=540.0;
      for(const auto& [key,value]:a.target)if(value!=a.baseline.at(key))a.patch[key]=value;
      Check(settings.Validate(a.baseline,a.target,error) && host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window change under 8x on Vulkan");
-     SettingsDisplayObservation seen;Check(host.Restart(false,seen,error) && lastRequest.parms.multiSamples==0,"a window change under MSAA restarts Vulkan");
+     SettingsDisplayObservation seen;Check(host.Restart(false,seen,error) && lastRequest.parms.multiSamples==0,"a window change under MSAA keeps Vulkan's window single-sample");
      Present();Check(host.PersistConfirmation(a,error) && host.Finish(false,error),"the window change keeps under MSAA on Vulkan");
      Check(Live(settings).at("r_multiSamples")==StateValue(8.0),"the change leaves MSAA as it was");}
     {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=Attempt(settings);
@@ -968,6 +977,84 @@ static void CombinedCases(){
      Check(!host.Startup(error) && writes==0 && files.contains(journalFile),"a target interval the catalog did not change is refused");host.Shutdown();}
 }
 
+// A display change that keeps the window's sample count is applied to the
+// running device's window: the device stays. Its journal, placement,
+// confirmation and restore are those of any display attempt, and a request the
+// device refuses or fails gets a new device on the same request.
+static bool TracedPrefix(const char* line){
+    return std::any_of(trace.begin(),trace.end(),[&](const std::string& entry){return entry.rfind(std::string("print:")+line,0)==0;});
+}
+static SettingsAttempt WindowAttempt(SystemSettingsHost& settings,bool textures=false,bool renderer=false,bool upload=false){
+    SettingsAttempt a{61,157,Live(settings),{},{}};a.target=a.baseline;a.target["r_windowWidth"]=960.0;a.target["r_windowHeight"]=540.0;
+    if(textures)a.target["image_downSize"]=true;
+    if(renderer)a.target["r_renderer"]=std::string("arb2");
+    if(upload)a.target["r_rendererUploadMegs"]=32.0;
+    for(const auto& [key,value]:a.target)if(value!=a.baseline.at(key))a.patch[key]=value;
+    const bool combined=textures||renderer||upload;
+    Check(settings.Validate(a.baseline,a.target,error) &&
+          SystemSettingsHost::ApplyClassOf(a.baseline,a.target)==(combined?SystemApplyClass::Combined:SystemApplyClass::Display),"validate window attempt fixture");
+    return a;
+}
+static void TransitionCases(){
+    for(const auto api:{RENDER_MODULE_API_GL,RENDER_MODULE_API_VULKAN})for(bool restore:{false,true}){ResetFixture();moduleStatus.activeApi=api;
+     SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings);
+     Check(host.Prepare(a,error) && geometryToken && settings.Write(a.patch,error),"prepare a window size change");
+     const auto generation=actual.presentation.generation;traceEnabled=true;SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==1 && restarts==0 && seen.ready && actual.window.logicalWidth==960 &&
+           actual.presentation.generation>generation,"the running device takes a window size change in place");
+     Check(TracedPrefix("UI_SETTINGS_TRANSITION restore=0 ") && !TracedPrefix("UI_SETTINGS_DEVICE"),"the trace names the transition");
+     Present();Check(host.Observe(false,seen,error),"the transitioned display matches its plan");
+     if(restore){StateValues back;for(const auto& [key,value]:a.patch)back[key]=a.baseline.at(key);
+      Check(settings.Write(back,error) && host.Restart(true,seen,error) && transitions==2 && restarts==0 && actual.window.logicalWidth==1280,
+            "Revert transitions back to the captured display");
+      Present();Check(host.Observe(true,seen,error) && host.Finish(true,error) && configWrites==0 && !files.contains(journalFile) && !geometryToken,
+                      "a reverted transition never archives its candidate");}
+     else{Check(host.PersistConfirmation(a,error) && configWrites==1 && Journal().state==SettingsJournalState::Confirmed,"Keep persists a transitioned display");
+      Check(host.Finish(false,error) && !files.contains(journalFile) && !geometryToken && leases.empty(),"Finish retires the transitioned attempt");}}
+    // A transition that fails part-way gets a new device on the same request.
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings);
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window change whose transition fails");
+     transitionOkay=false;traceEnabled=true;SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==1 && restarts==1 && actual.window.logicalWidth==960,"a failed transition falls back to a device restart");
+     Check(TracedPrefix("UI_SETTINGS_TRANSITION_REFUSED restore=0 detail=transition failed") && TracedPrefix("UI_SETTINGS_DEVICE restore=0 "),
+           "the trace names the refusal and the restart");
+     Present();Check(host.Observe(false,seen,error) && host.PersistConfirmation(a,error) && host.Finish(false,error),"the restarted attempt keeps");}
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings);
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window change whose transition and restart fail");
+     transitionOkay=false;restartOkay=false;SettingsDisplayObservation seen;
+     Check(!host.Restart(false,seen,error) && transitions==1 && restarts==1 && host.RecoveryActive(),"a failed fallback fails the attempt");host.Shutdown();}
+    // A window's sample count is fixed when its device is created: an MSAA
+    // change never tries a transition, on either back end, and neither does a
+    // window whose actual count differs from the request.
+    for(const auto api:{RENDER_MODULE_API_GL,RENDER_MODULE_API_VULKAN}){ResetFixture();moduleStatus.activeApi=api;
+     SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=Attempt(settings);
+     Check(a.patch.contains("r_multiSamples") && host.Prepare(a,error) && settings.Write(a.patch,error),"prepare an MSAA change");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==0 && restarts==1,"an MSAA change restarts the device");host.Shutdown();}
+    {ResetFixture();actual.presentation.samples=2;SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings);
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window change on a window whose samples differ from the setting");
+     SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==0 && restarts==1 && actual.presentation.samples==0,"a request for another sample count restarts the device");
+     host.Shutdown();}
+    // Inside a combined batch: textures ride along and reload in place; a
+    // renderer fallback or OpenGL's upload stream still needs a new device.
+    for(const auto api:{RENDER_MODULE_API_GL,RENDER_MODULE_API_VULKAN}){ResetFixture();moduleStatus.activeApi=api;
+     SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings,true);
+     a.completion=SettingsCompletion::UserConfirmation;
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window and texture batch");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==1 && restarts==0 && actual.window.logicalWidth==960,"a window and texture batch transitions");
+     Present();Check(host.Observe(false,seen,error) && host.PersistConfirmation(a,error) && host.Finish(false,error) && configWrites==1,"the batch keeps");}
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings,false,true);
+     a.completion=SettingsCompletion::UserConfirmation;
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window and renderer batch");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==0 && restarts==1,"a renderer fallback change restarts the device");host.Shutdown();}
+    for(const auto api:{RENDER_MODULE_API_GL,RENDER_MODULE_API_VULKAN}){ResetFixture();moduleStatus.activeApi=api;
+     SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings,false,false,true);
+     a.completion=SettingsCompletion::UserConfirmation;
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window and upload stream batch");SettingsDisplayObservation seen;
+     const bool gl=api==RENDER_MODULE_API_GL;
+     Check(host.Restart(false,seen,error) && transitions==(gl?0:1) && restarts==(gl?1:0),"only OpenGL restarts for its upload stream");host.Shutdown();}
+}
+
 // The display lists' inputs: the stamp, the topology, the window's display
 // (the primary without one) and the labels, English where a string is missing.
 static void CatalogInputCases(){
@@ -1030,7 +1117,7 @@ static void EmitDeferredJournals(const std::string& directory){
 
 int main(){
     if(const char* directory=std::getenv("OPENQ4_EMIT_DEFERRED_JOURNALS")){EmitDeferredJournals(directory);std::printf("Deferred recovery journals emitted: %d checks\n",checks);return 0;}
-    MultisamplingCapability();VulkanMultisampling();ExactCatalogCases();RuntimeJournal();StartupCases();GeometryAndStartupFailures();StartupClockCases();CommitOwnershipCases();ReindexedStartupRetry();UnusedTopologyCases();DeferredCases();DeferredExactCases();RendererCases();RendererExactCases();CombinedCases();CatalogInputCases();std::printf("UI settings display service passed: %d checks\n",checks);}
+    MultisamplingCapability();VulkanMultisampling();ExactCatalogCases();RuntimeJournal();StartupCases();GeometryAndStartupFailures();StartupClockCases();CommitOwnershipCases();ReindexedStartupRetry();UnusedTopologyCases();DeferredCases();DeferredExactCases();RendererCases();RendererExactCases();TransitionCases();CombinedCases();CatalogInputCases();std::printf("UI settings display service passed: %d checks\n",checks);}
 
 '''
 
