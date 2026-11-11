@@ -779,7 +779,9 @@ there is no double-click word selection.
   character under most lights, every frame, and never drew them. It now
   builds none; in a fight with ten characters on screen that was over thirty
   a frame. The saving is about a tenth of a millisecond of processor time per
-  frame there.
+  frame there. The same now holds for everything lit by a light that moves,
+  such as the spinning alarm lights in Data Storage Security, which rebuilt
+  the original shadow shapes of the whole room every frame.
 - **Distant scenery keeps a soft shadow.** Once a door frame or prop was far
   enough away to look small on screen, its shadow switched to the original
   hard-edged kind, and the light around it stayed on the slower mixed path for

@@ -1763,10 +1763,13 @@ optimization has landed.
   grew, to 512 cubes: one view from outside a level left 2.0 GB resident. It now has
   the cache's memory figure again as its ceiling (85 cubes at Quality) and releases
   what no view has needed for five seconds: 1.1 GB at that view, 0.6 GB ten seconds
-  after it. Remaining, in order:
-  the fullscreen budgets, including whether Enhanced can map point lights; and
-  static-world volumes, which are still built once per mapped light for the
-  fallback. (A light that moves now draws its maps directly instead of publishing
+  after it. Remaining:
+  the fullscreen budgets, including whether Enhanced can map point lights.
+  (Static volumes under mapped lights were measured on 11 November: about 7 ms
+  and 4 MiB for all of hub2, built once, and kept so the stencil fallback stays
+  instant. Under a light that moves they were built every frame, 27 a view in
+  storage2's alarm room, and are now left out with the dynamic models'.)
+  (A light that moves now draws its maps directly instead of publishing
   each one to the cache, copying it and composing over the copy: 560 passes on one
   hub2 route, `r_shadowMapCacheMovingLights`.) (A light whose map failed once now stops building its stencil volumes
   again after 240 views without another failure, `r_shadowMapStencilFallbackViews`;

@@ -5853,11 +5853,11 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
     )
     require_compact(
         frontend,
-        """const bool suppressDynamicShadowVolume =
+        """const bool suppressRegeneratedShadowVolume =
             surfaceCanCastStencilShadowVolume && shadowLODAdmitted &&
             ( surfaceCanCastDedicatedShadowMap ||
                 surfaceCanCastTranslucentShadowMap ) &&
-            entityModelIsDynamic &&
+            volumeIsRegenerated &&
             !forcePointEmitterStencilGeneration &&
             R_ShadowMapLightWillUseShadowMaps( lightDef );""",
         "point-emitter volume probe before dynamic elision",
@@ -7818,7 +7818,7 @@ def validate_vulkan_receiver_scan_contract() -> None:
     create = braced_body(interaction, "void idInteraction::CreateInteraction(", "interaction creation")
     require_order(create, ("R_ShadowMapNoteEntityModel( entityDef, model );",
                            "buildModel = model;", "R_InvalidateShadowMapReceiverScan( lightDef );",
-                           "const bool suppressDynamicShadowVolume =", "buildModel = NULL;",
+                           "const bool suppressRegeneratedShadowVolume =", "buildModel = NULL;",
                            "R_InvalidateShadowMapReceiverScan( lightDef );", "MakeEmpty();"),
                   "interaction creation brackets its slots with the build model")
 
@@ -8320,6 +8320,17 @@ def validate_stencil_elision_contract() -> None:
 
     # Dynamic volumes are left out by the entity's own model, and come back
     # when the light returns to stencil.
+    #
+    # So are the volumes under a light that moves. Every interaction of such
+    # a light is built again each time it moves, static geometry included,
+    # and under a shadow map none of those volumes is drawn: storage2's
+    # spinning alarm lights built 27 a frame. The mark is the engine's own
+    # (lightHasMoved, which also drops the light's prelight), not the moving
+    # window: a light that settles keeps the surfaces it was given, and they
+    # are built again with volumes if it returns to stencil.
+    #
+    # A static model under a light that never moved keeps its volumes. They
+    # are built once and make that light's stencil fallback instant.
     create = braced_body(interaction, "void idInteraction::CreateInteraction(", "interaction creation")
     require_order(
         create,
@@ -8328,12 +8339,25 @@ def validate_stencil_elision_contract() -> None:
             """const bool entityModelIsDynamic =
                 entityDef->parms.hModel != NULL &&
                 entityDef->parms.hModel->IsDynamicModel() != DM_STATIC;""",
-            "if ( suppressDynamicShadowVolume ) {",
+            """const bool volumeIsRegenerated =
+                entityModelIsDynamic || lightDef->lightHasMoved;""",
+            "if ( suppressRegeneratedShadowVolume ) {",
             "interactionGenerated = true;",
             "shadowVolumesSuppressed = true;",
             "} else if ( sint->shadowStencilEligible ) {",
         ),
-        "a dynamic model's volumes are left out while its light renders shadow maps",
+        "volumes that are regenerated with their interaction are left out while the light renders shadow maps",
+    )
+    update_light = braced_body(read("src/renderer/RenderWorld.cpp"), "void idRenderWorldLocal::UpdateLightDef(",
+                               "light update")
+    require_order(
+        update_light,
+        (
+            "light->lightHasMoved = true;",
+            "light->lastMovedFrameNum = tr.frameCount;",
+            "R_FreeLightDefDerivedData( light );",
+        ),
+        "a light that moves is marked before its interactions are freed",
     )
     if "model->IsDynamicModel() != DM_STATIC" in create:
         raise AssertionError(

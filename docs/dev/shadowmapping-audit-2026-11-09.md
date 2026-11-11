@@ -48,6 +48,8 @@ cache (sixteen at most) against forty cubes in view.
 | **Which still casters a map held followed the camera too.** The shadow LOD admitted an entity's shadow within 768 units and dropped it beyond, in the static map as anywhere, and a model's first snapshot counted as the model moving for a quarter of a second. Each change rendered the light's maps again. | **Fixed, both backends.** A static caster of a still light is in the map at any distance, and a first snapshot is not motion. See "Static membership" below. |
 | **A still light's maps were rendered again when two of its casters changed places in the list.** The signature chained every static caster into one running hash, in the order the casters reached the light. That order follows the view: entities are sorted by model and, within one model, by where the frame's memory happened to put them, so two door frames or two crates of one model change places as the camera moves. The casters and the depth they write are the same, and the signature was another. In the airdefense1 arena every map rendered fresh on two short walks was for this: 8 and 8 on Vulkan, 8 and 20 on OpenGL. | **Fixed, both backends.** Each caster is hashed by itself and the hashes are added up. See "Caster order and the live window" below. |
 | **A caster that had just come to rest could count as moving again.** A caster is live while it has changed within the frames of a quarter second, and that number of frames comes from a frame time that drops at once on a fast frame. When the frame rate rose the window grew by several frames in one step, and a door that had left it a frame earlier was inside it again: out of its lights' static maps and back in, each a change of signature. | **Fixed, both backends.** The oldest frame that still counts as recent never moves back. See "Caster order and the live window" below. |
+| **A light that moves built the stencil volumes of everything it touches, every frame, and drew none of them.** All of a moving light's interactions are built again each time it moves. A dynamic model's volumes were already left out under a mapped light; a static model's were not, on the reasoning that they are built once. Under a moving light they are built every frame: 27 a view in storage2's alarm room, a quarter of the time that view spent building interactions. | **Fixed, both backends.** Volumes under a light that has moved are left out with the dynamic models'. See "Static volumes under mapped lights" below. |
+| Under a light that has never moved, the stencil volumes of static models are built although the light renders shadow maps: about 7 ms and 4 MiB for all of hub2, 5 to 10 parts in a hundred of the work of building interactions. | **By design.** They are built once and make the light's stencil fallback instant; without them every return to stencil would build the light's interactions again whole. See "Static volumes under mapped lights" below. |
 | **GL timer queries ran in every shadow phase of every light**, whether or not anything read them. A view with more phases than the 64 query slots polled all 64 unfinished queries for each further phase. | **Fixed.** Queries are issued only while `r_shadowMapReport` or `r_shadowMapDebugOverlay` is on. This alone was about half of the OpenGL CPU frame in hub2. |
 | **The point receiver's per-texel path was the common path.** Each of the nine taps compared four texels against their own point on the receiver plane, with a cube-face selection each: 36 comparisons that read a four-by-four block of texels. | **Fixed, both backends.** The default kernel (nine fixed taps, one texel radius, hardware comparison) is one pass over the sixteen texels with the same weights, or nine plain bilinear lookups where the bias covers the block. Other tap counts, radii and the rotated mode keep the tap-by-tap path. 1.6 to 2.6 ms of GPU in hub2 against the old path, in two launches. |
 | **Receivers filtered shadows for fragments the light does not reach** (outside the falloff, turned away). | **Fixed, both backends**, in the stock-material path. The PBR variants still sample first. |
@@ -1154,6 +1156,89 @@ minutes. Two fail for reasons outside this change: `validation_hardening.py`
 another build type). No frame-time figure, for the reason given under
 "Walking".
 
+### Static volumes under mapped lights
+
+Added on 11 November, for the open item "static-world volumes are still built
+once for every mapped light and kept for the fallback". A temporary counter
+timed every stencil volume built for a static model under a light that was
+going to render shadow maps, and a switch left those volumes out the way a
+dynamic model's are.
+
+Quality, the volumes of static models built under mapped lights:
+
+| | Vulkan | OpenGL |
+|---|---:|---:|
+| hub2, loading and settling | 924 to 1,244 volumes, 6.3 to 9.2 ms | 1,226 volumes, 5.6 ms |
+| hub2, a 1,200 unit walk | 165 and 602 more, 0.9 to 1.5 ms | 165 more, 0.6 ms |
+| hub2, the worst single view | 0.7 ms | 0.4 ms |
+| hub2, memory they hold | 3.3 to 4.2 MiB | 4.0 MiB |
+| airdefense1 arena, loading and settling | 160 volumes, 2.6 ms | 159 volumes, 4.7 ms |
+| airdefense1 arena, a 480 unit walk | none | none |
+
+Building the interactions these volumes belong to took 76 to 126 ms in the
+same hub2 launches and 43 to 49 ms in the arena, so the volumes are 5 to 10
+parts in a hundred of work that is itself done once, when a light and a
+surface first meet. What they hold is index lists: the vertex program shares
+the surface's own vertices. On the walks 155 of 165 and 331 of 602 were world
+surfaces under a prelit light, which retail never builds, because the baked
+prelight stands for them, and which a mapped light needs surface by surface.
+
+With the switch on nothing else moved: the -y walk rendered the same 57 fresh
+maps in two launches each way. (A fifth launch, switch on, rendered 589: two
+projected lights drew a fresh map in every view of it and some 27 static
+surfaces were built again each view. That is the picture of two lights that
+move, the case of the second point below, and it did not come back in four
+further launches.)
+
+- **Under a light that has never moved the volumes stay.** Leaving them out
+  would save about 7 ms and 4 MiB a level. It would cost, each time a light
+  returned to stencil (a map that failed, an atlas that cannot hold the view,
+  which sends every atlas light of that view back at once, an update budget,
+  a receiver that needs stencil), building every interaction of that light
+  again whole, light surfaces as well as volumes: the work of which the
+  volumes are a twentieth to a tenth. And a subview, which under the default
+  policy draws a light whose cached map it cannot reuse from the stored
+  volumes, would have to render that light's map instead.
+- **Under a light that moves they are no longer built.** Every interaction
+  of such a light is built again each time it moves, static geometry
+  included, so its volumes were built every frame, and under a map none was
+  drawn. storage2's alarm room built 27 a view for its spinning lights, 54 of
+  the 214 microseconds a view spent building interactions. They are left out
+  now with the dynamic models' (`volumeIsRegenerated` in
+  `idInteraction::CreateInteraction`), by the engine's own mark for a light
+  that has moved (`lightHasMoved`, which also drops its prelight) and not by
+  the moving window, so that a light which settles keeps what it was given.
+  If such a light returns to stencil its surfaces are built again with their
+  volumes, by the rule that already did this for dynamic models. A subview
+  that sees a moving light needs that light's map now, where static geometry
+  alone could be drawn from volumes before.
+- **A static model that moves under still lights is left as it is.** A lift
+  in hub2 builds 7 or 8 volumes a view while it travels, 40 to 45
+  microseconds. An entity carries no mark of having moved, only of having
+  been touched recently, which every entity has when a level starts.
+
+storage2's alarm room after the change, 340 frames on each renderer: no
+stencil volume built in any frame, against 21 a frame with
+`r_shadowMapSkipStencilShadows 0`. With the lights frozen at nine moments and
+the room then switched from shadow maps to stencil, which is the rebuild, the
+two pictures differ in 0 to 77 pixels on Vulkan and 3 to 7 on OpenGL, and the
+stencil picture differs from the unshadowed one in up to 37,000: the volumes
+are there when they are asked for.
+
+Checked for this change, with the counter and its switch removed: the figures
+of the last paragraph; the fourteen scenarios on both back ends; the
+continuous-motion qualification, eight cases; the in-engine self-tests on
+both renderers; and the static tests that read the touched files. One
+scenario failed once: `door-portal` on Vulkan published the flashlight's map
+in the very view of its first cached capture, where the check wants a reuse,
+while the other scenarios were running one after another on a busy machine;
+run alone it passed twice. Of 68 static tests 61 pass, four need arguments
+and one was stopped at four minutes. The two that fail are the two of the
+last round, for the same reasons outside this change
+(`validation_hardening.py`, `ui_choice_scroll_runtime.py`). No frame-time
+figure: the counts are exact, and 54 microseconds a view is below what a
+frame time on this machine can show.
+
 ## Presets
 
 Unchanged. Enhanced keeps point lights on stencil: mapping them still costs
@@ -1167,9 +1252,12 @@ whether Enhanced can now map point lights on Vulkan.
 
 1. Fullscreen budgets for the three tiers, on the reference machine with
    nothing else running. Every change of this round moved what they cost.
-2. Static-world volumes are still built once for every mapped light and kept
-   for the fallback. Leaving them out too would need the same rebuild on
-   return, for every surface the light touches.
+2. A shadow-map pass with nothing to cast is treated as a pass that
+   failed, on both back ends. The light is marked for the stencil fallback,
+   leaves it after 240 clean views and is marked again, for as long as it is
+   in view. Reported by the openD3 session from Doom 3's hell1, where three
+   point lights have receivers and every caster rejected; not looked for in
+   Quake 4 yet. Nothing changes on screen.
 3. The OpenGL projected cache is the atlas, four full tiles at Quality and
    Ultra, so it holds one crowded view and nothing of the view just left.
    Vulkan holds eight maps' worth.
@@ -1184,9 +1272,13 @@ whether Enhanced can now map point lights on Vulkan.
    most, than the same light unshadowed, in up to a tenth of the view. Not
    the filter and not the translucent setting; Vulkan is exact. Invisible,
    and unexplained.
+7. A static model that moves under still lights (a lift, a door) builds its
+   volumes again each frame it moves, 40 to 45 microseconds a view in hub2.
+   Leaving them out needs a mark on the entity for having moved.
 
 Set aside after measurement: cube faces the view cannot see (see "Static
-cutout casters").
+cutout casters"); the stencil volumes of static models under lights that have
+never moved (see "Static volumes under mapped lights").
 
 Outside the shadow system, found in passing: `idMaterial::ConstantRegisters()`
 is NULL for every material, so every surface evaluates its registers every

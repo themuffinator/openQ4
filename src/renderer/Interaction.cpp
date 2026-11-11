@@ -1979,19 +1979,32 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 			interactionGenerated = true;
 		}
 
-		// Dynamic-model volumes are regenerated every time the entity
-		// animates, so they are left out while the light renders shadow maps.
+		// A volume that is thrown away with its interaction is left out while
+		// the light renders shadow maps. That is every volume of a dynamic
+		// model, which is regenerated each time the entity animates, and
+		// every volume under a light that moves, whose interactions are all
+		// built again each time it does. lightHasMoved is the engine's own
+		// mark for such a light, the one that drops its prelight. storage2's
+		// alarm lights built 27 volumes a frame this way and drew none.
 		// AddActiveInteraction builds the surfaces again, with their volumes,
-		// once the light returns to stencil. Static volumes are built once
-		// and kept so the per-light stencil fallback stays instant.
-		const bool suppressDynamicShadowVolume =
+		// once the light returns to stencil.
+		//
+		// The volumes of a static model under a light that has never moved
+		// are built once and kept, so that the light's stencil fallback stays
+		// instant. They are cheap: about 7 ms and 4 MiB of index lists for
+		// all of hub2, 5 to 10 parts in a hundred of what building its
+		// interactions takes, and leaving them out would mean building each
+		// interaction again whole when the light returned to stencil.
+		const bool volumeIsRegenerated =
+			entityModelIsDynamic || lightDef->lightHasMoved;
+		const bool suppressRegeneratedShadowVolume =
 			surfaceCanCastStencilShadowVolume && shadowLODAdmitted &&
 			( surfaceCanCastDedicatedShadowMap ||
 				surfaceCanCastTranslucentShadowMap ) &&
-			entityModelIsDynamic &&
+			volumeIsRegenerated &&
 			!forcePointEmitterStencilGeneration &&
 			R_ShadowMapLightWillUseShadowMaps( lightDef );
-		if ( suppressDynamicShadowVolume ) {
+		if ( suppressRegeneratedShadowVolume ) {
 			// shadow ownership stays with this interaction even without volumes
 			interactionGenerated = true;
 			shadowVolumesSuppressed = true;
@@ -2218,9 +2231,10 @@ void idInteraction::AddActiveInteraction( void ) {
 	}
 	dynamicModelFrameCount = entityDef->dynamicModelFrameCount;
 
-	// These surfaces were built without their dynamic volumes for a light that
-	// was going to render shadow maps. An entity that has stopped animating
-	// keeps them, so build them again once the light returns to stencil for
+	// These surfaces were built without their volumes for a light that was
+	// going to render shadow maps. An entity that has stopped animating keeps
+	// them, and so does every entity under a light that has stopped moving,
+	// so build them again once the light returns to stencil for
 	// every view: the sticky fallback, an update budget, a receiver that needs
 	// stencil. A subview policy alone is not such a return. There the missing
 	// volumes already make the map required, and rebuilding would repeat for
