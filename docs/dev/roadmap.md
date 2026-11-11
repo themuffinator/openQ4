@@ -2543,9 +2543,13 @@ Completion must advance through the existing dependencies:
   display, mode, refresh) became a transition on the running device
   (`TryDisplayTransition`, render API 34), with Keep/Revert, recovery and a
   fallback to the restart unchanged.
-  Remaining, in order: a visible fullscreen and borderless Apply checked on
-  a desktop (the engine checks ran on a hidden window, which cannot take
-  either); MSAA as a scene-target rebuild (Vulkan first; OpenGL's window is
+  On a visible desktop every mode change and undo was a transition on both
+  back ends, and Vulkan kept fullscreen and the return to a window.
+  Remaining, in order: a focused Keep under borderless and exclusive
+  fullscreen, and any Keep on OpenGL (the test window had no focus); the
+  OpenGL restore that missed its present deadline twice while unfocused; the
+  window placed at 0,0 after leaving fullscreen through Apply; MSAA as a
+  scene-target rebuild (Vulkan first; OpenGL's window is
   itself multisampled) and OpenGL's upload stream in place; a material
   re-parse so `image_ignoreHighQuality` applies in the session; the
   rendering API and GPU switch from inside a game; and an image reload

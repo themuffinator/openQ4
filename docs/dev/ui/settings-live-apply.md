@@ -159,10 +159,46 @@ checks.
   started a new device, for contrast.
 
 A hidden window can be neither fullscreen nor borderless, so these checks
-exercise a size change only. Fullscreen, borderless, another display and an
-exclusive mode go through the same strict window call that a device start
-makes after it creates its context, but they were not run here on a visible
-desktop, and the transitions were not timed.
+exercise a size change only, and the transitions were not timed.
+
+### Visible window, stage 2
+
+The same day, on a visible window on a 2560 by 1440 desktop, started as a
+1280 by 720 window and driven by console verbs only. Other sessions were
+using the machine, which matters: the controller undoes a visible display
+change whose window has no keyboard focus or is minimized, a rule that
+predates this stage, and Windows gives a window launched in the background no
+focus.
+
+- **Vulkan, with focus.** Desktop fullscreen was applied and kept three
+  times, and the return to a window applied and kept once. Each was a
+  transition; the renderer reported 2560 by 1440 fullscreen and then 1280 by
+  720. Borderless applied as a transition and its confirmation was presented,
+  then the window lost focus and the change was undone.
+- **Both back ends, mostly without focus.** Desktop fullscreen, borderless and
+  exclusive fullscreen at the desktop's mode each applied as a transition (the
+  executor checks the observed window against the request before it traces
+  one), were undone by the focus rule, and returned to the 1280 by 720 window
+  at its position as a transition. Over all visible runs that is 13 changes
+  and 9 undos on Vulkan, and 8 changes and 11 undos on OpenGL, where the extra
+  undos are retries after the missed deadline below. No transition was refused
+  and none fell back to a restart. The only device restarts were two on Vulkan
+  for a preset the test script changed by mistake, which changes MSAA.
+
+Not confirmed: Keep under borderless or exclusive fullscreen on either back
+end, and any Keep on OpenGL, because the window had no focus in those runs.
+
+Two observations for follow-up, neither changed here:
+
+- In two of the unfocused OpenGL runs the window presented about one frame a
+  second for a few seconds after an undo, and the controller reported
+  `Restored display did not present before its deadline` three times, which
+  leaves the page offering Retry. A later unfocused OpenGL run of four changes
+  did not show it. Whether a focused window or the restart path shows it is not known.
+- Returning from fullscreen to a window through Apply places the window at
+  the fullscreen window's origin (0,0), because the request keeps the captured
+  window's position (`BuildDisplayRequest`). An undo returns it to where it
+  was.
 
 ## What this stage does not do
 

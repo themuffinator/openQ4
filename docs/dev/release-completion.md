@@ -36,8 +36,11 @@ See [player release status](../user/release-status.md).
   textures in Air Defense 1 on the same device; all nine presets and
   Auto-Detect, where Vulkan restarted only for the six MSAA changes; a
   window size change applied, kept and reverted on the page, and one made
-  in Air Defense 1, each with no device start and every texture kept.
-  Fullscreen and borderless changes were not run on a visible desktop.
+  in Air Defense 1, each with no device start and every texture kept. On a
+  visible 2560 by 1440 desktop, fullscreen, borderless and exclusive
+  fullscreen each applied and were undone in place on both back ends, and
+  Vulkan kept fullscreen and the return to a window; keeping a change on
+  OpenGL was not confirmed because the test window had no focus.
   `tools/tests/ui_settings_display_service.py`,
   `tools/tests/ui_settings_effect_journal.py`,
   `tools/tests/ui_system_settings_host.py`.
