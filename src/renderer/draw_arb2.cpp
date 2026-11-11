@@ -12607,11 +12607,16 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 	const bool haveStencilShadowSurfs = primaryShadowSurfs != NULL || secondaryShadowSurfs != NULL;
 
 	if ( !haveOpaqueCasters && !haveStencilShadowSurfs && !haveTranslucentCasters ) {
-		// The front end may have elided stencil volumes this light could still
-		// need (e.g. its only casters are translucent/forceShadows materials the
-		// map path cannot draw). Restore volume generation so the next frame can
-		// take the stencil-only path instead of rendering unshadowed.
-		if ( vLight != NULL && R_ShadowMapLightWillUseShadowMaps( vLight->lightDef ) ) {
+		// Nothing casts in this ownership, in the map or in stencil. That is
+		// a map that failed only if the front end left a stencil volume out
+		// for it: restore volume generation then, so the next frame can take
+		// the stencil-only path instead of rendering unshadowed. A light with
+		// no such volume has nothing to shadow here. Marked all the same, it
+		// built volumes for 240 views, was let go, and was marked again.
+		if ( R_ShadowMapEmptyPassHasStencilVolumes( vLight,
+				passKind == SHADOWMAP_PASS_LOCAL
+					? SHADOWMAP_RECEIVER_MASK_LOCAL
+					: SHADOWMAP_RECEIVER_MASK_GLOBAL ) ) {
 			RB_ShadowMapMarkStencilFallbackSticky( vLight );
 		}
 		if ( passKind == SHADOWMAP_PASS_LOCAL ) {

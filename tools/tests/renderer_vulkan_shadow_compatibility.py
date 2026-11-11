@@ -8174,8 +8174,8 @@ def validate_point_cache_parity_and_receiver_cost_contract() -> None:
             "if ( liveSince != 985 ) {",
             "const int next = R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, frame, 30 );",
             "if ( next < liveSince || next != Max( 985, frame - 30 ) ) {",
-            "R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 1041, 4 ) == 1037",
-            "R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 10, 30 ) == -20;",
+            "R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 1041, 4 ) != 1037",
+            "R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 10, 30 ) != -20",
         ),
         "the latch is exercised by the in-engine self-test",
     )
@@ -8382,6 +8382,108 @@ def validate_stencil_elision_contract() -> None:
                             ("void idInteraction::FreeSurfaces(", "freed surfaces")):
         require(braced_body(interaction, marker, context), "shadowVolumesSuppressed",
                 f"{context} forgets suppressed volumes")
+
+    # A receiver pass with nothing to cast is not a map that failed. Both
+    # back ends used to send its light to the stencil fallback: OpenGL marked
+    # it, let it go after the clean views and marked it again, for as long as
+    # the light was in view; Vulkan marked it in every view and never let it
+    # go. Restoring volume generation helps only where stencil has a volume
+    # for that ownership: one linked in this view, or one the front end left
+    # out because the light was going to render shadow maps. The front end
+    # records the second per receiver ownership, and a noSelfShadow caster's
+    # volume counts for global receivers only.
+    require(read("src/renderer/tr_local.h"), "int\t\t\t\t\t\tshadowMapElidedStencilMask;",
+            "view lights carry the ownerships whose stencil volumes were left out")
+    require_order(
+        active,
+        (
+            """const bool volumeElidedForShadowMaps =
+                shadowTris != NULL &&
+                !shadowMapCasterOnly &&
+                R_ShadowMapLightWillUseShadowMaps( lightDef );""",
+            """const bool volumeSuppressedForShadowMaps =
+                shadowTris == NULL &&
+                shadowVolumesSuppressed &&
+                sint->shadowStencilEligible &&
+                !sint->shadowStencilUsesPrelight;""",
+            "if ( volumeElidedForShadowMaps || volumeSuppressedForShadowMaps ) {",
+            "vLight->shadowMapElidedStencilMask |= shadowReceiverMask;",
+        ),
+        "a volume left out for the map is recorded for the ownerships it would have shadowed",
+    )
+    empty_rule = braced_body(classification, "bool R_ShadowMapEmptyPassNeedsStencil(", "empty pass rule")
+    require_order(
+        empty_rule,
+        (
+            "if ( globalVolumesLinked ) {",
+            "return true;",
+            "if ( localVolumesLinked && ( receiverMask & SHADOWMAP_RECEIVER_MASK_GLOBAL ) != 0 ) {",
+            "return true;",
+            "return ( elidedStencilMask & receiverMask ) != 0;",
+        ),
+        "global volumes shadow both ownerships, local ones the global receivers only",
+    )
+    require_order(
+        braced_body(classification, "bool R_ShadowMapEmptyPassHasStencilVolumes(", "empty pass rule for a view light"),
+        (
+            "vLight->globalShadows != NULL, vLight->localShadows != NULL,",
+            "vLight->shadowMapElidedStencilMask, receiverMask );",
+        ),
+        "the rule reads the view light's linked chains and its left-out mask",
+    )
+    for case in ("R_ShadowMapEmptyPassNeedsStencil( false, false, 0, local )",
+                 "R_ShadowMapEmptyPassNeedsStencil( false, false, global, local )",
+                 "!R_ShadowMapEmptyPassNeedsStencil( false, false, global, global )",
+                 "!R_ShadowMapEmptyPassNeedsStencil( false, true, 0, global )",
+                 "R_ShadowMapEmptyPassNeedsStencil( true, false, 0, local )"):
+        require(selftest, case, "the self-test covers the empty pass rule")
+    gl_run = braced_body(read("src/renderer/draw_arb2.cpp"), "static void RB_ShadowMapRunPass(",
+                         "GL shadow-map pass")
+    require_order(
+        gl_run,
+        (
+            "if ( !haveOpaqueCasters && !haveStencilShadowSurfs && !haveTranslucentCasters ) {",
+            """if ( R_ShadowMapEmptyPassHasStencilVolumes( vLight,
+                    passKind == SHADOWMAP_PASS_LOCAL
+                        ? SHADOWMAP_RECEIVER_MASK_LOCAL
+                        : SHADOWMAP_RECEIVER_MASK_GLOBAL ) ) {""",
+            "RB_ShadowMapMarkStencilFallbackSticky( vLight );",
+            "RB_ShadowMapPassReport( vLight, passKind, pointLight, SHADOWMAP_PASS_RESULT_NO_SHADOW_SURFS,",
+            # a pass with volumes and no map caster is the stencil-only light, and stays held
+            "if ( !haveOpaqueCasters && !haveTranslucentCasters ) {",
+            "RB_ShadowMapMarkStencilFallbackSticky( vLight );",
+        ),
+        "OpenGL holds a light for an empty pass only where stencil has a volume",
+    )
+    empty_branch = gl_run[gl_run.index("if ( !haveOpaqueCasters && !haveStencilShadowSurfs && !haveTranslucentCasters ) {"):
+                          gl_run.index("if ( !haveOpaqueCasters && !haveTranslucentCasters ) {")]
+    if "R_ShadowMapLightWillUseShadowMaps" in empty_branch:
+        raise AssertionError("An empty pass must not be marked on the light's intent to map alone")
+    vk_shadow = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+    require_order(
+        vk_shadow,
+        (
+            """const bool passStencilVolumes[ VK_SHADOW_RECEIVER_PASS_COUNT ] = {
+                R_ShadowMapEmptyPassHasStencilVolumes( vLight, SHADOWMAP_RECEIVER_MASK_LOCAL ),
+                R_ShadowMapEmptyPassHasStencilVolumes( vLight, SHADOWMAP_RECEIVER_MASK_GLOBAL )
+            };""",
+            """if ( ( passNeeded[ VK_SHADOW_RECEIVER_LOCAL ] && passStencilVolumes[ VK_SHADOW_RECEIVER_LOCAL ] )
+                    || ( passNeeded[ VK_SHADOW_RECEIVER_GLOBAL ] && passStencilVolumes[ VK_SHADOW_RECEIVER_GLOBAL ] ) ) {
+                VK_ShadowMap_MarkStencilFallbackSticky( vLight );
+            }""",
+        ),
+        "Vulkan holds a light without map casters only where stencil has a volume",
+    )
+    held = """if ( !passHasCasters[ passIndex ] ) {
+                if ( passStencilVolumes[ passIndex ] ) {
+                    VK_ShadowMap_MarkStencilFallbackSticky( vLight );
+                }
+                continue;
+            }"""
+    if compact(vk_shadow).count(compact(held)) != 2:
+        raise AssertionError("Both Vulkan ownership loops must hold an empty pass only where stencil has a volume")
+    if compact("if ( !passHasCasters[ passIndex ] ) { VK_ShadowMap_MarkStencilFallbackSticky( vLight );") in compact(vk_shadow):
+        raise AssertionError("A Vulkan pass without casters must not mark its light unconditionally")
 
     # The map and the stencil volume agree on which casters LOD admitted: a
     # surface with a volume is always a map caster. The map may hold more (a

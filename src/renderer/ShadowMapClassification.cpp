@@ -354,6 +354,23 @@ int R_ShadowMapDynamicCasterFrames( void ) {
 	return shadowMapDynamicCasterFrames;
 }
 
+bool R_ShadowMapEmptyPassNeedsStencil( const bool globalVolumesLinked, const bool localVolumesLinked,
+		const int elidedStencilMask, const int receiverMask ) {
+	if ( globalVolumesLinked ) {
+		return true;
+	}
+	if ( localVolumesLinked && ( receiverMask & SHADOWMAP_RECEIVER_MASK_GLOBAL ) != 0 ) {
+		return true;
+	}
+	return ( elidedStencilMask & receiverMask ) != 0;
+}
+
+bool R_ShadowMapEmptyPassHasStencilVolumes( const viewLight_t *vLight, const int receiverMask ) {
+	return vLight != NULL && R_ShadowMapEmptyPassNeedsStencil(
+		vLight->globalShadows != NULL, vLight->localShadows != NULL,
+		vLight->shadowMapElidedStencilMask, receiverMask );
+}
+
 int R_ShadowMapPointCacheSlotLimitFor( int requestedSlots, int budgetMegs,
 		int faceSize, int bytesPerTexel, int maxSlots ) {
 	const int slotCeiling = idMath::ClampInt( 0,
@@ -648,8 +665,30 @@ bool R_ShadowMapCachePolicySelfTest( void ) {
 	}
 	// a window that shrinks is followed at once, and a frame counter that
 	// starts again does not leave every caster of the new count looking old
-	return R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 1041, 4 ) == 1037
-		&& R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 10, 30 ) == -20;
+	if ( R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 1041, 4 ) != 1037
+			|| R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 10, 30 ) != -20 ) {
+		return false;
+	}
+	// A pass with nothing to cast is a failed map only where stencil has a
+	// volume for it. A light with no volume at all has not failed.
+	const int local = SHADOWMAP_RECEIVER_MASK_LOCAL;
+	const int global = SHADOWMAP_RECEIVER_MASK_GLOBAL;
+	if ( R_ShadowMapEmptyPassNeedsStencil( false, false, 0, local )
+			|| R_ShadowMapEmptyPassNeedsStencil( false, false, 0, global ) ) {
+		return false;
+	}
+	// a noSelfShadow caster's volume shadows global receivers and no local one
+	if ( R_ShadowMapEmptyPassNeedsStencil( false, false, global, local )
+			|| !R_ShadowMapEmptyPassNeedsStencil( false, false, global, global )
+			|| R_ShadowMapEmptyPassNeedsStencil( false, true, 0, local )
+			|| !R_ShadowMapEmptyPassNeedsStencil( false, true, 0, global ) ) {
+		return false;
+	}
+	// any other caster's volume shadows both
+	return R_ShadowMapEmptyPassNeedsStencil( false, false, local | global, local )
+		&& R_ShadowMapEmptyPassNeedsStencil( false, false, local | global, global )
+		&& R_ShadowMapEmptyPassNeedsStencil( true, false, 0, local )
+		&& R_ShadowMapEmptyPassNeedsStencil( true, false, 0, global );
 }
 
 bool R_ShadowMapCasterTransformNeedsTwoSided( const float modelMatrix[ 16 ] ) {

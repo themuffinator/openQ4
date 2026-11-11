@@ -81,6 +81,7 @@ cache (sixteen at most) against forty cubes in view.
 | **Quality and Ultra give the projected atlas four cells** (2048 cells in 4096, 4096 in 8192) while Enhanced has sixteen. A light with local casters takes two. OpenGL re-renders the overflow every view; Vulkan marks the light for stencil permanently and can draw it unshadowed for a frame. convoy2's start view does this: up to four projected lights, five lights sent to stencil for good and one drawn unshadowed. | **Fixed, both backends.** A tile size per light, assigned per view. See "Atlas tile sizes" below. No preset changed. |
 | Vulkan: cascades in an 8192 atlas always fail (one CSM block is the whole atlas). | **Open**; no preset uses it. |
 | The stencil-fallback flag on a light was never cleared: one failed map pass cost the light its volume elision for the rest of the level. | **Fixed, both backends.** A light leaves the fallback after 240 views without another failure. See "Leaving the stencil fallback" below. |
+| **A light with nothing to cast was sent to the stencil fallback.** A receiver pass that found no caster for its map was treated as a map that had failed. OpenGL marked the light, released it after 240 clean views and marked it again, for as long as it was in view; Vulkan marked it in every view and never released it. Such a light has nothing for stencil to draw either. Found by the openD3 session on Doom 3's hell1; no stock Quake 4 view tried shows it. | **Fixed, both backends.** A pass with nothing to cast holds its light only where stencil has a volume for it. See "A pass with nothing to cast" below. |
 | OpenGL point cubes carry a colour cube the default receiver never samples: half their memory. The opt-in modern executor still reads it. | **Fixed.** Cubes are depth only while nothing samples the colour. See "Depth-only point cubes on OpenGL" below. At 512 the cache holds 64 cubes in 384 MiB, as on Vulkan; it held 42 in 504 MiB. |
 | Vulkan hub2: one light (`lights/squarelight1`) logs "required shadow resource unavailable" once and falls back; OpenGL maps it. | **Open**, present before this round. |
 | Vulkan's scratch cube pool only grows. A view takes a scratch cube for each uncached or composed point pass, up to 512 of them, and none is released until the cube size changes. A noclip walk out of the airdefense1 arena into the void, from where every area is visible, mapped 289 point lights in one view and left 2.0 GB resident at Quality's 512 faces. The cache has a memory bound; this pool had none. | **Fixed (Vulkan).** The pool has the cache's memory figure again as its ceiling, and gives back what recent views did not need. See "Scratch cube pool" below. |
@@ -1239,6 +1240,82 @@ last round, for the same reasons outside this change
 figure: the counts are exact, and 54 microseconds a view is below what a
 frame time on this machine can show.
 
+### A pass with nothing to cast
+
+Added on 11 November, from a report by the openD3 session, which runs this
+renderer on Doom 3. On hell1 three point lights have receivers and no caster
+the map accepts, and each of them was sent to the stencil fallback, left it
+after 240 views and was sent back, for as long as it was in view.
+
+A light renders one map for each kind of receiver it has. Both back ends
+treated a receiver pass that found no caster as a map that had failed:
+
+- **OpenGL** marked the light whenever the front end had expected it to map
+  (`RB_ShadowMapRunPass`). Marked, the light builds its stencil volumes
+  again; nothing asks for them, so after the clean views it is released, the
+  front end expects a map again, and the next view marks it.
+- **Vulkan** marked it in every view, whatever the front end expected
+  (three places in `VK_ShadowMap_PrepareViewLights`). Each mark restarts the
+  count of clean views, so the light never left the fallback.
+
+Restoring volume generation helps only if there is a volume to restore. By
+the time a back end runs, the front end has already marked the light for
+every caster that stencil could draw and the map does not hold, in the same
+view. What arrives with an empty pass is a light that stencil has nothing
+for either: no caster at all; a point light whose only caster is its own
+fixture; casters that neither representation draws, by distance or behind a
+closed door; or, as on hell1, casters and receivers that are all
+`noSelfShadow`, whose volumes shadow other receivers and never each other.
+
+- **The front end now records what it left out.** For each receiver
+  ownership, whether a stencil volume would have shadowed it in this view
+  and does not because the light is going to map: a volume that exists and
+  was not linked, or one that was not built
+  (`viewLight_t::shadowMapElidedStencilMask`, set in
+  `idInteraction::AddActiveInteraction`). A `noSelfShadow` caster counts for
+  global receivers only.
+- **An empty pass holds its light only where stencil has a volume for that
+  ownership**, linked in this view or left out
+  (`R_ShadowMapEmptyPassHasStencilVolumes`, one rule for both back ends).
+  The pass is drawn unshadowed, as before, and the light stays a mapped
+  light. A light that has volumes and no map caster is a stencil light, as
+  before, and is held for as long as that lasts.
+
+What the wrong mark cost is small and never showed in a picture: a marked
+light builds and links stencil volumes for whatever moving thing enters it,
+which a mapped light does not, and it wrote a line to the developer log at
+each turn of the cycle.
+
+No stock Quake 4 view tried shows the case: no light is marked in the start
+views of ten levels on OpenGL, in four of them on Vulkan, or on six walks on
+either renderer. It was reproduced with a temporary switch in the front end
+that gave every light of hub2's start view nothing to cast, the camera
+still, 750 views:
+
+| | OpenGL | Vulkan |
+|---|---:|---:|
+| Before: lights marked | 13, 57 times | 13, once each |
+| Before: lights released | 11, 44 times, and marked again | none |
+| After: lights marked | none | none |
+
+The other direction was checked with a second switch that hid the casters
+from OpenGL's back end only, so that the front end had left volumes out:
+twelve lights were marked once and held, and thirteen passes were drawn with
+stencil shadows. A view from outside the airdefense1 arena, where Vulkan runs
+out of shadow resources, marks 162 lights before and after.
+
+Checked for this change, with both switches removed: no light marked in four
+start views on each renderer, and the 162 from outside the arena; the
+fourteen scenarios on both back ends, all passing; the continuous-motion
+qualification, eight cases; the in-engine self-tests on both renderers,
+which now exercise the rule; and the static tests that read the touched
+files. The qualification's Vulkan image case failed once, at a pose where
+two captures of the same frozen frame differed from each other, while
+another session's test client was running; run alone it passed. Of 51 static
+tests 45 pass, four need arguments, one was stopped at four minutes and one
+fails for a reason outside this change (`ui_choice_scroll_runtime.py`). Not
+checked here: Doom 3's hell1, which is the openD3 session's to confirm.
+
 ## Presets
 
 Unchanged. Enhanced keeps point lights on stencil: mapping them still costs
@@ -1252,27 +1329,21 @@ whether Enhanced can now map point lights on Vulkan.
 
 1. Fullscreen budgets for the three tiers, on the reference machine with
    nothing else running. Every change of this round moved what they cost.
-2. A shadow-map pass with nothing to cast is treated as a pass that
-   failed, on both back ends. The light is marked for the stencil fallback,
-   leaves it after 240 clean views and is marked again, for as long as it is
-   in view. Reported by the openD3 session from Doom 3's hell1, where three
-   point lights have receivers and every caster rejected; not looked for in
-   Quake 4 yet. Nothing changes on screen.
-3. The OpenGL projected cache is the atlas, four full tiles at Quality and
+2. The OpenGL projected cache is the atlas, four full tiles at Quality and
    Ultra, so it holds one crowded view and nothing of the view just left.
    Vulkan holds eight maps' worth.
-4. On Vulkan a projected light's tile size is fitted as if every map of the
+3. On Vulkan a projected light's tile size is fitted as if every map of the
    view needed an atlas block. Maps read where they live need none, so a
    crowded view could keep more of its lights at full size. The fit decides
    the cache key, so it must not follow what happens to be cached.
-5. One static cube for both ownerships of a composed Vulkan light, as on
+4. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. Measured on a walk: 4 of 24 fresh maps and up to ten resident
    cubes. It needs a resident entry two passes of a view can share.
-6. On OpenGL a mapped light draws a PBR receiver one level brighter, two at
+5. On OpenGL a mapped light draws a PBR receiver one level brighter, two at
    most, than the same light unshadowed, in up to a tenth of the view. Not
    the filter and not the translucent setting; Vulkan is exact. Invisible,
    and unexplained.
-7. A static model that moves under still lights (a lift, a door) builds its
+6. A static model that moves under still lights (a lift, a door) builds its
    volumes again each frame it moves, 40 to 45 microseconds a view in hub2.
    Leaving them out needs a mark on the entity for having moved.
 

@@ -292,6 +292,12 @@ typedef struct viewLight_s {
 	// usable volume.
 	int						shadowMapIncompleteMapMask;
 	int						shadowMapIncompleteStencilMask;
+	// Receiver ownerships a stencil volume would have shadowed in this view
+	// and does not, because the light is going to render shadow maps: the
+	// volume exists and was not linked, or was never built. A back end that
+	// finds nothing to cast in a pass reads it to tell a map that failed
+	// from a light with nothing to shadow.
+	int						shadowMapElidedStencilMask;
 	// A hybrid receiver samples the partial map while stencil supplies the
 	// casters absent from it. This mask is narrower than either completeness
 	// mask: it records only ownership for which at least one required caster

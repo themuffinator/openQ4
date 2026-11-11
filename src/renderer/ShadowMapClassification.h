@@ -184,6 +184,19 @@ bool R_ShadowMapLightIsMoving( const idRenderLightLocal *lightDef, int frame );
 // published a map that the next view could not use, copied it and drew the
 // live casters over the copy.
 bool R_ShadowMapMovingLightSkipsCache( const viewLight_t *vLight, int frame );
+// A receiver pass that finds no caster for its map has failed only if stencil
+// has something to draw for it: a volume linked in this view, or one the
+// front end left out because the light was going to render shadow maps
+// (viewLight_t::shadowMapElidedStencilMask). A light whose casters are all
+// turned away has neither, and sending it to the stencil fallback restores
+// nothing: OpenGL marked it, let it go after the clean views, and marked it
+// again for as long as it was in view, and Vulkan never let it go.
+// receiverMask is SHADOWMAP_RECEIVER_MASK_LOCAL or _GLOBAL.
+bool R_ShadowMapEmptyPassHasStencilVolumes( const viewLight_t *vLight, int receiverMask );
+// The pure form, for the self-test. Global volumes shadow both ownerships,
+// local ones the global receivers only.
+bool R_ShadowMapEmptyPassNeedsStencil( bool globalVolumesLinked, bool localVolumesLinked,
+	int elidedStencilMask, int receiverMask );
 // The pure form, for the self-test: the window in frames for a smoothed frame
 // interval in milliseconds.
 int R_ShadowMapDynamicCasterFramesFor( float frameMsec );

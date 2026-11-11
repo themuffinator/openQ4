@@ -1769,6 +1769,11 @@ optimization has landed.
   and 4 MiB for all of hub2, built once, and kept so the stencil fallback stays
   instant. Under a light that moves they were built every frame, 27 a view in
   storage2's alarm room, and are now left out with the dynamic models'.)
+  (A receiver pass with nothing to cast no longer sends its light to the stencil
+  fallback: OpenGL cycled such a light in and out every 240 views and Vulkan never
+  released it. Found by the openD3 session on Doom 3's hell1; no stock Quake 4 view
+  tried shows it, so it was reproduced with a temporary switch and is pinned by
+  the shared rule's self-test.)
   (A light that moves now draws its maps directly instead of publishing
   each one to the cache, copying it and composing over the copy: 560 passes on one
   hub2 route, `r_shadowMapCacheMovingLights`.) (A light whose map failed once now stops building its stencil volumes

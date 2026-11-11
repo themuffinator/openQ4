@@ -2634,6 +2634,20 @@ void idInteraction::AddActiveInteraction( void ) {
 			shadowTris != NULL &&
 			!shadowMapCasterOnly &&
 			R_ShadowMapLightWillUseShadowMaps( lightDef );
+		// A volume this view goes without because the light is going to render
+		// shadow maps: one that exists and is not linked, or one that was left
+		// out when the surfaces were built. A back end that then finds nothing
+		// to cast in a receiver pass knows from this that the map has failed;
+		// without it the light simply has nothing to shadow there
+		// (R_ShadowMapEmptyPassHasStencilVolumes).
+		const bool volumeSuppressedForShadowMaps =
+			shadowTris == NULL &&
+			shadowVolumesSuppressed &&
+			sint->shadowStencilEligible &&
+			!sint->shadowStencilUsesPrelight;
+		if ( volumeElidedForShadowMaps || volumeSuppressedForShadowMaps ) {
+			vLight->shadowMapElidedStencilMask |= shadowReceiverMask;
+		}
 		bool mapMissingNeedsVisibleVolume = false;
 		bool mappedCasterNeedsVisibleFallbackVolume = false;
 

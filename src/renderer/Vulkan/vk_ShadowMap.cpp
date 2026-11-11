@@ -3629,6 +3629,11 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 			VK_ShadowMap_PassHasCasters( vLight, VK_SHADOW_RECEIVER_LOCAL ),
 			VK_ShadowMap_PassHasCasters( vLight, VK_SHADOW_RECEIVER_GLOBAL )
 		};
+		// what stencil has for a receiver pass that finds nothing to cast
+		const bool passStencilVolumes[ VK_SHADOW_RECEIVER_PASS_COUNT ] = {
+			R_ShadowMapEmptyPassHasStencilVolumes( vLight, SHADOWMAP_RECEIVER_MASK_LOCAL ),
+			R_ShadowMapEmptyPassHasStencilVolumes( vLight, SHADOWMAP_RECEIVER_MASK_GLOBAL )
+		};
 		const int incompleteStencilMask =
 				vLight->shadowMapIncompleteStencilMask |
 				( vLight->shadowMapPrelightStencilRequiredMask
@@ -3655,8 +3660,13 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 				&& ( !passNeeded[ VK_SHADOW_RECEIVER_GLOBAL ] || !passHasCasters[ VK_SHADOW_RECEIVER_GLOBAL ] ) ) {
 			// No required receiver pass has map-compatible casters. Use the
 			// retained stencil path now; sticky preserves later-frame volumes
-			// while mapped support may be retried.
-			VK_ShadowMap_MarkStencilFallbackSticky( vLight );
+			// while mapped support may be retried. A light with no stencil
+			// volume either, linked or left out, has nothing to shadow and
+			// is not held: marked every view, it never left the fallback.
+			if ( ( passNeeded[ VK_SHADOW_RECEIVER_LOCAL ] && passStencilVolumes[ VK_SHADOW_RECEIVER_LOCAL ] )
+					|| ( passNeeded[ VK_SHADOW_RECEIVER_GLOBAL ] && passStencilVolumes[ VK_SHADOW_RECEIVER_GLOBAL ] ) ) {
+				VK_ShadowMap_MarkStencilFallbackSticky( vLight );
+			}
 			continue;
 		}
 		if ( vkShadow.numLights >= VK_SHADOW_MAX_LIGHTS ) {
@@ -3713,7 +3723,9 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 					continue;
 				}
 				if ( !passHasCasters[ passIndex ] ) {
-					VK_ShadowMap_MarkStencilFallbackSticky( vLight );
+					if ( passStencilVolumes[ passIndex ] ) {
+						VK_ShadowMap_MarkStencilFallbackSticky( vLight );
+					}
 					continue;
 				}
 
@@ -3830,7 +3842,9 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 				continue;
 			}
 			if ( !passHasCasters[ passIndex ] ) {
-				VK_ShadowMap_MarkStencilFallbackSticky( vLight );
+				if ( passStencilVolumes[ passIndex ] ) {
+					VK_ShadowMap_MarkStencilFallbackSticky( vLight );
+				}
 				continue;
 			}
 
