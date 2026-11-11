@@ -1,12 +1,11 @@
-# Unreleased openQ4 development changes
+# openQ4 development change record
 
-These changes belong to the development tree and have not shipped in an
-available release. **0.13.2 is the latest available release; 0.14.0 was
-withdrawn.** This material was previously accumulated in the 0.13.2 notes,
-which incorrectly attributed later work to that package. It is retained here
-for the next release's curation, with no version or release date promised.
-See [release status](../../user/release-status.md) and the
-[development roadmap](../roadmap.md) for current scope.
+**Everything recorded here up to 11 November 2026 shipped in
+[0.14.1](v0.14.1.md)**, whose notes are the player-facing summary of this
+material. This file is kept as the detailed record and collects later
+development changes for the next release's curation, with no version or
+release date promised. See [release status](../../user/release-status.md) and
+the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 

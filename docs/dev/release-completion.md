@@ -1,10 +1,29 @@
 # openQ4 release completion and evidence record
 
-**Release status, 23 October 2026:** 0.13.2 is the latest available release.
-0.14.0 (`v0.14.000`) was published and then withdrawn because it was broken.
-Later implementation and validation entries below are unreleased development
-work. Historical CI/publication success does not restore the withdrawn release.
-See [player release status](../user/release-status.md).
+**Release status, 11 November 2026:** 0.14.1 is the latest available release,
+replacing 0.13.2. 0.14.0 (`v0.14.000`) was published and then withdrawn because
+it was broken. Entries below dated up to 11 November 2026 shipped in 0.14.1;
+later entries are unreleased development work. Historical CI/publication success
+does not restore the withdrawn release. See
+[player release status](../user/release-status.md).
+
+## 0.14.1 release, 11 November 2026
+
+- Curated player notes: [v0.14.1.md](releases/v0.14.1.md). They recap what the
+  withdrawn 0.14.0 introduced, then what 0.14.1 refined, for players coming
+  from 0.13.2. The Highlights section doubles as the Discord announcement.
+- Version: dispatched with `version_override=0.14.1`; the automatic bump would
+  render `0.14.001` and skips the withdrawn 0.14.0. The changelog baseline is
+  `v0.13.2`, because withdrawn releases are excluded.
+- First release to run the content-pack job. 0.13.2 publishes no pack manifest,
+  so every pack is built from source and the notes call it a full download.
+- The Discord announcer now uses the notes' lead paragraph as its intro, spreads
+  download links over as many embed fields as they need instead of truncating at
+  1000 characters, and links the experimental Android APK.
+- Known CI debt at the release commit (Python checks do not gate release builds):
+  `renderer_screenshot_readback.py` pins the light-grid bake camera code that
+  changed on 11 November, and `validation_hardening.py` reports
+  `material_quality_reparse_contract.py` missing from the push smoke checks.
 
 ## VR: room-scale steps without a stutter, vehicle saves that load facing forward, and damage numbers on their targets, 11 November 2026
 

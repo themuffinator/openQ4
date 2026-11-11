@@ -3,7 +3,7 @@
 # Building openQ4
 
 These instructions build the current development tree. The latest available
-release is **0.13.2**; **0.14.0 was withdrawn**. See
+release is **0.14.1**; **0.14.0 was withdrawn**. See
 [release status](docs/user/release-status.md) for downloads and matching player guides. from Source
 
 </div>

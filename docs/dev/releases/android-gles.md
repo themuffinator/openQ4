@@ -1,6 +1,6 @@
 # Android/GLES — integration and release notes
 
-> **Unreleased development notes.** 0.13.2 has no Android APK; the 0.14.0 release was withdrawn. See [release status](../../user/release-status.md).
+> **Detailed change record.** Everything recorded here up to 11 November 2026 shipped in [0.14.1](v0.14.1.md), whose notes are the player-facing summary. Later additions are unreleased development notes. See [release status](../../user/release-status.md).
 
 ## Highlights
 

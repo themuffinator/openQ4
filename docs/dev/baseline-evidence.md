@@ -1,6 +1,6 @@
 # Stage-one baseline evidence
 
-> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.13.2 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
+> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.14.1 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
 18 October 2026; starting source `8c1a49ca7a033e163e271ef3787a4a9ba73f7479`.
 Completed implementation and final tested source:

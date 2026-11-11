@@ -6,8 +6,8 @@ This file describes project goals, rules, and upstream credits for anyone workin
 - Name: openQ4
 - Author: themuffinator
 - Company: DarkMatter Productions
-- Latest available release: 0.13.2
-- Withdrawn release: 0.14.0 (tag `v0.14.000`); retain historical evidence, but do not present it as an available release. Current source changes are unreleased; see `docs/user/release-status.md`.
+- Latest available release: 0.14.1
+- Withdrawn release: 0.14.0 (tag `v0.14.000`); retain historical evidence, but do not present it as an available release. Source changes after 0.14.1 are unreleased; see `docs/user/release-status.md`.
 - Website: `www.darkmatter-quake.com`
 - Repository: `https://github.com/themuffinator/openQ4`
 - Game Sources: `src/game/` and `src/mpgame/` (SDK EULA); Awakening SP additions in `src/game/awakening/`

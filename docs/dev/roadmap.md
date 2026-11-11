@@ -1,6 +1,6 @@
 # openQ4 development roadmap
 
-> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.13.2 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
+> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.14.1 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
 Updated 8 November 2026 with the frame-rate recovery category (FPS). The progress
 review below otherwise dates from 4 November and uses the integrated source and
@@ -28,7 +28,7 @@ UI toolkit/editor/corpus remain major completion gates.
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
 | Ultra frame rate at 2560x1440 | **91-188 fps on GL, 96-188 fps on Vulkan, on the reference laptop; every tier meets its refresh class** | FPS-02 re-tiered the presets to refresh classes (Enhanced 144/90, Quality 100/60, Ultra 75/45 average/1% low) and all three meet them in every scene on both backends; the previous everything-on Ultra (19-58 fps on GL) is now the Maximum preset with no frame-rate target. Budgets are in [`performance-budgets.json`](performance-budgets.json). See the FPS category and the [performance report](performance-report.md). |
-| Release acceptance | **0 / 4 REL tasks closed** | Current-source progress is unreleased; 0.13.2 remains the available release under the recorded release-status policy. |
+| Release acceptance | **0 / 4 REL tasks closed** | 0.14.1 (November 2026) is the available release. It shipped ahead of these gates, which stay open for final-package acceptance; later source progress is unreleased. |
 
 ### Category completion estimates
 
@@ -5590,7 +5590,7 @@ Completion order for the selected release:
   in the shared release-status policy, player status page and historical notes;
   exclude them from version/changelog baselines without deleting evidence.
   Reconciliation on 23 October 2026 restores 0.13.2 as latest and marks 0.14.0
-  withdrawn. Update
+  withdrawn; 0.14.1 replaced 0.13.2 as the latest release in November 2026. Update
   this roadmap, UI acceptance registers, support/capability matrices and curated
   release notes together. State hardware/backend exclusions, upgrade/reinstall
   requirements and opt-in defaults. Use the existing renderer promotion token,

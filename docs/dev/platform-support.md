@@ -1,6 +1,6 @@
 # openQ4 platform and architecture support matrix
 
-> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.13.2 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
+> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.14.1 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
 This document records current support tiers, platform contracts and the evidence
 behind them. The [development roadmap](roadmap.md#desktop-platforms-and-packaging)

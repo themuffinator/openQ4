@@ -1,6 +1,6 @@
 # Engine Capability Matrix
 
-> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.13.2 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
+> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.14.1 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
 This is the authoritative current-state index for openQ4 engine capability claims. Source/default ownership was reconciled on 2026-10-18 in the [stage-one evidence record](baseline-evidence.md); runtime claims below retain their explicitly dated packages and limits. The [roadmap](roadmap.md) owns outstanding work. Domain documents linked below own detailed acceptance evidence; a source audit does not requalify an old hardware result.
 

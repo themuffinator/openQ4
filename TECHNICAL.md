@@ -4,7 +4,7 @@
 
 </div>
 
-> **Development reference:** This page follows current source. For the available 0.13.2 package and version-matched documentation, see [release status](docs/user/release-status.md).
+> **Development reference:** This page follows current source. For the available 0.14.1 package and version-matched documentation, see [release status](docs/user/release-status.md).
 
 This reference is for advanced players, server operators and modders. It covers the install layout, asset checks, useful console settings, file paths, mod packaging and version numbers.
 

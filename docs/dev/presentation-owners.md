@@ -1,6 +1,6 @@
 # High-refresh presentation owners
 
-> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.13.2 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
+> **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.14.1 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
 Contract for HF-03 through HF-08 in the [roadmap](roadmap.md), 23 October 2026,
 extended 24 and 25 October 2026.

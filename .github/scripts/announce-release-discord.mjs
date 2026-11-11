@@ -159,6 +159,37 @@ function extractHighlights(notes) {
   return highlights.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// Curated notes open with a lead paragraph just above "Highlights"; when there
+// is one, it is the announcement's intro instead of a canned sentence.
+function extractLead(notes) {
+  if (!notes) {
+    return "";
+  }
+
+  const lines = notes.split("\n");
+  const highlightsIndex = lines.findIndex((line) => /^#{2,3}\s+Highlights\s*$/i.test(line.trim()));
+  if (highlightsIndex < 0) {
+    return "";
+  }
+
+  let end = highlightsIndex;
+  while (end > 0 && !lines[end - 1].trim()) {
+    end -= 1;
+  }
+  let start = end;
+  while (start > 0 && lines[start - 1].trim()) {
+    start -= 1;
+  }
+
+  const paragraph = lines.slice(start, end).map((line) => line.trim());
+  if (!paragraph.length || paragraph.some((line) => /^(#|\||>|[-*+]\s|<|```)/.test(line))) {
+    return "";
+  }
+
+  const lead = paragraph.join(" ").replace(/\s+/g, " ").trim();
+  return lead.length >= 40 ? limitText(lead, 600) : "";
+}
+
 function limitText(text, maxLength) {
   if (text.length <= maxLength) {
     return text;
@@ -189,6 +220,7 @@ function buildDownloadLinks(release) {
     ["macos-arm64-metal.dmg", "macOS ARM64 Metal"],
     ["macos-arm64-metal-unsigned.tar.gz", "macOS ARM64 Metal preview (unsigned)"],
     ["macos-arm64-metal.tar.gz", "macOS ARM64 Metal"],
+    ["android-arm64-experimental.apk", "Android ARM64 APK (experimental)"],
   ];
 
   const links = [];
@@ -210,7 +242,30 @@ function buildDownloadLinks(release) {
   }
 
   links.push(markdownLink("All downloads", release.html_url));
-  return limitText(links.join("\n"), 1000);
+  return links;
+}
+
+// A Discord embed field holds at most 1024 characters, so the links are
+// spread over as many fields as they need instead of being cut mid-link.
+function buildDownloadFields(release) {
+  const fields = [];
+  let current = "";
+  for (const link of buildDownloadLinks(release)) {
+    const next = current ? `${current}\n${link}` : link;
+    if (next.length > 1000 && current) {
+      fields.push(current);
+      current = link;
+    } else {
+      current = next;
+    }
+  }
+  if (current) {
+    fields.push(limitText(current, 1000));
+  }
+  return fields.slice(0, 4).map((value, index) => ({
+    name: index === 0 ? "Downloads" : "More downloads",
+    value,
+  }));
 }
 
 async function postDiscordPayload(payload) {
@@ -239,7 +294,7 @@ async function main() {
   const safeAvatarUrl = validateHttpsUrl(avatarUrl, "DISCORD_RELEASE_AVATAR_URL");
   const displayName = cleanReleaseName(release);
   const notes = (release.body || "").replace(/\r/g, "").trim();
-  const intro = buildIntro(release, notes);
+  const intro = extractLead(notes) || buildIntro(release, notes);
   const highlights = extractHighlights(notes);
   const detailsLink = `[Full release notes and downloads](${releaseUrl})`;
   const feedback = `Feedback is welcome in ${feedbackChannel}.`;
@@ -271,7 +326,7 @@ async function main() {
         fields: [
           { name: "Version", value: release.tag_name || releaseTag, inline: true },
           { name: "State", value: release.prerelease ? "Prerelease" : "Stable release", inline: true },
-          { name: "Downloads", value: buildDownloadLinks(release) || `[Open release](${release.html_url})` },
+          ...buildDownloadFields(release),
         ],
         footer: { text: "openQ4 - open-source Quake 4 engine and game code" },
         timestamp: release.published_at || new Date().toISOString(),

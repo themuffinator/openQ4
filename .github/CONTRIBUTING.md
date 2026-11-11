@@ -6,7 +6,7 @@ reports, testing feedback, documentation improvements, and code contributions ar
 all welcome.
 
 If you just want to play, you do **not** need to build from source — download the
-latest available release, [0.13.2](https://github.com/themuffinator/openQ4/releases/tag/v0.13.2).
+latest available release, [0.14.1](https://github.com/themuffinator/openQ4/releases/tag/v0.14.1).
 The withdrawn 0.14.0 release is not a supported download; see
 [release status](../docs/user/release-status.md).
 
