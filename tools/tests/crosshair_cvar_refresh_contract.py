@@ -135,7 +135,7 @@ def check_source_root(source_root: str) -> str:
     # marker stands aside only while the animated crosshair owns its pulse.
     require(
         read(f"{source_root}/gamesys/SysCvar.cpp"),
-        'idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL,',
+        'idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL,',
         f"{source_root}/gamesys/SysCvar.cpp",
     )
     marker_path = f"{source_root}/HitMarker.cpp"

@@ -2981,6 +2981,7 @@ void rvWeapon::GetCrosshairSignals( crosshairSignals_t &signals ) const {
 	signals.design = g_crosshairCustom.GetBool() ? g_crosshairCustomFile.GetString() : spawnArgs.GetString( "mtr_crosshair" );
 	signals.weaponKey = ( owner != NULL ) ? owner->GetCurrentWeapon() + 1 : 0;
 	signals.raised = !wfl.hide && ( status == WP_READY || status == WP_OUTOFAMMO || status == WP_RELOAD || status == WP_FLASHLIGHT );
+	signals.rising = !wfl.hide && status == WP_RISING;
 	signals.firing = wsfl.attack && status == WP_READY;
 	signals.reloading = ( status == WP_RELOAD );
 	signals.empty = ( status == WP_OUTOFAMMO );

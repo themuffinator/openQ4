@@ -3,7 +3,7 @@
 // openQ4 animated crosshair: the weapon's own crosshair design drawn live in
 // place of the cursor GUI's still picture.  Each design comes apart into the
 // pieces Raven drew it from - arcs, ticks, bars, darts, brackets - and those
-// pieces answer the weapon: they assemble when it is raised, kick when it
+// pieces answer the weapon: they assemble as it comes up, kick when it
 // fires, close as it charges, wait while it cycles and stand down while it
 // reloads.  Hit feedback docks to the design instead of being laid over it.
 //
@@ -31,6 +31,7 @@ struct crosshairSignals_t {
 	const char *	design;				// the crosshair material the weapon names
 	int				weaponKey;			// identity of the weapon: a change replays the assembly
 	bool			raised;				// in hand and able to act, as opposed to switching or hidden
+	bool			rising;				// coming up: the design assembles with it, so it is whole when the weapon is ready
 	bool			firing;				// trigger held and the weapon answering it
 	bool			reloading;
 	bool			empty;				// nothing left to fire
@@ -48,6 +49,7 @@ struct crosshairSignals_t {
 		design = "";
 		weaponKey = 0;
 		raised = false;
+		rising = false;
 		firing = false;
 		reloading = false;
 		empty = false;

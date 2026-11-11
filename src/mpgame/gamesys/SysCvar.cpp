@@ -254,7 +254,7 @@ idCVar hud_crosshairHitFlash(		"hud_crosshairHitFlash",	"0",			CVAR_GAME | CVAR_
 // the weapon is raised, kick with each shot, close as it charges, wait while it
 // cycles and stand down while it reloads, and hit feedback docks into the design.
 // Retained interface only: the stock interface keeps the still picture.
-idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "animated crosshair: the weapon's crosshair drawn live, answering shots, charge, reload and hits; needs ui_retained 1" );
+idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "animated crosshair: the weapon's crosshair drawn live, answering shots, charge, reload and hits; needs ui_retained 1" );
 // openQ4 END
 
 // change anytime vars

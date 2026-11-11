@@ -30,7 +30,7 @@ The auto-skip cinematics, corpse cleanup, and corpse sink controls are also avai
 | `hud_hitMarker` | `1` | SP and MP client | Crosshair hit marker on hits you land. On by default. |
 | `hud_hitMarkerScale` | `1` | SP and MP client | Hit marker size multiplier, `0.25` to `4`, on top of `g_crosshairSize`. |
 | `hud_crosshairHitFlash` | `0` | SP and MP client | Recolours the crosshair on a hit, as stock Quake 4 does. Implied when `hud_hitMarker` is off. |
-| `hud_crosshairAnimated` | `0` | SP and MP client | Draws the weapon's crosshair live, answering shots, charge, reload and hits. New interface only. See [Animated Crosshair](#animated-crosshair). |
+| `hud_crosshairAnimated` | `1` | SP and MP client | Draws the weapon's crosshair live, answering shots, charge, reload and hits. New interface only. See [Animated Crosshair](#animated-crosshair). |
 | `g_hitFeedback` | `2` | Multiplayer server | Whether the server tells attackers about their hits at all. `0` none, `1` without the amount, `2` with the amount. |
 
 ## Multiplayer objective markers
@@ -317,19 +317,25 @@ draws each weapon's own Quake 4 crosshair live instead of as a still picture. Th
 designs are the originals. Each one comes apart into the pieces it was drawn from,
 arcs, ticks, bars, darts and brackets, and those pieces follow the weapon, so the
 crosshair tells you what the gun is doing without a second readout to look at.
-It is off by default.
+It is on by default; set `hud_crosshairAnimated 0`, or switch the option off, for
+the still picture.
 
 Every design does these:
 
-- **Assembles when the weapon is ready.** The pieces sweep, slide or turn into
-  place as the weapon comes up, and fold away while you switch weapons or while
-  the use hand, the talk frame or another context cursor is showing.
+- **Assembles as the weapon comes up.** The pieces sweep, slide or turn into
+  place while the weapon is raised, so the design is whole by the time you can
+  fire. They fold away while a weapon is put down and while the use hand, the
+  talk frame or another context cursor is showing.
+- **Never leaves the aim unmarked.** While the design is folded away between
+  weapons, a dot stays on the aim point and hands over to the design as it
+  assembles.
 - **Kicks with each shot** and settles before the next one.
 - **Stands down while you can't fire.** Reloading dims the design and shows the
   reload: one pip for each round where the weapon is loaded a round at a time,
   a sweep otherwise. Out of ammunition, a design with a cross turns it into an X.
-- **Takes the hit.** A hit squeezes the design and tints it in the hit's color
-  for the length of the pulse; a kill also sends one thin ring out from its edge.
+- **Takes the hit.** A hit squeezes the design for the length of the pulse, and
+  a kill also sends one thin ring out from its edge. See hit feedback below for
+  the marks and the tint.
 
 And each design has its own behavior:
 
@@ -345,15 +351,21 @@ And each design has its own behavior:
 | Rocket launcher | The faint halo of the original design sweeps round as the launcher cycles and closes when the next rocket is ready. |
 | Railgun | The shot throws the four bars out and the recharge draws them back: they are home, with a brief flash, when the next slug is. |
 | Lightning gun | The beam draws the four darts in and sets them crackling. They already sit where a hit marker would, so they are the hit marker: every hit drives them home in the hit's color. |
-| Napalm launcher | The splatter ring turns into place and swells with each shot. |
+| Napalm launcher | The shot throws the splatter ring wide and a quarter turn round; it draws back in and turns home as the next charge comes up. |
 | Gauntlet | Three teeth turn round the disc while the blade spins. |
 
 **Hit feedback** follows the [Hit Marker](#hit-marker) setting. With the marker on,
 its four marks dock into the clear space of the design in hand, between the
 machinegun's ticks, inside the rocket launcher's ring, between the nailgun's
-brackets, with the same sizes, colors and timing as before. With the marker off
-you still get the squeeze and the tint. `hud_hitMarkerScale` applies to the docked
-marks too.
+brackets, with the same sizes, colors and timing as before. The marks carry the
+hit, so the design keeps the color you chose and takes only a light cast of the
+hit's color. With the marker off the design takes the whole tint instead, as it
+does with `hud_crosshairHitFlash 1`, and on the lightning gun, whose darts are the
+marks. `hud_hitMarkerScale` applies to the docked marks too.
+
+A hit never waits for the crosshair. If one lands while the design is folded
+away, a rocket arriving as the next weapon comes up, or with the use hand
+showing, the marks draw at full strength round the aim point.
 
 **Vehicles** get the same treatment for the gun of your seat. A cannon that
 recharges between shots shows the recharge as a measured sweep, and a gun with a

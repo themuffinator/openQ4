@@ -23,6 +23,18 @@ static const float	XH_ASSEMBLE_TIME		= 0.26f;	// seconds a raised weapon's desig
 static const float	XH_COLLAPSE_TIME		= 0.11f;	// stand-down for a context cursor or a lowered weapon
 static const float	XH_SWAP_TIME			= 0.07f;	// the old design leaving on a weapon change
 
+// the aim point: what is left of a design while it is folded away
+static const float	XH_AIM_TIME				= 0.08f;
+static const float	XH_AIM_RADIUS			= 1.15f;
+
+// With the hit marks docked the design keeps the player's color and takes
+// only a cast of the hit's; without them the tint is the whole cue.
+static const float	XH_DOCKED_TINT			= 0.3f;
+
+// where a hit docks while the design it belongs in is not on screen
+static const float	XH_LOOSE_HIT_DOCK		= 9.0f;
+static const float	XH_LOOSE_HIT_SCALE		= 0.9f;
+
 // the shot spring: stiff enough to be back before the next round of anything
 // slower than the hyperblaster, loose enough to overshoot once
 static const float	XH_KICK_FREQUENCY		= 30.0f;	// rad/s
@@ -316,11 +328,13 @@ typedef struct xhState_s {
 	const idMaterial *	material;			// its stock art
 	int					weaponKey;
 	float				deploy;				// 0 folded away .. 1 assembled
+	float				aim;				// 0..1 a combat crosshair is the cursor: the aim point is marked
 
 	float				kick;				// the shot spring
 	float				kickVelocity;
 	int					lastNextAttack;
 	int					shotTime;			// game time of the last shot
+	float				shotSeconds;		// the same moment on the drawn clock, which is what moves the pieces
 	int					shotInterval;		// how long that shot makes the weapon wait
 	bool				cycling;
 	float				readyFlash;
@@ -453,6 +467,7 @@ typedef struct xhFrame_s {
 	float	seat;			// deploy with the overshoot of a part seating
 	float	slide;			// deploy eased out, for travel
 	float	alpha;			// overall
+	float	aim;			// the aim point's presence, whatever the design is doing
 	float	kick;
 	float	fire;
 	float	reload;
@@ -814,16 +829,35 @@ static void XH_DrawCannon( xhCanvas &canvas, const xhFrame_t &f, const idMateria
 ================
 XH_DrawWhole
 
-A design drawn as the single piece it is: the napalm launcher's splatter and
-the simple marks of the custom set.  It turns and settles into place, and
-swells with the shot the way the stock crosshair swells with a hit.
+A design drawn as the single piece it is: the simple marks of the custom set.
+It settles into place, and swells with the shot the way the stock crosshair
+swells with a hit.
 ================
 */
-static void XH_DrawWhole( xhCanvas &canvas, const xhFrame_t &f, const idMaterial *material, bool turns ) {
+static void XH_DrawWhole( xhCanvas &canvas, const xhFrame_t &f, const idMaterial *material ) {
 	const float scale = ( 1.0f + 0.4f * ( 1.0f - f.slide ) ) * ( 1.0f + 0.10f * f.kick - 0.06f * f.punch + 0.06f * f.standby );
-	const float turn = turns ? ( -60.0f * ( 1.0f - f.slide ) + 9.0f * f.kick ) : 0.0f;
 
-	canvas.Art( material, -XH_HALF, -XH_HALF, XH_HALF, XH_HALF, turn, scale, vec2_origin, XH_Ink( canvas, f, f.open ) );
+	canvas.Art( material, -XH_HALF, -XH_HALF, XH_HALF, XH_HALF, 0.0f, scale, vec2_origin, XH_Ink( canvas, f, f.open ) );
+}
+
+/*
+================
+XH_DrawNapalm
+
+The splatter ring is one irregular piece, so it moves as one: the shot throws
+it wide and a quarter turn round, and it draws back in and turns home as the
+next charge of napalm comes up, so the ring at rest is the launcher ready.
+================
+*/
+static void XH_DrawNapalm( xhCanvas &canvas, const xhFrame_t &f, const idMaterial *material ) {
+	const float wait = 1.0f - f.cycle;
+	const float spent = wait * idMath::Sqrt( wait );
+	const float scale = ( 1.0f + 0.4f * ( 1.0f - f.slide ) )
+						* ( 1.0f + 0.10f * f.kick + 0.16f * spent * f.motion - 0.06f * f.punch + 0.06f * f.standby );
+	const float turn = -60.0f * ( 1.0f - f.slide ) + 9.0f * f.kick + 90.0f * spent * f.motion;
+
+	canvas.Art( material, -XH_HALF, -XH_HALF, XH_HALF, XH_HALF, turn, scale, vec2_origin,
+				XH_Ink( canvas, f, f.open * ( 1.0f - 0.35f * wait ) ) );
 }
 
 /*
@@ -833,6 +867,24 @@ static void XH_DrawWhole( xhCanvas &canvas, const xhFrame_t &f, const idMaterial
 
 ===============================================================================
 */
+
+/*
+================
+XH_DrawAimPoint
+
+What a folded design leaves behind: a dot on the aim point for as long as a
+combat crosshair is the cursor.  It hands over to the design as that
+assembles, so a weapon change never leaves the player without an aim.
+================
+*/
+static void XH_DrawAimPoint( xhCanvas &canvas, const xhFrame_t &f ) {
+	const float alpha = f.aim * ( 1.0f - XH_EaseInOut( f.open ) );
+	if ( alpha <= 0.004f ) {
+		return;
+	}
+	canvas.Disc( vec2_origin, XH_AIM_RADIUS + 1.3f, canvas.Shade( 0.5f * alpha ) );
+	canvas.Disc( vec2_origin, XH_AIM_RADIUS, canvas.Ink( alpha ) );
+}
 
 /*
 ================
@@ -920,25 +972,46 @@ static void XH_DrawHit( xhCanvas &canvas, const xhFrame_t &f, const xhStyle_t &s
 		return;
 	}
 
+	// A hit is news whatever the crosshair is doing.  The rocket that lands
+	// while the next weapon is still coming up must read as clearly as one
+	// that lands on an assembled design, so the marks never fade with it.
 	idVec4 color = f.hitColor;
-	color.w = f.hitAlpha * f.open;
+	color.w = f.hitAlpha;
 
 	if ( f.kill ) {
-		const float reach = style.outer + 2.0f + 9.0f * f.hitExpansion;
+		const float reach = style.outer * XH_EaseOut( f.open ) + 2.0f + 9.0f * f.hitExpansion;
 		canvas.Arc( reach, 1.3f * ( 1.0f - 0.5f * f.hitExpansion ), 0.0f, 360.0f,
 					idVec4( color.x, color.y, color.z, color.w * 0.8f ) );
 	}
 
-	if ( !f.hitMarks || style.hitDock <= 0.0f ) {
+	if ( !f.hitMarks ) {
 		return;
 	}
 
+	// With the design away its clear space is gone too: the marks dock round
+	// the aim point, and move out to their place as the design assembles.  A
+	// design whose own pieces are the marks needs these only while it is away.
+	float dock = style.hitDock;
+	float dockScale = style.hitScale;
+	if ( dock <= 0.0f ) {
+		dock = XH_LOOSE_HIT_DOCK;
+		dockScale = XH_LOOSE_HIT_SCALE;
+		color.w *= 1.0f - f.open;
+		if ( color.w <= 0.004f ) {
+			return;
+		}
+	} else {
+		const float seated = XH_EaseInOut( f.open );
+		dock = XH_Lerp( XH_LOOSE_HIT_DOCK, dock, seated );
+		dockScale = XH_Lerp( XH_LOOSE_HIT_SCALE, dockScale, seated );
+	}
+
 	const hitMarkerTierStyle_t &tier = hitMarkerTierStyles[ f.hitTier ];
-	const float size = style.hitScale * XH_HIT_UNIT * idMath::ClampFloat( 0.25f, 4.0f, hud_hitMarkerScale.GetFloat() );
-	const float inner = style.hitDock + HITMARKER_BASE_SPREAD * tier.spreadScale * f.hitExpansion * size;
+	const float size = dockScale * XH_HIT_UNIT * idMath::ClampFloat( 0.25f, 4.0f, hud_hitMarkerScale.GetFloat() );
+	const float inner = dock + HITMARKER_BASE_SPREAD * tier.spreadScale * f.hitExpansion * size;
 	const float length = HITMARKER_BASE_LENGTH * tier.lengthScale * ( 1.0f - HITMARKER_LENGTH_TAPER * f.hitExpansion ) * size;
 	const float width = HITMARKER_BASE_WIDTH * tier.widthScale * ( 1.0f - HITMARKER_WIDTH_TAPER * f.hitExpansion ) * size;
-	const float sheath = HITMARKER_OUTLINE_INFLATE * XH_HIT_UNIT * style.hitScale;
+	const float sheath = HITMARKER_OUTLINE_INFLATE * XH_HIT_UNIT * dockScale;
 	const idVec4 outline( 0.0f, 0.0f, 0.0f, color.w * HITMARKER_OUTLINE_ALPHA );
 
 	for ( int i = 0; i < 4; i++ ) {
@@ -981,6 +1054,7 @@ static void XH_ReadSignals( const rvWeapon *weapon, const rvVehicleWeapon *vehic
 		signals.weaponKey = idStr::Hash( signals.design );
 	}
 	signals.raised = xhTest.GetBool( "raised", signals.raised ? "1" : "0" );
+	signals.rising = xhTest.GetBool( "rising", signals.rising ? "1" : "0" );
 	signals.firing = xhTest.GetBool( "fire", signals.firing ? "1" : "0" );
 	signals.reloading = xhTest.GetBool( "reload", signals.reloading ? "1" : "0" );
 	signals.empty = xhTest.GetBool( "empty", signals.empty ? "1" : "0" );
@@ -1015,6 +1089,10 @@ static void XH_Advance( const crosshairSignals_t &signals, bool shown, xhDesign_
 	st.lastTime = now;
 	st.seconds += dt;
 
+	// The aim point outlives the design: a weapon on its way down or up has
+	// no design assembled, and the stock cursor never left the aim unmarked.
+	st.aim = XH_Approach( st.aim, shown ? 1.0f : 0.0f, dt / XH_AIM_TIME );
+
 	// deploy.  A different weapon folds the old design away before the new
 	// one is let on screen, so two designs are never drawn across each other.
 	const bool swapped = ( wanted != st.design || signals.weaponKey != st.weaponKey || material != st.material );
@@ -1023,17 +1101,20 @@ static void XH_Advance( const crosshairSignals_t &signals, bool shown, xhDesign_
 		if ( st.deploy <= 0.0f ) {
 			const float seconds = st.seconds;
 			const int lastTime = st.lastTime;
+			const float aim = st.aim;
 
 			memset( &st, 0, sizeof( st ) );
 			st.seconds = seconds;
 			st.lastTime = lastTime;
+			st.aim = aim;
 			st.design = wanted;
 			st.material = material;
 			st.weaponKey = signals.weaponKey;
 			st.lastNextAttack = signals.nextAttackTime;
 			st.lastClip = signals.clip;
 		}
-	} else if ( shown && signals.raised ) {
+	} else if ( shown && ( signals.raised || signals.rising ) ) {
+		// it starts as the weapon starts up, so it is whole by the first shot
 		st.deploy = XH_Approach( st.deploy, 1.0f, dt / XH_ASSEMBLE_TIME );
 	} else {
 		st.deploy = XH_Approach( st.deploy, 0.0f, dt / XH_COLLAPSE_TIME );
@@ -1045,6 +1126,7 @@ static void XH_Advance( const crosshairSignals_t &signals, bool shown, xhDesign_
 	if ( signals.nextAttackTime > st.lastNextAttack && signals.nextAttackTime > gameLocal.time &&
 		 signals.raised && !signals.reloading && !swapped ) {
 		st.shotTime = gameLocal.time;
+		st.shotSeconds = st.seconds;
 		st.shotInterval = signals.nextAttackTime - gameLocal.time;
 		st.cycling = ( st.shotInterval >= XH_CYCLE_MIN_INTERVAL );
 		st.kickVelocity += XH_KICK_IMPULSE * xhStyles[ st.design ].kick * ( calm ? 0.3f : 1.0f );
@@ -1099,6 +1181,7 @@ static void XH_Advance( const crosshairSignals_t &signals, bool shown, xhDesign_
 	const float charge = Max( 0.0f, signals.charge );
 	if ( st.lastCharge > 0.2f && charge <= 0.0f && signals.raised && !swapped ) {
 		st.shotTime = gameLocal.time;
+		st.shotSeconds = st.seconds;
 		st.kickVelocity += XH_KICK_IMPULSE * xhStyles[ st.design ].kick * ( 1.0f + st.lastCharge ) * ( calm ? 0.3f : 1.0f );
 	}
 	st.lastCharge = charge;
@@ -1156,12 +1239,16 @@ static void XH_BuildFrame( xhFrame_t &f, bool calm, bool steady ) {
 	f.ready = st.readyFlash;
 	f.time = gameLocal.time;
 	f.seconds = st.seconds;
-	f.shotAge = ( st.shotTime != 0 ) ? gameLocal.time - st.shotTime : -1;
+	// Since the shot, on the drawn clock: the game's own time moves a tic at a
+	// time, and a sweep timed by it steps at the tic rate on a faster display.
+	const float sinceShot = Max( 0.0f, st.seconds - st.shotSeconds ) * 1000.0f;
+	f.shotAge = ( st.shotTime != 0 ) ? (int)sinceShot : -1;
 	f.alpha = ( calm ? st.deploy : 1.0f ) * ( 1.0f - XH_STANDBY_DIM * f.standby );
+	f.aim = st.aim;
 
 	f.cycle = 1.0f;
 	if ( st.cycling && st.shotInterval > 0 ) {
-		f.cycle = idMath::ClampFloat( 0.0f, 1.0f, (float)( gameLocal.time - st.shotTime ) / (float)st.shotInterval );
+		f.cycle = idMath::ClampFloat( 0.0f, 1.0f, sinceShot / (float)st.shotInterval );
 	}
 
 	// the hit marker's pulse
@@ -1181,6 +1268,13 @@ static void XH_BuildFrame( xhFrame_t &f, bool calm, bool steady ) {
 		f.hitAlpha = tier.alpha * fade * ( mistake ? HITMARKER_MISTAKE_ALPHA : 1.0f );
 		f.punch = ( 1.0f - life ) * ( 1.0f - life ) * tierPunch[ hitMarkerPulse.tier ] * ( calm ? 0.3f : 1.0f );
 		f.hitMix = fade * tier.alpha * ( cvarSystem->GetCVarBool( "ui_reducedFlashing" ) ? 0.45f : 0.9f );
+		// The marks carry the hit when they are docked in the design, so the
+		// design keeps the color the player chose for it.  It takes the whole
+		// tint where it is the only cue: the marker off, a design whose own
+		// pieces are the marks, or the stock recolor asked for by name.
+		if ( f.hitMarks && xhStyles[ st.design ].hitDock > 0.0f && !hud_crosshairHitFlash.GetBool() ) {
+			f.hitMix *= XH_DOCKED_TINT;
+		}
 	}
 }
 
@@ -1284,14 +1378,14 @@ void rvAnimatedCrosshair::Draw( idUserInterface *cursor, const rvWeapon *weapon,
 	if ( st.design == XH_NONE ) {
 		return;
 	}
-	// the marker's pulse belongs to the design from here on, drawn or not
+	// the marker's pulse belongs to the design from here on, assembled or not
 	xhOwnsMarker = true;
-	if ( st.deploy <= 0.0f ) {
-		return;
-	}
 
 	xhFrame_t f;
 	XH_BuildFrame( f, calm, steady );
+	if ( st.deploy <= 0.0f && f.aim <= 0.0f && f.hitAlpha <= 0.0f ) {
+		return;
+	}
 
 	idVec4 color( 1.0f, 1.0f, 1.0f, 1.0f );
 	sscanf( g_crosshairColor.GetString(), "%f %f %f %f", &color.x, &color.y, &color.z, &color.w );
@@ -1300,24 +1394,27 @@ void rvAnimatedCrosshair::Draw( idUserInterface *cursor, const rvWeapon *weapon,
 	canvas.Begin( (float)idMath::ClampInt( 16, 48, cvarSystem->GetCVarInteger( "g_crosshairSize" ) ), color );
 
 	const xhStyle_t &style = xhStyles[ st.design ];
-	switch ( st.design ) {
-		case XH_BLASTER:	XH_DrawBlaster( canvas, f ); break;
-		case XH_MACHINEGUN:	XH_DrawMachinegun( canvas, f ); break;
-		case XH_SHOTGUN:	XH_DrawShotgun( canvas, f ); break;
-		case XH_ROCKET:		XH_DrawRocket( canvas, f ); break;
-		case XH_RAILGUN:	XH_DrawRailgun( canvas, f ); break;
-		case XH_GAUNTLET:	XH_DrawGauntlet( canvas, f ); break;
-		case XH_GRENADE:	XH_DrawGrenade( canvas, f, st.material ); break;
-		case XH_NAILGUN:	XH_DrawNailgun( canvas, f, st.material ); break;
-		case XH_LIGHTNING:	XH_DrawLightning( canvas, f, st.material ); break;
-		case XH_CANNON:		XH_DrawCannon( canvas, f, st.material ); break;
-		case XH_NAPALM:		XH_DrawWhole( canvas, f, st.material, true ); break;
-		default:			XH_DrawWhole( canvas, f, st.material, false ); break;
-	}
+	XH_DrawAimPoint( canvas, f );
+	if ( st.deploy > 0.0f ) {
+		switch ( st.design ) {
+			case XH_BLASTER:	XH_DrawBlaster( canvas, f ); break;
+			case XH_MACHINEGUN:	XH_DrawMachinegun( canvas, f ); break;
+			case XH_SHOTGUN:	XH_DrawShotgun( canvas, f ); break;
+			case XH_ROCKET:		XH_DrawRocket( canvas, f ); break;
+			case XH_RAILGUN:	XH_DrawRailgun( canvas, f ); break;
+			case XH_GAUNTLET:	XH_DrawGauntlet( canvas, f ); break;
+			case XH_GRENADE:	XH_DrawGrenade( canvas, f, st.material ); break;
+			case XH_NAILGUN:	XH_DrawNailgun( canvas, f, st.material ); break;
+			case XH_LIGHTNING:	XH_DrawLightning( canvas, f, st.material ); break;
+			case XH_CANNON:		XH_DrawCannon( canvas, f, st.material ); break;
+			case XH_NAPALM:		XH_DrawNapalm( canvas, f, st.material ); break;
+			default:			XH_DrawWhole( canvas, f, st.material ); break;
+		}
 
-	XH_DrawGauge( canvas, f, style, signals );
-	if ( st.design != XH_NAILGUN ) {
-		XH_DrawLock( canvas, f, style );
+		XH_DrawGauge( canvas, f, style, signals );
+		if ( st.design != XH_NAILGUN ) {
+			XH_DrawLock( canvas, f, style );
+		}
 	}
 	XH_DrawHit( canvas, f, style );
 
@@ -1337,7 +1434,7 @@ void rvAnimatedCrosshair::Test( const idCmdArgs &args ) {
 		xhTest.Clear();
 		xhTestShot = 0;
 		gameLocal.Printf( "testCrosshair: released\n"
-						  "usage: testCrosshair [design <material>] [raised|fire|reload|empty|zoom 0/1] [clip n] [clipsize n]\n"
+						  "usage: testCrosshair [design <material>] [raised|rising|fire|reload|empty|zoom 0/1] [clip n] [clipsize n]\n"
 						  "       [progress|charge|spin|lock 0..1] [shot <ms>]\n" );
 		return;
 	}

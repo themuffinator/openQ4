@@ -276,11 +276,42 @@ See [player release status](../user/release-status.md).
   `tools/tests/choice_gui_value_contract.py`,
   `tools/tests/menu_controller_navigation.py`.
 
+## Animated crosshairs refined and on by default, 11 November 2026
+
+- **The animated crosshair is now the default** in the new interface
+  (`hud_crosshairAnimated 1`). `Settings -> Game Options -> HUD -> Animated
+  Crosshair` switches back to the still picture; the classic interface is
+  unchanged. A configuration saved by a development build that had the
+  option keeps the value it saved.
+- **The aim is never left unmarked.** A design used to vanish for the whole
+  of a weapon change and only start assembling once the new weapon could
+  fire. It now starts as the weapon starts up, so it is whole by the first
+  shot, and a dot holds the aim point in between.
+- **A hit never waits for the crosshair.** Hit marks and the kill ring used
+  to fade with the design, so a rocket landing during a weapon change, or
+  with the use hand showing, drew faintly or not at all. They now draw at
+  full strength round the aim point and move out to their place in the
+  design as it assembles.
+- **The crosshair keeps your color under fire.** With the hit marks docked
+  the design takes only a light cast of the hit's color instead of turning
+  wholly red, which under sustained fire had replaced the chosen color. The
+  whole tint remains where it is the only cue: the hit marker off,
+  `hud_crosshairHitFlash 1`, and the lightning gun's darts.
+- **Smoother waits.** The rocket launcher's halo, the railgun's bars, the
+  grenade launcher's quarters and the shotgun's echo are timed on the
+  display's clock instead of the game tic, so they no longer step at the
+  tic rate on a high-refresh display.
+- **The napalm launcher shows its cycle.** The splatter ring is thrown wide
+  and a quarter turn round by the shot, then draws in and turns home as the
+  next charge comes up.
+- Evidence: [Animated Crosshair](../user/gameplay-settings.md#animated-crosshair);
+  `tools/tests/crosshair_cvar_refresh_contract.py`.
+
 ## Animated crosshairs for the new interface, 10 November 2026
 
 - **Each weapon's crosshair now answers the weapon.** A new option,
   `Settings -> Game Options -> HUD -> Animated Crosshair`
-  (`hud_crosshairAnimated`, off by default), draws the original Quake 4
+  (`hud_crosshairAnimated`, on by default since 11 November), draws the original Quake 4
   crosshair designs live. Every design assembles as the weapon comes up, kicks
   with each shot, dims and shows the reload while you can't fire, and folds
   away for the use hand and the other context cursors.

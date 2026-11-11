@@ -195,15 +195,17 @@ See [release status](../../user/release-status.md) and the
   optional movement display also use the new renderer. Stock UI remains
   available with `ui_retained 0`.
 
-- **Crosshairs that come alive.** Switch on `Settings -> Game Options -> HUD ->
-  Animated Crosshair` and each weapon's original Quake 4 crosshair answers the
-  weapon instead of sitting still. It assembles as the weapon comes up and
+- **Crosshairs that come alive.** In the new interface each weapon's original
+  Quake 4 crosshair now answers the weapon instead of sitting still. It
+  assembles as the weapon comes up and
   kicks with every shot; the blaster's arcs wind shut into a ring as it
   charges, the railgun's bars come home as it recharges, the rocket launcher's
   halo sweeps round until the next rocket is ready, and the shotgun counts its
-  shells back in. Hits land inside the design instead of over it, and vehicle
-  guns get the same treatment. It is off by default and needs the new
-  interface. See [Animated Crosshair](../../user/gameplay-settings.md#animated-crosshair).
+  shells back in. Hits land inside the design instead of over it, a dot holds
+  your aim while you change weapons, and vehicle guns get the same treatment.
+  It is on by default; `Settings -> Game Options -> HUD -> Animated Crosshair`
+  switches back to the still crosshair, which the classic interface always
+  uses. See [Animated Crosshair](../../user/gameplay-settings.md#animated-crosshair).
 
 - **A sharper gameplay status bar.** The new interface now centers vector ammo,
   health and armor gauges in campaign and multiplayer, with a Strogg variant
