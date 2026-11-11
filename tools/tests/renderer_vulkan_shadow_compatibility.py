@@ -8821,8 +8821,8 @@ def validate_static_signature_view_independence_contract() -> None:
     require_order(
         add,
         (
-            "const bool lightHoldsStill = lightDef->lastModifiedFrameNum",
-            "< tr.frameCount - R_ShadowMapDynamicCasterFrames();",
+            "const bool lightHoldsStill =",
+            "!R_ShadowMapLightIsMoving( lightDef, tr.frameCount );",
             "const bool casterLODAdmitted = sint->shadowStencilEligible",
             "|| ( lightHoldsStill",
             "&& !R_ShadowMapCasterIsDynamic( entityDef, shadowShader ) )",
@@ -8864,6 +8864,103 @@ def validate_static_signature_view_independence_contract() -> None:
     # the signature still follows every snapshot, first or not
     require(record, "hash = R_ShadowMapHashInt( hash, entityDef->dynamicModelFrameCount );",
             "a new snapshot still changes the signature")
+
+
+def validate_moving_light_cache_bypass_contract() -> None:
+    """A moving light draws its shadow maps directly, on both renderers.
+
+    The static cache keeps a light's still casters so that a view only has to
+    draw the moving ones over them. A light that itself moves has a new map
+    every view: through the cache, each view published a map the next could
+    not use, copied it, and drew the live casters over the copy, and took a
+    cache record to do it. On one route through hub2 two lights riding the
+    data router did that 590 times in 504 views.
+
+    "Moving" is the light's shape changing (origin, axes, radius, projection),
+    stamped apart from lastModifiedFrameNum, which also follows a colour that
+    animates. A light whose colour alone changes keeps its cache.
+    """
+    policy = read("src/renderer/ShadowMapClassification.cpp")
+    require_order(
+        braced_body(policy, "bool R_ShadowMapLightIsMoving(", "moving light rule"),
+        (
+            "lightDef != NULL && lightDef->lastMovedFrameNum > 0",
+            "&& lightDef->lastMovedFrameNum >= frame - shadowMapMovingLightFrames;",
+        ),
+        "a light is moving while its shape changed within two game tics",
+    )
+    # Not the casters' quarter second: a light that has stopped would draw its
+    # maps afresh every frame for that long before it was cached again.
+    require_order(
+        braced_body(policy, "int R_ShadowMapMovingLightFramesFor(", "moving light window"),
+        (
+            "static_cast<double>( SHADOWMAP_MOVING_LIGHT_WINDOW_MSEC ) / frameMsec ) + 1.0;",
+            "return Max( 2, static_cast<int>( frames ) );",
+        ),
+        "the window bridges two game tics",
+    )
+    require(policy, "static const int SHADOWMAP_MOVING_LIGHT_WINDOW_MSEC = 70;", "seventy milliseconds")
+    require_order(
+        braced_body(policy, "bool R_ShadowMapMovingLightSkipsCache(", "cache bypass rule"),
+        (
+            "!r_shadowMapCacheMovingLights.GetBool() && vLight != NULL",
+            "&& R_ShadowMapLightIsMoving( vLight->lightDef, frame );",
+        ),
+        "the bypass has a comparison switch",
+    )
+    # the stamp is set where a light update finds the shape changed, and only there
+    world = read("src/renderer/RenderWorld.cpp")
+    require_order(
+        world,
+        (
+            "rlight->origin == light->parms.origin &&",
+            "justUpdate = true;",
+            "light->lightHasMoved = true;",
+            # the geometry alone: the shape test above also fails for a
+            # dropped prelight model, on every update of a light that once moved
+            "if ( !( rlight->origin == light->parms.origin && rlight->axis == light->parms.axis",
+            "&& rlight->lightRadius == light->parms.lightRadius",
+            "&& rlight->parallel == light->parms.parallel ) ) {",
+            "light->lastMovedFrameNum = tr.frameCount;",
+            "R_FreeLightDefDerivedData( light );",
+            "light->lastModifiedFrameNum = tr.frameCount;",
+        ),
+        "a change of shape stamps the move; any update stamps the modification",
+    )
+    if world.count("lastMovedFrameNum = tr.frameCount;") != 1:
+        raise AssertionError("Only a change of the light's shape counts as a move")
+    require(read("src/rendergeo/RenderGeometryLocalDefs.cpp"), "lastMovedFrameNum = 0;", "a new light has not moved")
+
+    # all four cacheable rules ask first, so the planner's estimate agrees with the draw
+    guard = "if ( R_ShadowMapMovingLightSkipsCache( vLight, backEnd.frameCount ) ) { return false; }"
+    for path, markers in (
+            ("src/renderer/Vulkan/vk_ShadowMap.cpp",
+             ("static bool VK_ShadowMap_StaticCacheable(", "static bool VK_ShadowMap_StaticCacheableReadOnly(")),
+            ("src/renderer/draw_arb2.cpp",
+             ("static bool RB_ShadowMapStaticCacheable(", "static bool RB_ShadowMapStaticCacheableReadOnly("))):
+        source = read(path)
+        for marker in markers:
+            body = braced_body(source, marker, marker)
+            require_order(
+                body,
+                (
+                    "if ( R_ShadowMapMovingLightSkipsCache( vLight, backEnd.frameCount ) ) {",
+                    "return false;",
+                ),
+                f"{path}: {marker} refuses a moving light",
+            )
+            # before any other statement of the rule
+            if compact(body).find(compact("R_ShadowMapMovingLightSkipsCache(")) > 400:
+                raise AssertionError(f"{path}: {marker} must refuse a moving light before anything else")
+    # the distance rule for static casters uses the same notion of a still light
+    require(read("src/renderer/Interaction.cpp"), "!R_ShadowMapLightIsMoving( lightDef, tr.frameCount );",
+            "the static-caster rule and the cache agree on what a still light is")
+    require_compact(
+        read("src/renderer/RenderSystem_init.cpp"),
+        'idCVar r_shadowMapCacheMovingLights( "r_shadowMapCacheMovingLights", "0", CVAR_RENDERER | CVAR_BOOL,',
+        "off by default, not archived",
+    )
+    require(read("docs/user/shadow-mapping.md"), "`r_shadowMapCacheMovingLights`", "the switch is in the user guide")
 
 
 def validate_stencil_fallback_release_contract() -> None:
@@ -9286,6 +9383,7 @@ def main() -> None:
     validate_depth_only_point_cube_contract()
     validate_static_cutout_caster_contract()
     validate_static_signature_view_independence_contract()
+    validate_moving_light_cache_bypass_contract()
     validate_stencil_fallback_release_contract()
     validate_scratch_cube_pool_contract()
     validate_resident_projected_sampling_contract()

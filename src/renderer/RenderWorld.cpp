@@ -827,6 +827,20 @@ void idRenderWorldLocal::UpdateLightDef( qhandle_t lightHandle, const renderLigh
 		} else {
 			// if we are updating shadows, the prelight model is no longer valid
 			light->lightHasMoved = true;
+			// Whether the light is moving is asked of its geometry alone. The
+			// test above also fails for another shader or prelight model, and
+			// a light that has moved once has its prelight model dropped, so
+			// it fails on every later update of a light that now holds still.
+			if ( !( rlight->origin == light->parms.origin && rlight->axis == light->parms.axis
+					&& rlight->lightRadius == light->parms.lightRadius
+					&& rlight->lightCenter == light->parms.lightCenter
+					&& rlight->target == light->parms.target && rlight->up == light->parms.up
+					&& rlight->right == light->parms.right && rlight->start == light->parms.start
+					&& rlight->end == light->parms.end
+					&& rlight->pointLight == light->parms.pointLight
+					&& rlight->parallel == light->parms.parallel ) ) {
+				light->lastMovedFrameNum = tr.frameCount;
+			}
 			R_FreeLightDefDerivedData( light );
 		}
 	} else {

@@ -149,6 +149,8 @@ public:
 
 	renderLight_t			parms;					// specification
 
+	int						lastMovedFrameNum;		// the frame its shape last changed (origin, axes, radius,
+													// projection): lastModifiedFrameNum also follows colour
 	bool					lightHasMoved;			// the light has changed its position since it was
 													// first added, so the prelight model is not valid
 

@@ -775,6 +775,68 @@ Checked for this change, on the final build: that run; the fourteen scenarios
 on both back ends; the in-engine self-tests; and the static tests that read
 the touched files.
 
+### Moving lights
+
+Added on 10 November. The static cache keeps a light's still casters so that
+a view only draws the moving ones over them. A light that itself moves has a
+new map every view. Through the cache, each view published a map the next
+could not use, copied it, drew the live casters over the copy, and took a
+cache record to do it.
+
+- **A moving light draws its maps directly** (`R_ShadowMapMovingLightSkipsCache`,
+  asked first by all four cacheable rules, so OpenGL's planner agrees with
+  what is drawn). `r_shadowMapCacheMovingLights 1` restores the old path.
+- **Moving means the light's geometry changed** within the last two game
+  tics: origin, axes, radius, centre, projection. That is stamped apart from
+  the light's modification frame, which also follows a colour that animates,
+  so a light that only changes colour keeps its cache. The distance rule for
+  static casters now uses the same test.
+
+Two first attempts at "moving" were wrong, and the scenarios caught both. The
+engine's own test for a changed shape also fails when the prelight model
+differs, and a light that has moved once has that model dropped, so it failed
+on every later update and a flashlight held still counted as moving for good.
+And the casters' quarter-second window kept a light that had just stopped out
+of the cache that long, drawing its maps afresh every frame meanwhile; seventy
+milliseconds bridge two tics and no more.
+
+The hub2 route with the two lights that ride the data router, Vulkan, Quality,
+504 views:
+
+| | Through the cache | Drawn directly |
+|---|---:|---:|
+| Point passes published and composed | 588 | 24 |
+| Point passes drawn in one go | 0 | 567 |
+| Composed passes in all | 1,945 | 1,390 |
+| Cubes rendered fresh | 651 | 641 |
+
+Each of those passes loses a cube copy, six render scopes and a cache record.
+
+The player's flashlight is the moving light most often on screen, and since
+11 November it casts shadows on every preset that draws them. Air Defense 2,
+Quality, flashlight on, the view turning, the switch alternated in one
+process on a quiet machine, six pairs:
+
+| Vulkan | Through the cache | Drawn directly |
+|---|---:|---:|
+| Shadow GPU phases | 0.69 ms | 0.34 ms |
+| of which the cache phase (the publish) | 0.20 ms | none |
+| of which the projected phase | 0.41 ms | 0.28 ms |
+| GPU frame | 6.07 ms | 5.72 ms (0.34 ms less, spread 1.03 ms, five of six) |
+
+CPU frame time is not resolved on Vulkan. On OpenGL nothing is resolved over
+eight pairs (GPU median of the pair differences 0.2 ms less, CPU 0.7 ms more,
+with single windows moving by several milliseconds either way).
+
+Checked for this change, on the final build: the route and the flashlight
+figures above; the fourteen scenarios on both back ends, all passing, and the
+one that had failed three times more; the continuous-motion qualification on
+both back ends; the in-engine self-tests; and the fifty-five static tests that
+read the touched files. One scenario harness needed a repair of its own: it
+waited thirty frames after placing a light before asking whether its map was
+reused, which on a fast enough machine is less than the seventy milliseconds
+a placed light counts as moving. It waits in wall time first now.
+
 Checks that passed on the final build: `renderer_shadow_mapping_maps.py`
 `caster-cycle-point`, `caster-cycle-cutout` and `door-point` on both backends
 (caster counts, cache reuse, cached against fresh images byte-identical; run
@@ -797,14 +859,9 @@ whether Enhanced can now map point lights on Vulkan.
 
 1. Fullscreen budgets for the three tiers, on the reference machine with
    nothing else running. Every change of this round moved what they cost.
-2. A light that moves every frame still goes through the cache every frame:
-   publish, copy, compose, and a cache record taken each time, where one
-   direct draw would do. Two such lights are most of the fresh maps on one
-   hub2 route. Neither renderer tells a light whose signature never settles
-   from one that changed once.
-   Also left of membership: the world's own geometry joins and leaves a
-   light's casters area by area as the player moves (seen on those two
-   lights; not measured on still ones).
+2. The world's own geometry joins and leaves a light's casters area by area
+   as the player moves (seen on the two moving lights of hub2; not measured on
+   still ones).
 3. Static-world volumes are still built once for every mapped light and kept
    for the fallback. Leaving them out too would need the same rebuild on
    return, for every surface the light touches.

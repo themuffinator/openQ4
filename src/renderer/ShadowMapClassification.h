@@ -118,6 +118,14 @@ static const int SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES = 500;
 // Called once per rendered frame with a millisecond clock.
 void R_ShadowMapBeginFrame( int nowMsec );
 int R_ShadowMapDynamicCasterFrames( void );
+// The light's shape changed within the last two game tics' worth of frames:
+// it is moving, and every view of it needs a new map.
+int R_ShadowMapMovingLightFramesFor( float frameMsec );
+bool R_ShadowMapLightIsMoving( const idRenderLightLocal *lightDef, int frame );
+// A moving light draws its maps directly. Through the static cache each view
+// published a map that the next view could not use, copied it and drew the
+// live casters over the copy.
+bool R_ShadowMapMovingLightSkipsCache( const viewLight_t *vLight, int frame );
 // The pure form, for the self-test: the window in frames for a smoothed frame
 // interval in milliseconds.
 int R_ShadowMapDynamicCasterFramesFor( float frameMsec );

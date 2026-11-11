@@ -2466,8 +2466,8 @@ void idInteraction::AddActiveInteraction( void ) {
 			// each time the player crossed its range, in either direction.
 			// A light that moves draws its map every frame whatever is in
 			// it, so its casters keep the LOD.
-			const bool lightHoldsStill = lightDef->lastModifiedFrameNum
-				< tr.frameCount - R_ShadowMapDynamicCasterFrames();
+			const bool lightHoldsStill =
+				!R_ShadowMapLightIsMoving( lightDef, tr.frameCount );
 			const bool casterLODAdmitted = sint->shadowStencilEligible
 				|| ( lightHoldsStill
 					&& !R_ShadowMapCasterIsDynamic( entityDef, shadowShader ) )

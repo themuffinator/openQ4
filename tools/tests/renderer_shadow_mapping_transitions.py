@@ -50,7 +50,11 @@ def transition_commands(scenario: str) -> tuple[list[str], tuple[str, ...]]:
 
     def capture(label: str, *settings: str) -> None:
         commands.extend(settings)
-        commands.extend(["wait 30", f"echo SHADOW_TRANSITION_{label}",
+        # A light that has just been placed counts as moving for seventy
+        # milliseconds and is drawn directly meanwhile, not cached. Thirty
+        # frames are less than that on a fast enough machine, so wait in wall
+        # time first.
+        commands.extend(["waitMsec 150", "wait 30", f"echo SHADOW_TRANSITION_{label}",
                          f"screenshot screenshots/{label}.tga", "wait 3"])
         captures.append(label)
 

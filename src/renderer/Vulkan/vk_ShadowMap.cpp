@@ -1683,6 +1683,10 @@ static bool VK_ShadowMap_StaticCacheable(
 		const viewLight_t *vLight, const viewDef_t *viewDef,
 		const vkShadowReceiverPass_t passKind, const bool pointLight,
 		const int cascadeCount, const int atlasDiv ) {
+	// A moving light has a new map every view, so it is drawn directly.
+	if ( R_ShadowMapMovingLightSkipsCache( vLight, backEnd.frameCount ) ) {
+		return false;
+	}
 	const int lightIndex = VK_ShadowMap_LightIndex( vLight );
 	const idRenderWorldLocal *renderWorld =
 			viewDef != NULL ? viewDef->renderWorld : NULL;
@@ -2284,6 +2288,10 @@ static bool VK_ShadowMap_UpdateAdmitted( const int lightIndex ) {
 static bool VK_ShadowMap_StaticCacheableReadOnly(
 		const viewLight_t *vLight, const viewDef_t *viewDef,
 		const bool pointLight, const int cascadeCount ) {
+	// A moving light has a new map every view, so it is drawn directly.
+	if ( R_ShadowMapMovingLightSkipsCache( vLight, backEnd.frameCount ) ) {
+		return false;
+	}
 	const idRenderWorldLocal *renderWorld =
 			viewDef != NULL ? viewDef->renderWorld : NULL;
 	const int lightIndex = VK_ShadowMap_LightIndex( vLight );

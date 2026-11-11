@@ -3737,6 +3737,10 @@ static bool RB_ShadowMapPointComposeAvailable( void ) {
 }
 
 static bool RB_ShadowMapStaticCacheable( const viewLight_t *vLight, const shadowMapPassKind_t passKind, const bool pointLight, const bool haveTranslucentCasters ) {
+	// A moving light has a new map every view, so it is drawn directly.
+	if ( R_ShadowMapMovingLightSkipsCache( vLight, backEnd.frameCount ) ) {
+		return false;
+	}
 	if ( !r_shadowMapStaticCache.GetBool() || vLight == NULL || RB_ShadowMapLightIndex( vLight ) < 0 ) {
 		return false;
 	}
@@ -3781,6 +3785,10 @@ static bool RB_ShadowMapStaticCacheable( const viewLight_t *vLight, const shadow
 }
 
 static bool RB_ShadowMapStaticCacheableReadOnly( const viewLight_t *vLight, const shadowMapPassKind_t passKind, const bool pointLight, const bool haveTranslucentCasters ) {
+	// A moving light has a new map every view, so it is drawn directly.
+	if ( R_ShadowMapMovingLightSkipsCache( vLight, backEnd.frameCount ) ) {
+		return false;
+	}
 	if ( !r_shadowMapStaticCache.GetBool() || vLight == NULL || RB_ShadowMapLightIndex( vLight ) < 0 ) {
 		return false;
 	}
