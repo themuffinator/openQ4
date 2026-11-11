@@ -1958,8 +1958,12 @@ and AND-05.
   left eye's views and none of the eyes' 2D; and a checkpoint preview reads
   the left eye, not the desktop mirror. The play-space and multiplayer smokes
   check each one, and each check fails on a build with its fix switched off.
-  One lead from that audit remains: on OpenGL a frame whose virtual-screen
-  copy fails stays marked presented.
+  The audit's last lead is fixed the same day: an OpenGL frame whose
+  virtual-screen copy failed, or that reached no target, stayed marked
+  presented, so the engine submitted images it never wrote. It now submits no
+  layer, as Vulkan; the test runtime's `imageFill:<n>:unbound` fault breaks
+  the screen's images for `openxr_lifecycle_runtime.py`, which failed before
+  the fix.
 - [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and

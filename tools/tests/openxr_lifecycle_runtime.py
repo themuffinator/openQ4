@@ -50,6 +50,12 @@ def main() -> int:
     vulkan = args.render_api == "vulkan"
     if (args.validation or args.windowless) and not vulkan:
         parser.error("--validation and --windowless need --render-api vulkan")
+    # imageFill:<n>:unbound hands one OpenGL swapchain texture names that name
+    # nothing (the third fill after a restart is the virtual screen's): the
+    # session runs on, and no frame may submit a layer whose image it never wrote
+    unbound = args.fault.endswith(":unbound")
+    if unbound and (vulkan or not args.fault.startswith("imageFill:")):
+        parser.error("the unbound fault is imageFill:<n>:unbound on OpenGL")
     if args.fault != "none" and not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*:[1-9][0-9]*:[a-z]+", args.fault):
         parser.error("fault must be call:positive-occurrence:value or none")
     runtime, output, manifest = args.runtime_dir.resolve(), args.output_dir.resolve(), args.manifest.resolve()
@@ -221,7 +227,17 @@ def main() -> int:
     restart = log.split("XR_FAULT_RESTART", 1)[-1].split("XR_FAULT_DESKTOP", 1)[0]
     if "running, focused" not in restart:
         report["failures"].append("manual restart did not restore focused XR gameplay")
-    if args.fault != "none" and not args.fault.endswith(":tracking"):
+    if unbound and faults:
+        # the virtual screen's copy fails every frame: no layer at all, since
+        # the eyes' projection is submitted only with the screen
+        after = [e for e in events[events.index(faults[0]) + 1:] if e["event"] == "end_frame"]
+        if "is not a complete color attachment" not in log:
+            report["failures"].append("the copy into the unbound screen image did not fail")
+        if not any(e.get("layers") == [] for e in after):
+            report["failures"].append("no frame went without layers after the screen image broke")
+        if any(layer.get("type") == "quad" for e in after for layer in e.get("layers", [])):
+            report["failures"].append("a frame submitted the virtual screen it never wrote")
+    if args.fault != "none" and not args.fault.endswith((":tracking", ":unbound")):
         fallback = log.split("XR_FAULT_AFTER", 1)[-1].split("XR_FAULT_AUTO", 1)[0]
         if "session: none" not in fallback:
             report["failures"].append("fault did not retire the session before fallback capture")
@@ -240,7 +256,10 @@ def main() -> int:
     if vulkan:
         captures.update(left=Path(f"{eye_prefix['restart']}_left.tga"), right=Path(f"{eye_prefix['restart']}_right.tga"),
                         after_capture=Path(f"{eye_prefix['after_capture']}_left.tga"))
-    else:
+    elif not unbound:
+        # (with nameless images in the engine's own context, the left eye's
+        # render-target readback fails, before and after the presented-flag fix
+        # alike; the fault case checks the submitted layers instead)
         captures.update({name: game / f"screenshots/xr_{name}.tga" for name in ("left", "right", "after_capture")})
     for name, path in captures.items():
         if path.is_file():

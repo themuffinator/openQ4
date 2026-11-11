@@ -343,6 +343,15 @@ def check_engine() -> None:
     require(read("src/renderer/Vulkan/vk_VRPresentation.cpp"),
             "VK_QueueSavePreviewFromImage( cmd, left.color, left.format, left.width, left.height );",
             "a Vulkan VR frame's preview is copied from the left eye")
+    # OpenGL submits no layer for an image the frame did not write, as Vulkan
+    gl_present = read("src/renderer/OpenGL/gl_VRPresentation.cpp")
+    require(gl_present, "\tif ( rb_vrTarget == -2 ) {\n\t\t// nothing reached the targets: submit no layers\n"
+                        "\t\ttr.vrFrameResult.presented = false;\n"
+                        "\t\ttr.vrFrameResult.eyeRendered[0] = tr.vrFrameResult.eyeRendered[1] = false;",
+            "an OpenGL VR frame that reached no target submits no layers")
+    require(gl_present, "if ( !rb_vrCleared[0] || !RB_VR_BlitToImage( tr.vrTargets[0], tr.vrFrame.screenImage, "
+                        "tr.vrFrame.screenWidth, tr.vrFrame.screenHeight ) ) {\n\t\ttr.vrFrameResult.presented = false;",
+            "an OpenGL virtual screen the frame did not draw or copy is not presented")
     # world GUIs, characters and usable things answer the weapon hand where it points
     require(player, "start = GetEyePosition();\n\t// openQ4 VR: the weapon hand points at world GUIs",
             "the focus trace starts where the weapon hand aims")

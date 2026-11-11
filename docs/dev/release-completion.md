@@ -33,6 +33,11 @@ See [player release status](../user/release-status.md).
   menu showed the desktop window: black with the mirror off (`vr_mirror 0`),
   only the HUD with the mirror on the floating screen. It now shows your left
   eye.
+- **OpenGL: a frame that never reached the headset's images is skipped.** If
+  copying the HUD into the headset's image failed, or nothing was drawn for
+  the headset that frame, OpenGL still handed the headset its images, holding
+  whatever an earlier frame left there. Such a frame is now skipped, as it
+  already was on Vulkan.
 - **For testers.** `vr_debug 2` also logs, each frame, where the head the eyes
   are drawn from stands and how dark the comfort vignette is.
   `testVehicle <name> enter` boards a vehicle without a console script, so a
@@ -47,7 +52,9 @@ See [player release status](../user/release-status.md).
   (271, 222) on the 640x480 HUD (317, 169), a demo frame wrote four views and
   the laser dot (two views, no dot), a checkpoint preview with the mirror off
   was black (lit), and a walker seat loaded 104 degrees from where it was
-  saved (4.4).
+  saved (4.4). With the HUD's image broken by the test runtime
+  (`openxr_lifecycle_runtime.py --fault imageFill:3:unbound`), OpenGL
+  submitted the HUD layer it never wrote; it now submits no layer.
 - Evidence: `openxr_vr_playspace_smoke.py` (the step's drawn head and
   vignette; a seat run with the demo, the checkpoint and the walker save),
   `openxr_vr_mp_smoke.py` (the walk's drawn head and vignette; the damage

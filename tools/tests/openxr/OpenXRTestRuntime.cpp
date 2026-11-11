@@ -19,7 +19,9 @@
 //   OPENQ4_XR_TEST_EYE_SIZE "WIDTHxHEIGHT" recommended per-eye size (default 1440x1600)
 //   OPENQ4_XR_TEST_RATE     display refresh in Hz (default 90); 0 runs unpaced
 //   OPENQ4_XR_TEST_NO_INPUT 1 keeps every controller action inactive
-//   OPENQ4_XR_TEST_FAULT    "call:occurrence:value" (e.g. xrWaitSwapchainImage:2:timeout)
+//   OPENQ4_XR_TEST_FAULT    "call:occurrence:value" (e.g. xrWaitSwapchainImage:2:timeout);
+//                           imageFill:<n>:unbound hands an OpenGL swapchain texture
+//                           names the runtime never made, so nothing can render into them
 //   OPENQ4_XR_TEST_FAULT_AFTER optional existing-file marker before counting calls
 //   OPENQ4_XR_TEST_FAULT_ONCE optional receipt prevents reinjection after loader restart
 //   OPENQ4_XR_TEST_VK_DEVICE  index of the Vulkan physical device the "headset"
@@ -2688,12 +2690,18 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateSwapchainImages( XrSwapchain handle
 	if ( countOutput == nullptr ) {
 		return XR_ERROR_VALIDATION_FAILURE;
 	}
+	bool unbound = false;
 	if ( Fault( capacity == 0 ? "imageCount" : "imageFill" ) ) {
 		if ( G().faultValue == "zero" || G().faultValue == "large" || G().faultValue == "changed" ) {
 			*countOutput = G().faultValue == "zero" ? 0 : G().faultValue == "large" ? UINT32_MAX : capacity + 1;
 			return XR_SUCCESS;
 		}
-		return FaultResult();
+		// the right count and type, but texture names that name nothing: an
+		// application's copy into them fails as into a broken image
+		if ( G().faultValue != "unbound" || capacity == 0 || swapchain->session->vulkan ) {
+			return FaultResult();
+		}
+		unbound = true;
 	}
 	*countOutput = swapchain->imageCount;
 	if ( capacity == 0 ) {
@@ -2717,7 +2725,7 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateSwapchainImages( XrSwapchain handle
 		if ( gl[i].type != XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR ) {
 			return XR_ERROR_VALIDATION_FAILURE;
 		}
-		gl[i].image = swapchain->textures[i];
+		gl[i].image = unbound ? 0x7fff0000u + static_cast<uint32_t>( i ) : swapchain->textures[i];
 	}
 	return XR_SUCCESS;
 }
