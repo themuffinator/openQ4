@@ -78,6 +78,7 @@ struct idSessionLocal {
     void UpdateRetainedJoinGame() {}
     void UpdateRetainedNotices() {}
     void UpdateRetainedSettingsPage() {}
+    void PrefetchRetainedNextPages() {}
     void UpdateBrowserTooltip() {}
     void PrecacheRetainedLevelshots(bool) {}
     bool RetainedSubpageEvent(const sysEvent_t*) { return false; }

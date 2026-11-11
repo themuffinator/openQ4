@@ -180,8 +180,10 @@ struct Common {
         char text[4096]; va_list args; va_start(args,format); std::vsnprintf(text,sizeof(text),format,args); va_end(args);
         prints.emplace_back(text);
     }
+    void DPrintf(const char*,...) {}
     int GetPresentationTime() const {return 0;}
 } commonObject,*common=&commonObject;
+static int Sys_Milliseconds() { return 0; }
 struct CVars {
     bool aspect=true,shadows=true;
     float brightness=1;

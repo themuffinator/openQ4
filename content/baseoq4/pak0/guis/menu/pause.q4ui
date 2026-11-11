@@ -25798,7 +25798,7 @@
               "disabled": "nav_resume.disabled"
              },
              "action": "resume",
-             "navigation": {"up": "link_exit", "down": "nav_savegame"}
+             "navigation": {"up": "link_exit", "down": "nav_savegame", "left": "nav_resume", "right": "nav_resume"}
             }
            },
            {
@@ -25998,7 +25998,7 @@
               "disabled": "nav_savegame.disabled"
              },
              "action": "saveGame",
-             "navigation": {"up": "nav_resume", "down": "nav_loadgame"}
+             "navigation": {"up": "nav_resume", "down": "nav_loadgame", "left": "nav_savegame", "right": "nav_savegame"}
             }
            },
            {
@@ -26198,7 +26198,7 @@
               "disabled": "nav_loadgame.disabled"
              },
              "action": "loadGame",
-             "navigation": {"up": "nav_savegame", "down": "nav_restart"}
+             "navigation": {"up": "nav_savegame", "down": "nav_restart", "left": "nav_loadgame", "right": "nav_loadgame"}
             }
            },
            {
@@ -26398,7 +26398,7 @@
               "disabled": "nav_restart.disabled"
              },
              "action": "restartLevel",
-             "navigation": {"up": "nav_loadgame", "down": "nav_objectives"}
+             "navigation": {"up": "nav_loadgame", "down": "nav_objectives", "left": "nav_restart", "right": "nav_restart"}
             }
            },
            {
@@ -26598,7 +26598,7 @@
               "disabled": "nav_objectives.disabled"
              },
              "event": "objectivesShow",
-             "navigation": {"up": "nav_restart", "down": "nav_settings"}
+             "navigation": {"up": "nav_restart", "down": "nav_settings", "left": "nav_objectives", "right": "nav_objectives"}
             }
            },
            {
@@ -26798,7 +26798,7 @@
               "disabled": "nav_settings.disabled"
              },
              "action": "settings",
-             "navigation": {"up": "nav_objectives", "down": "nav_quit"}
+             "navigation": {"up": "nav_objectives", "down": "nav_quit", "left": "nav_settings", "right": "nav_settings"}
             }
            },
            {
@@ -26998,7 +26998,7 @@
               "disabled": "nav_quit.disabled"
              },
              "event": "quitModalShow",
-             "navigation": {"up": "nav_settings", "down": "link_exit"}
+             "navigation": {"up": "nav_settings", "down": "link_exit", "left": "nav_quit", "right": "nav_quit"}
             }
            }
           ]

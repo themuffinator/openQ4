@@ -1234,13 +1234,17 @@ def safe_frame(result: dict) -> dict:
     return result
 
 
-def wrap_menu(column: list, row: list = ()) -> None:
+def wrap_menu(column: list, row: list = (), edges: bool = False) -> None:
     """Section 13.4: a menu of up to seven items wraps. Up and Down step
     through `column` (its controls top to bottom) and on to the plinth's
     links in `row`, and from there back to the top, so the column and the
     plinth form one loop; Left and Right wrap along the row. Each move is
     authored, and a control that cannot take focus (CONTINUE without a save,
-    a disabled entry) passes it on along its own (Interaction::Authored)."""
+    a disabled entry) passes it on along its own (Interaction::Authored).
+    With `edges` the column's plates name themselves for Left and Right,
+    where nothing stands beside them: unauthored, the step went looking for
+    the nearest control that way and found a plinth link (EXIT, from the
+    pause)."""
     if not 1 <= len(column) <= 7 or len(row) > 7:
         raise SystemExit(f"a wrapping menu holds up to seven items and links: {len(column)} and {len(row)}")
     ids = [node["id"] for node in column]
@@ -1249,6 +1253,9 @@ def wrap_menu(column: list, row: list = ()) -> None:
         up = ids[index - 1] if index > 0 else (links[0] if links else ids[-1])
         down = ids[index + 1] if index + 1 < len(ids) else (links[0] if links else ids[0])
         node["control"].setdefault("navigation", {}).update({"up": up, "down": down})
+        if edges:
+            node["control"]["navigation"].setdefault("left", node["id"])
+            node["control"]["navigation"].setdefault("right", node["id"])
     for index, node in enumerate(row):
         node["control"].setdefault("navigation", {}).update({
             "up": ids[-1], "down": ids[0], "left": links[index - 1], "right": links[(index + 1) % len(links)]})
@@ -2861,7 +2868,7 @@ def title_document() -> dict:
     # section (section 9).
     links = [link(doc, "link_mods", "#str_200010", action="mods"), link(doc, "link_updates", "#str_200011", action="updates"),
              link(doc, "link_credits", "#str_200012", action="credits"), link(doc, "link_exit", "#str_200013", event="exitModalShow")]
-    wrap_menu(buttons, links)
+    wrap_menu(buttons, links, edges=True)
     stage = group("home-stage", {**absolute(top=0, width=CANVAS_W, height=720), "left": length(50, "%"), "margin-left": length(-CANVAS_W / 2),
                                  "opacity": number(1)}, [
         emblem(doc),
@@ -4376,12 +4383,12 @@ def pause_document(strogg: bool = False) -> dict:
         # The actions translate 45 ms apart, EXIT after them, and the level
         # block's lines follow.
         exit_link = strogg_link(doc, "link_exit", "#str_200013", translation, 120 + 45 * len(items), event="exitModalShow")
-        wrap_menu(plates, [exit_link])
+        wrap_menu(plates, [exit_link], edges=True)
         home_parts = [strogg_title(translation), nav, strogg_level_block(doc, translation, 120 + 45 * (len(items) + 1)),
                       strogg_plinth([exit_link])]
     else:
         exit_link = link(doc, "link_exit", "#str_200013", event="exitModalShow")
-        wrap_menu(plates, [exit_link])
+        wrap_menu(plates, [exit_link], edges=True)
         home_parts = [label("paused-title", "#str_230031", {**absolute(left=U * 44, top=U * 134, width=U * 330, height=U * 24),
                             **typeface("marine", 18, U * 24, [1, 1, 1, 0.5]), "white-space": keyword("nowrap")}),
                       nav, level_block(doc), plinth(doc, [exit_link])]

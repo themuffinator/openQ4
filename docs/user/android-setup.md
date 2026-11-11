@@ -65,7 +65,7 @@ the test grid never sends movement or fire commands to the running game.
 ### Edit the touch layout
 
 Select **Edit layout** on the Controls page, or in the game open **Settings**,
-then **Controls**, and select **Touch layout** at the end of the Other tab.
+then **Controls**, and select **Touch Layout** at the end of the Other tab.
 The editor shows your screen with every control and its name:
 
 - Drag a control to move it. It snaps to an 8 dp grid and keeps clear of the

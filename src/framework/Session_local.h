@@ -348,6 +348,7 @@ public:
 	// Starts parsing PreloadRetainedScreens' documents on the job system's
 	// workers, while the stock menus load.
 	void				PrefetchRetainedScreens();
+	void				PrefetchRetainedNextPages();
 	void				PrepareRetainedLevel( const char *mapPath, bool multiplayer );
 	// As a map change begins, starts parsing the level's retained documents on
 	// the job system's workers: the pages PrepareRetainedLevel loads, and the

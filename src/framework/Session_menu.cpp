@@ -6047,6 +6047,7 @@ void idSessionLocal::GuiFrameEvents() {
 	UpdateRetainedMultiplayerPage();
 	UpdateRetainedJoinGame();
 	UpdateRetainedSettingsPage();
+	PrefetchRetainedNextPages();
 	UpdateRetainedNotices();
 	UpdateBrowserTooltip();
 	PrecacheRetainedLevelshots( false );
@@ -10493,16 +10494,72 @@ idUserInterface *idSessionLocal::SelectRetainedLoadingGui( idUserInterface *lega
 void idSessionLocal::PrefetchRetainedScreens() {
 #ifndef ID_DEDICATED
 	// PreloadRetainedScreens' documents, in its order, the title first. The
-	// pages a gate or a missing page will refuse are parsed for nothing.
+	// pages a gate or a missing page will refuse are parsed for nothing. The
+	// pages that load when first opened parse later, while the page that
+	// leads to them shows (PrefetchRetainedNextPages).
 	if ( !Session_RetainedScreensEnabled() ) {
 		return;
 	}
 	const char *const documents[] = {
 		RETAINED_TITLE_GUI, RETAINED_LOADGAME_GUI, RETAINED_CREDITS_GUI, RETAINED_DEMOS_GUI, RETAINED_ARENA_GUI,
-		RETAINED_MPPAGE_GUI, RETAINED_SETTINGSPAGE_GUI, Session_RetainedCreateServerEnabled() ? RETAINED_CREATE_SERVER_GUI : NULL,
+		RETAINED_MPPAGE_GUI, Session_RetainedCreateServerEnabled() ? RETAINED_CREATE_SERVER_GUI : NULL,
 		Session_RetainedJoinGameEnabled() ? RETAINED_JOIN_GAME_GUI : NULL
 	};
 	UI_RetainedPrefetchDocuments( documents, static_cast<int>( sizeof( documents ) / sizeof( documents[0] ) ) );
+#endif
+}
+
+/*
+===============
+idSessionLocal::PrefetchRetainedNextPages
+
+The pages that load when first opened, parsed on the job workers while the
+page that leads to them shows. Most of a load is the document's parse and
+validation (about 180 of CONTROLS' 270 ms), so the page chosen then waits
+for its view alone: the title leads to the Single Player and SETTINGS
+pages, Single Player to Campaign, Campaign to its difficulty and CHAPTERS
+pages, the pauses to SETTINGS, and SETTINGS to CONTROLS, GAME OPTIONS,
+DISPLAY and AUDIO. Nothing parses for a page that is loaded, that the stock
+screen stands in for, or whose parse is already under way, and a parse no
+page takes goes with the next level's unload (UI_RetainedPrefetchClear).
+===============
+*/
+void idSessionLocal::PrefetchRetainedNextPages() {
+#ifndef ID_DEDICATED
+	static const char *const leads[][5] = {
+		{ RETAINED_TITLE_GUI, RETAINED_SINGLEPLAYER_GUI, RETAINED_SETTINGSPAGE_GUI, NULL, NULL },
+		{ RETAINED_PAUSE_GUI, RETAINED_SETTINGSPAGE_GUI, NULL, NULL, NULL },
+		{ RETAINED_PAUSE_STROGG_GUI, RETAINED_SETTINGSPAGE_GUI, NULL, NULL, NULL },
+		{ RETAINED_SINGLEPLAYER_GUI, RETAINED_CAMPAIGNS_GUI, NULL, NULL, NULL },
+		{ RETAINED_CAMPAIGNS_GUI, RETAINED_SKILL_GUI, RETAINED_CHAPTERS_GUI, NULL, NULL },
+		{ RETAINED_SETTINGSPAGE_GUI, RETAINED_CONTROLS_GUI, RETAINED_GAME_GUI, RETAINED_SYSTEM_GUI, RETAINED_AUDIO_GUI }
+	};
+	// The page on screen: a retained home stands over the legacy menu.
+	static const idUserInterface *seen = NULL;
+	const idUserInterface *shown = guiRetainedHome != NULL && guiActive == guiMainMenu ? guiRetainedHome : guiActive;
+	if ( shown == seen ) {
+		return;
+	}
+	seen = shown;
+	if ( shown == NULL || !Session_RetainedScreensEnabled() ) {
+		return;
+	}
+	for ( int i = 0; i < static_cast<int>( sizeof( leads ) / sizeof( leads[0] ) ); ++i ) {
+		if ( idStr::Icmp( shown->Name(), leads[ i ][ 0 ] ) != 0 ) {
+			continue;
+		}
+		const char *pages[4] = { NULL, NULL, NULL, NULL };
+		for ( int next = 0; next < 4; ++next ) {
+			const char *page = leads[ i ][ next + 1 ];
+			if ( page == NULL || retainedStock.FindIndex( page ) >= 0 || uiManager->FindGui( page, false, false, false ) != NULL ||
+					( page == RETAINED_SYSTEM_GUI && !RetainedSystemAvailable() ) ) {
+				continue;
+			}
+			pages[ next ] = page;
+		}
+		UI_RetainedPrefetchDocuments( pages, 4 );
+		return;
+	}
 #endif
 }
 

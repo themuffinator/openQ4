@@ -99,6 +99,25 @@ See [player release status](../user/release-status.md).
   `tools/tests/material_constant_registers_contract.py`; the
   `rendererPBRMaterialSelfTest` command.
 
+## Menu pages that open without a pause, 11 November 2026
+
+- **Settings pages open at once.** The first time you opened Controls, Game
+  Options, Display or Audio in the new interface, the menu stopped for a
+  moment while the page was read: about a quarter of a second for Controls.
+  The game now reads those pages in the background while the Settings page
+  is on screen, so they open about three times sooner. The Single Player,
+  Campaign and Chapters pages gain in the same way.
+- **Fixes.**
+  - On the pause menu and the title, pressing Left or Right on a menu item
+    no longer jumps to the small EXIT link underneath.
+  - More English labels use the same capitals as their neighbours, for
+    example Use Password and Weapon Stay on Create Server and Model
+    Rotation on Player Setup.
+  - On the settings pages, section headings such as IMAGE QUALITY and
+    RENDERING line up with the rows under them. They started a little to
+    the left, past the edge of the panel behind them.
+- Evidence: [menu page loads](ui/menu-page-loads.md#evidence-11-november-2026).
+
 ## Key pictures on the Controls page, and menus that step the way they read, 10 November 2026
 
 - **The new interface's Controls page shows keys as pictures.** Each action

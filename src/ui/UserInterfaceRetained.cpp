@@ -1235,7 +1235,9 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 	const std::string source(static_cast<const char*>(data),static_cast<size_t>(size));
 	fileSystem->FreeFile(data);
 	Document candidate; std::vector<Diagnostic> diagnostics; std::string error;
-	if (!UI_RetainedTakePrefetched(path,source,candidate) && !candidate.Load(source,diagnostics)) {
+	const int loadStarted = Sys_Milliseconds();
+	const bool prefetched = UI_RetainedTakePrefetched(path,source,candidate);
+	if (!prefetched && !candidate.Load(source,diagnostics)) {
 		for (const auto& diagnostic : diagnostics) common->Warning("retained GUI %s:%u:%u %s: %s",path.c_str(),
 			static_cast<unsigned>(diagnostic.line),static_cast<unsigned>(diagnostic.column),diagnostic.pointer.c_str(),diagnostic.message.c_str());
 		return false;
@@ -1281,6 +1283,9 @@ bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool
 	RegisterLoaded(); RefreshThinking();
 	PrecacheImages(impl->document.Model().root);
 	common->Printf("RETAINED_GUI_LOADED %s\n",path.c_str());
+	// How long the page kept the frame, and whether a worker had parsed it.
+	common->DPrintf("retained GUI %s loaded in %d ms (%s)\n",path.c_str(),Sys_Milliseconds()-loadStarted,
+		prefetched ? "parse prefetched" : "parsed here");
 	return true;
 }
 

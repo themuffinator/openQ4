@@ -160,9 +160,20 @@ A [second round](key-bind-glyphs.md) that day took the settings tree:
 | Low | Stock | CONTROLS joined its key glyphs with "or" and squeezed long key names; Jump's fourth glyph was cut. | A space between glyphs; a keycap as wide as its name. |
 | Low | Both | Some English setting labels were in sentence case beside Title Case rows. | Title Case. |
 
-Left open there: DISPLAY in the retained interface still opens the stock
-page until a Performance Preset can be applied on the retained one, and the
-stock DISPLAY page's Section list does not name the page's headings.
+Left open there: the stock DISPLAY page's Section list does not name the
+page's headings. DISPLAY in the retained interface opened the stock page
+until later that day, when presets began to apply on the retained one.
+
+A [third round](menu-page-loads.md) on 11 November measured every retained
+menu and walked the pages the second had not:
+
+| Severity | Interface | Was | Now |
+| --- | --- | --- | --- |
+| Medium | Retained | The settings pages and the Single Player chain were parsed when first opened: CONTROLS held the frame 268 ms, GAME OPTIONS 184 ms. | The page that shows starts the next pages' parses on the job workers: 87 and 54 ms. |
+| Low | Retained | SETTINGS was parsed at startup, dropped unused, and parsed again when first opened (38 ms). | Parsed once, while the title or a pause shows (11 ms). |
+| Low | Retained | Right or Left from a plate of the pause or the title reached a plinth link (EXIT). | The plates hold the focus at their sides. |
+| Low | Both | More English labels in sentence case (Create Server's advanced options, Model rotation). | Title Case. |
+| Low | Retained | A settings column's heading and CONTROLS' hint began at the column's edge, over the leading end of the backing under the strip. | They start at the rows' label inset. |
 
 Left open: the stock pause's order, the stock Settings screen's
 arrangement and the campaign levels, which stay as the stock composition

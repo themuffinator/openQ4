@@ -115,6 +115,7 @@ struct idSessionLocal {
     void UpdateRetainedJoinGame() {}
     void UpdateRetainedNotices() {}
     void UpdateRetainedSettingsPage() {}
+    void PrefetchRetainedNextPages() {}
     void UpdateBrowserTooltip() {}
     void PrecacheRetainedLevelshots(bool) {}
     // Nor does the multiplayer card, or a loading screen held over a join.

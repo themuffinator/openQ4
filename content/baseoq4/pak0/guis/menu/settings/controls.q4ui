@@ -46894,6 +46894,19 @@
    }
   },
   {
+   "id": "tall.controls-move-note.padding-left",
+   "node": "controls-move-note",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
    "id": "tall.controls-move-note.margin-bottom",
    "node": "controls-move-note",
    "property": "margin-bottom",
@@ -50274,6 +50287,19 @@
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      {"op": "/", "args": [73.6307, {"state": "view.text"}]},
      36.0
+    ]
+   }
+  },
+  {
+   "id": "tall.controls-weapons-note.padding-left",
+   "node": "controls-weapons-note",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21.0, {"state": "view.text"}]}
     ]
    }
   },
@@ -53676,6 +53702,19 @@
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      {"op": "/", "args": [73.6307, {"state": "view.text"}]},
      36.0
+    ]
+   }
+  },
+  {
+   "id": "tall.controls-attack-note.padding-left",
+   "node": "controls-attack-note",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21.0, {"state": "view.text"}]}
     ]
    }
   },
@@ -57195,6 +57234,19 @@
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      {"op": "/", "args": [26.5889, {"state": "view.text"}]},
      13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.controls-other-note.padding-left",
+   "node": "controls-other-note",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21.0, {"state": "view.text"}]}
     ]
    }
   },
@@ -72434,7 +72486,8 @@
              "text": {"type": "text", "value": "#str_231545"},
              "position": {"type": "keyword", "value": "relative"},
              "display": {"type": "keyword", "value": "block"},
-             "width": {"type": "length", "value": 880.5, "unit": "dp"},
+             "width": {"type": "length", "value": 837.549, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 21.0, "unit": "dp"},
              "margin-bottom": {"type": "length", "value": 1.5, "unit": "dp"},
              "font-family": {"type": "font", "value": "lowpixel"},
              "font-size": {"type": "length", "value": 14, "unit": "dp"},
@@ -84650,7 +84703,8 @@
              "text": {"type": "text", "value": "#str_231545"},
              "position": {"type": "keyword", "value": "relative"},
              "display": {"type": "keyword", "value": "block"},
-             "width": {"type": "length", "value": 880.5, "unit": "dp"},
+             "width": {"type": "length", "value": 837.549, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 21.0, "unit": "dp"},
              "margin-bottom": {"type": "length", "value": 1.5, "unit": "dp"},
              "font-family": {"type": "font", "value": "lowpixel"},
              "font-size": {"type": "length", "value": 14, "unit": "dp"},
@@ -100565,7 +100619,8 @@
              "text": {"type": "text", "value": "#str_231545"},
              "position": {"type": "keyword", "value": "relative"},
              "display": {"type": "keyword", "value": "block"},
-             "width": {"type": "length", "value": 880.5, "unit": "dp"},
+             "width": {"type": "length", "value": 837.549, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 21.0, "unit": "dp"},
              "margin-bottom": {"type": "length", "value": 1.5, "unit": "dp"},
              "font-family": {"type": "font", "value": "lowpixel"},
              "font-size": {"type": "length", "value": 14, "unit": "dp"},
@@ -116480,7 +116535,8 @@
              "text": {"type": "text", "value": "#str_231545"},
              "position": {"type": "keyword", "value": "relative"},
              "display": {"type": "keyword", "value": "block"},
-             "width": {"type": "length", "value": 880.5, "unit": "dp"},
+             "width": {"type": "length", "value": 837.549, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 21.0, "unit": "dp"},
              "margin-bottom": {"type": "length", "value": 1.5, "unit": "dp"},
              "font-family": {"type": "font", "value": "lowpixel"},
              "font-size": {"type": "length", "value": 14, "unit": "dp"},

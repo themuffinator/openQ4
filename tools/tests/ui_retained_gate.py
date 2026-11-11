@@ -5695,9 +5695,15 @@ def main() -> int:
     assert 'Session_HandleCampaignPageRequest( *this, gui, command, false );' in menu
     # The pause screens are named once more by PrefetchRetainedLevel, which
     # parses them on workers as a map change begins; their loads stay in
-    # PrepareRetainedLevel.
-    assert menu.count('RETAINED_TITLE_GUI') == 4 and menu.count('RETAINED_PAUSE_GUI') == 4 and menu.count('RETAINED_LOADING_GUI') == 2
-    assert menu.count('RETAINED_PAUSE_STROGG_GUI') == 4
+    # PrepareRetainedLevel. The title and the pauses are named once more by
+    # PrefetchRetainedNextPages, which loads nothing: it starts the parses of
+    # the pages each leads to and that load when first opened.
+    assert menu.count('RETAINED_TITLE_GUI') == 5 and menu.count('RETAINED_PAUSE_GUI') == 5 and menu.count('RETAINED_LOADING_GUI') == 2
+    assert menu.count('RETAINED_PAUSE_STROGG_GUI') == 5
+    next_pages = function_body(menu, 'void idSessionLocal::PrefetchRetainedNextPages(')
+    assert 'FindRetainedGui' not in next_pages and 'UI_RetainedPrefetchDocuments( pages, 4 );' in next_pages
+    assert 'retainedStock.FindIndex( page ) >= 0 || uiManager->FindGui( page, false, false, false ) != NULL' in next_pages
+    assert 'RETAINED_SETTINGSPAGE_GUI' not in function_body(menu, 'void idSessionLocal::PrefetchRetainedScreens(')
     assert 'documents.Append( RETAINED_PAUSE_GUI );' in function_body(menu, 'void idSessionLocal::PrefetchRetainedLevel(')
     check_retained_multiplayer(menu, session)
     check_create_server(menu)

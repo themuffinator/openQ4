@@ -51,12 +51,19 @@ BACKING_STOPS = ((4.0, 0.0), (40.0, 1.0), (636.0, 1.0), (660.0, 0.0))   # u on t
 TAB_STATE, LEAVING_STATE = "page.tab", "page.leaving"   # "settings." states belong to the settings service
 TAB_FADE_MS = 150                         # the Escape card's page cross-fade
 HEADING_FACE = ("lowpixel", 14, [1, 1, 1, 0.4])   # Create Server's headings
+# A heading or a note starts where its rows' labels do, 21 dp in: at the
+# column's edge it began before the strip's backing and the header band's
+# cut, over their leading end.
+HEADING_INDENT = 21.0
 VIEW_STATE = "view.aspect"                # the runtime's view source: the view's width over its height
 # Views of 3:4 and taller take the single column: there it holds a landscape
 # column's fourteen rows at TALL_SCALE between the strip and the bottom band.
 TALL_ASPECT = 0.76
 TALL_SCALE = CONTENT_W / COLUMN_W         # a column's rows across the content's width
 TALL = {"op": "<", "args": [{"state": VIEW_STATE}, TALL_ASPECT]}
+# A note's width keeps its place while its indent grows with the rows in the
+# single column, so the note gives up the indent at its largest.
+NOTE_INSET = round(HEADING_INDENT * TALL_SCALE, 3)
 TEXT = {"state": TEXT_STATE}
 # The single column, in a tall view or at a text size above 100 %, where two
 # columns grown by the text size would not fit side by side.
@@ -206,7 +213,7 @@ def check_settings_text(tabs: list, note: str | None) -> None:
             for item in column:
                 if isinstance(item, tuple):
                     for language, text in any_text(item[1]).items():
-                        if text_width(face, text, size) > U * COLUMN_W - 8:
+                        if text_width(face, text, size) > U * COLUMN_W - 8 - HEADING_INDENT:
                             over[(item[1], language)] = round(text_width(face, text, size))
                 elif item.get("control", {}).get("label"):
                     key = item["control"]["label"]
@@ -216,7 +223,7 @@ def check_settings_text(tabs: list, note: str | None) -> None:
                             over[(key, language)] = round(wrapped_width(text))
     if note is not None:
         for language, text in any_text(note).items():
-            if text_width(face, text, size) > U * CONTENT_W:
+            if text_width(face, text, size) > U * CONTENT_W - NOTE_INSET:
                 over[(note, language)] = round(text_width(face, text, size))
     if over:
         raise SystemExit(f"settings page text past its room: {over}")
@@ -235,8 +242,10 @@ def settings_backing(ident: str) -> dict:
 
 
 def heading_label(ident: str, key: str, left: float, top: float, width: float, height: float) -> dict:
+    """A heading in a box `width` wide from `left`, its text HEADING_INDENT in."""
     face, size, tint = HEADING_FACE
-    return label(ident, key, {**absolute(left=left, top=top, width=width, height=height), **typeface(face, size, height, tint),
+    return label(ident, key, {**absolute(left=left, top=top, width=width - HEADING_INDENT, height=height),
+                              "padding-left": length(HEADING_INDENT), **typeface(face, size, height, tint),
                               "white-space": keyword("nowrap"), "overflow": keyword("hidden"), "pointer-events": keyword("none")})
 
 
@@ -361,8 +370,9 @@ def _note_line(ident: str, key: str, lead: float) -> dict:
     """The page's note across the content in the slot above the rows: one line
     in a landscape view, as many as it needs at the tall size."""
     face, size, tint = HEADING_FACE
-    return label(ident, key, {"position": keyword("relative"), "display": keyword("block"), "width": length(U * CONTENT_W),
-                              "margin-bottom": length(U * (lead - HEAD_H)), **typeface(face, size, U * HEAD_H, tint),
+    return label(ident, key, {"position": keyword("relative"), "display": keyword("block"), "width": length(U * CONTENT_W - NOTE_INSET),
+                              "padding-left": length(HEADING_INDENT), "margin-bottom": length(U * (lead - HEAD_H)),
+                              **typeface(face, size, U * HEAD_H, tint),
                               "white-space": keyword("normal"), "pointer-events": keyword("none")})
 
 

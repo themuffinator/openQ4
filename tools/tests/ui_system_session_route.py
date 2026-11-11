@@ -171,7 +171,7 @@ struct idSessionLocal {
     // Retained home screens are outside this route: they never present in these scenarios.
     idUserInterface* guiRetainedHome=nullptr;int retainedHomeUpdates=0;
     void UpdateRetainedHome(){++retainedHomeUpdates;}void RetainedHomeFrameEvent(){CHECK(guiRetainedHome==nullptr);}
-    void UpdateRetainedSubpage(){}void UpdateRetainedPage(){}void UpdateRetainedMultiplayerPage(){}void UpdateRetainedJoinGame(){}void UpdateRetainedNotices(){}void UpdateRetainedSettingsPage(){}void UpdateBrowserTooltip(){}void PrecacheRetainedLevelshots(bool){}idUserInterface* guiRetainedLoad=nullptr,*guiRetainedSave=nullptr;
+    void UpdateRetainedSubpage(){}void UpdateRetainedPage(){}void UpdateRetainedMultiplayerPage(){}void UpdateRetainedJoinGame(){}void UpdateRetainedNotices(){}void UpdateRetainedSettingsPage(){}void PrefetchRetainedNextPages(){}void UpdateBrowserTooltip(){}void PrecacheRetainedLevelshots(bool){}idUserInterface* guiRetainedLoad=nullptr,*guiRetainedSave=nullptr;
     // The SETTINGS page, whose DISPLAY the page is a sub-page of, and the change
     // of level its Back climbs out by (qualified by ui_retained_gate.py): each
     // change is recorded, then begun (the leaving page stays until the

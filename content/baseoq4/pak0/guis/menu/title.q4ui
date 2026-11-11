@@ -30041,7 +30041,7 @@
             "disabled": "nav_continue.disabled"
            },
            "action": "continue",
-           "navigation": {"up": "link_mods", "down": "nav_singleplayer"}
+           "navigation": {"up": "link_mods", "down": "nav_singleplayer", "left": "nav_continue", "right": "nav_continue"}
           }
          },
          {
@@ -30272,7 +30272,7 @@
             "disabled": "nav_singleplayer.disabled"
            },
            "action": "singlePlayer",
-           "navigation": {"up": "nav_continue", "down": "nav_loadgame"}
+           "navigation": {"up": "nav_continue", "down": "nav_loadgame", "left": "nav_singleplayer", "right": "nav_singleplayer"}
           }
          },
          {
@@ -30503,7 +30503,7 @@
             "disabled": "nav_loadgame.disabled"
            },
            "action": "loadGame",
-           "navigation": {"up": "nav_singleplayer", "down": "nav_multiplayer"}
+           "navigation": {"up": "nav_singleplayer", "down": "nav_multiplayer", "left": "nav_loadgame", "right": "nav_loadgame"}
           }
          },
          {
@@ -30734,7 +30734,7 @@
             "disabled": "nav_multiplayer.disabled"
            },
            "action": "multiplayer",
-           "navigation": {"up": "nav_loadgame", "down": "nav_settings"}
+           "navigation": {"up": "nav_loadgame", "down": "nav_settings", "left": "nav_multiplayer", "right": "nav_multiplayer"}
           }
          },
          {
@@ -30965,7 +30965,7 @@
             "disabled": "nav_settings.disabled"
            },
            "action": "settings",
-           "navigation": {"up": "nav_multiplayer", "down": "link_mods"}
+           "navigation": {"up": "nav_multiplayer", "down": "link_mods", "left": "nav_settings", "right": "nav_settings"}
           }
          }
         ]
